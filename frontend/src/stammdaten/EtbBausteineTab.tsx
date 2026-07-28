@@ -5,7 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
-import { TYP_LABEL } from '../etb/typFarben';
+import { etbTyp } from '../theme/statusFarben';
+import { abstand } from '../theme/tokens';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
 
@@ -27,7 +28,7 @@ export default function EtbBausteineTab() {
 
   const spalten: TableColumnsType<EtbBaustein> = [
     { title: 'Label', dataIndex: 'label', key: 'label' },
-    { title: 'Typ', dataIndex: 'typ', key: 'typ', render: (t: EtbBaustein['typ']) => <Tag>{TYP_LABEL[t]}</Tag> },
+    { title: 'Typ', dataIndex: 'typ', key: 'typ', render: (t: EtbBaustein['typ']) => <Tag>{etbTyp[t].label}</Tag> },
     { title: 'Inhalt', dataIndex: 'inhalt', key: 'inhalt' },
     { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
     ...(istAdmin
@@ -37,11 +38,11 @@ export default function EtbBausteineTab() {
             key: 'aktionen',
             render: (_, b: EtbBaustein) => (
               <Space>
-                <Button size="small" onClick={() => { setBearbeite(b); setModalOffen(true); }}>
+                <Button onClick={() => { setBearbeite(b); setModalOffen(true); }}>
                   Bearbeiten
                 </Button>
                 <Popconfirm title="Baustein deaktivieren?" onConfirm={() => deaktivieren.mutate(b.id)}>
-                  <Button size="small" danger>Deaktivieren</Button>
+                  <Button danger>Deaktivieren</Button>
                 </Popconfirm>
               </Space>
             ),
@@ -53,7 +54,7 @@ export default function EtbBausteineTab() {
   return (
     <>
       {istAdmin && (
-        <Button type="primary" style={{ marginBottom: 12 }} onClick={() => { setBearbeite(null); setModalOffen(true); }}>
+        <Button type="primary" style={{ marginBottom: abstand.md }} onClick={() => { setBearbeite(null); setModalOffen(true); }}>
           Baustein anlegen
         </Button>
       )}

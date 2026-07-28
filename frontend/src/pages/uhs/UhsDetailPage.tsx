@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tabs, Typography } from 'antd';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -10,17 +10,13 @@ import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
+import StatusTag from '../../components/StatusTag';
+import { uhsStatus } from '../../theme/statusFarben';
 import UhsSwitcher from './UhsSwitcher';
 import { merkeLetzteUhs } from './uhsAuswahl';
 import Grundriss from './Grundriss';
 import MaterialTab from './MaterialTab';
 import BewegungenTab from './BewegungenTab';
-
-const STATUS_LABEL: Record<UhsStatus, { label: string; color: string }> = {
-  geplant: { label: 'geplant', color: 'default' },
-  aktiv: { label: 'aktiv', color: 'green' },
-  aufgeloest: { label: 'aufgelöst', color: 'red' },
-};
 
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
@@ -100,7 +96,7 @@ export default function UhsDetailPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
         <Space>
           <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
-          <Tag color={STATUS_LABEL[uhs.status].color}>{STATUS_LABEL[uhs.status].label}</Tag>
+          <StatusTag darstellung={uhsStatus[uhs.status]} />
         </Space>
         <Space wrap>
           {!schreibgeschuetzt && uhs.status === 'geplant' && (

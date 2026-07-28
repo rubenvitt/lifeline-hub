@@ -82,24 +82,99 @@ export const farbenDunkel: Farbrollen = {
   normalFuellung: 'rgba(92, 196, 141, 0.1)',
 };
 
-/** Abstandsraster. Komponenten importieren diese Werte, statt Pixel zu erfinden
- *  (Sweep-Befund H26: heute 729 Inline-Styles gegen 2 Token). Die Staffel ist die
- *  kompakte Stufe; ob Tablet und mobil eine komfortablere bekommen, klärt A1. */
-export const abstand = {
-  xs: 3,
-  sm: 7,
-  md: 11,
-  lg: 18,
+/** Abstandsraster einer Dichtestufe. Komponenten importieren diese Werte, statt
+ *  Pixel zu erfinden (Sweep-Befund H26: heute 729 Inline-Styles gegen 2 Token). */
+export interface Abstandsraster {
+  xs: number;
+  sm: number;
+  md: number;
+  lg: number;
+}
+
+/** Bediendichte nach A1 Festlegung 4. `kompakt` ist der Fükw und die ortsfeste
+ *  Stelle, `komfortabel` das Führungs-Tablet und mobil, `handschuh` der Betrieb
+ *  mit Einsatzhandschuh (72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). */
+export type Dichte = 'kompakt' | 'komfortabel' | 'handschuh';
+
+export interface Dichtestufe {
+  /** `controlHeight` — trägt die Treffläche für alle Steuerelemente auf einmal. */
+  zeilenhoehe: number;
+  schriftgroesse: number;
+  abstand: Abstandsraster;
+}
+
+/**
+ * Die Staffel. Werte aus A1 Festlegung 4 — zitiert, nicht hier entschieden.
+ *
+ * A2 (LFH-328) baut damit nur den TRÄGER: `antdToken()` nimmt die Stufe als
+ * Parameter, `rollen.css` spiegelt sie als `[data-dichte='…']`. Die aktive Stufe
+ * bleibt fest `kompakt` — die Umschaltung (Kontext-Erkennung, Benutzerwahl) ist
+ * B5. `componentSize` scheidet als Träger aus: dessen `large` endet bei 40 px,
+ * die 48- und 72-px-Stufen sind damit nicht darstellbar.
+ *
+ * Die Grundschrift steigt nur EINMAL (13,5 → 15): der Handschuh ändert die Hand,
+ * nicht das Auge.
+ */
+export const dichten: Record<Dichte, Dichtestufe> = {
+  kompakt: {
+    zeilenhoehe: 30,
+    schriftgroesse: 13.5,
+    // md/lg stehen so in A1; xs/sm sind [abgeleitet] (× 1,6 / × 2,4 der
+    // md-Stufe, auf ganze Pixel gerundet) und in A1 nicht tabelliert.
+    abstand: { xs: 3, sm: 7, md: 11, lg: 18 },
+  },
+  komfortabel: {
+    zeilenhoehe: 48,
+    schriftgroesse: 15,
+    // xs/sm [abgeleitet] nach demselben Faktor wie kompakt.
+    abstand: { xs: 5, sm: 11, md: 18, lg: 28 },
+  },
+  handschuh: {
+    zeilenhoehe: 72,
+    schriftgroesse: 15,
+    // xs/sm [abgeleitet] nach demselben Faktor wie kompakt.
+    abstand: { xs: 7, sm: 16, md: 26, lg: 44 },
+  },
+};
+
+/** Das Abstandsraster der kompakten Stufe. Bleibt als A0-Export bestehen — die
+ *  Konsumenten außerhalb des Themes kennen (noch) keine Dichte. */
+export const abstand: Abstandsraster = dichten.kompakt.abstand;
+
+/**
+ * Wiederkehrende Flächen- und Breitenmaße, die heute als Inline-Pixel verstreut
+ * sind (Spec §2.2: `maxWidth: 900` in `AdminPage`, `960` in `EinsaetzePage`,
+ * `paddingTop: 80` an 32 Stellen, `minmax(260px…)`/`(220px…)` in den zwei
+ * Kartenrastern). Norm für Neues und ohnehin Angefasstes — kein Bestands-Sweep.
+ *
+ * Bewusst KEIN antd-Token: antd kennt weder eine Seitenbreite noch die Höhe
+ * einer Ladefläche.
+ */
+export const flaeche = {
+  /** Lesebreite einer Formularseite (heute `AdminPage`-Default). */
+  seiteSchmal: 900,
+  /** Lesebreite einer Listenseite (heute `EinsaetzePage`). */
+  seiteBreit: 960,
+  /** Abstand über einem Lade-/Fehlerzustand, damit er nicht am Kopf klebt. */
+  zustandOben: 80,
+  /** Mindestbreite einer Kachel im Kartenraster. */
+  kachelMin: 260,
+  /** …und die engere Variante für Nebenraster. */
+  kachelMinKlein: 220,
 } as const;
 
 /** Formrollen. Radius 0 ist eine Entscheidung, keine Unentschiedenheit:
- *  die Kachel wird vom Umrissrahmen getragen, nicht von einer weichen Ecke. */
+ *  die Kachel wird vom Umrissrahmen getragen, nicht von einer weichen Ecke.
+ *
+ *  `zeilenhoehe`/`schriftgroesse` sind Dichte, nicht Form — sie zeigen deshalb
+ *  auf `dichten.kompakt` und bleiben hier nur als A0-Export stehen. Wer eine
+ *  Stufe braucht, liest `dichten`. */
 export const form = {
   radiusFlaeche: 0,
   radiusSteuer: 0,
   radiusMarke: 0,
-  zeilenhoehe: 30,
-  schriftgroesse: 13.5,
+  zeilenhoehe: dichten.kompakt.zeilenhoehe,
+  schriftgroesse: dichten.kompakt.schriftgroesse,
   versalSperrung: '2.2px',
   uebergang: '120ms cubic-bezier(0.2, 0.8, 0.2, 1)',
 } as const;
@@ -117,7 +192,8 @@ export const schrift = {
  * Was antd nicht kennt (Marke, Kartenraster, Versal-Sperrung), lebt allein in
  * `rollen.css` und wird von handgeschriebenem CSS gelesen.
  */
-export function antdToken(farben: Farbrollen): ThemeConfig['token'] {
+export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): ThemeConfig['token'] {
+  const stufe = dichten[dichte];
   return {
     colorPrimary: farben.bedien,
     colorError: farben.alarm,
@@ -142,20 +218,21 @@ export function antdToken(farben: Farbrollen): ThemeConfig['token'] {
 
     fontFamily: schrift.text,
     fontFamilyCode: schrift.zahl,
-    fontSize: form.schriftgroesse,
+    fontSize: stufe.schriftgroesse,
 
-    // Dichte: die kompakte Stufe. `controlHeight` trägt sie für alle
-    // Steuerelemente auf einmal — das ist der Ersatz für 241 verstreute
-    // `size="small"`-Angaben (Umbaupfad in A2/B5).
-    controlHeight: form.zeilenhoehe,
-    padding: abstand.md,
-    paddingSM: abstand.sm,
-    paddingXS: abstand.xs,
-    paddingLG: abstand.lg,
-    margin: abstand.md,
-    marginSM: abstand.sm,
-    marginXS: abstand.xs,
-    marginLG: abstand.lg,
+    // Dichte aus der gewählten Stufe. `controlHeight` trägt sie für alle
+    // Steuerelemente auf einmal — das ist der Ersatz für die 236 verstreuten
+    // punktuellen Klein-Angaben an Steuerelementen (Umbaupfad in B5). Das Konstrukt
+    // steht hier bewusst NICHT wörtlich: es würde das Gate füllen, das es erklärt.
+    controlHeight: stufe.zeilenhoehe,
+    padding: stufe.abstand.md,
+    paddingSM: stufe.abstand.sm,
+    paddingXS: stufe.abstand.xs,
+    paddingLG: stufe.abstand.lg,
+    margin: stufe.abstand.md,
+    marginSM: stufe.abstand.sm,
+    marginXS: stufe.abstand.xs,
+    marginLG: stufe.abstand.lg,
 
     motionDurationMid: '120ms',
     motionDurationSlow: '150ms',

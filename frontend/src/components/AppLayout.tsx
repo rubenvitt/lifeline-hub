@@ -1,9 +1,9 @@
 import { Layout, Space, Typography } from 'antd';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
+import { darfVerwaltung } from '../einsatz/schreibrecht';
 import ThemeToggle from './ThemeToggle';
 import BenutzerMenu from './BenutzerMenu';
-import type { BenutzerAnzeige } from '../api/types';
 
 const { Header, Content } = Layout;
 
@@ -26,10 +26,6 @@ function GlobalLink({ to, label, gesperrt }: { to: string; label: string; gesper
   );
 }
 
-function darfAdmin(b: BenutzerAnzeige | null): boolean {
-  return b?.system_rolle === 'admin' || b?.org_rolle === 'fuehrungskraft';
-}
-
 export default function AppLayout() {
   const { benutzer } = useAuth();
 
@@ -39,7 +35,7 @@ export default function AppLayout() {
         <Link to="/einsaetze" style={{ color: '#fff', fontWeight: 600, fontSize: 18 }}>
           lifeline-hub
         </Link>
-        <GlobalLink to="/admin" label="Verwaltung" gesperrt={!darfAdmin(benutzer)} />
+        <GlobalLink to="/admin" label="Verwaltung" gesperrt={!darfVerwaltung(benutzer)} />
         <Space style={{ marginLeft: 'auto' }} size="middle">
           <ThemeToggle />
           <BenutzerMenu />

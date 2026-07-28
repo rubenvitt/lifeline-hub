@@ -2,23 +2,19 @@ import { Layout, Menu, Spin, theme } from 'antd';
 import type { MenuProps } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import type { BenutzerAnzeige } from '../api/types';
+import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { adminBenutzer, adminGruppen } from './adminNav';
 
 const { Sider, Content } = Layout;
-
-/** Darf auf den Admin-Bereich zugreifen: System-Admin oder Führungskraft. */
-export function darfAdmin(b: BenutzerAnzeige | null): boolean {
-  return b?.system_rolle === 'admin' || b?.org_rolle === 'fuehrungskraft';
-}
 
 /**
  * Admin-Shell (LFH-284): eine linke Sidebar (gruppiertes `Menu`) als EINZIGE Nav-Ebene für
  * `/admin` + `<Outlet>`. Löst die frühere doppelte Nav (Top-Tabs + In-Page-Umschalter) auf.
  * Menu-Einträge und Routen stammen aus derselben `adminNav`-Registry; die aktive Sektion folgt
  * der URL (kein eigener Nav-State). Sitzt unter <AppLayout> (globale Topbar kommt von dort).
- * Gate: admin oder fuehrungskraft — sonst Redirect zu /einsaetze. Benutzer-Eintrag nur für
- * System-Admins (strengeres Gate der Seite selbst bleibt zusätzlich bestehen).
+ * Gate: `darfVerwaltung` (admin oder fuehrungskraft, seit LFH-328 aus `einsatz/schreibrecht.ts`
+ * statt lokaler Kopie) — sonst Redirect zu /einsaetze. Benutzer-Eintrag nur für System-Admins
+ * (strengeres Gate der Seite selbst bleibt zusätzlich bestehen).
  */
 export default function AdminLayout() {
   const { benutzer, laedt } = useAuth();
@@ -34,7 +30,7 @@ export default function AdminLayout() {
     );
   }
 
-  if (!darfAdmin(benutzer)) {
+  if (!darfVerwaltung(benutzer)) {
     return <Navigate to="/einsaetze" replace />;
   }
 

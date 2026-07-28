@@ -28,6 +28,7 @@ import type {
   Warnstufe,
 } from '../../api/types';
 import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
+import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
@@ -42,7 +43,35 @@ import {
  *  „Fehler sieht aus wie leer" (LFH-326), und genau das soll jede Variante lösen. */
 export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
 
-export type Dringlichkeit = 'alarm' | 'achtung' | 'normal';
+/**
+ * Die drei Rollen, die eine Kennzahl **stufen** können — bewusst eine VERENGUNG von
+ * {@link Statusrolle}, kein Alias (LFH-328/A2).
+ *
+ * `Extract<>` statt einer zweiten Literalliste: die Werte bleiben dieselben drei, aber
+ * eine Umbenennung im Vertrag bricht hier den Typcheck, statt still auseinanderzulaufen.
+ *
+ * Warum nicht gleich alle sechs Rollen? Weil `LageDashboardPage` den Wert in einen
+ * KLASSENNAMEN einsetzt (`lfh-plakette--${stufe}`, `lfh-kz--${stufe}`) und
+ * `theme/sprache.css` genau für diese drei eine Regel hat. `Statusrolle` hier
+ * einzusetzen erlaubte ein `lfh-plakette--marke` — ein Klassenname ohne CSS, still
+ * ungestylt, und jsdom rechnet kein Layout, würde den Ausfall also in keinem Test
+ * zeigen. Die Verengung ist damit das Ehrlichere, nicht das Bequemere.
+ */
+export type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
+
+/** Rolle → Dringlichkeit. `Record` über die VOLLE `Statusrolle`, damit eine siebte
+ *  Rolle im Vertrag hier den Build bricht statt still auf `normal` zu fallen. Die drei
+ *  übrigen A0-Rollen tragen keine Dringlichkeit: `neutral` ist die bewusste
+ *  Nichtmeldung, `bedien` und `marke` sind Bedienung bzw. Herkunft — im Lagebild also
+ *  allesamt „kein Alarmbeitrag". */
+const ROLLE_ALS_DRINGLICHKEIT: Record<Statusrolle, Dringlichkeit> = {
+  alarm: 'alarm',
+  achtung: 'achtung',
+  normal: 'normal',
+  neutral: 'normal',
+  bedien: 'normal',
+  marke: 'normal',
+};
 
 export interface Ereigniszeile {
   zeit: string;
@@ -90,21 +119,25 @@ export interface Lagebild {
   ereignisse: Ereigniszeile[];
 }
 
-const WARNSTUFE_STUFE: Record<Warnstufe, Dringlichkeit> = {
-  keine: 'normal',
-  niedrig: 'normal',
-  mittel: 'achtung',
-  hoch: 'alarm',
-  akut: 'alarm',
-};
-
-const WARNSTUFE_WORT: Record<Warnstufe, string> = {
-  keine: 'keine',
-  niedrig: 'niedrig',
-  mittel: 'mittel',
-  hoch: 'hoch',
-  akut: 'akut',
-};
+/**
+ * Warnstufe → Dringlichkeit der Kennzahl. Ableitung aus dem Statusfarb-Vertrag, keine
+ * zweite Liste (LFH-328/A2) — sonst käme neben `warnstufeKarte` und `warnstufeKennzahl`
+ * noch eine Lesart desselben Enums dazu.
+ *
+ * Es GIBT eine dritte, und sie ist bewusst draußen: `gefahrenSchema.warnstufeFarbe()`
+ * hinterlegt Matrixzellen flächig (Pastelltöne, `keine` = transparent). Das ist eine
+ * andere Darstellungssorte — Zellhintergrund statt Status-Etikett — und sie ist im
+ * Kopfkommentar von `theme/statusFarben.ts` als Grenze benannt.
+ *
+ * Gelesen wird ausdrücklich {@link warnstufeKennzahl} und NICHT `warnstufeKarte`: die
+ * Karte zeigt ein OBJEKT (dieses eine Gebiet ist unbewertet ⇒ vorsichtshalber Gefahr,
+ * `keine` → `alarm`), das Dashboard eine KENNZAHL (nichts gemeldet ⇒ kein
+ * Alarmbeitrag, `keine` → `normal`). Wer hier auf `warnstufeKarte` umstellt, färbt
+ * einen Einsatz ohne jedes Gefahrengebiet rot.
+ */
+function warnstufeStufe(w: Warnstufe): Dringlichkeit {
+  return ROLLE_ALS_DRINGLICHKEIT[warnstufeKennzahl[w].rolle];
+}
 
 /** Tag + Ortszeit als DTG-Kurzform (`261432`), wie im Funkverkehr gesprochen.
  *  Bewusst aus den LOKALEN Feldern des Date gebaut, nicht aus `toISOString()` —
@@ -211,9 +244,9 @@ export function baueLagebild(r: Rohdaten): Lagebild {
       },
       {
         etikett: 'Höchste Warnstufe',
-        wert: WARNSTUFE_WORT[gefahren.hoechste],
+        wert: warnstufeKennzahl[gefahren.hoechste].label,
         zusatz: `${gefahren.anzahlAktiv} Gefahrengebiete aktiv`,
-        stufe: WARNSTUFE_STUFE[gefahren.hoechste],
+        stufe: warnstufeStufe(gefahren.hoechste),
         route: 'gefahren',
       },
       {

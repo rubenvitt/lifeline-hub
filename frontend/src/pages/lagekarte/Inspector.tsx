@@ -1,9 +1,12 @@
-import { Button, Descriptions, Space, Tag } from 'antd';
+import { Button, Descriptions, Space, Tag, theme } from 'antd';
+import { useId } from 'react';
 import { Select } from '../../components/Select';
+import FeldLabel from '../../components/FeldLabel';
+import GeoKennzahlen from '../../components/GeoKennzahlen';
 import { Link } from 'react-router';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
-import { geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
+import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 
@@ -74,6 +77,11 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
 export default function Inspector({
   einsatzId, marker, darfSchreiben, onSchliessen, onVerortungLoeschen, onSymbolAendern,
 }: InspectorProps) {
+  const { token } = theme.useToken();
+  // Eigene ids statt fester Literale: der Inspector kann neben anderen Feldern derselben
+  // Beschriftung stehen, doppelte ids brächen die Label-Assoziation.
+  const fachaufgabeId = useId();
+  const organisationId = useId();
   const modulLink = markerToUrl(marker, einsatzId);
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig (LFH-146).
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
@@ -82,8 +90,8 @@ export default function Inspector({
 
   return (
     <KartenDetailCard titel={marker.label} akzentFarbe={marker.farbe} onSchliessen={onSchliessen}>
-      <Tag color={marker.farbe} style={{ marginBottom: 8 }}>{TYP_LABEL[marker.typ]}</Tag>
-      <Descriptions column={1} size="small">
+      <Tag color={marker.farbe} style={{ marginBottom: token.marginXS }}>{TYP_LABEL[marker.typ]}</Tag>
+      <Descriptions column={1}>
         {marker.typ === 'lagemeldung' && marker.lageMeldung && (
           <Descriptions.Item label="Absender">{marker.lageMeldung.absender}</Descriptions.Item>
         )}
@@ -93,52 +101,52 @@ export default function Inspector({
         <Descriptions.Item label="Koordinate">
           <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} />
         </Descriptions.Item>
-        {kennzahlen?.flaecheM2 != null && (
-          <Descriptions.Item label="Fläche">{formatFlaeche(kennzahlen.flaecheM2)}</Descriptions.Item>
-        )}
-        {kennzahlen?.umfangM != null && (
-          <Descriptions.Item label="Umfang">{formatLaenge(kennzahlen.umfangM)}</Descriptions.Item>
-        )}
-        {kennzahlen?.laengeM != null && (
-          <Descriptions.Item label="Länge">{formatLaenge(kennzahlen.laengeM)}</Descriptions.Item>
-        )}
       </Descriptions>
+      {/* Abstand am Aufrufer wie im FachebenenInspector: `GeoKennzahlen` rendert ohne
+          Kennzahlen nichts, ein Wrapper mit `marginTop` hinterließe sonst eine leere Lücke —
+          und der Punkt-Marker ohne Geometrie ist hier der Regelfall. */}
+      {kennzahlen && (
+        <div style={{ marginTop: token.marginSM }}>
+          <GeoKennzahlen kennzahlen={kennzahlen} />
+        </div>
+      )}
       {symbolAuswahl && (
-        <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
-          <label style={{ display: 'block' }}>
-            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>Fachaufgabe</div>
+        <Space orientation="vertical" size={token.marginXS} style={{ width: '100%', marginTop: token.marginXS }}>
+          {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen. Zwei Quellen wären eine
+              doppelte Benennung, bei der `aria-label` gewinnt und den sichtbaren Text vom
+              Accessible Name abkoppelt. */}
+          <FeldLabel text="Fachaufgabe" htmlFor={fachaufgabeId}>
             <Select
-              aria-label="Fachaufgabe"
+              id={fachaufgabeId}
               allowClear
               style={{ width: '100%' }}
               value={marker.tz?.fachaufgabe ?? undefined}
               options={FACHAUFGABE_OPTIONEN}
               onChange={(v) => onSymbolAendern!(marker, { tz_fachaufgabe: v ?? null })}
             />
-          </label>
-          <label style={{ display: 'block' }}>
-            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>Organisation (Override)</div>
+          </FeldLabel>
+          <FeldLabel text="Organisation (Override)" htmlFor={organisationId}>
             <Select
-              aria-label="Organisation (Override)"
+              id={organisationId}
               allowClear
               style={{ width: '100%' }}
               value={marker.tz?.organisation ?? undefined}
               options={ORG_OPTIONEN}
               onChange={(v) => onSymbolAendern!(marker, { tz_organisation: v ?? null })}
             />
-          </label>
+          </FeldLabel>
         </Space>
       )}
-      <Space style={{ marginTop: 8 }}>
+      <Space style={{ marginTop: token.marginXS }}>
         <Link to={modulLink}>
-          <Button size="small">
+          <Button>
             {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fach-Modul öffnen'}
           </Button>
         </Link>
         {/* Lagemeldungen sind auf der Karte read-only: verortet wird ausschließlich beim
             Übergeben (LFH-113). Re-/Ent-Verorten würde am ON-CONFLICT-Upsert ohnehin verpuffen. */}
         {darfSchreiben && marker.typ !== 'einsatzort' && marker.typ !== 'lagemeldung' && (
-          <Button size="small" danger onClick={() => onVerortungLoeschen(marker)}>
+          <Button danger onClick={() => onVerortungLoeschen(marker)}>
             Verortung löschen
           </Button>
         )}

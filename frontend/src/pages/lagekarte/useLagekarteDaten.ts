@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { ladeEinsatz, ladeEinstellungen } from '../../api/einsaetze';
@@ -50,6 +51,11 @@ interface LagekarteDatenArgs {
  */
 export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quelle = { typ: 'live' } }: LagekarteDatenArgs) {
   const { benutzer } = useAuth();
+  // Kartenstil-Module (`marker.ts`, `zonenStil.ts`) erzeugen MapLibre-`paint`-Werte und haben
+  // deshalb keinen eigenen `useToken()`-Zugang (LFH-328/A2). Diese Ebene kennt den aktiven
+  // Modus und reicht den Token durch — der Modus wird NICHT über `document.documentElement`
+  // geraten (globaler Seiteneffekt, in Tests nicht gesetzt).
+  const { token } = theme.useToken();
   const istSnapshot = quelle.typ === 'snapshot';
   const liveAn = !istSnapshot;
   const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
@@ -149,8 +155,8 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
   );
 
   const { verortet, nichtVerortet } = useMemo(
-    () => baueMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? []),
-    [einsatz, uhsRoh, schaedenRoh],
+    () => baueMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? [], token),
+    [einsatz, uhsRoh, schaedenRoh, token],
   );
 
   const taktisch = useMemo(
@@ -212,11 +218,11 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
         if (!g) return [];
         const stil =
           z.typ === 'gefahrengebiet' && z.gefahrengebiet_id != null
-            ? gefahrengebietStil(gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine')
+            ? gefahrengebietStil(gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine', token)
             : zoneStil(z.typ, z.farbe);
         return [{ id: z.id, geometrie: g, label: z.label ?? null, stil }];
       }),
-    [zonen, zeigeZonen, gebietWarnstufe],
+    [zonen, zeigeZonen, gebietWarnstufe, token],
   );
 
   const lageMeldungMarker = useMemo(

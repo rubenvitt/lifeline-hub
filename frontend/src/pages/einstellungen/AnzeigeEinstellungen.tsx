@@ -1,43 +1,24 @@
-import { Alert, App, AutoComplete, Button, Form, Input, Spin } from 'antd';
+import { App, AutoComplete, Button, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
+import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeOrgEinstellungen, speichereOrgEinstellungen } from '../../api/orgEinstellungen';
 import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
 import { useAuth } from '../../auth/AuthContext';
-import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/types';
 import { globalKeys } from '../../api/queryKeys';
+import {
+  EINHEITEN_OPTIONEN,
+  KOORDINATEN_OPTIONEN,
+  ZEITFORMAT_OPTIONEN,
+  ZEITZONEN_OPTIONEN,
+} from './optionen';
 import {
   type FormWerteAnzeige,
   initialAnzeige,
   normalisiereAnzeige,
   zuUpdate,
 } from './orgEinstellungenForm';
-
-// Anzeige-Konventionen — kuratierte IANA-Zeitzonen + Freitext (AutoComplete).
-const ZEITZONEN_OPTIONEN = [
-  'Europe/Berlin', 'Europe/London', 'Europe/Paris', 'Europe/Zurich', 'Europe/Vienna',
-  'Europe/Warsaw', 'Europe/Moscow', 'UTC', 'America/New_York', 'America/Los_Angeles',
-  'Asia/Istanbul', 'Asia/Dubai', 'Asia/Tokyo',
-].map((z) => ({ value: z }));
-
-const ZEITFORMAT_OPTIONEN: { value: Zeitformat; label: string }[] = [
-  { value: '24h', label: '24 Stunden' },
-  { value: '12h', label: '12 Stunden (AM/PM)' },
-];
-
-const EINHEITEN_OPTIONEN: { value: EinheitenSystem; label: string }[] = [
-  { value: 'metrisch', label: 'Metrisch (m, km)' },
-  { value: 'imperial', label: 'Imperial (ft, mi)' },
-];
-
-const KOORDINATEN_OPTIONEN: { value: Koordinatenformat; label: string }[] = [
-  { value: 'wgs84', label: 'WGS84 dezimal' },
-  { value: 'dms', label: 'WGS84 (Grad/Min/Sek)' },
-  { value: 'utm', label: 'UTM' },
-  { value: 'mgrs', label: 'MGRS' },
-  { value: 'gk', label: 'Gauß-Krüger' },
-];
 
 /**
  * Admin-Sektion `/admin/einstellungen/anzeige` — org-weite Darstellungs-Defaults + Geocoder.
@@ -70,15 +51,16 @@ export default function AnzeigeEinstellungen() {
   });
 
   if (einstellungenQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
-      </div>
-    );
+    return <SeitenSkeleton />;
   }
 
   if (einstellungenQuery.isError || !einstellungenQuery.data) {
-    return <Alert type="error" title="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einstellungen nicht ladbar oder kein Zugriff"
+        onWiederholen={() => void einstellungenQuery.refetch()}
+      />
+    );
   }
 
   const einstellungen = einstellungenQuery.data;

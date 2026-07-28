@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,12 +13,11 @@ import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrStatus, Einheit, EinsatzFahrzeug } from '../../api/types';
 import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
-
-const STATUS_LABEL: Record<BrStatus, { label: string; color: string }> = {
-  geplant: { label: 'geplant', color: 'default' },
-  aktiv: { label: 'aktiv', color: 'green' },
-  aufgeloest: { label: 'aufgelöst', color: 'red' },
-};
+import EinsatzSeite from '../../components/EinsatzSeite';
+import SektionHeader from '../../components/SektionHeader';
+import StatusTag from '../../components/StatusTag';
+import { brStatus } from '../../theme/statusFarben';
+import { abstand, flaeche } from '../../theme/tokens';
 
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
@@ -113,19 +112,23 @@ export default function BrDetailPage() {
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <Breadcrumb items={[
-        { title: <Link to="/einsaetze">Einsätze</Link> },
-        { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
-        { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
-        { title: br.bezeichnung },
-      ]} />
-
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12, marginBottom: 12 }}>
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      titel={
         <Space>
-          <strong>{br.bezeichnung}</strong>
-          <Tag color={STATUS_LABEL[br.status].color}>{STATUS_LABEL[br.status].label}</Tag>
+          {br.bezeichnung}
+          <StatusTag darstellung={brStatus[br.status]} />
         </Space>
+      }
+      breadcrumb={
+        <Breadcrumb items={[
+          { title: <Link to="/einsaetze">Einsätze</Link> },
+          { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
+          { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
+          { title: br.bezeichnung },
+        ]} />
+      }
+      aktionen={
         <Space>
           {!schreibgeschuetzt && br.status === 'aktiv' && (
             <Popconfirm
@@ -151,20 +154,19 @@ export default function BrDetailPage() {
             </>
           )}
         </Space>
-      </Space>
-
-      <Descriptions size="small" column={2} style={{ marginBottom: 16 }}>
+      }
+    >
+      <Descriptions column={2} style={{ marginBottom: abstand.lg }}>
         <Descriptions.Item label="Standort" span={2}>{br.standort ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="Notiz" span={2}>{br.notiz ?? '—'}</Descriptions.Item>
       </Descriptions>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: abstand.lg, alignItems: 'flex-start' }}>
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
-          <strong>Bereitgestellte Einheiten</strong>
+          <SektionHeader titel="Bereitgestellte Einheiten" />
           <Liste
-            size="small"
-            style={{ marginTop: 8, marginBottom: 16 }}
+            style={{ marginBottom: abstand.lg }}
             dataSource={br.einheiten}
             emptyText="Keine Einheiten bereitgestellt"
             renderItem={(e) => (
@@ -174,7 +176,6 @@ export default function BrDetailPage() {
                     ? [
                         <Button
                           key="entfernen"
-                          size="small"
                           danger
                           onClick={() => onEntfernenEinheit(e.id)}
                           loading={belegungMut.isPending}
@@ -190,10 +191,8 @@ export default function BrDetailPage() {
             )}
           />
 
-          <strong>Bereitgestellte Fahrzeuge</strong>
+          <SektionHeader titel="Bereitgestellte Fahrzeuge" />
           <Liste
-            size="small"
-            style={{ marginTop: 8 }}
             dataSource={br.fahrzeuge}
             emptyText="Keine Fahrzeuge bereitgestellt"
             renderItem={(f) => (
@@ -203,7 +202,6 @@ export default function BrDetailPage() {
                     ? [
                         <Button
                           key="entfernen"
-                          size="small"
                           danger
                           onClick={() => onEntfernenFahrzeug(f.id)}
                           loading={belegungMut.isPending}
@@ -231,6 +229,6 @@ export default function BrDetailPage() {
           onZuweisenFahrzeug={onZuweisenFahrzeug}
         />
       </div>
-    </div>
+    </EinsatzSeite>
   );
 }

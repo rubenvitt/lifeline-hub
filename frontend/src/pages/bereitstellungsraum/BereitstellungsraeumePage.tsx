@@ -1,6 +1,6 @@
 import {
-  Alert, App, Breadcrumb, Button, Drawer, Form, Input, Space,
-  Spin, Table, Tag, Typography, type TableColumnsType,
+  Alert, App, Breadcrumb, Button, Drawer, Form, Input,
+  Spin, Table, type TableColumnsType,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,12 +13,10 @@ import { listeBr, legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellu
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
-
-const STATUS_META: Record<BrStatus, { label: string; color: string }> = {
-  geplant: { label: 'geplant', color: 'default' },
-  aktiv: { label: 'aktiv', color: 'green' },
-  aufgeloest: { label: 'aufgelöst', color: 'red' },
-};
+import EinsatzSeite from '../../components/EinsatzSeite';
+import StatusTag from '../../components/StatusTag';
+import { brStatus } from '../../theme/statusFarben';
+import { flaeche } from '../../theme/tokens';
 
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
@@ -67,10 +65,7 @@ export default function BereitstellungsraeumePage() {
     {
       title: 'Status',
       dataIndex: 'status',
-      render: (s: BrStatus) => {
-        const meta = STATUS_META[s];
-        return <Tag color={meta.color}>{meta.label}</Tag>;
-      },
+      render: (s: BrStatus) => <StatusTag darstellung={brStatus[s]} />,
     },
     { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
   ];
@@ -83,20 +78,22 @@ export default function BereitstellungsraeumePage() {
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <Breadcrumb items={[
-        { title: <Link to="/einsaetze">Einsätze</Link> },
-        { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
-        { title: 'Bereitstellungsräume' },
-      ]} />
-
-      <Space style={{ marginTop: 12, marginBottom: 12 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>Bereitstellungsräume</Typography.Title>
+    <EinsatzSeite
+      titel="Bereitstellungsräume"
+      breite={flaeche.seiteBreit}
+      breadcrumb={
+        <Breadcrumb items={[
+          { title: <Link to="/einsaetze">Einsätze</Link> },
+          { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
+          { title: 'Bereitstellungsräume' },
+        ]} />
+      }
+      aktionen={
         <Button type="primary" disabled={schreibgeschuetzt} onClick={() => setAnlegen(true)}>
           Neu
         </Button>
-      </Space>
-
+      }
+    >
       <Table<Bereitstellungsraum>
         rowKey="id"
         dataSource={(brQuery.data ?? []).filter((br) => !br.storniert_at)}
@@ -136,6 +133,6 @@ export default function BereitstellungsraeumePage() {
           </Button>
         </Form>
       </Drawer>
-    </div>
+    </EinsatzSeite>
   );
 }

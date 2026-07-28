@@ -102,6 +102,32 @@ describe('Inspector Kennzahlen (LFH-146)', () => {
   });
 });
 
+describe('Inspector Symbol-Auswahl — Beschriftung (LFH-328)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+    );
+  });
+
+  // Bewusst MIT gesetztem `tz`: bei leerem Select wäre der Accessible Name auch dann sauber,
+  // wenn die Beschriftung das Feld umschlösse — der gewählte Wert ist der Prüfstein.
+  const einheitMarker = {
+    schluessel: 'einheit-4', typ: 'einheit', id: 4, lat: 50.1, lon: 8.1, label: '1. Zug', farbe: '#1677ff',
+    tz: { fachaufgabe: 'rettungswesen', organisation: 'feuerwehr' },
+  } as KarteMarker;
+
+  it('der sichtbare Beschriftungstext ist der Accessible Name der Selects', () => {
+    renderMitProviders(
+      <Inspector einsatzId={1} marker={einheitMarker} darfSchreiben
+        onSchliessen={() => {}} onVerortungLoeschen={() => {}} onSymbolAendern={() => {}} />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Fachaufgabe' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Organisation (Override)' })).toBeInTheDocument();
+    // Der gewählte Wert steht sichtbar, aber nicht im Namen.
+    expect(screen.getByText('Rettungswesen/Sanität')).toBeInTheDocument();
+  });
+});
+
 describe('Inspector Typ-Tag (LFH-276)', () => {
   beforeEach(() => {
     server.use(

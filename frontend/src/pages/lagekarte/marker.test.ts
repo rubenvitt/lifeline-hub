@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { theme } from 'antd';
 import {
   baueMarker, baueTaktischeMarker, baueLageMeldungMarker,
   baueFreieZeichenMarker, baueFreiesZeichenTz, type TaktischeQuelle,
 } from './marker';
+import { rollenFarbe } from '../../theme/statusFarben';
 import type { EinsatzAnzeige, FreiesZeichen, LageMeldung, Schaden, Uhs } from '../../api/types';
+
+/** `baueMarker` ist reine Ableitung ohne Render — der Token kommt deshalb direkt aus antd.
+ *  Welcher Token es ist, ist egal: Erwartung und Code lesen denselben, geprüft wird die
+ *  ROLLE, nicht der Wert. */
+const token = theme.getDesignToken();
 
 function uhs(partial: Partial<Uhs>): Uhs {
   return {
@@ -34,6 +41,7 @@ describe('baueMarker', () => {
       einsatz,
       [uhs({ id: 5, lat: 50.1, lon: 8.1 }), uhs({ id: 6, bezeichnung: 'PA', lat: null, lon: null })],
       [schaden({ id: 9, registrier_nr: 3, lat: 51, lon: 7 }), schaden({ id: 10, registrier_nr: 4 })],
+      token,
     );
     expect(verortet.map((m) => m.schluessel)).toEqual(['einsatzort', 'uhs-5', 'schaden-9']);
     expect(nichtVerortet).toEqual([
@@ -44,24 +52,24 @@ describe('baueMarker', () => {
 
   it('lässt den Einsatzort weg, wenn er keine Koordinate hat', () => {
     const einsatz = { einsatzort: null, einsatzort_lat: null, einsatzort_lon: null } as EinsatzAnzeige;
-    const { verortet } = baueMarker(einsatz, [], []);
+    const { verortet } = baueMarker(einsatz, [], [], token);
     expect(verortet).toHaveLength(0);
   });
 
   it('färbt Schaden-Marker nach Ausmaß', () => {
-    const { verortet } = baueMarker(undefined, [], [schaden({ id: 1, ausmass: 'katastrophal', lat: 51, lon: 7 })]);
+    const { verortet } = baueMarker(undefined, [], [schaden({ id: 1, ausmass: 'katastrophal', lat: 51, lon: 7 })], token);
     expect(verortet[0].farbe).toBe('#f5222d');
   });
 
   it('nutzt Fallback-Farbe bei unbekanntem Ausmaß', () => {
     const { verortet } = baueMarker(undefined, [], [
       schaden({ id: 1, ausmass: 'unbekannt' as never, lat: 51, lon: 7 }),
-    ]);
+    ], token);
     expect(verortet[0].farbe).toBe('#8c8c8c');
   });
 
   it('kommt mit undefined-Einsatz klar', () => {
-    expect(baueMarker(undefined, [], [])).toEqual({ verortet: [], nichtVerortet: [] });
+    expect(baueMarker(undefined, [], [], token)).toEqual({ verortet: [], nichtVerortet: [] });
   });
 
   it('setzt taktische Zeichen für Einsatzort, UHS (je Typ) und Schaden', () => {
@@ -70,11 +78,28 @@ describe('baueMarker', () => {
       einsatz,
       [uhs({ id: 5, typ: 'patientenablage', lat: 50.1, lon: 8.1 })],
       [schaden({ id: 9, ausmass: 'mittel', lat: 51, lon: 7 })],
+      token,
     );
     const byKey = (k: string) => verortet.find((m) => m.schluessel === k);
     expect(byKey('einsatzort')?.tz?.grundzeichen).toBe('anlass');
     expect(byKey('uhs-5')?.tz).toEqual({ grundzeichen: 'stelle', symbol: 'sammelplatz-betroffene' });
     expect(byKey('schaden-9')?.tz).toEqual({ grundzeichen: 'gefahr', farbe: '#faad14' });
+  });
+
+  // LFH-328/A2, Spec §1.2: der Einsatzort ist der Ankerpunkt des EIGENEN Einsatzes (Marke),
+  // kein Gefahrenobjekt — auf `alarm` gezogen trüge dieselbe Farbe Gefahrengebiet UND
+  // Ortssignatur. Der Gate-5-Hexscan sieht nur, DASS kein Literal mehr dasteht, nicht WELCHE
+  // Rolle gewählt wurde; deshalb steht die Zuordnung hier.
+  it('färbt Einsatzort mit der Marken- und UHS mit der Bedienrolle (nicht Alarm)', () => {
+    const einsatz = { einsatzort: 'ELW', einsatzort_lat: 50, einsatzort_lon: 8 } as EinsatzAnzeige;
+    const { verortet } = baueMarker(einsatz, [uhs({ id: 5, lat: 50.1, lon: 8.1 })], [], token);
+    const byKey = (k: string) => verortet.find((m) => m.schluessel === k);
+
+    expect(byKey('einsatzort')?.farbe).toBe(rollenFarbe('marke', token));
+    expect(byKey('einsatzort')?.farbe).not.toBe(rollenFarbe('alarm', token));
+    expect(byKey('uhs-5')?.farbe).toBe(rollenFarbe('bedien', token));
+    // Vorher stand hier `#1677ff` — antd-v5-Default-Blau, nicht der A0-Bedienwert.
+    expect(byKey('uhs-5')?.farbe).not.toBe(rollenFarbe('marke', token));
   });
 });
 

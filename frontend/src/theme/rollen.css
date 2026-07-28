@@ -47,6 +47,7 @@
   --lfh-radius-marke: 0;
 
   /* ── Raster und Dichte (kompakt — die Stufe aus dem B-Entwurf) ─────────── */
+  /* Die beiden anderen Stufen stehen unten unter `[data-dichte='…']`. */
   --lfh-luft-1: 3px;
   --lfh-luft-2: 7px;
   --lfh-luft-3: 11px;
@@ -84,4 +85,31 @@
   --lfh-alarm-fuellung: rgba(255, 122, 127, 0.1);
   --lfh-achtung-fuellung: rgba(245, 185, 66, 0.1);
   --lfh-normal-fuellung: rgba(92, 196, 141, 0.1);
+}
+
+/* ── Dichte-Staffel (A1 Festlegung 4 · LFH-328/A2) ─────────────────────────
+   TRÄGER, KEIN SCHALTER: diese beiden Blöcke existieren, werden in A2 aber von
+   NICHTS gesetzt. Die Umschaltung (Kontext-Erkennung, Benutzerwahl) ist B5.
+   Sie überschreiben ausschließlich die Dichte-Properties — Farbe, Form, Stimme
+   und Schrift sind dichteunabhängig; `rollen.guard.test.ts` prüft genau das als
+   Partition, damit hier nichts Fremdes einsickert.
+   Kein Einzug beim Selektor: der Guard sucht ihn am Zeilenanfang.
+   ======================================================================== */
+
+[data-dichte='komfortabel'] {
+  --lfh-luft-1: 5px;
+  --lfh-luft-2: 11px;
+  --lfh-luft-3: 18px;
+  --lfh-luft-4: 28px;
+  --lfh-zeilenhoehe: 48px;
+  --lfh-schriftgroesse: 15px;
+}
+
+[data-dichte='handschuh'] {
+  --lfh-luft-1: 7px;
+  --lfh-luft-2: 16px;
+  --lfh-luft-3: 26px;
+  --lfh-luft-4: 44px;
+  --lfh-zeilenhoehe: 72px;
+  --lfh-schriftgroesse: 15px;
 }

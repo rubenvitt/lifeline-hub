@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Button, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Breadcrumb, Button, Table, type TableColumnsType } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { uhsDetailPfad } from '../routing/deeplinks';
@@ -10,19 +10,10 @@ import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
-
-const UHS_TYP_LABEL: Record<UhsTyp, string> = {
-  patientenablage: 'Patientenablage',
-  behandlungsplatz: 'Behandlungsplatz',
-  verletztensammelstelle: 'Verletztensammelstelle',
-  sonstige: 'Sonstige',
-};
-
-const STATUS_META: Record<UhsStatus, { label: string; color: string }> = {
-  geplant: { label: 'geplant', color: 'default' },
-  aktiv: { label: 'aktiv', color: 'green' },
-  aufgeloest: { label: 'aufgelöst', color: 'red' },
-};
+import EinsatzSeite from '../components/EinsatzSeite';
+import StatusTag from '../components/StatusTag';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { uhsStatus, uhsTyp } from '../theme/statusFarben';
 
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
@@ -53,37 +44,36 @@ export default function UnfallhilfsstellenPage() {
   const spalten: TableColumnsType<Uhs> = [
     { title: 'Bezeichnung', dataIndex: 'bezeichnung', render: (b: string, u) =>
         <Link to={uhsDetailPfad(einsatzId, u.id)}>{b}</Link> },
-    { title: 'Typ', dataIndex: 'typ', render: (t: UhsTyp) => UHS_TYP_LABEL[t] },
-    { title: 'Status', dataIndex: 'status', render: (s: UhsStatus) => {
-      const meta = STATUS_META[s];
-      return <Tag color={meta.color}>{meta.label}</Tag>;
-    }},
+    { title: 'Typ', dataIndex: 'typ', render: (t: UhsTyp) => uhsTyp[t].label },
+    { title: 'Status', dataIndex: 'status', render: (s: UhsStatus) => <StatusTag darstellung={uhsStatus[s]} /> },
     { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
   ];
 
-  if (einsatzQuery.isLoading || uhsQuery.isLoading) return <Spin />;
-  if (einsatzQuery.error) return <Alert type="error" title="Einsatz konnte nicht geladen werden" />;
+  if (einsatzQuery.isLoading || uhsQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.error) return <SeitenFehler text="Einsatz konnte nicht geladen werden" />;
 
   return (
-    <div style={{ padding: 16 }}>
-      <Breadcrumb items={[
-        { title: <Link to="/einsaetze">Einsätze</Link> },
-        { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
-        { title: 'Unfallhilfsstellen' },
-      ]} />
-      <Space style={{ marginTop: 12, marginBottom: 12 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>Unfallhilfsstellen</Typography.Title>
+    <EinsatzSeite
+      titel="Unfallhilfsstellen"
+      breadcrumb={
+        <Breadcrumb items={[
+          { title: <Link to="/einsaetze">Einsätze</Link> },
+          { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
+          { title: 'Unfallhilfsstellen' },
+        ]} />
+      }
+      aktionen={
         <Button type="primary" disabled={schreibgeschuetzt} onClick={() => setAnlegen(true)}>Neu</Button>
-      </Space>
+      }
+    >
       <Table<Uhs>
         rowKey="id"
         dataSource={uhsQuery.data ?? []}
         columns={spalten}
-        size="middle"
         pagination={false}
       />
 
       <UhsAnlegenDrawer einsatzId={einsatzId} open={anlegen} onClose={() => setAnlegen(false)} />
-    </div>
+    </EinsatzSeite>
   );
 }

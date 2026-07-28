@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,19 +16,44 @@ import {
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { EinsatzFahrzeug, EinsatzPersonal, Staerke, StatusKategorie } from '../api/types';
+import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
+import StatusTag from '../components/StatusTag';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { statusKategorie } from '../theme/statusFarben';
+import { abstand, flaeche } from '../theme/tokens';
 
-const KATEGORIE_FALLBACK: Record<StatusKategorie, string> = {
-  verfuegbar: 'green',
-  gebunden: 'orange',
-  nicht_verfuegbar: 'red',
-};
-
+/**
+ * Statusanzeige eines disponierten Fahrzeugs — und zugleich die GRENZE des
+ * Statusfarb-Vertrags (LFH-328/A2, Spec §1.3).
+ *
+ * Die Anzeige hat zwei Achsen, und nur eine davon kann der Vertrag tragen:
+ *
+ * 1. **DB-Achse** — `status_farbe` ist mandantengepflegter Freitext aus den
+ *    Stammdaten-Tabs. Das Backend (`src/routes/fahrzeug_status.rs`) trimmt ihn und
+ *    prüft sonst NICHTS: kein Enum, kein Hex-Format. Ein getypter `Record` kann das
+ *    nicht einfangen. Diese Achse bleibt deshalb unangetastet — wer sie „aufräumt",
+ *    nimmt dem Mandanten seine gepflegte Farbe weg. (Dass sie gegen die A0-Rollen
+ *    validiert werden sollte, ist ein eigener Befund, Spec §5 Nr. 1.)
+ * 2. **Fallback-Achse** — früher `KATEGORIE_FALLBACK`, byte-identisch in dieser und
+ *    der Nachbarseite dupliziert. Sie kommt jetzt aus `statusKategorie`.
+ *
+ * ABWEICHUNG VOM PLANWORTLAUT, bewusst: der Plan sagt „`status_farbe ?? …` bleibt
+ * stehen", gemeint als „die DB-Achse bleibt". Aus dem `??` einen Zweig zu machen
+ * erhält genau das — und vermeidet den Fehler, den `StatusTag` selbst dokumentiert:
+ * antds `color`-Prop rendert einen NICHT-Preset-Wert als Vollfläche mit erzwungen
+ * weißem Text. Die Rollenfarbe dort hineinzureichen (`rollenFarbe(...)` liefert Hex,
+ * nie einen Preset-Namen) hätte aus jedem Fallback-Tag — dem Normalfall, solange kein
+ * Mandant eine Farbe pflegt — eine gefüllte Fläche gemacht, im Dunkelmodus mit weißer
+ * Schrift auf aufgehelltem Rot. Der Zweig hält die DB-Achse byte-gleich und stellt die
+ * Fallback-Achse auf die Umrissform, die der Rest der Anwendung nach A2 trägt.
+ */
 function StatusBadge({ ef }: { ef: EinsatzFahrzeug }) {
   if (!ef.status_label || !ef.status_kategorie) return <Tag>kein Status</Tag>;
-  const farbe = ef.status_farbe ?? KATEGORIE_FALLBACK[ef.status_kategorie];
-  return <Tag color={farbe}>{ef.status_label}</Tag>;
+  if (ef.status_farbe) return <Tag color={ef.status_farbe}>{ef.status_label}</Tag>;
+  const meta = statusKategorie[ef.status_kategorie];
+  return <StatusTag darstellung={{ ...meta, label: ef.status_label }} />;
 }
 
 /**
@@ -96,7 +121,7 @@ function BesatzungsBlock({
   const ist = istBesatzungsStaerke(crew);
   return (
     <div style={{ paddingLeft: 8 }}>
-      <Space size={8} style={{ marginBottom: 8 }}>
+      <Space size={abstand.sm} style={{ marginBottom: abstand.sm }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
         <BesatzungsStaerkeBadge ist={ist} soll={ef.soll_besatzung ?? null} />
       </Space>
@@ -105,14 +130,14 @@ function BesatzungsBlock({
       ) : (
         crew.map((m) => (
           <Space key={m.id} style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}>
-            <Space size="small">
+            <Space size={abstand.sm}>
               <span>{m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}</span>
               {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
                 <Tag color="orange" style={{ margin: 0 }}>andere Einheit</Tag>
               )}
             </Space>
             {darfSchreiben && (
-              <Button size="small" danger onClick={() => onFreigeben(m.id)}>Freigeben</Button>
+              <Button danger onClick={() => onFreigeben(m.id)}>Freigeben</Button>
             )}
           </Space>
         ))
@@ -208,10 +233,15 @@ export default function FahrzeugePage() {
   });
 
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
@@ -244,7 +274,6 @@ export default function FahrzeugePage() {
       render: (_, ef) =>
         darfSchreiben ? (
           <Select
-            size="small"
             style={{ minWidth: 150 }}
             value={ef.status_id ?? undefined}
             placeholder="Status wählen"
@@ -286,7 +315,7 @@ export default function FahrzeugePage() {
             key: 'aktionen',
             render: (_, ef: EinsatzFahrzeug) => (
               <Popconfirm title="Aus Einsatz entfernen?" onConfirm={() => entfernenMutation.mutate(ef.id)}>
-                <Button size="small" danger>Entfernen</Button>
+                <Button danger>Entfernen</Button>
               </Popconfirm>
             ),
           },
@@ -295,17 +324,28 @@ export default function FahrzeugePage() {
   ];
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Fahrzeuge' }]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      titel={
         <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>Fahrzeuge</Typography.Title>
+          Fahrzeuge
+          {/* BEFUND (LFH-328/A2): der Einsatz-Status trägt hier weiterhin antd-Farbnamen und
+              den ROHEN Enum-String statt einer Statusrolle. `statusFarben.ts` hat für
+              `EinsatzStatus` keinen Eintrag — die Vertragstabelle der Spec (§1.3) listet acht
+              Enums, dieses ist keins davon. Die Zuordnung ist zwar entschieden (Spec §6,
+              Prüflistenzeile 7), steht aber als lokale Map in `EinsaetzePage`. Sie hierher zu
+              kopieren wäre eine dritte Wahrheit, sie nach `statusFarben.ts` zu heben eine
+              Vertragserweiterung — beides ist nicht A2s Auftrag (Spec §5 Befund 7). */}
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
-        {darfSchreiben && (
+      }
+      breadcrumb={
+        <Breadcrumb
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Fahrzeuge' }]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           <Space>
             <Select
               style={{ minWidth: 260 }}
@@ -317,18 +357,14 @@ export default function FahrzeugePage() {
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
           </Space>
-        )}
-      </Space>
-
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert
-          style={{ marginBottom: 12 }}
-          type="info"
-          showIcon
-          title="Einsatz ist abgeschlossen — nur Ansicht."
-        />
-      )}
-
+        )
+      }
+      hinweis={
+        !darfSchreiben && einsatz.status !== 'aktiv' && (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        )
+      }
+    >
       <Table
         rowKey="id"
         loading={efQuery.isLoading}
@@ -373,6 +409,6 @@ export default function FahrzeugePage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </EinsatzSeite>
   );
 }

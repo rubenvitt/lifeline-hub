@@ -1,4 +1,4 @@
-import { Button, Dropdown, Space, Tag, Typography, type MenuProps } from 'antd';
+import { Button, Dropdown, Space, Typography, type MenuProps } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -8,11 +8,21 @@ import { listeUhs } from '../../api/einsatzUhs';
 import { einsatzKeys } from '../../api/queryKeys';
 import UhsAnlegenDrawer from './UhsAnlegenDrawer';
 import type { Uhs, UhsStatus } from '../../api/types';
+import StatusTag from '../../components/StatusTag';
+import { uhsStatus } from '../../theme/statusFarben';
 
-const STATUS_META: Record<UhsStatus, { label: string; color: string; rang: number }> = {
-  aktiv: { label: 'aktiv', color: 'green', rang: 0 },
-  geplant: { label: 'geplant', color: 'default', rang: 1 },
-  aufgeloest: { label: 'aufgelöst', color: 'red', rang: 2 },
+/**
+ * Sortierrang der Status im Switcher — aktive UHS zuerst, aufgelöste zuletzt.
+ *
+ * Bleibt bewusst LOKAL und wandert nicht in den Statusfarb-Vertrag: das ist eine
+ * fachliche Reihenfolge dieser einen Liste, keine Darstellung. `statusFarben.ts`
+ * beantwortet „welche Bedeutung hat welcher Status", nicht „in welcher Reihenfolge
+ * zeigt ihn ausgerechnet der Switcher".
+ */
+const STATUS_RANG: Record<UhsStatus, number> = {
+  aktiv: 0,
+  geplant: 1,
+  aufgeloest: 2,
 };
 
 /** Header-Switcher im UHS-Detail: aktuelle UHS + Wechsel zu anderen + Neuanlage. */
@@ -27,7 +37,7 @@ export default function UhsSwitcher({ einsatzId, aktuelleUhs }: { einsatzId: num
   });
 
   const sortiert = [...liste].sort(
-    (a, b) => STATUS_META[a.status].rang - STATUS_META[b.status].rang
+    (a, b) => STATUS_RANG[a.status] - STATUS_RANG[b.status]
       || a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
   );
 
@@ -37,9 +47,7 @@ export default function UhsSwitcher({ einsatzId, aktuelleUhs }: { einsatzId: num
       label: (
         <Space>
           {u.bezeichnung}
-          <Tag color={STATUS_META[u.status].color} style={{ marginInlineEnd: 0 }}>
-            {STATUS_META[u.status].label}
-          </Tag>
+          <StatusTag darstellung={uhsStatus[u.status]} />
         </Space>
       ),
     })),

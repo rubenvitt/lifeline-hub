@@ -1,11 +1,10 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import EinsaetzePage from './EinsaetzePage';
 
 const admin = {
@@ -32,13 +31,11 @@ function einsatz(over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+// `renderMitProviders` (test/utils.tsx:37) rendert den `AuthProvider` selbst — ein
+// zweiter drumherum wäre ein doppelter `/api/auth/me`-Abruf ohne jeden Nutzen.
 function setup() {
   server.use(http.get('/api/auth/me', () => HttpResponse.json(admin)));
-  return renderMitProviders(
-    <AuthProvider>
-      <EinsaetzePage />
-    </AuthProvider>,
-  );
+  return renderMitProviders(<EinsaetzePage />);
 }
 
 describe('EinsaetzePage', () => {
@@ -58,12 +55,10 @@ describe('EinsaetzePage', () => {
       ),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<EinsaetzePage />} />
-          <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd');
@@ -77,11 +72,7 @@ describe('EinsaetzePage', () => {
       http.get('/api/auth/me', () => HttpResponse.json(ohneRecht)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
     );
-    renderMitProviders(
-      <AuthProvider>
-        <EinsaetzePage />
-      </AuthProvider>,
-    );
+    renderMitProviders(<EinsaetzePage />);
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Neuer Einsatz' })).not.toBeInTheDocument();
   });
@@ -112,14 +103,80 @@ describe('EinsaetzePage', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<EinsaetzePage />} />
-          <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
     );
     await userEvent.click(await screen.findByText('Hochwasser Nord'));
     await waitFor(() => expect(screen.getByText('Workspace-7')).toBeInTheDocument());
+  });
+
+  // ── Die drei Datenzustände (LFH-328 · A2, Task 10) ────────────────────────────
+  // Sie müssen UNTERSCHEIDBAR gerendert sein: vorher sah ein Anlegeberechtigter in
+  // allen dreien dieselbe leere Fläche mit nur dem „Neuer Einsatz"-Knopf — ein
+  // Serverfehler war von „noch keine Daten" nicht zu unterscheiden.
+
+  it('zeigt beim Laden Karten-Skelette im Raster und noch keinen Anlegen-Knopf', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', async () => {
+        await delay(60);
+        return HttpResponse.json([einsatz()]);
+      }),
+    );
+    renderMitProviders(<EinsaetzePage />);
+
+    // Die Skelett-Kacheln liegen im SELBEN Rasterknoten, der danach die Karten
+    // trägt (Prüfliste Kriterium 12). jsdom rechnet kein Layout — die gleiche
+    // Kachelhöhe ist hier nicht messbar, nur die gemeinsame Herkunft.
+    const raster = await screen.findByTestId('einsaetze-raster');
+    await waitFor(() =>
+      expect(raster.querySelectorAll('.lfh-skelett__balken').length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByRole('button', { name: /Neuer Einsatz/ })).toBeNull();
+
+    // Und erst nach dem Auflösen des Ladezustands erscheint er — das belegt, dass
+    // oben der Ladezustand ihn verborgen hat und nicht ein fehlendes Recht.
+    expect(await screen.findByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
+    expect(screen.getByTestId('einsaetze-raster').querySelector('.lfh-skelett__balken')).toBeNull();
+  });
+
+  it('zeigt bei einem Fehler eine Meldung, deren Wiederholen-Aktion neu abruft', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => {
+        abrufe += 1;
+        return abrufe === 1
+          ? HttpResponse.json({ error: 'Serverfehler' }, { status: 500 })
+          : HttpResponse.json([einsatz()]);
+      }),
+    );
+    renderMitProviders(<EinsaetzePage />);
+
+    const meldung = await screen.findByRole('alert');
+    expect(meldung).toHaveTextContent(/Einsatzliste/i);
+
+    // Der erneute Abruf wird über den Handler-Zähler belegt, nicht über einen Spy:
+    // nur so ist bewiesen, dass wirklich ein Request rausgegangen ist.
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+
+    expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
+    expect(abrufe).toBe(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerer Liste den Leer-Zustand — auch für Anlegeberechtigte', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+    );
+    renderMitProviders(<EinsaetzePage />);
+
+    // Bisher waren „leer" und „darf anlegen" ein Entweder-oder: der Empty-Zweig
+    // lief für Anlegeberechtigte nie, sie sahen nur den Knopf im leeren Raster.
+    expect(await screen.findByText('Keine Einsätze')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
   });
 });

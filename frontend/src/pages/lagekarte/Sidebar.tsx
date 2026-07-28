@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Empty, Popconfirm, Radio, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Badge, Button, Card, Empty, Popconfirm, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
 import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
@@ -130,6 +130,9 @@ export interface SidebarProps {
 
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
+  // Darstellungsfarben/-abstände kommen aus den Rollen-Tokens (LFH-328/T14) — dark-safe und
+  // dichteabhängig. Persistierte Farbwerte (Zone `farbe`) sind davon ausgenommen, siehe unten.
+  const { token } = theme.useToken();
   const [koord, setKoord] = useState<LatLon | null>(null);
   // Freies-Zeichen-Schnellerfassung (LFH-170): Picker erst auf Klick sichtbar (kein Dauer-
   // Combobox in der Sidebar), Entwurf bleibt über Platzierungen erhalten.
@@ -142,6 +145,22 @@ export default function Sidebar(props: SidebarProps) {
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
   const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
 
+  // Zum kleinen `size`-Prop in dieser Datei (LFH-328/A1 Festlegung 4): auf allen
+  // interaktiven Elementen — Button, Switch, Select, Radio.Group — ist es ENTFERNT; deren
+  // Höhe kommt jetzt aus der Zeilenhöhe der Dichte-Staffel am `ConfigProvider`. Stehen
+  // bleiben ausschliesslich Container-Fälle, und zwar aus zwei getrennten Gründen:
+  //
+  //   * Die elf `Card` und der eine `Spin` ändern nur die Polsterung bzw. die Grösse einer
+  //     Anzeige — sie verkleinern keine Treffläche. Die Leiste ist 300 px breit und
+  //     scrollt; elf Karten auf Normalpolsterung zu heben wäre eine REINE Sichtänderung an
+  //     der meistgenutzten Fläche der Anwendung, die jsdom nicht nachrechnen kann
+  //     (Layout-Regressionen sind hier nur per e2e sichtbar).
+  //   * Die drei `Liste` tragen gar kein antd-Prop: `components/Liste.tsx` bildet `size`
+  //     auf die Abstands-Token ab und zieht bei der Dichte-Umschaltung (B5) mit. Es zu
+  //     entfernen würde die Staffel nicht bedienen, sondern verlassen.
+  //
+  // Die Prop-Schreibweise steht hier bewusst NICHT ausgeschrieben: Gate 4 zählt ihr Literal
+  // repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht füllen.
   return (
     <div style={{ width: 300, padding: 12, overflowY: 'auto', height: '100%' }}>
       <AnsichtSwitcher
@@ -160,7 +179,8 @@ export default function Sidebar(props: SidebarProps) {
         title={
           <Space>
             <Typography.Text strong>⚠ Nicht verortet</Typography.Text>
-            <Badge count={nichtVerortet.length} showZero color="#fa8c16" />
+            {/* Zweiter Kanal ist die Zahl selbst (WCAG 1.4.1) — die Farbe trägt hier nur „Achtung". */}
+            <Badge count={nichtVerortet.length} showZero color={token.colorWarning} />
           </Space>
         }
         style={{ marginBottom: 12 }}
@@ -178,13 +198,13 @@ export default function Sidebar(props: SidebarProps) {
               if (darfSchreiben) {
                 if (o.typ === 'abschnitt') {
                   action = (
-                    <Button size="small" type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
+                    <Button type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
                       Fläche zeichnen
                     </Button>
                   );
                 } else if (aktiv) {
                   action = (
-                    <Button size="small" onClick={props.onPlatzierenAbbrechen}>
+                    <Button onClick={props.onPlatzierenAbbrechen}>
                       Abbrechen
                     </Button>
                   );
@@ -193,7 +213,6 @@ export default function Sidebar(props: SidebarProps) {
                   const punktTyp = o.typ;
                   action = (
                     <Button
-                      size="small"
                       type="primary"
                       onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
                     >
@@ -215,7 +234,7 @@ export default function Sidebar(props: SidebarProps) {
       </Card>
 
       {platzierungZiel && darfSchreiben && (
-        <Card size="small" style={{ marginBottom: 12, borderColor: '#1677ff' }}>
+        <Card size="small" style={{ marginBottom: 12, borderColor: token.colorPrimary }}>
           <Typography.Text type="secondary">
             Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
           </Typography.Text>
@@ -229,7 +248,6 @@ export default function Sidebar(props: SidebarProps) {
           </div>
           <div style={{ marginTop: 8 }}>
             <Button
-              size="small"
               disabled={!koord}
               onClick={() => {
                 if (koord) {
@@ -251,12 +269,11 @@ export default function Sidebar(props: SidebarProps) {
           </Typography.Text>
           {darfSchreiben &&
             (platzierungZiel?.typ === 'einsatzort' ? (
-              <Button size="small" onClick={props.onPlatzierenAbbrechen}>
+              <Button onClick={props.onPlatzierenAbbrechen}>
                 Abbrechen
               </Button>
             ) : (
               <Button
-                size="small"
                 type={props.einsatzortVerortet ? 'default' : 'primary'}
                 onClick={props.onEinsatzortPlatzieren}
               >
@@ -390,10 +407,9 @@ export default function Sidebar(props: SidebarProps) {
           {props.bilder.map((b) => {
             const imPlatzieren = props.bildPlatzierenId === b.id;
             return (
-              <div key={b.id} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: 6 }}>
+              <div key={b.id} style={{ borderBottom: `1px solid ${token.colorSplit}`, paddingBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Switch
-                    size="small"
                     checked={b.sichtbar}
                     aria-label={b.name}
                     onChange={(v) => props.onBildToggle(b.id, v)}
@@ -415,7 +431,6 @@ export default function Sidebar(props: SidebarProps) {
                   <Space size={4} style={{ flexShrink: 0 }}>
                     <Tooltip title="Auf Bild zentrieren">
                       <Button
-                        size="small"
                         icon={<FullscreenOutlined />}
                         onClick={() => props.onBildZentrieren(b.id)}
                         aria-label={`${b.name} zentrieren`}
@@ -425,7 +440,6 @@ export default function Sidebar(props: SidebarProps) {
                       <>
                         <Tooltip title={imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren'}>
                           <Button
-                            size="small"
                             type={imPlatzieren ? 'primary' : 'default'}
                             icon={<AimOutlined />}
                             onClick={() => (imPlatzieren ? props.onBildPlatzierenFertig() : props.onBildPlatzieren(b.id))}
@@ -438,7 +452,7 @@ export default function Sidebar(props: SidebarProps) {
                           okText="Entfernen"
                           cancelText="Abbrechen"
                         >
-                          <Button size="small" danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
+                          <Button danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
                         </Popconfirm>
                       </>
                     )}
@@ -458,8 +472,17 @@ export default function Sidebar(props: SidebarProps) {
                   disabled={!darfSchreiben}
                   onChange={(ansichtId) => props.onBildVerschieben(b.id, ansichtId)}
                 />
+                {/* Hinterlegung war `rgba(22,119,255,.06)` — derselbe Blauton wie die
+                    Bedien-Rolle, nur in rgba-Schreibweise und damit für jedes Hex-Grep
+                    unsichtbar. Jetzt die Rolle „aktiver Bedienbereich". */}
                 {imPlatzieren && darfSchreiben && (
-                  <div style={{ padding: 8, background: 'rgba(22,119,255,.06)', borderRadius: 4 }}>
+                  <div
+                    style={{
+                      padding: token.paddingXS,
+                      background: token.colorPrimaryBg,
+                      borderRadius: token.borderRadiusSM,
+                    }}
+                  >
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ = drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
                     </Typography.Text>
@@ -472,7 +495,6 @@ export default function Sidebar(props: SidebarProps) {
                     </div>
                     <Space style={{ marginTop: 6, width: '100%', justifyContent: 'space-between' }}>
                       <Button
-                        size="small"
                         disabled={!bildMitte}
                         onClick={() => {
                           if (bildMitte) {
@@ -483,7 +505,7 @@ export default function Sidebar(props: SidebarProps) {
                       >
                         Mittelpunkt setzen
                       </Button>
-                      <Button size="small" type="primary" onClick={props.onBildPlatzierenFertig}>
+                      <Button type="primary" onClick={props.onBildPlatzierenFertig}>
                         Fertig
                       </Button>
                     </Space>
@@ -501,7 +523,7 @@ export default function Sidebar(props: SidebarProps) {
                 return false;
               }}
             >
-              <Button icon={<UploadOutlined />} size="small">Bild hochladen</Button>
+              <Button icon={<UploadOutlined />}>Bild hochladen</Button>
             </Upload>
           )}
         </Space>
@@ -515,14 +537,17 @@ export default function Sidebar(props: SidebarProps) {
                 return (
                   <Space key={t.typ}>
                     <Typography.Text>{t.label}</Typography.Text>
+                    {/* `farbe` ist ein PERSISTIERTER Datenwert: er wandert über
+                        `onZoneZeichnenStart` in die Zone und damit in die Datenbank. Er darf
+                        deshalb NICHT auf ein Laufzeit-Token zeigen — ein Themenwechsel würde
+                        sonst bereits gespeicherte Zonen nachträglich uminterpretieren. Das
+                        Literal bleibt bewusst stehen (LFH-328/T14). */}
                     <Button
-                      size="small"
                       onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'polygon', farbe: '#1677ff' })}
                     >
                       Fläche
                     </Button>
                     <Button
-                      size="small"
                       onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'linie', farbe: '#1677ff' })}
                     >
                       Linie
@@ -534,7 +559,6 @@ export default function Sidebar(props: SidebarProps) {
               return (
                 <Button
                   key={t.typ}
-                  size="small"
                   block
                   onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus })}
                 >
@@ -551,7 +575,7 @@ export default function Sidebar(props: SidebarProps) {
           {props.zeichenPlatzieren ? (
             <Space orientation="vertical" style={{ width: '100%' }}>
               <Typography.Text type="secondary">Auf Karte klicken zum Platzieren.</Typography.Text>
-              <Button size="small" onClick={props.onZeichenPlatzierenAbbrechen}>
+              <Button onClick={props.onZeichenPlatzierenAbbrechen}>
                 Abbrechen
               </Button>
             </Space>
@@ -560,7 +584,6 @@ export default function Sidebar(props: SidebarProps) {
               <FreiesZeichenPicker wert={zeichenEntwurf} onChange={setZeichenEntwurf} />
               <Space>
                 <Button
-                  size="small"
                   type="primary"
                   onClick={() => {
                     props.onZeichenPlatzierenStart(zeichenEntwurf);
@@ -569,13 +592,13 @@ export default function Sidebar(props: SidebarProps) {
                 >
                   Platzieren
                 </Button>
-                <Button size="small" onClick={() => setZeichenPickerOffen(false)}>
+                <Button onClick={() => setZeichenPickerOffen(false)}>
                   Abbrechen
                 </Button>
               </Space>
             </Space>
           ) : (
-            <Button size="small" block onClick={() => setZeichenPickerOffen(true)}>
+            <Button block onClick={() => setZeichenPickerOffen(true)}>
               Taktisches Zeichen platzieren
             </Button>
           )}
@@ -587,7 +610,6 @@ export default function Sidebar(props: SidebarProps) {
           value={props.basemap}
           onChange={(e) => props.onBasemapWechsel(e.target.value as BasemapModus)}
           optionType="button"
-          size="small"
           name="lagekarte-basemap"
         >
           <Tooltip title={props.onlineVerfuegbar ? '' : 'nicht konfiguriert'}>
@@ -604,7 +626,6 @@ export default function Sidebar(props: SidebarProps) {
         </Radio.Group>
         {props.basemap === 'online' && props.onlineStyles.length > 1 && (
           <Select
-            size="small"
             aria-label="Online-Ansicht"
             style={{ width: '100%', marginTop: 8 }}
             value={props.onlineStilName ?? props.onlineStyles[0]?.name}
@@ -621,7 +642,6 @@ export default function Sidebar(props: SidebarProps) {
               value={props.kartenTheme}
               onChange={(e) => props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)}
               optionType="button"
-              size="small"
               aria-label="Karten-Design"
               name="lagekarte-karten-design"
             >

@@ -44,7 +44,7 @@ function renderInspector(opts: {
   const onAendern = opts.onAendern ?? vi.fn<ZonenInspectorProps['onAendern']>();
   const onLoeschen = opts.onLoeschen ?? vi.fn<ZonenInspectorProps['onLoeschen']>();
   const onMatrixOeffnen = opts.onMatrixOeffnen ?? vi.fn<ZonenInspectorProps['onMatrixOeffnen']>();
-  renderMitProviders(
+  const { container } = renderMitProviders(
     <ZonenInspector
       zone={opts.zone ?? basisZone}
       gebiete={opts.gebiete ?? [gebiet]}
@@ -56,7 +56,7 @@ function renderInspector(opts: {
       ansichten={[]}
     />,
   );
-  return { onAendern, onLoeschen, onMatrixOeffnen };
+  return { onAendern, onLoeschen, onMatrixOeffnen, container };
 }
 
 describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
@@ -64,6 +64,9 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
     renderInspector({});
     // Der Inspector soll ein Dropdown für die Gruppen-Zugehörigkeit zeigen.
     expect(screen.getAllByLabelText('Gehört zu Gefahrengebiet')[0]).toBeInTheDocument();
+    // Seit LFH-328 trägt ein echtes <label> den Namen (kein aria-label mehr): der sichtbare
+    // Text ist der Accessible Name, der gewählte Gebietsname steckt NICHT darin.
+    expect(screen.getByRole('combobox', { name: 'Gehört zu Gefahrengebiet' })).toBeInTheDocument();
   });
 
   it('zeigt den Button „Gefahrenmatrix bearbeiten" bei gesetzter gefahrengebiet_id', () => {
@@ -162,7 +165,10 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     const g: Gefahrengebiet = { ...gebiet, hoechste_warnstufe: 'hoch', zonen_ids: [1, 2, 3] };
     renderInspector({ zone, gebiete: [g] });
     expect(screen.getByText('Höchste Warnstufe')).toBeInTheDocument();
-    expect(screen.getByText('Hoch')).toBeInTheDocument();
+    // Das Label kommt seit LFH-328 aus `warnstufeKarte` (Statusfarb-Vertrag) und nicht
+    // mehr aus dem WARNSTUFEN-Katalog: klein wie alle anderen Status-Labels des Vertrags
+    // ('aktiv', 'geplant', 'aufgelöst'). Der Katalog bleibt für Auswahl-Dropdowns.
+    expect(screen.getByText('hoch')).toBeInTheDocument();
     expect(screen.getByText('Zonen')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
   });
@@ -172,5 +178,20 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     renderInspector({ zone: { ...basisZone, gefahrengebiet_id: null }, gebiete: [] });
     expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
     expect(screen.queryByText('Länge')).not.toBeInTheDocument();
+  });
+
+  it('hinterlässt ohne Kennzahlen keine leere Space-Zeile', () => {
+    // antds `Space` filtert `false`/`null` als KIND heraus, wickelt aber eine Komponente,
+    // die null RENDERT, trotzdem in ein `.ant-space-item` (gemessen: 3 statt 2). Ein
+    // unbedingt eingehängtes `<GeoKennzahlen>` erzeugte damit im häufigen Fall (freie
+    // Skizze, unparsebare Geometrie) eine sichtbare Lücke. Die Bedingung gehört deshalb
+    // an die Aufrufstelle, nicht nur in die Komponente.
+    const { container: ohne } = renderInspector({
+      zone: { ...basisZone, gefahrengebiet_id: null },
+      gebiete: [],
+    });
+    const { container: mit } = renderInspector({ zone: polygonZone, gebiete: [] });
+    const zaehle = (c: HTMLElement) => c.querySelectorAll('.ant-space-item').length;
+    expect(zaehle(ohne)).toBe(zaehle(mit) - 1);
   });
 });

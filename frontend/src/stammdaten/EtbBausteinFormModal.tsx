@@ -5,7 +5,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { aktualisiereBaustein, legeBausteinAn, type BausteinEingabe } from '../api/etbBaustein';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
-import { ERFASSBARE_TYPEN, TYP_LABEL } from '../etb/typFarben';
+import { ERFASSBARE_TYPEN } from '../etb/typFarben';
+import { etbTyp } from '../theme/statusFarben';
 import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { globalKeys } from '../api/queryKeys';
@@ -84,7 +85,7 @@ export default function EtbBausteinFormModal({
           <Input placeholder="z. B. Lage unverändert" />
         </Form.Item>
         <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
-          <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: TYP_LABEL[t] }))} />
+          <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }))} />
         </Form.Item>
         <Form.Item
           label="Inhalt (Platzhalter wie {einheit} erlaubt)"

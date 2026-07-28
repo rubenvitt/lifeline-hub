@@ -15,19 +15,33 @@ import type { Person, PlatzTyp, UhsDetail, UhsPlatz, VerbleibArt, Verfuegbarkeit
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
+import StatusTag from '../../components/StatusTag';
+import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 
 // Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
 // im Backend) bleiben, damit absolut platzierte Karten einander nicht überlappen, und
 // groß genug für den Worst Case (2-zeiliger Titel + Tag + Belegung + Aktionszeile).
 const PLATZ_KARTE_HOEHE = 116;
 
-const VERF_FARBE: Record<Verfuegbarkeit, string> = {
-  frei: '#52c41a',
-  defekt: '#ff4d4f',
-  aufbereitung: '#faad14',
-  gesperrt: '#bfbfbf',
-  reserviert: '#1677ff',
-};
+// BEFUND zum kleinen `size`-Prop (LFH-328/A1 Festlegung 4, Gate 4) — hier bleiben SECHS
+// stehen, in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene
+// Kollision:
+//
+//   * Die zwei `Card` in `PersonenSpalte`/`TransportSpalte` sind ein reiner
+//     Polsterungsfall und treffen keine Treffläche — bleiben.
+//   * Die vier Aktions-Buttons in `PlatzKarte` (Transport, Zurückweisen, „als frei",
+//     Platzaktionen) lassen sich NICHT auf die volle Zeilenhöhe der Dichte-Staffel heben,
+//     ohne die Karte zu sprengen. Die Rechnung: Innenraum = 116 − 12 (padding) − 4 (border)
+//     = 100 px, belegt von Titel 30 + Tags 24 + Belegung 24 + Aktionen 24 = 102 px. Ein
+//     Button auf voller Zeilenhöhe (kompakt: 30 px statt 22,5 px in der kleinen Stufe)
+//     braucht 108 px — und die Karte darf nicht wachsen, weil SCHRITT_Y = 120 im BACKEND
+//     (`raster_position`) sitzt. Die Treffläche hier hängt also an einer Server-Konstante,
+//     nicht an einem Frontend-Token; das gehört zur Dichte-Umschaltung (B5), nicht in A2.
+//     Einen Wert danebenzusetzen wäre genau die Ad-hoc-Entscheidung, gegen die A2 antritt
+//     (Spec §5 Befund 7).
+//
+// Prop-Literal und Token-Name stehen bewusst nicht ausgeschrieben: Gate 4 zählt beide
+// repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht reissen.
 
 function personLabel(person: Person): string {
   const nr = registrierAnzeige(person.registrier_nr);
@@ -109,7 +123,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     overflow: 'hidden',
     boxSizing: 'border-box',
     cursor: bearbeitbar ? 'grab' : 'default',
-    border: `2px solid ${VERF_FARBE[platz.verfuegbarkeit]}`,
+    border: `2px solid ${rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token)}`,
     // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
     // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
     // Theme-Tokens statt fixer Hex-Werte, damit die Karten im Dark Mode mitziehen.
@@ -159,7 +173,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
       </Typography.Text>
       {/* Status-Tags: eine Zeile, kein Umbruch (feste Höhe). */}
       <div style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        {zeigeVerfTag && <Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag>}
+        {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
         {belegtVon && <Tag color="blue">belegt</Tag>}
       </div>
       {/* Belegung: feste Höhe reserviert, auch wenn leer → Karte bleibt gleich groß.
@@ -461,7 +475,6 @@ export default function Grundriss({
                 : (
                   <Space>
                     <Button
-                      size="small"
                       type={platzBearbeitung ? 'primary' : 'text'}
                       onClick={() => setPlatzBearbeitung((v) => !v)}
                     >
@@ -572,7 +585,7 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
     onError: (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
   if (!open) {
-    return <Button size="small" type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>Plätze anlegen</Button>;
+    return <Button type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>Plätze anlegen</Button>;
   }
   return (
     <Space align="center" wrap>
@@ -582,7 +595,6 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
         options={PLATZ_TYPEN}
         style={{ width: 200 }}
         aria-label="Platz-Typ"
-        size="small"
       />
       <InputNumber
         min={1}
@@ -590,10 +602,9 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
         value={menge}
         onChange={(v) => setMenge(v ?? 1)}
         aria-label="Menge"
-        size="small"
       />
-      <Button size="small" type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
-      <Button size="small" onClick={() => setOpen(false)}>Abbrechen</Button>
+      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
+      <Button onClick={() => setOpen(false)}>Abbrechen</Button>
     </Space>
   );
 }

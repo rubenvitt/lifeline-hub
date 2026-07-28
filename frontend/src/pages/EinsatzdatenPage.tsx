@@ -1,6 +1,8 @@
-import { Alert, App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions, Form, Input, InputNumber, Space, Spin, Tag, Typography } from 'antd';
+import { App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions, Form, Input, InputNumber, Space, Tag } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../anzeige/koordinaten';
@@ -75,14 +77,15 @@ export default function EinsatzdatenPage() {
   });
 
   if (einsatzQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
-      </div>
-    );
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
 
@@ -136,25 +139,28 @@ export default function EinsatzdatenPage() {
   }
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+    <EinsatzSeite
+      titel={
         <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {einsatz.bezeichnung}
-          </Typography.Title>
+          {einsatz.bezeichnung}
+          {/* Der Einsatz-Status hat (noch) keinen Eintrag im Statusfarb-Vertrag —
+              die Map dazu lebt in `EinsaetzePage` und zieht in Task 8/10 um. */}
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
-        {!bearbeiten && darfBearbeiten && (
+      }
+      breadcrumb={
+        <Breadcrumb
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
+        />
+      }
+      aktionen={
+        !bearbeiten && darfBearbeiten ? (
           <Button type="primary" onClick={bearbeitenStarten}>
             Bearbeiten
           </Button>
-        )}
-      </Space>
-
+        ) : undefined
+      }
+    >
       {bearbeiten ? (
         <Form<FormWerte> form={form} layout="vertical" onFinish={speichern}>
           <Form.Item
@@ -240,6 +246,6 @@ export default function EinsatzdatenPage() {
       )}
 
       <MitgliederAbschnitt einsatzId={einsatzId} darfVerwalten={darfVerwaltenMitglieder} />
-    </div>
+    </EinsatzSeite>
   );
 }

@@ -1,4 +1,4 @@
-import { App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,17 +10,9 @@ import {
 import type { PersonalStatus, StatusKategorie } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
+import StatusTag from '../components/StatusTag';
+import { statusKategorie } from '../theme/statusFarben';
 
-const KATEGORIE_LABELS: Record<StatusKategorie, string> = {
-  verfuegbar: 'verfügbar',
-  gebunden: 'gebunden',
-  nicht_verfuegbar: 'nicht verfügbar',
-};
-const KATEGORIE_FARBEN: Record<StatusKategorie, string> = {
-  verfuegbar: 'green',
-  gebunden: 'orange',
-  nicht_verfuegbar: 'red',
-};
 
 interface FormWerte {
   label: string;
@@ -81,7 +73,7 @@ export default function PersonalStatusTab() {
       title: 'Kategorie',
       dataIndex: 'kategorie',
       key: 'kategorie',
-      render: (k: StatusKategorie) => <Tag color={KATEGORIE_FARBEN[k]}>{KATEGORIE_LABELS[k]}</Tag>,
+      render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
     },
     { title: 'Farbe', dataIndex: 'farbe', key: 'farbe', render: (f) => f ?? '—' },
     { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
@@ -92,9 +84,9 @@ export default function PersonalStatusTab() {
             key: 'aktionen',
             render: (_, s: PersonalStatus) => (
               <Space>
-                <Button size="small" onClick={() => { setBearbeite(s); setModalOffen(true); }}>Bearbeiten</Button>
+                <Button onClick={() => { setBearbeite(s); setModalOffen(true); }}>Bearbeiten</Button>
                 <Popconfirm title="Status deaktivieren?" onConfirm={() => deaktivieren.mutate(s.id)}>
-                  <Button size="small" danger>Deaktivieren</Button>
+                  <Button danger>Deaktivieren</Button>
                 </Popconfirm>
               </Space>
             ),
@@ -133,8 +125,8 @@ export default function PersonalStatusTab() {
           </Form.Item>
           <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
             <Select
-              options={(Object.keys(KATEGORIE_LABELS) as StatusKategorie[]).map((k) => ({
-                value: k, label: KATEGORIE_LABELS[k],
+              options={(Object.keys(statusKategorie) as StatusKategorie[]).map((k) => ({
+                value: k, label: statusKategorie[k].label,
               }))}
             />
           </Form.Item>

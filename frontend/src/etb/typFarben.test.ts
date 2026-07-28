@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { ERFASSBARE_TYPEN, TYP_FARBE, TYP_LABEL, istNachgetragen } from './typFarben';
+import { ERFASSBARE_TYPEN, istNachgetragen } from './typFarben';
+import { etbTyp } from '../theme/statusFarben';
 
 describe('typFarben', () => {
-  it('hat Label und Farbe für jeden erfassbaren Typ', () => {
-    expect(TYP_LABEL.meldung).toBe('Meldung');
-    expect(TYP_FARBE.berichtigung).toBeTruthy();
+  // Die Farbe eines Eintragstyps wird hier NICHT mehr geprüft — sie steht seit
+  // LFH-328/A2 im Statusfarb-Vertrag, und `statusFarben.test.ts` prüft dort für jeden
+  // Eintrag Rolle und Pflicht-`label`. Was diese Datei weiterhin schuldet, ist die
+  // Verbindung der beiden Listen: `ERFASSBARE_TYPEN` ist eine Teilmenge der
+  // Vertragsschlüssel, sonst zeigt die Schnellerfassung `undefined` als Option.
+  it('hält jeden erfassbaren Typ im Statusfarb-Vertrag', () => {
+    for (const t of ERFASSBARE_TYPEN) {
+      expect(etbTyp[t]?.label, `${t} ohne Vertragseintrag`).toBeTruthy();
+    }
   });
 
   it('schließt system aus den erfassbaren Typen aus', () => {
