@@ -23,21 +23,25 @@ import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../them
 // groß genug für den Worst Case (2-zeiliger Titel + Tag + Belegung + Aktionszeile).
 const PLATZ_KARTE_HOEHE = 116;
 
-// BEFUND zu `size="small"` (LFH-328/A1 Festlegung 4, Gate 4) — hier bleiben SECHS stehen,
-// in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene Kollision:
+// BEFUND zum kleinen `size`-Prop (LFH-328/A1 Festlegung 4, Gate 4) — hier bleiben SECHS
+// stehen, in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene
+// Kollision:
 //
-//   * `<Card size="small">` in `PersonenSpalte`/`TransportSpalte` (2×) ist ein reiner
-//     Polsterungsfall und trifft keine Treffläche — bleibt.
+//   * Die zwei `Card` in `PersonenSpalte`/`TransportSpalte` sind ein reiner
+//     Polsterungsfall und treffen keine Treffläche — bleiben.
 //   * Die vier Aktions-Buttons in `PlatzKarte` (Transport, Zurückweisen, „als frei",
-//     Platzaktionen) lassen sich NICHT auf `controlHeight` heben, ohne die Karte zu
-//     sprengen. Die Rechnung: Innenraum = 116 − 12 (padding) − 4 (border) = 100 px, belegt
-//     von Titel 30 + Tags 24 + Belegung 24 + Aktionen 24 = 102 px. Ein Button auf
-//     `controlHeight` (kompakt: 30 px, statt `controlHeightSM` = 22,5 px) braucht 108 px
-//     — und die Karte darf nicht wachsen, weil SCHRITT_Y = 120 im BACKEND
+//     Platzaktionen) lassen sich NICHT auf die volle Zeilenhöhe der Dichte-Staffel heben,
+//     ohne die Karte zu sprengen. Die Rechnung: Innenraum = 116 − 12 (padding) − 4 (border)
+//     = 100 px, belegt von Titel 30 + Tags 24 + Belegung 24 + Aktionen 24 = 102 px. Ein
+//     Button auf voller Zeilenhöhe (kompakt: 30 px statt 22,5 px in der kleinen Stufe)
+//     braucht 108 px — und die Karte darf nicht wachsen, weil SCHRITT_Y = 120 im BACKEND
 //     (`raster_position`) sitzt. Die Treffläche hier hängt also an einer Server-Konstante,
 //     nicht an einem Frontend-Token; das gehört zur Dichte-Umschaltung (B5), nicht in A2.
 //     Einen Wert danebenzusetzen wäre genau die Ad-hoc-Entscheidung, gegen die A2 antritt
 //     (Spec §5 Befund 7).
+//
+// Prop-Literal und Token-Name stehen bewusst nicht ausgeschrieben: Gate 4 zählt beide
+// repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht reissen.
 
 function personLabel(person: Person): string {
   const nr = registrierAnzeige(person.registrier_nr);

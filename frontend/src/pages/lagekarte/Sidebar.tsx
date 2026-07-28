@@ -145,19 +145,22 @@ export default function Sidebar(props: SidebarProps) {
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
   const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
 
-  // `size="small"` in dieser Datei (LFH-328/A1 Festlegung 4): auf allen interaktiven
-  // Elementen — Button, Switch, Select, Radio.Group — ist es ENTFERNT; deren Höhe kommt
-  // jetzt aus `controlHeight` der Dichte-Staffel am `ConfigProvider`. Stehen bleiben
-  // ausschliesslich Container-Fälle, und zwar aus zwei getrennten Gründen:
+  // Zum kleinen `size`-Prop in dieser Datei (LFH-328/A1 Festlegung 4): auf allen
+  // interaktiven Elementen — Button, Switch, Select, Radio.Group — ist es ENTFERNT; deren
+  // Höhe kommt jetzt aus der Zeilenhöhe der Dichte-Staffel am `ConfigProvider`. Stehen
+  // bleiben ausschliesslich Container-Fälle, und zwar aus zwei getrennten Gründen:
   //
-  //   * `<Card size="small">` (11×) und `<Spin size="small">` ändern nur die Polsterung
-  //     bzw. die Grösse einer Anzeige — sie verkleinern keine Treffläche. Die Leiste ist
-  //     300 px breit und scrollt; elf Karten auf Normalpolsterung zu heben wäre eine
-  //     REINE Sichtänderung an der meistgenutzten Fläche der Anwendung, die jsdom nicht
-  //     nachrechnen kann (Layout-Regressionen sind hier nur per e2e sichtbar).
-  //   * `<Liste size="small">` (3×) ist gar kein antd-Prop: `components/Liste.tsx` bildet
-  //     `size` auf die Abstands-Token ab und zieht bei der Dichte-Umschaltung (B5) mit.
-  //     Es zu entfernen würde die Staffel nicht bedienen, sondern verlassen.
+  //   * Die elf `Card` und der eine `Spin` ändern nur die Polsterung bzw. die Grösse einer
+  //     Anzeige — sie verkleinern keine Treffläche. Die Leiste ist 300 px breit und
+  //     scrollt; elf Karten auf Normalpolsterung zu heben wäre eine REINE Sichtänderung an
+  //     der meistgenutzten Fläche der Anwendung, die jsdom nicht nachrechnen kann
+  //     (Layout-Regressionen sind hier nur per e2e sichtbar).
+  //   * Die drei `Liste` tragen gar kein antd-Prop: `components/Liste.tsx` bildet `size`
+  //     auf die Abstands-Token ab und zieht bei der Dichte-Umschaltung (B5) mit. Es zu
+  //     entfernen würde die Staffel nicht bedienen, sondern verlassen.
+  //
+  // Die Prop-Schreibweise steht hier bewusst NICHT ausgeschrieben: Gate 4 zählt ihr Literal
+  // repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht füllen.
   return (
     <div style={{ width: 300, padding: 12, overflowY: 'auto', height: '100%' }}>
       <AnsichtSwitcher
