@@ -55,6 +55,12 @@
   --lfh-zeilenhoehe: 30px;
   --lfh-schriftgroesse: 13.5px;
 
+  /* ── Seitenrinne · Viewport-Achse (LFH-329 · B1) ───────────────────────── */
+  /* Mobil zuerst: hier steht der Ausgangswert für den schmalen Schirm, der
+     Media-Block am Dateiende hebt ihn ab antds md-Schwelle an. Eine andere
+     Achse als die Dichte — deshalb NICHT in den `data-dichte`-Blöcken unten. */
+  --lfh-seiten-polsterung: 12px;
+
   /* ── Stimme und Bewegung ───────────────────────────────────────────────── */
   --lfh-versal-sperrung: 2.2px;
   --lfh-uebergang: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -112,4 +118,23 @@
   --lfh-luft-4: 44px;
   --lfh-zeilenhoehe: 72px;
   --lfh-schriftgroesse: 15px;
+}
+
+/* ── Seitenrinne · die Viewport-Schwelle (LFH-329 · B1) ────────────────────
+   Ab antds `md` (768 px) trägt die Seite die volle Rinne — Fükw, ortsfeste
+   Stelle und Führungs-Tablet liegen alle darüber, der Handschirm darunter.
+   Dieselbe Schwelle, die auch jede JS-Achse liest; der Guard pinnt sie gegen
+   antds Design-Token, damit hier keine zweite Zahl entsteht.
+
+   ZWEI AUFLAGEN, BEIDE VOM GUARD ABGELEITET: der Block steht am DATEIENDE, und
+   sein innerer Selektor ist EINGERÜCKT. `rollen.guard.test.ts` sucht `:root`
+   am Zeilenanfang und nimmt den ersten Treffer — stünde dieser Block weiter
+   oben oder bündig, liefe die ganze Farb- und Rasterprüfung still gegen die
+   falschen Werte.
+   ======================================================================== */
+
+@media (min-width: 768px) {
+  :root {
+    --lfh-seiten-polsterung: 24px;
+  }
 }

@@ -83,12 +83,18 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   schaeden: <SchaedenPage />,
   lageberichte: <LageberichtePage />,
   lagekarte: (
-    <Suspense fallback={<div style={{ padding: 24 }}>Karte wird geladen…</div>}>
+    <Suspense
+      fallback={<div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>Karte wird geladen…</div>}
+    >
       <LagekartePage />
     </Suspense>
   ),
   kraefteuebersicht: (
-    <Suspense fallback={<div style={{ padding: 24 }}>Meldebild wird geladen…</div>}>
+    <Suspense
+      fallback={
+        <div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>Meldebild wird geladen…</div>
+      }
+    >
       <KraefteuebersichtPage />
     </Suspense>
   ),

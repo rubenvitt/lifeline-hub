@@ -103,7 +103,7 @@ export default function EinsatzLayout() {
             onModulKlick={onModulKlick}
           />
         )}
-        <Content style={{ padding: 24 }}>
+        <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
             <Outlet />
           </EinsatzAnzeigeProvider>

@@ -13,6 +13,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
+// Eigene Importzeile, damit der geschlossene §2.2-Pin unten in einem reinen
+// Additions-Diff stehen bleibt (eine erweiterte Importzeile wäre eine Änderung).
+import { seitenrinne } from './tokens';
 
 /** `ThemeConfig['token']` ist optional getypt — hier nicht wegcasten, sondern
  *  laut scheitern, wenn `antdToken` nichts liefert. */
@@ -88,5 +91,22 @@ describe('Flächenmaße als Token', () => {
       kachelMin: 260,
       kachelMinKlein: 220,
     });
+  });
+});
+
+/**
+ * Die Seitenrinne ist die VIEWPORT-Achse, nicht die Dichte-Achse und keine
+ * §2.2-Baseline — deshalb ein eigener Export statt zweier Schlüssel in
+ * `flaeche` (dessen `toEqual`-Pin oben ist erschöpfend und trüge sonst einen
+ * Namen, der nicht mehr stimmt). Träger im Browser ist die Custom-Property in
+ * `rollen.css`; dass beide Seiten dieselben Stufen tragen, bewacht
+ * `rollen.guard.test.ts`.
+ */
+describe('Seitenrinne (LFH-329 · B1)', () => {
+  it('exportiert die Seitenrinne als Viewport-Paar (LFH-329 · B1)', () => {
+    expect(seitenrinne).toEqual({ breit: 24, schmal: 12 });
+    // Benannte Diagnose gegen ein vertauschtes Paar: ein `toEqual` allein
+    // meldet nur einen Objektdiff, nicht die verdrehte Richtung.
+    expect(seitenrinne.schmal).toBeLessThan(seitenrinne.breit);
   });
 });

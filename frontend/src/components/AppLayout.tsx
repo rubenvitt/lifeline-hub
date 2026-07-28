@@ -41,7 +41,7 @@ export default function AppLayout() {
           <BenutzerMenu />
         </Space>
       </Header>
-      <Content style={{ padding: 24 }}>
+      <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
         <Outlet />
       </Content>
     </Layout>

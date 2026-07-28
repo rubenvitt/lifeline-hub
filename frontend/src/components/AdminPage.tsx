@@ -1,5 +1,6 @@
 import { Flex, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
+import { flaeche } from '../theme/tokens';
 
 interface AdminPageProps {
   titel: ReactNode;
@@ -15,7 +16,7 @@ interface AdminPageProps {
   aktionen?: ReactNode;
   /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
   hinweis?: ReactNode;
-  /** Container-Breite in px. Default 900. */
+  /** Container-Breite in px. Default `flaeche.seiteSchmal`. */
   breite?: number;
   children: ReactNode;
 }
@@ -32,7 +33,7 @@ export default function AdminPage({
   beschreibung,
   aktionen,
   hinweis,
-  breite = 900,
+  breite = flaeche.seiteSchmal,
   children,
 }: AdminPageProps) {
   const { token } = theme.useToken();

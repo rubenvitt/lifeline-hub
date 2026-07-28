@@ -163,6 +163,28 @@ export const flaeche = {
   kachelMinKlein: 220,
 } as const;
 
+/**
+ * Die Seitenrinne — der seitliche Rand, den eine Seite zum Fensterrand hält
+ * (LFH-329 · B1). Zwei Stufen, nach Viewport: `breit` am Fükw-Schirm und an
+ * jedem Tablet, `schmal` auf dem Handschirm.
+ *
+ * VIEWPORT-ACHSE, NICHT DICHTE-ACHSE — deshalb ein eigener Export und kein
+ * weiterer Schlüssel in `flaeche` (das trägt die gemessenen §2.2-Baselines und
+ * ist als solches gepinnt) und erst recht kein Eintrag in `dichten`.
+ *
+ * Wirksam wird sie nicht hier, sondern als Custom-Property in `rollen.css`:
+ * eine Media-Regel an antds `md`-Schwelle schaltet die Stufe um, die vier
+ * Konsumstellen lesen nur noch die Property. Das ist beim ersten Paint korrekt
+ * und gilt unter beiden Layouts. Dass CSS- und TS-Seite dieselben Stufen
+ * tragen, bewacht `rollen.guard.test.ts`.
+ */
+export const seitenrinne = {
+  /** Ab antds `md`-Schwelle (768 px) — Fükw, ortsfeste Stelle, Führungs-Tablet. */
+  breit: 24,
+  /** Darunter — mobil, ~390 px einhändig. */
+  schmal: 12,
+} as const;
+
 /** Formrollen. Radius 0 ist eine Entscheidung, keine Unentschiedenheit:
  *  die Kachel wird vom Umrissrahmen getragen, nicht von einer weichen Ecke.
  *
