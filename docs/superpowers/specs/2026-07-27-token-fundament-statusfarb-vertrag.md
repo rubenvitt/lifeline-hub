@@ -440,7 +440,7 @@ hätte (6) — die Prüfliste hat an ihrem zweiten Anlagefall wieder etwas gefun
 | 1 | **Gate 5** (A1): `grep -rniE '#(b02318\|ff7a7f\|f5b942\|5cc48d\|1c6640\|7a5200\|1a5fa0\|6fb4ec\|a8071a\|e04552)' frontend/src \| grep -v '/theme/'` = **0** | **verschärft** — ersetzt das Task-AC „höchstens 2 `a8071a`-Treffer". Gate 5 prüft alle zehn Rollenwerte. Heute: 8 Treffer |
 | 2 | `grep -rn "var(--ant-color-" frontend/src \| grep -v .test.` = **0** | unverändert (cssVar-Zweig „AUS", §1.1) |
 | 3 | In den angefassten Dateien: `grep -cE "rgba\(0,0,0,0\.\|#f0f0f0\|#1677ff"` = **0** | unverändert |
-| 4 | Statusfarb-Vertrag exhaustiv, **per Mutationsprobe belegt**: Rust-Enum-Variante ergänzen → `check-typ-codegen.sh` → `tsc` rot → revert. Ergebnis in dieser Spec dokumentiert | **präzisiert** — ein lokales Union-Widening beweist nichts |
+| 4 | Statusfarb-Vertrag exhaustiv, **per Mutationsprobe belegt** | **erfüllt** — durchgeführt 2026-07-28, Protokoll in §8 |
 | 5 | `grep -rn "KATEGORIE_FARBEN\|KAT_FARBE\|STATUS_META\|STATUS_LABEL\|UHS_TYP_LABEL" …` = 0 | **eingeschränkt** auf die Vertrags-Enums. `STATUS_META` benennt 7 fachlich unabhängige Maps (Material, Tier ×2, UHS, BR, Person, Schaden) — die außerhalb des Vertrags bleiben draußen (§5) |
 | 6 | Jeder Eintrag trägt einen zweiten Kanal — `label` ist Pflichtfeld | unverändert, Form in §1.3 |
 | 7 | `grep -rl "SektionHeader\|EinsatzSeite" … \| wc -l` ≥ 10 | **gilt.** Erreicht über die konsequente Anwendung der Norm auf alle ohnehin angefassten Dateien, siehe unten |
@@ -481,3 +481,54 @@ weil A2 diese Dateien schlicht nicht anfasst.
 `bereitstellungsraum/BereitstellungsraeumePage` · `bereitstellungsraum/BrDetailPage` ·
 `KraefteuebersichtPage` · `PersonenDetailPage` · `MaterialPage` (nur falls von einem anderen
 A2-Punkt berührt). Das sind ≥ 10 auch dann, wenn zwei davon wegfallen.
+
+---
+
+## 8 — Mutationsprobe: der Exhaustivitäts-Beweis (durchgeführt 2026-07-28)
+
+Das Akzeptanzkriterium verlangt, dass eine neue Enum-Variante den Typcheck bricht. Eine
+**Behauptung** wäre hier wertlos, und ein handgeschriebenes lokales Union-Widening ebenso:
+die Varianten kommen aus `types.generated.ts` und ändern sich **nur** über eine
+Rust-Änderung plus Regeneration. Der Beweis muss also den ganzen Weg gehen.
+
+**Eine Falle im Ablauf, die vorher nicht bekannt war.** `scripts/check-typ-codegen.sh`
+bricht in **Schritt 3** (`git diff --exit-code` auf die regenerierten Dateien), also
+**bevor `tsc` in Schritt 4 überhaupt läuft**. Das erfüllt das AC wörtlich — beweist aber
+nicht, was es beweisen soll. Der `tsc`-Lauf muss deshalb separat angestoßen werden.
+
+**Durchgeführter Ablauf** (Ziel: `UhsStatus`, `src/uhs/mod.rs:67`):
+
+1. Variante `Mutationsprobe` zu `UhsStatus` ergänzt, `as_str()` und `parse()` mitgezogen.
+2. **Erster Fang, noch in Rust:** `cargo build --lib` bricht mit **E0004** an
+   `src/uhs/mod.rs:115` (`uhs_status_uebergang_erlaubt`) — der Bestand hat dort einen
+   exhaustiven `match`. Für die Probe ergänzt, um bis zum eigentlichen Prüfpunkt zu kommen.
+3. `cargo test --test openapi_spec_aktuell` → schlägt an (erwartet), schreibt
+   `openapi.json` neu; `grep -c mutationsprobe openapi.json` = 1.
+4. `pnpm gen:types` → `types.generated.ts:2114` trägt
+   `UhsStatus: "geplant" | "aktiv" | "aufgeloest" | "mutationsprobe"`.
+5. **`tsc --noEmit` — der eigentliche Beweis.** Drei Fehler, wörtlich:
+
+```
+src/theme/statusFarben.ts(105,14): error TS2741: Property 'mutationsprobe' is missing in
+  type '{ geplant: …; aktiv: …; aufgeloest: … }' but required in type
+  'Record<"geplant" | "aktiv" | "aufgeloest" | "mutationsprobe", StatusDarstellung>'.
+
+src/pages/uhs/UhsSwitcher.tsx(22,7): error TS2741: Property 'mutationsprobe' is missing in
+  type '{ aktiv: number; geplant: number; aufgeloest: number; }' but required in type
+  'Record<"geplant" | "aktiv" | "aufgeloest" | "mutationsprobe", number>'.
+
+src/pages/lage-dashboard/lageVerdichtung.ts(118,24): error TS7053: Element implicitly has
+  an 'any' type … Property 'mutationsprobe' does not exist on type 'UhsVerdichtung'.
+```
+
+6. Rückbau per `git checkout` auf `src/uhs/mod.rs`, `openapi.json`, `types.generated.ts`;
+   `git status` sauber; `./scripts/check-typ-codegen.sh` läuft alle vier Schritte grün
+   („OK: Backend↔Frontend-Typen sind in Sync").
+
+**Was die Probe zusätzlich gezeigt hat.** Der Vertrag ist nicht das einzige Netz — die
+Kette fängt an **vier** unabhängigen Stellen: dem exhaustiven `match` in Rust (E0004), dem
+`Record` in `statusFarben.ts`, dem lokal gehaltenen `STATUS_RANG` in `UhsSwitcher` und der
+Verdichtung im Lagebild. Der zweite Fund ist der interessanteste: `STATUS_RANG` wurde
+bewusst **nicht** in den Vertrag gezogen (fachliche Sortierung, keine Darstellung) — und ist
+trotzdem exhaustiv getypt. Die Entscheidung, ihn lokal zu lassen, hat also keine Lücke
+aufgerissen.
