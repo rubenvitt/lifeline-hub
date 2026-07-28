@@ -138,6 +138,47 @@ async function jedeKennzahlStehtInIhremKnopf(page: Page) {
   }
 }
 
+/**
+ * Unterhalb der Umbruchschwelle bricht ein zu langes Etikett UM, statt einzeilig
+ * zu bleiben — `sprache.css` setzt dort `.lfh-etikett { white-space: normal }`
+ * mit der Begründung „Abgeschnittene Etiketten sind im Einsatz schlimmer als
+ * eine zweite Zeile."
+ *
+ * WARUM DAS EINEN EIGENEN NACHWEIS BRAUCHT: die Regel war von keiner einzigen
+ * Prüfung bewacht — man konnte sie ersatzlos entfernen, ohne dass irgendein Test
+ * rot wurde (nachgemessen). Insbesondere fängt `jedeKennzahlStehtInIhremKnopf`
+ * sie NICHT: das längste Etikett („Höchste Warnstufe") misst 161 px und passt
+ * damit auch einzeilig in seinen 183 px breiten Knopf. Es läuft nicht über — es
+ * bliebe bloß einzeilig, wo es zweizeilig gehört. Der einzige messbare
+ * Unterschied ist die HÖHE des Etiketts: 30,4 px mit der Regel (zwei Zeilen à
+ * 15,2), 15,2 px ohne sie.
+ *
+ * Gemessen wird gegen die gerechnete Zeilenhöhe, nicht gegen die feste 30,4:
+ * eine Schriftgrößen-Pflege verschöbe sonst beide Werte und färbte den Test rot,
+ * ohne dass die Regel litte.
+ */
+async function langesEtikettBrichtUm(page: Page) {
+  const mass = await page.locator('.lfh-kennzahlen').evaluate((el) => {
+    const etiketten = Array.from(el.querySelectorAll('.lfh-etikett'));
+    const hoechstes = etiketten.reduce((a, b) =>
+      a.getBoundingClientRect().height >= b.getBoundingClientRect().height ? a : b,
+    );
+    return {
+      zeilenhoehe: parseFloat(getComputedStyle(etiketten[0]).lineHeight),
+      whiteSpace: getComputedStyle(etiketten[0]).whiteSpace,
+      maxHoehe: hoechstes.getBoundingClientRect().height,
+      text: hoechstes.textContent,
+      anzahl: etiketten.length,
+    };
+  });
+  expect(mass.anzahl, 'Etiketten gefunden').toBe(6);
+  expect(
+    mass.maxHoehe,
+    `Kein Etikett bricht um — „${mass.text}" misst ${mass.maxHoehe}px bei ` +
+      `Zeilenhöhe ${mass.zeilenhoehe}px (white-space: ${mass.whiteSpace})`,
+  ).toBeGreaterThan(mass.zeilenhoehe * 1.5);
+}
+
 // Bewusst KEIN `.serial`: die drei Tests sind unabhängig (jeder meldet sich
 // selbst an), und im Reihen-Modus verdeckte ein Fehlschlag am Fükw-Schirm die
 // Messwerte der übrigen zwei Breiten — also genau die Zahlen, die man zur
@@ -163,6 +204,18 @@ test.describe('Kennzahlenleiste auf den drei Prüfbreiten', () => {
     expect(mass.spalten, 'Spalten am Fükw-Schirm').toBe(3);
     await keinWaagerechterUeberlauf(page);
     await jedeKennzahlStehtInIhremKnopf(page);
+
+    // Gegenprobe zur Umbruchregel am Handschirm: OBERHALB der Schwelle bleiben
+    // die Etiketten einzeilig. Ohne diese Zeile belegte der Umbruch-Nachweis
+    // unten nur „irgendetwas bricht um", nicht „die Regel greift genau unterhalb
+    // der Schwelle". Gemessen ist hier `nowrap` (Grundregel), unter 700 px
+    // Container `normal`. Geprüft wird der gerechnete Stil und nicht die Höhe:
+    // die hinge an der Etikettenlänge und bräche bei jeder Textpflege.
+    const umbruch = await page
+      .locator('.lfh-kennzahlen .lfh-etikett')
+      .first()
+      .evaluate((el) => getComputedStyle(el).whiteSpace);
+    expect(umbruch, 'Etiketten am Fükw-Schirm einzeilig').toBe('nowrap');
   });
 
   test('bei 1024 px steht die Kennzahlenleiste in 2 Spalten', async ({ page }) => {
@@ -201,17 +254,26 @@ test.describe('Kennzahlenleiste auf den drei Prüfbreiten', () => {
     // die Leiste bricht um, statt den Inhalt hinter einer waagerechten
     // Bildlaufleiste zu verstecken.
     //
-    // ZUSAMMENGEFÜHRT aus zwei Tests: der zweite hieß „scrollt bei 390 px nicht
-    // waagerecht", fuhr dieselbe Vorbereitung auf derselben Breite und rief von
-    // den drei Prüfungen hier nur `keinWaagerechterUeberlauf` auf — bis auf
-    // dessen `.lfh-flaeche`-Hälfte also eine echte Teilmenge. Zwei Tests, die
-    // dieselbe Frage stellen, kosten einen Anmeldezyklus und lesen sich wie zwei
-    // Belege, wo es einer ist. Der zusammengeführte Test ist strikt stärker: er
-    // prüft Spaltenzahl UND beide Überlaufhälften an derselben Messung.
+    // ZUSAMMENGEFÜHRT aus zwei Tests, die dieselbe Vorbereitung auf derselben
+    // Breite fuhren: „bricht auf 2 Spalten" und „scrollt nicht waagerecht".
+    //
+    // ACHTUNG, DAS WAR KEINE DUBLETTE — die naheliegende Begründung „der zweite
+    // ist eine Teilmenge des ersten" ist FALSCH und per Mutationsprobe widerlegt:
+    // setzt man im 700-px-Block `minmax(0, 1fr)` auf `minmax(220px, 1fr)`, fällt
+    // NUR `keinWaagerechterUeberlauf` (gemessen: Leisteninhalt 441 px in 367 px
+    // Fläche), während Spaltenzahl und „jede Kennzahl in ihrem Knopf" grün
+    // bleiben. Die beiden Tests trugen also je eine eigene Aussage.
+    //
+    // Zusammengeführt wird trotzdem, aber unter einer Bedingung, die hier erfüllt
+    // ist: es geht KEINE Zusicherung verloren. Der Test unten fährt alle drei
+    // Prüfungen an derselben Messung. Gegenprobe mit derselben Mutation: der
+    // zusammengeführte Test wird rot (an genau der Zeile oben). Was gespart wird,
+    // ist ein Anmeldezyklus, nicht eine Aussage.
     await dashboardOeffnen(page, 390, 844);
     const mass = await messen(page, 390);
     expect(mass.spalten, 'Spalten am Handschirm').toBe(2);
     await keinWaagerechterUeberlauf(page);
     await jedeKennzahlStehtInIhremKnopf(page);
+    await langesEtikettBrichtUm(page);
   });
 });
