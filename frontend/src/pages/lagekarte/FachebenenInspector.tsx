@@ -129,6 +129,7 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 function PegelInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
   const wert = s(p.wert);
   const einheit = s(p.einheit);
   const zustand = s(p.zustand);
@@ -137,10 +138,19 @@ function PegelInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       {wert ? (
-        <Typography.Title level={3} style={{ margin: '0 0 8px' }}>
+        // WEDER `EinsatzSeite` NOCH `SektionHeader` (LFH-328/A2, Norm §7.1): das hier war
+        // nie eine Überschrift, sondern ein MESSWERT („320 cm" + Zustand). Der Inspektor ist
+        // ein Panel in der Lagekarten-Leiste, hat also gar kein Seitenlayout, und ein
+        // `<h3>Pegelstand 320 cm</h3>` wäre für einen Screenreader eine Gliederungsebene, die
+        // es nicht gibt. Die Rolle fällt deshalb weg, das visuelle Gewicht bleibt: `Text` in
+        // Kennzahlen-Stimme mit `fontSizeHeading3` aus dem Theme statt einer eigenen Zahl.
+        <Typography.Text
+          strong
+          style={{ display: 'block', fontSize: token.fontSizeHeading3, marginBottom: token.marginXS }}
+        >
           {wert}{einheit ? ` ${einheit}` : ''}{' '}
           {zust ? <Tag color={zust.color}>{zust.label}</Tag> : null}
-        </Typography.Title>
+        </Typography.Text>
       ) : (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
           Kein aktueller Messwert

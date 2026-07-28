@@ -19,9 +19,10 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
+import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { statusKategorie } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
+import { abstand, flaeche } from '../theme/tokens';
 
 /**
  * Statusanzeige eines disponierten Fahrzeugs — und zugleich die GRENZE des
@@ -323,17 +324,28 @@ export default function FahrzeugePage() {
   ];
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: abstand.md }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Fahrzeuge' }]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: abstand.lg }}>
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      titel={
         <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>Fahrzeuge</Typography.Title>
+          Fahrzeuge
+          {/* BEFUND (LFH-328/A2): der Einsatz-Status trägt hier weiterhin antd-Farbnamen und
+              den ROHEN Enum-String statt einer Statusrolle. `statusFarben.ts` hat für
+              `EinsatzStatus` keinen Eintrag — die Vertragstabelle der Spec (§1.3) listet acht
+              Enums, dieses ist keins davon. Die Zuordnung ist zwar entschieden (Spec §6,
+              Prüflistenzeile 7), steht aber als lokale Map in `EinsaetzePage`. Sie hierher zu
+              kopieren wäre eine dritte Wahrheit, sie nach `statusFarben.ts` zu heben eine
+              Vertragserweiterung — beides ist nicht A2s Auftrag (Spec §5 Befund 7). */}
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
-        {darfSchreiben && (
+      }
+      breadcrumb={
+        <Breadcrumb
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Fahrzeuge' }]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           <Space>
             <Select
               style={{ minWidth: 260 }}
@@ -345,18 +357,14 @@ export default function FahrzeugePage() {
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
           </Space>
-        )}
-      </Space>
-
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert
-          style={{ marginBottom: abstand.md }}
-          type="info"
-          showIcon
-          title="Einsatz ist abgeschlossen — nur Ansicht."
-        />
-      )}
-
+        )
+      }
+      hinweis={
+        !darfSchreiben && einsatz.status !== 'aktiv' && (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        )
+      }
+    >
       <Table
         rowKey="id"
         loading={efQuery.isLoading}
@@ -401,6 +409,6 @@ export default function FahrzeugePage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </EinsatzSeite>
   );
 }

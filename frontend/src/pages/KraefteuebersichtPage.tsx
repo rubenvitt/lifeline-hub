@@ -1,4 +1,4 @@
-import { App as AntApp, Breadcrumb, Button, Card, Input, Space, Statistic, Table, Tag, Typography, theme } from 'antd';
+import { App as AntApp, Breadcrumb, Button, Card, Input, Space, Statistic, Table, Tag, theme } from 'antd';
 import type { GlobalToken } from 'antd';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { Select } from '../components/Select';
@@ -30,8 +30,9 @@ import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte'
 import type { MaterialStatus } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import EinsatzSeite from '../components/EinsatzSeite';
 import { rollenFarbe, statusKategorie, type Statusrolle } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
+import { abstand, flaeche } from '../theme/tokens';
 import './kraefteuebersichtPrint.css';
 
 /**
@@ -218,18 +219,27 @@ export default function KraefteuebersichtPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   return (
+    // `kraefte-print-root` bleibt die ÄUSSERE Hülle: `kraefteuebersichtPrint.css` hängt
+    // daran (`visibility` + absolute Positionierung im `@media print`), und `EinsatzSeite`
+    // nimmt kein `className` entgegen. Dass die Seite dadurch die Lesebreite aus `flaeche`
+    // bekommt, ändert am Druck nichts (die Druckseite ist ohnehin schmaler als 960 px).
     <div className="kraefte-print-root">
-      <Breadcrumb className="kraefte-no-print" style={{ marginBottom: abstand.md }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: abstand.xs }}>
-        <Typography.Title level={3} style={{ marginTop: 0 }}>Kräfteübersicht</Typography.Title>
-        <Space className="kraefte-no-print">
-          {darfSchreiben && (
-            <Button loading={uebernehmen.isPending} onClick={() => uebernehmen.mutate()}>In Lagebericht übernehmen</Button>
-          )}
-          <Button onClick={handleDrucken}>Drucken / als PDF</Button>
-        </Space>
-      </Space>
+      <EinsatzSeite
+        breite={flaeche.seiteBreit}
+        titel="Kräfteübersicht"
+        breadcrumb={
+          <Breadcrumb className="kraefte-no-print"
+            items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
+        }
+        aktionen={
+          <Space className="kraefte-no-print">
+            {darfSchreiben && (
+              <Button loading={uebernehmen.isPending} onClick={() => uebernehmen.mutate()}>In Lagebericht übernehmen</Button>
+            )}
+            <Button onClick={handleDrucken}>Drucken / als PDF</Button>
+          </Space>
+        }
+      >
       <Card style={{ marginBottom: abstand.lg }} styles={{ body: { overflowX: 'auto' } }}>
         {/* Monitoring-Kopf: nicht umbrechend, bei schmalem Viewport horizontal scrollbar. */}
         <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
@@ -329,6 +339,7 @@ export default function KraefteuebersichtPage() {
           childrenColumnName: 'children',
         }}
         locale={{ emptyText: 'Keine Kräfte im Einsatz disponiert' }} />
+      </EinsatzSeite>
     </div>
   );
 }

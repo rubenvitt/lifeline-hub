@@ -14,6 +14,8 @@ import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { flaeche } from '../theme/tokens';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, VerbleibArt } from '../api/types';
 import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
@@ -520,25 +522,32 @@ export default function PersonenDetailPage() {
   }
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: <Link to={zurueck}>Personen</Link> },
-          { title: registrierAnzeige(p.registrier_nr) },
-        ]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} align="start">
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      titel={
         <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Person {registrierAnzeige(p.registrier_nr)}
-          </Typography.Title>
+          Person {registrierAnzeige(p.registrier_nr)}
+          {/* BEFUND: `STATUS_META`/`SK_META` (`personen/personMeta.ts`) bleiben antd-Farbnamen.
+              Spec §5 zieht die Grenze bewusst — `PersonStatus`/`Sichtungskategorie` sind keine
+              Vertrags-Enums (§1.3), und die Sichtungskategorien tragen mit SK I–IV eine eigene,
+              genormte Farbsprache, die keine Statusrolle abbilden kann. Der Kopf wandert, die
+              Tags bleiben. */}
           <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>
           {p.aktuelle_sichtung && <Tag color={SK_META[p.aktuelle_sichtung].color}>{SK_META[p.aktuelle_sichtung].label}</Tag>}
           {p.storniert_at && <Tag color="default">storniert</Tag>}
         </Space>
+      }
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: <Link to={zurueck}>Personen</Link> },
+            { title: registrierAnzeige(p.registrier_nr) },
+          ]}
+        />
+      }
+      aktionen={
         <Space>
           {darfSchreiben && !p.storniert_at && !bearbeiten && (
             <Space wrap>
@@ -555,8 +564,8 @@ export default function PersonenDetailPage() {
           )}
           <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
         </Space>
-      </Space>
-
+      }
+    >
       <Row gutter={24}>
         <Col xs={24} lg={12}>
           <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>Stammdaten</Typography.Text>
@@ -679,6 +688,6 @@ export default function PersonenDetailPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </EinsatzSeite>
   );
 }

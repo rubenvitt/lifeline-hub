@@ -86,8 +86,12 @@ describe('App-Routing', () => {
       http.get('/api/fahrzeuge', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7/fahrzeuge');
+    // Teilstring statt exaktem Namen: seit die Seite ihren Kopf über `EinsatzSeite` baut,
+    // steht der Einsatz-Status-Tag INNERHALB der Überschrift (Muster aus `BrDetailPage`),
+    // und der zugängliche Name lautet damit „Fahrzeuge aktiv". Was der Test belegen soll —
+    // die echte Seite statt des Platzhalters — trägt die 🚧-Zusicherung darunter.
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Fahrzeuge' })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /Fahrzeuge/ })).toBeInTheDocument(),
     );
     expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
   });

@@ -21,8 +21,9 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import EinsatzSeite from '../components/EinsatzSeite';
 import { statusKategorie } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
+import { flaeche } from '../theme/tokens';
 
 /**
  * Statusanzeige eines disponierten Einsatzpersonals — und zugleich die GRENZE des
@@ -252,17 +253,25 @@ export default function PersonalPage() {
   ];
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: abstand.md }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Personal' }]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: abstand.lg }}>
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      titel={
         <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>Personal</Typography.Title>
+          Personal
+          {/* BEFUND wie in `FahrzeugePage`: `EinsatzStatus` hat keine Statusrolle in
+              `theme/statusFarben.ts` (Spec §1.3 listet acht Vertrags-Enums, dieses ist
+              keins davon). Der Tag bleibt deshalb auf antd-Farbnamen und rohem Enum-Wert
+              stehen — erfunden wird hier nichts (Spec §5 Befund 7). */}
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
-        {darfSchreiben && (
+      }
+      breadcrumb={
+        <Breadcrumb
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Personal' }]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           <Space>
             <Select
               style={{ minWidth: 260 }}
@@ -274,13 +283,14 @@ export default function PersonalPage() {
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
           </Space>
-        )}
-      </Space>
-
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert style={{ marginBottom: abstand.md }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-      )}
-
+        )
+      }
+      hinweis={
+        !darfSchreiben && einsatz.status !== 'aktiv' && (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        )
+      }
+    >
       <Table
         rowKey="id"
         loading={epQuery.isLoading}
@@ -313,6 +323,6 @@ export default function PersonalPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </EinsatzSeite>
   );
 }
