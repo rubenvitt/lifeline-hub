@@ -2,6 +2,7 @@
 import type { IconType } from 'react-icons';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides, Koordinatenformat } from '../api/types';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
+import type { Dichte } from '../theme/tokens';
 
 export type BefehlGruppe = 'module' | 'schnellaktionen' | 'einsaetze' | 'einstellungen' | 'navigation';
 
@@ -22,6 +23,7 @@ export interface BefehlKontext {
   darfSchreibenImEinsatz: boolean;
   navigate: (pfad: string) => void;
   setThemeModus: (m: ThemeModus) => void;
+  setDichte: (d: Dichte) => void;
   setKoordinaten: (f: Koordinatenformat) => void;
   logout: () => void;
 }

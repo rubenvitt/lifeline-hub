@@ -20,7 +20,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
   return {
     einsatzId: 5, benutzer: fuehrungskraft, einsaetze: [], overrides: undefined,
     darfSchreibenImEinsatz: true,
-    navigate: vi.fn(), setThemeModus: vi.fn(), setKoordinaten: vi.fn(), logout: vi.fn(),
+    navigate: vi.fn(), setThemeModus: vi.fn(), setDichte: vi.fn(), setKoordinaten: vi.fn(), logout: vi.fn(),
     ...over,
   };
 }
@@ -132,5 +132,22 @@ describe('baueBefehle — Schnelleinstellungen', () => {
     expect(k.setThemeModus).toHaveBeenCalledWith('dark');
     b.find((x) => x.id === 'koord:mgrs')!.ausfuehren();
     expect(k.setKoordinaten).toHaveBeenCalledWith('mgrs' as Koordinatenformat);
+  });
+
+  it('Schnelleinstellung Bediendichte ruft setDichte mit der Stufe', () => {
+    // Der zweite Bedienweg neben dem Kopfzeilen-Umschalter (LFH-329 · B1). Er
+    // trägt alle drei Stufen: die Kopfzeile legt ihre Umschalter auf schmalem
+    // Schirm ab, und ohne diesen Weg wäre die Stufe dann unerreichbar.
+    const k = kontext();
+    const b = baueBefehle(k);
+    for (const id of ['dichte:kompakt', 'dichte:komfortabel', 'dichte:handschuh']) {
+      const treffer = b.find((x) => x.id === id);
+      expect(treffer, id).toBeDefined();
+      expect(treffer!.gruppe, id).toBe('einstellungen');
+    }
+    b.find((x) => x.id === 'dichte:handschuh')!.ausfuehren();
+    expect(k.setDichte).toHaveBeenCalledWith('handschuh');
+    // Die Achsen bleiben getrennt: ein Dichte-Befehl rührt das Farbschema nicht an.
+    expect(k.setThemeModus).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 // frontend/src/command-palette/befehle.ts
-import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDesktop, TbWorld } from 'react-icons/tb';
+import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDesktop, TbWorld, TbArrowsMinimize, TbArrowsMaximize, TbHandStop } from 'react-icons/tb';
 import {
   modulRegistry, istModulSichtbar, istModulGesperrt, modulZielRoute,
 } from '../einsatz/modulRegistry';
@@ -7,6 +7,7 @@ import { darfVerwaltung } from '../einsatz/schreibrecht';
 import type { IconType } from 'react-icons';
 import type { Befehl, BefehlKontext } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
+import type { Dichte } from '../theme/tokens';
 import type { Koordinatenformat } from '../api/types';
 
 const SCHNELLAKTIONEN: { modulKey: string; route: string; label: string; schlagworte: string[] }[] = [
@@ -20,6 +21,15 @@ const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconT
   { id: 'theme:system', label: 'Darstellung: System', modus: 'system', icon: TbDeviceDesktop },
   { id: 'theme:light', label: 'Darstellung: Hell', modus: 'light', icon: TbSun },
   { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: TbMoon },
+];
+
+/** Bediendichte über die Palette (LFH-329 · B1) — der zweite Bedienweg neben dem
+ *  Kopfzeilen-Umschalter, und auf schmalem Schirm der einzige, weil die Kopfzeile
+ *  dort ihre Umschalter ablegt. */
+const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: IconType }[] = [
+  { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: TbArrowsMinimize },
+  { id: 'dichte:komfortabel', label: 'Dichte: Komfortabel', stufe: 'komfortabel', icon: TbArrowsMaximize },
+  { id: 'dichte:handschuh', label: 'Dichte: Handschuh', stufe: 'handschuh', icon: TbHandStop },
 ];
 
 const KOORD_BEFEHLE: { format: Koordinatenformat; label: string }[] = [
@@ -74,6 +84,9 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
   // 4. Schnelleinstellungen — global
   for (const t of THEME_BEFEHLE) {
     befehle.push({ id: t.id, gruppe: 'einstellungen', label: t.label, icon: t.icon, schlagworte: ['theme', 'hell', 'dunkel'], ausfuehren: () => k.setThemeModus(t.modus) });
+  }
+  for (const d of DICHTE_BEFEHLE) {
+    befehle.push({ id: d.id, gruppe: 'einstellungen', label: d.label, icon: d.icon, schlagworte: ['dichte', 'treffflaeche', 'handschuh', 'tablet', 'bedienung'], ausfuehren: () => k.setDichte(d.stufe) });
   }
   for (const c of KOORD_BEFEHLE) {
     befehle.push({ id: `koord:${c.format}`, gruppe: 'einstellungen', label: `Koordinaten: ${c.label}`, icon: TbWorld, schlagworte: ['koordinaten', 'format', c.format], ausfuehren: () => k.setKoordinaten(c.format) });
