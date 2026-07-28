@@ -91,7 +91,7 @@ async function messen(page: Page, viewportBreite: number) {
       `Viewport ${viewportBreite} px → .lfh-flaeche ${flaecheBreite} px (Container) ` +
       `→ ${mass.spalten} Spalten, Leiste ${mass.scrollWidth}/${mass.clientWidth} px (Inhalt/Fläche), ` +
       // Die Einsatz-Nummer steht mit in der Anmerkung, damit belegt ist, dass alle
-      // vier Tests DIESELBE Vorbedingung teilen — sonst legte ein Nachbartest still
+      // drei Tests DIESELBE Vorbedingung teilen — sonst legte ein Nachbartest still
       // seinen eigenen Einsatz an und niemand sähe es.
       `Einsatz ${einsatzId}`,
   });
@@ -138,7 +138,7 @@ async function jedeKennzahlStehtInIhremKnopf(page: Page) {
   }
 }
 
-// Bewusst KEIN `.serial`: die vier Tests sind unabhängig (jeder meldet sich
+// Bewusst KEIN `.serial`: die drei Tests sind unabhängig (jeder meldet sich
 // selbst an), und im Reihen-Modus verdeckte ein Fehlschlag am Fükw-Schirm die
 // Messwerte der übrigen zwei Breiten — also genau die Zahlen, die man zur
 // Diagnose braucht. Den einmal angelegten Einsatz teilen sie ohne `.serial`,
@@ -165,33 +165,53 @@ test.describe('Kennzahlenleiste auf den drei Prüfbreiten', () => {
     await jedeKennzahlStehtInIhremKnopf(page);
   });
 
-  test('bei 1024 px bleibt die Kennzahlenleiste überlaufsfrei', async ({ page }) => {
-    // Führungs-Tablet. BEWUSST OHNE Spaltenzahl-Assertion: der Container misst
-    // hier 694 px und liegt damit 6 px unter der Umbruchschwelle von 700 px —
-    // eine Zahl, die jede Änderung an Navigationsrahmen oder Seitenrinne kippt.
-    // Die Anmerkung protokolliert sie, statt sie zu behaupten. Gepinnt wird, was
-    // fachlich zählt: jede Kennzahl ist lesbar, nichts läuft aus dem Bild.
+  test('bei 1024 px steht die Kennzahlenleiste in 2 Spalten', async ({ page }) => {
+    // Führungs-Tablet. Gemessen bleiben von 1024 px Viewport 694 px Container
+    // übrig — 6 px UNTER der Umbruchschwelle von 700 px, die Leiste steht also in
+    // 2 Spalten × 3 Zeilen.
+    //
+    // FRÜHER STAND HIER, eine Spaltenzahl-Zusicherung sei bewusst weggelassen,
+    // weil die 694 px „jede Änderung an Navigationsrahmen oder Seitenrinne
+    // kippt". Das war die Begründung dafür, dass dieser Test gar nichts
+    // Unterscheidendes behauptete: die Überlaufprüfungen können hier nämlich
+    // beide nicht fallen. `.lfh-kennzahlen` ist ein Raster aus `minmax(0, 1fr)`
+    // und kann seinen Container waagerecht nicht überlaufen, und unterhalb von
+    // 700 px Container setzt `sprache.css` `.lfh-etikett { white-space: normal }`
+    // — umbrechende Etiketten laufen aus ihrem Knopf nicht heraus. Übrig blieb
+    // die `.lfh-flaeche`-Hälfte; die zugesagte Aussage „jede Kennzahl ist lesbar"
+    // war nicht gepinnt.
+    //
+    // Dass die 694 px empfindlich sind, ist deshalb kein Grund, nichts zu prüfen
+    // — es ist der Grund, WARUM geprüft wird: verschiebt der Navigationsrahmen
+    // die Fläche über 700 px, springt die Leiste auf 3 Spalten, und das gehört
+    // gesehen. Die Container-Breite steht als eigene Zusicherung daneben, damit
+    // ein Bruch benennt, welche Seite gekippt ist, statt nur „erwartet 2, war 3".
     await dashboardOeffnen(page, 1024, 768);
-    await messen(page, 1024);
+    const mass = await messen(page, 1024);
+    expect(mass.flaecheBreite, 'Container unter der 700-px-Schwelle').toBeLessThan(700);
+    expect(mass.spalten, 'Spalten am Führungs-Tablet').toBe(2);
     await keinWaagerechterUeberlauf(page);
     await jedeKennzahlStehtInIhremKnopf(page);
   });
 
-  test('die Kennzahlenleiste bricht bei 390 px auf 2 Spalten und zeigt alle 6 Kennzahlen', async ({
+  test('die Kennzahlenleiste bricht bei 390 px auf 2 Spalten und scrollt nicht waagerecht', async ({
     page,
   }) => {
-    // Handschirm, einhändig. 6 Kennzahlen / 2 Spalten = 3 Zeilen — das Paketziel.
+    // Handschirm, einhändig. 6 Kennzahlen / 2 Spalten = 3 Zeilen — das Paketziel:
+    // die Leiste bricht um, statt den Inhalt hinter einer waagerechten
+    // Bildlaufleiste zu verstecken.
+    //
+    // ZUSAMMENGEFÜHRT aus zwei Tests: der zweite hieß „scrollt bei 390 px nicht
+    // waagerecht", fuhr dieselbe Vorbereitung auf derselben Breite und rief von
+    // den drei Prüfungen hier nur `keinWaagerechterUeberlauf` auf — bis auf
+    // dessen `.lfh-flaeche`-Hälfte also eine echte Teilmenge. Zwei Tests, die
+    // dieselbe Frage stellen, kosten einen Anmeldezyklus und lesen sich wie zwei
+    // Belege, wo es einer ist. Der zusammengeführte Test ist strikt stärker: er
+    // prüft Spaltenzahl UND beide Überlaufhälften an derselben Messung.
     await dashboardOeffnen(page, 390, 844);
     const mass = await messen(page, 390);
     expect(mass.spalten, 'Spalten am Handschirm').toBe(2);
-    await jedeKennzahlStehtInIhremKnopf(page);
-  });
-
-  test('bei 390 px scrollt die Kennzahlenleiste nicht waagerecht', async ({ page }) => {
-    // Die eigentliche Paketfrage: die Leiste bricht um, statt den Inhalt hinter
-    // einer waagerechten Bildlaufleiste zu verstecken.
-    await dashboardOeffnen(page, 390, 844);
-    await messen(page, 390);
     await keinWaagerechterUeberlauf(page);
+    await jedeKennzahlStehtInIhremKnopf(page);
   });
 });

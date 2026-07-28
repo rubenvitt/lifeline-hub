@@ -58,11 +58,20 @@ test('gespeicherte Stufe handschuh trägt sich bis in die Trefffläche', async (
 
   const hoehe = await knopfhoehe(page);
   // Der Knopf trägt eine große Größen-Angabe, antd leitet daraus das 1,25-fache
-  // der Steuerhöhe ab: 72 × 1,25 = 90. Zweiseitig gepinnt, damit nicht irgendein
-  // anderer Grund die Schwelle reißt — eine bloße Untergrenze wäre auch von einem
-  // umgebrochenen Knopf erfüllt.
-  expect(hoehe, `handschuh: ${hoehe}px`).toBeGreaterThanOrEqual(72);
-  expect(hoehe, `handschuh: ${hoehe}px`).toBeLessThan(96);
+  // der Steuerhöhe ab: 72 × 1,25 = 90. GEMESSEN: exakt 90,0 px.
+  //
+  // Das Fenster liegt um die gemessenen 90, nicht bei „mindestens 72". Die alte
+  // Untergrenze widersprach ihrer eigenen Herleitung eine Zeile darüber: sie stand
+  // auf der ROHEN Steuerhöhe, nicht auf dem daraus abgeleiteten Knopfmaß. Ein
+  // Regress, der die große Größen-Angabe verliert, landet auf genau 72 — also
+  // exakt AUF der Grenze — und liefe durch (per Mutationsprobe belegt: ohne
+  // `size="large"` misst der Knopf 72 px und der alte Test blieb grün).
+  //
+  // ±4 px lassen Schrift- und Rundungsspiel und schließen trotzdem jeden Wert aus,
+  // der hier sonst in Frage käme: 72 (Größen-Angabe verloren), 60 (Stufe
+  // komfortabel, 48 × 1,25), 37,5 (Stufe kompakt).
+  expect(hoehe, `handschuh: ${hoehe}px`).toBeGreaterThanOrEqual(86);
+  expect(hoehe, `handschuh: ${hoehe}px`).toBeLessThanOrEqual(94);
 });
 
 test('ohne Seed bleibt es kompakt', async ({ page }) => {
@@ -72,7 +81,13 @@ test('ohne Seed bleibt es kompakt', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
 
   const hoehe = await knopfhoehe(page);
-  // 30 × 1,25 = 37,5.
-  expect(hoehe, `kompakt: ${hoehe}px`).toBeLessThan(72);
-  expect(hoehe, `kompakt: ${hoehe}px`).toBeGreaterThan(24);
+  // 30 × 1,25 = 37,5. GEMESSEN: exakt 37,5 px.
+  //
+  // Fenster um den gemessenen Wert, aus demselben Grund wie oben: die frühere
+  // Spanne 24 < h < 72 ließ auch 60 px durch (Stufe komfortabel, 48 × 1,25) — die
+  // Gegenprobe hätte also nicht gemerkt, wenn ohne Seed die falsche Stufe
+  // ankommt. Sie soll belegen, dass es KOMPAKT ist, nicht bloß „kleiner als
+  // handschuh".
+  expect(hoehe, `kompakt: ${hoehe}px`).toBeGreaterThanOrEqual(34);
+  expect(hoehe, `kompakt: ${hoehe}px`).toBeLessThanOrEqual(42);
 });

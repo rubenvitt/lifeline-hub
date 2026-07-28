@@ -54,14 +54,18 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  * Misst den waagerechten Überlauf elementweise UND benennt die Verursacher.
  *
  * WARUM NICHT `document.body.scrollWidth <= window.innerWidth`: dieses eine
- * Gesamtmaß ist auf 390 px heute rot, und zwar an einer Stelle, die diesem Paket
- * nicht gehört — die Knopfgruppe rechts in der Kopfzeile (Einsatz-Switcher,
- * Alarm-Zentrale, Theme-Umschalter, Benutzermenü) misst dort gemessene 869 px.
- * Ein Gesamtmaß-Assert wäre also entweder dauerhaft rot oder müsste ganz
- * entfallen; beides sagt nichts über den Navigationsrahmen aus. Die Prüfung
- * unten teilt deshalb elementweise nach Besitzer auf: `rahmen` (dieses Paket,
- * wird zugesichert), `kopfzeile` und `inhalt` (fremde Pakete, werden GEMELDET
- * statt stillschweigend übergangen).
+ * Gesamtmaß sagt nichts über den BESITZER eines Überlaufs. Es steht und fällt
+ * mit fremden Paketen — Kopfzeile, Modulseite —, und ein Bruch dort läse sich
+ * als „der Navigationsrahmen ist kaputt". Die Prüfung unten teilt deshalb
+ * elementweise nach Besitzer auf: `rahmen` (dieses Paket, wird zugesichert),
+ * `kopfzeile` und `inhalt` (fremde Pakete, werden GEMELDET statt stillschweigend
+ * übergangen).
+ *
+ * (Gemessen an HEAD wäre das Gesamtmaß auf 390 px grün — `body.scrollWidth`
+ * misst dort glatte 390 px. Der frühere Kommentar hier nannte es „heute rot" und
+ * bezifferte die Kopfzeilen-Knopfgruppe mit 869 px; beides gilt nicht mehr,
+ * siehe `meldeFremdenUeberlauf` unten. Die Aufteilung bleibt trotzdem richtig:
+ * sie trennt Verantwortung, nicht Symptome.)
  *
  * Ohne Täterliste meldet ein rotes Gate nur „ist zu breit", und der nächste
  * Leser fängt bei null an.
@@ -105,15 +109,34 @@ async function messeUeberlauf(page: Page) {
  * Meldet, was AUSSERHALB dieses Pakets über den Rand ragt — laut, aber ohne den
  * Lauf rot zu färben.
  *
- * Gemessen an HEAD sind das zwei Stellen, die H11 nicht gehören und die je ein
- * eigenes Paket haben:
- *  - die Knopfgruppe rechts in der Kopfzeile (Switcher, Alarm, Theme, Benutzer),
- *  - die ETB-Tabelle, deren feste Spaltenbreiten zusammen breiter sind als der
- *    Handschirm und die (noch) keine eigene Scroll-Fläche mitbringt.
+ * GEMESSEN AN HEAD meldet diese Funktion NICHTS: auf 390 px sind Kopfzeile und
+ * Modulseite beide leer, und `document.body.scrollWidth` misst glatte 390 px.
+ * Die Stelle ist damit heute eine reine Wache, kein Bericht über bekannte
+ * Ausreißer.
  *
- * Ein `body.scrollWidth`-Assert über die ganze Seite wäre dadurch dauerhaft rot
- * und würde als „H11 ist kaputt" gelesen. Deshalb: zusichern, was der Rahmen
- * beiträgt — und den Rest benennen, statt ihn zu verschweigen.
+ * FRÜHER STAND HIER, es seien zwei Stellen, und beide Angaben sind überholt:
+ *  - „die Knopfgruppe rechts in der Kopfzeile misst 869 px" — sie klappt
+ *    inzwischen zusammen und misst auf 390 px gemessene 46 px. Der Wert 869
+ *    stammt von einer Messung am FÜKW-Schirm, wo er nichts überragt.
+ *  - „die ETB-Tabelle bringt (noch) keine eigene Scroll-Fläche mit" — sie tut es:
+ *    `src/etb/EtbTabelle.tsx` läuft seit dem Katalogtabellen-Paket über
+ *    `KatalogTabelle`, und das setzt `scroll={{ x: 'max-content' }}`. Gemessen
+ *    trägt `.ant-table-body` `overflow-x: auto`; die 942 px breite Tabelle liegt
+ *    also in ihrem eigenen Bildlaufbereich und wird von `eingefasst()` unten
+ *    zu Recht herausgefiltert.
+ *
+ * Die AUFTEILUNG NACH BESITZER bleibt trotzdem richtig — sie ruhte nie darauf,
+ * dass gerade etwas überragt, sondern darauf, dass dieser Spec nur für den
+ * Navigationsrahmen geradesteht. Ein dokumentweiter `body.scrollWidth`-Assert
+ * wäre HEUTE grün, aber er würde diesem Paket fremde Pakete anlasten, sobald
+ * dort etwas kippt. Deshalb weiterhin: zusichern, was der Rahmen beiträgt — und
+ * den Rest benennen, statt ihn zu verschweigen.
+ *
+ * NEBENBEFUND, hier nicht behoben: `eingefasst()` unten behandelt JEDES
+ * `overflow-x` ungleich `visible` als Freibrief, also auch `hidden`. Ein
+ * geklippter (= unerreichbarer) Inhalt fiele dieser Prüfung damit nicht auf.
+ * `gate1-ueberlauf.spec.ts` beschreibt dieselbe Lücke und weist `hidden` in
+ * seiner Diagnose getrennt aus.
  */
 function meldeFremdenUeberlauf(
   lage: string,
@@ -225,7 +248,20 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
 
   const panel = (await page.locator('.ant-drawer-content-wrapper').boundingBox())!;
   const koerper = (await page.locator('.ant-drawer-body').boundingBox())!;
-  expect(panel.width, 'Panel trägt das Maß').toBe(DRAWER_BREITE);
+  // Dieselbe halbe-Pixel-Toleranz wie beim Schwestertest oben (Zeile ~186): es ist
+  // DIESELBE Messung an DEMSELBEN Panel, und dort hat Chromium unter Last
+  // 279.99999237060547 geliefert. Ein exakter Vergleich hier hätte denselben
+  // Flake behalten, der dort schon behoben war.
+  //
+  // Die Aussage bleibt unberührt: dieser Test fragt nicht, OB das Panel schmal
+  // genug ist (das tut der Test oben), sondern WELCHE Box das Maß trägt. Ein
+  // halbes Pixel unterscheidet das Panel weiterhin von jeder anderen Box, die
+  // hier in Frage käme — die Inhaltsbox liegt um die Polsterung schmaler, antds
+  // Vorgabe läge bei 378.
+  expect(
+    Math.abs(panel.width - DRAWER_BREITE),
+    `Panel trägt das Maß (gemessen ${panel.width})`,
+  ).toBeLessThanOrEqual(0.5);
   // Der Körper liegt INNERHALB des Panels (Innenrand), ist also nie breiter.
   expect(koerper.width, 'Körper liegt im Panel').toBeLessThanOrEqual(DRAWER_BREITE);
 });
