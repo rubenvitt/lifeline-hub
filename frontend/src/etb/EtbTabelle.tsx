@@ -2,8 +2,11 @@ import { Button, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { EtbEintragAnzeige } from '../api/types';
 import Markdown from '../components/Markdown';
+import StatusTag from '../components/StatusTag';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
-import { TYP_FARBE, TYP_LABEL, istNachgetragen } from './typFarben';
+import { istNachgetragen } from './typFarben';
+import { etbTyp } from '../theme/statusFarben';
+import { abstand } from '../theme/tokens';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { formatZeit } from '../kommunikation/zeit';
 
@@ -42,7 +45,7 @@ export default function EtbTabelle({
       key: 'ereigniszeit',
       width: 180,
       render: (_, e) => (
-        <Space size={4}>
+        <Space size={abstand.xs}>
           <span><ZeitAnzeige wert={e.ereigniszeit} format="kurz" /></span>
           {istNachgetragen(e.ereigniszeit, e.received_at) && (
             <Tooltip title={`Nachgetragen — Server-Empfang: ${formatZeit(e.received_at)}`}>
@@ -56,7 +59,7 @@ export default function EtbTabelle({
       title: 'Typ',
       dataIndex: 'typ',
       width: 130,
-      render: (_, e) => <Tag color={TYP_FARBE[e.typ]}>{TYP_LABEL[e.typ]}</Tag>,
+      render: (_, e) => <StatusTag darstellung={etbTyp[e.typ]} />,
     },
     {
       title: 'Von → An',
@@ -73,7 +76,7 @@ export default function EtbTabelle({
         return (
           <div>
             {(istBerichtigung || wurdeBerichtigt) && (
-              <div style={{ marginBottom: 4 }}>
+              <div style={{ marginBottom: abstand.xs }}>
                 {istBerichtigung && (
                   <Tag color="red">berichtigt #{lfdNrVonId.get(e.berichtigt_eintrag_id!) ?? '?'}</Tag>
                 )}
@@ -83,7 +86,7 @@ export default function EtbTabelle({
               </div>
             )}
             {(e.befehl_id != null || e.lagebericht_id != null || e.auftrag_id != null) && (
-              <div style={{ marginBottom: 4 }}>
+              <div style={{ marginBottom: abstand.xs }}>
                 <EtbBacklinkBadges eintrag={e} einsatzId={einsatzId} />
               </div>
             )}
@@ -101,19 +104,19 @@ export default function EtbTabelle({
       key: 'aktion',
       width: 230,
       render: (_, e) => (
-        <Space size={4} wrap>
+        <Space size={abstand.xs} wrap>
           {onBerichtigen && e.typ !== 'berichtigung' && (
-            <Button type="link" size="small" onClick={() => onBerichtigen(e)}>
+            <Button type="link" onClick={() => onBerichtigen(e)}>
               Berichtigen
             </Button>
           )}
           {onWiedervorlage && (
-            <Button type="link" size="small" onClick={() => onWiedervorlage(e)}>
+            <Button type="link" onClick={() => onWiedervorlage(e)}>
               Wiedervorlage
             </Button>
           )}
           {onAuftragErteilen && (
-            <Button type="link" size="small" onClick={() => onAuftragErteilen(e)}>
+            <Button type="link" onClick={() => onAuftragErteilen(e)}>
               Auftrag erteilen
             </Button>
           )}
@@ -125,7 +128,6 @@ export default function EtbTabelle({
   return (
     <Table
       rowKey="id"
-      size="small"
       columns={spalten}
       dataSource={eintraege}
       pagination={false}

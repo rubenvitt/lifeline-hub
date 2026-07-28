@@ -4,15 +4,16 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
 import type { EtbTyp } from '../api/types';
-import { TYP_LABEL } from './typFarben';
+import { etbTyp } from '../theme/statusFarben';
+import { abstand } from '../theme/tokens';
 
 interface Props {
   onChange: (werte: EtbFilterWerte) => void;
 }
 
-const TYP_OPTIONEN = (Object.keys(TYP_LABEL) as EtbTyp[]).map((t) => ({
+const TYP_OPTIONEN = (Object.keys(etbTyp) as EtbTyp[]).map((t) => ({
   value: t,
-  label: TYP_LABEL[t],
+  label: etbTyp[t].label,
 }));
 
 /** Wandelt einen dayjs-Zeitpunkt ins SQLite-/Backend-Format (UTC). */
@@ -34,7 +35,7 @@ export default function EtbFilterleiste({ onChange }: Props) {
   }
 
   return (
-    <Space wrap style={{ marginBottom: 16 }}>
+    <Space wrap style={{ marginBottom: abstand.lg }}>
       <Input.Search
         placeholder="Volltextsuche"
         allowClear

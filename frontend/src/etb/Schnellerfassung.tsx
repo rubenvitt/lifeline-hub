@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import type { NeuerEintrag } from '../api/etb';
 import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
-import { ERFASSBARE_TYPEN, TYP_LABEL } from './typFarben';
+import { ERFASSBARE_TYPEN } from './typFarben';
+import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import MetaChip from './MetaChip';
@@ -29,7 +30,7 @@ interface Props {
   onWerteChange?: (werte: EntwurfWerte) => void;
 }
 
-const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: TYP_LABEL[t] }));
+const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }));
 
 export default function Schnellerfassung({
   erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz, initialWerte, onWerteChange,
@@ -166,12 +167,12 @@ export default function Schnellerfassung({
   }
 
   return (
-    <Card size="small" className="etb-erfassung-card">
+    <Card className="etb-erfassung-card">
       {berichtigungZu && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 12 }}
           title={`Berichtigung zu #${berichtigungZu.lfd_nr}`}
-          action={<Button size="small" onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
+          action={<Button onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
         />
       )}
 
@@ -228,7 +229,6 @@ export default function Schnellerfassung({
           />
         )}
         <Button
-          size="small"
           type="dashed"
           icon={<PlusOutlined />}
           onClick={() => { setMenuFilter(''); setTriggerStart(-1); setMenuOffen((o) => !o); }}
