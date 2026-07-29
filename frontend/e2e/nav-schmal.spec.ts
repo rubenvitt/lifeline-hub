@@ -285,7 +285,25 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
     `Panel trägt das Maß (gemessen ${panel.width})`,
   ).toBeLessThanOrEqual(0.5);
   // Der Körper liegt INNERHALB des Panels (Innenrand), ist also nie breiter.
-  expect(koerper.width, 'Körper liegt im Panel').toBeLessThanOrEqual(DRAWER_BREITE);
+  //
+  // DIESELBE halbe-Pixel-Toleranz wie zwei Zeilen darüber, und aus demselben Grund.
+  // Der Nav-Drawer setzt die Körper-Polsterung auf 0, Körper und Panel sind hier also
+  // DIESELBE Messung — und die schwankt um 280 herum: der Kommentar oben hält
+  // 279.99999237060547 fest, gemessen wurde am 29.07.2026 (LFH-332) auch
+  // 280.00000762939453. Beide Werte sind 280 plus/minus Float-Rauschen, aber nur einer
+  // von beiden bestand einen exakten Vergleich. Dass die Toleranz oben nachgetragen und
+  // hier vergessen wurde, hat den Flake nur verschoben statt behoben.
+  //
+  // Ausgelöst hat es eine Änderung, die den Navigationsrahmen gar nicht anfasst (B4 hat
+  // die ETB-Steuerzeile um einen Schalter ergänzt) — genau das ist das Argument: eine
+  // Zusicherung, die eine beliebige Änderung an einer anderen Seite umwerfen kann,
+  // misst das Rauschen und nicht die Aussage. Die Aussage selbst bleibt scharf: gefragt
+  // ist, WELCHE Box das Maß trägt, und ein halbes Pixel unterscheidet 280 weiterhin von
+  // der um die Polsterung schmaleren Inhaltsbox wie von antds Vorgabe 378.
+  expect(
+    koerper.width,
+    `Körper liegt im Panel (gemessen ${koerper.width})`,
+  ).toBeLessThanOrEqual(DRAWER_BREITE + 0.5);
 });
 
 /**
