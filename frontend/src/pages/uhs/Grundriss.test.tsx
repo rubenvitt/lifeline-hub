@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
@@ -165,6 +165,71 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     expect(body!.art).toBe('entlassung');
     // status=abtransportiert NUR bei Transport → sonst null (Spiegel der Patienten-Ansicht).
     expect(body!.status).toBeNull();
+  });
+
+  it('setzt den Fokus beim Öffnen auf „Ziel", nicht auf das vorbelegte „Art"', async () => {
+    // LFH-332/B4: die Erfassungshülle fokussiert das ERSTE bedienbare Feld. Deshalb steht
+    // „Ziel" im Formular vor „Art" — „Art" ist mit Transport vorbelegt und nichts, was der
+    // Erfassende zuerst tippt. Der Test pinnt die Feldreihenfolge über ihre Wirkung.
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    const ziel = await screen.findByRole('textbox', { name: /Ziel/ });
+    await waitFor(() => expect(ziel).toHaveFocus());
+    // „Art" bleibt trotz der Umsortierung sichtbar und bedienbar.
+    expect(screen.getByRole('combobox', { name: 'Art' })).toBeEnabled();
+  });
+
+  it('lässt Dialog und Eingaben stehen, wenn das Speichern scheitert', async () => {
+    // LFH-332/B4: die Hülle leert erst NACH erfolgreichem Speichern. Das setzt voraus,
+    // dass `onErfassen` bei einem Fehler ablehnt (mutateAsync, nicht mutate) — sonst
+    // wäre der Wortlaut weg, obwohl der Verbleib nie ankam.
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    server.use(http.post('/api/einsaetze/1/personen/7/verbleib', () =>
+      HttpResponse.json({ error: 'Verbleib abgelehnt' }, { status: 500 })));
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Verbleib abgelehnt')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Ziel/ })).toHaveValue('KH Mitte');
+  });
+
+  // LFH-332/B4, Zusicherung 3: zurückgesetzt wird auf BEIDEN Wegen. Vor dem Umbau tat das
+  // der Aufrufer selbst (onSuccess UND onCancel), jetzt die Hülle.
+  //
+  // GEMESSENE LÜCKE (29.07., gehört NICHT dieser Datei): der Abbrechen-Weg hat zwei
+  // Auslöser, und nur einer läuft durch den Reset der Hülle. `ErfassungsModal` reicht
+  // `onAbbrechen` roh an `Modal.onCancel` weiter, während `form.resetFields()` allein im
+  // `abbrechen()` von `ErfassungsFormular` steht — also hinter dem Abbrechen-KNOPF. Escape,
+  // das Kreuz und der Maskenklick gehen daran vorbei; `destroyOnHidden` rettet nichts, weil
+  // der Formularspeicher beim Aufrufer liegt (`Form.useForm()`), nicht im zerstörten DOM.
+  // Gemessen: nach Escape steht beim Wiederöffnen „KH Mitte" im Ziel-Feld. Der Fix ist eine
+  // Zeile in `components/Erfassung.tsx` (Modal-`onCancel` durch denselben Griff wie den
+  // Knopf leiten) und trifft alle Aufrufer der Hülle — deshalb hier nur der Knopf-Weg
+  // gepinnt und die Lücke gemeldet, statt sie lokal mit einem verbotenen Aufrufer-Reset
+  // zuzukleistern (Regel 3 des Umbaus).
+  it('leert den Dialog nach dem Abbrechen per Knopf (auch die Vorbelegung ist wieder da)', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p]);
+    const oeffnen = await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' });
+    await userEvent.click(oeffnen);
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte');
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Art' }));
+    await userEvent.click(await screen.findByText('Entlassung vor Ort'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    await userEvent.click(oeffnen);
+    expect(await screen.findByRole('textbox', { name: /Ziel/ })).toHaveValue('');
+    // Art steht wieder auf der Vorbelegung. antd v6 trägt den gewählten Eintrag als
+    // `title` am Select-Inhalt — das Eingabefeld der Combobox ist immer leer.
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByTitle('Transport')).toBeInTheDocument();
+    expect(within(dialog).queryByTitle('Entlassung vor Ort')).not.toBeInTheDocument();
   });
 });
 

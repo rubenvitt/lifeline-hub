@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -122,6 +122,38 @@ async function modalDialog() {
   return (await screen.findAllByRole('dialog'))[0];
 }
 
+/**
+ * Wartet, bis die Dialogfelder aus dem Baum verschwunden sind — die Sonde für „geschlossen"
+ * (die Hülle rendert mit `destroyOnHidden`).
+ *
+ * Der Anstoß in der Schleife ist nötig, nicht dekorativ: antd fährt den Dialog mit einer
+ * Schließbewegung aus, und jsdom feuert dafür von sich aus kein Ende-Ereignis. Ohne das
+ * Ereignis bleibt das Modal für immer in `ant-zoom-leave-active` stehen (gemessen), die Felder
+ * werden nie abgeräumt — ein `not.toBeInTheDocument` liefe in den Timeout, obwohl die Anwendung
+ * korrekt schließt. Gemessen beendet `transitionend` die Bewegung, `animationend` NICHT (trotz
+ * des `ant-zoom`-Klassennamens); beide zu feuern kostet nichts und überlebt einen Wechsel.
+ * Geprüft wird am Ende nur Verhalten — die Felder sind weg —, kein Klassenname.
+ */
+async function warteBisDialogWeg() {
+  await vi.waitFor(() => {
+    const modal = document.querySelector<HTMLElement>('.ant-modal');
+    if (modal) {
+      fireEvent.transitionEnd(modal);
+      fireEvent.animationEnd(modal);
+    }
+    expect(screen.queryByLabelText('Ort')).not.toBeInTheDocument();
+  });
+}
+
+/** Die drei Pflichtfelder der Schnellerfassung füllen (Typ, Ausmaß, Ort). */
+async function fuelleSchaden(dialog: HTMLElement, typ: string, ausmass: string, ort: string) {
+  await userEvent.click(within(dialog).getAllByRole('combobox')[0]); // Typ
+  await waehleOption(typ);
+  await userEvent.click(within(dialog).getAllByRole('combobox')[1]); // Ausmaß
+  await waehleOption(ausmass);
+  await userEvent.type(within(dialog).getByLabelText('Ort'), ort);
+}
+
 describe('SchaedenPage', () => {
   it('zeigt offene Schäden mit S-Nummer, Typ und Ausmaß', async () => {
     render(einsatzAktiv, [
@@ -177,6 +209,95 @@ describe('SchaedenPage', () => {
     await vi.waitFor(() => expect(body.typ).toBe('umweltschaden'));
     expect(body.ausmass).toBe('gross');
     expect(body.ort).toBe('Hauptstr. 17');
+  });
+
+  /**
+   * SERIENMODUS (LFH-332 · B4) — Partnerpaar mit dem Fall darunter.
+   *
+   * „Der Dialog bleibt offen" allein belegte nichts: der Fall wäre genauso grün, wenn sich der
+   * Dialog ÜBERHAUPT NIE schlösse. Erst der zweite Fall mit derselben Sonde macht daraus eine
+   * Aussage über die Verzweigung Serien-Speichern ↔ Einzel-Erfassen.
+   *
+   * Sonde ist das Ortsfeld, nicht die Dialog-Rolle: die Hülle rendert mit `destroyOnHidden`,
+   * die Felder sind also genau so lange im Baum, wie der Dialog offen ist — während der
+   * Modal-Rahmen selbst über seine Schließ-Animation hinweg stehen bleibt.
+   */
+  it('„Speichern und nächste" lässt den Dialog offen und behält den Ort', async () => {
+    const koerper: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(basisSchaden(), { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    // Der Datensatz ist angekommen (Zähler der Hülle) …
+    expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
+    // … der Dialog steht weiter offen, und der Ort hat das Speichern überlebt (Wertübernahme).
+    expect(screen.getByLabelText('Ort')).toHaveValue('Hauptstr. 17');
+  });
+
+  /**
+   * „Geschädigt" ist kein `Form.Item`, sondern lokaler State des Modals — die Hülle leert beim
+   * Serien-Speichern das Formular, diesen Wert kann sie nicht kennen. Läge der Reset nur an
+   * `onFertig` (das beim Serien-Speichern NIE läuft), wanderte die Zuordnung des ersten
+   * Schadens still auf den zweiten: ein falscher Datensatz, keine Kosmetik.
+   *
+   * Geprüft werden BEIDE Absendungen. Nur `koerper[1] === null` wäre auch grün, wenn die
+   * Zuordnung nie angekommen wäre — erst die 42 in `koerper[0]` macht daraus „geleert".
+   */
+  it('Serien-Speichern trägt den Geschädigten NICHT in den nächsten Schaden', async () => {
+    const koerper: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(basisSchaden(), { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
+    await userEvent.click(within(dialog).getAllByRole('combobox')[2]); // Geschädigt
+    await waehleOption('R-007 · Anna Meier');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+
+    // Zweiter Schaden: Typ und Ausmaß neu wählen, Ort ist übernommen, Geschädigt unberührt.
+    await userEvent.click(within(dialog).getAllByRole('combobox')[0]);
+    await waehleOption('Umweltschaden');
+    await userEvent.click(within(dialog).getAllByRole('combobox')[1]);
+    await waehleOption('groß');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    expect(koerper[0].geschaedigt_person_id).toBe(42);
+    expect(koerper[1].geschaedigt_person_id).toBeNull();
+    expect(koerper[1].ort).toBe('Hauptstr. 17');
+  });
+
+  it('„Anlegen" schließt den Dialog', async () => {
+    const koerper: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(basisSchaden(), { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await warteBisDialogWeg();
   });
 
   it('Schnellerfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {

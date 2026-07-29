@@ -63,7 +63,9 @@ export default function PersonenPage() {
       if (v.folgeStatus) await setzePersonStatus(einsatzId, person.id, v.folgeStatus);
       return person;
     },
-    onSuccess: () => { invalidate(); setModus(null); },
+    // Nur invalidieren. Geschlossen wird über `onFertig` des Erfassungs-Primitivs (LFH-332 · B4):
+    // im Serienmodus ist ein erfolgreiches Speichern gerade KEIN Grund zu schließen.
+    onSuccess: () => invalidate(),
     onError: fehler,
   });
 
@@ -300,8 +302,12 @@ export default function PersonenPage() {
         modus={modus}
         isPending={anlegenMutation.isPending}
         onCancel={() => setModus(null)}
-        onFinish={(daten) =>
-          anlegenMutation.mutate({
+        onFertig={() => setModus(null)}
+        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
+        // Datensatz wirklich angekommen ist — dafür muss das Versprechen bei einem Fehler
+        // ablehnen. Den Fehler-Toast wirft weiterhin `onError` der Mutation.
+        onErfassen={(daten) =>
+          anlegenMutation.mutateAsync({
             daten,
             folgeStatus: modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
           })

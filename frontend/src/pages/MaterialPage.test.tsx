@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -245,6 +245,169 @@ describe('MaterialPage · Datenzustände', () => {
     await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
     expect(await screen.findByText('Kein Material im Dienst')).toBeInTheDocument();
     expect(screen.queryByText('Materialliste konnte nicht geladen werden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ad-hoc-Schnellerfassung (LFH-332 · B4).
+ *
+ * Der Dialog liegt auf `ErfassungsModal`. Was die Hülle selbst zusichert (Fokus, Enter,
+ * Leeren auf beiden Wegen, Ablehnung), steht in `components/Erfassung.test.tsx` und wird
+ * hier NICHT nachgespielt. Geprüft wird ausschließlich, was diese Seite entscheidet: das
+ * Feldbudget mit dem eingeklappten Rest und der Serienlauf mit seinen Übernahmefeldern.
+ */
+describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
+  /**
+   * Zählt die BEDIENBAREN Felder des Dialogs: Textfelder plus Zahlenfelder
+   * (`InputNumber` trägt `role="spinbutton"`). Die Rollen-Abfrage blendet aus, was im
+   * Barrierefreiheitsbaum nicht steht — und genau das ist der eingeklappte Bereich:
+   * `forceRender` lässt sein Feld im Baum, `CSSMotion` legt bei unsichtbarem Bereich ein
+   * `display: none` DIREKT ans Element (kein Klassenname). Deshalb hält diese Zählung
+   * auch in jsdom, wo antds Stylesheet nicht wirkt.
+   */
+  function sichtbareFelder(dialog: HTMLElement): number {
+    // Absichtlich breiter als die heute vorhandenen zwei Rollen: ein später ergänztes
+    // Auswahl- oder Schaltfeld soll die Vier-Feld-Grenze REISSEN, statt an einer zu engen
+    // Zählung vorbeizurutschen.
+    const rollen = ['textbox', 'spinbutton', 'combobox', 'checkbox', 'radio', 'switch'] as const;
+    const felder = new Set<Element>();
+    for (const rolle of rollen) {
+      for (const el of within(dialog).queryAllByRole(rolle)) {
+        // Nur was in einem `Form.Item` steckt, ist ein FELD. Das Kästchen „Werte behalten"
+        // der Hülle sitzt in der Fusszeile und zählt nicht mit — es erfasst nichts, es
+        // steuert den Serienlauf.
+        const item = el.closest('.ant-form-item');
+        if (item) felder.add(item);
+      }
+    }
+    return felder.size;
+  }
+
+  async function oeffneAdhoc() {
+    render(einsatzAktiv, []);
+    await screen.findByRole('heading', { name: 'Material' });
+    await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Material' }));
+    return await screen.findByRole('dialog');
+  }
+
+  it('zeigt eingeklappt höchstens vier Felder — das fünfte liegt unter „Weitere Angaben"', async () => {
+    const dialog = await oeffneAdhoc();
+
+    // GENAU vier, nicht „höchstens vier": eine Obergrenze wäre auch bei drei grün und
+    // deckte eine Zählung, die still ein Feld verliert.
+    expect(sichtbareFelder(dialog)).toBe(4);
+    // Die Bestandsnummer ist IM Baum (forceRender → sie geht beim Absenden mit), aber
+    // nicht sichtbar. Nur diese Paarung belegt beides; `queryByLabelText` allein fände sie
+    // auch im eingeklappten Zustand und bewiese gar nichts.
+    expect(within(dialog).getByLabelText('Bestandsnummer')).not.toBeVisible();
+  });
+
+  it('Aufklappen erhöht die Zahl der sichtbaren Felder', async () => {
+    const dialog = await oeffneAdhoc();
+    const vorher = sichtbareFelder(dialog);
+
+    // Der Zugangsname trägt das Zustandssymbol mit („collapsed Weitere Angaben"), deshalb
+    // Teiltreffer statt genauem Namen.
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+
+    await waitFor(() => expect(sichtbareFelder(dialog)).toBe(vorher + 1));
+    expect(within(dialog).getByRole('button', { name: /Weitere Angaben/ }))
+      .toHaveAttribute('aria-expanded', 'true');
+    /**
+     * KEIN `toBeVisible()` auf dem aufgeklappten Feld — gemessen, nicht vergessen: die
+     * Aufklapp-Animation beginnt mit `opacity: 0` und endet in jsdom nie (kein
+     * `transitionend`), jest-dom hielte das Feld also dauerhaft für unsichtbar. Der
+     * Barrierefreiheitsbaum kennt keine Deckkraft — die Rollen-Zählung oben ist deshalb das
+     * belastbare Mass. Im eingeklappten Zustand hält `not.toBeVisible()` dagegen sehr wohl:
+     * dort liegt ein `display: none` direkt am Element (Test darüber).
+     */
+  });
+
+  /**
+   * MUTATIONSPROBE zu `forceRender` (gemessen, Prop entfernt, Suite gefahren): rot wurde
+   * NUR der Test darüber — ohne die Prop existiert das Feld vor dem ersten Aufklappen gar
+   * nicht. DIESER Test blieb grün, weil antd den einmal aufgeklappten Bereich nicht wieder
+   * abbaut. Er pinnt deshalb den Leitungsvertrag (der Wert kommt hinten an), nicht die Prop
+   * — der Prop-Wächter ist die Existenzprüfung im eingeklappten Zustand.
+   */
+  it('ein Wert aus dem eingeklappten Bereich geht beim Absenden mit', async () => {
+    const gesendet: unknown[] = [];
+    const dialog = await oeffneAdhoc();
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
+      }),
+    );
+
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Spende-Decken');
+    const kopf = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
+    await userEvent.click(kopf);
+    await userEvent.type(within(dialog).getByLabelText('Bestandsnummer'), 'THW-4711');
+    // WIEDER ZUKLAPPEN und dann erst absenden — der Bediener lässt den Bereich selten offen.
+    await userEvent.click(kopf);
+    await waitFor(() => expect(kopf).toHaveAttribute('aria-expanded', 'false'));
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ adhoc: { bestandsnummer: 'THW-4711' } });
+  });
+
+  it('„Speichern und nächste" hält den Dialog offen und behält Kategorie und Trägerorganisation', async () => {
+    const gesendet: unknown[] = [];
+    const dialog = await oeffneAdhoc();
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
+      }),
+    );
+
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Spende-Decken');
+    await userEvent.type(within(dialog).getByLabelText('Kategorie'), 'Betreuung');
+    await userEvent.type(within(dialog).getByLabelText('Trägerorganisation'), 'THW');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ adhoc: { bezeichnung: 'Spende-Decken' }, menge: 1 });
+
+    // Offen geblieben — der Zähler ist der Beleg, dass gespeichert wurde und nicht bloß
+    // nichts passiert ist.
+    expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await waitFor(() => expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue(''));
+    expect(within(dialog).getByLabelText('Kategorie')).toHaveValue('Betreuung');
+    expect(within(dialog).getByLabelText('Trägerorganisation')).toHaveValue('THW');
+    // Die Menge steht wieder auf ihrem Startwert, obwohl sie kein Übernahmefeld ist:
+    // `initialValues` wirkt bei jedem Zurücksetzen erneut.
+    expect(within(dialog).getByLabelText('Menge')).toHaveValue('1');
+  });
+
+  it('der Primär-Knopf heißt „Disponieren" und schließt den Dialog', async () => {
+    const dialog = await oeffneAdhoc();
+    const treffer: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        treffer.push(await request.json());
+        return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
+      }),
+    );
+
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Spende-Decken');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(treffer).toHaveLength(1));
+
+    /**
+     * GEMESSEN: `queryByRole('dialog')).toBeNull()` wäre hier NIE grün. jsdom feuert kein
+     * `transitionend`, und antds Modal räumt seinen Knoten erst am Ende der
+     * Zoom-Animation ab — der Dialog bleibt also im Baum stehen, eingefroren in
+     * `ant-zoom-leave-active`. Beobachtbar ist damit der Verlassen-Zustand, und der
+     * belegt, was zu belegen ist: `onFertig` hat den Dialog geschlossen (der Serienlauf
+     * tut das nicht, siehe Test darüber).
+     */
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
   });
 });
 

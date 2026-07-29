@@ -46,6 +46,11 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Name', { exact: true }).fill('Mustermann');
+  // Vorname liegt seit dem Feldbudget (LFH-332 · B4) eingeklappt unter „Weitere
+  // Angaben" — sichtbar sind nur Geschlecht, Alter, Antreffort und Name. Der
+  // Zugangsname trägt das Pfeil-Icon mit („collapsed Weitere Angaben"), deshalb
+  // ein Teiltreffer statt exact.
+  await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
   await dialog.getByLabel('Vorname', { exact: true }).fill('Max');
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 

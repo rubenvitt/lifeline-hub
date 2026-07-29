@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -53,6 +53,35 @@ const tierVermisst: Tier = { ...tierBasis, id: 11, registrier_nr: 2, status: 've
  */
 function regFolge(): string[] {
   return screen.getAllByText(/^T-\d{3}$/).map((e) => e.textContent ?? '');
+}
+
+/**
+ * Wartet, bis der Erfassungsdialog wirklich aus dem Baum ist — inklusive des Anstosses, den
+ * die Schliess-Bewegung in jsdom braucht.
+ *
+ * GEMESSEN, und die Reihenfolge der Befunde ist der Grund für die zwei Ereignisnamen:
+ * antds Modal geht beim Schliessen in `ant-zoom-leave` und bleibt dort für immer stehen —
+ * jsdom hat keine Layout-Engine, die ein Animationsende meldet, und rc-motion setzt hier
+ * keine Frist. `destroyOnHidden` greift erst NACH der Bewegung, die Felder bleiben also im
+ * Baum, und `queryByRole('dialog')` findet den Dialog weiter (kein `display: none`).
+ *
+ * `fireEvent.animationEnd(...)` reicht dafür NICHT — das schickt „animationend", rc-motion
+ * hört aber auf den Namen, den es aus den Stil-Eigenschaften des Browsers ableitet
+ * (`getVendorPrefixedEventName`), und jsdoms `CSSStyleDeclaration` kennt `WebkitAnimation`,
+ * nicht `animation`: in dieser Umgebung heisst das Ereignis „webkitAnimationEnd". Beide
+ * Namen zu schicken hält den Helfer über einen jsdom-Wechsel hinweg heil.
+ */
+async function warteBisDialogWeg(timeout?: number) {
+  await waitFor(() => {
+    const modal = document.querySelector<HTMLElement>('.ant-modal');
+    if (modal) {
+      fireEvent.animationEnd(modal);
+      modal.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+    }
+    // Am FELD gemessen, nicht an der Dialogrolle: `destroyOnHidden` ist die Zusicherung,
+    // dass ein geschlossener Dialog keine Felder stehen lässt.
+    expect(screen.queryByLabelText('Rufname')).not.toBeInTheDocument();
+  }, timeout != null ? { timeout } : undefined);
 }
 
 function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[]) {
@@ -182,6 +211,97 @@ describe('TierePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await vi.waitFor(() => expect(body.status).toBe('vermisst'));
+  });
+
+  /**
+   * SCHNELLERFASSUNG auf der Erfassungshülle (LFH-332 · B4). Die drei Fälle prüfen die
+   * VERDRAHTUNG dieser Seite, nicht die Hülle: dass das erste Feld dieser Maske den Fokus
+   * bekommt, dass Enter den Wortlaut MIT dem aus dem Modus abgeleiteten Status schickt, und
+   * dass der Serienlauf die zwei Übernahmefelder dieser Maske mitnimmt. Das allgemeine
+   * Verhalten der Hülle steht in `components/Erfassung.test.tsx`.
+   */
+  it('setzt den Fokus beim Öffnen ins erste Feld der Maske', async () => {
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await screen.findByRole('dialog');
+    // IM Dialog gesucht: die zweite Combobox der Seite ist der Spezies-Filter der
+    // Werkzeugzeile, und der steht ausserhalb.
+    await waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
+  });
+
+  it('Enter im Rufnamen sendet ab — mit dem Status aus dem Modus', async () => {
+    let body: { rufname?: string | null; status?: string } = {};
+    server.use(http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      body = await request.json() as { rufname?: string | null; status?: string };
+      return HttpResponse.json({ ...tierBasis, id: 99, status: 'vermisst' }, { status: 201 });
+    }));
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await screen.findByRole('dialog');
+
+    // KEIN Klick auf „Erfassen": nur die Enter-Taste im Feld belegt, dass der Absende-Knopf
+    // im Formular liegt. Über `onOk` am Modal blieb Enter wirkungslos.
+    await userEvent.type(screen.getByLabelText('Rufname'), 'Mimi{Enter}');
+
+    await waitFor(() => expect(body.rufname).toBe('Mimi'));
+    // Die Ableitung aus dem Modus hat den Umbau überlebt.
+    expect(body.status).toBe('vermisst');
+    // Einzel-Erfassen schliesst — das macht `onFertig`, nicht mehr `onSuccess`.
+    await warteBisDialogWeg();
+  });
+
+  it('„Speichern und nächste" hält den Dialog offen und nimmt Spezies und Antreffort mit', async () => {
+    type Wortlaut = { spezies?: string; status?: string; antreff_ort?: string | null; rufname?: string | null };
+    const wortlaute: Wortlaut[] = [];
+    server.use(http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+      wortlaute.push(await request.json() as Wortlaut);
+      return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+    }));
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await screen.findByRole('dialog');
+
+    // Spezies WEG vom Startwert 'hund' stellen — sonst wäre 'hund' nach dem Zurücksetzen
+    // auch ohne Übernahme wieder da, und der zweite Wortlaut bewiese nichts.
+    await userEvent.click(within(dialog).getByRole('combobox'));
+    const katze = (await screen.findAllByText('Katze')).find((el) => el.closest('.ant-select-item-option'));
+    expect(katze).toBeTruthy();
+    await userEvent.click(katze!);
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Nord');
+    await userEvent.type(screen.getByLabelText('Rufname'), 'Rex');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(wortlaute).toHaveLength(1));
+
+    /**
+     * Der Dialog bleibt stehen — und die Gegenprobe steckt IM Anstoss.
+     *
+     * `getByRole('dialog')` allein unterschiede die beiden Fälle NICHT: ein sich
+     * schliessender antd-Dialog steht in jsdom genauso im Baum (kein `display: none`,
+     * Felder noch da), weil die Schliess-Bewegung ohne Anstoss nie endet — gemessen beim
+     * Bau von `warteBisDialogWeg`. Auch der Zähler trennt nicht: die Hülle zählt hoch,
+     * bevor sie sich für einen der beiden Wege entscheidet.
+     *
+     * Der Anstoss trennt sie: derselbe Helfer, der den Einzel-Weg beim Verschwinden
+     * beobachtet, läuft hier in seine Wartezeit — die Bewegung, die er beenden könnte, gibt
+     * es nicht. Auf dem Einzel-Weg ginge er durch.
+     */
+    await expect(warteBisDialogWeg(400)).rejects.toThrow();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rufname')).toBeInTheDocument();
+    expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
+    // Einzelfeld geleert, Wiederholfelder stehen.
+    await waitFor(() => expect(screen.getByLabelText('Rufname')).toHaveValue(''));
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Nord');
+
+    // Zweiter Satz: die Übernahme steht auch im WORTLAUT, nicht bloß im Feld.
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(wortlaute).toHaveLength(2));
+    expect(wortlaute[1].spezies).toBe('katze');
+    expect(wortlaute[1].antreff_ort).toBe('Sammelstelle Nord');
+    expect(wortlaute[1].status).toBe('aktiv');
+    // Das Einzelfeld ist NICHT mitgewandert — sonst stünde der vorige Satz zweimal in der Liste.
+    expect(wortlaute[1].rufname ?? '').toBe('');
   });
 
   it('navigiert beim Klick auf eine Zeile zur Detail-Vollseite', async () => {

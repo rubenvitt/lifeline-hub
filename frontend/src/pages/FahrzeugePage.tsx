@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +21,7 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
+import { ErfassungsModal } from '../components/Erfassung';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
@@ -208,9 +209,12 @@ export default function FahrzeugePage() {
     onSuccess: invalidate,
     onError: fehler,
   });
+  // Schliessen und Leeren gehoeren seit LFH-332/B4 der Erfassungshuelle: sie schliesst ueber
+  // `onFertig` (nur beim Einzel-Erfassen) und setzt auf BEIDEN Wegen zurueck. Ein Reset hier
+  // waere doppelt — und im Serienmodus falsch, weil er die uebernommenen Werte mitloeschte.
   const adhocMutation = useMutation({
     mutationFn: (daten: AdhocEingabe) => disponiereAdhoc(einsatzId, daten),
-    onSuccess: () => { invalidate(); setAdhocOffen(false); form.resetFields(); },
+    onSuccess: invalidate,
     onError: fehler,
   });
   const statusMutation = useMutation({
@@ -569,27 +573,58 @@ export default function FahrzeugePage() {
       </>
       )}
 
-      <Modal
-        open={adhocOffen}
-        title="Ad-hoc-Fahrzeug disponieren"
-        okText="Disponieren"
-        confirmLoading={adhocMutation.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => setAdhocOffen(false)}
-        destroyOnHidden
+      {/**
+        * Ad-hoc-Disposition als Schnellerfassung (LFH-332 · B4).
+        *
+        * SERIENMODUS, weil hier der Regelfall eine MENGE ist: trifft eine fremde Einheit ein,
+        * werden ihre Fahrzeuge nacheinander erfasst. „Speichern und nächste" hält den Dialog
+        * offen und den Fokus im Funkrufnamen; `Trägerorganisation` und `Fahrzeugtyp` überleben
+        * das Speichern (`uebernahme`) — beim Zug einer Einheit ist der Träger für alle gleich
+        * und der Typ oft auch, und genau diese beiden Wiederholfelder kosten sonst je Fahrzeug
+        * einen zweiten Tippdurchgang.
+        *
+        * FELDBUDGET: vier sichtbare Felder, `OPTA` liegt zugeklappt unter „Weitere Angaben".
+        * Die OPTA ist die taktisch-technische Betriebsstelle — bei einem ad-hoc erfassten
+        * Fremdfahrzeug ist sie im Erfassungsmoment meist unbekannt, während Funkrufname, Typ,
+        * Träger und Kennzeichen am Fahrzeug ablesbar sind.
+        *
+        * `forceRender` am Klapp-Bereich: das eingeklappte Feld bleibt im Baum, damit ein
+        * eingetragener und danach zugeklappter Wert beim Absenden mitgeht. (antds `preserve`
+        * hielte den WERT zwar ohnehin, aber erst nach einem ersten Rendern — und ohne
+        * `forceRender` ist das Feld für Tastatur und Prüfung schlicht nicht da.)
+        */}
+      <ErfassungsModal<AdhocEingabe>
+        offen={adhocOffen}
+        titel="Ad-hoc-Fahrzeug disponieren"
+        form={form}
+        erfassenText="Disponieren"
+        serie
+        uebernahme={['traegerorganisation', 'fahrzeugtyp']}
+        laeuft={adhocMutation.isPending}
+        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
+        // Datensatz wirklich ankam. Den Fehlertext meldet weiterhin `onError` der Mutation.
+        onErfassen={(w) => adhocMutation.mutateAsync(w)}
+        onFertig={() => setAdhocOffen(false)}
+        onAbbrechen={() => setAdhocOffen(false)}
       >
-        <Form<AdhocEingabe> form={form} layout="vertical" onFinish={(w) => adhocMutation.mutate(w)}>
-          <Form.Item label="Funkrufname" name="funkrufname" rules={[{ required: true, whitespace: true }]}>
-            <Input placeholder="z. B. Florian Nachbarstadt 44/1" />
-          </Form.Item>
-          <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp"><Input /></Form.Item>
-          <Form.Item label="Kennzeichen" name="kennzeichen"><Input /></Form.Item>
-          <Form.Item label="OPTA" name="opta"><Input /></Form.Item>
-          <Form.Item label="Trägerorganisation" name="traegerorganisation">
-            <Input placeholder="z. B. Feuerwehr Nachbarstadt" />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item label="Funkrufname" name="funkrufname" rules={[{ required: true, whitespace: true }]}>
+          <Input placeholder="z. B. Florian Nachbarstadt 44/1" />
+        </Form.Item>
+        <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp"><Input /></Form.Item>
+        <Form.Item label="Trägerorganisation" name="traegerorganisation">
+          <Input placeholder="z. B. Feuerwehr Nachbarstadt" />
+        </Form.Item>
+        <Form.Item label="Kennzeichen" name="kennzeichen"><Input /></Form.Item>
+        <Collapse
+          ghost
+          items={[{
+            key: 'weitere',
+            label: 'Weitere Angaben',
+            forceRender: true,
+            children: <Form.Item label="OPTA" name="opta"><Input /></Form.Item>,
+          }]}
+        />
+      </ErfassungsModal>
     </EinsatzSeite>
   );
 }

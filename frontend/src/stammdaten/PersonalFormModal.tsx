@@ -1,5 +1,6 @@
-import { App, AutoComplete, Form, Input, Modal } from 'antd';
+import { App, AutoComplete, Form, Input } from 'antd';
 import { Select } from '../components/Select';
+import { ErfassungsModal } from '../components/Erfassung';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -39,23 +40,27 @@ export default function PersonalFormModal({
   const qualQuery = useQuery({ queryKey: globalKeys.qualifikationen(), queryFn: listeQualifikationen });
   const benutzerQuery = useQuery({ queryKey: globalKeys.benutzer(), queryFn: listeBenutzer });
 
+  /**
+   * VORBELEGUNG, kein Zurücksetzen (LFH-332/B4, Regel 3). Der Anlegen-Zweig, der
+   * früher hier `resetFields()` + den Leerwert für `qualifikation_ids` setzte, ist
+   * weg: das Zurücksetzen macht `ErfassungsModal` auf BEIDEN Wegen (nach dem
+   * Speichern und beim Abbrechen), und der Leerwert steht jetzt als `initialValues`
+   * an der Hülle — von dort holt ihn jedes `resetFields` wieder. Ein
+   * zurückgebliebener Aufrufer-Reset wäre doppelt und würde verdecken, ob die Hülle
+   * ihre Zusicherung überhaupt einlöst.
+   */
   useEffect(() => {
-    if (!offen) return;
-    if (person) {
-      form.setFieldsValue({
-        name: person.name,
-        personalnummer: person.personalnummer ?? undefined,
-        traegerorganisation: person.traegerorganisation ?? undefined,
-        telefon: person.telefon ?? undefined,
-        staerke_position: person.staerke_position ?? undefined,
-        qualifikation_ids: person.qualifikationen.map((q) => q.id),
-        benutzer_id: person.benutzer_id ?? undefined,
-        bemerkung: person.bemerkung ?? undefined,
-      });
-    } else {
-      form.resetFields();
-      form.setFieldsValue({ qualifikation_ids: [] });
-    }
+    if (!offen || !person) return;
+    form.setFieldsValue({
+      name: person.name,
+      personalnummer: person.personalnummer ?? undefined,
+      traegerorganisation: person.traegerorganisation ?? undefined,
+      telefon: person.telefon ?? undefined,
+      staerke_position: person.staerke_position ?? undefined,
+      qualifikation_ids: person.qualifikationen.map((q) => q.id),
+      benutzer_id: person.benutzer_id ?? undefined,
+      bemerkung: person.bemerkung ?? undefined,
+    });
   }, [offen, person, form]);
 
   const mutation = useMutation({
@@ -72,10 +77,10 @@ export default function PersonalFormModal({
       };
       return person ? aktualisierePerson(person.id, daten) : legePersonAn(daten);
     },
+    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.personal() });
       qc.invalidateQueries({ queryKey: globalKeys.personalVorschlaege() });
-      onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
@@ -96,41 +101,49 @@ export default function PersonalFormModal({
     label: `${b.anzeigename} (${b.benutzername})`,
   }));
 
+  /*
+   * HÜLLEN-PILOT, kein Feldbudget-Ziel (LFH-332/B4). Diese Maske trägt acht Felder
+   * und liegt damit weit über der Modal-Leitlinie aus LFH-19 (≤ ~3 Felder). Das ist
+   * bekannt und hier bewusst NICHT angefasst: umgestellt wird die Hülle
+   * (Enter-Absenden, Fokus, symmetrisches Zurücksetzen), nicht der Feldbestand.
+   * Ebenso bewusst OHNE `serie` — die Maske dient auch dem Bearbeiten einer
+   * bestehenden Person, und „Speichern und nächste" ergibt dort keinen Sinn.
+   */
   return (
-    <Modal
-      open={offen}
-      title={person ? 'Person bearbeiten' : 'Person anlegen'}
-      okText="Speichern"
-      confirmLoading={mutation.isPending}
-      onOk={() => form.submit()}
-      onCancel={onClose}
-      destroyOnHidden
+    <ErfassungsModal<FormWerte>
+      offen={offen}
+      titel={person ? 'Person bearbeiten' : 'Person anlegen'}
+      form={form}
+      erfassenText="Speichern"
+      laeuft={mutation.isPending}
+      initialValues={{ qualifikation_ids: [] }}
+      onErfassen={(w) => mutation.mutateAsync(w)}
+      onFertig={onClose}
+      onAbbrechen={onClose}
     >
-      <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => mutation.mutate(w)}>
-        <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}>
-          <Input />
-        </Form.Item>
-        <Form.Item label="Personalnummer" name="personalnummer"><Input /></Form.Item>
-        <Form.Item label="Trägerorganisation" name="traegerorganisation">
-          <AutoComplete
-            options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
-            allowClear
-            placeholder="z. B. DRK Musterstadt"
-            showSearch={{ filterOption: (input, option) => (option?.value ?? '').toLowerCase().includes(input.toLowerCase()) }}
-          />
-        </Form.Item>
-        <Form.Item label="Telefon" name="telefon"><Input /></Form.Item>
-        <Form.Item label="Stärke-Position" name="staerke_position">
-          <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
-        </Form.Item>
-        <Form.Item label="Qualifikationen" name="qualifikation_ids">
-          <Select mode="multiple" allowClear options={qualOptionen} placeholder="Qualifikationen wählen" />
-        </Form.Item>
-        <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
-          <Select allowClear options={benutzerOptionen} placeholder="kein Konto verknüpft" />
-        </Form.Item>
-        <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
-      </Form>
-    </Modal>
+      <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}>
+        <Input />
+      </Form.Item>
+      <Form.Item label="Personalnummer" name="personalnummer"><Input /></Form.Item>
+      <Form.Item label="Trägerorganisation" name="traegerorganisation">
+        <AutoComplete
+          options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
+          allowClear
+          placeholder="z. B. DRK Musterstadt"
+          showSearch={{ filterOption: (input, option) => (option?.value ?? '').toLowerCase().includes(input.toLowerCase()) }}
+        />
+      </Form.Item>
+      <Form.Item label="Telefon" name="telefon"><Input /></Form.Item>
+      <Form.Item label="Stärke-Position" name="staerke_position">
+        <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
+      </Form.Item>
+      <Form.Item label="Qualifikationen" name="qualifikation_ids">
+        <Select mode="multiple" allowClear options={qualOptionen} placeholder="Qualifikationen wählen" />
+      </Form.Item>
+      <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
+        <Select allowClear options={benutzerOptionen} placeholder="kein Konto verknüpft" />
+      </Form.Item>
+      <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
+    </ErfassungsModal>
   );
 }

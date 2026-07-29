@@ -1,5 +1,6 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, InputNumber, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
+import { ErfassungsModal } from '../components/Erfassung';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
@@ -84,7 +85,11 @@ export default function MaterialPage() {
         bezeichnung: w.bezeichnung, kategorie: w.kategorie, bestandsnummer: w.bestandsnummer,
         traegerorganisation: w.traegerorganisation,
       }, w.menge ?? 1),
-    onSuccess: () => { invalidate(); setAdhocOffen(false); form.resetFields(); },
+    // Nur invalidieren und melden (LFH-332 · B4): geschlossen wird über `onFertig`,
+    // geleert wird von der Erfassungshülle — auf BEIDEN Wegen, auch beim Abbrechen.
+    // Das frühere `resetFields()` hier lief neben `setAdhocOffen(false)` und ließ den
+    // Abbruch-Weg ungeleert zurück; genau diese Asymmetrie behebt die Hülle.
+    onSuccess: () => { invalidate(); message.success('Ad-hoc-Material disponiert'); },
     onError: fehler,
   });
   const mengeMutation = useMutation({
@@ -353,27 +358,68 @@ export default function MaterialPage() {
       </>
       )}
 
-      <Modal
-        open={adhocOffen}
-        title="Ad-hoc-Material disponieren"
-        okText="Disponieren"
-        confirmLoading={adhocMutation.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => setAdhocOffen(false)}
-        destroyOnHidden
+      {/**
+        * Ad-hoc-Erfassung auf der Schnellerfassungs-Hülle (LFH-332 · B4).
+        *
+        * SERIENMODUS, weil Ad-hoc-Material stückweise nachkommt: eine Spende-Palette ist
+        * selten eine Position. „Speichern und nächste" hält den Dialog offen, zählt und
+        * setzt den Fokus zurück auf die Bezeichnung.
+        *
+        * WERTÜBERNAHME auf Kategorie und Trägerorganisation — die beiden Felder, die über
+        * eine ganze Anlieferung hinweg gleich bleiben. Sie stehen deshalb HINTEN: was sich
+        * je Position ändert (Bezeichnung, Menge), kommt zuerst; die stehenbleibenden Werte
+        * überspringt der Tabulatorlauf danach ohnehin, weil sie schon gefüllt sind.
+        *
+        * FELDBUDGET: höchstens vier sichtbare Felder. Die Bestandsnummer ist das fünfte —
+        * bei ad-hoc erfasstem Material (Spenden, Fremdmaterial) gibt es sie meistens gar
+        * nicht. Sie liegt unter „Weitere Angaben" mit `forceRender`.
+        *
+        * WAS `forceRender` HIER TUT, gemessen per Mutationsprobe (Prop entfernt, Tests
+        * gefahren): es registriert das Feld ab dem ersten Bild im Formular, statt erst beim
+        * ersten Aufklappen. Was es NICHT tut: den eingetippten Wert retten. Der überlebt das
+        * Zuklappen auch ohne die Prop — antd baut den Bereich nicht ab (`destroyOnHidden`
+        * ist aus) und hielte den Wert selbst dann noch (`Form.Item` bewahrt per Vorgabe).
+        * Ohne die Prop fiel genau ein Test: der, der das Feld VOR dem ersten Aufklappen im
+        * Baum sucht. Die naheliegende Begründung „sonst ist der Wert weg" wäre also falsch
+        * gewesen und steht deshalb nicht hier.
+        */}
+      <ErfassungsModal<MaterialAdhocEingabe & { menge: number }>
+        offen={adhocOffen}
+        titel="Ad-hoc-Material disponieren"
+        form={form}
+        erfassenText="Disponieren"
+        serie
+        uebernahme={['kategorie', 'traegerorganisation']}
+        initialValues={{ menge: 1 }}
+        laeuft={adhocMutation.isPending}
+        // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage lässt die Hülle die
+        // eingetippten Werte stehen. Den Fehlertext meldet weiterhin `onError`.
+        onErfassen={async (w) => { await adhocMutation.mutateAsync(w); }}
+        onFertig={() => setAdhocOffen(false)}
+        onAbbrechen={() => setAdhocOffen(false)}
       >
-        <Form form={form} layout="vertical" initialValues={{ menge: 1 }} onFinish={(w) => adhocMutation.mutate(w)}>
-          <Form.Item label="Bezeichnung" name="bezeichnung" rules={[{ required: true, whitespace: true }]}>
-            <Input placeholder="z. B. Spende-Decken" />
-          </Form.Item>
-          <Form.Item label="Kategorie" name="kategorie"><Input /></Form.Item>
-          <Form.Item label="Bestandsnummer" name="bestandsnummer"><Input /></Form.Item>
-          <Form.Item label="Trägerorganisation" name="traegerorganisation"><Input placeholder="z. B. THW" /></Form.Item>
-          <Form.Item label="Menge" name="menge" rules={[{ required: true }]}>
-            <InputNumber min={1} style={{ width: 120 }} />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item label="Bezeichnung" name="bezeichnung" rules={[{ required: true, whitespace: true }]}>
+          <Input placeholder="z. B. Spende-Decken" />
+        </Form.Item>
+        <Form.Item label="Menge" name="menge" rules={[{ required: true }]}>
+          <InputNumber min={1} style={{ width: 120 }} />
+        </Form.Item>
+        <Form.Item label="Kategorie" name="kategorie"><Input /></Form.Item>
+        <Form.Item label="Trägerorganisation" name="traegerorganisation"><Input placeholder="z. B. THW" /></Form.Item>
+        <Collapse
+          ghost
+          items={[{
+            key: 'weitere',
+            label: 'Weitere Angaben',
+            forceRender: true,
+            children: (
+              <Form.Item label="Bestandsnummer" name="bestandsnummer" style={{ marginBottom: 0 }}>
+                <Input />
+              </Form.Item>
+            ),
+          }]}
+        />
+      </ErfassungsModal>
     </div>
   );
 }

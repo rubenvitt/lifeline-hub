@@ -1,5 +1,6 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
+import { ErfassungsModal } from '../components/Erfassung';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -110,7 +111,9 @@ export default function PersonalPage() {
   });
   const adhocMutation = useMutation({
     mutationFn: (daten: AdhocEingabe) => disponiereAdhoc(einsatzId, daten),
-    onSuccess: () => { invalidate(); setAdhocOffen(false); form.resetFields(); },
+    // Nur noch invalidieren: das Schliessen macht `onFertig` am ErfassungsModal, das
+    // Leeren die Hülle selbst — und im Serienmodus bleibt der Dialog bewusst offen.
+    onSuccess: invalidate,
     onError: fehler,
   });
   const statusMutation = useMutation({
@@ -461,28 +464,43 @@ export default function PersonalPage() {
       </>
       )}
 
-      <Modal
-        open={adhocOffen}
-        title="Ad-hoc-Person disponieren"
-        okText="Disponieren"
-        confirmLoading={adhocMutation.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => setAdhocOffen(false)}
-        destroyOnHidden
+      {/*
+        * Ad-hoc-Disposition — Schnellerfassung mit Serienmodus (LFH-332/B4). An der
+        * Bereitstellung wird eine Helferkette am Stück aufgenommen, deshalb bleibt der
+        * Dialog nach „Speichern und nächste" stehen; Trägerorganisation und
+        * Stärke-Position überleben das Speichern, weil sie sich über eine Kette hinweg
+        * am seltensten ändern (dieselbe Einheit, dieselbe Funktionsebene).
+        *
+        * FELDBUDGET: hier ist NICHTS eingedampft, und das ist kein Versäumnis — die
+        * Maske trägt bereits genau vier Felder (Name, Funktion, Trägerorganisation,
+        * Stärke-Position) und liegt damit im Rahmen der Modal-/Schnellerfassungs-
+        * Leitlinie (LFH-19: ≤ ~4 Felder). Es gibt nichts wegzunehmen: Name ist Pflicht,
+        * die anderen drei sind genau die Angaben, die eine ad-hoc erfasste Person von
+        * einer namenlosen Zeile unterscheiden.
+        */}
+      <ErfassungsModal<AdhocEingabe>
+        offen={adhocOffen}
+        titel="Ad-hoc-Person disponieren"
+        form={form}
+        erfassenText="Disponieren"
+        laeuft={adhocMutation.isPending}
+        serie
+        uebernahme={['traegerorganisation', 'staerke_position']}
+        onErfassen={(w) => adhocMutation.mutateAsync(w)}
+        onFertig={() => setAdhocOffen(false)}
+        onAbbrechen={() => setAdhocOffen(false)}
       >
-        <Form<AdhocEingabe> form={form} layout="vertical" onFinish={(w) => adhocMutation.mutate(w)}>
-          <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-            <Input placeholder="z. B. Dr. Schmidt" />
-          </Form.Item>
-          <Form.Item label="Funktion" name="funktion"><Input placeholder="z. B. Notarzt" /></Form.Item>
-          <Form.Item label="Trägerorganisation" name="traegerorganisation">
-            <Input placeholder="z. B. KV Musterstadt" />
-          </Form.Item>
-          <Form.Item label="Stärke-Position" name="staerke_position">
-            <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+          <Input placeholder="z. B. Dr. Schmidt" />
+        </Form.Item>
+        <Form.Item label="Funktion" name="funktion"><Input placeholder="z. B. Notarzt" /></Form.Item>
+        <Form.Item label="Trägerorganisation" name="traegerorganisation">
+          <Input placeholder="z. B. KV Musterstadt" />
+        </Form.Item>
+        <Form.Item label="Stärke-Position" name="staerke_position">
+          <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
+        </Form.Item>
+      </ErfassungsModal>
     </EinsatzSeite>
   );
 }

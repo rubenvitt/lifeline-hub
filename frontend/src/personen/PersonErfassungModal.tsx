@@ -1,69 +1,122 @@
-import { Form, Input, InputNumber, Modal } from 'antd';
+import { Collapse, Form, Input, InputNumber } from 'antd';
 import { Select } from '../components/Select';
-import { useEffect } from 'react';
+import { ErfassungsModal } from '../components/Erfassung';
 import type { PersonEingabe } from '../api/einsatzPerson';
 
 /** Erfassungs-Modi der Personen-Schnellerfassung. `null` = Modal geschlossen. */
 export type ErfassungsModus = 'schnell' | 'vermisst' | 'betroffen';
 
+const TITEL: Record<ErfassungsModus, string> = {
+  schnell: 'Schnellerfassung',
+  vermisst: 'Vermisst melden',
+  betroffen: 'Betroffene/n erfassen',
+};
+
 interface Props {
   /** Aktueller Modus (steuert Titel + optionales Vermisst-Feld); `null` schließt das Modal. */
   modus: ErfassungsModus | null;
-  /** Läuft die Anlege-Mutation? → Bestätigen-Button zeigt Spinner. */
+  /** Läuft die Anlege-Mutation? → beide Speicher-Knöpfe zeigen Ladeanzeige. */
   isPending: boolean;
-  /** Formular abgeschickt (gültige Werte). Der Aufrufer leitet den Folgestatus aus `modus` ab. */
-  onFinish: (daten: PersonEingabe) => void;
+  /**
+   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) — sonst leert
+   * die Hülle die Felder, obwohl der Datensatz nie ankam. Der Aufrufer leitet den Folgestatus
+   * aus `modus` ab.
+   */
+  onErfassen: (daten: PersonEingabe) => Promise<unknown>;
+  /** Einzel-Erfassen erfolgreich. Der Aufrufer setzt `modus` auf `null`. */
+  onFertig: () => void;
   /** Abbrechen/Schließen. Der Aufrufer setzt `modus` auf `null`. */
   onCancel: () => void;
 }
 
-/** Schnellerfassungs-Modal für Personen (Schnell/Vermisst/Betroffen). Props-gesteuert:
- *  der Aufrufer (PersonenPage) hält `modus`-State und die Anlege-Mutation, dieses Modal
- *  besitzt nur das Formular. Nach dem Schließen wird das Formular geleert (antd `preserve`
- *  würde die Werte sonst über das nächste Öffnen hinweg behalten). */
-export default function PersonErfassungModal({ modus, isPending, onFinish, onCancel }: Props) {
+/**
+ * Schnellerfassungs-Modal für Personen (Schnell/Vermisst/Betroffen), auf dem
+ * Schnellerfassungs-Primitiv `ErfassungsModal` (LFH-332 · B4).
+ *
+ * Der Aufrufer (PersonenPage) hält `modus`-State und die Anlege-Mutation; dieses Modal besitzt
+ * nur das Formular. **Zurückgesetzt wird nicht mehr hier** — die Hülle leert auf beiden Wegen
+ * (nach dem Erfassen UND beim Abbrechen); ein zusätzlicher Reset an dieser Stelle wäre doppelt
+ * und verdeckte Fehler.
+ *
+ * ── FELDBUDGET: VIER SICHTBARE FELDER ──────────────────────────────
+ *
+ * Sichtbar sind Geschlecht, Geschätztes Alter, Antreffort, Name — in dieser Reihenfolge, weil
+ * das die Reihenfolge ist, in der an der Aufnahme gesprochen wird. Vorname, Notiz und (nur im
+ * Vermisst-Modus) Melder/Kontakt liegen eingeklappt unter „Weitere Angaben". Pflichtfelder gibt
+ * es weiterhin keine: eine Person, von der man nichts weiß, muss trotzdem erfassbar sein.
+ *
+ * **Kein `forceRender` am Panel — gemessen, nicht angenommen.** Der naheliegende Verdacht ist,
+ * dass eingeklappte Felder beim Absenden fehlen. Das trifft hier nicht zu, aus zwei
+ * unabhängigen Gründen: (1) antds Collapse hängt den Inhalt nach dem ersten Aufklappen NICHT
+ * wieder ab (`destroyOnHidden` ist aus), das Feld bleibt also samt Wert registriert; (2) selbst
+ * wenn es ihn abhinge, hält antds Form-Speicher den Wert (`preserve` ist an). Ein Feld, das nie
+ * aufgeklappt war, kann umgekehrt gar keinen Wert tragen. `forceRender` hätte den Preis, dass
+ * die drei Zusatzfelder von Anfang an im Baum stehen — womit „vier sichtbare Felder" nur noch
+ * über gerechnete CSS-Sichtbarkeit prüfbar wäre statt über die Anwesenheit im Baum. Der Beleg
+ * für (1)/(2) steht als eigener Fall in `PersonErfassungModal.test.tsx`.
+ *
+ * ── KONTEXT-DEFAULT ────────────────────────────────────────────────
+ *
+ * `uebernahme={['antreff_ort']}`: der Antreffort überlebt ein Serien-Speichern, weil an einer
+ * Sammelstelle zehn Personen hintereinander vom selben Ort kommen. Die Übernahme reicht so weit
+ * wie der geöffnete Dialog — schließt man ihn, ist sie weg (`destroyOnHidden` an der Hülle).
+ * Ein Vorbelegen über das Schließen hinaus wäre ein zweiter Speicher und ist bewusst nicht Teil
+ * dieses Umbaus.
+ */
+export default function PersonErfassungModal({
+  modus, isPending, onErfassen, onFertig, onCancel,
+}: Props) {
   const [form] = Form.useForm<PersonEingabe>();
 
-  useEffect(() => {
-    if (modus === null) form.resetFields();
-  }, [modus, form]);
+  const weitereAngaben = (
+    <>
+      <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
+      {modus === 'vermisst' && (
+        <Form.Item label="Melder / Kontakt" name="melder_kontakt">
+          <Input placeholder="Angehöriger, Kontaktdaten" />
+        </Form.Item>
+      )}
+      <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+    </>
+  );
 
   return (
-    <Modal
-      open={modus !== null}
-      title={modus === 'vermisst' ? 'Vermisst melden' : modus === 'betroffen' ? 'Betroffene/n erfassen' : 'Schnellerfassung'}
-      okText="Erfassen"
-      confirmLoading={isPending}
-      onOk={() => form.submit()}
-      onCancel={onCancel}
-      destroyOnHidden
+    <ErfassungsModal<PersonEingabe>
+      offen={modus !== null}
+      titel={modus === null ? '' : TITEL[modus]}
+      form={form}
+      onErfassen={onErfassen}
+      onFertig={onFertig}
+      onAbbrechen={onCancel}
+      laeuft={isPending}
+      serie
+      uebernahme={['antreff_ort']}
     >
-      <Form form={form} layout="vertical" onFinish={onFinish}>
-        <Form.Item label="Geschlecht" name="geschlecht">
-          <Select
-            allowClear
-            placeholder="unbekannt"
-            options={[
-              { value: 'maennlich', label: 'männlich' },
-              { value: 'weiblich', label: 'weiblich' },
-              { value: 'divers', label: 'divers' },
-              { value: 'unbekannt', label: 'unbekannt' },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
-          <InputNumber min={0} max={120} style={{ width: 140 }} />
-        </Form.Item>
-        <Form.Item label="Antreffort" name="antreff_ort"><Input placeholder="z. B. Brücke, Sammelstelle" /></Form.Item>
-        <Form.Item label="Name" name="name"><Input /></Form.Item>
-        <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
-        {modus === 'vermisst' && (
-          <Form.Item label="Melder / Kontakt" name="melder_kontakt">
-            <Input placeholder="Angehöriger, Kontaktdaten" />
-          </Form.Item>
-        )}
-        <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
-      </Form>
-    </Modal>
+      <Form.Item label="Geschlecht" name="geschlecht">
+        <Select
+          allowClear
+          placeholder="unbekannt"
+          options={[
+            { value: 'maennlich', label: 'männlich' },
+            { value: 'weiblich', label: 'weiblich' },
+            { value: 'divers', label: 'divers' },
+            { value: 'unbekannt', label: 'unbekannt' },
+          ]}
+        />
+      </Form.Item>
+      <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
+        <InputNumber min={0} max={120} style={{ width: 140 }} />
+      </Form.Item>
+      <Form.Item label="Antreffort" name="antreff_ort">
+        <Input placeholder="z. B. Brücke, Sammelstelle" />
+      </Form.Item>
+      {/* „Name" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab
+          (Zusicherung 1 der Hülle), und der Name ist das, was zuletzt gefragt wird. */}
+      <Form.Item label="Name" name="name"><Input /></Form.Item>
+      <Collapse
+        ghost
+        items={[{ key: 'weitere', label: 'Weitere Angaben', children: weitereAngaben }]}
+      />
+    </ErfassungsModal>
   );
 }
