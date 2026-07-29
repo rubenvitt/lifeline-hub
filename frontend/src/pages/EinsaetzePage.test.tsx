@@ -66,6 +66,77 @@ describe('EinsaetzePage', () => {
     await waitFor(() => expect(screen.getByText('Workspace-7')).toBeInTheDocument());
   });
 
+  it('erfasst Einsatzart und Alarmzeit gleich mit — vorbelegt und ohne Zutun', async () => {
+    // LFH-332 · B4 (Befund H18). Der Dialog schickt die beiden Felder selbst, statt
+    // sie dem 11-Feld-Kopfdatenformular zu überlassen. Geprüft wird der Rumpf, nicht
+    // die Anzeige: ein Dialog, der die Felder ZEIGT und nicht SENDET, sähe im DOM
+    // genauso aus.
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.post('/api/einsaetze', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf!.einsatzart).toBe('realeinsatz');
+    // Format wie im Kopfdaten-PATCH, nicht ISO — beide Wege schreiben denselben Wert.
+    expect(rumpf!.begonnen_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('führt genau vier Felder — die Obergrenze einer Schnellerfassung', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+    );
+    renderMitProviders(<EinsaetzePage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    const dialog = await screen.findByRole('dialog');
+
+    for (const feld of ['Bezeichnung', 'Stichwort', 'Einsatzart', 'Alarmzeit']) {
+      expect(screen.getByLabelText(feld)).toBeInTheDocument();
+    }
+    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(4);
+  });
+
+  it('setzt den Fokus beim Öffnen ins erste Feld und sendet per Enter', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.post('/api/einsaetze', () =>
+        HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 }),
+      ),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByLabelText('Bezeichnung')),
+    );
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd{Enter}');
+
+    await waitFor(() => expect(screen.getByText('Workspace-7')).toBeInTheDocument());
+  });
+
   it('zeigt den Anlege-Button nicht für Nutzer ohne Recht', async () => {
     const ohneRecht = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
     server.use(

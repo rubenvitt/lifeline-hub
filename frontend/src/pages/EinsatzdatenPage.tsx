@@ -19,13 +19,7 @@ import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrec
 import type { Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
-
-const EINSATZART_LABELS: Record<Einsatzart, string> = {
-  realeinsatz: 'Realeinsatz',
-  uebung: 'Übung',
-  sanitaetsdienst: 'Sanitätsdienst',
-  bereitstellung: 'Bereitstellung',
-};
+import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 
 /** Werte des Bearbeiten-Formulars (begonnen_at als Dayjs aus dem DatePicker). */
 interface FormWerte {
@@ -174,12 +168,7 @@ export default function EinsatzdatenPage() {
             <AutoComplete options={stichwortOptionen} allowClear placeholder="z. B. H1, MANV …" />
           </Form.Item>
           <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
-            <Select
-              options={(Object.keys(EINSATZART_LABELS) as Einsatzart[]).map((k) => ({
-                value: k,
-                label: EINSATZART_LABELS[k],
-              }))}
-            />
+            <Select options={EINSATZART_OPTIONEN} />
           </Form.Item>
           <Form.Item label="Einsatznummer (intern)" name="einsatznummer_intern">
             <Input />

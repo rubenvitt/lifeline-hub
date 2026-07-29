@@ -9,10 +9,26 @@ use chrono::Utc;
 use sqlx::SqlitePool;
 
 /// Legt einen Einsatz an und macht den Ersteller in derselben Transaktion zur Einsatzleitung.
+/// Die Felder, die beim Anlegen gesetzt werden dürfen (LFH-332 · B4).
+///
+/// **Warum ein Struct und nicht fünf Parameter:** `einsatzart` und `begonnen_at`
+/// kamen erst mit dem erweiterten Anlegedialog dazu. Beide sind `Option` und beide
+/// sind Strings — als Stellungsparameter wären sie ohne Blick auf die Signatur
+/// vertauschbar. Dasselbe Muster trägt `KopfPatch` weiter unten.
+pub struct NeuerEinsatzDaten<'a> {
+    pub bezeichnung: &'a str,
+    pub stichwort: Option<&'a str>,
+    /// `None` → DB-Default `'realeinsatz'`. Der Aufrufer hat den Wert bereits
+    /// gegen `Einsatzart::parse` geprüft.
+    pub einsatzart: Option<&'a str>,
+    /// Alarmzeit. `None` → DB-Default `datetime('now')`. Der Aufrufer hat den Wert
+    /// bereits durch `etb::normalisiere_zeit` geschickt.
+    pub begonnen_at: Option<&'a str>,
+}
+
 pub async fn anlegen(
     pool: &SqlitePool,
-    bezeichnung: &str,
-    stichwort: Option<&str>,
+    daten: NeuerEinsatzDaten<'_>,
     ersteller_id: i64,
 ) -> Result<Einsatz, AppError> {
     // Ein Einsatz gehört zur Organisation SEINES ERSTELLERS (F05/LFH-232). Vorher stand
@@ -47,13 +63,20 @@ pub async fn anlegen(
         .await?;
         let einsatznummer = format!("{praefix}{:03}", max_nr.unwrap_or(0) + 1);
 
+        // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`
+        // sind NOT NULL mit DB-Default. Ein explizit gebundenes NULL überschriebe den
+        // Default und verletzte die Bedingung — COALESCE lässt den Default greifen.
         let einsatz_id: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatznummer_intern, angelegt_at) \
-             VALUES (?, ?, ?, ?, datetime('now')) RETURNING id",
+            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
+                                  einsatznummer_intern, angelegt_at) \
+             VALUES (?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
+                     datetime('now')) RETURNING id",
         )
         .bind(org_id)
-        .bind(bezeichnung)
-        .bind(stichwort)
+        .bind(daten.bezeichnung)
+        .bind(daten.stichwort)
+        .bind(daten.einsatzart)
+        .bind(daten.begonnen_at)
         .bind(&einsatznummer)
         .fetch_one(&mut *conn)
         .await?;

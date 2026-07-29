@@ -23,6 +23,12 @@ use utoipa::ToSchema;
 pub struct NeuerEinsatz {
     pub bezeichnung: String,
     pub stichwort: Option<String>,
+    /// Einsatzart. Absent → DB-Default `'realeinsatz'`. Ein unbekannter Wert ist
+    /// **400**, nicht 422: das Feld scheitert für sich, nicht am Zusammenhang
+    /// (Statuscode-Konvention, `src/error.rs`) — dieselbe Linie wie im PATCH.
+    pub einsatzart: Option<String>,
+    /// Alarmzeit. Absent → DB-Default `datetime('now')`.
+    pub begonnen_at: Option<String>,
 }
 
 /// POST /api/einsaetze — neuen Einsatz anlegen; Ersteller wird Einsatzleitung.
@@ -46,8 +52,27 @@ pub async fn anlegen(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
-    let einsatz =
-        repo::anlegen(&state.pool, req.bezeichnung.trim(), stichwort, benutzer.id).await?;
+    let einsatzart = req.einsatzart.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    if let Some(art) = einsatzart {
+        Einsatzart::parse(art)
+            .ok_or_else(|| AppError::Validation("Ungültige Einsatzart".into()))?;
+    }
+    let begonnen_at = match req.begonnen_at.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
+        None => None,
+    };
+
+    let einsatz = repo::anlegen(
+        &state.pool,
+        repo::NeuerEinsatzDaten {
+            bezeichnung: req.bezeichnung.trim(),
+            stichwort,
+            einsatzart,
+            begonnen_at: begonnen_at.as_deref(),
+        },
+        benutzer.id,
+    )
+    .await?;
     Ok((
         StatusCode::CREATED,
         Json(einsatz.anzeige(Some(EINSATZ_ROLLE_LEITUNG.to_string()))),
