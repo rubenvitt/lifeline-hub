@@ -68,26 +68,6 @@ function fokussiereErstesFeld(wurzel: HTMLElement | null) {
   wurzel?.querySelector<HTMLElement>(FOKUSSIERBAR)?.focus();
 }
 
-/**
- * Fokus ins erste Feld — **im nächsten Bild**. Nur für den Rücksprung nach dem
- * Serien-Speichern: dort verpufft ein direkter `focus()`, weil der Knopfdruck
- * danach noch einen Renderdurchgang flusht und der Fokus gemessen auf `<body>`
- * landet. `requestAnimationFrame` ist derselbe Ausweg, den die
- * ETB-Schnellerfassung nimmt (`fokusInsFeld`).
- *
- * **BEIM MOUNT WÄRE DAS FALSCH — und der Fehler war messbar.** Ein aufgeschobener
- * Fokus greift, wann immer das Bild kommt, also womöglich erst, wenn die Person
- * schon tippt: dann springt der Cursor mitten im Wort ins erste Feld zurück und
- * der Rest des Wortlauts landet woanders. Der Testfall „Enter in der Textarea
- * sendet NICHT ab" hat genau das gezeigt — allein grün, in der vollen Suite unter
- * Last rot, weil der aufgeschobene Fokus dort erst nach dem ersten Tastendruck
- * kam. Beim Mount gibt es keinen konkurrierenden Renderdurchgang, deshalb steht
- * der Fokus dort direkt.
- */
-function fokussiereErstesFeldVerzoegert(wurzel: HTMLElement | null) {
-  requestAnimationFrame(() => fokussiereErstesFeld(wurzel));
-}
-
 interface ErfassungsFormularProps<T> {
   /** Die Formularinstanz des Aufrufers (`Form.useForm()`). Die Hülle setzt sie zurück. */
   form: FormInstance<T>;
@@ -136,9 +116,37 @@ export function ErfassungsFormular<T extends object>({
   // gelesen — ein State-Update wäre zu diesem Zeitpunkt noch nicht sichtbar.
   const serienlaufRef = useRef(false);
 
+  /**
+   * Der Fokus läuft über **zwei Effekte, nicht über eine Zeitangabe** — und das
+   * ist die teuerste Lektion dieser Datei.
+   *
+   * Ein direkter `focus()` im Absende-Handler verpufft: React flusht danach noch
+   * einen Renderdurchgang, und der Fokus landet gemessen auf `<body>`. Der
+   * naheliegende Ausweg `requestAnimationFrame` behebt das — und handelt sich
+   * zwei lastabhängige Fehler ein, beide von der vollen Vitest-Suite gefunden und
+   * im Einzellauf unsichtbar:
+   *
+   * 1. Am Mount greift ein aufgeschobener Fokus, wann immer das Bild kommt —
+   *    notfalls erst, wenn die Person schon tippt. Dann springt der Cursor mitten
+   *    im Wortlaut ins erste Feld zurück (`Erfassung.test.tsx`, „Enter in der
+   *    Textarea sendet NICHT ab").
+   * 2. Nach dem Serien-Speichern kam das Bild unter Last später als die
+   *    Erwartung des Tests (`PersonalPage.test.tsx:556`).
+   *
+   * Ein Effekt läuft **nach dem Commit** — also später als der direkte Aufruf und
+   * dennoch an einem festen Punkt statt an einem Zeitpunkt. Der Zähler
+   * `fokusTick` ist die Auslöse-Abhängigkeit; er zählt Serien-Speicherungen und
+   * hat sonst keine Bedeutung.
+   */
+  const [fokusTick, setFokusTick] = useState(0);
+
   useEffect(() => {
     fokussiereErstesFeld(wurzel.current);
   }, []);
+
+  useEffect(() => {
+    if (fokusTick > 0) fokussiereErstesFeld(wurzel.current);
+  }, [fokusTick]);
 
   const abschicken = useCallback(async (werte: T) => {
     const serienlauf = serienlaufRef.current;
@@ -162,7 +170,7 @@ export function ErfassungsFormular<T extends object>({
     }
     form.resetFields();
     if (behalten && uebernahme?.length) form.setFieldsValue(behaltene);
-    fokussiereErstesFeldVerzoegert(wurzel.current);
+    setFokusTick((n) => n + 1);
   }, [behalten, form, onErfassen, onFertig, uebernahme]);
 
   function abbrechen() {
