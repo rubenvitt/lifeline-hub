@@ -50,8 +50,24 @@ export default function UnfallhilfsstellenPage() {
     { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
   ];
 
-  if (einsatzQuery.isLoading || uhsQuery.isLoading) return <SeitenSkeleton />;
-  if (einsatzQuery.error) return <SeitenFehler text="Einsatz konnte nicht geladen werden" />;
+  // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
+  //
+  // SEITENZUSTAND — nur `einsatzQuery`. Breadcrumb und Schreibrecht hängen an ihr, ohne sie
+  // gibt es keinen Rahmen; nur sie rechtfertigt einen Frühausstieg.
+  //
+  // LISTENZUSTAND — `uhsQuery`. Sie entschied hier früher mit über die ganze Seite: bis ihre
+  // Antwort da war, stand alles im Ladebild, und scheiterte sie, blieb es dabei. Ihr Zustand
+  // gehört an die Stelle der Liste (unten), nicht in diesen Guard.
+  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.error) {
+    return (
+      <SeitenFehler
+        text="Einsatz konnte nicht geladen werden"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
+  }
 
   return (
     <EinsatzSeite
@@ -67,12 +83,27 @@ export default function UnfallhilfsstellenPage() {
         <Button type="primary" disabled={schreibgeschuetzt} onClick={() => setAnlegen(true)}>Neu</Button>
       }
     >
-      <KatalogTabelle<Uhs>
-        rowKey="id"
-        dataSource={uhsQuery.data ?? []}
-        columns={spalten}
-        pagination={false}
-      />
+      {/* Der Fehler TAUSCHT die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (D3): `Datensicht` führt den Kartenzweig an `Liste`, und deren Vertrag kennt
+          keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer der
+          beiden Formen. Der Leertext ist byte-gleich dem aus `UnfallhilfsstellenDefault`:
+          zwei Formulierungen für dieselbe Tatsache wären der Befund, den B3 behebt. */}
+      {uhsQuery.isError ? (
+        <SeitenFehler
+          text="Unfallhilfsstellen konnten nicht geladen werden"
+          ursache={uhsQuery.error}
+          onWiederholen={() => void uhsQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle<Uhs>
+          rowKey="id"
+          loading={uhsQuery.isLoading}
+          dataSource={uhsQuery.data ?? []}
+          columns={spalten}
+          pagination={false}
+          locale={{ emptyText: 'Noch keine Unfallhilfsstellen erfasst' }}
+        />
+      )}
 
       <UhsAnlegenDrawer einsatzId={einsatzId} open={anlegen} onClose={() => setAnlegen(false)} />
     </EinsatzSeite>

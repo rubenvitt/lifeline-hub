@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Empty, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Space, Spin, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -6,6 +6,7 @@ import { listeLageMeldungen } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
+import { SeitenLeer } from '../components/SeitenZustand';
 
 export default function LagemeldungenPage() {
   const { id } = useParams();
@@ -37,8 +38,11 @@ export default function LagemeldungenPage() {
       {lageQuery.isError && (
         <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Lageobjekte konnten nicht geladen werden" />
       )}
+      {/* KEINE Primäraktion (LFH-331 · B3): eine Lagemeldung entsteht nicht hier, sondern
+          dadurch, dass jemand anderswo eine Meldung als lagerelevant übergibt. Ein Knopf
+          auf die Meldungsliste führte zur Voraussetzung, nicht aus dem Leerzustand heraus. */}
       {eintraege.length === 0 ? (
-        <Empty description="Noch keine lagerelevanten Meldungen übergeben" />
+        <SeitenLeer titel="Noch keine lagerelevanten Meldungen übergeben" />
       ) : (
         <Liste
           dataSource={eintraege}

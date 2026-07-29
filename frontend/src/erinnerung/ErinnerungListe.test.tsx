@@ -79,4 +79,21 @@ describe('ErinnerungListe', () => {
     // auf die ungefilterte Liste zu zeigen.
     expect(link).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=42');
   });
+
+  /**
+   * Leerzustand (LFH-331 · B3). Der Wortlaut bleibt byte-gleich; getauscht wird der
+   * Knoten. Deshalb steht die Text-Zusicherung neben der Knoten-Zusicherung: allein
+   * wäre sie vor dem Umbau genauso grün gewesen und belegte nichts.
+   *
+   * Keine Primäraktion: die Liste ist rein darstellend — das Anlegen liegt auf der
+   * Seite darüber, nicht in dieser Komponente.
+   */
+  it('zeigt den Leertext über das Leer-Primitiv, ohne antds Leer-Element', () => {
+    const { container } = renderListe(
+      <ErinnerungListe erinnerungen={[]} darfSchreiben onErledigen={() => {}} onQuittieren={() => {}} />,
+    );
+    expect(screen.getByText('Keine Erinnerungen')).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeNull();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
 });

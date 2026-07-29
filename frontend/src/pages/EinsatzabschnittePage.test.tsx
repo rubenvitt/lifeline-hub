@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
@@ -196,6 +196,76 @@ describe('EinsatzabschnittePage', () => {
     expect(await screen.findByTestId('funk-erreichbarkeit')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Erreichbarkeit / Nummer')).not.toBeInTheDocument();
+  });
+
+  /**
+   * AK4-Partnerpaar (LFH-331 · B3). `EinsatzabschnittePage` ist Pflichtstelle.
+   *
+   * Die negative Hälfte allein belegte nichts — hätte der Umbau den Leertext neu
+   * formuliert, wäre sie auch im Leerfall trivial grün. Erst die positive Hälfte
+   * darunter, mit demselben Literal in derselben Datei, macht daraus eine Aussage
+   * über die Zustandsweiche statt über die Schreibweise eines Strings.
+   *
+   * Der 500er-Handler steht VOR `handlers()`: `server.use` stellt Laufzeit-Handler
+   * nach vorn und der erste Treffer gewinnt — hinten angehängt bliebe er wirkungslos.
+   */
+  it('zeigt bei gescheitertem Abschnitts-Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 500 })),
+      ...handlers(),
+    );
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Abschnitte')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerer Gliederung den Leertext und KEINEN Fehler', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', []));
+    renderPage();
+    expect(await screen.findByText('Noch keine Abschnitte')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die Primäraktion des Leerzustands trägt denselben Wortlaut wie der Kopfknopf —
+   * eine zweite Schreibweise für dieselbe Geste wäre genau der Befund, den B3 behebt.
+   * Eindeutig wird der Griff über `within(...)` auf die Gliederungs-Karte, nicht über
+   * einen abweichenden String.
+   */
+  it('bietet im leeren Baum genau eine Primäraktion, und die legt einen Abschnitt an', async () => {
+    let angelegt = false;
+    server.use(
+      http.post('/api/einsaetze/1/abschnitte', () => {
+        angelegt = true;
+        return HttpResponse.json({
+          id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Neuer Abschnitt',
+          leiter_id: null, leiter_name: null, bemerkung: null, sortier: 0,
+        });
+      }),
+      ...handlers('einsatzleitung', 'aktiv', []),
+    );
+    renderPage();
+    const karte = (await screen.findByText('Noch keine Abschnitte')).closest('.ant-card');
+    expect(karte, 'der Leerzustand muss in der Gliederungs-Karte stehen').not.toBeNull();
+    const knoepfe = within(karte as HTMLElement).getAllByRole('button');
+    expect(knoepfe).toHaveLength(1);
+
+    await userEvent.click(within(karte as HTMLElement).getByRole('button', { name: 'Abschnitt anlegen' }));
+    await waitFor(() => expect(angelegt).toBe(true));
+  });
+
+  /**
+   * Der zweite Leer-Knoten der Seite ist KEIN Leerzustand, sondern eine Aufforderung
+   * bei fehlender Auswahl: die Menge ist gefüllt, es fehlt nur die Wahl. Deshalb
+   * ausdrücklich ohne Primäraktion — ein Knopf hier führte aus einer Lage heraus, die
+   * gar kein Problem ist.
+   */
+  it('fordert bei fehlender Auswahl zur Wahl auf — ohne Aktion', async () => {
+    server.use(...handlers());
+    renderPage();
+    const karte = (await screen.findByText('Wähle einen Abschnitt im Baum')).closest('.ant-card');
+    expect(karte).not.toBeNull();
+    expect(within(karte as HTMLElement).queryAllByRole('button')).toHaveLength(0);
   });
 
   it('zeigt die Funk-Daten nicht doppelt (Zusammenfassung nur in der Lese-Ansicht)', async () => {

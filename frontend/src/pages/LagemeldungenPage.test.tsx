@@ -38,9 +38,18 @@ describe('LagemeldungenPage', () => {
     expect(screen.getByText('Herkunft: Meldung #5 von Florian Nord 1')).toBeInTheDocument();
   });
 
+  /**
+   * Der Wortlaut bleibt byte-gleich; getauscht wird der Knoten (LFH-331 · B3). Die
+   * zweite Zusicherung ist die tragende — die erste war vor dem Umbau genauso grün.
+   *
+   * Keine Primäraktion: eine Lagemeldung entsteht nicht hier, sondern dadurch, dass
+   * jemand anderswo eine Meldung als lagerelevant übergibt. Ein Knopf auf die
+   * Meldungsliste führte zur Voraussetzung, nicht aus dem Leerzustand heraus.
+   */
   it('zeigt Leerzustand ohne Lageobjekte', async () => {
     listeLageMeldungen.mockResolvedValue([]);
-    renderPage();
+    const { container } = renderPage();
     expect(await screen.findByText('Noch keine lagerelevanten Meldungen übergeben')).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeNull();
   });
 });

@@ -83,6 +83,34 @@ describe('UnfallhilfsstellenPage', () => {
     expect(btn).toBeDisabled();
   });
 
+  /**
+   * AK4-Regressionsklammer (LFH-331 · B3) zur Ebenen-Trennung D3: die Listen-Query
+   * entscheidet an der Stelle der Liste, nicht im Seitenguard. Vor dem Umbau kam die
+   * Seite bei gescheitertem UHS-Abruf ohne jede Aussage heraus.
+   *
+   * Der Leertext ist byte-gleich der aus `UnfallhilfsstellenDefault` — eine zweite
+   * Formulierung für dieselbe Tatsache wäre der Befund, den B3 behebt.
+   */
+  it('zeigt bei gescheitertem UHS-Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })),
+    );
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Unfallhilfsstellen erfasst')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerer Liste den Leertext und KEINEN Fehler', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    );
+    renderPage();
+    expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
   it('Anlegen-Flow ruft POST und schließt den Drawer', async () => {
     let body: unknown = null;
     server.use(

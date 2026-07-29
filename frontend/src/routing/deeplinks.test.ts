@@ -64,6 +64,17 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   it('unfallhilfsstellenListePfad', () => {
     expect(unfallhilfsstellenListePfad(E)).toBe('/einsaetze/5/unfallhilfsstellen/liste');
   });
+  /**
+   * Die Schnellerfassung der UHS-Liste (LFH-331 · B3). `UnfallhilfsstellenPage` liest
+   * `?neu=1` seit je, der Builder konnte den Param aber nicht bauen — jeder Aufrufer
+   * musste ihn danebenschreiben. Der Schalter ist damit KEIN toter: er hat eine Seite,
+   * die ihn liest.
+   */
+  it('unfallhilfsstellenListePfad mit ?neu=1', () => {
+    expect(unfallhilfsstellenListePfad(E, { neu: true })).toBe(
+      '/einsaetze/5/unfallhilfsstellen/liste?neu=1',
+    );
+  });
   it('bereitstellungsraeumePfad', () => {
     expect(bereitstellungsraeumePfad(E)).toBe('/einsaetze/5/bereitstellungsraeume');
   });

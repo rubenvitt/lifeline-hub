@@ -21,7 +21,7 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
@@ -110,11 +110,18 @@ function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | n
  * (Transparenz der bewusst orthogonalen Zuordnung).
  */
 function BesatzungsBlock({
-  ef, personal, darfSchreiben, onZuordnen, onFreigeben,
+  ef, personal, darfSchreiben, freiInhalt, onZuordnen, onFreigeben,
 }: {
   ef: EinsatzFahrzeug;
   personal: EinsatzPersonal[];
   darfSchreiben: boolean;
+  /**
+   * Text des Frei-Pools, wenn er nichts anzubieten hat — vom Aufrufer entschieden, weil
+   * nur dort bekannt ist, OB die Personalliste überhaupt ankam (LFH-331 · B3). Der Block
+   * bekommt einen fertigen String und keine Query: er soll den Zustand anzeigen, nicht
+   * über ihn urteilen.
+   */
+  freiInhalt: string;
   onZuordnen: (epId: number) => void;
   onFreigeben: (epId: number) => void;
 }) {
@@ -149,7 +156,7 @@ function BesatzungsBlock({
           style={{ width: '100%', maxWidth: 420, marginTop: 8 }}
           placeholder="Kraft zur Besatzung …"
           value={null}
-          notFoundContent="Keine freien Kräfte"
+          notFoundContent={freiInhalt}
           options={frei.map((p) => ({ value: p.id, label: p.name }))}
           onSelect={(epId) => onZuordnen(Number(epId))}
         />
@@ -255,6 +262,24 @@ export default function FahrzeugePage() {
   const poolOptionen = (poolQuery.data ?? [])
     .filter((f) => !disponierteIds.has(f.id))
     .map((f) => ({ value: f.id, label: `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}` }));
+
+  /**
+   * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
+   * (LFH-331 · B3). Scheitert der Abruf, filtert der Ausdruck darüber auf die leere Menge
+   * und das Feld behauptete „Keine freien Fahrzeuge" — eine Aussage über den Bestand, die
+   * niemand geprüft hat. `nichtGefundenInhalt` liefert nur im Fehlerfall einen Text; sonst
+   * bleibt der Bestandswortlaut byte-gleich stehen.
+   *
+   * KEIN `kein403`: `src/routes/fahrzeug.rs` und `personal.rs` sind org-lesbar ohne
+   * Admin-Schranke (nur `benutzer.rs` trägt eine). Ein „nur für Admins" am Fahrzeug-Pool
+   * wäre ein erfundener Fehlerfall.
+   */
+  const poolInhalt = nichtGefundenInhalt(poolQuery, {
+    allgemein: 'Fahrzeugliste konnte nicht geladen werden',
+  }) ?? 'Keine freien Fahrzeuge';
+  const besatzungInhalt = nichtGefundenInhalt(personalQuery, {
+    allgemein: 'Kräfte konnten nicht geladen werden',
+  }) ?? 'Keine freien Kräfte';
 
   /**
    * Trägerfilter aus den EIGENEN Daten (Muster der Kräfteübersicht). `undefined`, wenn
@@ -409,7 +434,7 @@ export default function FahrzeugePage() {
               placeholder="Stamm-Fahrzeug disponieren …"
               value={null}
               options={poolOptionen}
-              notFoundContent="Keine freien Fahrzeuge"
+              notFoundContent={poolInhalt}
               onSelect={(fahrzeugId) => { if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId); }}
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
@@ -432,6 +457,36 @@ export default function FahrzeugePage() {
           `zufluss` bleibt der Default `sammelbanner` — das ist die Kriterium-12-Antwort für
           genau diese Fläche: der Status wird IN der Zeile gewechselt, eigen wie fremd über
           eine Invalidierung. */}
+
+      {/* Der Statuskatalog trägt die Auswahlliste JEDER Statuszelle. Fällt er aus, steht in
+          der Zeile ein Auswahlfeld ohne Einträge — der Statuswechsel ist dann unmöglich, und
+          zwar lautlos. Die Meldung steht deshalb über der Tabelle, nicht in der Zelle.
+
+          An `darfSchreiben` gekoppelt, weil das Auswahlfeld selbst es ist: wer nur liest,
+          sieht `StatusBadge` (aus den Zeilendaten) und verliert durch den Katalogausfall
+          nichts. Ihm eine verlorene Fähigkeit anzukündigen, die er nie hatte, wäre falsch. */}
+      {darfSchreiben && statusQuery.isError && (
+        <div style={{ marginBottom: abstand.md }}>
+          <SeitenFehler
+            text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
+            ursache={statusQuery.error}
+            onWiederholen={() => void statusQuery.refetch()}
+          />
+        </div>
+      )}
+
+      {/* Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
+          werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
+          keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen.
+          Ohne diese Weiche behauptet „Noch keine Fahrzeuge disponiert" auch dann eine leere
+          Disposition, wenn bloß die Verbindung abgerissen ist. */}
+      {efQuery.isError ? (
+        <SeitenFehler
+          text="Disponierte Fahrzeuge konnten nicht geladen werden"
+          ursache={efQuery.error}
+          onWiederholen={() => void efQuery.refetch()}
+        />
+      ) : (
       <Datensicht
         bezeichnung="Fahrzeuge im Einsatz"
         spalten={spalten}
@@ -456,6 +511,7 @@ export default function FahrzeugePage() {
             ef={ef}
             personal={personal}
             darfSchreiben={darfSchreiben}
+            freiInhalt={besatzungInhalt}
             onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
             onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
           />
@@ -485,6 +541,7 @@ export default function FahrzeugePage() {
             : undefined,
         }}
       />
+      )}
 
       <Modal
         open={adhocOffen}

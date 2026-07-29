@@ -1,5 +1,8 @@
-import { Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Form, Input, Popconfirm, Space, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
 import { Select } from '../components/Select';
+import {
+  nichtGefundenInhalt, SeitenFehler, SeitenLeer, SeitenSkeleton,
+} from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -212,11 +215,40 @@ export default function EinheitenPage() {
   const freieFahrzeuge = (fahrzeugeQuery.data ?? []).filter((f) => f.einheit_id == null);
   const freiesMaterial = (materialQuery.data ?? []).filter((m) => m.einheit_id == null);
 
+  /**
+   * Was ein leerer Zuordnungs-Pool bedeutet, hängt daran, OB die Liste überhaupt ankam
+   * (LFH-331 · B3). Scheitert der Abruf, filtern die drei Ausdrücke oben auf die leere
+   * Menge, und das Auswahlfeld behauptete „Keine freien Personen" — eine Aussage über den
+   * Bestand, die niemand geprüft hat. Ohne Fehler bleibt der Bestandswortlaut byte-gleich.
+   *
+   * KEIN `kein403`: die Einsatz-Listen und `src/routes/einheit_typ.rs` sind org-lesbar
+   * ohne Admin-Schranke — ein „nur für Admins" wäre hier ein erfundener Fehlerfall.
+   */
+  const personalInhalt = nichtGefundenInhalt(personalQuery, {
+    allgemein: 'Kräfte konnten nicht geladen werden',
+  }) ?? 'Keine freien Personen';
+  const fahrzeugInhalt = nichtGefundenInhalt(fahrzeugeQuery, {
+    allgemein: 'Fahrzeuge konnten nicht geladen werden',
+  }) ?? 'Keine freien Fahrzeuge';
+  const materialInhalt = nichtGefundenInhalt(materialQuery, {
+    allgemein: 'Material konnte nicht geladen werden',
+  }) ?? 'Kein freies Material';
+
+  // Seitenzustand: NUR `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
+  // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden, nie
+  // als Frühausstieg. Kreisel und knopfloses Alert von früher hatten beide keinen Weg
+  // zurück; jetzt steht überall derselbe „Erneut abrufen".
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
@@ -238,8 +270,34 @@ export default function EinheitenPage() {
 
       <div style={{ display: 'flex', gap: 16 }}>
         <Card style={{ flex: '0 0 360px' }} size="small" title="Gliederung">
-          {einheiten.length === 0 ? (
-            <Empty description="Noch keine Einheiten" />
+          {/* DREI Zustände, nicht zwei (LFH-331 · B3). Die frühere Weiche hing an
+              `einheiten.length === 0` — und das ist während des Ladens und im Fehlerfall
+              genauso wahr wie bei einer tatsächlich leeren Gliederung. Zweimal von dreien
+              behauptete die Karte damit etwas, das niemand geprüft hatte. Gefragt wird
+              deshalb die QUERY; die Länge entscheidet erst, wenn sie überhaupt etwas
+              bedeutet. Reihenfolge ist Teil der Aussage: laden vor Fehler vor leer. */}
+          {einheitenQuery.isLoading ? (
+            <SeitenSkeleton zeilen={3} />
+          ) : einheitenQuery.isError ? (
+            <SeitenFehler
+              text="Gliederung konnte nicht geladen werden"
+              ursache={einheitenQuery.error}
+              onWiederholen={() => void einheitenQuery.refetch()}
+            />
+          ) : einheiten.length === 0 ? (
+            <SeitenLeer
+              titel="Noch keine Einheiten"
+              hinweis="Die Gliederung entsteht mit der ersten gebildeten Einheit."
+              aktion={
+                darfSchreiben
+                  // Wortlaut BYTE-GLEICH zum Kopfknopf: es ist dieselbe Handlung, und eine
+                  // zweite Schreibweise für dieselbe Geste ist genau der Befund, den B3
+                  // behebt. Dass damit zwei Knöpfe denselben Namen tragen, ist gewollt —
+                  // der Leerzustand führt dorthin, wo sonst nichts hinführt.
+                  ? { label: 'Einheit bilden', onClick: () => bilden.mutate() }
+                  : undefined
+              }
+            />
           ) : (
             <Tree
               treeData={baumDaten}
@@ -251,17 +309,34 @@ export default function EinheitenPage() {
         </Card>
 
         <Card style={{ flex: 1 }} size="small" title={aktuell ? `Einheit: ${aktuell.name}` : 'Keine Einheit gewählt'}>
+          {/* KEIN Leerzustand, sondern eine AUFFORDERUNG bei fehlender Auswahl — und
+              deshalb bewusst ohne Primäraktion: die Handlung liegt im Baum nebenan, ein
+              Knopf hier führte nirgendwohin. Die Unterscheidung ist dieselbe, die die
+              Gliederungs-Karte oben trifft, nur andersherum. */}
           {!aktuell ? (
-            <Empty description="Wähle eine Einheit im Baum" />
+            <SeitenLeer
+              titel="Wähle eine Einheit im Baum"
+              hinweis="Kopfdaten, Funk und Zuordnung erscheinen, sobald eine Einheit gewählt ist."
+            />
           ) : (
             <Form<KopfWerte> form={form} layout="vertical" disabled={!darfSchreiben} onFinish={(w) => speichern.mutate(w)}>
               <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
               <Form.Item label="Typ" name="typ_id">
+                {/* Der Typkatalog ist die einzige Fremdquelle dieses Formulars. Fällt er
+                    aus, stünde hier ein Auswahlfeld ohne Einträge — die Typzuordnung wäre
+                    unmöglich, und zwar lautlos. Der Ausfall steht deshalb im Feld selbst,
+                    dort wo die Fähigkeit verloren geht. */}
                 <Select allowClear placeholder="Typ wählen"
+                  notFoundContent={nichtGefundenInhalt(typenQuery, {
+                    allgemein: 'Einheitentypen konnten nicht geladen werden',
+                  })}
                   options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))} />
               </Form.Item>
               <Form.Item label="Abschnitt" name="abschnitt_id">
-                <TreeSelect allowClear placeholder="Abschnitt zuordnen" treeData={abschnittOptionen} />
+                <TreeSelect allowClear placeholder="Abschnitt zuordnen" treeData={abschnittOptionen}
+                  notFoundContent={nichtGefundenInhalt(abschnitteQuery, {
+                    allgemein: 'Abschnitte konnten nicht geladen werden',
+                  })} />
               </Form.Item>
               <Form.Item label="Über-Einheit" name="ueber_einheit_id">
                 <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
@@ -320,7 +395,7 @@ export default function EinheitenPage() {
               ))}
               {darfSchreiben && (
                 <Select style={{ width: '100%', marginTop: 8 }} placeholder="Person zuordnen …" value={null}
-                  notFoundContent="Keine freien Personen"
+                  notFoundContent={personalInhalt}
                   options={freiesPersonal.map((p) => ({ value: p.id, label: p.name }))}
                   onSelect={(epId) => personalZu.mutate(Number(epId))} />
               )}
@@ -334,7 +409,7 @@ export default function EinheitenPage() {
               ))}
               {darfSchreiben && (
                 <Select style={{ width: '100%', marginTop: 8 }} placeholder="Fahrzeug zuordnen …" value={null}
-                  notFoundContent="Keine freien Fahrzeuge"
+                  notFoundContent={fahrzeugInhalt}
                   options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
                   onSelect={(efId) => fahrzeugZu.mutate(Number(efId))} />
               )}
@@ -348,7 +423,7 @@ export default function EinheitenPage() {
               ))}
               {darfSchreiben && (
                 <Select style={{ width: '100%', marginTop: 8 }} placeholder="Material zuordnen …" value={null}
-                  notFoundContent="Kein freies Material"
+                  notFoundContent={materialInhalt}
                   options={freiesMaterial.map((m) => ({ value: m.id, label: `${m.bezeichnung} ×${m.menge}` }))}
                   onSelect={(emId) => materialZu.mutate(Number(emId))} />
               )}

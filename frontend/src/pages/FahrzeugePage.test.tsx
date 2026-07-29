@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
@@ -352,3 +353,140 @@ describe('FahrzeugePage', () => {
     expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
   });
 });
+
+/**
+ * Datenzustände der Fahrzeugseite (LFH-331 · B3).
+ *
+ * Drei Quellen können hier unabhängig voneinander ausfallen, und jede hat eine eigene
+ * sichtbare Antwort: die **Dispositionsliste** (tauscht die Datensicht gegen die
+ * Fehlermeldung), der **Statuskatalog** (Banner über der Tabelle — ohne ihn ist kein
+ * Statuswechsel möglich) und der **Stamm-Pool** (der Ausfall steht im Auswahlfeld statt
+ * eines stumm leeren „Keine freien Fahrzeuge").
+ *
+ * ZWEI REGELN, an denen diese Tests hängen:
+ *
+ * 1. Je Zusicherung „X nicht im DOM" steht eine Partnerzusicherung „X IST im DOM" mit
+ *    BYTE-GLEICHEM Literal daneben. Ohne sie wäre die negative Hälfte nach jeder
+ *    Umformulierung des Leertexts trivial grün — und belegte über die Zustandsweiche
+ *    nichts.
+ * 2. In jedem Fall scheitert GENAU EINE Query. Ein pauschaler 500er stellte mehrere
+ *    „Erneut abrufen" nebeneinander und ließe den Griff darauf an der Mehrdeutigkeit
+ *    scheitern statt an der Sache.
+ */
+describe('FahrzeugePage · Datenzustände', () => {
+  const gruenerBoden = () => [
+    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
+    http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
+    http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+  ];
+
+  function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
+    // Die Abweichung steht VORN: `server.use` reiht in der übergebenen Reihenfolge ein und
+    // der erste Treffer gewinnt. Andersherum hätte der grüne Boden jede Abweichung
+    // verschluckt — gemessen, ein Fehlschlag sah dann nach fehlenden Daten aus.
+    server.use(...abweichungen, ...gruenerBoden());
+    return renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/fahrzeuge' },
+    );
+  }
+
+  it('gescheiterte Dispositionsliste: Fehler statt Leertext', async () => {
+    zeige(http.get('/api/einsaetze/7/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Fahrzeuge disponiert')).not.toBeInTheDocument();
+  });
+
+  it('leere Dispositionsliste: Leertext und KEIN Fehler', async () => {
+    zeige();
+    expect(await screen.findByText('Noch keine Fahrzeuge disponiert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  it('gescheiterter Statuskatalog: Banner über der Tabelle', async () => {
+    zeige(http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })));
+    expect(
+      await screen.findByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+    ).toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: mit Statuskatalog steht kein Banner', async () => {
+    zeige();
+    await screen.findByText('Noch keine Fahrzeuge disponiert');
+    expect(
+      screen.queryByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Fahrzeuge"', async () => {
+    const { container } = zeige(http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
+    await screen.findByText('Noch keine Fahrzeuge disponiert');
+    await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
+    expect(await screen.findByText('Fahrzeugliste konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Keine freien Fahrzeuge')).not.toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: leerer Stamm-Pool behält „Keine freien Fahrzeuge"', async () => {
+    const { container } = zeige();
+    await screen.findByText('Noch keine Fahrzeuge disponiert');
+    await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
+    expect(await screen.findByText('Keine freien Fahrzeuge')).toBeInTheDocument();
+    expect(screen.queryByText('Fahrzeugliste konnte nicht geladen werden')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Der Besatzungs-Pool ist derselbe Fehlermodus eine Ebene tiefer: scheitert die
+   * Personalliste, filtert `personal.filter(p => p.fahrzeug_id == null)` auf die leere
+   * Menge, und das Auswahlfeld behauptet „Keine freien Kräfte" — obwohl niemand weiß,
+   * ob es welche gibt.
+   */
+  it('gescheiterte Personalliste: der Besatzungs-Pool nennt den Ausfall', async () => {
+    const { container } = zeige(
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
+      http.get('/api/einsaetze/7/personal', () => new HttpResponse(null, { status: 500 })),
+    );
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    await oeffneAuswahl(container, 'Kraft zur Besatzung …');
+    expect(await screen.findByText('Kräfte konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Keine freien Kräfte')).not.toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: leere Personalliste behält „Keine freien Kräfte"', async () => {
+    const { container } = zeige(http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])));
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    await oeffneAuswahl(container, 'Kraft zur Besatzung …');
+    expect(await screen.findByText('Keine freien Kräfte')).toBeInTheDocument();
+    expect(screen.queryByText('Kräfte konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext.
+ *
+ * NICHT per Klick auf den Platzhalter selbst: der `.ant-select-placeholder`-Knoten trägt
+ * `pointer-events: none`, und `userEvent` bricht dort mit „element has pointer-events:
+ * none" ab (gemessen). Gegriffen wird deshalb das Feld über seinen Text und darin die
+ * Combobox — der Knoten, den auch eine Tastaturbedienung fokussiert.
+ */
+async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
+    .find((s) => s.textContent?.includes(platzhalter));
+  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
+  await userEvent.click(within(feld!).getByRole('combobox'));
+}
+
+/** Klappt die erste Datenzeile auf — dort hängt der Besatzungsblock. */
+async function klappeZeileAuf(container: HTMLElement) {
+  const ausloeser = container.querySelector<HTMLElement>('.ant-table-row-expand-icon');
+  expect(ausloeser, 'die Fahrzeugzeile muss aufklappbar sein').not.toBeNull();
+  await userEvent.click(ausloeser!);
+}

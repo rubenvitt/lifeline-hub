@@ -1,9 +1,9 @@
-import { Alert, Button, Empty, Spin } from 'antd';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
+import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { liesLetzteUhs, waehleDefaultUhs } from './uhs/uhsAuswahl';
 
@@ -38,9 +38,15 @@ export default function UnfallhilfsstellenDefault() {
 
   if (!entscheidung.current) {
     if (uhsQuery.error) {
-      return <Alert type="error" title="Unfallhilfsstellen konnten nicht geladen werden" showIcon />;
+      return (
+        <SeitenFehler
+          text="Unfallhilfsstellen konnten nicht geladen werden"
+          ursache={uhsQuery.error}
+          onWiederholen={() => void uhsQuery.refetch()}
+        />
+      );
     }
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return <SeitenSkeleton />;
   }
 
   const { uhsId } = entscheidung.current;
@@ -48,9 +54,14 @@ export default function UnfallhilfsstellenDefault() {
 
   return (
     <div style={{ padding: 16 }}>
-      <Empty description="Noch keine Unfallhilfsstellen erfasst">
-        <Button type="primary" onClick={() => setAnlegen(true)}>Erste UHS anlegen</Button>
-      </Empty>
+      {/* Der einzige Leerzustand im Bestand, der zur Aktion führt — und er tut das ohne
+          Route: der Drawer öffnet über lokalen Zustand. Genau dafür trägt die Aktion des
+          Primitivs neben `pfad` auch `onClick`; ihm hier eine Route anzudichten hieße,
+          eine zu erfinden, die es nicht gibt (LFH-331 · B3, D2). */}
+      <SeitenLeer
+        titel="Noch keine Unfallhilfsstellen erfasst"
+        aktion={{ label: 'Erste UHS anlegen', onClick: () => setAnlegen(true) }}
+      />
       <UhsAnlegenDrawer
         einsatzId={einsatzId}
         open={anlegen}

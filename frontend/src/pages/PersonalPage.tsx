@@ -20,12 +20,12 @@ import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusTag from '../components/StatusTag';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
-import { flaeche } from '../theme/tokens';
+import { abstand, flaeche } from '../theme/tokens';
 
 /**
  * Statusanzeige eines disponierten Einsatzpersonals — und zugleich die GRENZE des
@@ -159,6 +159,18 @@ export default function PersonalPage() {
   const poolOptionen = (poolQuery.data ?? [])
     .filter((p) => !disponierteIds.has(p.id))
     .map((p) => ({ value: p.id, label: `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}` }));
+
+  /**
+   * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
+   * (LFH-331 · B3). Scheitert der Abruf, filtert der Ausdruck darüber auf die leere Menge
+   * und das Feld behauptete „Keine freien Personen" — eine Aussage über den Bestand, die
+   * niemand geprüft hat. Ohne Fehler bleibt der Bestandswortlaut byte-gleich stehen.
+   *
+   * KEIN `kein403`: `src/routes/personal.rs` ist org-lesbar ohne Admin-Schranke.
+   */
+  const poolInhalt = nichtGefundenInhalt(poolQuery, {
+    allgemein: 'Personalliste konnte nicht geladen werden',
+  }) ?? 'Keine freien Personen';
 
   /**
    * Trägerfilter aus den EIGENEN Daten; `undefined` ohne Werte — ein Filterfeld mit null
@@ -332,7 +344,7 @@ export default function PersonalPage() {
               placeholder="Person aus Pool disponieren …"
               value={null}
               options={poolOptionen}
-              notFoundContent="Keine freien Personen"
+              notFoundContent={poolInhalt}
               onSelect={(personalId) => { if (personalId != null) disponiereMutation.mutate(personalId); }}
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
@@ -354,6 +366,37 @@ export default function PersonalPage() {
           `zufluss` bleibt der Default `sammelbanner`: diese Seite trägt ZWEI Auswahlfelder
           in der Zeile (Position, Status), eigener wie fremder Wechsel läuft über eine
           Invalidierung. */}
+
+      {/* Der Statuskatalog trägt die Auswahlliste JEDER Statuszelle. Fällt er aus, steht in
+          der Zeile ein Auswahlfeld ohne Einträge — der Statuswechsel ist dann unmöglich, und
+          zwar lautlos. Die Meldung steht deshalb über der Tabelle, nicht in der Zelle.
+
+          An `darfSchreiben` gekoppelt, weil das Auswahlfeld selbst es ist: wer nur liest,
+          sieht `StatusBadge` aus den Zeilendaten und verliert durch den Katalogausfall
+          nichts. (Die Positionsspalte bleibt bedienbar — `POSITION_OPTIONEN` ist ein
+          lokales Enum und kommt nicht über die Leitung.) */}
+      {darfSchreiben && statusQuery.isError && (
+        <div style={{ marginBottom: abstand.md }}>
+          <SeitenFehler
+            text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
+            ursache={statusQuery.error}
+            onWiederholen={() => void statusQuery.refetch()}
+          />
+        </div>
+      )}
+
+      {/* Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
+          werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
+          keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen.
+          Ohne diese Weiche behauptet „Noch kein Personal disponiert" auch dann eine leere
+          Disposition, wenn bloß die Verbindung abgerissen ist. */}
+      {epQuery.isError ? (
+        <SeitenFehler
+          text="Disponiertes Personal konnte nicht geladen werden"
+          ursache={epQuery.error}
+          onWiederholen={() => void epQuery.refetch()}
+        />
+      ) : (
       <Datensicht
         bezeichnung="Personal im Einsatz"
         spalten={spalten}
@@ -390,6 +433,7 @@ export default function PersonalPage() {
             : undefined,
         }}
       />
+      )}
 
       <Modal
         open={adhocOffen}

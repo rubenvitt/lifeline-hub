@@ -14,6 +14,7 @@ import type { Ausmass, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
 import { AUSMASS_META, STATUS_META, TYP_LABEL, filterSchaeden, geschaedigtAnzeige } from './schaeden/schadenHelfer';
 import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
@@ -60,6 +61,27 @@ export default function SchaedenPage() {
 
   const alle = schaedenQuery.data ?? [];
   const sichtbar = filterSchaeden(alle, { sicht, typ: typFilter, ausmass: ausmassFilter, suche });
+
+  /**
+   * LISTENZUSTAND — an der Stelle der Tabelle entschieden, nie als Frühausstieg
+   * (LFH-331 · B3, D3).
+   *
+   * KEIN Seitenzustand-Frühausstieg an `einsatzQuery` auf dieser Seite: sie trägt keine
+   * Breadcrumb und kommt ohne den Einsatz aus (`einsatz?.org_id`, `einsatz?.org_name` unten
+   * haben eigene Rückfallwerte). Ein Frühausstieg wäre hier also keine Vereinheitlichung,
+   * sondern eine neue Route-Verhaltensänderung — die gehört nicht in dieses Bündel.
+   *
+   * Gemessen wird an `alle`, NICHT an `sichtbar`: die gefilterte Menge ist bei gesetztem
+   * Reiter, Typ, Ausmaß oder Suchbegriff regelmäßig leer, während Zeilen im Zwischenspeicher
+   * stehen — an ihr gemessen kippte die Seite bei jedem engen Filter in den Fehlerzweig.
+   *
+   * Ohne Zeilen tritt der Fehler an die Stelle der Tabelle, sonst behauptet „Keine Schäden
+   * in dieser Sicht" eine leere Menge, wo bloß der Abruf scheiterte. Mit Zeilen bleiben sie
+   * stehen und bekommen ein Banner: echt, nur womöglich alt. Der Ladezweig steht bewusst
+   * nicht hier, sondern am Primitiv (`loading`).
+   */
+  const listeGescheitert = schaedenQuery.isError && alle.length === 0;
+  const standVeraltet = schaedenQuery.isError && alle.length > 0;
 
   const spalten: TableColumnsType<Schaden> = [
     {
@@ -132,18 +154,30 @@ export default function SchaedenPage() {
         />
       </Space>
 
-      <KatalogTabelle<Schaden>
-        rowKey="id"
-        loading={schaedenQuery.isLoading}
-        dataSource={sichtbar}
-        columns={spalten}
-        pagination={false}
-        locale={{ emptyText: 'Keine Schäden in dieser Sicht' }}
-        onRow={(row) => ({
-          onClick: () => navigate(schadenDetailPfad(einsatzId, row.id)),
-          style: { cursor: 'pointer' },
-        })}
-      />
+      {listeGescheitert ? (
+        <SeitenFehler
+          text="Schäden konnten nicht geladen werden"
+          ursache={schaedenQuery.error}
+          onWiederholen={() => void schaedenQuery.refetch()}
+        />
+      ) : (
+        <>
+          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void schaedenQuery.refetch()} />}
+
+          <KatalogTabelle<Schaden>
+            rowKey="id"
+            loading={schaedenQuery.isLoading}
+            dataSource={sichtbar}
+            columns={spalten}
+            pagination={false}
+            locale={{ emptyText: 'Keine Schäden in dieser Sicht' }}
+            onRow={(row) => ({
+              onClick: () => navigate(schadenDetailPfad(einsatzId, row.id)),
+              style: { cursor: 'pointer' },
+            })}
+          />
+        </>
+      )}
 
       <SchadenErfassenModal
         open={erfassenOffen}

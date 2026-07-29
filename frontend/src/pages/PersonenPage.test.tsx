@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
+import { einsatzKeys } from '../api/queryKeys';
 import PersonenPage from './PersonenPage';
 import PersonenDetailPage from './PersonenDetailPage';
 
@@ -335,5 +336,79 @@ describe('PersonenPage', () => {
     await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
     // Detailseite zeigt den Personen-Titel als Heading:
     expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
+  });
+
+  /**
+   * AK4-Pflichtstelle (LFH-331 · B3) — das Partnerpaar, nicht die einzelne Zusicherung.
+   *
+   * Die negative Hälfte allein belegte nichts: hätte der Umbau den Leertext umformuliert,
+   * wäre sie auch im Leerfall trivial grün. Erst der Fall darunter — gleiches Literal,
+   * gleiche Datei — macht aus ihr eine Aussage über die Zustandsweiche statt über die
+   * Schreibweise eines Strings.
+   *
+   * Beide Leertexte der Seite stehen im Paar: die Listensicht bedient fünf Reiter, der
+   * Patienten-Reiter ist ein eigener Zweig mit eigenem Text — die Fehlerweiche muss beide
+   * verdrängen, sonst behauptet einer der zwei weiterhin eine leere Menge, wo bloß der
+   * Abruf scheiterte.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT die Leertexte', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/personen' },
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.getByText('Personen konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Personen in dieser Sicht')).not.toBeInTheDocument();
+    expect(screen.queryByText('Keine Patienten in diesem Einsatz.')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerer Menge die Leertexte und KEINEN Fehler', async () => {
+    render(einsatzAktiv, []);
+
+    expect(await screen.findByText('Keine Personen in dieser Sicht')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Patienten' }));
+    expect(await screen.findByText('Keine Patienten in diesem Einsatz.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher — nicht `isFetching`, nicht
+   * `isStale` (D5).
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung derselben Sicht. Ein bloß vorbefüllter Zwischenspeicher belegte den
+   * Produktionsweg NICHT — dort steht hinter den Zeilen nie ein erfolgreicher Abruf, und ob
+   * TanStack den Zustand nach einem HINTERGRUND-Fehlschlag überhaupt auf `error` stellt
+   * (statt die Meldung nur in `isRefetchError` abzulegen und `success` stehen zu lassen),
+   * wäre damit ungeprüft geblieben. Gemessen: er tut es und behält `data` — genau die Lage,
+   * die das Banner meint.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    const { client } = render(einsatzAktiv, [person]);
+    await screen.findByText('R-001');
+
+    server.use(
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+    );
+    await client.refetchQueries({ queryKey: einsatzKeys.personen(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('R-001')).toBeInTheDocument();
+    expect(screen.queryByText('Personen konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 });

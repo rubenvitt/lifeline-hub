@@ -1,6 +1,7 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -105,11 +106,21 @@ export default function MaterialPage() {
     onSuccess: invalidate, onError: fehler,
   });
 
+  // Seitenzustand (LFH-331 · B3): NUR `einsatzQuery` — ohne sie tragen weder Breadcrumb
+  // noch `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden,
+  // nie als Frühausstieg. Der drehende Kreisel und das knopflose Alert von früher hatten
+  // beide keinen Weg zurück; jetzt steht überall derselbe „Erneut abrufen".
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
@@ -120,6 +131,18 @@ export default function MaterialPage() {
   const poolOptionen = (poolQuery.data ?? []).map((m) => ({
     value: m.id, label: `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
   }));
+
+  /**
+   * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
+   * (LFH-331 · B3). Scheitert der Abruf, bleibt `poolOptionen` leer und das Feld behauptete
+   * „Kein Material im Dienst" — eine Aussage über den Bestand, die niemand geprüft hat.
+   * Ohne Fehler bleibt der Bestandswortlaut byte-gleich stehen.
+   *
+   * KEIN `kein403`: `src/routes/material.rs` ist org-lesbar ohne Admin-Schranke.
+   */
+  const poolInhalt = nichtGefundenInhalt(poolQuery, {
+    allgemein: 'Materialliste konnte nicht geladen werden',
+  }) ?? 'Kein Material im Dienst';
 
   /**
    * Kategoriefilter aus den EIGENEN Daten; `undefined` ohne Werte. Bewusste Folge: das Feld
@@ -235,7 +258,7 @@ export default function MaterialPage() {
               placeholder="Stamm-Material wählen …"
               value={poolAuswahl}
               options={poolOptionen}
-              notFoundContent="Kein Material im Dienst"
+              notFoundContent={poolInhalt}
               onChange={(v) => setPoolAuswahl(v ?? null)}
             />
             <InputNumber min={1} value={poolMenge} onChange={(v) => setPoolMenge(v ?? 1)} />
@@ -262,6 +285,23 @@ export default function MaterialPage() {
           A2 verbietet — der Status steht deshalb als beschriftetes Sekundärfeld.
 
           `titel` ohne `ziel`: Material hat keine Detailroute. */}
+
+      {/* KEIN Katalog-Banner auf dieser Seite, und das ist gemessen statt vergessen: der
+          Materialstatus ist das lokale Enum `MaterialStatus` (`STATUS_META`, fünf Werte).
+          Er kommt nicht über die Leitung und kann deshalb nicht ausfallen — anders als der
+          Statuskatalog der Fahrzeug- und Personalseite. Eine Meldung „Statuskatalog konnte
+          nicht geladen werden" wäre hier ein erfundener Fehlerfall.
+
+          Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
+          werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
+          keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen. */}
+      {emQuery.isError ? (
+        <SeitenFehler
+          text="Disponiertes Material konnte nicht geladen werden"
+          ursache={emQuery.error}
+          onWiederholen={() => void emQuery.refetch()}
+        />
+      ) : (
       <Datensicht
         bezeichnung="Material im Einsatz"
         spalten={spalten}
@@ -289,6 +329,7 @@ export default function MaterialPage() {
             : undefined,
         }}
       />
+      )}
 
       <Modal
         open={adhocOffen}

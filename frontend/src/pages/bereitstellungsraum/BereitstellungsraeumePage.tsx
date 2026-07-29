@@ -1,6 +1,6 @@
 import {
-  Alert, App, Breadcrumb, Button, Drawer, Form, Input,
-  Spin, type TableColumnsType,
+  App, Breadcrumb, Button, Drawer, Form, Input,
+  type TableColumnsType,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
+import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { brStatus } from '../../theme/statusFarben';
 import { flaeche } from '../../theme/tokens';
 import KatalogTabelle from '../../components/KatalogTabelle';
@@ -71,11 +72,23 @@ export default function BereitstellungsraeumePage() {
     { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
   ];
 
-  if (einsatzQuery.isLoading || brQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  }
+  // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
+  //
+  // SEITENZUSTAND — nur `einsatzQuery`. Breadcrumb und Schreibrecht hängen an ihr, ohne sie
+  // gibt es keinen Rahmen; nur sie rechtfertigt einen Frühausstieg.
+  //
+  // LISTENZUSTAND — `brQuery`. Sie entschied hier früher mit über die ganze Seite: bis ihre
+  // Antwort da war, stand alles im Ladebild, und scheiterte sie, blieb es dabei — ohne jede
+  // Aussage, was los ist. Ihr Zustand gehört an die Stelle der Liste (unten).
+  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.error) {
-    return <Alert type="error" title="Einsatz konnte nicht geladen werden" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz konnte nicht geladen werden"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
 
   return (
@@ -95,14 +108,28 @@ export default function BereitstellungsraeumePage() {
         </Button>
       }
     >
-      <KatalogTabelle<Bereitstellungsraum>
-        rowKey="id"
-        dataSource={(brQuery.data ?? []).filter((br) => !br.storniert_at)}
-        columns={spalten}
-        size="middle"
-        pagination={false}
-        locale={{ emptyText: 'Noch keine Bereitstellungsräume erfasst' }}
-      />
+      {/* Der Fehler TAUSCHT die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (D3): `Datensicht` führt den Kartenzweig an `Liste`, und deren Vertrag kennt
+          keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer der
+          beiden Formen. Ohne diese Weiche behauptet „Noch keine Bereitstellungsräume
+          erfasst" auch dann eine leere Lage, wenn bloß die Verbindung abgerissen ist. */}
+      {brQuery.isError ? (
+        <SeitenFehler
+          text="Bereitstellungsräume konnten nicht geladen werden"
+          ursache={brQuery.error}
+          onWiederholen={() => void brQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle<Bereitstellungsraum>
+          rowKey="id"
+          loading={brQuery.isLoading}
+          dataSource={(brQuery.data ?? []).filter((br) => !br.storniert_at)}
+          columns={spalten}
+          size="middle"
+          pagination={false}
+          locale={{ emptyText: 'Noch keine Bereitstellungsräume erfasst' }}
+        />
+      )}
 
       <Drawer
         title="Bereitstellungsraum anlegen"

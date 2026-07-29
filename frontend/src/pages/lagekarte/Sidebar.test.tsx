@@ -256,9 +256,15 @@ describe('Sidebar Fehler-Slots', () => {
   });
 
   it('„Nicht verortet": ohne Fehler die Erfolgsmeldung und keinen Slot', () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={[]} />);
+    const { container } = renderMitProviders(<Sidebar {...basisProps} nichtVerortet={[]} />);
     expect(screen.getByText('Alles verortet')).toBeInTheDocument();
     expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
+    /**
+     * Getauscht ist der Knoten, nicht der Wortlaut (LFH-331 · B3). „Alles verortet" ist
+     * ein ERFOLGS-, kein Leerzustand: er bekommt deshalb keine Primäraktion — es gibt
+     * nichts anzulegen, wenn alles verortet ist.
+     */
+    expect(container.querySelector('.ant-empty')).toBeNull();
   });
 
   it('„Bild-Hintergründe": Fehler-Slot, der Upload bleibt bedienbar', () => {

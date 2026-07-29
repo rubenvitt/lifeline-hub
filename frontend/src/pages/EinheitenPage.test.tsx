@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { delay, http, HttpResponse } from 'msw';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
@@ -149,3 +149,136 @@ describe('EinheitenPage', () => {
     expect((patchBody!['sprechgruppe_ids'] as number[])).toContain(7);
   });
 });
+
+/**
+ * Datenzustände der Einheitenseite (LFH-331 · B3).
+ *
+ * Die Gliederungs-Karte trug bislang eine **Zwei**-Zustands-Weiche (`einheiten.length === 0`)
+ * für einen **Drei**-Zustands-Raum: dieselbe Aussage „Noch keine Einheiten" stand während
+ * des Ladens, im Fehlerfall und bei tatsächlich leerer Gliederung. Zwei der drei Male war
+ * sie falsch.
+ *
+ * Die rechte Karte ist davon zu trennen: „Wähle eine Einheit im Baum" ist keine leere
+ * Menge, sondern eine **Aufforderung bei fehlender Auswahl** — sie bekommt bewusst keine
+ * Primäraktion, weil die Handlung im Baum liegt.
+ */
+describe('EinheitenPage · Datenzustände', () => {
+  function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
+    // Abweichung VORN: `server.use` reiht in Übergabereihenfolge ein, der erste Treffer
+    // gewinnt — andersherum schluckte der grüne Boden jede Abweichung.
+    server.use(...abweichungen, ...handlers());
+    return renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+  }
+
+  it('gescheiterter Einsatz: der Seitenrahmen bietet den erneuten Abruf an', async () => {
+    zeige(http.get('/api/einsaetze/1', () => new HttpResponse(null, { status: 500 })));
+    expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+  });
+
+  it('gescheiterte Gliederung: Fehler statt „Noch keine Einheiten"', async () => {
+    zeige(http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })));
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Einheiten')).not.toBeInTheDocument();
+  });
+
+  it('leere Gliederung: Leertext mit genau EINER Primäraktion und KEINEM Fehler', async () => {
+    const { container } = zeige(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])));
+    expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    /**
+     * Der Knopf heißt BYTE-GLEICH wie der im Seitenkopf — es ist dieselbe Handlung.
+     * Gezählt wird deshalb innerhalb der KARTE, nicht auf der Seite. Das ist zugleich die
+     * schärfere Aussage: „genau eine Primäraktion" hält hier nur, weil `SeitenLeer` null
+     * eigene Knöpfe beisteuert; ein Primitiv mit eingebautem Knopf machte die Zahl
+     * mehrdeutig.
+     */
+    const karte = [...container.querySelectorAll<HTMLElement>('.ant-card')]
+      .find((k) => k.textContent?.includes('Noch keine Einheiten'));
+    expect(karte, 'die Gliederungs-Karte muss den Leertext tragen').toBeTruthy();
+    expect(within(karte!).getByRole('button', { name: 'Einheit bilden' })).toBeInTheDocument();
+    expect(within(karte!).getAllByRole('button')).toHaveLength(1);
+  });
+
+  /**
+   * Die stärkste Zusicherung des Bündels — und die einzige, die den LADE-Zweig des
+   * Drei-Zustands-Bugs belegt.
+   *
+   * Sie hängt daran, dass NUR die Einheiten-Abfrage verzögert wird: der Einsatz ist dann
+   * schon da, die Karte also montiert. Ohne diese Trennung wäre die Aussage trivial wahr,
+   * weil der Seitenrahmen während `einsatzQuery` gar nichts von der Gliederung rendert.
+   */
+  it('WÄHREND des Ladens behauptet nichts, dass keine Einheiten da sind', async () => {
+    zeige(http.get('/api/einsaetze/1/einheiten', async () => {
+      await delay(300);
+      return HttpResponse.json([]);
+    }));
+    await screen.findByRole('heading', { name: 'Einheiten' });
+    expect(screen.queryByText('Noch keine Einheiten')).not.toBeInTheDocument();
+    // Partnerhälfte, gleiches Literal: nach dem Abruf steht die Aussage da.
+    expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
+  });
+
+  it('ohne Auswahl steht die Aufforderung — und trägt KEINE Aktion', async () => {
+    const { container } = zeige();
+    expect(await screen.findByText('Wähle eine Einheit im Baum')).toBeInTheDocument();
+    const karte = [...container.querySelectorAll<HTMLElement>('.ant-card')]
+      .find((k) => k.textContent?.includes('Wähle eine Einheit im Baum'));
+    expect(karte, 'die Detailkarte muss die Aufforderung tragen').toBeTruthy();
+    // Eine Primäraktion wäre hier sinnlos: die Handlung liegt im Baum, nicht in dieser
+    // Karte. Geprüft wird die KARTE, nicht die Seite — der Kopf trägt „Einheit bilden".
+    expect(within(karte!).queryByRole('button')).toBeNull();
+  });
+
+  /**
+   * Das Typ-Feld wird über sein FORMULARLABEL gegriffen, nicht über den Platzhalter: die
+   * gewählte Einheit trägt `typ_id: 1`, das Feld zeigt also einen Wert und gar keinen
+   * Platzhalter mehr (gemessen — der Griff über „Typ wählen" fand nichts).
+   */
+  it('gescheiterter Typkatalog: das Auswahlfeld nennt den Ausfall', async () => {
+    zeige(http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })));
+    await userEvent.click(await screen.findByText('1. Zug'));
+    await userEvent.click(await screen.findByLabelText('Typ'));
+    expect(await screen.findByText('Einheitentypen konnten nicht geladen werden')).toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: mit Typkatalog steht die Auswahl statt der Meldung', async () => {
+    zeige();
+    await userEvent.click(await screen.findByText('1. Zug'));
+    await userEvent.click(await screen.findByLabelText('Typ'));
+    expect((await screen.findAllByTitle('Zug')).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Einheitentypen konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+
+  it('gescheiterte Personalliste: der Zuordnungs-Pool nennt den Ausfall', async () => {
+    const { container } = zeige(
+      http.get('/api/einsaetze/1/personal', () => new HttpResponse(null, { status: 500 })),
+    );
+    await userEvent.click(await screen.findByText('1. Zug'));
+    await oeffneEinheitenAuswahl(container, 'Person zuordnen …');
+    expect(await screen.findByText('Kräfte konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Keine freien Personen')).not.toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: leere Personalliste behält „Keine freien Personen"', async () => {
+    const { container } = zeige();
+    await userEvent.click(await screen.findByText('1. Zug'));
+    await oeffneEinheitenAuswahl(container, 'Person zuordnen …');
+    expect(await screen.findByText('Keine freien Personen')).toBeInTheDocument();
+    expect(screen.queryByText('Kräfte konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den
+ * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` (gemessen).
+ */
+async function oeffneEinheitenAuswahl(container: HTMLElement, platzhalter: string) {
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
+    .find((s) => s.textContent?.includes(platzhalter));
+  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
+  await userEvent.click(within(feld!).getByRole('combobox'));
+}

@@ -30,6 +30,23 @@ describe('Liste', () => {
     expect(screen.getByText('Noch nichts da')).toBeInTheDocument();
   });
 
+  /**
+   * Der Fallback ohne `emptyText` (LFH-331 · B3). Er läuft jetzt über das Leer-Primitiv
+   * statt über antds Leer-Element; der Titel bleibt „Keine Daten", weil genau das die
+   * zehn Masken in Produktion (`ConfigProvider locale={deDE}`) heute schon zeigen —
+   * der Umbau ist am Wortlaut folgenlos, nur der Knoten wechselt.
+   *
+   * Die zweite Zusicherung ist die tragende: der Text allein wäre unter dem antd-Element
+   * ebenfalls grün (in Produktion — im Test ohne Locale wäre er englisch).
+   */
+  it('nutzt ohne emptyText das Leer-Primitiv, nicht antds Leer-Element', () => {
+    const { container } = renderMitProviders(
+      <Liste dataSource={[]} renderItem={(t: string) => <ListenEintrag>{t}</ListenEintrag>} />,
+    );
+    expect(screen.getByText('Keine Daten')).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeNull();
+  });
+
   it('rendert Aktionen und feuert onClick am Eintrag', async () => {
     const user = userEvent.setup();
     const onKlick = vi.fn();

@@ -1,4 +1,4 @@
-import { Empty } from 'antd';
+import { SeitenLeer } from '../components/SeitenZustand';
 import type { Auftrag } from '../api/types';
 import AuftragKarte from './AuftragKarte';
 
@@ -23,7 +23,7 @@ export default function AuftragListe({
   auftraege, ansicht = 'offen', einsatzId, darfSchreiben, highlightId,
   onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
 }: AuftragListeProps) {
-  if (auftraege.length === 0) return <Empty description="Keine Aufträge" />;
+  if (auftraege.length === 0) return <SeitenLeer titel="Keine Aufträge" />;
   return (
     <>
       {auftraege.map((a) => (

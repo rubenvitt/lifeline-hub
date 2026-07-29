@@ -4,17 +4,29 @@ import {
   modulRegistry, istModulSichtbar, istModulGesperrt, modulZielRoute,
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
+import { etbPfad, personenPfad, schaedenPfad, unfallhilfsstellenListePfad } from '../routing/deeplinks';
 import type { IconType } from 'react-icons';
 import type { Befehl, BefehlKontext } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import type { Koordinatenformat } from '../api/types';
 
-const SCHNELLAKTIONEN: { modulKey: string; route: string; label: string; schlagworte: string[] }[] = [
-  { modulKey: 'personen', route: 'personen', label: 'Neue Person erfassen', schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'] },
-  { modulKey: 'etb', route: 'etb', label: 'Neuer ETB-Eintrag', schlagworte: ['tagebuch', 'meldung', 'eintrag'] },
-  { modulKey: 'unfallhilfsstellen', route: 'unfallhilfsstellen', label: 'Neue Unfallhilfsstelle', schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'] },
-  { modulKey: 'schaeden', route: 'schaeden', label: 'Neuen Schaden erfassen', schlagworte: ['schaden', 'objekt'] },
+/**
+ * Die Ziele stehen als **Builder** aus `routing/deeplinks.ts` in der Tabelle, nicht als
+ * Routenstück, das unten zu einem Vorlagentext zusammengesetzt wird (LFH-331 · B3).
+ *
+ * Der Unterschied war an einer Zeile messbar und ein echter Fehler: die Unfallhilfsstellen
+ * liegen unter `/unfallhilfsstellen/liste`, während der bare Modulpfad auf
+ * `UnfallhilfsstellenDefault` zeigt — eine Seite, die `?neu=1` nicht liest. Die
+ * Schnellaktion lief damit ins Leere. Ein Routenstück nur für diese eine Zeile
+ * auszunehmen hätte zwei Wahrheiten für dieselbe Sache stehen lassen; deshalb tragen
+ * alle vier Zeilen den Builder.
+ */
+const SCHNELLAKTIONEN: { modulKey: string; pfad: (einsatzId: number) => string; label: string; schlagworte: string[] }[] = [
+  { modulKey: 'personen', pfad: (id) => personenPfad(id, { neu: true }), label: 'Neue Person erfassen', schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'] },
+  { modulKey: 'etb', pfad: (id) => etbPfad(id, { neu: true }), label: 'Neuer ETB-Eintrag', schlagworte: ['tagebuch', 'meldung', 'eintrag'] },
+  { modulKey: 'unfallhilfsstellen', pfad: (id) => unfallhilfsstellenListePfad(id, { neu: true }), label: 'Neue Unfallhilfsstelle', schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'] },
+  { modulKey: 'schaeden', pfad: (id) => schaedenPfad(id, { neu: true }), label: 'Neuen Schaden erfassen', schlagworte: ['schaden', 'objekt'] },
 ];
 
 const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconType }[] = [
@@ -62,7 +74,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       for (const a of SCHNELLAKTIONEN) {
         const m = modulRegistry.find((x) => x.key === a.modulKey);
         if (!m || !istModulSichtbar(m, k.overrides) || istModulGesperrt(m, k.benutzer, k.overrides)) continue;
-        const ziel = `/einsaetze/${k.einsatzId}/${a.route}?neu=1`;
+        const ziel = a.pfad(k.einsatzId);
         befehle.push({
           id: `aktion:${a.modulKey}`, gruppe: 'schnellaktionen', label: a.label,
           icon: TbPlus, schlagworte: a.schlagworte, ausfuehren: () => k.navigate(ziel),

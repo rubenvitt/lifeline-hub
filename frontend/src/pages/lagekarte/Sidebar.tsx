@@ -1,7 +1,7 @@
-import { Badge, Button, Card, Empty, Popconfirm, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
+import { Badge, Button, Card, Popconfirm, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
 import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
-import { SeitenFehler } from '../../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer } from '../../components/SeitenZustand';
 import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
@@ -235,12 +235,15 @@ export default function Sidebar(props: SidebarProps) {
       >
         {/* Der Fehlerzweig steht VOR der Leer-/Listen-Weiche (LFH-331 · B3): „Alles verortet"
             ist eine Erfolgsaussage und darf nicht fallen, solange unklar ist, ob überhaupt
-            etwas geladen wurde. Die Zeile darunter bleibt unangetastet — ihre Umstellung auf
-            das Leer-Primitiv gehört Bündel 6. */}
+            etwas geladen wurde.
+
+            Die Zeile darunter trägt jetzt dasselbe Primitiv wie die übrigen Leerzustände —
+            aber OHNE Aktion und ohne Hinweis „lege etwas an". Sie ist kein Leerzustand,
+            sondern ein Erfolgszustand: hier fehlt nichts, hier ist alles erledigt. */}
         {sektionFehler.nichtVerortet ? (
           <FehlerSlot fehler={sektionFehler.nichtVerortet} />
         ) : nichtVerortet.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Alles verortet" />
+          <SeitenLeer titel="Alles verortet" />
         ) : (
           <Liste
             size="small"

@@ -1,4 +1,4 @@
-import { App, Button, Card, Empty, Form, Input, Modal, Space, Tag, Typography } from 'antd';
+import { App, Button, Card, Form, Input, Modal, Space, Tag, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router';
@@ -12,7 +12,7 @@ import { globalKeys } from '../api/queryKeys';
 import EinsatzSeite from '../components/EinsatzSeite';
 import SektionHeader from '../components/SektionHeader';
 import StatusTag from '../components/StatusTag';
-import { SeitenFehler } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache. Der Import steht
@@ -153,11 +153,16 @@ export default function EinsaetzePage() {
   return (
     <EinsatzSeite titel="Einsätze" breite={flaeche.seiteBreit}>
       {/* Leer und anlegeberechtigt schließen sich NICHT aus: vorher lief der
-          Empty-Zweig nur für Nutzer ohne Anlegerecht, alle anderen sahen beim
-          Laden, bei leerer Liste und im Fehlerfall dieselbe leere Fläche. */}
+          Leer-Zweig nur für Nutzer ohne Anlegerecht, alle anderen sahen beim
+          Laden, bei leerer Liste und im Fehlerfall dieselbe leere Fläche.
+
+          KEINE Primäraktion am Leerknoten (LFH-331 · B3): der Weg heraus ist die
+          Anlegen-Kachel unmittelbar darunter. Ein zweiter Knopf mit derselben
+          Beschriftung machte jede Abfrage darauf mehrdeutig — und AK3 verlangt
+          höchstens einen Primärknopf je Leerzustand. */}
       {!isPending && leer && (
         <div style={{ marginBottom: abstand.lg }}>
-          <Empty description="Keine Einsätze" />
+          <SeitenLeer titel="Keine Einsätze" />
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
@@ -154,3 +155,81 @@ describe('MaterialPage', () => {
     expect(entfernen).not.toHaveClass('ant-btn-dangerous');
   });
 });
+
+/**
+ * Datenzustände der Materialseite (LFH-331 · B3).
+ *
+ * **Diese Seite hat KEINEN Katalog-Query.** Der Materialstatus ist das lokale Enum
+ * `MaterialStatus` mit fünf Werten (`STATUS_META`) — er kommt nicht über die Leitung und
+ * kann deshalb nicht ausfallen. Ein Banner „Statuskatalog konnte nicht geladen werden"
+ * wäre hier ein erfundener Fehlerfall und steht bewusst nicht in dieser Datei.
+ *
+ * Ausfallen können genau drei Dinge: der **Einsatz** selbst (Seitenrahmen), die
+ * **Dispositionsliste** und der **Stamm-Pool**.
+ */
+describe('MaterialPage · Datenzustände', () => {
+  const gruenerBoden = () => [
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+    http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    http.get('/api/material', () => HttpResponse.json([])),
+  ];
+
+  function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
+    // Abweichung VORN: der erste passende Handler gewinnt.
+    server.use(...abweichungen, ...gruenerBoden());
+    return renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/material' },
+    );
+  }
+
+  it('gescheiterter Einsatz: der Seitenrahmen bietet den erneuten Abruf an', async () => {
+    zeige(http.get('/api/einsaetze/1', () => new HttpResponse(null, { status: 500 })));
+    expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+  });
+
+  it('gescheiterte Dispositionsliste: Fehler statt Leertext', async () => {
+    zeige(http.get('/api/einsaetze/1/material', () => new HttpResponse(null, { status: 500 })));
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch kein Material disponiert')).not.toBeInTheDocument();
+  });
+
+  it('leere Dispositionsliste: Leertext und KEIN Fehler', async () => {
+    zeige();
+    expect(await screen.findByText('Noch kein Material disponiert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Kein Material im Dienst"', async () => {
+    const { container } = zeige(http.get('/api/material', () => new HttpResponse(null, { status: 500 })));
+    await screen.findByText('Noch kein Material disponiert');
+    await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
+    expect(await screen.findByText('Materialliste konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Kein Material im Dienst')).not.toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: leerer Stamm-Pool behält „Kein Material im Dienst"', async () => {
+    const { container } = zeige();
+    await screen.findByText('Noch kein Material disponiert');
+    await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
+    expect(await screen.findByText('Kein Material im Dienst')).toBeInTheDocument();
+    expect(screen.queryByText('Materialliste konnte nicht geladen werden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den
+ * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` (gemessen).
+ */
+async function oeffneMaterialAuswahl(container: HTMLElement, platzhalter: string) {
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
+    .find((s) => s.textContent?.includes(platzhalter));
+  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
+  await userEvent.click(within(feld!).getByRole('combobox'));
+}

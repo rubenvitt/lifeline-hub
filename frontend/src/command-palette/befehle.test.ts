@@ -96,6 +96,26 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:personen', 'aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden'],
     );
   });
+  /**
+   * Die vier Ziele stammen aus `routing/deeplinks.ts` (LFH-331 · B3), nicht aus einem
+   * Vorlagentext von Hand. Der Unterschied ist an EINER Zeile messbar und war ein
+   * echter Fehler: die Unfallhilfsstellen liegen unter `/unfallhilfsstellen/liste`,
+   * während `/unfallhilfsstellen` auf `UnfallhilfsstellenDefault` zeigt — eine Seite,
+   * die `?neu=1` gar nicht liest. Die Schnellaktion lief also ins Leere.
+   */
+  it('baut die Schnellaktions-Ziele über die Deeplink-Registry (UHS auf die Listenroute)', () => {
+    const k = kontext();
+    const b = baueBefehle(k);
+    for (const [id, ziel] of [
+      ['aktion:personen', '/einsaetze/5/personen?neu=1'],
+      ['aktion:etb', '/einsaetze/5/etb?neu=1'],
+      ['aktion:unfallhilfsstellen', '/einsaetze/5/unfallhilfsstellen/liste?neu=1'],
+      ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
+    ] as const) {
+      b.find((x) => x.id === id)!.ausfuehren();
+      expect(k.navigate).toHaveBeenCalledWith(ziel);
+    }
+  });
   it('folgt dem Modulfilter: versteckte Trägermodule liefern keine Schnellaktion', () => {
     const overrides = { etb: ueberschreibung({ sichtbar: false }) };
     expect(baueBefehle(kontext({ overrides })).some((x) => x.id === 'aktion:etb')).toBe(false);
