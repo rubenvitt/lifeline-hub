@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Space } from 'antd';
+import { Alert, Button, Card, Checkbox, Space } from 'antd';
 import { Select } from '../components/Select';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -28,12 +28,37 @@ interface Props {
   einsatz: EinsatzAnzeige;
   initialWerte?: EntwurfWerte;
   onWerteChange?: (werte: EntwurfWerte) => void;
+  /**
+   * Zustand des Schalters „Werte behalten" (LFH-332/H61). Er liegt bewusst beim
+   * Aufrufer: `EtbEntwurfsTabs` schliesst nach erfolgreichem Erfassen den Entwurfs-Tab
+   * und erzwingt über `key` einen Remount — ein Zustand im `useState` dieser Komponente
+   * überlebte das nicht.
+   */
+  werteBehalten?: boolean;
+  /** Fehlt der Callback, rendert die Steuerzeile den Schalter nicht (Berichtigung, Bestandsaufrufer). */
+  onWerteBehaltenChange?: (behalten: boolean) => void;
 }
 
 const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }));
 
+/**
+ * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
+ * (LFH-332/H61: eine Standard-Funkmeldung kostete 19 Tastenanschläge reines Gerüst,
+ * weil Von/An/Meldeweg nach jedem Senden verworfen wurden).
+ *
+ * `veranlassung` und `ereigniszeit` gehören ABSICHTLICH nicht dazu — die sind je Eintrag
+ * verschieden, eine stehengebliebene Ereigniszeit wäre eine falsche Tatsachenbehauptung.
+ *
+ * Die Funktion ist der einzige Ort, der diese Auswahl trifft; `EtbEntwurfsTabs` reicht
+ * denselben Filter über die Remount-Grenze.
+ */
+export function nurUebernahme(quelle: Pick<MetadatenWerte, 'von' | 'an' | 'meldeweg'>): MetadatenWerte {
+  return { von: quelle.von, an: quelle.an, meldeweg: quelle.meldeweg };
+}
+
 export default function Schnellerfassung({
   erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz, initialWerte, onWerteChange,
+  werteBehalten = false, onWerteBehaltenChange,
 }: Props) {
   const navigate = useNavigate();
   const textRef = useRef<TextAreaRef>(null);
@@ -81,6 +106,12 @@ export default function Schnellerfassung({
   }, []);
 
   const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => metadaten[f] != null);
+
+  // Der Schalter erscheint nur ausserhalb der Berichtigung und nur, wenn ein Aufrufer den
+  // Zustand führt. Ohne sichtbaren Schalter wird auch nichts übernommen — eine unsichtbar
+  // wirkende Übernahme wäre für den Erfasser nicht erklärbar.
+  const zeigeSchalter = !berichtigungZu && onWerteBehaltenChange != null;
+  const uebernahmeAktiv = zeigeSchalter && werteBehalten;
 
   function fokusInsFeld() {
     requestAnimationFrame(() => textRef.current?.focus());
@@ -158,7 +189,13 @@ export default function Schnellerfassung({
         jetztIso: new Date().toISOString(),
       });
       await erfassen(eintrag);
-      setInhalt(''); setMetadaten({}); setEditFeld(null); setMenuOffen(false);
+      setInhalt('');
+      // Wertübernahme: Von/An/Meldeweg bleiben stehen, alles andere fällt weg. Im
+      // Berichtigungsmodus bleibt es beim vollständigen Leeren (dort gibt es auch keinen
+      // Schalter). Greift für Aufrufer OHNE Remount; `EtbEntwurfsTabs` remountet und setzt
+      // dieselben Felder über `initialWerte` wieder ein.
+      setMetadaten((m) => (uebernahmeAktiv ? nurUebernahme(m) : {}));
+      setEditFeld(null); setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
       fokusInsFeld();
     } finally {
@@ -243,6 +280,11 @@ export default function Schnellerfassung({
           <Select value={typ} style={{ minWidth: 150 }} options={TYP_OPTIONEN} onChange={(v) => setTyp(v)} />
         )}
         <Button type="primary" loading={sendet} onClick={() => void absenden()}>Erfassen</Button>
+        {zeigeSchalter && (
+          <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
+            Werte behalten
+          </Checkbox>
+        )}
         {!berichtigungZu && typ === 'lage' && (
           <Button type="link" style={{ paddingLeft: 0 }} onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
             Als strukturierten Lagebericht erfassen →

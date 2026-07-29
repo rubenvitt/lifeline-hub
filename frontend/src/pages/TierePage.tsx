@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Space, Tabs, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from 
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
@@ -170,9 +171,16 @@ export default function TierePage() {
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
+  /**
+   * Anlegen. `onSuccess` invalidiert nur noch (LFH-332 · B4) — Schliessen macht `onFertig`
+   * der Erfassungshülle, Leeren macht die Hülle auf BEIDEN Wegen (Erfassen und Abbrechen).
+   * Ein hier verbliebenes `resetFields` wäre doppelt und leerte im Serienlauf auch die
+   * übernommenen Werte. `onError` bleibt: die Fehlermeldung kommt weiterhin von der Mutation,
+   * die Hülle sieht nur die Ablehnung und lässt den Wortlaut stehen.
+   */
   const anlegenMutation = useMutation({
     mutationFn: (v: TierEingabe) => legeTierAn(einsatzId, v),
-    onSuccess: () => { invalidate(); setModus(null); form.resetFields(); },
+    onSuccess: () => { invalidate(); },
     onError: fehler,
   });
 
@@ -312,34 +320,54 @@ export default function TierePage() {
         </>
       )}
 
-      <Modal
-        open={modus !== null}
-        title={modus === 'vermisst' ? 'Vermisst melden' : 'Schnellerfassung'}
-        okText="Erfassen"
-        confirmLoading={anlegenMutation.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => { setModus(null); form.resetFields(); }}
-        destroyOnHidden
+      {/**
+        * SERIENMODUS (LFH-332 · B4). An einer Sammelstelle kommen die Tiere in Serie an —
+        * ein Dialog, der nach jedem Satz zufällt, kostet dort je Tier einen Klick auf
+        * „Schnellerfassung" und einen weiteren in das erste Feld.
+        *
+        * `uebernahme` trägt genau die zwei Felder, die sich an einer Sammelstelle NICHT
+        * ändern: der Antreffort ist die Sammelstelle selbst, und wer eine Reihe Nutzgeflügel
+        * aufnimmt, wählt die Spezies sonst zwanzigmal neu (das Zurücksetzen fiele auf
+        * `initialValues` = 'hund' zurück). Die übrigen Felder — Rufname, Rasse, Farbe,
+        * Kennzeichnung, Halter-Kontakt, Notiz — beschreiben das EINZELNE Tier; sie
+        * mitzunehmen hiesse, den vorigen Satz zu wiederholen.
+        *
+        * `status` steht bewusst nicht im Formular: er kommt aus dem Modus, mit dem der
+        * Dialog geöffnet wurde, und die Ableitung sitzt deshalb in `onErfassen`.
+        */}
+      <ErfassungsModal<TierEingabe>
+        offen={modus !== null}
+        titel={modus === 'vermisst' ? 'Vermisst melden' : 'Schnellerfassung'}
+        form={form}
+        laeuft={anlegenMutation.isPending}
+        initialValues={{ spezies: 'hund' }}
+        serie
+        uebernahme={['spezies', 'antreff_ort']}
+        onErfassen={async (daten) => {
+          // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
+          await anlegenMutation.mutateAsync({
+            ...daten,
+            status: modus === 'vermisst' ? 'vermisst' : 'aktiv',
+          });
+        }}
+        onFertig={() => setModus(null)}
+        onAbbrechen={() => setModus(null)}
       >
-        <Form form={form} layout="vertical"
-          initialValues={{ spezies: 'hund' }}
-          onFinish={(daten) => anlegenMutation.mutate({ ...daten, status: modus === 'vermisst' ? 'vermisst' : 'aktiv' })}>
-          <Form.Item label="Spezies" name="spezies" rules={[{ required: true, message: 'Bitte Spezies wählen' }]}>
-            <Select options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
-          </Form.Item>
-          <Form.Item label="Rufname" name="rufname"><Input /></Form.Item>
-          <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung"><Input placeholder="z. B. Haflinger, Deutscher Schäferhund" /></Form.Item>
-          <Form.Item label="Antreffort" name="antreff_ort"><Input placeholder="z. B. Weide, Sammelstelle" /></Form.Item>
-          {modus === 'vermisst' && (
-            <>
-              <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung"><Input /></Form.Item>
-              <Form.Item label="Kennzeichnung (Chip/Tätowierung/Halsband)" name="kennzeichnung"><Input /></Form.Item>
-              <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt"><Input placeholder="meldender Halter" /></Form.Item>
-            </>
-          )}
-          <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item label="Spezies" name="spezies" rules={[{ required: true, message: 'Bitte Spezies wählen' }]}>
+          <Select options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
+        </Form.Item>
+        <Form.Item label="Rufname" name="rufname"><Input /></Form.Item>
+        <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung"><Input placeholder="z. B. Haflinger, Deutscher Schäferhund" /></Form.Item>
+        <Form.Item label="Antreffort" name="antreff_ort"><Input placeholder="z. B. Weide, Sammelstelle" /></Form.Item>
+        {modus === 'vermisst' && (
+          <>
+            <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung"><Input /></Form.Item>
+            <Form.Item label="Kennzeichnung (Chip/Tätowierung/Halsband)" name="kennzeichnung"><Input /></Form.Item>
+            <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt"><Input placeholder="meldender Halter" /></Form.Item>
+          </>
+        )}
+        <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+      </ErfassungsModal>
     </div>
   );
 }

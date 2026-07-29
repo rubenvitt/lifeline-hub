@@ -13,7 +13,20 @@ const admin = {
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
-const status = [
+/**
+ * Die Feldtypen stehen ausgeschrieben da, statt aus den Werten geschlossen zu werden:
+ * `farbe` und `fms_anker` sind hier zufällig überall `null` bzw. gesetzt, und aus dem
+ * Vorrat abgeleitet hiessen sie `null` und `number` — ein Vorrat mit gesetzter Farbe
+ * (Prüfung „erbt keine Werte", ganz unten) liesse sich dann gar nicht erst übergeben.
+ */
+const status: {
+  id: number;
+  label: string;
+  kategorie: string;
+  farbe: string | null;
+  fms_anker: number | null;
+  sortier: number;
+}[] = [
   { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, fms_anker: 1, sortier: 10 },
   { id: 2, label: 'disponiert', kategorie: 'gebunden', farbe: null, fms_anker: 3, sortier: 20 },
 ];
@@ -158,5 +171,103 @@ describe('StatusKatalogTab', () => {
 
     expect(await screen.findByText('Kein Status')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * LFH-332 · B4. Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: der
+   * Anlege-Zweig setzt seine fünf Felder jetzt von Hand zusammen. `kategorie` ist
+   * darunter die Vorgabe, die zu einem SICHTBAR falschen Datensatz führt — ein
+   * Fahrzeugstatus in der falschen Kategorie färbt jede Kräfteübersicht falsch ein;
+   * `fms_anker: null` hält den Anker frei, statt eine Ziffer zu erfinden. Ein Test,
+   * der nur zählt, bliebe bei beidem grün.
+   *
+   * Der Knopf trägt weiter den Namen des gestrichenen Dialog-Knopfes, deshalb sind
+   * die Rechte-Prüfungen oben unverändert gültig.
+   */
+  it('die Schnellerfassung legt mit Label und den Vorgaben des alten Dialogs an', async () => {
+    const ruempfe: unknown[] = [];
+    server.use(
+      http.post('/api/fahrzeug-status', async ({ request }) => {
+        ruempfe.push(await request.json());
+        return HttpResponse.json({
+          id: 9, label: 'nicht einsatzbereit', kategorie: 'gebunden',
+          farbe: null, fms_anker: null, sortier: 0,
+        });
+      }),
+    );
+    render(admin);
+    await screen.findByText('einsatzbereit');
+
+    await userEvent.type(
+      screen.getByLabelText('Neuer Fahrzeug-Status'),
+      'nicht einsatzbereit{Enter}',
+    );
+
+    await waitFor(() =>
+      expect(ruempfe).toEqual([{
+        label: 'nicht einsatzbereit',
+        kategorie: 'gebunden',
+        farbe: null,
+        fms_anker: null,
+        sortier: 0,
+      }]),
+    );
+  });
+
+  /**
+   * Der Dialog ist seit LFH-332 · B4 reines Bearbeiten. Ohne diese Prüfung schiffe
+   * eine kaputte Vorbelegung mit vollständig grüner Suite: kein anderer Test dieser
+   * Datei öffnet ihn.
+   */
+  it('Bearbeiten öffnet den Dialog mit vorbelegten Werten', async () => {
+    render(admin);
+    await screen.findByText('einsatzbereit');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Status bearbeiten')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Label')).toHaveValue('einsatzbereit');
+    expect(within(dialog).getByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('1');
+  });
+
+  /**
+   * Der zweite Datensatz darf nicht die Werte des ersten erben.
+   *
+   * Seit LFH-332 · B4 ist der Dialog reines Bearbeiten, und die Vorbelegung setzt
+   * KEIN `resetFields()` davor. Die Sorge dabei ist antds Wertespeicher: der
+   * überlebt das Schliessen, und ein `setFieldsValue({ fms_anker: undefined })`
+   * könnte einen Schlüssel mit `undefined` als „nicht gemeint" behandeln, statt zu
+   * leeren — dann trüge der zweite Status Farbe und FMS-Anker des ersten.
+   *
+   * GEMESSEN: er tut es nicht. Diese Prüfung bleibt auch grün, wenn man
+   * `destroyOnHidden` am Dialog entfernt — rc-field-form schreibt den `undefined`
+   * durch. Sie pinnt deshalb bewusst das ERGEBNIS und keinen der beiden
+   * Mechanismen: fällt einer von beiden bei einem antd-Sprung weg, ist das hier
+   * die Stelle, an der es auffällt, statt in einem stillen Datensatz mit fremdem
+   * FMS-Anker.
+   *
+   * Der Vorrat ist eigens dafür gewählt: der erste Eintrag hat beide optionalen
+   * Felder gesetzt, der zweite keines davon.
+   */
+  it('ein zweiter Datensatz erbt keine Werte des ersten', async () => {
+    render(admin, [
+      { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: '#112233', fms_anker: 5, sortier: 10 },
+      { id: 2, label: 'disponiert', kategorie: 'gebunden', farbe: null, fms_anker: null, sortier: 20 },
+    ]);
+    await screen.findByText('einsatzbereit');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+    const ersterDialog = await screen.findByRole('dialog');
+    expect(within(ersterDialog).getByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('5');
+    await userEvent.click(within(ersterDialog).getByRole('button', { name: /Cancel|Abbrechen/ }));
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[1]);
+    const zweiterDialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(zweiterDialog).getByLabelText('Label')).toHaveValue('disponiert'),
+    );
+    expect(within(zweiterDialog).getByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('');
+    expect(within(zweiterDialog).getByLabelText('Farbe (Hex, optional)')).toHaveValue('');
   });
 });

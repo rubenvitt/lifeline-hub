@@ -1815,3 +1815,95 @@ async fn vollbody_patch_verhaelt_sich_weiter_wie_vollersatz() {
     assert!(a["anzahl_betroffene_initial"].is_null());
     assert_eq!(a["begonnen_at"], "2026-05-25 08:00:00");
 }
+
+/// Legt einen Einsatz mit frei gewähltem Rumpf an (LFH-332 · B4).
+async fn einsatz_anlegen_roh(app: &axum::Router, cookie: &str, body: Value) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/einsaetze")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+#[tokio::test]
+async fn anlegen_nimmt_einsatzart_und_alarmzeit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, a) = einsatz_anlegen_roh(
+        &app,
+        &admin,
+        json!({
+            "bezeichnung": "Übung Nordwind",
+            "stichwort": "MANV",
+            "einsatzart": "uebung",
+            "begonnen_at": "2026-05-25T08:00:00Z",
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(a["einsatzart"], "uebung");
+    assert_eq!(a["stichwort"], "MANV");
+    assert_eq!(a["begonnen_at"], "2026-05-25 08:00:00");
+}
+
+#[tokio::test]
+async fn anlegen_ohne_die_neuen_felder_behaelt_die_db_defaults() {
+    // Der Beleg dafür, dass die beiden COALESCE im INSERT greifen: beide Spalten
+    // sind NOT NULL mit Default — ein gebundenes NULL hätte die Bedingung verletzt,
+    // und der alte Aufrufweg (nur Bezeichnung) muss unverändert durchgehen.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, a) = einsatz_anlegen(&app, &admin, "Schlichte Lage").await;
+
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(a["einsatzart"], "realeinsatz");
+    // `is_null()` allein wäre wertblind: die Spalte ist NOT NULL, also kann dort
+    // niemals `null` stehen — die Zeile wäre auch dann grün, wenn COALESCE einen
+    // Unsinnswert einsetzte. Geprüft wird deshalb der WERT: der DB-Default ist
+    // `datetime('now')` in UTC, die Alarmzeit muss also im selben Format vorliegen
+    // und höchstens ein paar Minuten alt sein.
+    let begonnen = a["begonnen_at"]
+        .as_str()
+        .expect("begonnen_at ist ein String");
+    let gesetzt = chrono::NaiveDateTime::parse_from_str(begonnen, "%Y-%m-%d %H:%M:%S")
+        .expect("begonnen_at im SQLite-Format");
+    let jetzt = chrono::Utc::now().naive_utc();
+    assert!(
+        (jetzt - gesetzt).num_minutes().abs() <= 5,
+        "begonnen_at {begonnen} liegt nicht bei jetzt ({jetzt})"
+    );
+}
+
+#[tokio::test]
+async fn anlegen_mit_unbekannter_einsatzart_ist_400() {
+    // Statuscode-Konvention: das Feld scheitert für sich (unbekannter Enum-Wert),
+    // nicht am Zusammenhang → 400. Dieselbe Linie wie im Kopfdaten-PATCH.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = einsatz_anlegen_roh(
+        &app,
+        &admin,
+        json!({ "bezeichnung": "Krumme Lage", "einsatzart": "grossschadenslage" }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

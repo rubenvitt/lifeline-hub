@@ -497,6 +497,140 @@ describe('FahrzeugePage · Datenzustände', () => {
 });
 
 /**
+ * Ad-hoc-Schnellerfassung (LFH-332 · B4).
+ *
+ * Zwei Zusicherungen, die BEIDE eine Falle haben:
+ *
+ * 1. **Feldbudget.** Ein reiner Zählvergleich „4 eingeklappt / 5 aufgeklappt" belegt das
+ *    `forceRender` NICHT — ohne das Flag rendert der Klapp-Bereich sein Feld gar nicht und
+ *    die Zahlen sind dieselben. Ein Nutzlast-Vergleich hilft ebenfalls nicht: antds `Form`
+ *    hält mit `preserve` (Default) auch den Wert eines ausgehängten Feldes. Was das Flag
+ *    unterscheidbar macht, ist allein die DOM-Anwesenheit im eingeklappten Zustand —
+ *    deshalb steht die `OPTA`-Zusicherung zwischen den beiden Zählungen.
+ * 2. **Serienmodus.** „Der Dialog ist noch offen" ist für sich trivial grün: bei einem
+ *    still gescheiterten POST steht er ebenfalls noch da. Gemessen wird deshalb zuerst der
+ *    Zähler der Hülle — er steigt erst, nachdem `mutateAsync` aufgelöst hat.
+ *
+ * Sichtbarkeit wird über die POSITIVE Klasse `ant-collapse-panel-active` entschieden, nicht über
+ * eine Verborgen-Klasse: welchen Namen rc-motion dem geschlossenen Zustand gibt, ist eine
+ * Implementierungsfrage der Animation. `toBeVisible()` scheidet aus — antd v6 schreibt
+ * `:where()`-Selektoren, und jsdoms berechneter Stil ist dort kein verlässlicher Zeuge.
+ * (Gemessen: antd v6 rendert `ant-collapse-panel` + `-active`/`-inactive`, NICHT das aus v5
+ * bekannte `ant-collapse-content` — ein Filter darauf ließ alle fünf Felder als sichtbar
+ * durchgehen und den Test still danebengreifen.)
+ */
+describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
+  /** Beschriftungen der Felder, die der Bediener gerade wirklich sieht. */
+  function sichtbareFelder(dialog: HTMLElement) {
+    return [...dialog.querySelectorAll<HTMLElement>('.ant-form-item-label label')]
+      .filter((l) => {
+        const klappinhalt = l.closest('.ant-collapse-panel');
+        return klappinhalt == null || klappinhalt.classList.contains('ant-collapse-panel-active');
+      })
+      .map((l) => l.textContent);
+  }
+
+  async function oeffneAdhoc() {
+    render(einsatz());
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Fahrzeug' }));
+    return screen.getByRole('dialog');
+  }
+
+  it('zeigt höchstens vier Felder — das fünfte liegt zugeklappt, aber im Baum', async () => {
+    const dialog = await oeffneAdhoc();
+    expect(sichtbareFelder(dialog)).toEqual([
+      'Funkrufname', 'Fahrzeugtyp', 'Trägerorganisation', 'Kennzeichen',
+    ]);
+    // Das `forceRender`-Beweisstück: eingeklappt UND trotzdem da, damit ein eingetragener
+    // Wert beim Absenden mitgeht und das Feld für Tastatur und Prüfung existiert.
+    expect(within(dialog).getByLabelText('OPTA')).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByText('Weitere Angaben'));
+    // `waitFor`: rc-motion sieht in jsdom kein `transitionend`, der Klassenwechsel kommt
+    // trotzdem — nur nicht zwingend im selben Zug wie der Klick.
+    await waitFor(() => expect(sichtbareFelder(dialog)).toHaveLength(5));
+    expect(sichtbareFelder(dialog)).toContain('OPTA');
+  });
+
+  it('„Speichern und nächste" hält den Dialog offen und behält Träger und Typ', async () => {
+    const gesendet: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge', async ({ request }) => {
+        const koerper = (await request.json()) as { adhoc: Record<string, unknown> };
+        gesendet.push(koerper.adhoc);
+        return HttpResponse.json({
+          ...ef, id: 20 + gesendet.length, ist_adhoc: true,
+          funkrufname: String(koerper.adhoc.funkrufname),
+        });
+      }),
+    );
+    const dialog = await oeffneAdhoc();
+    await userEvent.type(within(dialog).getByLabelText('Funkrufname'), 'Florian Nachbarstadt 44/1');
+    await userEvent.type(within(dialog).getByLabelText('Fahrzeugtyp'), 'LF 20');
+    await userEvent.type(within(dialog).getByLabelText('Trägerorganisation'), 'FF Nachbarstadt');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+
+    // Der Zähler steigt erst NACH der aufgelösten Mutation — er ist hier der Beleg, dass
+    // wirklich gespeichert wurde, nicht bloß nichts passiert ist.
+    expect(await within(dialog).findByText('Erfasst: 1')).toBeInTheDocument();
+    expect(gesendet).toEqual([
+      { funkrufname: 'Florian Nachbarstadt 44/1', fahrzeugtyp: 'LF 20', traegerorganisation: 'FF Nachbarstadt' },
+    ]);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Wertübernahme: der Funkrufname ist leer für das nächste Fahrzeug, Träger und Typ des
+    // eintreffenden Zuges stehen weiter da.
+    expect(within(dialog).getByLabelText('Funkrufname')).toHaveValue('');
+    expect(within(dialog).getByLabelText('Fahrzeugtyp')).toHaveValue('LF 20');
+    expect(within(dialog).getByLabelText('Trägerorganisation')).toHaveValue('FF Nachbarstadt');
+  });
+
+  it('ein Wert aus dem zugeklappten Bereich geht beim Absenden mit', async () => {
+    const gesendet: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge', async ({ request }) => {
+        const koerper = (await request.json()) as { adhoc: Record<string, unknown> };
+        gesendet.push(koerper.adhoc);
+        return HttpResponse.json({ ...ef, id: 22, ist_adhoc: true });
+      }),
+    );
+    const dialog = await oeffneAdhoc();
+    await userEvent.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 44/2');
+    // Aufklappen, eintragen, WIEDER zuklappen — der Weg, auf dem ein ohne `forceRender`
+    // ausgehängtes Feld seinen Wert lautlos verlöre.
+    await userEvent.click(within(dialog).getByText('Weitere Angaben'));
+    await userEvent.type(await within(dialog).findByLabelText('OPTA'), 'FL RD 44/2');
+    await userEvent.click(within(dialog).getByText('Weitere Angaben'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ funkrufname: 'Florian 44/2', opta: 'FL RD 44/2' });
+  });
+
+  /**
+   * Gegenprobe zum Serienmodus: ohne sie wäre „der Dialog bleibt offen" auch dann grün,
+   * wenn er NIE zuginge — `onFertig` also gar nicht verdrahtet ist.
+   *
+   * Gemessen wird der Schließ-VORGANG, nicht das Verschwinden: rc-motion sieht in jsdom nie
+   * ein `transitionend`, die Abgang-Animation läuft deshalb nie zu Ende und antd lässt die
+   * Hülle samt `role="dialog"` und ihren Feldern im Baum stehen (gemessen, auch nach 800 ms
+   * und trotz `destroyOnHidden`). Beweiskräftig ist der Abgangszustand am Dialogknoten.
+   */
+  it('Gegenprobe: „Disponieren" fährt den Dialog zu', async () => {
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json({ ...ef, id: 21, ist_adhoc: true, funkrufname: 'Florian 44/1' })),
+    );
+    const dialog = await oeffneAdhoc();
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+    await userEvent.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 44/1');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+  });
+});
+
+/**
  * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext.
  *
  * NICHT per Klick auf den Platzhalter selbst: der `.ant-select-placeholder`-Knoten trägt

@@ -87,9 +87,14 @@ export default function MeldungenPage() {
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
 
+  // LFH-332/B4: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach
+  // dem Senden offen, damit die nächste Meldung ohne Aufklappen weitergeht;
+  // Zuklappen ist ausdrückliche Nutzeraktion (Kopf-Umschalter oder Kreuz an der
+  // Card). Der conditional Render der Card (unten) würde das Formular sonst
+  // unmounten — samt Serienzähler und Wertübernahme.
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueMeldung) => legeMeldungAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Meldung erfasst'); setFormOffen(false); },
+    onSuccess: () => { invalidiere(); message.success('Meldung erfasst'); },
     onError: fehler,
   });
   const statusMutation = useMutation({
@@ -216,7 +221,10 @@ export default function MeldungenPage() {
           <MeldungFormular
             card={false}
             senden={anlegenMutation.isPending}
-            onAnlegen={(d) => anlegenMutation.mutate(d)}
+            // mutateAsync, nicht mutate: die Erfassungshülle darf die Felder nur
+            // leeren, wenn der Datensatz wirklich angekommen ist. Den Fehler-Toast
+            // wirft weiterhin `onError` der Mutation.
+            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
         </Card>
       )}

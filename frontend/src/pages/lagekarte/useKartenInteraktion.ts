@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useState } from 'react';
+import { useCallback, useReducer, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { aktualisiereEinsatz, type KopfdatenUpdate } from '../../api/einsaetze';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
@@ -146,6 +146,30 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   // unbestätigten Entwurf verwirft statt ihn beim nächsten Zeichnen als Orphan liegen zu lassen.
   // Bewusst NICHT im Modus: der Zähler muss über Modus-Wechsel hinweg monoton bleiben.
   const [zoneZeichnenNonce, setZoneZeichnenNonce] = useState(0);
+  // Serienmodus (LFH-332/M76). Beide Platzier-Modi brachen bisher nach JEDEM gesetzten
+  // Objekt ab — für das zweite gleichartige Zeichen kostete das drei Klicks Umweg
+  // (Karte → Sidebar → Picker → Platzieren). Vorgabe AN, weil das Setzen einer Folge der
+  // Normalfall ist; beendet wird der Modus dann explizit über „Fertig" (Vorbild:
+  // onBildPlatzierenFertig). Die Zähler tragen zwei Dinge: die Anzeige „n platziert" und
+  // die Beschriftung des Abbruch-Knopfes — solange nichts gesetzt ist, heißt Beenden
+  // „Abbrechen"; ab dem ersten gespeicherten Objekt ist es „Fertig", denn abbrechen lässt
+  // sich das Gespeicherte nicht mehr.
+  const [zeichenSerie, setZeichenSerie] = useState(true);
+  const [zeichenSerieAnzahl, setZeichenSerieAnzahl] = useState(0);
+  const [zoneSerie, setZoneSerie] = useState(true);
+  const [zoneSerieAnzahl, setZoneSerieAnzahl] = useState(0);
+
+  // Spiegel von `modus` und `zoneSerie` fuer die asynchrone Aufloesung des
+  // Zonen-Speicherns. Die Zuweisung steht bewusst im Renderrumpf und nicht in
+  // einem Effekt: ein Effekt liefe erst NACH dem Commit, und genau dazwischen
+  // kann die Promise aufloesen — der Spiegel zeigte dann den vorletzten Stand.
+  // Refs statt der Closure-Werte, weil die Kette mit den Werten vom Klickzeitpunkt
+  // rechnete: ein waehrend des Speicherns umgelegter Schalter verpuffte, obwohl
+  // die Steuerung ihn als „letzte Gelegenheit zu widerrufen" beschreibt.
+  const modusRef = useRef(modus);
+  modusRef.current = modus;
+  const zoneSerieRef = useRef(zoneSerie);
+  zoneSerieRef.current = zoneSerie;
   // Panel-Selektion als eine Union (s. KartenSelektion). Die drei bisherigen Setter bleiben
   // als API erhalten, sind aber Wrapper über EIN Feld: ein Setzen verdrängt jede andere
   // Selektion, null räumt (das gerade offene Panel ist per Konstruktion das einzige).
@@ -230,7 +254,11 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
-      dispatch({ t: 'beenden', arten: ['zeichen'] });
+      // Serienmodus (LFH-332/M76): der Platzier-Modus überlebt den POST, der Entwurf in der
+      // Sidebar ohnehin (er wird dort nie zurückgesetzt). Beendet wird nur noch über
+      // „Fertig"/„Abbrechen" — oder, bei ausgeschalteter Serie, wie bisher hier.
+      if (zeichenSerie) setZeichenSerieAnzahl((n) => n + 1);
+      else dispatch({ t: 'beenden', arten: ['zeichen'] });
     },
     onError: fehler,
   });
@@ -319,10 +347,50 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       farbe: zu.typ === 'freie_skizze' ? zu.farbe ?? null : null,
       ansicht_id: aktiveAnsichtId ?? null,
     })
-      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }))
-      .catch(fehler)
-      // Beendet Zeichnen → Kartenflaeche-Effekt ruft stoppen() → clear().
-      .finally(() => dispatch({ t: 'beenden', arten: ['zone'] }));
+      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }).then(() => true))
+      .catch((e) => {
+        fehler(e);
+        return false;
+      })
+      .then((erfolg) => {
+        // Serienmodus (LFH-332/M76): nach erfolgreichem Speichern denselben Zonen-Typ erneut
+        // scharf schalten statt den Modus zu beenden.
+        //
+        // Der Nonce MUSS dabei steigen. Der Zonen-Effekt in `Kartenflaeche` hängt an
+        // [zoneZeichnen, zoneZeichnenNonce]; `zoneZeichnen` ist der Zeichen-MODUS und bleibt
+        // bei Zone→Zone gleich. Ohne den Nonce feuerte der Effekt also nicht neu, `starten()`
+        // liefe nicht — und damit weder das `draw.clear()`, das die gerade gespeicherte
+        // Geometrie vom Zeichen-Layer räumt (sonst doppelte Kontur neben der frisch
+        // invalidierten Zonen-Query), noch das `setMode()`, ohne das der Zeichenmodus tot
+        // bliebe. Genau dafür existiert der Zähler (s. Deklaration oben).
+        //
+        // Nur bei ERFOLG: schlägt der POST fehl, endet der Modus wie bisher — ein Neustart
+        // würde die nicht gespeicherte Geometrie stillschweigend verwerfen und so aussehen,
+        // als sei nichts passiert.
+        // ERST die Frage, ob dieser Zug ueberhaupt noch der laufende ist. Die Kette
+        // wartet nicht nur auf den POST, sondern auch auf `invalidateQueries` — in
+        // dieser Zeit bleibt die ganze Sidebar bedienbar. Wer waehrenddessen eine
+        // andere Zone, ein taktisches Zeichen oder ein Bild startet, bekaeme sonst
+        // seinen Modus still ueberschrieben und zeichnete im falschen Zonentyp
+        // weiter, waehrend die Steuerung „1 gespeichert" behauptet. Der Reducer-Fall
+        // 'zone' ist bedingungslos und kann das nicht abfangen — anders als
+        // 'beenden', das ueber `arten` gatet; genau deshalb war die alte
+        // Auto-Beenden-Zeile rennsicher und die neue Serien-Zeile ist es nicht.
+        //
+        // `speichern` ist die Marke dieses Zuges: 'zoneSpeichernStart' setzt sie,
+        // und JEDER andere Modusstart loescht sie (der Fall 'zone' setzt sie auf
+        // false zurueck, jeder andere Fall verlaesst die Zonen-Form ganz).
+        const nochUnserZug = modusRef.current.art === 'zone' && modusRef.current.speichern;
+        if (!nochUnserZug) return;
+        if (erfolg && zoneSerieRef.current) {
+          dispatch({ t: 'zone', entwurf: { typ: zu.typ, modus: zu.modus, farbe: zu.farbe } });
+          setZoneZeichnenNonce((n) => n + 1);
+          setZoneSerieAnzahl((n) => n + 1);
+        } else {
+          // Beendet Zeichnen → Kartenflaeche-Effekt ruft stoppen() → clear().
+          dispatch({ t: 'beenden', arten: ['zone'] });
+        }
+      });
   };
   // Verwirft den Entwurf (stoppen() → clear()).
   const bestaetigungVerwerfen = () => dispatch({ t: 'beenden', arten: ['zone'] });
@@ -342,9 +410,12 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   const onZoneZeichnenStart = (entwurf: ZoneEntwurf) => {
     dispatch({ t: 'zone', entwurf });
     setZoneZeichnenNonce((n) => n + 1);
+    setZoneSerieAnzahl(0); // neue Serie (LFH-332)
     setZoneAuswahl(null);
     setAuswahl(null);
   };
+  /** Beendet eine laufende Zonen-Serie (LFH-332) — Vorbild: onBildPlatzierenFertig. */
+  const onZoneZeichnenFertig = () => dispatch({ t: 'beenden', arten: ['zone'] });
   const onKoordinateEingeben = (lat: number, lon: number) => {
     if (platzierungZiel && darfSchreiben) verortenMutation.mutate({ lat, lon });
   };
@@ -355,9 +426,12 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   // Freies-Zeichen-Platzieren starten/abbrechen (LFH-170).
   const onZeichenPlatzierenStart = (spec: FreiesZeichenUpdate) => {
     dispatch({ t: 'zeichen', spec });
+    setZeichenSerieAnzahl(0); // neue Serie (LFH-332)
     setAuswahl(null);
   };
   const onZeichenPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['zeichen'] });
+  /** Beendet eine laufende Zeichen-Serie (LFH-332) — Vorbild: onBildPlatzierenFertig. */
+  const onZeichenPlatzierenFertig = () => dispatch({ t: 'beenden', arten: ['zeichen'] });
   const onBildPlatzieren = (id: number) => {
     dispatch({ t: 'bild', id });
     setAuswahl(null);
@@ -441,6 +515,13 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     bildPlatzierenId,
     zeichenPlatzieren,
     exklusiverModusAktiv,
+    // Serienmodus (LFH-332/M76).
+    zeichenSerie,
+    setZeichenSerie,
+    zeichenSerieAnzahl,
+    zoneSerie,
+    setZoneSerie,
+    zoneSerieAnzahl,
     // Panel-Schließer (onSchliessen der Inspektoren).
     setAuswahl,
     setZoneAuswahl,
@@ -458,12 +539,14 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
     onZoneZeichnenStart,
+    onZoneZeichnenFertig,
     onKoordinateEingeben,
     onEinsatzortPlatzieren,
     onBildPlatzieren,
     onBildPlatzierenFertig,
     onZeichenPlatzierenStart,
     onZeichenPlatzierenAbbrechen,
+    onZeichenPlatzierenFertig,
     onFlaecheGezeichnet,
     onFlaecheKlick,
     onZoneKlick,

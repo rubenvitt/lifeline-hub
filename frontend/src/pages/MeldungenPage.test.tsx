@@ -314,6 +314,61 @@ describe('MeldungenPage', () => {
     })));
   });
 
+  // --- LFH-332/B4: Serienerfassung im Inline-Formular ---
+
+  /** Formular aufklappen und eine vollständige Meldung eintippen. */
+  async function oeffneUndFuelle(inhalt = 'Eingetroffen') {
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
+    await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), inhalt);
+  }
+
+  it('lässt das Inline-Formular nach dem Senden offen und behält den Serienzustand', async () => {
+    legeMeldungAn.mockResolvedValue(meldung());
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await oeffneUndFuelle();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
+
+    // Das Formular steht noch — früher klappte onSuccess es per setFormOffen(false) zu,
+    // und der conditional Render der Card unmountete es dabei.
+    expect(screen.getByLabelText('Inhalt / Wortlaut')).toBeInTheDocument();
+    // Zähler und Wertübernahme leben IM Formular: nur sie belegen, dass es nicht
+    // bloss neu montiert wurde. Der Nachlade-Lauf nach invalidiere() darf sie nicht kippen.
+    expect(await screen.findByText(/Erfasst: 1/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
+    // Die Umschaltung ist auch in der Einbettung ohne eigene Card sichtbar
+    // (`card={false}` ist der einzige Produktivpfad — die Formular-Tests rendern
+    // die Default-Card).
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).toBeInTheDocument();
+  });
+
+  it('schließt das Inline-Formular nur auf ausdrückliche Nutzeraktion', async () => {
+    legeMeldungAn.mockResolvedValue(meldung());
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await oeffneUndFuelle();
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('Inhalt / Wortlaut')).toBeInTheDocument();
+    // Das Kreuz an der Card trägt als einziges ein aria-label — der Kopf-Umschalter
+    // heisst gleich, hat seinen Namen aber aus dem Text.
+    await userEvent.click(screen.getByLabelText('Formular schließen'));
+    await waitFor(() => expect(screen.queryByLabelText('Inhalt / Wortlaut')).not.toBeInTheDocument());
+  });
+
+  it('lässt den Wortlaut stehen, wenn das Anlegen fehlschlägt', async () => {
+    legeMeldungAn.mockRejectedValue(new Error('Netz weg'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await oeffneUndFuelle('Wichtiger Wortlaut');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue('Wichtiger Wortlaut');
+    expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
+  });
+
   // --- LFH-153: Deeplink-Selektion ?meldung= ---
 
   it('?meldung=<id> hebt die Ziel-Meldung hervor und räumt den Param', async () => {

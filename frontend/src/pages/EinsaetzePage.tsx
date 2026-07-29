@@ -1,11 +1,16 @@
-import { App, Button, Card, Form, Input, Modal, Space, Tag, Typography } from 'antd';
+import { App, AutoComplete, Button, Card, DatePicker, Form, Input, Space, Tag, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import dayjs, { type Dayjs } from 'dayjs';
 import { useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { EinsatzAnzeige, EinsatzStatus } from '../api/types';
+import type { Einsatzart, EinsatzAnzeige, EinsatzStatus } from '../api/types';
 import { ApiError } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
+import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
+import { EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
+import { ErfassungsModal } from '../components/Erfassung';
+import { Select } from '../components/Select';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { globalKeys } from '../api/queryKeys';
@@ -20,6 +25,14 @@ import { abstand, flaeche } from '../theme/tokens';
 // ihn wären die Balken 0 px hoch, und jsdom rechnet kein Layout — der Ausfall
 // wäre in keinem Test sichtbar (dieselbe Falle wie `SeitenZustand.tsx:3-7`).
 import '../theme/sprache.css';
+
+/** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
+interface AnlegeWerte {
+  bezeichnung: string;
+  stichwort?: string;
+  einsatzart: Einsatzart;
+  begonnen_at: Dayjs;
+}
 
 /**
  * Status eines Einsatzes als Statusrolle (LFH-328 · A2).
@@ -86,7 +99,7 @@ export default function EinsaetzePage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [dialogOffen, setDialogOffen] = useState(false);
-  const [form] = Form.useForm<{ bezeichnung: string; stichwort?: string }>();
+  const [form] = Form.useForm<AnlegeWerte>();
 
   const darfAnlegen = darfVerwaltung(benutzer);
 
@@ -103,12 +116,28 @@ export default function EinsaetzePage() {
     queryFn: listeEinsaetze,
   });
 
+  const { data: stichwortVorschlaege = [] } = useQuery({
+    queryKey: globalKeys.stichwortVorschlaege(),
+    queryFn: listeStichwortVorschlaege,
+  });
+  const stichwortOptionen = stichwortVorschlaege.map((v) => ({ value: v.text }));
+
   const anlegen = useMutation({
-    mutationFn: (werte: { bezeichnung: string; stichwort?: string }) =>
-      legeEinsatzAn(werte.bezeichnung, werte.stichwort),
+    mutationFn: (werte: AnlegeWerte) =>
+      legeEinsatzAn({
+        bezeichnung: werte.bezeichnung,
+        stichwort: werte.stichwort,
+        einsatzart: werte.einsatzart,
+        // `.utc()` VOR dem Formatieren — `begonnen_at` ist ein UTC-Wirestring, und
+        // gelesen wird er auch so (`anzeige/format.ts:46` parst mit `dayjs.utc`).
+        // Ohne die Umrechnung landete die lokale Wanduhrzeit als UTC in der Spalte,
+        // und jeder neue Einsatz trüge eine um den Zonenversatz verschobene
+        // Alarmzeit — in Berlin zwei Stunden NACH seinem eigenen Anlagezeitpunkt.
+        // Dieselbe Form wie bei allen anderen Zeit-Sendern des Frontends
+        // (`MeldungFormular`, `AuftragFormular`, `WiedervorlageModal`, ETB).
+        begonnen_at: werte.begonnen_at?.utc().format('YYYY-MM-DD HH:mm:ss'),
+      }),
     onSuccess: (neuerEinsatz) => {
-      form.resetFields();
-      setDialogOffen(false);
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       navigate(`/einsaetze/${neuerEinsatz.id}`);
     },
@@ -206,30 +235,39 @@ export default function EinsaetzePage() {
         </div>
       )}
 
-      <Modal
-        title="Neuen Einsatz anlegen"
-        open={dialogOffen}
-        onCancel={() => {
-          setDialogOffen(false);
-          form.resetFields();
-        }}
-        onOk={() => form.submit()}
-        okText="Anlegen"
-        confirmLoading={anlegen.isPending}
+      {/* Vier Felder statt zwei (LFH-332 · B4, Befund H18). Einsatzart und Alarmzeit
+          waren bisher nur über das 11-Feld-Kopfdatenformular erreichbar — die
+          Nachpflege nach dem Anlegen entfällt damit im Regelfall. Vier Felder ist
+          zugleich die Obergrenze für eine Schnellerfassung (LFH-19); ein fünftes
+          gehört in die Kopfdaten, nicht hierher. */}
+      <ErfassungsModal<AnlegeWerte>
+        offen={dialogOffen}
+        titel="Neuen Einsatz anlegen"
+        form={form}
+        erfassenText="Anlegen"
+        laeuft={anlegen.isPending}
+        initialValues={{ einsatzart: 'realeinsatz' as Einsatzart, begonnen_at: dayjs() }}
+        onErfassen={async (w) => { await anlegen.mutateAsync(w); }}
+        onFertig={() => setDialogOffen(false)}
+        onAbbrechen={() => setDialogOffen(false)}
       >
-        <Form form={form} layout="vertical" onFinish={(w) => anlegen.mutate(w)}>
-          <Form.Item
-            label="Bezeichnung"
-            name="bezeichnung"
-            rules={[{ required: true, message: 'Bitte Bezeichnung eingeben' }]}
-          >
-            <Input autoFocus />
-          </Form.Item>
-          <Form.Item label="Stichwort" name="stichwort">
-            <Input placeholder="optional, z.B. THW / RD" />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item
+          label="Bezeichnung"
+          name="bezeichnung"
+          rules={[{ required: true, message: 'Bitte Bezeichnung eingeben' }]}
+        >
+          <Input />
+        </Form.Item>
+        <Form.Item label="Stichwort" name="stichwort">
+          <AutoComplete options={stichwortOptionen} allowClear placeholder="z. B. H1, MANV …" />
+        </Form.Item>
+        <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
+          <Select options={EINSATZART_OPTIONEN} />
+        </Form.Item>
+        <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
+          <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+        </Form.Item>
+      </ErfassungsModal>
     </EinsatzSeite>
   );
 }

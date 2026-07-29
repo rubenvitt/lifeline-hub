@@ -72,6 +72,13 @@ export default function EtbPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
+  /**
+   * Der Schalter „Werte behalten" (LFH-332/H61) liegt HIER, nicht in `EtbEntwurfsTabs`.
+   * Grund: die Berichtigung unten rendert eine eigene `Schnellerfassung` STATT der Tabs,
+   * der Container verschwindet dabei also. Läge der Zustand dort, stünde eine bewusst
+   * abgewählte Wertübernahme nach jeder Berichtigung wieder auf AN — ohne Nutzeraktion.
+   */
+  const [werteBehalten, setWerteBehalten] = useState(true);
   const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
@@ -253,6 +260,8 @@ export default function EtbPage() {
               erfassen={erfassenMitMeldung}
               bausteine={bausteineQuery.data ?? []}
               einsatz={einsatz}
+              werteBehalten={werteBehalten}
+              onWerteBehaltenChange={setWerteBehalten}
             />
           )}
         </div>

@@ -460,6 +460,136 @@ describe('PersonalPage · Datenzustände', () => {
 });
 
 /**
+ * Ad-hoc-Disposition als Schnellerfassung (LFH-332/B4).
+ *
+ * An der Bereitstellung wird eine Helferkette am Stück aufgenommen — genau der Fall,
+ * für den `ErfassungsModal` den Serienmodus hat. Geprüft wird, was an DIESER Maske
+ * verdrahtet ist: Fokus, Enter, Serie, Wertübernahme. Die Hülle selbst ist in
+ * `components/Erfassung.test.tsx` bewiesen und wird hier nicht nachgespielt.
+ */
+describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
+  /**
+   * Immer im Dialog greifen, nie global: die Tabelle dahinter trägt eine sortierbare
+   * Spalte „Name" mit `aria-label` — ein `getByLabelText('Name')` auf `screen` findet
+   * zwei Knoten und bricht ab (gemessen).
+   */
+  const imDialog = () => within(screen.getByRole('dialog'));
+
+  /** Öffnet den Ad-hoc-Dialog und sammelt die abgesetzten POST-Bodies. */
+  async function oeffneAdhoc() {
+    const gesendet: unknown[] = [];
+    render(einsatz());
+    server.use(
+      http.post('/api/einsaetze/7/personal', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...disponiert[0], id: 99 });
+      }),
+    );
+    await screen.findByText('Thomas Müller');
+    await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Person' }));
+    await screen.findByRole('dialog');
+    return gesendet;
+  }
+
+  it('öffnet mit Fokus im Namensfeld', async () => {
+    await oeffneAdhoc();
+    await waitFor(() => expect(document.activeElement).toBe(imDialog().getByLabelText('Name')));
+  });
+
+  it('Enter im Namensfeld disponiert und schliesst den Dialog', async () => {
+    const gesendet = await oeffneAdhoc();
+    await userEvent.type(imDialog().getByLabelText('Name'), 'Dr. Schmidt{Enter}');
+
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ adhoc: { name: 'Dr. Schmidt' } });
+    /**
+     * GEMESSEN: `queryByRole('dialog')).toBeNull()` wäre hier NIE grün. jsdom feuert kein
+     * `transitionend`/`animationend`, rc-motion setzt hier keine Frist, und antds Modal
+     * räumt seinen Knoten erst am Ende der Zoom-Bewegung ab — `destroyOnHidden` greift
+     * also nie, die Felder bleiben stehen. Beobachtbar ist der Verlassen-Zustand, und
+     * der belegt genau das, was zu belegen ist: `onFertig` hat geschlossen. (Der
+     * Serienlauf tut das nicht — siehe den Test darunter, der die Gegenprobe ist.)
+     */
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
+  });
+
+  it('„Speichern und nächste" hält den Dialog offen, zählt mit und behält die Wiederholfelder', async () => {
+    /**
+     * Die eigentliche Zeitersparnis an der Bereitstellung: Trägerorganisation und
+     * Stärke-Position gehören zur KETTE, nicht zur Person — sie überleben das
+     * Speichern, der Name nicht. Zusammen mit dem zurückkehrenden Fokus ist der
+     * zweite Datensatz damit reine Namenseingabe.
+     */
+    const gesendet = await oeffneAdhoc();
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(imDialog().getByLabelText('Name'), 'Dr. Schmidt');
+    await nutzer.type(imDialog().getByLabelText('Trägerorganisation'), 'KV Musterstadt');
+    // Die zweite Übernahme läuft NICHT über ein `<input>`, sondern über `components/Select` —
+    // dass `setFieldsValue` auch dort wieder greift, ist der eigentliche Prüfpunkt.
+    // Der Dialog trägt genau eine Combobox (Stärke-Position), deshalb ist sie eindeutig.
+    await nutzer.click(imDialog().getByRole('combobox'));
+    // Der klickbare Eintrag ist `.ant-select-item-option-content`; der `role="option"`-Knoten
+    // ist nur das a11y-Spiegelelement und reagiert nicht auf Klicks (Repo-Muster, MetaChip).
+    await nutzer.click(await screen.findByText(
+      (_, el) => typeof el?.className === 'string'
+        && el.className.includes('ant-select-item-option-content')
+        && el.textContent === 'Führer',
+    ));
+    await nutzer.click(imDialog().getByRole('button', { name: 'Speichern und nächste' }));
+
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      adhoc: {
+        name: 'Dr. Schmidt',
+        traegerorganisation: 'KV Musterstadt',
+        staerke_position: 'fuehrer',
+      },
+    });
+
+    // Offen geblieben, mit Zähler.
+    expect(await imDialog().findByText('Erfasst: 1')).toBeInTheDocument();
+    // Übernahme greift, der Name ist frei, der Fokus steht wieder im ersten Feld.
+    await waitFor(() =>
+      expect(imDialog().getByLabelText('Trägerorganisation')).toHaveValue('KV Musterstadt'));
+    expect(imDialog().getByLabelText('Name')).toHaveValue('');
+    await waitFor(() => expect(document.activeElement).toBe(imDialog().getByLabelText('Name')));
+
+    // Der zweite Datensatz ist damit reine Namenseingabe — Enter genügt. Der abgesetzte
+    // Rumpf ist der stärkere Beleg als jede DOM-Prüfung: BEIDE Wiederholfelder sind noch
+    // dabei, obwohl dazwischen zurückgesetzt wurde.
+    await nutzer.type(imDialog().getByLabelText('Name'), 'Frau Meier{Enter}');
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[1]).toMatchObject({
+      adhoc: {
+        name: 'Frau Meier',
+        traegerorganisation: 'KV Musterstadt',
+        staerke_position: 'fuehrer',
+      },
+    });
+  });
+
+  it('ein abgelehntes Speichern lässt den Wortlaut stehen', async () => {
+    // Ohne `mutateAsync` würde die Hülle die Felder leeren, obwohl nichts ankam —
+    // an der Bereitstellung heisst das: der Erfasser tippt alles noch einmal.
+    render(einsatz());
+    server.use(
+      http.post('/api/einsaetze/7/personal', () =>
+        HttpResponse.json({ error: 'Name bereits disponiert' }, { status: 409 })),
+    );
+    await screen.findByText('Thomas Müller');
+    await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Person' }));
+    await screen.findByRole('dialog');
+    await userEvent.type(imDialog().getByLabelText('Name'), 'Dr. Schmidt{Enter}');
+
+    await screen.findByText('Name bereits disponiert');
+    // Gegenprobe zum Test oben: KEIN Verlassen-Zustand — der Dialog steht.
+    expect(screen.getByRole('dialog')).not.toHaveClass('ant-zoom-leave');
+    expect(imDialog().getByLabelText('Name')).toHaveValue('Dr. Schmidt');
+  });
+});
+
+/**
  * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den
  * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` und `userEvent` bricht
  * dort ab (gemessen). Gegriffen wird die Combobox — der Knoten, den auch die Tastatur

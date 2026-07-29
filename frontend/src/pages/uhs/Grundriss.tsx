@@ -1,4 +1,4 @@
-import { App, Button, Card, Dropdown, Form, Input, InputNumber, Modal, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { App, Button, Card, Dropdown, Form, Input, InputNumber, Space, Tag, Tooltip, Typography, theme } from 'antd';
 import { Select } from '../../components/Select';
 import {
   CarOutlined, CheckCircleOutlined, DeleteOutlined, LockOutlined, LogoutOutlined,
@@ -15,6 +15,7 @@ import type { Person, PlatzTyp, UhsDetail, UhsPlatz, VerbleibArt, Verfuegbarkeit
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
+import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 
@@ -288,6 +289,9 @@ function TransportSpalte({ personen, schreibgeschuetzt, onOeffnen }: { personen:
   );
 }
 
+/** Felder des Abschluss-Screens „Verbleib erfassen". */
+type VerbleibWerte = { art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string };
+
 export default function Grundriss({
   einsatzId, uhs, schreibgeschuetzt,
 }: { einsatzId: number; uhs: UhsDetail; schreibgeschuetzt: boolean }) {
@@ -312,7 +316,7 @@ export default function Grundriss({
 
   // Zielperson des „Verbleib erfassen"-Abschluss-Screens (null = geschlossen).
   const [transportPerson, setTransportPerson] = useState<Person | null>(null);
-  const [transportForm] = Form.useForm<{ art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }>();
+  const [transportForm] = Form.useForm<VerbleibWerte>();
 
   // Klick auf eine Patientenkarte öffnet den schlanken Detail-Drawer (nur ansehen).
   const [detailPersonId, setDetailPersonId] = useState<number | null>(null);
@@ -380,12 +384,13 @@ export default function Grundriss({
   // bei Transport wandert sie rechts in „Auf Transport gebracht". status=abtransportiert
   // nur bei Transport (sonst null) — gleiche Semantik wie PersonenPage.
   const transportMut = useMutation({
-    mutationFn: ({ personId, art, ziel, transportmittel, notiz }: { personId: number; art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }) =>
+    mutationFn: ({ personId, art, ziel, transportmittel, notiz }: VerbleibWerte & { personId: number }) =>
       erfasseVerbleib(einsatzId, personId, {
         art, ziel: ziel ?? null, transportmittel: transportmittel ?? null,
         status: art === 'transport' ? 'abtransportiert' : null, notiz: notiz ?? null,
       }),
-    onSuccess: () => { message.success('Verbleib erfasst'); setTransportPerson(null); transportForm.resetFields(); invalidate(); },
+    // Schliessen und Leeren macht die Erfassungshülle (onFertig bzw. ihr eigener Reset).
+    onSuccess: () => { message.success('Verbleib erfasst'); invalidate(); },
     onError: fehler,
   });
   const verfMut = useMutation({
@@ -523,35 +528,40 @@ export default function Grundriss({
       </DragOverlay>
 
       {/* Abschluss-Screen „Verbleib erfassen" — Art wählbar (Default Transport, vom
-          Platz-Button und vom Drag auf „Auf Transport gebracht" vorbelegt). */}
-      <Modal
-        open={transportPerson != null}
-        title={transportPerson ? `Verbleib erfassen — ${personLabel(transportPerson)}` : 'Verbleib erfassen'}
-        okText="Erfassen"
-        confirmLoading={transportMut.isPending}
-        onOk={() => transportForm.submit()}
-        onCancel={() => { setTransportPerson(null); transportForm.resetFields(); }}
-        destroyOnHidden
+          Platz-Button und vom Drag auf „Auf Transport gebracht" vorbelegt).
+          Kein Serienmodus: ein Verbleib wird je Patient genau einmal erfasst.
+
+          FELDREIHENFOLGE IST ABSICHT: „Ziel" steht vor „Art", weil die Hülle beim Öffnen
+          das erste bedienbare Feld fokussiert — und „Art" ist bereits mit Transport
+          vorbelegt, also nichts, was der Erfassende zuerst tippt. Wer hier umsortiert,
+          verschiebt damit den Fokus. */}
+      <ErfassungsModal<VerbleibWerte>
+        offen={transportPerson != null}
+        titel={transportPerson ? `Verbleib erfassen — ${personLabel(transportPerson)}` : 'Verbleib erfassen'}
+        form={transportForm}
+        initialValues={{ art: 'transport' }}
+        laeuft={transportMut.isPending}
+        onErfassen={async (werte) => {
+          // Der Dialog ist nur offen, solange eine Zielperson steht (`offen` oben);
+          // die Prüfung engt bloss den Typ ein.
+          if (!transportPerson) return;
+          await transportMut.mutateAsync({ personId: transportPerson.id, ...werte });
+        }}
+        onFertig={() => setTransportPerson(null)}
+        onAbbrechen={() => setTransportPerson(null)}
       >
-        <Form
-          form={transportForm}
-          layout="vertical"
-          initialValues={{ art: 'transport' }}
-          onFinish={(v) => { if (transportPerson) transportMut.mutate({ personId: transportPerson.id, ...v }); }}
-        >
-          <Form.Item label="Art" name="art" rules={[{ required: true }]}>
-            <Select options={[
-              { value: 'transport', label: 'Transport' },
-              { value: 'entlassung', label: 'Entlassung vor Ort' },
-              { value: 'vor_ort', label: 'verbleibt vor Ort' },
-              { value: 'verstorben', label: 'Verbleib des Leichnams' },
-            ]} />
-          </Form.Item>
-          <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
-          <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
-          <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
+        <Form.Item label="Art" name="art" rules={[{ required: true }]}>
+          <Select options={[
+            { value: 'transport', label: 'Transport' },
+            { value: 'entlassung', label: 'Entlassung vor Ort' },
+            { value: 'vor_ort', label: 'verbleibt vor Ort' },
+            { value: 'verstorben', label: 'Verbleib des Leichnams' },
+          ]} />
+        </Form.Item>
+        <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
+        <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+      </ErfassungsModal>
 
       {/* Schlanker Detail-Drawer beim Klick auf eine Patientenkarte (nur ansehen). */}
       <PersonDetailDrawer einsatzId={einsatzId} personId={detailPersonId} onClose={() => setDetailPersonId(null)} />

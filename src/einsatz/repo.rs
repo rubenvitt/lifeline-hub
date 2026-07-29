@@ -8,11 +8,27 @@ use crate::error::AppError;
 use chrono::Utc;
 use sqlx::SqlitePool;
 
+/// Die Felder, die beim Anlegen gesetzt werden dürfen (LFH-332 · B4).
+///
+/// **Warum ein Struct und nicht fünf Parameter:** `einsatzart` und `begonnen_at`
+/// kamen erst mit dem erweiterten Anlegedialog dazu. Beide sind `Option` und beide
+/// sind Strings — als Stellungsparameter wären sie ohne Blick auf die Signatur
+/// vertauschbar. Dasselbe Muster trägt `KopfPatch` weiter unten.
+pub struct NeuerEinsatzDaten<'a> {
+    pub bezeichnung: &'a str,
+    pub stichwort: Option<&'a str>,
+    /// `None` → DB-Default `'realeinsatz'`. Der Aufrufer hat den Wert bereits
+    /// gegen `Einsatzart::parse` geprüft.
+    pub einsatzart: Option<&'a str>,
+    /// Alarmzeit. `None` → DB-Default `datetime('now')`. Der Aufrufer hat den Wert
+    /// bereits durch `etb::normalisiere_zeit` geschickt.
+    pub begonnen_at: Option<&'a str>,
+}
+
 /// Legt einen Einsatz an und macht den Ersteller in derselben Transaktion zur Einsatzleitung.
 pub async fn anlegen(
     pool: &SqlitePool,
-    bezeichnung: &str,
-    stichwort: Option<&str>,
+    daten: NeuerEinsatzDaten<'_>,
     ersteller_id: i64,
 ) -> Result<Einsatz, AppError> {
     // Ein Einsatz gehört zur Organisation SEINES ERSTELLERS (F05/LFH-232). Vorher stand
@@ -47,13 +63,20 @@ pub async fn anlegen(
         .await?;
         let einsatznummer = format!("{praefix}{:03}", max_nr.unwrap_or(0) + 1);
 
+        // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`
+        // sind NOT NULL mit DB-Default. Ein explizit gebundenes NULL überschriebe den
+        // Default und verletzte die Bedingung — COALESCE lässt den Default greifen.
         let einsatz_id: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatznummer_intern, angelegt_at) \
-             VALUES (?, ?, ?, ?, datetime('now')) RETURNING id",
+            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
+                                  einsatznummer_intern, angelegt_at) \
+             VALUES (?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
+                     datetime('now')) RETURNING id",
         )
         .bind(org_id)
-        .bind(bezeichnung)
-        .bind(stichwort)
+        .bind(daten.bezeichnung)
+        .bind(daten.stichwort)
+        .bind(daten.einsatzart)
+        .bind(daten.begonnen_at)
         .bind(&einsatznummer)
         .fetch_one(&mut *conn)
         .await?;
@@ -732,6 +755,28 @@ pub async fn zaehle_einsatzleitung(pool: &SqlitePool, einsatz_id: i64) -> Result
 mod tests {
     use super::*;
 
+    /// Kurzform für die Testfälle dieser Datei: legt einen Einsatz mit den beiden
+    /// Pflichtangaben an. Einsatzart und Alarmzeit spielen hier nirgends eine Rolle —
+    /// die deckt `tests/einsatz.rs` über die Route ab, wo sie auch validiert werden.
+    async fn test_anlegen(
+        pool: &SqlitePool,
+        bezeichnung: &str,
+        stichwort: Option<&str>,
+        ersteller_id: i64,
+    ) -> Result<Einsatz, AppError> {
+        anlegen(
+            pool,
+            NeuerEinsatzDaten {
+                bezeichnung,
+                stichwort,
+                einsatzart: None,
+                begonnen_at: None,
+            },
+            ersteller_id,
+        )
+        .await
+    }
+
     /// Legt Org (id=1) + einen Benutzer an und liefert dessen id.
     async fn benutzer_anlegen(pool: &SqlitePool, name: &str) -> i64 {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -759,7 +804,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
 
-        let einsatz = anlegen(&pool, "Hochwasser", Some("Deichbruch"), leit)
+        let einsatz = test_anlegen(&pool, "Hochwasser", Some("Deichbruch"), leit)
             .await
             .unwrap();
         assert_eq!(einsatz.bezeichnung, "Hochwasser");
@@ -775,7 +820,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let fremd = benutzer_anlegen(&pool, "fremd").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         assert_eq!(rolle_von(&pool, einsatz.id, fremd).await.unwrap(), None);
     }
@@ -784,7 +829,7 @@ mod tests {
     async fn abschliessen_setzt_status_und_von() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
         assert_eq!(abgeschlossen.status, EinsatzStatus::Abgeschlossen);
@@ -815,7 +860,7 @@ mod tests {
         // die operative Position (lat/lon) bleibt wie das übrige Skelett erhalten.
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         abschliessen(&pool, einsatz.id, leit).await.unwrap();
         // Retention-Guard erfüllen: soft-gelöscht.
         sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
@@ -860,7 +905,7 @@ mod tests {
         // kommunikationsmittel (Schlüssel digitalfunk/mobil/…) ist kein PII und bleibt.
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         abschliessen(&pool, einsatz.id, leit).await.unwrap();
         sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
             .bind("2026-01-01 00:00:00")
@@ -934,7 +979,7 @@ mod tests {
     async fn abschliessen_befuellt_retention_bis_aus_dauer_und_schreibt_audit() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         setze_dauer(&pool, einsatz.id, leit, 30).await;
 
         let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
@@ -965,7 +1010,7 @@ mod tests {
     async fn abschliessen_ohne_dauer_setzt_keine_frist() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
         assert_eq!(abgeschlossen.retention_bis, None);
@@ -976,7 +1021,7 @@ mod tests {
     async fn abschliessen_org_default_befuellt_retention_bis() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         // Kein Einsatz-Override; Org-Default=30.
         setze_org_dauer(&pool, einsatz.org_id, leit, 30).await;
 
@@ -998,7 +1043,7 @@ mod tests {
     async fn abschliessen_einsatz_dauer_schlaegt_org_default() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         setze_dauer(&pool, einsatz.id, leit, 60).await;
         setze_org_dauer(&pool, einsatz.org_id, leit, 30).await;
 
@@ -1019,7 +1064,7 @@ mod tests {
     async fn abschliessen_ueberschreibt_manuelle_frist_nicht() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         setze_dauer(&pool, einsatz.id, leit, 30).await;
         // Manuell gesetzte Frist VOR Abschluss.
         frist_setzen(
@@ -1044,7 +1089,7 @@ mod tests {
     async fn frist_setzen_speichert_und_schreibt_etb_audit() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         assert_eq!(einsatz.retention_bis, None);
 
         let aktualisiert = frist_setzen(
@@ -1150,7 +1195,7 @@ mod tests {
     async fn frist_setzen_none_hebt_frist_auf() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         frist_setzen(&pool, einsatz.id, leit, Some("2030-01-01 00:00:00"), "set")
             .await
             .unwrap();
@@ -1166,7 +1211,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let erika = benutzer_anlegen(&pool, "erika").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         setze_rolle(&pool, einsatz.id, erika, EinsatzRolle::Beobachter)
             .await
@@ -1191,7 +1236,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let erika = benutzer_anlegen(&pool, "erika").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         setze_rolle(&pool, einsatz.id, erika, EinsatzRolle::Beobachter)
             .await
             .unwrap();
@@ -1205,7 +1250,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let erika = benutzer_anlegen(&pool, "erika").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         setze_rolle(&pool, einsatz.id, erika, EinsatzRolle::Beobachter)
             .await
             .unwrap();
@@ -1232,7 +1277,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let fremd = benutzer_anlegen(&pool, "fremd").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         // Ersteller sieht sich als Einsatzleitung.
         let leit_benutzer = benutzer_laden(&pool, leit).await;
@@ -1260,8 +1305,8 @@ mod tests {
             .await
             .unwrap();
 
-        let a = anlegen(&pool, "Lage A", None, leit).await.unwrap();
-        let b = anlegen(&pool, "Lage B", None, leit).await.unwrap();
+        let a = test_anlegen(&pool, "Lage A", None, leit).await.unwrap();
+        let b = test_anlegen(&pool, "Lage B", None, leit).await.unwrap();
         assert_eq!(
             a.einsatznummer_intern.as_deref(),
             Some(format!("{jahr}-001").as_str())
@@ -1297,7 +1342,7 @@ mod tests {
             .unwrap();
 
         // anlegen nutzt Org 1 (ORDER BY id LIMIT 1) → beginnt bei 001.
-        let a = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let a = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         assert_eq!(
             a.einsatznummer_intern.as_deref(),
             Some(format!("{jahr}-001").as_str())
@@ -1314,7 +1359,7 @@ mod tests {
     async fn patche_kopf_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Alt", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Alt", None, leit).await.unwrap();
 
         let aktualisiert = patche_kopf(
             &pool,
@@ -1362,7 +1407,7 @@ mod tests {
     async fn patche_kopf_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let einsatz = anlegen(&pool, "Alt", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Alt", None, leit).await.unwrap();
         let voll = patche_kopf(
             &pool,
             einsatz.id,
@@ -1420,8 +1465,8 @@ mod tests {
     async fn patche_kopf_doppelte_nummer_ist_conflict() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let a = anlegen(&pool, "A", None, leit).await.unwrap();
-        let b = anlegen(&pool, "B", None, leit).await.unwrap();
+        let a = test_anlegen(&pool, "A", None, leit).await.unwrap();
+        let b = test_anlegen(&pool, "B", None, leit).await.unwrap();
 
         // b auf a's Nummer setzen → Unique-Verstoß → Conflict.
         let err = patche_kopf(
@@ -1442,7 +1487,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let admin = benutzer_anlegen(&pool, "admin").await;
-        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         // Admin zur höheren Berechtigung machen.
         sqlx::query("UPDATE benutzer SET system_rolle = ? WHERE id = ?")

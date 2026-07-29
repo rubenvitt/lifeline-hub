@@ -13,8 +13,20 @@ export function ladeEinsatz(id: number): Promise<EinsatzAnzeige> {
   return apiGet<EinsatzAnzeige>(`/api/einsaetze/${id}`);
 }
 
-export function legeEinsatzAn(bezeichnung: string, stichwort?: string): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>('/api/einsaetze', 'POST', { bezeichnung, stichwort });
+/**
+ * Anlegefelder eines Einsatzes (LFH-332 · B4). `einsatzart` und `begonnen_at` sind
+ * optional — fehlen sie, greifen die DB-Defaults `'realeinsatz'` und `jetzt`.
+ */
+export interface NeuerEinsatz {
+  bezeichnung: string;
+  stichwort?: string;
+  einsatzart?: Einsatzart;
+  /** Alarmzeit. Format wie im Kopfdaten-PATCH: `'YYYY-MM-DD HH:mm:ss'`. */
+  begonnen_at?: string;
+}
+
+export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>('/api/einsaetze', 'POST', daten);
 }
 
 export function schliesseEinsatzAb(id: number): Promise<EinsatzAnzeige> {

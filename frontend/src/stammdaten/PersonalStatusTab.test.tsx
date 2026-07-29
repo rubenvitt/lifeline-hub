@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -122,5 +122,53 @@ describe('PersonalStatusTab', () => {
 
     expect(await screen.findByText('Kein Status')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * LFH-332 · B4. Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: der
+   * Anlege-Zweig setzt seine Vorgaben jetzt von Hand zusammen, und `kategorie` ist
+   * darunter die einzige, die zu einem SICHTBAR falschen Datensatz führt — ein
+   * Status in der falschen Kategorie färbt jede Kräfteübersicht falsch ein. Ein
+   * Test, der nur zählt, bliebe dabei grün.
+   *
+   * Der Knopf trägt weiter den Namen des gestrichenen Dialog-Knopfes, deshalb sind
+   * die Rechte-Prüfungen oben unverändert gültig.
+   */
+  it('die Schnellerfassung legt mit Label und den Vorgaben des alten Dialogs an', async () => {
+    const ruempfe: unknown[] = [];
+    server.use(
+      http.post('/api/personal-status', async ({ request }) => {
+        ruempfe.push(await request.json());
+        return HttpResponse.json({
+          id: 9, label: 'im Anmarsch', kategorie: 'gebunden', farbe: null, sortier: 0,
+        });
+      }),
+    );
+    render(admin);
+    await screen.findByText('dienstbereit');
+
+    await userEvent.type(screen.getByLabelText('Neuer Personal-Status'), 'im Anmarsch{Enter}');
+
+    await waitFor(() =>
+      expect(ruempfe).toEqual([
+        { label: 'im Anmarsch', kategorie: 'gebunden', farbe: null, sortier: 0 },
+      ]),
+    );
+  });
+
+  /**
+   * Der Dialog ist seit LFH-332 · B4 reines Bearbeiten. Ohne diese Prüfung schiffe
+   * eine kaputte Vorbelegung mit vollständig grüner Suite: kein anderer Test dieser
+   * Datei öffnet ihn.
+   */
+  it('Bearbeiten öffnet den Dialog mit vorbelegten Werten', async () => {
+    render(admin);
+    await screen.findByText('dienstbereit');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Status bearbeiten')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Label')).toHaveValue('dienstbereit');
   });
 });
