@@ -104,10 +104,11 @@ interface KartenAnsichtArgs {
  */
 export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenAnsichtArgs) {
   const qc = useQueryClient();
-  const { data: ansichten } = useQuery({
+  const ansichtenQuery = useQuery({
     queryKey: einsatzKeys.kartenAnsicht(einsatzId),
     queryFn: () => ladeKartenAnsichten(einsatzId),
   });
+  const ansichten = ansichtenQuery.data;
   // B/LFH-320: die aktive Ansicht kommt aus `?ansicht=` (per Prop); fällt auf die
   // Standardansicht (bzw. die erste) zurück, wenn der Param fehlt oder ins Leere zeigt.
   const aktiveAnsicht = useMemo(() => {
@@ -226,6 +227,12 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
 
   return {
     ansichten,
+    // Fehlerzustand der Ansichtsliste (LFH-331 · B3). Der stumme Fall dieser Seite:
+    // `AnsichtSwitcher` liefert bei leerer Liste `null`, ein gescheiterter Abruf sieht also
+    // exakt aus wie „noch nicht geladen" — dauerhaft und ohne jede Spur.
+    ansichtenFehler: ansichtenQuery.isError,
+    ansichtenFehlerUrsache: ansichtenQuery.error,
+    ansichtenNeuLaden: () => void ansichtenQuery.refetch(),
     aktiveAnsicht,
     // Aktive Ansicht-id — für Objekt-Filterung (client-seitig) und das Stempeln neuer Objekte.
     aktiveAnsichtId: aktiveAnsicht?.id,

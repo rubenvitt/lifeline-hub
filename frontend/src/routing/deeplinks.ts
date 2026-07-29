@@ -71,8 +71,21 @@ export function schadenDetailPfad(einsatzId: number, schadenId: number): string 
 
 // ── Listen-Routes (auch NaN-Redirect-Ziele) ──────────────────────────────────
 
-export function unfallhilfsstellenListePfad(einsatzId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'unfallhilfsstellen')}/liste`;
+/**
+ * Die UHS-Listenroute. `opts.neu` nachgetragen (LFH-331 · B3): `UnfallhilfsstellenPage`
+ * liest `?neu=1` seit je, der Builder konnte den Param aber nicht bauen — Aufrufer
+ * mussten ihn danebenschreiben, was die Registry an genau dieser Stelle umging.
+ *
+ * Achtung beim Kürzen: die Liste liegt unter `/unfallhilfsstellen/liste`. Der bare
+ * Modulpfad zeigt auf `UnfallhilfsstellenDefault`, das `?neu=1` gar nicht liest.
+ */
+export function unfallhilfsstellenListePfad(
+  einsatzId: number,
+  opts: { neu?: boolean } = {},
+): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'unfallhilfsstellen')}/liste`, {
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 export function bereitstellungsraeumePfad(einsatzId: number): string {

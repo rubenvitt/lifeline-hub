@@ -1,4 +1,4 @@
-import { Empty } from 'antd';
+import { SeitenLeer } from '../components/SeitenZustand';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import NachforderungKarte from './NachforderungKarte';
 
@@ -16,7 +16,7 @@ export interface NachforderungListeProps {
 export default function NachforderungListe({
   nachforderungen, ansicht = 'offen', darfSchreiben, onStatus, onAblehnen,
 }: NachforderungListeProps) {
-  if (nachforderungen.length === 0) return <Empty description="Keine Nachforderungen" />;
+  if (nachforderungen.length === 0) return <SeitenLeer titel="Keine Nachforderungen" />;
   return (
     <>
       {nachforderungen.map((n) => (

@@ -20,12 +20,12 @@ import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusTag from '../components/StatusTag';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
-import { flaeche } from '../theme/tokens';
+import { abstand, flaeche } from '../theme/tokens';
 
 /**
  * Statusanzeige eines disponierten Einsatzpersonals — und zugleich die GRENZE des
@@ -152,6 +152,29 @@ export default function PersonalPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const eps = epQuery.data ?? [];
+
+  /**
+   * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
+   * Bedingung NICHT.
+   *
+   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Datensicht, sonst
+   * behauptet „Noch kein Personal disponiert" eine leere Disposition, wo bloß der Abruf
+   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
+   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
+   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an `eps`, der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`):
+   * Suche, Trägerfilter und Gruppenachse leben IM Primitiv, an ihrer Restmenge gemessen
+   * kippte die Seite bei jedem engen Filter in den Fehlerzweig — und nähme dem Bediener
+   * die Schalter, mit denen er ihn wieder aufmachen könnte.
+   *
+   * NICHT zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht ZUSÄTZLICH
+   * über der Tabelle und tauscht nichts aus. Eine Mengenbedingung hat dort nichts zu
+   * suchen — es verschwindet nichts, also ist auch nichts zu bewahren.
+   */
+  const listeGescheitert = epQuery.isError && eps.length === 0;
+  const standVeraltet = epQuery.isError && eps.length > 0;
+
   const einheitById = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e] as const));
   const fahrzeugById = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f] as const));
   const stati = statusQuery.data ?? [];
@@ -159,6 +182,18 @@ export default function PersonalPage() {
   const poolOptionen = (poolQuery.data ?? [])
     .filter((p) => !disponierteIds.has(p.id))
     .map((p) => ({ value: p.id, label: `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}` }));
+
+  /**
+   * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
+   * (LFH-331 · B3). Scheitert der Abruf, filtert der Ausdruck darüber auf die leere Menge
+   * und das Feld behauptete „Keine freien Personen" — eine Aussage über den Bestand, die
+   * niemand geprüft hat. Ohne Fehler bleibt der Bestandswortlaut byte-gleich stehen.
+   *
+   * KEIN `kein403`: `src/routes/personal.rs` ist org-lesbar ohne Admin-Schranke.
+   */
+  const poolInhalt = nichtGefundenInhalt(poolQuery, {
+    allgemein: 'Personalliste konnte nicht geladen werden',
+  }) ?? 'Keine freien Personen';
 
   /**
    * Trägerfilter aus den EIGENEN Daten; `undefined` ohne Werte — ein Filterfeld mit null
@@ -332,7 +367,7 @@ export default function PersonalPage() {
               placeholder="Person aus Pool disponieren …"
               value={null}
               options={poolOptionen}
-              notFoundContent="Keine freien Personen"
+              notFoundContent={poolInhalt}
               onSelect={(personalId) => { if (personalId != null) disponiereMutation.mutate(personalId); }}
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
@@ -354,6 +389,39 @@ export default function PersonalPage() {
           `zufluss` bleibt der Default `sammelbanner`: diese Seite trägt ZWEI Auswahlfelder
           in der Zeile (Position, Status), eigener wie fremder Wechsel läuft über eine
           Invalidierung. */}
+
+      {/* Der Statuskatalog trägt die Auswahlliste JEDER Statuszelle. Fällt er aus, steht in
+          der Zeile ein Auswahlfeld ohne Einträge — der Statuswechsel ist dann unmöglich, und
+          zwar lautlos. Die Meldung steht deshalb über der Tabelle, nicht in der Zelle.
+
+          An `darfSchreiben` gekoppelt, weil das Auswahlfeld selbst es ist: wer nur liest,
+          sieht `StatusBadge` aus den Zeilendaten und verliert durch den Katalogausfall
+          nichts. (Die Positionsspalte bleibt bedienbar — `POSITION_OPTIONEN` ist ein
+          lokales Enum und kommt nicht über die Leitung.) */}
+      {darfSchreiben && statusQuery.isError && (
+        <div style={{ marginBottom: abstand.md }}>
+          <SeitenFehler
+            text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
+            ursache={statusQuery.error}
+            onWiederholen={() => void statusQuery.refetch()}
+          />
+        </div>
+      )}
+
+      {/* Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
+          werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
+          keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen.
+          Ohne diese Weiche behauptet „Noch kein Personal disponiert" auch dann eine leere
+          Disposition, wenn bloß die Verbindung abgerissen ist. */}
+      {listeGescheitert ? (
+        <SeitenFehler
+          text="Disponiertes Personal konnte nicht geladen werden"
+          ursache={epQuery.error}
+          onWiederholen={() => void epQuery.refetch()}
+        />
+      ) : (
+      <>
+      {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
       <Datensicht
         bezeichnung="Personal im Einsatz"
         spalten={spalten}
@@ -390,6 +458,8 @@ export default function PersonalPage() {
             : undefined,
         }}
       />
+      </>
+      )}
 
       <Modal
         open={adhocOffen}

@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
@@ -346,4 +347,127 @@ function zelleNachKopf(container: HTMLElement, zeile: HTMLElement, kopf: string)
   const zellen = zeile.querySelectorAll('td');
   expect(zellen.length, 'Zeile hat weniger Zellen als Spaltenköpfe').toBeGreaterThan(index);
   return zellen[index] as HTMLElement;
+}
+
+/**
+ * Datenzustände der Personalseite (LFH-331 · B3).
+ *
+ * Drei Quellen fallen hier unabhängig aus: die **Dispositionsliste** (tauscht die
+ * Datensicht gegen die Fehlermeldung), der **Statuskatalog** (Banner über der Tabelle —
+ * ohne ihn ist kein Statuswechsel möglich) und der **Stamm-Pool** (der Ausfall steht im
+ * Auswahlfeld statt eines stumm leeren „Keine freien Personen").
+ *
+ * Je Zusicherung „X nicht im DOM" steht die Partnerzusicherung „X IST im DOM" mit
+ * BYTE-GLEICHEM Literal daneben; und je Fall scheitert GENAU EINE Query, damit „Erneut
+ * abrufen" eindeutig bleibt.
+ */
+describe('PersonalPage · Datenzustände', () => {
+  const gruenerBoden = () => [
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+    http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
+    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
+    http.get('/api/personal-status', () => HttpResponse.json([
+      { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+    ])),
+    http.get('/api/personal', () => HttpResponse.json([])),
+  ];
+
+  function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
+    // Abweichung VORN: `server.use` reiht in Übergabereihenfolge ein, der erste Treffer
+    // gewinnt — andersherum schluckte der grüne Boden jede Abweichung.
+    server.use(...abweichungen, ...gruenerBoden());
+    return renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/personal' },
+    );
+  }
+
+  it('gescheiterte Dispositionsliste: Fehler statt Leertext', async () => {
+    zeige(http.get('/api/einsaetze/7/personal', () => new HttpResponse(null, { status: 500 })));
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch kein Personal disponiert')).not.toBeInTheDocument();
+  });
+
+  it('leere Dispositionsliste: Leertext und KEIN Fehler', async () => {
+    zeige();
+    expect(await screen.findByText('Noch kein Personal disponiert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`.
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Vor dem Umbau verdrängte der Fehler die Zeilen — die Einsatzkraft verlor
+   * eine Disposition, die sie eben noch gelesen hatte.
+   *
+   * Assertiert wird der Banner-TEXT, nicht der Knopf „Erneut abrufen": den tragen
+   * `SeitenStandVeraltet`, `SeitenFehler` UND das Statuskatalog-Banner. Über den Knopf
+   * gemessen wäre die Zusicherung mehrdeutig und im schlimmsten Fall trivial grün.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    const { client } = zeige(http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)));
+    await screen.findByText('Thomas Müller');
+
+    server.use(http.get('/api/einsaetze/7/personal', () => new HttpResponse(null, { status: 500 })));
+    await client.refetchQueries({ queryKey: einsatzKeys.personal(7) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('Thomas Müller')).toBeInTheDocument();
+    expect(screen.queryByText('Disponiertes Personal konnte nicht geladen werden')).not.toBeInTheDocument();
+  });
+
+  it('gescheiterter Statuskatalog: Banner über der Tabelle', async () => {
+    zeige(http.get('/api/personal-status', () => new HttpResponse(null, { status: 500 })));
+    expect(
+      await screen.findByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+    ).toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: mit Statuskatalog steht kein Banner', async () => {
+    zeige();
+    await screen.findByText('Noch kein Personal disponiert');
+    expect(
+      screen.queryByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Personen"', async () => {
+    const { container } = zeige(http.get('/api/personal', () => new HttpResponse(null, { status: 500 })));
+    await screen.findByText('Noch kein Personal disponiert');
+    await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
+    expect(await screen.findByText('Personalliste konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Keine freien Personen')).not.toBeInTheDocument();
+  });
+
+  it('Partnerhälfte: leerer Stamm-Pool behält „Keine freien Personen"', async () => {
+    const { container } = zeige();
+    await screen.findByText('Noch kein Personal disponiert');
+    await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
+    expect(await screen.findByText('Keine freien Personen')).toBeInTheDocument();
+    expect(screen.queryByText('Personalliste konnte nicht geladen werden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den
+ * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` und `userEvent` bricht
+ * dort ab (gemessen). Gegriffen wird die Combobox — der Knoten, den auch die Tastatur
+ * fokussiert.
+ */
+async function oeffnePersonalAuswahl(container: HTMLElement, platzhalter: string) {
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
+    .find((s) => s.textContent?.includes(platzhalter));
+  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
+  await userEvent.click(within(feld!).getByRole('combobox'));
 }

@@ -30,3 +30,20 @@ describe('AuftragListe — ETB-Backlink (LFH-112)', () => {
     expect(screen.queryByRole('link', { name: /ETB-Eintrag/ })).not.toBeInTheDocument();
   });
 });
+
+describe('AuftragListe — Leerzustand (LFH-331 · B3)', () => {
+  /**
+   * Der Wortlaut bleibt byte-gleich; getauscht wird der Knoten. Deshalb steht die
+   * Text-Zusicherung neben der Knoten-Zusicherung: allein wäre sie vor dem Umbau
+   * genauso grün gewesen und belegte nichts.
+   *
+   * Keine Primäraktion: die Liste ist rein darstellend — die Erteilung liegt auf der
+   * Seite darüber, nicht in dieser Komponente.
+   */
+  it('zeigt den Leertext über das Leer-Primitiv, ohne antds Leer-Element', () => {
+    const { container } = renderMitProviders(<AuftragListe auftraege={[]} einsatzId={7} />);
+    expect(screen.getByText('Keine Aufträge')).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeNull();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+});

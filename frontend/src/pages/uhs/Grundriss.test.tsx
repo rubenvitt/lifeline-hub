@@ -330,6 +330,6 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     renderGrundriss(uhsDetail({}), [p]);
     await userEvent.click(await screen.findByText(/R-011|· unbekannt/));
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 });

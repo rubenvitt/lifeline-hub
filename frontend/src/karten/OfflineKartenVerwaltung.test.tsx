@@ -380,6 +380,62 @@ describe('OfflineKartenVerwaltung', () => {
     });
   });
 
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
+   * formulierte jemand den Leertext um, wäre sie auch im Leerfall trivial grün. Erst die
+   * positive Hälfte darunter — gleiches Literal, gleiche Datei — macht daraus eine Aussage
+   * über die Zustandsweiche statt über die Schreibweise eines Strings.
+   *
+   * Meldung UND Detailzeile werden als exakte Literale gegriffen: hier wurde eine
+   * handgerollte Geschwister-Meldung auf das Primitiv umgestellt, und der Umbau ist nur dann
+   * kein Rückschritt, wenn beide Zeilen byte-gleich stehen bleiben.
+   */
+  it('zeigt eine Fehlermeldung statt stiller Leere, wenn die Liste nicht lädt', async () => {
+    mockBasis(admin);
+    server.use(
+      http.get('/api/karte/offline-karten', () =>
+        HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 }),
+      ),
+    );
+    render();
+    expect(await screen.findByText('Offline-Karten konnten nicht geladen werden')).toBeInTheDocument();
+    // Die Detailzeile stammt aus dem `{error}`-Body des Backends und ist genau die, die die
+    // abgelöste Handrolle zeigte. Ohne sie belegte der Test nur die Überschrift.
+    expect(screen.getByText('Kartenregistry nicht erreichbar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Offline-Karten')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    mockBasis(admin, []);
+    render();
+    expect(await screen.findByText('Noch keine Offline-Karten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  it('„Erneut abrufen" holt die Liste wirklich neu', async () => {
+    /**
+     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des Knopfes: der zweite Abruf
+     * gelingt, die Tabelle steht. Ohne diese Hälfte wäre ein `onWiederholen={() => {}}`
+     * genauso grün wie die Verdrahtung auf `refetch`.
+     */
+    let abrufe = 0;
+    mockBasis(admin);
+    server.use(
+      http.get('/api/karte/offline-karten', () => {
+        abrufe += 1;
+        return abrufe === 1
+          ? HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 })
+          : HttpResponse.json([karte]);
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Erneut abrufen' }));
+
+    expect(await screen.findByText('Deutschland – Bremen')).toBeInTheDocument();
+    expect(screen.queryByText('Offline-Karten konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+
   it('Bau-Status-Zeile: zeigt aktive Bau-Jobs (verschachtelter status.status) über der Tabelle', async () => {
     const bauJob: BauJob = {
       id: 7,

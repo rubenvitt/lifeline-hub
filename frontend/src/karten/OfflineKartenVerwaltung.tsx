@@ -1,8 +1,9 @@
 import {
-  Alert, App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Typography,
+  App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Typography,
   type TableColumnsType,
 } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -378,12 +379,17 @@ export default function OfflineKartenVerwaltung() {
           ))}
         </Space>
       )}
+      {/* Meldung und Detailzeile sind die der abgelösten Handrolle, byte-gleich: das Primitiv
+          bildet mit `ursacheText` genau dieselbe Weiche ab (nur eine `ApiError` trägt eine
+          Meldung, die vor einem Menschen besteht), der Umbau ist also verhaltensgleich und
+          bringt nur die Wiederholung dazu. Wiederholt wird GENAU diese Query, nicht der ganze
+          Karten-Zweig: `invalidiereKarte` zöge Karten-Config und Bau-Status mit, die beide
+          nicht gescheitert sind. */}
       {kartenQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          title="Offline-Karten konnten nicht geladen werden"
-          description={kartenQuery.error instanceof ApiError ? kartenQuery.error.message : undefined}
+        <SeitenFehler
+          text="Offline-Karten konnten nicht geladen werden"
+          ursache={kartenQuery.error}
+          onWiederholen={() => void kartenQuery.refetch()}
         />
       ) : (
         <KatalogTabelle

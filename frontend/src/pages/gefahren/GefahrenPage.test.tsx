@@ -24,7 +24,7 @@ function handlers(gebiete: unknown[] = [gebiet], matrix: unknown[] = []) {
   ];
 }
 function renderPage() {
-  renderMitProviders(
+  return renderMitProviders(
     <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
     { route: '/einsaetze/1/gefahren' },
   );
@@ -40,10 +40,34 @@ describe('GefahrenPage', () => {
     expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
   });
 
-  it('zeigt Leerzustand ohne Gefahrengebiete', async () => {
+  /**
+   * Leerzustand (LFH-331 · B3). Der Ort der Handlung liegt woanders: ein
+   * Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte. Deshalb trägt der
+   * Leerzustand hier — anders als die reinen Karten-Listen — eine Primäraktion, und
+   * ihr Ziel kommt aus `routing/deeplinks.ts` (`lagekartePfad`), nicht als
+   * Vorlagentext von Hand.
+   *
+   * Die Knoten-Zusicherung ist die tragende: die Textzeile war vor dem Umbau grün.
+   */
+  it('zeigt Leerzustand ohne Gefahrengebiete — mit dem Weg zur Lagekarte', async () => {
     server.use(...handlers([]));
-    renderPage();
+    const { container } = renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+        {/* Zielsonde: belegt, dass der Knopf wirklich auf der Lagekarten-Route landet.
+            Ein Vergleich auf den String allein prüfte den Builder gegen sich selbst. */}
+        <Route path="/einsaetze/:id/lagekarte" element={<div>Kartenfläche</div>} />
+      </Routes>,
+      { route: '/einsaetze/1/gefahren' },
+    );
     expect(await screen.findByText(/keine Gefahrengebiete/i)).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeNull();
+    // Höchstens EINE Primäraktion (AK3) — und sie führt aus dem Leerzustand heraus.
+    const knoepfe = screen.getAllByRole('button');
+    expect(knoepfe).toHaveLength(1);
+    expect(knoepfe[0]).toHaveTextContent('Zur Lagekarte');
+    await userEvent.click(knoepfe[0]);
+    expect(await screen.findByText('Kartenfläche')).toBeInTheDocument();
   });
 
   it('bietet „Auf Karte zeigen" mit Reverse-Deeplink auf die Lagekarte (LFH-155)', async () => {

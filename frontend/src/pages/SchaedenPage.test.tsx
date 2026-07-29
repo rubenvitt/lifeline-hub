@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
+import { einsatzKeys } from '../api/queryKeys';
 import SchaedenPage from './SchaedenPage';
 
 class FakeEventSource {
@@ -292,5 +293,60 @@ describe('SchaedenPage', () => {
     })]);
     expect(await screen.findByText(/Geschädigt \(storniert\): R-007/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /R-007/ })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts — sie wäre
+   * auch grün, wenn der Umbau den Leertext bloß umformuliert hätte. Erst der Fall darunter
+   * mit demselben Literal macht sie zu einer Aussage über die Zustandsweiche.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/schaeden', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/schaeden' },
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.getByText('Schäden konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Schäden in dieser Sicht')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerer Menge den Leertext und KEINEN Fehler', async () => {
+    render(einsatzAktiv, []);
+
+    expect(await screen.findByText('Keine Schäden in dieser Sicht')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`. Der Ablauf ist der echte: geglückter Abruf, dann gescheiterte
+   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher ließe offen, ob TanStack nach
+   * einem HINTERGRUND-Fehlschlag überhaupt auf `error` stellt statt auf `success` zu bleiben.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    const { client } = render(einsatzAktiv, [basisSchaden()]);
+    await screen.findByText('S-001');
+
+    server.use(http.get('/api/einsaetze/1/schaeden', () => new HttpResponse(null, { status: 500 })));
+    await client.refetchQueries({ queryKey: einsatzKeys.schaeden(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('S-001')).toBeInTheDocument();
+    expect(screen.queryByText('Schäden konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 });

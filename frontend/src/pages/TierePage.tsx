@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Tabs, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from 
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
 import { filterTiere, type TiereSicht } from './tiere/tierHelfer';
@@ -175,17 +176,44 @@ export default function TierePage() {
     onError: fehler,
   });
 
+  /**
+   * SEITENZUSTAND — nur `einsatzQuery` (LFH-331 · B3, D3): Breadcrumb, Titelzeile und
+   * `darfImEinsatzSchreiben(...)` hängen an ihr, ohne sie gibt es keinen Rahmen. Deshalb
+   * hier ein Frühausstieg — und NUR hier. Der Wortlaut ist byte-gleich zum Bestand.
+   */
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const alle = tiereQuery.data ?? [];
   const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
+
+  /**
+   * LISTENZUSTAND — an der Stelle der Liste entschieden, nie als Frühausstieg (D3).
+   *
+   * Gemessen wird an `alle`, NICHT an `tiere`: die gefilterte Menge ist bei gesetztem
+   * Reiter oder Spezies-Filter regelmäßig leer, während Zeilen im Zwischenspeicher stehen —
+   * an ihr gemessen kippte die Seite bei jedem engen Filter in den Fehlerzweig und nähme dem
+   * Bediener die Schalter, mit denen er ihn wieder aufmachen könnte.
+   *
+   * Ohne Zeilen tritt der Fehler an die Stelle der Sicht, sonst behauptet „Keine Tiere in
+   * dieser Sicht" eine leere Menge, wo bloß der Abruf scheiterte. Mit Zeilen bleiben sie
+   * stehen und bekommen ein Banner: echt, nur womöglich alt. Der Ladezweig steht bewusst
+   * nicht hier, sondern am Primitiv (`ladend`).
+   */
+  const listeGescheitert = tiereQuery.isError && alle.length === 0;
+  const standVeraltet = tiereQuery.isError && alle.length > 0;
 
   return (
     <div>
@@ -222,55 +250,67 @@ export default function TierePage() {
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
-      <Datensicht
-        /**
-         * Vier Reiter, EINE Sichtstelle — der Schlüssel trägt deshalb die Statusachse.
-         * Ohne ihn steht dieselbe Instanz über allen vier Mengen: React sieht denselben
-         * Komponententyp an derselben Baumstelle und montiert nicht neu, sondern reicht
-         * weiter. Der Suchbegriff lebt IM Primitiv (`suchbegriff` in `Datensicht.tsx`) und
-         * filtert danach eine Menge, für die er nie gemeint war — im Reiter „Vermisst" nach
-         * einem Rufnamen gesucht, auf „Alle" gewechselt, und dort steht eine fremde Menge auf
-         * diesen Rufnamen zusammengestrichen. Kein Fehler, keine Warnung, nur fehlende
-         * Zeilen. Dieselbe Falle wurde an `PersonenPage` gemessen und dort ebenso behoben.
-         *
-         * Der Preis, und er ist hier kleiner als dort: der Remount trifft ALLEN Zustand des
-         * Primitivs — `suchbegriff` (den wollen wir), `eigeneSortierung`, `eigeneSpaltenAus`,
-         * `schleuse`. Das ist die Folge des Schlüssels, keine Auswahl; getrennt abschaltbar
-         * ist nichts davon. Die Sortierung ist dabei reines Beiwerk: `tierSpalten` ist EINE
-         * Modulkonstante über allen vier Reitern, ein Zurückfallen auf `standardSortierung`
-         * wäre also verzichtbar. Und `filterWerte` ist auf dieser Seite ohnehin tot — keine
-         * Spalte von `tierSpalten` trägt ein `filter`. Der Spaltenauswahl-Grund aus
-         * `PersonenPage` (je Reiter eine andere Spaltenliste) gilt hier NICHT und wird
-         * deshalb auch nicht behauptet.
-         *
-         * SPEZIES BEWUSST NICHT im Schlüssel, obwohl sie die Zeilenmenge genauso
-         * mitbestimmt. Sie ist die INNERE, häufig getastete Achse: `filterTiere`
-         * (`tiere/tierHelfer.ts`) bildet die Schnittmenge aus Status und Spezies, und der
-         * Suchplatzhalter unten nennt Rufname und Rasse — Suche und Spezies werden zusammen
-         * gestellt. Ein Remount an dieser Achse löschte den Begriff, den der Bediener eine
-         * Handlung vorher getippt hat, und wegen `allowClear` ein zweites Mal beim
-         * Zurücknehmen der Einengung. Der Reiter wechselt das Arbeitsfach, die Spezies engt
-         * darin ein; nur das Erste rechtfertigt das Wegwerfen.
-         *
-         * Der Guard (`components/datensicht.guard.test.ts`) entscheidet die Spezies-Frage
-         * NICHT: er prüft allein, ob der Schlüssel die Schalterachse `sicht` nennt — beide
-         * Varianten kämen durch. Die Entscheidung oben steht auf der Sache, nicht am Gate.
-         */
-        key={sicht}
-        bezeichnung="Tiere im Einsatz"
-        spalten={tierSpalten}
-        daten={tiere}
-        zeilenSchluessel="id"
-        ladend={tiereQuery.isLoading}
-        leerText="Keine Tiere in dieser Sicht"
-        suche={{ platzhalter: 'T-Nr., Rufname, Rasse' }}
-        // Spiegelt die Backend-Ordnung (`ORDER BY t.registrier_nr DESC`): das jüngste Tier
-        // oben. Die Sortierung liegt jetzt trotzdem im Client — der Sortierpfeil der Spalte
-        // dreht sie um, ohne einen Nachladevorgang.
-        standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
-        onZeileKlick={(t) => navigate(tiereDetailPfad(einsatzId, t.id))}
-        karte={tierKarte(einsatzId)}
-      />
+      {listeGescheitert ? (
+        <SeitenFehler
+          text="Tiere konnten nicht geladen werden"
+          ursache={tiereQuery.error}
+          onWiederholen={() => void tiereQuery.refetch()}
+        />
+      ) : (
+        <>
+          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void tiereQuery.refetch()} />}
+
+          <Datensicht
+            /**
+             * Vier Reiter, EINE Sichtstelle — der Schlüssel trägt deshalb die Statusachse.
+             * Ohne ihn steht dieselbe Instanz über allen vier Mengen: React sieht denselben
+             * Komponententyp an derselben Baumstelle und montiert nicht neu, sondern reicht
+             * weiter. Der Suchbegriff lebt IM Primitiv (`suchbegriff` in `Datensicht.tsx`) und
+             * filtert danach eine Menge, für die er nie gemeint war — im Reiter „Vermisst" nach
+             * einem Rufnamen gesucht, auf „Alle" gewechselt, und dort steht eine fremde Menge auf
+             * diesen Rufnamen zusammengestrichen. Kein Fehler, keine Warnung, nur fehlende
+             * Zeilen. Dieselbe Falle wurde an `PersonenPage` gemessen und dort ebenso behoben.
+             *
+             * Der Preis, und er ist hier kleiner als dort: der Remount trifft ALLEN Zustand des
+             * Primitivs — `suchbegriff` (den wollen wir), `eigeneSortierung`, `eigeneSpaltenAus`,
+             * `schleuse`. Das ist die Folge des Schlüssels, keine Auswahl; getrennt abschaltbar
+             * ist nichts davon. Die Sortierung ist dabei reines Beiwerk: `tierSpalten` ist EINE
+             * Modulkonstante über allen vier Reitern, ein Zurückfallen auf `standardSortierung`
+             * wäre also verzichtbar. Und `filterWerte` ist auf dieser Seite ohnehin tot — keine
+             * Spalte von `tierSpalten` trägt ein `filter`. Der Spaltenauswahl-Grund aus
+             * `PersonenPage` (je Reiter eine andere Spaltenliste) gilt hier NICHT und wird
+             * deshalb auch nicht behauptet.
+             *
+             * SPEZIES BEWUSST NICHT im Schlüssel, obwohl sie die Zeilenmenge genauso
+             * mitbestimmt. Sie ist die INNERE, häufig getastete Achse: `filterTiere`
+             * (`tiere/tierHelfer.ts`) bildet die Schnittmenge aus Status und Spezies, und der
+             * Suchplatzhalter unten nennt Rufname und Rasse — Suche und Spezies werden zusammen
+             * gestellt. Ein Remount an dieser Achse löschte den Begriff, den der Bediener eine
+             * Handlung vorher getippt hat, und wegen `allowClear` ein zweites Mal beim
+             * Zurücknehmen der Einengung. Der Reiter wechselt das Arbeitsfach, die Spezies engt
+             * darin ein; nur das Erste rechtfertigt das Wegwerfen.
+             *
+             * Der Guard (`components/datensicht.guard.test.ts`) entscheidet die Spezies-Frage
+             * NICHT: er prüft allein, ob der Schlüssel die Schalterachse `sicht` nennt — beide
+             * Varianten kämen durch. Die Entscheidung oben steht auf der Sache, nicht am Gate.
+             */
+            key={sicht}
+            bezeichnung="Tiere im Einsatz"
+            spalten={tierSpalten}
+            daten={tiere}
+            zeilenSchluessel="id"
+            ladend={tiereQuery.isLoading}
+            leerText="Keine Tiere in dieser Sicht"
+            suche={{ platzhalter: 'T-Nr., Rufname, Rasse' }}
+            // Spiegelt die Backend-Ordnung (`ORDER BY t.registrier_nr DESC`): das jüngste Tier
+            // oben. Die Sortierung liegt jetzt trotzdem im Client — der Sortierpfeil der Spalte
+            // dreht sie um, ohne einen Nachladevorgang.
+            standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
+            onZeileKlick={(t) => navigate(tiereDetailPfad(einsatzId, t.id))}
+            karte={tierKarte(einsatzId)}
+          />
+        </>
+      )}
 
       <Modal
         open={modus !== null}

@@ -47,6 +47,36 @@ function zustandVon(...queries: UseQueryResult<unknown>[]): Datenzustand {
   return 'daten';
 }
 
+/**
+ * Der Wortlaut des Ladezustands — an EINER Stelle, weil er im Band und in der
+ * Kennzahlenleiste dasselbe bedeuten muss (LFH-331 · B3).
+ *
+ * Er ersetzt den Gedankenstrich im Band: der stand dort während des Abrufs und
+ * bedeutet anderswo „kein Wert" — genau die Verwechslung von „lädt" und „ist
+ * nichts", gegen die dieses Ticket antritt.
+ */
+const LADETEXT = 'wird abgerufen';
+
+/**
+ * Die sechs Kennzahl-Etiketten, in der Reihenfolge aus `lagebild.ts`.
+ *
+ * Sie stehen hier ein zweites Mal, weil vor dem ersten Einsatz-Abruf gar kein
+ * Lagebild existiert und die Leiste ihre Plätze trotzdem stellen muss — sonst
+ * bleibt sie leer und sechs Knöpfe springen später herein (Prüfliste Kriterium 12,
+ * CLS ≤ 0,1). Die Doppelung ist gegen Drift abgesichert, nicht dem Zufall
+ * überlassen: `LageDashboardPage.test.tsx` pinnt BEIDE Reihen gegen dieselben
+ * handgeschriebenen Literale — die geladene Leiste und diese hier. Wandert eine
+ * Kennzahl, wird eine der beiden Prüfungen rot.
+ */
+const KENNZAHL_ETIKETTEN = [
+  'Kräfte F/UF/M//Σ',
+  'Patienten SK I–IV',
+  'Vermisst',
+  'Höchste Warnstufe',
+  'Schäden offen',
+  'UHS aktiv',
+] as const;
+
 function Plakette({ stufe, children }: { stufe: Dringlichkeit; children: React.ReactNode }) {
   return <span className={`lfh-plakette lfh-plakette--${stufe}`}>{children}</span>;
 }
@@ -279,7 +309,7 @@ export default function LageDashboardPage() {
           </div>
           <div className="lfh-band__wert">
             <span className="lfh-etikett">Einsatz</span>
-            <b className="lfh-band__titel">{einsatz?.bezeichnung ?? '—'}</b>
+            <b className="lfh-band__titel">{einsatz ? einsatz.bezeichnung : LADETEXT}</b>
           </div>
           <div className="lfh-band__wert">
             <span className="lfh-etikett">DTG</span>
@@ -302,9 +332,31 @@ export default function LageDashboardPage() {
           </div>
         </header>
 
-        {/* Kennzahlen — Wortlaut statt nackter Zähler */}
+        {/* Kennzahlen — Wortlaut statt nackter Zähler.
+            Vor dem ersten Einsatz-Abruf gibt es noch kein Lagebild und damit auch
+            keine Kennzahlen; die Leiste stand deshalb leer, und die Weiche je
+            Kennzahl darunter („····" / „?") konnte gar nicht greifen — sie hängt an
+            Knöpfen, die es zu diesem Zeitpunkt nicht gab. Die sechs Plätze stellt
+            die Leiste jetzt selbst, aus den festen Etiketten. */}
         <div className="lfh-kennzahlen">
-          {(lagebild?.kennzahlen ?? []).map((k, i) => {
+          {lagebild == null &&
+            KENNZAHL_ETIKETTEN.map((etikett) => (
+              <div
+                key={etikett}
+                className="lfh-kz"
+                aria-busy="true"
+                // Der Platz ist kein Knopf: es gibt noch nichts, wohin er führen
+                // könnte. `.lfh-kz` trägt seine Geometrie und den Zeigerwechsel in
+                // einem — der wird hier zurückgenommen, damit der Platz nicht
+                // anbietet, was er nicht kann.
+                style={{ cursor: 'default' }}
+              >
+                <span className="lfh-etikett">{etikett}</span>
+                <b className="lfh-zahl lfh-zahl--gross">····</b>
+                <span className="lfh-zusatz">{LADETEXT}</span>
+              </div>
+            ))}
+          {lagebild?.kennzahlen.map((k, i) => {
             const z = kennzahlZustaende[i] ?? 'daten';
             return (
               <button

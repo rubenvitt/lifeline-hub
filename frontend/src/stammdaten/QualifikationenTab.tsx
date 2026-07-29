@@ -3,6 +3,7 @@ import {
   type TableColumnsType,
 } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -99,20 +100,33 @@ export default function QualifikationenTab() {
           Qualifikation anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={query.isLoading}
-        dataSource={query.data ?? []}
-        columns={spalten}
-        /**
-         * Kein Filter in dieser Tabelle, und das ist kein Versäumnis: der Katalog hat weder
-         * Status noch Kategorie, und die einzige Zustandsspalte `aktiv` siebt schon der
-         * Server aus (`src/personal/qualifikation_repo.rs:55` — `WHERE … aktiv = 1`).
-         * Ein Trichter über zwei Spalten, von denen eine eine Zahl ist, wäre Zierrat.
-         */
-        suche={{ platzhalter: 'Label' }}
-        locale={{ emptyText: 'Keine Qualifikationen' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Keine Qualifikationen" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {query.isError ? (
+        <SeitenFehler
+          text="Qualifikationen konnten nicht geladen werden"
+          ursache={query.error}
+          onWiederholen={() => void query.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={query.isLoading}
+          dataSource={query.data ?? []}
+          columns={spalten}
+          /**
+           * Kein Filter in dieser Tabelle, und das ist kein Versäumnis: der Katalog hat weder
+           * Status noch Kategorie, und die einzige Zustandsspalte `aktiv` siebt schon der
+           * Server aus (`src/personal/qualifikation_repo.rs:55` — `WHERE … aktiv = 1`).
+           * Ein Trichter über zwei Spalten, von denen eine eine Zahl ist, wäre Zierrat.
+           */
+          suche={{ platzhalter: 'Label' }}
+          locale={{ emptyText: 'Keine Qualifikationen' }}
+        />
+      )}
       <Modal
         open={modalOffen}
         title={bearbeite ? 'Qualifikation bearbeiten' : 'Qualifikation anlegen'}

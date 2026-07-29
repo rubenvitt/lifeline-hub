@@ -7,7 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
-import LagekartePage from './LagekartePage';
+import LagekartePage, { quellenMeldung } from './LagekartePage';
 
 // URL.createObjectURL / revokeObjectURL fehlen in jsdom → Stubs definieren bevor Tests laufen.
 // Direkt auf URL setzen (nicht via spyOn, da die Methoden in jsdom gar nicht existieren).
@@ -224,6 +224,22 @@ const FUEHRUNGSKRAFT_VERORTET = {
 
 const ORG_DRK = { id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' };
 
+// Einsatz-Einstellungen: die Seite liest davon heute nichts, die Query läuft aber (Render-
+// Kontext für Anzeigekonventionen). Ohne Handler beantwortete MSW sie mit einem Netzwerkfehler
+// und `einstellungenQuery` stand in JEDEM Test dieser Datei auf `isError` (LFH-331 · B3).
+const EINSTELLUNGEN = {
+  einsatz_id: 1,
+  standard_modul: null,
+  basemap_modus: null,
+  karten_zoom_start: null,
+  fachebenen_sichtbar: null,
+  zeitzone: null,
+  zeitformat: null,
+  einheiten: null,
+  koordinatenformat: null,
+  org_defaults: { org_id: 1 },
+};
+
 function basisHandler(
   extra: ReturnType<typeof http.get>[] = [],
   config: KarteServerConfig = {
@@ -250,8 +266,11 @@ function basisHandler(
     http.get('/api/einsaetze/1/freie-zeichen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
+    http.get('/api/einsaetze/1/einstellungen', () => HttpResponse.json(EINSTELLUNGEN)),
+    http.get('/api/einsaetze/1/lage-snapshots', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([])),
     // LFH-319: Standardansicht mit basemap_modus=null → useKartenAnsicht hydratisiert auf
     // den config-Verfügbarkeits-Default (wie vor der Kartenansichten-Umstellung).
@@ -290,6 +309,150 @@ function renderSeiteMitSonde(route: string) {
     { route },
   );
 }
+
+/**
+ * AK6 (LFH-331 · B3) — das Warn-Overlay der Lagekarte.
+ *
+ * Der Zweck des Overlays ist der unsichtbare Ausfall: fehlt eine Domänen-Quelle, fehlen ihre
+ * Objekte auf der Karte, und eine Karte ohne Objekt sieht aus wie eine Lage ohne Objekt.
+ * Deshalb nennt es die Quelle namentlich.
+ *
+ * Das Paar aus „ist da" und „ist nicht da" trägt hier doppelt: es ist die AK4-Partnerklammer
+ * UND der Beleg, dass die drei nachgetragenen MSW-Handler (gefahrengebiete, einstellungen,
+ * lage-snapshots) wirklich gefehlt haben. Ohne sie stünden drei Quellen in JEDEM Test dieser
+ * Datei auf Fehler (`onUnhandledRequest: 'error'` + `retry: false`), und der Negativfall unten
+ * wäre unerreichbar.
+ */
+describe('quellenMeldung', () => {
+  it('zählt bis drei Namen auf', () => {
+    expect(quellenMeldung(['Zonen'])).toBe('Lagebild unvollständig: Zonen');
+    expect(quellenMeldung(['Zonen', 'Personal', 'Fahrzeuge'])).toBe(
+      'Lagebild unvollständig: Zonen, Personal, Fahrzeuge',
+    );
+  });
+
+  it('kürzt darüber hinaus — die vierte Quelle wird zur Zahl', () => {
+    // Die Einzahl steht ausgeschrieben da: „und 1 weitere" ist kein deutscher Satz, und
+    // genau dieser Grenzfall wird über die Seite nie erreicht (dort scheitern 1 oder alle 11).
+    expect(quellenMeldung(['A', 'B', 'C', 'D'])).toBe('Lagebild unvollständig: A, B, C und eine weitere');
+    expect(quellenMeldung(['A', 'B', 'C', 'D', 'E'])).toBe('Lagebild unvollständig: A, B, C und 2 weitere');
+  });
+});
+
+describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
+  it('zeigt bei vollständig geladenem Lagebild KEIN Warn-Overlay', async () => {
+    basisHandler();
+    renderSeite();
+    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByTestId('lagebild-unvollstaendig')).not.toBeInTheDocument();
+  });
+
+  it('nennt die gescheiterte Quelle namentlich und trägt KEINEN Schließen-Knopf', async () => {
+    basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
+    renderSeite();
+    const overlay = await screen.findByTestId('lagebild-unvollstaendig');
+    expect(overlay).toHaveTextContent('Lagebild unvollständig: Unfallhilfsstellen');
+    // Positiver Partner (F2) zur Negativen im Historien-Test unten: ohne ihn wäre der
+    // Live-Satz des Overlays ungepinnt, und ein „nicht da" über einen Text, den niemand
+    // je als „da" zusichert, belegt nichts. Der Titel kann die Wendung nicht erzeugen —
+    // dort steht nur „Lagebild unvollständig: <Quellen>", ohne „, nicht leer".
+    expect(overlay).toHaveTextContent('unvollständig, nicht leer');
+    // Die eigentliche AK6-Zusicherung: das Overlay ist NICHT wegklickbar. Geprüft wird die
+    // Abwesenheit JEDES Knopfes — „bleibt nach einem Klick stehen" wäre nicht widerlegbar,
+    // weil es gar keinen Codepfad gäbe, der es entfernen könnte.
+    expect(within(overlay).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('kürzt bei Totalausfall auf drei Namen plus Restzähler', async () => {
+    // Backend weg: alle elf Lagebild-Quellen scheitern. Eine vollständige Aufzählung wäre auf
+    // dem Fükw-Schirm unlesbar; die Zahl trägt die Aussage „alles", die Namen den Einstieg.
+    basisHandler(
+      [
+        '/api/einsaetze/1',
+        '/api/einsaetze/1/uhs',
+        '/api/einsaetze/1/schaeden',
+        '/api/einsaetze/1/einheiten',
+        '/api/einsaetze/1/fahrzeuge',
+        '/api/einsaetze/1/abschnitte',
+        '/api/einsaetze/1/zonen',
+        '/api/einsaetze/1/freie-zeichen',
+        '/api/einsaetze/1/gefahrengebiete',
+        '/api/einsaetze/1/lage/meldungen',
+        '/api/einsaetze/1/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => new HttpResponse(null, { status: 500 }))),
+    );
+    renderSeite();
+    const overlay = await screen.findByTestId('lagebild-unvollstaendig');
+    expect(overlay).toHaveTextContent(
+      'Lagebild unvollständig: Einsatzdaten, Unfallhilfsstellen, Schäden und 8 weitere',
+    );
+  });
+
+  it('sagt im Historien-Modus, dass die Karte LEER ist — nicht bloß unvollständig', async () => {
+    // Scheitert das Snapshot-Dokument, sind ALLE Rohlisten undefined: die Karte ist nicht
+    // lückenhaft, sie ist leer. Der Live-Satz „unvollständig, nicht leer" wäre hier schlicht
+    // falsch — und dieser Pfad ist real, nicht hypothetisch (die Live-Queries sind im
+    // Historien-Modus abgeschaltet, es gibt keinen Ersatzstand).
+    basisHandler([
+      http.get('/api/einsaetze/1/lage-snapshots/3', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    renderSeite('/einsaetze/1/lagekarte?snapshot=3');
+    const overlay = await screen.findByTestId('lagebild-unvollstaendig');
+    expect(overlay).toHaveTextContent('Gesicherter Stand');
+    expect(overlay).toHaveTextContent('die Karte ist leer, nicht aktuell');
+    expect(overlay).not.toHaveTextContent('unvollständig, nicht leer');
+  });
+});
+
+/**
+ * Die zwei Sektionen mit EIGENER Query. Sie stehen nicht im Overlay (das spricht für das
+ * Lagebild), und sie scheiterten bisher spurlos: eine leere Bilderliste sieht aus wie „kein
+ * Lageplan hinterlegt", und `AnsichtSwitcher` rendert bei leerer Liste gar nichts.
+ */
+describe('LagekartePage · Fehler-Slots der Sidebar', () => {
+  it('verdrahtet den Slot an „Nicht verortet" mit denselben Lagebild-Quellen wie das Overlay', async () => {
+    // Derselbe 500er wie im AK6-Test: die Seitenverdrahtung war bisher nirgends geprüft —
+    // `Sidebar.test.tsx` reicht den Slot als selbstgebauten Prop-Wert herein und kann daher
+    // nicht sehen, ob die Seite ihn je füllt.
+    basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
+    renderSeite();
+    expect(await screen.findByText('Objektlisten konnten nicht geladen werden')).toBeInTheDocument();
+    // Die unterscheidende Zusicherung: ohne die Verdrahtung ist `nichtVerortet` schlicht
+    // leer (die Quelle ist ja tot) und die Sektion behauptete „Alles verortet" — eine
+    // Erfolgsaussage über Daten, die niemand geladen hat.
+    expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
+    // Section-lokal, nicht seitenweit: der Sektionskopf steht weiterhin da. Geprüft wird
+    // das Verhalten, nicht der DOM-Aufbau der Sidebar — kein Griff in die Card-Struktur.
+    expect(screen.getByText('⚠ Nicht verortet')).toBeInTheDocument();
+  });
+
+  it('meldet die gescheiterte Bilder-Query in ihrer Sektion', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/hintergrundbilder', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
+    // Kein Lagebild-Fehler → kein Overlay. Der Slot ersetzt es nicht, er ergänzt es.
+    expect(screen.queryByTestId('lagebild-unvollstaendig')).not.toBeInTheDocument();
+  });
+
+  it('meldet die gescheiterte Ansichts-Query in ihrer Sektion', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/karten-ansichten', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('Kartenansichten konnten nicht geladen werden')).toBeInTheDocument();
+  });
+
+  it('ohne Fehler trägt die Sidebar keinen der drei Slots', async () => {
+    basisHandler();
+    renderSeite();
+    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bild-Hintergründe konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kartenansichten konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+});
 
 describe('LagekartePage', () => {
   it('zeigt die Nicht-verortet-Liste mit Anzahl-Badge', async () => {

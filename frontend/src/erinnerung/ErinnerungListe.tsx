@@ -1,4 +1,4 @@
-import { Empty } from 'antd';
+import { SeitenLeer } from '../components/SeitenZustand';
 import type { Erinnerung } from '../api/types';
 import ErinnerungKarte from './ErinnerungKarte';
 
@@ -16,7 +16,7 @@ export interface ErinnerungListeProps {
 export default function ErinnerungListe({
   erinnerungen, ansicht = 'offen', darfSchreiben, onErledigen, onQuittieren,
 }: ErinnerungListeProps) {
-  if (erinnerungen.length === 0) return <Empty description="Keine Erinnerungen" />;
+  if (erinnerungen.length === 0) return <SeitenLeer titel="Keine Erinnerungen" />;
   return (
     <>
       {erinnerungen.map((e) => (

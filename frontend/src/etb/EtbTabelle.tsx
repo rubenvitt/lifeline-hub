@@ -1,5 +1,6 @@
 import { Button, Space, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { ReactNode } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
 import KatalogTabelle from '../components/KatalogTabelle';
 import Markdown from '../components/Markdown';
@@ -23,10 +24,25 @@ interface Props {
   onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, erscheint je Eintrag eine „Auftrag erteilen"-Aktion (ETB→Auftrag, LFH-112). */
   onAuftragErteilen?: (eintrag: EtbEintragAnzeige) => void;
+  /**
+   * Der Abruf läuft noch. Wird bis an antds `Table` durchgereicht (LFH-331 · B3).
+   *
+   * Optional wie die beiden folgenden Angaben — die acht Bestandsfälle in
+   * `EtbTabelle.test.tsx` rendern die Chronologie ohne Zustandsangabe, ein Pflichtfeld
+   * bräche dort schon den Typcheck.
+   */
+  ladend?: boolean;
+  /** Der Abruf ist gescheitert. Trägt allein die Unterdrückung unten — die Meldung selbst
+   *  gehört der Seite (Spec-Festlegung D3). */
+  fehler?: boolean;
+  /** Was anstelle der Zeilen steht, wenn keine da sind. Die Seite baut ihn, weil erst dort
+   *  bekannt ist, ob ein Filter aktiv ist und ob der Benutzer erfassen darf. */
+  leerText?: ReactNode;
 }
 
 export default function EtbTabelle({
   eintraege, einsatzId, highlightId, onBerichtigen, onWiedervorlage, onAuftragErteilen,
+  ladend, fehler, leerText,
 }: Props) {
   // Map id → lfd_nr, um Berichtigungs-Ziele auf ihre laufende Nummer aufzulösen.
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
@@ -126,6 +142,25 @@ export default function EtbTabelle({
     });
   }
 
+  /**
+   * Solange geladen wird oder der Abruf gescheitert ist, wird über die Menge nichts
+   * behauptet — Hausvorbild `components/Liste.tsx`, das seit je so gebaut ist. Ohne die
+   * Weiche blitzte „Noch keine Einträge." hinter dem Ladebalken bzw. unter der
+   * Fehlermeldung auf und behauptete ein leeres Tagebuch, wo bloß die Verbindung riss.
+   *
+   * Die Fehlerhälfte ist der Teil, den die zentrale Regel im Tabellen-Primitiv NICHT
+   * abdeckt (Spec-Festlegung D4, die das Tagebuch namentlich nennt): das ETB tauscht
+   * seine Tabelle im Fehlerfall bewusst NICHT aus, sondern behält sie mit der Meldung
+   * darüber montiert — bereits geladene Einträge bleiben lesbar. Genau deshalb ist die
+   * Unterdrückung hier auch prüfbar: die Zusicherung „Leertext nicht im DOM" belegt eine
+   * Entscheidung und nicht bloß eine abwesende Komponente (Spec §3/F2).
+   *
+   * `null` statt `undefined`: antd wertet `locale.emptyText` per `typeof` aus — `undefined`
+   * fällt auf sein Standard-Leerbild zurück, `null` wird als „nichts" übernommen (gemessen
+   * an `antd/es/table/InternalTable.js`).
+   */
+  const leer = ladend || fehler ? null : leerText;
+
   return (
     // Über das geteilte Primitiv statt roh (LFH-329 · B1, Gate-1-Abschluss):
     // die Chronologie ist mit sieben Spalten breiter als ein Handschirm und
@@ -136,6 +171,8 @@ export default function EtbTabelle({
       rowKey="id"
       columns={spalten}
       dataSource={eintraege}
+      loading={ladend}
+      locale={{ emptyText: leer }}
       pagination={false}
       rowClassName={(e) =>
         [

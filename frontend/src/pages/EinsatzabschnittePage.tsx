@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Card, Descriptions, Empty, Form, Input, Popconfirm, Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Descriptions, Form, Input, Popconfirm, Space, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,6 +17,7 @@ import type { Einsatzabschnitt, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
+import { SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
@@ -162,14 +163,43 @@ export default function EinsatzabschnittePage() {
         { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
       );
 
-  if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  }
+  // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
+  //
+  // SEITENZUSTAND — nur `einsatzQuery`. Ohne sie rendern weder Breadcrumb noch
+  // `darfImEinsatzSchreiben(...)`, also gibt es hier nichts zu zeigen als Ladebild oder
+  // Fehler. Nur diese Query rechtfertigt einen Frühausstieg.
+  //
+  // LISTENZUSTAND — `abschnitteQuery` und alles Weitere. Diese Queries entscheiden an der
+  // Stelle, an der ihre Daten stehen (siehe Gliederungs-Karte unten), NIE als Frühausstieg:
+  // sonst reißt ein gescheiterter Nebenabruf die ganze Seite weg, obwohl der Rest bedienbar
+  // bliebe.
+  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+
+  /**
+   * LISTENZUSTAND der Gliederungs-Karte — zwei Lagen, zwei Antworten (D3). Der Fehler
+   * allein reicht als Bedingung NICHT.
+   *
+   * Ohne Abschnitte im Zwischenspeicher tritt der Fehler an die Stelle des Baums. MIT
+   * Abschnitten bleibt der Baum stehen und bekommt ein Banner: er ist echt, nur womöglich
+   * alt. Ein Fehler, der ihn wegräumt, nähme der Einsatzkraft die Gliederung, die sie eben
+   * noch vor sich hatte — und mit ihr die Auswahl, über die die rechte Karte lebt. Genau
+   * das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`).
+   */
+  const listeGescheitert = abschnitteQuery.isError && abschnitte.length === 0;
+  const standVeraltet = abschnitteQuery.isError && abschnitte.length > 0;
 
   const einheitenListe = (
     <>
@@ -211,17 +241,49 @@ export default function EinsatzabschnittePage() {
 
       <div style={{ display: 'flex', gap: 16 }}>
         <Card style={{ flex: '0 0 360px' }} size="small" title="Gliederung">
-          {abschnitte.length === 0 ? (
-            <Empty description="Noch keine Abschnitte" />
+          {/* Drei Zustände, in dieser Reihenfolge (LFH-331 · B3). Vorher stand hier eine
+              einzige Weiche auf die Länge der Liste — die ist während des Ladens und im
+              Fehlerfall genauso wahr wie bei einer wirklich leeren Gliederung. Die Seite
+              behauptete damit „keine Abschnitte", wenn bloß die Verbindung abgerissen war.
+              Solange geladen wird, wird über die Menge nichts behauptet.
+
+              Der Fehlerzweig trägt zusätzlich die MENGENBEDINGUNG (`listeGescheitert`):
+              er verdrängt den Baum nur, wenn es keinen gibt. Steht einer im
+              Zwischenspeicher, bleibt er und bekommt das Veraltet-Banner (unten). */}
+          {abschnitteQuery.isLoading ? (
+            <SeitenSkeleton />
+          ) : listeGescheitert ? (
+            <SeitenFehler
+              text="Abschnitte konnten nicht geladen werden"
+              ursache={abschnitteQuery.error}
+              onWiederholen={() => void abschnitteQuery.refetch()}
+            />
+          ) : abschnitte.length === 0 ? (
+            <SeitenLeer
+              titel="Noch keine Abschnitte"
+              hinweis="Gliedere die Lage in Abschnitte, um Einheiten und Führung zuzuordnen."
+              /* Derselbe Wortlaut wie der Kopfknopf: eine zweite Schreibweise für dieselbe
+                 Geste wäre der Befund, den B3 behebt. Ohne Schreibrecht keine Aktion — ein
+                 Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
+              aktion={darfSchreiben ? { label: 'Abschnitt anlegen', onClick: () => anlegen.mutate() } : undefined}
+            />
           ) : (
-            <Tree treeData={baumDaten} selectedKeys={gewaehlt != null ? [gewaehlt] : []} defaultExpandAll
-              onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)} />
+            <>
+              {standVeraltet && (
+                <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
+              )}
+              <Tree treeData={baumDaten} selectedKeys={gewaehlt != null ? [gewaehlt] : []} defaultExpandAll
+                onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)} />
+            </>
           )}
         </Card>
 
         <Card style={{ flex: 1 }} size="small" title={aktuell ? `Abschnitt: ${aktuell.name}` : 'Kein Abschnitt gewählt'}>
+          {/* KEIN Leerzustand, sondern eine Aufforderung bei fehlender Auswahl: die Menge
+              kann voll sein, es fehlt nur die Wahl. Deshalb ausdrücklich ohne Aktion — es
+              gibt nichts zu beheben, nur etwas anzuklicken. */}
           {!aktuell ? (
-            <Empty description="Wähle einen Abschnitt im Baum" />
+            <SeitenLeer titel="Wähle einen Abschnitt im Baum" />
           ) : bearbeiten ? (
             <Form<AbschnittWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
               <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>

@@ -225,6 +225,58 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
     [zonen, zeigeZonen, gebietWarnstufe, token],
   );
 
+  // Benannter Quellenkatalog (LFH-331 · B3): Query-Zustand → der Name, unter dem eine
+  // Einsatzkraft die Quelle kennt. Er wird IM Callback gebaut, nicht daneben — ein außen
+  // gebautes Array hätte pro Render neue Identität, die Memoisierung liefe leer und die
+  // Abhängigkeitsprüfung verlangte es trotzdem in der Liste. Verglichen werden deshalb die
+  // `isError`-BOOLEANS.
+  //
+  // NICHT im Katalog: `organisation`, `karte/config` und `einstellungen`. Sie sind
+  // Render-Kontext, kein Lagebild — ihr Ausfall lässt kein Objekt von der Karte
+  // verschwinden. `karte/config` hat mit dem Basemap-Fallback bereits einen eigenen
+  // sichtbaren Ausfallpfad („Keine Basemap konfiguriert …" in der Sidebar); ein zweiter,
+  // widersprechender Text daneben verwirrt mehr, als er meldet. `organisation` liefert nur
+  // den TZ-Vorgabewert — sein Ausfall zeichnet ein taktisches Zeichen mit der
+  // Vorgabe-Organisation statt mit der eigenen, aber es fehlt nichts. Und `einstellungen`
+  // trägt Anzeigekonventionen (Koordinatenformat, Zeitzone), keinen Kartengegenstand.
+  //
+  // Die live/snapshot-Weiche spiegelt `ladt`: im Historien-Modus sind alle elf Live-Queries
+  // abgeschaltet, die EINE Quelle ist das eingefrorene Dokument.
+  const fehlerhafteQuellen = useMemo<string[]>(() => {
+    if (istSnapshot) return snapQuery.isError ? ['Gesicherter Stand'] : [];
+    const katalog: [string, boolean][] = [
+      ['Einsatzdaten', einsatzQuery.isError],
+      ['Unfallhilfsstellen', uhsQuery.isError],
+      ['Schäden', schaedenQuery.isError],
+      ['Einheiten', einheitenQuery.isError],
+      ['Fahrzeuge', fahrzeugeQuery.isError],
+      ['Einsatzabschnitte', abschnitteQuery.isError],
+      ['Zonen', zonenQuery.isError],
+      ['Taktische Zeichen', freieZeichenQuery.isError],
+      ['Gefahrengebiete', gebieteQuery.isError],
+      ['Lagemeldungen', lageMeldungenQuery.isError],
+      ['Personal', fkQuery.isError],
+    ];
+    return katalog.filter(([, kaputt]) => kaputt).map(([name]) => name);
+  }, [
+    istSnapshot, snapQuery.isError,
+    einsatzQuery.isError, uhsQuery.isError, schaedenQuery.isError, einheitenQuery.isError,
+    fahrzeugeQuery.isError, abschnitteQuery.isError, zonenQuery.isError, freieZeichenQuery.isError,
+    gebieteQuery.isError, lageMeldungenQuery.isError, fkQuery.isError,
+  ]);
+
+  // Erneuter Abruf: gezielt nur die GESCHEITERTEN Quellen. Ein pauschales Invalidieren träfe
+  // auch die elf gesunden Listen und liefe im Historien-Modus gegen abgeschaltete Queries.
+  // Bewusst KEIN Namenskatalog hier — die Namen leben genau einmal, oben.
+  const neuLaden = () => {
+    for (const q of [
+      snapQuery, einsatzQuery, uhsQuery, schaedenQuery, einheitenQuery, fahrzeugeQuery,
+      abschnitteQuery, zonenQuery, freieZeichenQuery, gebieteQuery, lageMeldungenQuery, fkQuery,
+    ]) {
+      if (q.isError) void q.refetch();
+    }
+  };
+
   const lageMeldungMarker = useMemo(
     () => baueLageMeldungMarker(lageMeldungenRoh ?? []),
     [lageMeldungenRoh],
@@ -261,6 +313,12 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
     // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine disabled
     // Live-Query meldet isLoading=false → sonst „fertig geladen" bei leerem Dokument, Marker-Pop-in).
     ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,
+    // Namen der Lagebild-Quellen, deren Abruf scheiterte (LFH-331 · B3) — leer = vollständig.
+    // Die Kürzung für die Anzeige liegt bewusst NICHT hier: sie ist Darstellung, und ein Hook,
+    // der schon kürzt, nähme der Seite die Wahl (und dem Test die Zählbarkeit).
+    fehlerhafteQuellen,
+    /** Erneuter Abruf genau der gescheiterten Quellen. */
+    neuLaden,
     config: configQuery.data,
     einstellungen: einstellungenQuery.data,
     einstellungenLaedt: einstellungenQuery.isLoading,

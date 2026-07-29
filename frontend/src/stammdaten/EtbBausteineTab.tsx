@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -86,19 +87,32 @@ export default function EtbBausteineTab() {
           Baustein anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={query.isLoading}
-        dataSource={query.data ?? []}
-        columns={spalten}
-        /**
-         * Label UND Inhalt sind genannt, weil beide echten Fließtext tragen und die Suche des
-         * Primitivs die Rohwerte aller Spalten mit Datenbezug liest — den Baustein sucht man
-         * mal am Namen, mal an einer Wendung aus dem Text.
-         */
-        suche={{ platzhalter: 'Label oder Inhalt' }}
-        locale={{ emptyText: 'Keine Bausteine' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Keine Bausteine" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {query.isError ? (
+        <SeitenFehler
+          text="ETB-Bausteine konnten nicht geladen werden"
+          ursache={query.error}
+          onWiederholen={() => void query.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={query.isLoading}
+          dataSource={query.data ?? []}
+          columns={spalten}
+          /**
+           * Label UND Inhalt sind genannt, weil beide echten Fließtext tragen und die Suche des
+           * Primitivs die Rohwerte aller Spalten mit Datenbezug liest — den Baustein sucht man
+           * mal am Namen, mal an einer Wendung aus dem Text.
+           */
+          suche={{ platzhalter: 'Label oder Inhalt' }}
+          locale={{ emptyText: 'Keine Bausteine' }}
+        />
+      )}
       <EtbBausteinFormModal offen={modalOffen} baustein={bearbeite} onClose={() => setModalOffen(false)} />
     </>
   );

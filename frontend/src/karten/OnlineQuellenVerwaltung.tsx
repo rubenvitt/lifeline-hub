@@ -1,5 +1,6 @@
-import { Alert, App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -154,12 +155,15 @@ export default function OnlineQuellenVerwaltung() {
           <Button onClick={() => setKatalogOffen(true)}>Aus Katalog hinzufügen</Button>
         </Space>
       )}
+      {/* Wiederholt wird GENAU diese Query, nicht der ganze Karten-Zweig: `invalidiereKarte`
+          zöge Katalog und Karten-Config mit, die beide nicht gescheitert sind. Die Zusage aus
+          dem früheren Kommentar hier — Knopf samt Test mit AK1 — ist mit dem Partnerpaar in
+          `OnlineQuellenVerwaltung.test.tsx` eingelöst (LFH-331 · B3). */}
       {quellenQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          title="Online-Quellen konnten nicht geladen werden"
-          description={quellenQuery.error instanceof ApiError ? quellenQuery.error.message : undefined}
+        <SeitenFehler
+          text="Online-Quellen konnten nicht geladen werden"
+          ursache={quellenQuery.error}
+          onWiederholen={() => void quellenQuery.refetch()}
         />
       ) : (
         <KatalogTabelle

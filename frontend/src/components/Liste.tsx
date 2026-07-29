@@ -1,6 +1,7 @@
-import { Empty, Spin, theme } from 'antd';
+import { Spin, theme } from 'antd';
 import { createContext, useContext } from 'react';
 import type { CSSProperties, Key, ReactNode } from 'react';
+import { SeitenLeer } from './SeitenZustand';
 
 /**
  * Schlanker, nicht-deprecated Ersatz für antd `<List>` (LFH-167).
@@ -76,11 +77,20 @@ export function Liste<T>({
 
   const headerPaddingInline = bordered ? (size === 'small' ? token.padding : token.paddingLG) : 0;
 
-  // antd `List`: bei gesetztem `emptyText` nur den Text zeigen (`.ant-list-empty-text`), sonst
-  // das Standard-`<Empty>` (simple image) als Fallback — beides in derselben zentrierten Box.
-  // Während `loading` wird der Leer-Zustand unterdrückt (wie antd), damit kein Empty hinter
-  // dem Spinner aufblitzt, solange noch keine Daten da sind.
-  const leer = loading ? null : (
+  // Zwei Wege, wie antds `List`: mit `emptyText` steht nur dieser Text in der zentrierten
+  // Box; ohne ihn trug der Fallback bis LFH-331 (B3) antds eigenes Leer-Element mit Bild.
+  // Das ist jetzt `SeitenLeer` — dasselbe Primitiv, das alle übrigen Leerzustände tragen,
+  // und damit dieselbe Form für dieselbe Tatsache.
+  //
+  // Der Fallback-Titel bleibt „Keine Daten": genau das zeigten die zehn Masken in
+  // Produktion schon vorher (`ConfigProvider locale={deDE}`). Der Umzug ist am Wortlaut
+  // also folgenlos — er tauscht den Knoten, nicht die Aussage. Wer einer Maske eine echte
+  // Aussage geben will, setzt `emptyText`; dafür ist die Prop da.
+  //
+  // Die Ladeunterdrückung darüber bleibt unverändert und lebt hier an genau EINER Stelle
+  // (B3/D4): solange geladen wird, wird nichts über die Menge behauptet — sonst blitzte
+  // der Leerzustand hinter dem Spinner auf, bevor überhaupt Daten da sein können.
+  const leer = loading ? null : emptyText != null ? (
     <div
       style={{
         padding: token.padding,
@@ -89,8 +99,10 @@ export function Liste<T>({
         textAlign: 'center',
       }}
     >
-      {emptyText != null ? emptyText : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ margin: 0 }} />}
+      {emptyText}
     </div>
+  ) : (
+    <SeitenLeer titel="Keine Daten" />
   );
 
   // Items als `<ul>/<li>` (list/listitem-Rolle wie antds `List` — Screenreader-Semantik erhalten).

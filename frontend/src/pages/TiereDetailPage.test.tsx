@@ -305,6 +305,6 @@ describe('TiereDetailPage — Robustheit', () => {
       http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
     ]);
     expect(await screen.findByText('Tier konnte nicht geladen werden')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 });

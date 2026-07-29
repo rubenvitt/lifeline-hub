@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Empty, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Space, Spin, Tag, Typography } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -13,6 +13,7 @@ import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
+import { SeitenLeer } from '../../components/SeitenZustand';
 
 export default function GefahrenPage() {
   const { id } = useParams();
@@ -80,7 +81,24 @@ export default function GefahrenPage() {
   if (gebieteQuery.isError) return <Alert type="error" title="Gefahrengebiete konnten nicht geladen werden" showIcon />;
 
   if (gebiete.length === 0) {
-    return <Empty description="Noch keine Gefahrengebiete – auf der Lagekarte ein Gefahrengebiet zeichnen." style={{ marginTop: 64 }} />;
+    /**
+     * Der Ort der Handlung liegt woanders (LFH-331 · B3): ein Gefahrengebiet entsteht
+     * durch Zeichnen auf der Lagekarte, nicht auf dieser Seite. Deshalb trägt dieser
+     * Leerzustand — anders als die reinen Kartenlisten — eine Primäraktion, und ihr Ziel
+     * kommt aus `routing/deeplinks.ts`, nicht als Vorlagentext von Hand.
+     *
+     * Der Wortlaut ist derselbe wie vorher, nur auf Aussage und Hinweis aufgeteilt; die
+     * Aufforderung „zeichnen" gehört jetzt an den Knopf, der auch dorthin führt.
+     */
+    return (
+      <div style={{ marginTop: 64 }}>
+        <SeitenLeer
+          titel="Noch keine Gefahrengebiete"
+          hinweis="Auf der Lagekarte ein Gefahrengebiet zeichnen."
+          aktion={{ label: 'Zur Lagekarte', pfad: lagekartePfad(einsatzId) }}
+        />
+      </div>
+    );
   }
 
   const aktuell = gebiete.find((g) => g.id === gewaehlt);

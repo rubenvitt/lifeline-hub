@@ -18,10 +18,10 @@ const typen = [
   { id: 2, label: 'Sonstige', soll: null, sortier: 50 },
 ];
 
-function render(benutzer: typeof admin) {
+function render(benutzer: typeof admin, katalog = typen) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
-    http.get('/api/einheit-typen', () => HttpResponse.json(typen)),
+    http.get('/api/einheit-typen', () => HttpResponse.json(katalog)),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -73,5 +73,33 @@ describe('EinheitTypenTab', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Typ anlegen' })).not.toBeInTheDocument(),
     );
+  });
+
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
+   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
+   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
+   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <EinheitTypenTab />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Kein Einheitstyp')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    render(admin, []);
+
+    expect(await screen.findByText('Kein Einheitstyp')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 });

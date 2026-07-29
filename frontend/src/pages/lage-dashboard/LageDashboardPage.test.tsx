@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { delay, http, HttpResponse } from 'msw';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -161,13 +161,22 @@ interface Daten {
   auftraege?: unknown[];
   meldungen?: unknown[];
   gefahrenStatus?: number;
+  personenStatus?: number;
+  /** Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild`
+   *  noch gar nichts liefert und die Kennzahlenleiste ihre Plätze selbst stellen muss. */
+  einsatzLaedt?: boolean;
 }
 
 function mockEndpunkte(d: Daten) {
   const json = (arr?: unknown[]) => HttpResponse.json(arr ?? []);
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/1/personen', () => json(d.personen)),
+    http.get('/api/einsaetze/1', async () => {
+      if (d.einsatzLaedt) await delay('infinite');
+      return HttpResponse.json(einsatz);
+    }),
+    http.get('/api/einsaetze/1/personen', () =>
+      d.personenStatus ? new HttpResponse(null, { status: d.personenStatus }) : json(d.personen),
+    ),
     http.get('/api/einsaetze/1/uhs', () => json(d.uhs)),
     http.get('/api/einsaetze/1/schaeden', () => json(d.schaeden)),
     http.get('/api/einsaetze/1/tiere', () => json(d.tiere)),
@@ -204,6 +213,19 @@ function kennzahl(etikett: string): HTMLElement {
   return el;
 }
 
+/**
+ * Das Wartesignal auf „Daten sind da" (LFH-331 · B3).
+ *
+ * Seit die Leiste ihre sechs Plätze schon WÄHREND des Einsatz-Abrufs stellt, ist
+ * ein `findByText(<Etikett>)` kein Gate mehr — es erfüllt sich sofort am
+ * Platzhalter, und die Zusicherung danach liefe gegen den Ladezustand statt gegen
+ * die Daten (gemessen: sieben Bestandstests fielen genau daran). Angesetzt wird
+ * deshalb auf dem KNOPF, den erst das Lagebild baut; der Platzhalter ist keiner.
+ */
+function kennzahlGeladen(etikett: string): Promise<HTMLElement> {
+  return waitFor(() => kennzahl(etikett));
+}
+
 describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
   it('zeigt Einsatz und Leitzahlen im Instrumentenband', async () => {
     mockEndpunkte({
@@ -227,7 +249,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     mockEndpunkte({ personen: [person('sk1')] });
     render();
     // „keine" statt „0" — eine nackte Null sagt nicht, ob gemessen oder leer.
-    expect(await screen.findByText('Höchste Warnstufe')).toBeInTheDocument();
+    expect(await kennzahlGeladen('Höchste Warnstufe')).toBeInTheDocument();
     expect(kennzahl('Höchste Warnstufe')).toHaveTextContent('keine');
     expect(kennzahl('Vermisst')).toHaveTextContent('keine offenen Fälle');
   });
@@ -244,7 +266,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
   it('Deep-Link: Klick auf die Patienten-Kennzahl navigiert ins Personen-Modul', async () => {
     mockEndpunkte({ personen: [person('sk1')] });
     render();
-    await screen.findByText('Patienten SK I–IV');
+    await kennzahlGeladen('Patienten SK I–IV');
     await userEvent.click(kennzahl('Patienten SK I–IV'));
     expect(await screen.findByText('PERSONEN-MODUL')).toBeInTheDocument();
   });
@@ -286,7 +308,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     // Leerzustand wie „nichts vorhanden". Wer daraus eine Lage funkt, funkt falsch.
     mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
     render();
-    await screen.findByText('Höchste Warnstufe');
+    await kennzahlGeladen('Höchste Warnstufe');
     const warnstufe = kennzahl('Höchste Warnstufe');
     expect(warnstufe).toHaveTextContent('?');
     expect(warnstufe).toHaveTextContent('Stand unbekannt');
@@ -297,7 +319,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
   it('ein Teilfehler macht die übrigen Kennzahlen nicht unkenntlich', async () => {
     mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
     render();
-    await screen.findByText('Patienten SK I–IV');
+    await kennzahlGeladen('Patienten SK I–IV');
     // Die Personen-Abfrage lief durch — ihre Zahl bleibt lesbar.
     expect(kennzahl('Patienten SK I–IV')).toHaveTextContent('1');
     expect(kennzahl('Patienten SK I–IV')).not.toHaveTextContent('Stand unbekannt');
@@ -309,7 +331,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     // anderen — ohne Fehler, ohne roten Test. Deshalb dieser Vergleich.
     mockEndpunkte({ personen: [person('sk1')] });
     render();
-    await screen.findByText('Patienten SK I–IV');
+    await kennzahlGeladen('Patienten SK I–IV');
     const etiketten = [
       'Kräfte F/UF/M//Σ',
       'Patienten SK I–IV',
@@ -336,7 +358,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     // funkt, sucht die Zahl an ihrem Platz, nicht in einer Rangliste.
     mockEndpunkte({ personen: [person('sk1')] });
     render();
-    await screen.findByText('Patienten SK I–IV');
+    await kennzahlGeladen('Patienten SK I–IV');
 
     const knoepfe = Array.from(document.querySelectorAll('.lfh-kennzahlen .lfh-kz'));
     expect(knoepfe).toHaveLength(6);
@@ -368,7 +390,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
       gefahren: [{ hoechste_warnstufe: 'mittel' }],
     });
     render();
-    await screen.findByText('Vermisst');
+    await kennzahlGeladen('Vermisst');
 
     expect(kennzahl('Vermisst').className).toContain('lfh-kz--alarm');
     expect(kennzahl('Höchste Warnstufe').className).toContain('lfh-kz--achtung');
@@ -392,10 +414,89 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
 
     mockEndpunkte({ gefahren: [{ hoechste_warnstufe: 'niedrig' }] });
     render();
-    await screen.findByText('Höchste Warnstufe');
+    await kennzahlGeladen('Höchste Warnstufe');
     const knopf = kennzahl('Höchste Warnstufe');
     expect(knopf).toHaveTextContent('niedrig');
     expect(knopf.className).not.toContain('lfh-kz--');
+  });
+
+  /**
+   * R1 (LFH-331 · B3). Solange der Einsatz-Abruf läuft, stand die Leiste leer und
+   * sechs Kennzahlen sprangen danach herein — die Weiche je Kennzahl („····" / „?")
+   * konnte nicht greifen, weil es die Knöpfe noch gar nicht gab.
+   *
+   * Die sechs Etiketten sind hier als LITERALE aufgeschrieben, genau wie im
+   * Ordnungstest darüber. Das ist der Sinn: die Liste in der Seite und die in
+   * `lagebild.ts` hängen jetzt beide an derselben handgeschriebenen Reihe — läuft
+   * eine der beiden aus dem Takt, wird eine der beiden Prüfungen rot.
+   *
+   * NICHT geprüft, weil jsdom kein Layout rechnet: dass die Plätze auch WIRKLICH
+   * dieselbe Höhe reservieren (Prüfliste Kriterium 12, CLS ≤ 0,1). Belegt wird hier
+   * die Anzahl, die Ordnung und der Wortlaut — die Höhe misst `e2e/gate1-ueberlauf.spec.ts`.
+   */
+  it('die Kennzahlenleiste stellt schon während des Einsatz-Abrufs sechs Plätze', async () => {
+    mockEndpunkte({ einsatzLaedt: true });
+    render();
+    const plaetze = Array.from(document.querySelectorAll('.lfh-kennzahlen .lfh-kz'));
+    expect(plaetze).toHaveLength(6);
+    expect(plaetze.map((k) => k.querySelector('.lfh-etikett')?.textContent)).toEqual([
+      'Kräfte F/UF/M//Σ',
+      'Patienten SK I–IV',
+      'Vermisst',
+      'Höchste Warnstufe',
+      'Schäden offen',
+      'UHS aktiv',
+    ]);
+    // Kein Platz behauptet einen Stand, solange keiner abgerufen ist.
+    for (const p of plaetze) expect(p.textContent).toContain('wird abgerufen');
+  });
+
+  /**
+   * R2 — der Einsatzname im Band zeigte während des Abrufs einen Gedankenstrich, also
+   * dasselbe Zeichen, das anderswo „kein Wert" bedeutet. Beide Hälften sind POSITIV
+   * formuliert: „wird abgerufen" steht im Ladezustand siebenmal auf der Seite (Band
+   * plus sechs Plätze), ein Griff über den sichtbaren Text wäre mehrdeutig, und eine
+   * Negativ-Zusicherung auf „—" beliebig erfüllbar.
+   */
+  it('das Band nennt während des Abrufs den Ladezustand', async () => {
+    mockEndpunkte({ einsatzLaedt: true });
+    render();
+    expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe('wird abgerufen');
+  });
+
+  it('das Band nennt nach dem Abruf den Einsatz', async () => {
+    mockEndpunkte({});
+    render();
+    await kennzahlGeladen('Patienten SK I–IV');
+    expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe(
+      'Hochwasser Musterstadt',
+    );
+  });
+
+  /**
+   * R3 — das AK4-Partnerpaar. Die Seite trug beide Zustände seit LFH-352 im Code,
+   * aber keinen Beleg: dass eine Umsetzung steht, hieß nie, dass sie belegt ist.
+   *
+   * Nur die Personen-Abfrage fällt aus. Damit ist genau EINE Kachel im Fehlerzustand,
+   * und „Daten nicht abrufbar" bleibt eindeutig greifbar — bei einem Sammelausfall
+   * stünde der Satz sechsmal da und der Griff wäre mehrdeutig.
+   */
+  it('bei gescheitertem Personen-Abruf zeigt die Kachel den Fehler und NICHT den Leertext', async () => {
+    mockEndpunkte({ personenStatus: 500 });
+    render();
+    expect(await screen.findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Personen erfasst.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Person aufnehmen' })).not.toBeInTheDocument();
+  });
+
+  it('bei leerem Personenbestand zeigt die Kachel den Leertext und KEINEN Fehler', async () => {
+    mockEndpunkte({});
+    render();
+    expect(await screen.findByText('Noch keine Personen erfasst.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Person aufnehmen' })).toBeInTheDocument();
+    expect(screen.queryByText('Daten nicht abrufbar')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 });
 

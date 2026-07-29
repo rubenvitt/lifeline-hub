@@ -281,6 +281,6 @@ describe('SchaedenDetailPage — Robustheit', () => {
       http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
     ]);
     expect(await screen.findByText('Schaden konnte nicht geladen werden')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 });

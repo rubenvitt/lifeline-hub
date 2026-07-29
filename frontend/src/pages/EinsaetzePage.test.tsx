@@ -172,11 +172,16 @@ describe('EinsaetzePage', () => {
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
     );
-    renderMitProviders(<EinsaetzePage />);
+    const { container } = renderMitProviders(<EinsaetzePage />);
 
-    // Bisher waren „leer" und „darf anlegen" ein Entweder-oder: der Empty-Zweig
+    // Bisher waren „leer" und „darf anlegen" ein Entweder-oder: der Leer-Zweig
     // lief für Anlegeberechtigte nie, sie sahen nur den Knopf im leeren Raster.
     expect(await screen.findByText('Keine Einsätze')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
+    // Getauscht ist der Knoten, nicht der Wortlaut (LFH-331 · B3) — die Textzeile
+    // darüber war vor dem Umbau genauso grün und belegt für sich genommen nichts.
+    // Der Leerknoten trägt KEINE eigene Aktion: die Anlegen-Kachel steht direkt
+    // darunter, ein zweiter „Neuer Einsatz"-Knopf machte die Abfrage mehrdeutig.
+    expect(container.querySelector('.ant-empty')).toBeNull();
   });
 });

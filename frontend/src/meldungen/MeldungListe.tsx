@@ -1,4 +1,4 @@
-import { Empty } from 'antd';
+import { SeitenLeer } from '../components/SeitenZustand';
 import type { Meldung, MeldungStatus } from '../api/types';
 import MeldungKarte from './MeldungKarte';
 
@@ -34,7 +34,7 @@ export default function MeldungListe({
   meldungen, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder, highlightId,
   onStatus, onZuweisen, onLagerelevant, onBestaetigen, onAuftragErteilen,
 }: MeldungListeProps) {
-  if (meldungen.length === 0) return <Empty description="Keine Meldungen" />;
+  if (meldungen.length === 0) return <SeitenLeer titel="Keine Meldungen" />;
   return (
     <>
       {meldungen.map((m) => (

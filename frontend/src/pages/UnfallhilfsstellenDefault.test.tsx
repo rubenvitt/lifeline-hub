@@ -76,6 +76,26 @@ describe('UnfallhilfsstellenDefault', () => {
     expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
   });
 
+  /**
+   * AK4-Partnerpaar (LFH-331 · B3). Vor dem Umbau zeigte der Fehlerfall eine Meldung
+   * ohne Wiederholung; der Leertext war ein antd-Leer-Element mit eingebettetem Knopf.
+   * Beide Hälften nennen dasselbe Literal, damit die negative Zusicherung eine Aussage
+   * über die Weiche bleibt und nicht über die Schreibweise des Strings.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })));
+    renderDefault();
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Unfallhilfsstellen erfasst')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei 0 UHS den Leertext und KEINEN Fehler', async () => {
+    server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])));
+    renderDefault();
+    expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
   it('springt nicht automatisch ins Detail, wenn nachträglich eine aktive UHS auftaucht', async () => {
     server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });

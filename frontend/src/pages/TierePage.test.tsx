@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
+import { einsatzKeys } from '../api/queryKeys';
 import TierePage from './TierePage';
 import type { Tier } from '../api/types';
 
@@ -275,5 +276,58 @@ describe('TierePage', () => {
     const mitHalter: Tier = { ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7, halter_storniert_at: '2026-05-29 11:00:00' };
     render(einsatzAktiv, [mitHalter]);
     expect(await screen.findByText(/Halter \(storniert\): R-007/)).toBeInTheDocument();
+  });
+
+  /**
+   * Partnerpaar zu AK4 (LFH-331 · B3): die negative Hälfte allein wäre auch dann grün, wenn
+   * der Umbau den Leertext bloß umformuliert hätte. Erst der Fall darunter — gleiches
+   * Literal, gleiche Datei — macht daraus eine Aussage über die Zustandsweiche.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/tiere', () => new HttpResponse(null, { status: 500 })),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/tiere' },
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.getByText('Tiere konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Tiere in dieser Sicht')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerer Menge den Leertext und KEINEN Fehler', async () => {
+    render(einsatzAktiv, []);
+
+    expect(await screen.findByText('Keine Tiere in dieser Sicht')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`. Der Ablauf ist der echte: geglückter Abruf, dann gescheiterte
+   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher ließe offen, ob TanStack nach
+   * einem HINTERGRUND-Fehlschlag überhaupt auf `error` stellt statt auf `success` zu bleiben.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    const { client } = render(einsatzAktiv, [tierBasis]);
+    await screen.findByText('T-001');
+
+    server.use(http.get('/api/einsaetze/1/tiere', () => new HttpResponse(null, { status: 500 })));
+    await client.refetchQueries({ queryKey: einsatzKeys.tiere(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('T-001')).toBeInTheDocument();
+    expect(screen.queryByText('Tiere konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 });
