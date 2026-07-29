@@ -64,15 +64,28 @@ const FOKUSSIERBAR = [
   'select:not([disabled])',
 ].join(', ');
 
-/**
- * Fokus ins erste Feld — **im nächsten Bild**, nicht sofort. Ein direkter
- * `focus()` nach dem Serien-Speichern verpufft: der Knopfdruck flusht danach
- * noch einen Renderdurchgang, und der Fokus landet gemessen auf `<body>`.
- * `requestAnimationFrame` ist derselbe Ausweg, den die ETB-Schnellerfassung
- * seit LFH-118 nimmt (`fokusInsFeld`).
- */
 function fokussiereErstesFeld(wurzel: HTMLElement | null) {
-  requestAnimationFrame(() => wurzel?.querySelector<HTMLElement>(FOKUSSIERBAR)?.focus());
+  wurzel?.querySelector<HTMLElement>(FOKUSSIERBAR)?.focus();
+}
+
+/**
+ * Fokus ins erste Feld — **im nächsten Bild**. Nur für den Rücksprung nach dem
+ * Serien-Speichern: dort verpufft ein direkter `focus()`, weil der Knopfdruck
+ * danach noch einen Renderdurchgang flusht und der Fokus gemessen auf `<body>`
+ * landet. `requestAnimationFrame` ist derselbe Ausweg, den die
+ * ETB-Schnellerfassung nimmt (`fokusInsFeld`).
+ *
+ * **BEIM MOUNT WÄRE DAS FALSCH — und der Fehler war messbar.** Ein aufgeschobener
+ * Fokus greift, wann immer das Bild kommt, also womöglich erst, wenn die Person
+ * schon tippt: dann springt der Cursor mitten im Wort ins erste Feld zurück und
+ * der Rest des Wortlauts landet woanders. Der Testfall „Enter in der Textarea
+ * sendet NICHT ab" hat genau das gezeigt — allein grün, in der vollen Suite unter
+ * Last rot, weil der aufgeschobene Fokus dort erst nach dem ersten Tastendruck
+ * kam. Beim Mount gibt es keinen konkurrierenden Renderdurchgang, deshalb steht
+ * der Fokus dort direkt.
+ */
+function fokussiereErstesFeldVerzoegert(wurzel: HTMLElement | null) {
+  requestAnimationFrame(() => fokussiereErstesFeld(wurzel));
 }
 
 interface ErfassungsFormularProps<T> {
@@ -149,7 +162,7 @@ export function ErfassungsFormular<T extends object>({
     }
     form.resetFields();
     if (behalten && uebernahme?.length) form.setFieldsValue(behaltene);
-    fokussiereErstesFeld(wurzel.current);
+    fokussiereErstesFeldVerzoegert(wurzel.current);
   }, [behalten, form, onErfassen, onFertig, uebernahme]);
 
   function abbrechen() {

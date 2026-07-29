@@ -64,6 +64,10 @@ describe('ErfassungsFormular — Enter sendet ab', () => {
     renderMitProviders(<Harness onErfassen={onErfassen} />);
     const nutzer = userEvent.setup();
 
+    // Erst den Mount-Fokus abwarten, dann tippen. Käme der Fokus dazwischen,
+    // spränge der Cursor mitten im Wortlaut ins erste Feld — genau der Fehler,
+    // den dieser Fall in der vollen Suite einmal aufgedeckt hat.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
     await nutzer.type(screen.getByLabelText('Notiz'), 'Zeile 1{Enter}Zeile 2');
 
     expect(onErfassen).not.toHaveBeenCalled();
