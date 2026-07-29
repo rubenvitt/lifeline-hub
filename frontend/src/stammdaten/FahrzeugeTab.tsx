@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -117,18 +118,31 @@ export default function FahrzeugeTab() {
           Fahrzeug anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={fahrzeugeQuery.isLoading}
-        dataSource={fahrzeugeQuery.data ?? []}
-        columns={spalten}
-        locale={{ emptyText: 'Noch keine Fahrzeuge' }}
-        // Durchsucht werden die vier Spalten mit Datenbezug: Funkrufname, Typ, Träger,
-        // Kennzeichen. Stärke und Status sind render-only und tragen nichts bei. Der
-        // Platzhalter nennt die drei, nach denen tatsächlich gesucht wird — die volle
-        // Aufzählung würde im 220 px breiten Feld ohnehin abgeschnitten.
-        suche={{ platzhalter: 'Funkrufname, Typ oder Kennzeichen' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Fahrzeuge" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {fahrzeugeQuery.isError ? (
+        <SeitenFehler
+          text="Fahrzeuge konnten nicht geladen werden"
+          ursache={fahrzeugeQuery.error}
+          onWiederholen={() => void fahrzeugeQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={fahrzeugeQuery.isLoading}
+          dataSource={fahrzeugeQuery.data ?? []}
+          columns={spalten}
+          locale={{ emptyText: 'Noch keine Fahrzeuge' }}
+          // Durchsucht werden die vier Spalten mit Datenbezug: Funkrufname, Typ, Träger,
+          // Kennzeichen. Stärke und Status sind render-only und tragen nichts bei. Der
+          // Platzhalter nennt die drei, nach denen tatsächlich gesucht wird — die volle
+          // Aufzählung würde im 220 px breiten Feld ohnehin abgeschnitten.
+          suche={{ platzhalter: 'Funkrufname, Typ oder Kennzeichen' }}
+        />
+      )}
       <FahrzeugFormModal
         offen={modalOffen}
         fahrzeug={bearbeite}

@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -115,23 +116,36 @@ export default function PersonalTab() {
           Person anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={personalQuery.isLoading}
-        dataSource={personalQuery.data ?? []}
-        columns={spalten}
-        /**
-         * Die Suche des Primitivs liest die ROHWERTE der Spalten mit `dataIndex`, nicht das
-         * Gerenderte (Dateikopf `components/KatalogTabelle.tsx`). Der Platzhalter nennt
-         * deshalb genau die drei Spalten, die auch beitragen: Name, Personalnr., Träger.
-         * Qualifikationen, Stärke-Position und Status sind Render-Spalten ohne Datenbezug und
-         * tragen zur Suche NICHTS bei — bei den letzten beiden ist das gewollt und geprüft
-         * (`PersonalTab.test.tsx`), sonst lägen ihre Drahtwerte (`mannschaft`, `in_dienst`)
-         * im Korb und die Suche träfe Zeilen, die niemand gemeint hat.
-         */
-        suche={{ platzhalter: 'Name, Personalnr. oder Träger' }}
-        locale={{ emptyText: 'Noch kein Personal' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Noch kein Personal" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {personalQuery.isError ? (
+        <SeitenFehler
+          text="Personal konnte nicht geladen werden"
+          ursache={personalQuery.error}
+          onWiederholen={() => void personalQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={personalQuery.isLoading}
+          dataSource={personalQuery.data ?? []}
+          columns={spalten}
+          /**
+           * Die Suche des Primitivs liest die ROHWERTE der Spalten mit `dataIndex`, nicht das
+           * Gerenderte (Dateikopf `components/KatalogTabelle.tsx`). Der Platzhalter nennt
+           * deshalb genau die drei Spalten, die auch beitragen: Name, Personalnr., Träger.
+           * Qualifikationen, Stärke-Position und Status sind Render-Spalten ohne Datenbezug und
+           * tragen zur Suche NICHTS bei — bei den letzten beiden ist das gewollt und geprüft
+           * (`PersonalTab.test.tsx`), sonst lägen ihre Drahtwerte (`mannschaft`, `in_dienst`)
+           * im Korb und die Suche träfe Zeilen, die niemand gemeint hat.
+           */
+          suche={{ platzhalter: 'Name, Personalnr. oder Träger' }}
+          locale={{ emptyText: 'Noch kein Personal' }}
+        />
+      )}
       <PersonalFormModal
         offen={modalOffen}
         person={bearbeite}

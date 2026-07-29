@@ -1,5 +1,6 @@
 import { App, Button, Input, Space, Typography, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -96,17 +97,30 @@ export default function StichworteTab() {
         Einsatz unabhängig davon möglich.
       </Typography.Paragraph>
 
-      <KatalogTabelle
-        rowKey="id"
-        loading={vorschlaegeQuery.isLoading}
-        dataSource={vorschlaege}
-        columns={spalten}
-        locale={{ emptyText: 'Noch keine Stichworte' }}
-        // Nur `text` hat einen Datenbezug — die Aktionsspalte ist render-only und trägt
-        // zur Suche nichts bei (dokumentierte Grenze im Kopf von `KatalogTabelle`).
-        // Der Platzhalter benennt deshalb genau dieses eine Feld.
-        suche={{ platzhalter: 'Stichwort' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Stichworte" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {vorschlaegeQuery.isError ? (
+        <SeitenFehler
+          text="Stichworte konnten nicht geladen werden"
+          ursache={vorschlaegeQuery.error}
+          onWiederholen={() => void vorschlaegeQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={vorschlaegeQuery.isLoading}
+          dataSource={vorschlaege}
+          columns={spalten}
+          locale={{ emptyText: 'Noch keine Stichworte' }}
+          // Nur `text` hat einen Datenbezug — die Aktionsspalte ist render-only und trägt
+          // zur Suche nichts bei (dokumentierte Grenze im Kopf von `KatalogTabelle`).
+          // Der Platzhalter benennt deshalb genau dieses eine Feld.
+          suche={{ platzhalter: 'Stichwort' }}
+        />
+      )}
 
       {istAdmin && (
         <Space.Compact style={{ marginTop: 12, width: '100%' }}>

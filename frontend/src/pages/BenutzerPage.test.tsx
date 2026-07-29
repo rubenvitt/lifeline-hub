@@ -254,6 +254,50 @@ describe('BenutzerPage', () => {
     await waitFor(() => expect(namen()).toEqual(['Eva']));
   });
 
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
+   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
+   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
+   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () => new HttpResponse(null, { status: 500 })),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Benutzer')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+
+    expect(await screen.findByText('Noch keine Benutzer')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {
     server.use(
       http.get('/api/auth/me', () =>

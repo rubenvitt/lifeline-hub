@@ -179,4 +179,35 @@ describe('PersonalTab', () => {
     );
     expect(namen(container)).toEqual(['Ömer Berg']);
   });
+
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
+   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
+   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
+   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/personal', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/personal-vorschlaege', () => HttpResponse.json({ traegerorganisation: [] })),
+      http.get('/api/qualifikationen', () => HttpResponse.json([])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <PersonalTab />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch kein Personal')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    render(admin, []);
+
+    expect(await screen.findByText('Noch kein Personal')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
 });

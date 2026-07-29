@@ -39,10 +39,10 @@ async function menueEintrag(text: string): Promise<HTMLElement> {
   return treffer;
 }
 
-function render(benutzer: typeof admin) {
+function render(benutzer: typeof admin, statusListe: typeof status = status) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
-    http.get('/api/personal-status', () => HttpResponse.json(status)),
+    http.get('/api/personal-status', () => HttpResponse.json(statusListe)),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -94,5 +94,33 @@ describe('PersonalStatusTab', () => {
       document.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
     );
     expect(labels(container)).toEqual(['alarmiert']);
+  });
+
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
+   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
+   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
+   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/personal-status', () => new HttpResponse(null, { status: 500 })),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <PersonalStatusTab />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Kein Status')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    render(admin, []);
+
+    expect(await screen.findByText('Kein Status')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 });

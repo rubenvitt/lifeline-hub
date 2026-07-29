@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -106,18 +107,31 @@ export default function MaterialTab() {
           Material anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={materialQuery.isLoading}
-        dataSource={materialQuery.data ?? []}
-        columns={spalten}
-        locale={{ emptyText: 'Noch kein Material' }}
-        // Durchsucht werden die vier Spalten mit Datenbezug: Bezeichnung, Kategorie,
-        // Bestandsnummer, Träger. Die Statusspalte ist render-only und trägt nichts bei.
-        // Der Platzhalter nennt die beiden, nach denen tatsächlich gesucht wird — die
-        // volle Aufzählung würde im 220 px breiten Feld abgeschnitten.
-        suche={{ platzhalter: 'Bezeichnung oder Kategorie' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Noch kein Material" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {materialQuery.isError ? (
+        <SeitenFehler
+          text="Material konnte nicht geladen werden"
+          ursache={materialQuery.error}
+          onWiederholen={() => void materialQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={materialQuery.isLoading}
+          dataSource={materialQuery.data ?? []}
+          columns={spalten}
+          locale={{ emptyText: 'Noch kein Material' }}
+          // Durchsucht werden die vier Spalten mit Datenbezug: Bezeichnung, Kategorie,
+          // Bestandsnummer, Träger. Die Statusspalte ist render-only und trägt nichts bei.
+          // Der Platzhalter nennt die beiden, nach denen tatsächlich gesucht wird — die
+          // volle Aufzählung würde im 220 px breiten Feld abgeschnitten.
+          suche={{ platzhalter: 'Bezeichnung oder Kategorie' }}
+        />
+      )}
       <MaterialFormModal
         offen={modalOffen}
         material={bearbeite}

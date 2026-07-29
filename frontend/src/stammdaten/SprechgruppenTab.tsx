@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -125,14 +126,27 @@ export default function SprechgruppenTab() {
           Sprechgruppe anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={sprechgruppenQuery.isLoading}
-        dataSource={sprechgruppenQuery.data ?? []}
-        columns={spalten}
-        locale={{ emptyText: 'Noch keine Sprechgruppen' }}
-        suche={{ platzhalter: 'Bezeichnung, Betriebsart oder Hinweis' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Sprechgruppen" auch
+          dann einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {sprechgruppenQuery.isError ? (
+        <SeitenFehler
+          text="Sprechgruppen konnten nicht geladen werden"
+          ursache={sprechgruppenQuery.error}
+          onWiederholen={() => void sprechgruppenQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={sprechgruppenQuery.isLoading}
+          dataSource={sprechgruppenQuery.data ?? []}
+          columns={spalten}
+          locale={{ emptyText: 'Noch keine Sprechgruppen' }}
+          suche={{ platzhalter: 'Bezeichnung, Betriebsart oder Hinweis' }}
+        />
+      )}
       <SprechgruppeFormModal
         offen={modalOffen}
         sprechgruppe={bearbeite}

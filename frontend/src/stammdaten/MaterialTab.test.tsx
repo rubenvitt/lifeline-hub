@@ -162,4 +162,33 @@ describe('MaterialTab', () => {
     await userEvent.click(kopf!);
     expect(ersteZeile()).toContain('B-Schlauch 5 m');
   });
+
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
+   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
+   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
+   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/material', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/material-kategorien', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <MaterialTab />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch kein Material')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    render(admin, []);
+
+    expect(await screen.findByText('Noch kein Material')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
 });

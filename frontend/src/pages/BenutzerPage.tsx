@@ -1,5 +1,6 @@
 import { App, Button, Form, Input, Modal, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
 import { useState } from 'react';
@@ -42,10 +43,11 @@ export default function BenutzerPage() {
   const [zuBearbeiten, setZuBearbeiten] = useState<BenutzerAnzeige | null>(null);
   const [editForm] = Form.useForm<BearbeitenWerte>();
 
-  const { data: benutzerListe = [], isLoading } = useQuery({
+  const benutzerQuery = useQuery({
     queryKey: globalKeys.benutzer(),
     queryFn: listeBenutzer,
   });
+  const benutzerListe = benutzerQuery.data ?? [];
 
   const anlegen = useMutation({
     mutationFn: (b: NeuerBenutzer) => legeBenutzerAn(b),
@@ -156,14 +158,27 @@ export default function BenutzerPage() {
         </Button>
       }
     >
-      <KatalogTabelle
-        rowKey="id"
-        loading={isLoading}
-        dataSource={benutzerListe}
-        columns={spalten}
-        locale={{ emptyText: 'Noch keine Benutzer' }}
-        suche={{ platzhalter: 'Name oder Benutzername' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Benutzer" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {benutzerQuery.isError ? (
+        <SeitenFehler
+          text="Benutzer konnten nicht geladen werden"
+          ursache={benutzerQuery.error}
+          onWiederholen={() => void benutzerQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={benutzerQuery.isLoading}
+          dataSource={benutzerListe}
+          columns={spalten}
+          locale={{ emptyText: 'Noch keine Benutzer' }}
+          suche={{ platzhalter: 'Name oder Benutzername' }}
+        />
+      )}
 
       <Modal
         title="Neuen Benutzer anlegen"

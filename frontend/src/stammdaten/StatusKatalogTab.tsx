@@ -1,5 +1,6 @@
 import { App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -142,20 +143,33 @@ export default function StatusKatalogTab() {
           Status anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={statusQuery.isLoading}
-        dataSource={statusQuery.data ?? []}
-        columns={spalten}
-        locale={{ emptyText: 'Kein Status' }}
-        // Der Platzhalter nennt NUR das Label, obwohl die Suche des Primitivs jede Spalte
-        // mit Datenbezug liest. Grund: sie greift den Rohwert, und der stimmt hier bei
-        // genau einer Spalte nicht mit dem Gezeigten überein — die Kategorie zeigt
-        // „verfügbar", der Drahtwert heißt `verfuegbar`. Ein Platzhalter, der „Kategorie"
-        // verspräche, ginge bei getippten Umlauten ins Leere. Diese Achse bedient der
-        // Spaltenfilter, nicht die Suche.
-        suche={{ platzhalter: 'Label' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Kein Status" auch dann einen
+          leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {statusQuery.isError ? (
+        <SeitenFehler
+          text="Statuskatalog konnte nicht geladen werden"
+          ursache={statusQuery.error}
+          onWiederholen={() => void statusQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={statusQuery.isLoading}
+          dataSource={statusQuery.data ?? []}
+          columns={spalten}
+          locale={{ emptyText: 'Kein Status' }}
+          // Der Platzhalter nennt NUR das Label, obwohl die Suche des Primitivs jede Spalte
+          // mit Datenbezug liest. Grund: sie greift den Rohwert, und der stimmt hier bei
+          // genau einer Spalte nicht mit dem Gezeigten überein — die Kategorie zeigt
+          // „verfügbar", der Drahtwert heißt `verfuegbar`. Ein Platzhalter, der „Kategorie"
+          // verspräche, ginge bei getippten Umlauten ins Leere. Diese Achse bedient der
+          // Spaltenfilter, nicht die Suche.
+          suche={{ platzhalter: 'Label' }}
+        />
+      )}
       <Modal
         open={modalOffen}
         title={bearbeite ? 'Status bearbeiten' : 'Status anlegen'}

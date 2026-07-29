@@ -2,6 +2,7 @@ import {
   App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType,
 } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -112,17 +113,30 @@ export default function EinheitTypenTab() {
           Typ anlegen
         </Button>
       )}
-      <KatalogTabelle
-        rowKey="id"
-        loading={typenQuery.isLoading}
-        dataSource={typenQuery.data ?? []}
-        columns={spalten}
-        locale={{ emptyText: 'Kein Einheitstyp' }}
-        // Der Platzhalter nennt das Feld, das man tippt. Die Spalte „Sortierung" fällt über ihren
-        // `dataIndex` technisch mit in den Suchkorpus (gemessen: „4" trifft Zug über `sortier: 40`) —
-        // harmlos, aber kein Grund, sie in den Platzhalter zu schreiben.
-        suche={{ platzhalter: 'Label' }}
-      />
+      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
+          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
+          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
+          der beiden Formen. Ohne diese Weiche behauptet „Kein Einheitstyp" auch dann
+          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {typenQuery.isError ? (
+        <SeitenFehler
+          text="Einheitstypen konnten nicht geladen werden"
+          ursache={typenQuery.error}
+          onWiederholen={() => void typenQuery.refetch()}
+        />
+      ) : (
+        <KatalogTabelle
+          rowKey="id"
+          loading={typenQuery.isLoading}
+          dataSource={typenQuery.data ?? []}
+          columns={spalten}
+          locale={{ emptyText: 'Kein Einheitstyp' }}
+          // Der Platzhalter nennt das Feld, das man tippt. Die Spalte „Sortierung" fällt über ihren
+          // `dataIndex` technisch mit in den Suchkorpus (gemessen: „4" trifft Zug über `sortier: 40`) —
+          // harmlos, aber kein Grund, sie in den Platzhalter zu schreiben.
+          suche={{ platzhalter: 'Label' }}
+        />
+      )}
       <Modal
         open={modalOffen}
         title={bearbeite ? 'Typ bearbeiten' : 'Typ anlegen'}

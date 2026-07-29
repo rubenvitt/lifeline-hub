@@ -27,10 +27,13 @@ const quals = [
 const labels = (c: HTMLElement) =>
   [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
 
-function render(benutzer: typeof admin) {
+// Die Fixture ist voreingestellt und bleibt es: der Ordnungs-Test unten hängt an genau
+// diesen zwei Zeilen in genau dieser Reihenfolge. Der Parameter existiert allein für den
+// leeren Katalog der AK4-Hälfte.
+function render(benutzer: typeof admin, katalog: typeof quals = quals) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
-    http.get('/api/qualifikationen', () => HttpResponse.json(quals)),
+    http.get('/api/qualifikationen', () => HttpResponse.json(katalog)),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -76,5 +79,33 @@ describe('QualifikationenTab', () => {
     // `aktiv` siebt schon der Server (`qualifikation_repo.rs:55`). Wer hier einen Filter
     // nachrüstet, ohne die Spalte zu haben, fällt hier auf.
     expect(container.querySelector('.ant-table-filter-trigger')).toBeNull();
+  });
+
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
+   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
+   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
+   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   */
+  it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/qualifikationen', () => new HttpResponse(null, { status: 500 })),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <QualifikationenTab />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Keine Qualifikationen')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    render(admin, []);
+
+    expect(await screen.findByText('Keine Qualifikationen')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 });
