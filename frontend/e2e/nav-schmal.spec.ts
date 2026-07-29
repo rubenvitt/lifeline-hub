@@ -283,7 +283,7 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
   expect(
     Math.abs(panel.width - DRAWER_BREITE),
     `Panel trägt das Maß (gemessen ${panel.width})`,
-  ).toBeLessThanOrEqual(0.5);
+  ).toBeLessThanOrEqual(SUBPIXEL);
   // Der Körper liegt INNERHALB des Panels (Innenrand), ist also nie breiter.
   //
   // DIESELBE halbe-Pixel-Toleranz wie zwei Zeilen darüber, und aus demselben Grund.
@@ -303,7 +303,7 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
   expect(
     koerper.width,
     `Körper liegt im Panel (gemessen ${koerper.width})`,
-  ).toBeLessThanOrEqual(DRAWER_BREITE + 0.5);
+  ).toBeLessThanOrEqual(DRAWER_BREITE + SUBPIXEL);
 });
 
 /**

@@ -407,6 +407,20 @@ test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet d
       if (offen) break;
     }
     await expect(menue, 'der Griff ließ sich in drei Anläufen nicht öffnen').toHaveCount(1);
+    /*
+     * ERST SCHAUEN, DANN DRÜCKEN. Der Kommentar oben hält fest, dass rc-menu sich den
+     * zuletzt aktiven Eintrag merkt — beim ZWEITEN Öffnen steht die Hervorhebung also
+     * schon auf der Zielspalte. Ein unbedingtes `ArrowDown` schob genau dort daran
+     * vorbei, und die Suchschleife lief einmal um das Menü herum, bis sie wieder
+     * ankam; landete sie unterwegs am Rand oder verschluckte rc-trigger einen
+     * Tastendruck, schaltete die Eingabetaste eine FREMDE Spalte. Gemessen am
+     * 29.07.2026: Zähler 3 statt 1 zurück, also zwei fremde Spalten ausgeblendet
+     * statt der einen wieder eingeblendet.
+     *
+     * Die Schleife bleibt unverändert die Absicherung für den ersten Aufruf, bei dem
+     * noch nichts hervorgehoben ist.
+     */
+    if (((await aktiv.textContent().catch(() => null)) ?? '').trim() === ZIELSPALTE) return;
     for (let i = 0; i < 12; i += 1) {
       await page.keyboard.press('ArrowDown');
       // Belegt zugleich, dass der Fokus überhaupt ins Menü gewandert ist — genau der Punkt,
