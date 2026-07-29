@@ -1,5 +1,6 @@
-import { Alert, App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -154,13 +155,11 @@ export default function OnlineQuellenVerwaltung() {
           <Button onClick={() => setKatalogOffen(true)}>Aus Katalog hinzufügen</Button>
         </Space>
       )}
+      {/* Der Fehlerzweig trägt noch keine Wiederholung: `karten/` hat heute keine Testdatei,
+          und der Umzug auf das Primitiv soll hier nachweisbar verhaltensgleich sein. Der Knopf
+          kommt mit AK1 (Fehlerzustand der 13 Katalogtabellen) — dort mitsamt seinem Test. */}
       {quellenQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          title="Online-Quellen konnten nicht geladen werden"
-          description={quellenQuery.error instanceof ApiError ? quellenQuery.error.message : undefined}
-        />
+        <SeitenFehler text="Online-Quellen konnten nicht geladen werden" ursache={quellenQuery.error} />
       ) : (
         <KatalogTabelle
           rowKey="id"

@@ -283,7 +283,7 @@ describe('PersonenDetailPage — Robustheit', () => {
       http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
     ]);
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 
   it('zeigt das Patient-Tag bei gesichteter Person (SK I)', async () => {

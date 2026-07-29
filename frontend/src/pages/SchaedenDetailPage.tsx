@@ -1,5 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
+import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -128,11 +129,10 @@ export default function SchaedenDetailPage() {
 
   if (detailQuery.isError) {
     return (
-      <Alert
-        type="error" showIcon
-        title="Schaden konnte nicht geladen werden"
-        description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
-        action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
+      <SeitenFehler
+        text="Schaden konnte nicht geladen werden"
+        ursache={detailQuery.error}
+        onWiederholen={() => void detailQuery.refetch()}
       />
     );
   }

@@ -1,5 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Tag, Typography, theme, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
+import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -254,11 +255,10 @@ export default function PersonenDetailPage() {
 
   if (detailQuery.isError) {
     return (
-      <Alert
-        type="error" showIcon
-        title="Person konnte nicht geladen werden"
-        description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
-        action={<Button onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
+      <SeitenFehler
+        text="Person konnte nicht geladen werden"
+        ursache={detailQuery.error}
+        onWiederholen={() => void detailQuery.refetch()}
       />
     );
   }

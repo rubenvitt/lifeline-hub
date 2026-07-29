@@ -1,12 +1,12 @@
-import { Alert, Button, Descriptions, Drawer, Space, Spin, Tag, Typography, theme } from 'antd';
+import { Button, Descriptions, Drawer, Space, Spin, Tag, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { personDetailPfad } from '../routing/deeplinks';
 import { ladePerson, registrierAnzeige } from '../api/einsatzPerson';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META, istPatient } from './personMeta';
 import PersonVerlauf from './PersonVerlauf';
+import { SeitenFehler } from '../components/SeitenZustand';
 
 // Schlanker, NUR-LESEN Personen-Detail-Drawer für Kontexte außerhalb der vollen
 // Personen-Verwaltung (z. B. Klick auf einen Patienten im UHS-Grundriss). Zeigt
@@ -42,12 +42,10 @@ export default function PersonDetailDrawer({
     >
       {detailQuery.isLoading && <Spin />}
       {detailQuery.isError && (
-        <Alert
-          type="error"
-          showIcon
-          title="Person konnte nicht geladen werden"
-          description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
-          action={<Button onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
+        <SeitenFehler
+          text="Person konnte nicht geladen werden"
+          ursache={detailQuery.error}
+          onWiederholen={() => void detailQuery.refetch()}
         />
       )}
       {p && (
