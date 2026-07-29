@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/rubeen/.cargo/bin/cona hook PostToolUse"
+            "command": "[ \"${CONA_RENUDGE_EVERY:-0}\" -gt 0 ] 2>/dev/null && /Users/rubeen/.cargo/bin/cona hook PostToolUse || :"
           }
         ]
       }
