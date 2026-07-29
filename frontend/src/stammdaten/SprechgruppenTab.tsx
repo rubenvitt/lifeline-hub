@@ -62,19 +62,21 @@ export default function SprechgruppenTab() {
     },
     {
       title: 'Aktiv',
-      dataIndex: 'aktiv',
       key: 'aktiv',
       // Zweite Filterachse: der Tab lädt bewusst auch die deaktivierten (`listeSprechgruppen(false)`),
-      // wer nur den Bestand im Funkbetrieb sehen will, blendet sie hier weg. Die Spalte behält
-      // ihren `dataIndex` (der `render` hängt daran) und fällt damit in den Suchkorpus des
-      // Primitivs — „true" trifft jede aktive Zeile. Harmlos, aber kein Wort im Platzhalter wert.
+      // wer nur den Bestand im Funkbetrieb sehen will, blendet sie hier weg.
+      //
+      // Bewusst OHNE `dataIndex` — `onFilter` und `render` bekommen ohnehin den ganzen Datensatz,
+      // ein Bezug trüge hier nur den Drahtwert in den Suchkorpus des Primitivs, das die ROHWERTE
+      // liest. Gemessen: mit `dataIndex: 'aktiv'` traf die Eingabe „al" jede INAKTIVE Zeile
+      // („false") und „ru" jede aktive („true") — Zufallstreffer, die niemand tippen wollte.
+      // Gleiche Bauform wie die Status-Spalte in `pages/BenutzerPage.tsx`.
       filters: [
         { text: 'Aktiv', value: true },
         { text: 'Inaktiv', value: false },
       ],
       onFilter: (wert, sg) => sg.aktiv === wert,
-      render: (aktiv: boolean) =>
-        aktiv ? <Tag color="green">Aktiv</Tag> : <Tag>Inaktiv</Tag>,
+      render: (_, sg) => (sg.aktiv ? <Tag color="green">Aktiv</Tag> : <Tag>Inaktiv</Tag>),
     },
     ...(istAdmin
       ? ([

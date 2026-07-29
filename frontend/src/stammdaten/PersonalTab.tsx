@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { ladePersonalVorschlaege, listePersonal, POSITION_LABELS, setzeDienststatus } from '../api/personal';
-import type { Personal, StaerkePosition } from '../api/types';
+import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 
@@ -55,9 +55,16 @@ export default function PersonalTab() {
     },
     {
       title: 'Stärke-Position',
-      dataIndex: 'staerke_position',
       key: 'staerke_position',
-      render: (p: StaerkePosition | null) => (p ? POSITION_LABELS[p] : '—'),
+      /**
+       * Bewusst OHNE `dataIndex` — dieselbe Regel, die unten an `dienststatus` schon richtig
+       * stand und hier verletzt war. Gemessen mit `dataIndex: 'staerke_position'`: die
+       * Drahtwerte lagen im Suchkorpus des Primitivs, „mann" und „sch" trafen jede
+       * Mannschafts-Person (`mannschaft`), während „Führer" mit Umlaut NICHTS traf — genau
+       * verkehrt herum zu dem, was der Platzhalter verspricht. `render` bekommt den ganzen
+       * Datensatz, die Spalte zeigt unverändert dasselbe.
+       */
+      render: (_, p) => (p.staerke_position ? POSITION_LABELS[p.staerke_position] : '—'),
     },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
     {
@@ -116,10 +123,11 @@ export default function PersonalTab() {
         /**
          * Die Suche des Primitivs liest die ROHWERTE der Spalten mit `dataIndex`, nicht das
          * Gerenderte (Dateikopf `components/KatalogTabelle.tsx`). Der Platzhalter nennt
-         * deshalb nur, was ein Mensch auch so tippt. Zwei Grenzen, die daraus folgen und
-         * bewusst so stehen: die Stärke-Position liegt als Drahtwert (`fuehrer`) mit im Korb
-         * — stiller Beifang, kein Versprechen —, und die Qualifikationen sind eine
-         * Render-Spalte ohne Datenbezug und tragen zur Suche gar nichts bei.
+         * deshalb genau die drei Spalten, die auch beitragen: Name, Personalnr., Träger.
+         * Qualifikationen, Stärke-Position und Status sind Render-Spalten ohne Datenbezug und
+         * tragen zur Suche NICHTS bei — bei den letzten beiden ist das gewollt und geprüft
+         * (`PersonalTab.test.tsx`), sonst lägen ihre Drahtwerte (`mannschaft`, `in_dienst`)
+         * im Korb und die Suche träfe Zeilen, die niemand gemeint hat.
          */
         suche={{ platzhalter: 'Name, Personalnr. oder Träger' }}
         locale={{ emptyText: 'Noch kein Personal' }}

@@ -41,11 +41,35 @@ export default function OnlineQuellenVerwaltung() {
   });
 
   const spalten: TableColumnsType<OnlineQuelle> = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      /**
+       * Leitspalte: am Namen sucht ein Mensch die Quelle, nie an der DB-Kennung — dieselbe
+       * Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
+       *
+       * KEIN `defaultSortOrder`: das Backend liefert `ORDER BY sortier, id`
+       * (`src/karte/registry/repo.rs:141`), und `sortier` ist die vom Admin gesetzte
+       * Reihenfolge des Basemap-Switchers — genau die, die der Nutzer der Lagekarte zu
+       * sehen bekommt. Sie bleibt Voreinstellung; die alphabetische Sortierung ist ein
+       * Angebot, das der dritte Kopfklick zurücknimmt.
+       */
+      sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
+    },
     {
       title: 'Typ',
       dataIndex: 'typ',
       key: 'typ',
+      /**
+       * BEWUSST OHNE `filters`, und das ist keine Auslassung: das Etikett zeigt den
+       * Drahtwert selbst (`{t}` → „vektor"/„raster"), der `dataIndex` trägt ihn damit
+       * ehrlich in die Freitextsuche — „raster" tippen siebt bereits. Ein Filter wäre eine
+       * zweite Tür in denselben Raum.
+       *
+       * Gegenstück ist „Aktiv" weiter unten: dort steht ein Wahrheitswert, den keine
+       * Suche erreicht — deshalb trägt jene Spalte den Filter und diese nicht.
+       */
       render: (t: OnlineQuelle['typ']) => <Tag color={t === 'vektor' ? 'blue' : 'geekblue'}>{t}</Tag>,
     },
     {
@@ -59,12 +83,41 @@ export default function OnlineQuellenVerwaltung() {
       ),
     },
     { title: 'Attribution', dataIndex: 'attribution', key: 'attribution', render: (a: string | null) => a ?? '—' },
-    { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
+    {
+      title: 'Sortierung',
+      dataIndex: 'sortier',
+      key: 'sortier',
+      // Numerisch vergleichen, nicht über die Zeichenkette: nur so steht 5 vor 40.
+      sorter: (a, b) => a.sortier - b.sortier,
+    },
     {
       title: 'Aktiv',
-      dataIndex: 'aktiv',
       key: 'aktiv',
-      render: (a: boolean) => (a ? <Tag color="green">aktiv</Tag> : <Tag>inaktiv</Tag>),
+      /**
+       * Die eine geschlossene Achse dieser Tabelle — und sie existiert wirklich in den
+       * DATEN: die Verwaltungsliste kommt ungefiltert aus `karte_online_quelle`
+       * (`src/karte/registry/repo.rs:141`), anders als der Switcher-Pfad daneben
+       * (`:73`, `WHERE aktiv = 1`). Inaktive Quellen stehen hier also mit drin, und
+       * „welche erscheint überhaupt in der Lagekarte?" ist die erste Frage an diese Tabelle.
+       * Genau daran scheiterte der Filter bei Qualifikationen und Einheitentypen: dort siebt
+       * schon der Server, clientseitig bliebe nichts zu filtern.
+       *
+       * KEIN `dataIndex` (Norm der Katalogtabellen): der Filter braucht ihn nicht
+       * (`onFilter` liest den Datensatz selbst), zöge aber den Wahrheitswert in die
+       * Freitextsuche — „true" träfe dann jede aktive Quelle, ein Wort, das in keiner Zelle
+       * steht. Die Kehrseite ist der Grund für den Filter: ein Wahrheitswert ist über die
+       * Suche NICHT erreichbar, das Filtermenü ist sein einziger Zugang.
+       *
+       * Die Werte sind Wahrheitswerte statt Zeichenketten — antd typisiert das
+       * Filterargument als `React.Key | boolean`, ein `String(wert)`-Umweg wie bei den
+       * Enum-Achsen der Stammdaten ist hier also nicht nötig.
+       */
+      filters: [
+        { text: 'aktiv', value: true },
+        { text: 'inaktiv', value: false },
+      ],
+      onFilter: (wert, q) => q.aktiv === wert,
+      render: (_, q) => (q.aktiv ? <Tag color="green">aktiv</Tag> : <Tag>inaktiv</Tag>),
     },
     ...(istAdmin
       ? ([
@@ -115,6 +168,12 @@ export default function OnlineQuellenVerwaltung() {
           dataSource={quellen}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Online-Quellen' }}
+          // Durchsucht werden die Spalten mit Datenbezug: Name, Typ, URL, Attribution und
+          // (technisch mit) Sortierung. „Aktiv" trägt bewusst keinen `dataIndex` und bleibt
+          // dem Filter vorbehalten. Der Platzhalter nennt die drei Felder, nach denen
+          // tatsächlich getippt wird — die volle Aufzählung würde im 220 px breiten Feld
+          // ohnehin abgeschnitten.
+          suche={{ platzhalter: 'Name, URL oder Attribution' }}
         />
       )}
       <OnlineQuelleFormModal

@@ -149,6 +149,20 @@ export default function OfflineKartenVerwaltung() {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      /**
+       * Leitspalte: am Regionsnamen sucht und vergleicht man eine Offline-Karte, nie an der
+       * DB-Kennung — dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
+       *
+       * KEIN `defaultSortOrder`: das Backend liefert `ORDER BY sortier, id`
+       * (`src/karte/registry/repo.rs:334`); diese fachliche Reihenfolge bleibt Voreinstellung,
+       * die alphabetische ist ein Angebot.
+       *
+       * Die Zelle zeigt mehr, als die Suche liest: „Stand YYYY-MM-DD" und das
+       * Update-Etikett entstehen erst beim Rendern (aus `quell_url` bzw. `update_verfuegbar`)
+       * und tragen deshalb nicht zum Suchkorpus bei — die im Dateikopf von `KatalogTabelle`
+       * beschriebene Grenze, hier ohne Folgen: gesucht wird nach dem Namen.
+       */
+      sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
       render: (name: string, k: OfflineKarte) => {
         const stand = standAusUrl(k.quell_url);
         return (
@@ -174,9 +188,40 @@ export default function OfflineKartenVerwaltung() {
     },
     {
       title: 'Status',
-      dataIndex: 'status',
       key: 'status',
-      render: (s: OfflineKarteStatus, k: OfflineKarte) => {
+      /**
+       * Die Statusachse dieser Tabelle, geschlossen und vollständig in den Daten vorhanden:
+       * `listeOfflineKarten` liefert alle Zeilen (`src/karte/registry/repo.rs:334`), erst der
+       * Auslieferungspfad daneben siebt auf `status = 'bereit'` (`:694`).
+       *
+       * BEWUSST OHNE `dataIndex` (Norm der Katalogtabellen): der Filter braucht ihn nicht
+       * (`onFilter` liest den Datensatz selbst), zöge aber den Drahtwert in die
+       * Freitextsuche — „laedt" ist ein Wort, das niemand tippt, weil die Zelle „lädt" zeigt.
+       * Die Kehrseite: `render` bekommt damit als erstes Argument den DATENSATZ, nicht den
+       * Status; der Status wird unten aus `k.status` gelesen.
+       *
+       * NAMENTLICHE FOLGE, damit sie niemand als Fehler sucht: diese Liste pollt im Zwei-
+       * Sekunden-Takt, solange etwas lädt. Bei gesetztem Filter „lädt" verschwindet eine
+       * Zeile also von selbst aus der Sicht, sobald ihr Download fertig ist. Das ist die
+       * gefilterte Frage ehrlich beantwortet, kein Sprung unter dem Cursor im Sinne von
+       * Kriterium 12 — dort geht es um Zeilen, die ungefragt DAZUkommen.
+       *
+       * Der Filter siebt den STATUS, nicht das Etikett, und einmal fällt beides auseinander:
+       * eine Zeile im In-Place-Neuladen bleibt `status: 'bereit'` und zeigt trotzdem
+       * „aktualisiert" (siehe `render` unten). Sie steckt also im Filter „bereit", nicht in
+       * „lädt" — richtig so, denn die Karte wird währenddessen weiter ausgeliefert.
+       */
+      filters: [
+        { text: 'registriert', value: 'registriert' },
+        { text: 'lädt', value: 'laedt' },
+        { text: 'bereit', value: 'bereit' },
+        { text: 'Fehler', value: 'fehler' },
+      ],
+      // `String(wert)`: antd typisiert das Filterargument als `React.Key | boolean`, nicht
+      // als unser `OfflineKarteStatus`.
+      onFilter: (wert, k) => k.status === String(wert),
+      render: (_: unknown, k: OfflineKarte) => {
+        const s = k.status;
         // Ein Download läuft, wenn status='laedt' (Neu-Zeile) ODER ein In-Place-Reload aktiv ist
         // (die Zeile bleibt 'bereit', trägt aber Live-Fortschritt).
         const laeuft = s === 'laedt' || k.geladen != null;
@@ -210,6 +255,17 @@ export default function OfflineKartenVerwaltung() {
       title: 'Größe',
       dataIndex: 'groesse',
       key: 'groesse',
+      /**
+       * Die zweite Frage an diese Tabelle nach dem Namen: was liegt hier eigentlich auf der
+       * Platte. Numerisch vergleichen, nicht über die formatierte Zeichenkette — sonst stünde
+       * „9,1 MB" hinter „44,0 MB".
+       *
+       * `?? -1`: eine registrierte oder noch ladende Zeile trägt `groesse: null` — unbekannt,
+       * nicht null Bytes. Aufsteigend steht sie damit VOR jeder bekannten Größe, auch vor einer
+       * (theoretischen) Null-Byte-Datei, mit der `?? 0` sie verschmelzen ließe. Der Test misst
+       * die Richtung (unbekannt zuerst), nicht den Unterschied zwischen -1 und 0.
+       */
+      sorter: (a, b) => (a.groesse ?? -1) - (b.groesse ?? -1),
       render: (g: number | null) => formatGroesse(g),
     },
     {
@@ -336,6 +392,11 @@ export default function OfflineKartenVerwaltung() {
           dataSource={karten}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Offline-Karten' }}
+          // Durchsucht werden die Spalten mit Datenbezug: Name, Größe (technisch mit, als
+          // Bytezahl) und Attribution. Status und Anzeige tragen keinen `dataIndex` und damit
+          // nichts bei — Absicht, siehe Statusspalte. Der Platzhalter nennt die beiden Felder,
+          // nach denen tatsächlich getippt wird.
+          suche={{ platzhalter: 'Name oder Attribution' }}
         />
       )}
       <OfflineRegionPicker offen={pickerOffen} onClose={() => setPickerOffen(false)} />

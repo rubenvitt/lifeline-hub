@@ -203,12 +203,22 @@ export default function PersonenPage() {
            * gewechselt — dort stand der Begriff noch im Feld und filterte eine fremde
            * Menge auf leer. Kein Fehler, keine Warnung, nur fehlende Zeilen.
            *
-           * Der Preis, dreifach und gewollt: mit dem Reiterwechsel fallen auch
-           * Sortierung, Spaltenauswahl und die Zeilenschleuse (Sammelbanner) zurück.
+           * Der Preis, vierfach und gewollt: mit dem Reiterwechsel fallen auch
+           * Sortierung, Spaltenauswahl, die Spaltenfilter und die Zeilenschleuse
+           * (Sammelbanner) zurück. Alle vier sind Zustand IM Primitiv
+           * (`eigeneSortierung`, `eigeneSpaltenAus`, `filterWerte`, `schleuse` in
+           * `Datensicht.tsx`) — der Remount trifft sie zwangsläufig alle, das ist keine
+           * Auswahl, sondern die Folge. Drei davon wollen wir; die Sortierung ist
+           * hingenommenes Beiwerk — ihre Spalten sind über die fünf Reiter bis auf
+           * `abgleich` dieselben, ein Zurückfallen auf `standardSortierung` wäre also
+           * verzichtbar und ist nur nicht getrennt abschaltbar.
            * Für die Spaltenauswahl ist das nicht nur hinnehmbar, sondern richtig — die
            * Spaltenliste ist je Reiter eine andere (`abgleichSpalten` existiert nur unter
            * `sicht === 'vermisst'`), eine mitgeschleppte Auswahl trüge also Schlüssel,
-           * die es in der nächsten Sicht gar nicht gibt.
+           * die es in der nächsten Sicht gar nicht gibt. Für die Spaltenfilter gilt
+           * dasselbe eine Stufe schärfer: ihre Werte stammen aus der Menge, in der sie
+           * gesetzt wurden, und würden in der nächsten Sicht Zeilen aus einem Grund
+           * ausblenden, der auf dem Reiter nirgends sichtbar ist.
            */
           key={`liste-${sicht}`}
           bezeichnung="Personen"

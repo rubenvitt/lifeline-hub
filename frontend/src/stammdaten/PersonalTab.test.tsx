@@ -28,11 +28,17 @@ const personal = [
  * eine zweite „Bearbeiten"-Schaltfläche und machte sie mehrdeutig. Absichtlich NICHT
  * alphabetisch hinter „Thomas Müller" — sonst wäre die Reihenfolge nach dem Sortierklick
  * dieselbe wie davor und die Zusicherung bewiese nichts.
+ *
+ * Der Umlaut in „Ömer" ist der Grund für genau diesen Namen und keinen anderen: „Ö" ist
+ * byteweise (U+00D6) HINTER „T", sprachbewusst nach DIN 5007-1 aber davor. Damit fällt die
+ * Sortier-Zusicherung auch, wenn nur das `localeCompare(…, 'de')` der Leitspalte zu einem
+ * schlichten Zeichenvergleich verkommt — vorher blieb sie bei dieser Mutation grün (gemessen).
+ * Wer den Namen „normalisiert", nimmt der Prüfung ihren Zweck.
  */
 const zweiPersonen = [
   personal[0],
   {
-    ...personal[0], id: 2, name: 'Anna Berg', personalnummer: '0815',
+    ...personal[0], id: 2, name: 'Ömer Berg', personalnummer: '0815',
     traegerorganisation: 'THW', staerke_position: 'mannschaft',
     dienststatus: 'ausser_dienst', qualifikationen: [],
   },
@@ -47,6 +53,12 @@ const namen = (c: HTMLElement) =>
  * `Tag` und im Menü —, ein schlichtes `findByText` bräche also an der Mehrdeutigkeit. Und das
  * Menü hängt in einem Portal unter `document.body`, nicht unter dem `container`.
  */
+/** Der Filterauslöser der Status-Spalte, über seine Kopfzelle statt über „der einzige im Baum". */
+const statusTrichter = () =>
+  screen
+    .getByRole('columnheader', { name: /Status/ })
+    .querySelector<HTMLElement>('.ant-table-filter-trigger')!;
+
 async function menueEintrag(text: string): Promise<HTMLElement> {
   const treffer = (await screen.findAllByText(text)).find((k) =>
     k.closest('.ant-table-filter-dropdown'),
@@ -93,27 +105,78 @@ describe('PersonalTab', () => {
   it('Ordnung: die Leitspalte sortiert, Suche und Dienststatus-Filter verengen', async () => {
     const { container } = render(admin, zweiPersonen);
     await screen.findByText('Thomas Müller');
-    expect(namen(container)).toEqual(['Thomas Müller', 'Anna Berg']);
+    expect(namen(container)).toEqual(['Thomas Müller', 'Ömer Berg']);
 
     // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte. jsdom rechnet
     // dort kein Layout — dass der Klick auch am 390-px-Schirm ankommt, ist hier NICHT belegt.
+    // Die Erwartung ist zugleich die Kollationsprobe: byteweise käme „Ömer" hinter „Thomas",
+    // die Reihenfolge bliebe also die der Serverantwort.
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
-    expect(namen(container)).toEqual(['Anna Berg', 'Thomas Müller']);
+    expect(namen(container)).toEqual(['Ömer Berg', 'Thomas Müller']);
 
     // Träger: eine Spalte mit Datenbezug, deren Rohwert ein Mensch auch so tippt.
     const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
     await userEvent.type(feld, 'THW');
-    expect(namen(container)).toEqual(['Anna Berg']);
+    expect(namen(container)).toEqual(['Ömer Berg']);
     await userEvent.clear(feld);
     expect(namen(container)).toHaveLength(2);
 
     // Gefiltert wird die ZEILENMENGE, nicht die Anwesenheit des Trichters: antd zeichnet ihn
     // schon bei gesetztem `filters`, gefiltert wird aber erst mit `onFilter`.
-    await userEvent.click(container.querySelector<HTMLElement>('.ant-table-filter-trigger')!);
+    // Der Trichter wird über seine Kopfzelle gegriffen, nicht als einziger im Container: heute
+    // ist Status die einzige filterbare Spalte, morgen ist es vielleicht nicht mehr so.
+    await userEvent.click(statusTrichter());
     await userEvent.click(await menueEintrag('in Dienst'));
     await userEvent.click(
       document.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
     );
     expect(namen(container)).toEqual(['Thomas Müller']);
+  });
+
+  /**
+   * Die Stärke-Position darf NICHTS zum Suchkorpus des Primitivs beitragen, das die ROHWERTE
+   * der Spalten mit `dataIndex` liest. Gemessen mit `dataIndex: 'staerke_position'`: „mann"
+   * und „sch" trafen jede Mannschafts-Person (Rohwert `mannschaft`), während „Führer" mit
+   * Umlaut nichts traf — genau verkehrt herum zu dem, was der Platzhalter verspricht.
+   *
+   * Die Kontrollsuche steht vorweg und ist nicht Zierde: ohne sie wäre die leere Erwartung auch
+   * dann grün, wenn das Suchfeld gar nicht gefunden wäre.
+   */
+  it('die Stärke-Position trägt nichts zum Suchkorpus bei', async () => {
+    const { container } = render(admin, zweiPersonen);
+    await screen.findByText('Thomas Müller');
+    const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+
+    await userEvent.type(feld, 'Müller');
+    expect(namen(container)).toEqual(['Thomas Müller']);
+    await userEvent.clear(feld);
+    expect(namen(container)).toHaveLength(2);
+
+    // Keine der drei beitragenden Spalten (Name, Personalnr., Träger) trägt „sch" oder „mann".
+    for (const bruchstueck of ['sch', 'mann']) {
+      await userEvent.type(feld, bruchstueck);
+      expect(namen(container)).toEqual([]);
+      await userEvent.clear(feld);
+    }
+  });
+
+  /**
+   * Der zweite Filterwert. Er stand ungeprüft: mit `value: 'voellig_falsch'` statt
+   * `'ausser_dienst'` blieb die Datei grün (gemessen) — belegt war nur die halbe Achse.
+   * Eigener `it` mit frischem Rendern, weil sich die Auswahl im Filtermenü nach dem Anwenden
+   * nicht verlässlich zurücknehmen lässt (die „Reset"-Schaltfläche ist dort deaktiviert,
+   * gemessen in `SprechgruppenTab.test.tsx`).
+   */
+  it('der Dienststatus-Filter kennt auch „außer Dienst"', async () => {
+    const { container } = render(admin, zweiPersonen);
+    await screen.findByText('Thomas Müller');
+    expect(namen(container)).toHaveLength(2);
+
+    await userEvent.click(statusTrichter());
+    await userEvent.click(await menueEintrag('außer Dienst'));
+    await userEvent.click(
+      document.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
+    );
+    expect(namen(container)).toEqual(['Ömer Berg']);
   });
 });

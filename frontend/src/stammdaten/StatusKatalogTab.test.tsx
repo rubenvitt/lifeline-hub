@@ -94,4 +94,41 @@ describe('StatusKatalogTab', () => {
     await waitFor(() => expect(zeilen()).toHaveLength(1));
     expect(zeilen()[0].textContent).toContain('einsatzbereit');
   });
+
+  it('die Freitextsuche greift den Rohwert — deshalb nennt der Platzhalter nur das Label', async () => {
+    /**
+     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props: ohne das Prop
+     * rendert `KatalogTabelle` keine Werkzeugzeile, der Griff aufs Feld fällt dann schon
+     * am `null`, bevor eine Zeile gezählt wird.
+     *
+     * Der zweite Teil pinnt die Begründung, die am Produktivcode nur als Prosa steht: die
+     * Suche liest über `zellenWert` den ROHWERT der Spalte. Die Kategoriespalte zeigt
+     * „verfügbar", trägt aber den Drahtwert `verfuegbar` — wer den Umlaut tippt, findet
+     * nichts. Genau deshalb verspricht der Platzhalter nur „Label" und die Kategorie wird
+     * vom Spaltenfilter oben bedient, nicht von der Suche.
+     *
+     * `userEvent.clear` zwischen den Läufen, damit die Begriffe sich nicht überlagern.
+     */
+    const { container } = render(admin);
+    await screen.findByText('einsatzbereit');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(zeilen()).toHaveLength(2);
+
+    const feld = container.querySelector<HTMLInputElement>('input[type="search"]');
+    expect(feld, 'der Statuskatalog muss ein Suchfeld tragen').not.toBeNull();
+    expect(feld!.placeholder).toBe('Label');
+
+    await userEvent.type(feld!, 'disponiert');
+    expect(zeilen()).toHaveLength(1);
+    expect(zeilen()[0].textContent).toContain('disponiert');
+
+    await userEvent.clear(feld!);
+    await userEvent.type(feld!, 'verfügbar');
+    expect(zeilen()).toHaveLength(0);
+
+    await userEvent.clear(feld!);
+    await userEvent.type(feld!, 'verfuegbar');
+    expect(zeilen()).toHaveLength(1);
+    expect(zeilen()[0].textContent).toContain('einsatzbereit');
+  });
 });

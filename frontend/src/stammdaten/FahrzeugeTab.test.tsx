@@ -98,4 +98,37 @@ describe('FahrzeugeTab', () => {
     await waitFor(() => expect(zeilen()).toHaveLength(1));
     expect(zeilen()[0].textContent).toContain('Rotkreuz 2');
   });
+
+  it('die Freitextsuche verkleinert die Zeilenmenge', async () => {
+    /**
+     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props — genau die
+     * Lücke, die eine Mutationsjagd hier gefunden hat: das Prop entfernt, 32/32 grün.
+     * Ohne das Prop rendert `KatalogTabelle` keine Werkzeugzeile, der Griff aufs Feld
+     * fällt dann schon am `null`, bevor eine Zeile gezählt wird.
+     *
+     * Gesucht wird über den Typ, nicht über den Funkrufnamen: das belegt zugleich, dass
+     * die Suche mehr als die Leitspalte liest, und damit den Platzhalter „Funkrufname,
+     * Typ oder Kennzeichen". „RTW" kommt in keiner datenbezogenen Spalte des ersten
+     * Fahrzeugs vor (`Florian 1` / `LF 20` / — / `XX-AB 1`).
+     *
+     * Kein `waitFor` um die Zählung: `userEvent.type` wickelt den Zustandslauf in `act`
+     * ein, die gefilterte Menge steht danach. Die Filterprüfung oben braucht es, weil das
+     * Menü im Portal erst erscheinen muss.
+     */
+    const { container } = render(admin, [
+      fahrzeug,
+      { ...fahrzeug, id: 2, funkrufname: 'Rotkreuz 2', fahrzeugtyp: 'RTW', kennzeichen: 'XX-CD 2' },
+    ]);
+    await screen.findByText('Florian 1');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(zeilen()).toHaveLength(2);
+
+    const feld = container.querySelector<HTMLInputElement>('input[type="search"]');
+    expect(feld, 'die Fahrzeugtabelle muss ein Suchfeld tragen').not.toBeNull();
+    expect(feld!.placeholder).toBe('Funkrufname, Typ oder Kennzeichen');
+
+    await userEvent.type(feld!, 'RTW');
+    expect(zeilen()).toHaveLength(1);
+    expect(zeilen()[0].textContent).toContain('Rotkreuz 2');
+  });
 });

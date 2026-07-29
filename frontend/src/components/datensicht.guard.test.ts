@@ -30,13 +30,47 @@ import { describe, expect, it } from 'vitest';
  * Untertabellen"), existiert für die abgeleitete Hälfte nicht: die Menge ist durch das
  * Vorkommen der Marke definiert, nicht durch eine Einschätzung.
  *
- * ── DIE VIER GEPFLEGTEN LISTEN ──────────────────────────────────────────────────
+ * ── DIE FÜNF GEPFLEGTEN LISTEN ──────────────────────────────────────────────────
  *
  * Drei SEMANTISCHE Ausnahmemengen ({@link KARTEN_EIGENBAU} — leer, {@link NUR_KARTE} — zwei,
- * {@link NUR_TABELLE} — eine) und eine PFLICHTMENGE ({@link VOLLMENGE_PFLICHT} — eine). Alle
- * vier sind auf ihre Länge gepinnt und werden auf tote Einträge geprüft: wer eine Datei
- * einträgt, ohne sie umzubauen, fällt am Anwesenheits-Gegentest auf — ein toter Eintrag
- * wird gemeldet, nicht geduldet.
+ * {@link NUR_TABELLE} — eine), eine PFLICHTMENGE ({@link VOLLMENGE_PFLICHT} — eine) und eine
+ * SCHULDMENGE ({@link REITERSCHLUESSEL_OFFEN} — eine). Alle fünf sind auf ihre Länge gepinnt
+ * und werden auf tote Einträge geprüft: wer eine Datei einträgt, ohne sie umzubauen, fällt am
+ * Anwesenheits-Gegentest auf — ein toter Eintrag wird gemeldet, nicht geduldet.
+ *
+ * ── DIE ZWEI SCHLÜSSELREGELN, und warum es zwei sein müssen ─────────────────────
+ *
+ * Sie fangen ZWEI verschiedene Gestalten desselben Fehlers, und keine sieht die andere.
+ *
+ * 1. {@link schluesselBefunde} — MEHRERE Sichten, EINE Baumstelle. Greift ab zwei
+ *    `<Datensicht>` je Datei und verlangt distinkte `key`. Gemessen an `PersonenPage`.
+ * 2. {@link reiterBefunde} — EINE Sicht, MEHRERE Reiter. Die häufigere Gestalt, und für
+ *    Regel 1 grundsätzlich unsichtbar: eine Datei mit genau einem `<Datensicht>` fällt aus
+ *    deren Filter (`stellen.length < 2`) heraus, bevor irgendetwas geprüft wird. Genau so
+ *    sah der Fehler aus, gegen den dieser Guard gebaut wurde — ein Element, fünf Reiter,
+ *    fünf Datenmengen.
+ *
+ * Regel 2 kann „ein Schlüssel trägt eine Reiterachse" nicht beweisen; das ist statisch nicht
+ * sicher entscheidbar. Sie nähert an, und die Näherung ist an DREI Stellen verankert, die im
+ * Quelltext nachweisbar sind statt geraten:
+ *
+ * · Die ACHSE kommt aus dem Attribut, das ein {@link SICHTSCHALTER}-Element bindet
+ *   (`activeKey=`/`value=`) — nicht aus einer Namenskonvention wie `useState<Sicht>`. Das
+ *   Attribut ist die Stelle, an der die Achse nachweislich hängt; ein Typname ist ein Vorschlag.
+ * · GEMELDET wird nur, wenn `daten` an der Achse hängt und der `key` NICHT. Ein konstanter
+ *   Schlüssel über achsunabhängigen Daten ist richtig, nicht verdächtig.
+ * · Der Weg von `daten` zur Achse läuft über die lokalen `const`-Initialisierer der Datei
+ *   (Tiefe 3), weil die reale Form `daten={tiere}` mit `const tiere = filterTiere(alle,
+ *   { sicht })` eine Stufe entfernt liegt und eine direkte Prüfung sie verfehlte.
+ *
+ * GEMESSEN am Baum dieses Bündels, und das ist die Begründung für „bauen" statt „nur
+ * dokumentieren": 9 Konsumenten, davon 2 mit Schalterachse, zusammen 3 Sichtstellen →
+ * 1 Meldung, 0 Fehlalarme. Beide Sichten von `PersonenPage` bleiben still, und zwar aus dem
+ * richtigen Grund: `key="patienten"` steht über `alle.filter(istPatient)` (achsunabhängig,
+ * also kein Befund), `` key={`liste-${sicht}`} `` über `filterPersonen(alle, sicht)` (Achse im
+ * Schlüssel). Die eine Meldung ist echt und steht in {@link REITERSCHLUESSEL_OFFEN}.
+ * Zur künftigen Reichweite ehrlich: repoweit tragen 13 Dateien eine Schalterachse — die Regel
+ * ist an 2 gemessen, nicht an 13.
  *
  * ── WIE ER SEINE EIGENE PROSA NICHT MITZÄHLT — dreifach ─────────────────────────
  *
@@ -73,6 +107,22 @@ import { describe, expect, it } from 'vitest';
  *   auseinanderlaufen; zwei verschieden geschriebene, die denselben Wert liefern, fallen
  *   nicht auf. Ein `key` in einem `{...spread}` wird nicht gesucht — es steht nicht am
  *   Element.
+ * · **Die Achsverfolgung von {@link reiterBefunde} ist eine Näherung, an vier benannten
+ *   Stellen.** (a) Sie misst QUELLTEXT: `haengtAnAchse` sucht Bezeichner per Regex, ein
+ *   Achsenname in einem Zeichenkettenliteral zählt also mit — bei `daten` zu scharf, beim
+ *   `key` zu milde. (b) Die Initialisierer-Karte ist FLACH über die ganze Datei, ohne
+ *   Gültigkeitsbereiche: zwei gleichnamige lokale Bindungen fallen zusammen. (c) Aus dem
+ *   Schalter-Attribut wird JEDER Bezeichner zur Achse — bei `activeKey={filter.reiter}`
+ *   also auch `filter`. (d) Als Schalter gelten nur die drei Tags in {@link SICHTSCHALTER};
+ *   eine handgebaute Reiterleiste aus `<Button>`n ist keiner. (e) Der EINGANG der Regel ist
+ *   das `daten`-Attribut am Element — eine Sicht, die ihre Zeilen aus einem `{...spread}`
+ *   bezieht, hat für den Guard keine Daten und wird stillschweigend übersprungen. Dieselbe
+ *   Spread-Grenze wie beim `key` eine Zeile höher, hier aber folgenreicher: beim `key` fehlt
+ *   dann eine Angabe, hier fällt die ganze Prüfung aus. Die Näherung ist gemessen
+ *   (0 Fehlalarme auf 3 Sichtstellen), nicht bewiesen.
+ * · **Ob ein Reiterwechsel den Zustand überhaupt zurücksetzen SOLL.** Der Guard verlangt nur,
+ *   dass die Entscheidung im Schlüssel steht. Wer den Zustand bewusst mitnimmt, trägt sie
+ *   nicht dort ein und braucht einen Eintrag in {@link REITERSCHLUESSEL_OFFEN} mit Begründung.
  * · **Die vier Marken aus {@link VERBOTEN_BEI_VOLLMENGE} treffen nur die wörtliche Form.**
  *   Ein `filter: WERTE_FILTER` aus einer Konstanten, ein durch einen Wrapper gereichtes
  *   `suche={props.suche}` oder ein `{...datensichtProps}` mit einer dieser Angaben darin
@@ -91,6 +141,8 @@ const SRC = (() => {
 
 const PRIMITIV = '/src/components/Datensicht.tsx';
 const ENDUNGEN = /\.(ts|tsx)$/;
+/** Bezeichner im Quelltext — bewusst textuell, samt der Grenzen im Kopfkommentar. */
+const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
 
 /**
  * Dateien, die `art: 'eigen'` im Kartenplan setzen dürfen.
@@ -140,6 +192,25 @@ const NUR_TABELLE: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
  * Diese Liste ist deshalb dateibezogen und KEINE repoweite Zusicherung.
  */
 const VOLLMENGE_PFLICHT: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
+
+/**
+ * Dateien mit einer Reiterachse, deren Sicht den Reiter NICHT im Schlüssel trägt.
+ *
+ * KEINE Ausnahmemenge, sondern eine SCHULDMENGE: die vier Listen oben sagen „so ist es
+ * richtig", diese sagt „so ist es, und es ist falsch". Deshalb steht in ihrem Gegentest die
+ * umgekehrte Erwartung — ein Eintrag muss WEITERHIN GEMELDET WERDEN. Verschwindet die
+ * Meldung, ist entweder die Datei repariert (Eintrag löschen) oder die Regel kaputt.
+ *
+ * Der eine Eintrag ist gemessen, nicht vermutet: `TierePage` schaltet vier Reiter
+ * (`aktiv`/`vermisst`/`abgeschlossen`/`alle`) über `filterTiere(alle, { sicht, spezies })` auf
+ * die Zeilenmenge und rendert dafür EINE `<Datensicht>` ohne `key` — mit `suche` und
+ * `standardSortierung` im Primitiv. Das ist Wort für Wort die an `PersonenPage` gemessene
+ * Falle: im Reiter A gesucht, auf B gewechselt, der Begriff steht noch im Feld und filtert
+ * eine fremde Menge auf leer. Behoben wird sie hier NICHT — `pages/TierePage.tsx` gehört
+ * einem anderen Bündel; ein Guard-Bündel, das fremde Seiten mitrepariert, kollidiert mit dem,
+ * das sie gerade umbaut.
+ */
+const REITERSCHLUESSEL_OFFEN: string[] = ['/src/pages/TierePage.tsx'];
 
 /**
  * Das Konsumenteninventar von LFH-330 · B2, handgeschrieben — nicht aus dem Scan abgeleitet.
@@ -226,30 +297,63 @@ function istTest(pfad: string): boolean {
   return /\.test\.[jt]sx?$/.test(pfad) || /\.generated\.[jt]sx?$/.test(pfad);
 }
 
-/** Eine `<Datensicht>`-Stelle samt dem, was AM ELEMENT als `key` steht. */
+/** Eine `<Datensicht>`-Stelle samt dem, was AM ELEMENT als `key` und als `daten` steht. */
 export interface Sichtstelle {
   /** 1-basiert, wie in Editor-/Guard-Meldungen üblich. */
   zeile: number;
   /** Quelltext des Schlüssels (`"patienten"`, `` `liste-${sicht}` ``) oder `null`. */
   schluessel: string | null;
+  /** Quelltext der Zeilenmenge (`tiere`, `filterPersonen(alle, sicht)`) oder `null`. */
+  daten: string | null;
 }
 
-/** Das `key`-Attribut AM Element — Spreads werden nicht durchsucht (siehe Kopfkommentar). */
-function schluesselVon(element: ts.JsxOpeningLikeElement, quelle: ts.SourceFile): string | null {
+/**
+ * Ein Attribut AM Element — Spreads werden nicht durchsucht (siehe Kopfkommentar).
+ * Zeichenkettenliterale kommen mit Anführungszeichen zurück, damit `key="a"` und `key={a}`
+ * in der Meldung unterscheidbar bleiben.
+ */
+function attributVon(
+  element: ts.JsxOpeningLikeElement,
+  name: string,
+  quelle: ts.SourceFile,
+): string | null {
   for (const attribut of element.attributes.properties) {
-    if (!ts.isJsxAttribute(attribut) || attribut.name.getText(quelle) !== 'key') continue;
+    if (!ts.isJsxAttribute(attribut) || attribut.name.getText(quelle) !== name) continue;
     const wert = attribut.initializer;
-    if (wert == null) return 'key'; // bloßes `key` ohne Wert — formal da, praktisch leer
+    if (wert == null) return name; // bloßes `key` ohne Wert — formal da, praktisch leer
     if (ts.isStringLiteral(wert)) return JSON.stringify(wert.text);
-    if (ts.isJsxExpression(wert)) return wert.expression?.getText(quelle) ?? 'key={}';
+    if (ts.isJsxExpression(wert)) return wert.expression?.getText(quelle) ?? `${name}={}`;
     return wert.getText(quelle);
   }
   return null;
 }
 
 /**
- * Alle `<Datensicht>`-Stellen einer Datei — AST statt Regex, nach dem Muster von
- * `api/queryKeyScan.ts`.
+ * Elemente, die eine Sicht-/Reiterachse schalten, je mit dem Attribut, das die AKTIVE Achse
+ * trägt.
+ *
+ * Nur diese drei — eine handgebaute Reiterleiste aus `<Button>`n erkennt der Guard nicht
+ * (im Kopf benannt). Der Bezeichner kommt aus dem ATTRIBUT, nicht aus einer Namenskonvention:
+ * `useState<Sicht>` heißt anderswo `modus` oder `tab`, aber `activeKey={…}` ist die Stelle,
+ * an der die Achse nachweislich gebunden wird.
+ */
+const SICHTSCHALTER: Readonly<Record<string, string>> = {
+  Tabs: 'activeKey',
+  Segmented: 'value',
+  'Radio.Group': 'value',
+};
+
+/** Was EIN AST-Durchlauf über eine Datei hergibt. */
+export interface Dateilage {
+  stellen: Sichtstelle[];
+  /** Bezeichner aus dem Schalter-Attribut eines {@link SICHTSCHALTER}-Elements. */
+  achsen: Set<string>;
+  /** `const x = …` der ganzen Datei, FLACH — ohne Gültigkeitsbereiche (siehe Kopf). */
+  initialisierer: Map<string, string>;
+}
+
+/**
+ * Ein Durchlauf, drei Ausbeuten — AST statt Regex, nach dem Muster von `api/queryKeyScan.ts`.
  *
  * Der Grund ist gemessen: die Vorgängerform zählte jedes `key=` der ganzen DATEI gegen die
  * Zahl der Sichten, und die Treffer stammen überwiegend aus Spalten-Renderern
@@ -260,7 +364,7 @@ function schluesselVon(element: ts.JsxOpeningLikeElement, quelle: ts.SourceFile)
  * `ohneKommentare` läuft hier NICHT: Kommentare sind keine AST-Knoten, und das Strippen
  * verschöbe nur die Zeilennummern der Meldung.
  */
-export function sichtstellen(pfad: string, quelltext: string): Sichtstelle[] {
+export function leseDatei(pfad: string, quelltext: string): Dateilage {
   const quelle = ts.createSourceFile(
     pfad,
     quelltext,
@@ -269,20 +373,37 @@ export function sichtstellen(pfad: string, quelltext: string): Sichtstelle[] {
     pfad.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const stellen: Sichtstelle[] = [];
+  const achsen = new Set<string>();
+  const initialisierer = new Map<string, string>();
+
   const gehe = (knoten: ts.Node): void => {
-    if (
-      (ts.isJsxOpeningElement(knoten) || ts.isJsxSelfClosingElement(knoten)) &&
-      knoten.tagName.getText(quelle) === 'Datensicht'
-    ) {
-      stellen.push({
-        zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
-        schluessel: schluesselVon(knoten, quelle),
-      });
+    if (ts.isVariableDeclaration(knoten) && ts.isIdentifier(knoten.name) && knoten.initializer) {
+      initialisierer.set(knoten.name.text, knoten.initializer.getText(quelle));
+    }
+    if (ts.isJsxOpeningElement(knoten) || ts.isJsxSelfClosingElement(knoten)) {
+      const tag = knoten.tagName.getText(quelle);
+      const schalterAttribut = SICHTSCHALTER[tag];
+      if (schalterAttribut != null) {
+        const wert = attributVon(knoten, schalterAttribut, quelle);
+        for (const bezeichner of wert?.match(BEZEICHNER) ?? []) achsen.add(bezeichner);
+      }
+      if (tag === 'Datensicht') {
+        stellen.push({
+          zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
+          schluessel: attributVon(knoten, 'key', quelle),
+          daten: attributVon(knoten, 'daten', quelle),
+        });
+      }
     }
     ts.forEachChild(knoten, gehe);
   };
   gehe(quelle);
-  return stellen;
+  return { stellen, achsen, initialisierer };
+}
+
+/** Alle `<Datensicht>`-Stellen einer Datei. */
+export function sichtstellen(pfad: string, quelltext: string): Sichtstelle[] {
+  return leseDatei(pfad, quelltext).stellen;
 }
 
 /**
@@ -315,6 +436,72 @@ export function schluesselBefunde(
     }
     for (const [schluessel, anzahl] of haeufigkeit) {
       if (anzahl > 1) gefunden.push(`${pfad}: ${anzahl} Sichten teilen den key ${schluessel}.`);
+    }
+  }
+  return gefunden;
+}
+
+/**
+ * Hängt ein Ausdruck an einem der Achsen-Bezeichner — direkt oder über lokale `const`?
+ *
+ * Die Tiefe ist der Grund, warum die Regel überhaupt greift: die reale Form ist nicht
+ * `daten={f(sicht)}`, sondern `daten={tiere}` mit `const tiere = filterTiere(alle, { sicht })`
+ * eine Stufe darüber. Bei Tiefe 0 wäre der einzige gemessene Befund unsichtbar (per Probe
+ * belegt: Tiefe 0 → 0 Meldungen). Drei Stufen, weil die Kette in der Praxis eine ist und die
+ * Reserve billig ist; unbegrenzt wäre sie es nicht, `gesehen` bricht Zyklen ohnehin ab.
+ */
+export function haengtAnAchse(
+  ausdruck: string,
+  achsen: ReadonlySet<string>,
+  initialisierer: ReadonlyMap<string, string>,
+  tiefe = 3,
+): boolean {
+  const gesehen = new Set<string>();
+  let text = ausdruck;
+  for (let stufe = 0; stufe <= tiefe; stufe++) {
+    const bezeichner = text.match(BEZEICHNER) ?? [];
+    if (bezeichner.some((b) => achsen.has(b))) return true;
+    let naechste = '';
+    for (const b of bezeichner) {
+      if (gesehen.has(b)) continue;
+      gesehen.add(b);
+      const init = initialisierer.get(b);
+      if (init != null) naechste += ` ${init}`;
+    }
+    if (naechste === '') return false;
+    text = naechste;
+  }
+  return false;
+}
+
+/**
+ * Befunde der Reiterregel: hängt die Zeilenmenge einer Sicht an der Reiterachse, muss der
+ * `key` es auch tun. Rein und exportiert wie {@link schluesselBefunde} — Bauform aus
+ * `useViewport.guard.test.ts`.
+ *
+ * Was hier NICHT gemeldet wird, ist so wichtig wie was gemeldet wird: eine Datei ohne
+ * Schalterachse, und eine Sicht mit konstantem Schlüssel über achsunabhängigen Daten. Sonst
+ * schlüge die Regel an `PersonenPage`s `key="patienten"` an — richtig geschrieben, weil
+ * `alle.filter(istPatient)` nicht am Reiter hängt.
+ */
+export function reiterBefunde(dateien: Record<string, string>, nur: readonly string[]): string[] {
+  const gefunden: string[] = [];
+  for (const [pfad, roh] of Object.entries(dateien)) {
+    if (!nur.includes(pfad)) continue;
+    const { stellen, achsen, initialisierer } = leseDatei(pfad, roh);
+    if (achsen.size === 0) continue; // keine Reiterachse → nichts zu tragen
+    for (const stelle of stellen) {
+      if (stelle.daten == null) continue;
+      if (!haengtAnAchse(stelle.daten, achsen, initialisierer)) continue;
+      if (stelle.schluessel != null && haengtAnAchse(stelle.schluessel, achsen, initialisierer)) {
+        continue;
+      }
+      gefunden.push(
+        `${pfad}: Zeile ${stelle.zeile} — daten={${stelle.daten}} hängt an der Reiterachse ` +
+          `${[...achsen].sort().join('/')}, der key (${stelle.schluessel ?? 'fehlt'}) nicht. ` +
+          'React reicht beim Reiterwechsel dieselbe Instanz weiter: Suchbegriff, Spaltenfilter, ' +
+          'Sortierung und Zeilenschleuse stehen danach über einer fremden Menge.',
+      );
     }
   }
   return gefunden;
@@ -521,7 +708,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     ).toEqual([]);
   });
 
-  it('die vier gepflegten Listen stehen auf dem entschiedenen Stand', () => {
+  it('die fünf gepflegten Listen stehen auf dem entschiedenen Stand', () => {
     // `KARTEN_EIGENBAU` bleibt leer, und das ist die Aussage: kein Modul dieses Pakets
     // brauchte einen eigenen Kartenrenderer. Wer den ersten einträgt, muss begründen, warum
     // der Plan-Modus nicht reicht — sonst wächst die Ausnahme über das Band auf fünf.
@@ -534,6 +721,9 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
     // (Aggregate stromaufwärts über die Vollmenge), nicht bloß den Verweis hierauf.
     expect(VOLLMENGE_PFLICHT).toHaveLength(1);
+    // Die fünfte ist eine SCHULD, keine Ausnahme — sie soll schrumpfen, nicht stehen. Ein
+    // zweiter Eintrag ist kein Vermerk, sondern eine zweite Seite mit demselben Fehler.
+    expect(REITERSCHLUESSEL_OFFEN).toHaveLength(1);
   });
 
   it('Sentinel: der Scan sieht das Primitiv und mehr als 200 Dateien', () => {
@@ -575,6 +765,81 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       'Zwei Sichten an derselben Baumstelle teilen ihren Zustand — jede braucht ihr eigenes, ' +
         'von den anderen verschiedenes key.',
     ).toEqual([]);
+  });
+
+  it('eine reiterabhängige Sicht trägt den Reiter im Schlüssel', () => {
+    /**
+     * Die ZWEITE Gestalt desselben Fehlers, und die häufigere: nicht zwei Sichten in einem
+     * Ternär, sondern EINE Sicht über mehreren Reitern. Die Regel darüber sieht sie
+     * grundsätzlich nicht — sie steigt bei `stellen.length < 2` aus, und eine Seite mit einem
+     * einzigen `<Datensicht>` kommt nie an ihre Zusicherung heran. Genau so sah der an
+     * `PersonenPage` behobene Fehler aus: ein Element, fünf Reiter, fünf Datenmengen.
+     */
+    const gemeldet = reiterBefunde(dateien, KONSUMENTEN);
+    const istOffen = (b: string): boolean =>
+      REITERSCHLUESSEL_OFFEN.some((p) => b.startsWith(`${p}:`));
+    expect(
+      gemeldet.filter((b) => !istOffen(b)),
+      'Wer eine Reiterachse auf die Zeilenmenge legt, trägt den Reiter in den key — sonst ' +
+        'reicht React beim Wechsel dieselbe Instanz samt Suchbegriff und Spaltenfilter weiter.',
+    ).toEqual([]);
+
+    // Der Gegentest der SCHULDMENGE steht umgekehrt zu dem der vier Ausnahmelisten: dort ist
+    // ein Eintrag tot, wenn er NICHT mehr zutrifft — hier, wenn er nicht mehr GEMELDET wird.
+    // Beides fängt dieselbe zwei Fehler, aber nur so herum: die Anwesenheitsprüfung oben
+    // (`konsumenten.includes`) bliebe grün, sobald TierePage seinen Schlüssel bekommt.
+    for (const eintrag of REITERSCHLUESSEL_OFFEN) {
+      // Die Datei-Existenz zuerst und GETRENNT: sonst behauptete die Meldung unten bei einer
+      // gelöschten oder umbenannten Datei eine von zwei Ursachen, von denen keine zutrifft.
+      expect(
+        dateien[eintrag] != null,
+        `tote Ausnahme in REITERSCHLUESSEL_OFFEN: ${eintrag} gibt es nicht mehr — ` +
+          'umbenannt oder gelöscht, Eintrag nachziehen.',
+      ).toBe(true);
+      expect(
+        gemeldet.some((b) => b.startsWith(`${eintrag}:`)),
+        `toter Eintrag in REITERSCHLUESSEL_OFFEN: ${eintrag} wird nicht mehr gemeldet. ` +
+          'Entweder hat die Datei ihren Reiterschlüssel bekommen — dann den Eintrag löschen — ' +
+          'oder die Regel sieht sie nicht mehr, dann ist der Scanner kaputt und die anderen ' +
+          'Zeilen dieses Tests sind wertlos grün.',
+      ).toBe(true);
+    }
+  });
+
+  it('Selbstbeweis: die Reiterregel trifft die eine Form und verschont die drei anderen', () => {
+    const reiter = ['const x = <Tabs activeKey={sicht} onChange={setSicht} />;'];
+    const lauf = (zeilen: string[]): string[] =>
+      reiterBefunde({ '/src/pages/R.tsx': zeilen.join('\n') }, ['/src/pages/R.tsx']);
+
+    // (a) Der Befund: Achse gesetzt, Daten hängen daran — über eine lokale const, also eine
+    // Stufe entfernt, wie in der echten Datei —, der Schlüssel fehlt.
+    const getroffen = lauf([
+      ...reiter,
+      'const zeilen = filterTiere(alle, { sicht });',
+      'const y = <Datensicht daten={zeilen} suche={{ platzhalter: "x" }} />;',
+    ]);
+    expect(getroffen).toHaveLength(1);
+    expect(getroffen[0]).toContain('der key (fehlt) nicht');
+
+    // (b) Derselbe Aufbau MIT Reiter im Schlüssel ist still — das ist die Behebung, und der
+    // Test wäre wertlos, wenn er sie nicht von (a) unterscheiden könnte.
+    expect(
+      lauf([
+        ...reiter,
+        'const zeilen = filterTiere(alle, { sicht });',
+        'const y = <Datensicht key={`liste-${sicht}`} daten={zeilen} />;',
+      ]),
+    ).toEqual([]);
+
+    // (c) KONSTANTER Schlüssel über achsunabhängigen Daten ist richtig, nicht verdächtig —
+    // die Form von `key="patienten"`. Ohne diese Zeile wäre die Regel an PersonenPage rot.
+    expect(
+      lauf([...reiter, 'const y = <Datensicht key="patienten" daten={alle.filter(istPatient)} />;']),
+    ).toEqual([]);
+
+    // (d) Ohne Schalterachse gibt es keinen Reiter, den ein Schlüssel tragen könnte. Ohne
+    // diesen Ausstieg meldete die Regel jede schlüssellose Sicht des Repos.
+    expect(lauf(['const y = <Datensicht daten={filterTiere(alle, { sicht })} />;'])).toEqual([]);
   });
 
   it('Sentinel: der Schlüssel-Scan sieht die zwei Sichten von PersonenPage', () => {
