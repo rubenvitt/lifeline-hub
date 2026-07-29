@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
@@ -11,7 +11,8 @@ import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
-import { parseRouteId } from '../routing/deeplinks';
+import { etbPfad, parseRouteId } from '../routing/deeplinks';
+import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { useEffect, useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
@@ -28,6 +29,19 @@ export default function EtbPage() {
   // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207-C):
   // der etb-Listener dort invalidiert ['etb', einsatzId] (Prefix deckt die gefilterte Liste ab).
   const [filter, setFilter] = useState<EtbFilterWerte>({});
+  /**
+   * Zählmarke, die `EtbFilterleiste` neu aufsetzt. Die Leiste hält eine eigene Kopie des
+   * Filters und ihre Felder sind unkontrolliert — Begründung samt Zeitzonen-Fehlermodus im
+   * Dateikopf von `etb/EtbFilterleiste.tsx`. Ein Reset allein auf `filter` ließe die
+   * sichtbaren Eingaben stehen.
+   */
+  const [filterMarke, setFilterMarke] = useState(0);
+  const filterAktiv = Object.keys(filter).length > 0;
+
+  function filterZuruecksetzen() {
+    setFilter({});
+    setFilterMarke((m) => m + 1);
+  }
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -50,6 +64,9 @@ export default function EtbPage() {
         : undefined,
   });
 
+  // Die leere Ersatzliste bleibt: `dataSource` braucht ein Array, und solange der Abruf
+  // läuft, gibt es keins. Falsch war daran nie die Ersatzliste, sondern das fehlende
+  // Lade-/Fehler-Gate daneben — das steht jetzt in `leerInhalt` weiter unten.
   const eintraege = etbQuery.data?.pages.flat() ?? [];
 
   const qc = useQueryClient();
@@ -130,21 +147,55 @@ export default function EtbPage() {
     }
   }
 
+  // Seitenzustand (nicht Listenzustand): ohne den Einsatz gibt es weder Breadcrumb noch
+  // Schreibrecht — deshalb Frühausstieg. Der Listenzustand des Tagebuchs wird unten an
+  // der Tabelle entschieden, nicht hier (Spec-Festlegung D3).
   if (einsatzQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
-      </div>
-    );
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
 
   const darfAbschliessen = darfEinsatzLeiten(einsatz, benutzer);
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+
+  /**
+   * Der vierteilige Zustandsraum des Tagebuchs, dritter und vierter Teil: leer-mit-Filter
+   * und leer-ohne-Filter. Laden und Fehler unterdrücken diesen Knoten in `EtbTabelle`.
+   *
+   * Die Rechte-Weiche ist keine Kosmetik: ohne Schreibrecht wird die Erfassungsleiste gar
+   * nicht gerendert (siehe unten), ein Sprung dorthin zeigte auf einen Knoten, den es
+   * nicht gibt. Deshalb derselbe Titel, aber ein anderer Hinweis und keine Aktion.
+   */
+  const leerInhalt = filterAktiv ? (
+    <SeitenLeer
+      titel="Kein Eintrag passt zum Filter"
+      hinweis="Zeitraum, Typ oder Suchbegriff einschränken — oder den Filter zurücksetzen."
+      aktion={{ label: 'Filter zurücksetzen', onClick: filterZuruecksetzen }}
+    />
+  ) : darfSchreiben ? (
+    <SeitenLeer
+      titel="Noch keine Einträge."
+      hinweis="Die angepinnte Erfassungszeile am Kopf des Tagebuchs nimmt den ersten Eintrag auf."
+      // Ziel aus der Deeplink-Registry, nicht als Vorlagentext von Hand: `?neu=1` rollt die
+      // Erfassungszeile ins Bild und fokussiert sie (Effekt oben).
+      aktion={{ label: 'Ersten Eintrag erfassen', pfad: etbPfad(einsatzId, { neu: true }) }}
+    />
+  ) : (
+    <SeitenLeer
+      titel="Noch keine Einträge."
+      hinweis="Sobald jemand mit Schreibrecht etwas einträgt, erscheint es hier."
+    />
+  );
 
   return (
     <div>
@@ -207,16 +258,21 @@ export default function EtbPage() {
         </div>
       )}
 
+      {/* Die Meldung steht ÜBER der Tabelle, statt sie auszutauschen: bereits geladene
+          Einträge bleiben lesbar, wenn nur das Nachladen scheitert. Den Leertext
+          unterdrückt dafür `EtbTabelle` (Spec-Festlegung D4). Wortlaut unverändert,
+          dazugekommen sind Ursache und Wiederholung. */}
       {etbQuery.isError && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 12 }}
-          title="ETB-Einträge konnten nicht geladen werden"
-        />
+        <div style={{ marginBottom: 12 }}>
+          <SeitenFehler
+            text="ETB-Einträge konnten nicht geladen werden"
+            ursache={etbQuery.error}
+            onWiederholen={() => void etbQuery.refetch()}
+          />
+        </div>
       )}
 
-      <EtbFilterleiste onChange={setFilter} />
+      <EtbFilterleiste key={filterMarke} onChange={setFilter} />
       {abgelehnt.length > 0 && (
         <Alert
           type="error"
@@ -262,6 +318,9 @@ export default function EtbPage() {
         eintraege={eintraege}
         einsatzId={einsatzId}
         highlightId={highlightId}
+        ladend={etbQuery.isLoading}
+        fehler={etbQuery.isError}
+        leerText={leerInhalt}
         onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
         onWiedervorlage={darfSchreiben ? (e) => setWiedervorlageZu(e) : undefined}
         onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}

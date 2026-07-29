@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import { App, Spin } from 'antd';
+import { Alert, App } from 'antd';
 import { ApiError } from '../api/client';
+import { SeitenSkeleton } from '../components/SeitenZustand';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import { gefahrenPfad, parseRouteId } from '../routing/deeplinks';
@@ -27,6 +28,25 @@ import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
 import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
+
+/**
+ * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird.
+ *
+ * Drei, weil der Grenzfall der Totalausfall ist: dann scheitern alle elf, und
+ * „Lagebild unvollständig: Einsatzdaten, Unfallhilfsstellen, Schäden, Einheiten, Fahrzeuge,
+ * Einsatzabschnitte, …" ist eine Zeile, die im Einsatz niemand liest. Die Zahl trägt die
+ * Aussage „das ist nicht ein Ausfall, sondern alle", die ersten drei Namen den Einstieg für
+ * den Einzelfall — und der ist der häufigere.
+ */
+const QUELLEN_NAMEN_MAX = 3;
+
+/** Meldungszeile des Warn-Overlays. Exportiert, damit die Kürzungsregel ohne Karte prüfbar ist. */
+export function quellenMeldung(quellen: string[]): string {
+  const kopf = quellen.slice(0, QUELLEN_NAMEN_MAX).join(', ');
+  const rest = quellen.length - QUELLEN_NAMEN_MAX;
+  if (rest <= 0) return `Lagebild unvollständig: ${kopf}`;
+  return `Lagebild unvollständig: ${kopf} und ${rest === 1 ? 'eine' : rest} weitere`;
+}
 
 export default function LagekartePage() {
   const { id } = useParams();
@@ -60,6 +80,7 @@ export default function LagekartePage() {
   // getrennten localStorage-Quellen ab.
   const {
     ansichten, aktiveAnsichtId,
+    ansichtenFehler, ansichtenFehlerUrsache, ansichtenNeuLaden,
     neueAnsicht, umbenennen, setzeStandard, loeschen, ansichtBusy,
     basemap, setBasemap, onlineStilName, setOnlineStilName, kartenTheme, setKartenTheme,
     fachebenenSichtbar, setFachebenenSichtbar, layer, setLayer,
@@ -69,7 +90,7 @@ export default function LagekartePage() {
   // Domänen-Daten + Marker-Ableitungen (SSE-Live liegt im EinsatzLayout, keine eigene
   // EventSource hier — eine 2. Verbindung/Seite spränge das HTTP/1.1-6-Limit).
   const {
-    einsatz, darfSchreiben, ladt, gebiete,
+    einsatz, darfSchreiben, ladt, gebiete, fehlerhafteQuellen, neuLaden,
     verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen, freieZeichen,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
@@ -197,6 +218,7 @@ export default function LagekartePage() {
 
   const {
     bilder, bildOverlays, aktivesPlatzierBild, bildPlatzierZentrum,
+    bilderFehler, bilderFehlerUrsache, bilderNeuLaden,
     onBildUpload, onBildToggle, onBildOpazitaet, onBildLoeschen, onBildVerschieben,
     onPlatzierGeometrie, onBildZentrieren, onBildUmbenennen, onBildMittelpunkt,
   } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
@@ -235,177 +257,234 @@ export default function LagekartePage() {
   }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
 
   if (ladt) {
-    return <Spin style={{ marginTop: 64 }} />;
+    return <SeitenSkeleton />;
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 120px)', position: 'relative' }}>
-      <Sidebar
-        einsatzId={einsatzId}
-        nichtVerortet={nichtVerortetAlle}
-        verortet={alleVerortet}
-        darfSchreiben={!!darfSchreiben}
-        platzierungZiel={platzierungZiel}
-        onPlatzierenStart={onPlatzierenStart}
-        onPlatzierenAbbrechen={onPlatzierenAbbrechen}
-        onAbschnittZeichnenStart={onAbschnittZeichnenStart}
-        onZoneZeichnenStart={onZoneZeichnenStart}
-        zeichenPlatzieren={zeichenPlatzieren}
-        onZeichenPlatzierenStart={onZeichenPlatzierenStart}
-        onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
-        onKoordinateEingeben={onKoordinateEingeben}
-        einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
-        onEinsatzortPlatzieren={onEinsatzortPlatzieren}
-        layer={layer}
-        onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
-        basemap={basemap}
-        onBasemapWechsel={setBasemap}
-        onMarkerWaehlen={onMarkerWaehlen}
-        onlineVerfuegbar={(config?.online_styles.length ?? 0) > 0}
-        offlineVerfuegbar={!!config?.offline_verfuegbar}
-        onlineStyles={config?.online_styles ?? []}
-        onlineStilName={onlineStilName}
-        onOnlineStilWechsel={setOnlineStilName}
-        kartenTheme={kartenTheme}
-        onKartenThemeWechsel={setKartenTheme}
-        ansichtDirty={dirty}
-        ansichtSpeichert={speichertGerade}
-        onAnsichtSpeichern={onAnsichtSpeichern}
-        fachebenenSichtbar={fachebenenSichtbar}
-        fachebenenStatus={fachebenenStatus}
-        onFachebeneToggle={onFachebeneToggle}
-        kritisZoomZuKlein={kritisZoomZuKlein}
-        fachebenenLaedt={fachebenenLaedt}
-        bilder={bilder}
-        onBildUpload={onBildUpload}
-        onBildToggle={onBildToggle}
-        onBildOpazitaet={onBildOpazitaet}
-        onBildPlatzieren={onBildPlatzieren}
-        onBildPlatzierenFertig={onBildPlatzierenFertig}
-        onBildLoeschen={onBildLoeschen}
-        onBildVerschieben={onBildVerschieben}
-        onBildZentrieren={onBildZentrieren}
-        onBildUmbenennen={onBildUmbenennen}
-        onBildMittelpunkt={onBildMittelpunkt}
-        bildPlatzierenId={bildPlatzierenId}
-        bildPlatzierZentrum={bildPlatzierZentrum}
-        ansichten={ansichten ?? []}
-        aktiveAnsichtId={aktiveAnsichtId}
-        onAnsichtWaehlen={waehleAnsicht}
-        onAnsichtNeu={onAnsichtNeu}
-        onAnsichtUmbenennen={onAnsichtUmbenennen}
-        onAnsichtStandard={onAnsichtStandard}
-        onAnsichtLoeschen={onAnsichtLoeschen}
-        ansichtBusy={ansichtBusy}
-      />
-      <div style={{ flex: 1, position: 'relative' }}>
-        <Kartenflaeche
-          ref={kartenRef}
-          style={style}
-          attribution={attribution}
-          markers={sichtbareMarker}
-          onKarteKlick={onKarteKlick}
-          // LFH-208: Map-Marker-Klick während eines exklusiven Modus (Platzieren/Zeichnen/…)
-          // öffnet kein Panel. Nur der Map-Pfad ist gegatet — die Sidebar-Selektion (onMarkerWaehlen
-          // direkt an die Sidebar, s. o.) bleibt frei.
-          onMarkerKlick={(schluessel) => {
-            if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
-          }}
-          flyToZiel={flyToZiel}
-          onStyleFehler={onStyleFehler}
-          flaechen={layer.abschnitt ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon })) : []}
-          zeichnen={zeichneAbschnittId != null}
-          onFlaecheGezeichnet={onFlaecheGezeichnet}
-          onFlaecheKlick={onFlaecheKlick}
-          zonen={zonenFeatures}
-          zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
-          zoneZeichnenNonce={zoneZeichnenNonce}
-          onZoneKlick={onZoneKlick}
-          onZoneGezeichnet={onZoneGezeichnet}
-          fachebenen={aktiveFachebenen}
-          onBboxAenderung={fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined}
-          onZoomAenderung={setKartenZoom}
-          onFachebeneKlick={onFachebeneKlick}
-          bilder={bildOverlays}
-          platzierBild={aktivesPlatzierBild}
-          onPlatzierGeometrie={onPlatzierGeometrie}
-        />
-        <ZeichnenSteuerung
-          aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
-          titel={
-            zeichneAbschnittId != null
-              ? 'Abschnitt'
-              : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
-                  (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie' ? 'Linie' : 'Fläche'
-                }`
-          }
-          phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
-          speichernLaeuft={zoneSpeichern}
-          onAbschliessen={() =>
-            zeichneAbschnittId != null
-              ? kartenRef.current?.abschnittAbschliessen()
-              : kartenRef.current?.zoneAbschliessen()
-          }
-          onAbbrechen={onZeichnenAbbrechen}
-          onSpeichern={bestaetigungSpeichern}
-          onVerwerfen={bestaetigungVerwerfen}
-        />
-        {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
-          <Inspector
-            einsatzId={einsatzId}
-            marker={aktiverMarker}
-            darfSchreiben={!!darfSchreiben}
-            onSchliessen={() => setAuswahl(null)}
-            onVerortungLoeschen={loescheVerortung}
-            onSymbolAendern={aendereSymbol}
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+      {/* Warn-Overlay (AK6, LFH-331 · B3): eine Karte ohne Objekt sieht aus wie eine Lage ohne
+          Objekt — der Ausfall einer Domänen-Quelle ist der einzige Fehler dieser Seite, der
+          sich als gültiger Zustand tarnt. Deshalb steht er dauerhaft und namentlich da.
+
+          Form nach `live/LiveStatusBanner`: `banner`-Alert, kein `closable`, KEIN Knopf. Ein
+          Wiederhol-Knopf wäre hier zudem irreführend — er könnte nur EINE der elf Quellen
+          meinen; nachladen tut die Seite ohnehin über den Live-Stream des EinsatzLayouts.
+
+          Er liegt IM Fluss über der ganzen Seite, nicht schwebend über der Karte: der
+          `HistorienBanner` unten belegt bereits `position: absolute; top: 12` in der
+          Kartenspalte, und zwei schwebende Meldungen landen im Historien-Modus mit
+          gescheitertem Dokument übereinander. */}
+      {fehlerhafteQuellen.length > 0 && (
+        <div data-testid="lagebild-unvollstaendig">
+          <Alert
+            type="error"
+            showIcon
+            banner
+            title={quellenMeldung(fehlerhafteQuellen)}
+            /* Zwei Sätze, weil die Lage zweierlei ist: im Live-Betrieb fehlen EINZELNE
+               Quellen und der Rest der Karte stimmt. Scheitert dagegen das Snapshot-
+               Dokument, gibt es keinen Ersatz — die Live-Queries sind im Historien-Modus
+               abgeschaltet, alle Rohlisten bleiben leer. „unvollständig, nicht leer" wäre
+               dort die Unwahrheit, und zwar die gefährliche Richtung. */
+            description={
+              snapshotParam != null
+                ? 'Der gesicherte Stand konnte nicht abgerufen werden — die Karte ist leer, nicht aktuell.'
+                : 'Objekte dieser Quellen fehlen auf der Karte. Der Stand ist unvollständig, nicht leer.'
+            }
           />
-        )}
-        {ausgewaehltesZeichen && (
-          <FreiesZeichenInspector
-            key={ausgewaehltesZeichen.id}
-            zeichen={ausgewaehltesZeichen}
-            darfSchreiben={!!darfSchreiben}
-            onSchliessen={() => setAuswahl(null)}
-            onAendern={(spec) => zeichenAendern(ausgewaehltesZeichen.id, spec)}
-            onLoeschen={() => zeichenLoeschen(ausgewaehltesZeichen.id)}
-            ansichten={ansichten ?? []}
-            onVerschieben={(ansichtId) => zeichenVerschieben(ausgewaehltesZeichen.id, ansichtId)}
-          />
-        )}
-        {fachebeneAuswahl && (
-          <FachebenenInspector
-            quelle={fachebeneAuswahl.quelle}
-            properties={fachebeneAuswahl.properties}
-            geometrie={fachebeneAuswahl.geometrie}
-            onSchliessen={() => setFachebeneAuswahl(null)}
-          />
-        )}
-        {ausgewaehlteZone && (
-          <ZonenInspector
-            zone={ausgewaehlteZone}
-            gebiete={gebiete}
-            darfSchreiben={!!darfSchreiben}
-            onSchliessen={() => setZoneAuswahl(null)}
-            onAendern={(patch) => zoneAendern(ausgewaehlteZone.id, patch)}
-            onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
-            onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
-            ansichten={ansichten ?? []}
-          />
-        )}
-        {snapshotParam != null && (
-          <HistorienBanner
-            standAt={aktiverSnapshot?.stand_at}
-            bezeichnung={aktiverSnapshot?.bezeichnung}
-            onZurueckAktuell={() => waehleSnapshot(null)}
-          />
-        )}
-        <SnapshotLeiste
+        </div>
+      )}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}>
+        <Sidebar
           einsatzId={einsatzId}
-          darfSichern={!!darfSchreiben}
-          aktiverSnapshotId={snapshotParam}
-          onWaehle={waehleSnapshot}
-          fehler={fehler}
+          nichtVerortet={nichtVerortetAlle}
+          verortet={alleVerortet}
+          darfSchreiben={!!darfSchreiben}
+          platzierungZiel={platzierungZiel}
+          onPlatzierenStart={onPlatzierenStart}
+          onPlatzierenAbbrechen={onPlatzierenAbbrechen}
+          onAbschnittZeichnenStart={onAbschnittZeichnenStart}
+          onZoneZeichnenStart={onZoneZeichnenStart}
+          zeichenPlatzieren={zeichenPlatzieren}
+          onZeichenPlatzierenStart={onZeichenPlatzierenStart}
+          onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
+          onKoordinateEingeben={onKoordinateEingeben}
+          einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
+          onEinsatzortPlatzieren={onEinsatzortPlatzieren}
+          layer={layer}
+          onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
+          basemap={basemap}
+          onBasemapWechsel={setBasemap}
+          onMarkerWaehlen={onMarkerWaehlen}
+          onlineVerfuegbar={(config?.online_styles.length ?? 0) > 0}
+          offlineVerfuegbar={!!config?.offline_verfuegbar}
+          onlineStyles={config?.online_styles ?? []}
+          onlineStilName={onlineStilName}
+          onOnlineStilWechsel={setOnlineStilName}
+          kartenTheme={kartenTheme}
+          onKartenThemeWechsel={setKartenTheme}
+          ansichtDirty={dirty}
+          ansichtSpeichert={speichertGerade}
+          onAnsichtSpeichern={onAnsichtSpeichern}
+          fachebenenSichtbar={fachebenenSichtbar}
+          fachebenenStatus={fachebenenStatus}
+          onFachebeneToggle={onFachebeneToggle}
+          kritisZoomZuKlein={kritisZoomZuKlein}
+          fachebenenLaedt={fachebenenLaedt}
+          bilder={bilder}
+          onBildUpload={onBildUpload}
+          onBildToggle={onBildToggle}
+          onBildOpazitaet={onBildOpazitaet}
+          onBildPlatzieren={onBildPlatzieren}
+          onBildPlatzierenFertig={onBildPlatzierenFertig}
+          onBildLoeschen={onBildLoeschen}
+          onBildVerschieben={onBildVerschieben}
+          onBildZentrieren={onBildZentrieren}
+          onBildUmbenennen={onBildUmbenennen}
+          onBildMittelpunkt={onBildMittelpunkt}
+          bildPlatzierenId={bildPlatzierenId}
+          bildPlatzierZentrum={bildPlatzierZentrum}
+          ansichten={ansichten ?? []}
+          aktiveAnsichtId={aktiveAnsichtId}
+          onAnsichtWaehlen={waehleAnsicht}
+          onAnsichtNeu={onAnsichtNeu}
+          onAnsichtUmbenennen={onAnsichtUmbenennen}
+          onAnsichtStandard={onAnsichtStandard}
+          onAnsichtLoeschen={onAnsichtLoeschen}
+          ansichtBusy={ansichtBusy}
+          /* Drei Sektionen, drei Ursachen (LFH-331 · B3). Der Slot an „Nicht verortet" hängt
+             an denselben elf Lagebild-Quellen wie das Overlay oben; er wiederholt deren Namen
+             nicht, sondern trägt den erneuten Abruf — die eine Handlung, die das Overlay
+             bewusst nicht anbietet, weil es für elf Quellen zugleich spricht. */
+          sektionFehler={{
+            nichtVerortet: fehlerhafteQuellen.length
+              ? { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: neuLaden }
+              : undefined,
+            bilder: bilderFehler
+              ? {
+                  text: 'Bild-Hintergründe konnten nicht geladen werden',
+                  ursache: bilderFehlerUrsache,
+                  onWiederholen: bilderNeuLaden,
+                }
+              : undefined,
+            ansichten: ansichtenFehler
+              ? {
+                  text: 'Kartenansichten konnten nicht geladen werden',
+                  ursache: ansichtenFehlerUrsache,
+                  onWiederholen: ansichtenNeuLaden,
+                }
+              : undefined,
+          }}
         />
+        <div style={{ flex: 1, position: 'relative' }}>
+          <Kartenflaeche
+            ref={kartenRef}
+            style={style}
+            attribution={attribution}
+            markers={sichtbareMarker}
+            onKarteKlick={onKarteKlick}
+            // LFH-208: Map-Marker-Klick während eines exklusiven Modus (Platzieren/Zeichnen/…)
+            // öffnet kein Panel. Nur der Map-Pfad ist gegatet — die Sidebar-Selektion (onMarkerWaehlen
+            // direkt an die Sidebar, s. o.) bleibt frei.
+            onMarkerKlick={(schluessel) => {
+              if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
+            }}
+            flyToZiel={flyToZiel}
+            onStyleFehler={onStyleFehler}
+            flaechen={layer.abschnitt ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon })) : []}
+            zeichnen={zeichneAbschnittId != null}
+            onFlaecheGezeichnet={onFlaecheGezeichnet}
+            onFlaecheKlick={onFlaecheKlick}
+            zonen={zonenFeatures}
+            zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
+            zoneZeichnenNonce={zoneZeichnenNonce}
+            onZoneKlick={onZoneKlick}
+            onZoneGezeichnet={onZoneGezeichnet}
+            fachebenen={aktiveFachebenen}
+            onBboxAenderung={fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined}
+            onZoomAenderung={setKartenZoom}
+            onFachebeneKlick={onFachebeneKlick}
+            bilder={bildOverlays}
+            platzierBild={aktivesPlatzierBild}
+            onPlatzierGeometrie={onPlatzierGeometrie}
+          />
+          <ZeichnenSteuerung
+            aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
+            titel={
+              zeichneAbschnittId != null
+                ? 'Abschnitt'
+                : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
+                    (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie' ? 'Linie' : 'Fläche'
+                  }`
+            }
+            phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
+            speichernLaeuft={zoneSpeichern}
+            onAbschliessen={() =>
+              zeichneAbschnittId != null
+                ? kartenRef.current?.abschnittAbschliessen()
+                : kartenRef.current?.zoneAbschliessen()
+            }
+            onAbbrechen={onZeichnenAbbrechen}
+            onSpeichern={bestaetigungSpeichern}
+            onVerwerfen={bestaetigungVerwerfen}
+          />
+          {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
+            <Inspector
+              einsatzId={einsatzId}
+              marker={aktiverMarker}
+              darfSchreiben={!!darfSchreiben}
+              onSchliessen={() => setAuswahl(null)}
+              onVerortungLoeschen={loescheVerortung}
+              onSymbolAendern={aendereSymbol}
+            />
+          )}
+          {ausgewaehltesZeichen && (
+            <FreiesZeichenInspector
+              key={ausgewaehltesZeichen.id}
+              zeichen={ausgewaehltesZeichen}
+              darfSchreiben={!!darfSchreiben}
+              onSchliessen={() => setAuswahl(null)}
+              onAendern={(spec) => zeichenAendern(ausgewaehltesZeichen.id, spec)}
+              onLoeschen={() => zeichenLoeschen(ausgewaehltesZeichen.id)}
+              ansichten={ansichten ?? []}
+              onVerschieben={(ansichtId) => zeichenVerschieben(ausgewaehltesZeichen.id, ansichtId)}
+            />
+          )}
+          {fachebeneAuswahl && (
+            <FachebenenInspector
+              quelle={fachebeneAuswahl.quelle}
+              properties={fachebeneAuswahl.properties}
+              geometrie={fachebeneAuswahl.geometrie}
+              onSchliessen={() => setFachebeneAuswahl(null)}
+            />
+          )}
+          {ausgewaehlteZone && (
+            <ZonenInspector
+              zone={ausgewaehlteZone}
+              gebiete={gebiete}
+              darfSchreiben={!!darfSchreiben}
+              onSchliessen={() => setZoneAuswahl(null)}
+              onAendern={(patch) => zoneAendern(ausgewaehlteZone.id, patch)}
+              onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
+              onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
+              ansichten={ansichten ?? []}
+            />
+          )}
+          {snapshotParam != null && (
+            <HistorienBanner
+              standAt={aktiverSnapshot?.stand_at}
+              bezeichnung={aktiverSnapshot?.bezeichnung}
+              onZurueckAktuell={() => waehleSnapshot(null)}
+            />
+          )}
+          <SnapshotLeiste
+            einsatzId={einsatzId}
+            darfSichern={!!darfSchreiben}
+            aktiverSnapshotId={snapshotParam}
+            onWaehle={waehleSnapshot}
+            fehler={fehler}
+          />
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Drawer, Layout, Space, Spin } from 'antd';
+import { Alert, Button, Drawer, Layout, Space, Spin } from 'antd';
 import { TbMenu2 } from 'react-icons/tb';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
+import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
 import { navDrawerBreite } from '../theme/tokens';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
@@ -123,17 +124,50 @@ export default function EinsatzLayout() {
     if (breit) setNavOffen(false);
   }, [breit]);
 
-  const { data: einsatz, isLoading } = useQuery({
+  const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
+  const einsatz = einsatzQuery.data;
 
   // Modul-Overrides (LFH-132) für die Nav-Reflexion; geteilter queryKey wie die
   // Einstellungen (Hot-Path, einmal gecacht je Einsatz).
-  const { data: modulOverrides } = useQuery({
+  const modulOverridesQuery = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
   });
+  const modulOverrides = modulOverridesQuery.data;
+
+  /**
+   * FRÜHER AUSSTIEG, VOR dem Haupt-JSX — nicht als Meldung innerhalb der Schale
+   * (LFH-331 · B3).
+   *
+   * Die Kindseite im `Outlet` liest denselben Einsatz aus demselben
+   * Zwischenspeicher. Bliebe der Rahmen stehen, stellte sie ihre eigene
+   * Fehlermeldung daneben, und die Einsatzkraft sähe zwei konkurrierende Aussagen
+   * über dieselbe Ursache. Deshalb die Großform statt eines Banners: hinter einem
+   * kaputten Einsatz steht nichts mehr, die dreißig Türen der Navigation führen
+   * alle ins Leere.
+   *
+   * Angesetzt wird ausschließlich an `isError`, ausdrücklich NICHT zusätzlich an
+   * „keine Daten": während des Abrufs ist `einsatz` regulär leer, und ein Ausstieg
+   * an dieser Stelle nähme dem Rahmen jeden Ladezustand — und machte nebenbei jede
+   * Prüfung „unter `lg` steht die Navigation nicht im Layout" trivial wahr.
+   *
+   * Der Rückweg ist als Literal geschrieben: `routing/deeplinks.ts` baut
+   * Einsatz-BINNEN-Pfade und führt die nackte Liste laut eigenem Dateikopf bewusst
+   * nicht (kein passender Builder); `LageDashboardPage` verlinkt sie ebenso direkt.
+   */
+  if (einsatzQuery.isError) {
+    return (
+      <SeitenSackgasse
+        titel="Einsatz konnte nicht geladen werden"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+        rueckweg={{ pfad: '/einsaetze', label: 'Zur Einsatzliste' }}
+      />
+    );
+  }
 
   /**
    * Rail-Klick im inline-Rahmen: derselbe Kategorie-Knopf klappt das Panel zu und
@@ -191,7 +225,7 @@ export default function EinsatzLayout() {
           />
         )}
         <div style={REST_STIL}>
-          {isLoading ? (
+          {einsatzQuery.isLoading ? (
             <Spin />
           ) : (
             <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
@@ -208,6 +242,24 @@ export default function EinsatzLayout() {
         </Space>
       </Header>
       <LiveStatusBanner />
+      {/* Warnung, keine Sackgasse: der Einsatz bleibt vollständig bedienbar, nur die
+          Navigation zeigt womöglich mehr, als konfiguriert ist. `istModulSichtbar`
+          (`einsatz/modulRegistry.ts`) prüft `sichtbar !== false` und fällt ohne
+          Overrides also nach OFFEN — jedes per LFH-132 ausgeblendete Modul stünde
+          stumm wieder in der Nav. Ein stiller Fehlschlag wäre hier schlimmer als ein
+          lauter: er sieht aus wie eine Einsatzkonfiguration, die niemand so gesetzt
+          hat. Rot bleibt der Gefahr vorbehalten (Bedien-Leitlinie), deshalb `warning`. */}
+      {modulOverridesQuery.isError && (
+        <Alert
+          type="warning"
+          showIcon
+          banner
+          title="Modul-Sichtbarkeit konnte nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet sind."
+          action={
+            <Button onClick={() => void modulOverridesQuery.refetch()}>Erneut abrufen</Button>
+          }
+        />
+      )}
       {/* Das Seitenspalten-Attribut unten ist tragend, in BEIDEN Zweigen: weder
           die Rail (`<nav>`) noch das Panel (`<div>`) ist eine antd-Seitenspalte,
           antd erkennt also von selbst keine — nur dieses Attribut erzwingt die

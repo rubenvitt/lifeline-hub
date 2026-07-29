@@ -155,11 +155,16 @@ export default function OnlineQuellenVerwaltung() {
           <Button onClick={() => setKatalogOffen(true)}>Aus Katalog hinzufügen</Button>
         </Space>
       )}
-      {/* Der Fehlerzweig trägt noch keine Wiederholung: `karten/` hat heute keine Testdatei,
-          und der Umzug auf das Primitiv soll hier nachweisbar verhaltensgleich sein. Der Knopf
-          kommt mit AK1 (Fehlerzustand der 13 Katalogtabellen) — dort mitsamt seinem Test. */}
+      {/* Wiederholt wird GENAU diese Query, nicht der ganze Karten-Zweig: `invalidiereKarte`
+          zöge Katalog und Karten-Config mit, die beide nicht gescheitert sind. Die Zusage aus
+          dem früheren Kommentar hier — Knopf samt Test mit AK1 — ist mit dem Partnerpaar in
+          `OnlineQuellenVerwaltung.test.tsx` eingelöst (LFH-331 · B3). */}
       {quellenQuery.isError ? (
-        <SeitenFehler text="Online-Quellen konnten nicht geladen werden" ursache={quellenQuery.error} />
+        <SeitenFehler
+          text="Online-Quellen konnten nicht geladen werden"
+          ursache={quellenQuery.error}
+          onWiederholen={() => void quellenQuery.refetch()}
+        />
       ) : (
         <KatalogTabelle
           rowKey="id"

@@ -7,6 +7,28 @@ import type { EtbTyp } from '../api/types';
 import { etbTyp } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 
+/**
+ * Filterleiste des Einsatztagebuchs.
+ *
+ * **Zwei Quellen für einen Filter — bewusst geduldet, nicht übersehen (LFH-331 · B3).**
+ * Diese Leiste hält in `werte` eine eigene Kopie des Filters, und ihre vier Felder sind
+ * unkontrolliert: den sichtbaren Stand kennt allein das DOM. `EtbPage` hält denselben
+ * Filter ein zweites Mal, weil er in den Query-Key geht. Beide Stände laufen nur deshalb
+ * nicht auseinander, weil `aktualisiere` sie bei jeder Änderung zusammenführt.
+ *
+ * **Folge für „Filter zurücksetzen":** ein Reset, der nur den Seitenzustand räumt, ließe
+ * die sichtbaren Eingaben stehen — und der nächste Tastendruck mischte die alte Kopie über
+ * `{ ...werte, ...teil }` wieder ein. Der Aufrufer setzt die Leiste deshalb per `key` neu
+ * auf (`pages/EtbPage.tsx`), statt sie zu kontrollieren.
+ *
+ * **Warum nicht kontrolliert, was die Doppelung beseitigt hätte:** ein `value`-Prop
+ * verlangte die Umkehr von {@link alsBackendZeit} — aus dem UTC-String wieder ein
+ * `dayjs`-Objekt in Ortszeit. Deren Fehlermodus ist eine STILLE Verschiebung um den
+ * Zonenversatz: kein roter Test, kein Fehlerbild, nur ein falscher Zeitraum in der
+ * Führungsunterlage. Das Remount hat diesen Fehlermodus nicht. Wer die Leiste später doch
+ * kontrolliert, braucht dafür zuerst einen Test über die Zeitachse.
+ */
+
 interface Props {
   onChange: (werte: EtbFilterWerte) => void;
 }

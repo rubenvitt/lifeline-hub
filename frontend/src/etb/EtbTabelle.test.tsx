@@ -98,3 +98,35 @@ describe('EtbTabelle', () => {
     expect(container.querySelector('[data-row-key="9"]')).toHaveClass('zeile-hervorgehoben');
   });
 });
+
+/**
+ * Die drei Zusicherungen unten sind das AK4-Partnerpaar dieses Bündels — und zwar das
+ * einzige mit echter Beweiskraft (Spec §3/F2): die Tabelle bleibt in allen drei Fällen
+ * montiert, der Leertext wird also wirklich unterdrückt und nicht bloß mangels Komponente
+ * nicht gerendert. Deshalb dasselbe Literal in allen drei Fällen.
+ */
+describe('EtbTabelle – Datenzustände (LFH-331 · B3)', () => {
+  const LEER = 'Noch keine Einträge.';
+
+  it('zeigt den Leertext, wenn die Menge leer und der Abruf durch ist', () => {
+    renderTabelle({ eintraege: [], leerText: LEER });
+    expect(screen.getByText(LEER)).toBeInTheDocument();
+  });
+
+  it('unterdrückt den Leertext, solange geladen wird', () => {
+    renderTabelle({ eintraege: [], leerText: LEER, ladend: true });
+    expect(screen.queryByText(LEER)).not.toBeInTheDocument();
+  });
+
+  it('unterdrückt den Leertext im Fehlerfall', () => {
+    renderTabelle({ eintraege: [], leerText: LEER, fehler: true });
+    expect(screen.queryByText(LEER)).not.toBeInTheDocument();
+  });
+
+  it('reicht den Ladezustand bis an die Tabelle durch', () => {
+    // `.ant-spin-spinning`, nicht `.ant-spin`: den Wrapper rendert antds Spin auch im
+    // Ruhezustand, eine Zusicherung darauf wäre unabhängig vom Prop grün (gemessen).
+    const { container } = renderTabelle({ eintraege: [], ladend: true });
+    expect(container.querySelector('.ant-spin-spinning')).toBeInTheDocument();
+  });
+});

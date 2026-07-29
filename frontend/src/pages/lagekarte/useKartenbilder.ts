@@ -213,8 +213,17 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
     return { lat, lon: lng };
   }, [aktivesPlatzierBild]);
 
+  // Fehlerzustand der Bilderliste (LFH-331 · B3). Er wandert an die Sidebar-Sektion, weil ein
+  // gescheiterter Abruf hier bisher wie „keine Bilder hinterlegt" aussah — und ein Lageplan,
+  // von dem niemand weiß, dass er existiert, ist derselbe Schaden wie keiner.
+  // Die Quellen-Weiche spiegelt die oben: im Historien-Modus trägt das Dokument die Bilder.
+  const aktiveBilderQuery = istSnapshot ? snapQuery : bilderQuery;
+
   return {
     bilder: sichtbareBilder,
+    bilderFehler: aktiveBilderQuery.isError,
+    bilderFehlerUrsache: aktiveBilderQuery.error,
+    bilderNeuLaden: () => void aktiveBilderQuery.refetch(),
     bildOverlays,
     aktivesPlatzierBild,
     bildPlatzierZentrum,

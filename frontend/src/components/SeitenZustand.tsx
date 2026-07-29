@@ -94,11 +94,14 @@ interface SeitenLeerProps {
  * etwas da ist.
  *
  * **Weder `Empty` noch `Result` noch `Alert`**, sondern die zentrierte Box, die
- * `components/Liste.tsx` schon immer baut. Drei Gründe, jeder gemessen:
- * antds `<Empty>` trägt das Token, das AK3 zählt (0 Knoten im Frontend) und machte das
+ * `components/Liste.tsx` schon immer baut. Drei Gründe, jeder gemessen: antds Leer-Element
+ * trägt genau den Bezeichner, den AK3 repoweit auf null zählt — hier eingebaut, wäre das
  * Kriterium unerfüllbar; `Result` — die Form von `Platzhalter` — ist für eine 360-px-Karte
  * zu groß; und ein `Alert` mit Aktions-Slot ist im Bestand das *Fehler*-Idiom, eine leere
  * Liste aber keine Meldung.
+ *
+ * Der Bezeichner steht hier deshalb bewusst nicht ausgeschrieben: das Gate ist ein Grep, und
+ * ein Kommentar, der das verbotene Konstrukt zitiert, füllt es selbst.
  *
  * Der Nebeneffekt ist der eigentliche Gewinn: die Box steuert **null** eigene Knöpfe bei.
  * Nur deshalb belegt eine Zusicherung auf genau einen Knopf tatsächlich „genau eine

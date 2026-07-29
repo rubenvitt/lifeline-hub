@@ -160,14 +160,62 @@ describe('OnlineQuellenVerwaltung', () => {
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
+  /**
+   * Das Partnerpaar zu AK4 (LFH-331 · B3), zusammen mit dem Leerfall darunter. Die negative
+   * Hälfte allein belegte nichts: formulierte jemand den Leertext um, wäre sie auch im
+   * Leerfall trivial grün. Erst die positive Hälfte — gleiches Literal, gleiche Datei —
+   * macht daraus eine Aussage über die Zustandsweiche statt über die Schreibweise.
+   *
+   * Die Meldung wird als EXAKTES Literal gegriffen, nicht als Teilmuster: der Umzug auf das
+   * Primitiv soll nachweisbar verhaltensgleich sein, und ein `/nicht geladen/i` bliebe auch
+   * unter einem umformulierten Text grün.
+   */
   it('zeigt eine Fehlermeldung statt stiller Leere, wenn die Liste nicht lädt', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
-      http.get('/api/karte/online-quellen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/karte/online-quellen', () =>
+        HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 }),
+      ),
     );
     render();
-    expect(await screen.findByText(/nicht geladen/i)).toBeInTheDocument();
+    expect(await screen.findByText('Online-Quellen konnten nicht geladen werden')).toBeInTheDocument();
+    // Die Detailzeile kommt aus dem `{error}`-Body des Backends — nur eine `ApiError` trägt
+    // eine Meldung, die vor einem Menschen bestehen kann. Ohne diese Zusicherung belegte der
+    // Test nur die Überschrift, und der Wegfall der Ursache bliebe unbemerkt.
+    expect(screen.getByText('Kartenregistry nicht erreichbar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Online-Quellen')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei leerem Katalog den Leertext und KEINEN Fehler', async () => {
+    mockBasis(admin, []);
+    render();
+    expect(await screen.findByText('Noch keine Online-Quellen')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  it('„Erneut abrufen" holt die Liste wirklich neu', async () => {
+    /**
+     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des Knopfes: der zweite Abruf
+     * gelingt, die Tabelle steht. Ohne diese Hälfte wäre ein `onWiederholen={() => {}}`
+     * genauso grün wie die Verdrahtung auf `refetch`.
+     */
+    let abrufe = 0;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/karte/online-quellen', () => {
+        abrufe += 1;
+        return abrufe === 1
+          ? HttpResponse.json({ error: 'Kartenregistry nicht erreichbar' }, { status: 500 })
+          : HttpResponse.json([quelle]);
+      }),
+      http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json([katalogEintrag])),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Erneut abrufen' }));
+
+    expect(await screen.findByText('OpenStreetMap')).toBeInTheDocument();
+    expect(screen.queryByText('Online-Quellen konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 
   it('Katalog-Flow: „Aus Katalog hinzufügen" → Eintrag → POST mit korrektem Body', async () => {

@@ -26,12 +26,24 @@ const einsatz = {
   abgeschlossen_von: null, meine_rolle: 'einsatzleitung',
 };
 
-function setup(overrides: Record<string, unknown> = {}) {
+/**
+ * `fehler` schaltet die beiden Abrufe des Rahmens einzeln auf 500 — einzeln, weil
+ * die beiden Ausfälle im Layout verschiedene Antworten haben: der Einsatz-Abruf
+ * ersetzt die ganze Seite, der Overrides-Abruf nur ein Banner darüber.
+ */
+function setup(
+  overrides: Record<string, unknown> = {},
+  fehler: { einsatz?: boolean; overrides?: boolean } = {},
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json(overrides)),
+    http.get('/api/einsaetze/7', () =>
+      fehler.einsatz ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(einsatz),
+    ),
+    http.get('/api/einsaetze/7/modul-overrides', () =>
+      fehler.overrides ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(overrides),
+    ),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -114,6 +126,70 @@ describe('EinsatzLayout', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(urls).toHaveLength(1);
     expect(urls[0]).toBe('/api/einsaetze/7/live');
+  });
+
+  /**
+   * AK4-Partnerpaar zum Einsatz-Abruf (LFH-331 · B3), Hälfte 1.
+   *
+   * Geprüft wird die Großform UND ihre Ausschließlichkeit: der Rahmen darf daneben
+   * nicht stehenbleiben. Sonst läse die Kindseite im Outlet dieselbe kaputte Abfrage
+   * aus demselben Zwischenspeicher und stellte eine zweite, konkurrierende
+   * Fehlermeldung daneben.
+   *
+   * Angesetzt wird an der Überschrift, nicht an der Detailzeile: die stammt aus
+   * `ursacheText` und trägt nur bei einer `ApiError` mit Meldungsrumpf Text — eine
+   * nackte 500 ohne Rumpf ergäbe dort nichts und der Test wäre von der Laune des
+   * Fehlerkörpers abhängig.
+   */
+  it('bei gescheitertem Einsatz-Abruf steht die Sackgasse STATT des Rahmens', async () => {
+    setup({}, { einsatz: true });
+    expect(await screen.findByText('Einsatz konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zur Einsatzliste' })).toBeInTheDocument();
+    expect(screen.queryByText('ETB-Inhalt')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Kategorien' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Hälfte 2 — dieselben Literale, dieselbe Datei. Ohne sie belegte die Negativhälfte
+   * oben nichts: eine umformulierte Überschrift ließe sie auch dann grün, wenn die
+   * Sackgasse gar nicht mehr entstünde.
+   */
+  it('bei erfolgreichem Einsatz-Abruf steht der Rahmen und KEINE Sackgasse', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
+    expect(screen.queryByText('Einsatz konnte nicht geladen werden')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Zur Einsatzliste' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Der zweite Ausfall hat bewusst eine ANDERE Antwort: fehlen die Overrides, blendet
+   * `istModulSichtbar` jedes per LFH-132 ausgeblendete Modul wieder ein (gemessen:
+   * `overrides?.[key]?.sichtbar !== false` ist ohne Overrides wahr). Das ist keine
+   * Sackgasse — der Einsatz bleibt bedienbar —, aber eine Navigation, die mehr zeigt
+   * als der Einsatz konfiguriert hat, muss sich dazu bekennen.
+   */
+  it('bei gescheitertem Overrides-Abruf warnt ein Banner, der Rahmen bleibt bedienbar', async () => {
+    setup({}, { overrides: true });
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(
+      screen.getByText(
+        'Modul-Sichtbarkeit konnte nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet sind.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
+  });
+
+  it('ohne Overrides-Fehler steht kein Warnbanner über dem Rahmen', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(
+      screen.queryByText(
+        'Modul-Sichtbarkeit konnte nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet sind.',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   // Die Gegenprobe zum Schmal-Block darunter. Ohne sie wäre der Schmal-Test auch

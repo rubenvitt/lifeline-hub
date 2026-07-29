@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { theme } from 'antd';
+import { http, HttpResponse } from 'msw';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { server } from '../../test/server';
 import { neuerQueryClient } from '../../test/utils';
 import { gefahrengebietStil } from './zonenStil';
 
@@ -127,5 +129,84 @@ describe('useLagekarteDaten Standquelle', () => {
     // Läse der Hook die (im Snapshot-Modus abgeschaltete) Live-Org-Query, wäre organisation nicht 'thw'.
     const einheit = result.current.alleVerortet.find((m) => m.schluessel === 'einheit-1');
     expect(einheit?.tz?.organisation).toBe('thw');
+  });
+});
+
+/**
+ * Der benannte Quellenkatalog (LFH-331 · B3).
+ *
+ * Hier liegt die Beweislast für AK6, nicht in der Seitenklammer: dort ist die Negativhälfte
+ * strukturell wahr (kein Fehler → das Overlay ist gar nicht montiert), hier wird die
+ * Zuordnung Query → Name und die Trennlinie Lagebild/Render-Kontext tatsächlich geprüft.
+ */
+describe('useLagekarteDaten fehlerhafteQuellen', () => {
+  it('nennt die gescheiterten Lagebild-Quellen — und KEINEN Render-Kontext', async () => {
+    // Zwei Lagebild-Quellen scheitern (uhs, zonen) UND alle drei Render-Kontext-Quellen
+    // (Organisation, Karten-Config, Einstellungen). Genau das trennt die Entscheidung von
+    // einem „alles, was rot ist"-Sammelsurium: nur die zwei stehen in der Meldung. Wäre der
+    // Render-Kontext im Katalog, käme die Liste hier auf fünf Einträge.
+    server.use(
+      http.get('/api/einsaetze/5', () => HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' })),
+      http.get('/api/einsaetze/5/uhs', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/5/zonen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/karte/config', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/5/einstellungen', () => new HttpResponse(null, { status: 500 })),
+      ...[
+        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/einheiten',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+    );
+    const { result } = renderHook(
+      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toHaveLength(2));
+    expect(result.current.fehlerhafteQuellen).toEqual(['Unfallhilfsstellen', 'Zonen']);
+  });
+
+  it('ist bei vollständigem Abruf leer', async () => {
+    server.use(
+      http.get('/api/einsaetze/5', () => HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' })),
+      http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
+      http.get('/api/karte/config', () => HttpResponse.json({ online_styles: [], offline_verfuegbar: false, offline_tiles_url: null, offline_attribution: null, offline_regionen: [], karten_bau_verfuegbar: false })),
+      http.get('/api/einsaetze/5/einstellungen', () => HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } })),
+      ...[
+        '/api/einsaetze/5/uhs',
+        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/einheiten',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+    );
+    const { result } = renderHook(
+      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('spiegelt im Historien-Modus die EINE aktive Quelle, nicht die elf abgeschalteten', async () => {
+    // Die Weiche ist dieselbe wie bei `ladt`: im Snapshot-Modus sind die Live-Queries
+    // `enabled: false` und melden nie einen Fehler — die Aussage über den Stand kann also
+    // nur das Dokument treffen.
+    ladeLageSnapshot.mockRejectedValue(new Error('weg'));
+    const { result } = renderHook(
+      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Gesicherter Stand']));
   });
 });

@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, type RequestHandler } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -232,5 +232,100 @@ describe('EtbPage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('ort-suche').textContent).not.toContain('neu'),
     );
+  });
+});
+
+/**
+ * Der Zustandsraum des Tagebuchs ist vierteilig: laden / Fehler / leer-ohne-Filter /
+ * leer-mit-Filter (LFH-331 · B3, Spec §5 Bündel 7).
+ *
+ * Die Zusicherungen „Leertitel NICHT im DOM" unten sind Regressionsklammern; ihre
+ * Beweiskraft liegt im Primitivtest (`etb/EtbTabelle.test.tsx`), wo die Tabelle in allen
+ * drei Fällen montiert bleibt. Hier steht die Partnerhälfte mit byte-gleichem Literal
+ * (Spec §3/F2).
+ */
+describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
+  const LEER_TITEL = 'Noch keine Einträge.';
+
+  /** Wie `setup`, aber mit Handlern, die die Grundausstattung überschreiben (MSW: zuletzt gewinnt). */
+  function setupMit(zusatz: RequestHandler[], route = '/einsaetze/7/etb') {
+    setupMSW();
+    server.use(...zusatz);
+    return renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+        <OrtSpy />
+      </AuthProvider>,
+      { route },
+    );
+  }
+
+  it('zeigt beim Laden des Einsatzes Skelettbalken statt eines Kreisels', async () => {
+    const { container } = setup();
+    expect(container.querySelector('.lfh-skelett')).not.toBeNull();
+    expect(screen.getByLabelText(/wird geladen/i)).toBeInTheDocument();
+    // Auflaufen lassen, damit kein Zustandswechsel nach Testende passiert.
+    await screen.findByRole('heading', { name: 'Hochwasser Nord' });
+  });
+
+  it('bietet beim gescheiterten Einsatz-Abruf einen erneuten Abruf an', async () => {
+    setupMit([
+      http.get('/api/einsaetze/7', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    ]);
+    expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+  });
+
+  it('zeigt bei gescheitertem ETB-Abruf den Fehler und behauptet keine leere Menge', async () => {
+    setupMit([
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    ]);
+    expect(await screen.findByText('ETB-Einträge konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText(LEER_TITEL)).not.toBeInTheDocument();
+  });
+
+  it('nennt die leere Menge beim Namen und führt zur Erfassung (Schreibrecht)', async () => {
+    setupMit([http.get('/api/einsaetze/7/etb', () => HttpResponse.json([]))]);
+    expect(await screen.findByText(LEER_TITEL)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ersten Eintrag erfassen' })).toBeInTheDocument();
+  });
+
+  it('zeigt Lesenden denselben Leertitel, aber keine Erfassungsaktion', async () => {
+    setupMit([
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ ...admin, system_rolle: 'keiner', anzeigename: 'Beobachter' }),
+      ),
+      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' })),
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
+    ]);
+    expect(await screen.findByText(LEER_TITEL)).toBeInTheDocument();
+    // Die Erfassungsleiste wird für Lesende gar nicht gerendert — ein Fokussprung dorthin
+    // zeigte auf einen Knoten, den es nicht gibt.
+    expect(document.querySelector('.etb-erfassung-sticky')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ersten Eintrag erfassen' })).not.toBeInTheDocument();
+  });
+
+  it('unterscheidet leer-mit-Filter und setzt beim Zurücksetzen auch das Eingabefeld zurück', async () => {
+    setupMit([
+      http.get('/api/einsaetze/7/etb', ({ request }) =>
+        HttpResponse.json(new URL(request.url).searchParams.has('q') ? [] : [eintrag]),
+      ),
+    ]);
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+
+    await user.type(screen.getByPlaceholderText('Volltextsuche'), 'zzz');
+    expect(await screen.findByText('Kein Eintrag passt zum Filter')).toBeInTheDocument();
+    expect(screen.queryByText(LEER_TITEL)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+
+    // DIE unterscheidende Zusicherung: ein Reset, der nur den Seitenzustand räumt, ließe
+    // die sichtbare Eingabe stehen — und der nächste Tastendruck mischte sie wieder ein.
+    expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('');
+    expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
   });
 });
