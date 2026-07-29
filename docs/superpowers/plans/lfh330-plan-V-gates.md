@@ -4,15 +4,59 @@
 
 Alle Pfade absolut ab Worktree-Wurzel `/Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-330-einsatzlisten-primitive`.
 
+---
+
+## NACHTRAG (Stand `fc48f60`) — was die Wirklichkeit überholt hat
+
+Dieser Plan ist ein **Protokoll**. Er wurde vor der Umsetzung geschrieben; seitdem sind Bündel
+F/I/II/III/IV und Teile von V gelaufen. Die Stellen unten sind **überholt, nicht falsch
+gewesen** — sie werden markiert, nicht überschrieben. Jede Korrektur trägt ihren Messwert.
+Marker im Text: **[K-n überholt]**.
+
+| # | Stelle | Behauptung im Plan | Gemessen an `fc48f60` |
+|---|---|---|---|
+| K-1 | §5.6 | `getByLabelText('Personal')`/`('Fahrzeuge')` sei „heute nicht schreibbar" | **Schreibbar und geschrieben.** `kraefte/AmpelZelle.tsx:50` trägt `role="group" aria-label={bezeichnung}`; die Abfrage steht in `pages/KraefteuebersichtPage.test.tsx:226/231` und `kraefte/AmpelZelle.test.tsx:21`. Die Ampelzelle hat die Beschriftung mitgebracht, auf die der Plan wartete. |
+| K-2 | §0 Z. 11, §2 | „13 Katalogtabellen", Inventar 13 → 19 | **An `a06cd0f` gab es schon 14 `KatalogTabelle`-Konsumenten**: die 13 des Tickets **plus `etb/EtbTabelle.tsx`**. Das gelieferte Inventar hält zwei getrennte Listen — `KATALOGE` (13) + `UEBERLAUF_NACHZUG` (6) = 19, Test `it('alle 19 Tabellen laufen über das Primitiv')`. `EtbTabelle` ist die **zwanzigste** Konsumentin und bewusst draußen (serverseitiges 100-Zeilen-Fenster), als benannter Restposten. Die flache 19er-Liste des Plans hätte die Blätterungs-Zusicherung der Kataloge auf die sechs Nachzügler mitverpflichtet. |
+| K-3 | §0 Z. 14 | AK (c): `sorter` = 0, `filters:` = 0, `Input.Search` in keiner Zieldatei | **Für die 13 Kataloge seit `fc48f60` erfüllt** (Trefferzahl je Datei 1–3), maschinell erzwungen von `ordnungsBefunde` / `it('jeder Katalog trägt Sortierung, Suche und — bis auf drei begründete — eine Filterachse')`. Für die vier `Datensicht`-Konsumenten weiterhin 0 — dort **am Typ unerfüllbar** (Mutationsprobe: `sorter: true` → `TS2561`). Die Neuformulierung in §6 bleibt richtig, ihre Zahlen sind es nicht mehr. |
+| K-4 | §0 Z. 15, §5.5 | `KraefteuebersichtPage.tsx`: `<Table<MeldebildZeile>` :333, `Input.Search width: 220` :324, `Statistic` :249/:256, Kennzahlen-Card :243/:245 | Datei jetzt **387 Zeilen**. `<Table<MeldebildZeile>` **weg** (Datensicht, `form="tabelle"` :375). `Input.Search` :340 **ohne `width`** — der Plan führte die feste Feldbreite als Nichtlieferung, sie ist behoben (Kommentar :338: „Fluide statt `width: 220`"). `Statistic title="Personal"` :255 / `"Fahrzeuge"` :262. Kennzahlen-Card `overflowX: 'auto'` :249, `flexWrap: 'nowrap'` :251 — **noch da**, also weiterhin Nichtlieferung. |
+| K-5 | §1 Schritt 1, §2 | Zeilennummern und Dateigrößen | `KatalogTabelle.tsx` 75 → **257** Zeilen, das Tabellenelement :74 → **:242**, `sticky` :253. `gate1-ueberlauf.spec.ts` 196 → **467**. `katalogTabelle.guard.test.ts` 136 → **631**. `drawer-nutzung-…-design.md` 176 → **214**. `2026-07-28-katalogtabellen-pruefliste.md` 68 → **67** — die Verweise `:65`/`:66` (Z13 / Z14) stimmen trotzdem, nachgeprüft. |
+| K-6 | §0 Z. 11 | AK-(a)-Ausgangslage „29 von 30" | Die Zahl ist **vor-B3 gezählt**. An `a06cd0f`: **17 Dateien, 18 rohe Tabellenstellen** (`PersonenPage` 2×), davon **15 ohne `scroll`**. 17 + 13 = 30 — die alte Rechnung geht auf, sie beschreibt nur eine Welt, in der die dreizehn Kataloge ihr Tabellenelement noch selbst trugen. |
+| K-7 | §3 Punkt 12, §6 | AK (e) sei „unerfüllbar", man protokolliere sie | Der Ersatz ist **gebaut**, nicht bloß protokolliert: `datensicht.guard.test.ts` erzwingt `NUR_KARTE` (2 Einträge, Literal `form="karte"` Pflicht) und `NUR_TABELLE` (1 Eintrag, `form="tabelle"` Pflicht), mit Selbstbeweis und Längen-Pin. |
+| K-8 | §4 Schlusssatz | „Markdown-Dateien werden von `scripts/check-fmt.sh` mitgeprüft" | **Falsch.** `check-fmt.sh` fährt nur `cargo fmt --all --check`; Prettier läuft in **keinem** Gate-Skript (`grep -rn prettier scripts/*.sh .githooks/*` → 0 Treffer), `.prettierrc` liegt unter `frontend/`. Kein Gate prüft Markdown. |
+| K-9 | §1 Schritt 4, §2 | `2026-07-28-einsatzlisten-pruefliste.md` steht noch aus | **Geliefert** (274 Zeilen, noch nicht committet), mit zwei Gruppen und der B5-Tabelle der drei 390-px-Bestandsverstöße (`:144-146`). Sie weicht in Zeile Z9 begründet von §5.5 dieses Plans ab (Kennzahlenkopf → B5 statt eigenes Ticket). |
+
+> **ACHTUNG, von diesem Nachtrag verursacht:** die Prüfliste zitiert die betroffene Stelle als
+> `lfh330-plan-V-gates.md:375`. Dieser Nachtrag hat den Plan von 415 auf ~530 Zeilen verlängert;
+> die Stelle steht heute in **§5, Punkt 5** (Suche: `eigenes Ticket`). Der Verweis in der
+> Prüfliste ist damit **stumpf und muss dort nachgezogen werden** — er ist der einzige
+> Zeilenverweis auf diesen Plan im ganzen Repo (`rg -n 'plan-V-gates\.md:[0-9]'` → 1 Treffer).
+> Genau deshalb steht in §5 Punkt 5 jetzt ein Anker.
+
+**Reichweite von K-5, ehrlich abgegrenzt:** nachgemessen wurden die **Dateigrößen** und die
+namentlich genannten Marken. Die **dateiinternen** Zeilenverweise in §2 (`gate1-ueberlauf.spec.ts`
+`:152-163`/`:172`/`:182`/`:87-123`/`:165-195`/`:143-151`; `katalogTabelle.guard.test.ts`
+`:56-80`/`:83-85`/`:100-120`/`:122-135`/`:101`) stammen aus dem Stand **vor** der Migration und
+wurden **nicht** einzeln nachgemessen — die Größensprünge (196→467, 136→631) belegen für sich,
+dass keiner davon noch stimmen kann. Ebenso §0 Zeile 12: `pages/MitgliederAbschnitt.tsx:124` und
+`pages/PersonenDetailPage.tsx:511` bezeichnen die **rohen Tabellenstellen vor** der Migration;
+beide Dateien laufen heute über `KatalogTabelle`, die Elemente gibt es nicht mehr. Nur §0
+Zeile 13 (`GefahrenMatrix` `:53`/`:92`) ist nachgeprüft und **unverändert gültig**.
+
+**Was NICHT überholt ist:** die positive Ordnungs-Zusicherung für die vier
+`Datensicht`-Konsumenten aus §6 (3a) steht bis heute **nicht** im Guard — siehe die Markierung
+dort. Das ist ausstehende Arbeit, kein überholter Plansatz.
+
+---
+
 ## 0. Am Code nachgeprüft — Korrekturen an den Vorgaben, bevor irgendetwas gebaut wird
 
 | Vorgabe | Gemessen | Konsequenz |
 |---|---|---|
-| §9.10: „13er-Inventar wächst auf **18**", fünf Dateien genannt | 16 Konsumentendateien, 17 rohe `<Table>`-Stellen (`pages/PersonenPage.tsx` 2×). Aufteilung nach E3/E5/§5/§8: **9 Datensicht** (BefehlListe, FahrzeugePage, KraefteuebersichtPage, LageberichtePage, MaterialPage, PersonalPage, PersonenPage, TierePage, uhs/BewegungenTab) · **6 KatalogTabelle** (BereitstellungsraeumePage, MitgliederAbschnitt, PersonenDetailPage, SchaedenPage, uhs/MaterialTab, UnfallhilfsstellenPage) · **1 Ausnahme** (GefahrenMatrix) | Inventar wächst auf **19**, nicht 18. §9.10 hat fünf gezählt, `LageberichtePage` fälschlich eingerechnet (E5/§8 schicken sie auf `form="karte"`) und `MitgliederAbschnitt` + `uhs/MaterialTab` vergessen. **Steht als Korrektur im Guard-Kopfkommentar**, sonst rechnet der nächste Leser 18 gegen 19 und rät. |
+| §9.10: „13er-Inventar wächst auf **18**", fünf Dateien genannt **[K-2 / K-6 überholt]** | 16 Konsumentendateien, 17 rohe `<Table>`-Stellen (`pages/PersonenPage.tsx` 2×). Aufteilung nach E3/E5/§5/§8: **9 Datensicht** (BefehlListe, FahrzeugePage, KraefteuebersichtPage, LageberichtePage, MaterialPage, PersonalPage, PersonenPage, TierePage, uhs/BewegungenTab) · **6 KatalogTabelle** (BereitstellungsraeumePage, MitgliederAbschnitt, PersonenDetailPage, SchaedenPage, uhs/MaterialTab, UnfallhilfsstellenPage) · **1 Ausnahme** (GefahrenMatrix) | Inventar wächst auf **19**, nicht 18. §9.10 hat fünf gezählt, `LageberichtePage` fälschlich eingerechnet (E5/§8 schicken sie auf `form="karte"`) und `MitgliederAbschnitt` + `uhs/MaterialTab` vergessen. **Steht als Korrektur im Guard-Kopfkommentar**, sonst rechnet der nächste Leser 18 gegen 19 und rät. |
 | Advisor-Prüfauftrag: Container-Scroll bei den zwei „stillen" Neuzugängen | `pages/MitgliederAbschnitt.tsx:124` steht in einem `<section>` innerhalb `pages/EinsatzdatenPage.tsx:248` — **Seitenfluss, kein Drawer**. `pages/PersonenDetailPage.tsx:511` steht in einem nackten `<div>` innerhalb eines `<Space>` — **ebenfalls Seitenfluss**. | `sticky` (fensterbezogen) wirkt in beiden. Keine Caveat-Zeile nötig. `MitgliederAbschnitt` trägt `size="small"` **am `<Table>`** (:126) — Bestand, kommt durch `KatalogTabelleProps` unverändert durch, Abbau ist B5. |
 | `pages/gefahren/GefahrenMatrix.tsx` | 94 Zeilen; `:92` setzt **schon** `scroll={{ x: 'max-content' }}`, `:53` **schon** `fixed: 'left'` + `width: 180`. Fehlt nur `sticky`. Tests (`GefahrenMatrix.test.tsx`) fahren `renderMitProviders` und sichern **keine** Tabellenstruktur zu. | Migration wäre 2 Zeilen — **ich mache sie nicht** (fremde Datei, Flächencodierung statt Listenvergleich). Sie wird **deklarierte Ausnahme mit Totmeldung**: migriert sie jemand, meldet der Guard den toten Eintrag und erzwingt seine Streichung. |
-| AP8: „AK (c) ist heute grün" | Kritik §4(1) ist präziser: `sorter` = 0, `filters:` = 0, `defaultSortOrder` = 0, `Input.Search` = 3 (`etb/EtbFilterleiste.tsx:39`, `pages/SchaedenPage.tsx:126`, `pages/KraefteuebersichtPage.tsx:324`), keines davon in einer der Zieldateien | AK 3 ist **heute rot und nach B2 unerfüllbar** — beides. Neuformulierung in §6 unten. |
-| `pages/KraefteuebersichtPage.tsx` | `<Table<MeldebildZeile>` **:333** ✓, `Input.Search style={{ width: 220 }}` **:324** ✓, `Statistic title="Personal"` **:249** / `"Fahrzeuge"` **:256** ✓, Kennzahlen-Card `styles={{ body: { overflowX: 'auto' } }}` **:243** + `flexWrap:'nowrap'` **:245** ✓. Filter-Card `:294` mit `Space wrap` | Die Kennzahlenleiste ist ein **eigener Bildlaufbesitzer** — `gate1-ueberlauf.spec.ts:95-101` weist sie als `[eigener Bildlauf]` aus und meldet sie nicht. Der Überlauf-Kandidat ist allein die Tabelle. |
+| AP8: „AK (c) ist heute grün" **[K-3 überholt]** | Kritik §4(1) ist präziser: `sorter` = 0, `filters:` = 0, `defaultSortOrder` = 0, `Input.Search` = 3 (`etb/EtbFilterleiste.tsx:39`, `pages/SchaedenPage.tsx:126`, `pages/KraefteuebersichtPage.tsx:324`), keines davon in einer der Zieldateien | AK 3 ist **heute rot und nach B2 unerfüllbar** — beides. Neuformulierung in §6 unten. |
+| `pages/KraefteuebersichtPage.tsx` **[K-4 überholt]** | `<Table<MeldebildZeile>` **:333** ✓, `Input.Search style={{ width: 220 }}` **:324** ✓, `Statistic title="Personal"` **:249** / `"Fahrzeuge"` **:256** ✓, Kennzahlen-Card `styles={{ body: { overflowX: 'auto' } }}` **:243** + `flexWrap:'nowrap'` **:245** ✓. Filter-Card `:294` mit `Space wrap` | Die Kennzahlenleiste ist ein **eigener Bildlaufbesitzer** — `gate1-ueberlauf.spec.ts:95-101` weist sie als `[eigener Bildlauf]` aus und meldet sie nicht. Der Überlauf-Kandidat ist allein die Tabelle. |
 | `pages/AuftraegePage.tsx:37-51` | `<Tabs defaultActiveKey="auftraege">` **ohne `forceRender`**, **ohne URL-Param** | Ein `goto('/einsaetze/:id/auftraege')` misst den **Aufträge**-Tab. Die Befehle-Liste ist nicht im Baum. Die `routen`-Schleife braucht einen Vorbereitungsschritt. |
 | Z13-Vorbild im Repo | `press(`/`keyboard.` trifft ausschließlich `frontend/e2e/command-palette.spec.ts`. `'Tab'` = **0 Treffer** in `frontend/e2e/` | Neubau, kein Muster zum Kopieren. Deshalb trägt der Spec einen **Positivnachweis** (§2 Schritt 1c). |
 | `page.request` / API-Seeding in e2e | **0 Vorkommen** in `frontend/e2e/`. Session ist Cookie-basiert (`api/client.ts:35/46/56` `credentials: 'same-origin'`) → `page.request` teilt den Cookie-Jar des Kontexts | Neues Muster, braucht Begründung im Dateikopf. Body-Formen am API-Modul verifiziert: `POST /api/benutzer` `{anzeigename,benutzername,passwort}` (`api/benutzer.ts:8-17`), `POST /api/einsaetze/{id}/personal` `{adhoc:{name,funktion?,traegerorganisation?}}` (`api/einsatzPersonal.ts:7-12/29-31`), `POST /api/einsaetze/{id}/befehle` `{vorlage,titel}` (`api/befehle.ts:12-20`, gültiger Schlüssel `befehl_lad` aus `BefehlListe.tsx:68`). |
@@ -27,7 +71,9 @@ Die Stufe ist Nachlauf — aber **nicht durchgehend**. Schritt 1 hängt an keine
 
 ### Schritt 1 — Z13: `frontend/e2e/fokus-verdeckung.spec.ts` (NEU, der einzige echt rot-fähige Schritt)
 
-Erst der Test, und er ist **heute** lauffähig, weil `docs/…/2026-07-28-katalogtabellen-pruefliste.md:36/65` Z13 mit genau dieser Begründung an B2 delegiert hat: *„genau dieses Paket zieht eine fixierte Kopfzeile und eine fixierte erste Spalte ein"* — das Konstrukt existiert seit B1 in `components/KatalogTabelle.tsx:74` und ist auf `/admin/benutzer` erreichbar.
+Erst der Test, und er ist **heute** lauffähig, weil `docs/…/2026-07-28-katalogtabellen-pruefliste.md:36/65` Z13 mit genau dieser Begründung an B2 delegiert hat: *„genau dieses Paket zieht eine fixierte Kopfzeile und eine fixierte erste Spalte ein"* — das Konstrukt existiert seit B1 in `components/KatalogTabelle.tsx:74` **[K-5 überholt: die Datei hat heute 257 Zeilen, das Tabellenelement steht auf `:242`, `sticky` auf `:253`]** und ist auf `/admin/benutzer` erreichbar.
+
+> **[K-5]** `frontend/e2e/fokus-verdeckung.spec.ts` existiert inzwischen — Schritt 1 ist geliefert.
 
 Dateiname ohne `z13-`-Präfix: `gate1-` im Bestand bezeichnet ein **Gate** der Leitlinie, Z13 ist eine **Prüflistenzeile**. Der Kopf nennt die Zeile.
 
@@ -161,7 +207,16 @@ Zwei Selbstbeweisfälle dazu (der bestehende `:122-135` bleibt **unangetastet**)
 4. `it('Selbstbeweis: eine erfundene rohe Tabelle wird gemeldet')` — synthetischer Baum, kein Dateisystem.
 5. `it('tote Freistellungen werden gemeldet')` — Baum ohne Fundstelle, `frei` mit Eintrag.
 
-**2b — Inventar von 13 auf 19, ein Eintrag je Migrations-Commit**
+**2b — Inventar von 13 auf 19, ein Eintrag je Migrations-Commit** **[K-2 überholt]**
+
+> **[K-2]** Geliefert wurde **keine flache 19er-Liste**, sondern zwei getrennte: `KATALOGE` (13)
+> + `UEBERLAUF_NACHZUG` (6). Grund, der beim Schreiben des Plans noch nicht gesehen war: die
+> Blätterungs-Zusicherung (`BLAETTER_SCHWELLE`) gilt **nur** für die Kataloge — eine flache
+> Liste hätte die sechs Nachzügler mitverpflichtet. Test heißt
+> `it('alle 19 Tabellen laufen über das Primitiv')`, `NOCH_OFFEN` gibt es nicht mehr (alle
+> Migrationen sind durch). Und: schon an `a06cd0f` gab es **14** `KatalogTabelle`-Konsumenten
+> — `etb/EtbTabelle.tsx` ist die zwanzigste und bewusst draußen (serverseitiges
+> 100-Zeilen-Fenster), als benannter Restposten im Guard-Kopf.
 
 `KATALOGTABELLEN` bekommt sechs Zeilen, `toHaveLength(13)` → `toHaveLength(19)`:
 ```
@@ -265,7 +320,7 @@ Siehe §6. Landet als Kommentar am ClickUp-Task **und** als Abschnitt „Akzepta
 
 ## 2. Je Datei: was geändert wird, was bricht, wie es angepasst wird
 
-### `frontend/e2e/gate1-ueberlauf.spec.ts` (196 Zeilen)
+### `frontend/e2e/gate1-ueberlauf.spec.ts` (196 Zeilen) **[K-5 überholt: 467 Zeilen]**
 - **Neu:** `type Route` mit `vorbereiten?`; `seedeUeberlaufstoff(page, einsatzId)`; drei `routen`-Einträge (:152-163 → 7 Einträge); `vorbereiten`-Aufruf in der Schleife nach `page.goto(pfad)` (:172) und vor der Ankerprüfung (:182); Kopfkommentar-Absatz zu `page.request`-Seeding samt Begründung und zur protokollierten Mutationsprobe; Anker-Begründung (:143-151) um die drei neuen Zeilen erweitert, **mit dem Satz, dass ein leerer Modul-Leerzustand überlauffrei ist und deshalb gesät wird**.
 - **Nicht geändert:** `ueberlauf()` (:87-123), `PRUEFBREITEN` (:30-34), die Sammel-Meldung (:165-195), die vier Bestandsrouten.
 - **Bricht:** nichts. Die Datei hat einen Test und keine Fremdkonsumenten. Laufzeit steigt von 12 auf 21 Messungen (+~10 s) plus zwei Seeding-Requests.
@@ -277,23 +332,33 @@ Siehe §6. Landet als Kommentar am ClickUp-Task **und** als Abschnitt „Akzepta
 - Vier Tests: 1c Selbstbeweis · 1b Katalogtabelle · 1d Datensicht-Tabellenzweig · 1d′ Gegenprobe „bei 390 px steht kein `.ant-table` auf der Personalseite" **nur**, falls das Primitiv-Bündel `datensicht-schmal.spec.ts` nicht liefert — sonst entfällt sie, um keine zwei Eigentümer derselben Aussage zu haben.
 - **Bricht:** nichts. Berührungspunkt zum Bestand ist allein die gemeinsame Temp-DB.
 
-### `frontend/src/components/katalogTabelle.guard.test.ts` (136 Zeilen)
+### `frontend/src/components/katalogTabelle.guard.test.ts` (136 Zeilen) **[K-5 überholt: 631 Zeilen]**
 - **Neu:** `lieseQuellen` + `ENDUNGEN` (kopiert, Pfade **relativ** wie `KATALOGTABELLEN`); `BEGRUENDETE_AUSNAHMEN`; `NOCH_OFFEN`; `rohTabellen`; `scrollSetzer`; fünf Testfälle (2 Schließungen, 1 Sentinel, 2 Selbstbeweise); Kopfkommentar: Grenze 1 wird von „handgepflegt, Zuwachs fällt nicht auf" auf „durch die repoweite Schließung geschlossen; was der Guard **weiter nicht** sieht" umgeschrieben — nämlich: eine Datei, die ihre Tabelle **entfernt und nichts** an ihre Stelle setzt (das fängt `<Datensicht` ≥ 1 in `datensicht.guard.test.ts`), sowie jede Aussage über Layout.
 - **Geändert:** `KATALOGTABELLEN` 13 → 19 Einträge; `toHaveLength(13)` → `toHaveLength(19)` (:101).
 - **Unverändert:** `ohneKommentare` (:56-80), `elementMuster` (:83-85), `SCROLL_MUSTER` (:88), die drei Bestandszusicherungen (:100-120), der Bestands-Selbstbeweis (:122-135).
 - **Bricht:** der eigene Test `:101` beim ersten Einfügen — das ist beabsichtigt (rot vor grün) und wird je Datei im Migrations-Commit aufgelöst. `frontend/src/components/KatalogTabelle.test.tsx` bricht **nicht** (prüft das Primitiv, nicht das Inventar).
 - **Prosa-Falle, geprüft:** die Datei zählt Marken in **fremden** Dateien und in `KatalogTabelle.tsx`. Der neue Kopfkommentar darf `<Table` und `scroll={{` nicht ausschreiben — er wird umschrieben („die rohe antd-Tabelle", „das Bildlauf-Prop"). Der Kommentar-Stripper trägt den Blockzustand über Zeilengrenzen, und der Bestands-Selbstbeweis `:123-131` belegt bereits, dass Kommentar-Fundstellen 0 zählen; für die neuen Funktionen kommt derselbe Nachweis im synthetischen Baum dazu. Gegenbeispiel und Warnung im Repo: `theme/seitenrinne.guard.test.ts:35-39` notiert, dass ein Erklärtext „sein eigenes Gate reißt (im Vorläuferpaket zweimal passiert)".
 
-### `frontend/src/components/KatalogTabelle.tsx` (75 Zeilen)
+### `frontend/src/components/KatalogTabelle.tsx` (75 Zeilen) **[K-5 überholt: 257 Zeilen; der Absatz `:27-29` liegt heute anderswo]**
 - Ein Satz in `:27-29` (Querverweis auf `Datensicht`, Z14-Verdikt „nicht anwendbar" für die dreizehn). **Bricht nichts**: der Guard strippt Kommentare, `scroll={{`-Zählung `toBe(1)` unberührt.
 
 ### `docs/superpowers/specs/2026-07-28-einsatzlisten-pruefliste.md` (NEU)
 Keine Tests hängen daran. Gate 7 ist ein Lesegate: 15 Zeilen, je ein Verdikt, 0 Zeilen ohne Verdikt, jede offene Zeile mit Zielticket.
 
-### `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md` (176 Zeilen)
+> **[K-9 überholt]** Die Datei ist inzwischen geliefert (274 Zeilen, noch nicht committet),
+> mit zwei Gruppen (A: 9 Dateien/10 Sichten, B: 6 Dateien) statt der geplanten Aufteilung, und
+> mit der B5-Tabelle der drei 390-px-Bestandsverstöße (`:144-146`). Sie widerspricht §5.5
+> dieses Plans **bewusst und begründet** (dort `:9`, Zeile Z9): der Kennzahlenkopf der
+> Kräfteübersicht geht nach **B5 (LFH-333)** statt in ein eigenes Ticket, weil B5 die
+> Umbruch-Entscheidung für Kopfaktions-Leisten ohnehin führt und `gate1-ueberlauf.spec.ts:144-146`
+> die drei freigestellten Routen mit **derselben** Ursache (`Space` ohne `wrap` im Seitenkopf)
+> genau dorthin schickt. Die feste Suchfeldbreite bleibt davon getrennt — sie ist inzwischen
+> ohnehin behoben, siehe K-4.
+
+### `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md` (176 Zeilen) **[K-5 überholt: 214 Zeilen; die AK3b-Ergänzung ist geliefert, `:71-94`]**
 Zwei Tabellenzeilen + zwei Absätze in AK3 (`:52-67`). Der Status-Kopf `:5` (`in design`) bleibt — der Task ist LFH-19, nicht LFH-330; ich schreibe **keinen** fremden Ticketstatus um. Bricht nichts.
 
-### `docs/superpowers/specs/2026-07-28-katalogtabellen-pruefliste.md` (68 Zeilen)
+### `docs/superpowers/specs/2026-07-28-katalogtabellen-pruefliste.md` (68 Zeilen) **[K-5: 67 Zeilen — die Verweise `:65`/`:66` stimmen trotzdem, nachgeprüft]**
 Genau **eine** Zeile: `:65` (`Z13 → B2`) bekommt „eingelöst in `2026-07-28-einsatzlisten-pruefliste.md`" bzw. bei rotem Befund das dort benannte Folgeziel. `:66` (`Z14 → B2 / B5`) bekommt denselben Verweis mit dem Verdikt „für die dreizehn unverändert nicht anwendbar; Schalter mit Zähler geliefert in `Datensicht`". Eine gepinnte Delegationszeile wird **quittiert, nicht gelöscht**.
 
 ---
@@ -311,7 +376,7 @@ Genau **eine** Zeile: `:65` (`Z13 → B2`) bekommt „eingelöst in `2026-07-28-
 9. **Ein Datensicht-Konsument mit 0 `<Table>` und 0 `<Datensicht>`** — Tabelle entfernt, Ersatz vergessen — passiert meine Schließung. → gehört ausdrücklich in die „Was der Guard nicht sieht"-Liste; geschlossen wird es von `<Datensicht` ≥ 1 in `datensicht.guard.test.ts` (Fremdbündel).
 10. **`toHaveLength(19)` ohne Schließung** wäre der alte Zustand mit größerer Zahl: eine zwanzigste Tabelle fiele weiter nicht auf. Die Zahl allein ist kein Fortschritt, die Schließung ist es.
 11. **Tote Freistellung.** Migriert jemand `GefahrenMatrix`, bleibt der Ausnahme-Eintrag als dauerhafte Lücke stehen. → Totmeldung (`useViewport.guard.test.ts:161-163/214-222`).
-12. **AK (e) `grep -c "<Table" BefehlListe.tsx = 0` ist ein Gate, das nicht fallen kann** — nach dem Umbau liegt das Element in `KatalogTabelle.tsx`, die Datei ist zwangsläufig bei 0. Und `<Table` = 0 gilt für eine `form="karte"`-Datei **auch dann, wenn sie eine Tabelle rendert**. → das trägt die `form="karte"`-Literalprüfung in `datensicht.guard.test.ts` (§8), nicht mein Guard. Ich protokolliere die AK als unerfüllbar.
+12. **[K-7 überholt: die Formzusicherung ist gebaut — `NUR_KARTE`/`NUR_TABELLE` in `datensicht.guard.test.ts`, Literal `form="karte"`/`form="tabelle"` je Datei erzwungen, Längen gepinnt, Selbstbeweis vorhanden.]** **AK (e) `grep -c "<Table" BefehlListe.tsx = 0` ist ein Gate, das nicht fallen kann** — nach dem Umbau liegt das Element in `KatalogTabelle.tsx`, die Datei ist zwangsläufig bei 0. Und `<Table` = 0 gilt für eine `form="karte"`-Datei **auch dann, wenn sie eine Tabelle rendert**. → das trägt die `form="karte"`-Literalprüfung in `datensicht.guard.test.ts` (§8), nicht mein Guard. Ich protokolliere die AK als unerfüllbar.
 13. **Der gate1-Lauf ohne Basislinie.** Grün nach der Migration beweist nichts, wenn grün vor der Migration nicht gemessen wurde. → 3a plus 3e.
 14. **Prosa-Selbstschuss im Guard-Kopf** (Punkt 2 unter „Bricht" oben) und **doppelt gezählte Prüflistenzeilen** in der Zusammenfassung (`Z…`-Schreibweise) — beides im Repo je zweimal passiert und dort protokolliert.
 15. **Verdikt „erfüllt" durch Wunschlektüre.** §9 der Entscheidung schreibt Z13 als „erfüllt — Nachweis in diesem Paket" vor, **bevor** gemessen wurde. → die Gabel in Schritt 1 ist verbindlich; „nicht geprüft" ist kein Verdikt, „erfüllt ohne grünen Lauf" auch nicht.
@@ -364,6 +429,14 @@ cd "$W" && rtk proxy ./scripts/check-all.sh
 
 Markdown-Dateien werden von `scripts/check-fmt.sh` (Schritt 1) mitgeprüft — ein Prettier-Bruch in der neuen Prüfliste bricht Gate 1, also wird sie vor dem Sammel-Gate einmal formatiert geprüft.
 
+> **[K-8 überholt — die Aussage ist falsch, nachgemessen.]** `scripts/check-fmt.sh` fährt
+> **ausschließlich** `cargo fmt --all --check` (23 Zeilen, keine weitere Zeile). Prettier wird
+> von **keinem** Gate-Skript aufgerufen (`grep -rn prettier scripts/*.sh .githooks/*` → 0
+> Treffer), und `.prettierrc` liegt unter `frontend/`, deckt `docs/` also ohnehin nicht ab.
+> **Kein Gate prüft Markdown.** Folge: ein Formatierungsfehler in einer Prüfliste bricht nichts
+> — die Konsequenz ist nicht „vorher einmal formatiert prüfen", sondern dass Markdown-Sorgfalt
+> hier ungegatet und damit Handarbeit ist.
+
 ---
 
 ## 5. Was dieses Bündel NICHT liefert
@@ -371,9 +444,27 @@ Markdown-Dateien werden von `scripts/check-fmt.sh` (Schritt 1) mitgeprüft — e
 1. **`frontend/src/components/Datensicht.tsx` und `datensicht.guard.test.ts`** — Primitiv-Bündel. Ich schreibe die AK-3-Inventare als **Text** (§6) und übergebe sie; ich lege die Datei nicht an. Grund: sonst zwei Schreiber auf demselben Guard, genau die Kollision, die die Kritik für `katalogTabelle.guard.test.ts` bemängelt.
 2. **`frontend/e2e/datensicht-schmal.spec.ts`** — Trefflächen, Kartenzweig-Gegenprobe, 390-px-Aussagen über das Primitiv. Gehört dorthin, wo das Primitiv entsteht; sonst gibt es zwei Eigentümer für dieselbe Aussage. Meine Datei misst **Fokusverdeckung**, nicht Breite oder Trefffläche — Ausnahme: der Spaltenschalter in 1d, dessen Trefffläche ich mitnehme, weil er ein Fokusziel des Durchlaufs ist.
 3. **Die Migration der 15 Dateien.** Ich liefere die Zusicherung, nicht den Umbau. `NOCH_OFFEN` ist die Burn-down-Liste, an der der Fortschritt maschinell sichtbar ist.
+   > **[K-2 überholt]** Alle 15 sind migriert; `NOCH_OFFEN` existiert an `fc48f60` nicht mehr
+   > (0 Treffer in `katalogTabelle.guard.test.ts`). Die Schließung ist unbedingt: übrig sind
+   > `AUSNAHMEN` mit zwei Einträgen — das Primitiv selbst und `pages/gefahren/GefahrenMatrix.tsx`
+   > als benannter Restposten, beide mit Totmeldung.
 4. **Die Migration von `pages/gefahren/GefahrenMatrix.tsx`** (2 Zeilen: `<Table>` → `KatalogTabelle`, eigenes `scroll` weg). Fremde Datei, Flächencodierung statt Listenvergleich, kein Auftrag im Task. Sie bleibt deklarierte Ausnahme mit Totmeldung — wer sie migriert, wird vom Guard zur Streichung des Eintrags gezwungen.
-5. **`pages/KraefteuebersichtPage.tsx:324` `style={{ width: 220 }}`** am Suchfeld — die von B1 abgeschaffte feste Feldbreite, in einem von `feldbreiten.guard.test.ts:44` **ungescannten** Verzeichnis. Behebung zöge die Frage nach sich, ob `BEREICHE` mitwächst (und damit weiterer Bestand auffällt, den B2 nicht besitzt). → eigenes Ticket. Ebenso `overflowX: 'auto'` + `flexWrap: 'nowrap'` am Kennzahlenkopf (`:243/:245`), das der an der Lage-Dashboard-Kennzahlenleiste validierten Umbruch-Entscheidung widerspricht.
-6. **AK (d) `getByLabelText('Personal')`/`('Fahrzeuge')`** — heute nicht schreibbar: `pages/KraefteuebersichtPage.tsx:249/256` sind `<Statistic title="…">`, antd rendert den Titel in `div.ant-statistic-title` ohne `aria-label`/`aria-labelledby`, RTLs `getByLabelText` matcht kein `title`-Attribut, und `aria-label` kommt in der ganzen Datei 0× vor. Entweder die Seite bekommt Labels (UI-Änderung, fremdes Bündel) oder die AK wird auf `getByText`/`getByRole('table')` umformuliert. → **Entscheidung nötig, nicht von mir getroffen**; ich baue kein Gate auf eine nicht existierende Beschriftung.
+5. <a id="anker-eigenes-ticket"></a>**[ANKER — vor dem NACHTRAG war dies `:375`; `2026-07-28-einsatzlisten-pruefliste.md:63` (Z9) zitiert diese Stelle unter der alten Nummer.]**
+   **[K-4 zur Hälfte überholt]** Das Suchfeld ist **behoben**: `pages/KraefteuebersichtPage.tsx:338-340` trägt keine feste Breite mehr (Kommentar `:338`: „Fluide statt `width: 220`: die Regel aus `feldbreiten.guard.test.ts` gilt auch …"). Der Kennzahlenkopf ist **weiterhin** Nichtlieferung, nur an anderer Stelle: `overflowX: 'auto'` jetzt `:249`, `flexWrap: 'nowrap'` jetzt `:251`. Ursprünglicher Wortlaut:
+   **`pages/KraefteuebersichtPage.tsx:324` `style={{ width: 220 }}`** am Suchfeld — die von B1 abgeschaffte feste Feldbreite, in einem von `feldbreiten.guard.test.ts:44` **ungescannten** Verzeichnis. Behebung zöge die Frage nach sich, ob `BEREICHE` mitwächst (und damit weiterer Bestand auffällt, den B2 nicht besitzt). → eigenes Ticket. Ebenso `overflowX: 'auto'` + `flexWrap: 'nowrap'` am Kennzahlenkopf (`:243/:245`), das der an der Lage-Dashboard-Kennzahlenleiste validierten Umbruch-Entscheidung widerspricht.
+6. **[K-1 überholt — die Behauptung ist widerlegt.]** Das Kriterium ist **schreibbar und
+   geschrieben**: `kraefte/AmpelZelle.tsx:50` rendert
+   `<span className="lfh-ampel" role="group" aria-label={bezeichnung}>`, gesetzt aus den
+   Spalten `pages/KraefteuebersichtPage.tsx:116/120`
+   (`<AmpelZelle bezeichnung="Personal" …>` / `"Fahrzeuge"`). Die Abfrage steht wörtlich in
+   `pages/KraefteuebersichtPage.test.tsx:226/231` (gescopet über `within(zeile)` — ungescopet
+   träfe sie beim zweiten Abschnitt mehrfach) und in `kraefte/AmpelZelle.test.tsx:21`. Der
+   zweite Kanal ist der Kurztext neben der Zahl, das Emoji hängt an einem eigenen
+   `aria-hidden="true"`-Knoten. Der Plan hat auf die falschen Knoten gesehen: die `Statistic`
+   der Kennzahlenleiste, nicht auf die Zählgruppen der Meldebildzeilen — dort entstand die
+   Beschriftung. **Es braucht keine Entscheidung und keine Umformulierung.** Ursprünglicher
+   Wortlaut:
+   **AK (d) `getByLabelText('Personal')`/`('Fahrzeuge')`** — heute nicht schreibbar: `pages/KraefteuebersichtPage.tsx:249/256` sind `<Statistic title="…">`, antd rendert den Titel in `div.ant-statistic-title` ohne `aria-label`/`aria-labelledby`, RTLs `getByLabelText` matcht kein `title`-Attribut, und `aria-label` kommt in der ganzen Datei 0× vor. Entweder die Seite bekommt Labels (UI-Änderung, fremdes Bündel) oder die AK wird auf `getByText`/`getByRole('table')` umformuliert. → **Entscheidung nötig, nicht von mir getroffen**; ich baue kein Gate auf eine nicht existierende Beschriftung.
 7. **Ein geteiltes e2e-Hilfsmodul.** Fünf Specs sagen wörtlich „aus … kopiert — es gibt (noch) kein geteiltes e2e-Hilfsmodul". Es einzuführen ist eine eigene Entscheidung; ich kopiere weiter (5 + 7 Zeilen).
 8. **Ein zweites Playwright-Projekt / Device-Descriptor.** Vier Specs begründen gleichlautend, dass ein `devices['iPhone …']` webkit nachzieht und ein Browser-Download im Repo nirgends abgesichert ist. 390 × 844 kommt per `setViewportSize`/`test.use` im chromium-Projekt.
 9. **Ein achter Shell-Schritt in `scripts/check-all.sh`.** Im ganzen `scripts/`-Verzeichnis gibt es kein einziges grep-basiertes Gate; neue Gates gehören als Vitest-Guard in Schritt 5 bzw. als Spec in Schritt 7.
@@ -384,6 +475,35 @@ Markdown-Dateien werden von `scripts/check-fmt.sh` (Schritt 1) mitgeprüft — e
 ---
 
 ## 6. Akzeptanzkriterium 3 — warum die Ist-Formulierung unerfüllbar ist und wie sie lauten muss
+
+> **[K-3 überholt — der Befund zerfällt in zwei Gruppen mit gegenläufigem Ergebnis.]**
+> Die 17 Dateien sind nicht ein Fall, sondern zwei. Gemessen an `fc48f60` mit der
+> Ticket-Formel (Treffer je Datei):
+>
+> - **13 Kataloge: 1–3 Treffer, alle ≥ 1 → seit `fc48f60` ERFÜLLT.** Maschinell erzwungen von
+>   `ordnungsBefunde` / `it('jeder Katalog trägt Sortierung, Suche und — bis auf drei
+>   begründete — eine Filterachse')`, auf **entkommentiertem** Text, mit `filters:` == `onFilter:`
+>   und Totmeldung der drei begründeten Freistellungen (`OHNE_FILTERACHSE`). Der Plan hielt AK 3
+>   pauschal für „nach B2 unerfüllbar" — für diese Gruppe stimmt das nicht.
+> - **4 `Datensicht`-Konsumenten: 0 Treffer → am Typ unerfüllbar.** Mutationsprobe belegt es
+>   statt es zu behaupten: `sorter: true` an die Zeit-Spalte von `pages/uhs/BewegungenTab.tsx`
+>   → `TS2561: 'sorter' does not exist in type 'DatensichtSpalte<…>'. Did you mean to write
+>   'sortWert'?` (danach per `cp` zurückgesetzt, Datei bytegleich).
+>
+> **Und ein dritter Befund, den der Plan nicht hatte: das Muster ist kommentarblind und damit
+> WERTLOS erfüllbar.** Zweite Mutationsprobe, dieselbe Datei: ein Satz Prosa mit dem Wort
+> `sorter` eingefügt → Trefferzahl **0 → 1**, `tsc` grün. Das ist der eigentliche Grund, warum
+> der Ersatz in einen Guard mit Kommentar-Stripper gehört und nicht in eine Shell-`grep`.
+>
+> **Was §6 unten nicht liefert und was noch fehlt:** die Tabelle **(3a)** („Positiv,
+> gruppenweise") ist **nicht gebaut**. `datensicht.guard.test.ts` erzwingt heute die negative
+> Hälfte (`sorter:`/`filters:`/`defaultSortOrder`/`responsive:` = 0, `spaltenFuer` ≥ 1) und die
+> Formzusicherung, **nicht** die positive. Nachrüstung: eine Liste `ORDNUNG_PFLICHT` nach dem
+> Bauplan von `OHNE_FILTERACHSE`. **Falle dabei**, gemessen: die Zusicherung gilt **je Datei,
+> nicht je Gruppe** — `pages/PersonenPage.tsx` misst selbst `sortWert:` = 0, weil seine Spalten
+> in `personen/personenSpalten.tsx` liegen (dort `sortWert:` = 2). Eine Liste über alle neun
+> Konsumenten wäre falsch rot.
+> **(3b)**, **(3c)** und **(3d)** sind geliefert.
 
 **Ist:** `grep -rnE "sorter|filters:|Input.Search"` mit **≥ 1 Treffer je Datei** über 17 Dateien.
 
@@ -411,6 +531,25 @@ Markdown-Dateien werden von `scripts/check-fmt.sh` (Schritt 1) mitgeprüft — e
 **(3d) Kommentar-Stripper mit Blockzustand plus Selbstbeweistest** in jeder dieser Zählungen — sonst zählt der Erklärtext der geprüften Datei ihr eigenes Gate voll (im Repo zweimal passiert, `theme/seitenrinne.guard.test.ts:35-39`).
 
 **Ebenfalls umzuformulieren, im selben Zug:**
-- **AK (e)** `grep -c "<Table" auftraege/BefehlListe.tsx = 0` → ein Gate, das nicht fallen kann (nach dem Umbau liegt das Element in `KatalogTabelle.tsx`, und `form="karte"` erfüllt es auch dann, wenn die Datei eine Tabelle rendert). **Ersatz:** `form="karte"`-Literalprüfung je Datei (§8) **plus** meine repoweite Schließung in `katalogTabelle.guard.test.ts`, die aussagt, dass rohe antd-Tabellen ausschließlich im Primitiv und in einer einzigen deklarierten Ausnahme leben.
+- **AK (e)** **[K-7: der Ersatz ist gebaut, nicht bloß protokolliert.** `datensicht.guard.test.ts`
+  erzwingt `NUR_KARTE` = `['/src/auftraege/BefehlListe.tsx', '/src/pages/LageberichtePage.tsx']`
+  mit Pflicht-Literal `form="karte"` und `NUR_TABELLE` = `['/src/pages/KraefteuebersichtPage.tsx']`
+  mit `form="tabelle"`; Längen gepinnt in `it('die fünf gepflegten Listen stehen auf dem
+  entschiedenen Stand')`, Rotwerdbarkeit belegt in `it('Selbstbeweis: eine Formliste ohne das
+  passende Literal fällt auf')`.**]** `grep -c "<Table" auftraege/BefehlListe.tsx = 0` → ein Gate, das nicht fallen kann (nach dem Umbau liegt das Element in `KatalogTabelle.tsx`, und `form="karte"` erfüllt es auch dann, wenn die Datei eine Tabelle rendert). **Ersatz:** `form="karte"`-Literalprüfung je Datei (§8) **plus** meine repoweite Schließung in `katalogTabelle.guard.test.ts`, die aussagt, dass rohe antd-Tabellen ausschließlich im Primitiv und in einer einzigen deklarierten Ausnahme leben.
 - **AK (a)** `document.body.scrollWidth <= window.innerWidth` → auf das etablierte Maß `documentElement.scrollWidth - clientWidth` (1-px-Toleranz, Verursacherliste) umschreiben. Vier Specs verwerfen die AK-Formel begründet; `gate1-ueberlauf.spec.ts:64-70` nennt zusätzlich den Mechanismus (ein `body`-Klipp propagiert bei `html: visible` auf den Viewport, `documentElement.scrollWidth` wächst dann gerade **nicht**). Unverifiziert und für die Bewertung unerheblich: ob `window.innerWidth` und `documentElement.clientWidth` unter dieser Chromium-Konfiguration um die Bildlaufleistenbreite auseinanderliegen — falls ja, ist die AK-Formel die **lockerere** und kann bei echtem Überlauf grün bleiben.
 - **AK (Nr. 1)** „jede in diesem Task genannte Tabellen-Datei" → auf „**alle 16** Konsumentendateien, aufgeteilt in 9 Datensicht + 6 KatalogTabelle + 1 begründete Ausnahme" umschreiben. Sonst ist das Kriterium erfüllbar, während 5 von 16 Tabellen weiter ohne Bildlaufschutz stehen: Befund H25 formal abgehakt, faktisch offen.
+
+  > **[K-6 ergänzt]** Der Plan sah den **zweiten** Fehler der AK-(a)-Formel nicht: `<Table` trifft
+  > ohne Wortgrenze als **Teilstring** und meldet `components/Datensicht.tsx` (`useMemo<TableColumnsType<T>>`,
+  > `:1107`) als Verstoß, obwohl die Datei kein Tabellenelement enthält und ihr `scroll` bewusst
+  > an `KatalogTabelle` abgibt. Gemessen an `fc48f60` gibt die volle Ticket-Formel genau diese
+  > eine Zeile aus. Zweitens: läuft die innere `grep` leer — der **Erfolgsfall** — rekursiert
+  > `grep -rL` ohne Datei-Operand über das Arbeitsverzeichnis (an einem Wegwerf-Baum
+  > reproduziert). Die Ersatzformel ist deshalb **positiv** und trägt eine Wortgrenze,
+  > Sollergebnis genau zwei Zeilen (Primitiv `KatalogTabelle.tsx:242` + deklarierte Ausnahme
+  > `GefahrenMatrix.tsx:91`):
+  > `rg -n '<Table\b' frontend/src -g '*.tsx' -g '!*.test.*'` —
+  > **`git grep -E` kennt `\b` nicht** und liefert dort still 0 Treffer.
+  > Die eigentliche Durchsetzung sind ohnehin die beiden Inventar-Guards
+  > (`katalogTabelle.guard.test.ts` / `datensicht.guard.test.ts`), nicht das Kommando.

@@ -89,6 +89,46 @@ describe('TierePage', () => {
     expect(screen.getByText('Mimi')).toBeInTheDocument();
   });
 
+  it('nimmt den Suchbegriff nicht in den nächsten Reiter mit', async () => {
+    /**
+     * VIER Reiter auf EINER `Datensicht` — bei konstantem `key` reicht React beim
+     * Reiterwechsel dieselbe Instanz weiter, und `suchbegriff` lebt IN der Sicht: der Begriff
+     * aus „Vermisst" filtert danach die Menge von „Alle".
+     *
+     * Drei Schritte, weil der letzte allein nichts belegte: eine Behauptung über das leere
+     * Feld bliebe auch grün, wenn die Suche gar nicht filterte (etwa ohne `suchText` an der
+     * Rufnamen-Spalte). Schritt 1 zeigt erst, dass der Begriff beißt; Schritt 3 nennt den
+     * Schaden beim Namen — eine fremde Menge auf einen fremden Begriff gefiltert.
+     *
+     * FIXTUREN BEWUSST QUER: `suchText` greift auf Reg.-Nr., Rufname, Rasse UND Halter zu.
+     * Träfe der Begriff die Zielzeile über irgendeines dieser Felder, stünde sie nach dem
+     * Wechsel sichtbar da, WEIL sie passt — und nicht, weil das Feld geleert wurde. „Mimi"
+     * trifft deshalb genau eine der drei Zeilen, und alle drei tragen eine eigene Rasse.
+     */
+    const mimi: Tier = { ...tierBasis, id: 70, registrier_nr: 4, status: 'vermisst',
+      spezies: 'katze', rufname: 'Mimi', rasse_beschreibung: 'Perser' };
+    const bello: Tier = { ...tierBasis, id: 71, registrier_nr: 5, status: 'vermisst',
+      rufname: 'Bello', rasse_beschreibung: 'Dackel' };
+    const rex: Tier = { ...tierBasis, id: 72, registrier_nr: 6, status: 'aktiv',
+      rufname: 'Rex', rasse_beschreibung: 'Schäferhund' };
+    render(einsatzAktiv, [mimi, bello, rex]);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+    expect(await screen.findByText('Bello')).toBeInTheDocument();
+
+    // 1. Die Suche wirkt überhaupt: die nicht passende Zeile fällt heraus.
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Suche in Tiere im Einsatz' }),
+      'Mimi',
+    );
+    await vi.waitFor(() => expect(screen.queryByText('Bello')).not.toBeInTheDocument());
+    expect(screen.getByText('Mimi')).toBeInTheDocument();
+
+    // 2. + 3. Reiterwechsel: die fremde Zeile steht ungefiltert da, das Feld ist leer.
+    await userEvent.click(screen.getByRole('tab', { name: 'Alle' }));
+    expect(await screen.findByText('Rex')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Suche in Tiere im Einsatz' })).toHaveValue('');
+  });
+
   it('filtert nach Spezies', async () => {
     render(einsatzAktiv, [tierBasis, { ...tierBasis, id: 12, registrier_nr: 3, spezies: 'katze', rufname: 'Felix' }]);
     await screen.findByText('Rex');

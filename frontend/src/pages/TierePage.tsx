@@ -223,6 +223,40 @@ export default function TierePage() {
       )}
 
       <Datensicht
+        /**
+         * Vier Reiter, EINE Sichtstelle — der Schlüssel trägt deshalb die Statusachse.
+         * Ohne ihn steht dieselbe Instanz über allen vier Mengen: React sieht denselben
+         * Komponententyp an derselben Baumstelle und montiert nicht neu, sondern reicht
+         * weiter. Der Suchbegriff lebt IM Primitiv (`suchbegriff` in `Datensicht.tsx`) und
+         * filtert danach eine Menge, für die er nie gemeint war — im Reiter „Vermisst" nach
+         * einem Rufnamen gesucht, auf „Alle" gewechselt, und dort steht eine fremde Menge auf
+         * diesen Rufnamen zusammengestrichen. Kein Fehler, keine Warnung, nur fehlende
+         * Zeilen. Dieselbe Falle wurde an `PersonenPage` gemessen und dort ebenso behoben.
+         *
+         * Der Preis, und er ist hier kleiner als dort: der Remount trifft ALLEN Zustand des
+         * Primitivs — `suchbegriff` (den wollen wir), `eigeneSortierung`, `eigeneSpaltenAus`,
+         * `schleuse`. Das ist die Folge des Schlüssels, keine Auswahl; getrennt abschaltbar
+         * ist nichts davon. Die Sortierung ist dabei reines Beiwerk: `tierSpalten` ist EINE
+         * Modulkonstante über allen vier Reitern, ein Zurückfallen auf `standardSortierung`
+         * wäre also verzichtbar. Und `filterWerte` ist auf dieser Seite ohnehin tot — keine
+         * Spalte von `tierSpalten` trägt ein `filter`. Der Spaltenauswahl-Grund aus
+         * `PersonenPage` (je Reiter eine andere Spaltenliste) gilt hier NICHT und wird
+         * deshalb auch nicht behauptet.
+         *
+         * SPEZIES BEWUSST NICHT im Schlüssel, obwohl sie die Zeilenmenge genauso
+         * mitbestimmt. Sie ist die INNERE, häufig getastete Achse: `filterTiere`
+         * (`tiere/tierHelfer.ts`) bildet die Schnittmenge aus Status und Spezies, und der
+         * Suchplatzhalter unten nennt Rufname und Rasse — Suche und Spezies werden zusammen
+         * gestellt. Ein Remount an dieser Achse löschte den Begriff, den der Bediener eine
+         * Handlung vorher getippt hat, und wegen `allowClear` ein zweites Mal beim
+         * Zurücknehmen der Einengung. Der Reiter wechselt das Arbeitsfach, die Spezies engt
+         * darin ein; nur das Erste rechtfertigt das Wegwerfen.
+         *
+         * Der Guard (`components/datensicht.guard.test.ts`) entscheidet die Spezies-Frage
+         * NICHT: er prüft allein, ob der Schlüssel die Schalterachse `sicht` nennt — beide
+         * Varianten kämen durch. Die Entscheidung oben steht auf der Sache, nicht am Gate.
+         */
+        key={sicht}
         bezeichnung="Tiere im Einsatz"
         spalten={tierSpalten}
         daten={tiere}

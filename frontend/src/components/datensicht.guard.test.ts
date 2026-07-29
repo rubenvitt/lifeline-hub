@@ -34,8 +34,9 @@ import { describe, expect, it } from 'vitest';
  *
  * Drei SEMANTISCHE Ausnahmemengen ({@link KARTEN_EIGENBAU} — leer, {@link NUR_KARTE} — zwei,
  * {@link NUR_TABELLE} — eine), eine PFLICHTMENGE ({@link VOLLMENGE_PFLICHT} — eine) und eine
- * SCHULDMENGE ({@link REITERSCHLUESSEL_OFFEN} — eine). Alle fünf sind auf ihre Länge gepinnt
- * und werden auf tote Einträge geprüft: wer eine Datei einträgt, ohne sie umzubauen, fällt am
+ * SCHULDMENGE ({@link REITERSCHLUESSEL_OFFEN} — seit Bündel T LEER, der eine Eintrag wurde
+ * getilgt statt fortgeschrieben). Alle fünf sind auf ihre Länge gepinnt und werden auf tote
+ * Einträge geprüft: wer eine Datei einträgt, ohne sie umzubauen, fällt am
  * Anwesenheits-Gegentest auf — ein toter Eintrag wird gemeldet, nicht geduldet.
  *
  * ── DIE ZWEI SCHLÜSSELREGELN, und warum es zwei sein müssen ─────────────────────
@@ -64,11 +65,14 @@ import { describe, expect, it } from 'vitest';
  *   { sicht })` eine Stufe entfernt liegt und eine direkte Prüfung sie verfehlte.
  *
  * GEMESSEN am Baum dieses Bündels, und das ist die Begründung für „bauen" statt „nur
- * dokumentieren": 9 Konsumenten, davon 2 mit Schalterachse, zusammen 3 Sichtstellen →
- * 1 Meldung, 0 Fehlalarme. Beide Sichten von `PersonenPage` bleiben still, und zwar aus dem
- * richtigen Grund: `key="patienten"` steht über `alle.filter(istPatient)` (achsunabhängig,
- * also kein Befund), `` key={`liste-${sicht}`} `` über `filterPersonen(alle, sicht)` (Achse im
- * Schlüssel). Die eine Meldung ist echt und steht in {@link REITERSCHLUESSEL_OFFEN}.
+ * dokumentieren": 9 Konsumenten, davon 2 mit Schalterachse, zusammen 3 Sichtstellen → bei
+ * Auslieferung 1 Meldung, 0 Fehlalarme. Beide Sichten von `PersonenPage` bleiben still, und
+ * zwar aus dem richtigen Grund: `key="patienten"` steht über `alle.filter(istPatient)`
+ * (achsunabhängig, also kein Befund), `` key={`liste-${sicht}`} `` über
+ * `filterPersonen(alle, sicht)` (Achse im Schlüssel). Die eine Meldung galt `TierePage` und
+ * ist in Bündel T behoben — die Seite trägt jetzt `key={sicht}`, der Baum meldet 0. Dass die
+ * Regel überhaupt noch etwas FINDET, hängt seither allein am Selbstbeweis (a) auf
+ * synthetischer Quelle; ohne ihn wäre ein abgestumpfter Scanner still grün.
  * Zur künftigen Reichweite ehrlich: repoweit tragen 13 Dateien eine Schalterachse — die Regel
  * ist an 2 gemessen, nicht an 13.
  *
@@ -107,11 +111,21 @@ import { describe, expect, it } from 'vitest';
  *   auseinanderlaufen; zwei verschieden geschriebene, die denselben Wert liefern, fallen
  *   nicht auf. Ein `key` in einem `{...spread}` wird nicht gesucht — es steht nicht am
  *   Element.
- * · **Die Achsverfolgung von {@link reiterBefunde} ist eine Näherung, an vier benannten
- *   Stellen.** (a) Sie misst QUELLTEXT: `haengtAnAchse` sucht Bezeichner per Regex, ein
+ * · **Die Achsverfolgung von {@link reiterBefunde} ist eine Näherung, an fünf benannten
+ *   Stellen.** (a) bis (e) — die Zahl stand vorher auf „vier" und zählte (e) nicht mit.
+ *   (a) Sie misst QUELLTEXT: `haengtAnAchse` sucht Bezeichner per Regex, ein
  *   Achsenname in einem Zeichenkettenliteral zählt also mit — bei `daten` zu scharf, beim
  *   `key` zu milde. (b) Die Initialisierer-Karte ist FLACH über die ganze Datei, ohne
- *   Gültigkeitsbereiche: zwei gleichnamige lokale Bindungen fallen zusammen. (c) Aus dem
+ *   Gültigkeitsbereiche: zwei gleichnamige lokale Bindungen fallen zusammen. Wie hart (a) und
+ *   (b) zusammen sein können, ist in Bündel T bei der Mutationsprobe an `TierePage`
+ *   herausgefallen: `key="tiere"` blieb STILL. Der Weg dahin ist (a) plus (b) — `BEZEICHNER`
+ *   zieht `tiere` aus dem Zeichenkettenliteral HERAUS, und die flache Initialisierer-Karte
+ *   löst diesen Namen anschließend über die gleichnamige lokale Bindung
+ *   `const tiere = filterTiere(alle, { sicht, … })` zur Achse auf. Nicht das Attribut wird
+ *   aufgelöst, sondern der Bezeichner in seinem Text. Dieselbe Stelle mit `key="liste"`
+ *   meldete sofort. Ein konstanter
+ *   Schlüssel, der zufällig den Namen einer achsabhängigen lokalen Bindung trägt, kommt also
+ *   durch. (c) Aus dem
  *   Schalter-Attribut wird JEDER Bezeichner zur Achse — bei `activeKey={filter.reiter}`
  *   also auch `filter`. (d) Als Schalter gelten nur die drei Tags in {@link SICHTSCHALTER};
  *   eine handgebaute Reiterleiste aus `<Button>`n ist keiner. (e) Der EINGANG der Regel ist
@@ -201,16 +215,17 @@ const VOLLMENGE_PFLICHT: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
  * umgekehrte Erwartung — ein Eintrag muss WEITERHIN GEMELDET WERDEN. Verschwindet die
  * Meldung, ist entweder die Datei repariert (Eintrag löschen) oder die Regel kaputt.
  *
- * Der eine Eintrag ist gemessen, nicht vermutet: `TierePage` schaltet vier Reiter
- * (`aktiv`/`vermisst`/`abgeschlossen`/`alle`) über `filterTiere(alle, { sicht, spezies })` auf
- * die Zeilenmenge und rendert dafür EINE `<Datensicht>` ohne `key` — mit `suche` und
- * `standardSortierung` im Primitiv. Das ist Wort für Wort die an `PersonenPage` gemessene
- * Falle: im Reiter A gesucht, auf B gewechselt, der Begriff steht noch im Feld und filtert
- * eine fremde Menge auf leer. Behoben wird sie hier NICHT — `pages/TierePage.tsx` gehört
- * einem anderen Bündel; ein Guard-Bündel, das fremde Seiten mitrepariert, kollidiert mit dem,
- * das sie gerade umbaut.
+ * LEER, und das ist die Aussage. Der eine Eintrag bei Auslieferung des Guards war
+ * `pages/TierePage.tsx`: vier Reiter (`aktiv`/`vermisst`/`abgeschlossen`/`alle`) über
+ * `filterTiere(alle, { sicht, spezies })` auf die Zeilenmenge, dafür EINE `<Datensicht>` ohne
+ * `key` — Wort für Wort die an `PersonenPage` gemessene Falle. Bündel T hat ihn behoben
+ * (`key={sicht}`) statt fortgeschrieben, und damit ist die Schuld getilgt, nicht verwaltet.
+ *
+ * Ein neuer Eintrag ist deshalb kein Vermerk, sondern eine zweite Seite mit demselben Fehler
+ * — er gehört behoben. Wer trotzdem einen braucht, weil der Zustand über den Reiter hinweg
+ * bewusst stehen bleiben soll, schreibt die Begründung daneben (Regel im Kopfkommentar).
  */
-const REITERSCHLUESSEL_OFFEN: string[] = ['/src/pages/TierePage.tsx'];
+const REITERSCHLUESSEL_OFFEN: string[] = [];
 
 /**
  * Das Konsumenteninventar von LFH-330 · B2, handgeschrieben — nicht aus dem Scan abgeleitet.
@@ -721,9 +736,10 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
     // (Aggregate stromaufwärts über die Vollmenge), nicht bloß den Verweis hierauf.
     expect(VOLLMENGE_PFLICHT).toHaveLength(1);
-    // Die fünfte ist eine SCHULD, keine Ausnahme — sie soll schrumpfen, nicht stehen. Ein
-    // zweiter Eintrag ist kein Vermerk, sondern eine zweite Seite mit demselben Fehler.
-    expect(REITERSCHLUESSEL_OFFEN).toHaveLength(1);
+    // Die fünfte ist eine SCHULD, keine Ausnahme — sie sollte schrumpfen, und sie ist auf 0
+    // geschrumpft: der eine Eintrag (`TierePage`) wurde behoben, nicht fortgeschrieben. Ein
+    // Eintrag hier ist kein Vermerk, sondern eine zweite Seite mit demselben Fehler.
+    expect(REITERSCHLUESSEL_OFFEN).toHaveLength(0);
   });
 
   it('Sentinel: der Scan sieht das Primitiv und mehr als 200 Dateien', () => {
@@ -787,7 +803,13 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // Der Gegentest der SCHULDMENGE steht umgekehrt zu dem der vier Ausnahmelisten: dort ist
     // ein Eintrag tot, wenn er NICHT mehr zutrifft — hier, wenn er nicht mehr GEMELDET wird.
     // Beides fängt dieselbe zwei Fehler, aber nur so herum: die Anwesenheitsprüfung oben
-    // (`konsumenten.includes`) bliebe grün, sobald TierePage seinen Schlüssel bekommt.
+    // (`konsumenten.includes`) bliebe grün, sobald eine Seite ihren Schlüssel bekommt.
+    //
+    // Die Schleife läuft seit Bündel T LEER — genau weil `TierePage` ihn bekommen hat — und
+    // beweist damit nichts mehr; sie steht für den nächsten Eintrag. Der positive Beleg, dass
+    // `reiterBefunde` überhaupt noch etwas findet, liegt seither allein beim Selbstbeweis (a)
+    // unten auf synthetischer Quelle. Fällt der weg, ist die erste Behauptung dieses Tests
+    // wertlos grün.
     for (const eintrag of REITERSCHLUESSEL_OFFEN) {
       // Die Datei-Existenz zuerst und GETRENNT: sonst behauptete die Meldung unten bei einer
       // gelöschten oder umbenannten Datei eine von zwei Ursachen, von denen keine zutrifft.
