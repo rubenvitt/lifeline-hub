@@ -18,14 +18,22 @@ body {
   background-color: #2a1215;
 }
 
-/* Cross-Modul-Deeplink-Highlight (LFH-25): eine per ?<modul>=<id> angesteuerte Tabellenzeile
-   dezent hervorheben, damit das Zielobjekt nach dem Sprung auffindbar ist. */
-.zeile-hervorgehoben > td {
+/* Cross-Modul-Deeplink-Highlight (LFH-25): eine per ?<modul>=<id> angesteuerte Zeile dezent
+   hervorheben, damit das Zielobjekt nach dem Sprung auffindbar ist.
+
+   ZWEI SELEKTOREN, weil `Datensicht` unter `md` KARTEN statt Zeilen rendert (LFH-330/B2).
+   Die Klasse landet dort auf der Karte, die keine `td`-Kinder hat — die Hervorhebung fiel
+   still aus, genau auf dem schmalen Schirm, auf dem eine lange Liste am unübersichtlichsten
+   ist. Beim Tabellenzweig muss die Farbe weiterhin an die `td` (antd färbt die Zellen, ein
+   Hintergrund am `tr` bliebe verdeckt). */
+.zeile-hervorgehoben > td,
+[data-lfh='datensicht-karte'].zeile-hervorgehoben {
   background-color: #fffbe6;
   transition: background-color 0.4s ease;
 }
 
-[data-theme='dark'] .zeile-hervorgehoben > td {
+[data-theme='dark'] .zeile-hervorgehoben > td,
+[data-theme='dark'] [data-lfh='datensicht-karte'].zeile-hervorgehoben {
   background-color: #2b2611;
 }
 

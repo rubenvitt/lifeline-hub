@@ -97,6 +97,58 @@ describe('PersonalPage', () => {
     );
   });
 
+  it('auch im KARTENZWEIG trägt der Deeplink seine Hervorhebung — und springt zum Ziel', async () => {
+    /**
+     * Unter `md` rendert `Datensicht` Karten. Das `data-row-key` der Tabelle gibt es dort
+     * nicht: die Hervorhebung landete auf einem Knoten ohne Regel, und der Sprung suchte
+     * einen Selektor, den kein Knoten trug — beides still, ausgerechnet auf dem Gerät mit
+     * der kleinsten Übersicht.
+     *
+     * Die CSS-Regel selbst kann hier nicht fallen (`vite.config.ts` fährt `css: false`,
+     * jsdom rechnet kein Layout). Geprüft wird, was prüfbar ist: die Klasse sitzt auf der
+     * KARTE, und der Sprung findet sein Ziel.
+     */
+    setzeViewportBreite(390);
+    const gerufen: Element[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      gerufen.push(this);
+    };
+
+    try {
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json(admin)),
+        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+        http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
+        http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
+        http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
+        http.get('/api/personal-status', () => HttpResponse.json([
+          { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+        ])),
+        http.get('/api/personal', () => HttpResponse.json([])),
+      );
+      const { container } = renderMitProviders(
+        <AuthProvider>
+          <Routes>
+            <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+          </Routes>
+        </AuthProvider>,
+        { route: '/einsaetze/7/personal?personal=10' },
+      );
+      await screen.findByText('Thomas Müller');
+      expect(container.querySelector('.ant-table'), 'Gegenprobe: hier steht keine Tabelle').toBeNull();
+      await waitFor(() =>
+        expect(
+          container.querySelector('[data-lfh="datensicht-karte"].zeile-hervorgehoben'),
+        ).not.toBeNull(),
+      );
+      await waitFor(() => expect(gerufen).toHaveLength(1));
+      expect(gerufen[0].getAttribute('data-lfh')).toBe('datensicht-karte');
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
   it('Leitung im aktiven Einsatz sieht Dispositions-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');

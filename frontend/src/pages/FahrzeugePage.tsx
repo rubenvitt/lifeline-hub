@@ -20,7 +20,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
@@ -186,7 +186,7 @@ export default function FahrzeugePage() {
   });
   useEffect(() => {
     if (highlightId == null) return;
-    document.querySelector(`[data-row-key="${highlightId}"]`)?.scrollIntoView?.({ block: 'center' });
+    scrolleZurZeile(highlightId);
   }, [highlightId]);
 
   function invalidate() {

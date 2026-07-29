@@ -513,6 +513,27 @@ export function gruppiere<T>(
     .map((wert) => ({ wert, etikett: gruppen.etikett(wert), zeilen: eimer.get(wert)! }));
 }
 
+/** Klasse, die eine per Deeplink angesteuerte Zeile markiert (LFH-25). */
+export const HERVORGEHOBEN = 'zeile-hervorgehoben';
+
+/**
+ * Scrollt die per Deeplink angesteuerte Zeile ins Bild — in BEIDEN Zweigen.
+ *
+ * Der Selektor `[data-row-key="…"]` allein trifft nur die Tabelle. Unter `md` rendert das
+ * Primitiv Karten, dort gibt es kein `data-row-key`, und der Sprung lief still ins Leere:
+ * genau auf dem Gerät, auf dem eine lange Liste am wenigsten überschaubar ist. Deshalb liegt
+ * die Funktion hier und nicht in den Seiten — die Zweige und ihre Merkmale gehören dem
+ * Primitiv, nicht seinen Aufrufern.
+ *
+ * `scrollIntoView` fehlt in jsdom; der optionale Aufruf hält das No-op fest.
+ */
+export function scrolleZurZeile(schluessel: Key): void {
+  const ziel = document.querySelector(
+    `[data-row-key="${schluessel}"], [data-lfh="datensicht-karte"].${HERVORGEHOBEN}`,
+  );
+  ziel?.scrollIntoView?.({ block: 'center' });
+}
+
 /** Sichtbare Spalten + Zähler — EINE Wahrheit aus Handauswahl UND `abBreite`. */
 export function sichtbareSpalten<T, K extends string>(args: {
   spalten: readonly DatensichtSpalte<T, K>[];

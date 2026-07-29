@@ -22,7 +22,7 @@ import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
 import { flaeche } from '../theme/tokens';
@@ -94,7 +94,7 @@ export default function PersonalPage() {
   });
   useEffect(() => {
     if (highlightId == null) return;
-    document.querySelector(`[data-row-key="${highlightId}"]`)?.scrollIntoView?.({ block: 'center' });
+    scrolleZurZeile(highlightId);
   }, [highlightId]);
 
   function invalidate() {
