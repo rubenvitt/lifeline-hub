@@ -206,11 +206,13 @@ export default function LagekartePage() {
     platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
     zoneZeichnenNonce, zoneAuswahl, auswahl, flyToZiel, fachebeneAuswahl, bildPlatzierenId,
     zeichenPlatzieren, exklusiverModusAktiv,
+    zeichenSerie, setZeichenSerie, zeichenSerieAnzahl, zoneSerie, setZoneSerie, zoneSerieAnzahl,
     setAuswahl, setZoneAuswahl, setFachebeneAuswahl, setFlyToZiel,
     onKarteKlick, onMarkerWaehlen, loescheVerortung, aendereSymbol,
     bestaetigungSpeichern, bestaetigungVerwerfen,
     onPlatzierenStart, onPlatzierenAbbrechen, onAbschnittZeichnenStart, onZoneZeichnenStart,
-    onZeichenPlatzierenStart, onZeichenPlatzierenAbbrechen, zeichenAendern, zeichenVerschieben, zeichenLoeschen,
+    onZeichenPlatzierenStart, onZeichenPlatzierenAbbrechen, onZeichenPlatzierenFertig,
+    onZoneZeichnenFertig, zeichenAendern, zeichenVerschieben, zeichenLoeschen,
     onKoordinateEingeben, onEinsatzortPlatzieren, onBildPlatzieren, onBildPlatzierenFertig,
     onFlaecheGezeichnet, onFlaecheKlick, onZoneKlick, onZoneGezeichnet, onFachebeneKlick,
     onZeichnenAbbrechen, zoneAendern, zoneLoeschen,
@@ -308,6 +310,10 @@ export default function LagekartePage() {
           zeichenPlatzieren={zeichenPlatzieren}
           onZeichenPlatzierenStart={onZeichenPlatzierenStart}
           onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
+          zeichenSerie={zeichenSerie}
+          onZeichenSerieWechsel={setZeichenSerie}
+          zeichenSerieAnzahl={zeichenSerieAnzahl}
+          onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
           onKoordinateEingeben={onKoordinateEingeben}
           einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
           onEinsatzortPlatzieren={onEinsatzortPlatzieren}
@@ -427,6 +433,13 @@ export default function LagekartePage() {
             onAbbrechen={onZeichnenAbbrechen}
             onSpeichern={bestaetigungSpeichern}
             onVerwerfen={bestaetigungVerwerfen}
+            // Serienmodus nur für Zonen (LFH-332/M76) — eine Abschnittsfläche gehört zu genau
+            // einem Abschnitt, für sie gibt es keine Folge. Ohne onSerieWechsel rendert die
+            // Steuerung im Abschnitt-Fall unverändert.
+            serie={zeichneAbschnittId != null ? undefined : zoneSerie}
+            onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
+            serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
+            onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
           />
           {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
             <Inspector

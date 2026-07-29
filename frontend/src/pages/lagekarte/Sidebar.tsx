@@ -102,6 +102,13 @@ export interface SidebarProps {
   zeichenPlatzieren: FreiesZeichenUpdate | null;
   onZeichenPlatzierenStart: (spec: FreiesZeichenUpdate) => void;
   onZeichenPlatzierenAbbrechen: () => void;
+  /** Serienmodus des Platzierens (LFH-332/M76): AN heißt, ein erfolgreicher POST beendet
+   *  den Platzier-Modus NICHT. Beendet wird dann über „Fertig". */
+  zeichenSerie: boolean;
+  onZeichenSerieWechsel: (an: boolean) => void;
+  /** Bereits gesetzte Zeichen der laufenden Serie; 0 = noch keins (dann heißt Beenden „Abbrechen"). */
+  zeichenSerieAnzahl: number;
+  onZeichenPlatzierenFertig: () => void;
   onKoordinateEingeben: (lat: number, lon: number) => void;
   einsatzortVerortet: boolean;
   onEinsatzortPlatzieren: () => void;
@@ -680,9 +687,35 @@ export default function Sidebar(props: SidebarProps) {
           {props.zeichenPlatzieren ? (
             <Space orientation="vertical" style={{ width: '100%' }}>
               <Typography.Text type="secondary">Auf Karte klicken zum Platzieren.</Typography.Text>
-              <Button onClick={props.onZeichenPlatzierenAbbrechen}>
-                Abbrechen
-              </Button>
+              {/* Serienmodus (LFH-332/M76). Der Entwurf im Picker überlebt eine Platzierung
+                  ohnehin — nur der Modus brach ab, was jedes Folge-Zeichen drei Klicks
+                  kostete. Der Schalter steht hier und nicht im Picker, weil er den LAUFENDEN
+                  Modus beschreibt und mitten in einer Serie umgelegt werden können muss. */}
+              <Space>
+                <Switch
+                  checked={props.zeichenSerie}
+                  onChange={props.onZeichenSerieWechsel}
+                  aria-label="Weitere platzieren"
+                />
+                <Typography.Text>Weitere platzieren</Typography.Text>
+              </Space>
+              {props.zeichenSerieAnzahl > 0 && (
+                <Typography.Text type="secondary">
+                  {props.zeichenSerieAnzahl} platziert
+                </Typography.Text>
+              )}
+              {/* Ein Knopf, zwei Wahrheiten: solange nichts gesetzt ist, verwirft Beenden
+                  tatsächlich nur die Absicht („Abbrechen"). Ab dem ersten gesetzten Zeichen
+                  wäre „Abbrechen" eine Lüge — das Gespeicherte bleibt. */}
+              {props.zeichenSerieAnzahl > 0 ? (
+                <Button type="primary" onClick={props.onZeichenPlatzierenFertig}>
+                  Fertig
+                </Button>
+              ) : (
+                <Button onClick={props.onZeichenPlatzierenAbbrechen}>
+                  Abbrechen
+                </Button>
+              )}
             </Space>
           ) : zeichenPickerOffen ? (
             <Space orientation="vertical" style={{ width: '100%' }}>

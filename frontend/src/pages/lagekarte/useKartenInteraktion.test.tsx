@@ -16,6 +16,16 @@ const freieZeichenApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/freieZeichen', () => freieZeichenApi);
 
+// Zonen-API mocken (LFH-332): `bestaetigungSpeichern` ruft `legeZoneAn`. Die Factory MUSS
+// jeden vom Hook importierten Export tragen — fehlt einer, scheitert die Modul-Initialisierung
+// der GANZEN Datei, nicht nur der neue Fall. (`ZonePatch` ist ein reiner Typ und wird gelöscht.)
+const lagezonenApi = vi.hoisted(() => ({
+  legeZoneAn: vi.fn(() => Promise.resolve({ id: 5 })),
+  aktualisiereZone: vi.fn(() => Promise.resolve({ id: 5 })),
+  loescheZone: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('../../api/lagezonen', () => lagezonenApi);
+
 function wrapper() {
   const client = neuerQueryClient();
   return ({ children }: { children: ReactNode }) => (
@@ -23,7 +33,7 @@ function wrapper() {
   );
 }
 
-function rendere() {
+function rendere(fehler: (e: unknown) => void = vi.fn()) {
   return renderHook(
     () =>
       useKartenInteraktion({
@@ -31,7 +41,7 @@ function rendere() {
         einsatz: undefined,
         darfSchreiben: true,
         alleVerortet: [],
-        fehler: vi.fn(),
+        fehler,
       }),
     { wrapper: wrapper() },
   );
@@ -288,8 +298,11 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
         ansicht_id: null,
       }),
     );
-    // nach erfolgreichem Anlegen ist der Platzier-Modus beendet
-    await waitFor(() => expect(result.current.zeichenPlatzieren).toBeNull());
+    // Seit LFH-332 überlebt der Platzier-Modus den POST (Serie ist Vorgabe) — der Zähler ist
+    // das beobachtbare Zeichen dafür, dass onSuccess gelaufen ist. Das Ende der Serie prüft
+    // der eigene Block unten.
+    await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
+    expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle', label: 'X' });
   });
 
   it('Doppelklick legt nur EIN freies Zeichen an (isPending-Guard, kein Duplikat)', async () => {
@@ -340,5 +353,147 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     );
     // setAuswahl(null) läuft im .then nach erfolgreichem DELETE.
     await waitFor(() => expect(result.current.auswahl).toBeNull());
+  });
+});
+
+/**
+ * Serienmodus (LFH-332/M76).
+ *
+ * Beide Platzier-Modi endeten nach JEDEM gesetzten Objekt. Für das zweite gleichartige
+ * Zeichen kostete das drei Klicks Umweg — bei einer Lage mit einem Dutzend gleicher Zeichen
+ * ist das der Unterschied zwischen „nebenbei" und „später".
+ */
+describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => {
+  /** Ein Karten-Klick + Warten auf GENAU den n-ten POST. Die Zählung ist nötig: ein blosses
+   *  `toHaveBeenCalled()` wäre beim zweiten Klick schon durch den ersten erfüllt. */
+  async function platziere(result: HookResult, lng: number, lat: number, malCount: number) {
+    act(() => result.current.onKarteKlick({ lng, lat }));
+    await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(malCount));
+  }
+
+  it('ist Vorgabe AN', () => {
+    const { result } = rendere();
+    expect(result.current.zeichenSerie).toBe(true);
+  });
+
+  // Das wörtliche Akzeptanzkriterium: der Modus überlebt den erfolgreichen POST, und erst
+  // „Fertig" beendet ihn.
+  it('nach erfolgreichem Speichern bleibt der Platzier-Modus aktiv — erst „Fertig" beendet ihn', async () => {
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+
+    await platziere(result, 8.6, 50.1, 1);
+    await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
+    // Kern der Sache: der Modus steht noch, samt unveränderter Spec.
+    expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle' });
+
+    // … und ein zweiter Karten-Klick legt deshalb ohne Umweg ein zweites Zeichen an.
+    await platziere(result, 8.7, 50.2, 2);
+    await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(2));
+    expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(2);
+
+    act(() => result.current.onZeichenPlatzierenFertig());
+    expect(result.current.zeichenPlatzieren).toBeNull();
+  });
+
+  // Die Gegenprobe ist load-bearing, nicht Symmetrie: nur sie belegt, dass onSuccess den
+  // AKTUELLEN Schalterwert liest und nicht den, der bei Anlage der Mutation galt.
+  it('mit ausgeschalteter Serie endet der Modus nach dem Speichern wie zuvor', async () => {
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.setZeichenSerie(false));
+
+    await platziere(result, 8.6, 50.1, 1);
+    await waitFor(() => expect(result.current.zeichenPlatzieren).toBeNull());
+    expect(result.current.zeichenSerieAnzahl).toBe(0);
+  });
+
+  it('ein neuer Platzier-Start setzt den Serien-Zähler zurück', async () => {
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    await platziere(result, 8.6, 50.1, 1);
+    await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
+
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'zweite Serie' }));
+    expect(result.current.zeichenSerieAnzahl).toBe(0);
+  });
+});
+
+describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
+  /** Zone-Modus starten, Geometrie abschließen → Phase „bestaetigen". */
+  function bisZurBestaetigung(result: HookResult) {
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+  }
+
+  it('ist Vorgabe AN', () => {
+    const { result } = rendere();
+    expect(result.current.zoneSerie).toBe(true);
+  });
+
+  it('nach erfolgreichem Speichern ist derselbe Zonen-Typ erneut scharf UND der Nonce gestiegen', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    bisZurBestaetigung(result);
+    const nonceVorher = result.current.zoneZeichnenNonce;
+
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.zoneSerieAnzahl).toBe(1));
+
+    // Erste Hälfte: der Modus steht noch, mit demselben Entwurf und ohne alte Bestätigung.
+    expect(result.current.zoneEntwurf).toEqual({ typ: 'gefahrengebiet', modus: 'polygon', farbe: undefined });
+    expect(result.current.zoneBestaetigung).toBeNull();
+    expect(result.current.zoneSpeichern).toBe(false);
+    // Zweite Hälfte — ohne sie beweist der Test die Falle nicht: der Zonen-Effekt in
+    // Kartenflaeche hängt an [zoneZeichnen, zoneZeichnenNonce]. Der Modus bleibt bei
+    // Zone→Zone gleich, also feuert nur der gestiegene Nonce den Effekt neu; ohne ihn liefe
+    // kein starten() → der Zeichenmodus wäre tot und die gespeicherte Geometrie bliebe als
+    // zweite Kontur auf dem Zeichen-Layer liegen.
+    expect(result.current.zoneZeichnenNonce).toBeGreaterThan(nonceVorher);
+
+    act(() => result.current.onZoneZeichnenFertig());
+    expect(result.current.zoneEntwurf).toBeNull();
+  });
+
+  it('mit ausgeschalteter Serie endet der Zonen-Modus nach dem Speichern wie zuvor', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    bisZurBestaetigung(result);
+    act(() => result.current.setZoneSerie(false));
+
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.zoneEntwurf).toBeNull());
+    expect(result.current.zoneBestaetigung).toBeNull();
+  });
+
+  // Ein gescheiterter POST darf die Serie NICHT fortsetzen: der Neustart verwürfe die nicht
+  // gespeicherte Geometrie und sähe aus, als sei nichts passiert.
+  it('scheitert das Speichern, endet der Modus und der Fehler wird gemeldet', async () => {
+    const fehler = vi.fn();
+    lagezonenApi.legeZoneAn.mockClear();
+    lagezonenApi.legeZoneAn.mockImplementationOnce(() => Promise.reject(new Error('kaputt')));
+    const { result } = rendere(fehler);
+    bisZurBestaetigung(result);
+
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.zoneEntwurf).toBeNull());
+    expect(result.current.zoneSerieAnzahl).toBe(0);
+  });
+
+  it('ein neuer Zonen-Start setzt den Serien-Zähler zurück', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    bisZurBestaetigung(result);
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(result.current.zoneSerieAnzahl).toBe(1));
+
+    act(() => result.current.onZoneZeichnenStart({ typ: 'absperrgrenze', modus: 'linie' }));
+    expect(result.current.zoneSerieAnzahl).toBe(0);
   });
 });

@@ -17,6 +17,13 @@ const basisProps: SidebarProps = {
   zeichenPlatzieren: null,
   onZeichenPlatzierenStart: vi.fn(),
   onZeichenPlatzierenAbbrechen: vi.fn(),
+  // Serienmodus (LFH-332): der Zähler steht hier auf 0 — die Basis ist der Zustand VOR dem
+  // ersten gesetzten Zeichen, in dem Beenden noch „Abbrechen" heißt. Den Gegenzustand baut
+  // der eigene Block unten explizit auf.
+  zeichenSerie: true,
+  onZeichenSerieWechsel: vi.fn(),
+  zeichenSerieAnzahl: 0,
+  onZeichenPlatzierenFertig: vi.fn(),
   onKoordinateEingeben: vi.fn(),
   einsatzortVerortet: true,
   onEinsatzortPlatzieren: vi.fn(),
@@ -214,6 +221,45 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(screen.getByText(/Auf Karte klicken zum Platzieren/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(onZeichenPlatzierenAbbrechen).toHaveBeenCalled();
+  });
+
+  /**
+   * Serienmodus (LFH-332/M76). Die beiden Fälle sind ein Paar: erst nachdem gezeigt ist,
+   * dass VOR dem ersten Zeichen „Abbrechen" steht (Fall oben, `zeichenSerieAnzahl: 0`),
+   * sagt das Auftauchen von „Fertig" etwas aus. Sonst wäre es nur ein Knopf, der da ist.
+   */
+  it('Serienmodus: Schalter „Weitere platzieren" meldet das Umlegen (LFH-332)', () => {
+    const onZeichenSerieWechsel = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        zeichenSerie
+        onZeichenSerieWechsel={onZeichenSerieWechsel}
+      />,
+    );
+    const schalter = screen.getByRole('switch', { name: 'Weitere platzieren' });
+    expect(schalter).toBeChecked();
+    fireEvent.click(schalter);
+    expect(onZeichenSerieWechsel).toHaveBeenCalledWith(false, expect.anything());
+  });
+
+  it('Serienmodus: ab dem ersten gesetzten Zeichen heißt Beenden „Fertig" (LFH-332)', () => {
+    const onZeichenPlatzierenFertig = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        zeichenSerie
+        zeichenSerieAnzahl={2}
+        onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
+      />,
+    );
+    expect(screen.getByText('2 platziert')).toBeInTheDocument();
+    // „Abbrechen" wäre hier die Unwahrheit: die zwei gesetzten Zeichen bleiben stehen.
+    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Fertig' }));
+    expect(onZeichenPlatzierenFertig).toHaveBeenCalled();
   });
 
   it('benennt ein Bild über die Inline-Bearbeitung um', () => {

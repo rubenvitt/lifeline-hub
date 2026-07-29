@@ -61,3 +61,53 @@ describe('ZeichnenSteuerung', () => {
     expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeDisabled();
   });
 });
+
+/**
+ * Serienmodus (LFH-332/M76). Der Zonen-Modus brach nach jedem gespeicherten Objekt ab.
+ *
+ * Die Komponente trägt hier zwei Zustände, die beide belegt sein müssen: der Schalter
+ * existiert NUR, wenn ein `onSerieWechsel` gereicht wird (Abschnitt-Zeichnen bekommt keinen —
+ * die vier Fälle oben laufen deshalb unverändert), und die Beschriftung des Beenden-Knopfes
+ * hängt daran, ob die Serie schon etwas gespeichert hat.
+ */
+describe('ZeichnenSteuerung — Serienmodus (LFH-332)', () => {
+  it('ohne onSerieWechsel (Abschnitt) gibt es keinen Schalter', () => {
+    setup();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+  });
+
+  it('mit onSerieWechsel steht der Schalter in BEIDEN Phasen und meldet das Umlegen', async () => {
+    const onSerieWechsel = vi.fn();
+    setup({ serie: true, onSerieWechsel });
+    const schalter = screen.getByRole('switch', { name: 'Weitere zeichnen' });
+    expect(schalter).toBeChecked();
+    await userEvent.click(schalter);
+    expect(onSerieWechsel).toHaveBeenCalledWith(false, expect.anything());
+  });
+
+  it('Phase bestaetigen zeigt den Schalter ebenfalls (letzte Gelegenheit vor dem Speichern)', () => {
+    setup({ phase: 'bestaetigen', serie: true, onSerieWechsel: vi.fn() });
+    expect(screen.getByRole('switch', { name: 'Weitere zeichnen' })).toBeInTheDocument();
+  });
+
+  it('ohne gespeichertes Objekt heißt Beenden weiterhin „Abbrechen"', async () => {
+    const onFertig = vi.fn();
+    const p = setup({ serie: true, onSerieWechsel: vi.fn(), serieAnzahl: 0, onFertig });
+    expect(screen.queryByRole('button', { name: 'Fertig' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(p.onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(onFertig).not.toHaveBeenCalled();
+  });
+
+  it('ab der ersten gespeicherten Zone heißt Beenden „Fertig" und zählt mit', async () => {
+    const onFertig = vi.fn();
+    const p = setup({ serie: true, onSerieWechsel: vi.fn(), serieAnzahl: 3, onFertig });
+    expect(screen.getByText('3 gespeichert')).toBeInTheDocument();
+    // „Abbrechen" verwürfe nur einen Entwurf — die drei Zonen bleiben stehen.
+    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Fertig' }));
+    expect(onFertig).toHaveBeenCalledTimes(1);
+    expect(p.onAbbrechen).not.toHaveBeenCalled();
+  });
+});
