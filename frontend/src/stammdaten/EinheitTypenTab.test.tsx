@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -101,5 +101,54 @@ describe('EinheitTypenTab', () => {
 
     expect(await screen.findByText('Kein Einheitstyp')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * LFH-332 · B4. Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: der
+   * Anlege-Zweig setzt seine Vorgaben jetzt von Hand zusammen — drei `null` für die
+   * Soll-Stärke und `sortier: 0` —, und genau ein solches Vorgabe-Objekt kann still
+   * falsch sein. Ein Test, der nur zählt, bliebe dabei grün.
+   *
+   * Der Knopf trägt weiter den Namen des gestrichenen Dialog-Knopfes, deshalb sind
+   * die Rechte-Prüfungen oben unverändert gültig.
+   */
+  it('die Schnellerfassung legt mit Label und leerer Soll-Stärke an', async () => {
+    const ruempfe: unknown[] = [];
+    server.use(
+      http.post('/api/einheit-typen', async ({ request }) => {
+        ruempfe.push(await request.json());
+        return HttpResponse.json({ id: 9, label: 'Gruppe', soll: null, sortier: 0 });
+      }),
+    );
+    render(admin);
+    await screen.findByText('Zug');
+
+    await userEvent.type(screen.getByLabelText('Neuer Einheitstyp'), 'Gruppe{Enter}');
+
+    await waitFor(() =>
+      expect(ruempfe).toEqual([{
+        label: 'Gruppe',
+        soll_fuehrer: null,
+        soll_unterfuehrer: null,
+        soll_mannschaft: null,
+        sortier: 0,
+      }]),
+    );
+  });
+
+  /**
+   * Der Dialog ist seit LFH-332 · B4 reines Bearbeiten. Ohne diese Prüfung schiffe
+   * eine kaputte Vorbelegung mit vollständig grüner Suite: kein anderer Test dieser
+   * Datei öffnet ihn.
+   */
+  it('Bearbeiten öffnet den Dialog mit vorbelegten Werten', async () => {
+    render(admin);
+    await screen.findByText('Zug');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Typ bearbeiten')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Label')).toHaveValue('Zug');
   });
 });

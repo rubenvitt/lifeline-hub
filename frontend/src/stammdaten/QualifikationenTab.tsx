@@ -3,6 +3,7 @@ import {
   type TableColumnsType,
 } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,18 +27,38 @@ export default function QualifikationenTab() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
-  const [modalOffen, setModalOffen] = useState(false);
+  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz (LFH-332 · B4):
+  // seit das Anlegen in der Schnellerfassung sitzt, gibt es kein „offen ohne
+  // Datensatz" mehr. Ein zweites `modalOffen` daneben könnte nur noch von diesem
+  // hier abweichen.
   const [bearbeite, setBearbeite] = useState<Qualifikation | null>(null);
 
   const query = useQuery({ queryKey: globalKeys.qualifikationen(), queryFn: listeQualifikationen });
 
   const speichern = useMutation({
-    mutationFn: (werte: FormWerte) => {
+    mutationFn: ({ id, werte }: { id: number; werte: FormWerte }) => {
       const daten: QualifikationEingabe = { label: werte.label.trim(), sortier: werte.sortier ?? 0 };
-      return bearbeite ? aktualisiereQualifikation(bearbeite.id, daten) : legeQualifikationAn(daten);
+      return aktualisiereQualifikation(id, daten);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() }); setModalOffen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() }); setBearbeite(null); },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+  });
+
+  /**
+   * Schnellerfassung (LFH-332 · B4, Befund M43). Pflicht ist an dieser Entität
+   * allein das Label; `sortier: 0` ist deshalb kein erfundener Wert, sondern
+   * byte-genau die Vorbelegung, die der gestrichene Anlege-Zweig des Dialogs
+   * gesetzt hat (`form.setFieldsValue({ sortier: 0 })`). Wer eine Reihenfolge
+   * braucht, trägt sie im Bearbeiten-Dialog nach.
+   *
+   * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
+   * Bei 25 Qualifikationen am Stück wären 25 Einblendungen genau die Störung,
+   * gegen die dieses Ticket antritt.
+   */
+  const schnellAnlegen = useMutation({
+    mutationFn: (label: string) => legeQualifikationAn({ label, sortier: 0 }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() }),
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
 
   const deaktivieren = useMutation({
@@ -46,15 +67,11 @@ export default function QualifikationenTab() {
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
+  // Vorbelegung beim Öffnen — kein Zurücksetzen: `destroyOnHidden` am Dialog wirft
+  // die Felder beim Schliessen ohnehin weg.
   useEffect(() => {
-    if (!modalOffen) return;
-    if (bearbeite) {
-      form.setFieldsValue({ label: bearbeite.label, sortier: bearbeite.sortier });
-    } else {
-      form.resetFields();
-      form.setFieldsValue({ sortier: 0 });
-    }
-  }, [modalOffen, bearbeite, form]);
+    if (bearbeite) form.setFieldsValue({ label: bearbeite.label, sortier: bearbeite.sortier });
+  }, [bearbeite, form]);
 
   const spalten: TableColumnsType<Qualifikation> = [
     {
@@ -78,7 +95,7 @@ export default function QualifikationenTab() {
             key: 'aktionen',
             render: (_, q: Qualifikation) => (
               <Space>
-                <Button size="small" onClick={() => { setBearbeite(q); setModalOffen(true); }}>Bearbeiten</Button>
+                <Button size="small" onClick={() => setBearbeite(q)}>Bearbeiten</Button>
                 <Popconfirm title="Qualifikation deaktivieren?" onConfirm={() => deaktivieren.mutate(q.id)}>
                   <Button size="small" danger>Deaktivieren</Button>
                 </Popconfirm>
@@ -91,14 +108,18 @@ export default function QualifikationenTab() {
 
   return (
     <>
+      {/* Die Schnellerfassung steht ÜBER der Tabelle — dort, wo bis LFH-332 der
+          Knopf „Qualifikation anlegen" stand, und bewusst AUSSERHALB der
+          Fehlerweiche darunter: ein gescheiterter Abruf der Liste ist kein Grund,
+          die einzige Schreibmöglichkeit der Seite verschwinden zu lassen. */}
       {istAdmin && (
-        <Button
-          type="primary"
-          style={{ marginBottom: 12 }}
-          onClick={() => { setBearbeite(null); setModalOffen(true); }}
-        >
-          Qualifikation anlegen
-        </Button>
+        <SchnellAnlegen
+          beschriftung="Neue Qualifikation"
+          platzhalter="z. B. Sanitäter"
+          knopfText="Qualifikation anlegen"
+          onAnlegen={(label) => schnellAnlegen.mutateAsync(label)}
+          laeuft={schnellAnlegen.isPending}
+        />
       )}
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
           (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
@@ -127,16 +148,23 @@ export default function QualifikationenTab() {
           locale={{ emptyText: 'Keine Qualifikationen' }}
         />
       )}
+      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben;
+          ein Dialog, der sich nach jedem Speichern schliesst, ist für 25 Einträge
+          am Stück das falsche Werkzeug. */}
       <Modal
-        open={modalOffen}
-        title={bearbeite ? 'Qualifikation bearbeiten' : 'Qualifikation anlegen'}
+        open={bearbeite !== null}
+        title="Qualifikation bearbeiten"
         okText="Speichern"
         confirmLoading={speichern.isPending}
         onOk={() => form.submit()}
-        onCancel={() => setModalOffen(false)}
+        onCancel={() => setBearbeite(null)}
         destroyOnHidden
       >
-        <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
+        <Form<FormWerte>
+          form={form}
+          layout="vertical"
+          onFinish={(w) => { if (bearbeite) speichern.mutate({ id: bearbeite.id, werte: w }); }}
+        >
           <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
             <Input />
           </Form.Item>

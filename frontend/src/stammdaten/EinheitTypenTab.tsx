@@ -2,6 +2,7 @@ import {
   App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType,
 } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -27,13 +28,16 @@ export default function EinheitTypenTab() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
-  const [modalOffen, setModalOffen] = useState(false);
+  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz (LFH-332 · B4):
+  // seit das Anlegen in der Schnellerfassung sitzt, gibt es kein „offen ohne
+  // Datensatz" mehr. Ein zweites `modalOffen` daneben könnte nur noch von diesem
+  // hier abweichen.
   const [bearbeite, setBearbeite] = useState<EinheitTyp | null>(null);
 
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
 
   const speichern = useMutation({
-    mutationFn: (werte: FormWerte) => {
+    mutationFn: ({ id, werte }: { id: number; werte: FormWerte }) => {
       const daten: TypEingabe = {
         label: werte.label.trim(),
         soll_fuehrer: werte.soll?.fuehrer ?? null,
@@ -41,10 +45,31 @@ export default function EinheitTypenTab() {
         soll_mannschaft: werte.soll?.mannschaft ?? null,
         sortier: werte.sortier ?? 0,
       };
-      return bearbeite ? aktualisiereTyp(bearbeite.id, daten) : legeTypAn(daten);
+      return aktualisiereTyp(id, daten);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }); setModalOffen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }); setBearbeite(null); },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+  });
+
+  /**
+   * Schnellerfassung (LFH-332 · B4, Befund M43). Pflicht ist allein das Label.
+   * Die Soll-Stärke bleibt leer — `TypEingabe` lässt alle drei Teile `null` zu,
+   * und die Tabelle zeigt dafür „—"; `sortier: 0` ist byte-genau die Vorbelegung
+   * des gestrichenen Anlege-Zweigs (`form.setFieldsValue({ sortier: 0 })`).
+   * Beides trägt man bei Bedarf im Bearbeiten-Dialog nach.
+   *
+   * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
+   */
+  const schnellAnlegen = useMutation({
+    mutationFn: (label: string) => legeTypAn({
+      label,
+      soll_fuehrer: null,
+      soll_unterfuehrer: null,
+      soll_mannschaft: null,
+      sortier: 0,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }),
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
 
   const deaktivieren = useMutation({
@@ -53,19 +78,17 @@ export default function EinheitTypenTab() {
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
+  // Vorbelegung beim Öffnen — kein Zurücksetzen: `destroyOnHidden` am Dialog wirft
+  // die Felder beim Schliessen ohnehin weg.
   useEffect(() => {
-    if (!modalOffen) return;
     if (bearbeite) {
       form.setFieldsValue({
         label: bearbeite.label,
         soll: bearbeite.soll,
         sortier: bearbeite.sortier,
       });
-    } else {
-      form.resetFields();
-      form.setFieldsValue({ sortier: 0 });
     }
-  }, [modalOffen, bearbeite, form]);
+  }, [bearbeite, form]);
 
   // Keine Filterspalte in diesem Katalog: `EinheitTyp` trägt weder Status noch Kategorie, und
   // `einheit/typ_repo.rs` liefert ohnehin nur `WHERE aktiv = 1` — eine Aktiv-Achse gäbe es hier
@@ -95,7 +118,7 @@ export default function EinheitTypenTab() {
             key: 'aktionen',
             render: (_, t: EinheitTyp) => (
               <Space>
-                <Button size="small" onClick={() => { setBearbeite(t); setModalOffen(true); }}>Bearbeiten</Button>
+                <Button size="small" onClick={() => setBearbeite(t)}>Bearbeiten</Button>
                 <Popconfirm title="Typ deaktivieren?" onConfirm={() => deaktivieren.mutate(t.id)}>
                   <Button size="small" danger>Deaktivieren</Button>
                 </Popconfirm>
@@ -108,10 +131,21 @@ export default function EinheitTypenTab() {
 
   return (
     <>
+      {/* Die Schnellerfassung steht ÜBER der Tabelle — dort, wo bis LFH-332 der Knopf
+          „Typ anlegen" stand, und bewusst AUSSERHALB der Fehlerweiche darunter: ein
+          gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit
+          der Seite verschwinden zu lassen.
+          Der Platzhalter nennt NICHT „Label" — diesen Wortlaut trägt bereits das
+          Suchfeld der Tabelle, und ein zweiter Knoten mit demselben Platzhalter machte
+          den Griff darauf mehrdeutig. */}
       {istAdmin && (
-        <Button type="primary" style={{ marginBottom: 12 }} onClick={() => { setBearbeite(null); setModalOffen(true); }}>
-          Typ anlegen
-        </Button>
+        <SchnellAnlegen
+          beschriftung="Neuer Einheitstyp"
+          platzhalter="z. B. Zug"
+          knopfText="Typ anlegen"
+          onAnlegen={(label) => schnellAnlegen.mutateAsync(label)}
+          laeuft={schnellAnlegen.isPending}
+        />
       )}
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
           (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
@@ -137,16 +171,21 @@ export default function EinheitTypenTab() {
           suche={{ platzhalter: 'Label' }}
         />
       )}
+      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben. */}
       <Modal
-        open={modalOffen}
-        title={bearbeite ? 'Typ bearbeiten' : 'Typ anlegen'}
+        open={bearbeite !== null}
+        title="Typ bearbeiten"
         okText="Speichern"
         confirmLoading={speichern.isPending}
         onOk={() => form.submit()}
-        onCancel={() => setModalOffen(false)}
+        onCancel={() => setBearbeite(null)}
         destroyOnHidden
       >
-        <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
+        <Form<FormWerte>
+          form={form}
+          layout="vertical"
+          onFinish={(w) => { if (bearbeite) speichern.mutate({ id: bearbeite.id, werte: w }); }}
+        >
           <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
             <Input placeholder="z. B. Zug" />
           </Form.Item>
