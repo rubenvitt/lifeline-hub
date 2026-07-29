@@ -52,12 +52,21 @@ pub async fn anlegen(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
-    let einsatzart = req.einsatzart.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let einsatzart = req
+        .einsatzart
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     if let Some(art) = einsatzart {
         Einsatzart::parse(art)
             .ok_or_else(|| AppError::Validation("Ungültige Einsatzart".into()))?;
     }
-    let begonnen_at = match req.begonnen_at.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    let begonnen_at = match req
+        .begonnen_at
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
         None => None,
     };
