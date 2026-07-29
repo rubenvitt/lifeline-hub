@@ -97,6 +97,61 @@ Jede Zahl trägt dort Quelle und Abschnittsnummer, Gerechnetes ist als `[abgelei
 Details, Herleitungen und die am Lage-Dashboard validierte Prüfliste:
 `docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`.
 
+## Frontend — Erfassungs-Norm (LFH-332/B4)
+
+**Ein Erfassungsformular wird nicht mehr von Hand gebaut.** Träger ist
+`components/Erfassung.tsx` — `ErfassungsModal` für Dialoge, `ErfassungsFormular` für
+Inline-Formulare. Wer eine neue Erfassungsmaske schreibt oder eine bestehende ohnehin
+anfasst, nimmt die Hülle; ein handgebautes `<Modal>` + `<Form>` daneben ist ein Fehler,
+kein Stil.
+
+Die Hülle trägt drei Zusicherungen, die der Bestand einzeln verletzt hat:
+
+- **Der Absende-Knopf liegt im `<form>`, deshalb sendet Enter.** Das ist die eingebaute
+  Formularübermittlung des Browsers, kein nachgebauter Tastaturbehandler — und genau
+  deshalb bleibt Enter in einer `Input.TextArea` weiterhin ein Zeilenumbruch, ohne
+  Sonderfall. Der Bestand sendete über `onOk={() => form.submit()}` am Modal, also mit
+  dem Knopf **ausserhalb** des Formulars; dort war Enter tot (26 Stellen am 29.07.2026,
+  Befund H69). Der Dialog rendert seine Fusszeile deshalb **selbst** (`footer={null}`)
+  statt antds `footer` zu füllen.
+- **Fokus im ersten Feld** beim Öffnen und nach jedem Serien-Speichern. Der Rücksprung
+  braucht `requestAnimationFrame` — direkt gerufen verpufft er und der Fokus landet
+  gemessen auf `<body>`.
+- **Zurückgesetzt wird auf beiden Wegen**, nach dem Erfassen *und* beim Abbrechen. Der
+  Aufrufer ruft `resetFields()` nicht mehr selbst; ein zurückgebliebener Reset ist
+  doppelt und verdeckt Fehler. Ausgenommen ist das Vorbelegen zum **Bearbeiten**
+  (`setFieldsValue` beim Öffnen) — das ist kein Reset.
+
+**`onErfassen` muss bei Ablehnung ablehnen** — also `mutateAsync`, nicht `mutate`. Der
+Bestand rief `resetFields()` synchron neben `mutate()`: ein 422 kostete den Wortlaut
+trotz Fehler-Toast. Die Hülle lässt die Felder stehen, wenn die Zusage bricht.
+
+**Serienmodus** (`serie`) für alles, was im Minutentakt erfasst wird — Aufnahme, BHP,
+BTP. „Speichern und nächste" hält offen, leert, zählt und fokussiert zurück; Schliessen
+bleibt ausdrückliche Nutzeraktion. **Wiederholfelder** (`uebernahme`) überleben ein
+Serien-Speichern, sichtbar umschaltbar über „Werte behalten". Nur der Primär-Knopf ist
+ein Übermittlungsknopf — „Speichern und nächste" ruft `form.submit()` von Hand, weil
+Enter sonst vom **ersten** Übermittlungsknopf im Baum abhinge und damit von der
+Anordnung im DOM.
+
+**Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`**, nicht die Hülle und
+kein Modal: Eingabefeld plus Knopf in einer Zeile, Enter legt an, das Modal bleibt fürs
+Bearbeiten. Es ist bewusst **kein** `<Form>` — eine Einsatzstelle kann in einem fremden
+Formular landen, und ein verschachteltes Formular lädt beim Absenden die Seite neu.
+
+**Feldbudget** (LFH-19, unverändert): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder.
+Überzähliges wird optional und eingeklappt, nicht gestrichen. Zwei gemessene Testfallen
+dabei: ein `<Collapse>` rendert seinen Inhalt ohne `forceRender` erst beim Aufklappen —
+dann ist die Zählung „≤ 4" trivial erfüllt und beweist nichts; mit `forceRender` stehen
+die Felder im DOM und werden mitgezählt. Und eine „≤ 4"-Behauptung ohne die zweite
+Hälfte (**Aufklappen → Zahl steigt**) ist nicht widerlegbar.
+
+**Was hier nicht hingehört:** Trefferflächen und Dichte. Die erbt jedes Element vom
+`ConfigProvider` (Dichteachse aus LFH-329/B1); neues punktuelles `size` auf interaktiven
+Elementen bleibt verboten. Und `test/utils.tsx` rendert ein **nacktes** `ConfigProvider`
+ohne Theme — eine Höhen- oder Trefferflächen-Behauptung im Vitest misst antd-Vorgaben
+und belegt nichts.
+
 ## Frontend — Deeplink-Muster (Route vs. Query-Param)
 
 Modulübergreifende Deeplinks folgen einem festen Muster (LFH-25):

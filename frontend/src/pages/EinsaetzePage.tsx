@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Card, DatePicker, Form, Input, Select, Space, Tag, Typography } from 'antd';
+import { App, AutoComplete, Button, Card, DatePicker, Form, Input, Space, Tag, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useState, type CSSProperties } from 'react';
@@ -10,6 +10,7 @@ import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
+import { Select } from '../components/Select';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { globalKeys } from '../api/queryKeys';
@@ -24,6 +25,14 @@ import { abstand, flaeche } from '../theme/tokens';
 // ihn wären die Balken 0 px hoch, und jsdom rechnet kein Layout — der Ausfall
 // wäre in keinem Test sichtbar (dieselbe Falle wie `SeitenZustand.tsx:3-7`).
 import '../theme/sprache.css';
+
+/** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
+interface AnlegeWerte {
+  bezeichnung: string;
+  stichwort?: string;
+  einsatzart: Einsatzart;
+  begonnen_at: Dayjs;
+}
 
 /**
  * Status eines Einsatzes als Statusrolle (LFH-328 · A2).
@@ -40,14 +49,6 @@ import '../theme/sprache.css';
  * entschieden, sondern zitiert (Spec §6, Prüflistenzeile 7: `aktiv` → `normal`,
  * `abgeschlossen` → `neutral`).
  */
-/** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
-interface AnlegeWerte {
-  bezeichnung: string;
-  stichwort?: string;
-  einsatzart: Einsatzart;
-  begonnen_at: Dayjs;
-}
-
 const EINSATZ_STATUS: Record<EinsatzStatus, StatusDarstellung> = {
   aktiv: { rolle: 'normal', label: 'aktiv' },
   abgeschlossen: { rolle: 'neutral', label: 'abgeschlossen' },
