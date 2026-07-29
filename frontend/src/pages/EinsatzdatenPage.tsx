@@ -10,6 +10,7 @@ import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { aktualisiereEinsatz, ladeEinsatz, ladeMitglieder, type KopfdatenUpdate } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -21,7 +22,30 @@ import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 
-/** Werte des Bearbeiten-Formulars (begonnen_at als Dayjs aus dem DatePicker). */
+// Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
+dayjs.extend(utc);
+
+/**
+ * UTC-Wirestring → Dayjs für den DatePicker, in LOKALER Zeit.
+ *
+ * `dayjs(wire)` läse den naiven Wirestring als lokale Zeit und landete damit auf einem
+ * anderen Instant (in Europe/Berlin um 2 h daneben). Das `.local()` ist ebenso wenig
+ * verzichtbar: es hält den Picker auf derselben Wanduhrzeit, die `ZeitAnzeige` daneben
+ * rendert (`anzeige/format.ts:inZone` → `dayjs.utc(x).local()`); ein Dayjs im UTC-Modus
+ * zeigte die UTC-Wanduhrzeit und widerspräche der Descriptions-Zelle direkt daneben.
+ * Nebeneffekt: antds generateConfig bleibt durchgehend im Lokal-Modus, auch wenn der
+ * Nutzer einen neuen Wert wählt.
+ */
+export function wireZuPicker(wire: string): Dayjs {
+  return dayjs.utc(wire).local();
+}
+
+/** Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss' (rein, testbar). */
+export function pickerZuWire(d: Dayjs): string {
+  return d.utc().format('YYYY-MM-DD HH:mm:ss');
+}
+
+/** Werte des Bearbeiten-Formulars (begonnen_at als lokale Picker-Zeit vor der UTC-Wandlung). */
 interface FormWerte {
   bezeichnung: string;
   stichwort?: string;
@@ -109,7 +133,7 @@ export default function EinsatzdatenPage() {
       meldende_stelle: einsatz.meldende_stelle ?? undefined,
       sachverhalt: einsatz.sachverhalt ?? undefined,
       anzahl_betroffene_initial: einsatz.anzahl_betroffene_initial ?? undefined,
-      begonnen_at: dayjs(einsatz.begonnen_at),
+      begonnen_at: wireZuPicker(einsatz.begonnen_at),
     });
     setBearbeiten(true);
   }
@@ -127,7 +151,7 @@ export default function EinsatzdatenPage() {
       meldende_stelle: leerZuNull(werte.meldende_stelle),
       sachverhalt: leerZuNull(werte.sachverhalt),
       anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
-      begonnen_at: werte.begonnen_at.format('YYYY-MM-DD HH:mm:ss'),
+      begonnen_at: pickerZuWire(werte.begonnen_at),
     };
     speichernMutation.mutate(felder);
   }

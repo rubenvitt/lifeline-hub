@@ -3,11 +3,15 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
-import EinsatzdatenPage from './EinsatzdatenPage';
+import EinsatzdatenPage, { pickerZuWire, wireZuPicker } from './EinsatzdatenPage';
+
+dayjs.extend(utc);
 
 const admin: BenutzerAnzeige = {
   id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
@@ -57,7 +61,67 @@ function setup(opts: SetupOpts = {}) {
   );
 }
 
+describe('Alarmzeit-Wandlung (Wire ↔ Picker)', () => {
+  it('liest den Wirestring als UTC — geprüft am absoluten Instant, nicht an der Wanduhrzeit', () => {
+    // Die Assertion prüft den INSTANT, nicht das Format: `Date.UTC(...)` ist in jeder
+    // Zeitzone derselbe Zeitpunkt. Die frühere Fassung (`dayjs(wire)`) parst den naiven
+    // Wirestring als LOKALE Zeit und landet damit auf einem anderen Instant — in
+    // Europe/Berlin um 2 h daneben. Eine Prüfung auf die Form 'YYYY-MM-DD HH:mm:ss'
+    // wäre hier wertlos, sie ist in jeder Zeitzone grün.
+    //
+    // Bleibt eine unvermeidbare Grenze: unter TZ=UTC sind beide Lesarten derselbe
+    // Instant, der Test also trivial grün. Gegengeprüft wird deshalb unter
+    // TZ=Europe/Berlin (dort ist er scharf) — dieselbe Einschränkung, die
+    // `ErinnerungFormular.test.tsx` für die Gegenrichtung dokumentiert.
+    expect(wireZuPicker('2026-05-23 09:00:00').valueOf()).toBe(Date.UTC(2026, 4, 23, 9, 0, 0));
+  });
+
+  it('hält den Picker in lokaler Zeit — dieselbe Wanduhrzeit, die ZeitAnzeige daneben rendert', () => {
+    // `ZeitAnzeige`/`format.ts:inZone` rendert ohne konfigurierte Zone `dayjs.utc(x).local()`.
+    // Der Picker muss dieselbe Wanduhrzeit zeigen, sonst steht im Bearbeiten-Modus eine
+    // andere Uhrzeit als in der Descriptions-Zelle direkt daneben — der gemeldete Fehler.
+    expect(wireZuPicker('2026-05-23 09:00:00').format('YYYY-MM-DD HH:mm:ss')).toBe(
+      dayjs.utc('2026-05-23 09:00:00').local().format('YYYY-MM-DD HH:mm:ss'),
+    );
+  });
+
+  it('normalisiert die lokale Picker-Zeit zurück auf den UTC-Wirestring', () => {
+    // Fester Instant 09:00 UTC, als Dayjs im Lokal-Modus übergeben — so liefert ihn der
+    // antd-DatePicker. Ohne `.utc()` im Helfer formatiert `.format()` die lokale
+    // Wanduhrzeit und der Test fällt auf jeder Nicht-UTC-Maschine; der local→UTC-Shift
+    // wird also echt exerziert statt durch UTC-Eingabe zum No-op zu werden.
+    const lokal = dayjs.utc('2026-05-23 09:00:00').local();
+    expect(pickerZuWire(lokal)).toBe('2026-05-23 09:00:00');
+  });
+});
+
 describe('EinsatzdatenPage', () => {
+  it('zeigt die Alarmzeit im Picker lokal und schickt sie unverändert als UTC zurück', async () => {
+    let patchBody: Record<string, unknown> = {};
+    setup();
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisEinsatz);
+      }),
+    );
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+
+    // Der DatePicker trägt die LOKALE Entsprechung des Wire-UTC (in Europe/Berlin 11:00).
+    const alarmzeit = await screen.findByLabelText('Alarmzeit');
+    expect(alarmzeit).toHaveValue(
+      dayjs.utc(basisEinsatz.begonnen_at).local().format('YYYY-MM-DD HH:mm:ss'),
+    );
+
+    // Unverändert gespeichert muss exakt derselbe UTC-Wirestring zurückgehen: die
+    // Runde Wire→Picker→Wire darf den Instant nicht verschieben.
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody.begonnen_at).toBe('2026-05-23 09:00:00'));
+  });
+
+
   it('zeigt Kopfdaten im Lesemodus, leere Felder als —', async () => {
     setup();
     expect(await screen.findByText('2026-001')).toBeInTheDocument();
