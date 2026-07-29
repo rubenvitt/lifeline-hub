@@ -494,9 +494,9 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     // ALTEN Entwurf und zählte „1 gespeichert" dazu — die Person zeichnete im
     // falschen Zonentyp weiter.
     lagezonenApi.legeZoneAn.mockClear();
-    let loese: (w: unknown) => void = () => {};
+    let loese: () => void = () => {};
     lagezonenApi.legeZoneAn.mockImplementationOnce(
-      () => new Promise((r) => { loese = r; }),
+      () => new Promise<{ id: number }>((r) => { loese = () => r({ id: 9 }); }),
     );
     const { result } = rendere();
     bisZurBestaetigung(result);
@@ -506,10 +506,10 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
 
     // Mittendrin etwas anderes anfangen — hier ein taktisches Zeichen, weil das
     // den Zonen-Modus ganz verlässt und der Fehler damit am deutlichsten ist.
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'einheit' }));
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
     expect(result.current.zeichenPlatzieren).not.toBeNull();
 
-    await act(async () => { loese({ id: 9 }); });
+    await act(async () => { loese(); });
 
     expect(result.current.zeichenPlatzieren).not.toBeNull();
     expect(result.current.zoneEntwurf ?? null).toBeNull();
