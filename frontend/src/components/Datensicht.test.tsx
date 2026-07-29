@@ -685,6 +685,30 @@ describe('Datensicht · Formachse', () => {
     expect(karten(container)).toHaveLength(3);
   });
 
+  it('die md-Schwelle sitzt bei 768: 767 px Karten, 768 px Tabelle', () => {
+    /**
+     * Das Akzeptanzkriterium nennt `md` — die beiden Zweigtests oben messen aber 390 und
+     * 1024 px, und damit wäre JEDE Schwelle dazwischen grün. Erst dieses Grenzpaar pinnt
+     * die Zahl (antds `screenMD` = 768, `theme/util/alias.js`); gemessen: kippt die Weiche
+     * auf `abBreite('lg')`, wird die 768er Hälfte rot, während 1024 grün bleibt.
+     *
+     * `useViewport` ist bewusst NICHT gemockt: die Breite kommt über den
+     * matchMedia-Stub aus `test/viewport.ts` durch den echten Hook. Ein Mock des Hooks
+     * pinnte die Schwelle im Mock statt im Produktivcode, und eine Regression in
+     * `abBreiteAus` bliebe unsichtbar.
+     */
+    setzeViewportBreite(767);
+    const schmal = rendere();
+    expect(tabellen(schmal.container)).toHaveLength(0);
+    expect(karten(schmal.container)).toHaveLength(3);
+    schmal.unmount();
+
+    setzeViewportBreite(768);
+    const { container } = rendere();
+    expect(tabellen(container)).toHaveLength(1);
+    expect(karten(container)).toHaveLength(0);
+  });
+
   it('trägt eine ansprechbare Region mit der Bezeichnung', () => {
     // `<section aria-label>` — ein nacktes `div` mit `aria-label` hat keine Rolle und
     // `getByRole('region')` griffe dort nicht.
@@ -1041,6 +1065,59 @@ describe('Datensicht · Zeilenschleuse', () => {
     const { container } = rendere({ spalten: spalten.slice(0, 1) });
     expect(container.querySelector('input[type="search"]')).toBeNull();
     expect(container.querySelector('[data-lfh="datensicht-werkzeuge"]')).not.toBeNull();
+  });
+
+  it('die LEERE Ladeansicht friert nicht ein — und schärft sich beim nächsten Fokuseintritt nach', () => {
+    /**
+     * Die Werkzeugzeile steht auch ohne Daten im Baum (Test darüber). Wer den Fokus vor der
+     * ersten Antwort ins Suchfeld setzt, fror damit eine LEERE Folge ein: die gesamte erste
+     * Lieferung landete hinter dem Sammelbanner statt in der Liste — gemessen 0 Zeilen und
+     * „3 neue Einträge", bevor `betreten` die Null-Zeilen-Bedingung bekam.
+     *
+     * DREI Fallen in diesem Test, alle scharf:
+     *  - `suche` muss in JEDEM Render stehen. Fehlt es beim Nachziehen, meldet sich das
+     *    Suchfeld ab, der Fokus fällt auf den Body, die Schleuse taut von selbst auf — und
+     *    der Test wäre auch OHNE die Bedingung grün.
+     *  - „3 Zeilen, kein Banner" allein ist auch grün, wenn `betreten` überhaupt nicht mehr
+     *    einfriert. Die Gegenprobe dazu ist der Nachbar-Test „mit Fokus in der Sicht bleibt
+     *    die Zeilenmenge stehen und ein Banner erscheint" — und die zweite Hälfte hier.
+     *  - `ladend` ist NICHT die Bedingung im Produktivcode: ein Query, der auf `[]` auflöst
+     *    und erst per SSE Zeilen bekommt, hat `ladend === false` bei leerer Menge. Es steht
+     *    hier nur, weil die acht betroffenen Konsumenten es so übergeben.
+     */
+    const suche = { platzhalter: 'Funkrufname' };
+    const sicht = (daten: Fahrzeug[], ladend: boolean) => (
+      <Datensicht<Fahrzeug, FahrzeugKey>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={spalten}
+        daten={daten}
+        zeilenSchluessel="id"
+        karte={karte}
+        suche={suche}
+        ladend={ladend}
+      />
+    );
+
+    const { container, rerender } = renderMitProviders(sicht([], true));
+    // antd rendert für die leere Menge `ant-table-placeholder`, keine `ant-table-row` —
+    // der Startpunkt ist damit nachweislich 0 und nicht bloß „noch nichts gemessen".
+    expect(zeilenZahl(container)).toBe(0);
+
+    container.querySelector<HTMLInputElement>('input[type="search"]')!.focus();
+    rerender(sicht(DREI, false));
+
+    expect(zeilenZahl(container)).toBe(3);
+    expect(screen.queryByRole('button', { name: /neue/ })).toBeNull();
+
+    // Der benannte Rest: die Schleuse ist jetzt OFFEN. Sie schärft sich beim nächsten
+    // Fokuseintritt nach — `onFocus` läuft über `focusin` und bubbelt, der Sprung vom
+    // Suchfeld auf einen Zeilenlink derselben Sicht genügt also; die Sicht ganz zu
+    // verlassen ist nicht nötig. Das belegt zugleich, dass die neue Bedingung NUR den
+    // Null-Zeilen-Fall ausnimmt.
+    screen.getByRole('link', { name: 'Florian 1' }).focus();
+    rerender(sicht([...DREI, F(4, 'Florian 4')], false));
+    expect(zeilenZahl(container)).toBe(3);
+    expect(screen.getByRole('button', { name: /1 neuer Eintrag/ })).toBeInTheDocument();
   });
 
   it('mit Fokus in der Sicht bleibt die Zeilenmenge stehen und ein Banner erscheint', async () => {

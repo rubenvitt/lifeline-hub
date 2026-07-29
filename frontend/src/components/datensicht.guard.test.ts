@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -16,29 +17,26 @@ import { describe, expect, it } from 'vitest';
  * und nähme allen künftigen Konsumenten still waagerechten Bildlauf, stehende Kopfzeile und
  * fixierte Kennungsspalte. Eine reine Verbotsliste kann das nicht sehen.
  *
- * ── HÄLFTE 2: die Konsumenten, ABGELEITET statt handgepflegt ────────────────────
+ * ── HÄLFTE 2: die Konsumenten, ABGELEITET **und** handgepflegt ──────────────────
  *
- * Die Entscheidung (§8) verlangt ein handgepflegtes Inventar mit `toHaveLength(n)`. Das ist
- * hier bewusst NICHT umgesetzt, und zwar aus zwei Gründen:
+ * Beides, gegeneinander geprüft — weil jede Hälfte für sich blind ist. Die Menge wird aus
+ * der Marke `<Datensicht` ERSCHNÜFFELT und gegen das handgeschriebene {@link KONSUMENTEN}
+ * gestellt: ein rein abgeleitetes Inventar sähe eine Datei nicht, die still aus dem
+ * Primitiv herausfällt (es hätte sich mitverkleinert), ein rein handgepflegtes müsste von
+ * jedem Folgebündel editiert werden — genau die Kollision, die für
+ * `katalogTabelle.guard.test.ts` einen benannten Eigentümer nötig gemacht hat.
  *
- * 1. Bei Lieferung ist n = **0** — dieses Bündel liefert `Datensicht.tsx` mit NULL
- *    Konsumenten (alle liegen in B3/AP3/AP6/AP7). Ein auf 0 gepinntes Inventar bewiese
- *    nichts, und es wäre auf Dauer die zweite Wahrheit neben dem Code.
- * 2. Jedes Folgebündel müsste dieselbe Datei editieren — genau die Kollision, die für
- *    `katalogTabelle.guard.test.ts` einen benannten Eigentümer nötig gemacht hat.
+ * Die Falsch-Positiv-Sorge, die dessen 13er-Inventar handgepflegt macht („Modals, Listen,
+ * Untertabellen"), existiert für die abgeleitete Hälfte nicht: die Menge ist durch das
+ * Vorkommen der Marke definiert, nicht durch eine Einschätzung.
  *
- * Die Konsumentenmenge wird deshalb aus der Marke `<Datensicht` ERSCHNÜFFELT. Die
- * Falsch-Positiv-Sorge, die das 13er-Inventar von `katalogTabelle.guard.test.ts`
- * handgepflegt macht („Modals, Listen, Untertabellen"), existiert hier nicht: die Menge ist
- * durch das Vorkommen der Marke definiert, nicht durch eine Einschätzung.
+ * ── DIE VIER GEPFLEGTEN LISTEN ──────────────────────────────────────────────────
  *
- * ── WAS BÜNDEL V FÜLLT ──────────────────────────────────────────────────────────
- *
- * Handgepflegt bleiben allein die drei SEMANTISCHEN Ausnahmemengen unten
- * ({@link KARTEN_EIGENBAU}, {@link NUR_KARTE}, {@link NUR_TABELLE}). Alle drei sind bei
- * Lieferung leer und mit `toHaveLength(0)` gepinnt; **Bündel V füllt sie**, sobald die
- * Zielmodule umgebaut sind. Wer eine Datei einträgt, ohne sie umzubauen, fällt am
- * Anwesenheits-Gegentest auf — ein toter Eintrag wird gemeldet, nicht geduldet.
+ * Drei SEMANTISCHE Ausnahmemengen ({@link KARTEN_EIGENBAU} — leer, {@link NUR_KARTE} — zwei,
+ * {@link NUR_TABELLE} — eine) und eine PFLICHTMENGE ({@link VOLLMENGE_PFLICHT} — eine). Alle
+ * vier sind auf ihre Länge gepinnt und werden auf tote Einträge geprüft: wer eine Datei
+ * einträgt, ohne sie umzubauen, fällt am Anwesenheits-Gegentest auf — ein toter Eintrag
+ * wird gemeldet, nicht geduldet.
  *
  * ── WIE ER SEINE EIGENE PROSA NICHT MITZÄHLT — dreifach ─────────────────────────
  *
@@ -54,6 +52,11 @@ import { describe, expect, it } from 'vitest';
  * importiert: ein Import aus einer anderen `*.test.ts` registriert deren `describe`-Blöcke
  * ein zweites Mal.
  *
+ * Die SCHLÜSSELPRÜFUNG ({@link sichtstellen}) braucht die ersten beiden nicht: sie liest den
+ * AST, und Kommentare sind dort keine Knoten — auch ein ausgeschriebenes `<Datensicht` in
+ * einer Prosa-Zeile ist kein JSX-Element. Die dritte gilt weiter, nur anders begründet: sie
+ * läuft ausschließlich über {@link KONSUMENTEN} und kommt deshalb an keine Testdatei.
+ *
  * ── WAS DER GUARD NICHT SIEHT, und das ist Teil des Vertrags ────────────────────
  *
  * · **Ob hinter einem Slot-Schlüssel überhaupt eine Spalte steht.** Das kann nur
@@ -65,6 +68,16 @@ import { describe, expect, it } from 'vitest';
  *   Trefflächen, Überlauf und Fokusverdeckung gehören nach `frontend/e2e/`.
  * · **Dynamisch zusammengesetzte Bezeichner.** Wie in `useViewport.guard.test.ts` bewusst
  *   nicht abgedeckt.
+ * · **Die Gleichheit zweier Schlüssel misst der QUELLTEXT, nicht der Laufzeitwert.** Zwei
+ *   gleich geschriebene Ausdrücke gelten als Dublette, auch wenn sie zur Laufzeit
+ *   auseinanderlaufen; zwei verschieden geschriebene, die denselben Wert liefern, fallen
+ *   nicht auf. Ein `key` in einem `{...spread}` wird nicht gesucht — es steht nicht am
+ *   Element.
+ * · **Die vier Marken aus {@link VERBOTEN_BEI_VOLLMENGE} treffen nur die wörtliche Form.**
+ *   Ein `filter: WERTE_FILTER` aus einer Konstanten, ein durch einen Wrapper gereichtes
+ *   `suche={props.suche}` oder ein `{...datensichtProps}` mit einer dieser Angaben darin
+ *   kommen durch. Dieselbe Lücke wie bei jedem Regex-Gate des Repos — hier benannt, weil
+ *   diese Liste Teil des Vertrags ist und nicht später entdeckt werden soll.
  */
 
 /** Wurzel des Scans: `frontend/src`, über `process.cwd()` aufgelöst (siehe gate5.guard). */
@@ -105,6 +118,28 @@ const NUR_KARTE: string[] = ['/src/auftraege/BefehlListe.tsx', '/src/pages/Lageb
  * Anwesenheit des Literals kann es.
  */
 const NUR_TABELLE: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
+
+/**
+ * Dateien, deren `Datensicht` die ZEILENMENGE nicht antasten darf — keine Freitextsuche,
+ * kein Spaltenfilter, keine Sortierung IM PRIMITIV.
+ *
+ * Die Gegenzeile zu {@link NUR_TABELLE}: dort steht, welche Form das Meldebild trägt, hier,
+ * was es nicht tun darf. Der Grund ist die Rechenrichtung — die Aggregate der Elternzeilen
+ * werden stromaufwärts über die VOLLMENGE kumuliert (`addKategorie`), während
+ * `filtereKraefte` die Rohlisten filtert und den Baum neu baut. Fiele im Primitiv eine Zeile
+ * weg, behielten die Eltern Zahlen über nicht mehr sichtbare Kinder: die Ampelzahlen lügen
+ * still, ohne Fehler und ohne roten Test.
+ *
+ * WARUM STATISCH, obwohl `pruefeKartenplan` zwei der vier Marken kennt: dessen Prüfung
+ * greift nur, SOLANGE `baum` gesetzt ist, kennt die Sortierung gar nicht — und sie ist ein
+ * `console.warn` hinter `import.meta.env.DEV` (`Datensicht.tsx`, gemessen bei Zeile 971).
+ * Sie färbt keinen Test rot.
+ *
+ * `Input.Search` ist hier ausdrücklich ERLAUBT: die Filter-Card der Seite liegt AUSSERHALB
+ * der Datensicht und filtert die Rohlisten, aus denen die Aggregate danach neu entstehen.
+ * Diese Liste ist deshalb dateibezogen und KEINE repoweite Zusicherung.
+ */
+const VOLLMENGE_PFLICHT: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
 
 /**
  * Das Konsumenteninventar von LFH-330 · B2, handgeschrieben — nicht aus dem Scan abgeleitet.
@@ -191,6 +226,100 @@ function istTest(pfad: string): boolean {
   return /\.test\.[jt]sx?$/.test(pfad) || /\.generated\.[jt]sx?$/.test(pfad);
 }
 
+/** Eine `<Datensicht>`-Stelle samt dem, was AM ELEMENT als `key` steht. */
+export interface Sichtstelle {
+  /** 1-basiert, wie in Editor-/Guard-Meldungen üblich. */
+  zeile: number;
+  /** Quelltext des Schlüssels (`"patienten"`, `` `liste-${sicht}` ``) oder `null`. */
+  schluessel: string | null;
+}
+
+/** Das `key`-Attribut AM Element — Spreads werden nicht durchsucht (siehe Kopfkommentar). */
+function schluesselVon(element: ts.JsxOpeningLikeElement, quelle: ts.SourceFile): string | null {
+  for (const attribut of element.attributes.properties) {
+    if (!ts.isJsxAttribute(attribut) || attribut.name.getText(quelle) !== 'key') continue;
+    const wert = attribut.initializer;
+    if (wert == null) return 'key'; // bloßes `key` ohne Wert — formal da, praktisch leer
+    if (ts.isStringLiteral(wert)) return JSON.stringify(wert.text);
+    if (ts.isJsxExpression(wert)) return wert.expression?.getText(quelle) ?? 'key={}';
+    return wert.getText(quelle);
+  }
+  return null;
+}
+
+/**
+ * Alle `<Datensicht>`-Stellen einer Datei — AST statt Regex, nach dem Muster von
+ * `api/queryKeyScan.ts`.
+ *
+ * Der Grund ist gemessen: die Vorgängerform zählte jedes `key=` der ganzen DATEI gegen die
+ * Zahl der Sichten, und die Treffer stammen überwiegend aus Spalten-Renderern
+ * (`<Tag key={w}>` in einer `.map()`). Damit blieben genau die zwei Fälle unsichtbar, gegen
+ * die die Zusicherung überhaupt gebaut wurde: zwei Sichten OHNE eigenen Schlüssel und zwei
+ * mit DEMSELBEN.
+ *
+ * `ohneKommentare` läuft hier NICHT: Kommentare sind keine AST-Knoten, und das Strippen
+ * verschöbe nur die Zeilennummern der Meldung.
+ */
+export function sichtstellen(pfad: string, quelltext: string): Sichtstelle[] {
+  const quelle = ts.createSourceFile(
+    pfad,
+    quelltext,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    pfad.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const stellen: Sichtstelle[] = [];
+  const gehe = (knoten: ts.Node): void => {
+    if (
+      (ts.isJsxOpeningElement(knoten) || ts.isJsxSelfClosingElement(knoten)) &&
+      knoten.tagName.getText(quelle) === 'Datensicht'
+    ) {
+      stellen.push({
+        zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
+        schluessel: schluesselVon(knoten, quelle),
+      });
+    }
+    ts.forEachChild(knoten, gehe);
+  };
+  gehe(quelle);
+  return stellen;
+}
+
+/**
+ * Befunde der Schlüsselregel: ab ZWEI Sichten in einer Datei trägt jede einen `key`, und
+ * die Schlüssel sind paarweise verschieden. Rein und exportiert, damit die Selbstbeweise
+ * sie ohne Dateisystem prüfen können — Bauform aus `useViewport.guard.test.ts`.
+ */
+export function schluesselBefunde(
+  dateien: Record<string, string>,
+  nur: readonly string[],
+): string[] {
+  const gefunden: string[] = [];
+  for (const [pfad, roh] of Object.entries(dateien)) {
+    if (!nur.includes(pfad)) continue;
+    const stellen = sichtstellen(pfad, roh);
+    if (stellen.length < 2) continue;
+
+    const ohneSchluessel = stellen.filter((s) => s.schluessel == null);
+    if (ohneSchluessel.length > 0) {
+      gefunden.push(
+        `${pfad}: ${stellen.length} Sichten, davon ${ohneSchluessel.length} ohne key ` +
+          `(Zeile ${ohneSchluessel.map((s) => s.zeile).join(', ')}).`,
+      );
+    }
+
+    const haeufigkeit = new Map<string, number>();
+    for (const stelle of stellen) {
+      if (stelle.schluessel == null) continue;
+      haeufigkeit.set(stelle.schluessel, (haeufigkeit.get(stelle.schluessel) ?? 0) + 1);
+    }
+    for (const [schluessel, anzahl] of haeufigkeit) {
+      if (anzahl > 1) gefunden.push(`${pfad}: ${anzahl} Sichten teilen den key ${schluessel}.`);
+    }
+  }
+  return gefunden;
+}
+
 /** Verbotene Formen im Primitiv, je mit Grund für die Fehlermeldung. */
 const VERBOTEN_IM_PRIMITIV: readonly { muster: RegExp; grund: string }[] = [
   { muster: elementMuster('Table'), grund: 'keine zweite Tabellenwahrheit — über KatalogTabelle rendern' },
@@ -212,13 +341,46 @@ const VERBOTEN_IM_PRIMITIV: readonly { muster: RegExp; grund: string }[] = [
  */
 const BEGRUENDUNG = ['KARTEN-AUSNAHME', 'TRENNLINIE'];
 
-/** Verbotene Formen je Konsumentendatei. */
+/**
+ * Verbotene Formen je Konsumentendatei.
+ *
+ * `<Card` steht hier BEWUSST NICHT: gemessen zwei legitime Treffer (Kennzahlen- und
+ * Filter-Card in `pages/KraefteuebersichtPage.tsx`), und die Filter-Card ist genau der
+ * Grund, aus dem {@link VOLLMENGE_PFLICHT} dort gelten darf. Ein Verbot wäre am Liefertag
+ * rot. Im PRIMITIV bleibt `<Card` verboten — dort doppelt der Rahmen die li-Trennlinie.
+ */
 const VERBOTEN_BEIM_KONSUMENTEN: readonly { muster: RegExp; grund: string }[] = [
   { muster: elementMuster('Table'), grund: 'die Tabelle kommt aus Datensicht/KatalogTabelle' },
   { muster: /\bscroll=\{\{/g, grund: 'der Bildlauf gehört dem Primitiv' },
   { muster: /\bsorter:/g, grund: 'Sortierung läuft über sortWert, nicht über antds Haken' },
   { muster: /\bfilters:/g, grund: 'Filter laufen über filter: { werte, trifft }' },
   { muster: /\bresponsive:/g, grund: 'Spaltenbreiten laufen über abBreite (sonst lügt der Zähler)' },
+  {
+    muster: /\bdefaultSortOrder\b/g,
+    grund: 'die Voreinstellung läuft über standardSortierung — `DatensichtSpalte` blendet ' +
+      'antds Prop aus, ein Nachzügler säße also stumm in der Spaltenliste',
+  },
+];
+
+/**
+ * Verbotene Formen in einer Datei aus {@link VOLLMENGE_PFLICHT} — alles, was das Primitiv
+ * Zeilen entziehen oder umordnen ließe. Begründung dort.
+ */
+const VERBOTEN_BEI_VOLLMENGE: readonly { muster: RegExp; grund: string }[] = [
+  {
+    muster: /\bsuche=\{/g,
+    grund: 'die Freitextsuche des Primitivs entfernt Zeilen — gefiltert wird außerhalb',
+  },
+  {
+    muster: /\bfilter:\s*\{/g,
+    grund: 'ein Spaltenfilter entfernt Zeilen, die Elternaggregate zählen sie weiter mit',
+  },
+  {
+    muster: /\bsortWert:/g,
+    grund: 'im Baumzweig gibt effektiveDaten die Daten referenzgleich zurück — der Pfeil ' +
+      'verspräche eine Ordnung, die nie eintritt',
+  },
+  { muster: /\bstandardSortierung=/g, grund: 'siehe sortWert — die Baumordnung ist die Ordnung' },
 ];
 
 /**
@@ -227,7 +389,12 @@ const VERBOTEN_BEIM_KONSUMENTEN: readonly { muster: RegExp; grund: string }[] = 
  */
 export function befunde(
   dateien: Record<string, string>,
-  ausnahmen: { eigenbau: readonly string[]; nurKarte: readonly string[]; nurTabelle: readonly string[] },
+  ausnahmen: {
+    eigenbau: readonly string[];
+    nurKarte: readonly string[];
+    nurTabelle: readonly string[];
+    vollmenge: readonly string[];
+  },
 ): string[] {
   const gefunden: string[] = [];
   const roh = dateien[PRIMITIV];
@@ -294,6 +461,15 @@ export function befunde(
     if (ausnahmen.nurTabelle.includes(pfad) && !/form="tabelle"/.test(rein)) {
       gefunden.push(`${pfad}: steht in NUR_TABELLE, trägt aber kein form="tabelle".`);
     }
+    // Die NEGATIVE Hälfte der Gegenzeile: NUR_TABELLE sagt, welche Form; das hier, was die
+    // Sicht nicht tun darf. `Input.Search` bleibt unangetastet — die Muster greifen nur
+    // Props/Spaltenschlüssel des Primitivs.
+    if (ausnahmen.vollmenge.includes(pfad)) {
+      for (const { muster, grund } of VERBOTEN_BEI_VOLLMENGE) {
+        const anzahl = treffer(rein, muster);
+        if (anzahl > 0) gefunden.push(`${pfad}: ${anzahl}× ${muster.source} — ${grund}`);
+      }
+    }
   }
 
   // Tote Ausnahmeeinträge melden — sonst veraltet die Liste still, wie in
@@ -302,6 +478,7 @@ export function befunde(
     ['KARTEN_EIGENBAU', ausnahmen.eigenbau],
     ['NUR_KARTE', ausnahmen.nurKarte],
     ['NUR_TABELLE', ausnahmen.nurTabelle],
+    ['VOLLMENGE_PFLICHT', ausnahmen.vollmenge],
   ] as const) {
     for (const eintrag of liste) {
       if (dateien[eintrag] == null) gefunden.push(`tote Ausnahme in ${name}: ${eintrag}`);
@@ -331,6 +508,7 @@ const AUSNAHMEN = {
   eigenbau: KARTEN_EIGENBAU,
   nurKarte: NUR_KARTE,
   nurTabelle: NUR_TABELLE,
+  vollmenge: VOLLMENGE_PFLICHT,
 };
 
 describe('Datensicht-Guard (LFH-330 · B2)', () => {
@@ -343,7 +521,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     ).toEqual([]);
   });
 
-  it('die semantischen Ausnahmemengen stehen auf dem entschiedenen Stand', () => {
+  it('die vier gepflegten Listen stehen auf dem entschiedenen Stand', () => {
     // `KARTEN_EIGENBAU` bleibt leer, und das ist die Aussage: kein Modul dieses Pakets
     // brauchte einen eigenen Kartenrenderer. Wer den ersten einträgt, muss begründen, warum
     // der Plan-Modus nicht reicht — sonst wächst die Ausnahme über das Band auf fünf.
@@ -352,6 +530,10 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
     expect(NUR_KARTE).toHaveLength(2);
     expect(NUR_TABELLE).toHaveLength(1);
+    // Die vierte ist keine Ausnahme, sondern eine PFLICHT — und sie ist ausdrücklich
+    // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
+    // (Aggregate stromaufwärts über die Vollmenge), nicht bloß den Verweis hierauf.
+    expect(VOLLMENGE_PFLICHT).toHaveLength(1);
   });
 
   it('Sentinel: der Scan sieht das Primitiv und mehr als 200 Dateien', () => {
@@ -382,26 +564,76 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
      * die eigene Voreinstellung griff nie. Keine Warnung, kein roter Test — sichtbar wurde es
      * nur, weil zufällig eine Sortierbehauptung auf dem zweiten Zweig lag.
      *
-     * Die Prüfung ist bewusst grob (Anwesenheit mindestens so vieler `key=`-Angaben wie
-     * Sichten, nicht deren Distinktheit): ob zwei Schlüssel wirklich verschieden sind, kann
-     * ein Textscanner nicht entscheiden. Sie fängt den Fall, der real auftrat — Sichten ohne
-     * jeden Schlüssel — und benennt für Band C die Regel, um die es geht.
+     * Gelesen wird der `key` AM ELEMENT, aus dem AST ({@link sichtstellen}). Die
+     * Vorgängerform zählte stattdessen jedes `key=` der ganzen DATEI gegen die Zahl der
+     * Sichten — und die Treffer stammen überwiegend aus Spalten-Renderern. Für sie waren
+     * beide Fehler unsichtbar, gegen die die Zusicherung gebaut ist: zwei Sichten ohne
+     * jeden Schlüssel, und zwei mit demselben.
      */
-    const mehrfach = Object.entries(dateien)
-      .filter(([pfad]) => KONSUMENTEN.includes(pfad))
-      .map(([pfad, roh]) => {
-        const text = ohneKommentare(roh);
-        return {
-          pfad,
-          sichten: text.match(/<Datensicht(?=[\s/>{<])/g)?.length ?? 0,
-          schluessel: text.match(/\bkey=/g)?.length ?? 0,
-        };
-      })
-      .filter((d) => d.sichten > 1);
-
     expect(
-      mehrfach.filter((d) => d.schluessel < d.sichten).map((d) => d.pfad),
-      'Zwei Sichten an derselben Baumstelle teilen ihren Zustand — jede braucht ihr eigenes key.',
+      schluesselBefunde(dateien, KONSUMENTEN),
+      'Zwei Sichten an derselben Baumstelle teilen ihren Zustand — jede braucht ihr eigenes, ' +
+        'von den anderen verschiedenes key.',
+    ).toEqual([]);
+  });
+
+  it('Sentinel: der Schlüssel-Scan sieht die zwei Sichten von PersonenPage', () => {
+    // Ein Scanner, der überall [] liefert (falsche ScriptKind, danebengreifender tagName,
+    // geschluckter Parse-Fehler), meldete „keine Datei hat ≥ 2 Sichten" und wäre still grün.
+    // Gepinnt gegen den echten Baum — samt des Block-Kommentars, der IM öffnenden Element
+    // vor `key="patienten"` steht: Kommentare sind Trivia, das Attribut bleibt sichtbar.
+    // BEWUSST nicht auf die Schlüsselwerte gepinnt: die Seite gehört einem anderen Bündel.
+    // Ein Pin auf `"patienten"` ginge bei einer legitimen Umbenennung rot, und der nächste
+    // repariert dann den Guard statt die Seite. Wogegen der Sentinel steht — ein Scanner,
+    // der überall nichts findet — belegen Anzahl und Anwesenheit vollständig.
+    const pfad = '/src/pages/PersonenPage.tsx';
+    const stellen = sichtstellen(pfad, dateien[pfad] ?? '');
+    expect(stellen).toHaveLength(2);
+    expect(stellen.every((s) => s.schluessel != null)).toBe(true);
+  });
+
+  it('Selbstbeweis: fremde key= aus Zellen-Renderern decken fehlende Sichtschlüssel nicht zu', () => {
+    // Der Blindfleck der Vorgängerform als Fixture: zwei Sichten OHNE Schlüssel, dazu zwei
+    // `key=` aus Renderern. Zählend („2 key= ≥ 2 Sichten") war das grün — und genau diese
+    // Konstellation ist der Normalfall einer Listenseite, nicht der Sonderfall.
+    const datei = [
+      'const zellen = werte.map((w) => <Tag key={w}>{w}</Tag>);',
+      'const kopf = spalten.map((s) => <th key={s.key}>{s.title}</th>);',
+      'const x = offen ? <Datensicht spalten={a} /> : <Datensicht spalten={b} />;',
+    ].join('\n');
+    expect(schluesselBefunde({ '/src/pages/Zwei.tsx': datei }, ['/src/pages/Zwei.tsx'])).toEqual([
+      '/src/pages/Zwei.tsx: 2 Sichten, davon 2 ohne key (Zeile 3, 3).',
+    ]);
+  });
+
+  it('Selbstbeweis: zwei Sichten mit demselben Schlüssel fallen auf, mit verschiedenen nicht', () => {
+    const gleich = 'const x = offen ? <Datensicht key="liste" /> : <Datensicht key="liste" />;';
+    expect(schluesselBefunde({ '/src/pages/Doppelt.tsx': gleich }, ['/src/pages/Doppelt.tsx'])).toEqual([
+      '/src/pages/Doppelt.tsx: 2 Sichten teilen den key "liste".',
+    ]);
+    const verschieden = 'const x = offen ? <Datensicht key="a" /> : <Datensicht key="b" />;';
+    expect(
+      schluesselBefunde({ '/src/pages/Doppelt.tsx': verschieden }, ['/src/pages/Doppelt.tsx']),
+    ).toEqual([]);
+    // Dieselbe Regel für den AUSDRUCKS-Schlüssel (`key={…}`, die Form von PersonenPage):
+    // gemessen wird der Quelltext, nicht der Laufzeitwert — zweimal derselbe Ausdruck ist
+    // eine Dublette, zwei verschiedene sind es nicht.
+    const gleicherAusdruck =
+      'const x = offen ? <Datensicht key={`liste-${sicht}`} /> : <Datensicht key={`liste-${sicht}`} />;';
+    expect(
+      schluesselBefunde({ '/src/pages/Dyn.tsx': gleicherAusdruck }, ['/src/pages/Dyn.tsx']),
+    ).toEqual(['/src/pages/Dyn.tsx: 2 Sichten teilen den key `liste-${sicht}`.']);
+    const andereAusdruecke =
+      'const x = offen ? <Datensicht key={`liste-${a}`} /> : <Datensicht key={`liste-${b}`} />;';
+    expect(
+      schluesselBefunde({ '/src/pages/Dyn.tsx': andereAusdruecke }, ['/src/pages/Dyn.tsx']),
+    ).toEqual([]);
+    // Eine EINZELNE Sicht braucht keinen Schlüssel: ohne Geschwister an derselben Baumstelle
+    // gibt es nichts, womit React sie verwechseln könnte.
+    expect(
+      schluesselBefunde({ '/src/pages/Eine.tsx': 'const x = <Datensicht daten={d} />;' }, [
+        '/src/pages/Eine.tsx',
+      ]),
     ).toEqual([]);
   });
 
@@ -413,6 +645,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       eigenbau: [],
       nurKarte: [],
       nurTabelle: [],
+      vollmenge: [],
     });
     expect(gemeldet.some((b) => b.includes('<KatalogTabelle fehlt'))).toBe(true);
     expect(gemeldet.some((b) => b.includes('keine zweite Tabellenwahrheit'))).toBe(true);
@@ -420,7 +653,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
 
   it('Selbstbeweis: die Begründungsmarken werden verlangt', () => {
     const ohneBegruendung = { [PRIMITIV]: 'const a = <KatalogTabelle columns={c} />;' };
-    const gemeldet = befunde(ohneBegruendung, { eigenbau: [], nurKarte: [], nurTabelle: [] });
+    const gemeldet = befunde(ohneBegruendung, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] });
     expect(gemeldet.filter((b) => b.includes('schriftliche Begründung'))).toHaveLength(2);
   });
 
@@ -429,16 +662,77 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       [PRIMITIV]: 'KARTEN-AUSNAHME TRENNLINIE\nconst a = <KatalogTabelle columns={c} />;',
       '/src/pages/Schlampig.tsx': [
         'const spalten: readonly DatensichtSpalte<P>[] = [',
-        "  { key: 'a', title: 'A', sorter: (x, y) => 0, filters: [], responsive: ['lg'] },",
+        "  { key: 'a', title: 'A', sorter: (x, y) => 0, filters: [], responsive: ['lg'],",
+        "    defaultSortOrder: 'descend' },",
         '];',
         'const x = <Datensicht spalten={spalten} />;',
         'const y = <Table dataSource={d} scroll={{ x: 1 }} />;',
       ].join('\n'),
     };
-    const gemeldet = befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [] });
+    const gemeldet = befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] });
     const eigene = gemeldet.filter((b) => b.startsWith('/src/pages/Schlampig.tsx'));
-    expect(eigene).toHaveLength(6);
+    // Sechs Verbotsmarken (Table, scroll, sorter, filters, responsive, defaultSortOrder) plus
+    // die fehlende spaltenFuer-Marke. Die Zahl ist der Mutationsbeweis jedes einzelnen
+    // Musters: fällt eines weg, fällt sie auf 6.
+    expect(eigene).toHaveLength(7);
     expect(eigene.some((b) => b.includes('spaltenFuer'))).toBe(true);
+    expect(eigene.some((b) => b.includes('defaultSortOrder'))).toBe(true);
+  });
+
+  it('Selbstbeweis: Suche, Spaltenfilter und Sortierung fallen NUR in einer Vollmengen-Pflichtdatei auf', () => {
+    const baum = {
+      [PRIMITIV]: 'KARTEN-AUSNAHME TRENNLINIE\nconst a = <KatalogTabelle columns={c} />;',
+      '/src/pages/Meldebild.tsx': [
+        'const spalten = spaltenFuer<Zeile>()([',
+        "  { key: 'bez', filter: { werte: [], trifft: () => true }, sortWert: (z) => z.bez },",
+        ']);',
+        'const x = (',
+        '  <Datensicht',
+        '    spalten={spalten}',
+        '    form="tabelle"',
+        "    suche={{ platzhalter: 'Suche…' }}",
+        "    standardSortierung={{ spalte: 'bez', richtung: 'auf' }}",
+        '  />',
+        ');',
+      ].join('\n'),
+    };
+    const mitPflicht = befunde(baum, {
+      eigenbau: [],
+      nurKarte: [],
+      nurTabelle: [],
+      vollmenge: ['/src/pages/Meldebild.tsx'],
+    });
+    expect(mitPflicht).toHaveLength(4);
+    // Dieselbe Datei OHNE Eintrag ist sauber. Das ist die Aussage der Liste: sie ist
+    // dateibezogen, keine repoweite Zusicherung — Suche und Filter sind das Normale.
+    expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual([]);
+  });
+
+  it('Selbstbeweis: Input.Search bleibt in einer Vollmengen-Pflichtdatei erlaubt', () => {
+    // Die Filter-Card liegt AUSSERHALB der Datensicht und filtert die Rohlisten, aus denen
+    // die Aggregate danach neu entstehen. Ein Verbot von Input.Search wäre am Liefertag rot —
+    // und würde die einzige Stelle treffen, an der das Meldebild überhaupt filtern DARF.
+    const baum = {
+      [PRIMITIV]: 'KARTEN-AUSNAHME TRENNLINIE\nconst a = <KatalogTabelle columns={c} />;',
+      '/src/pages/Meldebild.tsx': [
+        "const spalten = spaltenFuer<Zeile>()([{ key: 'bez' }]);",
+        'const f = (',
+        '  <Card>',
+        '    <Input.Search value={filter.suche}',
+        '      onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))} />',
+        '  </Card>',
+        ');',
+        'const x = <Datensicht spalten={spalten} form="tabelle" daten={bild.baum} />;',
+      ].join('\n'),
+    };
+    expect(
+      befunde(baum, {
+        eigenbau: [],
+        nurKarte: [],
+        nurTabelle: ['/src/pages/Meldebild.tsx'],
+        vollmenge: ['/src/pages/Meldebild.tsx'],
+      }),
+    ).toEqual([]);
   });
 
   it('Selbstbeweis: art eigen ohne Eintrag fällt auf, mit Eintrag nicht', () => {
@@ -448,12 +742,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       '/src/pages/Eigen.tsx': `${zeile}\nconst x = <Datensicht spaltenFuer />;`,
     };
     expect(
-      befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [] }).some((b) =>
+      befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] }).some((b) =>
         b.includes("art: 'eigen' ohne Eintrag"),
       ),
     ).toBe(true);
     expect(
-      befunde(baum, { eigenbau: ['/src/pages/Eigen.tsx'], nurKarte: [], nurTabelle: [] }),
+      befunde(baum, { eigenbau: ['/src/pages/Eigen.tsx'], nurKarte: [], nurTabelle: [], vollmenge: [] }),
     ).toEqual([]);
   });
 
@@ -468,6 +762,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       eigenbau: [],
       nurKarte: ['/src/pages/Befehle.tsx'],
       nurTabelle: [],
+      vollmenge: [],
     });
     expect(gemeldet).toEqual(['/src/pages/Befehle.tsx: steht in NUR_KARTE, trägt aber kein form="karte".']);
   });
@@ -475,8 +770,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
   it('Selbstbeweis: tote Ausnahmeeinträge werden gemeldet', () => {
     const baum = { [PRIMITIV]: 'KARTEN-AUSNAHME TRENNLINIE\n<KatalogTabelle columns={c} />' };
     expect(
-      befunde(baum, { eigenbau: [], nurKarte: ['/src/pages/Weg.tsx'], nurTabelle: [] }),
+      befunde(baum, { eigenbau: [], nurKarte: ['/src/pages/Weg.tsx'], nurTabelle: [], vollmenge: [] }),
     ).toEqual(['tote Ausnahme in NUR_KARTE: /src/pages/Weg.tsx']);
+    // Auch die vierte Liste rottet nicht still: ein Eintrag ohne Datei fällt genauso auf.
+    expect(
+      befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: ['/src/pages/Weg.tsx'] }),
+    ).toEqual(['tote Ausnahme in VOLLMENGE_PFLICHT: /src/pages/Weg.tsx']);
   });
 
   it('Selbstbeweis: Kommentar-Fundstellen zählen nicht, auch im Block über Zeilen', () => {
@@ -492,7 +791,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // Die Verbotsformen liegen im Kommentar → 0 Befunde. Die BEGRÜNDUNG liegt ebenfalls im
     // Kommentar und wird trotzdem gefunden, weil sie am Rohtext gemessen wird — genau diese
     // Asymmetrie ist der Grund für die zwei Textquellen.
-    expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [] })).toEqual([]);
+    expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual([]);
   });
 
   it('Selbstbeweis: die generische Schreibweise wird richtig zugeordnet', () => {

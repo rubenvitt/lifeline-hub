@@ -94,6 +94,40 @@ describe('PersonenPage', () => {
     expect(screen.getByText('unbekannt')).toBeInTheDocument();
   });
 
+  it('nimmt den Suchbegriff nicht in den nächsten Reiter mit', async () => {
+    /**
+     * EINE `Datensicht` bedient fünf Reiter — sie stehen alle im selben Zweig des
+     * Ternärs. Bei konstantem `key` reicht React beim Reiterwechsel dieselbe Instanz
+     * weiter, und `suchbegriff` lebt IN der Sicht: der Begriff aus „Vermisst" filtert
+     * danach die Menge von „Betroffen".
+     *
+     * Drei Schritte, weil der letzte allein nichts belegte: eine Behauptung über das
+     * leere Feld bliebe auch grün, wenn die Suche überhaupt nicht filterte (etwa ohne
+     * `suchText` an der Namensspalte). Schritt 1 zeigt erst, dass der Begriff wirkt;
+     * Schritt 3 nennt den Schaden beim Namen — eine fremde Menge auf einen fremden
+     * Begriff gefiltert.
+     */
+    const mueller = { ...person, id: 60, registrier_nr: 11, status: 'vermisst' as const,
+      name: 'Müller', vorname: 'Anna' };
+    const krause = { ...person, id: 61, registrier_nr: 12, status: 'vermisst' as const,
+      name: 'Krause', vorname: 'Bernd' };
+    const schmidt = { ...person, id: 62, registrier_nr: 13, status: 'betroffen' as const,
+      name: 'Schmidt', vorname: 'Carla' };
+    render(einsatzAktiv, [mueller, krause, schmidt]);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+    expect(await screen.findByText('Krause, Bernd')).toBeInTheDocument();
+
+    // 1. Die Suche wirkt überhaupt: die nicht passende Zeile fällt heraus.
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Suche in Personen' }), 'Müller');
+    await vi.waitFor(() => expect(screen.queryByText('Krause, Bernd')).not.toBeInTheDocument());
+    expect(screen.getByText('Müller, Anna')).toBeInTheDocument();
+
+    // 2. + 3. Reiterwechsel: die fremde Menge steht ungefiltert da, das Feld ist leer.
+    await userEvent.click(screen.getByRole('tab', { name: 'Betroffen' }));
+    expect(await screen.findByText('Schmidt, Carla')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Suche in Personen' })).toHaveValue('');
+  });
+
   it('Einsatzleitung sieht die Anlege-Buttons', async () => {
     render(einsatzAktiv, []);
     await screen.findByRole('heading', { name: 'Personen' });

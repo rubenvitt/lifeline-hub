@@ -201,6 +201,59 @@ describe('BenutzerPage', () => {
     freigeben();
   });
 
+  // Ordnung statt bloßer Anwesenheit: geprüft wird, was Suche, Sortierung und Statusfilter mit
+  // den Zeilen TUN. Die stehende Kopfzeile schiebt eine verborgene Messzeile als erste
+  // Körperzeile ein, deshalb die Verengung auf `tr.ant-table-row`.
+  it('sucht, sortiert und filtert die Benutzerliste', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer(),
+          benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner', aktiv: false }),
+        ]),
+      ),
+    );
+    const { container } = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+    await screen.findByText('@eva');
+    const namen = () =>
+      Array.from(container.querySelectorAll('tr.ant-table-row td:first-child')).map(
+        (z) => z.textContent,
+      );
+    expect(namen()).toEqual(['Admin', 'Eva']);
+
+    // Gesucht wird der Rohwert: „eva", nicht das gerenderte „@eva".
+    const feld = screen.getByPlaceholderText('Name oder Benutzername');
+    await userEvent.type(feld, 'eva');
+    await waitFor(() => expect(namen()).toEqual(['Eva']));
+    await userEvent.clear(feld);
+    await waitFor(() => expect(namen()).toHaveLength(2));
+
+    // Zweimal klicken: aufsteigend ist hier die Serverreihenfolge, erst absteigend beweist,
+    // dass wirklich sortiert wird.
+    const kopf = screen.getByRole('columnheader', { name: /Name/ });
+    await userEvent.click(kopf);
+    await userEvent.click(kopf);
+    await waitFor(() => expect(namen()).toEqual(['Eva', 'Admin']));
+
+    // Der Filterkorb hängt in einem Portal an `document.body`, nicht im Container.
+    const status = screen.getByRole('columnheader', { name: /Status/ });
+    await userEvent.click(status.querySelector('.ant-table-filter-trigger') as HTMLElement);
+    const korb = document.querySelector('.ant-table-filter-dropdown') as HTMLElement;
+    await userEvent.click(within(korb).getByText('deaktiviert'));
+    // `test/utils.tsx` montiert `ConfigProvider` ohne Locale — die Schaltfläche heißt „OK".
+    await userEvent.click(within(korb).getByRole('button', { name: 'OK' }));
+    await waitFor(() => expect(namen()).toEqual(['Eva']));
+  });
+
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {
     server.use(
       http.get('/api/auth/me', () =>

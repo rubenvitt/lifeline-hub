@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -19,10 +20,13 @@ const fahrzeug = {
   bemerkung: null, dienststatus: 'in_dienst', angelegt_at: '2026-05-26 10:00:00',
 };
 
-function render(benutzer: typeof admin) {
+// Voreinstellung bleibt EIN Fahrzeug: die Bestandsprüfungen unten greifen „Bearbeiten"
+// per `getByRole` (Einzahl), eine zweite Zeile brächte zwei gleichnamige Schaltflächen
+// und ließe sie an der Mehrdeutigkeit scheitern statt an der Sache.
+function render(benutzer: typeof admin, fahrzeuge = [fahrzeug]) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
-    http.get('/api/fahrzeuge', () => HttpResponse.json([fahrzeug])),
+    http.get('/api/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/fahrzeug-vorschlaege', () =>
       HttpResponse.json({ fahrzeugtyp: ['LF 20'], traegerorganisation: [], standort: [] }),
     ),
@@ -53,5 +57,45 @@ describe('FahrzeugeTab', () => {
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Fahrzeug anlegen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+
+  it('der Statusfilter verkleinert die Zeilenmenge auf die gewählte Kategorie', async () => {
+    /**
+     * Gemessen wird die WIRKUNG (Zeilenmenge schrumpft, und zwar auf die richtige Zeile),
+     * nicht die Anwesenheit des `filters`-Props. Zwei Fahrzeuge mit verschiedenem
+     * Dienststatus sind das Mindeste, an dem ein Filter überhaupt etwas ändern kann.
+     *
+     * `renderMitProviders` montiert `ConfigProvider` OHNE Locale — die Bestätigung im
+     * Filtermenü heißt daher „OK", in en_US wie in de_DE derselbe Text.
+     */
+    const { container } = render(admin, [
+      fahrzeug,
+      { ...fahrzeug, id: 2, funkrufname: 'Rotkreuz 2', dienststatus: 'ausser_dienst' },
+    ]);
+    await screen.findByText('Florian 1');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(zeilen()).toHaveLength(2);
+
+    // Erst der Griff, dann der Klick: ohne diese Zwischenprüfung meldete die Probe
+    // (Filter entfernt) erst zwölf Zeilen später ein leeres Filtermenü statt hier den
+    // fehlenden Auslöser — gemessen.
+    const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
+    expect(ausloeser, 'die Statusspalte muss einen Filter tragen').not.toBeNull();
+    await userEvent.click(ausloeser!);
+    // Das Filtermenü hängt in einem Portal an `document.body`, nicht im Container. Die
+    // Auswahl wird DARIN gegriffen, und zwar zwingend: „außer Dienst" steht zu diesem
+    // Zeitpunkt auch als Etikett in der Statusspalte der zweiten Zeile. Gemessen — ein
+    // Griff über `screen` bricht mit „Found multiple elements with the text: außer
+    // Dienst" (`span.ant-tag` der Zeile gegen `span` des Menüeintrags).
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    await userEvent.click(within(menue).getByText('außer Dienst'));
+    await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
+
+    await waitFor(() => expect(zeilen()).toHaveLength(1));
+    expect(zeilen()[0].textContent).toContain('Rotkreuz 2');
   });
 });

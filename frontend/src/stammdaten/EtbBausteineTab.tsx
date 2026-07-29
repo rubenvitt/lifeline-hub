@@ -28,8 +28,35 @@ export default function EtbBausteineTab() {
   });
 
   const spalten: TableColumnsType<EtbBaustein> = [
-    { title: 'Label', dataIndex: 'label', key: 'label' },
-    { title: 'Typ', dataIndex: 'typ', key: 'typ', render: (t: EtbBaustein['typ']) => <Tag>{etbTyp[t].label}</Tag> },
+    {
+      title: 'Label',
+      dataIndex: 'label',
+      key: 'label',
+      /**
+       * Leitspalte: an ihr sucht ein Mensch den Baustein. Kein `defaultSortOrder` — die
+       * fachliche Reihenfolge ist `sortier` und kommt vom Server
+       * (`src/etb_baustein/repo.rs:47` — `ORDER BY sortier, id`); sie bestimmt, in welcher
+       * Folge die Bausteine im ETB angeboten werden, und bleibt deshalb der Einstieg.
+       */
+      sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
+    },
+    {
+      title: 'Typ',
+      dataIndex: 'typ',
+      key: 'typ',
+      /**
+       * Werte aus derselben Quelle wie die Anzeige (`theme/statusFarben`) — ein neuer
+       * ETB-Typ taucht damit von selbst im Trichter auf. Dass der Drahtwert (`lage`) hier
+       * zufällig fast wie sein Label („Lage") aussieht, ändert nichts: der Typ gehört in den
+       * Filter, nicht in den Suchplatzhalter, sonst hinge das Versprechen an einem Zufall.
+       */
+      filters: (Object.keys(etbTyp) as EtbBaustein['typ'][]).map((t) => ({
+        text: etbTyp[t].label,
+        value: t,
+      })),
+      onFilter: (wert, b) => b.typ === wert,
+      render: (t: EtbBaustein['typ']) => <Tag>{etbTyp[t].label}</Tag>,
+    },
     { title: 'Inhalt', dataIndex: 'inhalt', key: 'inhalt' },
     { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
     ...(istAdmin
@@ -64,6 +91,12 @@ export default function EtbBausteineTab() {
         loading={query.isLoading}
         dataSource={query.data ?? []}
         columns={spalten}
+        /**
+         * Label UND Inhalt sind genannt, weil beide echten Fließtext tragen und die Suche des
+         * Primitivs die Rohwerte aller Spalten mit Datenbezug liest — den Baustein sucht man
+         * mal am Namen, mal an einer Wendung aus dem Text.
+         */
+        suche={{ platzhalter: 'Label oder Inhalt' }}
         locale={{ emptyText: 'Keine Bausteine' }}
       />
       <EtbBausteinFormModal offen={modalOffen} baustein={bearbeite} onClose={() => setModalOffen(false)} />

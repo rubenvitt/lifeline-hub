@@ -33,7 +33,24 @@ export default function FahrzeugeTab() {
   });
 
   const spalten: TableColumnsType<Fahrzeug> = [
-    { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
+    {
+      title: 'Funkrufname',
+      dataIndex: 'funkrufname',
+      key: 'funkrufname',
+      /**
+       * Leitspalte: am Funkrufname wird ein Fahrzeug gesucht, nie an der DB-Kennung —
+       * dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
+       *
+       * `numeric: true`, weil Funkrufnamen durchnummeriert sind; rein lexikografisch
+       * stünde „Florian 10" vor „Florian 2" [abgeleitet].
+       *
+       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY funkrufname`
+       * (`src/fahrzeug/repo.rs:74`). Die Sortierung ist hier also ein Angebot —
+       * absteigend, und mit `de`-Kollation statt SQLites BINARY-Vergleich — kein
+       * neuer Default.
+       */
+      sorter: (a, b) => a.funkrufname.localeCompare(b.funkrufname, 'de', { numeric: true }),
+    },
     { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
     { title: 'Kennzeichen', dataIndex: 'kennzeichen', key: 'kennzeichen', render: (t) => t ?? '—' },
@@ -41,6 +58,26 @@ export default function FahrzeugeTab() {
     {
       title: 'Status',
       key: 'dienststatus',
+      /**
+       * Die einzige geschlossene Achse dieser Tabelle (`Dienststatus` =
+       * `in_dienst | ausser_dienst`) und die Frage, die im Einsatz zuerst gestellt
+       * wird: welche Fahrzeuge stehen überhaupt zur Verfügung. Typ und Träger sind
+       * dagegen Freitext aus den Stammdaten — die bedient die Suche besser als eine
+       * Auswahlliste, die mit dem Bestand driftet.
+       *
+       * BEWUSST WEITERHIN OHNE `dataIndex`: der wäre für den Filter nicht nötig
+       * (`onFilter` liest den Datensatz selbst), zöge aber den Drahtwert `in_dienst`
+       * in die Freitextsuche des Primitivs — ein Wort, das hier niemand tippt, weil
+       * die Zelle „in Dienst" zeigt.
+       *
+       * `String(wert)`: antd typisiert das Filterargument als `React.Key | boolean`,
+       * nicht als unser `Dienststatus`.
+       */
+      filters: [
+        { text: 'in Dienst', value: 'in_dienst' },
+        { text: 'außer Dienst', value: 'ausser_dienst' },
+      ],
+      onFilter: (wert, f) => f.dienststatus === String(wert),
       render: (_, f) =>
         f.dienststatus === 'in_dienst' ? <Tag color="green">in Dienst</Tag> : <Tag>außer Dienst</Tag>,
     },
@@ -86,6 +123,11 @@ export default function FahrzeugeTab() {
         dataSource={fahrzeugeQuery.data ?? []}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Fahrzeuge' }}
+        // Durchsucht werden die vier Spalten mit Datenbezug: Funkrufname, Typ, Träger,
+        // Kennzeichen. Stärke und Status sind render-only und tragen nichts bei. Der
+        // Platzhalter nennt die drei, nach denen tatsächlich gesucht wird — die volle
+        // Aufzählung würde im 220 px breiten Feld ohnehin abgeschnitten.
+        suche={{ platzhalter: 'Funkrufname, Typ oder Kennzeichen' }}
       />
       <FahrzeugFormModal
         offen={modalOffen}

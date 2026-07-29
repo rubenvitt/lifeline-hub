@@ -47,7 +47,27 @@ export default function StichworteTab() {
   const vorschlaege = vorschlaegeQuery.data ?? [];
 
   const spalten: TableColumnsType<StichwortVorschlag> = [
-    { title: 'Stichwort', dataIndex: 'text', key: 'text' },
+    {
+      title: 'Stichwort',
+      dataIndex: 'text',
+      key: 'text',
+      /**
+       * Leitspalte: das Stichwort ist das einzige fachliche Merkmal des Datensatzes
+       * (`StichwortVorschlag` = `{ id, text }`), an ihm sucht ein Mensch — nicht an der
+       * DB-Kennung.
+       *
+       * `numeric: true`, weil die Stichworte durchnummeriert sind (H1, H2, … H10);
+       * rein lexikografisch stünde H10 vor H2 [abgeleitet].
+       *
+       * KEIN `defaultSortOrder`: das Backend liefert `ORDER BY sortier, text`
+       * (`src/stichwort/mod.rs:17`), also eine gepflegte fachliche Reihenfolge. Sie
+       * bleibt die Voreinstellung, die Sortierung ist ein Angebot. Wichtig, weil die
+       * Antwort `sortier` gar nicht mitträgt — einmal weggeworfen, könnte das Frontend
+       * die fachliche Reihenfolge nicht wiederherstellen; nur der dritte Kopfklick
+       * (antd: aufsteigend → absteigend → aus) holt sie zurück.
+       */
+      sorter: (a, b) => a.text.localeCompare(b.text, 'de', { numeric: true }),
+    },
     ...(istAdmin
       ? ([
           {
@@ -82,6 +102,10 @@ export default function StichworteTab() {
         dataSource={vorschlaege}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Stichworte' }}
+        // Nur `text` hat einen Datenbezug — die Aktionsspalte ist render-only und trägt
+        // zur Suche nichts bei (dokumentierte Grenze im Kopf von `KatalogTabelle`).
+        // Der Platzhalter benennt deshalb genau dieses eine Feld.
+        suche={{ platzhalter: 'Stichwort' }}
       />
 
       {istAdmin && (

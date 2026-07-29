@@ -908,13 +908,42 @@ export default function Datensicht<T extends object, const K extends string>(
     setSchleuse({ art: 'gefroren', ...standJetzt() });
   }, [schleuse, standJetzt]);
 
+  /**
+   * DIE LEERE LADEANSICHT FRIERT NICHT EIN.
+   *
+   * Die Werkzeugzeile steht IMMER im Baum, auch ohne Daten (Begründung unten am
+   * `werkzeugzeile`-Knoten). Wer den Fokus vor der ersten Antwort ins Suchfeld setzt, fröre
+   * damit eine LEERE Folge ein — und die gesamte erste Lieferung landete hinter dem
+   * Sammelbanner statt in der Liste. Bei null gerenderten Zeilen gibt es nichts
+   * einzufrieren: es steht kein Cursor über einer Zeile, also kann auch nichts unter ihm
+   * wegrutschen.
+   *
+   * NICHT auf `ladend` gaten: ein Query, der auf `[]` auflöst und seine Zeilen erst per
+   * SSE nachbekommt, hat `ladend === false` bei leerer Menge — derselbe Fehler, nur eine
+   * Runde später. `zeilen` ist die einzige ehrliche Quelle.
+   *
+   * Der `'neu'`-Pfad braucht die Bedingung NICHT: {@link nachBenutzeraktion} ist aus dem
+   * Zustand `'offen'` heraus ein No-op, und in einer nie eingefrorenen Sicht ist die
+   * Schleuse genau das — es gibt also gar keinen Auftrag, den der Layout-Effekt erfüllen
+   * könnte.
+   *
+   * BENANNTER REST, bewusst so: bleibt der Fokus nach dem Eintreffen in der Werkzeugzeile
+   * stehen, ist die Schleuse weiter offen und späterer Zufluss schiebt sich live ein. Sie
+   * schärft sich beim NÄCHSTEN Fokuseintritt nach — React delegiert `onFocus` über
+   * `focusin`, das bubbelt, also genügt schon der Sprung Suchfeld → Zeilenlink (gemessen im
+   * Test „… und schärft sich beim nächsten Fokuseintritt nach"); die Sicht ganz zu
+   * verlassen ist nicht nötig. Nachzurüsten wäre nur ein Einfrieren beim ersten Datenstand,
+   * das der Benutzer nicht ausgelöst hat — und es fröre ausgerechnet die Lieferung ein, auf
+   * die er wartet.
+   */
   const betreten = useCallback(() => {
     if (zufluss !== 'sammelbanner') return;
+    if (zeilen.length === 0) return;
     // SYNCHRON im Handler: die jetzt sichtbare Folge ist die richtige.
     setSchleuse((vorher) =>
       vorher.art === 'offen' ? { art: 'gefroren', ...standJetzt() } : vorher,
     );
-  }, [zufluss, standJetzt]);
+  }, [zufluss, zeilen.length, standJetzt]);
 
   /**
    * `focusout` feuert AUCH beim Sprung von der Titelzelle zum Aktionsknopf derselben

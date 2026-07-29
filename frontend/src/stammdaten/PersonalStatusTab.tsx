@@ -69,11 +69,35 @@ export default function PersonalStatusTab() {
   }, [modalOffen, bearbeite, form]);
 
   const spalten: TableColumnsType<PersonalStatus> = [
-    { title: 'Label', dataIndex: 'label', key: 'label' },
+    {
+      title: 'Label',
+      dataIndex: 'label',
+      key: 'label',
+      /**
+       * Leitspalte: an ihr sucht ein Mensch den Status. Kein `defaultSortOrder` — die
+       * fachliche Reihenfolge ist `sortier` und kommt vom Server
+       * (`src/personal/status_repo.rs:42` — `ORDER BY sortier, id`); sie bleibt der
+       * Einstieg, das Alphabet ist ein Angebot.
+       */
+      sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
+    },
     {
       title: 'Kategorie',
       dataIndex: 'kategorie',
       key: 'kategorie',
+      /**
+       * Die Filterwerte kommen aus derselben Quelle wie die Anzeige (`theme/statusFarben`),
+       * damit eine neue Kategorie nicht an zwei Stellen nachgetragen werden muss. Der
+       * gefilterte Wert ist der DRAHTWERT (`nicht_verfuegbar`), der angezeigte Text sein
+       * Label — genau deshalb ist die Kategorie hier ein Filter und steht nicht im
+       * Suchplatzhalter: die Freitextsuche des Primitivs liest Rohwerte, „nicht verfügbar"
+       * fände dort nichts.
+       */
+      filters: (Object.keys(statusKategorie) as StatusKategorie[]).map((k) => ({
+        text: statusKategorie[k].label,
+        value: k,
+      })),
+      onFilter: (wert, s) => s.kategorie === wert,
       render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
     },
     { title: 'Farbe', dataIndex: 'farbe', key: 'farbe', render: (f) => f ?? '—' },
@@ -108,6 +132,12 @@ export default function PersonalStatusTab() {
         loading={statusQuery.isLoading}
         dataSource={statusQuery.data ?? []}
         columns={spalten}
+        /**
+         * Genannt wird nur das Label — die übrigen Spalten mit Datenbezug tragen zwar zur
+         * Suche bei (Kategorie als Drahtwert, Farbe als Hexwert, Sortierung als Zahl), aber
+         * nach keinem davon tippt jemand. Die Kategorie hat stattdessen ihren Trichter.
+         */
+        suche={{ platzhalter: 'Label' }}
         locale={{ emptyText: 'Kein Status' }}
       />
       <Modal

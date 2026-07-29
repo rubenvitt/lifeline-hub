@@ -27,7 +27,21 @@ export default function PersonalTab() {
   });
 
   const spalten: TableColumnsType<Personal> = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      /**
+       * Leitspalte: an ihr sucht ein Mensch die Person, deshalb sitzt die Sortierung hier
+       * und nicht an der Datenbank-Kennung. Der Server sortiert zwar bereits
+       * (`src/personal/repo.rs:178` — `ORDER BY name`), aber über SQLites
+       * Standardkollation, also byteweise: „Öttinger" landet dort hinter „Zimmer" und
+       * „albert" hinter allem Großgeschriebenen. Der Vergleich hier ist sprachbewusst und
+       * gibt zusätzlich die Gegenrichtung her. Kein `defaultSortOrder` — die
+       * Serverreihenfolge bleibt der Einstieg, die Sortierung ist ein Angebot.
+       */
+      sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
+    },
     { title: 'Personalnr.', dataIndex: 'personalnummer', key: 'personalnummer', render: (t) => t ?? '—' },
     {
       title: 'Qualifikationen',
@@ -49,6 +63,17 @@ export default function PersonalTab() {
     {
       title: 'Status',
       key: 'dienststatus',
+      /**
+       * Der Filter kommt bewusst OHNE `dataIndex` aus: `onFilter` bekommt den ganzen
+       * Datensatz. Ein Bezug wäre hier nicht bloß überflüssig, sondern schädlich — er zöge
+       * den Drahtwert `in_dienst` in die Freitextsuche des Primitivs, die Rohwerte liest;
+       * wer „in Dienst" tippt, fände dann nichts, wer „in_dienst" tippt, alles.
+       */
+      filters: [
+        { text: 'in Dienst', value: 'in_dienst' },
+        { text: 'außer Dienst', value: 'ausser_dienst' },
+      ],
+      onFilter: (wert, p) => p.dienststatus === wert,
       render: (_, p) =>
         p.dienststatus === 'in_dienst' ? <Tag color="green">in Dienst</Tag> : <Tag>außer Dienst</Tag>,
     },
@@ -88,6 +113,15 @@ export default function PersonalTab() {
         loading={personalQuery.isLoading}
         dataSource={personalQuery.data ?? []}
         columns={spalten}
+        /**
+         * Die Suche des Primitivs liest die ROHWERTE der Spalten mit `dataIndex`, nicht das
+         * Gerenderte (Dateikopf `components/KatalogTabelle.tsx`). Der Platzhalter nennt
+         * deshalb nur, was ein Mensch auch so tippt. Zwei Grenzen, die daraus folgen und
+         * bewusst so stehen: die Stärke-Position liegt als Drahtwert (`fuehrer`) mit im Korb
+         * — stiller Beifang, kein Versprechen —, und die Qualifikationen sind eine
+         * Render-Spalte ohne Datenbezug und tragen zur Suche gar nichts bei.
+         */
+        suche={{ platzhalter: 'Name, Personalnr. oder Träger' }}
         locale={{ emptyText: 'Noch kein Personal' }}
       />
       <PersonalFormModal

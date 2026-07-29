@@ -194,8 +194,23 @@ export default function PersonenPage() {
         />
       ) : (
         <Datensicht
-          // Gegenstück zum Schlüssel oben — siehe die Begründung dort.
-          key="liste"
+          /**
+           * Gegenstück zum Schlüssel oben — mit einem Zusatz, der dort nicht nötig ist:
+           * der Schlüssel trägt den REITER, nicht bloß den Zweig. Diese eine Stelle im
+           * Baum bedient FÜNF Sichten mit fünf verschiedenen Datenmengen; bei konstantem
+           * Schlüssel reicht React auch beim Reiterwechsel dieselbe Instanz weiter.
+           * Gemessen: im Reiter „Vermisst" nach einem Namen gesucht und auf „Betroffen"
+           * gewechselt — dort stand der Begriff noch im Feld und filterte eine fremde
+           * Menge auf leer. Kein Fehler, keine Warnung, nur fehlende Zeilen.
+           *
+           * Der Preis, dreifach und gewollt: mit dem Reiterwechsel fallen auch
+           * Sortierung, Spaltenauswahl und die Zeilenschleuse (Sammelbanner) zurück.
+           * Für die Spaltenauswahl ist das nicht nur hinnehmbar, sondern richtig — die
+           * Spaltenliste ist je Reiter eine andere (`abgleichSpalten` existiert nur unter
+           * `sicht === 'vermisst'`), eine mitgeschleppte Auswahl trüge also Schlüssel,
+           * die es in der nächsten Sicht gar nicht gibt.
+           */
+          key={`liste-${sicht}`}
           bezeichnung="Personen"
           spalten={listenSpalten}
           daten={filterPersonen(alle, sicht)}

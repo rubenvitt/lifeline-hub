@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -21,10 +22,43 @@ const personal = [
   },
 ];
 
-function render(benutzer: typeof admin) {
+/**
+ * Zweite Person NUR für die Ordnungs-Prüfung, deshalb als Parameter und nicht in `personal`:
+ * die Bestandstests greifen ihre Knöpfe per `getByRole` (Einzahl), eine zweite Zeile brächte
+ * eine zweite „Bearbeiten"-Schaltfläche und machte sie mehrdeutig. Absichtlich NICHT
+ * alphabetisch hinter „Thomas Müller" — sonst wäre die Reihenfolge nach dem Sortierklick
+ * dieselbe wie davor und die Zusicherung bewiese nichts.
+ */
+const zweiPersonen = [
+  personal[0],
+  {
+    ...personal[0], id: 2, name: 'Anna Berg', personalnummer: '0815',
+    traegerorganisation: 'THW', staerke_position: 'mannschaft',
+    dienststatus: 'ausser_dienst', qualifikationen: [],
+  },
+];
+
+/** Die Leitspalte aller Datenzeilen — der Kopf ist ein eigenes `<table>`, siehe KatalogTabelle. */
+const namen = (c: HTMLElement) =>
+  [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
+
+/**
+ * Der Eintrag IM Filtermenü. Der gesuchte Text steht zweimal im Dokument — in der Zelle als
+ * `Tag` und im Menü —, ein schlichtes `findByText` bräche also an der Mehrdeutigkeit. Und das
+ * Menü hängt in einem Portal unter `document.body`, nicht unter dem `container`.
+ */
+async function menueEintrag(text: string): Promise<HTMLElement> {
+  const treffer = (await screen.findAllByText(text)).find((k) =>
+    k.closest('.ant-table-filter-dropdown'),
+  );
+  if (!treffer) throw new Error(`Kein Filtereintrag „${text}" im Menü`);
+  return treffer;
+}
+
+function render(benutzer: typeof admin, liste: unknown[] = personal) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
-    http.get('/api/personal', () => HttpResponse.json(personal)),
+    http.get('/api/personal', () => HttpResponse.json(liste)),
     http.get('/api/personal-vorschlaege', () => HttpResponse.json({ traegerorganisation: ['DRK'] })),
     http.get('/api/qualifikationen', () => HttpResponse.json([{ id: 1, label: 'Sanitäter', sortier: 10 }])),
     http.get('/api/benutzer', () => HttpResponse.json([])),
@@ -54,5 +88,32 @@ describe('PersonalTab', () => {
     render(nichtAdmin);
     await screen.findByText('Thomas Müller');
     expect(screen.queryByRole('button', { name: 'Person anlegen' })).not.toBeInTheDocument();
+  });
+
+  it('Ordnung: die Leitspalte sortiert, Suche und Dienststatus-Filter verengen', async () => {
+    const { container } = render(admin, zweiPersonen);
+    await screen.findByText('Thomas Müller');
+    expect(namen(container)).toEqual(['Thomas Müller', 'Anna Berg']);
+
+    // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte. jsdom rechnet
+    // dort kein Layout — dass der Klick auch am 390-px-Schirm ankommt, ist hier NICHT belegt.
+    await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
+    expect(namen(container)).toEqual(['Anna Berg', 'Thomas Müller']);
+
+    // Träger: eine Spalte mit Datenbezug, deren Rohwert ein Mensch auch so tippt.
+    const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+    await userEvent.type(feld, 'THW');
+    expect(namen(container)).toEqual(['Anna Berg']);
+    await userEvent.clear(feld);
+    expect(namen(container)).toHaveLength(2);
+
+    // Gefiltert wird die ZEILENMENGE, nicht die Anwesenheit des Trichters: antd zeichnet ihn
+    // schon bei gesetztem `filters`, gefiltert wird aber erst mit `onFilter`.
+    await userEvent.click(container.querySelector<HTMLElement>('.ant-table-filter-trigger')!);
+    await userEvent.click(await menueEintrag('in Dienst'));
+    await userEvent.click(
+      document.querySelector<HTMLElement>('.ant-table-filter-dropdown-btns .ant-btn-primary')!,
+    );
+    expect(namen(container)).toEqual(['Thomas Müller']);
   });
 });

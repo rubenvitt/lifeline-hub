@@ -56,7 +56,19 @@ export default function QualifikationenTab() {
   }, [modalOffen, bearbeite, form]);
 
   const spalten: TableColumnsType<Qualifikation> = [
-    { title: 'Label', dataIndex: 'label', key: 'label' },
+    {
+      title: 'Label',
+      dataIndex: 'label',
+      key: 'label',
+      /**
+       * Leitspalte: an ihr sucht ein Mensch die Qualifikation. Kein `defaultSortOrder` —
+       * die fachliche Reihenfolge ist `sortier` und kommt vom Server
+       * (`src/personal/qualifikation_repo.rs:55` — `ORDER BY sortier, id`); sie bleibt der
+       * Einstieg, das Alphabet ist ein Angebot. Antds dritter Klick auf den Kopf schaltet
+       * die Sortierung wieder ab und stellt damit genau diese Reihenfolge her.
+       */
+      sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
+    },
     { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
     ...(istAdmin
       ? ([
@@ -92,6 +104,13 @@ export default function QualifikationenTab() {
         loading={query.isLoading}
         dataSource={query.data ?? []}
         columns={spalten}
+        /**
+         * Kein Filter in dieser Tabelle, und das ist kein Versäumnis: der Katalog hat weder
+         * Status noch Kategorie, und die einzige Zustandsspalte `aktiv` siebt schon der
+         * Server aus (`src/personal/qualifikation_repo.rs:55` — `WHERE … aktiv = 1`).
+         * Ein Trichter über zwei Spalten, von denen eine eine Zahl ist, wäre Zierrat.
+         */
+        suche={{ platzhalter: 'Label' }}
         locale={{ emptyText: 'Keine Qualifikationen' }}
       />
       <Modal
