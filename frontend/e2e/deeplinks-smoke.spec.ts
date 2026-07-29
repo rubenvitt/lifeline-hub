@@ -41,7 +41,7 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
 
   const inhalt = `Smoke-Eintrag ${Date.now()}`;
   await page.getByPlaceholder('Inhalt …').fill(inhalt);
-  await page.getByRole('button', { name: 'Erfassen' }).click();
+  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   const zeile = page.locator('tr', { hasText: inhalt });
   await expect(zeile).toBeVisible();

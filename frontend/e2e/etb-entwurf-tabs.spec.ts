@@ -37,13 +37,13 @@ test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Tabelle, Entwurf-Tab wird 
   // Beim Öffnen ist ein leerer Entwurf-Tab aktiv (Erfassungsfeld + Erfassen-Button da).
   const feld = page.getByPlaceholder('Inhalt …');
   await expect(feld).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Erfassen' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Erfassen', exact: true })).toBeVisible();
 
   // Eintrag erfassen. Während des Tippens spiegelt das Tab-Label den Inhalt (Autosave);
   // nach dem Absenden schließt der Tab und ein neuer leerer Tab ('Neuer Eintrag') wird aktiv.
   const inhalt = `Lagemeldung ${Date.now()}`;
   await feld.fill(inhalt);
-  await page.getByRole('button', { name: 'Erfassen' }).click();
+  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   // Erst den stabilen Zustand nach dem Absenden abwarten: das Eingabefeld ist geleert
   // und der Tab auf einen neuen leeren Entwurf zurückgesetzt. (Während des Tippens

@@ -49,7 +49,7 @@ test('Login → Einsatz → Eintrag live in zweitem Client', async ({ browser })
   // A erfasst einen Eintrag.
   const inhalt = `Live-Test ${Date.now()}`;
   await a.getByPlaceholder('Inhalt …').fill(inhalt);
-  await a.getByRole('button', { name: 'Erfassen' }).click();
+  await a.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   // A sieht den Eintrag in der ETB-Tabelle. role=cell ist eindeutig gegenüber Tab
   // (role=tab) und Eingabefeld (role=textbox) — anders als ein generischer getByText,
