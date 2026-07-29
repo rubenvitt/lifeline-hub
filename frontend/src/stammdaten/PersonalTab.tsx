@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { ladePersonalVorschlaege, listePersonal, POSITION_LABELS, setzeDienststatus } from '../api/personal';
-import type { Personal, StaerkePosition } from '../api/types';
+import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 
@@ -27,7 +27,21 @@ export default function PersonalTab() {
   });
 
   const spalten: TableColumnsType<Personal> = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      /**
+       * Leitspalte: an ihr sucht ein Mensch die Person, deshalb sitzt die Sortierung hier
+       * und nicht an der Datenbank-Kennung. Der Server sortiert zwar bereits
+       * (`src/personal/repo.rs:178` — `ORDER BY name`), aber über SQLites
+       * Standardkollation, also byteweise: „Öttinger" landet dort hinter „Zimmer" und
+       * „albert" hinter allem Großgeschriebenen. Der Vergleich hier ist sprachbewusst und
+       * gibt zusätzlich die Gegenrichtung her. Kein `defaultSortOrder` — die
+       * Serverreihenfolge bleibt der Einstieg, die Sortierung ist ein Angebot.
+       */
+      sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
+    },
     { title: 'Personalnr.', dataIndex: 'personalnummer', key: 'personalnummer', render: (t) => t ?? '—' },
     {
       title: 'Qualifikationen',
@@ -41,14 +55,32 @@ export default function PersonalTab() {
     },
     {
       title: 'Stärke-Position',
-      dataIndex: 'staerke_position',
       key: 'staerke_position',
-      render: (p: StaerkePosition | null) => (p ? POSITION_LABELS[p] : '—'),
+      /**
+       * Bewusst OHNE `dataIndex` — dieselbe Regel, die unten an `dienststatus` schon richtig
+       * stand und hier verletzt war. Gemessen mit `dataIndex: 'staerke_position'`: die
+       * Drahtwerte lagen im Suchkorpus des Primitivs, „mann" und „sch" trafen jede
+       * Mannschafts-Person (`mannschaft`), während „Führer" mit Umlaut NICHTS traf — genau
+       * verkehrt herum zu dem, was der Platzhalter verspricht. `render` bekommt den ganzen
+       * Datensatz, die Spalte zeigt unverändert dasselbe.
+       */
+      render: (_, p) => (p.staerke_position ? POSITION_LABELS[p.staerke_position] : '—'),
     },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
     {
       title: 'Status',
       key: 'dienststatus',
+      /**
+       * Der Filter kommt bewusst OHNE `dataIndex` aus: `onFilter` bekommt den ganzen
+       * Datensatz. Ein Bezug wäre hier nicht bloß überflüssig, sondern schädlich — er zöge
+       * den Drahtwert `in_dienst` in die Freitextsuche des Primitivs, die Rohwerte liest;
+       * wer „in Dienst" tippt, fände dann nichts, wer „in_dienst" tippt, alles.
+       */
+      filters: [
+        { text: 'in Dienst', value: 'in_dienst' },
+        { text: 'außer Dienst', value: 'ausser_dienst' },
+      ],
+      onFilter: (wert, p) => p.dienststatus === wert,
       render: (_, p) =>
         p.dienststatus === 'in_dienst' ? <Tag color="green">in Dienst</Tag> : <Tag>außer Dienst</Tag>,
     },
@@ -88,8 +120,17 @@ export default function PersonalTab() {
         loading={personalQuery.isLoading}
         dataSource={personalQuery.data ?? []}
         columns={spalten}
+        /**
+         * Die Suche des Primitivs liest die ROHWERTE der Spalten mit `dataIndex`, nicht das
+         * Gerenderte (Dateikopf `components/KatalogTabelle.tsx`). Der Platzhalter nennt
+         * deshalb genau die drei Spalten, die auch beitragen: Name, Personalnr., Träger.
+         * Qualifikationen, Stärke-Position und Status sind Render-Spalten ohne Datenbezug und
+         * tragen zur Suche NICHTS bei — bei den letzten beiden ist das gewollt und geprüft
+         * (`PersonalTab.test.tsx`), sonst lägen ihre Drahtwerte (`mannschaft`, `in_dienst`)
+         * im Korb und die Suche träfe Zeilen, die niemand gemeint hat.
+         */
+        suche={{ platzhalter: 'Name, Personalnr. oder Träger' }}
         locale={{ emptyText: 'Noch kein Personal' }}
-        pagination={false}
       />
       <PersonalFormModal
         offen={modalOffen}

@@ -1,9 +1,11 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
+import { einsatzKeys } from '../api/queryKeys';
 import { AuthProvider } from '../auth/AuthContext';
 import PersonalPage from './PersonalPage';
 
@@ -95,6 +97,58 @@ describe('PersonalPage', () => {
     );
   });
 
+  it('auch im KARTENZWEIG trägt der Deeplink seine Hervorhebung — und springt zum Ziel', async () => {
+    /**
+     * Unter `md` rendert `Datensicht` Karten. Das `data-row-key` der Tabelle gibt es dort
+     * nicht: die Hervorhebung landete auf einem Knoten ohne Regel, und der Sprung suchte
+     * einen Selektor, den kein Knoten trug — beides still, ausgerechnet auf dem Gerät mit
+     * der kleinsten Übersicht.
+     *
+     * Die CSS-Regel selbst kann hier nicht fallen (`vite.config.ts` fährt `css: false`,
+     * jsdom rechnet kein Layout). Geprüft wird, was prüfbar ist: die Klasse sitzt auf der
+     * KARTE, und der Sprung findet sein Ziel.
+     */
+    setzeViewportBreite(390);
+    const gerufen: Element[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      gerufen.push(this);
+    };
+
+    try {
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json(admin)),
+        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+        http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
+        http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
+        http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
+        http.get('/api/personal-status', () => HttpResponse.json([
+          { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+        ])),
+        http.get('/api/personal', () => HttpResponse.json([])),
+      );
+      const { container } = renderMitProviders(
+        <AuthProvider>
+          <Routes>
+            <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+          </Routes>
+        </AuthProvider>,
+        { route: '/einsaetze/7/personal?personal=10' },
+      );
+      await screen.findByText('Thomas Müller');
+      expect(container.querySelector('.ant-table'), 'Gegenprobe: hier steht keine Tabelle').toBeNull();
+      await waitFor(() =>
+        expect(
+          container.querySelector('[data-lfh="datensicht-karte"].zeile-hervorgehoben'),
+        ).not.toBeNull(),
+      );
+      await waitFor(() => expect(gerufen).toHaveLength(1));
+      expect(gerufen[0].getAttribute('data-lfh')).toBe('datensicht-karte');
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
   it('Leitung im aktiven Einsatz sieht Dispositions-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');
@@ -122,7 +176,16 @@ describe('PersonalPage', () => {
     const { container } = render(einsatz());
     await screen.findByText('Thomas Müller');
 
-    const clear = container.querySelector('.ant-select-clear');
+    /**
+     * AUF DIE ZEILE GESCOPET, seit die Werkzeugzeile von `Datensicht` eigene Felder trägt.
+     * Der Selektor greift den ERSTEN Treffer in Dokumentordnung, und die Werkzeugzeile
+     * steht davor. Gemessen bricht es heute noch nicht: ein leerer Filter-`Select` rendert
+     * gar keinen Löschknoten (`useAllowClear` verlangt einen gewählten Wert), und die
+     * Freitextsuche ist ein nacktes `input type="search"` ohne antd-Löscher. Der Test wäre
+     * also grün geblieben, BIS irgendwann ein Filter einen Wert hält — genau die Sorte
+     * Test, die aufhört zu prüfen, ohne rot zu werden. Deshalb scopen statt abwarten.
+     */
+    const clear = container.querySelector('[data-row-key="10"] .ant-select-clear');
     expect(clear, 'Position-Select muss allowClear haben').not.toBeNull();
     fireEvent.mouseDown(clear!);
     fireEvent.click(clear!);
@@ -157,10 +220,130 @@ describe('PersonalPage', () => {
     // Auf die Zeile der unzugeordneten Kraft scopen (robust gegen andere Zeilen/Kopf).
     const zeile = container.querySelector('[data-row-key="11"]') as HTMLElement;
     expect(zeile).not.toBeNull();
-    // Keine Fahrzeug-/Einheit-Deeplinks in dieser Zeile ...
+    // Keine Fahrzeug-/Einheit-Deeplinks in dieser Zeile — und GENAU deshalb trägt
+    // `karte.titel` kein `ziel`: das würde die Namenszelle in beiden Zweigen zu einem Link
+    // machen und diese Aussage lautlos umdrehen, obwohl `personalPfad` auf DIESE Seite zeigt.
     expect(within(zeile).queryByRole('link')).toBeNull();
-    // ... und beide neuen Spalten (Fahrzeug, Einheit) zeigen den „—"-Platzhalter.
-    // (Alle übrigen Felder der Testperson sind gesetzt bzw. im Schreibmodus Inputs.)
-    expect(within(zeile).getAllByText('—')).toHaveLength(2);
+    /**
+     * ... und beide Spalten zeigen den „—"-Platzhalter. GEZIELT je Zelle statt
+     * `getAllByText('—')).toHaveLength(2)`: der Zähler stimmt rechnerisch auch nach dem
+     * Umbau, pinnt aber eine Platzhalterzahl statt einer Aussage — er bliebe grün, wenn
+     * der Strich in zwei ganz anderen Spalten stünde.
+     */
+    expect(zelleNachKopf(container, zeile, 'Fahrzeug').textContent).toBe('—');
+    expect(zelleNachKopf(container, zeile, 'Einheit').textContent).toBe('—');
+  });
+
+  // ── Datensicht (LFH-330 · B2) ───────────────────────────────────────────────────
+
+  const epGebunden = disponiert[0];
+  const epVerfuegbar = {
+    ...disponiert[0], id: 12, personal_id: 6, name: 'Zora Zebra', staerke_position: 'mannschaft',
+    status_label: 'einsatzbereit', status_kategorie: 'verfuegbar', einheit_id: null, fahrzeug_id: null,
+  };
+  const zeilenFolge = (container: HTMLElement) =>
+    [...container.querySelectorAll('tr.ant-table-row')].map((r) => r.getAttribute('data-row-key'));
+
+  it('der Spaltenschalter meldet die ausgeblendete Bemerkungsspalte als TEXT', async () => {
+    /**
+     * Kein Zähl-Abzeichen: ein antd-`Badge` mit `count` und ohne `color` rendert auf
+     * `token.colorError` — Rot für einen Spaltenzähler bricht „Rot bedient nichts" und
+     * Kriterium 7. Der Zähler steht deshalb im ZUGÄNGLICHEN NAMEN des Knopfes.
+     */
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Bemerkung' })).toBeNull();
+    // Position ist SCHREIBTRAGEND und bleibt deshalb sichtbar — sie bekommt kein
+    // `abBreite`, weil das Führungs-Tablet (1024–1280 px) sie sonst genau dort verlöre,
+    // wo sie gebraucht wird, und es keine Detailroute als Ausweichort gibt.
+    expect(screen.getByRole('columnheader', { name: 'Position' })).toBeInTheDocument();
+  });
+
+  it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
+    const { container } = render(einsatz(), [epGebunden, epVerfuegbar]);
+    await screen.findByText('Thomas Müller');
+    expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
+    expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
+    // Die Gruppenachse führt: verfügbar (Zora) steht VOR gebunden (Thomas) — das ist
+    // WEDER die Serverordnung noch die Namensordnung.
+    expect(zeilenFolge(container)).toEqual(['12', '10']);
+  });
+
+  it('ein Statuswechsel unter dem Cursor verschiebt die Zeile NICHT (Kriterium 12)', async () => {
+    /**
+     * Diese Seite trägt ZWEI Auswahlfelder in der Zeile (Position und Status). Geprüft wird
+     * mit dem Fokus im POSITIONS-Feld: die Schleuse darf nicht davon abhängen, welches
+     * Element der Zeile den Fokus hält, sondern nur davon, dass er in der Sicht liegt.
+     */
+    const { container, client } = render(einsatz(), [epGebunden, epVerfuegbar]);
+    await screen.findByText('Thomas Müller');
+    const vorher = zeilenFolge(container);
+    expect(vorher).toEqual(['12', '10']);
+
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    act(() => within(zeile).getAllByRole('combobox')[0].focus());
+    const sicht = screen.getByRole('region', { name: 'Personal im Einsatz' });
+    expect(sicht.contains(document.activeElement)).toBe(true);
+
+    act(() => {
+      client.setQueryData(einsatzKeys.personal(7), [
+        { ...epGebunden, status_kategorie: 'verfuegbar', status_label: 'einsatzbereit' },
+        epVerfuegbar,
+      ]);
+    });
+
+    await waitFor(() => expect(screen.getByText('verfügbar · 2')).toBeInTheDocument());
+    expect(zeilenFolge(container)).toEqual(vorher);
+  });
+
+  it('Gegenprobe: OHNE Fokus in der Sicht ordnet sich die Liste sofort neu', async () => {
+    const { container, client } = render(einsatz(), [epGebunden, epVerfuegbar]);
+    await screen.findByText('Thomas Müller');
+    expect(zeilenFolge(container)).toEqual(['12', '10']);
+
+    act(() => {
+      client.setQueryData(einsatzKeys.personal(7), [
+        { ...epGebunden, status_kategorie: 'verfuegbar', status_label: 'einsatzbereit' },
+        epVerfuegbar,
+      ]);
+    });
+
+    await waitFor(() => expect(zeilenFolge(container)).toEqual(['10', '12']));
+  });
+
+  describe('unter md', () => {
+    it('steht keine Tabelle, sondern Karten — und genau EIN Zweig im Baum', async () => {
+      setzeViewportBreite(390);
+      const { container } = render(einsatz());
+      expect(await screen.findByText('Thomas Müller')).toBeInTheDocument();
+      expect(container.querySelector('.ant-table')).toBeNull();
+      expect(container.querySelectorAll('[data-lfh="datensicht-karte"]')).toHaveLength(1);
+      // Der Statusslot trägt ein Etikett MIT Text, nicht das Auswahlfeld der Spalte —
+      // ein `minWidth: 150`-Select drückte eine 390-px-Karte breit.
+      const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
+      expect(within(karte).getByText('alarmiert')).toBeInTheDocument();
+      expect(karte.querySelector('.ant-select')).toBeNull();
+    });
+  });
+
+  it('Gegenprobe: ab md steht die Tabelle', async () => {
+    const { container } = render(einsatz());
+    await screen.findByText('Thomas Müller');
+    expect(container.querySelector('.ant-table')).not.toBeNull();
+    expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
   });
 });
+
+/**
+ * Die Zelle einer Zeile über den SPALTENKOPF, nicht über einen Positionsindex: eine neue
+ * oder ausgeblendete Spalte verschöbe jeden gezählten Index lautlos.
+ */
+function zelleNachKopf(container: HTMLElement, zeile: HTMLElement, kopf: string): HTMLElement {
+  const koepfe = [...container.querySelectorAll('th.ant-table-cell')].map((th) => th.textContent);
+  const index = koepfe.indexOf(kopf);
+  expect(index, `Spaltenkopf „${kopf}" nicht gefunden (gefunden: ${koepfe.join(', ')})`).toBeGreaterThanOrEqual(0);
+  const zellen = zeile.querySelectorAll('td');
+  expect(zellen.length, 'Zeile hat weniger Zellen als Spaltenköpfe').toBeGreaterThan(index);
+  return zellen[index] as HTMLElement;
+}

@@ -1,6 +1,6 @@
-import { App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, Table, Tag, Typography } from 'antd';
+import { App, Breadcrumb, Button, Flex, Form, Input, Modal, Spin, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
-import type { TableColumnsType } from 'antd';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,8 +11,77 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte, type NeuerLagebericht } from '../api/lageberichte';
-import type { LageberichtAnzeige } from '../api/types';
+import type { LageberichtAnzeige, LageberichtVorlageKey } from '../api/types';
 import { VORLAGEN } from '../lageberichte/vorlagen';
+import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
+
+/**
+ * Lageberichte als Kartensicht (LFH-330 · B2, Bündel III) — der Zwilling der Befehlsliste.
+ *
+ * `form="karte"` in JEDER Breite: ein Lagebericht wird als EINHEIT gelesen (Vorlage,
+ * Fassung, Freigabestand), nicht spaltenweise verglichen. Beide Flächen werden gemeinsam
+ * umgestellt, weil sie bis auf die Fachbegriffe gleich gebaut sind — nur eine von beiden
+ * umzustellen erzeugte eine Divergenz zwischen zwei nahezu identischen Seiten.
+ *
+ * Die v-Nummer trägt dieselbe Last wie beim Befehl: die Fortschreibung legt eine NEUE Zeile
+ * mit `version + 1` und demselben Titel an, der Vorgänger bleibt freigegeben liegen. Zwei
+ * Zeilen der Liste können sich also allein in der Fassung unterscheiden.
+ */
+
+function vorlageLabel(schluessel: LageberichtVorlageKey | string): string {
+  return VORLAGEN.find((v) => v.schluessel === schluessel)?.label ?? String(schluessel);
+}
+
+/**
+ * Modulkonstante, IN dieser Datei: der Guard verlangt die Marke `spaltenFuer` je
+ * Konsumentendatei. Nie annotieren — eine Typangabe weitete `K` auf `string`, und der
+ * Kartenplan nähme danach jeden Slot-Tippfehler stillschweigend an.
+ */
+const lageberichtSpalten = spaltenFuer<LageberichtAnzeige>()([
+  {
+    key: 'titel',
+    title: 'Titel',
+    immerSichtbar: true,
+    sortWert: (lb) => lb.titel,
+    suchText: (lb) => lb.titel,
+    // KEIN Anker hier: den Link setzt `karte.titel.ziel`, sonst verschachtelte Links.
+    render: (_t, lb) => lb.titel,
+  },
+  {
+    key: 'status',
+    title: 'Status',
+    // Sekundärslot statt `karte.status`: das Modul bleibt auf der Phasenachse aus
+    // `kommunikation/phase.ts`, die bewusst außerhalb des A2-Statusfarb-Vertrags liegt.
+    render: (_t, lb) => (
+      <StatusBadge
+        phase={LAGEBERICHT_STATUS[lb.status].phase}
+        label={LAGEBERICHT_STATUS[lb.status].label}
+      />
+    ),
+  },
+  {
+    key: 'vorlage',
+    // Bezeichnung „Vorlage" beibehalten — beim Lagebericht heißt die Achse so, beim Befehl
+    // „Schema". Eine Umbenennung wäre eine fachliche Änderung ohne Anlass.
+    title: 'Vorlage',
+    suchText: (lb) => vorlageLabel(lb.vorlage),
+    filter: {
+      werte: VORLAGEN.map((v) => ({ text: v.label, value: v.schluessel })),
+      trifft: (lb, w) => lb.vorlage === w,
+    },
+    render: (_t, lb) => vorlageLabel(lb.vorlage),
+  },
+  {
+    key: 'fassung',
+    title: 'Fassung',
+    sortWert: (lb) => lb.zeitstand,
+    // v-Nummer, Zeitstand und Ersteller in EINER Zeile — drei Slots sind das Maximum.
+    // `zeitstand` bleibt der rohe Wirestring, wie auf der Detailseite: nur hier zu
+    // formatieren zeigte für dasselbe Feld zwei verschiedene Uhrzeiten (lokal vs. UTC).
+    render: (_t, lb) => `v${lb.version} · ${lb.zeitstand} · ${lb.ersteller_name}`,
+  },
+]);
 
 export default function LageberichtePage() {
   const { id } = useParams();
@@ -61,33 +130,7 @@ export default function LageberichtePage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const berichte = berichteQuery.data ?? [];
-
-  const spalten: TableColumnsType<LageberichtAnzeige> = [
-    {
-      title: 'Titel',
-      dataIndex: 'titel',
-      render: (titel: string, lb) => (
-        <Link to={lageberichtDetailPfad(einsatzId, lb.id)}>{titel}</Link>
-      ),
-    },
-    {
-      title: 'Vorlage',
-      dataIndex: 'vorlage',
-      render: (v: string) => VORLAGEN.find((x) => x.schluessel === v)?.label ?? v,
-    },
-    { title: 'Zeitstand', dataIndex: 'zeitstand' },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      render: (s: string) => (
-        <Tag color={s === 'freigegeben' ? 'green' : 'default'}>
-          {s === 'freigegeben' ? 'Freigegeben' : 'Entwurf'}
-        </Tag>
-      ),
-    },
-    { title: 'Version', dataIndex: 'version' },
-    { title: 'Ersteller', dataIndex: 'ersteller_name' },
-  ];
+  const entwuerfe = berichte.filter((lb) => lb.status === 'entwurf').length;
 
   return (
     <div>
@@ -99,24 +142,57 @@ export default function LageberichtePage() {
           { title: 'Lageberichte' },
         ]}
       />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          Lageberichte
-        </Typography.Title>
+      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
+        <div>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            Lageberichte
+          </Typography.Title>
+          {/*
+            Zählt den BESTAND, während die Gruppenköpfe das ANGEZEIGTE zählen — bei aktiver
+            Suche laufen die Zahlen deshalb auseinander. Gewollt: die Kopfzeile ist die
+            Lageauskunft, der Gruppenkopf die Auskunft über die Trefferliste.
+          */}
+          <Typography.Text type="secondary">
+            {berichte.length} Berichte · {entwuerfe} im Entwurf
+          </Typography.Text>
+        </div>
         {darfSchreiben && (
-          <Button type="primary" onClick={() => setAnlegenOffen(true)}>
+          // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
+          // `aria-label` gegen antds Icon-Etikett: `<span role="img" aria-label="plus">`
+          // fließt sonst in den berechneten Namen ein („plus Neuer Bericht", gemessen).
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            aria-label="Neuer Bericht"
+            onClick={() => setAnlegenOffen(true)}
+          >
             Neuer Bericht
           </Button>
         )}
-      </Space>
+      </Flex>
 
-      <Table<LageberichtAnzeige>
-        rowKey="id"
-        loading={berichteQuery.isLoading}
-        dataSource={berichte}
-        columns={spalten}
-        pagination={false}
-        locale={{ emptyText: 'Noch keine Lageberichte' }}
+      <Datensicht
+        bezeichnung="Lageberichte"
+        form="karte"
+        spalten={lageberichtSpalten}
+        daten={berichte}
+        zeilenSchluessel="id"
+        ladend={berichteQuery.isLoading}
+        leerText="Noch keine Lageberichte"
+        suche={{ platzhalter: 'Titel oder Vorlage' }}
+        standardSortierung={{ spalte: 'fassung', richtung: 'ab' }}
+        gruppen={{
+          schluessel: (lb) => lb.status,
+          etikett: (w) => (w === 'entwurf' ? 'Entwürfe' : 'Freigegeben'),
+          reihenfolge: ['entwurf', 'freigegeben'],
+        }}
+        karte={{
+          art: 'plan',
+          titel: { spalte: 'titel', ziel: (lb) => lageberichtDetailPfad(einsatzId, lb.id) },
+          // Keine `aktion`: Freigeben/Fortschreiben/Drucken liegen auf der Detailseite,
+          // die einzige Interaktion der Zeile ist der Titel-Link.
+          sekundaer: ['status', 'vorlage', 'fassung'],
+        }}
       />
 
       <Modal

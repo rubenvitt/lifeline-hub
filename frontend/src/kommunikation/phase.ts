@@ -69,6 +69,31 @@ export const ERINNERUNG_STATUS: StatusDeskriptor = {
 };
 
 /**
+ * BEFEHL (`BefehlStatus`, `api/types.generated.ts` — `'entwurf' | 'freigegeben'`).
+ *
+ * Zwei Zustände, keine Zwischenphase: ein Befehl ist bearbeitbarer Entwurf oder
+ * freigegeben. Die Fortschreibung erzeugt eine NEUE Zeile mit `version + 1` im Status
+ * `entwurf`, der Vorgänger bleibt `freigegeben` — beide Fassungen stehen deshalb
+ * gleichzeitig in der Liste (LFH-330 · B2).
+ */
+export const BEFEHL_STATUS: StatusDeskriptor = {
+  entwurf: { label: 'Entwurf', phase: 'offen' },
+  freigegeben: { label: 'Freigegeben', phase: 'abgeschlossen' },
+};
+
+/**
+ * LAGEBERICHT (`LageberichtStatus`, `api/types.generated.ts` — dieselben zwei Werte).
+ *
+ * Bewusst dieselbe Achse wie {@link BEFEHL_STATUS} und nicht deren Alias: die Gleichheit
+ * ist eine fachliche Aussage über zwei Module und in `phase.test.ts` gepinnt. Ein Alias
+ * machte eine spätere Divergenz zu einer Umbenennung statt zu einer Entscheidung.
+ */
+export const LAGEBERICHT_STATUS: StatusDeskriptor = {
+  entwurf: { label: 'Entwurf', phase: 'offen' },
+  freigegeben: { label: 'Freigegeben', phase: 'abgeschlossen' },
+};
+
+/**
  * Trennung Offen/Abgeschlossen-Ansicht: abgeschlossen UND ausnahme (z. B.
  * abgelehnte Nachforderung) zählen für die Abgeschlossen-Ansicht.
  */

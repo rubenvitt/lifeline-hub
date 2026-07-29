@@ -29,11 +29,29 @@ export default function SprechgruppenTab() {
   });
 
   const spalten: TableColumnsType<Sprechgruppe> = [
-    { title: 'Bezeichnung', dataIndex: 'bezeichnung', key: 'bezeichnung' },
+    {
+      title: 'Bezeichnung',
+      dataIndex: 'bezeichnung',
+      key: 'bezeichnung',
+      // Leitspalte: an der Bezeichnung sucht ein Mensch die Sprechgruppe. `numeric: true`, weil
+      // die Bezeichner mit Zahlen beginnen (412_F_DRK) und ein rein zeichenweiser Vergleich
+      // 42_… vor 412_… einsortierte. Ohne `defaultSortOrder` — die Voreinstellung bleibt die
+      // fachliche Reihenfolge des Backends (`sprechgruppe/repo.rs`:
+      // ORDER BY betriebsart, sortier, bezeichnung), die TMO und DMO gruppiert hält.
+      sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
+    },
     {
       title: 'Betriebsart',
       dataIndex: 'betriebsart',
       key: 'betriebsart',
+      // Die Filterwerte stehen fest aus dem Wire-Enum `Betriebsart` ("TMO" | "DMO") und werden
+      // NICHT aus den geladenen Zeilen abgeleitet: sonst verschwände genau der Filterwert aus
+      // der Liste, dessen Zeilen man gerade sucht, weil keine geladene Zeile ihn trägt.
+      filters: [
+        { text: 'TMO', value: 'TMO' },
+        { text: 'DMO', value: 'DMO' },
+      ],
+      onFilter: (wert, sg) => sg.betriebsart === wert,
       render: (ba: string) => <Tag color={ba === 'TMO' ? 'blue' : 'orange'}>{ba}</Tag>,
     },
     {
@@ -44,10 +62,21 @@ export default function SprechgruppenTab() {
     },
     {
       title: 'Aktiv',
-      dataIndex: 'aktiv',
       key: 'aktiv',
-      render: (aktiv: boolean) =>
-        aktiv ? <Tag color="green">Aktiv</Tag> : <Tag>Inaktiv</Tag>,
+      // Zweite Filterachse: der Tab lädt bewusst auch die deaktivierten (`listeSprechgruppen(false)`),
+      // wer nur den Bestand im Funkbetrieb sehen will, blendet sie hier weg.
+      //
+      // Bewusst OHNE `dataIndex` — `onFilter` und `render` bekommen ohnehin den ganzen Datensatz,
+      // ein Bezug trüge hier nur den Drahtwert in den Suchkorpus des Primitivs, das die ROHWERTE
+      // liest. Gemessen: mit `dataIndex: 'aktiv'` traf die Eingabe „al" jede INAKTIVE Zeile
+      // („false") und „ru" jede aktive („true") — Zufallstreffer, die niemand tippen wollte.
+      // Gleiche Bauform wie die Status-Spalte in `pages/BenutzerPage.tsx`.
+      filters: [
+        { text: 'Aktiv', value: true },
+        { text: 'Inaktiv', value: false },
+      ],
+      onFilter: (wert, sg) => sg.aktiv === wert,
+      render: (_, sg) => (sg.aktiv ? <Tag color="green">Aktiv</Tag> : <Tag>Inaktiv</Tag>),
     },
     ...(istAdmin
       ? ([
@@ -102,7 +131,7 @@ export default function SprechgruppenTab() {
         dataSource={sprechgruppenQuery.data ?? []}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Sprechgruppen' }}
-        pagination={false}
+        suche={{ platzhalter: 'Bezeichnung, Betriebsart oder Hinweis' }}
       />
       <SprechgruppeFormModal
         offen={modalOffen}

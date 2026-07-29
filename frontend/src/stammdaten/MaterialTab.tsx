@@ -27,13 +27,46 @@ export default function MaterialTab() {
   });
 
   const spalten: TableColumnsType<Material> = [
-    { title: 'Bezeichnung', dataIndex: 'bezeichnung', key: 'bezeichnung' },
+    {
+      title: 'Bezeichnung',
+      dataIndex: 'bezeichnung',
+      key: 'bezeichnung',
+      /**
+       * Leitspalte: an der Bezeichnung wird ein Materialposten gesucht, nicht an der
+       * DB-Kennung — dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung
+       * fixiert. `numeric: true`, weil Bezeichnungen Größen tragen („B-Schlauch 5 m"
+       * vs. „… 20 m"); rein lexikografisch stünde 20 vor 5 [abgeleitet].
+       *
+       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY bezeichnung`
+       * (`src/material/repo.rs:54`). Die Sortierung ist ein Angebot — absteigend und
+       * mit `de`-Kollation statt SQLites BINARY-Vergleich —, kein neuer Default.
+       */
+      sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
+    },
     { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie', render: (t) => t ?? '—' },
     { title: 'Bestandsnummer', dataIndex: 'bestandsnummer', key: 'bestandsnummer', render: (t) => t ?? '—' },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
     {
       title: 'Status',
       key: 'dienststatus',
+      /**
+       * Gefiltert wird über den Dienststatus, nicht über die Kategorie: `Dienststatus`
+       * ist ein geschlossenes Enum (`in_dienst | ausser_dienst`) und beantwortet die
+       * Frage, die im Einsatz zuerst gestellt wird. Die Kategorie ist mandantengepflegt
+       * — eine Filterliste daraus (`kategorienQuery`) käme aus einer zweiten Abfrage und
+       * könnte mit den angezeigten Zeilen auseinanderlaufen; sie hat einen `dataIndex`
+       * und wird deshalb bereits von der Freitextsuche bedient.
+       *
+       * BEWUSST WEITERHIN OHNE `dataIndex` (Begründung wie in `FahrzeugeTab`): der
+       * Filter braucht keinen, ein gesetzter zöge aber den Drahtwert `in_dienst` in die
+       * Suche. `String(wert)`, weil antd das Filterargument als `React.Key | boolean`
+       * typisiert.
+       */
+      filters: [
+        { text: 'in Dienst', value: 'in_dienst' },
+        { text: 'außer Dienst', value: 'ausser_dienst' },
+      ],
+      onFilter: (wert, m) => m.dienststatus === String(wert),
       render: (_, m) =>
         m.dienststatus === 'in_dienst' ? <Tag color="green">in Dienst</Tag> : <Tag>außer Dienst</Tag>,
     },
@@ -79,7 +112,11 @@ export default function MaterialTab() {
         dataSource={materialQuery.data ?? []}
         columns={spalten}
         locale={{ emptyText: 'Noch kein Material' }}
-        pagination={false}
+        // Durchsucht werden die vier Spalten mit Datenbezug: Bezeichnung, Kategorie,
+        // Bestandsnummer, Träger. Die Statusspalte ist render-only und trägt nichts bei.
+        // Der Platzhalter nennt die beiden, nach denen tatsächlich gesucht wird — die
+        // volle Aufzählung würde im 220 px breiten Feld abgeschnitten.
+        suche={{ platzhalter: 'Bezeichnung oder Kategorie' }}
       />
       <MaterialFormModal
         offen={modalOffen}

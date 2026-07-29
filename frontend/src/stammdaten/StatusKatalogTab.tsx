@@ -75,11 +75,41 @@ export default function StatusKatalogTab() {
   }, [modalOffen, bearbeite, form]);
 
   const spalten: TableColumnsType<FahrzeugStatus> = [
-    { title: 'Label', dataIndex: 'label', key: 'label' },
+    {
+      title: 'Label',
+      dataIndex: 'label',
+      key: 'label',
+      /**
+       * Leitspalte: am Label wird ein Status gesucht, nicht an der DB-Kennung.
+       *
+       * KEIN `defaultSortOrder` — und hier trägt das mehr Gewicht als in den anderen
+       * Katalogen: `sortier` IST die fachliche Reihenfolge dieses Katalogs, sie
+       * bestimmt die Anordnung in jeder Statusauswahl, und das Backend liefert
+       * `ORDER BY sortier, id` (`src/fahrzeug/status_repo.rs:44`). Sie bleibt die
+       * Voreinstellung; die alphabetische Sortierung ist ein Angebot zum Auffinden
+       * eines Eintrags und wird vom dritten Kopfklick wieder zurückgenommen.
+       */
+      sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
+    },
     {
       title: 'Kategorie',
       dataIndex: 'kategorie',
       key: 'kategorie',
+      /**
+       * Die geschlossene Achse dieses Katalogs. Die Filterliste kommt aus
+       * {@link statusKategorie} statt aus einer eigenen Aufzählung — derselbe Griff wie
+       * beim `Select` im Formular unten. Der Vertrag ist ein exhaustiver
+       * `Record<StatusKategorie, …>`, eine neue Enum-Variante taucht damit von selbst
+       * im Filter auf, statt still zu fehlen.
+       *
+       * `String(wert)`, weil antd das Filterargument als `React.Key | boolean`
+       * typisiert, nicht als `StatusKategorie`.
+       */
+      filters: (Object.keys(statusKategorie) as StatusKategorie[]).map((k) => ({
+        text: statusKategorie[k].label,
+        value: k,
+      })),
+      onFilter: (wert, s) => s.kategorie === String(wert),
       render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
     },
     { title: 'Farbe', dataIndex: 'farbe', key: 'farbe', render: (f) => f ?? '—' },
@@ -117,8 +147,14 @@ export default function StatusKatalogTab() {
         loading={statusQuery.isLoading}
         dataSource={statusQuery.data ?? []}
         columns={spalten}
-        pagination={false}
         locale={{ emptyText: 'Kein Status' }}
+        // Der Platzhalter nennt NUR das Label, obwohl die Suche des Primitivs jede Spalte
+        // mit Datenbezug liest. Grund: sie greift den Rohwert, und der stimmt hier bei
+        // genau einer Spalte nicht mit dem Gezeigten überein — die Kategorie zeigt
+        // „verfügbar", der Drahtwert heißt `verfuegbar`. Ein Platzhalter, der „Kategorie"
+        // verspräche, ginge bei getippten Umlauten ins Leere. Diese Achse bedient der
+        // Spaltenfilter, nicht die Suche.
+        suche={{ platzhalter: 'Label' }}
       />
       <Modal
         open={modalOffen}

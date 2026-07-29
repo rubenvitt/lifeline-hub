@@ -66,10 +66,27 @@ export default function EinheitTypenTab() {
     }
   }, [modalOffen, bearbeite, form]);
 
+  // Keine Filterspalte in diesem Katalog: `EinheitTyp` trägt weder Status noch Kategorie, und
+  // `einheit/typ_repo.rs` liefert ohnehin nur `WHERE aktiv = 1` — eine Aktiv-Achse gäbe es hier
+  // also nicht einmal in den Daten. Erfunden wird sie nicht.
   const spalten: TableColumnsType<EinheitTyp> = [
-    { title: 'Label', dataIndex: 'label', key: 'label' },
+    {
+      title: 'Label',
+      dataIndex: 'label',
+      key: 'label',
+      // Leitspalte: am Label sucht ein Mensch den Typ. Die Sortierung ist ein ANGEBOT ohne
+      // `defaultSortOrder` — voreingestellt bleibt die fachliche Reihenfolge des Backends
+      // (`einheit/typ_repo.rs`: ORDER BY sortier, id), die die Zug-vor-Gruppe-Ordnung hält.
+      sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
+    },
     { title: 'Soll-Stärke (F/UF/M//Σ)', key: 'soll', render: (_, t) => <StaerkeAnzeige wert={t.soll ?? null} /> },
-    { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
+    {
+      title: 'Sortierung',
+      dataIndex: 'sortier',
+      key: 'sortier',
+      // Numerisch vergleichen, nicht über die Zeichenkette: nur so steht 5 vor 40.
+      sorter: (a, b) => a.sortier - b.sortier,
+    },
     ...(istAdmin
       ? ([
           {
@@ -100,8 +117,11 @@ export default function EinheitTypenTab() {
         loading={typenQuery.isLoading}
         dataSource={typenQuery.data ?? []}
         columns={spalten}
-        pagination={false}
         locale={{ emptyText: 'Kein Einheitstyp' }}
+        // Der Platzhalter nennt das Feld, das man tippt. Die Spalte „Sortierung" fällt über ihren
+        // `dataIndex` technisch mit in den Suchkorpus (gemessen: „4" trifft Zug über `sortier: 40`) —
+        // harmlos, aber kein Grund, sie in den Platzhalter zu schreiben.
+        suche={{ platzhalter: 'Label' }}
       />
       <Modal
         open={modalOffen}

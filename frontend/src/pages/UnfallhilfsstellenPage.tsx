@@ -1,4 +1,4 @@
-import { Breadcrumb, Button, Table, type TableColumnsType } from 'antd';
+import { Breadcrumb, Button, type TableColumnsType } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { uhsDetailPfad } from '../routing/deeplinks';
@@ -14,6 +14,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { uhsStatus, uhsTyp } from '../theme/statusFarben';
+import KatalogTabelle from '../components/KatalogTabelle';
 
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
@@ -66,7 +67,7 @@ export default function UnfallhilfsstellenPage() {
         <Button type="primary" disabled={schreibgeschuetzt} onClick={() => setAnlegen(true)}>Neu</Button>
       }
     >
-      <Table<Uhs>
+      <KatalogTabelle<Uhs>
         rowKey="id"
         dataSource={uhsQuery.data ?? []}
         columns={spalten}

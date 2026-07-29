@@ -161,3 +161,58 @@ it('Suche matcht über Name und Funkrufname', () => {
   expect(nachFunk.fahrzeuge.map((x) => x.funkrufname)).toEqual(['F2']);
   expect(nachFunk.personal).toHaveLength(0);
 });
+
+/**
+ * Die BRÜCKE zwischen den zwei Zahlenwegen derselben Frage (LFH-330 · B2).
+ *
+ * Der Kennzahlenkopf der Kräfteübersicht liest `verdichtung`, gerechnet direkt aus den
+ * Rohlisten. Die neue Ampelzeile in den Baumzeilen liest `personalVerteilung` /
+ * `fahrzeugVerteilung`, kumuliert über `addKategorie` und `addVerteilung`. Zwei Wege, eine
+ * Frage — und bei kaputter Kumulation laufen sie auseinander, ohne dass ein Test es merkt:
+ * „Kopf zählt jede Kraft genau einmal" deckt den Kopf, nicht den Vergleich.
+ *
+ * Die Fixture ist absichtlich schief: verschachtelte Einheiten, eine Kraft OHNE Einheit
+ * (landet im Sammelknoten) und drei verschiedene Kategorien. Eine flache Fixture mit einer
+ * Kategorie wäre auch bei kaputter Rekursion grün.
+ */
+it('Brücke: die Wurzelzeilen summieren sich auf die Verdichtung — beide Achsen', () => {
+  const personal = [
+    p(1, 10, 'fuehrer', 'verfuegbar'),
+    p(2, 20, 'mannschaft', 'gebunden'),
+    p(3, null, 'mannschaft', null),
+    p(4, 30, 'unterfuehrer', 'nicht_verfuegbar'),
+  ];
+  const fahrzeuge = [
+    fz(1, 10, 'verfuegbar'),
+    fz(2, 20, 'gebunden'),
+    fz(3, null, null),
+    fz(4, 30, 'verfuegbar'),
+  ];
+  // Abschnitt 1 mit Einheit 10 und darunter 20; Einheit 30 hängt an KEINEM Abschnitt.
+  const bild = baueKraeftebild([ab(1)], [eh(10, 1), eh(20, 1, 10), eh(30, null)], personal, fahrzeuge, []);
+
+  const summe = (feld: 'personalVerteilung' | 'fahrzeugVerteilung') =>
+    bild.baum.reduce(
+      (acc, z) => {
+        const v = z[feld];
+        if (!v) return acc;
+        return {
+          verfuegbar: acc.verfuegbar + v.verfuegbar,
+          gebunden: acc.gebunden + v.gebunden,
+          nicht_verfuegbar: acc.nicht_verfuegbar + v.nicht_verfuegbar,
+          ohne: acc.ohne + v.ohne,
+        };
+      },
+      { verfuegbar: 0, gebunden: 0, nicht_verfuegbar: 0, ohne: 0 },
+    );
+
+  expect(summe('personalVerteilung')).toEqual(bild.verdichtung.personalStatus);
+  expect(summe('fahrzeugVerteilung')).toEqual(bild.verdichtung.fahrzeugStatus);
+  // Und die Verdichtung selbst ist nicht leer — sonst wäre 0 == 0 die ganze Aussage.
+  expect(bild.verdichtung.personalStatus).toEqual({
+    verfuegbar: 1, gebunden: 1, nicht_verfuegbar: 1, ohne: 1,
+  });
+  expect(bild.verdichtung.fahrzeugStatus).toEqual({
+    verfuegbar: 2, gebunden: 1, nicht_verfuegbar: 0, ohne: 1,
+  });
+});

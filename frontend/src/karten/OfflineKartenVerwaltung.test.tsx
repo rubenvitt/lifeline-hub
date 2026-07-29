@@ -80,6 +80,115 @@ describe('OfflineKartenVerwaltung', () => {
     expect(screen.getByText('© OpenStreetMap contributors (ODbL)')).toBeInTheDocument();
   });
 
+  // ── Ordnung der Katalogtabelle (LFH-330 · AP5) ──────────────────────────────────
+  // Geprüft wird durchweg die WIRKUNG auf die Zeilenmenge, nicht die Anwesenheit eines
+  // Props. Die stehende Kopfzeile schiebt eine verborgene Messzeile als erste Körperzeile
+  // ein — deshalb überall die Verengung auf `tr.ant-table-row`.
+
+  /** Kleiner als die Vorgabe (42,0 MB) und alphabetisch davor — beide Achsen sind messbar. */
+  const kleineKarte: OfflineKarte = {
+    ...karte, id: 3, name: 'Deutschland – Bayern', groesse: 9_500_000, pfad: 'karte-3.mbtiles',
+  };
+  /** Registriert, aber noch nicht geladen: `groesse: null` heißt UNBEKANNT, nicht null Bytes. */
+  const ohneGroesse: OfflineKarte = {
+    ...karte, id: 4, name: 'Deutschland – Saarland', groesse: null, status: 'registriert',
+    pfad: '', sha256: null, download_at: null,
+  };
+
+  it('sortiert nach Größe und engt per Suche ein', async () => {
+    mockBasis(admin, [karte, kleineKarte, ohneGroesse]);
+    const { container } = render();
+    await screen.findByText('Deutschland – Bremen');
+    const namen = () =>
+      Array.from(container.querySelectorAll('tr.ant-table-row td:first-child')).map(
+        (z) => z.textContent,
+      );
+
+    // Voreinstellung ist die gelieferte Reihenfolge (Backend: ORDER BY sortier, id) — die
+    // Vorgabe steht bewusst weder nach Größe noch alphabetisch, sonst wäre die Zusicherung
+    // stumpf und ein versehentliches `defaultSortOrder` bliebe unbemerkt.
+    expect(namen()).toEqual([
+      'Deutschland – Bremen', 'Deutschland – Bayern', 'Deutschland – Saarland',
+    ]);
+
+    // Aufsteigend nach Bytes: 9,5 MB vor 42,0 MB. Über die formatierte Zeichenkette
+    // sortiert stünde „9.1 MB" hinter „42.0 MB" — genau das fängt dieser Klick.
+    //
+    // Die unbekannte Größe steht VORNE, nicht hinten: sie ist das Gegenteil einer großen
+    // Datei. Diese Zusicherung ist der einzige Ort, an dem die Ersatzzahl des Sorters
+    // überhaupt gemessen wird — sie unterscheidet `?? -1` allerdings NICHT von `?? 0`
+    // (beide liegen unter jeder echten Größe); sie fängt die Umkehrung (`?? Infinity` und
+    // Geschwister) und den Absturz auf `null`.
+    await userEvent.click(screen.getByRole('columnheader', { name: /Größe/ }));
+    await waitFor(() =>
+      expect(namen()).toEqual([
+        'Deutschland – Saarland', 'Deutschland – Bayern', 'Deutschland – Bremen',
+      ]),
+    );
+
+    await userEvent.type(screen.getByPlaceholderText('Name oder Attribution'), 'Bremen');
+    await waitFor(() => expect(namen()).toEqual(['Deutschland – Bremen']));
+  });
+
+  it('der Statusfilter verkleinert die Zeilenmenge auf die gewählte Kategorie', async () => {
+    mockBasis(admin, [karte, karteLaedt]);
+    const { container } = render();
+    await screen.findByText('Deutschland – Bremen');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(zeilen()).toHaveLength(2);
+
+    // Erst den Griff belegen, dann klicken: sonst meldete die Probe (Filter entfernt) ein
+    // leeres Filtermenü statt den fehlenden Auslöser. „Status" ist die einzige Spalte mit
+    // Filter, der Auslöser ist damit eindeutig.
+    const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
+    expect(ausloeser, 'die Statusspalte muss einen Filter tragen').not.toBeNull();
+    await userEvent.click(ausloeser!);
+
+    // Das Filtermenü hängt in einem Portal an `document.body`, nicht im Container — und
+    // „bereit" steht zu diesem Zeitpunkt auch als Etikett in der ersten Zeile. Der Griff
+    // muss deshalb IM Menü erfolgen, sonst ist er mehrdeutig.
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    await userEvent.click(within(menue).getByText('lädt'));
+    await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
+
+    await waitFor(() => expect(zeilen()).toHaveLength(1));
+    expect(zeilen()[0].textContent).toContain('Deutschland – Bayern');
+  });
+
+  it('der Drahtwert der Statusspalte bleibt außerhalb der Freitextsuche', async () => {
+    /**
+     * Die Kehrseite des fehlenden `dataIndex` an der Statusspalte, und der Grund, warum sie
+     * einen Filter trägt. Zwei Ausfälle hängen an dieser Zusicherung:
+     *
+     * - `dataIndex: 'status'` wieder gesetzt → der Drahtwert „laedt" landet im Suchkorpus.
+     *   Ein Wort, das niemand tippt, weil die Zelle „lädt" zeigt.
+     * - `dataIndex` weg, `render` aber nicht nachgezogen → das erste Render-Argument ist der
+     *   DATENSATZ statt des Status, `STATUS_TAG[…]` wird `undefined` und die Zeile stürzt ab.
+     *   Der laut scheiternde der beiden Fälle; die Kontrollsuche unten deckt ihn mit ab.
+     */
+    mockBasis(admin, [karte, karteLaedt]);
+    const { container } = render();
+    await screen.findByText('Deutschland – Bremen');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(zeilen()).toHaveLength(2);
+    // Menschenlesbares Etikett statt Drahtwert — über den Text, nie über die Farbklasse.
+    expect(zeilen()[1].textContent).toContain('lädt');
+
+    const feld = screen.getByPlaceholderText('Name oder Attribution');
+    await userEvent.type(feld, 'laedt');
+    await waitFor(() => expect(zeilen()).toHaveLength(0));
+
+    // Kontrolle: die Suche greift überhaupt — ohne sie wäre die Null oben auch mit einer
+    // kaputten Suche zu haben.
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Bayern');
+    await waitFor(() => expect(zeilen()).toHaveLength(1));
+  });
+
   it('Admin sieht Download- und Zeilen-Aktionen', async () => {
     mockBasis(admin);
     render();

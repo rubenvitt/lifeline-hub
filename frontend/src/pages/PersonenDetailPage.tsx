@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Table, Tag, Typography, theme, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Tag, Typography, theme, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { flaeche } from '../theme/tokens';
 import PersonVerlauf from '../personen/PersonVerlauf';
+import KatalogTabelle from '../components/KatalogTabelle';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, VerbleibArt } from '../api/types';
 import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
 
@@ -508,7 +509,7 @@ export default function PersonenDetailPage() {
             <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
               Zugriffs-Audit
             </Typography.Text>
-            <Table<PersonZugriff>
+            <KatalogTabelle<PersonZugriff>
               rowKey="id" pagination={false}
               loading={auditQuery.isLoading}
               dataSource={auditQuery.data ?? []}

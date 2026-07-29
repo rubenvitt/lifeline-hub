@@ -1,5 +1,6 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
+import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -22,9 +23,10 @@ const STATUS_META: Record<MaterialStatus, { label: string; color: string }> = {
   verbraucht: { label: 'verbraucht', color: 'default' },
   desinfektion_noetig: { label: 'Desinfektion nötig', color: 'orange' },
 };
-const STATUS_OPTIONEN = (Object.keys(STATUS_META) as MaterialStatus[]).map((s) => ({
-  value: s, label: STATUS_META[s].label,
-}));
+const STATUS_REIHENFOLGE = Object.keys(STATUS_META) as MaterialStatus[];
+const STATUS_OPTIONEN = STATUS_REIHENFOLGE.map((s) => ({ value: s, label: STATUS_META[s].label }));
+/** Filterwerte auf der EIGENEN Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
+const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({ value: s, text: STATUS_META[s].label }));
 
 /** Inline-Mengen-Editor: lokaler Zustand, committet erst bei Blur/Enter (min 1). */
 function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: number) => void }) {
@@ -119,10 +121,33 @@ export default function MaterialPage() {
     value: m.id, label: `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
   }));
 
-  const spalten: TableColumnsType<EinsatzMaterial> = [
+  /**
+   * Kategoriefilter aus den EIGENEN Daten; `undefined` ohne Werte. Bewusste Folge: das Feld
+   * erscheint erst mit dem ersten gepflegten Wert. Ein dauerhaft leeres Filterfeld sieht wie
+   * ein Werkzeug aus und ist keins — der Tausch ist gewollt.
+   */
+  const kategorieWerte = [...new Set(ems.map((m) => m.kategorie).filter((k): k is string => !!k))]
+    .sort()
+    .map((k) => ({ text: k, value: k }));
+  const kategorieFilter = kategorieWerte.length > 0
+    ? { werte: kategorieWerte, trifft: (m: EinsatzMaterial, w: string) => m.kategorie === w }
+    : undefined;
+
+  /**
+   * Spaltenregister der Materialseite (LFH-330 · B2).
+   *
+   * `EinsatzMaterialAnzeige` hat KEIN `status_kategorie` — 15 Felder, am generierten Typ
+   * geprüft. Gruppiert und gefiltert wird deshalb auf der EIGENEN Fünf-Werte-Achse
+   * (`MaterialStatus`), nicht auf verfügbar/gebunden/nicht verfügbar. Dieselbe Grenze zieht
+   * `filtereKraefte` schon in der Datenschicht. Ein hierher gemapptes Feld wäre erfunden.
+   */
+  const spalten = spaltenFuer<EinsatzMaterial>()([
     {
       title: 'Bezeichnung',
       key: 'bezeichnung',
+      immerSichtbar: true,
+      sortWert: (m) => m.bezeichnung,
+      suchText: (m) => m.bezeichnung,
       render: (_, em) => (
         <Space>
           {em.bezeichnung}
@@ -130,22 +155,30 @@ export default function MaterialPage() {
         </Space>
       ),
     },
-    { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie', render: (t) => t ?? '—' },
+    {
+      title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie',
+      filter: kategorieFilter, suchText: (m) => m.kategorie, render: (t) => t ?? '—',
+    },
     {
       title: 'Menge',
       key: 'menge',
+      sortWert: (m) => m.menge,
       render: (_, em) =>
         darfSchreiben
+          // `MengeZelle` bleibt unangetastet (samt ihrer Klein-Variante) — ihr Abbau ist
+          // LFH-333/B5, nicht dieser Umbau.
           ? <MengeZelle em={em} onChange={(menge) => mengeMutation.mutate({ emId: em.id, menge })} />
           : em.menge,
     },
     {
       title: 'Status',
       key: 'status',
+      filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
       render: (_, em) =>
         darfSchreiben ? (
+          // Keine Klein-Variante mehr: die Höhe kommt aus `controlHeight` und zieht mit der
+          // Dichtestufe mit (ohnehin angefasste Stelle, Norm aus CLAUDE.md).
           <Select
-            size="small"
             style={{ minWidth: 170 }}
             value={em.status}
             options={STATUS_OPTIONEN}
@@ -168,19 +201,21 @@ export default function MaterialPage() {
         ),
     },
     ...(darfSchreiben
-      ? ([
+      ? [
           {
             title: 'Aktionen',
-            key: 'aktionen',
-            render: (_, em: EinsatzMaterial) => (
+            key: 'aktionen' as const,
+            immerSichtbar: true,
+            render: (_: unknown, em: EinsatzMaterial) => (
               <Popconfirm title="Aus Einsatz entfernen?" onConfirm={() => entfernenMutation.mutate(em.id)}>
-                <Button size="small" danger>Entfernen</Button>
+                {/* Ohne Klein-Variante und ohne `danger`: Rot ist Gefahr, nicht Bedienung. */}
+                <Button>Entfernen</Button>
               </Popconfirm>
             ),
           },
-        ] as TableColumnsType<EinsatzMaterial>)
+        ]
       : []),
-  ];
+  ]);
 
   return (
     <div>
@@ -221,13 +256,38 @@ export default function MaterialPage() {
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
-      <Table
-        rowKey="id"
-        loading={emQuery.isLoading}
-        dataSource={ems}
-        columns={spalten}
-        pagination={false}
-        locale={{ emptyText: 'Noch kein Material disponiert' }}
+      {/* Kein `karte.status`-Slot: `STATUS_META` sind rohe antd-Preset-Farbnamen und liegen
+          ausdrücklich außerhalb des Statusfarb-Vertrags (A2 nennt diese Seite namentlich als
+          draußen). Sie in eine `StatusDarstellung` zu zwingen wäre der Bestands-Sweep, den
+          A2 verbietet — der Status steht deshalb als beschriftetes Sekundärfeld.
+
+          `titel` ohne `ziel`: Material hat keine Detailroute. */}
+      <Datensicht
+        bezeichnung="Material im Einsatz"
+        spalten={spalten}
+        daten={ems}
+        zeilenSchluessel="id"
+        ladend={emQuery.isLoading}
+        leerText="Noch kein Material disponiert"
+        suche={{ platzhalter: 'Bezeichnung, Kategorie' }}
+        standardSortierung={{ spalte: 'bezeichnung', richtung: 'auf' }}
+        gruppen={{
+          schluessel: (m) => m.status,
+          etikett: (w) => STATUS_META[w as MaterialStatus]?.label ?? w,
+          reihenfolge: STATUS_REIHENFOLGE,
+        }}
+        karte={{
+          art: 'plan',
+          titel: { spalte: 'bezeichnung' },
+          sekundaer: ['kategorie', 'menge', 'status'],
+          aktion: darfSchreiben
+            ? {
+                etikett: 'Entfernen',
+                bestaetigung: 'Aus Einsatz entfernen?',
+                onKlick: (em) => entfernenMutation.mutate(em.id),
+              }
+            : undefined,
+        }}
       />
 
       <Modal

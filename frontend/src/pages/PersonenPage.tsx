@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Space, Spin, Tabs, Tag, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -9,20 +9,17 @@ import { useAuth } from '../auth/AuthContext';
 import { legePersonAn, listePersonen, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person } from '../api/types';
-import { PATIENT_SK, SK_META } from '../personen/personMeta';
-import { abgleichSpalte, personenSpalten } from '../personen/personenSpalten';
+import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import type { Person, Sichtungskategorie } from '../api/types';
+import { PATIENT_SK, SK_META, istPatient } from '../personen/personMeta';
+import { abgleichSpalten, personenKarte, personenSpalten } from '../personen/personenSpalten';
+import { filterPersonen, gefundenePersonen, type PersonenSicht } from '../personen/personenFilter';
+import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
 import LagebildStreifen from '../personen/LagebildStreifen';
 
-/** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot);
- *  unverletzt und ungesichtet zählen nicht (LFH-10, rein medizinische Achse). */
-function istPatient(p: Person): boolean {
-  return p.aktuelle_sichtung != null && PATIENT_SK.includes(p.aktuelle_sichtung);
-}
-
 /** Sicht-Tabs: 'alle' = kein Filter; 'patienten' = SK-Achse; sonst Status-Filter. */
-type Sicht = 'erfasst' | 'vermisst' | 'betroffen' | 'patienten' | 'verstorben' | 'alle';
+type Sicht = PersonenSicht;
 const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'erfasst', label: 'Neu' },
   { key: 'vermisst', label: 'Vermisst' },
@@ -50,6 +47,8 @@ export default function PersonenPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [modus, setModus] = useState<ErfassungsModus | null>(null);
+  /** `null` = kein Abgleich-Dialog offen. Trägt die vermisste Person, zu der gesucht wird. */
+  const [abgleichFuer, setAbgleichFuer] = useState<Person | null>(null);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
@@ -90,7 +89,7 @@ export default function PersonenPage() {
   const abgleichVorschlagMutation = useMutation({
     mutationFn: (v: { vermisstId: number; gefundenId: number }) =>
       schlageAbgleichVor(einsatzId, v.vermisstId, v.gefundenId),
-    onSuccess: () => { invalidate(); message.success('Verdachts-Abgleich angelegt'); },
+    onSuccess: () => { invalidate(); setAbgleichFuer(null); message.success('Verdachts-Abgleich angelegt'); },
     onError: fehler,
   });
 
@@ -104,15 +103,26 @@ export default function PersonenPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const alle = personenQuery.data ?? [];
-  const personen = (sicht === 'alle' || sicht === 'patienten')
-    ? alle
-    : alle.filter((p) => p.status === sicht);
+  const gefundene = gefundenePersonen(alle);
+  const darfAbgleichen = darfSchreiben && sicht === 'vermisst';
 
-  const gefundene = alle.filter((p) => ['betroffen', 'verstorben'].includes(p.status) && !p.storniert_at);
-
-  const aktionsSpalte = darfSchreiben && sicht === 'vermisst'
-    ? abgleichSpalte(gefundene, (vermisstId, gefundenId) => abgleichVorschlagMutation.mutate({ vermisstId, gefundenId }))
-    : [];
+  /**
+   * Die Spaltenliste der Listen-Sicht: Register plus Abgleichspalte.
+   *
+   * Durch `spaltenFuer<Person>()` geführt, NICHT annotiert. Eine Annotation
+   * (`readonly DatensichtSpalte<Person>[]`) weitete die Schlüsselliterale auf `string`, und
+   * jeder Tippfehler in einem Kartenplan-Slot wäre danach unbemerkt. Gemessen: durch die
+   * Fabrik geführt bleibt `K` die Vereinigung beider Teillisten und ein falscher Slot
+   * scheitert am Typcheck.
+   */
+  const listenSpalten = spaltenFuer<Person>()([
+    ...personenSpalten,
+    ...(darfAbgleichen
+      ? abgleichSpalten(gefundene, (vermisstId, gefundenId) =>
+          abgleichVorschlagMutation.mutate({ vermisstId, gefundenId }),
+        )
+      : []),
+  ]);
 
   return (
     <div>
@@ -147,45 +157,100 @@ export default function PersonenPage() {
       <LagebildStreifen alle={alle} />
 
       {sicht === 'patienten' ? (
-        <Spin spinning={personenQuery.isLoading}>
-        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
-          {PATIENT_SK.map((sk) => {
-            const gruppe = alle.filter((p) => p.aktuelle_sichtung === sk);
-            if (gruppe.length === 0) return null;
-            return (
-              <div key={sk}>
-                <Typography.Title level={5} style={{ marginTop: 0 }}>
-                  <Tag color={SK_META[sk].color}>{SK_META[sk].label}</Tag>{' '}
-                  <Typography.Text type="secondary">
-                    {gruppe.length} {gruppe.length === 1 ? 'Patient' : 'Patienten'}
-                  </Typography.Text>
-                </Typography.Title>
-                <Table
-                  rowKey="id"
-                  dataSource={gruppe}
-                  columns={personenSpalten}
-                  pagination={false}
-                  onRow={(p) => ({ onClick: () => navigate(personDetailPfad(einsatzId, p.id)), style: { cursor: 'pointer' } })}
-                />
-              </div>
-            );
-          })}
-          {!personenQuery.isLoading && !alle.some(istPatient) && (
-            <Alert type="info" showIcon title="Keine Patienten in diesem Einsatz." />
-          )}
-        </Space>
-        </Spin>
+        /**
+         * EINE Sicht mit Gruppenachse statt fünf Tabellen: damit gibt es eine stehende
+         * Kopfzeile, eine fixierte Kennungsspalte und einen Spaltenschalter statt fünf.
+         * Die Ordnung ist die Dringlichkeit — SK-Rang zuerst (Gruppenachse ist die führende
+         * Sortierachse), innerhalb der Kategorie der ÄLTESTE Sichtungszeitpunkt zuerst.
+         */
+        <Datensicht
+          /**
+           * `key` ist hier NICHT Kosmetik, sondern das Einzige, was die beiden Sichten
+           * trennt. Sie stehen an DERSELBEN Stelle im Elementbaum und haben denselben
+           * Komponententyp — React reicht die Instanz samt internem Zustand (Sortierung,
+           * Suchbegriff, Spaltenauswahl, Zeilenschleuse) einfach weiter, statt neu zu
+           * montieren. Gemessen: ohne die Schlüssel behielt der Patienten-Reiter die
+           * `standardSortierung` der Listen-Sicht (`reg`), und die Dringlichkeitsordnung
+           * nach `seit` griff nie — ohne Fehler, ohne Warnung. `datensicht.guard.test.ts`
+           * hält die Regel seither fest.
+           */
+          key="patienten"
+          bezeichnung="Patienten nach Sichtungskategorie"
+          spalten={personenSpalten}
+          daten={alle.filter(istPatient)}
+          zeilenSchluessel="id"
+          ladend={personenQuery.isLoading}
+          leerText="Keine Patienten in diesem Einsatz."
+          standardSortierung={{ spalte: 'seit', richtung: 'auf' }}
+          gruppen={{
+            schluessel: (p) => p.aktuelle_sichtung ?? 'ohne',
+            // 'ohne' ist hier unerreichbar (`istPatient` filtert es weg) und steht nur,
+            // damit die Funktion total bleibt statt an einem Nachschlag zu werfen.
+            etikett: (sk) => (sk === 'ohne' ? 'ohne SK' : SK_META[sk as Sichtungskategorie].label),
+            reihenfolge: [...PATIENT_SK],
+          }}
+          onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
+          karte={personenKarte(einsatzId)}
+        />
       ) : (
-        <Table
-          rowKey="id"
-          loading={personenQuery.isLoading}
-          dataSource={personen}
-          columns={[...personenSpalten, ...aktionsSpalte]}
-          pagination={false}
-          locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
-          onRow={(p) => ({ onClick: () => navigate(personDetailPfad(einsatzId, p.id)), style: { cursor: 'pointer' } })}
+        <Datensicht
+          /**
+           * Gegenstück zum Schlüssel oben — mit einem Zusatz, der dort nicht nötig ist:
+           * der Schlüssel trägt den REITER, nicht bloß den Zweig. Diese eine Stelle im
+           * Baum bedient FÜNF Sichten mit fünf verschiedenen Datenmengen; bei konstantem
+           * Schlüssel reicht React auch beim Reiterwechsel dieselbe Instanz weiter.
+           * Gemessen: im Reiter „Vermisst" nach einem Namen gesucht und auf „Betroffen"
+           * gewechselt — dort stand der Begriff noch im Feld und filterte eine fremde
+           * Menge auf leer. Kein Fehler, keine Warnung, nur fehlende Zeilen.
+           *
+           * Der Preis, vierfach und gewollt: mit dem Reiterwechsel fallen auch
+           * Sortierung, Spaltenauswahl, die Spaltenfilter und die Zeilenschleuse
+           * (Sammelbanner) zurück. Alle vier sind Zustand IM Primitiv
+           * (`eigeneSortierung`, `eigeneSpaltenAus`, `filterWerte`, `schleuse` in
+           * `Datensicht.tsx`) — der Remount trifft sie zwangsläufig alle, das ist keine
+           * Auswahl, sondern die Folge. Drei davon wollen wir; die Sortierung ist
+           * hingenommenes Beiwerk — ihre Spalten sind über die fünf Reiter bis auf
+           * `abgleich` dieselben, ein Zurückfallen auf `standardSortierung` wäre also
+           * verzichtbar und ist nur nicht getrennt abschaltbar.
+           * Für die Spaltenauswahl ist das nicht nur hinnehmbar, sondern richtig — die
+           * Spaltenliste ist je Reiter eine andere (`abgleichSpalten` existiert nur unter
+           * `sicht === 'vermisst'`), eine mitgeschleppte Auswahl trüge also Schlüssel,
+           * die es in der nächsten Sicht gar nicht gibt. Für die Spaltenfilter gilt
+           * dasselbe eine Stufe schärfer: ihre Werte stammen aus der Menge, in der sie
+           * gesetzt wurden, und würden in der nächsten Sicht Zeilen aus einem Grund
+           * ausblenden, der auf dem Reiter nirgends sichtbar ist.
+           */
+          key={`liste-${sicht}`}
+          bezeichnung="Personen"
+          spalten={listenSpalten}
+          daten={filterPersonen(alle, sicht)}
+          zeilenSchluessel="id"
+          ladend={personenQuery.isLoading}
+          leerText="Keine Personen in dieser Sicht"
+          suche={{ platzhalter: 'R-Nr. oder Name' }}
+          standardSortierung={{ spalte: 'reg', richtung: 'auf' }}
+          onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
+          karte={{
+            ...personenKarte(einsatzId),
+            // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (24 px hoch,
+            // 200 px fest breit) — der Deskriptor ersetzt es durch einen Knopf plus Dialog.
+            aktion: darfAbgleichen
+              ? { etikett: 'Abgleich vorschlagen …', onKlick: (p) => setAbgleichFuer(p) }
+              : undefined,
+          }}
         />
       )}
+
+      <AbgleichVorschlagModal
+        vermisst={abgleichFuer}
+        gefundene={gefundene}
+        isPending={abgleichVorschlagMutation.isPending}
+        onCancel={() => setAbgleichFuer(null)}
+        onFinish={(gefundenId) =>
+          abgleichFuer &&
+          abgleichVorschlagMutation.mutate({ vermisstId: abgleichFuer.id, gefundenId })
+        }
+      />
 
       <PersonErfassungModal
         modus={modus}

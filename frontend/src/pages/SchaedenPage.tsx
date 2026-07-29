@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad } from '../routing/deeplinks';
-import { Button, Input, Space, Table, Tabs, Tag, Typography } from 'antd';
+import { Button, Input, Space, Tabs, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import type { TableColumnsType } from 'antd';
 import { einsatzKeys } from '../api/queryKeys';
@@ -13,6 +13,7 @@ import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import type { Ausmass, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
 import { AUSMASS_META, STATUS_META, TYP_LABEL, filterSchaeden, geschaedigtAnzeige } from './schaeden/schadenHelfer';
 import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
+import KatalogTabelle from '../components/KatalogTabelle';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
@@ -131,7 +132,7 @@ export default function SchaedenPage() {
         />
       </Space>
 
-      <Table
+      <KatalogTabelle<Schaden>
         rowKey="id"
         loading={schaedenQuery.isLoading}
         dataSource={sichtbar}

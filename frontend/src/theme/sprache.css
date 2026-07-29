@@ -621,3 +621,27 @@
   font: inherit;
   cursor: pointer;
 }
+
+/* ── Zählzeile in einer Tabellenzelle (LFH-330 · B2) ───────────────────────
+   ADDITIV. Der Werteblock `.lfh-felder` oben ist ein vierspaltiges Raster mit
+   Rahmen — in einer Tabellenzelle ist das falsch. Hier zählt Kompaktheit:
+   dieselben `.lfh-feld` waagerecht, ohne Raster, ohne Fläche, eng gepolstert.
+   Die Stufenregeln (`--alarm`/`--achtung`) gelten unverändert weiter; der
+   zweite Kanal ist das `.lfh-etikett` IM Feld, nicht diese Klasse. */
+.lfh-ampel {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--lfh-luft-1);
+}
+
+.lfh-ampel .lfh-feld {
+  align-items: center;
+  gap: 0;
+  padding: 0 var(--lfh-luft-1);
+  background: none;
+}
+
+.lfh-ampel .lfh-zahl {
+  line-height: 1.15;
+}

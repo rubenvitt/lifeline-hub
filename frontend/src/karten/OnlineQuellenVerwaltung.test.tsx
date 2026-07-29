@@ -54,6 +54,94 @@ describe('OnlineQuellenVerwaltung', () => {
     expect(screen.getByText('raster')).toBeInTheDocument();
   });
 
+  // ── Ordnung der Katalogtabelle (LFH-330 · AP5) ──────────────────────────────────
+  // Geprüft wird durchweg die WIRKUNG auf die Zeilenmenge, nicht die Anwesenheit eines
+  // Props. Die stehende Kopfzeile schiebt eine verborgene Messzeile als erste Körperzeile
+  // ein — deshalb überall die Verengung auf `tr.ant-table-row`.
+
+  const zweiteQuelle: OnlineQuelle = {
+    ...quelle, id: 2, name: 'Basemap.de', url: 'https://basemap.de/style.json',
+    typ: 'vektor', attribution: '© GeoBasis-DE', sortier: 1, aktiv: false,
+  };
+
+  it('sortiert nach Name und engt per Suche ein', async () => {
+    mockBasis(admin, [quelle, zweiteQuelle]);
+    const { container } = render();
+    await screen.findByText('OpenStreetMap');
+    const namen = () =>
+      Array.from(container.querySelectorAll('tr.ant-table-row td:first-child')).map(
+        (z) => z.textContent,
+      );
+
+    // Voreinstellung ist die gelieferte Reihenfolge (Backend: ORDER BY sortier, id), nicht
+    // die alphabetische — die Vorgabe steht bewusst un-alphabetisch, sonst wäre die
+    // Zusicherung stumpf und ein versehentliches `defaultSortOrder` bliebe unbemerkt.
+    expect(namen()).toEqual(['OpenStreetMap', 'Basemap.de']);
+
+    await userEvent.click(screen.getByRole('columnheader', { name: /Name/ }));
+    await waitFor(() => expect(namen()).toEqual(['Basemap.de', 'OpenStreetMap']));
+
+    await userEvent.type(screen.getByPlaceholderText('Name, URL oder Attribution'), 'OpenStreetMap');
+    await waitFor(() => expect(namen()).toEqual(['OpenStreetMap']));
+  });
+
+  it('der Aktiv-Filter verkleinert die Zeilenmenge auf die gewählte Kategorie', async () => {
+    mockBasis(admin, [quelle, zweiteQuelle]);
+    const { container } = render();
+    await screen.findByText('OpenStreetMap');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(zeilen()).toHaveLength(2);
+
+    // Erst den Griff belegen, dann klicken: sonst meldete die Probe (Filter entfernt) ein
+    // leeres Filtermenü statt den fehlenden Auslöser. „Aktiv" ist die einzige Spalte mit
+    // Filter, der Auslöser ist damit eindeutig.
+    const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
+    expect(ausloeser, 'die Aktiv-Spalte muss einen Filter tragen').not.toBeNull();
+    await userEvent.click(ausloeser!);
+
+    // Das Filtermenü hängt in einem Portal an `document.body`, nicht im Container — und
+    // „inaktiv" steht zu diesem Zeitpunkt auch als Etikett in der zweiten Zeile. Der Griff
+    // muss deshalb IM Menü erfolgen, sonst ist er mehrdeutig.
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    await userEvent.click(within(menue).getByText('inaktiv'));
+    await userEvent.click(within(menue).getByRole('button', { name: 'OK' }));
+
+    await waitFor(() => expect(zeilen()).toHaveLength(1));
+    expect(zeilen()[0].textContent).toContain('Basemap.de');
+  });
+
+  it('der Wahrheitswert der Aktiv-Spalte bleibt außerhalb der Freitextsuche', async () => {
+    /**
+     * Die Kehrseite des fehlenden `dataIndex` an der Aktiv-Spalte, und der Grund, warum sie
+     * einen Filter trägt. Zwei Ausfälle hängen an dieser Zusicherung:
+     *
+     * - `dataIndex: 'aktiv'` wieder gesetzt → `String(true)` landet im Suchkorpus, „true"
+     *   trifft jede aktive Quelle. Ein Wort, das in keiner Zelle steht.
+     * - `dataIndex` weg, `render` aber nicht nachgezogen → das erste Render-Argument ist der
+     *   DATENSATZ statt des Wahrheitswerts, also immer wahr, und jede Zeile behauptet
+     *   „aktiv". Kein Fehler, kein Absturz — deshalb steht die Etikettprüfung daneben.
+     */
+    mockBasis(admin, [quelle, zweiteQuelle]);
+    const { container } = render();
+    await screen.findByText('OpenStreetMap');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+    expect(zeilen()).toHaveLength(2);
+
+    // Etiketten über ihren Text, nie über die Farbklasse (.ant-tag-green ist nicht eindeutig).
+    // „aktiv" steckt als Teilzeichenkette in „inaktiv" — die erste Zeile wird deshalb über
+    // die ABWESENHEIT von „inaktiv" belegt, sonst wäre die Zusicherung in beide Richtungen
+    // erfüllbar und die halbe Rückdrehung (jede Zeile behauptet „aktiv") bliebe grün.
+    expect(zeilen()[0].textContent).not.toContain('inaktiv');
+    expect(zeilen()[1].textContent).toContain('inaktiv');
+
+    await userEvent.type(screen.getByPlaceholderText('Name, URL oder Attribution'), 'true');
+    await waitFor(() => expect(zeilen()).toHaveLength(0));
+  });
+
   it('Admin sieht Schreibaktionen', async () => {
     mockBasis(admin);
     render();

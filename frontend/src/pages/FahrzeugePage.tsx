@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,7 +20,9 @@ import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
+import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 
@@ -184,7 +186,7 @@ export default function FahrzeugePage() {
   });
   useEffect(() => {
     if (highlightId == null) return;
-    document.querySelector(`[data-row-key="${highlightId}"]`)?.scrollIntoView?.({ block: 'center' });
+    scrolleZurZeile(highlightId);
   }, [highlightId]);
 
   function invalidate() {
@@ -254,10 +256,45 @@ export default function FahrzeugePage() {
     .filter((f) => !disponierteIds.has(f.id))
     .map((f) => ({ value: f.id, label: `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}` }));
 
-  const spalten: TableColumnsType<EinsatzFahrzeug> = [
+  /**
+   * Trägerfilter aus den EIGENEN Daten (Muster der Kräfteübersicht). `undefined`, wenn
+   * kein Fahrzeug eine Trägerorganisation trägt — ein Filterfeld mit null Optionen wäre
+   * Rauschen in der Werkzeugzeile, kein Werkzeug.
+   *
+   * BEWUSSTE FOLGE, damit sie nicht unbenannt bleibt: das Feld erscheint erst mit dem
+   * ersten gepflegten Wert, also nach dem Laden — in der umbrechenden Werkzeugzeile eine
+   * kleine Verschiebung. Der Tausch ist gewollt: ein dauerhaft leeres Filterfeld sieht wie
+   * ein Werkzeug aus und ist keins.
+   */
+  const traegerWerte = [...new Set(efs.map((e) => e.traegerorganisation).filter((t): t is string => !!t))]
+    .sort()
+    .map((t) => ({ text: t, value: t }));
+  const traegerFilter = traegerWerte.length > 0
+    ? { werte: traegerWerte, trifft: (e: EinsatzFahrzeug, w: string) => e.traegerorganisation === w }
+    : undefined;
+
+  /**
+   * Spaltenregister der Fahrzeugseite (LFH-330 · B2).
+   *
+   * Durch `spaltenFuer<EinsatzFahrzeug>()` geführt und NICHT annotiert: eine Annotation
+   * weitet die Schlüsselliterale auf `string`, und der Kartenplan nähme danach jeden
+   * Tippfehler ohne Meldung an.
+   *
+   * ── `abBreite` NUR FÜR LESENDE SPALTEN ──────────────────────────────────────────
+   *
+   * `abBreite` versteckt eine Spalte, ohne dass der Nutzer sie zurückholen kann.
+   * Schreibtragende Spalten (`status`, `bemerkung`, `aktionen`) bekommen deshalb NIE eins;
+   * soll eine davon weichen, dann über `spaltenAusVoreinstellung` — dann steht sie im
+   * Spaltenschalter, im Zähler, und ein Klick holt sie zurück. Genau deshalb hat
+   * `bemerkung` hier KEIN `abBreite`, obwohl die API-Spec eins vorschlägt.
+   */
+  const spalten = spaltenFuer<EinsatzFahrzeug>()([
     {
       title: 'Funkrufname',
       key: 'funkrufname',
+      immerSichtbar: true,
+      sortWert: (ef) => ef.funkrufname,
+      suchText: (ef) => ef.funkrufname,
       render: (_, ef) => (
         <Space>
           {ef.funkrufname}
@@ -265,12 +302,29 @@ export default function FahrzeugePage() {
         </Space>
       ),
     },
-    { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'typ', render: (t) => t ?? '—' },
-    { title: 'Kennzeichen', dataIndex: 'kennzeichen', key: 'kennzeichen', render: (t) => t ?? '—' },
-    { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
+    {
+      title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'typ',
+      sortWert: (ef) => ef.fahrzeugtyp, suchText: (ef) => ef.fahrzeugtyp,
+      render: (t) => t ?? '—',
+    },
+    {
+      title: 'Kennzeichen', dataIndex: 'kennzeichen', key: 'kennzeichen', abBreite: 'lg',
+      suchText: (ef) => ef.kennzeichen, render: (t) => t ?? '—',
+    },
+    {
+      title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger',
+      filter: traegerFilter, render: (t) => t ?? '—',
+    },
     {
       title: 'Status',
       key: 'status',
+      // Gefiltert wird über die KATEGORIE, nicht über `status_id`: die ID kommt aus dem
+      // Mandantenkatalog und filterte je Mandant anders — und stimmte nicht mit den
+      // Gruppen überein, die dieselbe Achse benutzen.
+      filter: {
+        werte: KATEGORIE_WERTE,
+        trifft: (ef, w) => kategorieVon(ef.status_kategorie) === w,
+      },
       render: (_, ef) =>
         darfSchreiben ? (
           <Select
@@ -309,19 +363,22 @@ export default function FahrzeugePage() {
         ),
     },
     ...(darfSchreiben
-      ? ([
+      ? [
           {
             title: 'Aktionen',
-            key: 'aktionen',
-            render: (_, ef: EinsatzFahrzeug) => (
+            key: 'aktionen' as const,
+            immerSichtbar: true,
+            render: (_: unknown, ef: EinsatzFahrzeug) => (
               <Popconfirm title="Aus Einsatz entfernen?" onConfirm={() => entfernenMutation.mutate(ef.id)}>
-                <Button danger>Entfernen</Button>
+                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung (LFH-352/LFH-315). Der
+                    zweite Handgriff aus Kriterium 4 ist die Rückfrage, nicht die Farbe. */}
+                <Button>Entfernen</Button>
               </Popconfirm>
             ),
           },
-        ] as TableColumnsType<EinsatzFahrzeug>)
+        ]
       : []),
-  ];
+  ]);
 
   return (
     <EinsatzSeite
@@ -365,26 +422,67 @@ export default function FahrzeugePage() {
         )
       }
     >
-      <Table
-        rowKey="id"
-        loading={efQuery.isLoading}
-        dataSource={efs}
-        columns={spalten}
-        pagination={false}
-        rowClassName={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : '')}
-        locale={{ emptyText: 'Noch keine Fahrzeuge disponiert' }}
-        expandable={{
-          // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar;
-          // die kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte.
-          expandedRowRender: (ef) => (
-            <BesatzungsBlock
-              ef={ef}
-              personal={personal}
-              darfSchreiben={darfSchreiben}
-              onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-              onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
-            />
-          ),
+      {/* `karte.titel` trägt bewusst KEIN `ziel`: `fahrzeugePfad` ist eine
+          Query-Param-Selektion auf DIESE Seite (Deeplink-Muster), der Link zeigte also auf
+          sich selbst — und er brach die gepinnte LFH-139-Aussage „in dieser Zeile steht kein
+          Link". Tastaturziel der Karte ist damit die Primäraktion. Benannte Folge: eine
+          Karte im Nur-Lese-Modus hat unter `md` kein fokussierbares Element; Kriterium 1
+          wird im Kartenzweig am Aktionsknopf und am Spaltenschalter gemessen.
+
+          `zufluss` bleibt der Default `sammelbanner` — das ist die Kriterium-12-Antwort für
+          genau diese Fläche: der Status wird IN der Zeile gewechselt, eigen wie fremd über
+          eine Invalidierung. */}
+      <Datensicht
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={spalten}
+        daten={efs}
+        zeilenSchluessel="id"
+        ladend={efQuery.isLoading}
+        leerText="Noch keine Fahrzeuge disponiert"
+        suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
+        standardSortierung={{ spalte: 'funkrufname', richtung: 'auf' }}
+        spaltenAusVoreinstellung={['bemerkung']}
+        gruppen={{
+          schluessel: (ef) => kategorieVon(ef.status_kategorie),
+          etikett: kategorieEtikett,
+          reihenfolge: KATEGORIE_REIHENFOLGE,
+        }}
+        zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
+        // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar; die
+        // kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte. Läuft nur im
+        // Tabellenzweig — unter `md` fehlt der Block, und das ist an dieser Stelle sichtbar.
+        aufklappzeile={(ef) => (
+          <BesatzungsBlock
+            ef={ef}
+            personal={personal}
+            darfSchreiben={darfSchreiben}
+            onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
+            onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+          />
+        )}
+        karte={{
+          art: 'plan',
+          titel: { spalte: 'funkrufname' },
+          // NICHT das `render` der Statusspalte: dort steht im Schreibmodus ein
+          // Auswahlfeld mit `minWidth: 150`, das eine 390-px-Karte breit drückt. Der Slot
+          // nimmt die Vertragsachse mit dem Mandantenlabel — der TEXT ist damit in beiden
+          // Zweigen identisch, die Farbe weicht ab, wenn der Mandant `status_farbe` pflegt
+          // (ungeprüfter Freitext außerhalb des A2-Vertrags).
+          status: (ef) =>
+            ef.status_kategorie
+              ? {
+                  ...statusKategorie[ef.status_kategorie],
+                  label: ef.status_label ?? statusKategorie[ef.status_kategorie].label,
+                }
+              : null,
+          sekundaer: ['typ', 'traeger', 'besatzung'],
+          aktion: darfSchreiben
+            ? {
+                etikett: 'Entfernen',
+                bestaetigung: 'Aus Einsatz entfernen?',
+                onKlick: (ef) => entfernenMutation.mutate(ef.id),
+              }
+            : undefined,
         }}
       />
 

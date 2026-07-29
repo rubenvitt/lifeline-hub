@@ -77,7 +77,17 @@ export default function BenutzerPage() {
   }
 
   const spalten: TableColumnsType<BenutzerAnzeige> = [
-    { title: 'Name', dataIndex: 'anzeigename', key: 'anzeigename' },
+    {
+      title: 'Name',
+      dataIndex: 'anzeigename',
+      key: 'anzeigename',
+      // Leitspalte: am Anzeigenamen sucht ein Mensch das Konto. Ein Angebot, keine neue
+      // Voreinstellung — `routes/benutzer.rs` liefert ORDER BY id, also die Anlage-Reihenfolge;
+      // die ist keine fachliche Ordnung, aber sie umzustellen ist nicht Teil dieses Umbaus.
+      sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
+    },
+    // Die Suche liest den ROHWERT der Spalte, nicht das Gerenderte: das führende „@" ist reine
+    // Darstellung, gesucht wird „eva", nicht „@eva".
     { title: 'Benutzername', dataIndex: 'benutzername', key: 'benutzername', render: (t) => `@${t}` },
     {
       title: 'Rollen',
@@ -93,6 +103,14 @@ export default function BenutzerPage() {
     {
       title: 'Status',
       key: 'status',
+      // Bewusst OHNE `dataIndex`: `onFilter` bekommt den ganzen Datensatz, und ohne Datenbezug
+      // fällt das Feld nicht in den Suchkorpus des Primitivs — sonst träfe die Freitextsuche
+      // nach „true"/„false" jede aktive bzw. deaktivierte Zeile.
+      filters: [
+        { text: 'aktiv', value: true },
+        { text: 'deaktiviert', value: false },
+      ],
+      onFilter: (wert, b) => b.aktiv === wert,
       render: (_, b) => (b.aktiv ? <Tag color="green">aktiv</Tag> : <Tag>deaktiviert</Tag>),
     },
     {
@@ -144,7 +162,7 @@ export default function BenutzerPage() {
         dataSource={benutzerListe}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Benutzer' }}
-        pagination={false}
+        suche={{ platzhalter: 'Name oder Benutzername' }}
       />
 
       <Modal
