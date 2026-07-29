@@ -13,6 +13,9 @@ export interface EtbEntwurfsTabsProps {
   erfassen: (e: NeuerEintrag) => Promise<void>;
   bausteine: EtbBaustein[];
   einsatz: EinsatzAnzeige;
+  /** Zustand des Schalters „Werte behalten". Liegt beim Aufrufer — s. Kommentar unten. */
+  werteBehalten: boolean;
+  onWerteBehaltenChange: (b: boolean) => void;
 }
 
 /**
@@ -31,7 +34,9 @@ function mitUebernahme(w: EntwurfWerte, u: MetadatenWerte): EntwurfWerte {
   };
 }
 
-export default function EtbEntwurfsTabs({ einsatzId, erfassen, bausteine, einsatz }: EtbEntwurfsTabsProps) {
+export default function EtbEntwurfsTabs({
+  einsatzId, erfassen, bausteine, einsatz, werteBehalten, onWerteBehaltenChange,
+}: EtbEntwurfsTabsProps) {
   const { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen } =
     useEtbEntwuerfe(einsatzId);
 
@@ -39,13 +44,20 @@ export default function EtbEntwurfsTabs({ einsatzId, erfassen, bausteine, einsat
    * Wertübernahme über die Remount-Grenze (LFH-332/H61).
    *
    * Nach erfolgreichem Erfassen schliesst dieser Container den Entwurfs-Tab; das `key`-Prop
-   * an `Schnellerfassung` erzwingt dabei einen Remount. Deshalb liegen sowohl die
-   * übernommenen Werte als auch der Zustand des Schalters HIER und nicht in der
-   * Schnellerfassung — ein `useState` unterhalb der Remount-Grenze überlebt das nicht.
-   * Bewusst kein Modul-Global (macht Tests reihenfolgeabhängig) und kein `localStorage`
-   * (die Übernahme gilt für die laufende Erfassung, nicht für die nächste Sitzung).
+   * an `Schnellerfassung` erzwingt dabei einen Remount. Deshalb liegen die übernommenen
+   * Werte HIER und nicht in der Schnellerfassung — ein `useState` unterhalb der
+   * Remount-Grenze überlebt das nicht. Bewusst kein Modul-Global (macht Tests
+   * reihenfolgeabhängig) und kein `localStorage` (die Übernahme gilt für die laufende
+   * Erfassung, nicht für die nächste Sitzung).
+   *
+   * **Der SCHALTER liegt noch eine Ebene höher, in `EtbPage`** — und zwar aus demselben
+   * Grund, eine Grenze weiter: `EtbPage` rendert bei einer Berichtigung eine eigene
+   * `Schnellerfassung` STATT dieser Tabs, dieser Container verschwindet dabei also ganz.
+   * Läge der Schalter hier, stünde eine bewusst abgewählte Wertübernahme nach jeder
+   * Berichtigung wieder auf AN — ohne Nutzeraktion und ohne Hinweis. Die übernommenen
+   * WERTE dürfen dabei fallen (eine Berichtigung unterbricht die Erfassungsreihe
+   * ohnehin); die Entscheidung darf es nicht.
    */
-  const [werteBehalten, setWerteBehalten] = useState(true);
   const [uebernahme, setUebernahme] = useState<MetadatenWerte>({});
 
   const onEdit = useCallback(
@@ -80,7 +92,7 @@ export default function EtbEntwurfsTabs({ einsatzId, erfassen, bausteine, einsat
           initialWerte={mitUebernahme(zuWerte(e), uebernahme)}
           onWerteChange={(w) => entwurfAktualisieren(e.id, w)}
           werteBehalten={werteBehalten}
-          onWerteBehaltenChange={setWerteBehalten}
+          onWerteBehaltenChange={onWerteBehaltenChange}
         />
       ) : null,
   }));

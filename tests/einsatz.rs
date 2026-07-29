@@ -1874,7 +1874,21 @@ async fn anlegen_ohne_die_neuen_felder_behaelt_die_db_defaults() {
 
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(a["einsatzart"], "realeinsatz");
-    assert!(!a["begonnen_at"].is_null());
+    // `is_null()` allein wäre wertblind: die Spalte ist NOT NULL, also kann dort
+    // niemals `null` stehen — die Zeile wäre auch dann grün, wenn COALESCE einen
+    // Unsinnswert einsetzte. Geprüft wird deshalb der WERT: der DB-Default ist
+    // `datetime('now')` in UTC, die Alarmzeit muss also im selben Format vorliegen
+    // und höchstens ein paar Minuten alt sein.
+    let begonnen = a["begonnen_at"]
+        .as_str()
+        .expect("begonnen_at ist ein String");
+    let gesetzt = chrono::NaiveDateTime::parse_from_str(begonnen, "%Y-%m-%d %H:%M:%S")
+        .expect("begonnen_at im SQLite-Format");
+    let jetzt = chrono::Utc::now().naive_utc();
+    assert!(
+        (jetzt - gesetzt).num_minutes().abs() <= 5,
+        "begonnen_at {begonnen} liegt nicht bei jetzt ({jetzt})"
+    );
 }
 
 #[tokio::test]

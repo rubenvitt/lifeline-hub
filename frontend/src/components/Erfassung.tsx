@@ -22,12 +22,16 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
  *    mehrzeiliges Feld an der Übermittlung nicht teilnimmt.
  * 2. **Der Fokus steht beim Öffnen im ersten Feld** und kehrt nach jedem
  *    Serien-Speichern dorthin zurück.
- * 3. **Zurückgesetzt wird auf beiden Wegen** — nach dem Erfassen UND beim
- *    Abbrechen. Der Bestand macht das asymmetrisch: `SchadenErfassenModal`
- *    schliesst sich selbst, `PersonErfassungModal` wird vom Eltern geschlossen,
- *    die beiden Ad-hoc-Dialoge setzen nur im Erfolgsfall zurück, das
- *    Verbleib-Modal im UHS-Grundriss auf beiden. Diese Hülle vereinheitlicht
- *    das nach der strengsten der vier Varianten.
+ * 3. **Zurückgesetzt wird auf JEDEM Weg hinaus** — nach dem Erfassen, über den
+ *    Abbrechen-Knopf, über das Schliesskreuz, über Escape und über den Klick auf
+ *    die Maske. Die letzten drei laufen nicht durch das Formular; warum sie
+ *    trotzdem zurücksetzen müssen und warum `destroyOnHidden` das eben NICHT
+ *    erledigt, steht am `ErfassungsModal` weiter unten. Der Bestand machte das
+ *    asymmetrisch: `SchadenErfassenModal` schliesst sich selbst,
+ *    `PersonErfassungModal` wird vom Eltern geschlossen, die beiden
+ *    Ad-hoc-Dialoge setzen nur im Erfolgsfall zurück, das Verbleib-Modal im
+ *    UHS-Grundriss auf beiden. Diese Hülle vereinheitlicht das nach der
+ *    strengsten der vier Varianten.
  *
  * ── ZWEI ABWEICHUNGEN VON DER TICKET-FORMULIERUNG ──────────────────
  *
@@ -180,7 +184,18 @@ export function ErfassungsFormular<T extends object>({
 
   return (
     <div ref={wurzel}>
-      <Form form={form} layout="vertical" initialValues={initialValues} onFinish={abschicken}>
+      {/* `onFinishFailed` ist die zweite Hälfte von `serienlaufRef`. Scheitert die
+          Prüfung, läuft `onFinish` NIE — die Marke bliebe auf „Serie" stehen und
+          das nächste, reguläre Absenden nähme still den Serien-Zweig: gespeichert,
+          Felder leer, Dialog offen. Wer dann ein zweites Mal drückt, legt den
+          Datensatz doppelt an. Gemessen an einer Serien-Maske mit Pflichtfeld. */}
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={initialValues}
+        onFinish={abschicken}
+        onFinishFailed={() => { serienlaufRef.current = false; }}
+      >
         {children}
         <div
           style={{
@@ -189,8 +204,14 @@ export function ErfassungsFormular<T extends object>({
             borderTop: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          {serie && zaehler > 0 && (
-            <Typography.Text type="secondary" aria-live="polite">Erfasst: {zaehler}</Typography.Text>
+          {/* Die Ansage-Region steht IMMER im Baum, auch bei 0. Wird sie erst
+              zusammen mit ihrem ersten Text eingehängt, sagt der Screenreader
+              genau die erste Speicherung nicht an — eine `aria-live`-Region meldet
+              nur Änderungen an bereits vorhandenem Inhalt. */}
+          {serie && (
+            <Typography.Text type="secondary" aria-live="polite">
+              {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
+            </Typography.Text>
           )}
           {serie && uebernahme != null && uebernahme.length > 0 && (
             <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
@@ -229,12 +250,33 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
  * Dieselbe Hülle als Dialog. `footer={null}`, weil die Knöpfe **im** Formular
  * liegen (Dateikopf, Abweichung 1); `destroyOnHidden`, damit ein geschlossener
  * Dialog keine Felder im Baum stehen lässt.
+ *
+ * **`onCancel` wird NICHT durchgereicht, sondern umschlossen — und das ist kein
+ * Feinschliff.** Ein Dialog hat vier Auswege: den Abbrechen-Knopf, das
+ * Schließkreuz, Escape und den Klick auf die Maske. Nur der erste läuft durch das
+ * Formular. Reichte man `onAbbrechen` roh an das Modal durch, setzten die anderen
+ * drei nicht zurück — und `destroyOnHidden` fängt das **nicht** auf: es hängt die
+ * Kinder ab, aber der Formularspeicher von rc-field-form überlebt
+ * (`destroyForm(undefined)` lässt den Store stehen, `preserve` ist per Vorgabe an,
+ * und beim nächsten Öffnen gewinnt der alte Store gegen `initialValues`). Gemessen
+ * an `PersonalFormModal`: Person bearbeiten, mit Escape schließen, „Person
+ * anlegen" öffnen — das Formular trug Name, Personalnummer und Telefon der
+ * bearbeiteten Person, und Speichern legte sie als Dublette an.
+ *
+ * Deshalb liegt der Reset zweimal, aber nie doppelt: der Knopf geht durch
+ * `ErfassungsFormular.abbrechen`, die drei anderen Wege durch `schliessen` hier.
  */
 export function ErfassungsModal<T extends object>({
   offen, titel, onAbbrechen, ...rest
 }: ErfassungsModalProps<T>) {
+  const { form } = rest;
+  const schliessen = useCallback(() => {
+    form.resetFields();
+    onAbbrechen();
+  }, [form, onAbbrechen]);
+
   return (
-    <Modal open={offen} title={titel} onCancel={onAbbrechen} footer={null} destroyOnHidden>
+    <Modal open={offen} title={titel} onCancel={schliessen} footer={null} destroyOnHidden>
       <ErfassungsFormular<T> onAbbrechen={onAbbrechen} {...rest} />
     </Modal>
   );

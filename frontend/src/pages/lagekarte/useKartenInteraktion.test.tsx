@@ -486,6 +486,36 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     expect(result.current.zoneSerieAnzahl).toBe(0);
   });
 
+  it('was während des Speicherns gestartet wurde, überlebt die Auflösung', async () => {
+    // Der Review-Fund: der Reducer-Fall 'zone' ist bedingungslos, anders als
+    // 'beenden' mit seiner `arten`-Prüfung. Die Kette wartet auf POST UND
+    // invalidateQueries; die Sidebar bleibt dabei bedienbar. Ohne den Schutz
+    // überschriebe die späte Auflösung den inzwischen gestarteten Modus mit dem
+    // ALTEN Entwurf und zählte „1 gespeichert" dazu — die Person zeichnete im
+    // falschen Zonentyp weiter.
+    lagezonenApi.legeZoneAn.mockClear();
+    let loese: (w: unknown) => void = () => {};
+    lagezonenApi.legeZoneAn.mockImplementationOnce(
+      () => new Promise((r) => { loese = r; }),
+    );
+    const { result } = rendere();
+    bisZurBestaetigung(result);
+
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+
+    // Mittendrin etwas anderes anfangen — hier ein taktisches Zeichen, weil das
+    // den Zonen-Modus ganz verlässt und der Fehler damit am deutlichsten ist.
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'einheit' }));
+    expect(result.current.zeichenPlatzieren).not.toBeNull();
+
+    await act(async () => { loese({ id: 9 }); });
+
+    expect(result.current.zeichenPlatzieren).not.toBeNull();
+    expect(result.current.zoneEntwurf ?? null).toBeNull();
+    expect(result.current.zoneSerieAnzahl).toBe(0);
+  });
+
   it('ein neuer Zonen-Start setzt den Serien-Zähler zurück', async () => {
     lagezonenApi.legeZoneAn.mockClear();
     const { result } = rendere();

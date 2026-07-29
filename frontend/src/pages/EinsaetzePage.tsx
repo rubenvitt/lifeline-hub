@@ -128,9 +128,14 @@ export default function EinsaetzePage() {
         bezeichnung: werte.bezeichnung,
         stichwort: werte.stichwort,
         einsatzart: werte.einsatzart,
-        // Dasselbe Format wie im Kopfdaten-PATCH (`EinsatzdatenPage`), damit beide
-        // Wege denselben Wert schreiben.
-        begonnen_at: werte.begonnen_at?.format('YYYY-MM-DD HH:mm:ss'),
+        // `.utc()` VOR dem Formatieren — `begonnen_at` ist ein UTC-Wirestring, und
+        // gelesen wird er auch so (`anzeige/format.ts:46` parst mit `dayjs.utc`).
+        // Ohne die Umrechnung landete die lokale Wanduhrzeit als UTC in der Spalte,
+        // und jeder neue Einsatz trüge eine um den Zonenversatz verschobene
+        // Alarmzeit — in Berlin zwei Stunden NACH seinem eigenen Anlagezeitpunkt.
+        // Dieselbe Form wie bei allen anderen Zeit-Sendern des Frontends
+        // (`MeldungFormular`, `AuftragFormular`, `WiedervorlageModal`, ETB).
+        begonnen_at: werte.begonnen_at?.utc().format('YYYY-MM-DD HH:mm:ss'),
       }),
     onSuccess: (neuerEinsatz) => {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });

@@ -2,7 +2,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { StrictMode } from 'react';
+import { StrictMode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
@@ -28,8 +28,20 @@ function props(over: Partial<React.ComponentProps<typeof EtbEntwurfsTabs>> = {})
     erfassen: vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined),
     bausteine: [] as EtbBaustein[],
     einsatz,
+    werteBehalten: true,
+    onWerteBehaltenChange: vi.fn(),
     ...over,
   };
+}
+
+/**
+ * Wrapper, der den Schalterzustand hält — seit er in `EtbPage` liegt und nicht mehr
+ * in den Tabs (LFH-332, Review). Wer ihn im Test umlegen will, braucht diesen
+ * Zustand; die Tabs selbst sind darin jetzt gesteuert.
+ */
+function MitSchalter(p: React.ComponentProps<typeof EtbEntwurfsTabs>) {
+  const [behalten, setBehalten] = useState(p.werteBehalten);
+  return <EtbEntwurfsTabs {...p} werteBehalten={behalten} onWerteBehaltenChange={setBehalten} />;
 }
 
 describe('EtbEntwurfsTabs', () => {
@@ -155,7 +167,7 @@ describe('EtbEntwurfsTabs', () => {
 
   it('lässt den nächsten Entwurf leer, wenn der Schalter aus ist', async () => {
     const p = props();
-    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    renderMitProviders(<MitSchalter {...p} />);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
     await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();

@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useState } from 'react';
+import { useCallback, useReducer, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { aktualisiereEinsatz, type KopfdatenUpdate } from '../../api/einsaetze';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
@@ -158,6 +158,18 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   const [zeichenSerieAnzahl, setZeichenSerieAnzahl] = useState(0);
   const [zoneSerie, setZoneSerie] = useState(true);
   const [zoneSerieAnzahl, setZoneSerieAnzahl] = useState(0);
+
+  // Spiegel von `modus` und `zoneSerie` fuer die asynchrone Aufloesung des
+  // Zonen-Speicherns. Die Zuweisung steht bewusst im Renderrumpf und nicht in
+  // einem Effekt: ein Effekt liefe erst NACH dem Commit, und genau dazwischen
+  // kann die Promise aufloesen — der Spiegel zeigte dann den vorletzten Stand.
+  // Refs statt der Closure-Werte, weil die Kette mit den Werten vom Klickzeitpunkt
+  // rechnete: ein waehrend des Speicherns umgelegter Schalter verpuffte, obwohl
+  // die Steuerung ihn als „letzte Gelegenheit zu widerrufen" beschreibt.
+  const modusRef = useRef(modus);
+  modusRef.current = modus;
+  const zoneSerieRef = useRef(zoneSerie);
+  zoneSerieRef.current = zoneSerie;
   // Panel-Selektion als eine Union (s. KartenSelektion). Die drei bisherigen Setter bleiben
   // als API erhalten, sind aber Wrapper über EIN Feld: ein Setzen verdrängt jede andere
   // Selektion, null räumt (das gerade offene Panel ist per Konstruktion das einzige).
@@ -355,7 +367,22 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
         // Nur bei ERFOLG: schlägt der POST fehl, endet der Modus wie bisher — ein Neustart
         // würde die nicht gespeicherte Geometrie stillschweigend verwerfen und so aussehen,
         // als sei nichts passiert.
-        if (erfolg && zoneSerie) {
+        // ERST die Frage, ob dieser Zug ueberhaupt noch der laufende ist. Die Kette
+        // wartet nicht nur auf den POST, sondern auch auf `invalidateQueries` — in
+        // dieser Zeit bleibt die ganze Sidebar bedienbar. Wer waehrenddessen eine
+        // andere Zone, ein taktisches Zeichen oder ein Bild startet, bekaeme sonst
+        // seinen Modus still ueberschrieben und zeichnete im falschen Zonentyp
+        // weiter, waehrend die Steuerung „1 gespeichert" behauptet. Der Reducer-Fall
+        // 'zone' ist bedingungslos und kann das nicht abfangen — anders als
+        // 'beenden', das ueber `arten` gatet; genau deshalb war die alte
+        // Auto-Beenden-Zeile rennsicher und die neue Serien-Zeile ist es nicht.
+        //
+        // `speichern` ist die Marke dieses Zuges: 'zoneSpeichernStart' setzt sie,
+        // und JEDER andere Modusstart loescht sie (der Fall 'zone' setzt sie auf
+        // false zurueck, jeder andere Fall verlaesst die Zonen-Form ganz).
+        const nochUnserZug = modusRef.current.art === 'zone' && modusRef.current.speichern;
+        if (!nochUnserZug) return;
+        if (erfolg && zoneSerieRef.current) {
           dispatch({ t: 'zone', entwurf: { typ: zu.typ, modus: zu.modus, farbe: zu.farbe } });
           setZoneZeichnenNonce((n) => n + 1);
           setZoneSerieAnzahl((n) => n + 1);

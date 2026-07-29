@@ -36,6 +36,26 @@ function Harness(props: {
   );
 }
 
+/** Wie {@link Harness}, aber mit einem Pflichtfeld — für die Prüfungs-Fälle. */
+function PflichtHarness(props: {
+  onErfassen: (w: Werte) => Promise<unknown>;
+  onFertig: () => void;
+}) {
+  const [form] = Form.useForm<Werte>();
+  return (
+    <ErfassungsFormular<Werte>
+      form={form}
+      onErfassen={props.onErfassen}
+      onFertig={props.onFertig}
+      serie
+    >
+      <Form.Item label="Ort" name="ort" rules={[{ required: true, message: 'Ort ist Pflicht' }]}>
+        <Input />
+      </Form.Item>
+    </ErfassungsFormular>
+  );
+}
+
 describe('ErfassungsFormular — Fokus', () => {
   it('setzt den Fokus beim Öffnen auf das erste Feld', async () => {
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} />);
@@ -102,6 +122,31 @@ describe('ErfassungsFormular — Serienmodus', () => {
     await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+  });
+
+  it('eine gescheiterte Prüfung färbt das nächste reguläre Absenden nicht zum Serienlauf', async () => {
+    // Der zweite Review-Fund: die Serien-Marke wird im Klick gesetzt und nur in
+    // `onFinish` verbraucht. Scheitert die Prüfung, läuft `onFinish` nie — ohne
+    // `onFinishFailed` bliebe die Marke stehen, und der nächste „Erfassen"-Klick
+    // meldete kein `onFertig`. Die Person drückt dann ein zweites Mal und legt den
+    // Datensatz doppelt an; genau diese Folge prüft der letzte Aufruf mit.
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    renderMitProviders(
+      <PflichtHarness onErfassen={onErfassen} onFertig={onFertig} />,
+    );
+    const nutzer = userEvent.setup();
+
+    // Leeres Pflichtfeld: die Prüfung scheitert, gespeichert wird nichts.
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(screen.getByText('Ort ist Pflicht')).toBeInTheDocument());
+    expect(onErfassen).not.toHaveBeenCalled();
+
+    await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
   });
 
@@ -203,6 +248,27 @@ describe('ErfassungsModal', () => {
     await nutzer.type(screen.getByLabelText('Ort'), 'Brücke{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('leert die Felder auch über Escape und das Schliesskreuz, nicht nur über den Knopf', async () => {
+    // Der Fehler, den der Review gefunden hat: `onCancel` roh durchgereicht deckte
+    // nur den Abbrechen-KNOPF ab. `destroyOnHidden` rettet das nicht — es hängt die
+    // Kinder ab, aber der Speicher von rc-field-form überlebt und gewinnt beim
+    // nächsten Öffnen gegen `initialValues`. Beide Wege einzeln, weil sie im Modal
+    // an verschiedenen Stellen hängen.
+    for (const weg of ['escape', 'kreuz'] as const) {
+      const { unmount } = renderMitProviders(
+        <ModalHarness offen onErfassen={vi.fn().mockResolvedValue(undefined)} />,
+      );
+      const nutzer = userEvent.setup();
+      await nutzer.type(screen.getByLabelText('Ort'), 'Brücke');
+
+      if (weg === 'escape') await nutzer.keyboard('{Escape}');
+      else await nutzer.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+
+      await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+      unmount();
+    }
   });
 
   it('trägt keine eigene antd-Fusszeile — der Absende-Knopf liegt im Formular', () => {

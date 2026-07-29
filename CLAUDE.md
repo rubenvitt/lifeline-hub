@@ -117,10 +117,16 @@ Die Hülle trägt drei Zusicherungen, die der Bestand einzeln verletzt hat:
 - **Fokus im ersten Feld** beim Öffnen und nach jedem Serien-Speichern. Der Rücksprung
   braucht `requestAnimationFrame` — direkt gerufen verpufft er und der Fokus landet
   gemessen auf `<body>`.
-- **Zurückgesetzt wird auf beiden Wegen**, nach dem Erfassen *und* beim Abbrechen. Der
-  Aufrufer ruft `resetFields()` nicht mehr selbst; ein zurückgebliebener Reset ist
-  doppelt und verdeckt Fehler. Ausgenommen ist das Vorbelegen zum **Bearbeiten**
-  (`setFieldsValue` beim Öffnen) — das ist kein Reset.
+- **Zurückgesetzt wird auf JEDEM Weg hinaus** — nach dem Erfassen, über den Abbrechen-Knopf,
+  über das Schließkreuz, über Escape und über den Klick auf die Maske. Der Aufrufer ruft
+  `resetFields()` nicht mehr selbst; ein zurückgebliebener Reset ist doppelt und verdeckt
+  Fehler. Ausgenommen ist das Vorbelegen zum **Bearbeiten** (`setFieldsValue` beim Öffnen) —
+  das ist kein Reset. **`destroyOnHidden` erledigt das nicht** (gemessen, LFH-332-Review): es
+  hängt die Kinder ab, aber der Speicher von rc-field-form überlebt (`destroyForm(undefined)`
+  lässt den Store stehen, `preserve` ist per Vorgabe an) und gewinnt beim nächsten Öffnen
+  gegen `initialValues`. Wer einen Dialog baut, dessen Schließwege nicht durch das Formular
+  laufen, muss dort selbst zurücksetzen — sonst trägt der Anlegen-Dialog die Werte des
+  zuletzt bearbeiteten Datensatzes und legt ihn als Dublette an.
 
 **`onErfassen` muss bei Ablehnung ablehnen** — also `mutateAsync`, nicht `mutate`. Der
 Bestand rief `resetFields()` synchron neben `mutate()`: ein 422 kostete den Wortlaut
@@ -132,7 +138,11 @@ bleibt ausdrückliche Nutzeraktion. **Wiederholfelder** (`uebernahme`) überlebe
 Serien-Speichern, sichtbar umschaltbar über „Werte behalten". Nur der Primär-Knopf ist
 ein Übermittlungsknopf — „Speichern und nächste" ruft `form.submit()` von Hand, weil
 Enter sonst vom **ersten** Übermittlungsknopf im Baum abhinge und damit von der
-Anordnung im DOM.
+Anordnung im DOM. Die Marke, die den Serienlauf unterscheidet, wird in `onFinish`
+verbraucht **und in `onFinishFailed` gelöscht**: scheitert die Prüfung, läuft `onFinish`
+nie, und eine stehengebliebene Marke färbte das nächste reguläre Absenden still zum
+Serienlauf — der Dialog bliebe offen, die Person drückte ein zweites Mal, der Datensatz
+läge doppelt vor.
 
 **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`**, nicht die Hülle und
 kein Modal: Eingabefeld plus Knopf in einer Zeile, Enter legt an, das Modal bleibt fürs

@@ -8,7 +8,6 @@ use crate::error::AppError;
 use chrono::Utc;
 use sqlx::SqlitePool;
 
-/// Legt einen Einsatz an und macht den Ersteller in derselben Transaktion zur Einsatzleitung.
 /// Die Felder, die beim Anlegen gesetzt werden dürfen (LFH-332 · B4).
 ///
 /// **Warum ein Struct und nicht fünf Parameter:** `einsatzart` und `begonnen_at`
@@ -26,6 +25,7 @@ pub struct NeuerEinsatzDaten<'a> {
     pub begonnen_at: Option<&'a str>,
 }
 
+/// Legt einen Einsatz an und macht den Ersteller in derselben Transaktion zur Einsatzleitung.
 pub async fn anlegen(
     pool: &SqlitePool,
     daten: NeuerEinsatzDaten<'_>,
