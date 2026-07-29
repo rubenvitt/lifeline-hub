@@ -1,7 +1,7 @@
 import { Alert, App, Breadcrumb, Button, Card, Form, Input, Popconfirm, Space, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
 import { Select } from '../components/Select';
 import {
-  nichtGefundenInhalt, SeitenFehler, SeitenLeer, SeitenSkeleton,
+  nichtGefundenInhalt, SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -253,6 +253,21 @@ export default function EinheitenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
+  /**
+   * LISTENZUSTAND der Gliederungs-Karte — zwei Lagen, zwei Antworten (D3). Der Fehler
+   * allein reicht als Bedingung NICHT.
+   *
+   * Ohne Einheiten im Zwischenspeicher tritt der Fehler an die Stelle des Baums. MIT
+   * Einheiten bleibt der Baum stehen und bekommt ein Banner: er ist echt, nur womöglich
+   * alt. Ein Fehler, der ihn wegräumt, nähme der Einsatzkraft die Gliederung, die sie eben
+   * noch vor sich hatte — und mit ihr die Auswahl, über die alles Weitere dieser Seite
+   * läuft. Genau das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`).
+   */
+  const listeGescheitert = einheitenQuery.isError && einheiten.length === 0;
+  const standVeraltet = einheitenQuery.isError && einheiten.length > 0;
+
   return (
     <div>
       <Breadcrumb style={{ marginBottom: 12 }}
@@ -275,10 +290,14 @@ export default function EinheitenPage() {
               genauso wahr wie bei einer tatsächlich leeren Gliederung. Zweimal von dreien
               behauptete die Karte damit etwas, das niemand geprüft hatte. Gefragt wird
               deshalb die QUERY; die Länge entscheidet erst, wenn sie überhaupt etwas
-              bedeutet. Reihenfolge ist Teil der Aussage: laden vor Fehler vor leer. */}
+              bedeutet. Reihenfolge ist Teil der Aussage: laden vor Fehler vor leer.
+
+              Der Fehlerzweig trägt zusätzlich die MENGENBEDINGUNG (`listeGescheitert`):
+              er verdrängt den Baum nur, wenn es keinen gibt. Steht einer im
+              Zwischenspeicher, bleibt er und bekommt das Veraltet-Banner (unten). */}
           {einheitenQuery.isLoading ? (
             <SeitenSkeleton zeilen={3} />
-          ) : einheitenQuery.isError ? (
+          ) : listeGescheitert ? (
             <SeitenFehler
               text="Gliederung konnte nicht geladen werden"
               ursache={einheitenQuery.error}
@@ -299,12 +318,17 @@ export default function EinheitenPage() {
               }
             />
           ) : (
-            <Tree
-              treeData={baumDaten}
-              selectedKeys={gewaehlt != null ? [gewaehlt] : []}
-              defaultExpandAll
-              onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)}
-            />
+            <>
+              {standVeraltet && (
+                <SeitenStandVeraltet onWiederholen={() => void einheitenQuery.refetch()} />
+              )}
+              <Tree
+                treeData={baumDaten}
+                selectedKeys={gewaehlt != null ? [gewaehlt] : []}
+                defaultExpandAll
+                onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)}
+              />
+            </>
           )}
         </Card>
 

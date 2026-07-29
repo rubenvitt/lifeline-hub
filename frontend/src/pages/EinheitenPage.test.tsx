@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinheitenPage from './EinheitenPage';
+import { einsatzKeys } from '../api/queryKeys';
 
 const tmoSprechgruppe = {
   id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
@@ -201,6 +202,30 @@ describe('EinheitenPage · Datenzustände', () => {
     expect(karte, 'die Gliederungs-Karte muss den Leertext tragen').toBeTruthy();
     expect(within(karte!).getByRole('button', { name: 'Einheit bilden' })).toBeInTheDocument();
     expect(within(karte!).getAllByRole('button')).toHaveLength(1);
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`.
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Vor dem Umbau verschwand der Baum an dieser Stelle — die Einsatzkraft
+   * verlor die Gliederung, die sie eben noch vor sich hatte, und mit ihr die Auswahl, über
+   * die alles Weitere dieser Seite läuft.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Einheiten im Cache scheitert', async () => {
+    const { client } = zeige();
+    await screen.findByText('1. Zug');
+
+    server.use(http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })));
+    await client.refetchQueries({ queryKey: einsatzKeys.einheiten(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn NICHT.
+    expect(screen.getByText('1. Zug')).toBeInTheDocument();
+    expect(screen.queryByText('Gliederung konnte nicht geladen werden')).not.toBeInTheDocument();
   });
 
   /**

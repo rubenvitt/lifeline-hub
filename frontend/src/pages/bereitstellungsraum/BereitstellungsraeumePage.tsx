@@ -15,7 +15,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
-import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
+import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../../components/SeitenZustand';
 import { brStatus } from '../../theme/statusFarben';
 import { flaeche } from '../../theme/tokens';
 import KatalogTabelle from '../../components/KatalogTabelle';
@@ -91,6 +91,30 @@ export default function BereitstellungsraeumePage() {
     );
   }
 
+  const alle = brQuery.data ?? [];
+  const sichtbar = alle.filter((br) => !br.storniert_at);
+
+  /**
+   * ZWEI LAGEN, ZWEI ANTWORTEN (D3) — der Fehler allein reicht als Bedingung NICHT.
+   *
+   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Tabelle, sonst
+   * behauptet „Noch keine Bereitstellungsräume erfasst" eine leere Lage, wo bloß der Abruf
+   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
+   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
+   * sie eben noch hatte.
+   *
+   * Gemessen an `alle`, NICHT an `sichtbar` — dieselbe Achse wie in `TierePage`/`SchaedenPage`.
+   * Die Begründung trägt hier allerdings anders und das soll nicht unbenannt bleiben:
+   * `storniert_at` ist kein vom Bediener gesetzter Filter, der Fall „Filter eng, Cache voll"
+   * tritt hier also nicht laufend auf. Gewählt ist die ungefilterte Achse trotzdem, weil eine
+   * zweite Messgrundlage für dieselbe Weiche genau der Befund wäre, den B3 behebt.
+   * BENANNTE FOLGE: sind ALLE Räume storniert und scheitert die Aktualisierung, steht das
+   * Banner über einer Tabelle, die „Noch keine … erfasst" zeigt. Das ist die ehrlichere der
+   * beiden Aussagen — der Bestand ist tatsächlich leer, nur eben womöglich veraltet leer.
+   */
+  const listeGescheitert = brQuery.isError && alle.length === 0;
+  const standVeraltet = brQuery.isError && alle.length > 0;
+
   return (
     <EinsatzSeite
       titel="Bereitstellungsräume"
@@ -113,22 +137,25 @@ export default function BereitstellungsraeumePage() {
           keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer der
           beiden Formen. Ohne diese Weiche behauptet „Noch keine Bereitstellungsräume
           erfasst" auch dann eine leere Lage, wenn bloß die Verbindung abgerissen ist. */}
-      {brQuery.isError ? (
+      {listeGescheitert ? (
         <SeitenFehler
           text="Bereitstellungsräume konnten nicht geladen werden"
           ursache={brQuery.error}
           onWiederholen={() => void brQuery.refetch()}
         />
       ) : (
-        <KatalogTabelle<Bereitstellungsraum>
-          rowKey="id"
-          loading={brQuery.isLoading}
-          dataSource={(brQuery.data ?? []).filter((br) => !br.storniert_at)}
-          columns={spalten}
-          size="middle"
-          pagination={false}
-          locale={{ emptyText: 'Noch keine Bereitstellungsräume erfasst' }}
-        />
+        <>
+          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void brQuery.refetch()} />}
+          <KatalogTabelle<Bereitstellungsraum>
+            rowKey="id"
+            loading={brQuery.isLoading}
+            dataSource={sichtbar}
+            columns={spalten}
+            size="middle"
+            pagination={false}
+            locale={{ emptyText: 'Noch keine Bereitstellungsräume erfasst' }}
+          />
+        </>
       )}
 
       <Drawer

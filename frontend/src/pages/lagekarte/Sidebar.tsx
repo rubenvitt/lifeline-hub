@@ -1,7 +1,7 @@
 import { Badge, Button, Card, Popconfirm, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
 import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
-import { SeitenFehler, SeitenLeer } from '../../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
 import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
@@ -167,6 +167,20 @@ function FehlerSlot({ fehler }: { fehler?: SektionFehler }) {
   return <SeitenFehler text={fehler.text} ursache={fehler.ursache} onWiederholen={fehler.onWiederholen} />;
 }
 
+/**
+ * Derselbe Fehler, aber ÜBER erhalten gebliebenen Zeilen statt an ihrer Stelle (D5).
+ *
+ * `SeitenStandVeraltet` verlangt einen Wiederhol-Weg — ohne ihn trüge sein „Erneut abrufen"
+ * ins Leere. `SektionFehler.onWiederholen` ist optional, also fällt der Slot dann auf die
+ * gewöhnliche Fehlermeldung zurück. Bewusst NICHT auf „gar kein Banner": dass der gezeigte
+ * Stand alt ist, bleibt die Aussage, die die Einsatzkraft braucht.
+ */
+function VeraltetSlot({ fehler }: { fehler?: SektionFehler }) {
+  if (!fehler) return null;
+  if (!fehler.onWiederholen) return <FehlerSlot fehler={fehler} />;
+  return <SeitenStandVeraltet onWiederholen={fehler.onWiederholen} />;
+}
+
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
   const sektionFehler = props.sektionFehler ?? {};
@@ -233,18 +247,31 @@ export default function Sidebar(props: SidebarProps) {
         }
         style={{ marginBottom: 12 }}
       >
-        {/* Der Fehlerzweig steht VOR der Leer-/Listen-Weiche (LFH-331 · B3): „Alles verortet"
-            ist eine Erfolgsaussage und darf nicht fallen, solange unklar ist, ob überhaupt
-            etwas geladen wurde.
+        {/* Die Weiche ist das Paar aus D3 und D5 (LFH-331 · B3) — dasselbe wie in
+            `PersonenPage`/`SchaedenPage`/`TierePage`, und der `anzahl === 0`-Wächter ist
+            der tragende Teil daran: **ein Fehler ersetzt Inhalt nur, wenn es keinen
+            Inhalt gibt.**
 
-            Die Zeile darunter trägt jetzt dasselbe Primitiv wie die übrigen Leerzustände —
-            aber OHNE Aktion und ohne Hinweis „lege etwas an". Sie ist kein Leerzustand,
-            sondern ein Erfolgszustand: hier fehlt nichts, hier ist alles erledigt. */}
-        {sektionFehler.nichtVerortet ? (
+            Ohne den Wächter nähme der Ausfall EINER der elf Lagebild-Quellen die komplette
+            Liste vom Schirm — und mit ihr die einzige Bedienung zum Verorten, für Objekte,
+            die der Fehler gar nicht betrifft. Stehen also noch Zeilen im Zwischenspeicher,
+            wird der Fehler zum Banner DARÜBER (`SeitenStandVeraltet`: die Zeilen sind echt,
+            nur womöglich alt), und die Liste bleibt bedienbar.
+
+            Nur wenn nichts mehr dasteht, tritt der Fehler an die Stelle des Inhalts —
+            denn „Alles verortet" ist eine Erfolgsaussage und darf nicht fallen, solange
+            unklar ist, ob überhaupt etwas geladen wurde.
+
+            Die Erfolgszeile trägt dasselbe Primitiv wie die übrigen Leerzustände — aber
+            OHNE Aktion und ohne Hinweis „lege etwas an". Sie ist kein Leerzustand, sondern
+            ein Erfolgszustand: hier fehlt nichts, hier ist alles erledigt. */}
+        {sektionFehler.nichtVerortet && nichtVerortet.length === 0 ? (
           <FehlerSlot fehler={sektionFehler.nichtVerortet} />
         ) : nichtVerortet.length === 0 ? (
           <SeitenLeer titel="Alles verortet" />
         ) : (
+          <>
+          <VeraltetSlot fehler={sektionFehler.nichtVerortet} />
           <Liste
             size="small"
             dataSource={nichtVerortet}
@@ -287,6 +314,7 @@ export default function Sidebar(props: SidebarProps) {
               );
             }}
           />
+          </>
         )}
       </Card>
 
@@ -465,10 +493,23 @@ export default function Sidebar(props: SidebarProps) {
 
       <Card size="small" title="Bild-Hintergründe" style={{ marginBottom: 12 }}>
         <Space orientation="vertical" style={{ width: '100%' }}>
-          {/* Nur die LESE-Liste wird ersetzt; der Upload darunter hängt an einer eigenen
-              Route und bleibt bedienbar. */}
+          {/* Der Slot ist ein BANNER über der Liste, kein Ersatz für sie — dieselbe Regel
+              wie bei „Nicht verortet" oben: ein Fehler ersetzt Inhalt nur, wenn es keinen
+              Inhalt gibt. Hier hat sie eine eigene Schärfe: die Bild-Overlays liegen
+              weiterhin sichtbar auf der KARTE. Verschwänden nur ihre Bedienelemente,
+              bliebe das Bild liegen und liesse sich nicht mehr abschalten — der Fehler
+              nähme die Fähigkeit weg, seine eigene Folge zu beheben. Ist der
+              Zwischenspeicher leer, steht das Banner ohnehin allein.
+
+              Bewusst `SeitenFehler` statt `SeitenStandVeraltet` (anders als oben): dieser
+              Slot führt eine `ursache` (`bilderFehlerUrsache` in `LagekartePage.tsx`), und
+              das Veraltet-Banner hat für sie keinen Kanal. Die Detailzeile ist hier die
+              nützlichere Aussage.
+
+              Der Upload darunter hängt an einer eigenen Route und bleibt ohnehin
+              unberührt bedienbar. */}
           <FehlerSlot fehler={sektionFehler.bilder} />
-          {!sektionFehler.bilder && props.bilder.map((b) => {
+          {props.bilder.map((b) => {
             const imPlatzieren = props.bildPlatzierenId === b.id;
             return (
               <div key={b.id} style={{ borderBottom: `1px solid ${token.colorSplit}`, paddingBottom: 6 }}>

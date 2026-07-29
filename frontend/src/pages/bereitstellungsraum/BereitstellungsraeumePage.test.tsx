@@ -5,6 +5,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import BereitstellungsraeumePage from './BereitstellungsraeumePage';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, EinsatzAnzeige } from '../../api/types';
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
@@ -30,7 +31,7 @@ function br(over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {
 }
 
 function renderPage() {
-  renderMitProviders(
+  return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/bereitstellungsraeume" element={<BereitstellungsraeumePage />} />
     </Routes>,
@@ -77,6 +78,36 @@ describe('BereitstellungsraeumePage', () => {
   });
 
   /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`.
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher belegte den Produktionsweg nicht.
+   * Vor dem Umbau verschwand die Zeile hier — die Einsatzkraft verlor Daten, die sie eben
+   * noch hatte, und bekam dafür eine Fehlermeldung über etwas, das sie längst gelesen hatte.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([br()])),
+    );
+    const { client } = renderPage();
+    await screen.findByText('BR Ost');
+
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => new HttpResponse(null, { status: 500 })),
+    );
+    await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('BR Ost')).toBeInTheDocument();
+    expect(screen.queryByText('Bereitstellungsräume konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+
+  /**
    * Eine vollständig stornierte Liste ist ein echter Leerzustand: der Seitenfilter
    * (`storniert_at`) läuft durch dieselbe Weiche wie eine leere Antwort. Ohne diesen
    * Fall bliebe der Filter unbelegt, obwohl er die Menge auf null bringen kann.
@@ -91,5 +122,45 @@ describe('BereitstellungsraeumePage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
     expect(screen.queryByText('BR Ost')).not.toBeInTheDocument();
+  });
+
+  /**
+   * PIN auf die MESSACHSE der beiden Zustandsflaggen — die einzige Stelle im Bündel, an
+   * der die Wahl überhaupt widerlegbar ist.
+   *
+   * Auf den übrigen sechs Seiten leben Suche und Filter IM Primitiv; dort steht neben der
+   * ungefilterten Menge gar keine zweite Zahl, gegen die man messen könnte. Hier schon:
+   * `sichtbar` liegt eine Zeile über den Flaggen, und wer sie „vereinfachend" einsetzt,
+   * holt eine Spielart genau des Befunds zurück, den B3 behebt — alles storniert plus
+   * gescheiterte Aktualisierung, und der Fehler verdrängt wieder eine Tabelle, die die
+   * Einsatzkraft eben noch gelesen hat.
+   *
+   * Gemessen: an `alle.length` grün, an `sichtbar.length` rot („Bereitstellungsräume
+   * konnten nicht geladen werden" tritt an die Stelle des Banners).
+   *
+   * Die Lage selbst ist die benannte Folge aus dem Dateikopf der Seite: das Banner steht
+   * über einer leeren Tabelle. Das ist die ehrlichere der beiden Aussagen — der Bestand
+   * IST leer, nur eben womöglich veraltet leer.
+   */
+  it('misst an der ungefilterten Menge: alles storniert + Fehler ergibt Banner, nicht Seitenfehler', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json([br({ storniert_at: '2026-07-29 10:00:00' })]),
+      ),
+    );
+    const { client } = renderPage();
+    await screen.findByText('Noch keine Bereitstellungsräume erfasst');
+
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => new HttpResponse(null, { status: 500 })),
+    );
+    await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
+    expect(screen.queryByText('Bereitstellungsräume konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 });

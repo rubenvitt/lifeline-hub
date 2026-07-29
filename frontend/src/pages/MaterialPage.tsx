@@ -1,7 +1,7 @@
 import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -126,6 +126,25 @@ export default function MaterialPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const ems = emQuery.data ?? [];
+
+  /**
+   * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
+   * Bedingung NICHT.
+   *
+   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Datensicht, sonst
+   * behauptet „Noch kein Material disponiert" eine leere Disposition, wo bloß der Abruf
+   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
+   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
+   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an `ems`, der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`):
+   * Suche und Filter leben IM Primitiv, an ihrer Restmenge gemessen kippte die Seite bei
+   * jedem engen Filter in den Fehlerzweig — und nähme dem Bediener die Schalter, mit denen
+   * er ihn wieder aufmachen könnte.
+   */
+  const listeGescheitert = emQuery.isError && ems.length === 0;
+  const standVeraltet = emQuery.isError && ems.length > 0;
+
   // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach (als getrennte
   // Position) disponiert werden (Mengen-Splitting auf Einheiten).
   const poolOptionen = (poolQuery.data ?? []).map((m) => ({
@@ -295,13 +314,15 @@ export default function MaterialPage() {
           Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
           werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
           keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen. */}
-      {emQuery.isError ? (
+      {listeGescheitert ? (
         <SeitenFehler
           text="Disponiertes Material konnte nicht geladen werden"
           ursache={emQuery.error}
           onWiederholen={() => void emQuery.refetch()}
         />
       ) : (
+      <>
+      {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void emQuery.refetch()} />}
       <Datensicht
         bezeichnung="Material im Einsatz"
         spalten={spalten}
@@ -329,6 +350,7 @@ export default function MaterialPage() {
             : undefined,
         }}
       />
+      </>
       )}
 
       <Modal

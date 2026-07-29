@@ -20,9 +20,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  *    Bezeichnung, Ordnungsnummer), nie die Datenbank-Kennung — dagegen steht die
  *    DEV-Warnung unten.
  *
- * Alles Übrige (Zeilenschlüssel, Ladezustand, Leertext) bleibt beim Aufrufer: die
- * Aufrufstellen setzen es heute selbst und behalten es, was den Migrations-Diff je Datei
- * auf zwei Zeilen hält.
+ * Die WERTE des Übrigen (Zeilenschlüssel, Ladezustand, Leertext) bleiben beim Aufrufer: die
+ * Aufrufstellen setzen sie heute selbst und behalten sie, was den Migrations-Diff je Datei
+ * auf zwei Zeilen hält. Ihre VERSCHRÄNKUNG dagegen gehört hierher — siehe den Abschnitt zu
+ * den drei Zuständen unten.
  *
  * ── ZWEI ADDITIVE ERWEITERUNGEN (LFH-330 · B2) ──────────────────────────────────
  *
@@ -48,6 +49,38 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  * Kein Spaltenschalter: die Tabellen hier tragen höchstens sieben Spalten, alle sichtbar.
  * Die vierte Gate-2-Anforderung bleibt für diese Familie „nicht anwendbar" — den Schalter
  * für breite Einsatzflächen trägt `Datensicht` (LFH-330 · B2), nicht dieses Primitiv.
+ *
+ * ── DREI ZUSTÄNDE — UND DIE LADEUNTERDRÜCKUNG LEBT HIER (LFH-331 · B3, D4) ───────
+ *
+ * Dieses Primitiv kennt **ladend** (`loading`), **leer** (`dataSource` ohne Zeile) und
+ * **gefüllt**. Den vierten Zustand — **Fehler** — trägt es ausdrücklich NICHT: er wird an
+ * der Seite gegen `SeitenFehler` getauscht, bevor die Tabelle überhaupt montiert ist (D3).
+ * Ein `fehler`-Prop wirkte hier nur unter `form="tabelle"` und täte im Kartenzweig von
+ * `Datensicht` nichts, weil `ListeProps` keinen Fehlerbegriff kennt — zwei Wahrheiten für
+ * dieselbe Sache.
+ *
+ * **Ladend und leer schließen sich aus, und das wird an genau EINER Stelle entschieden:
+ * hier.** Solange geladen wird, wird nichts über die Menge behauptet — der Leertext wird
+ * unterdrückt (`locale.emptyText` auf `null`), der Leerknoten fällt aus dem DOM. Vorbild ist
+ * `Liste.tsx` (`const leer = loading ? null : …`), das seit je so gebaut ist. Ohne diese
+ * Stelle behaupteten alle Aufrufstellen beim ersten Rendern „Noch keine …", bevor eine Zeile
+ * überhaupt da sein kann, und Tabellen- und Kartenzweig von `Datensicht` verhielten sich
+ * ungleich. Deshalb dürfen `loading` und `locale` NICHT durch `...rest` an antd
+ * durchfallen; beide werden ausgepackt und verschränkt.
+ *
+ * Ehrlich gemacht: bei GANZ FEHLENDER `dataSource` unterdrückt antd schon selbst
+ * (`rawData === EMPTY_LIST`). Diese Stelle deckt den Fall `[]` — den alle Aufrufstellen
+ * fahren, weil sie `daten ?? []` übergeben — und damit den einzigen, der ohne sie leckt.
+ *
+ * Zwei gemessene Feinheiten, die eine naive Fassung verfehlt:
+ *
+ * · `loading` ist `boolean | SpinProps`. Ein OBJEKT ohne `spinning` lädt ebenfalls
+ *   (`antd/es/table/hooks/useSpinProps.js`: `{ spinning: true, ...loading }`) — eine
+ *   Prüfung auf `loading === true` ließe diese Form still durch.
+ * · `emptyText: null` unterdrückt wirklich und fällt NICHT auf `renderEmpty` zurück:
+ *   `antd/es/table/InternalTable.js` prüft `typeof locale?.emptyText !== 'undefined'`.
+ *   Das ist gemessenes antd-Verhalten, kein zugesicherter Vertrag — es steht deshalb als
+ *   Pin in `KatalogTabelle.test.tsx` und bricht sichtbar bei einem antd-Bump.
  */
 export type KatalogTabelleProps<T> = Omit<TableProps<T>, 'scroll' | 'sticky'> & {
   /**
@@ -152,10 +185,23 @@ function useSlashKuerzel(aktiv: boolean, fokussiere: () => void): void {
   }, [aktiv]);
 }
 
+/**
+ * Lädt die Tabelle gerade? Bildet {@link https://github.com/ant-design/ant-design | antds}
+ * `useSpinProps` nach: ein Objekt ohne `spinning` lädt, ein explizites `spinning: false`
+ * nicht. Eine Prüfung auf `loading === true` verfehlte die Objektform still.
+ */
+function istLadend(loading: TableProps['loading']): boolean {
+  if (typeof loading === 'boolean') return loading;
+  if (loading == null) return false;
+  return loading.spinning ?? true;
+}
+
 export default function KatalogTabelle<T extends object>({
   columns,
   dataSource,
   pagination,
+  loading,
+  locale,
   suche,
   ...rest
 }: KatalogTabelleProps<T>) {
@@ -214,6 +260,16 @@ export default function KatalogTabelle<T extends object>({
    * geblättert wird, und schöbe damit das breiteste Element der Leiste in eine Fläche,
    * die bei 390 px gemessen wird.
    */
+  /**
+   * Ladend schlägt leer — D4, für alle Aufrufstellen an dieser einen Stelle.
+   *
+   * `emptyText: null` ist die Unterdrückung, nicht das Weglassen des Schlüssels: antd
+   * bewertet `typeof locale?.emptyText !== 'undefined'`, ein fehlender Schlüssel fiele also
+   * auf `renderEmpty` (Bild + „Keine Daten") zurück. Der Rest von `locale` bleibt stehen —
+   * er trägt Filter- und Sortierbeschriftungen, die mit dem Ladezustand nichts zu tun haben.
+   */
+  const wirkendesLocale = istLadend(loading) ? { ...locale, emptyText: null } : locale;
+
   const blaetterung =
     pagination ??
     ((dataSource?.length ?? 0) > BLAETTER_SCHWELLE
@@ -243,6 +299,8 @@ export default function KatalogTabelle<T extends object>({
         {...rest}
         columns={fixierteSpalten}
         dataSource={sichtbareZeilen}
+        loading={loading}
+        locale={wirkendesLocale}
         pagination={blaetterung}
         // `test/utils.tsx` montiert `ConfigProvider` OHNE Locale, die Produktion setzt
         // `deDE` — der Sortier-Tooltip wäre im Test englisch und in Produktion deutsch,

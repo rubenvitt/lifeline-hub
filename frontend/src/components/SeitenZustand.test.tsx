@@ -220,9 +220,16 @@ describe('SeitenStandVeraltet', () => {
   });
 
   it('trägt keinen Zeitstempel', () => {
-    // Ein „Stand von HH:MM" koppelte das Primitiv an `AnzeigeKonventionenContext` und
-    // trüge die aus LFH-318 bekannte Zeitzonen-Falle in eine Komponente, die vier Seiten
-    // teilen. Handlungsleitend ist ohnehin der Knopf, nicht die Zahl.
+    // Ein „Stand von HH:MM" koppelte das Primitiv an `AnzeigeKonventionenContext` und trüge
+    // die aus LFH-318 bekannte Zeitzonen-Falle in ein GETEILTES Primitiv — die Kopplung
+    // schlüge auf jeden Konsumenten zugleich durch. Handlungsleitend ist ohnehin der Knopf,
+    // nicht die Zahl.
+    //
+    // Hier steht bewusst KEINE Anzahl der Konsumenten: sie wächst mit dem B3-Rollout
+    // (gemessen auf diesem Branch: `UnfallhilfsstellenPage`, `Sidebar` und
+    // `BereitstellungsraeumePage` sind währenddessen dazugekommen). Eine Zahl an dieser
+    // Stelle ist keine Tatsache, sondern eine Wartungslast — sie veraltet still, und genau
+    // das ist ihr vorheriger Stand („vier") schon einmal getan.
     renderMitProviders(<SeitenStandVeraltet onWiederholen={vi.fn()} />);
 
     expect(screen.getByRole('alert').textContent).not.toMatch(/\d{1,2}:\d{2}/);

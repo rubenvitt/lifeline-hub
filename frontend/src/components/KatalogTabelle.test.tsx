@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { TableColumnsType } from 'antd';
+import type { TableColumnsType, TableProps } from 'antd';
 import { renderMitProviders } from '../test/utils';
 import KatalogTabelle, { BLAETTER_SCHWELLE } from './KatalogTabelle';
 
@@ -99,6 +99,82 @@ describe('KatalogTabelle', () => {
       />,
     );
     expect(gruppe.container.querySelectorAll('th.ant-table-cell-fix-start')).toHaveLength(0);
+  });
+
+  /**
+   * Die Ladeunterdrückung des Leerknotens (LFH-331 · B3, D4). Sie lebt im Primitiv, nicht an
+   * den Aufrufstellen — geprüft wird sie deshalb hier und nur hier.
+   *
+   * `dataSource={[]}` ist die tragende Wahl: bei FEHLENDER `dataSource` unterdrückt antd
+   * schon selbst (`InternalTable.js`, `rawData === EMPTY_LIST`), ein Test darauf wäre auch
+   * ohne unsere Stelle grün und bewiese nichts.
+   */
+  const LEERTEXT = 'Noch keine Fahrzeuge erfasst';
+
+  const leereTabelle = (loading: TableProps<Zeile>['loading']) => (
+    <KatalogTabelle<Zeile>
+      rowKey="id"
+      columns={SPALTEN}
+      dataSource={[]}
+      pagination={false}
+      loading={loading}
+      locale={{ emptyText: LEERTEXT }}
+    />
+  );
+
+  it('unterdrückt den Leertext, solange geladen wird — boolesch wie als SpinProps', () => {
+    // `{ tip: … }` ist der Fall, den eine Prüfung auf `loading === true` still durchließe:
+    // antds `useSpinProps` macht daraus `{ spinning: true, tip: … }`.
+    for (const ladend of [true, { spinning: true }, { tip: 'Lade …' }]) {
+      const r = renderMitProviders(leereTabelle(ladend));
+      expect(r.queryByText(LEERTEXT), `loading=${JSON.stringify(ladend)}`).toBeNull();
+      expect(r.container.querySelector('.ant-spin-spinning')).not.toBeNull();
+      r.unmount();
+    }
+
+    for (const ruhend of [undefined, false, { spinning: false }]) {
+      const r = renderMitProviders(leereTabelle(ruhend));
+      expect(r.queryByText(LEERTEXT), `loading=${JSON.stringify(ruhend)}`).not.toBeNull();
+      r.unmount();
+    }
+  });
+
+  it('der Leertext erscheint erst, wenn das Laden durch ist', () => {
+    const { rerender, queryByText } = renderMitProviders(leereTabelle(true));
+    expect(queryByText(LEERTEXT)).toBeNull();
+
+    rerender(leereTabelle(false));
+    expect(queryByText(LEERTEXT)).not.toBeNull();
+  });
+
+  it('pinnt antds Leerknoten-Vertrag: `emptyText: null` unterdrückt ohne Rückfall', () => {
+    /**
+     * Der Mechanismus der Unterdrückung ist antd-Verhalten, kein zugesicherter Vertrag:
+     * `InternalTable.js` bewertet `typeof locale?.emptyText !== 'undefined'`, weshalb `null`
+     * durchgeht und NICHT auf `renderEmpty` zurückfällt. Kippte ein antd-Bump das auf eine
+     * `!= null`-Prüfung, stünde plötzlich wieder ein Leerknoten (`.ant-empty`, Bild +
+     * „Keine Daten") hinter dem Spinner — lautlos, weil kein anderer Test darauf zeigt.
+     *
+     * Deshalb ohne `locale`: geprüft wird der Rückfallpfad selbst, nicht unser Leertext.
+     */
+    const ladend = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={SPALTEN}
+        dataSource={[]}
+        pagination={false}
+        loading
+      />,
+    );
+    expect(ladend.container.querySelector('.ant-empty')).toBeNull();
+    ladend.unmount();
+
+    // Gegenprobe: ohne Ladezustand rendert derselbe Aufruf antds Leerknoten — der Pin oben
+    // misst also die Unterdrückung und nicht bloß eine Tabelle, die nie einen Leerknoten hat.
+    const ruhend = renderMitProviders(
+      <KatalogTabelle<Zeile> rowKey="id" columns={SPALTEN} dataSource={[]} pagination={false} />,
+    );
+    expect(ruhend.container.querySelector('.ant-empty')).not.toBeNull();
   });
 
   it('warnt in DEV, wenn die erste Spalte die DB-id trägt', () => {
@@ -252,7 +328,10 @@ describe('KatalogTabelle · Suche', () => {
         suche={{ platzhalter: 'suchen' }}
       />,
     );
-    await userEvent.type(container.querySelector<HTMLInputElement>('input[type="search"]')!, 'GW-San');
+    await userEvent.type(
+      container.querySelector<HTMLInputElement>('input[type="search"]')!,
+      'GW-San',
+    );
     expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(0);
   });
 
@@ -262,7 +341,10 @@ describe('KatalogTabelle · Suche', () => {
      * `zeile['id']` statt `zeile.meta.id` und lieferte still den falschen Wert. Deshalb
      * hat die Suche ihren eigenen, pfadlaufenden Resolver.
      */
-    interface Tief { id: number; meta: { kennung: string } }
+    interface Tief {
+      id: number;
+      meta: { kennung: string };
+    }
     const spalten: TableColumnsType<Tief> = [
       { title: 'Kennung', dataIndex: ['meta', 'kennung'], key: 'kennung' },
     ];
@@ -279,7 +361,10 @@ describe('KatalogTabelle · Suche', () => {
         suche={{ platzhalter: 'suchen' }}
       />,
     );
-    await userEvent.type(container.querySelector<HTMLInputElement>('input[type="search"]')!, 'ALPHA');
+    await userEvent.type(
+      container.querySelector<HTMLInputElement>('input[type="search"]')!,
+      'ALPHA',
+    );
     expect(screen.queryByText('ALPHA')).not.toBeNull();
     expect(screen.queryByText('BRAVO')).toBeNull();
   });
@@ -326,11 +411,17 @@ describe('KatalogTabelle · Suche', () => {
     const { container } = renderMitProviders(
       <>
         <KatalogTabelle<Zeile>
-          rowKey="id" columns={SPALTEN} dataSource={ZWEI} pagination={false}
+          rowKey="id"
+          columns={SPALTEN}
+          dataSource={ZWEI}
+          pagination={false}
           suche={{ platzhalter: 'erste' }}
         />
         <KatalogTabelle<Zeile>
-          rowKey="id" columns={SPALTEN} dataSource={ZWEI} pagination={false}
+          rowKey="id"
+          columns={SPALTEN}
+          dataSource={ZWEI}
+          pagination={false}
           suche={{ platzhalter: 'zweite' }}
         />
       </>,
@@ -341,7 +432,9 @@ describe('KatalogTabelle · Suche', () => {
     fireEvent.keyDown(window, { key: '/' });
     expect(document.activeElement).not.toBe(felder[0]);
     expect(document.activeElement).not.toBe(felder[1]);
-    expect(spion.mock.calls.filter((a) => String(a[0]).includes('[KatalogTabelle]'))).toHaveLength(1);
+    expect(spion.mock.calls.filter((a) => String(a[0]).includes('[KatalogTabelle]'))).toHaveLength(
+      1,
+    );
     spion.mockRestore();
   });
 });
@@ -382,7 +475,10 @@ describe('KatalogTabelle · Blätterung', () => {
     // strukturell nicht fallen kann. `??` statt `||`, damit `false` gewinnt.
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile>
-        rowKey="id" columns={SPALTEN} dataSource={vieleZeilen(60)} pagination={false}
+        rowKey="id"
+        columns={SPALTEN}
+        dataSource={vieleZeilen(60)}
+        pagination={false}
       />,
     );
     expect(container.querySelector('.ant-pagination')).toBeNull();
@@ -399,12 +495,18 @@ describe('KatalogTabelle · Blätterung', () => {
     const daten = [...vieleZeilen(60), { id: 999, funkrufname: 'Rotkreuz Sonderfall', typ: 'GW' }];
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile>
-        rowKey="id" columns={SPALTEN} dataSource={daten} suche={{ platzhalter: 'suchen' }}
+        rowKey="id"
+        columns={SPALTEN}
+        dataSource={daten}
+        suche={{ platzhalter: 'suchen' }}
       />,
     );
     expect(container.querySelector('.ant-pagination')).not.toBeNull();
 
-    await userEvent.type(container.querySelector<HTMLInputElement>('input[type="search"]')!, 'Sonderfall');
+    await userEvent.type(
+      container.querySelector<HTMLInputElement>('input[type="search"]')!,
+      'Sonderfall',
+    );
     expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(1);
     expect(container.querySelector('.ant-pagination')).not.toBeNull();
   });

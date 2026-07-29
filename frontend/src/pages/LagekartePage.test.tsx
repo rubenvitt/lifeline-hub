@@ -352,6 +352,11 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
     renderSeite();
     const overlay = await screen.findByTestId('lagebild-unvollstaendig');
     expect(overlay).toHaveTextContent('Lagebild unvollständig: Unfallhilfsstellen');
+    // Positiver Partner (F2) zur Negativen im Historien-Test unten: ohne ihn wäre der
+    // Live-Satz des Overlays ungepinnt, und ein „nicht da" über einen Text, den niemand
+    // je als „da" zusichert, belegt nichts. Der Titel kann die Wendung nicht erzeugen —
+    // dort steht nur „Lagebild unvollständig: <Quellen>", ohne „, nicht leer".
+    expect(overlay).toHaveTextContent('unvollständig, nicht leer');
     // Die eigentliche AK6-Zusicherung: das Overlay ist NICHT wegklickbar. Geprüft wird die
     // Abwesenheit JEDES Knopfes — „bleibt nach einem Klick stehen" wäre nicht widerlegbar,
     // weil es gar keinen Codepfad gäbe, der es entfernen könnte.
@@ -405,6 +410,22 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
  * Lageplan hinterlegt", und `AnsichtSwitcher` rendert bei leerer Liste gar nichts.
  */
 describe('LagekartePage · Fehler-Slots der Sidebar', () => {
+  it('verdrahtet den Slot an „Nicht verortet" mit denselben Lagebild-Quellen wie das Overlay', async () => {
+    // Derselbe 500er wie im AK6-Test: die Seitenverdrahtung war bisher nirgends geprüft —
+    // `Sidebar.test.tsx` reicht den Slot als selbstgebauten Prop-Wert herein und kann daher
+    // nicht sehen, ob die Seite ihn je füllt.
+    basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
+    renderSeite();
+    expect(await screen.findByText('Objektlisten konnten nicht geladen werden')).toBeInTheDocument();
+    // Die unterscheidende Zusicherung: ohne die Verdrahtung ist `nichtVerortet` schlicht
+    // leer (die Quelle ist ja tot) und die Sektion behauptete „Alles verortet" — eine
+    // Erfolgsaussage über Daten, die niemand geladen hat.
+    expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
+    // Section-lokal, nicht seitenweit: der Sektionskopf steht weiterhin da. Geprüft wird
+    // das Verhalten, nicht der DOM-Aufbau der Sidebar — kein Griff in die Card-Struktur.
+    expect(screen.getByText('⚠ Nicht verortet')).toBeInTheDocument();
+  });
+
   it('meldet die gescheiterte Bilder-Query in ihrer Sektion', async () => {
     basisHandler([
       http.get('/api/einsaetze/1/karte/hintergrundbilder', () => new HttpResponse(null, { status: 500 })),
@@ -423,10 +444,11 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
     expect(await screen.findByText('Kartenansichten konnten nicht geladen werden')).toBeInTheDocument();
   });
 
-  it('ohne Fehler trägt die Sidebar keinen der beiden Slots', async () => {
+  it('ohne Fehler trägt die Sidebar keinen der drei Slots', async () => {
     basisHandler();
     renderSeite();
     expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
     expect(screen.queryByText('Bild-Hintergründe konnten nicht geladen werden')).not.toBeInTheDocument();
     expect(screen.queryByText('Kartenansichten konnten nicht geladen werden')).not.toBeInTheDocument();
   });

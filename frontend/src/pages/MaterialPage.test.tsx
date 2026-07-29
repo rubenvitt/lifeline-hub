@@ -8,6 +8,7 @@ import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import MaterialPage from './MaterialPage';
+import { einsatzKeys } from '../api/queryKeys';
 
 const admin = {
   id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
@@ -204,6 +205,30 @@ describe('MaterialPage · Datenzustände', () => {
     zeige();
     expect(await screen.findByText('Noch kein Material disponiert')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`.
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Vor dem Umbau verdrängte der Fehler die Zeilen — die Einsatzkraft verlor
+   * Daten, die sie eben noch gelesen hatte, und das ist das Gegenteil dessen, wofür
+   * `SeitenStandVeraltet` gebaut wurde.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    const { client } = zeige(http.get('/api/einsaetze/1/material', () => HttpResponse.json([em])));
+    await screen.findByText('Wolldecke');
+
+    server.use(http.get('/api/einsaetze/1/material', () => new HttpResponse(null, { status: 500 })));
+    await client.refetchQueries({ queryKey: einsatzKeys.material(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('Wolldecke')).toBeInTheDocument();
+    expect(screen.queryByText('Disponiertes Material konnte nicht geladen werden')).not.toBeInTheDocument();
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Kein Material im Dienst"', async () => {

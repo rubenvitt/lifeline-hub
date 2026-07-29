@@ -20,7 +20,7 @@ import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusTag from '../components/StatusTag';
-import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
@@ -152,6 +152,29 @@ export default function PersonalPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const eps = epQuery.data ?? [];
+
+  /**
+   * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
+   * Bedingung NICHT.
+   *
+   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Datensicht, sonst
+   * behauptet „Noch kein Personal disponiert" eine leere Disposition, wo bloß der Abruf
+   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
+   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
+   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an `eps`, der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`):
+   * Suche, Trägerfilter und Gruppenachse leben IM Primitiv, an ihrer Restmenge gemessen
+   * kippte die Seite bei jedem engen Filter in den Fehlerzweig — und nähme dem Bediener
+   * die Schalter, mit denen er ihn wieder aufmachen könnte.
+   *
+   * NICHT zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht ZUSÄTZLICH
+   * über der Tabelle und tauscht nichts aus. Eine Mengenbedingung hat dort nichts zu
+   * suchen — es verschwindet nichts, also ist auch nichts zu bewahren.
+   */
+  const listeGescheitert = epQuery.isError && eps.length === 0;
+  const standVeraltet = epQuery.isError && eps.length > 0;
+
   const einheitById = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e] as const));
   const fahrzeugById = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f] as const));
   const stati = statusQuery.data ?? [];
@@ -390,13 +413,15 @@ export default function PersonalPage() {
           keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen.
           Ohne diese Weiche behauptet „Noch kein Personal disponiert" auch dann eine leere
           Disposition, wenn bloß die Verbindung abgerissen ist. */}
-      {epQuery.isError ? (
+      {listeGescheitert ? (
         <SeitenFehler
           text="Disponiertes Personal konnte nicht geladen werden"
           ursache={epQuery.error}
           onWiederholen={() => void epQuery.refetch()}
         />
       ) : (
+      <>
+      {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
       <Datensicht
         bezeichnung="Personal im Einsatz"
         spalten={spalten}
@@ -433,6 +458,7 @@ export default function PersonalPage() {
             : undefined,
         }}
       />
+      </>
       )}
 
       <Modal

@@ -21,7 +21,7 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
-import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
@@ -256,6 +256,29 @@ export default function FahrzeugePage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const efs = efQuery.data ?? [];
+
+  /**
+   * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
+   * Bedingung NICHT.
+   *
+   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Datensicht, sonst
+   * behauptet „Noch keine Fahrzeuge disponiert" eine leere Disposition, wo bloß der Abruf
+   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
+   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
+   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an `efs`, der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`):
+   * Suche, Trägerfilter und Gruppenachse leben IM Primitiv, an ihrer Restmenge gemessen
+   * kippte die Seite bei jedem engen Filter in den Fehlerzweig — und nähme dem Bediener
+   * die Schalter, mit denen er ihn wieder aufmachen könnte.
+   *
+   * NICHT zu verwechseln mit dem Statuskatalog-Banner weiter unten: das steht ZUSÄTZLICH
+   * über der Tabelle und tauscht nichts aus. Eine Mengenbedingung hat dort nichts zu
+   * suchen — es verschwindet nichts, also ist auch nichts zu bewahren.
+   */
+  const listeGescheitert = efQuery.isError && efs.length === 0;
+  const standVeraltet = efQuery.isError && efs.length > 0;
+
   const stati = statusQuery.data ?? [];
   const personal = personalQuery.data ?? [];
   const disponierteIds = new Set(efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null));
@@ -480,13 +503,15 @@ export default function FahrzeugePage() {
           keinen Fehlerbegriff — ein Prop am Primitiv wirkte nur in einer der beiden Formen.
           Ohne diese Weiche behauptet „Noch keine Fahrzeuge disponiert" auch dann eine leere
           Disposition, wenn bloß die Verbindung abgerissen ist. */}
-      {efQuery.isError ? (
+      {listeGescheitert ? (
         <SeitenFehler
           text="Disponierte Fahrzeuge konnten nicht geladen werden"
           ursache={efQuery.error}
           onWiederholen={() => void efQuery.refetch()}
         />
       ) : (
+      <>
+      {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
       <Datensicht
         bezeichnung="Fahrzeuge im Einsatz"
         spalten={spalten}
@@ -541,6 +566,7 @@ export default function FahrzeugePage() {
             : undefined,
         }}
       />
+      </>
       )}
 
       <Modal

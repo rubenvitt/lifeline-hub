@@ -17,7 +17,7 @@ import type { Einsatzabschnitt, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
-import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
@@ -186,6 +186,21 @@ export default function EinsatzabschnittePage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
+  /**
+   * LISTENZUSTAND der Gliederungs-Karte — zwei Lagen, zwei Antworten (D3). Der Fehler
+   * allein reicht als Bedingung NICHT.
+   *
+   * Ohne Abschnitte im Zwischenspeicher tritt der Fehler an die Stelle des Baums. MIT
+   * Abschnitten bleibt der Baum stehen und bekommt ein Banner: er ist echt, nur womöglich
+   * alt. Ein Fehler, der ihn wegräumt, nähme der Einsatzkraft die Gliederung, die sie eben
+   * noch vor sich hatte — und mit ihr die Auswahl, über die die rechte Karte lebt. Genau
+   * das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`).
+   */
+  const listeGescheitert = abschnitteQuery.isError && abschnitte.length === 0;
+  const standVeraltet = abschnitteQuery.isError && abschnitte.length > 0;
+
   const einheitenListe = (
     <>
       <Typography.Title level={5} style={{ marginTop: 16 }}>Zugeordnete Einheiten</Typography.Title>
@@ -230,10 +245,14 @@ export default function EinsatzabschnittePage() {
               einzige Weiche auf die Länge der Liste — die ist während des Ladens und im
               Fehlerfall genauso wahr wie bei einer wirklich leeren Gliederung. Die Seite
               behauptete damit „keine Abschnitte", wenn bloß die Verbindung abgerissen war.
-              Solange geladen wird, wird über die Menge nichts behauptet. */}
+              Solange geladen wird, wird über die Menge nichts behauptet.
+
+              Der Fehlerzweig trägt zusätzlich die MENGENBEDINGUNG (`listeGescheitert`):
+              er verdrängt den Baum nur, wenn es keinen gibt. Steht einer im
+              Zwischenspeicher, bleibt er und bekommt das Veraltet-Banner (unten). */}
           {abschnitteQuery.isLoading ? (
             <SeitenSkeleton />
-          ) : abschnitteQuery.isError ? (
+          ) : listeGescheitert ? (
             <SeitenFehler
               text="Abschnitte konnten nicht geladen werden"
               ursache={abschnitteQuery.error}
@@ -249,8 +268,13 @@ export default function EinsatzabschnittePage() {
               aktion={darfSchreiben ? { label: 'Abschnitt anlegen', onClick: () => anlegen.mutate() } : undefined}
             />
           ) : (
-            <Tree treeData={baumDaten} selectedKeys={gewaehlt != null ? [gewaehlt] : []} defaultExpandAll
-              onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)} />
+            <>
+              {standVeraltet && (
+                <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
+              )}
+              <Tree treeData={baumDaten} selectedKeys={gewaehlt != null ? [gewaehlt] : []} defaultExpandAll
+                onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)} />
+            </>
           )}
         </Card>
 

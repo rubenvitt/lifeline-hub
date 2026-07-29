@@ -410,6 +410,33 @@ describe('FahrzeugePage · Datenzustände', () => {
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`.
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Vor dem Umbau verdrängte der Fehler die Zeilen — die Einsatzkraft verlor
+   * eine Disposition, die sie eben noch gelesen hatte.
+   *
+   * Assertiert wird der Banner-TEXT, nicht der Knopf „Erneut abrufen": den tragen
+   * `SeitenStandVeraltet`, `SeitenFehler` UND das Statuskatalog-Banner. Über den Knopf
+   * gemessen wäre die Zusicherung mehrdeutig und im schlimmsten Fall trivial grün.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    const { client } = zeige(http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])));
+    await screen.findByText('Florian 1');
+
+    server.use(http.get('/api/einsaetze/7/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
+    await client.refetchQueries({ queryKey: einsatzKeys.fahrzeuge(7) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('Florian 1')).toBeInTheDocument();
+    expect(screen.queryByText('Disponierte Fahrzeuge konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+
   it('gescheiterter Statuskatalog: Banner über der Tabelle', async () => {
     zeige(http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })));
     expect(

@@ -9,6 +9,7 @@ import UnfallhilfsstellenPage from './UnfallhilfsstellenPage';
 import UhsDetailPage from './uhs/UhsDetailPage';
 import { liesLetzteUhs } from './uhs/uhsAuswahl';
 import { AuthProvider } from '../auth/AuthContext';
+import { einsatzKeys } from '../api/queryKeys';
 import { App as AntApp } from 'antd';
 
 class FakeEventSource {
@@ -30,9 +31,16 @@ function einsatzAntwort(rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung
   };
 }
 
+/** Eine UHS-Zeile — die Kennung `BHP 50` ist in mehreren Tests der Beleg „Zeile steht". */
+const bhp50 = {
+  id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+  bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
+  erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+};
+
 function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return { qc, ...render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
@@ -45,7 +53,7 @@ function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>
-  );
+  ) };
 }
 
 describe('UnfallhilfsstellenPage', () => {
@@ -99,6 +107,38 @@ describe('UnfallhilfsstellenPage', () => {
     renderPage();
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Unfallhilfsstellen erfasst')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`.
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Ein bloß vorbefüllter Zwischenspeicher belegte den Produktionsweg nicht —
+   * dort steht hinter den Zeilen immer ein erfolgreicher Abruf.
+   *
+   * Gemessen wird an der UNGEFILTERTEN Menge; nur so kippt die Seite nicht in den
+   * Fehlerzweig, sobald eine engere Sicht zufällig 0 Treffer hat.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([bhp50])),
+    );
+    const { qc } = renderPage();
+    await screen.findByText('BHP 50');
+
+    server.use(
+      http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })),
+    );
+    await qc.refetchQueries({ queryKey: einsatzKeys.uhs(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
+    expect(screen.getByText('BHP 50')).toBeInTheDocument();
+    expect(screen.queryByText('Unfallhilfsstellen konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 
   it('zeigt bei leerer Liste den Leertext und KEINEN Fehler', async () => {

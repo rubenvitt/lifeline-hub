@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
+import { einsatzKeys } from '../api/queryKeys';
 
 const tmoSprechgruppe = {
   id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
@@ -27,7 +28,7 @@ const funkAbschnitt = {
 };
 
 function renderPage() {
-  renderMitProviders(
+  return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
     </Routes>,
@@ -224,6 +225,33 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Abschnitte')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Veralteter Stand = `isError` MIT Zeilen im Zwischenspeicher (D5) — nicht `isFetching`,
+   * nicht `isStale`.
+   *
+   * Der Ablauf ist BEWUSST der echte: erst ein geglückter Abruf, dann eine gescheiterte
+   * Aktualisierung. Vor dem Umbau verschwand der Baum an dieser Stelle — die Einsatzkraft
+   * verlor die Gliederung, die sie eben noch vor sich hatte, und mit ihr die Auswahl, über
+   * die alles Weitere dieser Seite läuft.
+   */
+  it('meldet den veralteten Stand, wenn die Aktualisierung mit Abschnitten im Cache scheitert', async () => {
+    server.use(...handlers());
+    const { client } = renderPage();
+    await screen.findByText('Nord');
+
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 500 })),
+    );
+    await client.refetchQueries({ queryKey: einsatzKeys.abschnitte(1) });
+
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn NICHT.
+    expect(screen.getByText('Nord')).toBeInTheDocument();
+    expect(screen.queryByText('Abschnitte konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 
   /**

@@ -12,7 +12,7 @@ import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import StatusTag from '../components/StatusTag';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { uhsStatus, uhsTyp } from '../theme/statusFarben';
 import KatalogTabelle from '../components/KatalogTabelle';
 
@@ -69,6 +69,24 @@ export default function UnfallhilfsstellenPage() {
     );
   }
 
+  const alle = uhsQuery.data ?? [];
+
+  /**
+   * ZWEI LAGEN, ZWEI ANTWORTEN (D3) — der Fehler allein reicht als Bedingung NICHT.
+   *
+   * Ohne Zeilen im Zwischenspeicher tritt der Fehler an die Stelle der Tabelle, sonst
+   * behauptet „Noch keine Unfallhilfsstellen erfasst" eine leere Lage, wo bloß der Abruf
+   * scheiterte. MIT Zeilen bleiben sie stehen und bekommen ein Banner: sie sind echt, nur
+   * womöglich alt. Ein Fehler, der die Zeilen wegräumt, nähme der Einsatzkraft Daten, die
+   * sie eben noch hatte — das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
+   *
+   * Gemessen an der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`): an einer
+   * engeren Sicht gemessen kippte die Seite bei jedem Filter mit null Treffern in den
+   * Fehlerzweig.
+   */
+  const listeGescheitert = uhsQuery.isError && alle.length === 0;
+  const standVeraltet = uhsQuery.isError && alle.length > 0;
+
   return (
     <EinsatzSeite
       titel="Unfallhilfsstellen"
@@ -88,21 +106,24 @@ export default function UnfallhilfsstellenPage() {
           keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer der
           beiden Formen. Der Leertext ist byte-gleich dem aus `UnfallhilfsstellenDefault`:
           zwei Formulierungen für dieselbe Tatsache wären der Befund, den B3 behebt. */}
-      {uhsQuery.isError ? (
+      {listeGescheitert ? (
         <SeitenFehler
           text="Unfallhilfsstellen konnten nicht geladen werden"
           ursache={uhsQuery.error}
           onWiederholen={() => void uhsQuery.refetch()}
         />
       ) : (
-        <KatalogTabelle<Uhs>
-          rowKey="id"
-          loading={uhsQuery.isLoading}
-          dataSource={uhsQuery.data ?? []}
-          columns={spalten}
-          pagination={false}
-          locale={{ emptyText: 'Noch keine Unfallhilfsstellen erfasst' }}
-        />
+        <>
+          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void uhsQuery.refetch()} />}
+          <KatalogTabelle<Uhs>
+            rowKey="id"
+            loading={uhsQuery.isLoading}
+            dataSource={alle}
+            columns={spalten}
+            pagination={false}
+            locale={{ emptyText: 'Noch keine Unfallhilfsstellen erfasst' }}
+          />
+        </>
       )}
 
       <UhsAnlegenDrawer einsatzId={einsatzId} open={anlegen} onClose={() => setAnlegen(false)} />

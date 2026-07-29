@@ -267,6 +267,37 @@ describe('Sidebar Fehler-Slots', () => {
     expect(container.querySelector('.ant-empty')).toBeNull();
   });
 
+  /**
+   * Der Kern von D3/D5: **ein Fehler ersetzt Inhalt nur, wenn es keinen Inhalt gibt.**
+   *
+   * Die Zeilen unter „Nicht verortet" tragen die EINZIGE Bedienung zum Verorten
+   * („Platzieren" / „Fläche zeichnen"). Fällt eine der elf Lagebild-Quellen aus, während
+   * die übrigen zehn Zeilen im Zwischenspeicher stehen, nähme ein Vollersatz der Sektion
+   * der Einsatzkraft die Fähigkeit weg, ein Objekt zu verorten — wegen eines Fehlers, der
+   * dieses Objekt gar nicht betrifft.
+   *
+   * Deshalb steht der Fehler hier als D5-Banner ÜBER den Zeilen, nicht an ihrer Stelle.
+   */
+  it('„Nicht verortet": mit Zeilen im Zwischenspeicher bleibt die Liste samt Bedienung stehen', () => {
+    const onPlatzierenStart = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        nichtVerortet={[{ typ: 'uhs', id: 42, label: 'UHS Nord' }]}
+        sektionFehler={{ nichtVerortet: slot }}
+        onPlatzierenStart={onPlatzierenStart}
+      />,
+    );
+    // Der Fehler wird gemeldet — aber als Banner, das den Stand als alt kennzeichnet.
+    expect(screen.getByText(/nicht aktualisiert werden/i)).toBeInTheDocument();
+    // Die Zeile aus dem Zwischenspeicher steht weiter da …
+    expect(screen.getByText(/UHS: UHS Nord/)).toBeInTheDocument();
+    // … und die einzige Bedienung zum Verorten ist bedienbar geblieben.
+    fireEvent.click(screen.getByRole('button', { name: 'Platzieren' }));
+    expect(onPlatzierenStart).toHaveBeenCalledWith({ typ: 'uhs', id: 42 });
+  });
+
   it('„Bild-Hintergründe": Fehler-Slot, der Upload bleibt bedienbar', () => {
     renderMitProviders(
       <Sidebar
@@ -286,6 +317,29 @@ describe('Sidebar Fehler-Slots', () => {
     renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[]} />);
     expect(screen.queryByText('Bild-Hintergründe konnten nicht geladen werden')).not.toBeInTheDocument();
     expect(screen.getByText(/Bild hochladen/i)).toBeInTheDocument();
+  });
+
+  /**
+   * Dieselbe Regel an der zweiten Stelle — hier mit einer eigenen Schärfe: die Bild-Overlays
+   * liegen weiterhin sichtbar auf der KARTE. Verschwindet nur ihre Bedienleiste, bleibt das
+   * Bild liegen und lässt sich nicht mehr abschalten — der Fehler nähme die Fähigkeit weg,
+   * seine eigene Folge zu beheben.
+   */
+  it('„Bild-Hintergründe": mit Bildern im Zwischenspeicher bleibt die Liste bedienbar', () => {
+    const onBildToggle = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        onBildToggle={onBildToggle}
+        sektionFehler={{ bilder: { text: 'Bild-Hintergründe konnten nicht geladen werden', onWiederholen: vi.fn() } }}
+      />,
+    );
+    expect(screen.getByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
+    // Der Schalter, der das Overlay von der Karte nimmt, ist der Punkt der Sache.
+    fireEvent.click(screen.getByRole('switch', { name: /Lageplan/i }));
+    expect(onBildToggle).toHaveBeenCalledWith(1, false);
   });
 
   it('Ansichts-Switcher: Fehler-Slot statt eines stumm leeren Kopfes', () => {
