@@ -319,3 +319,114 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — A
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+/**
+ * Der Spaltenschalter ist das Bedienelement, mit dem Prüflisten-Zeile 14 („Spaltenschalter mit
+ * Zähler ausgeblendeter Spalten") begründet wird. Ein Schalter, der nur mit der Maus wirkt,
+ * trägt dieses Verdikt nicht — WCAG 2.1.1 verlangt einen Tastaturweg für jede Funktion, und
+ * die ortsfeste Stelle ist in der Bedien-Leitlinie ausdrücklich als „voller Tastaturfluss"
+ * geführt.
+ *
+ * DER TEST WAR ZUERST ROT (gemessen am Stand 82c2885): der Umschalter hing allein am
+ * `onChange` des Kontrollkästchens, das Dropdown bekam beim Öffnen keinen Fokus
+ * (`ArrowDown` ließ `document.activeElement` auf dem Knopf, kein Eintrag wurde hervorgehoben),
+ * und die Eingabetaste schloss das Menü, ohne die Spalte umzuschalten. Der Zähler stand vorher
+ * wie nachher auf demselben Wert.
+ *
+ * WARUM NICHT IN VITEST: jsdom kennt weder Fokusfolge im Portal noch `-active`-Hervorhebung
+ * von rc-menu; die Aussage wäre dort strukturell unfähig, rot zu werden.
+ *
+ * DIE LEERTASTE IST BEWUSST NICHT ZUGESICHERT: rc-menu bindet auf dem hervorgehobenen Eintrag
+ * nur die Eingabetaste (gemessen — mit Leertaste blieb der Zähler stehen). Ein Tastaturweg ist
+ * verlangt, nicht jeder denkbare.
+ */
+test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet die Spalte, der Zähler zieht mit', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Schalter Tastatur ${Date.now()}`);
+  await seedeKraft(page, einsatzId);
+
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  await page.waitForLoadState('networkidle');
+
+  const werkzeuge = page.locator('[data-lfh="datensicht-werkzeuge"]');
+  const schalter = werkzeuge.getByRole('button', { name: /^Spalten/ });
+  await expect(schalter).toHaveCount(1);
+  // Namentlich, nicht über die Position: „Träger" ist bei 1366 px sichtbar (steht also in den
+  // Spaltenköpfen) UND wählbar (`PersonalPage.tsx` gibt ihr weder Position 0 noch
+  // `immerSichtbar`) — beides braucht der Test, um Zähler und Tabelle gemeinsam zu prüfen.
+  const ZIELSPALTE = 'Träger';
+
+  // Der Zähler ist der Messwert. Er steht als Text im Namen des Knopfes (`Datensicht.tsx:628`)
+  // und zählt BEIDE Ursachen — Handauswahl und `abBreite`.
+  const zaehler = async () => {
+    const text = (await schalter.textContent()) ?? '';
+    return Number(text.match(/·\s*(\d+)\s*ausgeblendet/)?.[1] ?? 0);
+  };
+  const vorher = await zaehler();
+
+  // NUR das offene Menü. antd lässt das Portal nach dem Schließen im Baum stehen (der Wrapper
+  // trägt dann `ant-dropdown-hidden`), und der zuletzt hervorgehobene Eintrag behält seine
+  // `-active`-Klasse: ein Locator ohne diese Einschränkung misst ein geschlossenes Menü und
+  // liest daraus eine Hervorhebung, die niemand sieht.
+  const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu');
+  const aktiv = menue.locator('li.ant-dropdown-menu-item-active');
+
+  /**
+   * Öffnet den Schalter per Tastatur und läuft mit `ArrowDown`, bis {@link ZIELSPALTE}
+   * hervorgehoben ist.
+   *
+   * ZWEI GEMESSENE GRÜNDE für die Suchschleife statt eines gezählten `ArrowDown`:
+   *  - rc-menu merkt sich den zuletzt aktiven Eintrag; ein zweites Öffnen startet NICHT
+   *    wieder oben, und ein blindes `ArrowDown` traf in der Gegenprobe eine andere Spalte.
+   *  - Auch das ERSTE Öffnen ist nicht deterministisch: je nach Zeitpunkt steht schon ein
+   *    Eintrag aktiv, wenn die erste Taste ankommt, oder noch keiner. Unter Last (vier
+   *    Playwright-Worker) kippte das den Test, allein gefahren nicht — genau die Flake-Klasse,
+   *    die `nav-schmal.spec.ts:26-39` dreimal getroffen hat.
+   * Deshalb ist die Spalte NAMENTLICH festgelegt und die Position egal.
+   */
+  const oeffneUndHebeHervor = async (): Promise<void> => {
+    // Erst warten, bis ein vorheriges Menü WIRKLICH zu ist. Ein Tastendruck auf den Griff,
+    // während das Portal noch ausblendet, wird von rc-trigger verschluckt: das Menü bleibt
+    // dann zu, die folgenden Pfeiltasten laufen ins Leere und die Eingabetaste schaltet
+    // nichts. Gemessen: ohne diese Zeile fiel die Gegenprobe in zwei von drei Wiederholungen.
+    await expect(menue, 'vor dem Öffnen muss das Menü geschlossen sein').toHaveCount(0);
+    await schalter.press('Enter');
+    await expect(menue).toHaveCount(1);
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press('ArrowDown');
+      // Belegt zugleich, dass der Fokus überhaupt ins Menü gewandert ist — genau der Punkt,
+      // an dem der Ausgangszustand brach (Fokus blieb am Knopf, 0 Einträge hervorgehoben).
+      await expect(aktiv, 'nach ArrowDown muss genau ein Eintrag hervorgehoben sein').toHaveCount(
+        1,
+      );
+      if (((await aktiv.textContent()) ?? '').trim() === ZIELSPALTE) return;
+    }
+    throw new Error(`Eintrag „${ZIELSPALTE}" war in 12 Schritten nicht erreichbar`);
+  };
+
+  const spaltenKoepfe = async () =>
+    (await page.locator('th.ant-table-cell').allTextContents()).map((t) => t.trim());
+
+  await oeffneUndHebeHervor();
+  const geschaltet = ZIELSPALTE;
+  expect(await spaltenKoepfe(), 'die Spalte steht vor dem Umschalten').toContain(geschaltet);
+
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(zaehler, { message: 'die Eingabetaste muss eine Spalte ausblenden' })
+    .toBe(vorher + 1);
+  // Der Zähler allein genügt nicht: er könnte mitzählen, ohne dass die Spalte verschwindet.
+  expect(await spaltenKoepfe(), 'die Spalte ist aus der Tabelle verschwunden').not.toContain(
+    geschaltet,
+  );
+
+  // Gegenrichtung: derselbe Weg holt dieselbe Spalte zurück. Ohne sie bliebe offen, ob die
+  // Taste umschaltet oder nur in eine Richtung schiebt.
+  await oeffneUndHebeHervor();
+  await page.keyboard.press('Enter');
+  await expect.poll(zaehler, { message: 'derselbe Weg muss zurückschalten' }).toBe(vorher);
+  expect(await spaltenKoepfe(), 'die Spalte steht wieder in der Tabelle').toContain(geschaltet);
+});

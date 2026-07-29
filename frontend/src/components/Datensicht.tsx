@@ -630,14 +630,32 @@ export function SpaltenSchalter<T, K extends string>(props: {
   return (
     <Dropdown
       trigger={['click']}
+      /*
+       * Der Fokus muss beim Öffnen IN das Menü wandern. Ohne `autoFocus` bleibt er am Knopf,
+       * die Pfeiltasten heben keinen Eintrag hervor, und die Eingabetaste schließt das Menü
+       * wieder — gemessen: nach `ArrowDown` stand `document.activeElement` weiter auf dem
+       * Knopf und `.ant-dropdown-menu-item-active` bei 0.
+       */
+      autoFocus
       menu={{
+        /*
+         * Umgeschaltet wird am MENÜEINTRAG, nicht am Kontrollkästchen: rc-menu ruft `onClick`
+         * auf beiden Wegen auf — Mausklick und Eingabe-/Leertaste auf dem hervorgehobenen
+         * Eintrag. Hing der Umschalter allein am `onChange` des Kästchens, gab es nur einen
+         * Mausweg; die Tastatur konnte den Schalter öffnen, aber keine Spalte umschalten
+         * (WCAG 2.1.1). Der Nachweis liegt in `frontend/e2e/datensicht-schmal.spec.ts` und
+         * nicht in Vitest: jsdom liefert kein Fokusverhalten für ein Portal-Menü.
+         */
+        onClick: ({ key }) => umschalten(key as K),
         items: waehlbar.map((spalte) => ({
           key: spalte.key,
           label: (
-            <Checkbox
-              checked={!aus.includes(spalte.key)}
-              onChange={() => umschalten(spalte.key)}
-            >
+            /*
+             * Das Kästchen ist ANZEIGE, kein zweiter Umschalter: mit eigenem `onChange` würde
+             * ein Mausklick darauf zusätzlich das `onClick` des Eintrags auslösen und die
+             * Umschaltung im selben Atemzug zurücknehmen.
+             */
+            <Checkbox checked={!aus.includes(spalte.key)}>
               {etikettVon(spalte) ?? spalte.key}
             </Checkbox>
           ),
