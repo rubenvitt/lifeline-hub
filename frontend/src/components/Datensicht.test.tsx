@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -860,6 +860,64 @@ describe('Datensicht · Tabellenzweig', () => {
     ]);
   });
 
+  it('ein Filter wirkt NICHT mehr, sobald seine Spalte ausgeblendet ist — und wieder, wenn sie zurückkommt', async () => {
+    /**
+     * Das Bedienelement hing schon immer an den GEZEIGTEN Spalten, die Wirkung aber an
+     * allen: wer die gefilterte Spalte ausblendete, behielt eine gefilterte Liste ohne
+     * sichtbaren Grund und ohne Rückweg. Geprüft wird die Zeilenmenge, nicht der Zustand —
+     * ein Test auf `filterWerte` bliebe grün, obwohl der Benutzer Zeilen vermisst.
+     */
+    const { container } = rendere();
+    const namen = () =>
+      [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
+
+    /**
+     * Immer über das GEÖFFNETE Menü, nie über einen freien `findByRole`-Griff: antd lässt die
+     * Portale geschlossener Dropdowns im Baum stehen, und ein Griff nach der Beschriftung
+     * kann dann ein totes Kästchen erwischen. Das ist einmal zugeschlagen — der Test war
+     * grün gefahren und fiel erst im Sammellauf um.
+     */
+    const koepfe = () =>
+      [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
+    const schalteSpalte = async (etikett: string, danach: 'weg' | 'da') => {
+      await userEvent.click(screen.getByRole('button', { name: /Spalten/ }));
+      const menue = await screen.findByRole('menu');
+      await userEvent.click(within(menue).getByRole('checkbox', { name: etikett }));
+      // Auf die WIRKUNG warten, nicht auf den Klick: ohne diesen Halt prüfte die nächste
+      // Zusicherung gegen einen Baum, der die Umschaltung noch nicht verarbeitet hat — im
+      // Sammellauf gemessen, allein gefahren nie.
+      await waitFor(() =>
+        danach === 'weg'
+          ? expect(koepfe()).not.toContain(etikett)
+          : expect(koepfe()).toContain(etikett),
+      );
+    };
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
+    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    // Auswahlliste schließen: bliebe sie offen, fienge sie den nächsten Klick als
+    // Außenklick ab und der Spaltenschalter öffnete gar nicht.
+    await userEvent.keyboard('{Escape}');
+    expect(namen()).toEqual(['Florian 1', 'Florian 3']);
+
+    await schalteSpalte('Träger', 'weg');
+    expect(namen(), 'ohne die Spalte ist auch ihr Filter unwirksam').toEqual([
+      'Florian 1',
+      'Rotkreuz 2',
+      'Florian 3',
+    ]);
+    // Und das Bedienelement ist mit der Spalte verschwunden — sonst stünde ein Filter da,
+    // der nichts tut.
+    expect(screen.queryByRole('combobox', { name: 'Träger' })).toBeNull();
+
+    // Erneut öffnen: das Menü schließt nach jedem Umschalten.
+    await schalteSpalte('Träger', 'da');
+    expect(namen(), 'die Spalte zurück, der gemerkte Filter wirkt wieder').toEqual([
+      'Florian 1',
+      'Florian 3',
+    ]);
+  });
+
   it('aufklappzeile läuft nur im Tabellenzweig', () => {
     const breit = rendere({ aufklappzeile: (f) => `Besatzung von ${f.funkrufname}` });
     expect(breit.container.querySelectorAll('.ant-table-row-expand-icon')).toHaveLength(3);
@@ -1120,6 +1178,45 @@ describe('Datensicht · Zeilenschleuse', () => {
     );
     expect(karten(container)).toHaveLength(3);
     expect(screen.getByRole('button', { name: /1 neuer Eintrag/ })).toBeInTheDocument();
+  });
+
+  it('die eingefrorene Sicht hält auch die GRUPPENZUGEHÖRIGKEIT — die Karte wandert nicht unter einen anderen Kopf', () => {
+    /**
+     * Die Zusicherung des Dateikopfs lautet „nur die Zeile darf nicht wandern", ohne
+     * Einschränkung auf die Reihenfolge. Ohne eingefrorene Gruppenachse bestimmt
+     * `gruppiere` die Gruppe aus den FRISCHEN Daten: ein Statuswechsel per Live-Ereignis
+     * hängt die Karte im Kartenzweig unter einen anderen Kopf um, während jemand in der
+     * Sicht arbeitet — dieselbe Bewegung, nur eine Achse weiter.
+     *
+     * Der Zellinhalt muss den neuen Wert trotzdem sofort zeigen; beides steht deshalb im
+     * selben Test, sonst wäre „eingefroren" auch durch stehengebliebene Inhalte erfüllt.
+     */
+    setzeViewportBreite(390);
+    const gruppen = {
+      schluessel: (f: Fahrzeug) => f.traeger ?? 'ohne',
+      etikett: (w: string) => (w === 'FW' ? 'Feuerwehr' : w === 'HiOrg' ? 'Hilfsorganisation' : 'ohne Träger'),
+      reihenfolge: ['FW', 'HiOrg'],
+    };
+    const { rerender } = rendere({ gruppen });
+    expect(screen.getByText('Feuerwehr · 2')).toBeInTheDocument();
+    expect(screen.getByText('Hilfsorganisation · 1')).toBeInTheDocument();
+
+    screen.getByRole('link', { name: 'Florian 1' }).focus();
+    rerender(
+      <Datensicht<Fahrzeug, FahrzeugKey>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={spalten}
+        daten={[{ ...DREI[0], traeger: 'HiOrg' }, DREI[1], DREI[2]]}
+        zeilenSchluessel="id"
+        karte={karte}
+        gruppen={gruppen}
+      />,
+    );
+
+    expect(screen.getByText('Feuerwehr · 2'), 'die Karte bleibt unter ihrem alten Kopf').toBeInTheDocument();
+    expect(screen.getByText('Hilfsorganisation · 1')).toBeInTheDocument();
+    // Der neue Wert steht trotzdem in der Karte — eingefroren ist die POSITION, nicht der Inhalt.
+    expect(screen.getAllByText('HiOrg')).toHaveLength(2);
   });
 });
 

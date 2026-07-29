@@ -728,6 +728,14 @@ export default function Datensicht<T extends object, const K extends string>(
    * Überlebenden bekämen dann die NEUE Reihenfolge, und genau das ist der Sprung unter dem
    * Cursor, den das Kriterium verbietet.
    *
+   * `gruppeVon` friert die GRUPPENZUGEHÖRIGKEIT mit ein, nicht nur die Folge. Ohne sie
+   * bestimmt {@link gruppiere} die Gruppe aus den frischen Daten: ein Statuswechsel per
+   * Live-Ereignis hängt die Karte unter einen anderen Gruppenkopf um, während die Sicht
+   * eingefroren ist — dieselbe Bewegung, die die Zusicherung oben („nur die Zeile darf nicht
+   * wandern") verbietet, nur eine Achse weiter. Eine Zeile, deren Gruppenwert sich ändert,
+   * bleibt deshalb bis zum Auftauen unter ihrem alten Kopf; der Zellinhalt zeigt den neuen
+   * Status sofort.
+   *
    * ── WARUM DREI ZUSTÄNDE UND NICHT `readonly Key[] | null` ────────────────────────
    *
    * Zwei Bewegungen sehen gleich aus und sind es nicht: eine Zeile, die von SELBST unter
@@ -744,9 +752,10 @@ export default function Datensicht<T extends object, const K extends string>(
   type Schleuse =
     | { art: 'offen' }
     | { art: 'neu' }
-    | { art: 'gefroren'; folge: readonly Key[] };
+    | { art: 'gefroren'; folge: readonly Key[]; gruppeVon: ReadonlyMap<Key, string> };
   const [schleuse, setSchleuse] = useState<Schleuse>({ art: 'offen' });
   const gefroren = schleuse.art === 'gefroren' ? schleuse.folge : null;
+  const gefroreneGruppeVon = schleuse.art === 'gefroren' ? schleuse.gruppeVon : null;
 
   const nachBenutzeraktion = useCallback(() => {
     setSchleuse((vorher) => (vorher.art === 'offen' ? vorher : { art: 'neu' }));
@@ -779,6 +788,34 @@ export default function Datensicht<T extends object, const K extends string>(
   const [suchbegriff, setSuchbegriff] = useState('');
   const [filterWerte, setFilterWerte] = useState<Record<string, readonly string[]>>({});
 
+  // ── Spaltensichtbarkeit ───────────────────────────────────────────────────────────
+  // Steht VOR der Zeilenmenge, weil die wirksamen Filter davon abhängen (siehe unten).
+  const verborgen = useMemo(() => new Set(aktiveSpaltenAus), [aktiveSpaltenAus]);
+  const { spalten: gezeigteSpalten } = useMemo(
+    () => sichtbareSpalten({ spalten, verborgen, abBreite }),
+    [spalten, verborgen, abBreite],
+  );
+
+  /**
+   * WAS MAN NICHT SIEHT, WIRKT NICHT: nur Filter sichtbarer Spalten schneiden die Zeilenmenge.
+   *
+   * Vorher hing das Bedienelement an {@link gezeigteSpalten}, die Wirkung aber an allen
+   * Spalten — wer eine Spalte mit gesetztem Filter ausblendete, behielt eine gefilterte
+   * Liste ohne sichtbaren Grund und ohne Rückweg (das Bedienelement war ja weg).
+   *
+   * Der Wert bleibt im Zustand stehen und wirkt beim Wiedereinblenden erneut; verworfen wird
+   * er nicht. GEWÄHLTE FOLGE, kein Nebeneffekt: das gilt auch für Spalten, die `abBreite`
+   * verbirgt — beim Verkleinern des Fensters ändert sich also die Zeilenzahl. Das ist die
+   * Kehrseite derselben Regel und bewusst so: ein unsichtbar wirkender Filter ist der
+   * schlechtere Zustand. Der Spaltenzähler behandelt beide Ursachen ebenfalls gleich
+   * (`sichtbareSpalten` zählt Handauswahl UND `abBreite`) — Zähler und Filter folgen damit
+   * derselben einen Wahrheit, nur an verschiedenen Enden.
+   */
+  const wirksameFilterWerte = useMemo(() => {
+    const sichtbar = new Set(gezeigteSpalten.map((s) => s.key as string));
+    return Object.fromEntries(Object.entries(filterWerte).filter(([k]) => sichtbar.has(k)));
+  }, [filterWerte, gezeigteSpalten]);
+
   // ── Die Zeilenmenge ───────────────────────────────────────────────────────────────
   const zeilen = useMemo(
     () =>
@@ -787,11 +824,11 @@ export default function Datensicht<T extends object, const K extends string>(
         spalten,
         sortierung: aktiveSortierung,
         suchbegriff,
-        filterWerte,
+        filterWerte: wirksameFilterWerte,
         gruppen,
         baum: baum != null,
       }),
-    [daten, spalten, aktiveSortierung, suchbegriff, filterWerte, gruppen, baum],
+    [daten, spalten, aktiveSortierung, suchbegriff, wirksameFilterWerte, gruppen, baum],
   );
 
   const schluessel = useCallback(
@@ -819,18 +856,34 @@ export default function Datensicht<T extends object, const K extends string>(
    * „Benutzeraktion" und „Folge ist wieder gefroren". Trifft in dieser Lücke ein Datenstand
    * ein, rutscht er durch und die Zeile springt doch.
    */
+  /**
+   * Der eingefrorene Stand — Folge UND Gruppenzugehörigkeit. Beide Einfrierstellen (der
+   * `'neu'`-Auftrag unten und {@link betreten}) gehen hierdurch: sie einzeln zu bauen hieße,
+   * eine von beiden zu vergessen, und dann bliebe der Bannerweg kaputt, während der
+   * Fokusweg richtig einfriert.
+   */
+  const standJetzt = useCallback(
+    (): { folge: readonly Key[]; gruppeVon: ReadonlyMap<Key, string> } => ({
+      folge: zeilen.map(schluessel),
+      gruppeVon: new Map(
+        gruppen ? zeilen.map((z) => [schluessel(z), gruppen.schluessel(z)] as const) : [],
+      ),
+    }),
+    [zeilen, schluessel, gruppen],
+  );
+
   useLayoutEffect(() => {
     if (schleuse.art !== 'neu') return;
-    setSchleuse({ art: 'gefroren', folge: zeilen.map(schluessel) });
-  }, [schleuse, zeilen, schluessel]);
+    setSchleuse({ art: 'gefroren', ...standJetzt() });
+  }, [schleuse, standJetzt]);
 
   const betreten = useCallback(() => {
     if (zufluss !== 'sammelbanner') return;
     // SYNCHRON im Handler: die jetzt sichtbare Folge ist die richtige.
     setSchleuse((vorher) =>
-      vorher.art === 'offen' ? { art: 'gefroren', folge: zeilen.map(schluessel) } : vorher,
+      vorher.art === 'offen' ? { art: 'gefroren', ...standJetzt() } : vorher,
     );
-  }, [zufluss, zeilen, schluessel]);
+  }, [zufluss, standJetzt]);
 
   /**
    * `focusout` feuert AUCH beim Sprung von der Titelzelle zum Aktionsknopf derselben
@@ -859,19 +912,39 @@ export default function Datensicht<T extends object, const K extends string>(
     console.warn(`[Datensicht: ${bezeichnung}] ${befundSchluessel}`);
   }, [befundSchluessel, bezeichnung]);
 
-  // ── Spaltensichtbarkeit ───────────────────────────────────────────────────────────
-  const verborgen = useMemo(() => new Set(aktiveSpaltenAus), [aktiveSpaltenAus]);
-  const { spalten: gezeigteSpalten } = useMemo(
-    () => sichtbareSpalten({ spalten, verborgen, abBreite }),
-    [spalten, verborgen, abBreite],
-  );
-
   // ── Formwahl ──────────────────────────────────────────────────────────────────────
   const alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite('md'));
 
   // ── Werkzeugzeile ─────────────────────────────────────────────────────────────────
   const filterSpalten = gezeigteSpalten.filter((s) => s.filter != null);
+  /**
+   * Gruppiert wird über die EINGEFRORENE Achse, solange die Schleuse zu ist — sonst hängt ein
+   * Statuswechsel die Karte im Kartenzweig unter einen anderen Gruppenkopf um (der Sprung,
+   * den Kriterium 12 verbietet). Der Rückfall auf die frische Achse greift nur für Zeilen,
+   * die beim Einfrieren nicht dabei waren; eine Zeile, deren Gruppenwert sich GEÄNDERT hat,
+   * behält ihren alten Eimer, auch wenn der neue Wert in `reihenfolge` gar nicht vorkommt.
+   */
+  const gruppenAchse = useMemo(() => {
+    if (!gruppen || !gefroreneGruppeVon) return gruppen;
+    return {
+      ...gruppen,
+      schluessel: (zeile: T) =>
+        gefroreneGruppeVon.get(schluessel(zeile)) ?? gruppen.schluessel(zeile),
+    };
+  }, [gruppen, gefroreneGruppeVon, schluessel]);
+  /**
+   * ZWEI Gruppierungen, und die Trennung ist der Punkt:
+   *
+   *  - `gruppenKarten` (gefrorene Achse) ordnet im KARTENZWEIG die Karten den Köpfen zu. Dort
+   *    ist die Gruppe eine POSITION — eine umgehängte Karte ist der verbotene Sprung.
+   *  - `gruppenZaehler` (frische Achse) speist den Zählerstreifen der Werkzeugzeile im
+   *    Tabellenzweig. Dort ist die Gruppe eine ZAHL, keine Position: die Zeilenfolge steht
+   *    ohnehin fest, und ein eingefrorener Zähler wäre dasselbe wie ein eingefrorener
+   *    Zellinhalt — den schließt die Zusicherung oben ausdrücklich aus („ein Statuswechsel
+   *    muss sofort sichtbar sein").
+   */
   const gruppenZaehler = gruppen ? gruppiere(sichtbareZeilen, gruppen) : [];
+  const gruppenKarten = gruppenAchse ? gruppiere(sichtbareZeilen, gruppenAchse) : [];
 
   const werkzeugzeile = (
     /**
@@ -1203,7 +1276,7 @@ export default function Datensicht<T extends object, const K extends string>(
   const kartenZweig =
     gruppen && !baum ? (
       <>
-        {gruppenZaehler.map((g) => (
+        {gruppenKarten.map((g) => (
           <div key={g.wert}>
             {kartenListe(
               g.zeilen,
@@ -1213,7 +1286,7 @@ export default function Datensicht<T extends object, const K extends string>(
             )}
           </div>
         ))}
-        {gruppenZaehler.length === 0 && kartenListe([])}
+        {gruppenKarten.length === 0 && kartenListe([])}
       </>
     ) : (
       kartenListe(sichtbareZeilen)
