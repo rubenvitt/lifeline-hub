@@ -219,6 +219,34 @@ describe('effektiveDaten()', () => {
     expect(ab.map((f) => f.funkrufname)).toEqual(['Cäsar', 'Berta', 'Anton']);
   });
 
+  it('Zahlen im Text sortieren nach ihrem WERT: Florian 2 vor Florian 10', () => {
+    /**
+     * Der Funkrufname ist die menschenlesbare Kennung der Bedien-Leitlinie und die
+     * Standardsortierung der Fahrzeug- und Personalliste. Ein reiner Zeichenvergleich legt
+     * dort „Florian 10" vor „Florian 2" — im Einsatz die falsche Zeile unter dem Finger.
+     */
+    const flotte = [F(1, 'Florian 10'), F(2, 'Florian 2'), F(3, 'Florian 1')];
+    const auf = effektiveDaten({
+      daten: flotte,
+      spalten,
+      sortierung: { spalte: 'funkrufname', richtung: 'auf' },
+      suchbegriff: '',
+      filterWerte: OHNE_FILTER,
+      baum: false,
+    });
+    expect(auf.map((f) => f.funkrufname)).toEqual(['Florian 1', 'Florian 2', 'Florian 10']);
+
+    const ab = effektiveDaten({
+      daten: flotte,
+      spalten,
+      sortierung: { spalte: 'funkrufname', richtung: 'ab' },
+      suchbegriff: '',
+      filterWerte: OHNE_FILTER,
+      baum: false,
+    });
+    expect(ab.map((f) => f.funkrufname)).toEqual(['Florian 10', 'Florian 2', 'Florian 1']);
+  });
+
   it('null und undefined landen HINTEN — in BEIDEN Richtungen', () => {
     // Ohne diese Zusicherung sortiert `undefined` je nach Vergleichsfunktion irgendwohin,
     // und „kein Wert" wandert bei einem Richtungswechsel an den Anfang der Liste.
@@ -879,9 +907,28 @@ describe('Datensicht · Tabellenzweig', () => {
      */
     const koepfe = () =>
       [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
+    /**
+     * Öffnet den Schalter und gibt das OFFENE Menü zurück — notfalls mit einem zweiten Klick.
+     *
+     * Gemessen: liegt die Auswahlliste des Spaltenfilters noch offen, verbraucht sie den
+     * ersten Klick als Außenklick und das Menü bleibt zu. Sie eigens zu schließen gelingt in
+     * jsdom auf keinem Weg (Esc-Taste, zweiter Klick auf die Combobox, Klick auf
+     * `document.body` — alle drei probiert, `aria-expanded` blieb `true`). Ein Bediener
+     * klickt in dieser Lage ebenfalls einfach noch einmal.
+     */
+    const oeffneMenue = async (): Promise<HTMLElement> => {
+      const knopf = screen.getByRole('button', { name: /Spalten/ });
+      for (let i = 0; i < 3; i += 1) {
+        await userEvent.click(knopf);
+        const offen = document.querySelector<HTMLElement>(
+          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+        );
+        if (offen) return offen;
+      }
+      throw new Error('Der Spaltenschalter ließ sich in drei Klicks nicht öffnen');
+    };
     const schalteSpalte = async (etikett: string, danach: 'weg' | 'da') => {
-      await userEvent.click(screen.getByRole('button', { name: /Spalten/ }));
-      const menue = await screen.findByRole('menu');
+      const menue = await oeffneMenue();
       await userEvent.click(within(menue).getByRole('checkbox', { name: etikett }));
       // Auf die WIRKUNG warten, nicht auf den Klick: ohne diesen Halt prüfte die nächste
       // Zusicherung gegen einen Baum, der die Umschaltung noch nicht verarbeitet hat — im
@@ -895,10 +942,16 @@ describe('Datensicht · Tabellenzweig', () => {
 
     await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
     await userEvent.click(await screen.findByTitle('Feuerwehr'));
-    // Auswahlliste schließen: bliebe sie offen, fienge sie den nächsten Klick als
-    // Außenklick ab und der Spaltenschalter öffnete gar nicht.
-    await userEvent.keyboard('{Escape}');
-    expect(namen()).toEqual(['Florian 1', 'Florian 3']);
+    await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Florian 3']));
+
+    /*
+     * Die geöffnete Auswahlliste wird bewusst NICHT eigens geschlossen. Drei Wege dafür sind
+     * gemessen und tragen alle nicht: die Esc-Taste lässt `aria-expanded` in jsdom auf `true`
+     * (der Fokus liegt nach der Optionswahl woanders), ein zweiter Klick auf die Combobox
+     * ebenso, und ein Klick auf `document.body` räumt das Portal nicht ab. Der Öffnungsklick
+     * auf den Spaltenschalter kommt trotzdem an — was den Test trägt, sind die beiden
+     * Wartestellen in `schalteSpalte`.
+     */
 
     await schalteSpalte('Träger', 'weg');
     expect(namen(), 'ohne die Spalte ist auch ihr Filter unwirksam').toEqual([

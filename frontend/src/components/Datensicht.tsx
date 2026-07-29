@@ -403,6 +403,16 @@ export function etikettVon<T>(spalte: DatensichtSpalte<T>): string | undefined {
   return undefined;
 }
 
+/**
+ * Sortiert Text so, wie eine Einsatzkraft ihn liest: „Florian 2" vor „Florian 10".
+ *
+ * Ohne `numeric` vergleicht `localeCompare` Ziffer für Ziffer und legt die 10 vor die 2 —
+ * genau in der Spalte, die die Bedien-Leitlinie als menschenlesbare Kennung fixiert
+ * (Funkrufname, Ordnungsnummer). Die Sprache steht FEST auf `de` statt auf der
+ * Systemsprache: sonst hinge die Reihenfolge an der Umgebung, in der der Test läuft.
+ */
+const KOLLATOR = new Intl.Collator('de', { numeric: true });
+
 /** Vergleicht zwei Sortierwerte; Leerwerte landen IMMER hinten, in beiden Richtungen. */
 function vergleiche(
   a: string | number | null | undefined,
@@ -415,7 +425,7 @@ function vergleiche(
   if (aLeer || bLeer) return aLeer && bLeer ? 0 : aLeer ? 1 : -1;
   const faktor = richtung === 'auf' ? 1 : -1;
   if (typeof a === 'number' && typeof b === 'number') return (a - b) * faktor;
-  return String(a).localeCompare(String(b)) * faktor;
+  return KOLLATOR.compare(String(a), String(b)) * faktor;
 }
 
 /**
