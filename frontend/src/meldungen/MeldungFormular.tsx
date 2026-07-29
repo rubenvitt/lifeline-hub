@@ -1,5 +1,6 @@
 import { Button, Card, Col, DatePicker, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
 import { Select } from '../components/Select';
+import { ErfassungsFormular } from '../components/Erfassung';
 import { ThunderboltOutlined, SendOutlined } from '@ant-design/icons';
 import { useEffect } from 'react';
 import dayjs from 'dayjs';
@@ -31,9 +32,27 @@ const DEFAULTS: MeldungFormWerte = {
   bestaetigung_pflicht: false, frist_min: null,
 };
 
+/**
+ * Wiederholfelder einer Meldungs-Serie (LFH-332/B4). Am Funkgerät wechselt der
+ * Wortlaut, nicht die Gegenstelle: Absender, Meldeweg und Adressat bleiben über
+ * mehrere Meldungen gleich. Alles andere — insbesondere `inhalt` und
+ * `ereigniszeit` — wird geleert, weil ein stehengebliebener Wortlaut die
+ * nächste Meldung verfälschen würde.
+ *
+ * `DEFAULTS` ist gleichzeitig `initialValues` UND Reset-Ziel; die Übernahme
+ * läuft deshalb nicht über geänderte Defaults, sondern über das Re-Seeding der
+ * Hülle (zurücksetzen, dann die gemerkten Felder wieder setzen).
+ */
+const UEBERNAHME: (keyof MeldungFormWerte & string)[] = ['absender', 'meldeweg', 'empfaenger'];
+
 export default function MeldungFormular({ senden, onAnlegen, card = true }: {
   senden: boolean;
-  onAnlegen: (d: NeueMeldung) => void;
+  /**
+   * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
+   * die Erfassungshülle lässt den Wortlaut nur dann stehen, wenn sie den
+   * Fehlschlag sieht (LFH-332/B4).
+   */
+  onAnlegen: (d: NeueMeldung) => Promise<unknown>;
   /** Umschließende Card mit Titel rendern. `false` für Inline-Einbettung, wo der
    *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
@@ -60,7 +79,12 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
     form.setFieldsValue({ meldungsart: 'lagemeldung', richtung: 'extern' });
   };
 
-  const absenden = (w: MeldungFormWerte) => {
+  // Das `return` ist tragend: die Erfassungshülle wartet auf diese Zusage und
+  // lässt die Felder stehen, wenn sie abgelehnt wird. Ein blosser Aufruf würde
+  // die Ablehnung an ihr vorbeilaufen lassen und den Wortlaut trotz Fehler-Toast
+  // leeren — genau der Fehler, den der Bestand (fire-and-forget + resetFields)
+  // hatte.
+  const absenden = (w: MeldungFormWerte) =>
     onAnlegen({
       absender: w.absender.trim(),
       empfaenger: w.empfaenger?.trim() || undefined,
@@ -75,11 +99,27 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
       bestaetigung_frist_min:
         w.bestaetigung_pflicht && w.frist_min != null ? w.frist_min : undefined,
     });
-    form.resetFields();
-  };
 
   const formular = (
-    <Form<MeldungFormWerte> form={form} layout="vertical" initialValues={DEFAULTS} onFinish={absenden}>
+    <ErfassungsFormular<MeldungFormWerte>
+      form={form}
+      initialValues={DEFAULTS}
+      onErfassen={absenden}
+      // Das Inline-Formular schliesst sich nach dem Senden NICHT: Zuklappen ist
+      // ausdrückliche Nutzeraktion über den Kopf-Umschalter oder das Kreuz an
+      // der Card (LFH-332/B4). Deshalb ist „fertig" hier ein Nichts.
+      //
+      // Die beiden Speicher-Knöpfe unterscheiden sich damit NUR in der Übernahme:
+      // „Meldung erfassen" (auch der Enter-Weg) leert alles wie bisher,
+      // „Speichern und nächste" hält Absender/Meldeweg/Adressat fest. Das ist die
+      // Aufteilung der Hülle und keine Verschlechterung — der Bestand hat auf dem
+      // Enter-Weg ebenfalls vollständig zurückgesetzt.
+      onFertig={() => {}}
+      laeuft={senden}
+      erfassenText="Meldung erfassen"
+      serie
+      uebernahme={UEBERNAHME}
+    >
       {/* Fast-Path (LFH-112): im Formularkörper statt Card-extra, damit sie auch in der
           Inline-Einbettung (card={false}) erhalten bleiben. */}
       <Space style={{ marginBottom: 16 }} wrap>
@@ -179,8 +219,7 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
       >
         <TextArea aria-label="Inhalt / Wortlaut" rows={3} />
       </Form.Item>
-      <Button type="primary" htmlType="submit" loading={senden} block>Meldung erfassen</Button>
-    </Form>
+    </ErfassungsFormular>
   );
 
   if (!card) return formular;

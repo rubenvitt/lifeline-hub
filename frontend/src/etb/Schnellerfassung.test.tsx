@@ -229,6 +229,85 @@ describe('Schnellerfassung', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Wertübernahme (LFH-332/H61)
+//
+// Hier steht nur, was OHNE Remount gilt. Der Fall, der in der Anwendung wirklich
+// zählt — Entwurfs-Tab schließt, Komponente wird neu montiert — kann diese Datei
+// nicht prüfen; er liegt in `entwuerfe/EtbEntwurfsTabs.test.tsx`.
+// ---------------------------------------------------------------------------
+
+describe('Schnellerfassung – Wertübernahme', () => {
+  async function setzeTextfeld(feld: HTMLElement, trigger: string, label: string, wert: string) {
+    await userEvent.type(feld, ` /${trigger}`);
+    await userEvent.click(await screen.findByText(label));
+    await userEvent.type(await screen.findByLabelText(label), `${wert}{Enter}`);
+  }
+
+  it('zeigt den Schalter nicht, wenn kein Aufrufer den Zustand führt', () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.queryByRole('checkbox', { name: 'Werte behalten' })).toBeNull();
+  });
+
+  it('zeigt den Schalter nicht im Berichtigungsmodus', () => {
+    const p = props({ berichtigungZu: original(), werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.getByText(/Berichtigung zu #5/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Werte behalten' })).toBeNull();
+  });
+
+  it('meldet das Umlegen des Schalters an den Aufrufer', async () => {
+    const onWerteBehaltenChange = vi.fn();
+    const p = props({ werteBehalten: true, onWerteBehaltenChange });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const schalter = screen.getByRole('checkbox', { name: 'Werte behalten' });
+    expect(schalter).toBeChecked();
+    await userEvent.click(schalter);
+    expect(onWerteBehaltenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('lässt Von stehen, verwirft aber die Veranlassung (Schalter an)', async () => {
+    const p = props({ werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Lage');
+    await setzeTextfeld(feld, 'von', 'Von', 'ELW 1');
+    await setzeTextfeld(feld, 'veranlassung', 'Veranlassung', 'Nachforderung');
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0])
+      .toMatchObject({ von: 'ELW 1', veranlassung: 'Nachforderung' });
+    expect(feld).toHaveValue('');
+    // Von überlebt (Wiederholfeld), Veranlassung nicht (je Eintrag verschieden).
+    expect(await screen.findByText('Von: ELW 1')).toBeInTheDocument();
+    expect(screen.queryByText('Veranlassung: Nachforderung')).toBeNull();
+  });
+
+  it('verwirft Von, wenn der Schalter aus ist', async () => {
+    const p = props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Lage');
+    await setzeTextfeld(feld, 'von', 'Von', 'ELW 1');
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(feld).toHaveValue(''));
+    expect(screen.queryByText('Von: ELW 1')).toBeNull();
+  });
+
+  it('leert im Berichtigungsmodus alles, obwohl der Aufrufer den Schalter an hat', async () => {
+    const p = props({ berichtigungZu: original(), werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Korrektur');
+    await setzeTextfeld(feld, 'von', 'Von', 'ELW 1');
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(feld).toHaveValue(''));
+    expect(screen.queryByText('Von: ELW 1')).toBeNull();
+  });
+});
+
 describe('Schnellerfassung – Entwurf-Anbindung', () => {
   it('übernimmt initialWerte in das Eingabefeld', () => {
     const p = props({ initialWerte: { inhalt: 'Vorbefüllt', typ: 'meldung', metadaten: {} } });

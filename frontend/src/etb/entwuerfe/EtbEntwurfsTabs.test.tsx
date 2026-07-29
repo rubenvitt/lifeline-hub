@@ -99,6 +99,82 @@ describe('EtbEntwurfsTabs', () => {
     }
   });
 
+  // -------------------------------------------------------------------------
+  // Wertübernahme über die Remount-Grenze (LFH-332/H61)
+  //
+  // Genau hier — und nur hier — ist der Fall prüfbar: nach erfolgreichem Erfassen
+  // schließt dieser Container den Entwurfs-Tab, und das key-Prop erzwingt einen
+  // Remount der Schnellerfassung. Ein Wert, der nur in deren useState läge, wäre
+  // danach weg.
+  // -------------------------------------------------------------------------
+
+  async function setzeAnUndMeldeweg(feld: HTMLElement) {
+    await userEvent.type(feld, ' /an');
+    await userEvent.click(await screen.findByText('An'));
+    await userEvent.type(await screen.findByLabelText('An'), 'Florian 1{Enter}');
+    await userEvent.type(feld, ' /meldeweg');
+    await userEvent.click(await screen.findByText('Meldeweg'));
+    await userEvent.click(await screen.findByText('Funk'));
+  }
+
+  it('übernimmt An und Meldeweg in den nächsten Entwurf (Schalter an)', async () => {
+    const p = props();
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    // Vorgabe des Schalters ist AN.
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).toBeChecked();
+
+    await userEvent.type(feld, 'Erste Meldung');
+    await setzeAnUndMeldeweg(feld);
+    await userEvent.type(feld, '{Enter}');
+
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0])
+      .toMatchObject({ an: 'Florian 1', meldeweg: 'funk' });
+
+    // Der leere Inhalt beweist, dass wir den NEUEN Entwurf sehen: die alte Instanz ist
+    // beim Schließen des Tabs unmountet worden und hat ihr Feld nie geleert.
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('');
+      expect(screen.getByText('An: Florian 1')).toBeInTheDocument();
+      expect(screen.getByText('Meldeweg: Funk')).toBeInTheDocument();
+    });
+
+    // Kein Geister-Entwurf: Die übernommenen Chips dürfen den gerade gelöschten Entwurf
+    // nicht wieder in den Speicher schreiben. Die Schnellerfassung setzt nach dem Erfassen
+    // metadaten auf die Übernahme — träfe dieser Autosave noch den ALTEN Entwurf, wäre
+    // `istLeer` wegen der gesetzten Metadaten falsch und der Entwurf käme leer zurück.
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
+
+    // …und sie werden beim nächsten Eintrag ohne erneutes Tippen mitgesendet.
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Zweite Meldung{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[1][0])
+      .toMatchObject({ inhalt: 'Zweite Meldung', an: 'Florian 1', meldeweg: 'funk' });
+  });
+
+  it('lässt den nächsten Entwurf leer, wenn der Schalter aus ist', async () => {
+    const p = props();
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+
+    await userEvent.type(feld, 'Erste Meldung');
+    await setzeAnUndMeldeweg(feld);
+    await userEvent.type(feld, '{Enter}');
+
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0])
+      .toMatchObject({ an: 'Florian 1', meldeweg: 'funk' });
+
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    expect(screen.queryByText('An: Florian 1')).toBeNull();
+    expect(screen.queryByText('Meldeweg: Funk')).toBeNull();
+    // Der Schalterzustand selbst überlebt den Remount ebenfalls.
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+  });
+
   it('öffnet über den +-Button einen zweiten Tab', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
