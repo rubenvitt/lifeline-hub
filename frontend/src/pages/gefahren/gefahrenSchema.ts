@@ -50,15 +50,3 @@ export function kombinationGueltig(typ: Gefahrentyp, objekt: Schutzobjekt): bool
   }
   return true;
 }
-
-/** Hintergrundfarbe je Warnstufe (Zell-Codierung). `keine` = neutral. */
-export function warnstufeFarbe(w: Warnstufe): string {
-  switch (w) {
-    case 'niedrig': return '#fff7e6';
-    case 'mittel': return '#ffd591';
-    case 'hoch': return '#ffa39e';
-    case 'akut': return '#ff4d4f';
-    case 'keine':
-    default: return 'transparent';
-  }
-}

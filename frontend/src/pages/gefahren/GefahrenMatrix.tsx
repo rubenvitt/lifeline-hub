@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Button, Input, Popover, Space, Table } from 'antd';
+import { Button, Input, Popover, Space, Table, theme } from 'antd';
 import { Select } from '../../components/Select';
 import { EditOutlined } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 import type { BewertungEingabe } from '../../api/gefahren';
-import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig, warnstufeFarbe } from './gefahrenSchema';
+import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
+import { flaechenFarbe } from '../../theme/statusFarben';
 
 interface ZeilenDaten { typ: Gefahrentyp; label: string; }
 
@@ -44,6 +45,7 @@ export interface GefahrenMatrixProps {
 
 /** Wiederverwendbares 13×5-Raster für EIN Gefahrengebiet (GefahrenPage + Karten-Drawer). */
 export default function GefahrenMatrix({ matrix, darfSchreiben, pending, onSetzen }: GefahrenMatrixProps) {
+  const { token } = theme.useToken();
   const zelleVon = (typ: Gefahrentyp, objekt: Schutzobjekt) =>
     matrix.find((m) => m.gefahrentyp === typ && m.schutzobjekt === objekt);
   const warnstufeVon = (typ: Gefahrentyp, objekt: Schutzobjekt): Warnstufe =>
@@ -55,7 +57,9 @@ export default function GefahrenMatrix({ matrix, darfSchreiben, pending, onSetze
       title: obj.label,
       key: obj.wert,
       onCell: (zeile: ZeilenDaten) => ({
-        style: { backgroundColor: warnstufeFarbe(warnstufeVon(zeile.typ, obj.wert)), textAlign: 'center' as const },
+        // Nur die Farbquelle wechselt (LFH-368 · Task 3 macht aus der Zelle mehr als
+        // eine Farbfläche) — `flaechenFarbe` ersetzt `warnstufeFarbe` 1:1.
+        style: { backgroundColor: flaechenFarbe(warnstufeVon(zeile.typ, obj.wert), token), textAlign: 'center' as const },
       }),
       render: (_: unknown, zeile: ZeilenDaten) => {
         const gueltig = kombinationGueltig(zeile.typ, obj.wert);

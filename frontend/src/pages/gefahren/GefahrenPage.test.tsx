@@ -70,6 +70,21 @@ describe('GefahrenPage', () => {
     expect(await screen.findByText('Kartenfläche')).toBeInTheDocument();
   });
 
+  it('zeigt die höchste Warnstufe als Etikett, nicht als Flächenfarbe (LFH-368)', async () => {
+    server.use(...handlers());
+    renderPage();
+    const tag = await screen.findByText('hoch');
+    // Der PASTELLWERT ist die Signatur des Fehlgriffs: `warnstufeFarbe('hoch')` = '#ffa39e'
+    // landete als `color=` am `<Tag>`. Der Hex-String selbst steht NICHT im `style` — antd
+    // rechnet ihn beim Rendern in `rgb(...)` um (per Mutationsprobe gemessen:
+    // `color: rgb(255, 163, 158)` bei `#ffa39e`) und trägt ihn als TEXTFARBE, nicht als
+    // Hintergrund; die Hintergrundfläche ist ein daraus abgeleiteter Tint. Geprüft wird
+    // deshalb die ABWESENHEIT des umgerechneten Werts, nicht der neue Wert — den positiv zu
+    // pinnen prüfte antds Vorgaben, weil `test/utils.tsx` ein nacktes `ConfigProvider`
+    // rendert (dieselbe Falle wie bei Höhen).
+    expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain('rgb(255, 163, 158)');
+  });
+
   it('bietet „Auf Karte zeigen" mit Reverse-Deeplink auf die Lagekarte (LFH-155)', async () => {
     server.use(...handlers());
     renderPage();

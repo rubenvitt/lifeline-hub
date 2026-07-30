@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Space, Spin, Tag, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -10,7 +10,7 @@ import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
-import { warnstufeFarbe } from './gefahrenSchema';
+import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
 import GefahrenMatrix from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
@@ -21,6 +21,7 @@ export default function GefahrenPage() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -114,11 +115,21 @@ export default function GefahrenPage() {
         renderItem={(g) => (
           <ListenEintrag
             onClick={() => setGewaehlt(g.id)}
-            style={{ cursor: 'pointer', background: g.id === gewaehlt ? 'rgba(22,119,255,0.08)' : undefined }}
+            style={{
+              cursor: 'pointer',
+              // Die Rolle `bedien`, nicht antds Default-Blau: `rgba(22,119,255,0.08)`
+              // stand hier hartkodiert und blieb im Nachtmodus derselbe helle Schleier
+              // auf dunklem Grund (LFH-368). `colorPrimaryBg` leitet antd aus
+              // `colorPrimary` ab — also aus unserer Rolle, in beiden Modi.
+              background: g.id === gewaehlt ? token.colorPrimaryBg : undefined,
+            }}
           >
             <Space>
-              <Tag color={g.hoechste_warnstufe === 'keine' ? undefined : warnstufeFarbe(g.hoechste_warnstufe)}>
-                {g.hoechste_warnstufe}
+              {/* Etikett, nicht Fläche: `warnstufeKarte` liefert die Rolle, `rollenFarbe`
+                  den Wert des aktiven Modus. Vorher stand hier `warnstufeFarbe` — dieselbe
+                  Sortenverwechslung, die LFH-328 in `ZonenInspector.tsx` behoben hat. */}
+              <Tag color={rollenFarbe(warnstufeKarte[g.hoechste_warnstufe].rolle, token)}>
+                {warnstufeKarte[g.hoechste_warnstufe].label}
               </Tag>
               <span>{gefahrengebietName(g.label, g.id)}</span>
               <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
