@@ -1,44 +1,7 @@
 {
   "hooks": {
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rubeen/.cargo/bin/cona index --quiet"
-          }
-        ],
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ \"${CONA_RENUDGE_EVERY:-0}\" -gt 0 ] 2>/dev/null && /Users/rubeen/.cargo/bin/cona hook PostToolUse || :"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rubeen/.cargo/bin/cona index --quiet --session-start"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rubeen/.cargo/bin/cona hook PreToolUse"
-          }
-        ],
-        "matcher": "Read|Grep"
-      }
-    ]
+    "PostToolUse": [],
+    "SessionStart": [],
+    "PreToolUse": []
   }
 }
