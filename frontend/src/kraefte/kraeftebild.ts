@@ -397,6 +397,21 @@ export function staerkeText(s: StaerkeSumme): string {
 
 // ── Markdown-Renderer ─────────────────────────────────────────────────────────
 
+/**
+ * Die Art des Mittels als KURZWORT, nicht als Emoji.
+ *
+ * Hier standen drei Emoji. Das Ziel dieses Markdowns ist ein Lagebericht — er wird
+ * gedruckt, in Textform weitergegeben und in Ausgabeketten gelesen, die keine
+ * Farbschrift führen; ein Emoji trägt dort nichts und fällt im schlechtesten Fall auf ein
+ * Ersatzkästchen zurück. Die Kürzel folgen dem Präfix, das die Kennzahlenzeile der Seite
+ * schon führt („Mtl. defekt" in `MAT_STATUS_ANZEIGE`).
+ *
+ * Als Konstante und nicht dreimal inline: so hat die Marke EINEN Ort. Der Test pinnt sie
+ * trotzdem als LITERAL (`- Pers. `) und nicht über diese Konstante — sonst prüfte er sie
+ * gegen sich selbst und bliebe grün, wenn hier wieder ein Bildzeichen einzöge.
+ */
+const MITTEL_MARKE = { person: 'Pers.', fahrzeug: 'Fzg.', material: 'Mtl.' } as const;
+
 function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): string {
   const zeilen: string[] = [];
 
@@ -415,15 +430,15 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
     if (zeile.mittelArt === 'person') {
       const detail = zeile.detail ? ` (${zeile.detail})` : '';
       const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
-      zeilen.push(`${einzug}  - 👤 ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
+      zeilen.push(`${einzug}  - ${MITTEL_MARKE.person} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
     } else if (zeile.mittelArt === 'fahrzeug') {
       const detail = zeile.detail ? ` (${zeile.detail})` : '';
       const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
-      zeilen.push(`${einzug}  - 🚒 ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
+      zeilen.push(`${einzug}  - ${MITTEL_MARKE.fahrzeug} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
     } else {
       const menge = zeile.menge != null ? ` ×${zeile.menge}` : '';
       const status = zeile.statusLabel ?? '';
-      zeilen.push(`${einzug}  - 📦 ${zeile.bezeichnung}${menge}${status ? ` [${status}]` : ''}`);
+      zeilen.push(`${einzug}  - ${MITTEL_MARKE.material} ${zeile.bezeichnung}${menge}${status ? ` [${status}]` : ''}`);
     }
   }
 

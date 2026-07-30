@@ -89,9 +89,12 @@ function achsenTrenner(token: GlobalToken) {
  *
  * Vorher trug die Statusspalte drei Rollen gleichzeitig: den Einzelstatus der Mittel, die
  * Personalverteilung und die Fahrzeugverteilung — bis zu acht `Tag` in einem `Space` ohne
- * `wrap` bei `width: 220`, unterschieden allein durch zwei Emoji. Und Werte gleich 0 fielen
- * weg, wodurch zwei übereinanderliegende Zeilen einer VERGLEICHSTABELLE nicht mehr
+ * `wrap` bei `width: 220`, unterschieden allein durch zwei Zierzeichen. Und Werte gleich 0
+ * fielen weg, wodurch zwei übereinanderliegende Zeilen einer VERGLEICHSTABELLE nicht mehr
  * fluchteten (Prüflisten-Kriterium 14).
+ *
+ * Die Zierde ist keine Prop: `AmpelZelle` leitet ihr Piktogramm aus `bezeichnung` ab. Hier
+ * standen bis dahin zwei Emoji als Zeichenketten — Begründung im Kopf von `AmpelZelle`.
  *
  * Jetzt: „Personal" und „Fahrzeuge" als Spalten mit Textkopf, je eine kompakte Zählzeile
  * mit vier Feldern in fester Folge. Der Volltext hängt als `title` daran, der Kurztext ist
@@ -113,11 +116,11 @@ const meldebildSpalten = spaltenFuer<MeldebildZeile>()([
   },
   {
     title: 'Personal', key: 'personal', width: 190,
-    render: (_t, z) => <AmpelZelle bezeichnung="Personal" symbol="👤" verteilung={z.personalVerteilung} />,
+    render: (_t, z) => <AmpelZelle bezeichnung="Personal" verteilung={z.personalVerteilung} />,
   },
   {
     title: 'Fahrzeuge', key: 'fahrzeuge', width: 190,
-    render: (_t, z) => <AmpelZelle bezeichnung="Fahrzeuge" symbol="🚒" verteilung={z.fahrzeugVerteilung} />,
+    render: (_t, z) => <AmpelZelle bezeichnung="Fahrzeuge" verteilung={z.fahrzeugVerteilung} />,
   },
   {
     title: 'Status', key: 'status', width: 220,
