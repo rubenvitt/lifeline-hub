@@ -130,7 +130,6 @@ export default function ErinnerungenPage() {
           extra={(
             <Button
               type="text"
-              size="small"
               icon={<CloseOutlined />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"

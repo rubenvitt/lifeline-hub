@@ -50,7 +50,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
         onChange={({ fileList }) => setDateien(fileList)}
         style={{ marginTop: 8 }}
       >
-        <Button size="small" type="text" icon={<PaperClipOutlined />}>Anhang</Button>
+        <Button type="text" icon={<PaperClipOutlined />}>Anhang</Button>
       </Upload>
     </div>
   );

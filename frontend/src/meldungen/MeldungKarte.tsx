@@ -72,6 +72,26 @@ export default function MeldungKarte({
   // Unübersehbare Hervorhebung (AK1/AK3): unbestätigte überfällige/eskalierte Sofortmeldung.
   const alarmiert = !!(m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert));
 
+  // Bündelung in ein Dreipunkt-Menü: GEPRÜFT und VERWORFEN (LFH-364/B5d).
+  //
+  // Der Anlass ist echt — die sechs Aktionen unten schliessen sich NICHT aus. Eine neue,
+  // bestätigungspflichtige, noch nicht lagerelevante Meldung ohne Auftrag zeigt alle
+  // sechs gleichzeitig, und auf der Stufe `handschuh` (72 px) wächst die Karte damit um
+  // mehrere Knopfzeilen. Dagegen stehen zwei gemessene Kosten:
+  //
+  //  1. `pages/MeldungenPage.test.tsx` greift diese Aktionen an ~10 Stellen als
+  //     `getByRole('button', { name })` ab (Sichten, Erledigt, An Lage übergeben,
+  //     Auftrag erteilen, Bestätigen). Ein Dropdown macht aus der Rolle `button` ein
+  //     `menuitem` — gleicher Wortlaut rettet die Abfragen also nicht. LFH-364 nennt
+  //     diese Datei nicht als Änderungsziel.
+  //  2. Vier der sechs Aktionen hängen in einem `Popconfirm`. Im Menü braucht jede die
+  //     `stopPropagation`-Konstruktion aus `chat/NachrichtenStrom.tsx` — vier
+  //     Bestätigungsblasen in einem Menü sind eine eigene Interaktionsentscheidung,
+  //     keine Nebenwirkung einer Dichte-Aufgabe.
+  //
+  // Das verbindliche Kriterium von B5 ist die TREFFFLÄCHE, und die trägt jetzt der
+  // `ConfigProvider`. Die Kartenhöhe bei sechs offenen Aktionen bleibt offen und liegt
+  // als LFH-372 (B5k) auf dem Board — dort samt dem Testumbau, den sie erzwingt.
   const aktionen: ReactNode[] = darfSchreiben
     ? [
         m.bestaetigung_pflicht && !m.ist_bestaetigt && onBestaetigen
@@ -83,7 +103,7 @@ export default function MeldungKarte({
               cancelText="Abbrechen"
               onConfirm={() => onBestaetigen(m.id)}
             >
-              <Button size="small" danger>Bestätigen</Button>
+              <Button danger>Bestätigen</Button>
             </Popconfirm>
           ) : null,
         m.status === 'neu' && onStatus
@@ -95,7 +115,7 @@ export default function MeldungKarte({
               cancelText="Abbrechen"
               onConfirm={() => onStatus(m.id, 'gesichtet')}
             >
-              <Button size="small">Sichten</Button>
+              <Button>Sichten</Button>
             </Popconfirm>
           ) : null,
         (m.status === 'neu' || m.status === 'gesichtet') && onStatus
@@ -107,7 +127,7 @@ export default function MeldungKarte({
               cancelText="Abbrechen"
               onConfirm={() => onStatus(m.id, 'in_bearbeitung')}
             >
-              <Button size="small">In Bearbeitung</Button>
+              <Button>In Bearbeitung</Button>
             </Popconfirm>
           ) : null,
         m.status !== 'erledigt' && onStatus
@@ -119,17 +139,17 @@ export default function MeldungKarte({
               cancelText="Abbrechen"
               onConfirm={() => onStatus(m.id, 'erledigt')}
             >
-              <Button size="small" type="primary" ghost>Erledigt</Button>
+              <Button type="primary" ghost>Erledigt</Button>
             </Popconfirm>
           ) : null,
         // An die Lage übergeben (LFH-95/113): öffnet ein Formular-Modal (optionale
         // Verortung) statt Popconfirm → eigener Button ohne Popconfirm.
         !m.lagerelevant && onLagerelevant
-          ? <Button key="lr" size="small" onClick={() => onLagerelevant(m.id)}>An Lage übergeben</Button> : null,
+          ? <Button key="lr" onClick={() => onLagerelevant(m.id)}>An Lage übergeben</Button> : null,
         // Meldung→Auftrag (LFH-113): nur solange noch kein Auftrag erteilt. Öffnet ein
         // Formular-Modal (kein Popconfirm) → eigener Button.
         m.auftrag_id == null && onAuftragErteilen
-          ? <Button key="ae" size="small" onClick={() => onAuftragErteilen(m)}>Auftrag erteilen</Button> : null,
+          ? <Button key="ae" onClick={() => onAuftragErteilen(m)}>Auftrag erteilen</Button> : null,
       ].filter(Boolean)
     : [];
 
@@ -181,7 +201,6 @@ export default function MeldungKarte({
         )}
         {darfSchreiben && onZuweisen ? (
           <Select<number | null>
-            size="small"
             allowClear
             style={{ minWidth: 180 }}
             placeholder="Bearbeiter zuweisen"

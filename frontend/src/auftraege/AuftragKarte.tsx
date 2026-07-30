@@ -63,6 +63,19 @@ export default function AuftragKarte({
   const sichtbareEmpf = a.empfaenger.slice(0, 3);
   const restEmpf = a.empfaenger.length - sichtbareEmpf.length;
   const details = gefuellteFelder(a);
+  // Nur die SICHTBAREN Empfänger bekommen eine Aktion — aus Layoutgründen, damit die
+  // Aktionszeile kurz bleibt. Die Daten wären da: `a.empfaenger` trägt jeden Empfänger
+  // mit `snap_anzeige` (`src/auftrag/repo.rs`/`empfaenger_von` hat kein LIMIT), nur die
+  // ANZEIGE ist auf drei geschnitten.
+  // Damit bleibt eine Lücke, die der Bestand vor LFH-364 genauso hatte (der
+  // `Typography.Link` sass in derselben `slice(0, 3)`): sind die ersten drei quittiert
+  // und ein vierter offen, verschwindet die Zeile und der Auftrag ist nicht mehr voll
+  // quittierbar — womit `empfaenger_anzahl == quittiert_anzahl` in
+  // `src/routes/auftrag.rs` nie wahr wird und die Auto-Erinnerung aus LFH-118 nicht
+  // schliesst. Eigener Task, siehe LFH-371.
+  const offeneQuittungen = darfSchreiben && onQuittieren
+    ? sichtbareEmpf.filter((e) => !e.quittiert_at)
+    : [];
 
   const aktionen: ReactNode[] = darfSchreiben
     ? [
@@ -75,12 +88,12 @@ export default function AuftragKarte({
               cancelText="Abbrechen"
               onConfirm={() => onInArbeit(a.id)}
             >
-              <Button size="small">In Bearbeitung</Button>
+              <Button>In Bearbeitung</Button>
             </Popconfirm>
           ) : null,
         // „Vollzug melden" öffnet das Modal (= eigene Bestätigung) → kein Popconfirm.
         (a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') && onVollzugMelden
-          ? <Button key="vm" size="small" onClick={() => onVollzugMelden(a.id)}>Vollzug melden</Button> : null,
+          ? <Button key="vm" onClick={() => onVollzugMelden(a.id)}>Vollzug melden</Button> : null,
         a.bearbeitungsstatus === 'vollzogen' && onAbnehmen
           ? (
             <Popconfirm
@@ -90,7 +103,7 @@ export default function AuftragKarte({
               cancelText="Abbrechen"
               onConfirm={() => onAbnehmen(a.id)}
             >
-              <Button size="small" type="primary" ghost>Abnehmen</Button>
+              <Button type="primary" ghost>Abnehmen</Button>
             </Popconfirm>
           ) : null,
       ].filter(Boolean)
@@ -138,21 +151,38 @@ export default function AuftragKarte({
           {sichtbareEmpf.map((e) => (
             <Tag key={e.id} variant="filled" color={e.quittiert_at ? 'green' : 'default'} style={{ margin: 0, fontSize: 12 }}>
               {e.snap_anzeige}{e.quittiert_at ? ' ✓' : ''}
-              {darfSchreiben && !e.quittiert_at && onQuittieren && (
-                <Popconfirm
-                  title="Empfang/Kenntnis quittieren?"
-                  okText="Bestätigen"
-                  cancelText="Abbrechen"
-                  onConfirm={() => onQuittieren(a.id, e.id)}
-                >
-                  <Typography.Link style={{ marginInlineStart: 6 }}>quittieren</Typography.Link>
-                </Popconfirm>
-              )}
             </Tag>
           ))}
           {restEmpf > 0 && <Text type="secondary" style={{ fontSize: 12 }}>+{restEmpf}</Text>}
         </Space>
       </Flex>
+
+      {/* Quittungs-Aktionen in EIGENER Zeile (LFH-364/B5d, Weg (a) des Elterntickets).
+          Der zweite Weg — den Empfänger-Chip komplett antippbar machen — ist verworfen:
+          derselbe Tag trägt oben auch den reinen Statuszustand (grün + ✓). Antippbar und
+          nicht-antippbar sähen dann gleich aus, die Bedienbarkeit hinge allein an der
+          Farbe und der zweite Kanal fehlte (WCAG 1.4.1).
+          Der Knopftext bleibt wörtlich „quittieren"; wer für WEN quittiert, steht im
+          zugänglichen Namen — bei mehreren offenen Empfängern wären sonst mehrere
+          gleichnamige Knöpfe nicht auseinanderzuhalten. */}
+      {offeneQuittungen.length > 0 && (
+        <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
+          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Quittung offen:</Text>
+          {offeneQuittungen.map((e) => (
+            <Space key={e.id} size={4}>
+              <Text style={{ fontSize: 13 }}>{e.snap_anzeige}</Text>
+              <Popconfirm
+                title="Empfang/Kenntnis quittieren?"
+                okText="Bestätigen"
+                cancelText="Abbrechen"
+                onConfirm={() => onQuittieren?.(a.id, e.id)}
+              >
+                <Button aria-label={`Empfang für ${e.snap_anzeige} quittieren`}>quittieren</Button>
+              </Popconfirm>
+            </Space>
+          ))}
+        </Flex>
+      )}
 
       {ansicht === 'abgeschlossen' && (
         <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
@@ -170,7 +200,6 @@ export default function AuftragKarte({
       {details.length > 0 && (
         <Collapse
           ghost
-          size="small"
           style={{ marginInline: -8 }}
           items={[{
             key: 'details',

@@ -165,7 +165,6 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
           extra={(
             <Button
               type="text"
-              size="small"
               icon={<CloseOutlined />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"

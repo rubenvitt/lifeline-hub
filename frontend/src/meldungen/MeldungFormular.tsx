@@ -123,10 +123,10 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
       {/* Fast-Path (LFH-112): im Formularkörper statt Card-extra, damit sie auch in der
           Inline-Einbettung (card={false}) erhalten bleiben. */}
       <Space style={{ marginBottom: 16 }} wrap>
-        <Button danger size="small" icon={<ThunderboltOutlined />} onClick={sofortVorbelegen}>
+        <Button danger icon={<ThunderboltOutlined />} onClick={sofortVorbelegen}>
           Sofortmeldung
         </Button>
-        <Button size="small" icon={<SendOutlined />} onClick={lagemeldungVorbelegen}>
+        <Button icon={<SendOutlined />} onClick={lagemeldungVorbelegen}>
           Lagemeldung (extern)
         </Button>
       </Space>

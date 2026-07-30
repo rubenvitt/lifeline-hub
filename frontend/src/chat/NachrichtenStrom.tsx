@@ -89,7 +89,7 @@ export default function NachrichtenStrom({
               menuItems && menuItems.length > 0
                 ? [
                     <Dropdown key="aktionen" trigger={['click']} menu={{ items: menuItems }}>
-                      <Button type="text" size="small" aria-label="Aktionen" icon={<MoreOutlined />} />
+                      <Button type="text" aria-label="Aktionen" icon={<MoreOutlined />} />
                     </Dropdown>,
                   ]
                 : []

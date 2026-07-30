@@ -82,15 +82,39 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-363: 69 Stellen in 34 Dateien — gemessen, nicht fortgeschrieben —, je
-  Verzeichnis-Bündel von LFH-333 zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit Klammertiefe, nicht per
-  Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind (gemessen 61 statt 82)
-  und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop steht — ein Gate, das
-  einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in seinem
-  Kopfkommentar und ist Teil des Vertrags. Nicht-interaktive Flächen (`Card`, `Descriptions`,
-  `Spin`) sind absichtlich draußen, die Projekt-Primitive `Liste`/`KatalogTabelle` ebenso — dort
-  ist `size` ein **Abstandsmaß**, keine Treffläche, und `Liste.test.tsx` prüft das über mehrere
-  Dichtestufen.
+  30.07.2026 nach LFH-363 + LFH-364: **49 Stellen in 23 Dateien** — gemessen, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
+  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit
+  Klammertiefe, nicht per Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind
+  (gemessen 61 statt 82) und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop
+  steht — ein Gate, das einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in
+  seinem Kopfkommentar und ist Teil des Vertrags. Nicht-interaktive Flächen (`Card`,
+  `Descriptions`, `Spin`) sind absichtlich draußen, die Projekt-Primitive `Liste`/`KatalogTabelle`
+  ebenso — dort ist `size` ein **Abstandsmaß**, keine Treffläche, und `Liste.test.tsx` prüft das
+  über mehrere Dichtestufen.
+  **Der Scanner kennt seit LFH-364 zwei weitere Fälle** — beide gemessen, nicht vermutet, und
+  beide zeigen, dass ein Gate in BEIDE Richtungen falsch liegen kann: **(1)** ein generisches
+  Typargument (`<Select<number | null> size="small">`) schrieb sich vorbei, weil der Lookahead
+  hinter dem Namen ein `[\s/>{]` verlangte; ein `<` ist keins. Der Lookahead allein genügt nicht —
+  `tagEnde` nimmt sonst das `>` des Typarguments für das Tag-Ende, deshalb überspringt
+  `generikEnde` die balancierte Klammer zuerst (die Mutationsprobe „nur Lookahead" färbt 5 Tests
+  rot). Diese eine Lücke versteckte 4 Stellen, darunter einen Verstoß in
+  `personen/personenSpalten.tsx`, der in keiner Schuldzeile stand. **(2)** umgekehrt rechnete der
+  Guard eine Angabe aus einer **Prop-Expression** dem äußeren Element zu: `<Collapse
+  items={[{ children: <Descriptions size="small"/> }]}>` blieb gemeldet, als die eigene Angabe des
+  Collapse längst weg war. `attributEbene` reduziert den Tag darum auf seine Attributebene. Ein
+  Gate, das einen Verstoß nicht wieder loslässt, ist von einem kaputten nicht zu unterscheiden.
+  Dessen Klammer-Bilanz **muss Zeichenketten überspringen** wie `tagEnde`/`generikEnde`: ohne das
+  verschluckt eine Klammer *im String* (`title={x ? "{" : ""} size="small"`) den Rest des Tags —
+  ein Fix, der ein neues Loch reißt, ist schlimmer als der Fehlalarm, den er behebt (im Review
+  gemessen und mit Selbstbeweis geschlossen). Blindfleck bleiben ein **Funktionstyp** im
+  Typargument (dessen `=>` schließt die Klammer zu früh; im Bestand an keiner der 25
+  Generic-Stellen) und eine Klammer in einem **Regex-Literal** einer Prop (Altlast in `tagEnde`).
+  **Klein-Angaben an `Card`/`Descriptions`/`Space`/`Liste` bleiben stehen — als Regel, nicht als
+  Restarbeit**, und sie gehören auch nicht in `OFFEN`: `befunde` belegt einen Eintrag nur über
+  einen echten Fund, ein Eintrag für eine nicht-interaktive Fläche wäre also sofort eine „tote
+  Schuld-Ausnahme" und färbte den Guard rot. Ein handgezähltes Inventar solcher Ausnahmen verrottet
+  (das AK von LFH-364 sprach von „drei" Karten, allein das B5d-Bündel trägt zwölf) — die Regel
+  nicht.
   **Die kleine Steuerhöhe liegt seit LFH-361 auf dem Gate-3-Boden** (24 / 48 / 72 statt antds
   abgeleiteter 22,5 / 36 / 54 — `genControlHeight.js` rechnet × 0,75). Folge: wo eine Bibliothek
   die Kleingröße **erzwingt** — antds Popconfirm tut das hart in `PurePanel.js` — greift die
@@ -504,24 +528,7 @@ Modul behält deshalb sein rohes `Path` für die Sub-IDs (gemessen: `auftrag.rs`
 beide) — die frühere Annahme „Migration entfernt das rohe Path" war falsch, weshalb LFH-317
 unabhängig von der (partiell gebliebenen, unscheduled) LFH-121/230-Migration umgesetzt wurde. Eine
 spätere Kontext-Migration trimmt höchstens ein Tuple-Element, macht den Swap aber nicht zunichte.
-<!-- cona:begin -->
-## cona — token-efficient code navigation
 
-This project is cona-indexed: reading ONE symbol costs a fraction of a whole
-file, and `cona grep`/`refs` search code semantically (identifier nodes — never
-strings or comments). Prefer them over a full Read or a broad Grep when you want
-a specific function, class, or usage site.
-
-Coarse → fine: `cona tree --rank` (orient) → `cona outline <file>` (map a file) →
-`cona show <Sym>` (read one symbol) → `cona edit <Sym>` (syntax-verified write).
-
-`<Sym>` = `Name`, `Parent.Name`, or `file.rs:Name`. Index auto-refreshes;
-`cona index` (~1s) if a repo isn't indexed yet.
-
-Everything else — `context` `impact` `diff` `deps` `callers` `tests` `blame`
-`insert` `rename` `note` `check` — is listed in `cona --help`, with details per
-group (`cona nav --help`, `inspect`, `code`, `history`, `project`, `maint`).
-<!-- cona:end -->
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
