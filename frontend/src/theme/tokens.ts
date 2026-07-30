@@ -99,6 +99,13 @@ export type Dichte = 'kompakt' | 'komfortabel' | 'handschuh';
 export interface Dichtestufe {
   /** `controlHeight` — trägt die Treffläche für alle Steuerelemente auf einmal. */
   zeilenhoehe: number;
+  /**
+   * `controlHeightSM` — die Höhe, die antd allen als „klein" markierten
+   * Steuerelementen gibt. Steht hier, weil antd sie sonst mit dem Faktor 0,75
+   * aus {@link Dichtestufe.zeilenhoehe} ableitet und dabei unter den Boden aus
+   * A1 Gate 3 fällt (Herleitung bei {@link dichten}).
+   */
+  kleineZeilenhoehe: number;
   schriftgroesse: number;
   abstand: Abstandsraster;
 }
@@ -114,10 +121,30 @@ export interface Dichtestufe {
  *
  * Die Grundschrift steigt nur EINMAL (13,5 → 15): der Handschuh ändert die Hand,
  * nicht das Auge.
+ *
+ * ── `kleineZeilenhoehe`: warum sie hier steht statt abgeleitet zu werden ──────
+ * antd rechnet `controlHeightSM = controlHeight × 0,75` (`genControlHeight.js`).
+ * Das ergäbe 22,5 / 36 / 54 — und damit in JEDER Stufe weniger als der Boden,
+ * den A1 Gate 3 für die kurze Achse setzt: kompakt ≥ 24, komfortabel ≥ 48,
+ * Handschuh ≥ 72 (Spec Zeile 196). Gate 3 kennt keine Ausnahme für Elemente,
+ * die eine Bibliothek intern „klein" nennt — ein Daumen misst nicht nach, welche
+ * Prop am Knopf steht.
+ *
+ * Folge: in `komfortabel` und `handschuh` fällt die kleine Höhe mit der vollen
+ * zusammen. Das ist kein Versehen, sondern die Aussage — auf dem Tablet und im
+ * Handschuh gibt es keine kleine Fläche. Nur `kompakt` behält eine echte zweite
+ * Stufe (24 gegen 30), weil dort Maus und Tastatur bedienen; die 22,5 von heute
+ * unterschritten auch diesen Boden.
+ *
+ * Das macht die verbliebenen punktuellen Klein-Angaben harmlos, nimmt ihnen aber
+ * NICHT die Begründung: abgebaut werden sie über den Guard aus LFH-362, nicht
+ * über den Schmerz. `controlHeightXS`/`LG` bleiben abgeleitet — sie hängen an
+ * `zeilenhoehe`, nicht an diesem Wert, und tragen keine Trefflächen-Aussage.
  */
 export const dichten: Record<Dichte, Dichtestufe> = {
   kompakt: {
     zeilenhoehe: 30,
+    kleineZeilenhoehe: 24,
     schriftgroesse: 13.5,
     // md/lg stehen so in A1; xs/sm sind [abgeleitet] (× 1,6 / × 2,4 der
     // md-Stufe, auf ganze Pixel gerundet) und in A1 nicht tabelliert.
@@ -125,12 +152,14 @@ export const dichten: Record<Dichte, Dichtestufe> = {
   },
   komfortabel: {
     zeilenhoehe: 48,
+    kleineZeilenhoehe: 48,
     schriftgroesse: 15,
     // xs/sm [abgeleitet] nach demselben Faktor wie kompakt.
     abstand: { xs: 5, sm: 11, md: 18, lg: 28 },
   },
   handschuh: {
     zeilenhoehe: 72,
+    kleineZeilenhoehe: 72,
     schriftgroesse: 15,
     // xs/sm [abgeleitet] nach demselben Faktor wie kompakt.
     abstand: { xs: 7, sm: 16, md: 26, lg: 44 },
@@ -263,6 +292,11 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     // punktuellen Klein-Angaben an Steuerelementen (Umbaupfad in B5). Das Konstrukt
     // steht hier bewusst NICHT wörtlich: es würde das Gate füllen, das es erklärt.
     controlHeight: stufe.zeilenhoehe,
+    // Ohne diese Zeile leitet antd mit dem Faktor 0,75 ab und unterschreitet in
+    // jeder Stufe den Boden aus A1 Gate 3 — Herleitung bei `dichten`. Sie ist
+    // der Grund, warum antds Zwang zur Kleingröße (z. B. in den Aktionen einer
+    // Bestätigungsblase) die Dichteachse nicht mehr aushebelt.
+    controlHeightSM: stufe.kleineZeilenhoehe,
     padding: stufe.abstand.md,
     paddingSM: stufe.abstand.sm,
     paddingXS: stufe.abstand.xs,

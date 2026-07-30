@@ -77,8 +77,14 @@ export default function EtbPage() {
    * Grund: die Berichtigung unten rendert eine eigene `Schnellerfassung` STATT der Tabs,
    * der Container verschwindet dabei also. Läge der Zustand dort, stünde eine bewusst
    * abgewählte Wertübernahme nach jeder Berichtigung wieder auf AN — ohne Nutzeraktion.
+   *
+   * Vorgabe AUS (30.07.2026), gleiche Begründung wie in `components/Erfassung.tsx`: der
+   * Schalter verändert, was nach dem Erfassen im Formular stehen bleibt. Steht er von
+   * selbst auf AN, hat ihn die erste Person, die ihn bemerkt, bereits benutzt, ohne ihn
+   * gewählt zu haben. Wer in Serie funkt, schaltet ihn einmal an — er hält, bis die Seite
+   * verlassen wird.
    */
-  const [werteBehalten, setWerteBehalten] = useState(true);
+  const [werteBehalten, setWerteBehalten] = useState(false);
   const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);

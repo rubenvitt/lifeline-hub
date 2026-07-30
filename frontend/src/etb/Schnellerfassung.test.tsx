@@ -180,8 +180,68 @@ describe('Schnellerfassung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.click(screen.getByRole('button', { name: /Feld/ }));
     await userEvent.click(await screen.findByText('Ereigniszeit'));
-    // Chip im Edit-Zustand erscheint (Zeit-Editor)
-    expect(await screen.findByText(/Ereigniszeit/)).toBeInTheDocument();
+    // Geprüft wird der Chip-Editor über sein `aria-label`, NICHT ein Text „Ereigniszeit"
+    // irgendwo: der Menüeintrag heisst genauso, ein `findByText(/Ereigniszeit/)` fand also
+    // auch dann etwas, wenn gar kein Chip aufging und bloss das Menü stehenblieb.
+    expect(await screen.findByLabelText('Ereigniszeit')).toBeInTheDocument();
+  });
+
+  it('schliesst das Menü nach der Auswahl — auch wenn es über den Feld-Button kam', async () => {
+    /**
+     * Der Bug, gemeldet am 30.07.2026. `waehleEintrag` schloss das Menü nicht selbst,
+     * sondern verliess sich auf `entferneTriggerText` — und die steigt bei
+     * `triggerStart < 0` sofort aus, BEVOR sie schliesst. Der Feld-Button setzt
+     * `triggerStart` ausdrücklich auf -1 (es gibt keinen „/"-Text zu entfernen), also
+     * blieb das Menü genau auf diesem Weg stehen. Es liegt absolut über der Chip-Leiste
+     * und verdeckte damit den Chip-Editor, der gerade aufgegangen war.
+     *
+     * Beide Öffnungswege in EINEM Test: über „/" schloss es immer, über den Knopf nie.
+     * Ein Test für nur einen Weg wäre entweder trivial grün oder ohne Kontrast.
+     */
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+
+    // Weg 1 — über den Feld-Button.
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    expect(screen.getByTestId('slash-menu')).toBeInTheDocument();
+    await nutzer.click(await screen.findByText('Ereigniszeit'));
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
+
+    // Weg 2 — über „/" im Text. Zur Kontrolle, dass der Fix ihn nicht verliert.
+    await nutzer.type(feld, '/');
+    expect(await screen.findByTestId('slash-menu')).toBeInTheDocument();
+    await nutzer.click(await screen.findByText('Von'));
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
+  });
+
+  it('der Feld-Knopf schliesst das Menü auch wieder', async () => {
+    // Der Knopf schaltet um. Der „Klick daneben"-Griff darf ihm nicht zuvorkommen:
+    // schlösse dieser zuerst, öffnete der Klick danach wieder — der Knopf könnte nie
+    // schliessen, und aus einem Umschalter würde ein Einschalter.
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    const knopf = screen.getByRole('button', { name: /Feld/ });
+
+    await nutzer.click(knopf);
+    expect(screen.getByTestId('slash-menu')).toBeInTheDocument();
+    await nutzer.click(knopf);
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
+  });
+
+  it('schliesst das Menü beim Klick daneben', async () => {
+    // Die zweite Hälfte von „schliesst sich nicht": ohne Auswahl gab es überhaupt
+    // keinen Weg hinaus ausser Escape oder einem zweiten Druck auf denselben Knopf.
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    expect(screen.getByTestId('slash-menu')).toBeInTheDocument();
+    await nutzer.click(document.body);
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
   });
 
   it('Berichtigungsmodus sendet typ=berichtigung + berichtigt_eintrag_id', async () => {

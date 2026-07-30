@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Checkbox, Space } from 'antd';
+import { Alert, Button, Card, Checkbox, Space, Tooltip, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -42,6 +42,16 @@ interface Props {
 const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }));
 
 /**
+ * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen
+ * Knopf „Speichern und nächste", auf den er sich beziehen könnte — im ETB erfasst
+ * jedes Absenden in Serie. Genannt werden die Felder, weil `nurUebernahme` genau
+ * drei kennt und die Auswahl sonst geraten werden müsste.
+ */
+const UEBERNAHME_ERKLAERUNG =
+  'Von, An und Meldeweg bleiben nach dem Erfassen für den nächsten Eintrag stehen. '
+  + 'Inhalt, Veranlassung und Ereigniszeit werden immer geleert.';
+
+/**
  * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
  * (LFH-332/H61: eine Standard-Funkmeldung kostete 19 Tastenanschläge reines Gerüst,
  * weil Von/An/Meldeweg nach jedem Senden verworfen wurden).
@@ -63,6 +73,7 @@ export default function Schnellerfassung({
   const navigate = useNavigate();
   const textRef = useRef<TextAreaRef>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
+  const feldKnopfRef = useRef<HTMLButtonElement>(null);
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
@@ -105,6 +116,29 @@ export default function Schnellerfassung({
     textRef.current?.focus();
   }, []);
 
+  /**
+   * Klick daneben schliesst das Menü. Vorher gab es ohne Auswahl überhaupt keinen Weg
+   * hinaus ausser Escape oder einem zweiten Druck auf denselben Knopf.
+   *
+   * Zwei Ausnahmen, beide notwendig: Das **Menü selbst**, weil seine Einträge über
+   * `onMouseDown` wählen und `pointerdown` davor läuft — würde hier geschlossen, wäre
+   * der Eintrag beim Klick schon weg und die Auswahl per Maus tot. Und der
+   * **Feld-Knopf**, der selbst umschaltet: sonst schlösse dieser Effekt zuerst und der
+   * Klick öffnete danach wieder, der Knopf könnte also nie schliessen.
+   */
+  useEffect(() => {
+    if (!menuOffen) return;
+    function beiZeigerAb(ereignis: PointerEvent) {
+      const ziel = ereignis.target;
+      const el = ziel instanceof Element ? ziel : (ziel as Node | null)?.parentElement ?? null;
+      if (el?.closest('[data-slash-menu]')) return;
+      if (el && feldKnopfRef.current?.contains(el)) return;
+      setMenuOffen(false);
+    }
+    document.addEventListener('pointerdown', beiZeigerAb);
+    return () => document.removeEventListener('pointerdown', beiZeigerAb);
+  }, [menuOffen]);
+
   const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => metadaten[f] != null);
 
   // Der Schalter erscheint nur ausserhalb der Berichtigung und nur, wenn ein Aufrufer den
@@ -132,16 +166,25 @@ export default function Schnellerfassung({
     aktualisiereTrigger(neu, caret);
   }
 
+  /**
+   * Entfernt NUR den „/…"-Text, der das Menü ausgelöst hat. Schliesst bewusst nicht
+   * mit — das tut `waehleEintrag`. Bis zum 30.07.2026 hing das Schliessen hier mit
+   * drin, hinter dem frühen Ausstieg: wer das Menü über den Feld-Knopf öffnete, hatte
+   * `triggerStart === -1` (es gibt keinen Trigger-Text), und das Menü blieb nach der
+   * Auswahl stehen. Es liegt absolut über der Chip-Leiste und verdeckte damit genau
+   * den Chip-Editor, der gerade aufgegangen war.
+   */
   function entferneTriggerText() {
     if (triggerStart < 0) return;
     const ta = textRef.current?.resizableTextArea?.textArea;
     const caret = ta?.selectionStart ?? inhalt.length;
     setInhalt(inhalt.slice(0, triggerStart) + inhalt.slice(caret));
-    setMenuOffen(false);
   }
 
   function waehleEintrag(e: SlashEintrag) {
     entferneTriggerText();
+    // Auf JEDEM Weg hinaus, unabhängig davon, wie das Menü aufging.
+    setMenuOffen(false);
     if (e.art === 'feld') {
       setEditFeld(e.key as MetaFeld);
     } else {
@@ -266,6 +309,7 @@ export default function Schnellerfassung({
           />
         )}
         <Button
+          ref={feldKnopfRef}
           type="dashed"
           icon={<PlusOutlined />}
           onClick={() => { setMenuFilter(''); setTriggerStart(-1); setMenuOffen((o) => !o); }}
@@ -274,17 +318,27 @@ export default function Schnellerfassung({
         </Button>
       </Space>
 
+      {/* EINSTELLUNG — eigene Zeile ÜBER der Steuerzeile, sekundär gesetzt.
+          Der Schalter stand bis zum 30.07.2026 zwischen „Erfassen" und dem
+          Lagebericht-Link, also inmitten von Aktionen; er ist aber keine, sondern
+          eine Vorgabe für das nächste Erfassen. Dieselbe Trennung wie in
+          `components/Erfassung.tsx`, deren Dateikopf sie begründet. */}
+      {zeigeSchalter && (
+        <div style={{ marginTop: 12 }}>
+          <Tooltip title={UEBERNAHME_ERKLAERUNG}>
+            <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
+              <Typography.Text type="secondary">Werte behalten</Typography.Text>
+            </Checkbox>
+          </Tooltip>
+        </div>
+      )}
+
       {/* Steuerzeile */}
       <Space align="center" style={{ marginTop: 12, width: '100%' }}>
         {!berichtigungZu && (
           <Select value={typ} style={{ minWidth: 150 }} options={TYP_OPTIONEN} onChange={(v) => setTyp(v)} />
         )}
         <Button type="primary" loading={sendet} onClick={() => void absenden()}>Erfassen</Button>
-        {zeigeSchalter && (
-          <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
-            Werte behalten
-          </Checkbox>
-        )}
         {!berichtigungZu && typ === 'lage' && (
           <Button type="link" style={{ paddingLeft: 0 }} onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
             Als strukturierten Lagebericht erfassen →

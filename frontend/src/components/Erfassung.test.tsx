@@ -2,7 +2,7 @@ import { Form, Input } from 'antd';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ErfassungsFormular, ErfassungsModal } from './Erfassung';
+import { ErfassungsFormular, ErfassungsModal, serienKuerzel } from './Erfassung';
 import { renderMitProviders } from '../test/utils';
 
 interface Werte { ort: string; melder: string; notiz: string }
@@ -157,12 +157,20 @@ describe('ErfassungsFormular — Serienmodus', () => {
 });
 
 describe('ErfassungsFormular — Wertübernahme', () => {
-  it('behält die Übernahmefelder über ein Serien-Speichern hinweg', async () => {
+  it('steht beim Öffnen auf AUS', () => {
+    renderMitProviders(
+      <Harness onErfassen={vi.fn().mockResolvedValue(undefined)} serie uebernahme={['ort']} />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+  });
+
+  it('behält die Übernahmefelder über ein Serien-Speichern hinweg, sobald er AN ist', async () => {
     renderMitProviders(
       <Harness onErfassen={vi.fn().mockResolvedValue(undefined)} serie uebernahme={['ort']} />,
     );
     const nutzer = userEvent.setup();
 
+    await nutzer.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await nutzer.type(screen.getByLabelText('Ort'), 'Sammelstelle');
     await nutzer.type(screen.getByLabelText('Melder'), 'RTW 1');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
@@ -171,13 +179,12 @@ describe('ErfassungsFormular — Wertübernahme', () => {
     expect(screen.getByLabelText('Ort')).toHaveValue('Sammelstelle');
   });
 
-  it('mit ausgeschaltetem „Werte behalten" ist auch das Übernahmefeld leer', async () => {
+  it('leert ohne Zutun auch das Übernahmefeld — der Schalter ist die Ausnahme, nicht die Regel', async () => {
     renderMitProviders(
       <Harness onErfassen={vi.fn().mockResolvedValue(undefined)} serie uebernahme={['ort']} />,
     );
     const nutzer = userEvent.setup();
 
-    await nutzer.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await nutzer.type(screen.getByLabelText('Ort'), 'Sammelstelle');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
@@ -187,6 +194,91 @@ describe('ErfassungsFormular — Wertübernahme', () => {
   it('zeigt „Werte behalten" nur, wenn es Übernahmefelder gibt', () => {
     renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} serie />);
     expect(screen.queryByRole('checkbox', { name: 'Werte behalten' })).not.toBeInTheDocument();
+  });
+});
+
+describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
+  it('Strg/⌘ + Enter speichert und hält offen', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    renderMitProviders(<Harness onErfassen={onErfassen} onFertig={onFertig} serie />);
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Ort'), 'Sammelstelle');
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    // Der Serienlauf schliesst NICHT — sonst wäre es der Primär-Knopf mit
+    // Umweg über die Tastatur.
+    expect(onFertig).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  });
+
+  it('nimmt auch die Meta-Taste (⌘ auf dem Mac)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Ort'), 'Sammelstelle');
+    await nutzer.keyboard('{Meta>}{Enter}{/Meta}');
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('sendet bei gehaltener Taste nicht doppelt', async () => {
+    // Die Zusage bleibt offen, bis der Test sie einlöst — genau das Fenster, in
+    // dem eine Tastenwiederholung ein zweites Mal absenden würde. Der Knopf ist
+    // in diesem Fenster `loading` und damit klicktaub; die Tastatur ist es nicht.
+    let einloesen: () => void = () => {};
+    const onErfassen = vi.fn(() => new Promise<void>((res) => { einloesen = res; }));
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Ort'), 'Sammelstelle');
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+
+    expect(onErfassen).toHaveBeenCalledTimes(1);
+    einloesen();
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  });
+
+  it('zeigt das Kürzel, ohne den zugänglichen Namen des Knopfes zu verändern', () => {
+    // Der sichtbare Zusatz steht `aria-hidden` IM Knopf. Wäre er es nicht, hiesse der
+    // Knopf „Speichern und nächste Strg + ↵" — und die rund zehn Aufrufstellen, die ihn
+    // über genau diesen Namen suchen, fänden ihn nicht mehr. `toHaveAccessibleName`
+    // prüft exakt und ist damit strenger als die `getByRole`-Abfrage, die ihn findet.
+    renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} serie />);
+    const knopf = screen.getByRole('button', { name: 'Speichern und nächste' });
+    expect(knopf).toHaveAccessibleName('Speichern und nächste');
+    // …und das Kürzel steht trotzdem sichtbar drin.
+    expect(knopf).toHaveTextContent('Strg + ↵');
+  });
+
+  it('beschriftet das Kürzel nach der Plattform', () => {
+    // jsdom ist kein Mac, deshalb über die reine Funktion — sonst bliebe der Zweig,
+    // den der Nutzer auf dem Mac tatsächlich sieht, ungeprüft.
+    expect(serienKuerzel('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe('⌘ ↵');
+    expect(serienKuerzel('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Strg + ↵');
+  });
+
+  it('ist ohne Serienmodus wirkungslos', async () => {
+    // Nicht nur „speichert nichts": das Kürzel darf ohne Serien-Knopf auch keine
+    // Serien-Marke setzen. Stünde sie, nähme das nächste reguläre Enter still den
+    // Serien-Zweig — gespeichert, Felder leer, Dialog offen, und wer dann erneut
+    // drückt, legt den Datensatz doppelt an.
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    renderMitProviders(<Harness onErfassen={onErfassen} onFertig={onFertig} />);
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Ort'), 'Sammelstelle');
+    await nutzer.keyboard('{Control>}{Enter}{/Control}');
+    expect(onErfassen).not.toHaveBeenCalled();
+
+    await nutzer.keyboard('{Enter}');
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
   });
 });
 

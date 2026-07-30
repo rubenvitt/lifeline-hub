@@ -364,6 +364,8 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
       }),
     );
 
+    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Spende-Decken');
     await userEvent.type(within(dialog).getByLabelText('Kategorie'), 'Betreuung');
     await userEvent.type(within(dialog).getByLabelText('Trägerorganisation'), 'THW');

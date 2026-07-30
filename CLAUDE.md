@@ -79,8 +79,28 @@ Alltag wichtigsten:
 - **Dichte-Staffel 30 / 48 / 72 px** (kompakt aus LFH-352 · komfortabel = Material 48 dp ·
   Handschuh = 72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). Träger ist ein **Dichte-Token am
   `ConfigProvider`** — nicht `componentSize` (dessen `large` endet bei 40 px) und erst recht nicht
-  236 verstreute `size="small"`. **Neues punktuelles `size="small"` auf interaktiven Elementen ist
-  ab sofort verboten**; der Abbau des Bestands läuft über LFH-328/B5.
+  verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
+  ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
+  `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
+  30.07.2026: 93 Stellen in 44 Dateien, je Verzeichnis-Bündel von LFH-333 zugeordnet; ein Eintrag
+  ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit Klammertiefe, nicht per
+  Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind (gemessen 61 statt 82)
+  und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop steht — ein Gate, das
+  einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in seinem
+  Kopfkommentar und ist Teil des Vertrags. Nicht-interaktive Flächen (`Card`, `Descriptions`,
+  `Spin`) sind absichtlich draußen, die Projekt-Primitive `Liste`/`KatalogTabelle` ebenso — dort
+  ist `size` ein **Abstandsmaß**, keine Treffläche, und `Liste.test.tsx` prüft das über mehrere
+  Dichtestufen.
+  **Die kleine Steuerhöhe liegt seit LFH-361 auf dem Gate-3-Boden** (24 / 48 / 72 statt antds
+  abgeleiteter 22,5 / 36 / 54 — `genControlHeight.js` rechnet × 0,75). Folge: wo eine Bibliothek
+  die Kleingröße **erzwingt** — antds Popconfirm tut das hart in `PurePanel.js` — greift die
+  Staffel trotzdem durch. Eine Hülle, die das per `okButtonProps` zurückdreht, wäre überflüssig;
+  das wurde gemessen, nicht vermutet (`button/style/index.js:175` gibt einem kleinen Knopf
+  `controlHeightSM`). Ebenfalls seit LFH-361: **die Zeigerart belegt die Stufe vor** (grob →
+  `komfortabel`), aber **nur ohne gespeicherte Wahl** — eine getroffene Wahl gewinnt immer, sonst
+  drehte sich der Umschalter beim Neuladen selbst zurück. Die Abfrage liegt in
+  `components/useViewport.ts` (`zeigerIstGrob`), nicht im Theme-Provider: dessen Freistellung im
+  Viewport-Guard gilt nur der Dunkelmodus-Frage.
 - **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein
@@ -143,6 +163,28 @@ verbraucht **und in `onFinishFailed` gelöscht**: scheitert die Prüfung, läuft
 nie, und eine stehengebliebene Marke färbte das nächste reguläre Absenden still zum
 Serienlauf — der Dialog bliebe offen, die Person drückte ein zweites Mal, der Datensatz
 läge doppelt vor.
+
+**„Werte behalten" ist eine Einstellung, keine Aktion** (Nachtrag 30.07.2026). Der
+Schalter stand bis dahin in derselben Reihe wie die Knöpfe, wirkte aber nur auf
+„Speichern und nächste" — der Primär-Knopf daneben leert und schliesst, mit Schalter
+oder ohne. Ein Umschalter mitten in einer Knopfreihe, der nur einen der Knöpfe betrifft,
+ist von der Bedienung aus nicht von „wirkungslos" zu unterscheiden; genau so wurde er
+gemeldet. Deshalb: **eigene, sekundär gesetzte Zeile über der Knopfreihe**, Tooltip nennt
+die Bedingung, und die **Vorgabe ist AUS** — ein Schalter, der von selbst ansteht, ist
+benutzt worden, ohne gewählt worden zu sein. Beide Träger sind betroffen und wurden
+gemeinsam umgestellt: `components/Erfassung.tsx` und die ETB-Schnellerfassung, deren
+Zustand in `pages/EtbPage.tsx` liegt (`useState(false)`). Wer nur einen von beiden
+umlegt, hat es halb getan.
+
+**Strg/⌘ + Enter löst „Speichern und nächste" aus**, blankes Enter bleibt der
+Primär-Knopf. Das Kürzel hängt am Wurzel-`div` der Hülle (unabhängig davon, ob antd
+unbekannte Props ans native `form` durchreicht) und **greift nur bei `serie`** — ohne
+den Knopf dürfte es keine Serien-Marke setzen, sonst gilt der Doppel-Datensatz-Fall aus
+dem Absatz darüber. Der Riegel gegen doppeltes Absenden sitzt in `abschicken`
+(`sendetRef`) und nicht am Knopf: ein `loading`-Knopf ignoriert Klicks, eine gehaltene
+Taste erreicht ihn nie. Angezeigt wird das Kürzel `aria-hidden` im Knopf — der
+zugängliche Name bleibt „Speichern und nächste", sonst müsste jede der ~10
+Aufrufstellen ihre Knopf-Abfrage umschreiben.
 
 **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`**, nicht die Hülle und
 kein Modal: Eingabefeld plus Knopf in einer Zeile, Enter legt an, das Modal bleibt fürs

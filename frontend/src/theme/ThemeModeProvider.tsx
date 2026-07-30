@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import deDE from 'antd/locale/de_DE';
 import { antdToken, farbenDunkel, farbenHell, type Dichte } from './tokens';
+import { zeigerIstGrob } from '../components/useViewport';
 
 /** Vom Nutzer wählbarer Modus. `system` folgt der OS-Einstellung. */
 export type ThemeModus = 'system' | 'light' | 'dark';
@@ -15,15 +16,22 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 /** Ausgangsstufe ohne gespeicherte Wahl: der Fükw-Arbeitsplatz (A1 Festlegung 1). */
 const DICHTE_DEFAULT: Dichte = 'kompakt';
 
+/** …und die Ausgangsstufe, wenn der primäre Zeiger grob ist (LFH-361 · B5a). */
+const DICHTE_DEFAULT_BERUEHRUNG: Dichte = 'komfortabel';
+
 interface ThemeModeWert {
   modus: ThemeModus;
   effektiv: EffektivesTheme;
   setModus: (m: ThemeModus) => void;
   /** Gewählte Bediendichte. Es gibt hier bewusst KEINEN zweiten Typ analog
-   *  `ThemeModus`/`EffektivesTheme`: die Wahl IST die effektive Stufe. Ein
-   *  `system`-Wert, der sich aus Schirmbreite oder Zeigerart auflöste, bräuchte
-   *  eine zweite Medienabfrage in diesem Provider — und die gehört laut B1
-   *  ausschließlich in `useViewport`. Die Ableitung aus dem Einsatzkontext ist B5. */
+   *  `ThemeModus`/`EffektivesTheme`: die Wahl IST die effektive Stufe.
+   *
+   *  Das bleibt auch nach LFH-361 so. Die Zeigerart entscheidet dort nur, WOMIT
+   *  eine Sitzung ohne gespeicherte Wahl beginnt (`gespeicherteDichte`) — sie
+   *  bleibt keine laufende Auflösung wie `system` beim Theme. Ein `automatisch`
+   *  müsste von vier Bedienwegen mitgetragen werden und könnte die Wahl
+   *  überstimmen; beides ist nicht gewollt. Die Abfrage selbst kommt aus
+   *  `useViewport`, nicht aus einer zweiten Medienabfrage in diesem Provider. */
   dichte: Dichte;
   setDichte: (d: Dichte) => void;
 }
@@ -43,9 +51,24 @@ function istDichte(wert: string | null): wert is Dichte {
   return wert === 'kompakt' || wert === 'komfortabel' || wert === 'handschuh';
 }
 
+/**
+ * Die Stufe, mit der eine Sitzung beginnt (LFH-361 · B5a).
+ *
+ * Reihenfolge ist die Aussage: eine getroffene Wahl gewinnt IMMER, das
+ * Kontextsignal belegt nur vor. Andersherum wäre der Dichte-Umschalter auf
+ * jedem Gerät mit grobem Zeiger ein Knopf, der sich beim Neuladen selbst
+ * zurückdreht.
+ *
+ * Ein unbekannter gespeicherter Wert (alte Version, Handeingriff) fällt auf das
+ * Kontextsignal zurück, nicht auf `kompakt` — er ist keine Wahl, sondern Müll.
+ *
+ * Die Zeigerfrage kommt aus dem Viewport-Primitiv, nicht aus einem eigenen
+ * `matchMedia` hier: siehe die Begründung an `zeigerIstGrob`.
+ */
 function gespeicherteDichte(): Dichte {
   const wert = localStorage.getItem(DICHTE_SCHLUESSEL);
-  return istDichte(wert) ? wert : DICHTE_DEFAULT;
+  if (istDichte(wert)) return wert;
+  return zeigerIstGrob() ? DICHTE_DEFAULT_BERUEHRUNG : DICHTE_DEFAULT;
 }
 
 function systemBevorzugtDunkel(): boolean {
@@ -117,9 +140,13 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
           // sie fest auf `kompakt`, weil A2 nur den Träger baute). Sie hängt genau
           // hier und nicht an einer Größen-Prop je Element: die Steuerhöhe trägt
           // alle Steuerelemente auf einmal, während die verworfene Prop bei 40 px
-          // endet und die 48-/72-px-Stufen nicht darstellen kann. Was NOCH offen
-          // ist: die Stufe aus dem Einsatzkontext ABZULEITEN statt sie zu wählen —
-          // das ist B5.
+          // endet und die 48-/72-px-Stufen nicht darstellen kann.
+          //
+          // Seit LFH-361 · B5a belegt die Zeigerart die Stufe vor, wenn noch keine
+          // Wahl gespeichert ist (`gespeicherteDichte`), und `antdToken` setzt die
+          // kleine Steuerhöhe mit — sonst rechnete antd sie unter den Boden aus
+          // A1 Gate 3 zurück und die Staffel griffe an jedem Element vorbei, das
+          // eine Bibliothek intern klein nennt.
           token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
           algorithm: effektiv === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         }}

@@ -87,6 +87,10 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   return (
     <div
       data-testid="slash-menu"
+      // Eigenes Attribut statt des Testids: der Aufrufer nimmt das Menü vom
+      // „Klick daneben schliesst"-Griff aus, und dafür darf er sich nicht auf
+      // eine Test-Kennung stützen, die jederzeit wegfallen darf.
+      data-slash-menu=""
       style={{
         position: 'absolute', zIndex: 10, minWidth: 240, marginTop: 4,
         background: token.colorBgElevated, color: token.colorText,

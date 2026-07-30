@@ -566,6 +566,8 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
       }),
     );
     const dialog = await oeffneAdhoc();
+    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.type(within(dialog).getByLabelText('Funkrufname'), 'Florian Nachbarstadt 44/1');
     await userEvent.type(within(dialog).getByLabelText('Fahrzeugtyp'), 'LF 20');
     await userEvent.type(within(dialog).getByLabelText('Trägerorganisation'), 'FF Nachbarstadt');
