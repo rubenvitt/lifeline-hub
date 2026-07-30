@@ -1,5 +1,5 @@
 import { Form, Input } from 'antd';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ErfassungsModal } from '../../components/Erfassung';
 import type { GefahrBewertung } from '../../api/types';
 
@@ -10,7 +10,14 @@ interface Werte {
 
 export interface GefahrenZelleDetailsProps {
   offen: boolean;
-  /** Die bewertete Zelle. `null`, solange keine gewählt ist. */
+  /**
+   * Stabile Kennung der gemeinten Zelle (`zellSchluessel`), `null` wenn keine gewählt
+   * ist. Sie — nicht {@link GefahrenZelleDetailsProps.zelle} — entscheidet, wann das
+   * Formular neu belegt wird.
+   */
+  kennung: string | null;
+  /** Die bewertete Zelle, bei jedem Render frisch aus der Matrix abgeleitet. `null`,
+   *  solange keine gewählt ist. Die Objektidentität wechselt also bei jedem Nachladen. */
   zelle: GefahrBewertung | null;
   /** „Brand × Menschen" — steht im Dialogtitel. */
   titel: string;
@@ -31,18 +38,38 @@ export interface GefahrenZelleDetailsProps {
  * jedem Weg hinaus, auch über Escape und den Klick auf die Maske.
  */
 export default function GefahrenZelleDetails({
-  offen, zelle, titel, laeuft, onSpeichern, onSchliessen,
+  offen, kennung, zelle, titel, laeuft, onSpeichern, onSchliessen,
 }: GefahrenZelleDetailsProps) {
   const [form] = Form.useForm<Werte>();
 
+  /**
+   * Der Zellinhalt liegt in einer Ref, damit der Vorbeleg-Effekt ihn LESEN kann,
+   * ohne von ihm ABZUHÄNGEN.
+   *
+   * Der Aufrufer leitet `zelle` bei jedem Render frisch aus der Matrix ab — jedes
+   * Nachladen liefert also eine neue Objektidentität, auch wenn sich nichts geändert
+   * hat. Hinge der Effekt an `zelle`, liefe er dann mitten im Tippen los und
+   * überschriebe den Wortlaut mit dem Serverstand. Der Effekt hängt deshalb an der
+   * ÖFFNUNG und an der stabilen {@link GefahrenZelleDetailsProps.kennung}: eine andere
+   * Zelle belegt neu, dieselbe Zelle in frischer Fassung nicht.
+   *
+   * Die Ref wird in einem eigenen Effekt nachgezogen, nicht im Renderdurchgang.
+   * Er steht VOR dem Vorbeleg-Effekt, weil React sie in Deklarationsreihenfolge
+   * abarbeitet — beim Öffnen liest der zweite also bereits den aktuellen Wert.
+   */
+  const zelleRef = useRef(zelle);
   useEffect(() => {
-    if (offen) {
-      form.setFieldsValue({
-        beschreibung: zelle?.beschreibung ?? '',
-        gemeldet_von: zelle?.gemeldet_von ?? '',
-      });
-    }
-  }, [offen, zelle, form]);
+    zelleRef.current = zelle;
+  }, [zelle]);
+
+  useEffect(() => {
+    if (!offen) return;
+    const aktuell = zelleRef.current;
+    form.setFieldsValue({
+      beschreibung: aktuell?.beschreibung ?? '',
+      gemeldet_von: aktuell?.gemeldet_von ?? '',
+    });
+  }, [offen, kennung, form]);
 
   return (
     <ErfassungsModal

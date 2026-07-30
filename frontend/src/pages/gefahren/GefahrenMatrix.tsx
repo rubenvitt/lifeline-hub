@@ -11,6 +11,10 @@ import GefahrenZelleDetails from './GefahrenZelleDetails';
 
 interface ZeilenDaten { typ: Gefahrentyp; label: string; }
 
+/** Welche Zelle der Detail-Dialog meint. Bewusst die Kennung statt des Datensatzes —
+ *  Begründung am Zustand in {@link GefahrenMatrix}. */
+interface Zellkennung { typ: Gefahrentyp; objekt: Schutzobjekt; }
+
 /** Symbol + Kurzform je Schutzobjekt. Der Kopf trug vorher das volle Wort und war mit
  *  ~85 px nie breitenbestimmend — die Zelle ist es. Das Symbol ist deshalb Gewinn an
  *  Lesbarkeit, nicht an Breite; das Kurzwort bleibt als zweiter Kanal daneben stehen. */
@@ -60,7 +64,20 @@ export default function GefahrenMatrix({
   matrix, darfSchreiben, laufendeZelle, onSetzen, onDetailsSpeichern,
 }: GefahrenMatrixProps) {
   const { token } = theme.useToken();
-  const [detailZelle, setDetailZelle] = useState<GefahrBewertung | null>(null);
+  /**
+   * Im Zustand steht die KENNUNG der Zelle, nicht ihr Datensatz.
+   *
+   * Ein `useState<GefahrBewertung>` wäre eine Momentaufnahme: einmal beim Menüklick
+   * aus `matrix` kopiert und danach von keinem Nachladen mehr erreicht. Der Detail-PUT
+   * schickt aber `warnstufe` mit — die Momentaufnahme schriebe also die Stufe zurück,
+   * die zum Zeitpunkt des Klicks galt, und drehte eine inzwischen gesetzte still
+   * zurück. Zwei erreichbare Wege: ein zweiter Bediener am selben Gefahrengebiet
+   * (`GefahrenPage` invalidiert die Matrix bei jedem erfolgreichen PUT), und derselbe
+   * Bediener, der eine Stufe setzt und sofort „Details …" öffnet, bevor das Nachladen
+   * durch ist. Der frühere Inline-`DetailPopover` hatte dieses Problem nicht — er stand
+   * in der Zelle und bekam `zelle` bei jedem Render frisch.
+   */
+  const [detailKennung, setDetailKennung] = useState<Zellkennung | null>(null);
 
   const zelleVon = (typ: Gefahrentyp, objekt: Schutzobjekt) =>
     matrix.find((m) => m.gefahrentyp === typ && m.schutzobjekt === objekt);
@@ -124,7 +141,7 @@ export default function GefahrenMatrix({
                 // und das Synthetic Event des Portals steigt nicht in einen klickbaren
                 // Elternteil (Muster und Falle aus LFH-365).
                 onClick: ({ key }) => {
-                  if (key === 'details') { setDetailZelle(zelle ?? null); return; }
+                  if (key === 'details') { setDetailKennung({ typ: zeile.typ, objekt: obj.wert }); return; }
                   onSetzen({
                     gefahrentyp: zeile.typ,
                     schutzobjekt: obj.wert,
@@ -155,6 +172,19 @@ export default function GefahrenMatrix({
   ];
   const zeilen: ZeilenDaten[] = GEFAHRENTYPEN.map((g) => ({ typ: g.wert, label: g.label }));
 
+  // Je Render frisch aus `matrix` abgeleitet — DAS ist die Zusicherung, die die
+  // Kennung im Zustand erkauft. Ein Nachladen erreicht den offenen Dialog damit.
+  const detailZelle = detailKennung
+    ? zelleVon(detailKennung.typ, detailKennung.objekt) ?? null
+    : null;
+  const detailSchluessel = detailKennung
+    ? zellSchluessel(detailKennung.typ, detailKennung.objekt)
+    : null;
+  const detailTitel = detailKennung
+    ? `${GEFAHRENTYPEN.find((g) => g.wert === detailKennung.typ)?.label ?? detailKennung.typ}`
+      + ` × ${SCHUTZOBJEKTE.find((s) => s.wert === detailKennung.objekt)?.label ?? detailKennung.objekt}`
+    : '';
+
   return (
     <>
       <Table<ZeilenDaten>
@@ -169,28 +199,32 @@ export default function GefahrenMatrix({
         scroll={{ x: 'max-content' }}
       />
       <GefahrenZelleDetails
-        offen={detailZelle !== null}
+        offen={detailKennung !== null}
+        // Die stabile Kennung trennt „ein anderer Datensatz" von „derselbe Datensatz,
+        // frisch geladen". Nur das Erste darf das Formular neu belegen — warum, steht
+        // am Vorbeleg-Effekt in `GefahrenZelleDetails`.
+        kennung={detailSchluessel}
         zelle={detailZelle}
-        titel={
-          detailZelle
-            ? `${GEFAHRENTYPEN.find((g) => g.wert === detailZelle.gefahrentyp)?.label ?? detailZelle.gefahrentyp}`
-              + ` × ${SCHUTZOBJEKTE.find((s) => s.wert === detailZelle.schutzobjekt)?.label ?? detailZelle.schutzobjekt}`
-            : ''
-        }
-        laeuft={detailZelle !== null && laufendeZelle === zellSchluessel(detailZelle.gefahrentyp, detailZelle.schutzobjekt)}
+        titel={detailTitel}
+        laeuft={detailSchluessel !== null && laufendeZelle === detailSchluessel}
         // `onDetailsSpeichern`, NICHT `onSetzen`: die Hülle darf die Felder nur leeren,
         // wenn der PUT angenommen wurde. Das zurückgegebene Promise ist die Zusage —
         // ein `async`-Wrapper um ein `=> void` wäre eine Zusage ohne Deckung.
+        //
+        // `warnstufe` kommt aus der ABGELEITETEN Zelle, nicht aus dem Zustand: sonst
+        // schriebe das Detail-Speichern eine überholte Stufe zurück. Der Rückfall auf
+        // `'keine'` greift nur, wenn die Zelle zwischenzeitlich aus der Matrix
+        // verschwunden ist — den Eintrag „Details …" gibt es sonst gar nicht.
         onSpeichern={(beschreibung, gemeldetVon) =>
           onDetailsSpeichern({
-            gefahrentyp: detailZelle!.gefahrentyp,
-            schutzobjekt: detailZelle!.schutzobjekt,
-            warnstufe: detailZelle!.warnstufe,
+            gefahrentyp: detailKennung!.typ,
+            schutzobjekt: detailKennung!.objekt,
+            warnstufe: detailZelle?.warnstufe ?? 'keine',
             beschreibung,
             gemeldet_von: gemeldetVon,
           })
         }
-        onSchliessen={() => setDetailZelle(null)}
+        onSchliessen={() => setDetailKennung(null)}
       />
     </>
   );

@@ -20,19 +20,31 @@ function imMenue() {
   return within(menue as HTMLElement);
 }
 
-/** Ein Ort für die Pflichtprops. Ohne den trägt jeder der sieben Fälle vier Zeilen
- *  Gerüst, und eine neue Prop hieße sieben Änderungen. */
+const PFLICHT: GefahrenMatrixProps = {
+  matrix: [],
+  darfSchreiben: true,
+  laufendeZelle: null,
+  onSetzen: () => {},
+  onDetailsSpeichern: async () => {},
+};
+
+/** Ein Ort für die Pflichtprops. Ohne den trägt jeder der neun Fälle vier Zeilen
+ *  Gerüst, und eine neue Prop hieße neun Änderungen. Getrennt vom Rendern, weil zwei
+ *  Fälle dasselbe Element mit geänderter `matrix` NACHREICHEN müssen (`rerender`) —
+ *  das ist der Weg, auf dem ein Nachladen unter einem offenen Dialog eintrifft. */
+function matrixElement(over: Partial<GefahrenMatrixProps> = {}) {
+  return <GefahrenMatrix {...PFLICHT} {...over} />;
+}
+
 function rendereMatrix(over: Partial<GefahrenMatrixProps> = {}) {
-  return renderMitProviders(
-    <GefahrenMatrix
-      matrix={[]}
-      darfSchreiben
-      laufendeZelle={null}
-      onSetzen={() => {}}
-      onDetailsSpeichern={async () => {}}
-      {...over}
-    />,
-  );
+  return renderMitProviders(matrixElement(over));
+}
+
+/** Öffnet den Detail-Dialog der Zelle Brand × Menschen und wartet, bis er steht. */
+async function oeffneDetails(stufe: string) {
+  await userEvent.click(screen.getByRole('button', { name: `Bewertung Brand × Menschen: ${stufe}` }));
+  await userEvent.click(imMenue().getByRole('menuitem', { name: 'Details …' }));
+  return screen.findByLabelText('Beschreibung');
 }
 
 describe('GefahrenMatrix', () => {
@@ -106,13 +118,54 @@ describe('GefahrenMatrix', () => {
   it('hält den Detail-Wortlaut, wenn das Speichern abgelehnt wird', async () => {
     const onDetailsSpeichern = vi.fn().mockRejectedValue(new Error('422'));
     rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })], onDetailsSpeichern });
-    await userEvent.click(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch' }));
-    await userEvent.click(imMenue().getByRole('menuitem', { name: 'Details …' }));
-    const feld = await screen.findByLabelText('Beschreibung');
+    const feld = await oeffneDetails('hoch');
     await userEvent.type(feld, 'Dachstuhl brennt');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalled());
     // Nicht geleert, nicht geschlossen — der Wortlaut ist teurer als der Klick.
     expect(await screen.findByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
+  });
+
+  /**
+   * Das verlorene Update. Der Dialog zeigt die Warnstufe NICHT an, schickt sie aber
+   * mit — hielte er den Zell-Datensatz als Momentaufnahme aus dem Augenblick des
+   * Menüklicks, schriebe „Speichern" eine inzwischen gesetzte Stufe still zurück.
+   * Zwei erreichbare Wege dorthin: ein zweiter Bediener am selben Gefahrengebiet
+   * (`GefahrenPage` invalidiert die Matrix nach jedem erfolgreichen PUT), und derselbe
+   * Bediener, der eine Stufe setzt und sofort „Details …" öffnet.
+   *
+   * Der `rerender` IST der Nachladefall: eine neue `matrix`-Prop unter einem bereits
+   * offenen Dialog.
+   */
+  it('speichert die AKTUELLE Warnstufe, nicht die beim Öffnen gesehene', async () => {
+    const onDetailsSpeichern = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })], onDetailsSpeichern });
+    await oeffneDetails('hoch');
+    rerender(matrixElement({ matrix: [zelle({ warnstufe: 'akut' })], onDetailsSpeichern }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalledWith({
+      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'akut',
+      beschreibung: null, gemeldet_von: null,
+    }));
+  });
+
+  /**
+   * Die Kehrseite des Falls darüber, und ohne sie wäre der Fix eine Verschlechterung:
+   * die Zelle wird jetzt bei JEDEM Render frisch abgeleitet, hat also nach jedem
+   * Nachladen eine neue Objektidentität. Ein Vorbeleg-Effekt, der an dieser Identität
+   * hinge, liefe mitten im Tippen los und ersetzte den Wortlaut durch den Serverstand.
+   * Der Effekt hängt deshalb an der Öffnung und an der stabilen Kennung.
+   */
+  it('lässt den getippten Wortlaut stehen, wenn die Matrix unter dem offenen Dialog nachlädt', async () => {
+    const { rerender } = rendereMatrix({
+      matrix: [zelle({ warnstufe: 'hoch', beschreibung: 'alter Stand' })],
+    });
+    const feld = await oeffneDetails('hoch');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Dachstuhl brennt');
+    rerender(matrixElement({
+      matrix: [zelle({ warnstufe: 'akut', beschreibung: 'vom Server' })],
+    }));
+    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
   });
 });
