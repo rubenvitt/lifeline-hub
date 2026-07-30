@@ -75,6 +75,14 @@ describe('EtbPage', () => {
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
   });
 
+  it('startet mit ausgeschaltetem „Werte behalten"', async () => {
+    // Der Zustand liegt in EtbPage (nicht in EtbEntwurfsTabs, s. Kommentar dort), also
+    // hält NUR dieser Test die Vorgabe. Die Tabs-Tests reichen ihn als Prop herein und
+    // wären auch bei umgelegtem Vorgabewert grün.
+    setup();
+    expect(await screen.findByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+  });
+
   it('hebt per ?eintrag=<id> den geladenen Eintrag hervor und räumt den Param (LFH-25)', async () => {
     const { container } = setup('/einsaetze/7/etb?eintrag=1');
     await screen.findByText('Erste Meldung');

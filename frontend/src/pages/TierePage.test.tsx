@@ -261,6 +261,8 @@ describe('TierePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await screen.findByRole('dialog');
 
+    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     // Spezies WEG vom Startwert 'hund' stellen — sonst wäre 'hund' nach dem Zurücksetzen
     // auch ohne Übernahme wieder da, und der zweite Wortlaut bewiese nichts.
     await userEvent.click(within(dialog).getByRole('combobox'));

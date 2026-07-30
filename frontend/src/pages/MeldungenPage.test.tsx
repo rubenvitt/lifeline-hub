@@ -328,6 +328,9 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await oeffneUndFuelle();
+    // Der Schalter steht per Vorgabe AUS (30.07.2026); der Absender unten belegt die
+    // Übernahme nur, wenn er hier eingeschaltet wurde.
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
 

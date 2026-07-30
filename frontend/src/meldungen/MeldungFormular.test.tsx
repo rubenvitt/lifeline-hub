@@ -89,6 +89,9 @@ describe('MeldungFormular', () => {
     await userEvent.click(screen.getByRole('combobox', { name: 'Meldeweg' }));
     await userEvent.click(await screen.findByText('Telefon'));
     await fuellePflichtfelder('RTW 2', 'Erste Meldung');
+    // Der Schalter steht per Vorgabe AUS (30.07.2026) — die Übernahme ist eine
+    // bewusste Wahl, kein Verhalten, in das man hineinläuft.
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
 
@@ -104,11 +107,11 @@ describe('MeldungFormular', () => {
     });
   });
 
-  it('leert mit abgeschalteter Übernahme auch die Wiederholfelder', async () => {
+  it('leert ohne den Schalter auch die Wiederholfelder', async () => {
     const onAnlegen = renderFormular();
     await userEvent.type(screen.getByPlaceholderText('z. B. ELW 1, S3'), 'ELW 1');
     await fuellePflichtfelder('RTW 2', 'Erste Meldung');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
+    // Kein Klick auf „Werte behalten": das ist der unangetastete Vorgabezustand.
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Absender')).toHaveValue('');

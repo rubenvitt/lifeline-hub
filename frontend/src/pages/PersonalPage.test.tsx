@@ -523,6 +523,8 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     const gesendet = await oeffneAdhoc();
     const nutzer = userEvent.setup();
 
+    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    await nutzer.click(imDialog().getByRole('checkbox', { name: 'Werte behalten' }));
     await nutzer.type(imDialog().getByLabelText('Name'), 'Dr. Schmidt');
     await nutzer.type(imDialog().getByLabelText('Trägerorganisation'), 'KV Musterstadt');
     // Die zweite Übernahme läuft NICHT über ein `<input>`, sondern über `components/Select` —

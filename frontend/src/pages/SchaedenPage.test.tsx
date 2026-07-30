@@ -233,6 +233,8 @@ describe('SchaedenPage', () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await modalDialog();
+    // Der Schalter steht per Vorgabe AUS (30.07.2026) — ohne ihn gäbe es keine Übernahme.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
 
@@ -263,6 +265,10 @@ describe('SchaedenPage', () => {
     render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await modalDialog();
+    // „Werte behalten" AN: der Test prüft am Ende, dass der Ort mitwandert (Übernahme)
+    // und der Geschädigte NICHT (lokaler State, den die Hülle nicht kennt). Ohne den
+    // Schalter fiele die erste Hälfte weg und die zweite bewiese nichts mehr.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
     await userEvent.click(within(dialog).getAllByRole('combobox')[2]); // Geschädigt
     await waehleOption('R-007 · Anna Meier');

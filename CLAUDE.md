@@ -144,6 +144,28 @@ nie, und eine stehengebliebene Marke färbte das nächste reguläre Absenden sti
 Serienlauf — der Dialog bliebe offen, die Person drückte ein zweites Mal, der Datensatz
 läge doppelt vor.
 
+**„Werte behalten" ist eine Einstellung, keine Aktion** (Nachtrag 30.07.2026). Der
+Schalter stand bis dahin in derselben Reihe wie die Knöpfe, wirkte aber nur auf
+„Speichern und nächste" — der Primär-Knopf daneben leert und schliesst, mit Schalter
+oder ohne. Ein Umschalter mitten in einer Knopfreihe, der nur einen der Knöpfe betrifft,
+ist von der Bedienung aus nicht von „wirkungslos" zu unterscheiden; genau so wurde er
+gemeldet. Deshalb: **eigene, sekundär gesetzte Zeile über der Knopfreihe**, Tooltip nennt
+die Bedingung, und die **Vorgabe ist AUS** — ein Schalter, der von selbst ansteht, ist
+benutzt worden, ohne gewählt worden zu sein. Beide Träger sind betroffen und wurden
+gemeinsam umgestellt: `components/Erfassung.tsx` und die ETB-Schnellerfassung, deren
+Zustand in `pages/EtbPage.tsx` liegt (`useState(false)`). Wer nur einen von beiden
+umlegt, hat es halb getan.
+
+**Strg/⌘ + Enter löst „Speichern und nächste" aus**, blankes Enter bleibt der
+Primär-Knopf. Das Kürzel hängt am Wurzel-`div` der Hülle (unabhängig davon, ob antd
+unbekannte Props ans native `form` durchreicht) und **greift nur bei `serie`** — ohne
+den Knopf dürfte es keine Serien-Marke setzen, sonst gilt der Doppel-Datensatz-Fall aus
+dem Absatz darüber. Der Riegel gegen doppeltes Absenden sitzt in `abschicken`
+(`sendetRef`) und nicht am Knopf: ein `loading`-Knopf ignoriert Klicks, eine gehaltene
+Taste erreicht ihn nie. Angezeigt wird das Kürzel `aria-hidden` im Knopf — der
+zugängliche Name bleibt „Speichern und nächste", sonst müsste jede der ~10
+Aufrufstellen ihre Knopf-Abfrage umschreiben.
+
 **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`**, nicht die Hülle und
 kein Modal: Eingabefeld plus Knopf in einer Zeile, Enter legt an, das Modal bleibt fürs
 Bearbeiten. Es ist bewusst **kein** `<Form>` — eine Einsatzstelle kann in einem fremden

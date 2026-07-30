@@ -1,6 +1,6 @@
-import { Button, Checkbox, Form, Modal, Space, Typography, theme } from 'antd';
+import { Button, Checkbox, Form, Modal, Space, Tooltip, Typography, theme } from 'antd';
 import type { FormInstance, FormProps } from 'antd';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 /**
  * Schnellerfassungs-Primitive (LFH-332 · B4) — Formularhülle, Serienmodus,
@@ -56,6 +56,30 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
  * Übermittlungsknopf im Baum aus. Wären es zwei, entschiede die Anordnung im
  * DOM darüber, was Enter tut — und die Anordnung ist eine Gestaltungsfrage
  * (primär steht rechts), keine Verhaltensfrage.
+ *
+ * ── NACHTRAG 30.07.2026: DER FUSS HAT ZWEI ZEILEN ──────────────────
+ *
+ * Bis hierher standen Zähler, „Werte behalten" und die drei Knöpfe in EINER
+ * Reihe. Der Schalter wirkt aber ausschliesslich auf „Speichern und nächste" —
+ * der Primär-Knopf direkt daneben leert und schliesst, mit Schalter oder ohne.
+ * Ein Umschalter, der mitten in einer Knopfreihe steht und nur einen der Knöpfe
+ * betrifft, ist von der Bedienung aus nicht von „wirkungslos" zu unterscheiden;
+ * genau so wurde er gemeldet. Deshalb liegt die **Einstellung** jetzt in einer
+ * eigenen, sekundär gesetzten Zeile über der **Aktion**, und der Tooltip nennt
+ * die Bedingung („beim Speichern und nächste"), statt sie den Bedienenden
+ * herleiten zu lassen.
+ *
+ * Der Schalter startet **AUS**. Er verändert, was nach einem Speichern im
+ * Formular steht — ein Vorgabewert AN bedeutet, dass die erste Person, die ihn
+ * bemerkt, ihn bereits benutzt hat, ohne ihn zu wählen. Wer in Serie erfasst,
+ * schaltet ihn einmal an; er hält für die Lebensdauer des Dialogs.
+ *
+ * Das Tastenkürzel **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes
+ * Enter bleibt der Primär-Knopf). Es hängt am Wurzel-`div`, nicht am `<form>`:
+ * so ist es unabhängig davon, ob antd unbekannte Props ans native `form`
+ * durchreicht. Der Riegel gegen ein doppeltes Absenden sitzt in `abschicken`
+ * (`sendetRef`) und nicht nur am Knopf — ein `loading`-Knopf ignoriert Klicks,
+ * eine Tastenwiederholung erreicht ihn nie.
  */
 
 /**
@@ -71,6 +95,24 @@ const FOKUSSIERBAR = [
 function fokussiereErstesFeld(wurzel: HTMLElement | null) {
   wurzel?.querySelector<HTMLElement>(FOKUSSIERBAR)?.focus();
 }
+
+/**
+ * Beschriftung des Serien-Kürzels. Auf dem Mac heisst die Taste ⌘, sonst Strg;
+ * beide werden im Handler gleichwertig akzeptiert, angezeigt wird die ortsübliche.
+ *
+ * Exportiert und mit Parameter, damit BEIDE Zweige prüfbar sind: jsdom meldet
+ * keinen Mac, ein Test gegen die Modul-Konstante träfe also immer denselben.
+ */
+export function serienKuerzel(userAgent: string) {
+  return /Mac|iPhone|iPad|iPod/.test(userAgent) ? '⌘ ↵' : 'Strg + ↵';
+}
+
+// Einmal je Sitzung bestimmt — die Plattform wechselt nicht.
+const SERIEN_KUERZEL = serienKuerzel(typeof navigator === 'undefined' ? '' : navigator.userAgent);
+
+const UEBERNAHME_ERKLAERUNG =
+  'Beim „Speichern und nächste" bleiben die Wiederholfelder stehen, alle übrigen Felder werden geleert. '
+  + 'Auf den Knopf rechts hat der Schalter keinen Einfluss — der schliesst den Dialog.';
 
 interface ErfassungsFormularProps<T> {
   /** Die Formularinstanz des Aufrufers (`Form.useForm()`). Die Hülle setzt sie zurück. */
@@ -115,10 +157,14 @@ export function ErfassungsFormular<T extends object>({
   const { token } = theme.useToken();
   const wurzel = useRef<HTMLDivElement>(null);
   const [zaehler, setZaehler] = useState(0);
-  const [behalten, setBehalten] = useState(true);
+  // Vorgabe AUS — Begründung im Dateikopf, Abschnitt „NACHTRAG".
+  const [behalten, setBehalten] = useState(false);
   // Ref statt State: der Wert wird zwischen Klick und `onFinish` im selben Zug
   // gelesen — ein State-Update wäre zu diesem Zeitpunkt noch nicht sichtbar.
   const serienlaufRef = useRef(false);
+  // „Ein Absenden ist unterwegs." Gleicher Grund für die Ref: der Riegel muss
+  // innerhalb desselben Zuges greifen, in dem er gesetzt wurde.
+  const sendetRef = useRef(false);
 
   /**
    * Der Fokus läuft über **zwei Effekte, nicht über eine Zeitangabe** — und das
@@ -153,19 +199,27 @@ export function ErfassungsFormular<T extends object>({
   }, [fokusTick]);
 
   const abschicken = useCallback(async (werte: T) => {
+    // Der Riegel liegt HIER und nicht am Knopf: über das Tastenkürzel erreicht
+    // eine gehaltene Taste den Knopf nie, und `loading` blockiert nur Klicks.
+    if (sendetRef.current) return;
+    sendetRef.current = true;
     const serienlauf = serienlaufRef.current;
     serienlaufRef.current = false;
     // Werte VOR dem Zurücksetzen sichern — danach sind sie weg.
     const behaltene = Object.fromEntries(
       (uebernahme ?? []).map((feld) => [feld, werte[feld]]),
     ) as Partial<T>;
+    let angenommen = false;
     try {
       await onErfassen(werte);
+      angenommen = true;
     } catch {
       // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
       // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
-      return;
+    } finally {
+      sendetRef.current = false;
     }
+    if (!angenommen) return;
     setZaehler((n) => n + 1);
     if (!serienlauf) {
       form.resetFields();
@@ -177,13 +231,36 @@ export function ErfassungsFormular<T extends object>({
     setFokusTick((n) => n + 1);
   }, [behalten, form, onErfassen, onFertig, uebernahme]);
 
+  /**
+   * Der Serienlauf — eine Funktion für Knopf UND Tastenkürzel. Zwei Kopien
+   * gingen genau so lange auseinander, bis eine von beiden die Marke vergisst.
+   */
+  const serienSpeichern = useCallback(() => {
+    // Greift NICHT beim auslösenden Druck — `sendetRef` wird erst in `abschicken`
+    // gesetzt, also nach der Prüfung. Der Riegel hier erspart einem Druck WÄHREND
+    // eines laufenden Absendens die überflüssige Prüfrunde; der wirksame Riegel
+    // steht in `abschicken`.
+    if (sendetRef.current) return;
+    serienlaufRef.current = true;
+    form.submit();
+  }, [form]);
+
+  function aufTaste(e: KeyboardEvent<HTMLDivElement>) {
+    // Ohne Serienmodus gibt es den Knopf nicht — dann darf das Kürzel auch
+    // keine Serien-Marke setzen. Eine stehengebliebene Marke färbt das nächste
+    // reguläre Absenden still zum Serienlauf (s. `onFinishFailed` unten).
+    if (!serie || e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return;
+    e.preventDefault();
+    serienSpeichern();
+  }
+
   function abbrechen() {
     form.resetFields();
     onAbbrechen?.();
   }
 
   return (
-    <div ref={wurzel}>
+    <div ref={wurzel} onKeyDown={aufTaste}>
       {/* `onFinishFailed` ist die zweite Hälfte von `serienlaufRef`. Scheitert die
           Prüfung, läuft `onFinish` NIE — die Marke bliebe auf „Serie" stehen und
           das nächste, reguläre Absenden nähme still den Serien-Zweig: gespeichert,
@@ -199,34 +276,49 @@ export function ErfassungsFormular<T extends object>({
         {children}
         <div
           style={{
-            display: 'flex', alignItems: 'center', gap: token.marginXS, flexWrap: 'wrap',
             marginTop: token.margin, paddingTop: token.paddingSM,
             borderTop: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          {/* Die Ansage-Region steht IMMER im Baum, auch bei 0. Wird sie erst
-              zusammen mit ihrem ersten Text eingehängt, sagt der Screenreader
-              genau die erste Speicherung nicht an — eine `aria-live`-Region meldet
-              nur Änderungen an bereits vorhandenem Inhalt. */}
+          {/* EINSTELLUNG — eigene Zeile über der Aktion. Warum getrennt: Dateikopf,
+              Abschnitt „NACHTRAG". Die Zeile steht im Serienmodus IMMER, denn sie
+              trägt die Ansage-Region: wird die erst zusammen mit ihrem ersten Text
+              eingehängt, sagt der Screenreader genau die erste Speicherung nicht an
+              — eine `aria-live`-Region meldet nur Änderungen an bereits vorhandenem
+              Inhalt. */}
           {serie && (
-            <Typography.Text type="secondary" aria-live="polite">
-              {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
-            </Typography.Text>
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: token.marginXS,
+                flexWrap: 'wrap', marginBottom: token.marginXS,
+              }}
+            >
+              {uebernahme != null && uebernahme.length > 0 && (
+                <Tooltip title={UEBERNAHME_ERKLAERUNG}>
+                  <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
+                    <Typography.Text type="secondary">Werte behalten</Typography.Text>
+                  </Checkbox>
+                </Tooltip>
+              )}
+              <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
+                {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}
+              </Typography.Text>
+            </div>
           )}
-          {serie && uebernahme != null && uebernahme.length > 0 && (
-            <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
-              Werte behalten
-            </Checkbox>
-          )}
-          <Space style={{ marginLeft: 'auto' }}>
+          {/* AKTION */}
+          <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
             {onAbbrechen && <Button onClick={abbrechen}>Abbrechen</Button>}
             {serie && (
               // htmlType="button": siehe „EINE FALLE" im Dateikopf.
-              <Button
-                loading={laeuft}
-                onClick={() => { serienlaufRef.current = true; form.submit(); }}
-              >
+              // Das Kürzel steht `aria-hidden` im Knopf: sichtbar für die Augen,
+              // unsichtbar für den zugänglichen Namen — sonst müsste jede
+              // Aufrufstelle ihre Knopf-Abfrage auf den Zusatz umschreiben, und
+              // eine Vorlesehilfe buchstabierte „Strg Plus Pfeil".
+              <Button loading={laeuft} onClick={serienSpeichern}>
                 Speichern und nächste
+                <span aria-hidden style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}>
+                  {SERIEN_KUERZEL}
+                </span>
               </Button>
             )}
             <Button type="primary" htmlType="submit" loading={laeuft}>{erfassenText}</Button>

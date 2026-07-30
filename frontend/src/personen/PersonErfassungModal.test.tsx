@@ -86,9 +86,11 @@ describe('PersonErfassungModal — Serienmodus', () => {
   it('der Antreffort überlebt das Serien-Speichern (Kontext-Default)', async () => {
     // `uebernahme={['antreff_ort']}`: an einer Sammelstelle kommen zehn Personen vom
     // selben Ort. Der Beleg ist das Nebeneinander — Name leer, Antreffort steht.
+    // Der Schalter steht per Vorgabe AUS (30.07.2026) und wird hier eingeschaltet.
     zeige();
     const nutzer = userEvent.setup();
 
+    await nutzer.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
     await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
