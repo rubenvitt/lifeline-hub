@@ -99,7 +99,14 @@ export default function Inspector({
           <Descriptions.Item label="Inhalt">{marker.lageMeldung.inhalt}</Descriptions.Item>
         )}
         <Descriptions.Item label="Koordinate">
-          <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} />
+          {/* Drei Zeilen statt der vollen rückwärts aufgelösten Adresse: die füllt in der
+              300-px-Karte sonst ein halbes Dutzend Zeilen und drückt die Aktionen aus dem
+              Blick. Die Koordinate darüber bleibt ungekürzt — sie ist die tragende Angabe.
+              Drei und nicht zwei, weil der Tooltip mit dem vollen Wortlaut an `hover`/`focus`
+              hängt und die Karte auf Touch bedient wird: was hier steht, muss ohne ihn
+              tragen. Wo das nicht reicht, führt der Knopf darunter ins Fach-Modul, das die
+              Adresse ungekürzt zeigt. */}
+          <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} maxOrtZeilen={3} />
         </Descriptions.Item>
       </Descriptions>
       {/* Abstand am Aufrufer wie im FachebenenInspector: `GeoKennzahlen` rendert ohne
@@ -137,16 +144,26 @@ export default function Inspector({
           </FeldLabel>
         </Space>
       )}
-      <Space style={{ marginTop: token.marginXS }}>
-        <Link to={modulLink}>
-          <Button>
+      {/* Senkrecht, nicht nebeneinander: die Karte ist auf 300 px festgelegt, die beiden
+          volltextigen Knöpfe tragen zusammen rund 300 px Eigenbreite und passen damit in
+          keiner Dichtestufe in den Innenraum. Waagerecht bricht ein `Space` nicht um, und
+          `overflowY: 'auto'` an der Karte zieht per CSS auch `overflow-x` auf `auto` — der
+          zweite Knopf wurde also abgeschnitten. Dieselbe Bauform wie in `ZonenInspector`
+          und `FreiesZeichenInspector` an derselben Karte.
+          Kein Dreipunkt-Menü: gezählt wird nach der Rechteprüfung (LFH-366), und ohne
+          Schreibrecht bleibt hier genau eine Aktion. */}
+      <Space orientation="vertical" size="middle" style={{ width: '100%', marginTop: token.marginXS }}>
+        {/* `display: block` am Anker: er ist inline, sonst liefe das `block` am Knopf darin
+            ins Leere und die Zeile bliebe auf Textbreite. */}
+        <Link to={modulLink} style={{ display: 'block' }}>
+          <Button block>
             {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fach-Modul öffnen'}
           </Button>
         </Link>
         {/* Lagemeldungen sind auf der Karte read-only: verortet wird ausschließlich beim
             Übergeben (LFH-113). Re-/Ent-Verorten würde am ON-CONFLICT-Upsert ohnehin verpuffen. */}
         {darfSchreiben && marker.typ !== 'einsatzort' && marker.typ !== 'lagemeldung' && (
-          <Button danger onClick={() => onVerortungLoeschen(marker)}>
+          <Button danger block onClick={() => onVerortungLoeschen(marker)}>
             Verortung löschen
           </Button>
         )}
