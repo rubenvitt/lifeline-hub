@@ -82,7 +82,7 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-364: **73 Stellen in 33 Dateien** — gemessen, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
+  30.07.2026 nach LFH-363 + LFH-364: **49 Stellen in 23 Dateien** — gemessen, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
   zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit
   Klammertiefe, nicht per Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind
   (gemessen 61 statt 82) und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop
