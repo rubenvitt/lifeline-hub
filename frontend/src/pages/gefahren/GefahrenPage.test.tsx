@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -160,12 +160,19 @@ describe('GefahrenPage', () => {
       }),
     );
     renderPage();
-    const zellen = await screen.findAllByLabelText('Warnstufe brand × menschen');
-    const combobox = zellen[0].querySelector('input[role="combobox"]') ?? zellen[0];
-    await userEvent.click(combobox);
-    await userEvent.click(await screen.findByText('Hoch'));
-    await screen.findAllByText('Nord'); // settle
-    expect(put).toMatchObject({ gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' });
+    // Seit LFH-368/B5h trägt die Zelle EINEN Auslöser statt eines Mini-Selects; der
+    // zugängliche Name nennt Zeile, Spalte und die aktuelle Stufe.
+    await userEvent.click(await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }));
+    // Der Eintrag wird über das OFFENE Menü gegriffen — antd lässt die Portale
+    // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbTabelle.test.tsx`).
+    const menue = document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    if (!menue) throw new Error('kein offenes Menü im Baum');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /hoch/i }));
+    // Auf den PUT selbst warten: es gibt keinen Select-Neuzeichnung mehr, auf die
+    // sich ein Textsucher stützen könnte.
+    await waitFor(() => expect(put).toMatchObject({
+      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
+    }));
   });
 
   it('benennt das gewählte Gefahrengebiet um (PATCH)', async () => {

@@ -11,7 +11,7 @@ import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
 import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
-import GefahrenMatrix from './GefahrenMatrix';
+import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 
@@ -148,8 +148,11 @@ export default function GefahrenPage() {
               {gefahrengebietName(aktuell.label, aktuell.id)}
             </Typography.Title>
             {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an. */}
+            {/* Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (30/48/72,
+                LFH-362). Ein `size="small"` nagelte sie hier auf die kompakte Stufe
+                fest — auch im Handschuh-Betrieb, wo derselbe Knopf 72 px braucht. */}
             <Link to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
-              <Button size="small">Auf Karte zeigen</Button>
+              <Button>Auf Karte zeigen</Button>
             </Link>
           </div>
         )}
@@ -162,8 +165,20 @@ export default function GefahrenPage() {
           <GefahrenMatrix
             matrix={matrixQuery.data ?? []}
             darfSchreiben={darfSchreiben}
-            pending={setzen.isPending}
+            // Nur die Zelle des laufenden PUT sperren. `variables` kommt von TanStack
+            // Query und ist genau die Eingabe der laufenden Mutation — kein
+            // Parallel-State, der auseinanderlaufen kann.
+            laufendeZelle={
+              setzen.isPending && setzen.variables
+                ? zellSchluessel(setzen.variables.gefahrentyp, setzen.variables.schutzobjekt)
+                : null
+            }
             onSetzen={(d) => setzen.mutate(d)}
+            // `mutateAsync`: der Detail-Dialog braucht die Ablehnung, sonst leert die
+            // Erfassungshülle den getippten Wortlaut trotz 422. Den Toast macht weiterhin
+            // `onError: fehler`; die abgelehnte Zusage fängt `abschicken` in der Hülle
+            // (`Erfassung.tsx`, `catch {}`) — also keine unbehandelte Ablehnung.
+            onDetailsSpeichern={(d) => setzen.mutateAsync(d)}
           />
         )}
       </div>
