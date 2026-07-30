@@ -140,11 +140,15 @@ describe('MaterialPage', () => {
     expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
   });
 
-  it('leere Bemerkung trägt einen benannten Auslöser, nicht nur ein nacktes Stift-Icon', async () => {
+  it('leere Bemerkung trägt einen sichtbaren, zeilenbenannten Auslöser statt eines Stift-Icons', async () => {
     /**
      * Befund M21 (LFH-369 · B5i). Bei `bemerkung: null` blieb von `Typography.Text editable`
-     * genau das Stift-Icon übrig — ohne zugänglichen Namen. Der LESEzweig hatte längst ein
-     * „—", der Schreibzweig nichts: die Affordanz war genau falsch herum verteilt.
+     * genau das Stift-Icon übrig: sichtbar KEINE Aufforderung, und sein zugänglicher Name war
+     * antds Locale-Vorgabe „Bearbeiten" — der sagt nicht, was bearbeitet wird, und lieferte in
+     * einer n-zeiligen Liste n gleichnamige Knöpfe. Der LESEzweig hatte längst ein „—", der
+     * Schreibzweig nichts: die Affordanz war genau falsch herum verteilt.
+     *
+     * Der Name trägt deshalb die Zeilenkennung (Regel aus LFH-365) — hier die Bezeichnung.
      *
      * Geprüft wird im TABELLENzweig. Unter `md` führt keine der drei `karte.sekundaer`-Listen
      * die Bemerkung (Slot auf 3 Einträge begrenzt) — ein Test am schmalen Schirm fände nichts
@@ -153,7 +157,7 @@ describe('MaterialPage', () => {
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(within(zeile).getByRole('button', { name: 'Bemerkung hinzufügen' })).toBeInTheDocument();
+    expect(within(zeile).getByRole('button', { name: 'Bemerkung zu Wolldecke hinzufügen' })).toBeInTheDocument();
   });
 
   it('keine Klein-Variante mehr am Status-Auswahlfeld und am Entfernen-Knopf', async () => {

@@ -319,6 +319,7 @@ export default function PersonalPage() {
       render: (_, ep) => (
         <BemerkungZelle
           wert={ep.bemerkung}
+          kennung={ep.name}
           darfSchreiben={darfSchreiben}
           onSpeichern={(val) => bemerkungMutation.mutate({ epId: ep.id, bemerkung: val })}
         />

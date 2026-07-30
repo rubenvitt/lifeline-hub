@@ -248,7 +248,7 @@ describe('PersonalPage', () => {
   it('eingeschaltete Bemerkungsspalte trägt bei leerem Wert einen benannten Auslöser', async () => {
     /**
      * Befund M21 (LFH-369 · B5i) an der Personalseite. Zwei Hälften, denn nur zusammen sind
-     * sie widerlegbar: die Spalte ist per Voreinstellung ABGEWÄHLT (`PersonalPage.tsx:437`),
+     * sie widerlegbar: die Spalte ist per Voreinstellung ABGEWÄHLT (`PersonalPage.tsx:436`),
      * also gibt es vorher keinen Auslöser — eine reine „ist da"-Prüfung hätte auch bei einem
      * Platzhalter bestanden, der irgendwo sonst auf der Seite steht.
      *
@@ -259,13 +259,13 @@ describe('PersonalPage', () => {
      */
     const { container } = render(einsatz());
     await screen.findByText('Thomas Müller');
-    expect(screen.queryByRole('button', { name: 'Bemerkung hinzufügen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(within(zeile).getByRole('button', { name: 'Bemerkung hinzufügen' })).toBeInTheDocument();
+    expect(within(zeile).getByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
   });
 

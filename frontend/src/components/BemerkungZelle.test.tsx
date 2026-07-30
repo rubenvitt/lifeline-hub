@@ -81,12 +81,21 @@ describe('BemerkungZelle', () => {
      * und klickte ins Leere.
      */
     const onSpeichern = vi.fn();
-    renderMitProviders(<BemerkungZelle wert="Tank leer" darfSchreiben onSpeichern={onSpeichern} />);
+    renderMitProviders(
+      <BemerkungZelle wert="Tank leer" darfSchreiben kennung="Florian 1" onSpeichern={onSpeichern} />,
+    );
 
     expect(screen.getByText('Tank leer')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: BEMERKUNG_HINZUFUEGEN })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    /**
+     * Über die KENNUNG gegriffen, nicht über antds Vorgabenamen: `test/utils.tsx` rendert
+     * ohne `locale`, dort heißt der Stift „Edit" — in Produktion setzt `ThemeModeProvider`
+     * `deDE`, dort „Bearbeiten" (`locale/de_DE.js:78-79`). Ein Test auf „Edit" prüfte also
+     * einen Namen, den nie jemand zu sehen bekommt, und bräche, sobald die Testhülle eine
+     * Locale bekommt.
+     */
+    await userEvent.click(screen.getByRole('button', { name: 'Bemerkung zu Florian 1 bearbeiten' }));
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
@@ -103,12 +112,38 @@ describe('BemerkungZelle', () => {
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN })).toBeInTheDocument();
   });
 
+  it('nach dem Verlassen liegt der Fokus wieder auf dem Platzhalter, nicht auf <body>', async () => {
+    /**
+     * antd stellt den Fokus beim Verlassen selbst her — aber nur auf seinen EIGENEN Stift
+     * (`Base/index.js:90-95`, `useLayoutEffect` auf `editIconRef`). Auf dem leeren Zweig
+     * hängt `Typography.Text` in derselben Runde aus dem Baum aus, in der `bearbeitet` auf
+     * `false` fällt: der Effekt läuft für diesen Wert nie, `editIconRef` ist ohnehin leer,
+     * und der Fokus fällt auf `<body>`. Genau diese Klasse führt die Erfassungs-Norm bereits
+     * („der Fokus landet gemessen auf `<body>`").
+     *
+     * Beide Auswege werden geprüft — Abbrechen UND Übernehmen —, weil sie verschiedene
+     * Zweige nehmen und ein Fix nur für einen von beiden nicht auffiele.
+     */
+    const onSpeichern = vi.fn();
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
+
+    const platzhalter = () => screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN });
+
+    await userEvent.click(platzhalter());
+    druecke(screen.getByRole('textbox'), ESCAPE);
+    expect(document.activeElement).toBe(platzhalter());
+
+    await userEvent.click(platzhalter());
+    druecke(screen.getByRole('textbox'), ENTER);
+    expect(document.activeElement).toBe(platzhalter());
+  });
+
   it('Lesezweig zeigt „—" und KEINEN Platzhalter — eine Aufforderung ohne Aktion wäre gelogen', () => {
     /**
-     * „Lesezweig konsistent halten" heißt gleiche Zeilenhöhe und Typografie, NICHT gleicher
+     * „Lesezweig konsistent halten" heißt gleiche BEDEUTUNG des Leerzustands, nicht gleicher
      * Wortlaut: ohne Schreibrecht gibt es keine Aktion, ein „Bemerkung hinzufügen" wäre eine
-     * falsche Affordanz. Dass beide Zweige gleich hoch bleiben, trägt das Primitiv dadurch,
-     * dass sie durch dieselbe Datei laufen.
+     * Aufforderung ins Leere. Über gleiche Zeilenhöhe sagt dieser Test nichts — jsdom rechnet
+     * kein Layout, und die beiden Zweige sind gemessen auch nicht gleich hoch.
      */
     const { container } = renderMitProviders(
       <BemerkungZelle wert={null} darfSchreiben={false} onSpeichern={vi.fn()} />,
@@ -122,6 +157,44 @@ describe('BemerkungZelle', () => {
       <BemerkungZelle wert="Tank leer" darfSchreiben={false} onSpeichern={vi.fn()} />,
     );
     expect(container.textContent).toBe('Tank leer');
+  });
+
+  it('mit Zeilenkennung tragen mehrere Zellen unterscheidbare Namen — sichtbar bleibt der kurze Text', () => {
+    /**
+     * Die Bündelungs-Festlegung aus LFH-365 verlangt die Zeilenkennung im zugänglichen Namen,
+     * „weil n Zeilen sonst n gleichnamige Knöpfe liefern". Das gilt hier genauso: auf der
+     * Materialseite steht die Bemerkungsspalte per Voreinstellung SICHTBAR, eine 50-Zeilen-
+     * Liste lieferte also 50-mal denselben Namen in der Knopfliste eines Screenreaders.
+     *
+     * Sichtbar bleibt der kurze Text — die Kennung steht daneben schon in der Zeile und
+     * würde die Spalte sonst unnötig breit machen.
+     */
+    renderMitProviders(
+      <>
+        <BemerkungZelle wert={null} darfSchreiben kennung="Florian 1" onSpeichern={vi.fn()} />
+        <BemerkungZelle wert="Tank leer" darfSchreiben kennung="Florian 2" onSpeichern={vi.fn()} />
+      </>,
+    );
+
+    const leer = screen.getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' });
+    expect(leer).toHaveTextContent(BEMERKUNG_HINZUFUEGEN);
+    expect(screen.getByRole('button', { name: 'Bemerkung zu Florian 2 bearbeiten' })).toBeInTheDocument();
+  });
+
+  it('ohne Änderung wird nicht gespeichert — ein Fehlklick kostet keinen Schreibvorgang', async () => {
+    /**
+     * antd vergleicht nicht: `Base/index.js` ruft `onChange` beim Verlassen unbedingt. Ein
+     * Klick auf den Platzhalter und ein Klick daneben schickten damit ein PATCH mit leerem
+     * Wert, samt Invalidierung und Live-Ereignis an alle Verbundenen — für nichts. Der
+     * sichtbare Platzhalter macht diesen Fehlklick deutlich leichter als der alte Stift.
+     */
+    const onSpeichern = vi.fn();
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
+
+    await userEvent.click(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }));
+    fireEvent.blur(screen.getByRole('textbox'));
+
+    expect(onSpeichern).not.toHaveBeenCalled();
   });
 
   it('der Platzhalter setzt keine eigene Größe und keine Klein-Variante', () => {

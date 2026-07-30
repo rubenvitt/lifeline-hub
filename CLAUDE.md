@@ -160,23 +160,40 @@ Alltag wichtigsten:
   LFH-372/B5k).
 - **Ein leeres Feld muss sagen, dass man es schreiben kann** (LFH-369 · B5i, Befund M21). Eine
   inline bearbeitbare, **optionale** Angabe nimmt `components/BemerkungZelle.tsx` — nicht
-  `Typography.Text editable` von Hand. Grund: bei leerem Wert blieb davon genau das Stift-Icon
-  übrig, als `<button>` ohne Textinhalt und damit **ohne zugänglichen Namen** (gemessen:
-  `getByRole('button', { name: … })` fand nichts). Der **Lese**zweig hatte dagegen längst ein
-  „—" — die Affordanz war genau falsch herum verteilt. Der Platzhalter ist ein echter
-  antd-`Button` (`type="link"`) und **kein gestyltes `<span onClick>`**: so erbt er
-  `controlHeight` vom `ConfigProvider` und schuldet nicht die zwei Angaben plus
-  Dichte-Zusicherung, die LFH-365 einem handgebauten Bedienziel auferlegt. Der Lesezweig behält
-  „—": ohne Schreibrecht gibt es keine Aktion, eine Aufforderung wäre eine falsche Affordanz —
-  „konsistent" heißt gleiche Höhe und Typografie, und die trägt das Primitiv, weil beide Zweige
-  durch dieselbe Datei laufen. **Drei Aufrufer, nicht fünf:** `gefahren/GefahrenPage.tsx:135`
-  und `lagekarte/Sidebar.tsx:532` haben gemessen **keinen Leerfall** (Pflichtname mit
-  `trim`-Vergleich) und bleiben draußen. **Gemessene Testfalle:** antds `Editable` entscheidet
-  über Übernehmen/Abbrechen am **legacy `keyCode`** (`Editable.js:70-86`) und vergleicht keydown
-  gegen keyup — `userEvent` v14 setzt es nicht, `type(feld, '…{Enter}')` bleibt wirkungslos und
-  der Test scheitert mit „0 calls", als wäre die Komponente kaputt. Tastenwege deshalb über
-  `fireEvent` mit explizitem `keyCode`; der Mausweg (`onBlur` → übernehmen) gehört eigens
-  belegt, er ist im Betrieb der häufigere.
+  `Typography.Text editable` von Hand. Bei leerem Wert blieb davon genau das Stift-Icon übrig:
+  **sichtbar keine Aufforderung**, und als Trefffläche ein Icon statt eines Textziels.
+  **Nicht** dagegen namenlos — das ist im Review gemessen worden und korrigiert hier sowohl das
+  Akzeptanzkriterium des Tickets als auch den ersten Anlauf dieses Absatzes: antd setzt das
+  `aria-label` unbedingt aus der Locale (`typography/Base/index.js:271-283`), mit `deDE` heißt
+  der Stift **„Bearbeiten"** (`locale/de_DE.js:78-79`, gesetzt in `theme/ThemeModeProvider.tsx`).
+  Der Mangel ist, dass dieser Name **nicht sagt, WAS** — und dass n Zeilen n gleichnamige Knöpfe
+  liefern. Deshalb trägt der Auslöser die **Zeilenkennung** im zugänglichen Namen („Bemerkung zu
+  Florian 1 hinzufügen") bei kurzem sichtbaren Text; das ist dieselbe Regel wie bei der
+  Aktionsbündelung zwei Absätze weiter unten, nicht ihre Ausnahme. Der **Lese**zweig hatte
+  längst ein „—" — die Affordanz war genau falsch herum verteilt.
+  Der Platzhalter ist ein echter antd-`Button` (`type="link"`) und **kein gestyltes
+  `<span onClick>`**: so erbt er `controlHeight` vom `ConfigProvider` und schuldet nicht die zwei
+  Angaben plus Dichte-Zusicherung, die LFH-365 einem handgebauten Bedienziel auferlegt. Der
+  Lesezweig behält „—": ohne Schreibrecht gibt es keine Aktion, eine Aufforderung wäre eine ins
+  Leere. „Konsistent" heißt hier gleiche **Bedeutung** des Leerzustands — ausdrücklich **nicht**
+  gleiche Höhe: blanker Text und ein Knopf mit Polsterung sind nicht gleich hoch, und dieselbe
+  Datei ändert daran nichts.
+  **Drei Aufrufer, nicht fünf:** `pages/gefahren/GefahrenPage.tsx:135` und
+  `pages/lagekarte/Sidebar.tsx:532` sind **Pflichtnamen, die umbenannt werden**, keine optionalen
+  Notizen — der Platzhalter hätte dort keinen Zustand, in dem er erschiene. Die Mechanik ist
+  dabei **nicht dieselbe**: `Sidebar` verwirft eine leere Eingabe selbst (`if (t && t !== b.name)`),
+  `GefahrenPage` tut das **nicht** — dort fängt erst die Anzeige es ab (`api/gefahren.ts`,
+  `gefahrengebietName`).
+  **Zwei gemessene Fallen beim Anfassen:** (1) antds `Editable` entscheidet über
+  Übernehmen/Abbrechen am **legacy `keyCode`** (`Editable.js:70-86`) und vergleicht keydown gegen
+  keyup — `userEvent` v14 setzt es nicht, `type(feld, '…{Enter}')` bleibt wirkungslos und der Test
+  scheitert mit „0 calls", als wäre die Komponente kaputt; Tastenwege deshalb über `fireEvent` mit
+  explizitem `keyCode`, und der Mausweg (`onBlur` → übernehmen) gehört eigens belegt, er ist im
+  Betrieb der häufigere. (2) antd gibt den Fokus beim Verlassen nur an seinen **eigenen** Stift
+  zurück (`Base/index.js:90-95`); wo ein Platzhalter das `Typography` ersetzt, hängt es in
+  derselben Runde aus und der Fokus fällt auf `<body>` — die Rückgabe muss das Primitiv selbst
+  übernehmen. Und `onChange` feuert beim Verlassen **unbedingt**: ohne Wertgleichheits-Riegel
+  kostet ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
 - **Die Zielform des Statuswechsels in den Kräfte-Listen liegt fest, gebaut wird sie in
   LFH-339/C4** (LFH-369 · B5i, `docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
   Kurzfassung: **Auslöser ist die Statusanzeige selbst** plus senkrechtes Menü im Portal — kein

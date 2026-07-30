@@ -242,6 +242,7 @@ export default function MaterialPage() {
       render: (_, em) => (
         <BemerkungZelle
           wert={em.bemerkung}
+          kennung={em.bezeichnung}
           darfSchreiben={darfSchreiben}
           onSpeichern={(val) => bemerkungMutation.mutate({ emId: em.id, bemerkung: val })}
         />

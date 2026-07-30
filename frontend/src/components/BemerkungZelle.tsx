@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Button, Typography } from 'antd';
 
 /**
@@ -8,21 +8,40 @@ import { Button, Typography } from 'antd';
  *
  * Befund M21: `FahrzeugePage`, `PersonalPage` und `MaterialPage` trugen drei zeichengleiche
  * Kopien von `Typography.Text editable` mit `{x.bemerkung ?? ''}` als Kind. Bei leerer
- * Bemerkung blieb davon genau das Stift-Icon übrig — als `<button>` ohne Textinhalt, also
- * ohne zugänglichen Namen (gemessen an `82c2885`: `getByRole('button', { name: … })` fand
- * nichts, nur ein nacktes `<svg>`). Der LESEzweig hatte dagegen längst ein „—": die
- * Affordanz war genau falsch herum verteilt — wer nichts tun kann, sah einen Platzhalter;
- * wer schreiben durfte, sah nichts.
+ * Bemerkung blieb davon genau das Stift-Icon übrig.
+ *
+ * ── PRÄZISIERUNG GEGEN TICKET UND ERSTEN ANLAUF (im Review gemessen) ───────────────────
+ *
+ * Der Stift ist NICHT namenlos, und das Akzeptanzkriterium des Tickets („nicht nur ein Icon
+ * ohne zugänglichen Namen") beschreibt einen Zustand, den es so nie gab: antd setzt sein
+ * `aria-label` unbedingt aus der Locale (`typography/Base/index.js:271-283`), und
+ * `theme/ThemeModeProvider.tsx` fährt `deDE` — in Produktion heißt er **„Bearbeiten"**
+ * (`locale/de_DE.js:78-79`). Der Befund bleibt gültig, nur anders benannt:
+ *
+ * 1. **Sichtbar stand gar nichts.** In der leeren Zelle gab es keine Aufforderung, nur ein
+ *    Icon — dessen Trefffläche zudem kleiner ist als die eines Textziels.
+ * 2. **Der Name sagt nicht, WAS.** „Bearbeiten" ist antds Vorgabe für jedes editierbare
+ *    `Typography`; n Zeilen lieferten n gleichnamige Knöpfe — genau der Mangel, den die
+ *    Bündelungs-Regel aus LFH-365 benennt. Deshalb trägt {@link BemerkungZelleProps.kennung}
+ *    die Zeilenkennung in den Namen.
+ * 3. **Die Affordanz war falsch herum verteilt.** Der LESEzweig hatte längst ein „—": wer
+ *    nichts tun kann, sah einen Platzhalter; wer schreiben durfte, sah nichts.
  *
  * ── DREI AUFRUFER, NICHT FÜNF ──────────────────────────────────────────────────────────
  *
  * Das Ticket zählt fünf Aufrufer desselben Musters und leitet daraus das Primitiv ab. Die
- * zwei zusätzlichen sind `gefahren/GefahrenPage.tsx:135` und `lagekarte/Sidebar.tsx:532` —
- * gemessen haben BEIDE keinen Leerfall: dort wird ein **Pflichtname umbenannt**
- * (`gefahrengebietName(label, id)` liefert immer einen Fallback, `b.name` ist gesetzt), mit
- * `trim`-Vergleich gegen den Altwert und Verwerfen bei leerer Eingabe. Ein „hinzufügen"-
- * Platzhalter hätte dort keinen Zustand, in dem er erscheinen könnte. Sie bleiben deshalb
- * draußen; das Primitiv trägt die drei Stellen mit einer OPTIONALEN Notiz.
+ * zwei zusätzlichen sind `pages/gefahren/GefahrenPage.tsx:135` und
+ * `pages/lagekarte/Sidebar.tsx:532` — gemessen hat BEI BEIDEN der Leerfall keinen sichtbaren
+ * Zustand, aber aus zwei VERSCHIEDENEN Gründen, die nicht zusammenzuziehen sind:
+ * `Sidebar.tsx:536` verwirft eine leere Eingabe selbst (`if (t && t !== b.name)`);
+ * `GefahrenPage.tsx:135` tut das **nicht** — dort fängt erst die Anzeige es ab
+ * (`api/gefahren.ts` `gefahrengebietName`: leeres Label → „Gefahrengebiet #<id>"). Beide sind
+ * ein **Pflichtname**, der umbenannt wird (`trim`-Vergleich gegen den Altwert), keine
+ * optionale Notiz — ein „hinzufügen"-Platzhalter hätte dort keinen Zustand, in dem er
+ * erscheinen könnte. Nebenbei: beide tragen den Wertgleichheits-Riegel, den dieses Primitiv
+ * anfangs vermissen ließ (siehe `onChange` unten).
+ *
+ * Sie bleiben deshalb draußen; das Primitiv trägt die drei Stellen mit einer OPTIONALEN Notiz.
  *
  * ── WARUM EIN ECHTER `Button` UND KEIN GESTYLTES `<span onClick>` ───────────────────────
  *
@@ -53,26 +72,69 @@ export interface BemerkungZelleProps {
    * hätte drei Aufrufer verbogen, um einem Primitiv Arbeit abzunehmen, die es nicht hat.
    */
   onSpeichern: (wert: string) => void;
+  /**
+   * Menschenlesbare Zeilenkennung (Funkrufname, Name, Bezeichnung) für den zugänglichen
+   * Namen. Ohne sie liefern n Zeilen n gleichnamige Knöpfe — dieselbe Begründung wie bei der
+   * Aktionsbündelung aus LFH-365, und hier besonders spürbar: auf der Materialseite steht die
+   * Bemerkungsspalte per Voreinstellung sichtbar.
+   *
+   * Optional, damit ein Einzelgebrauch außerhalb einer Liste nicht gezwungen ist, eine
+   * Kennung zu erfinden.
+   */
+  kennung?: string;
 }
 
 /** Wortlaut an EINER Stelle — drei Seiten und ihre drei Tests greifen denselben Namen. */
 export const BEMERKUNG_HINZUFUEGEN = 'Bemerkung hinzufügen';
 
-export function BemerkungZelle({ wert, darfSchreiben, onSpeichern }: BemerkungZelleProps) {
+export function BemerkungZelle({ wert, darfSchreiben, onSpeichern, kennung }: BemerkungZelleProps) {
   const [bearbeitet, setBearbeitet] = useState(false);
+  const knopfRef = useRef<HTMLButtonElement>(null);
+  const warBearbeitet = useRef(false);
   const gefuellt = !!wert;
 
   /**
-   * Lesezweig unverändert bei „—" — und das ist keine Nachlässigkeit, sondern die Aussage:
-   * ohne Schreibrecht gibt es keine Aktion, ein „Bemerkung hinzufügen" wäre eine falsche
-   * Affordanz. „Konsistent" heißt hier gleiche Zeilenhöhe und Typografie, nicht gleicher
-   * Wortlaut — und die trägt das Primitiv, weil beide Zweige durch dieselbe Datei laufen.
+   * Fokusrückgabe auf den Platzhalter.
+   *
+   * antd stellt den Fokus beim Verlassen selbst her, aber nur auf seinen EIGENEN Stift
+   * (`Base/index.js:90-95`). Solange der Wert gefüllt ist, greift das: `Typography.Text`
+   * bleibt am Baum, der Effekt sieht `prevEditing` und fokussiert. Auf dem LEEREN Zweig
+   * hängt es in derselben Runde aus, in der `bearbeitet` auf `false` fällt — der Effekt
+   * läuft für diesen Wert nie und der Fokus fällt auf `<body>` (gemessen). Genau diese
+   * Klasse führt die Erfassungs-Norm schon.
+   *
+   * `useLayoutEffect` wie antd: vor dem Anstrich, damit der Fokus nicht sichtbar springt.
+   */
+  useLayoutEffect(() => {
+    if (warBearbeitet.current && !bearbeitet && !gefuellt) knopfRef.current?.focus();
+    warBearbeitet.current = bearbeitet;
+  }, [bearbeitet, gefuellt]);
+
+  /**
+   * Lesezweig unverändert bei „—" — keine Nachlässigkeit, sondern die Aussage: ohne
+   * Schreibrecht gibt es keine Aktion, ein „Bemerkung hinzufügen" wäre eine Aufforderung ins
+   * Leere. Das Ticket verlangt, den Lesezweig „konsistent zu halten"; eingelöst wird das als
+   * **gleiche Bedeutung des Leerzustands** (beide Zweige sagen „hier steht nichts"), nicht als
+   * gleicher Wortlaut.
+   *
+   * Was hier ausdrücklich NICHT behauptet wird, ist gleiche Zeilenhöhe: der Lesezweig gibt
+   * blanken Text zurück, der Schreibzweig einen `Button` mit `controlHeight` und Polsterung —
+   * die sind nicht gleich hoch, und dass beide durch dieselbe Datei laufen, ändert daran
+   * nichts. jsdom rechnet ohnehin kein Layout; wer die Höhen angleichen will, braucht eine
+   * e2e-Messung und eine eigene Entscheidung.
    */
   if (!darfSchreiben) return <>{wert || '—'}</>;
 
   if (!gefuellt && !bearbeitet) {
     return (
-      <Button type="link" onClick={() => setBearbeitet(true)}>
+      <Button
+        ref={knopfRef}
+        type="link"
+        // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
+        // so breit wie die längste Kennung.
+        aria-label={kennung ? `Bemerkung zu ${kennung} hinzufügen` : undefined}
+        onClick={() => setBearbeitet(true)}
+      >
         {BEMERKUNG_HINZUFUEGEN}
       </Button>
     );
@@ -86,9 +148,16 @@ export function BemerkungZelle({ wert, darfSchreiben, onSpeichern }: BemerkungZe
         // gefüllten Wert nicht mehr — antd ruft im kontrollierten Fall nur noch diesen Weg.
         editing: bearbeitet,
         onStart: () => setBearbeitet(true),
+        // `tooltip` ist zugleich der zugängliche Name des Stifts (`Base/index.js:271-283`:
+        // `aria-label` kommt aus `tooltip` oder, ohne eins, aus antds Locale-Vorgabe
+        // „Bearbeiten"). Ohne Kennung bleibt es bei der Vorgabe.
+        tooltip: kennung ? `Bemerkung zu ${kennung} bearbeiten` : undefined,
         onChange: (val) => {
           setBearbeitet(false);
-          onSpeichern(val);
+          // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen
+          // Riegel kostete ein Klick auf den Platzhalter und ein Klick daneben ein PATCH mit
+          // leerem Wert, samt Invalidierung und Live-Ereignis an alle Verbundenen.
+          if (val !== (wert ?? '')) onSpeichern(val);
         },
         onCancel: () => setBearbeitet(false),
       }}

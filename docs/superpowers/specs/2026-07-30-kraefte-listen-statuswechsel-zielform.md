@@ -6,8 +6,13 @@ bekommt (Teil 2). Teil 2 ist ausdrücklich **kein Umbau**: gebaut wird er in Ban
 (LFH-339/C4). Was hier steht, ist die Entscheidungsgrundlage, die dort fehlte — es gab bis
 heute **keine Zeile** in `docs/superpowers/specs/`, die eine Zielform benannte.
 
-Gemessen am 2026-07-30 gegen `1cc682c`. Betroffen sind `frontend/src/pages/FahrzeugePage.tsx`,
+Gemessen am 2026-07-30. Betroffen sind `frontend/src/pages/FahrzeugePage.tsx`,
 `PersonalPage.tsx` und `MaterialPage.tsx`.
+
+**Alle Zeilennummern hier zeigen auf den Stand NACH Teil 1** — also auf das, was ein Leser
+ausgecheckt hat, nicht auf die Ausgangslage `1cc682c`. Die frühere Fassung mischte beides in
+derselben Tabelle; das ist die unangenehmere Sorte Fehler, weil jede einzelne Zahl für sich
+plausibel aussieht.
 
 Wo dieses Dokument dem Ticket oder dem Elternticket LFH-333 widerspricht, gilt dieses
 Dokument; jede Abweichung steht unten mit Beleg.
@@ -18,10 +23,11 @@ Dokument; jede Abweichung steht unten mit Beleg.
 
 | Ticket / Elternticket | Gemessen |
 | --- | --- |
-| „**fünf Aufrufer** desselben Musters rechtfertigen ein Primitiv" | **Drei.** `gefahren/GefahrenPage.tsx:135` und `lagekarte/Sidebar.tsx:532` haben **keinen Leerfall**: dort wird ein *Pflichtname* umbenannt (`gefahrengebietName(label, id)` liefert immer einen Fallback, `b.name` ist gesetzt), mit `trim`-Vergleich gegen den Altwert und Verwerfen bei leerer Eingabe. Ein „hinzufügen"-Platzhalter hätte dort keinen Zustand, in dem er erscheinen könnte. |
+| „**fünf Aufrufer** desselben Musters rechtfertigen ein Primitiv" | **Drei.** `pages/gefahren/GefahrenPage.tsx:135` und `pages/lagekarte/Sidebar.tsx:532` sind *Pflichtnamen, die umbenannt werden* (`trim`-Vergleich gegen den Altwert), keine optionalen Notizen — ein „hinzufügen"-Platzhalter hätte dort keinen Zustand, in dem er erschiene. **Die Mechanik ist dabei nicht dieselbe**, auch wenn sie sich so zusammenfassen ließe: `Sidebar.tsx:536` verwirft eine leere Eingabe selbst (`if (t && t !== b.name)`); `GefahrenPage.tsx:135` tut das **nicht** und feuert auch mit `''` — dort fängt erst die Anzeige es ab (`api/gefahren.ts`, `gefahrengebietName`: leeres Label → „Gefahrengebiet #&lt;id&gt;"). |
 | Statuswechsel sitzt in einer **24-px-Zelle** | Die Zelle gibt es nicht mehr. Seit B1 hängt die Höhe an `controlHeight` (30/48/72); auf `komfortabel` und `handschuh` liegt sie **über** dem Ziel. Der Befund gilt nur noch für die Vorgabestufe. |
 | Zielform ist ein `Segmented`-Feld mit **Statusfarbe als Fläche** | Beides fällt durch — §3 (Breite) und §4 (Farbe), je mit Zahl bzw. Regel. |
-| „dann passt der Auslöser in den **Aktionsslot der Karte**" (`2026-06-22-drawer-nutzung-reduzieren-design.md:102-106`) | Der Slot ist auf allen drei Seiten mit „Entfernen" belegt (`FahrzeugePage:564`, `PersonalPage:455`, `MaterialPage:349`) und `Datensicht.tsx:193-200` sichert **genau EINE** Primäraktion zu. Der Satz ist doppelt falsch; §5 löst ihn auf. |
+| „dann passt der Auslöser in den **Aktionsslot der Karte**" (`2026-06-22-drawer-nutzung-reduzieren-design.md:102-106`) | Der Slot ist auf allen drei Seiten mit „Entfernen" belegt (`FahrzeugePage:565`, `PersonalPage:456`, `MaterialPage:352`) und `Datensicht.tsx:185-200` sichert **genau EINE** Primäraktion zu. Der Satz ist doppelt falsch; §5 löst ihn auf. |
+| AK: „nicht nur ein **Icon ohne zugänglichen Namen**" | Den Zustand gab es nie. antd setzt das `aria-label` des Stifts unbedingt aus der Locale (`typography/Base/index.js:271-283`); mit `deDE` (`theme/ThemeModeProvider.tsx`) heißt er **„Bearbeiten"** (`locale/de_DE.js:78-79`). Der Mangel ist ein anderer — siehe §2. |
 | Alle sechs Zeilennummern des Elterntickets | Falsch. LFH-330/B2 hat die Seiten auf `components/Datensicht.tsx` umgezogen (`82c2885`). Die geltenden stehen im Ticket LFH-369 selbst. |
 
 ---
@@ -32,11 +38,25 @@ Dokument; jede Abweichung steht unten mit Beleg.
 
 **Der Befund, den das Ticket nicht kannte, war der wichtigere:** der **Lese**zweig hatte
 längst einen „—"-Platzhalter, nur der **Schreib**zweig nicht. Die Affordanz war genau falsch
-herum verteilt — wer nichts tun konnte, sah einen Platzhalter; wer schreiben durfte, sah ein
-`<button>`, dessen ganzer Inhalt ein `<svg>` war, also **ohne zugänglichen Namen** (gemessen:
-`getByRole('button', { name: … })` fand vor der Änderung nichts).
+herum verteilt — wer nichts tun konnte, sah einen Platzhalter; wer schreiben durfte, sah nur
+ein Stift-Icon.
 
-Drei Festlegungen, die beim Anfassen gelten:
+**Was der Mangel NICHT war** (im Review gemessen, korrigiert das AK und den ersten Anlauf
+dieser Spec): ein Auslöser ohne zugänglichen Namen. Den gab es nie — der Stift heißt in
+Produktion „Bearbeiten". Der Mangel ist dreiteilig und in jedem Teil real:
+
+1. **Sichtbar stand gar nichts** in der leeren Zelle, und ein Icon ist als Trefffläche kleiner
+   als ein Textziel.
+2. **Der Name sagt nicht, WAS.** „Bearbeiten" ist antds Vorgabe für jedes editierbare
+   `Typography`; eine n-zeilige Liste lieferte n gleichnamige Knöpfe.
+3. **Die Affordanz stand auf der falschen Seite** (siehe oben).
+
+Vier Festlegungen, die beim Anfassen gelten:
+
+- **Der zugängliche Name trägt die Zeilenkennung** („Bemerkung zu Florian 1 hinzufügen"), der
+  sichtbare Text bleibt kurz. Das ist **dieselbe** Regel wie bei der Aktionsbündelung aus
+  LFH-365, nicht deren Ausnahme — und hier besonders nötig, weil `MaterialPage` die
+  Bemerkungsspalte per Voreinstellung **sichtbar** führt.
 
 - **Der Platzhalter ist ein echter antd-`Button`** (`type="link"`), kein gestyltes
   `<span onClick>`. Grund: ein handgebautes Bedienziel schuldet nach LFH-365 **zwei** Angaben
@@ -44,13 +64,16 @@ Drei Festlegungen, die beim Anfassen gelten:
   Dichtestufen, weil kein Guard eine Pixelangabe sieht. Ein `Button` erbt seine Höhe vom
   `ConfigProvider` und schuldet nichts davon. `type="link"` liefert zugleich die Bedienfarbe
   aus dem Token (`colorLink`, blau) statt eines Hex-Literals — „Rot bedient nichts".
-- **Der Lesezweig behält „—".** „Konsistent halten" heißt gleiche Zeilenhöhe und Typografie,
-  **nicht** gleicher Wortlaut: ohne Schreibrecht gibt es keine Aktion, ein „Bemerkung
-  hinzufügen" wäre eine falsche Affordanz. Dass beide Zweige gleich hoch bleiben, trägt das
-  Primitiv dadurch, dass sie durch **dieselbe Datei** laufen.
+- **Der Lesezweig behält „—".** „Konsistent halten" wird als gleiche **Bedeutung** des
+  Leerzustands eingelöst, **nicht** als gleicher Wortlaut: ohne Schreibrecht gibt es keine
+  Aktion, ein „Bemerkung hinzufügen" wäre eine Aufforderung ins Leere. Ausdrücklich **nicht**
+  behauptet wird gleiche Zeilenhöhe — blanker Text und ein `Button` mit Polsterung sind nicht
+  gleich hoch, und dass beide durch dieselbe Datei laufen, ändert daran nichts. Wer sie
+  angleichen will, braucht eine e2e-Messung (jsdom rechnet kein Layout) und eine eigene
+  Entscheidung.
 - **`spaltenAusVoreinstellung` und `abBreite` wurden geprüft und NICHT geändert.** Der
   sichtbare Platzhalter macht die Spalte breiter — die B2-Entscheidung
-  (`FahrzeugePage.tsx:335-341`: schreibtragende Spalten bekommen nie ein `abBreite`, sie
+  (`FahrzeugePage.tsx:336-342`: schreibtragende Spalten bekommen nie ein `abBreite`, sie
   weichen nur über die Voreinstellung) bleibt davon unberührt, und beide Seitentests belegen,
   dass der Spaltenzähler vorher wie nachher stimmt. Die Frage des AK („kann die
   Voreinstellungs-Entscheidung berühren") ist damit mit *geprüft, nicht geändert* beantwortet.
@@ -70,20 +93,24 @@ oder VIER unbeschriftete Werte. Darüber wird senkrecht angeordnet.**
 Gerechnet wird gegen die Quick-View-Obergrenze **480 px** (CLAUDE.md: breiter → eigene Route),
 abzüglich zweimal Innenpolster `abstand.lg`. Zielbreite beschriftet = **150 px** — das ist
 keine geschätzte Zeichenbreite, sondern die im Bestand als nötig befundene `minWidth` der
-Statusfelder (`FahrzeugePage:383`, `PersonalPage:305`; Material nimmt sogar 170).
+Statusfelder (`FahrzeugePage:384`, `PersonalPage:306`; Material nimmt sogar 170).
 Zielbreite unbeschriftet = `controlHeight` (quadratisch). Lücke = `abstand.sm`.
 
 | Stufe | nutzbar `[abgeleitet]` | beschriftet (150 px) `[abgeleitet]` | unbeschriftet `[abgeleitet]` |
 | --- | --- | --- | --- |
+| kompakt (30 / sm 7 / lg 18) | 480 − 36 = **444** | 157N − 7 ≤ 444 → N ≤ 2,87 → **2** | 37N − 7 ≤ 444 → N ≤ 12,19 → **12** |
 | komfortabel (48 / sm 11 / lg 28) | 480 − 56 = **424** | 161N − 11 ≤ 424 → N ≤ 2,70 → **2** | 59N − 11 ≤ 424 → N ≤ 7,37 → **7** |
 | handschuh (72 / sm 16 / lg 44) | 480 − 88 = **392** | 166N − 16 ≤ 392 → N ≤ 2,46 → **2** | 88N − 16 ≤ 392 → N ≤ 4,63 → **4** |
 
+Alle drei Stufen stehen in der Tabelle, auch die kompakte — sie ändert das Ergebnis nicht,
+aber eine Tabelle, die zwei von drei Stufen zeigt, sieht aus, als wären es alle.
+
 Die beschriftete Schwelle ist damit **dichteunabhängig 2**; die unbeschriftete fällt auf den
-Handschuh-Boden **4**.
+Handschuh-Boden **4** (und ist damit die einzige Zahl, die überhaupt von der Stufe abhängt).
 
 **Gemessene Kardinalitäten im Bestand:** Fahrzeug **10** (FMS 0–9, `migrations/0008:22-36`),
 Personal **6** (`migrations/0012:18-30`), Material **5** (`MaterialPage.tsx:22-28`).
-Längstes Label: „8 – Bedingt einsatzbereit" (24 Zeichen), „Desinfektion nötig" (18).
+Längstes Label: „8 – Bedingt einsatzbereit" (25 Zeichen), „Desinfektion nötig" (18).
 
 **Jeder der drei Kataloge liegt über jeder Schwelle, in jeder Dichtestufe.** Die waagerechte
 Zielform fällt damit nicht nach Geschmack durch, sondern nach Zahl — und `Segmented` bricht
@@ -104,8 +131,8 @@ mit ganzzeiligen Bedienzielen (`controlHeight` je Zeile). Kein neuer Drawer, kei
 
 In der **Tabelle** ersetzt er das heutige `<Select>` in der Statuszelle. In der **Karte** wird
 das heute rein anzeigende Statusetikett bedienbar — bei Fahrzeug und Personal ist der
-`karte.status`-Slot bereits gesetzt (`FahrzeugePage:554`, `PersonalPage:445`), bei Material
-steht der Status als Sekundärfeld (`MaterialPage:348`) und wird dort zum Auslöser.
+`karte.status`-Slot bereits gesetzt (`FahrzeugePage:555`, `PersonalPage:446`), bei Material
+steht der Status als Sekundärfeld (`MaterialPage:349`) und wird dort zum Auslöser.
 
 Das schließt die Lücke, die `2026-06-22-drawer-nutzung-reduzieren-design.md:102-106` benennt
 („unter `md` sind diese Module lesend plus eine Primäraktion") — **ohne** Drawer: der Grund,
@@ -140,7 +167,7 @@ Hintergrundfläche des Textes. Das Textlabel ist Pflicht (zweiter Kanal, WCAG 1.
 Zwei belegte Gründe, warum „Statusfarbe als Fläche" aus dem Elternticket eine begründete
 Entscheidung zurückdrehen würde:
 
-1. `components/StatusTag.tsx:26-31` verwirft antds Vollflächen-`color` **ausdrücklich**: ein
+1. `components/StatusTag.tsx:25-30` verwirft antds Vollflächen-`color` **ausdrücklich**: ein
    Nicht-Preset-Wert rendert als Fläche mit erzwungen weißem Text, und im Dunkelmodus sind die
    Rollenfarben aufgehellt — Weiß darauf ist unlesbar.
 2. **Vertragsgrenze.** Für Fahrzeug und Personal liegt die Statusfarbe gar nicht im
@@ -157,7 +184,7 @@ Entscheidung zurückdrehen würde:
 **Regel: Es wird KEIN zweiter Primäraktions-Slot geschaffen. Der Auslöser ist die
 Statusanzeige selbst.**
 
-`Datensicht.tsx:193-200` sichert genau **eine** Primäraktion zu, und dieser Slot ist auf allen
+`Datensicht.tsx:185-200` sichert genau **eine** Primäraktion zu, und dieser Slot ist auf allen
 drei Seiten mit „Entfernen" belegt. Die Annahme der Drawer-Spec, der Auslöser passe dorthin,
 geht deshalb nicht auf — und die Antwort ist nicht, den Slot zu verdoppeln, sondern ihn nicht
 zu brauchen: bedient wird an der Stelle, an der der Status **schon steht**.
@@ -195,7 +222,7 @@ die Fläche nicht braucht, die sie erzeugt hätte.
   nur das ein, was hier steht. Die dortigen Zeilen Z1/Z2/Z9/Z14/Z15 bleiben offen und behalten
   ihr Zielticket — geprüft, nicht stillschweigend übergangen.
 - **Kein Bestands-Sweep an den zwei Umbenenner-Stellen.** `GefahrenPage.tsx:135` und
-  `lagekarte/Sidebar.tsx:532` bleiben, wie sie sind (§1, erste Zeile).
+  `pages/lagekarte/Sidebar.tsx:532` bleiben, wie sie sind (§1, erste Zeile).
 
 ---
 
@@ -204,7 +231,7 @@ die Fläche nicht braucht, die sie erzeugt hätte.
 - `frontend/src/components/BemerkungZelle.tsx` (+ Test) · `components/Datensicht.tsx:193-200/234-239`
 - `frontend/src/pages/FahrzeugePage.tsx:403` · `PersonalPage.tsx:315` · `MaterialPage.tsx:238`
 - `frontend/src/theme/tokens.ts:143-160` (Dichte-Staffel) · `theme/statusFarben.ts:28-41` ·
-  `components/StatusTag.tsx:26-31`
+  `components/StatusTag.tsx:25-30`
 - `migrations/0008:22-36` (FMS 0–9) · `migrations/0012:18-30` (Personal) ·
   `frontend/src/stammdaten/StatusKatalogTab.test.tsx:181` (`fms_anker` nullable)
 - `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md:61/102-106` ·

@@ -407,6 +407,7 @@ export default function FahrzeugePage() {
       render: (_, ef) => (
         <BemerkungZelle
           wert={ef.bemerkung}
+          kennung={ef.funkrufname}
           darfSchreiben={darfSchreiben}
           onSpeichern={(val) => bemerkungMutation.mutate({ efId: ef.id, bemerkung: val })}
         />
