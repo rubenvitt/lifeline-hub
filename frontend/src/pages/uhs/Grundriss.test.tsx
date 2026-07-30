@@ -471,14 +471,22 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   it('reagiert nicht auf den Klick, wenn der Platz bereits belegt ist', async () => {
     // Festlegung LFH-367: nur unbelegte Plätze nehmen per Klick auf. Ein belegter Platz
     // trägt bereits eigene Klickziele (Personenkarte, Transport, Zurückweisen).
-    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    //
+    // Die ZWEITE Person ist der Grund, dass dieser Test etwas belegt: mit dem Belegenden
+    // allein wäre die Kandidatenmenge leer (er steht weder im Wartebereich noch unter
+    // „noch nicht aufgenommen"), der Dialog zeigte „Niemand zuweisbar" statt einer Auswahl
+    // — und eine Prüfung darauf bliebe auch ohne die `belegtVon`-Bedingung grün. Gemessen.
+    const belegend = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const wartend = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
-    renderGrundriss(uhs, [p]);
+    renderGrundriss(uhs, [belegend, wartend]);
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
 
-    expect(screen.queryByRole('combobox', { name: 'Patient' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Patient zuweisen')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Auch der Menü-Weg schweigt: der Eintrag steht nur an zuweisbaren Plätzen.
+    await userEvent.click(screen.getByRole('button', { name: 'Platzaktionen' }));
+    expect(within(offenesMenue()).queryByText('Patient zuweisen')).not.toBeInTheDocument();
   });
 
   it('nimmt auch einen defekten oder gesperrten Platz per Klick auf', async () => {
@@ -517,14 +525,15 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     expect(screen.queryByRole('combobox', { name: 'Patient' })).not.toBeInTheDocument();
   });
 
-  it('zeigt einen Hinweis statt einer leeren Auswahl, wenn niemand zuweisbar ist', async () => {
+  it('meldet statt eines Dialogs, wenn niemand zuweisbar ist', async () => {
+    // Kein Dialog mit totem Primär-Knopf: der hätte nichts zu erfassen und schlösse nur.
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, []);
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
 
     expect(await screen.findByText(/Niemand zuweisbar/)).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Patient' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 

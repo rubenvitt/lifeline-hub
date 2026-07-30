@@ -569,7 +569,17 @@ export default function Grundriss({
                   onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
                   onStorno={() => stornoMut.mutate(p.id)}
                   onOeffnen={setDetailPersonId}
-                  onZuweisen={() => setZuweisenPlatz(p)}
+                  onZuweisen={() => {
+                    // Ohne Kandidaten gar nicht erst öffnen: der Dialog trüge einen
+                    // Primär-Knopf, der nichts erfasst und nur schliesst — eine tote
+                    // Hauptaktion. Die Hülle kennt keinen Weg, ihn zu unterdrücken,
+                    // und sie dafür umzubauen träfe alle ihre Aufrufer.
+                    if (zuweisbarePersonen.length === 0) {
+                      message.info('Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.');
+                      return;
+                    }
+                    setZuweisenPlatz(p);
+                  }}
                 />
               ))}
               {uhs.plaetze.length === 0 && (
@@ -647,18 +657,12 @@ export default function Grundriss({
         onFertig={() => setZuweisenPlatz(null)}
         onAbbrechen={() => setZuweisenPlatz(null)}
       >
-        {zuweisbarePersonen.length === 0 ? (
-          <Typography.Text type="secondary">
-            Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.
-          </Typography.Text>
-        ) : (
-          <Form.Item label="Patient" name="personId" rules={[{ required: true }]}>
-            <Select<number>
-              placeholder="Patient auswählen…"
-              options={zuweisbarePersonen.map((p) => ({ value: p.id, label: personLabel(p) }))}
-            />
-          </Form.Item>
-        )}
+        <Form.Item label="Patient" name="personId" rules={[{ required: true }]}>
+          <Select<number>
+            placeholder="Patient auswählen…"
+            options={zuweisbarePersonen.map((p) => ({ value: p.id, label: personLabel(p) }))}
+          />
+        </Form.Item>
       </ErfassungsModal>
 
       {/* Schlanker Detail-Drawer beim Klick auf eine Patientenkarte (nur ansehen). */}
