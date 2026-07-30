@@ -143,11 +143,15 @@ const OFFEN: string[] = [
   '/src/pages/lagekarte/HistorienBanner.tsx',
   '/src/pages/lagekarte/KartenDetailCard.tsx',
   '/src/pages/lagekarte/SnapshotLeiste.tsx',
-  // ── B5g · UHS-Grundriss (LFH-367) ─────────────────────────────────────────
-  // Die vier Knöpfe der Platzkarte hängen an der Backend-Konstante SCHRITT_Y;
-  // ihre Begründung steht in `uhs/Grundriss.tsx` (LFH-328/A2).
+  // ── B5g · UHS-Grundriss (LFH-367) ── TEILWEISE ABGERÄUMT ──────────────────
+  // `MaterialTab.tsx` ist raus (1 Stelle): der Lösen-Knopf sass in einer Tabellenzelle,
+  // die mit der Dichtestufe wachsen darf. Was bleibt, sind die VIER Knöpfe der
+  // Platzkarte — und die sind kein Ermessen: ihre Höhe hängt an der Backend-Konstante
+  // SCHRITT_Y, die Rechnung steht im Dateikopf von `uhs/Grundriss.tsx` (LFH-328/A2).
+  // Die Karte kann in KEINER Dichtestufe ein Element auf voller Zeilenhöhe tragen —
+  // „alles ins Dropdown" löst es deshalb auch nicht, dessen Auslöser bräuchte sie
+  // ebenfalls. Diese Zeile fällt erst mit einer Änderung an `raster_position`.
   '/src/pages/uhs/Grundriss.tsx',
-  '/src/pages/uhs/MaterialTab.tsx',
   // ── B5h · Gefahren (LFH-368) ──────────────────────────────────────────────
   '/src/pages/gefahren/GefahrenMatrix.tsx',
   '/src/pages/gefahren/GefahrenPage.tsx',
