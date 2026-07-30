@@ -454,17 +454,23 @@ hoechste_warnstufe: 'hoch' }]))` vorbereiten.
 it('zeigt die höchste Warnstufe als Etikett, nicht als Flächenfarbe (LFH-368)', async () => {
   renderPage();
   const tag = await screen.findByText('hoch');
-  // Ein Etikett bekommt seine Farbe über die Statusrolle, nicht über eine
-  // Zellfüllung. Eine Füllung ist immer `rgba(...)`; ein Rollenwert ist es nie.
-  expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toMatch(/rgba\(/);
+  // Der PASTELLWERT ist die Signatur des Fehlgriffs: `warnstufeFarbe('hoch')` = '#ffa39e'
+  // landete als Inline-Hintergrund am Etikett. Geprüft wird seine ABWESENHEIT, nicht der
+  // neue Wert — den positiv zu pinnen prüfte antds Vorgaben, weil `test/utils.tsx` ein
+  // nacktes `ConfigProvider` rendert (dieselbe Falle wie bei Höhen).
+  expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain('#ffa39e');
 });
 ```
+
+Der Text taugt hier **nicht** als Behauptung: `warnstufeKarte.hoch.label` ist ebenfalls `'hoch'`,
+das Etikett liest sich vor und nach dem Fix gleich.
 
 - [ ] **Step 3: Lauf zur Bestätigung, dass er fehlschlägt**
 
 Run: `mise exec pnpm@10 -- pnpm -C <abs>/frontend exec vitest run src/pages/gefahren/GefahrenPage.test.tsx`
-Expected: FAIL — heute liefert `warnstufeFarbe('hoch')` `#ffa39e` in den `color`-Prop, antd rendert
-daraus eine Inline-Hintergrundfarbe.
+Expected: FAIL — heute steht `#ffa39e` im `style` des Tags. **Wenn er grün startet, ist die
+Behauptung falsch gebaut, nicht der Code schon richtig:** dann per Mutationsprobe klären (Wert im
+`style` suchen, den antd aus `color=` erzeugt) statt weiterzugehen.
 
 - [ ] **Step 4: Beide Neubefunde beheben**
 
@@ -557,7 +563,9 @@ Schlussfolgerung statt eines neuen Pfades. LFH-368"
   `SCHUTZOBJEKTE`, `WARNSTUFEN` (`gefahrenSchema.ts`) · `ErfassungsModal` (`components/Erfassung.tsx`).
 - Produces:
   - `GefahrenMatrixProps` **geändert**: `pending: boolean` → `laufendeZelle: string | null`
-    (Format `` `${Gefahrentyp}×${Schutzobjekt}` ``), plus unveränderte `matrix`, `darfSchreiben`, `onSetzen`.
+    (Format `` `${Gefahrentyp}×${Schutzobjekt}` ``), plus **neu** `onDetailsSpeichern:
+    (daten: BewertungEingabe) => Promise<unknown>` und unveränderte `matrix`, `darfSchreiben`,
+    `onSetzen`.
   - `export function zellSchluessel(typ: Gefahrentyp, objekt: Schutzobjekt): string` — dieselbe
     Funktion bildet den Schlüssel in Matrix und Seite, damit die Sperre nicht an zwei
     Schreibweisen hängt.
@@ -567,10 +575,11 @@ Schlussfolgerung statt eines neuen Pfades. LFH-368"
 
 - [ ] **Step 1: Die drei brechenden Testfälle neu schreiben**
 
-`GefahrenMatrix.test.tsx`. Fall 1 (`rendert 13 Zeilen × 5 Spalten`) bleibt **unverändert** — er
-nutzt nur `getAllByText` und überlebt jeden Bedienformwechsel. Die anderen drei greifen auf
-antd-Select-Internals zu und werden ersetzt. Neu dazu: die Zeilenkennung im zugänglichen Namen und
-die Zell-Sperre.
+`GefahrenMatrix.test.tsx`. Fall 1 (`rendert 13 Zeilen × 5 Spalten`) behält seinen **Rumpf** — er
+nutzt nur `getAllByText` und überlebt jeden Bedienformwechsel —, **seine Props-Zeile aber nicht**:
+`pending={false}` heißt jetzt `laufendeZelle={null}`, sonst bricht `tsc`. Der Fall wird also
+angefasst, nur nicht neu erfunden. Die anderen drei greifen auf antd-Select-Internals zu und
+werden ersetzt. Neu dazu: die Zeilenkennung im zugänglichen Namen und die Zell-Sperre.
 
 ```tsx
 /** Der Eintrag wird IMMER über das geöffnete Menü gegriffen: antd lässt die Portale
@@ -581,11 +590,24 @@ function imMenue() {
   return within(menue as HTMLElement);
 }
 
+/** Ein Ort für die Pflichtprops. Ohne den trägt jeder der sechs Fälle vier Zeilen
+ *  Gerüst, und eine neue Prop hieße sechs Änderungen. */
+function rendereMatrix(over: Partial<GefahrenMatrixProps> = {}) {
+  return renderMitProviders(
+    <GefahrenMatrix
+      matrix={[]}
+      darfSchreiben
+      laufendeZelle={null}
+      onSetzen={() => {}}
+      onDetailsSpeichern={async () => {}}
+      {...over}
+    />,
+  );
+}
+
 it('setzt eine Warnstufe über das Zellmenü und ruft onSetzen mit vollem Zell-Zustand', async () => {
   const onSetzen = vi.fn();
-  renderMitProviders(
-    <GefahrenMatrix matrix={[]} darfSchreiben laufendeZelle={null} onSetzen={onSetzen} />,
-  );
+  rendereMatrix({ onSetzen });
   await userEvent.click(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }));
   await userEvent.click(imMenue().getByRole('menuitem', { name: /hoch/ }));
   await waitFor(() => expect(onSetzen).toHaveBeenCalledWith({
@@ -595,9 +617,7 @@ it('setzt eine Warnstufe über das Zellmenü und ruft onSetzen mit vollem Zell-Z
 });
 
 it('gibt jeder Zelle einen eigenen Namen — 65 gleichnamige Knöpfe wären keine Bedienung', () => {
-  renderMitProviders(
-    <GefahrenMatrix matrix={[]} darfSchreiben laufendeZelle={null} onSetzen={() => {}} />,
-  );
+  rendereMatrix();
   const namen = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'));
   const bewertungen = namen.filter((n) => n?.startsWith('Bewertung '));
   expect(bewertungen).toHaveLength(58); // 65 − 7 ungültige Kombinationen
@@ -605,9 +625,7 @@ it('gibt jeder Zelle einen eigenen Namen — 65 gleichnamige Knöpfe wären kein
 });
 
 it('macht die 7 ungültigen Kombinationen ohne Farbe erkennbar — und unbedienbar', () => {
-  renderMitProviders(
-    <GefahrenMatrix matrix={[]} darfSchreiben laufendeZelle={null} onSetzen={() => {}} />,
-  );
+  rendereMatrix();
   // Zweiter Kanal ist TEXT: die Zelle sagt „nicht anwendbar", statt nur blass zu sein.
   expect(screen.getAllByText('n. a.')).toHaveLength(7);
   expect(
@@ -618,9 +636,7 @@ it('macht die 7 ungültigen Kombinationen ohne Farbe erkennbar — und unbedienb
 it('behält beschreibung/gemeldet_von bei Warnstufen-Wechsel', async () => {
   const onSetzen = vi.fn();
   const matrix = [zelle({ warnstufe: 'hoch', beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW' })];
-  renderMitProviders(
-    <GefahrenMatrix matrix={matrix} darfSchreiben laufendeZelle={null} onSetzen={onSetzen} />,
-  );
+  rendereMatrix({ matrix, onSetzen });
   await userEvent.click(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch' }));
   await userEvent.click(imMenue().getByRole('menuitem', { name: /akut/ }));
   await waitFor(() => expect(onSetzen).toHaveBeenCalledWith({
@@ -630,32 +646,26 @@ it('behält beschreibung/gemeldet_von bei Warnstufen-Wechsel', async () => {
 });
 
 it('sperrt beim laufenden PUT NUR die betroffene Zelle, nicht die anderen 57', () => {
-  renderMitProviders(
-    <GefahrenMatrix
-      matrix={[]}
-      darfSchreiben
-      laufendeZelle="brand×menschen"
-      onSetzen={() => {}}
-    />,
-  );
+  rendereMatrix({ laufendeZelle: 'brand×menschen' });
+  // antd klont den Auslöser mit `disabled` (`antd/es/dropdown/dropdown.js:125`:
+  // `disabled: child.props.disabled ?? disabled`) — die Prop am Dropdown erreicht
+  // also wirklich den Knopf, nicht nur das Popup.
   expect(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Bewertung Brand × Tiere: keine' })).toBeEnabled();
 });
 
 it('zeigt die Stufe als Kürzel — die Fläche allein wäre der einzige Kanal', () => {
-  const matrix = [zelle({ warnstufe: 'akut' })];
-  renderMitProviders(
-    <GefahrenMatrix matrix={matrix} darfSchreiben laufendeZelle={null} onSetzen={() => {}} />,
-  );
+  rendereMatrix({ matrix: [zelle({ warnstufe: 'akut' })] });
   const knopf = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: akut' });
   expect(knopf).toHaveTextContent('A');
 });
 ```
 
-`within` und `theme` in die Import-Zeile der Testdatei aufnehmen:
+`within` in die Import-Zeile der Testdatei aufnehmen, `GefahrenMatrixProps` für den Helfer:
 
 ```tsx
 import { screen, waitFor, within } from '@testing-library/react';
+import GefahrenMatrix, { type GefahrenMatrixProps } from './GefahrenMatrix';
 ```
 
 - [ ] **Step 2: Lauf zur Bestätigung, dass sie fehlschlagen**
@@ -785,13 +795,25 @@ export interface GefahrenMatrixProps {
    * in einer Maske, die im Minutentakt bedient wird, ein Vollstopp pro Klick.
    */
   laufendeZelle: string | null;
+  /** Stufenwechsel aus dem Menü. Kein Formularzustand zu schützen → `mutate` genügt. */
   onSetzen: (daten: BewertungEingabe) => void;
+  /**
+   * Speichern aus dem Detail-Dialog. **Muss bei Ablehnung ablehnen** — also
+   * `mutateAsync`, nicht `mutate` (`components/Erfassung.tsx:121-124`).
+   *
+   * Zwei Wege statt einem, weil sie verschieden enden: ein abgelehnter Stufenwechsel
+   * kostet nichts, ein abgelehntes Detail-Speichern kostet den getippten Wortlaut. Gäbe
+   * es hier nur `onSetzen` (`=> void`), löste die Hülle sofort auf, leerte die Felder
+   * und schlösse den Dialog — auch bei 422. Genau der Fehler, gegen den die Hülle
+   * gebaut wurde.
+   */
+  onDetailsSpeichern: (daten: BewertungEingabe) => Promise<unknown>;
 }
 
 /** Das 13×5-Raster eines Gefahrengebiets. Einziger Konsument ist `GefahrenPage`;
  *  der frühere Hinweis auf einen „Karten-Drawer" beschrieb keinen. */
 export default function GefahrenMatrix({
-  matrix, darfSchreiben, laufendeZelle, onSetzen,
+  matrix, darfSchreiben, laufendeZelle, onSetzen, onDetailsSpeichern,
 }: GefahrenMatrixProps) {
   const { token } = theme.useToken();
   const [detailZelle, setDetailZelle] = useState<GefahrBewertung | null>(null);
@@ -909,16 +931,18 @@ export default function GefahrenMatrix({
             : ''
         }
         laeuft={detailZelle !== null && laufendeZelle === zellSchluessel(detailZelle.gefahrentyp, detailZelle.schutzobjekt)}
-        onSpeichern={async (beschreibung, gemeldetVon) => {
-          if (!detailZelle) return;
-          onSetzen({
-            gefahrentyp: detailZelle.gefahrentyp,
-            schutzobjekt: detailZelle.schutzobjekt,
-            warnstufe: detailZelle.warnstufe,
+        // `onDetailsSpeichern`, NICHT `onSetzen`: die Hülle darf die Felder nur leeren,
+        // wenn der PUT angenommen wurde. Das zurückgegebene Promise ist die Zusage —
+        // ein `async`-Wrapper um ein `=> void` wäre eine Zusage ohne Deckung.
+        onSpeichern={(beschreibung, gemeldetVon) =>
+          onDetailsSpeichern({
+            gefahrentyp: detailZelle!.gefahrentyp,
+            schutzobjekt: detailZelle!.schutzobjekt,
+            warnstufe: detailZelle!.warnstufe,
             beschreibung,
             gemeldet_von: gemeldetVon,
-          });
-        }}
+          })
+        }
         onSchliessen={() => setDetailZelle(null)}
       />
     </>
@@ -948,8 +972,38 @@ import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
                 : null
             }
             onSetzen={(d) => setzen.mutate(d)}
+            // `mutateAsync`: der Detail-Dialog braucht die Ablehnung, sonst leert die
+            // Erfassungshülle den getippten Wortlaut trotz 422. Den Toast macht weiterhin
+            // `onError: fehler`; die abgelehnte Zusage fängt `abschicken` in der Hülle
+            // (`Erfassung.tsx`, `catch {}`) — also keine unbehandelte Ablehnung.
+            onDetailsSpeichern={(d) => setzen.mutateAsync(d)}
           />
 ```
+
+- [ ] **Step 5b: Die Zusage prüfen, nicht nur behaupten**
+
+Ein Kommentar „muss bei Ablehnung ablehnen" ist keine Zusicherung. Der Fall gehört in
+`GefahrenMatrix.test.tsx` — er ist der einzige, der den Unterschied zwischen `mutate` und
+`mutateAsync` überhaupt sichtbar macht:
+
+```tsx
+it('hält den Detail-Wortlaut, wenn das Speichern abgelehnt wird', async () => {
+  const onDetailsSpeichern = vi.fn().mockRejectedValue(new Error('422'));
+  rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })], onDetailsSpeichern });
+  await userEvent.click(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch' }));
+  await userEvent.click(imMenue().getByRole('menuitem', { name: 'Details …' }));
+  const feld = await screen.findByLabelText('Beschreibung');
+  await userEvent.type(feld, 'Dachstuhl brennt');
+  await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+  await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalled());
+  // Nicht geleert, nicht geschlossen — der Wortlaut ist teurer als der Klick.
+  expect(await screen.findByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
+});
+```
+
+Mutationsprobe dazu: `onDetailsSpeichern` in der Matrix versuchsweise auf `onSetzen` umbiegen
+(also die Zusage entwerten) — dieser Fall **muss** dann rot werden. Wird er es nicht, prüft er
+etwas anderes als gedacht.
 
 - [ ] **Step 6: Tests grün**
 
@@ -1117,6 +1171,28 @@ nennt, gilt seine.
   '/src/pages/gefahren/GefahrenMatrix.tsx',
 ```
 
+- [ ] **Step 3b: Die `sticky`-Behauptung absichern, sonst ist sie nur Prosa**
+
+Der Kommentar in Step 3 sagt, der Restposten sei eingelöst — geprüft wird das von niemandem:
+jsdom rechnet kein Layout, und der Guard sucht nur nach `<Table`. Also dieselbe Bauart wie
+`aktionsabstand.guard.test.ts`: **der Prop-Wert im Quelltext**. In
+`katalogTabelle.guard.test.ts` hinter die Rohtabellen-Hälfte:
+
+```ts
+describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
+  it('die Gefahrenmatrix hat die stehende Kopfzeile, die ihre Ausnahme verspricht', () => {
+    // Prop im QUELLTEXT, kein Pixel: jsdom rechnet kein Layout, und der Kommentar bei
+    // `AUSNAHMEN` behauptet seit LFH-368 `sticky`. Ein Versprechen ohne Prüfung ist
+    // genau die tote Ausnahme, die die andere Hälfte dieser Datei verhindert.
+    const quelle = KORPUS['/src/pages/gefahren/GefahrenMatrix.tsx'];
+    expect(quelle).toMatch(/^\s*sticky\s*$/m);
+  });
+});
+```
+
+Run: `mise exec pnpm@10 -- pnpm -C <abs>/frontend exec vitest run src/components/katalogTabelle.guard.test.ts`
+Expected: PASS. Mutationsprobe: `sticky` in der Matrix entfernen → dieser Fall wird rot.
+
 - [ ] **Step 4: CLAUDE.md — die Zahl und die zwei Festlegungen**
 
 Im Dichte-Absatz die Schuldmenge fortschreiben: `41 Stellen in 20 Dateien` → **`36 Stellen in 18
@@ -1139,7 +1215,18 @@ Dateien`**, Stand-Klammer auf `nach LFH-363 + LFH-364 + LFH-365 + LFH-368`. Im S
 
 `docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md`, Aufbau nach
 `2026-07-30-etb-pruefliste.md`: Umfang, gemessene Baseline als Tabelle (vorher/nachher), dann die
-**15 Kriterien** der Bedien-Leitlinie mit je einem Verdikt. Auflagen:
+15 Kriterien mit je einem Verdikt. **Die Liste ist vorgegeben, nicht zu erfinden** — sie steht in
+`2026-07-25-bedien-leitlinie-einsatzkontexte.md`, **Festlegung 7** (Zeile 372-415), in dieser
+Reihenfolge:
+
+1 Treffläche · 2 Handschuh-Modus · 3 Rückmeldung vor der Serverantwort · 4 kritische Aktion hat
+eine zweite Handlung · 5 Kontrast in beiden Modi · 6 kein Status allein über Farbe · 7 eine Farbe =
+eine Bedeutung · 8 Helligkeits-/Kontrastregler · 9 kritische Anzeigen im Blickfeld · 10
+Alarmbudget · 11 Warnverhalten · 12 kein Sprung unter dem Cursor · 13 Fokus nie verdeckt · 14
+Tabellenseite vollständig · 15 Erfassungsmaske vollständig.
+
+Die Normbezüge (WCAG-/MIL-/EEMUA-Nummern) je Zeile aus Festlegung 7 übernehmen, nicht aus dem
+Gedächtnis. Auflagen:
 
 - Jede Zeile trägt **erfüllt / offen → Zielticket / nicht anwendbar**. „Nicht geprüft" ist kein Verdikt.
 - Jede „offen"-Zeile nennt ein Ticket, das **existiert** — vor dem Schreiben mit
@@ -1148,8 +1235,11 @@ Dateien`**, Stand-Klammer auf `nach LFH-363 + LFH-364 + LFH-365 + LFH-368`. Im S
 - Der **Trefferflächen-Nachweis** ist *offen → LFH-370 (B5j)*: `test/utils.tsx` rendert ein
   nacktes `ConfigProvider`, eine Höhenbehauptung im Vitest misst antd-Vorgaben. Ebenso der
   **Kontrast von Kürzel auf Füllung** in beiden Modi — jsdom rechnet keine Farbmischung.
-- Kriterium 2 (Tabelle/Liste/Kachel) trägt die Begründung, warum die Matrix **Tabelle bleibt** und
-  unter `lg` nicht in Karten aufgelöst wird.
+- Kriterium **14** (Tabellenseite vollständig) trägt die Begründung, warum die Matrix **Tabelle
+  bleibt** und unter `lg` nicht in Karten aufgelöst wird — samt dem Verweis auf die Freistellung in
+  `katalogTabelle.guard.test.ts` und die neue `sticky`-Zusicherung. Kriterium **15** ist mit dem
+  Detail-Dialog **nicht** mehr „nicht anwendbar": er läuft über `ErfassungsModal`, also gelten
+  Labels über dem Feld, Enter-Absenden und Tastaturbedienung.
 - Die Baseline-Tabelle nennt: Klein-Angaben in `pages/gefahren/` **5 → 0**, Schuldzeilen **2 → 0**,
   Restschuld des Guards **41/20 → 36/18**, Zellbreite **~142,5 → ~40** (kompakt), Auslöser je Zelle
   **2 → 1**.
@@ -1203,6 +1293,17 @@ misst jsdom nicht. LFH-368"
 (Definition), Task 1 Step 6 (Test) und Task 3 (Konsum) dieselben Namen. `alarmFuellungStark`/
 `achtungFuellungStark` erscheinen in `tokens.ts`, `rollen.css` (als `--lfh-*-fuellung-stark`),
 `FARB_ABBILDUNG` und im Byte-Pin — vier Stellen, eine Schreibweise.
+
+**Zwei Stellen, die beim Ausführen zu prüfen sind, weil der Plan sie annimmt:**
+`screen.findByRole('list')` in Task 4 setzt voraus, dass das `Liste`-Primitiv mit `bordered` +
+`header` genau **eine** `list`-Rolle liefert — trifft mehr als eine zu, auf den Kopftext
+(`Gefahrengebiete`) verankern. Und `imMenue()` verlangt, dass die Menüeinträge die Rolle
+`menuitem` tragen; das gilt für `Dropdown` mit `menu={{ items }}` (deshalb steht dort kein
+`Popover` — der liefert im Repo ausschließlich Inhalt).
+
+**Reihenfolge ist zwingend sequenziell.** Task 3 braucht die Exporte aus Task 1, und Tasks 2, 3
+und 4 fassen alle `GefahrenPage.tsx` an. Keine parallele Ausführung — die Dateimengen sind nicht
+disjunkt.
 
 **Offen gelassen, mit Absicht:** der Kontrast von Kürzel auf Füllung in beiden Modi. Er ist mit
 jsdom nicht messbar und gehört in denselben Playwright-Topf wie der Trefferflächen-Nachweis
