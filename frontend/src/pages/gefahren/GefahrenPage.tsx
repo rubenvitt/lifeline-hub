@@ -9,6 +9,7 @@ import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMat
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
+import { useViewport } from '../../components/useViewport';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
 import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
@@ -24,6 +25,8 @@ export default function GefahrenPage() {
   const { token } = theme.useToken();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { abBreite } = useViewport();
+  const breit = abBreite('lg');
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
@@ -105,9 +108,22 @@ export default function GefahrenPage() {
   const aktuell = gebiete.find((g) => g.id === gewaehlt);
 
   return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+    <div
+      data-gefahren-rahmen
+      style={{
+        display: 'flex',
+        // Unter `lg` stapeln — dieselbe Schwelle, an der der Einsatzrahmen seine
+        // Navigation in den Drawer legt (`EinsatzLayout.tsx`). KEIN zweites Layout für
+        // die Matrix selbst: mit einem Auslöser je Zelle liegt sie bei ~380 px und
+        // trägt damit auch auf ~390 px. Ein Collapse je Gefahrentyp wäre eine zweite
+        // Bedienform für dieselbe Sache — begründet in der Prüfliste, Kriterium 2.
+        flexDirection: breit ? 'row' : 'column',
+        gap: 16,
+        alignItems: breit ? 'flex-start' : 'stretch',
+      }}
+    >
       <Liste
-        style={{ width: 240, flexShrink: 0 }}
+        style={breit ? { width: 240, flexShrink: 0 } : { width: '100%' }}
         size="small"
         bordered
         header={<Typography.Text strong>Gefahrengebiete</Typography.Text>}

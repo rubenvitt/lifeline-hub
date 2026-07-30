@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
+import { setzeViewportBreite } from '../../test/viewport';
 import GefahrenPage from './GefahrenPage';
 
 const einsatz = {
@@ -198,5 +199,25 @@ describe('GefahrenPage', () => {
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
     fireEvent.blur(input);
     await waitFor(() => expect(patch).toEqual({ label: 'Süd' }));
+  });
+
+  // Task 4 (LFH-368): unter `lg` stapeln Gebietsliste und Matrix, statt sich nebeneinander
+  // zu quetschen. Die Behauptung ist die Flex-RICHTUNG, nicht eine Pixelbreite — jsdom
+  // rechnet kein Layout. Beide Fälle zusammen sind die Behauptung: nur „column bei 800"
+  // wäre auch erfüllt, wenn die Richtung fest auf `column` stünde.
+  it('stapelt Gebietsliste und Matrix unter lg, statt sie nebeneinander zu quetschen', async () => {
+    server.use(...handlers());
+    setzeViewportBreite(800); // < lg (992)
+    renderPage();
+    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    expect(rahmen).toHaveStyle({ flexDirection: 'column' });
+  });
+
+  it('stellt sie ab lg nebeneinander', async () => {
+    server.use(...handlers());
+    setzeViewportBreite(1280);
+    renderPage();
+    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    expect(rahmen).toHaveStyle({ flexDirection: 'row' });
   });
 });
