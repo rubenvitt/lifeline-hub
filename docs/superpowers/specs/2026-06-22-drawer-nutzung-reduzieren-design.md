@@ -102,8 +102,18 @@ Katalogtabellen wird zu Karten** — dort wird verglichen.
 Was der Kartenzweig heute **nicht** kann und bewusst nicht können soll: In-Zeile-Bedienung.
 Die `Select`-Felder in den Zeilen von Fahrzeugen, Personal und Material haben in einer Karte
 keine Entsprechung; unter `md` sind diese Module lesend plus eine Primäraktion. Das ist ein
-realer Verlust, kein Versehen — B5 (LFH-333) holt den Statuswechsel ohnehin aus der 24-px-Zelle
-in einen Quick-View, und dann passt der Auslöser in den Aktionsslot der Karte.
+realer Verlust, kein Versehen.
+
+> **Korrigiert (LFH-369 · B5i, 30.07.2026).** Der Absatz endete hier mit dem Satz, B5 hole den
+> Statuswechsel „aus der 24-px-Zelle in einen Quick-View, und dann passt der Auslöser in den
+> Aktionsslot der Karte". Der war **doppelt falsch**: die 24-px-Zelle gibt es seit B1 nicht
+> mehr (die Höhe hängt an `controlHeight`, 30/48/72), und der Aktionsslot ist auf allen drei
+> Seiten mit „Entfernen" belegt, während `Datensicht.tsx:193-200` genau EINE Primäraktion
+> zusichert. Die geltende Zielform steht in
+> `2026-07-30-kraefte-listen-statuswechsel-zielform.md`: **kein Quick-View**, sondern ein
+> Auslöser, der das Statusetikett selbst ist, mit senkrechtem Menü im Portal — damit entfällt
+> auch die Mindestbreite, die das `Select` aus der 390-px-Karte gedrängt hat. Der Verlust wird
+> also geschlossen, ohne einen neuen Inhalts-Drawer zu erzeugen. Gebaut wird er in LFH-339/C4.
 
 ---
 

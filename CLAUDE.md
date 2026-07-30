@@ -158,6 +158,40 @@ Alltag wichtigsten:
   **MeldungKarte ist die begründete Gegenausnahme** — dort wurde die Bündelung geprüft und wegen
   vier Popconfirms und ~10 Testabfragen verworfen (`meldungen/MeldungKarte.tsx:75-94`, offen als
   LFH-372/B5k).
+- **Ein leeres Feld muss sagen, dass man es schreiben kann** (LFH-369 · B5i, Befund M21). Eine
+  inline bearbeitbare, **optionale** Angabe nimmt `components/BemerkungZelle.tsx` — nicht
+  `Typography.Text editable` von Hand. Grund: bei leerem Wert blieb davon genau das Stift-Icon
+  übrig, als `<button>` ohne Textinhalt und damit **ohne zugänglichen Namen** (gemessen:
+  `getByRole('button', { name: … })` fand nichts). Der **Lese**zweig hatte dagegen längst ein
+  „—" — die Affordanz war genau falsch herum verteilt. Der Platzhalter ist ein echter
+  antd-`Button` (`type="link"`) und **kein gestyltes `<span onClick>`**: so erbt er
+  `controlHeight` vom `ConfigProvider` und schuldet nicht die zwei Angaben plus
+  Dichte-Zusicherung, die LFH-365 einem handgebauten Bedienziel auferlegt. Der Lesezweig behält
+  „—": ohne Schreibrecht gibt es keine Aktion, eine Aufforderung wäre eine falsche Affordanz —
+  „konsistent" heißt gleiche Höhe und Typografie, und die trägt das Primitiv, weil beide Zweige
+  durch dieselbe Datei laufen. **Drei Aufrufer, nicht fünf:** `gefahren/GefahrenPage.tsx:135`
+  und `lagekarte/Sidebar.tsx:532` haben gemessen **keinen Leerfall** (Pflichtname mit
+  `trim`-Vergleich) und bleiben draußen. **Gemessene Testfalle:** antds `Editable` entscheidet
+  über Übernehmen/Abbrechen am **legacy `keyCode`** (`Editable.js:70-86`) und vergleicht keydown
+  gegen keyup — `userEvent` v14 setzt es nicht, `type(feld, '…{Enter}')` bleibt wirkungslos und
+  der Test scheitert mit „0 calls", als wäre die Komponente kaputt. Tastenwege deshalb über
+  `fireEvent` mit explizitem `keyCode`; der Mausweg (`onBlur` → übernehmen) gehört eigens
+  belegt, er ist im Betrieb der häufigere.
+- **Die Zielform des Statuswechsels in den Kräfte-Listen liegt fest, gebaut wird sie in
+  LFH-339/C4** (LFH-369 · B5i, `docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
+  Kurzfassung: **Auslöser ist die Statusanzeige selbst** plus senkrechtes Menü im Portal — kein
+  `Segmented`, keine Farbfläche, **kein neuer Drawer** und **kein zweiter Primäraktions-Slot**.
+  Die Zahl dahinter: eine waagerechte Reihe trägt höchstens **2 beschriftete** (dichteunabhängig)
+  bzw. **4 unbeschriftete** Ziele im 480-px-Quick-View; die Kataloge haben 10 / 6 / 5, der
+  Fahrzeugkatalog ist mandantengepflegt. Senkrecht trägt, weil ein Menü scrollen darf und im
+  Portal liegt — womit auch die feste Mindestbreite entfällt, die das `Select` aus der
+  390-px-Karte drängte (`Datensicht.tsx:234-236`). **Statusfarbe nur als Punkt/Rand/Beistrich,
+  nie als Textfläche**: `status_farbe` ist bei Fahrzeug und Personal ungeprüfter Freitext
+  (`statusFarben.ts:28-41`), Kontrast ist dort nicht zugesichert. `fms_anker` bleibt Sortier-Anker
+  und Tastenkürzel, **nicht** tragende Bedienform — die Spalte ist nullable, ein 0–9-Tastenfeld
+  darauf hätte Löcher. Die zwei Eigenwidersprüche des Elterntickets („read-only Quick-View +
+  Statuswahl" gegen LFH-19) sind damit **aufgelöst statt umbenannt**: es entsteht keine Fläche,
+  die sie erzeugen würde.
 - **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein

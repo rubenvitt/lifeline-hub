@@ -158,9 +158,17 @@ describe('MaterialPage', () => {
 
   it('keine Klein-Variante mehr am Status-Auswahlfeld und am Entfernen-Knopf', async () => {
     /**
-     * Zwei ohnehin angefasste `size="small"` fallen weg (Verbot aus CLAUDE.md; der Abbau
-     * des restlichen Bestands ist LFH-333/B5). `MengeZelle` bleibt bewusst unangetastet —
-     * sie ist nicht Teil dieses Umbaus.
+     * Zwei ohnehin angefasste `size="small"` fallen weg (Verbot aus CLAUDE.md). Der Abbau des
+     * restlichen Bestands läuft über die Schuldmenge in `components/dichte.guard.test.ts`
+     * (LFH-362), je Verzeichnis-Bündel den B5-Teiltickets zugeordnet — nicht über „B5"
+     * pauschal, das es als einzelnen Task nicht gibt.
+     *
+     * `MengeZelle` bleibt bewusst unangetastet — sie ist nicht Teil dieses Umbaus.
+     *
+     * Das `<Select>` in dieser Zelle bleibt VORLÄUFIG: seine Zielform ist mit LFH-369 · B5i
+     * festgelegt (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`
+     * — Auslöser plus senkrechtes Menü, kein `Segmented`, keine Farbfläche), gebaut wird sie
+     * in LFH-339/C4. Wer diesen Test anfasst, prüft dort gegen.
      */
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
