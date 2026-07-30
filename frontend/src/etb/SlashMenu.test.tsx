@@ -96,6 +96,20 @@ describe('SlashMenu — die Zeilen folgen der Dichte (LFH-365 · B5e)', () => {
   });
 
   /**
+   * Dasselbe für die HÖHE — und diese Zeile ist nicht überflüssig neben dem Boden-Fall
+   * unten, sondern erst zusammen mit ihm beweiskräftig.
+   *
+   * Gemessen: ein dichteblindes `minHeight: 72` passiert alle Boden-Zusicherungen, weil
+   * 72 jeden der drei Böden erfüllt. Eine Schranke bleibt eine Schranke; sie kann nicht
+   * belegen, dass der Wert aus der Stufe kommt. Genau diese Wertklasse — eine feste Zahl,
+   * die zufällig konform ist — ist die, für deren Abbau B5e existiert: in der kompakten
+   * Fükw-Stufe wären das 72 px pro Menüzeile statt 30.
+   */
+  it('zieht die Höhe bei einer Dichteumschaltung mit', () => {
+    expect(masse('handschuh').minHeight).not.toBe(masse('kompakt').minHeight);
+  });
+
+  /**
    * Die Böden aus Gate 3 der Bedien-Leitlinie, als Literale hingeschrieben — NICHT aus
    * dem Token zurückgelesen, sonst prüfte die Zusicherung den Token gegen sich selbst.
    */

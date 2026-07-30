@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import BuchstabierHilfe from './BuchstabierHilfe';
@@ -41,6 +41,36 @@ describe('BuchstabierHilfe', () => {
     renderMitProviders(<BuchstabierHilfe text="Florian" />);
     await userEvent.hover(screen.getByRole('button', { name: 'Buchstabierhilfe' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Buchstabierhilfe');
+  });
+
+  /**
+   * Der Tooltip weicht, sobald die Tafel steht (Review-Nachtrag zu LFH-365).
+   *
+   * Beide Hüllen hängen am selben Knopf, und der Kommentar „sie beißen sich nicht — der
+   * Tooltip hängt am Zeigereintritt, das Popover am Klick" gilt nur für die AUSLÖSER, nicht
+   * für die Overlays: gemessen liegen nach Zeigen-und-Klicken beide gleichzeitig im DOM.
+   * Sie teilen Anker und Ausrichtungsregel (`placement: 'top'`), fallen also an derselben
+   * Kante zusammen, und der Tooltip liegt oben (`zIndexPopupBase + 70` gegen `+ 30`) —
+   * er verdeckt die erste Zeile der Buchstabiertafel.
+   *
+   * Auf Touch ist das der Normalfall, nicht die Ausnahme: rc-trigger ergänzt einem
+   * Hover-Auslöser zusätzlich `touch`, ein Tipp öffnet also beides zugleich. Das
+   * Führungs-Tablet ist nach der Bedien-Leitlinie ein Primärkontext.
+   *
+   * Geprüft wird die antd-KLASSE, nicht `role="tooltip"`: antd gibt seinem Popover-Popup
+   * dieselbe Rolle, eine Rollenzählung läse sich als Doppeltreffer und belegte nichts.
+   */
+  it('räumt den Tooltip weg, sobald die Tafel offen ist', async () => {
+    renderMitProviders(<BuchstabierHilfe text="Florian" />);
+    const knopf = screen.getByRole('button', { name: 'Buchstabierhilfe' });
+    await userEvent.hover(knopf);
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Friedrich')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelectorAll('.ant-tooltip:not(.ant-tooltip-hidden)')).toHaveLength(0),
+    );
   });
 
   it('weist bei leerem Text auf die Eingabe hin', async () => {

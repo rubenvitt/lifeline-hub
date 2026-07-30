@@ -117,10 +117,39 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
   }
 
   return (
-    <Tag onClick={() => onEdit(feld)} style={{ cursor: 'pointer' }}>
-      {d.label}: {anzeige(feld, wert)}
+    <Tag>
+      {/*
+        Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip — und das ist der Kern
+        der Sache, nicht Kosmetik.
+
+        Ein `onClick` am `<Tag>` machte jeden Nachfahren zum Auslöser, und der
+        Menü-Overlay IST ein Nachfahre: ein React-Synthetic-Event steigt durch den
+        Komponentenbaum auf, auch über die Portal-Grenze. Das Overlay trägt rings um
+        seine Einträge ein 4-px-Polsterband (`dropdownEdgeChildPadding` → `paddingXXS`,
+        vom Projekt-Theme nicht überschrieben, also in JEDER Dichtestufe gleich schmal).
+        Ein Griff daneben schloss das Menü ohne die Aktion auszuführen UND schaltete den
+        Chip in den Editor — im Review gemessen.
+
+        Zwei Riegel standen hier vorher und fingen es nicht: einer am Auslöser, einer am
+        Menü-`onClick`. Der zweite feuert nur für Einträge; das Band gehört keinem. Ein
+        dritter Riegel wäre die falsche Antwort auf die Frage — richtig ist, dem Overlay
+        den klickbaren Vorfahren zu nehmen. Deshalb liegt der Handler jetzt an einem
+        Geschwisterknoten des Menüs, und es braucht überhaupt kein `stopPropagation`
+        mehr.
+      */}
+      <span onClick={() => onEdit(feld)} style={{ cursor: 'pointer' }}>
+        {d.label}: {anzeige(feld, wert)}
+      </span>
       <Dropdown
         trigger={['click']}
+        /*
+         * `autoFocus` aus demselben Grund wie an der Aktionsspalte in `EtbTabelle.tsx`
+         * und an `components/Datensicht.tsx:664-670`: ohne ihn bleibt der Fokus am
+         * Auslöser und die Pfeiltasten heben im Menü nichts hervor. Anders als dort ist
+         * die Wirkung hier gemessen — mit dem Prop trägt der erste Eintrag beim Öffnen
+         * die Hervorhebung, ohne ihn keiner.
+         */
+        autoFocus
         menu={{
           items: [
             { key: 'bearbeiten', label: 'Bearbeiten' },
@@ -129,17 +158,9 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
             // (LFH-363).
             { key: 'entfernen', label: 'Entfernen', danger: true },
           ],
-          /*
-           * Die Zuordnung hängt am MENÜ, nicht an den Einträgen (Muster
-           * `pages/lagekarte/AnsichtSwitcher.tsx:138`), weil der Riegel genau einen Ort
-           * braucht: das Overlay ist ein React-Kind des `<Tag onClick={onEdit}>`, und ein
-           * Synthetic Event steigt durch den KOMPONENTEN-Baum auf — auch aus dem Portal
-           * heraus. Ohne `stopPropagation` hier entfernte „Entfernen" das Feld und öffnete
-           * es im selben Klick wieder zum Bearbeiten (gemessen: `onEdit` wurde einmal
-           * gerufen, obwohl der Riegel am Auslöser schon saß).
-           */
-          onClick: ({ key, domEvent }) => {
-            domEvent.stopPropagation();
+          // Zuordnung am Menü statt an jedem Eintrag (Muster
+          // `pages/lagekarte/AnsichtSwitcher.tsx:138`).
+          onClick: ({ key }) => {
             if (key === 'bearbeiten') onEdit(feld);
             if (key === 'entfernen') onRemove(feld);
           },
@@ -149,16 +170,11 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
           Kein `size`-Prop: die Trefffläche kommt aus `controlHeight` und zieht mit der
           Dichtestufe mit (30 / 48 / 72 px). Genau das konnte das ~10-px-`closeIcon`
           nicht, das hier vorher stand.
-
-          Das `stopPropagation` ist der Erbe von dessen `onClose`-Riegel: der Auslöser
-          liegt IM `<Tag onClick={onEdit}>`, ohne den Riegel öffnete jeder Klick aufs
-          Menü zugleich den Editor.
         */}
         <Button
           type="text"
           aria-label={`Aktionen zu ${d.label}`}
           icon={<MoreOutlined />}
-          onClick={(e) => e.stopPropagation()}
         />
       </Dropdown>
     </Tag>

@@ -64,6 +64,33 @@ describe('MetaChip', () => {
     expect(onEdit).not.toHaveBeenCalled();
   });
 
+  /**
+   * Ein Fehlgriff darf nichts tun (Review-Nachtrag zu LFH-365). Das Menü-Overlay trägt
+   * rings um seine Einträge ein 4-px-Polsterband (`dropdownEdgeChildPadding` →
+   * `paddingXXS`, vom Projekt-Theme NICHT überschrieben, also in jeder Dichtestufe gleich
+   * schmal). Wer im Handschuh knapp neben „Entfernen" trifft, klickt darauf.
+   *
+   * Gemessen war das der teuerste Fehlklick des Umbaus: das Menü schloss OHNE die Aktion
+   * auszuführen (rc-dropdown ruft dort nur `setTriggerVisible(false)`), und weil das
+   * Overlay ein React-Kind des Chips ist, stieg das Synthetic Event weiter zum Chip auf
+   * und schaltete ihn in den Editor — der zieht per `autoFocus` den Fokus aus dem
+   * Inhaltsfeld. Der Erfasser wollte ein Feld entfernen und tippt stattdessen mitten in
+   * einen Editor.
+   *
+   * Ein Riegel am Menü-`onClick` fängt das nicht: der feuert nur für Einträge.
+   */
+  it('ein Klick auf die Polsterung des Menüs tut nichts', async () => {
+    const onEdit = vi.fn();
+    const onRemove = vi.fn();
+    renderMitProviders(
+      <MetaChip feld="von" editing={false} wert="ELW 1" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={onRemove} onEdit={onEdit} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
+    await userEvent.click(await screen.findByRole('menu'));
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
+  });
+
   it('Menü „Bearbeiten" ruft onEdit', async () => {
     const onEdit = vi.fn();
     renderMitProviders(

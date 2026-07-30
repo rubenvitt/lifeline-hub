@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
@@ -162,6 +162,22 @@ describe('EtbTabelle – Aktionsmenü (LFH-365 · B5e)', () => {
     expect(screen.getByRole('button', { name: 'Aktionen zu Eintrag 7' })).toBeInTheDocument();
   });
 
+  /*
+   * KEINE Zusicherung auf `autoFocus` — und das ist gemessen, nicht angenommen.
+   *
+   * Der Review hielt die Wirkung für in jsdom belegbar („mit dem Prop trägt der erste
+   * Eintrag die Hervorhebung"). Nachgemessen mit dem Testweg dieses Repos (`await
+   * userEvent.click` auf den Auslöser, danach das offene Menü untersuchen) gibt es
+   * keinen Unterschied: mit UND ohne den Prop bleibt `document.activeElement` der
+   * Auslöser-Knopf, die `li`-Klassen sind byte-gleich (`ant-dropdown-menu-item
+   * ant-dropdown-menu-item-only-child`), `aria-activedescendant` ist in beiden Fällen
+   * `null`. Ein Test darauf wäre also entweder grün-egal-was oder an ein Timing
+   * gebunden, das der Rest der Datei nicht nutzt.
+   *
+   * Der Prop bleibt trotzdem am Produktivcode: er ist Repo-Konvention mit Quelle
+   * (`components/Datensicht.tsx:664-670`, dort am echten Baum gemessen). Was hier steht,
+   * ist die Grenze des Belegbaren — der Nachweis gehört nach Playwright.
+   */
   it('bündelt die drei Aktionen in einem Menü statt in einer Knopfreihe', async () => {
     renderTabelle({
       eintraege: [eintrag()],
@@ -177,13 +193,25 @@ describe('EtbTabelle – Aktionsmenü (LFH-365 · B5e)', () => {
     expect(within(menue).getByRole('menuitem', { name: 'Auftrag erteilen' })).toBeInTheDocument();
   });
 
-  it('reicht die Auswahl mit dem Eintrag an den Aufrufer', async () => {
-    const onWiedervorlage = vi.fn();
-    const e = eintrag({ id: 42, lfd_nr: 3 });
-    renderTabelle({ eintraege: [e], onWiedervorlage });
+  /**
+   * Jeder der drei Zweige wird ANGEKLICKT, nicht nur auf Anwesenheit geprüft.
+   *
+   * Der Umbau hat drei direkte Verdrahtungen (`onClick={() => onBerichtigen(e)}`) durch
+   * einen Versand über Schlüssel-Zeichenketten ersetzt. Zwischen dem Schlüssel am Eintrag
+   * und dem Vergleich im Versand besteht keine Typkopplung — `MenuInfo.key` ist ein
+   * nackter `string`, `tsc` sieht eine Umbenennung also nicht. Ein Zweig, der nur per
+   * An-/Abwesenheit belegt ist, wäre gegen jeden Tippfehler ungeschützt.
+   */
+  it.each([
+    ['Berichtigen', 'onBerichtigen'],
+    ['Wiedervorlage', 'onWiedervorlage'],
+    ['Auftrag erteilen', 'onAuftragErteilen'],
+  ] as const)('„%s" reicht den Eintrag an %s', async (eintragName, prop) => {
+    const rueckruf = vi.fn();
+    renderTabelle({ eintraege: [eintrag({ id: 42, lfd_nr: 3 })], [prop]: rueckruf });
     const menue = await oeffneMenue('Aktionen zu Eintrag 3');
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Wiedervorlage' }));
-    expect(onWiedervorlage).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: eintragName }));
+    expect(rueckruf).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }));
   });
 
   /** Bestandslogik, die der Umbau erhalten muss: eine Berichtigung berichtigt man nicht. */
@@ -212,9 +240,26 @@ describe('EtbTabelle – Aktionsmenü (LFH-365 · B5e)', () => {
     expect(screen.queryByRole('button', { name: /^Aktionen/ })).not.toBeInTheDocument();
   });
 
-  it('rendert keinen Auslöser, wenn die Seite keine Aktion mitgibt', () => {
+  /**
+   * Ohne Rückrufe gibt es die Spalte GAR NICHT — geprüft an der Spaltenzahl, nicht bloß an
+   * der Abwesenheit des Auslösers.
+   *
+   * Der Unterschied ist der ganze Test: „kein Auslöser" wäre auch grün, wenn die Spalte
+   * angelegt und nur ihr Inhalt leer wäre, und der Fall darüber deckt den leeren Inhalt
+   * schon ab. Was hier hängt, ist die Weiche eine Ebene höher — sie ist produktiv
+   * erreichbar, weil `EtbPage` alle drei Rückrufe als `undefined` übergibt, wenn der
+   * Benutzer kein Schreibrecht hat. Ohne diese Zusicherung sähe ein Leser eine dauerhaft
+   * leere 96-px-Spalte, und kein Test würde rot.
+   */
+  it('legt die Aktionsspalte gar nicht an, wenn die Seite keine Aktion mitgibt', () => {
     renderTabelle({ eintraege: [eintrag()] });
+    const ohne = screen.getAllByRole('columnheader').length;
     expect(screen.queryByRole('button', { name: /^Aktionen/ })).not.toBeInTheDocument();
+
+    // Abbauen, sonst zählt die zweite Tabelle die Köpfe der ersten mit.
+    cleanup();
+    renderTabelle({ eintraege: [eintrag()], onWiedervorlage: vi.fn() });
+    expect(screen.getAllByRole('columnheader').length).toBe(ohne + 1);
   });
 });
 
