@@ -154,9 +154,11 @@ const OFFEN: string[] = [
   // „alles ins Dropdown" löst es deshalb auch nicht, dessen Auslöser bräuchte sie
   // ebenfalls. Diese Zeile fällt erst mit einer Änderung an `raster_position`.
   '/src/pages/uhs/Grundriss.tsx',
-  // ── B5h · Gefahren (LFH-368) ──────────────────────────────────────────────
-  '/src/pages/gefahren/GefahrenMatrix.tsx',
-  '/src/pages/gefahren/GefahrenPage.tsx',
+  // ── B5h · Gefahren (LFH-368) ── ABGERÄUMT, 5 Stellen in 2 Dateien.
+  // Darunter das rohe `<Table>` selbst (`Table` steht in {@link INTERAKTIV}) und der
+  // `Select` je Zelle, den ein einziger dichte-treuer Auslöser ersetzt hat. Die
+  // `Liste size="small"` in `GefahrenPage.tsx` zählte korrekt NICHT mit — sie steht in
+  // {@link EIGENE_SEMANTIK} und trägt dort ein Abstandsmaß, keine Trefffläche.
   // ── B5i · Kräfte-Listen (LFH-369) ─────────────────────────────────────────
   '/src/pages/MaterialPage.tsx',
   // ── B5j · Rest: Kopfzeile, Profil, Editor, Sonstiges (LFH-370) ────────────

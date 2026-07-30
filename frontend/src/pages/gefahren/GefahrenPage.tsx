@@ -116,7 +116,9 @@ export default function GefahrenPage() {
         // Navigation in den Drawer legt (`EinsatzLayout.tsx`). KEIN zweites Layout für
         // die Matrix selbst: mit einem Auslöser je Zelle liegt sie bei ~380 px und
         // trägt damit auch auf ~390 px. Ein Collapse je Gefahrentyp wäre eine zweite
-        // Bedienform für dieselbe Sache — begründet in der Prüfliste, Kriterium 2.
+        // Bedienform für dieselbe Sache. Begründet in der Prüfliste, Kriterium **14**
+        // („Tabellenseite vollständig" — dort steht die Auflösung in Karten):
+        // `docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md`.
         flexDirection: breit ? 'row' : 'column',
         gap: 16,
         alignItems: breit ? 'flex-start' : 'stretch',
