@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ConfigProvider } from 'antd';
 import { renderMitProviders } from '../../test/utils';
+import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
 import GefahrenMatrix, { type GefahrenMatrixProps } from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
 
@@ -235,5 +237,70 @@ describe('GefahrenMatrix', () => {
       matrix: [zelle({ warnstufe: 'akut', beschreibung: 'vom Server' })],
     }));
     expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
+  });
+});
+
+/**
+ * Die KURZE ACHSE des Zell-Auslösers folgt der Dichte (LFH-368 · B5h).
+ *
+ * WARUM ES DIESEN BLOCK GIBT: die Prüfliste begründet ihr „erfüllt" bei Kriterium 1
+ * ausdrücklich mit `style={{ minWidth: token.controlHeight }}` — WCAG 2.5.8 fordert
+ * 24 × 24 px, nicht 24 hoch, und der Inhalt des Knopfes ist ein EINZELNER Buchstabe
+ * („N", „M", „H", „A"). Ohne die Angabe fällt die Breite auf die Textbreite plus
+ * Polsterung und damit unter den Boden. Gemessen im Abschluss-Review: die Zeile ließ
+ * sich streichen, ohne dass ein einziger der 59 Fälle in `pages/gefahren/` und den
+ * beiden Guards rot wurde. Eine Zusicherung in Prosa ist keine.
+ *
+ * WARUM NICHT AM QUELLTEXT wie die `sticky`-Zusicherung in
+ * `components/katalogTabelle.guard.test.ts`: dort gibt es kein gerendertes Gegenstück,
+ * `position: sticky` hat in jsdom keine Wirkung. Ein INLINE-STYLE dagegen steht im Baum
+ * und ist lesbar. Der Quelltext-Weg wäre hier zudem SCHWÄCHER — ein dichteblindes
+ * `minWidth: 30` bestünde jedes Muster, das nach der Zeile sucht, und wäre in der
+ * Handschuh-Stufe genau der Fehler, für dessen Abbau B5h existiert. Deshalb steht die
+ * Ungleichheit über zwei Stufen neben den Böden; die Schablone ist
+ * `etb/SlashMenu.test.tsx:92-122` (LFH-365 · B5e).
+ *
+ * WAS ER BELEGT UND WAS NICHT: die ABSICHT, nicht das Pixel. jsdom rechnet kein Layout;
+ * die tatsächlich gerenderte Trefffläche misst erst Playwright mit `boundingBox()` und
+ * steht als Zeile 1/2 der Prüfliste offen (LFH-373). Wer hier mehr hineinliest, liest
+ * falsch.
+ *
+ * NICHT `renderMitProviders`: `test/utils.tsx` mountet ein nacktes `ConfigProvider` ohne
+ * Theme, jeder Token wäre dort eine antd-Vorgabe und die Zusicherung eine Attrappe.
+ */
+function ausloeserBreite(dichte: Dichte): string {
+  const { container, unmount } = render(
+    <ConfigProvider theme={{ token: antdToken(farbenHell, dichte) }}>
+      {matrixElement()}
+    </ConfigProvider>,
+  );
+  const knopf = container.querySelector<HTMLElement>('button[aria-label^="Bewertung "]');
+  if (!knopf) throw new Error('kein Zell-Auslöser im Baum — die Matrix hat sich geändert');
+  const breite = knopf.style.minWidth;
+  unmount();
+  return breite;
+}
+
+describe('GefahrenMatrix — die kurze Achse des Zell-Auslösers folgt der Dichte (LFH-368 · B5h)', () => {
+  /**
+   * Ein hartkodiertes `minWidth: 30` bliebe über beide Stufen byte-gleich. Diese Zeile ist
+   * neben den Böden unten nicht überflüssig, sondern macht sie erst beweiskräftig: eine
+   * Schranke kann nicht belegen, dass der Wert AUS DER STUFE kommt.
+   */
+  it('zieht die Breite bei einer Dichteumschaltung mit', () => {
+    expect(ausloeserBreite('handschuh')).not.toBe(ausloeserBreite('kompakt'));
+  });
+
+  /**
+   * Die Dichte-Staffel als Literale hingeschrieben — NICHT aus `token.controlHeight`
+   * zurückgelesen, sonst prüfte die Zusicherung den Token gegen sich selbst. Jede der
+   * drei Stufen liegt damit zugleich über dem WCAG-2.5.8-Boden von 24 px.
+   */
+  it.each([
+    ['kompakt', 30],
+    ['komfortabel', 48],
+    ['handschuh', 72],
+  ] as const)('erreicht in %s den Trefflächenboden von %i px', (dichte, boden) => {
+    expect(parseFloat(ausloeserBreite(dichte))).toBeGreaterThanOrEqual(boden);
   });
 });

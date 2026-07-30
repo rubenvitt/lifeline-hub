@@ -24,8 +24,9 @@ fortgeschrieben):
 | Restschuld des Guards über das ganze Frontend | 24 in 13 Dateien | **19 in 11 Dateien** |
 | Auslöser je bedienbarer Zelle | 2 (`Select` + Icon-Knopf für den Popover) | **1** |
 | Breite des Zellinhalts | `Select` mit festem `width: 110` | **`minWidth: token.controlHeight`** (30 / 48 / 72) |
-| Verhaltensfälle in `pages/gefahren/*.test.tsx` | 11 | **24** |
+| Verhaltensfälle in `pages/gefahren/*.test.tsx` | 11 | **28** |
 | Quelltext-Zusicherung auf die stehende Kopfzeile | 0 | **1** (mit Mutationsprobe) |
+| Zusicherungen auf die kurze Achse des Zell-Auslösers | 0 | **4** (mit drei Proben) |
 
 Die `Liste size="small"` in `GefahrenPage.tsx` zählt in keiner der beiden Spalten mit und ist
 **keine Restarbeit**: `Liste` steht in `EIGENE_SEMANTIK` des Guards, dort ist `size` ein
@@ -41,7 +42,7 @@ hängt jetzt an derselben Achse wie die Höhe.
 
 | #  | Verdikt | Beleg / Zielticket |
 | -- | ------- | ------------------ |
-| 1 · Treffläche<br>*WCAG 2.5.8 AA (≥ 24 × 24 px), WCAG 2.5.5 / Material 48 dp (zeitkritisch ≥ 48 × 48 px, ≥ 8 px Abstand)* | **erfüllt, mit einer benannten Belegbarkeitsgrenze** | Der einzige Auslöser je Zelle trägt **keine** Größen-Prop und erbt `controlHeight` — 30 / 48 / 72 px. Vorher standen in jeder der 58 bedienbaren Zellen **zwei** Ziele, beide auf der Kleingröße festgenagelt: ein `<Select size="small" style={{ width: 110 }}>` für die Stufe und ein icon-only `<Button size="small" type="text">` für den Detail-Popover. Der neue Auslöser trägt zusätzlich `style={{ minWidth: token.controlHeight }}` — bei einem Knopf, dessen Inhalt ein einzelner Buchstabe ist, entscheidet das über die **Breite** des Ziels, nicht bloß über die Höhe (WCAG 2.5.8 fordert 24 × 24, nicht 24 hoch). **Grenze:** kein gerendertes Pixel ist belegt. `test/utils.tsx` mountet ein nacktes `ConfigProvider` ohne Theme, jede Höhenmessung dort ergäbe antd-Vorgaben → **LFH-373** |
+| 1 · Treffläche<br>*WCAG 2.5.8 AA (≥ 24 × 24 px), WCAG 2.5.5 / Material 48 dp (zeitkritisch ≥ 48 × 48 px, ≥ 8 px Abstand)* | **erfüllt, mit einer benannten Belegbarkeitsgrenze** | Der einzige Auslöser je Zelle trägt **keine** Größen-Prop und erbt `controlHeight` — 30 / 48 / 72 px. Vorher standen in jeder der 58 bedienbaren Zellen **zwei** Ziele, beide auf der Kleingröße festgenagelt: ein `<Select size="small" style={{ width: 110 }}>` für die Stufe und ein icon-only `<Button size="small" type="text">` für den Detail-Popover. Der neue Auslöser trägt zusätzlich `style={{ minWidth: token.controlHeight }}` — bei einem Knopf, dessen Inhalt ein einzelner Buchstabe ist, entscheidet das über die **Breite** des Ziels, nicht bloß über die Höhe (WCAG 2.5.8 fordert 24 × 24, nicht 24 hoch). Dass dieser Wert wirklich im Baum ankommt **und mit der Dichtestufe wechselt**, ist seit dem Abschluss-Review zugesichert (eigener `describe`-Block in `GefahrenMatrix.test.tsx`, drei Proben unten). **Grenze:** kein gerendertes Pixel ist belegt. `test/utils.tsx` mountet ein nacktes `ConfigProvider` ohne Theme, jede Höhenmessung dort ergäbe antd-Vorgaben → **LFH-373** |
 | 2 · Handschuh-Modus<br>*MIL-STD-1472F Fig. 12 (≥ 72 px ≙ 19,05 mm [abgeleitet]); Abstand ≥ 16 px [abgeleitet aus Fig. 24, last contact]* | **teilweise erfüllt** | Die Dichtestufe greift auf der ganzen Seite durch: kein Element im Umfang hält seine Größe mehr fest, weder die Matrix noch der Karten-Knopf im Kopf. Der Zell-Auslöser folgt der Staffel in **beiden** Richtungen — das ist der Punkt, an dem 65 Zellen im Handschuh-Betrieb nicht mehr in einen 110-px-Kasten gezwängt bleiben, der für 24 px entworfen war. **Offen bleibt zweierlei:** die tatsächlich gerenderte Höhe ist nur im Browser messbar (jsdom rechnet kein Layout; belegt ist die Absicht, nämlich das Fehlen jeder punktuellen Größen-Prop) → **LFH-373**; und die Ableitung der Stufe aus dem Einsatzkontext hängt weiter an `localStorage['lifeline-hub.dichte']` mit Vorbelegung über die Zeigerart (LFH-361/B5a) → **B5-Restpunkt (LFH-333)** |
 | 3 · Rückmeldung vor der Serverantwort<br>*MIL 5.4.6.4 (≤ 100 ms), Tab. XXII (Kommandoreaktion ≤ 2 s), MIL 5.14.9 (> 15 s nur mit Fortschritt)* | **erfüllt, und hier liegt eine der beiden Kernverbesserungen** | Vorher sperrte ein `pending: boolean` **alle** 58 bedienbaren Zellen, solange irgendein PUT unterwegs war — ein Vollstopp pro Klick in einer Maske, die im Minutentakt bedient wird. Jetzt trägt `laufendeZelle` die Kennung genau der Zelle, deren PUT läuft (`zellSchluessel`, aus `setzen.variables` von TanStack Query — kein Parallel-State, der auseinanderlaufen kann); gepinnt von „sperrt beim laufenden PUT NUR die betroffene Zelle, nicht die anderen 57". Der Detail-Dialog reicht denselben Zustand als `laeuft` an die Erfassungshülle, die ihn am Absende-Knopf zeigt. Fehler kommen als Toast (`onError`). **Offen:** optimistische Updates gibt es im ganzen Repo nirgends → **B6 (LFH-334)** |
 | 4 · Kritische Aktion hat eine zweite Handlung<br>*MIL 5.4.6.6* | **erfüllt — die Seite trägt keine unumkehrbare Aktion** | Eine Warnstufe zu setzen ist vollständig umkehrbar: alle fünf Stufen einschließlich „keine" stehen im selben Menü, der Rückweg ist derselbe Klick. Das Umbenennen eines Gefahrengebiets ist ein Inline-Edit mit demselben Weg zurück. **Gelöscht wird hier gar nichts** — ein Gefahrengebiet entsteht und vergeht auf der Lagekarte, nicht auf dieser Seite (der Leerzustand sagt das und führt dorthin). Nach der Trennlinie aus LFH-363 (umkehrbar → Abstand ja, zusätzliche Reibung nein) wäre eine Rückfrage hier **falsch, nicht fehlend**. Entsprechend gibt es auf der Seite kein `danger` und kein `Popconfirm` — **gemessen: 0 Vorkommen von `danger` in `pages/gefahren/`**. Daraus folgt bewusst ein Nicht-Eintrag: CLAUDE.md sagt, `components/aktionsabstand.guard.test.ts` wachse mit den Bündeln B5d–B5j, und B5h liegt in dieser Reihe. Seine `MIT_NACHBARSCHAFT` ist aber eine **Soll**-Liste, die tote Einträge meldet (Gegenstück zur toten Schuld-Ausnahme des Dichte-Guards) — `pages/gefahren/` dort einzutragen behauptete eine Deckung ohne Gegenstand und färbte den Guard rot. B5h trägt keine danger-Nachbarschaft, deshalb kein Eintrag |
@@ -90,8 +91,32 @@ nicht stellt.
 Kopfkommentar weiterhin kein gespreiztes `{...props}`, keine Größe aus einer Variablen, keine
 Wrapper-Komponente, die die Prop intern setzt, und keinen Funktionstyp in einem generischen
 Typargument. Und er sieht **kein Pixel-Padding** — der Inline-Stil `minWidth: token.controlHeight`
-am Zell-Auslöser ist für ihn unsichtbar. Was diese eine Stelle hält, sind die Zusicherungen in
-`GefahrenMatrix.test.tsx`, nicht das Gate.
+am Zell-Auslöser ist für ihn unsichtbar.
+
+**Diese eine Stelle hielt zunächst gar nichts, und das ist gemessen.** In der ersten Fassung
+stand hier, sie werde von „den Zusicherungen in `GefahrenMatrix.test.tsx`" gehalten — der
+Abschluss-Review hat die Zeile entfernt und `vitest run src/pages/gefahren src/components/*.guard.test.ts`
+gefahren: **6 Dateien, 59 Fälle, alle grün**. Weder Test noch Guard hat sie gehalten. Das wog
+schwerer als ein schiefer Satz, weil Zeile 1 ihr „erfüllt" genau mit dieser Stelle begründet:
+WCAG 2.5.8 fordert 24 × **24**, und bei einem Ein-Buchstaben-Kürzel ist `minWidth` das Einzige,
+was die kurze Achse hält. Nachgezogen ist deshalb ein eigener `describe`-Block in
+`GefahrenMatrix.test.tsx` — nach der Schablone von `etb/SlashMenu.test.tsx` und **nicht** als
+Quelltext-Muster wie die `sticky`-Zusicherung: ein Inline-Style steht im Baum und ist lesbar,
+und ein Quelltext-Muster wäre hier **schwächer**, weil ein dichteblindes `minWidth: 30` es
+bestünde. Vier Fälle, drei Proben:
+
+- Prop entfernt → `Tests 4 failed | 12 passed (16)` (`expected '' not to be ''`,
+  `expected NaN to be greater than or equal to 30 / 48 / 72`).
+- Prop entfernt, die vollständige Angabe `style={{ minWidth: token.controlHeight }}` samt
+  „30/48/72" als **Kommentar** daneben → unverändert `4 failed | 12 passed`. Anders als beim
+  Quelltext-Weg ist das hier keine knappe Rettung, sondern strukturell: der Fall liest den
+  gerenderten Baum, in dem ein Kommentar nicht vorkommt.
+- Wert auf ein **dichteblindes** `minWidth: 72` festgenagelt → `1 failed | 15 passed`. Es
+  erfüllt **alle drei Böden** und wird allein von der Ungleichheit über zwei Dichtestufen
+  gefangen. Deshalb stehen beide Fälle da; einer allein belegte nichts.
+
+Was der Block **nicht** belegt, ist ein gerendertes Pixel — jsdom rechnet kein Layout. Das
+bleibt Zeile 1/2 und **LFH-373**.
 
 **Der `sticky`-Nachweis ist ein Quelltext-Nachweis, kein Layout-Nachweis** — und das ist Absicht:
 jsdom rechnet kein Layout, `position: sticky` hat dort keine geometrische Wirkung, jedes Rechteck
@@ -116,7 +141,7 @@ keinen belegten.
 
 **Es gibt keinen e2e-Fall, der die Gefahren-Route betritt.** Gemessen, nicht vermutet: das Wort
 „gefahren" kommt in `frontend/e2e/` nur in zwei Spec-Dateien vor, und beide Male als Verb in
-einem Prosakommentar. Alle 24 Verhaltensfälle dieses Bündels laufen in jsdom. Das trifft nicht
+einem Prosakommentar. Alle 28 Verhaltensfälle dieses Bündels laufen in jsdom. Das trifft nicht
 nur die Zeilen 1/2/12/13, sondern die Bedienform als Ganzes: dass ein Klick auf eine Zellfläche
 im **Browser** ein Menü öffnet, dessen Einträge man mit einer behandschuhten Hand trifft, ist
 hier nirgends belegt. Das ist die schärfste Lücke dieser Liste und der Grund, warum die Zeilen 1
