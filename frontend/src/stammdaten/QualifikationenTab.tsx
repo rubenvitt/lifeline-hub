@@ -94,10 +94,14 @@ export default function QualifikationenTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, q: Qualifikation) => (
-              <Space>
-                <Button size="small" onClick={() => setBearbeite(q)}>Bearbeiten</Button>
-                <Popconfirm title="Qualifikation deaktivieren?" onConfirm={() => deaktivieren.mutate(q.id)}>
-                  <Button size="small" danger>Deaktivieren</Button>
+              <Space size="middle">
+                <Button onClick={() => setBearbeite(q)}>Bearbeiten</Button>
+                <Popconfirm
+                  title="Qualifikation deaktivieren?"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => deaktivieren.mutate(q.id)}
+                >
+                  <Button danger>Deaktivieren</Button>
                 </Popconfirm>
               </Space>
             ),

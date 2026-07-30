@@ -66,11 +66,15 @@ export default function EtbBausteineTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, b: EtbBaustein) => (
-              <Space>
+              <Space size="middle">
                 <Button onClick={() => { setBearbeite(b); setModalOffen(true); }}>
                   Bearbeiten
                 </Button>
-                <Popconfirm title="Baustein deaktivieren?" onConfirm={() => deaktivieren.mutate(b.id)}>
+                <Popconfirm
+                  title="Baustein deaktivieren?"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => deaktivieren.mutate(b.id)}
+                >
                   <Button danger>Deaktivieren</Button>
                 </Popconfirm>
               </Space>

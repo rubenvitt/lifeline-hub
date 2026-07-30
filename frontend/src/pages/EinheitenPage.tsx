@@ -385,11 +385,12 @@ export default function EinheitenPage() {
               </Form.Item>
               <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
               {darfSchreiben && (
-                <Space>
+                <Space size="middle">
                   <Button type="primary" htmlType="submit" loading={speichern.isPending}>Speichern</Button>
                   <Popconfirm
                     title="Einheit auflösen?"
                     description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
+                    okButtonProps={{ danger: true }}
                     onConfirm={() => aufloesen.mutate(aktuell.id)}
                   >
                     <Button danger>Auflösen</Button>
@@ -410,9 +411,9 @@ export default function EinheitenPage() {
                 <Space key={m.ep_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>{m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}{m.ist_fuehrer && <Tag color="gold" style={{ marginLeft: 4 }}>Einheitsführer</Tag>}</span>
                   {darfSchreiben && (
-                    <Space>
-                      {!m.ist_fuehrer && <Button size="small" onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Einheitsführer</Button>}
-                      <Button size="small" danger onClick={() => personalFrei.mutate(m.ep_id)}>Entfernen</Button>
+                    <Space size="middle">
+                      {!m.ist_fuehrer && <Button onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Einheitsführer</Button>}
+                      <Button danger onClick={() => personalFrei.mutate(m.ep_id)}>Entfernen</Button>
                     </Space>
                   )}
                 </Space>
@@ -428,7 +429,7 @@ export default function EinheitenPage() {
               {aktuell.fahrzeug_mitglieder.map((m) => (
                 <Space key={m.ef_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>{m.funkrufname}{m.fahrzeugtyp ? ` (${m.fahrzeugtyp})` : ''}</span>
-                  {darfSchreiben && <Button size="small" danger onClick={() => fahrzeugFrei.mutate(m.ef_id)}>Entfernen</Button>}
+                  {darfSchreiben && <Button danger onClick={() => fahrzeugFrei.mutate(m.ef_id)}>Entfernen</Button>}
                 </Space>
               ))}
               {darfSchreiben && (
@@ -442,7 +443,7 @@ export default function EinheitenPage() {
               {aktuell.material_mitglieder.map((m) => (
                 <Space key={m.em_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>{m.bezeichnung} ×{m.menge}</span>
-                  {darfSchreiben && <Button size="small" danger onClick={() => materialFrei.mutate(m.em_id)}>Entfernen</Button>}
+                  {darfSchreiben && <Button danger onClick={() => materialFrei.mutate(m.em_id)}>Entfernen</Button>}
                 </Space>
               ))}
               {darfSchreiben && (

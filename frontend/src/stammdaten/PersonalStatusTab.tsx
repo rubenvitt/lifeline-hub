@@ -129,9 +129,13 @@ export default function PersonalStatusTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, s: PersonalStatus) => (
-              <Space>
+              <Space size="middle">
                 <Button onClick={() => setBearbeite(s)}>Bearbeiten</Button>
-                <Popconfirm title="Status deaktivieren?" onConfirm={() => deaktivieren.mutate(s.id)}>
+                <Popconfirm
+                  title="Status deaktivieren?"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => deaktivieren.mutate(s.id)}
+                >
                   <Button danger>Deaktivieren</Button>
                 </Popconfirm>
               </Space>

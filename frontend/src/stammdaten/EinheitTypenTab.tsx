@@ -117,10 +117,14 @@ export default function EinheitTypenTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, t: EinheitTyp) => (
-              <Space>
-                <Button size="small" onClick={() => setBearbeite(t)}>Bearbeiten</Button>
-                <Popconfirm title="Typ deaktivieren?" onConfirm={() => deaktivieren.mutate(t.id)}>
-                  <Button size="small" danger>Deaktivieren</Button>
+              <Space size="middle">
+                <Button onClick={() => setBearbeite(t)}>Bearbeiten</Button>
+                <Popconfirm
+                  title="Typ deaktivieren?"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => deaktivieren.mutate(t.id)}
+                >
+                  <Button danger>Deaktivieren</Button>
                 </Popconfirm>
               </Space>
             ),

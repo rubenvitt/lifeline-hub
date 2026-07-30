@@ -82,8 +82,8 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026: 93 Stellen in 44 Dateien, je Verzeichnis-Bündel von LFH-333 zugeordnet; ein Eintrag
-  ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit Klammertiefe, nicht per
+  30.07.2026 nach LFH-363: 69 Stellen in 34 Dateien — gemessen, nicht fortgeschrieben —, je
+  Verzeichnis-Bündel von LFH-333 zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit Klammertiefe, nicht per
   Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind (gemessen 61 statt 82)
   und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop steht — ein Gate, das
   einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in seinem
@@ -105,6 +105,21 @@ Alltag wichtigsten:
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein
   Fehler, kein Vorschlag.
+  **Rot steht auch nicht bündig neben Neutralem** (LFH-363): eine `<Space>`-Aktionsreihe mit
+  einem `danger`-Knopf und mindestens einer weiteren Aktion trägt `size="middle"`. Der
+  Vorgabewert ist hier **nicht** antds 8 px — antd mappt `spaceGapSmallSize` auf `paddingXS`,
+  und das steht auf `abstand.xs` = 3/5/7 px je Stufe; `middle` führt auf `abstand.md` =
+  11/18/26 und liegt damit in jeder Stufe über dem geforderten `token.marginSM`. Erzwungen von
+  `components/aktionsabstand.guard.test.ts` — auf die in LFH-363 bewerteten Dateien **gescopt**,
+  weil die danger-Nachbarschaft anders als eine Größen-Prop keine zählbare Eigenschaft ist,
+  sondern eine Bewertung je Stelle; er wächst mit den Bündeln B5d–B5j. Geprüft wird der
+  **Prop-Wert im Quelltext**, nicht ein Pixelabstand: jsdom rechnet kein Layout.
+  **Destruktiv ist nicht gleich destruktiv** (Entscheidung aus LFH-363): „Außer Dienst" /
+  „Deaktivieren" / eine gelöste Zuordnung sind **umkehrbar** — die Umkehrung steht als Knopf
+  daneben —, sie bekommen Abstand und `danger`, aber keine zusätzliche Reibung. **Unumkehrbares**
+  (heute nur „Löschen" in `stammdaten/StichworteTab.tsx`) bekommt zusätzlich eine Rückfrage.
+  Jedes `Popconfirm` an einer destruktiven Aktion trägt `okButtonProps={{ danger: true }}` —
+  sonst bestätigt man das Löschen mit einem blauen Knopf.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.

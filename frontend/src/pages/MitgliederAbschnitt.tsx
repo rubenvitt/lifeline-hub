@@ -80,9 +80,10 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
             title="Mitglied entfernen?"
             okText="Ja"
             cancelText="Abbrechen"
+            okButtonProps={{ danger: true }}
             onConfirm={() => entfernen.mutate(m.benutzer_id)}
           >
-            <Button type="link" danger size="small">
+            <Button type="link" danger>
               Entfernen
             </Button>
           </Popconfirm>

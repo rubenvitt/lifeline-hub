@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -49,6 +49,33 @@ describe('StichworteTab', () => {
     await screen.findByText('H1');
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die EINZIGE unumkehrbare Aktion der Stammdaten (LFH-363 · B5c): überall sonst heißt
+   * die destruktive Aktion „Außer Dienst"/„Deaktivieren" und hat ihre Umkehrung als
+   * Knopf daneben. Ein gelöschter Vorschlag ist weg.
+   *
+   * Die erste Hälfte ist die eigentliche Aussage — ohne sie wäre die zweite auch mit
+   * einem Knopf ganz ohne Blase grün: der Klick auf „Löschen" allein darf die Mutation
+   * NICHT auslösen.
+   */
+  it('Löschen fragt zurück, bevor es löscht', async () => {
+    let geloescht: number | null = null;
+    renderTab(admin);
+    server.use(
+      http.delete('/api/stichwort-vorschlaege/:id', ({ params }) => {
+        geloescht = Number(params.id);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await screen.findByText('H1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    expect(geloescht).toBeNull();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
+    await waitFor(() => expect(geloescht).toBe(1));
   });
 
   it('die Leitspalte sortiert numerisch, ohne die Serverreihenfolge zu verdrängen', async () => {
