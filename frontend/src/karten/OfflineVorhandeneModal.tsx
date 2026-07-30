@@ -89,8 +89,17 @@ export default function OfflineVorhandeneModal({
             >
               <ListenEintragMeta
                 title={
+                  /*
+                   * Ohne Größen-Prop, obwohl das Feld im TITEL einer Listenzeile sitzt und die
+                   * Zeile damit wächst (LFH-366 · B5f). Bewusst so, nicht übersehen: das Feld
+                   * ist das Bedienziel dieser Zeile — hier wird der Name der zu übernehmenden
+                   * Region getippt —, und ein Eingabefeld, das im Handschuh-Betrieb auf 30 px
+                   * festgenagelt bleibt, verfehlt genau den Betrieb, für den die Staffel da ist.
+                   * Die `Liste` darum trägt ihre Größe weiter (Abstandsmaß, keine Trefffläche).
+                   * Die Zeile wird dadurch höher; jsdom rechnet kein Layout, ein Test kann das
+                   * also weder belegen noch widerlegen — die Entscheidung steht hier.
+                   */
                   <Input
-                    size="small"
                     style={{ maxWidth: 260 }}
                     value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
                     onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}

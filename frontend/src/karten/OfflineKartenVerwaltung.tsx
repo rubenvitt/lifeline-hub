@@ -302,7 +302,11 @@ export default function OfflineKartenVerwaltung() {
               // Dann nur Abbrechen anbieten, keine Aktivieren/Update/Löschen-Aktionen.
               const laeuft = k.status === 'laedt' || k.geladen != null;
               return (
-                <Space>
+                // `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion (LFH-363-Norm,
+                // hier für B5f eingelöst — das Elternticket führte diese Stelle irrtümlich als
+                // Referenzmuster, sie war in Wahrheit dieselbe Fundstelle wie in `stammdaten/`).
+                // Erzwungen von `components/aktionsabstand.guard.test.ts`.
+                <Space size="middle">
                   {k.status === 'bereit' &&
                     k.update_verfuegbar &&
                     k.katalog_url &&
@@ -311,19 +315,18 @@ export default function OfflineKartenVerwaltung() {
                     // „Aktualisieren" (neue Zeile + Auto-Aktivieren + Alt-Löschung).
                     (k.aktiv_basemap ? (
                       <Button
-                        size="small"
                         loading={neuLadenMutation.isPending}
                         onClick={() => neuLadenMutation.mutate(k)}
                       >
                         Neu laden
                       </Button>
                     ) : (
-                      <Button size="small" onClick={() => aktualisierenMutation.mutate(k)}>
+                      <Button onClick={() => aktualisierenMutation.mutate(k)}>
                         Aktualisieren
                       </Button>
                     ))}
                   {laeuft && (
-                    <Button size="small" onClick={() => abbrechenMutation.mutate(k.id)}>
+                    <Button onClick={() => abbrechenMutation.mutate(k.id)}>
                       Abbrechen
                     </Button>
                   )}
@@ -334,7 +337,7 @@ export default function OfflineKartenVerwaltung() {
                       okButtonProps={{ danger: true }}
                       onConfirm={() => loeschenMutation.mutate(k.id)}
                     >
-                      <Button size="small" danger>
+                      <Button danger>
                         Löschen
                       </Button>
                     </Popconfirm>

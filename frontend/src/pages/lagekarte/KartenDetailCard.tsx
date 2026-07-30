@@ -25,7 +25,12 @@ export default function KartenDetailCard({
     <Card
       size="small"
       title={titel}
-      extra={<Button size="small" type="text" onClick={onSchliessen} aria-label="Schließen">×</Button>}
+      extra={
+        /* Die Klein-Angabe bleibt an der `Card` (Polsterung, keine Trefffläche), fällt aber
+           am Schließen-Knopf weg: er ist das einzige Bedienziel dieser Karte und muss der
+           Dichte-Staffel folgen (LFH-366 · B5f). */
+        <Button type="text" onClick={onSchliessen} aria-label="Schließen">×</Button>
+      }
       style={{
         position: 'absolute', right: 12, top: 12, width, zIndex: 5,
         maxHeight: 'calc(100% - 24px)', overflowY: 'auto',

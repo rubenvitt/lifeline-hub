@@ -82,7 +82,7 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-363 bis LFH-365 und LFH-367: **40 Stellen in 19 Dateien** — gemessen mit der
+  30.07.2026 nach LFH-363 bis LFH-367: **24 Stellen in 13 Dateien** — gemessen mit der
   Scan-Funktion des Guards selbst, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
   zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß).
   **Eine Ausnahme ist geprüft und dauerhaft** (LFH-367/B5g): die vier Knöpfe der UHS-Platzkarte
@@ -142,11 +142,25 @@ Alltag wichtigsten:
   begründet: handgeschriebenes CSS liest die Custom Properties, TSX liest `theme.useToken()`. Die
   Dichteachse wurde in TSX noch nie über eine CSS-Variable gelesen (gezählt: `--lfh-zeilenhoehe` hat
   genau einen Konsumenten, und der ist eine Klasse ohne Verwender). Präzedenz:
-  `components/Datensicht.tsx:1255`, `etb/SlashMenu.tsx`. **Kein Guard sieht diese Fälle** — ein
+  `components/Datensicht.tsx:1255`, `etb/SlashMenu.tsx`, `pages/lagekarte/Sidebar.tsx`
+  (`bedienzielStil`, als **reine, exportierte** Funktion — nur so ist die Zusicherung über zwei
+  Dichtestufen prüfbar, ohne zu rendern). Der Boden ist die **Trefffläche, nicht der ganze
+  Zugang**: ein `ListenEintrag` mit `onClick` bleibt ein nacktes `<div>` ohne `role`/`tabIndex`,
+  und die klickbare Zeile als Ganzes ist B7/LFH-335 zugeordnet. **Kein Guard sieht diese Fälle** — ein
   Pixel-Padding ist keine Größen-Prop —, die Zusicherung muss also von Hand kommen. Prüfbar ist der
   **Inline-Style**, nicht ein Pixel (jsdom rechnet kein Layout): die belastbare Behauptung ist die
-  Ungleichheit über zwei Dichtestufen plus die Böden 24/48/72 als **Literale** hingeschrieben —
+  Ungleichheit über zwei Dichtestufen plus die Böden als **Literale** hingeschrieben —
   aus dem Token zurückgelesen prüfte sie den Token gegen sich selbst.
+  **Welches Zahlentripel, hängt am Token** (Klarstellung aus dem LFH-366-Review, hier standen
+  vorher zwei Präzedenzen mit verschiedenen Zahlen unter einer): `controlHeight` = **30/48/72**,
+  `controlHeightSM` = **24/48/72**. `etb/SlashMenu.test.tsx` prüft gegen `controlHeightSM` und
+  deshalb als *untere Schranke*; `pages/lagekarte/Sidebar.test.tsx` prüft `controlHeight` auf
+  *Gleichheit*. Wer `toBe(24)` gegen `controlHeight` schreibt, prüft das falsche Tripel.
+  **Ist die Fläche ein `ListenEintrag`** (`components/Liste.tsx`), trägt der die Kurzform
+  `padding` aus dem übergebenen `style` — er setzt selbst `paddingBlock`/`paddingInline` und
+  spreizt `...style` **danach**, die spätere Deklaration gewinnt. Das ist heute richtig und
+  ungetestet: zöge jemand den Spread nach vorn, fiele die Polsterungshälfte still weg, während
+  `minHeight` überlebt. Der Kommentar an der Spread-Zeile sagt das; wer sie anfasst, liest ihn.
 - **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e nach dem Vorbild von
   LFH-364). Ab drei Aktionen an einer Zeile oder Karte: ein `Dropdown` mit `menu={{ items }}`,
   `trigger={['click']}`, `autoFocus` und einem icon-only `<Button type="text">` — kein `Popover`
@@ -154,13 +168,24 @@ Alltag wichtigsten:
   Sichtbarkeitsfilterung keine Aktion übrig, wird **gar kein** Auslöser gerendert statt eines
   deaktivierten. Der zugängliche Name trägt die **Zeilenkennung** (`Aktionen zu Eintrag 7`), weil n
   Zeilen sonst n gleichnamige Knöpfe liefern. Träger: `chat/NachrichtenStrom.tsx:88`,
-  `etb/EtbTabelle.tsx`, `etb/MetaChip.tsx`. Zwei gemessene Fallen: die Zuordnung gehört ans **Menü**
+  `etb/EtbTabelle.tsx`, `etb/MetaChip.tsx`, `pages/lagekarte/Sidebar.tsx` (Bild-Zeile).
+  **Gezählt wird NACH der Rechteprüfung** (LFH-366): fällt die Menge unter drei, ist ein Menü
+  keine Bündelung, sondern ein Umweg — die Bild-Zeile zeigt ohne Schreibrecht ihre eine Aktion
+  weiter direkt. Beide Fälle gehören als **Paar** getestet; „mit Recht ist der direkte Knopf WEG"
+  ist die Hälfte, die die Bündelung überhaupt prüfbar macht. **Braucht das Löschen im Menü eine
+  Rückfrage, trägt sie ein `<Modal>` mit eigenem State** (Bauform `AnsichtSwitcher.tsx:167`), kein
+  `Popconfirm` — der überlebt im Menü-Label nur mit `stopPropagation` das Auto-Schließen; der
+  Dialog steht **außerhalb** der Zeilen-`map`, je Zeile einer wären n gleichnamige Knöpfe im Baum.
+  Zwei gemessene Fallen: die Zuordnung gehört ans **Menü**
   (`onClick` am `menu`, nicht je Item), weil ein Riegel dann einen Ort hat — liegt das Menü in einem
   klickbaren Elternteil, steigt sein Synthetic Event aus dem Portal in den **Komponenten**-Baum auf
   und feuert dessen `onClick` mit (gemessen an `MetaChip`: „Entfernen" rief zusätzlich „Bearbeiten"
   auf, obwohl der Auslöser selbst schon `stopPropagation` hatte). Und im Test wird der Eintrag
   **immer über das geöffnete Menü** gegriffen (`.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]`
-  + `within`): antd lässt die Portale geschlossener Dropdowns im Baum stehen.
+  + `within`): antd lässt die Portale geschlossener Dropdowns im Baum stehen. Dort dann per
+  **Teilstring**, nicht per exaktem Namen (LFH-366): ein antd-Icon im Eintrag trägt ein eigenes
+  `aria-label` (`role="img"`), das in den zugänglichen Namen einfließt — gemessen heißt der
+  Eintrag `delete Bild entfernen …`. Die Beschriftung selbst prüft ein `textContent`-Vergleich.
   **MeldungKarte ist die begründete Gegenausnahme** — dort wurde die Bündelung geprüft und wegen
   vier Popconfirms und ~10 Testabfragen verworfen (`meldungen/MeldungKarte.tsx:75-94`, offen als
   LFH-372/B5k).
@@ -184,7 +209,12 @@ Alltag wichtigsten:
   11/18/26 und liegt damit in jeder Stufe über dem geforderten `token.marginSM`. Erzwungen von
   `components/aktionsabstand.guard.test.ts` — auf die in LFH-363 bewerteten Dateien **gescopt**,
   weil die danger-Nachbarschaft anders als eine Größen-Prop keine zählbare Eigenschaft ist,
-  sondern eine Bewertung je Stelle; er wächst mit den Bündeln B5d–B5j. Geprüft wird der
+  sondern eine Bewertung je Stelle; er wächst mit den Bündeln B5d–B5j (seit LFH-366 mit den
+  beiden Kartenverwaltungen). **Was er nicht sieht, ist ein `danger`-MENÜEINTRAG** — `reihenIn`
+  matcht `<Button` mit `danger` im Tag. Eine Datei, deren Löschen ins Dreipunkt-Menü gewandert
+  ist, gehört deshalb in **keine** der beiden Listen: sie aufzunehmen behauptete eine Deckung,
+  die der Scanner nicht hat. Dort ist die Trennung der Menü-Trenner, und der wird im
+  Komponententest geprüft (`pages/lagekarte/Sidebar.test.tsx`). Geprüft wird der
   **Prop-Wert im Quelltext**, nicht ein Pixelabstand: jsdom rechnet kein Layout.
   **Destruktiv ist nicht gleich destruktiv** (Entscheidung aus LFH-363): „Außer Dienst" /
   „Deaktivieren" / eine gelöste Zuordnung sind **umkehrbar** — die Umkehrung steht als Knopf

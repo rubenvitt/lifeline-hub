@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import Sidebar from './Sidebar';
+import Sidebar, { bedienzielStil, loeschDialogBild } from './Sidebar';
 import type { SidebarProps } from './Sidebar';
+import { dichten } from '../../theme/tokens';
 
 const basisProps: SidebarProps = {
   einsatzId: 1,
@@ -138,7 +140,35 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(screen.queryByText(/Bild hochladen/i)).not.toBeInTheDocument();
   });
 
-  it('Zentrieren-Button fliegt die Karte auf das Bild (auch ohne Schreibrecht)', () => {
+  /**
+   * Bild-Aktionen: gebündelt statt aufgereiht (LFH-366 · B5f).
+   *
+   * Die beiden Fälle sind ein PAAR und nur zusammen eine Aussage. Der Zentrieren-Test allein
+   * belegt bloß, dass es den Knopf irgendwo gibt — er bliebe auch grün, wenn die Bündelung gar
+   * nicht griffe oder ein zweiter Zentrieren-Knopf danebenstünde. Erst die Gegenprobe („mit
+   * Schreibrecht ist der direkte Knopf WEG und ein Auslöser da") macht die Bündelung prüfbar.
+   *
+   * Der Zugriff aufs Menü läuft über das OFFENE Portal: antd lässt die Portale geschlossener
+   * Dropdowns im Baum stehen, und hier liegt je Bild eines herum (CLAUDE.md, gemessene Falle
+   * aus LFH-365).
+   *
+   * Die Einträge werden per TEILSTRING gegriffen, nicht per exaktem Namen: antds Icons tragen
+   * ein eigenes `aria-label` (`role="img"`), das in den zugänglichen Namen des `menuitem`
+   * einfließt — der heißt gemessen „delete Bild entfernen …", nicht „Bild entfernen …". Das ist
+   * das Verhalten im ganzen Bestand (`AnsichtSwitcher`, `OfflineKartenVerwaltung`) und wird hier
+   * nicht einseitig geändert. Die Beschriftung selbst prüft der `textContent`-Vergleich unten
+   * exakt.
+   */
+  async function oeffneBildMenue(name: string | RegExp): Promise<HTMLElement> {
+    await userEvent.click(screen.getByRole('button', { name }));
+    const offen = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    if (!offen) throw new Error(`Das Menü „${String(name)}" ließ sich nicht öffnen`);
+    return offen;
+  }
+
+  it('ohne Schreibrecht bleibt Zentrieren ein direkter Knopf — eine Aktion braucht kein Menü', () => {
     const onBildZentrieren = vi.fn();
     renderMitProviders(
       <Sidebar
@@ -150,6 +180,124 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /Lageplan zentrieren/i }));
     expect(onBildZentrieren).toHaveBeenCalledWith(1);
+    // Die Gegenrichtung: kein Auslöser, wo es nichts zu bündeln gibt.
+    expect(screen.queryByRole('button', { name: 'Aktionen zu Lageplan' })).not.toBeInTheDocument();
+  });
+
+  it('mit Schreibrecht liegen alle drei Aktionen im Menü — und nicht mehr in der Icon-Reihe', async () => {
+    renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} />);
+    // Der direkte Zentrieren-Knopf ist weg: sonst wäre die Bündelung nur eine Ergänzung.
+    expect(screen.queryByRole('button', { name: /Lageplan zentrieren/i })).not.toBeInTheDocument();
+    const menue = await oeffneBildMenue('Aktionen zu Lageplan');
+    expect(within(menue).getAllByRole('menuitem').map((e) => e.textContent)).toEqual([
+      'Auf Bild zentrieren',
+      'Auf der Karte platzieren',
+      'Bild entfernen …',
+    ]);
+  });
+
+  /**
+   * AK2, erste Hälfte: die räumliche Trennung zwischen destruktiver und harmloser Aktion. Im
+   * Menü ist sie der Trenner — geprüft wird nicht bloß, DASS einer da ist, sondern dass er vor
+   * dem Entfernen sitzt. Ein Trenner an beliebiger Stelle trennte nichts.
+   */
+  it('der Trenner steht unmittelbar vor „Bild entfernen"', async () => {
+    renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} />);
+    const menue = await oeffneBildMenue('Aktionen zu Lageplan');
+    const trenner = menue.querySelectorAll('.ant-dropdown-menu-item-divider');
+    expect(trenner).toHaveLength(1);
+    expect(trenner[0].nextElementSibling?.textContent).toBe('Bild entfernen …');
+  });
+
+  it('der zugängliche Name trägt die Bild-Kennung — zwei Bilder, zwei unterscheidbare Auslöser', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan, { ...bildLageplan, id: 2, name: 'Übersicht' }]}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Aktionen zu Lageplan' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aktionen zu Übersicht' })).toBeInTheDocument();
+  });
+
+  it('Zentrieren aus dem Menü fliegt die Karte auf das Bild', async () => {
+    const onBildZentrieren = vi.fn();
+    renderMitProviders(
+      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} onBildZentrieren={onBildZentrieren} />,
+    );
+    const menue = await oeffneBildMenue('Aktionen zu Lageplan');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Auf Bild zentrieren/ }));
+    expect(onBildZentrieren).toHaveBeenCalledWith(1);
+  });
+
+  /**
+   * AK2, zweite Hälfte: das Entfernen wird bestätigt, und der Bestätigungsknopf ist rot. Ohne
+   * die Farb-Zusicherung bestätigte man das Löschen mit einem blauen Knopf — genau der Fall,
+   * den LFH-363 als eigene Festlegung aufgeschrieben hat.
+   *
+   * Der Aufruf darf ERST nach der Bestätigung kommen; die Zwischenprüfung ist deshalb kein
+   * Beiwerk, sondern der Unterschied zwischen „fragt nach" und „fragt zum Schein".
+   */
+  it('Entfernen fragt nach und bestätigt mit einem roten Knopf', async () => {
+    const onBildLoeschen = vi.fn();
+    renderMitProviders(
+      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} onBildLoeschen={onBildLoeschen} />,
+    );
+    const menue = await oeffneBildMenue('Aktionen zu Lageplan');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Bild entfernen/ }));
+    expect(screen.getByText('Bild „Lageplan" entfernen?')).toBeInTheDocument();
+    expect(onBildLoeschen).not.toHaveBeenCalled();
+
+    const bestaetigen = screen.getByRole('button', { name: 'Entfernen' });
+    expect(bestaetigen).toHaveClass('ant-btn-dangerous');
+    await userEvent.click(bestaetigen);
+    expect(onBildLoeschen).toHaveBeenCalledWith(1);
+  });
+
+  it('Abbrechen entfernt nichts', async () => {
+    const onBildLoeschen = vi.fn();
+    renderMitProviders(
+      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} onBildLoeschen={onBildLoeschen} />,
+    );
+    const menue = await oeffneBildMenue('Aktionen zu Lageplan');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Bild entfernen/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onBildLoeschen).not.toHaveBeenCalled();
+  });
+
+  it('Platzieren aus dem Menü heißt im laufenden Modus „beenden" und beendet ihn', async () => {
+    const onBildPlatzieren = vi.fn();
+    const onBildPlatzierenFertig = vi.fn();
+    const { rerender } = renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        bildPlatzierenId={null}
+        onBildPlatzieren={onBildPlatzieren}
+        onBildPlatzierenFertig={onBildPlatzierenFertig}
+      />,
+    );
+    let menue = await oeffneBildMenue('Aktionen zu Lageplan');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Auf der Karte platzieren/ }));
+    expect(onBildPlatzieren).toHaveBeenCalledWith(1);
+
+    // Im laufenden Modus wechselt derselbe Eintrag Beschriftung UND Wirkung.
+    rerender(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        bildPlatzierenId={1}
+        onBildPlatzieren={onBildPlatzieren}
+        onBildPlatzierenFertig={onBildPlatzierenFertig}
+      />,
+    );
+    menue = await oeffneBildMenue('Aktionen zu Lageplan');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Platzieren beenden/ }));
+    expect(onBildPlatzierenFertig).toHaveBeenCalled();
+    expect(onBildPlatzieren).toHaveBeenCalledTimes(1);
   });
 
   it('Platzier-Modus zeigt Mittelpunkt-Eingabe und beendet über „Fertig"', () => {
@@ -437,5 +585,87 @@ describe('Sidebar Fehler-Slots', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
     expect(onWiederholen).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Trefflächenboden der handgebauten Bedienziele (LFH-366 · B5f).
+ *
+ * Geprüft wird der INLINE-STYLE, nicht ein Pixel: jsdom rechnet kein Layout, und
+ * `test/utils.tsx` montiert ein nacktes `ConfigProvider` OHNE unser Theme — eine gerenderte
+ * Höhe belegte antd-Vorgaben, nicht die Staffel. Deshalb die reine Funktion gegen die
+ * Dichtestufen aus `theme/tokens.ts`.
+ *
+ * Die Böden stehen als LITERALE da. Aus dem Token zurückgelesen prüften sie den Token gegen
+ * sich selbst und blieben grün, egal welche Zahl dort steht.
+ */
+describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    paddingSM: dichten[stufe].abstand.sm,
+    padding: dichten[stufe].abstand.md,
+  });
+
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(bedienzielStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(bedienzielStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(bedienzielStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  /**
+   * Die eigentliche Aussage: der Wert ZIEHT MIT. Ein festgenagelter Stil bestünde die
+   * Literal-Prüfung oben nicht, ein aus einer Konstante gelesener aber schon — die Ungleichheit
+   * über die Stufen ist das, was eine Verwechslung der Quelle auffliegen ließe.
+   */
+  it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
+    const hoehen = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
+      (s) => bedienzielStil(tokenFuer(s)).minHeight,
+    );
+    expect(hoehen[0]).toBeLessThan(hoehen[1]);
+    expect(hoehen[1]).toBeLessThan(hoehen[2]);
+  });
+
+  /**
+   * ZWEI Angaben, nicht eine (Konvention aus LFH-365): die Polsterung allein trägt den Boden
+   * nicht — sie kommt im Handschuh-Betrieb auf grob 54 px gegen die geforderten 72. Sie muss
+   * trotzdem da sein und ebenfalls mitziehen, sonst klebt der Text an der Kante.
+   */
+  it('trägt neben der Höhe eine mitziehende Polsterung', () => {
+    expect(bedienzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
+    expect(bedienzielStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+  });
+});
+
+/**
+ * Nebenläufigkeit an der Löschbestätigung (Review-Fund G2 zu LFH-366).
+ *
+ * Die Bildliste kommt über den SSE-Fan-out und kann sich ändern, WÄHREND die Rückfrage
+ * offensteht — ein zweiter Bediener entfernt dasselbe Bild. Hing die Sichtbarkeit des Dialogs
+ * an `loeschBildId != null`, blieb er stehen, sein Titel fiel auf `Bild „" entfernen?` zurück,
+ * und „Entfernen" bot ein DELETE auf ein Objekt an, das es nicht mehr gab.
+ *
+ * Geprüft wird die REINE FUNKTION, nicht das gerenderte Modal — die Begründung steht bei
+ * `loeschDialogBild`: antd löst die Schliess-Animation über `transitionend` auf, das in jsdom
+ * nie feuert, also bliebe der Knopf gemessen im Baum und die naheliegende DOM-Zusicherung wäre
+ * rot, obwohl die Härtung greift.
+ */
+describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
+  const bilder = [
+    { id: 1, name: 'Lageplan' },
+    { id: 2, name: 'Übersicht' },
+  ];
+
+  it('findet das Bild zur Kennung — Titel und Sichtbarkeit aus einer Quelle', () => {
+    expect(loeschDialogBild(bilder, 2)?.name).toBe('Übersicht');
+  });
+
+  it('liefert null, sobald das Bild aus der Liste fällt', () => {
+    expect(loeschDialogBild(bilder, 1)).not.toBeNull();
+    // Derselbe Zustand nach einem SSE-Update, das genau dieses Bild entfernt hat:
+    expect(loeschDialogBild(bilder.filter((b) => b.id !== 1), 1)).toBeNull();
+  });
+
+  it('liefert null, wenn gar keine Rückfrage offensteht', () => {
+    expect(loeschDialogBild(bilder, null)).toBeNull();
   });
 });

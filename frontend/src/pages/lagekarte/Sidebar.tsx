@@ -1,8 +1,8 @@
-import { Badge, Button, Card, Popconfirm, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
+import { Badge, Button, Card, Dropdown, Modal, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
 import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
-import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
+import { AimOutlined, DeleteOutlined, FullscreenOutlined, MoreOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
@@ -188,6 +188,64 @@ function VeraltetSlot({ fehler }: { fehler?: SektionFehler }) {
   return <SeitenStandVeraltet onWiederholen={fehler.onWiederholen} />;
 }
 
+/**
+ * Das Bild, dessen Entfernen gerade bestätigt werden soll — oder `null`, wenn es keins (mehr)
+ * gibt (LFH-366 · B5f, Review-Fund G2).
+ *
+ * Warum nicht einfach `loeschBildId != null`: die Bildliste kommt über den SSE-Fan-out und kann
+ * sich ändern, WÄHREND die Rückfrage offensteht — ein zweiter Bediener entfernt dasselbe Bild.
+ * Gemessen an einem `rerender` ohne das Bild blieb der Dialog dann offen, sein Titel fiel auf
+ * `Bild „" entfernen?` zurück, und „Entfernen" schickte ein DELETE auf ein Objekt, das es nicht
+ * mehr gibt. Der Zustand, den der Dialog beschreibt, ist die ZEILE, nicht die Nummer.
+ *
+ * Rein und exportiert aus demselben Grund wie {@link bedienzielStil}: die Aussage ist am DOM
+ * nicht führbar. antd löst die Schliess-Animation eines `<Modal>` über `transitionend` auf, das
+ * in jsdom nie feuert — nach `open={false}` steht der Knopf weiter im Baum (gemessen), und die
+ * naheliegende Zusicherung `queryByRole('button') → null` wäre rot, obwohl die Härtung greift.
+ * Eine Zusicherung auf antds `ant-zoom-leave` hinge dagegen an einer Animationsklasse, die beim
+ * nächsten Bump wandert. Also wird geprüft, was die Entscheidung trägt, statt wie sie aussieht.
+ */
+export function loeschDialogBild<T extends { id: number; name: string }>(
+  bilder: readonly T[],
+  id: number | null,
+): T | null {
+  if (id == null) return null;
+  return bilder.find((b) => b.id === id) ?? null;
+}
+
+/**
+ * Trefflächenboden für ein HANDGEBAUTES Bedienziel (LFH-366 · B5f, Konvention aus LFH-365).
+ *
+ * Die Einträge der Karte „Verortet" sind klickbar, aber kein antd-Steuerelement: `ListenEintrag`
+ * legt sein `onClick` auf ein nacktes `<div>`, und dessen Höhe entsteht allein aus der Polsterung
+ * der `<Liste>`. Die trägt den Boden NICHT — gemessen kommt eine Zeile im Handschuh-Betrieb damit
+ * auf grob 54 px gegen die geforderten 72. Deshalb ZWEI Angaben und nicht eine: `minHeight` aus
+ * `controlHeight` (30 / 48 / 72) plus die Polsterung.
+ *
+ * Aufgelöste Tokens, nie `var(--lfh-*)`: die Arbeitsteilung steht in `theme/rollen.css`
+ * („ZWEI QUELLEN, EINE WAHRHEIT") — handgeschriebenes CSS liest die Custom Properties, TSX liest
+ * `theme.useToken()`. Präzedenz: `components/Datensicht.tsx:1255`, `etb/SlashMenu.tsx:102`.
+ *
+ * Rein und exportiert, damit die Zusicherung über zwei Dichtestufen prüfbar ist, OHNE zu rendern:
+ * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, ein gerenderter Wert
+ * belegte also antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein Layout.
+ *
+ * **Was hier NICHT gelöst wird:** die Tastaturbedienbarkeit. Das `<div onClick>` hat weder `role`
+ * noch `tabIndex` noch `onKeyDown`; das zu ändern hieße, `components/Liste.tsx` anzufassen, und
+ * die klickbare Zeile als Ganzes ist ausdrücklich B7 (LFH-335) zugeordnet
+ * (`components/Datensicht.tsx`, Festlegung 4). Der Boden hier ist die Trefffläche, nicht der
+ * ganze Zugang.
+ */
+export function bedienzielStil(token: { controlHeight: number; paddingSM: number; padding: number }) {
+  return {
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px ${token.padding}px`,
+  } as const;
+}
+
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
   const sektionFehler = props.sektionFehler ?? {};
@@ -203,6 +261,13 @@ export default function Sidebar(props: SidebarProps) {
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({ grundzeichen: 'taktische-formation' });
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
+  /**
+   * Bild, dessen Entfernen bestätigt werden soll (LFH-366 · B5f) — EIN Dialog für die ganze
+   * Liste, nicht einer je Zeile. Der `AnsichtSwitcher` daneben kommt mit einem einzigen
+   * `<Modal>` aus, weil es genau eine aktive Ansicht gibt; hier sind es n Bilder, und n
+   * Dialoge im Baum wären n gleichnamige Knöpfe pro Rolle.
+   */
+  const [loeschBildId, setLoeschBildId] = useState<number | null>(null);
   // Entwurf verwerfen, sobald ein anderes Bild platziert wird oder der Modus endet.
   useEffect(() => setBildMitte(null), [props.bildPlatzierenId]);
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
@@ -221,6 +286,21 @@ export default function Sidebar(props: SidebarProps) {
   //   * Die drei `Liste` tragen gar kein antd-Prop: `components/Liste.tsx` bildet `size`
   //     auf die Abstands-Token ab und zieht bei der Dichte-Umschaltung (B5) mit. Es zu
   //     entfernen würde die Staffel nicht bedienen, sondern verlassen.
+  //
+  // Nachtrag LFH-366 · B5f — zwei Dinge, die dieser Kommentar bisher offen ließ:
+  //
+  //   * Zwei der drei Listen tragen ANKLICKBARE Einträge („Verortet": UHS und Schäden). Dort
+  //     genügt die Abstands-Zusicherung oben NICHT: die Polsterung allein trägt keinen
+  //     Trefflächenboden. Diese Einträge bekommen deshalb `bedienzielStil` (siehe dort) —
+  //     `minHeight` aus `controlHeight` PLUS Polsterung. Die dritte Liste („Nicht verortet")
+  //     bleibt unangetastet: ihre Einträge sind nicht selbst klickbar, das Bedienziel ist der
+  //     Knopf in der Zeile, und der erbt die Staffel ohnehin.
+  //   * Die harten `marginBottom: 12` an den Karten bleiben stehen und werden NICHT auf ein
+  //     Abstands-Token gezogen. Es ist derselbe Grund wie beim ersten Punkt oben: eine
+  //     Umstellung träfe alle zwölf Karten dieser Leiste auf einmal und wäre eine reine
+  //     Sichtänderung an der meistgenutzten Fläche der Anwendung, die jsdom nicht nachrechnen
+  //     kann. Das ist eine Tokenisierungs-Aufgabe (A2-Linie), keine Dichte-Aufgabe, und sie
+  //     ist als LFH-377 getickt statt hier nebenbei mitgenommen zu werden.
   //
   // Die Prop-Schreibweise steht hier bewusst NICHT ausgeschrieben: Gate 4 zählt ihr Literal
   // repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht füllen.
@@ -386,7 +466,7 @@ export default function Sidebar(props: SidebarProps) {
           dataSource={uhsVerortet}
           rowKey={(m) => m.schluessel}
           renderItem={(m) => (
-            <ListenEintrag style={{ cursor: 'pointer' }} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
+            <ListenEintrag style={bedienzielStil(token)} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
               {m.label}
             </ListenEintrag>
           )}
@@ -397,7 +477,7 @@ export default function Sidebar(props: SidebarProps) {
           dataSource={schadenVerortet}
           rowKey={(m) => m.schluessel}
           renderItem={(m) => (
-            <ListenEintrag style={{ cursor: 'pointer' }} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
+            <ListenEintrag style={bedienzielStil(token)} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
               {m.label}
             </ListenEintrag>
           )}
@@ -540,35 +620,94 @@ export default function Sidebar(props: SidebarProps) {
                   >
                     {b.name}
                   </Typography.Text>
-                  <Space size={4} style={{ flexShrink: 0 }}>
-                    <Tooltip title="Auf Bild zentrieren">
-                      <Button
-                        icon={<FullscreenOutlined />}
-                        onClick={() => props.onBildZentrieren(b.id)}
-                        aria-label={`${b.name} zentrieren`}
-                      />
-                    </Tooltip>
-                    {darfSchreiben && (
-                      <>
-                        <Tooltip title={imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren'}>
-                          <Button
-                            type={imPlatzieren ? 'primary' : 'default'}
-                            icon={<AimOutlined />}
-                            onClick={() => (imPlatzieren ? props.onBildPlatzierenFertig() : props.onBildPlatzieren(b.id))}
-                            aria-label={`${b.name} platzieren`}
-                          />
-                        </Tooltip>
-                        <Popconfirm
-                          title="Bild entfernen?"
-                          onConfirm={() => props.onBildLoeschen(b.id)}
-                          okText="Entfernen"
-                          cancelText="Abbrechen"
-                        >
-                          <Button danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
-                        </Popconfirm>
-                      </>
+                  {/*
+                    Drei Aktionen an einer Zeile werden gebündelt, nicht aufgereiht (Norm aus
+                    LFH-365 · B5e; Hausvorbilder `AnsichtSwitcher.tsx:137` 250 Zeilen weiter oben
+                    und `etb/EtbTabelle.tsx:166`). Vorher standen sie als drei Icon-Knöpfe in
+                    einem `<Space size={4}>` — vier Pixel zwischen einem harmlosen und einem
+                    roten Knopf, in einer 300 px breiten Leiste, und die vier waren hart
+                    verdrahtet: sie blieben vier, auch im Handschuh-Betrieb. Mit dem Menü fällt
+                    der `<Space>` ersatzlos weg, statt auf ein Token gezogen zu werden.
+
+                    OHNE Schreibrecht bleibt genau eine Aktion übrig, und dafür ist ein Menü
+                    keine Bündelung, sondern ein Umweg: dann steht der Zentrieren-Knopf direkt
+                    da. Beide Fälle sind als Paar getestet — sonst bewiese der Zentrieren-Test
+                    nur, dass es den Knopf irgendwo gibt, nicht dass die Bündelung greift.
+                  */}
+                  <div style={{ flexShrink: 0 }}>
+                    {darfSchreiben ? (
+                      <Dropdown
+                        trigger={['click']}
+                        // `autoFocus` nach dem Befund an `components/Datensicht.tsx`: ohne ihn
+                        // klebt der Fokus am Auslöser und die Pfeiltasten heben im Menü nichts
+                        // hervor. In jsdom nicht prüfbar — Konvention mit Quelle, keine Zusicherung.
+                        autoFocus
+                        menu={{
+                          items: [
+                            {
+                              key: 'zentrieren',
+                              icon: <FullscreenOutlined />,
+                              label: 'Auf Bild zentrieren',
+                            },
+                            {
+                              key: 'platzieren',
+                              icon: <AimOutlined />,
+                              label: imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren',
+                            },
+                            /*
+                             * Die Trennung zwischen destruktiver und harmloser Aktion (AK2): im
+                             * Menü ist sie der Trenner, nicht ein `<Space size>`.
+                             *
+                             * Die Grenze davon gehört dazu, sonst behauptet der Kommentar mehr als
+                             * die Sache trägt: der Trenner trennt **visuell** — eine sichtbare
+                             * Linie, ein zweiter Kanal, den der abgelöste `<Space size={4}>` nie
+                             * hatte. Sein eigener Weissraum skaliert aber NICHT mit der Dichte:
+                             * antd rechnet ihn aus `lineWidth` (`menu/style/index.js`:
+                             * `marginBlock` + `borderTopWidth`), und `theme/tokens.ts` fasst
+                             * `lineWidth` nicht an — also ~3 px in jeder Stufe. Was mitzieht, sind
+                             * die Zeilenhöhen des Menüs (`itemHeight` ← `controlHeightLG`); die
+                             * beiden Ziele stehen im Handschuh-Betrieb also weit auseinander,
+                             * nicht weil der Trenner wächst, sondern weil sie es tun.
+                             */
+                            { type: 'divider' as const },
+                            {
+                              key: 'loeschen',
+                              icon: <DeleteOutlined />,
+                              label: 'Bild entfernen …',
+                              danger: true,
+                            },
+                          ],
+                          // Zuordnung am MENÜ, nicht je Eintrag: ein Riegel hat dann einen Ort
+                          // (Muster `AnsichtSwitcher.tsx:140`, Falle aus LFH-365 dokumentiert).
+                          onClick: ({ key }) => {
+                            if (key === 'zentrieren') props.onBildZentrieren(b.id);
+                            else if (key === 'platzieren') {
+                              if (imPlatzieren) props.onBildPlatzierenFertig();
+                              else props.onBildPlatzieren(b.id);
+                            } else if (key === 'loeschen') setLoeschBildId(b.id);
+                          },
+                        }}
+                      >
+                        {/* Der Name trägt die Bild-Kennung: n Bilder liefern sonst n
+                            gleichnamige Knöpfe, die per Rolle nicht zu unterscheiden sind
+                            (Festlegung aus LFH-364). Kein `size` — die Trefffläche kommt aus
+                            `controlHeight`. */}
+                        <Button
+                          type="text"
+                          icon={<MoreOutlined />}
+                          aria-label={`Aktionen zu ${b.name}`}
+                        />
+                      </Dropdown>
+                    ) : (
+                      <Tooltip title="Auf Bild zentrieren">
+                        <Button
+                          icon={<FullscreenOutlined />}
+                          onClick={() => props.onBildZentrieren(b.id)}
+                          aria-label={`${b.name} zentrieren`}
+                        />
+                      </Tooltip>
                     )}
-                  </Space>
+                  </div>
                 </div>
                 <Slider
                   min={0}
@@ -640,6 +779,39 @@ export default function Sidebar(props: SidebarProps) {
           )}
         </Space>
       </Card>
+
+      {/*
+        Löschbestätigung als EIN Dialog für die ganze Bildliste (LFH-366 · B5f), Bauform wie
+        `AnsichtSwitcher.tsx:167`. Bewusst kein `Popconfirm` mehr: der hing vorher am roten
+        Icon-Knopf, den es nach der Bündelung nicht mehr gibt — und ein Popconfirm IM Menü-Label
+        bräuchte ein `stopPropagation`, um das Auto-Schließen zu überleben (so löst es
+        `chat/NachrichtenStrom.tsx`), was hier nichts kauft.
+
+        `okButtonProps={{ danger: true }}` ist AK2 und keine Kosmetik: sonst bestätigt man das
+        Entfernen mit einem blauen Knopf. Der Dialog steht AUSSERHALB der `map` — n Dialoge im
+        Baum trügen n gleichnamige Knöpfe.
+      */}
+      <Modal
+        // Eine Quelle für Sichtbarkeit UND Titel (siehe `loeschDialogBild`): fällt das Bild
+        // während der Rückfrage aus der Liste, schliesst der Dialog, statt einen leeren Namen
+        // zu zeigen und ein DELETE auf ein totes Objekt anzubieten.
+        open={loeschDialogBild(props.bilder, loeschBildId) != null}
+        title={`Bild „${loeschDialogBild(props.bilder, loeschBildId)?.name ?? ''}" entfernen?`}
+        okText="Entfernen"
+        okButtonProps={{ danger: true }}
+        cancelText="Abbrechen"
+        onOk={() => {
+          if (loeschBildId != null) props.onBildLoeschen(loeschBildId);
+          setLoeschBildId(null);
+        }}
+        onCancel={() => setLoeschBildId(null)}
+        destroyOnHidden
+      >
+        <Typography.Paragraph>
+          Das Bild wird aus der Lagekarte entfernt. Bereits gesetzte Eckpunkte gehen dabei
+          verloren.
+        </Typography.Paragraph>
+      </Modal>
 
       {darfSchreiben && (
         <Card size="small" title="Zone zeichnen" style={{ marginBottom: 12 }}>
