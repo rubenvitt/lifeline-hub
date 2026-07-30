@@ -24,13 +24,33 @@
  * Pfeilfunktion VOR der Größen-Prop steht. Ein Gate, das eine Zeilenumbruch-Änderung
  * für Fortschritt hält, misst nicht das, wofür es existiert.
  *
+ * ── Warum das Element-Muster generische Typargumente kennt (LFH-364 · B5d) ──────
+ * `<Select<number | null> size="small">` schrieb sich am Guard vorbei: das Muster
+ * verlangte hinter dem Namen ein `[\s/>{]`, und ein `<` ist keins davon. Gemessen
+ * am 30.07.2026 versteckte diese eine Lücke 4 Stellen — darunter genau den Select,
+ * den LFH-364 ausdrücklich mitnehmen sollte, und einen Verstoß in
+ * `personen/personenSpalten.tsx`, der in keiner Schuldzeile stand.
+ * Der Lookahead allein genügt NICHT: `tagEnde` nähme dann das `>` des Typarguments
+ * für das Tag-Ende, und die Prop dahinter bliebe unsichtbar. Deshalb überspringt
+ * {@link generikEnde} das balancierte `<…>` zuerst.
+ *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
  * Teil des Vertrags, nicht Beiwerk:
  *   • ein gespreiztes `{...props}`, das die Größe als Objektfeld trägt;
  *   • eine Größe aus einer Variablen (`size={klein}`) oder einem Ausdruck;
  *   • eine eigene Wrapper-Komponente, die die Prop intern setzt;
- *   • Elemente, die hier nicht als interaktiv gelistet sind ({@link INTERAKTIV}).
- * Wer eine dieser Lücken nutzt, umgeht die Norm — der Guard fängt ihn nicht.
+ *   • Elemente, die hier nicht als interaktiv gelistet sind ({@link INTERAKTIV});
+ *   • einen FUNKTIONSTYP im Typargument (`<Select<(x: N) => S> size="small">`) —
+ *     dessen `=>` beendet für {@link generikEnde} die Klammer zu früh. Im Bestand
+ *     kommt das an keiner der 25 Generic-Stellen vor; wer es einführt, umgeht die
+ *     Norm.
+ *
+ * ── Die drei nicht-interaktiven Kleinflächen der Kommunikationskarten ───────────
+ * `meldungen/MeldungKarte.tsx`, `meldungen/MeldungFormular.tsx` und
+ * `auftraege/AuftragKarte.tsx` tragen je eine `<Card size="small">`. Sie sind
+ * ABSICHT, kein Rest von LFH-364: eine Karte polstert, sie trifft nicht. Sie stehen
+ * bewusst NICHT in {@link OFFEN} — `Card` ist strukturell außerhalb von
+ * {@link INTERAKTIV}, ein Eintrag dafür wäre unbelegt und färbte den Guard rot.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -99,19 +119,7 @@ const OFFEN: string[] = [
   // B5c (stammdaten/ und Verwaltung) ist mit LFH-363 abgetragen — 24 Stellen in
   // 10 Dateien. Der Abstand zur destruktiven Nachbaraktion, der dort auf denselben
   // Zeilen saß, hält seither `aktionsabstand.guard.test.ts`.
-  // ── B5d · Kommunikationskarten (LFH-364) ──────────────────────────────────
-  '/src/auftraege/AuftraegeListe.tsx',
-  '/src/auftraege/AuftragKarte.tsx',
-  '/src/chat/KanalListe.tsx',
-  '/src/chat/NachrichtEingabe.tsx',
-  '/src/chat/NachrichtenStrom.tsx',
-  '/src/erinnerung/ErinnerungKarte.tsx',
-  '/src/meldungen/MeldungFormular.tsx',
-  '/src/meldungen/MeldungKarte.tsx',
-  '/src/nachforderungen/NachforderungKarte.tsx',
-  '/src/pages/ErinnerungenPage.tsx',
-  '/src/pages/MeldungenPage.tsx',
-  '/src/pages/NachforderungenPage.tsx',
+  // ── B5d · Kommunikationskarten (LFH-364) ── ABGERÄUMT, 23 Stellen in 12 Dateien.
   // ── B5e · Einsatztagebuch (LFH-365) ───────────────────────────────────────
   '/src/etb/BuchstabierHilfe.tsx',
   '/src/etb/MetaChip.tsx',
@@ -142,6 +150,11 @@ const OFFEN: string[] = [
   '/src/pages/SchaedenDetailPage.tsx',
   '/src/pages/TiereDetailPage.tsx',
   '/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx',
+  // Erst durch den Scanner-Fix von LFH-364/B5d sichtbar geworden (`<Select<…>`), nicht
+  // neu entstanden. Die Schuldmenge wächst hier um 1, während die echte Schuld um 23
+  // fällt — B5d ist auf B5c/B5e–B5j ausdrücklich disjunkt gestellt, deshalb wird die
+  // Datei hier verbucht statt fremdes Bündel-Gebiet mitzuräumen.
+  '/src/personen/personenSpalten.tsx',
 ];
 
 function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, string> {
@@ -224,9 +237,80 @@ export function tagEnde(text: string, start: number): number {
   return -1;
 }
 
+/**
+ * Index HINTER dem balancierten `<…>` eines generischen Typarguments; `start` zeigt
+ * auf das öffnende `<`. `-1`, wenn es nicht schließt.
+ *
+ * Nötig, weil `tagEnde` das erste `>` auf Klammertiefe 0 nimmt — und das ist bei
+ * `<Select<number | null> size="small">` das des TYPARGUMENTS, nicht das des Tags.
+ * Ohne diesen Vorlauf endete der Tag-Text vor der Prop.
+ */
+export function generikEnde(text: string, start: number): number {
+  let tiefe = 0;
+  let anfuehrung: string | null = null;
+  for (let i = start; i < text.length; i++) {
+    const z = text[i];
+    if (anfuehrung) {
+      if (z === '\\') i++;
+      else if (z === anfuehrung) anfuehrung = null;
+      continue;
+    }
+    if (z === '"' || z === "'" || z === '`') anfuehrung = z;
+    else if (z === '<') tiefe++;
+    else if (z === '>') {
+      tiefe--;
+      if (tiefe === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Reduziert einen Tag-Text auf seine ATTRIBUT-Ebene: jeder `{…}`-Ausdruck, der mehr
+ * als ein nacktes Stringliteral enthält, wird zu `{}`.
+ *
+ * Ohne diesen Schritt zählte eine Klein-Angabe aus einem VERSCHACHTELTEN Element dem
+ * äußeren zu. Gemessen an `auftraege/AuftragKarte.tsx` (LFH-364): das `<Collapse>`
+ * trägt seine Kinder in `items={[{ children: <Descriptions size="small" …> }]}` —
+ * `tagEnde` überspringt die Klammer richtig, aber der Tag-Text ENTHÄLT sie, und der
+ * Guard meldete den Collapse noch, als dessen eigene Angabe längst weg war. Ein Gate,
+ * das einen Verstoß nicht wieder loslässt, ist von einem kaputten nicht zu
+ * unterscheiden.
+ *
+ * `{'small'}` bleibt erhalten — die geklammerte Schreibweise ist ein echter Verstoß.
+ * Alles Berechnete (`size={klein}`) fällt hier weg und ist ohnehin dokumentierter
+ * Blindfleck (siehe Dateikopf).
+ */
+export function attributEbene(tag: string): string {
+  let raus = '';
+  let anfuehrung: string | null = null;
+  for (let i = 0; i < tag.length; i++) {
+    const z = tag[i];
+    if (anfuehrung) {
+      raus += z;
+      if (z === '\\') { raus += tag[++i] ?? ''; continue; }
+      if (z === anfuehrung) anfuehrung = null;
+      continue;
+    }
+    if (z === '"' || z === "'" || z === '`') { anfuehrung = z; raus += z; continue; }
+    if (z !== '{') { raus += z; continue; }
+    // Balancierten Ausdruck greifen und entscheiden, ob er wörtlich genug ist.
+    let tiefe = 0;
+    let j = i;
+    for (; j < tag.length; j++) {
+      if (tag[j] === '{') tiefe++;
+      else if (tag[j] === '}' && --tiefe === 0) break;
+    }
+    const inhalt = tag.slice(i + 1, j).trim();
+    raus += /^["'][^"']*["']$/.test(inhalt) ? `{${inhalt}}` : '{}';
+    i = j;
+  }
+  return raus;
+}
+
 /** Trägt der Tag-Text eine wörtliche Klein-Angabe? Deckt `"…"`, `'…'` und `{…}` ab. */
 function tragtKleinAngabe(tag: string): boolean {
-  return /\bsize\s*=\s*(?:["']small["']|\{\s*["']small["']\s*\})/.test(tag);
+  return /\bsize\s*=\s*(?:["']small["']|\{\s*["']small["']\s*\})/.test(attributEbene(tag));
 }
 
 export interface Stelle {
@@ -243,11 +327,16 @@ export function stellenIn(pfad: string, quelltext: string): Stelle[] {
   const text = ohneKommentare(quelltext);
   const gefunden: Stelle[] = [];
   for (const element of INTERAKTIV) {
-    // Punkte im Namen (`Space.Compact`) sind wörtlich zu nehmen.
-    const muster = new RegExp(`<${element.replace(/\./g, '\\.')}(?=[\\s/>{])`, 'g');
+    // Punkte im Namen (`Space.Compact`) sind wörtlich zu nehmen. Das `<` im Lookahead
+    // lässt generische Typargumente zu (`<Select<T> …>`), siehe Dateikopf.
+    const muster = new RegExp(`<${element.replace(/\./g, '\\.')}(?=[\\s/>{<])`, 'g');
     for (const treffer of text.matchAll(muster)) {
       const start = treffer.index;
-      const ende = tagEnde(text, start);
+      // Ein Typargument zuerst überspringen, sonst endet der Tag-Text an dessen `>`.
+      const nachName = start + 1 + element.length;
+      const propsAb = text[nachName] === '<' ? generikEnde(text, nachName) : nachName;
+      if (propsAb === -1) continue;
+      const ende = tagEnde(text, propsAb);
       if (ende === -1) continue;
       const tag = text.slice(start, ende + 1);
       if (!tragtKleinAngabe(tag)) continue;
@@ -312,6 +401,39 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
 
   it('nimmt die geklammerte Schreibweise mit', () => {
     expect(stellenIn('/src/x.tsx', "<Select size={'small'} />")).toHaveLength(1);
+  });
+
+  // LFH-364/B5d: die Lücke, die `MeldungKarte.tsx:184` unsichtbar machte. Ein reiner
+  // Lookahead-Fix ließe den ersten Fall durch und den zweiten scheitern — das
+  // Typargument-`>` verkürzte den Tag-Text vor die Prop.
+  it('findet sie hinter einem generischen Typargument', () => {
+    expect(stellenIn('/src/x.tsx', '<Select<number | null> size="small" />')).toHaveLength(1);
+  });
+
+  it('findet sie auch bei mehrzeiligem Element mit Typargument', () => {
+    const quelle = ['<Select<number | null>', '  allowClear', '  size="small"', '/>'].join('\n');
+    expect(stellenIn('/src/x.tsx', quelle)).toHaveLength(1);
+  });
+
+  it('lässt ein Typargument OHNE Klein-Angabe in Ruhe', () => {
+    expect(stellenIn('/src/x.tsx', '<Select<number> allowClear />')).toEqual([]);
+  });
+
+  it('überspringt verschachtelte Typargumente balanciert', () => {
+    expect(stellenIn('/src/x.tsx', '<Select<Map<string, number>> size="small" />')).toHaveLength(1);
+  });
+
+  // LFH-364/B5d: die Angabe eines VERSCHACHTELTEN Elements gehört nicht dem äußeren.
+  // Ohne `attributEbene` blieb `AuftragKarte`s Collapse gemeldet, nachdem seine eigene
+  // Angabe entfernt war — der Verstoß saß im `items`-Ausdruck.
+  it('rechnet eine Angabe aus einer Prop-Expression nicht dem äußeren Element zu', () => {
+    const quelle = '<Collapse ghost items={[{ children: <Descriptions size="small" /> }]} />';
+    expect(stellenIn('/src/x.tsx', quelle)).toEqual([]);
+  });
+
+  it('meldet das äußere Element dennoch, wenn es SELBST eine Angabe trägt', () => {
+    const quelle = '<Collapse size="small" items={[{ children: <Descriptions size="small" /> }]} />';
+    expect(stellenIn('/src/x.tsx', quelle)).toHaveLength(1);
   });
 
   it('lässt Flächen ohne Bedienfunktion und die Projekt-Primitive in Ruhe', () => {

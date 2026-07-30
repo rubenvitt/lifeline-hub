@@ -82,15 +82,29 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-363: 69 Stellen in 34 Dateien — gemessen, nicht fortgeschrieben —, je
-  Verzeichnis-Bündel von LFH-333 zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit Klammertiefe, nicht per
-  Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind (gemessen 61 statt 82)
-  und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop steht — ein Gate, das
-  einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in seinem
-  Kopfkommentar und ist Teil des Vertrags. Nicht-interaktive Flächen (`Card`, `Descriptions`,
-  `Spin`) sind absichtlich draußen, die Projekt-Primitive `Liste`/`KatalogTabelle` ebenso — dort
-  ist `size` ein **Abstandsmaß**, keine Treffläche, und `Liste.test.tsx` prüft das über mehrere
-  Dichtestufen.
+  30.07.2026 nach LFH-364: **73 Stellen in 33 Dateien** — gemessen, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
+  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit
+  Klammertiefe, nicht per Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind
+  (gemessen 61 statt 82) und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop
+  steht — ein Gate, das einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in
+  seinem Kopfkommentar und ist Teil des Vertrags. Nicht-interaktive Flächen (`Card`,
+  `Descriptions`, `Spin`) sind absichtlich draußen, die Projekt-Primitive `Liste`/`KatalogTabelle`
+  ebenso — dort ist `size` ein **Abstandsmaß**, keine Treffläche, und `Liste.test.tsx` prüft das
+  über mehrere Dichtestufen.
+  **Der Scanner kennt seit LFH-364 zwei weitere Fälle** — beide gemessen, nicht vermutet, und
+  beide zeigen, dass ein Gate in BEIDE Richtungen falsch liegen kann: **(1)** ein generisches
+  Typargument (`<Select<number | null> size="small">`) schrieb sich vorbei, weil der Lookahead
+  hinter dem Namen ein `[\s/>{]` verlangte; ein `<` ist keins. Der Lookahead allein genügt nicht —
+  `tagEnde` nimmt sonst das `>` des Typarguments für das Tag-Ende, deshalb überspringt
+  `generikEnde` die balancierte Klammer zuerst (die Mutationsprobe „nur Lookahead" färbt 5 Tests
+  rot). Diese eine Lücke versteckte 4 Stellen, darunter einen Verstoß in
+  `personen/personenSpalten.tsx`, der in keiner Schuldzeile stand. **(2)** umgekehrt rechnete der
+  Guard eine Angabe aus einer **Prop-Expression** dem äußeren Element zu: `<Collapse
+  items={[{ children: <Descriptions size="small"/> }]}>` blieb gemeldet, als die eigene Angabe des
+  Collapse längst weg war. `attributEbene` reduziert den Tag darum auf seine Attributebene. Ein
+  Gate, das einen Verstoß nicht wieder loslässt, ist von einem kaputten nicht zu unterscheiden.
+  Ein **Funktionstyp** im Typargument bleibt Blindfleck (dessen `=>` schließt die Klammer zu früh)
+  — im Bestand an keiner der 25 Generic-Stellen vorhanden.
   **Die kleine Steuerhöhe liegt seit LFH-361 auf dem Gate-3-Boden** (24 / 48 / 72 statt antds
   abgeleiteter 22,5 / 36 / 54 — `genControlHeight.js` rechnet × 0,75). Folge: wo eine Bibliothek
   die Kleingröße **erzwingt** — antds Popconfirm tut das hart in `PurePanel.js` — greift die

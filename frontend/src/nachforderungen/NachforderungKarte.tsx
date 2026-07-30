@@ -51,12 +51,12 @@ export default function NachforderungKarte({
               cancelText="Abbrechen"
               onConfirm={() => onStatus(n.id, next)}
             >
-              <Button size="small">→ {NACHFORDERUNG_STATUS[next].label}</Button>
+              <Button>→ {NACHFORDERUNG_STATUS[next].label}</Button>
             </Popconfirm>
           ) : null,
         // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → kein Popconfirm.
         onAblehnen
-          ? <Button key="ab" size="small" danger onClick={() => onAblehnen(n.id)}>Ablehnen</Button> : null,
+          ? <Button key="ab" danger onClick={() => onAblehnen(n.id)}>Ablehnen</Button> : null,
       ].filter(Boolean)
     : [];
 

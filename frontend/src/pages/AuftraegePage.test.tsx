@@ -140,6 +140,41 @@ describe('AuftraegePage', () => {
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
   });
 
+  // LFH-364/B5d: die Quittungs-Aktion liegt in einer EIGENEN Zeile (Weg (a)), der
+  // Empfänger-Chip ist wieder reine Statusanzeige. Zwei Aussagen, die nur zusammen
+  // etwas belegen: dass mehrere offene Empfänger unterscheidbar bleiben, und dass ein
+  // bereits quittierter Empfänger gar keine Aktion mehr trägt.
+  it('trennt die Quittungs-Aktionen mehrerer Empfänger über den zugänglichen Namen', async () => {
+    const empf = (id: number, anzeige: string, quittiert: string | null) => ({
+      id, auftrag_id: 1, empfaenger_typ: 'funktion' as const, abschnitt_id: null, einheit_id: null,
+      person_id: null, fahrzeug_id: null, funktion_text: anzeige, extern_kategorie: null,
+      extern_bezeichnung: null, snap_anzeige: anzeige, quittiert_at: quittiert, quittiert_von_id: null,
+    });
+    listeAuftraege.mockResolvedValue([auftrag({
+      empfaenger_anzahl: 3,
+      quittiert_anzahl: 1,
+      empfaenger: [
+        empf(1, 'EA Nord', null),
+        empf(2, 'EA Süd', null),
+        empf(3, 'EA West', '2026-06-11 10:00:00'),
+      ],
+    })]);
+    quittiereEmpfaenger.mockResolvedValue(auftrag());
+    renderPage();
+    await screen.findByText('Deich sichern');
+
+    // Der quittierte Empfänger hat KEINEN Knopf — sonst wäre die Zeile nur eine
+    // zweite Chip-Reihe und die Trennung Status/Aktion bloß behauptet.
+    expect(screen.queryByRole('button', { name: /EA West/ })).not.toBeInTheDocument();
+
+    // Beide offenen Knöpfe heißen sichtbar „quittieren"; auseinanderhalten muss sie
+    // der zugängliche Name.
+    expect(screen.getAllByRole('button', { name: /quittieren$/ })).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Süd quittieren' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 2));
+  });
+
   it('meldet Vollzug über das Modal', async () => {
     setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'vollzogen' }));
     renderPage();

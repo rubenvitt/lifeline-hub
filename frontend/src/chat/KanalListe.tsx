@@ -27,7 +27,7 @@ export default function KanalListe({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <Typography.Text strong>Kanäle</Typography.Text>
         {darfSchreiben && (
-          <Button size="small" onClick={() => setOffen(true)}>Kanal</Button>
+          <Button onClick={() => setOffen(true)}>Kanal</Button>
         )}
       </div>
       <Liste<ChatKanal>

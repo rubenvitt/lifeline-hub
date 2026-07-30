@@ -140,7 +140,6 @@ export default function NachforderungenPage() {
           extra={(
             <Button
               type="text"
-              size="small"
               icon={<CloseOutlined />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"

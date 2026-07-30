@@ -77,7 +77,7 @@ export default function ErinnerungKarte({
           onConfirm={() => onQuittieren?.(e.id)}
         >
           <Tooltip title={TOOLTIP_QUITTIEREN}>
-            <Button size="small">Quittieren</Button>
+            <Button>Quittieren</Button>
           </Tooltip>
         </Popconfirm>,
         <Popconfirm
@@ -89,7 +89,7 @@ export default function ErinnerungKarte({
           onConfirm={() => onErledigen?.(e.id)}
         >
           <Tooltip title={TOOLTIP_ERLEDIGT}>
-            <Button size="small" type="primary">Erledigt</Button>
+            <Button type="primary">Erledigt</Button>
           </Tooltip>
         </Popconfirm>,
       ]
