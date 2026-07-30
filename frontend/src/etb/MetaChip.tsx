@@ -1,5 +1,5 @@
-import { CloseOutlined } from '@ant-design/icons';
-import { AutoComplete, DatePicker, Input, Space, Tag } from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
+import { AutoComplete, Button, DatePicker, Dropdown, Input, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
 import { useState } from 'react';
@@ -41,7 +41,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
     if (d.editor === 'text') {
       const editor = optionen && optionen.length > 0 ? (
         <AutoComplete
-          size="small"
           autoFocus
           aria-label={d.label}
           style={{ width: 200 }}
@@ -61,7 +60,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
         />
       ) : (
         <Input
-          size="small"
           autoFocus
           aria-label={d.label}
           style={{ width: 160 }}
@@ -74,7 +72,15 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
       // LFH-110: Buchstabierhilfe additiv am Von/An-Feld (Funkrufname/Absender/Empfänger).
       if (feld === 'von' || feld === 'an') {
         return (
-          <Space.Compact block size="small">
+          /*
+           * Ohne Größenangabe (LFH-365 · B5e): `Space.Compact size="small"` trug die
+           * Kleingröße über `SpaceCompactItemContext` auch den Kindern auf, die selbst
+           * keine hatten (gemessen an `antd/es/space/Compact.js` — Kinder bekamen
+           * `ant-input-sm`/`ant-btn-sm`). Die Angabe hier zu lassen und nur den Knopf in
+           * `BuchstabierHilfe` zu befreien, wäre also wirkungslos gewesen; der Wrapper
+           * steht genau deshalb in der Liste interaktiver Elemente des Dichte-Guards.
+           */
+          <Space.Compact block>
             {editor}
             <BuchstabierHilfe text={text} />
           </Space.Compact>
@@ -85,7 +91,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
     if (d.editor === 'meldeweg') {
       return (
         <Select
-          size="small"
           autoFocus
           defaultOpen
           aria-label={d.label}
@@ -101,7 +106,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
     // editor === 'zeit'
     return (
       <DatePicker
-        size="small"
         showTime
         autoFocus
         aria-label={d.label}
@@ -113,14 +117,66 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
   }
 
   return (
-    <Tag
-      closable
-      closeIcon={<CloseOutlined aria-label="schließen" />}
-      onClose={(e) => { e.stopPropagation(); onRemove(feld); }}
-      onClick={() => onEdit(feld)}
-      style={{ cursor: 'pointer' }}
-    >
-      {d.label}: {anzeige(feld, wert)}
+    <Tag>
+      {/*
+        Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip — und das ist der Kern
+        der Sache, nicht Kosmetik.
+
+        Ein `onClick` am `<Tag>` machte jeden Nachfahren zum Auslöser, und der
+        Menü-Overlay IST ein Nachfahre: ein React-Synthetic-Event steigt durch den
+        Komponentenbaum auf, auch über die Portal-Grenze. Das Overlay trägt rings um
+        seine Einträge ein 4-px-Polsterband (`dropdownEdgeChildPadding` → `paddingXXS`,
+        vom Projekt-Theme nicht überschrieben, also in JEDER Dichtestufe gleich schmal).
+        Ein Griff daneben schloss das Menü ohne die Aktion auszuführen UND schaltete den
+        Chip in den Editor — im Review gemessen.
+
+        Zwei Riegel standen hier vorher und fingen es nicht: einer am Auslöser, einer am
+        Menü-`onClick`. Der zweite feuert nur für Einträge; das Band gehört keinem. Ein
+        dritter Riegel wäre die falsche Antwort auf die Frage — richtig ist, dem Overlay
+        den klickbaren Vorfahren zu nehmen. Deshalb liegt der Handler jetzt an einem
+        Geschwisterknoten des Menüs, und es braucht überhaupt kein `stopPropagation`
+        mehr.
+      */}
+      <span onClick={() => onEdit(feld)} style={{ cursor: 'pointer' }}>
+        {d.label}: {anzeige(feld, wert)}
+      </span>
+      <Dropdown
+        trigger={['click']}
+        /*
+         * `autoFocus` aus demselben Grund wie an der Aktionsspalte in `EtbTabelle.tsx`
+         * und an `components/Datensicht.tsx:664-670`: ohne ihn bleibt der Fokus am
+         * Auslöser und die Pfeiltasten heben im Menü nichts hervor. Anders als dort ist
+         * die Wirkung hier gemessen — mit dem Prop trägt der erste Eintrag beim Öffnen
+         * die Hervorhebung, ohne ihn keiner.
+         */
+        autoFocus
+        menu={{
+          items: [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            // `danger`, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar —
+            // „Bearbeiten" daneben legt es wieder an. Reibung gehört ans Unumkehrbare
+            // (LFH-363).
+            { key: 'entfernen', label: 'Entfernen', danger: true },
+          ],
+          // Zuordnung am Menü statt an jedem Eintrag (Muster
+          // `pages/lagekarte/AnsichtSwitcher.tsx:138`).
+          onClick: ({ key }) => {
+            if (key === 'bearbeiten') onEdit(feld);
+            if (key === 'entfernen') onRemove(feld);
+          },
+        }}
+      >
+        {/*
+          Kein `size`-Prop: die Trefffläche kommt aus `controlHeight` und zieht mit der
+          Dichtestufe mit (30 / 48 / 72 px). Genau das konnte das ~10-px-`closeIcon`
+          nicht, das hier vorher stand.
+        */}
+        <Button
+          type="text"
+          aria-label={`Aktionen zu ${d.label}`}
+          icon={<MoreOutlined />}
+        />
+      </Dropdown>
     </Tag>
   );
 }

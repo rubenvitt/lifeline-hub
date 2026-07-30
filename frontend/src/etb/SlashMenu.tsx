@@ -60,7 +60,15 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
     if (eintraege.length === 0) return null;
     return (
       <div>
-        <Typography.Text type="secondary" style={{ fontSize: 11, padding: '4px 12px', display: 'block' }}>
+        {/*
+          Beschriftung, keine Bedienfläche: die Polsterung zieht mit der Dichte, eine
+          Mindesthöhe bekommt sie NICHT. Das ist dieselbe Trennlinie, die der
+          Dichte-Guard zwischen interaktiven Elementen und Flächen wie `Card` zieht.
+        */}
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: 11, padding: `${token.paddingXS}px ${token.padding}px`, display: 'block' }}
+        >
           {titel}
         </Typography.Text>
         {eintraege.map((e, i) => {
@@ -71,8 +79,30 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
               role="option"
               aria-selected={idx === aktiv}
               onMouseDown={(ev) => { ev.preventDefault(); onWahl(e); }}
+              /*
+               * Die Zeile ist ein Bedienziel und folgt deshalb der Dichte-Staffel
+               * (LFH-365 · B5e). Zwei getrennte Angaben, weil sie zwei Dinge sind:
+               *
+               *   `minHeight` trägt den Trefflächenboden (30 / 48 / 72 px aus
+               *   `controlHeight`). Ohne sie entsteht die Höhe allein aus Polsterung plus
+               *   Zeilenbox — im Handschuh gemessen grob 54 px gegen einen Boden von 72.
+               *   Präzedenz ist `components/Datensicht.tsx:1255`, dasselbe Problem an
+               *   einem anderen interaktiven Zeilenziel.
+               *
+               *   `padding` ist die Polsterung. Der Tausch bewegt in der kompakten Stufe
+               *   je ±1 px (6→7, 12→11), ist also ein Token-Tausch und keine
+               *   Umgestaltung.
+               *
+               * Tokens und nicht `var(--lfh-*)`: die Arbeitsteilung steht oben an
+               * `useToken()` und in `theme/rollen.css` — handgeschriebenes CSS liest die
+               * Custom Properties, TSX liest die aufgelösten Tokens. Die Dichteachse
+               * wurde in TSX noch nie über eine CSS-Variable gelesen.
+               */
               style={{
-                padding: '6px 12px', cursor: 'pointer', color: token.colorText,
+                minHeight: token.controlHeight,
+                padding: `${token.paddingSM}px ${token.padding}px`,
+                cursor: 'pointer',
+                color: token.colorText,
                 background: idx === aktiv ? token.controlItemBgActive : undefined,
               }}
             >
@@ -99,7 +129,12 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
       }}
     >
       {flach.length === 0 ? (
-        <div style={{ padding: '6px 12px', opacity: 0.6 }}>Kein Treffer</div>
+        /* Dieselbe Polsterung wie eine echte Option — der Leerzustand soll nicht
+           schmaler wirken als das, was er ersetzt. Keine Mindesthöhe: er ist nicht
+           wählbar. */
+        <div style={{ padding: `${token.paddingSM}px ${token.padding}px`, opacity: 0.6 }}>
+          Kein Treffer
+        </div>
       ) : (
         <>
           {sektion('Felder', treffer.felder, 0)}

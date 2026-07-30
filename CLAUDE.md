@@ -82,7 +82,8 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-363 + LFH-364: **49 Stellen in 23 Dateien** — gemessen, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
+  30.07.2026 nach LFH-363 + LFH-364 + LFH-365: **41 Stellen in 20 Dateien** — gemessen mit der
+  Scan-Funktion des Guards selbst, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
   zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit
   Klammertiefe, nicht per Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind
   (gemessen 61 statt 82) und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop
@@ -125,6 +126,38 @@ Alltag wichtigsten:
   drehte sich der Umschalter beim Neuladen selbst zurück. Die Abfrage liegt in
   `components/useViewport.ts` (`zeigerIstGrob`), nicht im Theme-Provider: dessen Freistellung im
   Viewport-Guard gilt nur der Dunkelmodus-Frage.
+  **Ein handgebautes Bedienziel braucht ZWEI Angaben, nicht eine** (Festlegung aus LFH-365 · B5e,
+  die dort offene Konventionsfrage). Wo kein antd-Steuerelement die Höhe mitbringt — eine
+  `role="option"`-Zeile, ein `<div onClick>`, ein Zeilen-`<Link>` —, gilt:
+  `minHeight: token.controlHeight` **plus** `padding` aus `token.paddingSM`/`token.padding`. Die
+  Polsterung allein trägt den Boden nicht: gemessen kommt eine Zeile im Handschuh-Betrieb damit auf
+  grob 54 px gegen die geforderten 72. Träger sind **aufgelöste Tokens, nie `var(--lfh-*)`** — die
+  Arbeitsteilung steht in `theme/rollen.css` („ZWEI QUELLEN, EINE WAHRHEIT") und ist seit LFH-328/A2
+  begründet: handgeschriebenes CSS liest die Custom Properties, TSX liest `theme.useToken()`. Die
+  Dichteachse wurde in TSX noch nie über eine CSS-Variable gelesen (gezählt: `--lfh-zeilenhoehe` hat
+  genau einen Konsumenten, und der ist eine Klasse ohne Verwender). Präzedenz:
+  `components/Datensicht.tsx:1255`, `etb/SlashMenu.tsx`. **Kein Guard sieht diese Fälle** — ein
+  Pixel-Padding ist keine Größen-Prop —, die Zusicherung muss also von Hand kommen. Prüfbar ist der
+  **Inline-Style**, nicht ein Pixel (jsdom rechnet kein Layout): die belastbare Behauptung ist die
+  Ungleichheit über zwei Dichtestufen plus die Böden 24/48/72 als **Literale** hingeschrieben —
+  aus dem Token zurückgelesen prüfte sie den Token gegen sich selbst.
+- **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e nach dem Vorbild von
+  LFH-364). Ab drei Aktionen an einer Zeile oder Karte: ein `Dropdown` mit `menu={{ items }}`,
+  `trigger={['click']}`, `autoFocus` und einem icon-only `<Button type="text">` — kein `Popover`
+  (der trägt im Repo ausschließlich Inhalt und liefert keine `menuitem`-Rollen). Bleibt nach der
+  Sichtbarkeitsfilterung keine Aktion übrig, wird **gar kein** Auslöser gerendert statt eines
+  deaktivierten. Der zugängliche Name trägt die **Zeilenkennung** (`Aktionen zu Eintrag 7`), weil n
+  Zeilen sonst n gleichnamige Knöpfe liefern. Träger: `chat/NachrichtenStrom.tsx:88`,
+  `etb/EtbTabelle.tsx`, `etb/MetaChip.tsx`. Zwei gemessene Fallen: die Zuordnung gehört ans **Menü**
+  (`onClick` am `menu`, nicht je Item), weil ein Riegel dann einen Ort hat — liegt das Menü in einem
+  klickbaren Elternteil, steigt sein Synthetic Event aus dem Portal in den **Komponenten**-Baum auf
+  und feuert dessen `onClick` mit (gemessen an `MetaChip`: „Entfernen" rief zusätzlich „Bearbeiten"
+  auf, obwohl der Auslöser selbst schon `stopPropagation` hatte). Und im Test wird der Eintrag
+  **immer über das geöffnete Menü** gegriffen (`.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]`
+  + `within`): antd lässt die Portale geschlossener Dropdowns im Baum stehen.
+  **MeldungKarte ist die begründete Gegenausnahme** — dort wurde die Bündelung geprüft und wegen
+  vier Popconfirms und ~10 Testabfragen verworfen (`meldungen/MeldungKarte.tsx:75-94`, offen als
+  LFH-372/B5k).
 - **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein

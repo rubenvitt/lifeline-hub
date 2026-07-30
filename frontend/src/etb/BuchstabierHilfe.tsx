@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Popover, Segmented, Space, Tag, Typography } from 'antd';
+import { Button, Popover, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
 import { SoundOutlined } from '@ant-design/icons';
 import { buchstabiere, type Buchstabiertafel } from './buchstabieren';
 
@@ -10,12 +10,21 @@ import { buchstabiere, type Buchstabiertafel } from './buchstabieren';
  */
 export default function BuchstabierHilfe({ text }: { text: string }) {
   const [tafel, setTafel] = useState<Buchstabiertafel>('din5009');
+  /**
+   * Der Popover-Zustand liegt hier, damit der Tooltip von ihm weiß.
+   *
+   * Beide Hüllen hängen am selben Knopf und teilen Anker wie Ausrichtungsregel; der
+   * Tooltip liegt per z-index über dem Popover und verdeckte dessen erste Tafelzeile,
+   * solange der Zeiger nach dem Klick auf dem Knopf blieb. Auf Touch ist das der
+   * Normalfall — rc-trigger ergänzt einem Hover-Auslöser zusätzlich `touch`, ein Tipp
+   * öffnet also beides zugleich.
+   */
+  const [tafelOffen, setTafelOffen] = useState(false);
   const zeichen = buchstabiere(text, tafel);
 
   const inhalt = (
     <div style={{ maxWidth: 300 }}>
       <Segmented
-        size="small"
         value={tafel}
         onChange={(v) => setTafel(v as Buchstabiertafel)}
         options={[{ value: 'din5009', label: 'Deutsch' }, { value: 'nato', label: 'NATO' }]}
@@ -41,8 +50,32 @@ export default function BuchstabierHilfe({ text }: { text: string }) {
   );
 
   return (
-    <Popover content={inhalt} title="Buchstabieren" trigger="click">
-      <Button size="small" type="text" aria-label="Buchstabierhilfe" icon={<SoundOutlined />} />
+    <Popover
+      content={inhalt}
+      title="Buchstabieren"
+      trigger="click"
+      open={tafelOffen}
+      onOpenChange={setTafelOffen}
+    >
+      {/*
+        Der Tooltip ist die fehlende Erklärung des icon-only-Auslösers (LFH-365 · B5e):
+        vorher trug er allein ein `aria-label`, war also für Maus und Touch stumm.
+
+        Wortlaut gleich dem `aria-label`, damit sichtbarer Hinweis und zugänglicher Name
+        übereinstimmen (WCAG 2.5.3).
+
+        Der leere Titel bei offener Tafel ist der Riegel gegen den Stapel: antd rendert
+        ohne Titel kein Overlay, und die Erklärung hat ausgedient, sobald das Erklärte
+        offen steht. Ein `open={false}` täte es nicht — es machte den Tooltip dauerhaft
+        kontrolliert und nähme ihm sein eigenes Zeigerverhalten.
+
+        Kein `size`-Prop am Knopf: die Trefffläche kommt aus `controlHeight`. Sie hing
+        bis LFH-365 doppelt fest — an diesem Knopf UND am `Space.Compact` in
+        `MetaChip.tsx`, das sie über den Kontext auch ohne eigene Prop erzwang.
+      */}
+      <Tooltip title={tafelOffen ? '' : 'Buchstabierhilfe'}>
+        <Button type="text" aria-label="Buchstabierhilfe" icon={<SoundOutlined />} />
+      </Tooltip>
     </Popover>
   );
 }
