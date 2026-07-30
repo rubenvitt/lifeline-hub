@@ -126,8 +126,12 @@ export default function OnlineQuellenVerwaltung() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, q: OnlineQuelle) => (
-              <Space>
-                <Button size="small" onClick={() => { setBearbeite(q); setFormOffen(true); }}>
+              // `size="middle"` trennt die destruktive von der neutralen Aktion (LFH-363-Norm,
+              // hier für B5f eingelöst): der Vorgabe-Abstand eines `<Space>` ist im Projekt
+              // `abstand.xs` = 3/5/7 px und damit im Handschuh-Betrieb keine Trennung.
+              // Erzwungen von `components/aktionsabstand.guard.test.ts`.
+              <Space size="middle">
+                <Button onClick={() => { setBearbeite(q); setFormOffen(true); }}>
                   Bearbeiten
                 </Button>
                 <Popconfirm
@@ -136,7 +140,7 @@ export default function OnlineQuellenVerwaltung() {
                   okButtonProps={{ danger: true }}
                   onConfirm={() => loeschenMutation.mutate(q.id)}
                 >
-                  <Button size="small" danger>Löschen</Button>
+                  <Button danger>Löschen</Button>
                 </Popconfirm>
               </Space>
             ),

@@ -136,13 +136,15 @@ const OFFEN: string[] = [
   // `SpaceCompactItemContext`), ein Entfernen nur am Knopf darin wäre also wirkungslos
   // geblieben. Der Wrapper steht in {@link INTERAKTIV} und war damit ein gezählter
   // Verstoß, keine Ermessensfrage.
-  // ── B5f · Lagekarte und Kartenverwaltung (LFH-366) ────────────────────────
-  '/src/karten/OfflineKartenVerwaltung.tsx',
-  '/src/karten/OfflineVorhandeneModal.tsx',
-  '/src/karten/OnlineQuellenVerwaltung.tsx',
-  '/src/pages/lagekarte/HistorienBanner.tsx',
-  '/src/pages/lagekarte/KartenDetailCard.tsx',
-  '/src/pages/lagekarte/SnapshotLeiste.tsx',
+  // ── B5f · Lagekarte und Kartenverwaltung (LFH-366) ── ABGERÄUMT, 16 Stellen in 6 Dateien.
+  // Die sechs schwierigen Entscheidungen stehen als Kommentar an ihrer jeweiligen Stelle, weil
+  // keine von ihnen aus einer Prop-Zählung folgt: die schwebende `SnapshotLeiste` (grössere
+  // Knöpfe verdecken Kartenfläche — sie klappt dafür ein), das Eingabefeld im Titel einer
+  // Listenzeile (`OfflineVorhandeneModal`), der Schliess-Knopf einer `Card`, die weiterhin
+  // klein bleibt (`KartenDetailCard`), und zwei danger-Nachbarschaften, die jetzt
+  // `aktionsabstand.guard.test.ts` hält. `Sidebar.tsx` stand hier NIE — der Befund M61 des
+  // Elterntickets („38× size=small") war zum Liefertag überholt; die Datei trug 0 Verstöße,
+  // ihre 15 Angaben sitzen auf `Card`/`Liste`/`Spin` und bleiben nach der Regel oben stehen.
   // ── B5g · UHS-Grundriss (LFH-367) ─────────────────────────────────────────
   // Die vier Knöpfe der Platzkarte hängen an der Backend-Konstante SCHRITT_Y;
   // ihre Begründung steht in `uhs/Grundriss.tsx` (LFH-328/A2).

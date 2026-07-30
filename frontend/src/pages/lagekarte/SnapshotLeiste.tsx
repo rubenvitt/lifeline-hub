@@ -59,6 +59,18 @@ function chipLabel(bezeichnung: string | null | undefined, standAt: string): str
  * Ein-/ausklappbar (LFH-353): das Band liegt über der Karte und ist ein Werkzeug auf Abruf, kein
  * Dauerelement. Eingeklappt bleibt nur ein kleiner Knopf unten links stehen; der Zustand ist
  * per-User gemerkt (localStorage), NICHT Teil der geteilten Ansichts-Konfiguration.
+ *
+ * **Keine punktuellen Klein-Angaben mehr (LFH-366 · B5f).** Die sieben Steuerelemente hier
+ * trugen sie und waren damit auf 30 px festgenagelt — auch im Handschuh-Betrieb. Der Einwand
+ * dagegen ist echt und war der Grund für die eigene Betrachtung im Ticket: die Leiste schwebt
+ * ÜBER der Karte, grössere Knöpfe verdecken Kartenfläche. Er trägt trotzdem nicht, weil diese
+ * Leiste als einzige der Kartenaufbauten bereits eine Antwort auf ihren Flächenverbrauch hat:
+ * sie klappt ein (LFH-353), und eingeklappt bleibt genau ein Knopf stehen. Wer die Karte
+ * braucht, klappt zu; wer die Zeitachse bedient, braucht sie treffbar. Eine Taste, die man im
+ * Handschuh dreimal anfassen muss, kostet mehr Lage als ein Band, das man wegklappen kann.
+ *
+ * Der Zeilenumbruch ist mitgedacht: der Rahmen trägt `flexWrap: 'wrap'`, die Leiste wird auf
+ * höheren Dichtestufen also höher statt breiter und schneidet nichts ab.
  */
 export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWaehle, fehler }: SnapshotLeisteProps) {
   const { message } = App.useApp();
@@ -143,7 +155,6 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
     return (
       <Tooltip title="Zeitachse einblenden">
         <Button
-          size="small"
           icon={<HistoryOutlined />}
           aria-label="Zeitachse einblenden"
           onClick={() => klappeUm(false)}
@@ -183,7 +194,6 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
       {darfSichern && (
         <Space.Compact>
           <Input
-            size="small"
             placeholder="Bezeichnung (optional)"
             value={bezeichnung}
             onChange={(e) => setBezeichnung(e.target.value)}
@@ -192,7 +202,6 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
             aria-label="Snapshot-Bezeichnung"
           />
           <Button
-            size="small"
             type="primary"
             icon={<CameraOutlined />}
             loading={sichertGerade}
@@ -206,7 +215,6 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
       {chrono.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 260 }}>
           <Button
-            size="small"
             type={aktiverSnapshotId == null ? 'primary' : 'default'}
             onClick={zurueckAktuell}
           >
@@ -214,7 +222,6 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
           </Button>
           <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
             <Button
-              size="small"
               icon={spielt ? <PauseOutlined /> : <PlayCircleOutlined />}
               onClick={aufPlayPause}
               disabled={chrono.length < 2}
@@ -246,7 +253,6 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
           {chrono.map((s) => (
             <Tooltip key={s.id} title={s.notiz ?? undefined}>
               <Button
-                size="small"
                 type={s.id === aktiverSnapshotId ? 'primary' : 'default'}
                 onClick={() => {
                   setSpielt(false);
@@ -264,7 +270,6 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
           seinem flex:1 fehlt (Schreibrecht, aber noch keine Stände). */}
       <Tooltip title="Zeitachse ausblenden">
         <Button
-          size="small"
           type="text"
           icon={<DownOutlined />}
           aria-label="Zeitachse ausblenden"

@@ -65,6 +65,18 @@ const MIT_NACHBARSCHAFT = [
   'pages/BenutzerPage.tsx',
   'pages/EinheitenPage.tsx',
   'pages/EinsatzabschnittePage.tsx',
+  // ── B5f · Kartenverwaltung (LFH-366) ──────────────────────────────────────
+  // Beide tragen in ihrer Aktionsspalte „Löschen" neben mindestens einer neutralen Aktion.
+  // `OfflineKartenVerwaltung` führte das Elternticket von LFH-333 irrtümlich als
+  // Referenzmuster; es war dieselbe Fundstelle wie in `stammdaten/`, nur unentdeckt.
+  //
+  // `pages/lagekarte/Sidebar.tsx` steht bewusst in KEINER der beiden Listen: dort ist das
+  // Löschen seit LFH-366 ein Menü-Eintrag mit `danger: true`, und den sieht {@link reihenIn}
+  // nicht (es matcht `<Button` mit `danger` im Tag). Die Datei aufzunehmen behauptete eine
+  // Deckung, die der Scanner nicht hat — die Trennung dort ist der Menü-Trenner und wird in
+  // `Sidebar.test.tsx` geprüft.
+  'karten/OfflineKartenVerwaltung.tsx',
+  'karten/OnlineQuellenVerwaltung.tsx',
 ];
 
 /**
