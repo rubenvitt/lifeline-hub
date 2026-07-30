@@ -138,12 +138,23 @@ it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschni
 });
 
 it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
-  const bild = baueKraeftebild([ab(1)], [eh(10, 1)], [p(1, 10, 'fuehrer')], [], []);
+  // Die Fixture trägt ALLE DREI Mittelarten. Mit nur einer Person wäre die
+  // „keine Bildzeichen"-Behauptung unten für zwei der drei Zweige gar nicht belegt —
+  // sie liefe über Text, den der Renderer nie erzeugt hat.
+  const bild = baueKraeftebild([ab(1)], [eh(10, 1)], [p(1, 10, 'fuehrer')], [fz(1, 10)], [mat(1, 10, 'einsatzbereit')]);
   const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
   expect(md).toContain('# Kräftemeldebild');
   expect(md).toContain('Stand 12:00');
   expect(md).toContain('Gesamtstärke');
   expect(md).toContain('A1');
+  // Die Art des Mittels steht als KURZWORT in der Liste, nicht als Bildzeichen: der
+  // Lagebericht wird gedruckt und in Textketten weitergereicht. Als Literale gepinnt und
+  // nicht über die Konstante des Renderers — sonst prüfte der Test sie gegen sich selbst.
+  expect(md).toContain('- Pers. P1');
+  expect(md).toContain('- Fzg. F1');
+  expect(md).toContain('- Mtl. M1');
+  // Hier stand vorher je ein Emoji.
+  expect(md).not.toMatch(/\p{Extended_Pictographic}/u);
 });
 
 it('Suche matcht über Name und Funkrufname', () => {

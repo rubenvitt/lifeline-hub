@@ -8,19 +8,29 @@ function verteilung(v: Partial<StatusVerteilung> = {}): StatusVerteilung {
 }
 
 describe('AmpelZelle', () => {
-  it('trägt die Bezeichnung an der ZÄHLGRUPPE und blendet das Symbol für Vorleser aus', () => {
+  it('trägt die Bezeichnung an der ZÄHLGRUPPE und blendet die Zierde für Vorleser aus', () => {
     /**
      * Die Auflösung des scheinbaren Widerspruchs „`aria-hidden`" gegen „`aria-label`":
-     * es sind zwei verschiedene Knoten. Das Emoji ist Zierde und darf nicht der
+     * es sind zwei verschiedene Knoten. Die Ikone ist Zierde und darf nicht der
      * alleinige Bedeutungsträger sein; die Bedeutung hängt am Etikett der Gruppe.
      */
     const { container } = render(
-      <AmpelZelle bezeichnung="Personal" symbol="👤" verteilung={verteilung({ verfuegbar: 7 })} />,
+      <AmpelZelle bezeichnung="Personal" verteilung={verteilung({ verfuegbar: 7 })} />,
     );
-    expect(screen.getByRole('group', { name: 'Personal' })).toBeInTheDocument();
+    const gruppe = screen.getByRole('group', { name: 'Personal' });
+    expect(gruppe).toBeInTheDocument();
     expect(screen.getByLabelText('Personal')).toBeInTheDocument();
+    // Ein antd-Icon bringt sein eigenes englisches `aria-label` mit (`role="img"`, hier
+    // „user"). Der Gruppenname bleibt davon unberührt — `aria-label` schlägt den Inhalt —,
+    // aber der Knoten selbst überlebt und stünde in JEDER Zeile der Tabelle als eigenes,
+    // ansteuerbares Ziel. Gemessen: ohne die `aria-hidden`-Hülle wird diese Zeile rot.
+    expect(within(gruppe).queryByRole('img')).toBeNull();
     const zierde = container.querySelector('[aria-hidden="true"]');
-    expect(zierde).toHaveTextContent('👤');
+    // KEIN Emoji, kein Schriftzeichen: ein `@ant-design/icons`-Knoten (`.anticon`) mit
+    // einem echten SVG. Der Test geht rot, wenn jemand die Zierde wieder als Zeichenkette
+    // hereinreicht ODER die `aria-hidden`-Hülle entfernt.
+    expect(zierde?.querySelector('.anticon svg')).not.toBeNull();
+    expect(zierde?.textContent).toBe('');
   });
 
   it('jede Zahl trägt einen Kurztext — die Farbe ist Verstärkung, nicht Kanal', () => {
@@ -32,7 +42,6 @@ describe('AmpelZelle', () => {
     const { container } = render(
       <AmpelZelle
         bezeichnung="Fahrzeuge"
-        symbol="🚒"
         verteilung={verteilung({ verfuegbar: 7, gebunden: 3, nicht_verfuegbar: 2, ohne: 1 })}
       />,
     );
@@ -46,7 +55,7 @@ describe('AmpelZelle', () => {
 
   it('zeigt alle vier Felder, auch die mit 0 — Vergleichsspalten müssen fluchten', () => {
     const { container } = render(
-      <AmpelZelle bezeichnung="Personal" symbol="👤" verteilung={verteilung({ gebunden: 4 })} />,
+      <AmpelZelle bezeichnung="Personal" verteilung={verteilung({ gebunden: 4 })} />,
     );
     expect(container.querySelectorAll('.lfh-feld')).toHaveLength(4);
     expect(within(screen.getByRole('group', { name: 'Personal' })).getByText('4')).toBeInTheDocument();
@@ -56,7 +65,6 @@ describe('AmpelZelle', () => {
     const { container } = render(
       <AmpelZelle
         bezeichnung="Personal"
-        symbol="👤"
         verteilung={verteilung({ gebunden: 2, nicht_verfuegbar: 0 })}
       />,
     );
@@ -67,7 +75,7 @@ describe('AmpelZelle', () => {
 
   it('rendert bei fehlender Verteilung NICHTS — mittel-Zeilen haben keine', () => {
     const { container } = render(
-      <AmpelZelle bezeichnung="Personal" symbol="👤" verteilung={null} />,
+      <AmpelZelle bezeichnung="Personal" verteilung={null} />,
     );
     expect(container.querySelector('.lfh-feld')).toBeNull();
     expect(screen.queryByRole('group')).toBeNull();
@@ -79,7 +87,6 @@ describe('AmpelZelle', () => {
     const { container } = render(
       <AmpelZelle
         bezeichnung="Fahrzeuge"
-        symbol="🚒"
         verteilung={verteilung({ verfuegbar: 1, gebunden: 1, nicht_verfuegbar: 1, ohne: 1 })}
       />,
     );
