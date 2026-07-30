@@ -423,10 +423,18 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     expect(senke.body).toEqual({ art: 'wechsel', uhs_id: 1, platz_id: 10 });
   });
 
-  it('bietet den Zuweisungsweg auch über das Platzaktionen-Menü an (Tastaturweg)', async () => {
-    // Der Wurzelklick ist die grosse Berührungsfläche; im Fükw (Tastatur+Maus) muss der
-    // Weg ebenso erreichbar sein. Ein eigener Knopf auf der Karte scheidet aus — sie ist
-    // an SCHRITT_Y gedeckelt (s. Dateikopf von Grundriss.tsx).
+  it('bietet den Zuweisungsweg auch über das Platzaktionen-Menü an', async () => {
+    // Der Wurzelklick ist die grosse Berührungsfläche; im Fükw (Tastatur+Maus) ist das
+    // Menü der Weg dorthin, weil ein `div onClick` keinen Tastaturzugang hat. Ein eigener
+    // Knopf auf der Karte scheidet aus — sie ist an SCHRITT_Y gedeckelt (s. Dateikopf).
+    //
+    // DER NAME SAGT BEWUSST NICHT „Tastaturweg": gefahren wird hier mit der Maus. Der Weg
+    // ist für die Tastatur gedacht, aber ein antd-Dropdown mit `trigger={['click']}` ist
+    // in jsdom nicht per Tastatur zu öffnen (gemessen: Enter auf dem Auslöser, danach
+    // Pfeil und Enter im Menü — der Dialog bleibt zu). Belegt ist damit, DASS der Eintrag
+    // existiert und den Dialog öffnet; NICHT, dass eine Tastatur ihn erreicht. Ein
+    // Testname, der das behauptet, wäre die Sorte Zusicherung, die diese Datei an drei
+    // anderen Stellen ausgeräumt hat.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
