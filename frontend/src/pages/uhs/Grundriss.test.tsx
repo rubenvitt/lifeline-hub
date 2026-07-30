@@ -357,6 +357,219 @@ describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
   });
 });
 
+describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
+  /** Öffnet das geladene Dropdown-Menü der Platzkarte. antd lässt die Portale
+   *  geschlossener Dropdowns im Baum stehen — deshalb über das SICHTBARE greifen. */
+  function offenesMenue(): HTMLElement {
+    const offen = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    if (!offen) throw new Error('kein offenes Dropdown-Menü im Baum');
+    return offen as HTMLElement;
+  }
+
+  /** Wählt im geöffneten Patienten-Auswahlfeld den Eintrag mit dieser Kennung.
+   *  Über das SICHTBARE Dropdown greifen: dieselbe Person steht zugleich in der linken
+   *  Spalte, ein blosser Textgriff wäre mehrdeutig. */
+  async function waehlePatient(kennung: RegExp) {
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Patient' }));
+    const liste = await waitFor(() => {
+      const el = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+      if (!el) throw new Error('kein offenes Auswahlfeld');
+      return el as HTMLElement;
+    });
+    await userEvent.click(within(liste).getByText(kennung));
+  }
+
+  function belegungRoute(personId: number, senke: { body: unknown }) {
+    return http.post(`/api/einsaetze/1/personen/${personId}/uhs-belegung`, async ({ request }) => {
+      senke.body = await request.json();
+      return HttpResponse.json({
+        id: 1, einsatz_id: 1, person_id: personId, uhs_id: 1, platz_id: 10,
+        art: 'eintritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+      });
+    });
+  }
+
+  it('weist eine noch nicht aufgenommene Person per Klick auf den Platz zu (art=eintritt)', async () => {
+    // AK1: der Weg läuft OHNE jedes Drag-Ereignis. Gepinnt wird der abgeschickte Body,
+    // nicht ein Mock auf useMutation — ein Mock wäre auch dann grün, wenn der Klickweg
+    // bloss den bestehenden DragEnd-Handler synthetisch auslöste.
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    const senke: { body: unknown } = { body: null };
+    server.use(belegungRoute(5, senke));
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+    await waehlePatient(/R-005/);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(senke.body).not.toBeNull());
+    expect(senke.body).toEqual({ art: 'eintritt', uhs_id: 1, platz_id: 10 });
+  });
+
+  it('verlegt eine Person aus dem Wartebereich auf den Platz (art=wechsel)', async () => {
+    // Zweiter Fall derselben Ableitung: wer bereits in DIESER UHS ist, wechselt.
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    const senke: { body: unknown } = { body: null };
+    server.use(belegungRoute(7, senke));
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+    await waehlePatient(/R-007/);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(senke.body).not.toBeNull());
+    expect(senke.body).toEqual({ art: 'wechsel', uhs_id: 1, platz_id: 10 });
+  });
+
+  it('bietet den Zuweisungsweg auch über das Platzaktionen-Menü an', async () => {
+    // Der Wurzelklick ist die grosse Berührungsfläche; im Fükw (Tastatur+Maus) ist das
+    // Menü der Weg dorthin, weil ein `div onClick` keinen Tastaturzugang hat. Ein eigener
+    // Knopf auf der Karte scheidet aus — sie ist an SCHRITT_Y gedeckelt (s. Dateikopf).
+    //
+    // DER NAME SAGT BEWUSST NICHT „Tastaturweg": gefahren wird hier mit der Maus. Der Weg
+    // ist für die Tastatur gedacht, aber ein antd-Dropdown mit `trigger={['click']}` ist
+    // in jsdom nicht per Tastatur zu öffnen (gemessen: Enter auf dem Auslöser, danach
+    // Pfeil und Enter im Menü — der Dialog bleibt zu). Belegt ist damit, DASS der Eintrag
+    // existiert und den Dialog öffnet; NICHT, dass eine Tastatur ihn erreicht. Ein
+    // Testname, der das behauptet, wäre die Sorte Zusicherung, die diese Datei an drei
+    // anderen Stellen ausgeräumt hat.
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Platzaktionen' }));
+    await userEvent.click(within(offenesMenue()).getByText('Patient zuweisen'));
+
+    expect(await screen.findByRole('combobox', { name: 'Patient' })).toBeInTheDocument();
+  });
+
+  it('löst beim Klick auf einen Menüeintrag NICHT zusätzlich die Platzzuweisung aus', async () => {
+    // AK2 / gemessener Portal-Fall (LFH-365/MetaChip): das Dropdown rendert im Portal,
+    // sein Synthetic Event steigt aber im KOMPONENTEN-Baum auf und erreicht den
+    // Wurzel-onClick der Karte. Ein stopPropagation am Auslöser allein genügt dort nicht.
+    // MIT zuweisbarer Person rendern: ohne sie zeigte der Dialog „Niemand zuweisbar" statt
+    // eines Auswahlfelds, und eine Prüfung auf die Auswahl wäre blind — gemessen, der Test
+    // blieb dann auch mit entferntem Riegel grün. Geprüft wird deshalb der DIALOG.
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })] });
+    server.use(http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})));
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Platzaktionen' }));
+    await userEvent.click(within(offenesMenue()).getByText('als frei markieren'));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('löst beim Klick auf einen Aktions-Button NICHT zusätzlich die Platzzuweisung aus', async () => {
+    // Zweite Hälfte von AK2: die direkten Icon-Buttons stoppten bisher nur `pointerdown`,
+    // nicht `click` — ein Wurzel-onClick feuerte damit bei jedem Aktionsklick mit.
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })] });
+    server.use(http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})));
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'als frei markieren' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('reagiert nicht auf den Klick, wenn der Platz bereits belegt ist', async () => {
+    // Festlegung LFH-367: nur unbelegte Plätze nehmen per Klick auf. Ein belegter Platz
+    // trägt bereits eigene Klickziele (Personenkarte, Transport, Zurückweisen).
+    //
+    // Die ZWEITE Person ist der Grund, dass dieser Test etwas belegt: mit dem Belegenden
+    // allein wäre die Kandidatenmenge leer (er steht weder im Wartebereich noch unter
+    // „noch nicht aufgenommen"), der Dialog zeigte „Niemand zuweisbar" statt einer Auswahl
+    // — und eine Prüfung darauf bliebe auch ohne die `belegtVon`-Bedingung grün. Gemessen.
+    const belegend = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const wartend = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [belegend, wartend]);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Auch der Menü-Weg schweigt: der Eintrag steht nur an zuweisbaren Plätzen.
+    await userEvent.click(screen.getByRole('button', { name: 'Platzaktionen' }));
+    expect(within(offenesMenue()).queryByText('Patient zuweisen')).not.toBeInTheDocument();
+  });
+
+  it('nimmt auch einen defekten oder gesperrten Platz per Klick auf', async () => {
+    // Festlegung LFH-367: „frei" ist UNBELEGT, nicht `verfuegbarkeit === 'frei'`. Der
+    // Drag-Weg prüft die Verfügbarkeit ebenfalls nicht — der Klickweg darf nicht strenger
+    // sein als die Geste, die er ersetzt.
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'gesperrt' })] });
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+
+    expect(await screen.findByRole('combobox', { name: 'Patient' })).toBeInTheDocument();
+  });
+
+  it('bietet keinen Zuweisungsweg im schreibgeschützten Modus', async () => {
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p], true);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+
+    expect(screen.queryByRole('combobox', { name: 'Patient' })).not.toBeInTheDocument();
+  });
+
+  it('bietet keinen Zuweisungsweg im Bearbeiten-Modus (dort verschiebt der Klick Layout)', async () => {
+    // Im Bearbeiten-Modus ist die Karte Drag-Source fürs Layout. Ein Zuweisungsdialog
+    // daneben stellte den Klick gegen die Geste, die dort gemeint ist.
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+
+    expect(screen.queryByRole('combobox', { name: 'Patient' })).not.toBeInTheDocument();
+  });
+
+  it('meldet statt eines Dialogs, wenn niemand zuweisbar ist', async () => {
+    // Kein Dialog mit totem Primär-Knopf: der hätte nichts zu erfassen und schlösse nur.
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, []);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+
+    expect(await screen.findByText(/Niemand zuweisbar/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – Berührungsbedienung: kein Scroll-Riegel (LFH-367/B5g, AK3)', () => {
+  // Das AK des Elterntickets forderte `touchAction: 'none'` auf beiden Draggables. In der
+  // Fassung wäre es eine REGRESSION: alle drei Träger liegen in overflow:auto-Containern,
+  // und die Angabe schaltet natives Scrollen auf dem Element ab — das Tablet könnte die
+  // Platzliste nicht mehr scrollen. Der PointerSensor deckt Berührung über Pointer Events
+  // bereits ab (dnd-kit empfiehlt PointerSensor ODER MouseSensor+TouchSensor, nicht beides).
+  // Geprüft wird der Inline-Style, nicht ein Pixel: jsdom rechnet kein Layout.
+  it('setzt auf der Platzkarte keine Angabe, die das Scrollen der Fläche abschaltet', async () => {
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, []);
+    const karte = await screen.findByTestId('platz-karte');
+    expect(karte.style.touchAction).toBe('');
+  });
+
+  it('setzt auch auf der ziehbaren Personenkarte keine solche Angabe', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [] });
+    renderGrundriss(uhs, [p]);
+    const tag = await screen.findByText(/R-007/);
+    const traeger = tag.closest('div');
+    expect(traeger).not.toBeNull();
+    expect(traeger!.style.touchAction).toBe('');
+  });
+});
+
 describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
   function detail(p: Person): PersonDetail {
     return { ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] };

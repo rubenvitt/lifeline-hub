@@ -82,9 +82,15 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-363 + LFH-364 + LFH-365: **41 Stellen in 20 Dateien** — gemessen mit der
+  30.07.2026 nach LFH-363 bis LFH-365 und LFH-367: **40 Stellen in 19 Dateien** — gemessen mit der
   Scan-Funktion des Guards selbst, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
-  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Der Guard scannt **JSX-Tags mit
+  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß).
+  **Eine Ausnahme ist geprüft und dauerhaft** (LFH-367/B5g): die vier Knöpfe der UHS-Platzkarte
+  hängen an der Backend-Konstante `SCHRITT_Y = 120` aus `raster_position`. Der Innenraum von
+  100 px trägt in **keiner** Dichtestufe eine Aktionszeile auf voller Höhe — auch „alles ins
+  Dropdown" löst es nicht, dessen Auslöser ist selbst ein Knopf. B5g hat deshalb den **Bedienweg**
+  geändert statt der Grösse (Klick auf die ganze Karte, 140 × 116 px, statt Ziehen); die Zeile
+  fällt erst mit einer Änderung an `raster_position`. Der Guard scannt **JSX-Tags mit
   Klammertiefe, nicht per Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind
   (gemessen 61 statt 82) und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop
   steht — ein Gate, das einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in
@@ -158,6 +164,15 @@ Alltag wichtigsten:
   **MeldungKarte ist die begründete Gegenausnahme** — dort wurde die Bündelung geprüft und wegen
   vier Popconfirms und ~10 Testabfragen verworfen (`meldungen/MeldungKarte.tsx:75-94`, offen als
   LFH-372/B5k).
+  **Wo der Riegel gegen dieses Aufsteigen NICHT hingehört, ist ebenfalls gemessen** (LFH-367/B5g):
+  ein `domEvent.stopPropagation()` im `menu.onClick` hält es **nicht** auf — mit ihm allein blieb
+  der Regressionstest rot; der Callback läuft zu spät für die Ausbreitung. Wirksam ist ein
+  `onClick`-Riegel an dem **Container, in dessen Teilbaum der Auslöser hängt** (dort:
+  `uhs/Grundriss.tsx`, Aktionszeile der Platzkarte). Einer am Container fängt beides — die
+  direkten Knöpfe daneben, die nur `pointerdown` stoppen (was den folgenden `click` nicht
+  aufhält), und den Portal-Klick des Menüs. Wer den Auslöser aus diesem Container bewegt, nimmt
+  den Riegel mit; `MetaChip` löste denselben Fall dadurch, dass der Schnellweg an einen
+  **Geschwisterknoten** wanderte und damit gar keinen klickbaren Vorfahren mehr hatte.
 - **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein

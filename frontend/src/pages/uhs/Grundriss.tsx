@@ -2,7 +2,7 @@ import { App, Button, Card, Dropdown, Form, Input, InputNumber, Space, Tag, Tool
 import { Select } from '../../components/Select';
 import {
   CarOutlined, CheckCircleOutlined, DeleteOutlined, LockOutlined, LogoutOutlined,
-  SyncOutlined, ToolOutlined,
+  SyncOutlined, ToolOutlined, UserAddOutlined,
 } from '@ant-design/icons';
 import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,6 +40,17 @@ const PLATZ_KARTE_HOEHE = 116;
 //     nicht an einem Frontend-Token; das gehört zur Dichte-Umschaltung (B5), nicht in A2.
 //     Einen Wert danebenzusetzen wäre genau die Ad-hoc-Entscheidung, gegen die A2 antritt
 //     (Spec §5 Befund 7).
+//
+// NACHTRAG LFH-367/B5g — die Ausnahme ist geprüft und BESTÄTIGT, nicht vertagt. Die
+// Rechnung oben gilt in JEDER Dichtestufe: die kleine Steuerhöhe liegt seit LFH-361 auf
+// 24 / 48 / 72, die volle auf 30 / 48 / 72 — der Innenraum von 100 px trägt in keiner
+// Stufe eine Aktionszeile auf voller Höhe. Damit scheidet auch der naheliegende Ausweg
+// aus, alles ins Menü zu räumen: dessen Auslöser ist selbst ein Knopf und bräuchte
+// dieselbe Höhe. Deshalb hat B5g den Bedienweg geändert statt der Grösse — die ganze
+// Karte nimmt jetzt per Klick einen Patienten an (140 × 116 px), und die Aktionszeile
+// bleibt die Ausweichfläche für den Rest. Die vier Angaben stehen als benannte Ausnahme
+// in der Schuldliste von `components/dichte.guard.test.ts`; sie fallen mit einer
+// Änderung an `raster_position`, nicht mit einem Frontend-Umbau.
 //
 // Prop-Literal und Token-Name stehen bewusst nicht ausgeschrieben: Gate 4 zählt beide
 // repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht reissen.
@@ -98,9 +109,10 @@ interface PlatzKarteProps {
   onTransport: () => void;
   onStorno: () => void;
   onOeffnen: (personId: number) => void;
+  onZuweisen: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen }: PlatzKarteProps) {
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen, onZuweisen }: PlatzKarteProps) {
   // Platz-Karte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus —
   // Drag-Source (Layout verschieben). Mit @dnd-kit beides am selben Knoten.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
@@ -111,6 +123,18 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
   });
   const { token } = theme.useToken();
   const setRef = (n: HTMLDivElement | null) => { setDragRef(n); setDropRef(n); };
+  // Klick-Ersatzweg für den Drag (LFH-367/B5g): die ganze Karte nimmt einen Patienten an
+  // — 140 × 116 px statt einer Geste, die auf dem Führungs-Tablet nicht verlässlich
+  // ausführbar war. Bedingungen, jede aus einem eigenen Grund:
+  //   * `belegtVon` — nur UNBELEGTE Plätze nehmen auf. Ein belegter trägt bereits eigene
+  //     Klickziele (Personenkarte, Transport, Zurückweisen); ein Wurzelklick daneben
+  //     vergrösserte genau die Verwechslungsfläche, die dieser Umbau verkleinern soll.
+  //   * `bearbeitbar` — dort ist die Karte Drag-Source fürs Layout; der Klick gehört
+  //     der Geste, die in diesem Modus gemeint ist.
+  // Die VERFÜGBARKEIT wird bewusst NICHT geprüft: das Drop-Target tut es auch nicht
+  // (s. onDragEnd), und ein Ersatzweg, der strenger ist als die Geste, die er ersetzt,
+  // ersetzt sie nicht.
+  const zuweisbar = !schreibgeschuetzt && !bearbeitbar && !belegtVon;
   const style: React.CSSProperties = {
     position: 'absolute',
     left: platz.pos_x ?? 10,
@@ -123,7 +147,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     height: PLATZ_KARTE_HOEHE,
     overflow: 'hidden',
     boxSizing: 'border-box',
-    cursor: bearbeitbar ? 'grab' : 'default',
+    cursor: bearbeitbar ? 'grab' : zuweisbar ? 'pointer' : 'default',
     border: `2px solid ${rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token)}`,
     // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
     // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
@@ -142,12 +166,27 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <SyncOutlined /> },
     { key: 'gesperrt', label: 'als gesperrt markieren', icon: <LockOutlined /> },
   ];
+  // „Patient zuweisen" steht auch im Menü — der Wurzelklick ist die Berührungsfläche, das
+  // Menü der Tastaturweg. Im Fükw (Tastatur + Maus, der PRIMÄRE Einsatzkontext) wäre ein
+  // reiner Wurzelklick nicht erreichbar. Ein eigener Knopf auf der Karte scheidet aus: die
+  // Aktionszeile ist an SCHRITT_Y gedeckelt (Rechnung im Dateikopf).
   const menu = {
-    items: bearbeitbar
-      ? [...verfItems, { type: 'divider' as const }, { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }]
-      : verfItems,
+    items: [
+      ...(zuweisbar ? [{ key: 'zuweisen', label: 'Patient zuweisen', icon: <UserAddOutlined /> }, { type: 'divider' as const }] : []),
+      ...verfItems,
+      ...(bearbeitbar ? [{ type: 'divider' as const }, { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }] : []),
+    ],
+    autoFocus: true,
+    // Das Dropdown rendert im Portal, sein Klick steigt aber im KOMPONENTEN-Baum auf und
+    // erreicht damit den Wurzel-onClick dieser Karte (der gemessene Fall aus
+    // LFH-365/MetaChip). Der Riegel dagegen sitzt NICHT hier: ein
+    // `domEvent.stopPropagation()` in diesem Callback kommt zu spät und hält die
+    // Ausbreitung nachweislich nicht auf — mit ihm allein bleibt der Regressionstest rot.
+    // Wirksam ist der `click`-Riegel an der Aktionszeile unten, in deren Teilbaum das
+    // Dropdown hängt. Wer den Auslöser von dort wegbewegt, muss den Riegel mitnehmen.
     onClick: ({ key }: { key: string }) => {
-      if (key === 'storno') onStorno();
+      if (key === 'zuweisen') onZuweisen();
+      else if (key === 'storno') onStorno();
       else onVerfuegbarkeit(key as Verfuegbarkeit);
     },
   };
@@ -159,7 +198,13 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
   // Aktions-Buttons) gilt als deaktiviert (Screenreader + Tests können nicht klicken).
   const dragProps = bearbeitbar ? { ...attributes, ...listeners } : {};
   return (
-    <div ref={setRef} data-testid="platz-karte" style={style} {...dragProps}>
+    <div
+      ref={setRef}
+      data-testid="platz-karte"
+      style={style}
+      {...dragProps}
+      onClick={zuweisbar ? onZuweisen : undefined}
+    >
       {/* Titel: max. 2 Zeilen, dann Ellipsis (voller Name im Tooltip). Feste maxHeight,
           damit ein Umbruch die Karte NICHT vergrößert. */}
       <Typography.Text
@@ -183,8 +228,17 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
       <div style={{ height: 24, overflow: 'hidden' }}>
         {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || bearbeitbar} kompakt onOeffnen={onOeffnen} />}
       </div>
-      {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons (kein Menü); feste Höhe. */}
-      <div style={{ display: 'flex', gap: 4, height: 24, alignItems: 'center' }}>
+      {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons (kein Menü); feste Höhe.
+          DER `click`-RIEGEL DER KARTE SITZT HIER — einmal am Container statt an jedem
+          Knopf. Die Knöpfe stoppen nur `pointerdown` (gegen den Drag-Start), und das hält
+          den nachfolgenden `click` nicht auf. Der Container fängt beides: die direkten
+          Knöpfe UND das Dropdown-Menü, dessen Portal-Klick im Komponentenbaum hier
+          durchläuft. Ohne diese Zeile öffnete jeder Aktionsklick zusätzlich den
+          Zuweisungsdialog — beide Regressionstests werden ohne sie rot (gemessen). */}
+      <div
+        style={{ display: 'flex', gap: 4, height: 24, alignItems: 'center' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {belegtVon && !schreibgeschuetzt && (
           <>
             <Tooltip title="Verbleib / Entlassung erfassen">
@@ -292,6 +346,9 @@ function TransportSpalte({ personen, schreibgeschuetzt, onOeffnen }: { personen:
 /** Felder des Abschluss-Screens „Verbleib erfassen". */
 type VerbleibWerte = { art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string };
 
+/** Einziges Feld des Klick-Zuweisungswegs (LFH-367/B5g). */
+type ZuweisenWerte = { personId: number };
+
 export default function Grundriss({
   einsatzId, uhs, schreibgeschuetzt,
 }: { einsatzId: number; uhs: UhsDetail; schreibgeschuetzt: boolean }) {
@@ -321,6 +378,10 @@ export default function Grundriss({
   // Klick auf eine Patientenkarte öffnet den schlanken Detail-Drawer (nur ansehen).
   const [detailPersonId, setDetailPersonId] = useState<number | null>(null);
 
+  // Zielplatz des Klick-Zuweisungswegs (null = geschlossen).
+  const [zuweisenPlatz, setZuweisenPlatz] = useState<UhsPlatz | null>(null);
+  const [zuweisenForm] = Form.useForm<ZuweisenWerte>();
+
   const personenQuery = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
@@ -337,6 +398,10 @@ export default function Grundriss({
   function belegtAn(platzId: number): Person | undefined {
     return personenInUhs.find((p) => p.aktueller_platz_id === platzId);
   }
+  // Kandidaten des Zuweisungsdialogs — dieselbe Menge, die der Drag-Weg erreicht: die
+  // beiden linken Spalten. Der Wartebereich steht vorn, weil er im Betrieb der häufigere
+  // Fall ist (bereits aufgenommen, wartet auf einen Platz).
+  const zuweisbarePersonen = [...wartebereichPersonen, ...nichtAufgenommen];
 
   // Rechte Spalte: Personen, die aus DIESER UHS heraus auf Transport gingen. Quelle ist
   // die UHS-eigene Austritts-Historie (uhs.belegungen) ∩ aktueller Verbleib „Transport".
@@ -504,6 +569,17 @@ export default function Grundriss({
                   onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
                   onStorno={() => stornoMut.mutate(p.id)}
                   onOeffnen={setDetailPersonId}
+                  onZuweisen={() => {
+                    // Ohne Kandidaten gar nicht erst öffnen: der Dialog trüge einen
+                    // Primär-Knopf, der nichts erfasst und nur schliesst — eine tote
+                    // Hauptaktion. Die Hülle kennt keinen Weg, ihn zu unterdrücken,
+                    // und sie dafür umzubauen träfe alle ihre Aufrufer.
+                    if (zuweisbarePersonen.length === 0) {
+                      message.info('Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.');
+                      return;
+                    }
+                    setZuweisenPlatz(p);
+                  }}
                 />
               ))}
               {uhs.plaetze.length === 0 && (
@@ -561,6 +637,32 @@ export default function Grundriss({
         </Form.Item>
         <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
         <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+      </ErfassungsModal>
+
+      {/* Klick-Zuweisungsweg (LFH-367/B5g): der Ersatz für das Ziehen auf den Platz.
+          EIN Feld — das Feldbudget aus LFH-19 (Modal ≤ ~3) ist mit Abstand eingehalten;
+          der Platz steht im Titel, nicht als zweites Feld. Kein Serienmodus: der Zielplatz
+          ist je Vorgang ein anderer, ein „und nächste" hätte kein sinnvolles Nächstes. */}
+      <ErfassungsModal<ZuweisenWerte>
+        offen={zuweisenPlatz != null}
+        titel={zuweisenPlatz ? `Patient zuweisen — ${zuweisenPlatz.bezeichnung}` : 'Patient zuweisen'}
+        form={zuweisenForm}
+        laeuft={belegMut.isPending}
+        onErfassen={async (werte) => {
+          // `mutateAsync`, damit ein abgelehnter Serverruf die Auswahl stehen lässt
+          // (LFH-332: die Hülle leert erst, wenn die Zusage hält).
+          if (!zuweisenPlatz || werte.personId == null) return;
+          await belegMut.mutateAsync({ personId: werte.personId, platzId: zuweisenPlatz.id });
+        }}
+        onFertig={() => setZuweisenPlatz(null)}
+        onAbbrechen={() => setZuweisenPlatz(null)}
+      >
+        <Form.Item label="Patient" name="personId" rules={[{ required: true }]}>
+          <Select<number>
+            placeholder="Patient auswählen…"
+            options={zuweisbarePersonen.map((p) => ({ value: p.id, label: personLabel(p) }))}
+          />
+        </Form.Item>
       </ErfassungsModal>
 
       {/* Schlanker Detail-Drawer beim Klick auf eine Patientenkarte (nur ansehen). */}

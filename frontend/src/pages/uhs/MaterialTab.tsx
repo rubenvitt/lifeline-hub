@@ -71,8 +71,14 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
             description="Das Material wird nicht mehr dieser UHS zugeordnet."
             onConfirm={() => loesenMut.mutate(em.id)}
             okText="Lösen"
+            // Sonst bestätigt man die destruktive Aktion mit einem blauen Knopf
+            // (Konvention aus LFH-363).
+            okButtonProps={{ danger: true }}
           >
-            <Button size="small" danger>Lösen</Button>
+            {/* Ohne Größen-Prop: die Fläche erbt die Dichtestufe. Anders als die vier
+                Knöpfe der Platzkarte hängt diese Zelle an keiner Backend-Konstante —
+                die Tabelle wächst mit. */}
+            <Button danger>Lösen</Button>
           </Popconfirm>
         ) : null,
     },
