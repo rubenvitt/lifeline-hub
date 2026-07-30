@@ -10,13 +10,28 @@ const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
   beschreibung: null, gemeldet_von: null, aktualisiert_von: 1, erstellt_at: '', geaendert_at: '', ...over,
 });
 
-/** Der Eintrag wird IMMER über das geöffnete Menü gegriffen: antd lässt die Portale
- *  geschlossener Dropdowns im Baum stehen, ein globales getByText träfe auch sie.
- *  Muster aus `etb/EtbTabelle.test.tsx` (LFH-365 · B5e); in einer Matrix mit 58
- *  Auslösern liegt je bereits geöffneter Zelle ein eigenes totes Portal herum. */
+/**
+ * Der Eintrag wird IMMER über das geöffnete Menü gegriffen: antd lässt die Portale
+ * geschlossener Dropdowns im Baum stehen, ein globales getByText träfe auch sie.
+ * Muster aus `etb/EtbTabelle.test.tsx` (LFH-365 · B5e); in einer Matrix mit 58
+ * Auslösern liegt je bereits geöffneter Zelle ein eigenes totes Portal herum.
+ *
+ * `:not(.ant-dropdown-hidden)` allein GENÜGT HIER NICHT — gemessen an genau dem Fall,
+ * der zwei Zellen nacheinander öffnet. In jsdom läuft keine Bewegung zu Ende, das
+ * verlassende Portal bekommt seine `ant-dropdown-hidden`-Klasse also nie und bleibt in
+ * `ant-slide-up-leave-active` stehen. Der Baum trug dann zwei „offene" Dropdowns; der
+ * erste Treffer war das TOTE, und `userEvent` scheiterte an dessen `pointer-events:
+ * none` statt am Testgegenstand. Genau dieser Inline-Stil ist das verlässliche
+ * Unterscheidungsmerkmal, deshalb filtert er hier — und die Zählung ist streng, damit
+ * eine falsche Annahme laut wird statt still das falsche Menü zu greifen.
+ */
 function imMenue() {
-  const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
-  if (!menue) throw new Error('kein offenes Menü im Baum');
+  const offen = Array.from(
+    document.querySelectorAll<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden)'),
+  ).filter((d) => d.style.pointerEvents !== 'none');
+  if (offen.length !== 1) throw new Error(`genau ein offenes Menü erwartet, ${offen.length} gefunden`);
+  const menue = offen[0].querySelector('[role="menu"]');
+  if (!menue) throw new Error('das offene Dropdown trägt kein Menü');
   return within(menue as HTMLElement);
 }
 
@@ -40,9 +55,9 @@ function rendereMatrix(over: Partial<GefahrenMatrixProps> = {}) {
   return renderMitProviders(matrixElement(over));
 }
 
-/** Öffnet den Detail-Dialog der Zelle Brand × Menschen und wartet, bis er steht. */
-async function oeffneDetails(stufe: string) {
-  await userEvent.click(screen.getByRole('button', { name: `Bewertung Brand × Menschen: ${stufe}` }));
+/** Öffnet den Detail-Dialog einer Zelle der Zeile Brand und wartet, bis er steht. */
+async function oeffneDetails(stufe: string, spalte = 'Menschen') {
+  await userEvent.click(screen.getByRole('button', { name: `Bewertung Brand × ${spalte}: ${stufe}` }));
   await userEvent.click(imMenue().getByRole('menuitem', { name: 'Details …' }));
   return screen.findByLabelText('Beschreibung');
 }
@@ -122,8 +137,61 @@ describe('GefahrenMatrix', () => {
     await userEvent.type(feld, 'Dachstuhl brennt');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalled());
-    // Nicht geleert, nicht geschlossen — der Wortlaut ist teurer als der Klick.
+    // Zugesichert ist NUR: nicht geleert. Der Wortlaut ist teurer als der Klick.
+    // „Nicht geschlossen" stünde hier zu Unrecht — in jsdom läuft keine
+    // Verlass-Bewegung, `.ant-modal-wrap` bleibt auch nach ERFOLGREICHEM Speichern im
+    // Baum. Ein Schliesszustand ist hier also gar nicht beobachtbar; der Nachweis
+    // gehört nach Playwright.
     expect(await screen.findByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
+  });
+
+  /**
+   * Die Vorbelegung selbst — und sie war bis zum Review von KEINEM Fall gedeckt.
+   *
+   * Gemessen (Review-Mutationsprobe): vertauscht man die beiden Effekte in
+   * `GefahrenZelleDetails`, liest der Vorbeleg-Effekt beim Öffnen eine noch leere Ref,
+   * die Felder bleiben leer — und die Suite blieb trotzdem 20/20 grün. Fehlerbild in
+   * der Bedienung: der Bediener öffnet „Details …", sieht ein leeres Feld statt des
+   * Bestands, tippt den Meldeweg nach und speichert — die vorhandene Beschreibung ist
+   * weg. Stiller Datenverlust ohne roten Test.
+   *
+   * Warum die Nachbarfälle das NICHT fangen: „lässt den getippten Wortlaut stehen"
+   * tippt seinen Text selbst (ein `clear` auf ein bereits leeres Feld ist ein No-op),
+   * und „speichert die AKTUELLE Warnstufe" liest die Stufe aus `matrix`, nie aus dem
+   * Formular.
+   */
+  it('belegt den Dialog mit dem Bestand vor', async () => {
+    rendereMatrix({
+      matrix: [zelle({ warnstufe: 'hoch', beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW' })],
+    });
+    await oeffneDetails('hoch');
+    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl');
+    expect(screen.getByLabelText('Gemeldet von')).toHaveValue('KdoW');
+  });
+
+  /**
+   * Die Gegenrichtung: eine Zelle OHNE Bestand darf nicht den Rest der vorigen tragen.
+   *
+   * Was dieser Fall NICHT belegt: dass `kennung` in den Abhängigkeiten des
+   * Vorbeleg-Effekts steht. Über die Matrix ist ein Zellwechsel nur mit Schliessen
+   * dazwischen erreichbar, `offen` springt dabei um, und das allein löst den Effekt
+   * schon aus — gemessen: ohne `kennung` in den Abhängigkeiten bleibt diese Datei
+   * vollständig grün. Den Beleg dafür trägt `GefahrenZelleDetails.test.tsx` an der
+   * Vertragsgrenze der Komponente.
+   */
+  it('leert die Felder beim Wechsel auf eine Zelle ohne Bestand', async () => {
+    rendereMatrix({
+      matrix: [
+        zelle({ warnstufe: 'hoch', beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW' }),
+        zelle({ id: 2, schutzobjekt: 'tiere', warnstufe: 'mittel' }),
+      ],
+    });
+    await oeffneDetails('hoch');
+    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await oeffneDetails('mittel', 'Tiere');
+    expect(screen.getByLabelText('Beschreibung')).toHaveValue('');
+    expect(screen.getByLabelText('Gemeldet von')).toHaveValue('');
   });
 
   /**
