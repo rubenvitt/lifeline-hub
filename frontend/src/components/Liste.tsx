@@ -168,6 +168,11 @@ export function ListenEintrag({ children, actions, onClick, style, className }: 
         gap: token.padding,
         paddingBlock,
         paddingInline,
+        // Die Spread-Position ist TRAGEND, nicht Stil (LFH-366): ein Aufrufer, der einen
+        // Trefflächenboden setzt, übergibt die Kurzform `padding` (`bedienzielStil` in
+        // `pages/lagekarte/Sidebar.tsx`), und die gewinnt nur, weil sie SPÄTER deklariert wird.
+        // Nach vorn gezogen fiele die Polsterungshälfte der „ZWEI Angaben"-Konvention still weg,
+        // während `minHeight` überlebt — und kein Test sähe es.
         ...style,
       }}
     >

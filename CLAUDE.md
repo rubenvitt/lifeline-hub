@@ -143,8 +143,18 @@ Alltag wichtigsten:
   und die klickbare Zeile als Ganzes ist B7/LFH-335 zugeordnet. **Kein Guard sieht diese Fälle** — ein
   Pixel-Padding ist keine Größen-Prop —, die Zusicherung muss also von Hand kommen. Prüfbar ist der
   **Inline-Style**, nicht ein Pixel (jsdom rechnet kein Layout): die belastbare Behauptung ist die
-  Ungleichheit über zwei Dichtestufen plus die Böden 24/48/72 als **Literale** hingeschrieben —
+  Ungleichheit über zwei Dichtestufen plus die Böden als **Literale** hingeschrieben —
   aus dem Token zurückgelesen prüfte sie den Token gegen sich selbst.
+  **Welches Zahlentripel, hängt am Token** (Klarstellung aus dem LFH-366-Review, hier standen
+  vorher zwei Präzedenzen mit verschiedenen Zahlen unter einer): `controlHeight` = **30/48/72**,
+  `controlHeightSM` = **24/48/72**. `etb/SlashMenu.test.tsx` prüft gegen `controlHeightSM` und
+  deshalb als *untere Schranke*; `pages/lagekarte/Sidebar.test.tsx` prüft `controlHeight` auf
+  *Gleichheit*. Wer `toBe(24)` gegen `controlHeight` schreibt, prüft das falsche Tripel.
+  **Ist die Fläche ein `ListenEintrag`** (`components/Liste.tsx`), trägt der die Kurzform
+  `padding` aus dem übergebenen `style` — er setzt selbst `paddingBlock`/`paddingInline` und
+  spreizt `...style` **danach**, die spätere Deklaration gewinnt. Das ist heute richtig und
+  ungetestet: zöge jemand den Spread nach vorn, fiele die Polsterungshälfte still weg, während
+  `minHeight` überlebt. Der Kommentar an der Spread-Zeile sagt das; wer sie anfasst, liest ihn.
 - **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e nach dem Vorbild von
   LFH-364). Ab drei Aktionen an einer Zeile oder Karte: ein `Dropdown` mit `menu={{ items }}`,
   `trigger={['click']}`, `autoFocus` und einem icon-only `<Button type="text">` — kein `Popover`

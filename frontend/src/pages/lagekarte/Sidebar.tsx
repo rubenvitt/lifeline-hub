@@ -189,6 +189,31 @@ function VeraltetSlot({ fehler }: { fehler?: SektionFehler }) {
 }
 
 /**
+ * Das Bild, dessen Entfernen gerade bestätigt werden soll — oder `null`, wenn es keins (mehr)
+ * gibt (LFH-366 · B5f, Review-Fund G2).
+ *
+ * Warum nicht einfach `loeschBildId != null`: die Bildliste kommt über den SSE-Fan-out und kann
+ * sich ändern, WÄHREND die Rückfrage offensteht — ein zweiter Bediener entfernt dasselbe Bild.
+ * Gemessen an einem `rerender` ohne das Bild blieb der Dialog dann offen, sein Titel fiel auf
+ * `Bild „" entfernen?` zurück, und „Entfernen" schickte ein DELETE auf ein Objekt, das es nicht
+ * mehr gibt. Der Zustand, den der Dialog beschreibt, ist die ZEILE, nicht die Nummer.
+ *
+ * Rein und exportiert aus demselben Grund wie {@link bedienzielStil}: die Aussage ist am DOM
+ * nicht führbar. antd löst die Schliess-Animation eines `<Modal>` über `transitionend` auf, das
+ * in jsdom nie feuert — nach `open={false}` steht der Knopf weiter im Baum (gemessen), und die
+ * naheliegende Zusicherung `queryByRole('button') → null` wäre rot, obwohl die Härtung greift.
+ * Eine Zusicherung auf antds `ant-zoom-leave` hinge dagegen an einer Animationsklasse, die beim
+ * nächsten Bump wandert. Also wird geprüft, was die Entscheidung trägt, statt wie sie aussieht.
+ */
+export function loeschDialogBild<T extends { id: number; name: string }>(
+  bilder: readonly T[],
+  id: number | null,
+): T | null {
+  if (id == null) return null;
+  return bilder.find((b) => b.id === id) ?? null;
+}
+
+/**
  * Trefflächenboden für ein HANDGEBAUTES Bedienziel (LFH-366 · B5f, Konvention aus LFH-365).
  *
  * Die Einträge der Karte „Verortet" sind klickbar, aber kein antd-Steuerelement: `ListenEintrag`
@@ -629,8 +654,21 @@ export default function Sidebar(props: SidebarProps) {
                               icon: <AimOutlined />,
                               label: imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren',
                             },
-                            // Die räumliche Trennung zwischen destruktiver und harmloser Aktion
-                            // (AK2): im Menü ist sie der Trenner, nicht ein `<Space size>`.
+                            /*
+                             * Die Trennung zwischen destruktiver und harmloser Aktion (AK2): im
+                             * Menü ist sie der Trenner, nicht ein `<Space size>`.
+                             *
+                             * Die Grenze davon gehört dazu, sonst behauptet der Kommentar mehr als
+                             * die Sache trägt: der Trenner trennt **visuell** — eine sichtbare
+                             * Linie, ein zweiter Kanal, den der abgelöste `<Space size={4}>` nie
+                             * hatte. Sein eigener Weissraum skaliert aber NICHT mit der Dichte:
+                             * antd rechnet ihn aus `lineWidth` (`menu/style/index.js`:
+                             * `marginBlock` + `borderTopWidth`), und `theme/tokens.ts` fasst
+                             * `lineWidth` nicht an — also ~3 px in jeder Stufe. Was mitzieht, sind
+                             * die Zeilenhöhen des Menüs (`itemHeight` ← `controlHeightLG`); die
+                             * beiden Ziele stehen im Handschuh-Betrieb also weit auseinander,
+                             * nicht weil der Trenner wächst, sondern weil sie es tun.
+                             */
                             { type: 'divider' as const },
                             {
                               key: 'loeschen',
@@ -754,8 +792,11 @@ export default function Sidebar(props: SidebarProps) {
         Baum trügen n gleichnamige Knöpfe.
       */}
       <Modal
-        open={loeschBildId != null}
-        title={`Bild „${props.bilder.find((b) => b.id === loeschBildId)?.name ?? ''}" entfernen?`}
+        // Eine Quelle für Sichtbarkeit UND Titel (siehe `loeschDialogBild`): fällt das Bild
+        // während der Rückfrage aus der Liste, schliesst der Dialog, statt einen leeren Namen
+        // zu zeigen und ein DELETE auf ein totes Objekt anzubieten.
+        open={loeschDialogBild(props.bilder, loeschBildId) != null}
+        title={`Bild „${loeschDialogBild(props.bilder, loeschBildId)?.name ?? ''}" entfernen?`}
         okText="Entfernen"
         okButtonProps={{ danger: true }}
         cancelText="Abbrechen"

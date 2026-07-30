@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import Sidebar, { bedienzielStil } from './Sidebar';
+import Sidebar, { bedienzielStil, loeschDialogBild } from './Sidebar';
 import type { SidebarProps } from './Sidebar';
 import { dichten } from '../../theme/tokens';
 
@@ -633,5 +633,39 @@ describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
     expect(bedienzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
     expect(bedienzielStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+  });
+});
+
+/**
+ * Nebenläufigkeit an der Löschbestätigung (Review-Fund G2 zu LFH-366).
+ *
+ * Die Bildliste kommt über den SSE-Fan-out und kann sich ändern, WÄHREND die Rückfrage
+ * offensteht — ein zweiter Bediener entfernt dasselbe Bild. Hing die Sichtbarkeit des Dialogs
+ * an `loeschBildId != null`, blieb er stehen, sein Titel fiel auf `Bild „" entfernen?` zurück,
+ * und „Entfernen" bot ein DELETE auf ein Objekt an, das es nicht mehr gab.
+ *
+ * Geprüft wird die REINE FUNKTION, nicht das gerenderte Modal — die Begründung steht bei
+ * `loeschDialogBild`: antd löst die Schliess-Animation über `transitionend` auf, das in jsdom
+ * nie feuert, also bliebe der Knopf gemessen im Baum und die naheliegende DOM-Zusicherung wäre
+ * rot, obwohl die Härtung greift.
+ */
+describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
+  const bilder = [
+    { id: 1, name: 'Lageplan' },
+    { id: 2, name: 'Übersicht' },
+  ];
+
+  it('findet das Bild zur Kennung — Titel und Sichtbarkeit aus einer Quelle', () => {
+    expect(loeschDialogBild(bilder, 2)?.name).toBe('Übersicht');
+  });
+
+  it('liefert null, sobald das Bild aus der Liste fällt', () => {
+    expect(loeschDialogBild(bilder, 1)).not.toBeNull();
+    // Derselbe Zustand nach einem SSE-Update, das genau dieses Bild entfernt hat:
+    expect(loeschDialogBild(bilder.filter((b) => b.id !== 1), 1)).toBeNull();
+  });
+
+  it('liefert null, wenn gar keine Rückfrage offensteht', () => {
+    expect(loeschDialogBild(bilder, null)).toBeNull();
   });
 });
