@@ -36,7 +36,12 @@ export interface Farbrollen {
   marke: string;
   markeGlut: string;
   alarmFuellung: string;
+  /** Zweite Intensität derselben Rolle — die obere Hälfte einer Flächenskala
+   *  (LFH-368 · B5h). KEIN neuer Farbton: `alarm` in stärkerer Füllung. */
+  alarmFuellungStark: string;
   achtungFuellung: string;
+  /** Zweite Intensität von `achtung` — Gegenstück zu {@link Farbrollen.alarmFuellungStark}. */
+  achtungFuellungStark: string;
   normalFuellung: string;
 }
 
@@ -57,7 +62,9 @@ export const farbenHell: Farbrollen = {
   marke: '#a8071a',
   markeGlut: '0 0 10px 0 rgba(168, 7, 26, 0.3)',
   alarmFuellung: 'rgba(176, 35, 24, 0.07)',
+  alarmFuellungStark: 'rgba(176, 35, 24, 0.2)',
   achtungFuellung: 'rgba(122, 82, 0, 0.08)',
+  achtungFuellungStark: 'rgba(122, 82, 0, 0.2)',
   normalFuellung: 'rgba(28, 102, 64, 0.07)',
 };
 
@@ -78,7 +85,9 @@ export const farbenDunkel: Farbrollen = {
   marke: '#e04552',
   markeGlut: '0 0 12px 0 rgba(224, 69, 82, 0.55)',
   alarmFuellung: 'rgba(255, 122, 127, 0.1)',
+  alarmFuellungStark: 'rgba(255, 122, 127, 0.24)',
   achtungFuellung: 'rgba(245, 185, 66, 0.1)',
+  achtungFuellungStark: 'rgba(245, 185, 66, 0.24)',
   normalFuellung: 'rgba(92, 196, 141, 0.1)',
 };
 
