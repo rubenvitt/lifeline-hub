@@ -125,7 +125,7 @@ Weil dieser Helfer privat ist (`:236`), lebt sie in `statusFarben.ts` — nicht 
 | `frontend/src/pages/gefahren/GefahrenMatrix.test.tsx` | 3 der 4 Fälle neu geschrieben, Fall 1 bleibt |
 | `frontend/src/components/dichte.guard.test.ts` | B5h-Block (`:151-153`) entfällt vollständig |
 | `frontend/src/components/katalogTabelle.guard.test.ts` | Ausnahme-Kommentar `:271-275` nachgezogen |
-| `CLAUDE.md` | Schuldmengenzahl 41/20 → 36/18, B5h-Festlegungen |
+| `CLAUDE.md` | Schuldmengenzahl 24/13 → 19/11, B5h-Festlegungen |
 | `docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md` | **neu** — Prüfliste Einsatztauglichkeit (15 Kriterien) |
 
 ---
@@ -1155,8 +1155,9 @@ Stattdessen bleibt eine Zeile in der Erledigt-Reihe darüber:
 - [ ] **Step 2: Guard-Lauf über alles**
 
 Run: `mise exec pnpm@10 -- pnpm -C <abs>/frontend exec vitest run src/components/dichte.guard.test.ts src/components/katalogTabelle.guard.test.ts`
-Expected: PASS. Die verbleibende Schuld ist **36 in 18 Dateien** — wenn der Guard eine andere Zahl
-nennt, gilt seine.
+Expected: PASS. Die verbleibende Schuld ist **19 in 11 Dateien** (Baseline 24/13 am 30.07.2026
+nach dem Rebase auf LFH-366/367/369, minus unsere 5) — **wenn der Guard eine andere Zahl nennt,
+gilt seine**, und dann wandert sie auch so nach CLAUDE.md.
 
 - [ ] **Step 3: Den Ausnahme-Kommentar der Katalogtabelle nachziehen**
 
@@ -1195,8 +1196,10 @@ Expected: PASS. Mutationsprobe: `sticky` in der Matrix entfernen → dieser Fall
 
 - [ ] **Step 4: CLAUDE.md — die Zahl und die zwei Festlegungen**
 
-Im Dichte-Absatz die Schuldmenge fortschreiben: `41 Stellen in 20 Dateien` → **`36 Stellen in 18
-Dateien`**, Stand-Klammer auf `nach LFH-363 + LFH-364 + LFH-365 + LFH-368`. Im Statusfarb-Absatz
+Im Dichte-Absatz die Schuldmenge fortschreiben: `24 Stellen in 13 Dateien` → **`19 Stellen in 11
+Dateien`**, Stand-Klammer von `nach LFH-363 bis LFH-367` auf `nach LFH-363 bis LFH-369`
+erweitern. **Vor dem Schreiben den Ist-Stand der Zeile lesen** — auf `main` laufen parallele
+Bündel, die Zahl kann sich seit dem Messen wieder bewegt haben; dann gilt die frische Messung. Im Statusfarb-Absatz
 („Rot bedient nichts") einen Satz ergänzen:
 
 ```markdown
@@ -1241,7 +1244,7 @@ Gedächtnis. Auflagen:
   Detail-Dialog **nicht** mehr „nicht anwendbar": er läuft über `ErfassungsModal`, also gelten
   Labels über dem Feld, Enter-Absenden und Tastaturbedienung.
 - Die Baseline-Tabelle nennt: Klein-Angaben in `pages/gefahren/` **5 → 0**, Schuldzeilen **2 → 0**,
-  Restschuld des Guards **41/20 → 36/18**, Zellbreite **~142,5 → ~40** (kompakt), Auslöser je Zelle
+  Restschuld des Guards **24/13 → 19/11**, Zellbreite **~142,5 → ~40** (kompakt), Auslöser je Zelle
   **2 → 1**.
 
 - [ ] **Step 6: Volles Gate**
