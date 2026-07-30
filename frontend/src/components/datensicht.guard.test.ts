@@ -530,7 +530,15 @@ const VERBOTEN_IM_PRIMITIV: readonly { muster: RegExp; grund: string }[] = [
     muster: elementMuster('Card'),
     grund: 'die Kartenform ist Liste/ListenEintrag — ein Rahmen doppelt die li-Trennlinie',
   },
-  { muster: /size="small"/g, grund: 'neue Klein-Varianten auf interaktiven Elementen sind verboten' },
+  {
+    // Bewusster Doppelgurt neben `dichte.guard.test.ts` (LFH-362), das dieselbe Norm
+    // repoweit trägt: jenes greift nur an INTERAKTIVEN Elementen, dieses hier an
+    // jedem. Im Primitiv ist das enger gemeint — auch eine Fläche darf ihre
+    // Polsterung nicht festnageln, weil sie die Kartenhöhe aller Konsumenten setzt.
+    // Entfällt dieser Eintrag, sinkt die Abdeckung; er ist keine Dublette.
+    muster: /size="small"/g,
+    grund: 'neue Klein-Varianten auf interaktiven Elementen sind verboten',
+  },
   { muster: /matchMedia|\buseBreakpoint\b/g, grund: 'die Breitenfrage läuft über useViewport' },
 ];
 
