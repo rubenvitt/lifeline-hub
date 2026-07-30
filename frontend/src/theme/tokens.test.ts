@@ -50,9 +50,36 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
     expect(abstand).toBe(dichten.kompakt.abstand);
   });
 
+  // Handgeschriebene Literale, KEIN Rückgriff auf `dichten.x.kleineZeilenhoehe`:
+  // sonst prüfte der Test die Konstante gegen sich selbst und bliebe grün, wenn
+  // die Staffel verrutscht (Byte-Pin-Lektion aus der Query-Key-Registry).
+  it('setzt die kleine Steuerhöhe je Stufe auf den A1-Gate-3-Boden (LFH-361 · B5a)', () => {
+    expect(dichten.kompakt.kleineZeilenhoehe).toBe(24);
+    expect(dichten.komfortabel.kleineZeilenhoehe).toBe(48);
+    expect(dichten.handschuh.kleineZeilenhoehe).toBe(72);
+  });
+
   it('setzt controlHeight und fontSize aus der gewählten Stufe', () => {
     expect(tokenFuer('handschuh').controlHeight).toBe(72);
     expect(tokenFuer('komfortabel').fontSize).toBe(15);
+  });
+
+  /**
+   * Der Kern von B5a. Ohne diesen Token leitet antd `controlHeightSM` mit dem
+   * Faktor 0,75 aus `controlHeight` ab (`genControlHeight.js`) — komfortabel
+   * ergäbe 36 px und risse damit den Gate-3-Boden von 48.
+   *
+   * Der zweite `expect` je Stufe ist die eigentliche Aussage: er schließt aus,
+   * dass hier zufällig derselbe Wert steht, den antd ohnehin gerechnet hätte.
+   * Nur bei `komfortabel`/`handschuh` fallen Boden und Zeilenhöhe zusammen —
+   * dort ist die Abgrenzung gegen 0,75 × Zeilenhöhe der ganze Beweis.
+   */
+  it('reicht die kleine Steuerhöhe durch, statt sie antd ableiten zu lassen', () => {
+    for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const t = tokenFuer(stufe);
+      expect(t.controlHeightSM).toBe(dichten[stufe].kleineZeilenhoehe);
+      expect(t.controlHeightSM).not.toBe(dichten[stufe].zeilenhoehe * 0.75);
+    }
   });
 
   it('führt die Stufe bis in die Abstände durch, nicht nur bis zur Steuerhöhe', () => {

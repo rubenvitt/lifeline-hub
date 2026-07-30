@@ -73,6 +73,7 @@ export default function Schnellerfassung({
   const navigate = useNavigate();
   const textRef = useRef<TextAreaRef>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
+  const feldKnopfRef = useRef<HTMLButtonElement>(null);
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
@@ -115,6 +116,29 @@ export default function Schnellerfassung({
     textRef.current?.focus();
   }, []);
 
+  /**
+   * Klick daneben schliesst das Menü. Vorher gab es ohne Auswahl überhaupt keinen Weg
+   * hinaus ausser Escape oder einem zweiten Druck auf denselben Knopf.
+   *
+   * Zwei Ausnahmen, beide notwendig: Das **Menü selbst**, weil seine Einträge über
+   * `onMouseDown` wählen und `pointerdown` davor läuft — würde hier geschlossen, wäre
+   * der Eintrag beim Klick schon weg und die Auswahl per Maus tot. Und der
+   * **Feld-Knopf**, der selbst umschaltet: sonst schlösse dieser Effekt zuerst und der
+   * Klick öffnete danach wieder, der Knopf könnte also nie schliessen.
+   */
+  useEffect(() => {
+    if (!menuOffen) return;
+    function beiZeigerAb(ereignis: PointerEvent) {
+      const ziel = ereignis.target;
+      const el = ziel instanceof Element ? ziel : (ziel as Node | null)?.parentElement ?? null;
+      if (el?.closest('[data-slash-menu]')) return;
+      if (el && feldKnopfRef.current?.contains(el)) return;
+      setMenuOffen(false);
+    }
+    document.addEventListener('pointerdown', beiZeigerAb);
+    return () => document.removeEventListener('pointerdown', beiZeigerAb);
+  }, [menuOffen]);
+
   const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => metadaten[f] != null);
 
   // Der Schalter erscheint nur ausserhalb der Berichtigung und nur, wenn ein Aufrufer den
@@ -142,16 +166,25 @@ export default function Schnellerfassung({
     aktualisiereTrigger(neu, caret);
   }
 
+  /**
+   * Entfernt NUR den „/…"-Text, der das Menü ausgelöst hat. Schliesst bewusst nicht
+   * mit — das tut `waehleEintrag`. Bis zum 30.07.2026 hing das Schliessen hier mit
+   * drin, hinter dem frühen Ausstieg: wer das Menü über den Feld-Knopf öffnete, hatte
+   * `triggerStart === -1` (es gibt keinen Trigger-Text), und das Menü blieb nach der
+   * Auswahl stehen. Es liegt absolut über der Chip-Leiste und verdeckte damit genau
+   * den Chip-Editor, der gerade aufgegangen war.
+   */
   function entferneTriggerText() {
     if (triggerStart < 0) return;
     const ta = textRef.current?.resizableTextArea?.textArea;
     const caret = ta?.selectionStart ?? inhalt.length;
     setInhalt(inhalt.slice(0, triggerStart) + inhalt.slice(caret));
-    setMenuOffen(false);
   }
 
   function waehleEintrag(e: SlashEintrag) {
     entferneTriggerText();
+    // Auf JEDEM Weg hinaus, unabhängig davon, wie das Menü aufging.
+    setMenuOffen(false);
     if (e.art === 'feld') {
       setEditFeld(e.key as MetaFeld);
     } else {
@@ -276,6 +309,7 @@ export default function Schnellerfassung({
           />
         )}
         <Button
+          ref={feldKnopfRef}
           type="dashed"
           icon={<PlusOutlined />}
           onClick={() => { setMenuFilter(''); setTriggerStart(-1); setMenuOffen((o) => !o); }}

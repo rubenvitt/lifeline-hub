@@ -32,8 +32,11 @@ import type { Breakpoint } from 'antd';
  * `pointer` beschreibt den PRIMÄREN Zeiger. Konservativ gewählt: `any-pointer` schlüge auch
  * am Fükw-Laptop mit Touchscreen an und erzwänge dort dauerhaft größere Trefflächen. Der
  * Preis ist das 2-in-1-Führungstablet mit angesteckter Tastatur, das dann `fine` meldet.
- * Was aus `istBeruehrung` folgt (Dichtestufe, Trefflächen), entscheidet ohnehin erst B5;
- * hier wird nur das Signal festgenagelt. Die Bauform — Abfrage einmal im
+ * Was aus dem Signal folgt, entscheidet B5: seit LFH-361 belegt es über
+ * {@link zeigerIstGrob} die Dichtestufe vor, wenn noch keine Wahl gespeichert ist.
+ * Der Preis oben ist damit real geworden — das 2-in-1 mit Tastatur startet kompakt und
+ * muss von Hand umgeschaltet werden. Bewusst so: lieber eine Stufe zu eng anbieten als
+ * einen Umschalter, der sich beim Neuladen selbst zurückdreht. Die Bauform — Abfrage einmal im
  * `useState`-Initialisierer lesen, Änderung über einen `change`-Zuhörer im Effekt — folgt
  * `theme/ThemeModeProvider.tsx`, das die Dunkelmodus-Frage genauso stellt.
  *
@@ -73,7 +76,23 @@ export function abBreiteAus(screens: ScreensKarte, punkt: AbBreitePunkt): boolea
   return screens[punkt] !== false;
 }
 
-function zeigerIstGrob(): boolean {
+/**
+ * Einmalige Momentaufnahme der Zeigerart, ohne Hook und ohne Zuhörer.
+ *
+ * Exportiert für Aufrufer, die die Frage VOR dem ersten Render stellen müssen
+ * und deshalb keinen Hook nehmen können — heute genau einer: die Vorbelegung
+ * der Dichtestufe in `theme/ThemeModeProvider.tsx` (LFH-361 · B5a), die im
+ * `useState`-Initialisierer entschieden wird.
+ *
+ * Sie steht bewusst HIER und nicht dort: der Viewport-Guard verlangt, dass
+ * Medienabfragen im Primitiv liegen, und `ThemeModeProvider.tsx` ist nur für
+ * die Dunkelmodus-Frage freigestellt. Eine zweite, handgeschriebene
+ * Zeigerabfrage dort liefe zwar durch die Datei-Freistellung, machte aber
+ * deren Begründung unwahr — ohne dass ein Test rot würde.
+ *
+ * Wer auf ÄNDERUNGEN reagieren muss, nimmt {@link useViewport}, nicht dies.
+ */
+export function zeigerIstGrob(): boolean {
   return window.matchMedia(ZEIGER_GROB).matches;
 }
 

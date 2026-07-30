@@ -112,8 +112,9 @@
 }
 
 /* ── Dichte-Staffel (A1 Festlegung 4 · LFH-328/A2) ─────────────────────────
-   TRÄGER, KEIN SCHALTER: diese beiden Blöcke existieren, werden in A2 aber von
-   NICHTS gesetzt. Die Umschaltung (Kontext-Erkennung, Benutzerwahl) ist B5.
+   Geschaltet wird von `theme/ThemeModeProvider.tsx`, und nur von dort: es setzt
+   das Merkmal am `<html>` (Benutzerwahl seit LFH-329/B1, Vorbelegung aus der
+   Zeigerart seit LFH-361/B5a). `rollen.guard.test.ts` erzwingt den einen Setzer.
    Sie überschreiben ausschließlich die Dichte-Properties — Farbe, Form, Stimme
    und Schrift sind dichteunabhängig; `rollen.guard.test.ts` prüft genau das als
    Partition, damit hier nichts Fremdes einsickert.

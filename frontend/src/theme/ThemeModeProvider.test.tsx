@@ -22,6 +22,7 @@ import userEvent from '@testing-library/user-event';
 import { theme } from 'antd';
 import { ThemeModeProvider, useDichte } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
+import { setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
 
 const STUFEN: Dichte[] = ['kompakt', 'komfortabel', 'handschuh'];
 const SPEICHER_SCHLUESSEL = 'lifeline-hub.dichte';
@@ -32,6 +33,10 @@ const SPEICHER_SCHLUESSEL = 'lifeline-hub.dichte';
 function masse(token: ReturnType<typeof theme.useToken>['token']) {
   return {
     controlHeight: token.controlHeight,
+    // Der Durchstich-Beweis für LFH-361: `tokens.test.ts` prüft `antdToken()`
+    // isoliert, hier steht die Sonde IM Provider und belegt, dass die kleine
+    // Höhe die antd-Ableitung (× 0,75) tatsächlich schlägt.
+    controlHeightSM: token.controlHeightSM,
     fontSize: token.fontSize,
     padding: token.padding,
     paddingSM: token.paddingSM,
@@ -48,6 +53,7 @@ function erwartet(stufe: Dichte) {
   const s = dichten[stufe];
   return {
     controlHeight: s.zeilenhoehe,
+    controlHeightSM: s.kleineZeilenhoehe,
     fontSize: s.schriftgroesse,
     padding: s.abstand.md,
     paddingSM: s.abstand.sm,
@@ -93,6 +99,9 @@ const gemesseneMasse = () => JSON.parse(screen.getByTestId('masse').textContent!
 afterEach(() => {
   delete document.documentElement.dataset.dichte;
   delete document.documentElement.dataset.theme;
+  // Seit LFH-361 liest der Provider die Zeigerart. Ohne diesen Rückbau trüge
+  // ein Test seine Zeigerannahme in die Nachfolger.
+  setzeViewportZurueck();
 });
 
 describe('Bediendichte — Zustand und Persistenz (LFH-329 · B1)', () => {
@@ -122,6 +131,48 @@ describe('Bediendichte — Zustand und Persistenz (LFH-329 · B1)', () => {
 
     zeigeSonde();
     expect(stufe()).toBe('handschuh');
+  });
+});
+
+/**
+ * Die Ableitung aus dem Einsatzkontext (LFH-361 · B5a).
+ *
+ * Bewusst NUR als Vorbelegung: das Kontextsignal entscheidet, womit jemand
+ * anfängt, nie was er gewählt hat. Eine Ableitung, die die gespeicherte Wahl
+ * überstimmt, wäre auf dem 2-in-1-Tablet mit angesteckter Tastatur ein
+ * Umschalter, der sich beim Neuladen selbst zurückdreht.
+ *
+ * Es gibt deshalb KEINE vierte Stufe `automatisch` analog zu `ThemeModus`:
+ * die Wahl bleibt die effektive Stufe, und der Provider braucht keinen zweiten
+ * Typ, den vier Bedienwege mittragen müssten.
+ */
+describe('Bediendichte — Ableitung aus der Zeigerart (LFH-361 · B5a)', () => {
+  it('grober Zeiger ohne gespeicherte Wahl beginnt bei komfortabel', () => {
+    setzeZeigerGrob(true);
+    zeigeSonde();
+    expect(stufe()).toBe('komfortabel');
+  });
+
+  it('die gespeicherte Wahl schlägt das Kontextsignal', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'kompakt');
+    setzeZeigerGrob(true);
+    zeigeSonde();
+    expect(stufe()).toBe('kompakt');
+  });
+
+  // Ohne diesen Fall wäre der erste Test auch dann grün, wenn die Ableitung
+  // pauschal `komfortabel` lieferte, statt den Zeiger zu lesen.
+  it('feiner Zeiger ohne gespeicherte Wahl bleibt bei kompakt', () => {
+    setzeZeigerGrob(false);
+    zeigeSonde();
+    expect(stufe()).toBe('kompakt');
+  });
+
+  it('ein unbekannter gespeicherter Wert fällt auf das Kontextsignal zurück, nicht auf kompakt', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'riesig');
+    setzeZeigerGrob(true);
+    zeigeSonde();
+    expect(stufe()).toBe('komfortabel');
   });
 });
 
