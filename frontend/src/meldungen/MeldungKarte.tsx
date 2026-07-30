@@ -90,8 +90,8 @@ export default function MeldungKarte({
   //     keine Nebenwirkung einer Dichte-Aufgabe.
   //
   // Das verbindliche Kriterium von B5 ist die TREFFFLÄCHE, und die trägt jetzt der
-  // `ConfigProvider`. Die Kartenhöhe bei sechs offenen Aktionen bleibt offen und gehört
-  // in ein eigenes Ticket, das die Menüform samt Testumbau verantwortet.
+  // `ConfigProvider`. Die Kartenhöhe bei sechs offenen Aktionen bleibt offen und liegt
+  // als LFH-372 (B5k) auf dem Board — dort samt dem Testumbau, den sie erzwingt.
   const aktionen: ReactNode[] = darfSchreiben
     ? [
         m.bestaetigung_pflicht && !m.ist_bestaetigt && onBestaetigen

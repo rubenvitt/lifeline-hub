@@ -63,8 +63,16 @@ export default function AuftragKarte({
   const sichtbareEmpf = a.empfaenger.slice(0, 3);
   const restEmpf = a.empfaenger.length - sichtbareEmpf.length;
   const details = gefuellteFelder(a);
-  // Nur die SICHTBAREN Empfänger bekommen eine Aktion: für die hinter „+n" fehlt der
-  // Name, und ein Knopf ohne benannten Adressaten ist nicht quittierbar.
+  // Nur die SICHTBAREN Empfänger bekommen eine Aktion — aus Layoutgründen, damit die
+  // Aktionszeile kurz bleibt. Die Daten wären da: `a.empfaenger` trägt jeden Empfänger
+  // mit `snap_anzeige` (`src/auftrag/repo.rs`/`empfaenger_von` hat kein LIMIT), nur die
+  // ANZEIGE ist auf drei geschnitten.
+  // Damit bleibt eine Lücke, die der Bestand vor LFH-364 genauso hatte (der
+  // `Typography.Link` sass in derselben `slice(0, 3)`): sind die ersten drei quittiert
+  // und ein vierter offen, verschwindet die Zeile und der Auftrag ist nicht mehr voll
+  // quittierbar — womit `empfaenger_anzahl == quittiert_anzahl` in
+  // `src/routes/auftrag.rs` nie wahr wird und die Auto-Erinnerung aus LFH-118 nicht
+  // schliesst. Eigener Task, siehe LFH-371.
   const offeneQuittungen = darfSchreiben && onQuittieren
     ? sichtbareEmpf.filter((e) => !e.quittiert_at)
     : [];

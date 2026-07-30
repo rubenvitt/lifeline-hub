@@ -43,14 +43,24 @@
  *   • einen FUNKTIONSTYP im Typargument (`<Select<(x: N) => S> size="small">`) —
  *     dessen `=>` beendet für {@link generikEnde} die Klammer zu früh. Im Bestand
  *     kommt das an keiner der 25 Generic-Stellen vor; wer es einführt, umgeht die
- *     Norm.
+ *     Norm;
+ *   • eine geschweifte Klammer in einem REGEX-Literal einer Prop
+ *     (`onClick={() => s.replace(/}/g, '')} size="small"`) — {@link tagEnde} kennt
+ *     Zeichenketten, aber keine Regex-Literale, und beendet das Tag dort zu früh.
+ *     Altlast, unabhängig von LFH-364 (der Scanner davor war genauso blind).
  *
- * ── Die drei nicht-interaktiven Kleinflächen der Kommunikationskarten ───────────
- * `meldungen/MeldungKarte.tsx`, `meldungen/MeldungFormular.tsx` und
- * `auftraege/AuftragKarte.tsx` tragen je eine `<Card size="small">`. Sie sind
- * ABSICHT, kein Rest von LFH-364: eine Karte polstert, sie trifft nicht. Sie stehen
- * bewusst NICHT in {@link OFFEN} — `Card` ist strukturell außerhalb von
- * {@link INTERAKTIV}, ein Eintrag dafür wäre unbelegt und färbte den Guard rot.
+ * ── Warum die Klein-Angaben an Karten, Beschreibungen und Listen STEHEN BLEIBEN ──
+ * Nicht als Restarbeit, sondern als Regel — sonst vergrößert der nächste Sweep
+ * Flächen, die niemand antippt. Ein Element, das nicht in {@link INTERAKTIV} steht
+ * (`Card`, `Descriptions`, `Space`, `Spin`) oder in {@link EIGENE_SEMANTIK}
+ * (`Liste`, `KatalogTabelle`), trägt mit `size` eine POLSTERUNG, keine Trefffläche.
+ * Es gehört deshalb auch nicht in {@link OFFEN}: `befunde` markiert einen Eintrag nur
+ * als belegt, wenn {@link stellenIn} dort etwas findet — ein Eintrag für eine
+ * nicht-interaktive Fläche wäre also sofort eine „tote Schuld-Ausnahme" und färbte
+ * den Guard rot. Wer diese Ausnahme dokumentieren will, tut es hier und nicht in der
+ * Schuldliste. (Das AK von LFH-364 verlangte genau das Gegenteil und war darin
+ * falsch; es sprach zudem von „drei" Karten, während allein das B5d-Bündel zwölf
+ * trägt — eine handgezählte Inventarliste verrottet, die Regel nicht.)
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -119,7 +129,7 @@ const OFFEN: string[] = [
   // B5c (stammdaten/ und Verwaltung) ist mit LFH-363 abgetragen — 24 Stellen in
   // 10 Dateien. Der Abstand zur destruktiven Nachbaraktion, der dort auf denselben
   // Zeilen saß, hält seither `aktionsabstand.guard.test.ts`.
-  // ── B5d · Kommunikationskarten (LFH-364) ── ABGERÄUMT, 23 Stellen in 12 Dateien.
+  // ── B5d · Kommunikationskarten (LFH-364) ── ABGERÄUMT, 24 Stellen in 12 Dateien.
   // ── B5e · Einsatztagebuch (LFH-365) ───────────────────────────────────────
   '/src/etb/BuchstabierHilfe.tsx',
   '/src/etb/MetaChip.tsx',
@@ -150,7 +160,7 @@ const OFFEN: string[] = [
   '/src/pages/SchaedenDetailPage.tsx',
   '/src/pages/TiereDetailPage.tsx',
   '/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx',
-  // Erst durch den Scanner-Fix von LFH-364/B5d sichtbar geworden (`<Select<…>`), nicht
+  // (B5j) Erst durch den Scanner-Fix von LFH-364/B5d sichtbar geworden (`<Select<…>`), nicht
   // neu entstanden. Die Schuldmenge wächst hier um 1, während die echte Schuld um 23
   // fällt — B5d ist auf B5c/B5e–B5j ausdrücklich disjunkt gestellt, deshalb wird die
   // Datei hier verbucht statt fremdes Bündel-Gebiet mitzuräumen.
@@ -295,11 +305,24 @@ export function attributEbene(tag: string): string {
     if (z === '"' || z === "'" || z === '`') { anfuehrung = z; raus += z; continue; }
     if (z !== '{') { raus += z; continue; }
     // Balancierten Ausdruck greifen und entscheiden, ob er wörtlich genug ist.
+    // Die Bilanz MUSS Zeichenketten überspringen — genau wie `tagEnde` und
+    // `generikEnde`. Sonst verschiebt eine Klammer INNERHALB eines Strings die Tiefe,
+    // der Ausdruck wird über sein Ende hinaus verschluckt und der Rest des Tags samt
+    // Klein-Angabe verschwindet: `<Button title={x ? "{" : ""} size="small" />` war so
+    // unsichtbar (gemessen im LFH-364-Review) — ein Fix, der ein neues Loch reißt.
     let tiefe = 0;
     let j = i;
+    let inner: string | null = null;
     for (; j < tag.length; j++) {
-      if (tag[j] === '{') tiefe++;
-      else if (tag[j] === '}' && --tiefe === 0) break;
+      const y = tag[j];
+      if (inner) {
+        if (y === '\\') j++;
+        else if (y === inner) inner = null;
+        continue;
+      }
+      if (y === '"' || y === "'" || y === '`') inner = y;
+      else if (y === '{') tiefe++;
+      else if (y === '}' && --tiefe === 0) break;
     }
     const inhalt = tag.slice(i + 1, j).trim();
     raus += /^["'][^"']*["']$/.test(inhalt) ? `{${inhalt}}` : '{}';
@@ -403,7 +426,7 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
     expect(stellenIn('/src/x.tsx', "<Select size={'small'} />")).toHaveLength(1);
   });
 
-  // LFH-364/B5d: die Lücke, die `MeldungKarte.tsx:184` unsichtbar machte. Ein reiner
+  // LFH-364/B5d: die Lücke, die `MeldungKarte.tsx:183` unsichtbar machte. Ein reiner
   // Lookahead-Fix ließe den ersten Fall durch und den zweiten scheitern — das
   // Typargument-`>` verkürzte den Tag-Text vor die Prop.
   it('findet sie hinter einem generischen Typargument', () => {
@@ -434,6 +457,19 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
   it('meldet das äußere Element dennoch, wenn es SELBST eine Angabe trägt', () => {
     const quelle = '<Collapse size="small" items={[{ children: <Descriptions size="small" /> }]} />';
     expect(stellenIn('/src/x.tsx', quelle)).toHaveLength(1);
+  });
+
+  // Die Kehrseite von `attributEbene`: seine Klammer-Bilanz muss Zeichenketten
+  // überspringen. Ohne das verschluckt eine Klammer IM STRING den Rest des Tags und
+  // die Angabe dahinter wird unsichtbar — ein Fix, der ein neues Loch reißt, ist
+  // schlimmer als der Fehlalarm, den er behebt.
+  it('lässt sich von einer geschweiften Klammer in einer Zeichenkette nicht abschütteln', () => {
+    expect(stellenIn('/src/x.tsx', '<Button title={x ? "{" : ""} size="small" />')).toHaveLength(1);
+    expect(stellenIn('/src/x.tsx', '<Button title={"}"} size="small" />')).toHaveLength(1);
+  });
+
+  it('gilt auch für ein Schablonen-Literal mit Klammer', () => {
+    expect(stellenIn('/src/x.tsx', '<Button aria-label={`a { b`} size="small" />')).toHaveLength(1);
   });
 
   it('lässt Flächen ohne Bedienfunktion und die Projekt-Primitive in Ruhe', () => {

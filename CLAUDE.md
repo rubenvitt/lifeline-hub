@@ -103,8 +103,18 @@ Alltag wichtigsten:
   items={[{ children: <Descriptions size="small"/> }]}>` blieb gemeldet, als die eigene Angabe des
   Collapse längst weg war. `attributEbene` reduziert den Tag darum auf seine Attributebene. Ein
   Gate, das einen Verstoß nicht wieder loslässt, ist von einem kaputten nicht zu unterscheiden.
-  Ein **Funktionstyp** im Typargument bleibt Blindfleck (dessen `=>` schließt die Klammer zu früh)
-  — im Bestand an keiner der 25 Generic-Stellen vorhanden.
+  Dessen Klammer-Bilanz **muss Zeichenketten überspringen** wie `tagEnde`/`generikEnde`: ohne das
+  verschluckt eine Klammer *im String* (`title={x ? "{" : ""} size="small"`) den Rest des Tags —
+  ein Fix, der ein neues Loch reißt, ist schlimmer als der Fehlalarm, den er behebt (im Review
+  gemessen und mit Selbstbeweis geschlossen). Blindfleck bleiben ein **Funktionstyp** im
+  Typargument (dessen `=>` schließt die Klammer zu früh; im Bestand an keiner der 25
+  Generic-Stellen) und eine Klammer in einem **Regex-Literal** einer Prop (Altlast in `tagEnde`).
+  **Klein-Angaben an `Card`/`Descriptions`/`Space`/`Liste` bleiben stehen — als Regel, nicht als
+  Restarbeit**, und sie gehören auch nicht in `OFFEN`: `befunde` belegt einen Eintrag nur über
+  einen echten Fund, ein Eintrag für eine nicht-interaktive Fläche wäre also sofort eine „tote
+  Schuld-Ausnahme" und färbte den Guard rot. Ein handgezähltes Inventar solcher Ausnahmen verrottet
+  (das AK von LFH-364 sprach von „drei" Karten, allein das B5d-Bündel trägt zwölf) — die Regel
+  nicht.
   **Die kleine Steuerhöhe liegt seit LFH-361 auf dem Gate-3-Boden** (24 / 48 / 72 statt antds
   abgeleiteter 22,5 / 36 / 54 — `genControlHeight.js` rechnet × 0,75). Folge: wo eine Bibliothek
   die Kleingröße **erzwingt** — antds Popconfirm tut das hart in `PurePanel.js` — greift die
