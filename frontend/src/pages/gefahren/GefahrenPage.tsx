@@ -16,6 +16,43 @@ import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 
+/**
+ * Trefflächenboden der Gebietszeile (Abschluss-Review zu LFH-368 · B5h, Konvention aus
+ * LFH-365).
+ *
+ * Die Zeile ist ein HANDGEBAUTES Bedienziel: `ListenEintrag` legt sein `onClick` auf ein
+ * nacktes `<div>` (`components/Liste.tsx:160-180`), und dessen Höhe entstand hier allein aus
+ * der Polsterung der `<Liste size="small">` — `paddingBlock = token.paddingXS`, also 3 / 5 / 7 px.
+ * Gerechnet kommt die Zeile damit im Handschuh-Betrieb auf grob 36 px gegen die geforderten 72.
+ * Deshalb ZWEI Angaben und nicht eine: `minHeight` aus `controlHeight` (30 / 48 / 72) PLUS die
+ * Polsterung. Die Polsterung allein trüge den Boden ebenfalls nicht (grob 54 px), sie muss aber
+ * da sein, sonst klebt der Text an der Kante.
+ *
+ * Aufgelöste Tokens, nie `var(--lfh-*)`: die Arbeitsteilung steht in `theme/rollen.css`
+ * („ZWEI QUELLEN, EINE WAHRHEIT") — handgeschriebenes CSS liest die Custom Properties, TSX liest
+ * `theme.useToken()`.
+ *
+ * Schablone ist `bedienzielStil` in `pages/lagekarte/Sidebar.tsx`; **importiert wird von dort
+ * nichts** — ein `pages/gefahren` → `pages/lagekarte`-Import wäre schlimmer als diese drei
+ * Zeilen. `display`/`alignItems` stehen anders als dort nicht drin: `ListenEintrag` setzt beide
+ * selbst, und eine Wiederholung sähe aus wie eine Absicht, die sie nicht ist.
+ *
+ * Rein und exportiert, damit die Zusicherung über zwei Dichtestufen prüfbar ist, OHNE zu rendern:
+ * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, ein gerenderter Wert
+ * belegte also antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein Layout.
+ *
+ * **Was hier NICHT gelöst wird:** die Tastaturbedienbarkeit. Das `<div onClick>` hat weder `role`
+ * noch `tabIndex` noch `onKeyDown`; die klickbare Zeile als Ganzes ist B7 (LFH-335) zugeordnet.
+ * Der Boden hier ist die Trefffläche, nicht der ganze Zugang.
+ */
+export function gebietszeileStil(token: { controlHeight: number; paddingSM: number; padding: number }) {
+  return {
+    cursor: 'pointer',
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px ${token.padding}px`,
+  } as const;
+}
+
 export default function GefahrenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -114,10 +151,14 @@ export default function GefahrenPage() {
         display: 'flex',
         // Unter `lg` stapeln — dieselbe Schwelle, an der der Einsatzrahmen seine
         // Navigation in den Drawer legt (`EinsatzLayout.tsx`). KEIN zweites Layout für
-        // die Matrix selbst: mit einem Auslöser je Zelle liegt sie bei ~380 px und
-        // trägt damit auch auf ~390 px. Ein Collapse je Gefahrentyp wäre eine zweite
-        // Bedienform für dieselbe Sache. Begründet in der Prüfliste, Kriterium **14**
-        // („Tabellenseite vollständig" — dort steht die Auflösung in Karten):
+        // die Matrix selbst: sie bleibt eine Tabelle und trägt auf schmalem Schirm
+        // waagerechten Bildlauf (`scroll={{ x: 'max-content' }}`), statt in Karten je
+        // Gefahrentyp aufgelöst zu werden — das zerstörte genau die Eigenschaft, für die
+        // es die Matrix gibt (Muster über beide Achsen auf einen Blick), und ein
+        // Collapse je Gefahrentyp wäre eine zweite Bedienform für dieselbe Sache.
+        // Hier stand einmal eine Breite („~380 px"); sie war falsch gerechnet und ist
+        // ersatzlos weg — die Entscheidung hängt nicht an ihr. Sie steht unabhängig
+        // begründet in der Prüfliste, Kriterium **14** („Tabellenseite vollständig"):
         // `docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md`.
         flexDirection: breit ? 'row' : 'column',
         gap: 16,
@@ -134,7 +175,12 @@ export default function GefahrenPage() {
           <ListenEintrag
             onClick={() => setGewaehlt(g.id)}
             style={{
-              cursor: 'pointer',
+              // Trefflächenboden ZUERST, die Färbung danach — beides landet über EIN `style`
+              // im Aufrufer, und `ListenEintrag` spreizt es bewusst zuletzt
+              // (`Liste.tsx:171-175`), damit die Kurzform `padding` gegen die Längsformen der
+              // Liste gewinnt. Zöge jemand den Spread dort nach vorn, fiele genau die
+              // Polsterungshälfte der „ZWEI Angaben"-Konvention still weg.
+              ...gebietszeileStil(token),
               // Die Rolle `bedien`, nicht antds Default-Blau: `rgba(22,119,255,0.08)`
               // stand hier hartkodiert und blieb im Nachtmodus derselbe helle Schleier
               // auf dunklem Grund (LFH-368). `colorPrimaryBg` leitet antd aus

@@ -7,7 +7,8 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
-import GefahrenPage from './GefahrenPage';
+import GefahrenPage, { gebietszeileStil } from './GefahrenPage';
+import { dichten } from '../../theme/tokens';
 
 const einsatz = {
   id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv', begonnen_at: '', abgeschlossen_at: null,
@@ -219,5 +220,79 @@ describe('GefahrenPage', () => {
     renderPage();
     const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
     expect(rahmen).toHaveStyle({ flexDirection: 'row' });
+  });
+
+  /**
+   * Die Gebietszeile ist ein handgebautes Bedienziel und muss den Boden selbst tragen
+   * (Abschluss-Review zu LFH-368, Konvention aus LFH-365). Die reine Funktion prüft die
+   * WERTE, dieser Fall prüft, dass sie überhaupt am `<div onClick>` ankommen — genau die
+   * Regression, die `Liste.tsx:171-175` benennt („kein Test sähe es"), wenn dort jemand den
+   * `...style`-Spread nach vorn zöge.
+   *
+   * Geprüft wird die ANWESENHEIT und die REIHENFOLGE der Angaben im Inline-Style, kein Wert:
+   * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, jede Zahl hier
+   * belegte antd-Vorgaben statt der Staffel (gemessen: `min-height: 32px; padding: 12px 16px`
+   * — antds Voreinstellungen, nicht 30/48/72).
+   */
+  it('legt den Trefflächenboden wirklich auf die klickbare Gebietszeile', async () => {
+    server.use(...handlers());
+    renderPage();
+    await screen.findAllByText('Nord');
+    const zeile = document.querySelector<HTMLElement>('.listen-eintrag');
+    if (!zeile) throw new Error('keine Listenzeile im Baum');
+    const stil = zeile.getAttribute('style') ?? '';
+    expect(stil).toContain('min-height');
+    // Die zweite Hälfte der Konvention: die Kurzform `padding` muss NACH den Längsformen
+    // `padding-block`/`padding-inline` der Liste stehen, sonst gewinnen deren kleinere Werte
+    // und die Polsterung fällt still weg. Genau diese Reihenfolge sichert der Spread in
+    // `Liste.tsx:171-175` zu — eine Zusicherung, die es dort selbst nicht gibt.
+    expect(stil.indexOf('padding:')).toBeGreaterThan(stil.indexOf('padding-block'));
+  });
+});
+
+/**
+ * Trefflächenboden der Gebietszeile — die Werte (Abschluss-Review zu LFH-368 · B5h).
+ *
+ * Schablone: `pages/lagekarte/Sidebar.test.tsx:602-637`. Geprüft wird die REINE FUNKTION gegen
+ * die Dichtestufen aus `theme/tokens.ts`, nicht ein gerendertes Pixel — jsdom rechnet kein
+ * Layout, und ein gerenderter Wert käme aus dem nackten `ConfigProvider` von `test/utils.tsx`.
+ *
+ * Die Böden stehen als LITERALE da. Aus dem Token zurückgelesen prüften sie den Token gegen sich
+ * selbst und blieben grün, egal welche Zahl dort steht.
+ */
+describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    paddingSM: dichten[stufe].abstand.sm,
+    padding: dichten[stufe].abstand.md,
+  });
+
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(gebietszeileStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(gebietszeileStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(gebietszeileStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  /**
+   * Die eigentliche Aussage: der Wert ZIEHT MIT. Ein dichteblindes `minHeight: 72` bestünde alle
+   * drei Böden oben und fällt allein hier — deshalb stehen beide Fälle da, einer allein belegte
+   * nichts.
+   */
+  it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
+    const hoehen = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
+      (s) => gebietszeileStil(tokenFuer(s)).minHeight,
+    );
+    expect(hoehen[0]).toBeLessThan(hoehen[1]);
+    expect(hoehen[1]).toBeLessThan(hoehen[2]);
+  });
+
+  /**
+   * ZWEI Angaben, nicht eine: die Polsterung allein trüge den Boden nicht (grob 54 px im
+   * Handschuh-Betrieb gegen die geforderten 72), muss aber da sein und ebenfalls mitziehen —
+   * sonst klebt der Text an der Kante. Auch hier LITERALE.
+   */
+  it('trägt neben der Höhe eine mitziehende Polsterung', () => {
+    expect(gebietszeileStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
+    expect(gebietszeileStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
   });
 });

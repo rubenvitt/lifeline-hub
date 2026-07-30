@@ -57,11 +57,26 @@ Gemessen am Code ist das Budget kleiner als die Zahl, gegen die es gestellt wird
 
 Ein 5-Wege-`Segmented` braucht kompakt ~174 px je Zelle (5 × ~34) ⇒ Matrix ~1050 px, in
 `komfortabel`/`handschuh` ~1420/~1980. **Entscheidung: ein Auslöser je Zelle** (`min-width` =
-`controlHeight`, also 30/48/72) ⇒ Zellbreite ~40/58/82 ⇒ Matrix ~380/470/590 px. Damit trägt die
-Matrix in **jeder** Dichtestufe innerhalb des Budgets, und die Staffel greift dort, wo sie zählt:
-an Auslöser und Menüeinträgen. Der Bildlauf (`scroll={{ x: 'max-content' }}`) bleibt als Netz,
-wird im Fükw aber nicht mehr gebraucht. Die Klickzahl bleibt bei zwei — wie heute (Select öffnen,
-Option wählen) —, aber der zweite Auslöser je Zelle (Details) entfällt: er zieht ins selbe Menü.
+`controlHeight`, also 30/48/72). Die Staffel greift damit dort, wo sie zählt: an Auslöser und
+Menüeinträgen. Die Klickzahl bleibt bei zwei — wie heute (Select öffnen, Option wählen) —, aber
+der zweite Auslöser je Zelle (Details) entfällt: er zieht ins selbe Menü.
+
+> **Nachtrag 30.07.2026 (Abschluss-Review, Fund 3).** Hier stand „⇒ Zellbreite ~40/58/82 ⇒
+> Matrix ~380/470/590 px. Damit trägt die Matrix in **jeder** Dichtestufe innerhalb des Budgets
+> […] wird im Fükw aber nicht mehr gebraucht." Die Zahlen waren zu klein gerechnet: die
+> Zellpolsterung fehlte. antd setzt `cellPaddingInline: padding`
+> (`antd/es/table/style/index.js:208`), und das `<Table>` trägt seit dem Umbau **keine**
+> `size`-Prop mehr — also `token.padding` = 11/18/26 **je Seite**. Zellbreite ist damit
+> `controlHeight + 2 × padding` = **52/84/124**, die Matrix `180 + 5 × Zellbreite` = **≥ 440 /
+> ≥ 600 / ≥ 800 px**.
+>
+> **Die Entscheidung bleibt, ihre Begründung ändert sich.** Kompakt (440) liegt weiter unter den
+> ~693 px des Fükw-Budgets — dort trägt die Matrix ohne Bildlauf. `komfortabel` (600) ebenfalls.
+> `handschuh` (800) **nicht**: dort greift der Bildlauf `scroll={{ x: 'max-content' }}`, und er
+> ist kein Netz mehr, sondern der reguläre Weg. Das ist folgenlos für die gewählte Bedienform —
+> ein 5-Wege-`Segmented` läge in derselben Rechnung bei ~1050/~1420/~1980 px und wäre in **keiner**
+> Stufe tragbar. Was **nicht** mehr trägt, ist das Breitenargument gegen ein zweites
+> Schmalschirm-Layout; siehe den zweiten Nachtrag weiter unten.
 
 **2 · Farbe.** `statusFarben.ts:49-60` erklärt die Flächenskala bereits als eigene, legitime
 Darstellungssorte; der Absatz 166-169 („nicht eine sechste Farbe") bindet `warnstufeKarte`, nicht
@@ -101,9 +116,17 @@ Weil dieser Helfer privat ist (`:236`), lebt sie in `statusFarben.ts` — nicht 
   die Zelle, nicht die Tabellensorte; die Ausnahme bleibt damit belegt und wird **nicht** tot. Der
   benannte Restposten „es fehlt allein die stehende Kopfzeile" wird in Task 3 eingelöst
   (`sticky`), der Kommentar entsprechend nachgezogen.
-- **Kein zweites Schmalschirm-Layout ohne Messung.** Bei ~380 px trägt die Matrix auch auf ~390 px;
-  gestapelt wird nur die Gebietsliste über der Matrix (Task 4). Ein Collapse-Layout je Gefahrentyp
-  wird nur gebaut, wenn die Messung es erzwingt — und das Ergebnis wird in der Prüfliste notiert.
+- **Kein zweites Schmalschirm-Layout ohne Messung.** Gestapelt wird nur die Gebietsliste über der
+  Matrix (Task 4). Ein Collapse-Layout je Gefahrentyp wird nur gebaut, wenn die Messung es
+  erzwingt — und das Ergebnis wird in der Prüfliste notiert.
+
+  > **Nachtrag 30.07.2026 (Abschluss-Review, Fund 3).** Hier stand „Bei ~380 px trägt die Matrix
+  > auch auf ~390 px". Nachgerechnet (siehe erster Nachtrag oben) sind es **≥ 440 px** — auf
+  > ~390 px trägt sie also **nicht**, sie rollt waagerecht. Der Punkt bleibt trotzdem stehen,
+  > weil er nie an dieser Zahl hing: die Matrix ist eine **Flächencodierung über zwei Achsen**,
+  > und Karten je Gefahrentyp zerstörten genau die Eigenschaft, für die es sie gibt. Diese
+  > Begründung steht unabhängig in Kriterium **14** der Prüfliste. Der Kommentar in
+  > `GefahrenPage.tsx` zitiert seit dem Review keine Breite mehr, sondern zeigt dorthin.
 - **Der Doc-Fehler im Kopfkommentar wird mitkorrigiert:** `GefahrenMatrix.tsx:45` verspricht
   „GefahrenPage + Karten-Drawer"; gemessen ist `GefahrenPage.tsx` der **einzige** Konsument.
 
@@ -1093,6 +1116,13 @@ Expected: FAIL — es gibt kein `data-gefahren-rahmen`, die Richtung ist fest `r
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
 ```
+
+> **Nachtrag 30.07.2026 (Abschluss-Review, Fund 3).** Der Kommentar unten und die
+> Commit-Botschaft weiter unten stehen als **Protokoll dessen, was geplant und gefahren wurde**,
+> unverändert da — mitsamt der Breite „~380 px". Sie ist falsch (nachgerechnet ≥ 440 px, siehe
+> die beiden Nachträge oben); im Quelltext ist sie ersatzlos entfernt und durch den Verweis auf
+> Kriterium 14 der Prüfliste ersetzt. Wer hier abschreibt, schreibt die korrigierte Fassung aus
+> `GefahrenPage.tsx` ab, nicht diesen Block.
 
 ```tsx
     <div
