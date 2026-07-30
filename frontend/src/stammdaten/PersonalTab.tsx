@@ -91,14 +91,18 @@ export default function PersonalTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, p: Personal) => (
-              <Space>
-                <Button size="small" onClick={() => { setBearbeite(p); setModalOffen(true); }}>Bearbeiten</Button>
+              <Space size="middle">
+                <Button onClick={() => { setBearbeite(p); setModalOffen(true); }}>Bearbeiten</Button>
                 {p.dienststatus === 'in_dienst' ? (
-                  <Popconfirm title="Außer Dienst stellen?" onConfirm={() => dienststatusMutation.mutate({ id: p.id, inDienst: false })}>
-                    <Button size="small" danger>Außer Dienst</Button>
+                  <Popconfirm
+                    title="Außer Dienst stellen?"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => dienststatusMutation.mutate({ id: p.id, inDienst: false })}
+                  >
+                    <Button danger>Außer Dienst</Button>
                   </Popconfirm>
                 ) : (
-                  <Button size="small" onClick={() => dienststatusMutation.mutate({ id: p.id, inDienst: true })}>
+                  <Button onClick={() => dienststatusMutation.mutate({ id: p.id, inDienst: true })}>
                     Wieder in Dienst
                   </Button>
                 )}

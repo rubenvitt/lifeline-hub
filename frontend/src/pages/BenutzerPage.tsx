@@ -119,24 +119,20 @@ export default function BenutzerPage() {
       title: 'Aktionen',
       key: 'aktionen',
       render: (_, b) => (
-        <Space>
-          <Button size="small" onClick={() => setZuBearbeiten(b)}>
-            Bearbeiten
-          </Button>
+        <Space size="middle">
+          <Button onClick={() => setZuBearbeiten(b)}>Bearbeiten</Button>
           {b.aktiv ? (
             <Popconfirm
               title="Benutzer deaktivieren?"
               okText="Ja"
               cancelText="Abbrechen"
+              okButtonProps={{ danger: true }}
               onConfirm={() => deaktivieren.mutate(b.id)}
             >
-              <Button size="small" danger>
-                Deaktivieren
-              </Button>
+              <Button danger>Deaktivieren</Button>
             </Popconfirm>
           ) : (
             <Button
-              size="small"
               loading={bearbeiten.isPending && bearbeiten.variables?.id === b.id}
               onClick={() => bearbeiten.mutate({ id: b.id, patch: { aktiv: true } })}
             >

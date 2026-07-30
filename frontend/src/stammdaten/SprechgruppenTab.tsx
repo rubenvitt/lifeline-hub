@@ -85,9 +85,8 @@ export default function SprechgruppenTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, sg: Sprechgruppe) => (
-              <Space>
+              <Space size="middle">
                 <Button
-                  size="small"
                   onClick={() => {
                     setBearbeite(sg);
                     setModalOffen(true);
@@ -98,11 +97,10 @@ export default function SprechgruppenTab() {
                 {sg.aktiv && (
                   <Popconfirm
                     title="Sprechgruppe deaktivieren?"
+                    okButtonProps={{ danger: true }}
                     onConfirm={() => deaktivierenMutation.mutate(sg.id)}
                   >
-                    <Button size="small" danger>
-                      Deaktivieren
-                    </Button>
+                    <Button danger>Deaktivieren</Button>
                   </Popconfirm>
                 )}
               </Space>

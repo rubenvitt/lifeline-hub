@@ -306,11 +306,12 @@ export default function EinsatzabschnittePage() {
               </Form.Item>
 
               <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
-              <Space>
+              <Space size="middle">
                 <Button type="primary" htmlType="submit" loading={speichern.isPending}>Speichern</Button>
                 <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
                 <Popconfirm title="Abschnitt auflösen?"
                   description={'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'}
+                  okButtonProps={{ danger: true }}
                   onConfirm={() => aufloesen.mutate(aktuell.id)}>
                   <Button danger>Auflösen</Button>
                 </Popconfirm>
@@ -333,10 +334,11 @@ export default function EinsatzabschnittePage() {
               </Descriptions>
 
               {darfSchreiben && (
-                <Space style={{ marginTop: 12 }}>
+                <Space size="middle" style={{ marginTop: 12 }}>
                   <Button type="primary" onClick={() => setBearbeiten(true)}>Bearbeiten</Button>
                   <Popconfirm title="Abschnitt auflösen?"
                     description={'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'}
+                    okButtonProps={{ danger: true }}
                     onConfirm={() => aufloesen.mutate(aktuell.id)}>
                     <Button danger>Auflösen</Button>
                   </Popconfirm>

@@ -1,4 +1,4 @@
-import { App, Button, Input, Space, Typography, type TableColumnsType } from 'antd';
+import { App, Button, Input, Popconfirm, Space, Typography, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -75,15 +75,25 @@ export default function StichworteTab() {
             title: 'Aktionen',
             key: 'aktionen',
             width: 120,
+            /**
+             * Die einzige UNUMKEHRBARE Aktion der Stammdaten (LFH-363 · B5c): jede andere
+             * destruktive Aktion heißt „Außer Dienst"/„Deaktivieren" und trägt ihre
+             * Umkehrung als Knopf daneben. Deshalb — und nur deshalb — steht hier eine
+             * Rückfrage, die dort keine wäre, sondern eine Reibung ohne Gegenwert.
+             * Ein Abstand ist hier nichts zu trennen: die Zelle trägt nur diese eine Aktion.
+             */
             render: (_, v: StichwortVorschlag) => (
-              <Button
-                danger
-                size="small"
-                loading={loeschenMutation.isPending}
-                onClick={() => loeschenMutation.mutate(v.id)}
+              <Popconfirm
+                title="Stichwort löschen?"
+                okText="Ja"
+                cancelText="Abbrechen"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => loeschenMutation.mutate(v.id)}
               >
-                Löschen
-              </Button>
+                <Button danger loading={loeschenMutation.isPending}>
+                  Löschen
+                </Button>
+              </Popconfirm>
             ),
           },
         ] as TableColumnsType<StichwortVorschlag>)

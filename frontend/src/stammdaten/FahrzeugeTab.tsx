@@ -88,19 +88,20 @@ export default function FahrzeugeTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, f: Fahrzeug) => (
-              <Space>
-                <Button size="small" onClick={() => { setBearbeite(f); setModalOffen(true); }}>
+              <Space size="middle">
+                <Button onClick={() => { setBearbeite(f); setModalOffen(true); }}>
                   Bearbeiten
                 </Button>
                 {f.dienststatus === 'in_dienst' ? (
                   <Popconfirm
                     title="Außer Dienst stellen?"
+                    okButtonProps={{ danger: true }}
                     onConfirm={() => dienststatusMutation.mutate({ id: f.id, inDienst: false })}
                   >
-                    <Button size="small" danger>Außer Dienst</Button>
+                    <Button danger>Außer Dienst</Button>
                   </Popconfirm>
                 ) : (
-                  <Button size="small" onClick={() => dienststatusMutation.mutate({ id: f.id, inDienst: true })}>
+                  <Button onClick={() => dienststatusMutation.mutate({ id: f.id, inDienst: true })}>
                     Wieder in Dienst
                   </Button>
                 )}

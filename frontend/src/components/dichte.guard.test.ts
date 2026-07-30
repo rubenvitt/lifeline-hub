@@ -96,17 +96,9 @@ const EIGENE_SEMANTIK = ['Liste', 'KatalogTabelle'] as const;
  * stillschweigend zur Dauerausnahme wird.
  */
 const OFFEN: string[] = [
-  // ── B5c · stammdaten/ und Verwaltung (LFH-363) ────────────────────────────
-  '/src/stammdaten/EinheitTypenTab.tsx',
-  '/src/stammdaten/FahrzeugeTab.tsx',
-  '/src/stammdaten/MaterialTab.tsx',
-  '/src/stammdaten/PersonalTab.tsx',
-  '/src/stammdaten/QualifikationenTab.tsx',
-  '/src/stammdaten/SprechgruppenTab.tsx',
-  '/src/stammdaten/StichworteTab.tsx',
-  '/src/pages/BenutzerPage.tsx',
-  '/src/pages/EinheitenPage.tsx',
-  '/src/pages/MitgliederAbschnitt.tsx',
+  // B5c (stammdaten/ und Verwaltung) ist mit LFH-363 abgetragen — 24 Stellen in
+  // 10 Dateien. Der Abstand zur destruktiven Nachbaraktion, der dort auf denselben
+  // Zeilen saß, hält seither `aktionsabstand.guard.test.ts`.
   // ── B5d · Kommunikationskarten (LFH-364) ──────────────────────────────────
   '/src/auftraege/AuftraegeListe.tsx',
   '/src/auftraege/AuftragKarte.tsx',

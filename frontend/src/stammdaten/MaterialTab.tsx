@@ -77,19 +77,20 @@ export default function MaterialTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, m: Material) => (
-              <Space>
-                <Button size="small" onClick={() => { setBearbeite(m); setModalOffen(true); }}>
+              <Space size="middle">
+                <Button onClick={() => { setBearbeite(m); setModalOffen(true); }}>
                   Bearbeiten
                 </Button>
                 {m.dienststatus === 'in_dienst' ? (
                   <Popconfirm
                     title="Außer Dienst stellen?"
+                    okButtonProps={{ danger: true }}
                     onConfirm={() => dienststatusMutation.mutate({ id: m.id, inDienst: false })}
                   >
-                    <Button size="small" danger>Außer Dienst</Button>
+                    <Button danger>Außer Dienst</Button>
                   </Popconfirm>
                 ) : (
-                  <Button size="small" onClick={() => dienststatusMutation.mutate({ id: m.id, inDienst: true })}>
+                  <Button onClick={() => dienststatusMutation.mutate({ id: m.id, inDienst: true })}>
                     Wieder in Dienst
                   </Button>
                 )}
