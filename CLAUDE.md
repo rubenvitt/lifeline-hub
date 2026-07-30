@@ -255,6 +255,28 @@ Alltag wichtigsten:
   darauf hätte Löcher. Die zwei Eigenwidersprüche des Elterntickets („read-only Quick-View +
   Statuswahl" gegen LFH-19) sind damit **aufgelöst statt umbenannt**: es entsteht keine Fläche,
   die sie erzeugen würde.
+- **Ein Emoji ist keine Ikone** (30.07.2026, Kräfteliste). Wo ein Bildzeichen für etwas steht —
+  Personal, Fahrzeug, Material, Erreichbarkeit, gesperrt, in Arbeit —, trägt es ein
+  `@ant-design/icons`-Element, nie ein Emoji. Begründung: Zeichnung, Farbe und Breite eines
+  Emojis kommen aus der Systemschrift statt aus dem Entwurf; es steht in **eigener** Farbe neben
+  einer Zeile, deren Farbgebung Bedeutung trägt (Kriterium 6), und im Ausdruck sowie in
+  Textausgabeketten (Lagebericht-Markdown) verhält es sich anders als der übrige Satz — dort
+  gehört ein **Kurzwort** hin (`Pers.` / `Fzg.` / `Mtl.`), kein Bildzeichen.
+  **Die Zuordnung liegt in der Komponente, nicht in einer Prop**: eine Prop, die eine
+  Zeichenkette nimmt, nimmt auch wieder ein Emoji. Präzedenz `kraefte/AmpelZelle.tsx` — dort
+  bildet ein `Record` über das String-Union der Achse ab, die frühere `symbol: string`-Prop ist
+  weg. **Und die Ikone braucht eine `aria-hidden`-Hülle**: ein `@ant-design/icons`-Knoten bringt
+  `role="img"` mit eigenem **englischem** `aria-label` mit („user"/„car"). Der Name der
+  umgebenden Gruppe leidet nicht (`aria-label` schlägt den Inhalt, gemessen) — der **Knoten**
+  schon, und in einer Vergleichstabelle steht er dann in jeder Zeile als eigenes Vorleseziel.
+  Prüfbar ist `queryByRole('img')` innerhalb der Gruppe, per Mutationsprobe belegt.
+  **Regel, nicht erzwungen**: es gibt keinen Guard, und ein repoweiter wäre rot geboren (rund 15
+  Bestandsstellen, u. a. `pages/EinheitenPage.tsx`, `pages/EinsatzabschnittePage.tsx`,
+  `components/FunkErreichbarkeit.tsx`, `einsatz/ModulPanel.tsx`, `components/AppLayout.tsx`,
+  `components/Platzhalter.tsx`, `pages/lagekarte/FachebenenInspector.tsx`) — und ein rot
+  geborenes Gate wird abgeschaltet statt befolgt. Verbindlich für Neues und ohnehin Angefasstes.
+  **Nicht gemeint** ist ein Schriftzeichen **innerhalb** eines Textetiketts (das Häkchen in
+  „Quittiert", das Warnzeichen vor „Nicht verortet") — das ist eine eigene Frage, kein Piktogramm.
 - **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein
