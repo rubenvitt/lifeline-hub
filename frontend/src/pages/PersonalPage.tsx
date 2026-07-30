@@ -1,5 +1,6 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Popconfirm, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
+import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -315,16 +316,13 @@ export default function PersonalPage() {
     {
       title: 'Bemerkung',
       key: 'bemerkung',
-      render: (_, ep) =>
-        darfSchreiben ? (
-          <Typography.Text
-            editable={{ onChange: (val) => bemerkungMutation.mutate({ epId: ep.id, bemerkung: val }) }}
-          >
-            {ep.bemerkung ?? ''}
-          </Typography.Text>
-        ) : (
-          ep.bemerkung || '—'
-        ),
+      render: (_, ep) => (
+        <BemerkungZelle
+          wert={ep.bemerkung}
+          darfSchreiben={darfSchreiben}
+          onSpeichern={(val) => bemerkungMutation.mutate({ epId: ep.id, bemerkung: val })}
+        />
+      ),
     },
     ...(darfSchreiben
       ? [

@@ -300,6 +300,29 @@ describe('FahrzeugePage', () => {
     await waitFor(() => expect(zeilenFolge(container)).toEqual(['10', '11']));
   });
 
+  it('eingeschaltete Bemerkungsspalte trägt bei leerem Wert einen benannten Auslöser', async () => {
+    /**
+     * Befund M21 (LFH-369 · B5i) an der Fahrzeugseite. Wie bei Personal ist die Spalte per
+     * Voreinstellung abgewählt (`FahrzeugePage.tsx:528`); die Vorprüfung auf „kein Auslöser"
+     * macht die zweite Hälfte erst aussagekräftig.
+     *
+     * Der Zähler ist hier die empfindlichere Stelle, weil diese Seite zusätzlich
+     * `kennzeichen` per `abBreite: 'lg'` führt: nach dem Einschalten der Bemerkung muss er
+     * bei 1024 px auf „nichts ausgeblendet" fallen. Täte er das nicht, wäre die
+     * Voreinstellungs-Entscheidung durch diesen Umbau verschoben worden.
+     */
+    const { container } = render(einsatz());
+    await screen.findByText('Florian 1');
+    expect(screen.queryByRole('button', { name: 'Bemerkung hinzufügen' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
+
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(within(zeile).getByRole('button', { name: 'Bemerkung hinzufügen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
+  });
+
   it('der Spaltenschalter zählt Handauswahl UND Breitenausblendung in EINEM Zähler', async () => {
     /**
      * Gate 2 verlangt den Zähler ausgeblendeter Spalten. Er darf nicht aus `aus.length`

@@ -140,6 +140,22 @@ describe('MaterialPage', () => {
     expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
   });
 
+  it('leere Bemerkung trägt einen benannten Auslöser, nicht nur ein nacktes Stift-Icon', async () => {
+    /**
+     * Befund M21 (LFH-369 · B5i). Bei `bemerkung: null` blieb von `Typography.Text editable`
+     * genau das Stift-Icon übrig — ohne zugänglichen Namen. Der LESEzweig hatte längst ein
+     * „—", der Schreibzweig nichts: die Affordanz war genau falsch herum verteilt.
+     *
+     * Geprüft wird im TABELLENzweig. Unter `md` führt keine der drei `karte.sekundaer`-Listen
+     * die Bemerkung (Slot auf 3 Einträge begrenzt) — ein Test am schmalen Schirm fände nichts
+     * und wäre leer grün.
+     */
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(within(zeile).getByRole('button', { name: 'Bemerkung hinzufügen' })).toBeInTheDocument();
+  });
+
   it('keine Klein-Variante mehr am Status-Auswahlfeld und am Entfernen-Knopf', async () => {
     /**
      * Zwei ohnehin angefasste `size="small"` fallen weg (Verbot aus CLAUDE.md; der Abbau
