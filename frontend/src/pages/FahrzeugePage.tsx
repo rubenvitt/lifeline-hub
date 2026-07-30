@@ -1,5 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
+import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -403,16 +404,14 @@ export default function FahrzeugePage() {
     {
       title: 'Bemerkung',
       key: 'bemerkung',
-      render: (_, ef) =>
-        darfSchreiben ? (
-          <Typography.Text
-            editable={{ onChange: (val) => bemerkungMutation.mutate({ efId: ef.id, bemerkung: val }) }}
-          >
-            {ef.bemerkung ?? ''}
-          </Typography.Text>
-        ) : (
-          ef.bemerkung || '—' // leere/null-Bemerkung als „—" anzeigen
-        ),
+      render: (_, ef) => (
+        <BemerkungZelle
+          wert={ef.bemerkung}
+          kennung={ef.funkrufname}
+          darfSchreiben={darfSchreiben}
+          onSpeichern={(val) => bemerkungMutation.mutate({ efId: ef.id, bemerkung: val })}
+        />
+      ),
     },
     ...(darfSchreiben
       ? [

@@ -1,5 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, InputNumber, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
+import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
@@ -238,14 +239,14 @@ export default function MaterialPage() {
     {
       title: 'Bemerkung',
       key: 'bemerkung',
-      render: (_, em) =>
-        darfSchreiben ? (
-          <Typography.Text editable={{ onChange: (val) => bemerkungMutation.mutate({ emId: em.id, bemerkung: val }) }}>
-            {em.bemerkung ?? ''}
-          </Typography.Text>
-        ) : (
-          em.bemerkung || '—'
-        ),
+      render: (_, em) => (
+        <BemerkungZelle
+          wert={em.bemerkung}
+          kennung={em.bezeichnung}
+          darfSchreiben={darfSchreiben}
+          onSpeichern={(val) => bemerkungMutation.mutate({ emId: em.id, bemerkung: val })}
+        />
+      ),
     },
     ...(darfSchreiben
       ? [
