@@ -90,25 +90,47 @@ export const BEMERKUNG_HINZUFUEGEN = 'Bemerkung hinzufügen';
 export function BemerkungZelle({ wert, darfSchreiben, onSpeichern, kennung }: BemerkungZelleProps) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const knopfRef = useRef<HTMLButtonElement>(null);
-  const warBearbeitet = useRef(false);
+  const textRef = useRef<HTMLElement>(null);
+  const fokusZurueck = useRef(false);
   const gefuellt = !!wert;
 
   /**
-   * Fokusrückgabe auf den Platzhalter.
+   * Fokusrückgabe nach dem Verlassen der Bearbeitung.
    *
-   * antd stellt den Fokus beim Verlassen selbst her, aber nur auf seinen EIGENEN Stift
-   * (`Base/index.js:90-95`). Solange der Wert gefüllt ist, greift das: `Typography.Text`
-   * bleibt am Baum, der Effekt sieht `prevEditing` und fokussiert. Auf dem LEEREN Zweig
-   * hängt es in derselben Runde aus, in der `bearbeitet` auf `false` fällt — der Effekt
-   * läuft für diesen Wert nie und der Fokus fällt auf `<body>` (gemessen). Genau diese
-   * Klasse führt die Erfassungs-Norm schon.
+   * antd stellt sie selbst her, aber nur auf seinen EIGENEN Stift (`Base/index.js:90-95`) und
+   * nur, solange `Typography.Text` am Baum bleibt. Hier bleibt es das oft nicht — beide Fälle
+   * sind gemessen, und der zweite ist der, den der Betrieb nimmt:
+   *
+   * 1. **Abbrechen / leer geblieben:** `Typography` hängt in derselben Runde aus, in der der
+   *    Platzhalter zurückkommt. antds Effekt läuft für diesen Wert nie.
+   * 2. **Gespeichert, Wert kommt NACH:** die Mutation läuft, der neue Wert trifft per
+   *    Invalidierung erst eine Runde später ein. Dann hängt der Platzhalter aus und ein
+   *    FRISCHES `Typography` ein — das kein `prevEditing` hat, also auch nicht fokussiert.
+   *
+   * In beiden Fällen landet der Fokus sonst auf `<body>`; genau diese Klasse führt die
+   * Erfassungs-Norm schon. Deshalb ein Merker, der den Zweigwechsel ÜBERLEBT, statt einer
+   * Flanke auf `bearbeitet` — die ist beim Nachlauf längst vorbei.
+   *
+   * Ohne Deps-Array: der Effekt muss auch in der Runde laufen, in der sich nur `wert` ändert.
+   * Eingegriffen wird NUR bei verwaistem Fokus (`activeElement === body`) — sonst risse man
+   * ihn einem Element weg, das die bedienende Person selbst angesteuert hat; sitzt er
+   * woanders, ist die Rückgabe erledigt und der Merker fällt.
    *
    * `useLayoutEffect` wie antd: vor dem Anstrich, damit der Fokus nicht sichtbar springt.
    */
   useLayoutEffect(() => {
-    if (warBearbeitet.current && !bearbeitet && !gefuellt) knopfRef.current?.focus();
-    warBearbeitet.current = bearbeitet;
-  }, [bearbeitet, gefuellt]);
+    if (bearbeitet) {
+      fokusZurueck.current = true;
+      return;
+    }
+    if (!fokusZurueck.current) return;
+    const ziel = gefuellt
+      ? textRef.current?.querySelector<HTMLElement>('.ant-typography-edit')
+      : knopfRef.current;
+    if (!ziel) return;
+    if (document.activeElement === document.body || document.activeElement === null) ziel.focus();
+    else fokusZurueck.current = false;
+  });
 
   /**
    * Lesezweig unverändert bei „—" — keine Nachlässigkeit, sondern die Aussage: ohne
@@ -142,6 +164,7 @@ export function BemerkungZelle({ wert, darfSchreiben, onSpeichern, kennung }: Be
 
   return (
     <Typography.Text
+      ref={textRef}
       editable={{
         // `editing` KONTROLLIERT: nur so kann der Platzhalter-Knopf die Bearbeitung von
         // außen öffnen. Dann muss `onStart` mitgeführt werden, sonst öffnet der Stift am

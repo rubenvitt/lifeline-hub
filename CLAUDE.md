@@ -230,10 +230,16 @@ Alltag wichtigsten:
   scheitert mit „0 calls", als wäre die Komponente kaputt; Tastenwege deshalb über `fireEvent` mit
   explizitem `keyCode`, und der Mausweg (`onBlur` → übernehmen) gehört eigens belegt, er ist im
   Betrieb der häufigere. (2) antd gibt den Fokus beim Verlassen nur an seinen **eigenen** Stift
-  zurück (`Base/index.js:90-95`); wo ein Platzhalter das `Typography` ersetzt, hängt es in
-  derselben Runde aus und der Fokus fällt auf `<body>` — die Rückgabe muss das Primitiv selbst
-  übernehmen. Und `onChange` feuert beim Verlassen **unbedingt**: ohne Wertgleichheits-Riegel
-  kostet ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
+  zurück (`Base/index.js:90-95`), und nur solange das `Typography` am Baum bleibt. Das tut es in
+  **zwei** Fällen nicht, beide gemessen: beim **Abbrechen** (der Platzhalter ersetzt es in
+  derselben Runde) und beim **Speichern**, wenn der neue Wert per Invalidierung erst eine Runde
+  **später** eintrifft — dann hängt ein FRISCHES `Typography` ein, das kein `prevEditing` hat.
+  Beide Male fällt der Fokus auf `<body>`; die Rückgabe muss das Primitiv selbst übernehmen, und
+  zwar mit einem Merker, der den **Zweigwechsel überlebt** — eine Flanke auf „wird bearbeitet"
+  ist beim Nachlauf längst vorbei. Der zweite Fall ist der, den der Betrieb nimmt, und ein Test
+  mit `vi.fn()` als Mutation sieht ihn **nicht** (dort kommt der Wert nie nach): er braucht ein
+  `rerender` mit dem gespeicherten Wert. Und `onChange` feuert beim Verlassen **unbedingt**: ohne
+  Wertgleichheits-Riegel kostet ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
 - **Die Zielform des Statuswechsels in den Kräfte-Listen liegt fest, gebaut wird sie in
   LFH-339/C4** (LFH-369 · B5i, `docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
   Kurzfassung: **Auslöser ist die Statusanzeige selbst** plus senkrechtes Menü im Portal — kein

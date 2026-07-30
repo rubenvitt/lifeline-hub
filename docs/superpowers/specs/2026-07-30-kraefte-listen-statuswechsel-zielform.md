@@ -26,7 +26,7 @@ Dokument; jede Abweichung steht unten mit Beleg.
 | „**fünf Aufrufer** desselben Musters rechtfertigen ein Primitiv" | **Drei.** `pages/gefahren/GefahrenPage.tsx:135` und `pages/lagekarte/Sidebar.tsx:612` sind *Pflichtnamen, die umbenannt werden* (`trim`-Vergleich gegen den Altwert), keine optionalen Notizen — ein „hinzufügen"-Platzhalter hätte dort keinen Zustand, in dem er erschiene. **Die Mechanik ist dabei nicht dieselbe**, auch wenn sie sich so zusammenfassen ließe: `Sidebar.tsx:616` verwirft eine leere Eingabe selbst (`if (t && t !== b.name)`); `GefahrenPage.tsx:135` tut das **nicht** und feuert auch mit `''` — dort fängt erst die Anzeige es ab (`api/gefahren.ts`, `gefahrengebietName`: leeres Label → „Gefahrengebiet #&lt;id&gt;"). |
 | Statuswechsel sitzt in einer **24-px-Zelle** | Die Zelle gibt es nicht mehr. Seit B1 hängt die Höhe an `controlHeight` (30/48/72); auf `komfortabel` und `handschuh` liegt sie **über** dem Ziel. Der Befund gilt nur noch für die Vorgabestufe. |
 | Zielform ist ein `Segmented`-Feld mit **Statusfarbe als Fläche** | Beides fällt durch — §3 (Breite) und §4 (Farbe), je mit Zahl bzw. Regel. |
-| „dann passt der Auslöser in den **Aktionsslot der Karte**" (`2026-06-22-drawer-nutzung-reduzieren-design.md:102-106`) | Der Slot ist auf allen drei Seiten mit „Entfernen" belegt (`FahrzeugePage:565`, `PersonalPage:456`, `MaterialPage:352`) und `Datensicht.tsx:185-200` sichert **genau EINE** Primäraktion zu. Der Satz ist doppelt falsch; §5 löst ihn auf. |
+| „dann passt der Auslöser in den **Aktionsslot der Karte**" (`2026-06-22-drawer-nutzung-reduzieren-design.md:102-116`) | Der Slot ist auf allen drei Seiten mit „Entfernen" belegt (`FahrzeugePage:565`, `PersonalPage:456`, `MaterialPage:352`) und `Datensicht.tsx:185-200` sichert **genau EINE** Primäraktion zu. Der Satz ist doppelt falsch; §5 löst ihn auf. |
 | AK: „nicht nur ein **Icon ohne zugänglichen Namen**" | Den Zustand gab es nie. antd setzt das `aria-label` des Stifts unbedingt aus der Locale (`typography/Base/index.js:271-283`); mit `deDE` (`theme/ThemeModeProvider.tsx`) heißt er **„Bearbeiten"** (`locale/de_DE.js:78-79`). Der Mangel ist ein anderer — siehe §2. |
 | Alle sechs Zeilennummern des Elterntickets | Falsch. LFH-330/B2 hat die Seiten auf `components/Datensicht.tsx` umgezogen (`82c2885`). Die geltenden stehen im Ticket LFH-369 selbst. |
 
@@ -134,7 +134,7 @@ das heute rein anzeigende Statusetikett bedienbar — bei Fahrzeug und Personal 
 `karte.status`-Slot bereits gesetzt (`FahrzeugePage:555`, `PersonalPage:446`), bei Material
 steht der Status als Sekundärfeld (`MaterialPage:349`) und wird dort zum Auslöser.
 
-Das schließt die Lücke, die `2026-06-22-drawer-nutzung-reduzieren-design.md:102-106` benennt
+Das schließt die Lücke, die `2026-06-22-drawer-nutzung-reduzieren-design.md:102-116` benennt
 („unter `md` sind diese Module lesend plus eine Primäraktion") — **ohne** Drawer: der Grund,
 warum das `Select` nicht in die Karte passt, ist seine feste Mindestbreite
 (`Datensicht.tsx:234-236`). Ein Auslöser mit Menü im Portal hat dieses Problem nicht.

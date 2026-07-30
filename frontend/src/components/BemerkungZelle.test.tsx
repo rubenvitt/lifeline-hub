@@ -112,6 +112,30 @@ describe('BemerkungZelle', () => {
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN })).toBeInTheDocument();
   });
 
+  it('auch wenn der gespeicherte Wert NACHKOMMT, fällt der Fokus nicht auf <body>', () => {
+    /**
+     * Der Weg, den der BETRIEB nimmt und den ein `vi.fn()` nicht nachstellt: nach dem
+     * Übernehmen läuft die Mutation, der neue Wert kommt per Invalidierung nach, `gefuellt`
+     * kippt — und der Platzhalter hängt aus dem Baum aus. Der Rückgabe-Effekt des Primitivs
+     * greift dann NICHT (`warBearbeitet` steht in dieser Runde schon auf `false`), und antds
+     * eigener auch nicht (das frisch eingehängte `Typography` hat kein `prevEditing`).
+     *
+     * Mit einem Mock bleibt `wert` null, der leere Zweig steht weiter und der Test wäre für
+     * genau diesen Fall blind — der Nachlauf wird deshalb per `rerender` gestellt.
+     */
+    const { rerender } = renderMitProviders(
+      <BemerkungZelle wert={null} darfSchreiben kennung="Florian 1" onSpeichern={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' }));
+    druecke(screen.getByRole('textbox'), ENTER);
+    rerender(
+      <BemerkungZelle wert="Tank leer" darfSchreiben kennung="Florian 1" onSpeichern={vi.fn()} />,
+    );
+
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it('nach dem Verlassen liegt der Fokus wieder auf dem Platzhalter, nicht auf <body>', async () => {
     /**
      * antd stellt den Fokus beim Verlassen selbst her — aber nur auf seinen EIGENEN Stift
