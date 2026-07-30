@@ -130,10 +130,12 @@ const OFFEN: string[] = [
   // 10 Dateien. Der Abstand zur destruktiven Nachbaraktion, der dort auf denselben
   // Zeilen saß, hält seither `aktionsabstand.guard.test.ts`.
   // ── B5d · Kommunikationskarten (LFH-364) ── ABGERÄUMT, 24 Stellen in 12 Dateien.
-  // ── B5e · Einsatztagebuch (LFH-365) ───────────────────────────────────────
-  '/src/etb/BuchstabierHilfe.tsx',
-  '/src/etb/MetaChip.tsx',
-  '/src/pages/EtbPage.tsx',
+  // ── B5e · Einsatztagebuch (LFH-365) ── ABGERÄUMT, 8 Stellen in 3 Dateien.
+  // Darunter der `Space.Compact`-Wrapper in `etb/MetaChip.tsx`: er trug die Kleingröße
+  // auch den Kindern OHNE eigene Größen-Prop auf (`antd/es/space/Compact.js` über
+  // `SpaceCompactItemContext`), ein Entfernen nur am Knopf darin wäre also wirkungslos
+  // geblieben. Der Wrapper steht in {@link INTERAKTIV} und war damit ein gezählter
+  // Verstoß, keine Ermessensfrage.
   // ── B5f · Lagekarte und Kartenverwaltung (LFH-366) ────────────────────────
   '/src/karten/OfflineKartenVerwaltung.tsx',
   '/src/karten/OfflineVorhandeneModal.tsx',

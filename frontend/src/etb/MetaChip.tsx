@@ -1,5 +1,5 @@
-import { CloseOutlined } from '@ant-design/icons';
-import { AutoComplete, DatePicker, Input, Space, Tag } from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
+import { AutoComplete, Button, DatePicker, Dropdown, Input, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
 import { useState } from 'react';
@@ -41,7 +41,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
     if (d.editor === 'text') {
       const editor = optionen && optionen.length > 0 ? (
         <AutoComplete
-          size="small"
           autoFocus
           aria-label={d.label}
           style={{ width: 200 }}
@@ -61,7 +60,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
         />
       ) : (
         <Input
-          size="small"
           autoFocus
           aria-label={d.label}
           style={{ width: 160 }}
@@ -74,7 +72,15 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
       // LFH-110: Buchstabierhilfe additiv am Von/An-Feld (Funkrufname/Absender/Empfänger).
       if (feld === 'von' || feld === 'an') {
         return (
-          <Space.Compact block size="small">
+          /*
+           * Ohne Größenangabe (LFH-365 · B5e): `Space.Compact size="small"` trug die
+           * Kleingröße über `SpaceCompactItemContext` auch den Kindern auf, die selbst
+           * keine hatten (gemessen an `antd/es/space/Compact.js` — Kinder bekamen
+           * `ant-input-sm`/`ant-btn-sm`). Die Angabe hier zu lassen und nur den Knopf in
+           * `BuchstabierHilfe` zu befreien, wäre also wirkungslos gewesen; der Wrapper
+           * steht genau deshalb in der Liste interaktiver Elemente des Dichte-Guards.
+           */
+          <Space.Compact block>
             {editor}
             <BuchstabierHilfe text={text} />
           </Space.Compact>
@@ -85,7 +91,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
     if (d.editor === 'meldeweg') {
       return (
         <Select
-          size="small"
           autoFocus
           defaultOpen
           aria-label={d.label}
@@ -101,7 +106,6 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
     // editor === 'zeit'
     return (
       <DatePicker
-        size="small"
         showTime
         autoFocus
         aria-label={d.label}
@@ -113,14 +117,50 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
   }
 
   return (
-    <Tag
-      closable
-      closeIcon={<CloseOutlined aria-label="schließen" />}
-      onClose={(e) => { e.stopPropagation(); onRemove(feld); }}
-      onClick={() => onEdit(feld)}
-      style={{ cursor: 'pointer' }}
-    >
+    <Tag onClick={() => onEdit(feld)} style={{ cursor: 'pointer' }}>
       {d.label}: {anzeige(feld, wert)}
+      <Dropdown
+        trigger={['click']}
+        menu={{
+          items: [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            // `danger`, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar —
+            // „Bearbeiten" daneben legt es wieder an. Reibung gehört ans Unumkehrbare
+            // (LFH-363).
+            { key: 'entfernen', label: 'Entfernen', danger: true },
+          ],
+          /*
+           * Die Zuordnung hängt am MENÜ, nicht an den Einträgen (Muster
+           * `pages/lagekarte/AnsichtSwitcher.tsx:138`), weil der Riegel genau einen Ort
+           * braucht: das Overlay ist ein React-Kind des `<Tag onClick={onEdit}>`, und ein
+           * Synthetic Event steigt durch den KOMPONENTEN-Baum auf — auch aus dem Portal
+           * heraus. Ohne `stopPropagation` hier entfernte „Entfernen" das Feld und öffnete
+           * es im selben Klick wieder zum Bearbeiten (gemessen: `onEdit` wurde einmal
+           * gerufen, obwohl der Riegel am Auslöser schon saß).
+           */
+          onClick: ({ key, domEvent }) => {
+            domEvent.stopPropagation();
+            if (key === 'bearbeiten') onEdit(feld);
+            if (key === 'entfernen') onRemove(feld);
+          },
+        }}
+      >
+        {/*
+          Kein `size`-Prop: die Trefffläche kommt aus `controlHeight` und zieht mit der
+          Dichtestufe mit (30 / 48 / 72 px). Genau das konnte das ~10-px-`closeIcon`
+          nicht, das hier vorher stand.
+
+          Das `stopPropagation` ist der Erbe von dessen `onClose`-Riegel: der Auslöser
+          liegt IM `<Tag onClick={onEdit}>`, ohne den Riegel öffnete jeder Klick aufs
+          Menü zugleich den Editor.
+        */}
+        <Button
+          type="text"
+          aria-label={`Aktionen zu ${d.label}`}
+          icon={<MoreOutlined />}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </Dropdown>
     </Tag>
   );
 }

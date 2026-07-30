@@ -302,7 +302,6 @@ export default function EtbPage() {
                   {a.id != null && (
                     <Button
                       type="link"
-                      size="small"
                       onClick={() => void abgelehntVerwerfen(a.id!)}
                     >
                       verwerfen

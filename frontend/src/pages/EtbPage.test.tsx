@@ -1,5 +1,5 @@
 import { http, HttpResponse, type RequestHandler } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
@@ -31,6 +31,25 @@ const eintrag = {
   ereigniszeit: '2026-05-23 10:00:00', received_at: '2026-05-23 10:00:01',
   erfasst_lokal_at: null, berichtigt_eintrag_id: null,
 };
+
+/**
+ * Wählt eine Zeilenaktion der ETB-Tabelle (LFH-365 · B5e).
+ *
+ * Die drei Aktionen liegen seit dem Bündel in einem Menü statt in einer Knopfreihe: erst
+ * den Auslöser, dann den Eintrag — und die Rolle wechselt dabei von `button` zu
+ * `menuitem`, gleicher Wortlaut rettet einen alten Griff also nicht.
+ *
+ * Der Eintrag wird über das GEÖFFNETE Menü geholt, nicht per freiem `findByRole`: antd
+ * lässt die Portale geschlossener Dropdowns im Baum stehen (`Datensicht.test.tsx:926-931`).
+ */
+async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(await screen.findByRole('button', { name: /^Aktionen zu Eintrag/ }));
+  const menue = document.querySelector<HTMLElement>(
+    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+  );
+  if (!menue) throw new Error('Das Zeilen-Aktionsmenü ließ sich nicht öffnen');
+  await user.click(within(menue).getByRole('menuitem', { name }));
+}
 
 /** Zeigt den aktuellen Search-String im DOM — ermöglicht Param-Bereinigung zu prüfen. */
 function OrtSpy() {
@@ -166,14 +185,19 @@ describe('EtbPage', () => {
     setup();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Auftrag erteilen' }));
+    await waehleZeilenaktion(user, 'Auftrag erteilen');
     // Auftragstext ist aus dem Eintragstext vorbefüllt.
     expect(await screen.findByDisplayValue('Erste Meldung')).toBeInTheDocument();
     // Einen Funktions-Empfänger ergänzen (Pflicht: >=1 Empfänger).
     await user.type(screen.getByPlaceholderText(/S3, Fachberater/), 'S3');
-    // Modal-Submit ("Auftrag erteilen") ist der zweite gleichnamige Button (Trigger + Submit).
-    const buttons = screen.getAllByRole('button', { name: 'Auftrag erteilen' });
-    await user.click(buttons[buttons.length - 1]);
+    /*
+     * Der Modal-Submit ist jetzt der EINZIGE Knopf dieses Namens. Vorher gab es zwei
+     * gleichnamige (Zeilen-Auslöser + Submit) und dieser Griff nahm den letzten; seit
+     * LFH-365 heißt der Zeilen-Auslöser „Aktionen zu Eintrag <lfd_nr>" und die
+     * Mehrdeutigkeit ist weg. Der Menü-Eintrag trägt die Rolle `menuitem`, kollidiert
+     * also auch dann nicht, wenn antd sein Portal geschlossen im Baum stehen lässt.
+     */
+    await user.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.auftrag_text).toBe('Erste Meldung');
@@ -219,7 +243,7 @@ describe('EtbPage', () => {
     setup();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Wiedervorlage' }));
+    await waehleZeilenaktion(user, 'Wiedervorlage');
     // Titel ist aus dem Eintragstext vorbefüllt.
     expect(await screen.findByDisplayValue(/Wiedervorlage: Erste Meldung/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Anlegen' }));

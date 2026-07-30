@@ -1,4 +1,5 @@
-import { Button, Space, Tag, Tooltip } from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
+import { Button, Dropdown, Space, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { ReactNode } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -64,9 +65,24 @@ export default function EtbTabelle({
       render: (_, e) => (
         <Space size={abstand.xs}>
           <span><ZeitAnzeige wert={e.ereigniszeit} format="kurz" /></span>
+          {/*
+            Ein Wort, kein Zeichen (LFH-365 · B5e): das ⧖ hier war nur mit Tooltip oder
+            Vorwissen deutbar, und die Aussage „nachgetragen" ist beweisrelevant. Der
+            `Tag` gibt ihr denselben Träger, den die Berichtigungs-Merkmale in der
+            Inhaltsspalte schon haben — Form als Kanal, ohne Farbwert, also ohne
+            Berührung des Statusfarb-Vertrags.
+
+            Kein `aria-label` mehr: es gewann in der Namensrechnung gegen den sichtbaren
+            Inhalt (accname 2C vor 2F) und machte damit jede Rollen-Zusicherung auf eine
+            SICHTBARE Beschriftung unwiderlegbar — sie war schon grün, als hier nur das
+            Zeichen stand. Wer es wieder hinzufügt, dreht das Kriterium ab.
+
+            Der Tooltip bleibt und trägt weiterhin den Server-Empfangszeitpunkt; er ist
+            die Begründung, nicht die Beschriftung.
+          */}
           {istNachgetragen(e.ereigniszeit, e.received_at) && (
             <Tooltip title={`Nachgetragen — Server-Empfang: ${formatZeit(e.received_at)}`}>
-              <span aria-label="nachgetragen">⧖</span>
+              <Tag style={{ margin: 0 }}>Nachtrag</Tag>
             </Tooltip>
           )}
         </Space>
@@ -119,26 +135,71 @@ export default function EtbTabelle({
     spalten.push({
       title: '',
       key: 'aktion',
-      width: 230,
-      render: (_, e) => (
-        <Space size={abstand.xs} wrap>
-          {onBerichtigen && e.typ !== 'berichtigung' && (
-            <Button type="link" onClick={() => onBerichtigen(e)}>
-              Berichtigen
-            </Button>
-          )}
-          {onWiedervorlage && (
-            <Button type="link" onClick={() => onWiedervorlage(e)}>
-              Wiedervorlage
-            </Button>
-          )}
-          {onAuftragErteilen && (
-            <Button type="link" onClick={() => onAuftragErteilen(e)}>
-              Auftrag erteilen
-            </Button>
-          )}
-        </Space>
-      ),
+      /*
+       * Von 230 px auf die Breite eines Auslösers. Die Zahl ist bewusst großzügig: der
+       * Knopf ist quadratisch und erbt seine Kante aus `controlHeight`, im
+       * Handschuh-Betrieb also 72 px. Eine feste Spaltenbreite kann der Staffel nicht
+       * folgen — sie ist hier nur ein Hinweis, weil `KatalogTabelle` mit
+       * `scroll={{ x: 'max-content' }}` rechnet.
+       */
+      width: 96,
+      render: (_, e) => {
+        /*
+         * Aus drei Knöpfen wird eine Datenliste (LFH-365 · B5e). Vorbild und
+         * Konsistenzanker ist `chat/NachrichtenStrom.tsx:88` — dort wurde genau diese
+         * Transformation schon vollzogen.
+         *
+         * Die Sichtbarkeitsregeln von vorher bleiben unverändert, sie wandern nur vom
+         * JSX in den Listenaufbau: eine Berichtigung berichtigt man nicht, und eine
+         * Aktion, die die Seite nicht mitgibt, gibt es nicht.
+         */
+        const items = [
+          ...(onBerichtigen && e.typ !== 'berichtigung'
+            ? [{ key: 'berichtigen', label: 'Berichtigen' }] : []),
+          ...(onWiedervorlage ? [{ key: 'wiedervorlage', label: 'Wiedervorlage' }] : []),
+          ...(onAuftragErteilen ? [{ key: 'auftrag', label: 'Auftrag erteilen' }] : []),
+        ];
+        // Kein Auslöser statt eines leeren oder deaktivierten Menüs. Erreichbar an einer
+        // Berichtigungszeile auf einer Seite, die nur „Berichtigen" anbietet.
+        if (items.length === 0) return null;
+        return (
+          <Dropdown
+            trigger={['click']}
+            /*
+             * `autoFocus` nach dem Befund an `components/Datensicht.tsx:664-670`: ohne
+             * ihn klebt der Fokus am Auslöser und die Pfeiltasten heben im Menü nichts
+             * hervor. Die Wirkung ist in jsdom nicht prüfbar — Fokus- und
+             * Tastaturverhalten eines Portal-Menüs belegt erst Playwright —, deshalb
+             * steht sie hier als Konvention mit Quelle und nicht als Zusicherung.
+             */
+            autoFocus
+            menu={{
+              items,
+              // Zuordnung am Menü statt an jedem Eintrag (Muster
+              // `pages/lagekarte/AnsichtSwitcher.tsx:138`).
+              onClick: ({ key }) => {
+                if (key === 'berichtigen') onBerichtigen?.(e);
+                if (key === 'wiedervorlage') onWiedervorlage?.(e);
+                if (key === 'auftrag') onAuftragErteilen?.(e);
+              },
+            }}
+          >
+            {/*
+              Der Name trägt die laufende Nummer, nicht bloß „Aktionen": die Tabelle
+              zeigt viele Zeilen, und n gleichnamige Knöpfe sind per Rolle nicht
+              auseinanderzuhalten (Festlegung aus LFH-364). Genommen wird die
+              menschenlesbare Kennung der Tabelle, nie die DB-`id`.
+
+              Kein `size`-Prop — die Trefffläche kommt aus `controlHeight`.
+            */}
+            <Button
+              type="text"
+              aria-label={`Aktionen zu Eintrag ${e.lfd_nr}`}
+              icon={<MoreOutlined />}
+            />
+          </Dropdown>
+        );
+      },
     });
   }
 
