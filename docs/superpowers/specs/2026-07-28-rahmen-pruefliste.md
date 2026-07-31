@@ -104,9 +104,10 @@ ohne die Lücke zuzudecken:
   senkt sie aber nie — in `handschuh` gilt 72, nicht 48. Genau daran wäre die naheliegende
   Formel `mindestTrefflaeche ?? token.controlHeight` gescheitert; sie hätte im Handschuh-Betrieb
   auf 48 gedeckelt.
-- **Was offen bleibt:** IconRail, Hamburger und Drawer-Schliesser stehen weiterhin fest auf 48
-  und unterschreiten damit in `handschuh` die geforderten 72. Das ist keine stille Dauerausnahme,
-  sondern ein benannter Rest → **LFH-373**.
+- **Was offen bleibt:** IconRail, Hamburger, Drawer-Schliesser und `ModulAkkordeon` stehen
+  weiterhin fest auf 48 und unterschreiten damit in `handschuh` die geforderten 72. Das ist keine
+  stille Dauerausnahme, sondern ein benannter Rest → **LFH-384**. Der e2e-Nachweis nimmt diese
+  vier Stellen im Handschuh-Durchgang ausdrücklich aus; er wäre dort per Konstruktion rot.
 
 ### Was diese Prüfliste nicht beweist
 
@@ -117,8 +118,11 @@ ohne die Lücke zuzudecken:
   sind damit **nicht** gemessen.
 - Die **Breite** beschrifteter Knöpfe folgt der Beschriftung, nicht der Dichteachse (antds
   `paddingInlineSM` ist ein Literal). Der OK-Knopf einer Bestätigungsblase bleibt rund 38 px breit
-  in jeder Stufe. Verdikt: **offen → Zielticket** (Systemlösung ist ein Komponenten-Token oder ein
+  in jeder Stufe. Verdikt: **offen → LFH-381** (Systemlösung ist ein Komponenten-Token oder ein
   `minWidth` am kleinen Knopf, nicht ein `okText` je Aufrufstelle).
+- Der **Switch** folgt der Staffel ebenfalls nicht: antd rechnet seine Höhe aus der Schrift
+  (`fontSize × lineHeight`), gemessen 21 / 24 / 24 px. B5j hat die ZEILE um den Schalter auf den
+  Boden gehoben, das Steuerelement selbst bleibt darunter. Verdikt: **offen → LFH-380**.
 
 ### Gemessene Baseline am 31.07.2026
 
