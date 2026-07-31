@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -1142,6 +1142,73 @@ describe('Datensicht · Zeilenschleuse', () => {
     await userEvent.click(screen.getByRole('button', { name: /2 neue Einträge/ }));
     expect(zeilenZahl(container)).toBe(5);
     expect(screen.queryByRole('button', { name: /neue Einträge/ })).toBeNull();
+  });
+
+  it('der Spaltenschalter ist eine Benutzeraktion — die freigegebene Zeile steht sofort da', async () => {
+    /**
+     * DER REGRESSIONSTEST zu einem echten Bedienfehler: `setzeSpaltenAus` war die einzige
+     * Aktion der Werkzeugzeile, die {@link nachBenutzeraktion} NICHT rief. Sortierung
+     * (Datensicht.tsx:802), Suche und Filter tun es seit jeher.
+     *
+     * Folge bei gefrorener Schleuse: blendet man die gefilterte Spalte aus, wird ihr Filter
+     * unwirksam — die dadurch freigegebene Zeile zählte als ZUFLUSS und landete hinter dem
+     * Sammelbanner. Der Bediener sah eine kurze Liste und daneben „1 neuer Eintrag" für eine
+     * Zeile, die längst da war.
+     *
+     * ZWEI HÄLFTEN, beide Pflicht: „3 Zeilen" allein wäre auch grün, wenn die Schleuse gar
+     * nicht mehr einfriert; „kein Banner" allein auch, wenn die Zeile ganz verschwände.
+     *
+     * `fireEvent` statt `userEvent` ist hier NICHT Kosmetik, sondern trägt den Test:
+     * `userEvent` zieht den Fokus ins Dropdown-Portal, `pruefeVerlassen` taut die Schleuse
+     * auf, und der Test wird auch OHNE den Fix zeitweise grün. Genau daran hat der
+     * Bestandstest :915 bisher gewürfelt (gemessen 1 von 5 Läufen grün).
+     */
+    const { container } = rendere();
+    const namen = () =>
+      [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
+    const koepfe = () =>
+      [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
+    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Florian 3']));
+
+    // Menü öffnen, BEVOR eingefroren wird — der Öffnungsklick selbst ist eine Mausaktion
+    // und würde den Fokus ohnehin verschieben.
+    const knopf = screen.getByRole('button', { name: /Spalten/ });
+    let menue: HTMLElement | null = null;
+    for (let i = 0; i < 3 && !menue; i += 1) {
+      await userEvent.click(knopf);
+      menue = document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    }
+    expect(menue, 'der Spaltenschalter ließ sich in drei Klicks nicht öffnen').not.toBeNull();
+
+    /**
+     * Antds Dropdown zieht den Fokus per `autoFocus` ins Menü — und zwar NACHGELAGERT.
+     * Käme das erst nach dem `focus()` unten, wanderte der Fokus aus der Wurzel ins Portal,
+     * `pruefeVerlassen` taute die Schleuse auf, und der Test wäre auch ohne den Fix grün.
+     * Gemessen war er ohne dieses Abwarten selbst flaky (1 von 3 Mutationsläufen grün) —
+     * also genau die Krankheit, die er heilen soll. Erst warten, bis der Fokus im Menü
+     * angekommen ist, DANN einfrieren.
+     */
+    await waitFor(() => expect(menue!.contains(document.activeElement)).toBe(true));
+
+    // JETZT einfrieren: Fokus nachweislich auf einem Zeilen-Link in der Sicht.
+    screen.getByRole('link', { name: 'Florian 1' }).focus();
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Florian 1' }));
+
+    fireEvent.click(within(menue!).getByRole('checkbox', { name: 'Träger' }));
+    await waitFor(() => expect(koepfe()).not.toContain('Träger'));
+
+    expect(namen(), 'die freigegebene Zeile steht in der Liste').toEqual([
+      'Florian 1',
+      'Rotkreuz 2',
+      'Florian 3',
+    ]);
+    expect(
+      screen.queryByRole('button', { name: /Eintr/ }),
+      'sie ist die Antwort auf den Klick, kein Zufluss — also kein Sammelbanner',
+    ).toBeNull();
   });
 
   it('Zellinhalte laufen weiter, während die Zeilen stehen', () => {
