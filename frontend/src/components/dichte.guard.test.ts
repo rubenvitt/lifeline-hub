@@ -164,7 +164,6 @@ const OFFEN: string[] = [
   '/src/components/SprechgruppenPicker.tsx',
   '/src/einsatz/AlarmZentrale.tsx',
   '/src/pages/LoginPage.tsx',
-  '/src/pages/ProfilPage.tsx',
   '/src/pages/SchaedenDetailPage.tsx',
   '/src/pages/TiereDetailPage.tsx',
   '/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx',

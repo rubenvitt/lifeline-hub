@@ -238,3 +238,82 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     expect(screen.getByText(/CODE-2222/)).toBeInTheDocument();
   });
 });
+
+/**
+ * Der einzige Ein-Klick-Weg zu Codes, die nur EINMAL angezeigt werden (LFH-370 · B5j,
+ * Befund M17). Vorher klickte ihn kein einziger Test — und er war im Nicht-Secure-Context
+ * ein stiller No-Op, weil `navigator.clipboard?.writeText(...).catch(() => {})` die ganze
+ * Kette kurzschloss.
+ *
+ * FALLE, gemessen: `userEvent.setup()` installiert einen EIGENEN Clipboard-Stub, die
+ * direkte `userEvent.click`-API nicht. Diese Datei nutzt durchgehend die direkte API —
+ * wer sie auf `setup()` umstellt, macht den Fallback-Test still grün und prüft im
+ * Erfolgsfall userEvents Stub statt der Seite.
+ */
+describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
+  /** Fährt den Enroll-Weg bis zur Anzeige der Codes. */
+  async function bisZuDenCodes() {
+    setup(false);
+    server.use(
+      http.post('/api/auth/totp/enroll/start', () =>
+        HttpResponse.json({
+          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          secret_base32: 'JBSWY3DPEHPK3PXP',
+        }),
+      ),
+      http.post('/api/auth/totp/enroll/finish', () =>
+        HttpResponse.json({ recovery_codes: ['aaaa-1111', 'bbbb-2222'] }),
+      ),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: '2FA einrichten' }));
+    await screen.findByText('JBSWY3DPEHPK3PXP');
+    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
+    await screen.findByText('Recovery-Codes jetzt sichern');
+  }
+
+  function setzeZwischenablage(wert: unknown) {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: wert,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  afterEach(() => {
+    setzeZwischenablage(undefined);
+  });
+
+  it('meldet den Erfolg — und legt die Codes tatsaechlich ab', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    setzeZwischenablage({ writeText });
+    await bisZuDenCodes();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Codes kopieren' }));
+
+    expect(writeText).toHaveBeenCalledWith('aaaa-1111\nbbbb-2222');
+    expect(await screen.findByText('Recovery-Codes kopiert')).toBeInTheDocument();
+  });
+
+  it('meldet auch die ABLEHNUNG — vorhanden heisst nicht erlaubt', async () => {
+    // Der Grund für zwei Zweige statt eines: `writeText` kann da sein und trotzdem
+    // ablehnen (NotAllowedError, fehlende Berechtigung).
+    setzeZwischenablage({ writeText: vi.fn().mockRejectedValue(new Error('NotAllowedError')) });
+    await bisZuDenCodes();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Codes kopieren' }));
+
+    expect(await screen.findByText(/Kopieren fehlgeschlagen/)).toBeInTheDocument();
+  });
+
+  it('zeigt OHNE Zwischenablage keinen toten Knopf, sondern den Weg zum Markieren', async () => {
+    setzeZwischenablage(undefined);
+    await bisZuDenCodes();
+
+    expect(screen.queryByRole('button', { name: 'Codes kopieren' })).not.toBeInTheDocument();
+    expect(screen.getByText(/lassen\s+sich markieren und kopieren/)).toBeInTheDocument();
+    // Die Codes selbst bleiben erreichbar — der Hinweis verweist auf sie, statt einen
+    // zweiten Mechanismus zu bauen.
+    expect(screen.getByText(/aaaa-1111/)).toBeInTheDocument();
+  });
+});
