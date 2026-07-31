@@ -938,8 +938,14 @@ describe('LagekartePage', () => {
     };
     basisHandler([
       http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([BILD])),
+      // KEIN `new Blob(...)` als Body: jsdoms Blob hat kein `stream()` (seit der
+      // Toolchain-Anhebung jsdom 25→29, f41b8e5), undicis `extractBody` ruft es aber
+      // beim Bau der Response. Der Handler stirbt dann STILL im MSW-Lookup
+      // („unhandled exception during the handler lookup"), der Download liefert nichts
+      // und der Test scheitert an einer leeren Anzeige — sieht aus wie eine kaputte
+      // Komponente, ist aber die Vorrichtung. Der MIME-Typ trägt der Header.
       http.get('/api/einsaetze/1/karte/hintergrundbilder/3/download', () =>
-        new HttpResponse(new Blob(['pixeldata'], { type: 'image/png' }), {
+        new HttpResponse(new TextEncoder().encode('pixeldata'), {
           status: 200,
           headers: { 'Content-Type': 'image/png' },
         }),
@@ -988,8 +994,9 @@ describe('LagekartePage', () => {
     basisHandler([
       http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json(bilderListe)),
       // Beide Downloads liefern Pixeldaten — die konkrete id steckt im Pfad.
+      // Kein `new Blob(...)` als Body, Begründung siehe oben beim Smoke-Test.
       http.get('/api/einsaetze/1/karte/hintergrundbilder/:bildId/download', () =>
-        new HttpResponse(new Blob(['pixeldata'], { type: 'image/png' }), {
+        new HttpResponse(new TextEncoder().encode('pixeldata'), {
           status: 200,
           headers: { 'Content-Type': 'image/png' },
         }),
