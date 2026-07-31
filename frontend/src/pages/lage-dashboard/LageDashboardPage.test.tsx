@@ -522,6 +522,41 @@ describe('Die Kennzahlenleiste in sprache.css', () => {
     return css.slice(auf + 1, zu);
   }
 
+  it('keine harte min-height mehr in sprache.css — die Hoehen lesen die Staffel', () => {
+    /**
+     * LFH-370 · B5j. Vorher trugen drei Blöcke Pixelwerte, und nur EINER band:
+     *  - `.lfh-kz` 62 px — gemessen wirkungslos (Inhalt ergibt 81,9 / 99,9 / 119,9 px),
+     *  - `.lfh-knopf` 32 px — band, gemessen 32/32/32 über alle drei Stufen,
+     *  - `.lfh-kachel__mehr` gar nichts, bei 19,6 px gerendert.
+     *
+     * Die tragende Zusicherung ist NICHT „keine Pixel", sondern „genau
+     * `--lfh-zeilenhoehe`": ein Wechsel auf irgendeine andere Custom Property wäre
+     * ebenfalls pixelfrei und läse trotzdem die falsche Stufe.
+     */
+    for (const wahl of ['.lfh-kz {', '.lfh-knopf {', '.lfh-kachel__mehr {']) {
+      expect(regel(wahl), `${wahl} liest die Dichte-Staffel`).toMatch(
+        /min-height:\s*var\(--lfh-zeilenhoehe\)/,
+      );
+    }
+    // Und keine harte Mindesthöhe mehr in der ganzen Datei — sonst wandert der
+    // nächste Pixelwert einfach in einen vierten Block.
+    expect(css, 'sprache.css trägt keine harte min-height mehr').not.toMatch(/min-height:\s*\d/);
+  });
+
+  it('der Blank-Reset steht VOR der Kachel-Ausgangsregel — sonst sind deren Schriftangaben tot', () => {
+    /**
+     * Gemessener Kaskadenfehler: `.lfh-knopf-blank { font: inherit }` stand NACH
+     * `.lfh-kachel__mehr` bei gleicher Spezifität. `font` ist eine Kurzform und setzt
+     * font-size UND font-weight mit zurück — der einzige Navigationsausgang jeder Kachel
+     * rendete deshalb mit 13,5 / 15 px bei Gewicht 400 statt der dort verlangten 11,5 / 600,
+     * also größer und dünner als der Kacheltitel über ihm.
+     *
+     * Ein Test auf „font-size steht im Block" fiele darauf herein — er stand ja da. Nur die
+     * REIHENFOLGE ist die Aussage.
+     */
+    expect(css.indexOf('.lfh-knopf-blank {')).toBeLessThan(css.indexOf('.lfh-kachel__mehr {'));
+  });
+
   it('die Spaltenstaffel der Kennzahlenleiste steht in sprache.css: 6 → 3 → 2', () => {
     // DIE SCHWELLEN SIND CONTAINER-BREITEN, nicht Viewport-Breiten — `.lfh-flaeche`
     // trägt `container-type: inline-size`. Im Browser nachgemessen (LFH-329 · B1):

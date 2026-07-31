@@ -82,9 +82,18 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-363 bis LFH-367: **24 Stellen in 13 Dateien** — gemessen mit der
+  31.07.2026 nach LFH-370/B5j: **10 Stellen in 4 Dateien** — gemessen mit der
   Scan-Funktion des Guards selbst, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
-  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß).
+  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Rest sind
+  `pages/uhs/Grundriss.tsx` (die geprüfte Dauerausnahme unten), `pages/gefahren/*` (B5h) und
+  `pages/MaterialPage.tsx` (B5i).
+  **Eine Klein-Angabe abzubauen kann eine Regel aufwerfen, die vorher keine war** (gemessen in
+  LFH-370): solange die vier Knöpfe der Aktionsreihen in `SchaedenDetailPage`/`TiereDetailPage`
+  klein waren, war die Frage nach dem Abstand zum `danger`-Knopf nicht gestellt. Mit der Staffel
+  wächst „Stornieren" auf bis zu 72 px und steht bündig neben drei gleich hohen neutralen
+  Aktionen — beide Dateien mussten im selben Commit in den Bereich von
+  `components/aktionsabstand.guard.test.ts`. Wer eine Zeile aus `OFFEN` streicht, prüft den
+  zweiten Guard mit.
   **Eine Ausnahme ist geprüft und dauerhaft** (LFH-367/B5g): die vier Knöpfe der UHS-Platzkarte
   hängen an der Backend-Konstante `SCHRITT_Y = 120` aus `raster_position`. Der Innenraum von
   100 px trägt in **keiner** Dichtestufe eine Aktionszeile auf voller Höhe — auch „alles ins
@@ -272,9 +281,17 @@ Alltag wichtigsten:
   Prüfbar ist `queryByRole('img')` innerhalb der Gruppe, per Mutationsprobe belegt.
   **Regel, nicht erzwungen**: es gibt keinen Guard, und ein repoweiter wäre rot geboren (rund 15
   Bestandsstellen, u. a. `pages/EinheitenPage.tsx`, `pages/EinsatzabschnittePage.tsx`,
-  `components/FunkErreichbarkeit.tsx`, `einsatz/ModulPanel.tsx`, `components/AppLayout.tsx`,
-  `components/Platzhalter.tsx`, `pages/lagekarte/FachebenenInspector.tsx`) — und ein rot
-  geborenes Gate wird abgeschaltet statt befolgt. Verbindlich für Neues und ohnehin Angefasstes.
+  `components/FunkErreichbarkeit.tsx`, `components/Platzhalter.tsx`,
+  `pages/lagekarte/FachebenenInspector.tsx`) — und ein rot geborenes Gate wird abgeschaltet statt
+  befolgt. Verbindlich für Neues und ohnehin Angefasstes.
+  **Zwei der genannten Stellen sind seit LFH-370 abgetragen**, weil das Bündel sie ohnehin anfasste:
+  `einsatz/ModulPanel.tsx` (🚧 ↗ 🔒 → `ToolOutlined`/`ExportOutlined`/`LockOutlined`) und
+  `components/AppLayout.tsx` (🔒 am gesperrten Verwaltungs-Link). Dabei gemessen und für die
+  nächste Stelle festgehalten: der Pin, der beim Umbau bricht, ist NICHT der Test auf den
+  Accessible Name, sondern ein `getByText(/🚧/)` — und in `AppLayout` war das Emoji sogar TEIL des
+  zugänglichen Namens („Verwaltung Schloss"), also nie bloß Dekoration. Testabfragen, die auf das
+  Zeichen zeigen (`queryByText('Benutzer 🔒')`), werden nach dem Umbau zu Attrappen, die immer
+  `null` liefern; sie gehören auf `title`/Klassenselektor umgestellt, nicht gelöscht.
   **Nicht gemeint** ist ein Schriftzeichen **innerhalb** eines Textetiketts (das Häkchen in
   „Quittiert", das Warnzeichen vor „Nicht verortet") — das ist eine eigene Frage, kein Piktogramm.
 - **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.

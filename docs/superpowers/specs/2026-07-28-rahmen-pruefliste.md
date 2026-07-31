@@ -74,6 +74,63 @@ Maschinell gepinnt sind die Zeilen 1, 2, 6, 9 und die belegte Hälfte von 13:
   Messung an `documentElement`, mit benannten Verursachern im Fehlerfall. Gate 1 ist damit
   belegt, nicht behauptet — der Lauf gehört zum Abschlussschritt des Pakets.
 
+## Nachtrag 31.07.2026 — was B5j (LFH-370) an dieser Liste eingelöst hat
+
+Diese Liste gab zwei Zeilen ausdrücklich an B5 ab. **Z2 ist eingelöst**, Z5 bleibt offen.
+
+**Zeilenverweise nachgezogen.** Die Liste zitierte `tokens.ts:133` (72 px) und `tokens.ts:142`
+(`abstand` = kompakt); beide Stellen liegen heute auf `:161` bzw. `:171`. `ModulAkkordeon.tsx:44/75`,
+`IconRail.tsx:45`, `ModulPanel.tsx:46` und `ThemeToggle.tsx` stimmten weiterhin — bis B5j sie
+angefasst hat (s. u.).
+
+### Z2 — der Rahmen folgt jetzt der Stufe
+
+| Stelle | vorher | nachher |
+| --- | --- | --- |
+| Modulzeile inline (`ModulPanel.tsx`) | `minHeight: undefined` — **gar kein Boden** | `Math.max(mindestTrefflaeche ?? 0, token.controlHeight)` → 30 / 48 / 72 |
+| Spaltenabstand der Modulliste | `gap: 2` fest | `token.marginXS` → 3 / 5 / 7 |
+| Segment-Ziel der Kopfzeile | 26×38 / 44×38 / 68×38 | 30×38 / 48×48 / 72×72 |
+| Abstand der zwei Umschaltgruppen | `size={4}` | `size="large"` → 18 / 28 / 44 |
+| `.lfh-knopf` (`sprache.css`) | `min-height: 32px`, gemessen 32/32/32 | `var(--lfh-zeilenhoehe)` → 30 / 48 / 72 |
+| `.lfh-kachel__mehr` | **keine** Mindesthöhe, gemessen 19,6 px | `var(--lfh-zeilenhoehe)` |
+
+**Die Auflösung des Widerspruchs in dieser Zeile.** Z2 verlangte, dass auch die 48-px-Konstanten
+in `ModulAkkordeon.tsx:44` und `IconRail.tsx:45` der Stufe folgen, während beide Dateiköpfe
+ausdrücklich begründen, warum die 48 dort FEST steht („das ist eine Trefffläche, keine
+Dichte-Angabe"). Beides zugleich geht nicht. Entschieden ist zugunsten der Dateiköpfe, aber
+ohne die Lücke zuzudecken:
+
+- Die 48 ist ein **Boden**, kein Ersatz für die Stufe. `mindestTrefflaeche` hebt die Zeile an,
+  senkt sie aber nie — in `handschuh` gilt 72, nicht 48. Genau daran wäre die naheliegende
+  Formel `mindestTrefflaeche ?? token.controlHeight` gescheitert; sie hätte im Handschuh-Betrieb
+  auf 48 gedeckelt.
+- **Was offen bleibt:** IconRail, Hamburger und Drawer-Schliesser stehen weiterhin fest auf 48
+  und unterschreiten damit in `handschuh` die geforderten 72. Das ist keine stille Dauerausnahme,
+  sondern ein benannter Rest → **LFH-373**.
+
+### Was diese Prüfliste nicht beweist
+
+- Der e2e-Nachweis (`e2e/trefflaeche-tablet.spec.ts`) misst die Modulzeilen des **inline**-Rahmens
+  und die Aktionsknöpfe **einer** Bestätigungsblase, nicht jedes fokussierbare Element jeder Route.
+- Die `sprache.css`-Messungen stammen aus einer Chromium-Probe mit derselben Verschachtelung wie
+  `LageDashboardPage.tsx`, nicht aus der laufenden Seite: Rasterwirkungen der sechsspaltigen Leiste
+  sind damit **nicht** gemessen.
+- Die **Breite** beschrifteter Knöpfe folgt der Beschriftung, nicht der Dichteachse (antds
+  `paddingInlineSM` ist ein Literal). Der OK-Knopf einer Bestätigungsblase bleibt rund 38 px breit
+  in jeder Stufe. Verdikt: **offen → Zielticket** (Systemlösung ist ein Komponenten-Token oder ein
+  `minWidth` am kleinen Knopf, nicht ein `okText` je Aufrufstelle).
+
+### Gemessene Baseline am 31.07.2026
+
+| Gemessen mit | vorher | nachher |
+| --- | --- | --- |
+| `dichte.guard.test.ts` — Schuldmenge `OFFEN` | 24 Stellen in 13 Dateien | **10 Stellen in 4 Dateien** |
+| davon Bündel B5j | 14 Stellen in 9 Dateien | **0** |
+| harte `min-height`-Pixel in `sprache.css` | 2 | **0** |
+
+Rest sind `pages/uhs/Grundriss.tsx` (geprüfte Dauerausnahme aus B5g), `pages/gefahren/*` (B5h /
+LFH-368, noch in Arbeit) und `pages/MaterialPage.tsx` (B5i).
+
 ## Was offen bleibt und wohin es geht
 
 Die Zeilennummern stehen hier als `Z…`: das Gate zählt die Zeilen der Prüfliste über ihre
@@ -81,7 +138,7 @@ führende Nummer, und eine Zusammenfassung im selben Format zählte doppelt.
 
 | Zeile   | Offener Punkt                                                          | Zielticket |
 | ------- | ---------------------------------------------------------------------- | ---------- |
-| Z2      | Rahmen-Trefflächen und -Abstände folgen der gewählten Stufe nicht       | B5         |
+| ~~Z2~~  | ~~Rahmen-Trefflächen und -Abstände folgen der gewählten Stufe nicht~~ — **erledigt in B5j (LFH-370)**, siehe Nachtrag unten | B5j ✓      |
 | Z2      | 1024 px bekommt die Zweispalten-Ansicht des Handschirms                 | C2         |
 | Z3, Z12 | Modul-Overrides ohne Lade- und Fehlerzustand                           | B3         |
 | Z5      | gesperrter Verwaltungs-Link 3,18 : 1; gewähltes Segment 1,40 : 1       | B5         |
