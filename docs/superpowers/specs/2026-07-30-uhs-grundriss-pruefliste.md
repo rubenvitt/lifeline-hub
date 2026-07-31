@@ -54,7 +54,7 @@ nicht per Grep und nicht fortgeschrieben):
 | **13** | Fokus-Sichtbarkeit beim Durchtabben der absolut positionierten Karten | **noch nicht getickt** — nur im Browser messbar, wäre der erste Dichte-/Fokus-e2e-Nachweis des Repos |
 | **14** | Spaltenschalter mit Zähler im Materialreiter | **noch nicht getickt** — Bestand, nicht von B5g verursacht |
 | **1a** | zweite AK-Hälfte: dass der Drag trotz des neuen Wurzel-`onClick` **ankommt** — in jsdom nicht fahrbar (unten begründet, mit dem gemessenen Teilergebnis) | **LFH-341/C6** — dessen AK1 fordert den Touch-e2e-Nachweis ohnehin |
-| 15b, „Ein Befund, der aus dem Umfang fällt" | handgebauter „Material zuordnen"-Dialog; `gap: 4` in der Aktionszeile; die Popconfirm-Frage an „Material lösen" | **LFH-378** |
+| 15b, „Ein Befund, der aus dem Umfang fällt" | handgebauter „Material zuordnen"-Dialog; `gap: 4` in der Aktionszeile; die Popconfirm-Frage an „Material lösen" | **LFH-378 — erledigt 31.07.2026**, siehe Nachtrag unten. Zwei der dortigen Messungen korrigieren diese Prüfliste; der verbliebene Überlauf der Aktionszeile ist **LFH-379** |
 
 Die fett markierten Zeilen zeigen auf **kein** Ticket, und das steht hier ausdrücklich so statt
 als „→ Zielticket". Ein Verweis auf eine Nummer, die es nicht gibt, liest sich wie erledigte
@@ -83,6 +83,49 @@ dann abschneidet — also derselbe `SCHRITT_Y`-Deckel wie in Zeile 1, nur an and
 Eintrag im `aktionsabstand.guard.test.ts` wäre zudem falsch: dessen Prüfung zielt auf
 `<Space>`-Reihen, und diese Zeile ist keine. Der Fall ist benannt und **nicht** stillschweigend
 umgangen → **LFH-378**.
+
+### Nachtrag 31.07.2026 — erledigt in LFH-378, und die Rechnung oben war falsch
+
+Alle drei Befunde sind umgesetzt. Zwei davon **korrigieren, was hier steht**, und das gehört an
+die Stelle statt in ein Erfolgsprotokoll:
+
+**Die 10,7 px je Lücke gelten nur in der kompakten Stufe.** Der Absatz oben rechnet mit „vier
+Knöpfen à 24 px" über alle Stufen hinweg. Nachgemessen: antd gibt einem **icon-only**-Knopf
+`width: controlHeight` — bei `size="small"` also `controlHeightSM`, und das ist über die Staffel
+**24 / 48 / 72 px** (`antd/lib/button/style/index.js`, `genButtonStyle` +
+`genSizeSmallButtonStyle`). Die Knöpfe sind ausserdem Flex-Items **ohne** `flex-shrink: 0` — sie
+laufen also gar nicht über, sie **schrumpfen**. Ab `komfortabel` brauchen vier Knöpfe allein
+4 × 48 = 192 px in einer 124 px breiten Zeile (140 − 2×2 Rand − 2×6 Polsterung; die „128 px" oben
+vergessen den Rand). Folge: dort ginge **jede** Lücke direkt von der Trefffläche ab, und ein
+ungedeckeltes `marginSM` wäre nominell regelkonform und in der Bedienung **schlechter**.
+
+Umgesetzt ist deshalb ein Deckel: `aktionsabstand()` in `Grundriss.tsx` nimmt `token.marginSM`
+als **Obergrenze**, Ergebnis **7 / 0 / 0**. Rein und exportiert nach dem Muster von
+`bedienzielStil`, geprüft gegen Literale je Dichtestufe und über zwei Stufen **ungleich**.
+
+Dass die Zeile ab `komfortabel` überhaupt überläuft und die Knöpfe unter den Trefflächenboden
+schrumpfen, ist damit **nicht** behoben — es ist ein eigener Befund, den weder B5g noch LFH-378
+im Umfang hatten, und liegt als **LFH-379** auf dem Board.
+
+**„Enter ist tot" ist bei einem `Select` nicht behebbar.** Zeile 15b oben nennt es als Mangel des
+handgebauten Dialogs. Der Umbau auf `ErfassungsModal` ist erfolgt, aber Enter sendet weiterhin
+nicht ab: `@rc-component/select` ruft in `BaseSelect/index.js:246` bei **jedem** Enter
+`event.preventDefault()`, solange der Modus nicht `combobox` ist („Do not submit form when type in
+the input"). Ein `Select` ist damit von der Enter-Zusicherung ausgenommen wie eine
+`Input.TextArea`. Belegt wird stattdessen die **Struktur** — kein `.ant-modal-footer`, und der
+Absende-Knopf hat ein `form` als Vorfahr.
+
+**„Nur auf zwei der vier Auswege" stimmt für diese Maske nicht.** Ebenfalls Zeile 15b. antds
+`Modal` ruft `onCancel` für **alle vier** Auswege, und der Bestand leerte dort seinen `useState` —
+die Maske war also nie lückenhaft. Der gemessene Reset-Fehler aus LFH-332 traf Masken mit einem
+`Form`-Speicher, der das Abhängen der Kinder überlebt; einen solchen bekommt diese Maske durch den
+Umbau **erst**. Der Escape-Test ist deshalb kein Fix-Beleg, sondern der Riegel dagegen, dass der
+Umbau eine Lücke einbaut, die vorher nicht da war.
+
+**Die Rückfrage an „Material lösen" ist entfernt**, mit Begründung am Code: die Aktion ist über
+„Material zuordnen" umkehrbar, CLAUDE.md nennt „eine gelöste Zuordnung" wörtlich als Beispiel. Sie
+war zugleich der einzige Riegel gegen einen zweiten Klick — der liegt jetzt als `loading` je Zeile
+dort, nicht je Mutation (die bedient alle Zeilen).
 
 ## Was diese Prüfliste nicht beweist
 
