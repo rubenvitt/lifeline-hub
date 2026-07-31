@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -45,15 +45,22 @@ describe('AppLayout (globale Topbar)', () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'Eva' });
     await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
-    expect(screen.queryByText('Benutzer 🔒')).not.toBeInTheDocument();
+    // Am `title` greifen, nicht am Zeichen: das Schloss ist seit LFH-370 eine Ikone in
+    // einer aria-hidden-Hülle, `queryByText('Benutzer 🔒')` wäre eine Attrappe, die
+    // IMMER null liefert und nichts mehr prüft.
+    expect(screen.queryByTitle('Keine Berechtigung')).not.toBeInTheDocument();
   });
 
-  it('Sonstige: Verwaltung gesperrt (🔒), kein Admin-Tag, kein Benutzer-Eintrag', async () => {
+  it('Sonstige: Verwaltung gesperrt, kein Admin-Tag, kein Benutzer-Eintrag', async () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'keine', anzeigename: 'Max' });
     await waitFor(() => expect(screen.getByText('Max')).toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Verwaltung' })).not.toBeInTheDocument();
-    expect(screen.getByText('Verwaltung 🔒')).toBeInTheDocument();
-    expect(screen.queryByText('Benutzer 🔒')).not.toBeInTheDocument();
+    const gesperrt = screen.getAllByTitle('Keine Berechtigung');
+    // GENAU einer — sonst bliebe „kein Benutzer-Eintrag" unbewiesen.
+    expect(gesperrt).toHaveLength(1);
+    expect(gesperrt[0]).toHaveTextContent('Verwaltung');
+    // Die Ikone ist Dekoration und darf kein eigenes Vorleseziel sein.
+    expect(within(gesperrt[0]).queryByRole('img')).not.toBeInTheDocument();
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
   });
 
