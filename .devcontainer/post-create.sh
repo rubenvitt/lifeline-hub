@@ -2,6 +2,14 @@
 # Einmaliges Setup nach dem Erstellen des Dev Containers.
 set -euo pipefail
 
+echo "==> System-OpenSSL-Dev-Header (Build-Voraussetzung von openssl-sys)"
+# webauthn-rs zieht `openssl`/`openssl-sys` unconditional herein — nicht per Feature
+# abwählbar (Cargo.toml:73-82, docs/betrieb/packaging.md:33-69). Ohne die Dev-Header
+# bricht der erste `cargo build`. pkg-config bringt das Rust-Image mit, libssl-dev nicht
+# zuverlässig; apt-get ist idempotent, ein bereits installiertes Paket kostet nichts.
+sudo apt-get update -qq
+sudo apt-get install -y --no-install-recommends pkg-config libssl-dev
+
 echo "==> corepack/pnpm aktivieren"
 corepack enable
 # Aktiviert exakt die in frontend/package.json gepinnte pnpm-Version (packageManager-Feld).
