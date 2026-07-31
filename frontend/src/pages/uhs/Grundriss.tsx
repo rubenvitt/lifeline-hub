@@ -49,6 +49,13 @@ const AKTIONEN_MAX = 4;
  * wird mit der vollen Zeile: ein Abstand, der mit der Knopfzahl springt, wäre von Karte zu
  * Karte verschieden.
  *
+ * Die Rechnung ist bewusst eine ABSCHÄTZUNG nach oben und keine Pixelbilanz: drei der vier
+ * Knöpfe sind icon-only und damit quadratisch (`width: controlHeightSM`), der vierte ist der
+ * Menü-Auslöser mit „…" als Inhalt — der misst `paddingInlineSM × 2 + Textbreite` und damit
+ * etwas anderes. Ihn ebenfalls als Quadrat zu zählen überschätzt den Bedarf leicht; das ist
+ * die richtige Richtung für einen Deckel, der nichts überlaufen lassen soll. Eine echte
+ * Breitenmessung bräuchte Layout, und jsdom rechnet keins.
+ *
  * Rein und exportiert aus demselben Grund wie `bedienzielStil` in `lagekarte/Sidebar.tsx`:
  * nur so ist die Zusicherung über mehrere Dichtestufen prüfbar, ohne zu rendern — jsdom
  * rechnet kein Layout, und `test/utils.tsx` montiert ein `ConfigProvider` ohne unser Theme.

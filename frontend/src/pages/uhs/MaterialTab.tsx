@@ -79,7 +79,19 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
           // Ohne Größen-Prop: die Fläche erbt die Dichtestufe. Anders als die vier
           // Knöpfe der Platzkarte hängt diese Zelle an keiner Backend-Konstante —
           // die Tabelle wächst mit.
-          <Button danger onClick={() => loesenMut.mutate(em.id)}>Lösen</Button>
+          //
+          // `loading` je ZEILE, nicht je Mutation: `loesenMut` bedient alle Zeilen, ein
+          // pauschales `isPending` legte die ganze Spalte lahm. Es ersetzt den Riegel, den
+          // die entfernte Rückfrage nebenbei mitbrachte — ohne ihn setzt jeder weitere
+          // Klick einen weiteren PATCH ab, samt Invalidierung, Live-Ereignis und einer
+          // zweiten Erfolgsmeldung für eine Aktion, die einmal stattgefunden hat.
+          <Button
+            danger
+            loading={loesenMut.isPending && loesenMut.variables === em.id}
+            onClick={() => loesenMut.mutate(em.id)}
+          >
+            Lösen
+          </Button>
         ) : null,
     },
   ];

@@ -58,12 +58,20 @@ interface Patch { emId: number; body: unknown }
  * Rendert den Reiter und gibt die aufgezeichneten PATCHes zurück. Kein `vi.fn()` als
  * Mutation: geprüft wird der Weg bis zum Request, nicht der Aufruf eines Doubles.
  */
-function render(material: EinsatzMaterial[], schreibgeschuetzt = false) {
+function render(
+  material: EinsatzMaterial[],
+  schreibgeschuetzt = false,
+  // Hält den PATCH offen, bis der Test ihn freigibt. Nur so ist der Zustand WÄHREND des
+  // Requests beobachtbar — ohne das antwortet MSW, bevor ein zweiter Klick möglich wäre,
+  // und der Riegel gegen das Doppel-Absenden wäre nicht prüfbar.
+  anhalten?: { freigeben: () => void; versprechen: Promise<void> },
+) {
   const patches: Patch[] = [];
   server.use(
     http.get('/api/einsaetze/1/material', () => HttpResponse.json(material)),
     http.patch('/api/einsaetze/1/material/:emId', async ({ params, request }) => {
       patches.push({ emId: Number(params.emId), body: await request.json() });
+      if (anhalten) await anhalten.versprechen;
       return HttpResponse.json({ ...frei, id: Number(params.emId) });
     }),
   );
@@ -182,6 +190,36 @@ describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-3
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toEqual({ emId: 12, body: { uhs_id: null } });
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die Kehrseite der entfernten Rückfrage: sie war zugleich das Einzige, was einen
+   * zweiten Klick abgefangen hat. Ohne Riegel setzt jeder weitere Klick einen weiteren
+   * PATCH ab — fachlich idempotent (`uhs_id: null` bleibt `null`), aber es kostet je Klick
+   * eine Invalidierung, ein Live-Ereignis und eine zweite Erfolgsmeldung für eine Aktion,
+   * die einmal stattgefunden hat. Der Riegel ist ein `loading` je ZEILE: `loesenMut` ist
+   * eine Mutation für alle Zeilen, ein pauschales `isPending` legte die ganze Spalte lahm.
+   */
+  it('nimmt keinen zweiten Klick an, solange der PATCH läuft', async () => {
+    const user = userEvent.setup();
+    let freigeben!: () => void;
+    const versprechen = new Promise<void>((r) => { freigeben = r; });
+    const { patches } = render([verortet, { ...verortet, id: 13, bezeichnung: 'Decke' }],
+      false, { freigeben, versprechen });
+    await screen.findByText('Trage');
+    const [ersteZeile, zweiteZeile] = screen.getAllByRole('button', { name: 'Lösen' });
+
+    await user.click(ersteZeile);
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await user.click(ersteZeile);
+
+    expect(patches).toHaveLength(1);
+    // Und der Riegel liegt an DIESER Zeile, nicht an der Spalte — sonst wäre „ein
+    // laufender Request sperrt alles" nicht von „der Riegel wirkt" zu unterscheiden.
+    expect(zweiteZeile).toBeEnabled();
+
+    freigeben();
+    await waitFor(() => expect(ersteZeile).toBeEnabled());
   });
 
   it('ohne Schreibrecht gibt es weder Lösen noch Zuordnen', async () => {
