@@ -301,6 +301,24 @@ Alltag wichtigsten:
   (heute nur „Löschen" in `stammdaten/StichworteTab.tsx`) bekommt zusätzlich eine Rückfrage.
   Jedes `Popconfirm` an einer destruktiven Aktion trägt `okButtonProps={{ danger: true }}` —
   sonst bestätigt man das Löschen mit einem blauen Knopf.
+  **Die erste Anwendung auf den Bestand steht** (LFH-378/B5l): das „Lösen" im UHS-Materialreiter
+  (`pages/uhs/MaterialTab.tsx`) hat seine Rückfrage **verloren**, weil CLAUDE.md „eine gelöste
+  Zuordnung" wörtlich als umkehrbar führt und die Umkehrung („Material zuordnen") als Knopf
+  darüber steht. LFH-367/B5g hatte dasselbe `Popconfirm` noch **gehärtet statt entfernt** —
+  bewusst, weil das Entfernen einer bestehenden Rückfrage eine Bedienentscheidung ist und nicht
+  ins AK eines Härtungs-Tickets gehört. Wer eine Rückfrage anfasst, entscheidet also zuerst die
+  Umkehrbarkeit; `okButtonProps` ist die Antwort auf die zweite Frage, nicht auf die erste.
+  **Ein gedeckelter Abstand ist kein fehlender Abstand** (ebenfalls LFH-378): die Aktionszeile
+  der UHS-Platzkarte nimmt `token.marginSM` **als Obergrenze**, nicht als Sollwert
+  (`aktionsabstand()` in `uhs/Grundriss.tsx`, rein und exportiert nach dem Muster von
+  `bedienzielStil`). Grund, gemessen: antd gibt einem icon-only-Knopf `width: controlHeightSM`
+  (24 / 48 / 72), und als Flex-Items ohne `flex-shrink: 0` schrumpfen die Knöpfe auf die 124 px
+  Innenbreite der Karte. Ab `komfortabel` brauchen vier Knöpfe allein 192 px — dort ginge **jede
+  Lücke direkt von der Trefffläche ab**, ein ungedeckeltes `marginSM` machte die Ziele also
+  kleiner statt besser. Die Karte ist breitenseitig an `SCHRITT_X = 160` gebunden wie ihre Höhe
+  an `SCHRITT_Y = 120` (`uhs/platz_repo.rs`, `raster_position`); das ist dieselbe Ausnahme, nur
+  an der anderen Achse. Der Ergebniswert ist **7 / 0 / 0** — die Ungleichheit über zwei Stufen
+  ist das, was einen dichteblinden Festwert auffliegen lässt.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
@@ -330,6 +348,17 @@ Die Hülle trägt drei Zusicherungen, die der Bestand einzeln verletzt hat:
   dem Knopf **ausserhalb** des Formulars; dort war Enter tot (26 Stellen am 29.07.2026,
   Befund H69). Der Dialog rendert seine Fusszeile deshalb **selbst** (`footer={null}`)
   statt antds `footer` zu füllen.
+  **Ein `Select` ist von Enter ausgenommen wie eine `Input.TextArea`** (gemessen 31.07.2026,
+  LFH-378/B5l). `@rc-component/select` ruft in `BaseSelect/index.js:246` bei **jedem** Enter
+  `event.preventDefault()`, solange der Modus nicht `combobox` ist — kommentiert mit „Do not
+  submit form when type in the input" — und öffnet stattdessen die Liste. Die eingebaute
+  Übermittlung des Browsers erreicht die Taste also nie; die Zusicherung greift für
+  `Input`/`InputNumber`/`DatePicker`. Folge fürs **Testen**: eine Maske, deren einziges Feld ein
+  `Select` ist, kann „Enter sendet ab" nicht belegen. Prüfbar ist die **Struktur, aus der die
+  Zusicherung folgt** — kein `.ant-modal-footer` im Dialog **und** `knopf.closest('form')` ≠
+  `null` (Muster: `components/Erfassung.test.tsx`, angewandt in `pages/uhs/MaterialTab.test.tsx`).
+  Ein Ticket, das „Enter sendet ab" für eine Select-Maske als Akzeptanzkriterium schreibt,
+  verlangt etwas, das die Bibliothek nicht hergibt — das ist kein Umsetzungsfehler.
 - **Fokus im ersten Feld** beim Öffnen und nach jedem Serien-Speichern. Der Rücksprung
   braucht `requestAnimationFrame` — direkt gerufen verpufft er und der Fokus landet
   gemessen auf `<body>`.
@@ -343,6 +372,13 @@ Die Hülle trägt drei Zusicherungen, die der Bestand einzeln verletzt hat:
   gegen `initialValues`. Wer einen Dialog baut, dessen Schließwege nicht durch das Formular
   laufen, muss dort selbst zurücksetzen — sonst trägt der Anlegen-Dialog die Werte des
   zuletzt bearbeiteten Datensatzes und legt ihn als Dublette an.
+  **Der Fehler traf nur Masken mit `Form`-Speicher** (Klarstellung aus LFH-378, gemessen):
+  antds `Modal` ruft `onCancel` für **alle vier** Auswege — Knopf, Schliesskreuz, Escape und
+  Maskenklick. Ein handgebauter Dialog, der seinen Zustand in `useState` hält und dort leert,
+  war also **nie** lückenhaft; die Lücke entsteht am Speicher von rc-field-form, der das
+  Abhängen der Kinder überlebt. Wer ein `<Modal onOk>` auf die Hülle zieht, baut die Lücke
+  damit **erst ein** und muss sie im selben Zug wieder schliessen — „der Bestand deckte nur
+  zwei der vier Wege" ist für solche Masken eine Fehldiagnose.
 
 **`onErfassen` muss bei Ablehnung ablehnen** — also `mutateAsync`, nicht `mutate`. Der
 Bestand rief `resetFields()` synchron neben `mutate()`: ein 422 kostete den Wortlaut
