@@ -270,8 +270,9 @@ const AUSNAHMEN = [
   '/src/components/KatalogTabelle.tsx',
   // Flächencodierung Gefahrentyp × Schutzobjekt: eine Matrix, in der jede Zelle ein eigener
   // Sachverhalt ist — kein Listenvergleich, also auch keine Katalogtabelle. Sie trägt
-  // waagerechten Bildlauf und die fixierte Kennungsspalte (`fixed: 'left'`) selbst; es fehlt
-  // allein die stehende Kopfzeile. Das ist ein benannter Restposten, kein Freibrief.
+  // waagerechten Bildlauf, die fixierte Kennungsspalte (`fixed: 'left'`) und seit
+  // LFH-368/B5h auch die stehende Kopfzeile (`sticky`) selbst. Der Restposten von LFH-330
+  // ist damit eingelöst; die Freistellung bleibt, weil die Sorte bleibt.
   '/src/pages/gefahren/GefahrenMatrix.tsx',
 ];
 
@@ -627,5 +628,26 @@ describe('KatalogTabelle-Schließung', () => {
       '/src/pages/Zwei.tsx:1  const a = <Table rowKey="id" />;',
       '/src/pages/Zwei.tsx:3  const c = <Table rowKey="id" />;',
     ]);
+  });
+});
+
+describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
+  it('die Gefahrenmatrix hat die stehende Kopfzeile, die ihre Ausnahme verspricht', () => {
+    /**
+     * Geprüft wird der Prop-Wert im QUELLTEXT, kein Pixel — jsdom rechnet kein Layout, und
+     * `position: sticky` hat dort keine geometrische Wirkung. Bauart wie
+     * `aktionsabstand.guard.test.ts`.
+     *
+     * Der Kommentar bei {@link AUSNAHMEN} behauptet seit LFH-368, der Restposten von LFH-330
+     * (stehende Kopfzeile) sei eingelöst. Ein Versprechen ohne Prüfung ist genau die tote
+     * Ausnahme, die die andere Hälfte dieser Datei verhindert.
+     *
+     * `ohneKommentare` ist NICHT Beiwerk: {@link KORPUS} trägt anders als {@link QUELLEN}
+     * ROHTEXT, und über dem Prop steht in `GefahrenMatrix.tsx` ein dreizeiliger Kommentar,
+     * der ihn erklärt. Ohne den Stripper füllte eine Umformatierung dieses Kommentars das
+     * Gate mit seiner eigenen Prosa — derselbe Fehlertyp, vor dem Grenze 8 im Dateikopf warnt.
+     */
+    const quelle = ohneKommentare(KORPUS['/src/pages/gefahren/GefahrenMatrix.tsx'] ?? '');
+    expect(quelle).toMatch(/^\s*sticky\s*$/m);
   });
 });

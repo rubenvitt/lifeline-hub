@@ -82,7 +82,7 @@ Alltag wichtigsten:
   verstreute punktuelle Größen-Props. **Neues punktuelles `size="small"` auf interaktiven Elementen
   ist verboten** — seit LFH-362 nicht mehr nur als Prosa, sondern erzwungen von
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
-  30.07.2026 nach LFH-363 bis LFH-367: **24 Stellen in 13 Dateien** — gemessen mit der
+  30.07.2026 nach LFH-363 bis LFH-369: **19 Stellen in 11 Dateien** — gemessen mit der
   Scan-Funktion des Guards selbst, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
   zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß).
   **Eine Ausnahme ist geprüft und dauerhaft** (LFH-367/B5g): die vier Knöpfe der UHS-Platzkarte
@@ -281,6 +281,19 @@ Alltag wichtigsten:
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein
   Fehler, kein Vorschlag.
+  **Die Fläche ist die dritte Darstellungssorte, und sie liegt seit LFH-368/B5h im Vertrag**:
+  `theme/statusFarben.ts:warnstufeFlaeche` bildet die fünf Warnstufen auf **drei** Farbtöne ab —
+  zwei Intensitäten von `achtung`/`alarm` plus leer —, `flaechenFarbe` löst sie je Modus auf.
+  Damit hält „nicht eine sechste Farbe" auch dort, wo fünf Flächen gebraucht werden. Eine Füllung
+  ist **keine** `Statusrolle`: sie hat einen eigenen Typ (`Flaechendarstellung`) und erreicht
+  bewusst keinen antd-Token — `rollenFarbe` kann sie nicht liefern, `antdToken()` bildet die
+  Füllungsrollen nicht ab. Wer eine vierte Sorte braucht, benennt sie dort, statt sie in `pages/`
+  daneben zu bauen: die Pastelltöne, die dort lagen, hatten **kein Nachtmodus-Paar** und standen
+  im Dunkelmodus als vier grelle Helligkeitsblöcke. Weil zwei Stufen sich denselben Ton in zwei
+  Intensitäten teilen, ist der **zweite Kanal Pflicht, nicht Kür** — `Flaechendarstellung.kuerzel`
+  steht im Auslöser, das Stufenwort im zugänglichen Namen. Ihr **Kontrast** ist eine begründete
+  Setzung und kein Messwert (jsdom rechnet keine Farbmischung): der Nachweis steht offen und
+  gehört in den Playwright-Topf von **LFH-370/B5j**, der ihn heute noch nicht führt.
   **Rot steht auch nicht bündig neben Neutralem** (LFH-363): eine `<Space>`-Aktionsreihe mit
   einem `danger`-Knopf und mindestens einer weiteren Aktion trägt `size="middle"`. Der
   Vorgabewert ist hier **nicht** antds 8 px — antd mappt `spaceGapSmallSize` auf `paddingXS`,

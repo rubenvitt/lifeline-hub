@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Space, Spin, Tag, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -9,11 +9,49 @@ import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMat
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
+import { useViewport } from '../../components/useViewport';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
-import { warnstufeFarbe } from './gefahrenSchema';
-import GefahrenMatrix from './GefahrenMatrix';
+import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
+import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
+
+/**
+ * Trefflächenboden der Gebietszeile (Abschluss-Review zu LFH-368 · B5h, Konvention aus
+ * LFH-365).
+ *
+ * Die Zeile ist ein HANDGEBAUTES Bedienziel: `ListenEintrag` legt sein `onClick` auf ein
+ * nacktes `<div>` (`components/Liste.tsx:160-180`), und dessen Höhe entstand hier allein aus
+ * der Polsterung der `<Liste size="small">` — `paddingBlock = token.paddingXS`, also 3 / 5 / 7 px.
+ * Gerechnet kommt die Zeile damit im Handschuh-Betrieb auf grob 36 px gegen die geforderten 72.
+ * Deshalb ZWEI Angaben und nicht eine: `minHeight` aus `controlHeight` (30 / 48 / 72) PLUS die
+ * Polsterung. Die Polsterung allein trüge den Boden ebenfalls nicht (grob 54 px), sie muss aber
+ * da sein, sonst klebt der Text an der Kante.
+ *
+ * Aufgelöste Tokens, nie `var(--lfh-*)`: die Arbeitsteilung steht in `theme/rollen.css`
+ * („ZWEI QUELLEN, EINE WAHRHEIT") — handgeschriebenes CSS liest die Custom Properties, TSX liest
+ * `theme.useToken()`.
+ *
+ * Schablone ist `bedienzielStil` in `pages/lagekarte/Sidebar.tsx`; **importiert wird von dort
+ * nichts** — ein `pages/gefahren` → `pages/lagekarte`-Import wäre schlimmer als diese drei
+ * Zeilen. `display`/`alignItems` stehen anders als dort nicht drin: `ListenEintrag` setzt beide
+ * selbst, und eine Wiederholung sähe aus wie eine Absicht, die sie nicht ist.
+ *
+ * Rein und exportiert, damit die Zusicherung über zwei Dichtestufen prüfbar ist, OHNE zu rendern:
+ * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, ein gerenderter Wert
+ * belegte also antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein Layout.
+ *
+ * **Was hier NICHT gelöst wird:** die Tastaturbedienbarkeit. Das `<div onClick>` hat weder `role`
+ * noch `tabIndex` noch `onKeyDown`; die klickbare Zeile als Ganzes ist B7 (LFH-335) zugeordnet.
+ * Der Boden hier ist die Trefffläche, nicht der ganze Zugang.
+ */
+export function gebietszeileStil(token: { controlHeight: number; paddingSM: number; padding: number }) {
+  return {
+    cursor: 'pointer',
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px ${token.padding}px`,
+  } as const;
+}
 
 export default function GefahrenPage() {
   const { id } = useParams();
@@ -21,8 +59,11 @@ export default function GefahrenPage() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { abBreite } = useViewport();
+  const breit = abBreite('lg');
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
@@ -104,9 +145,28 @@ export default function GefahrenPage() {
   const aktuell = gebiete.find((g) => g.id === gewaehlt);
 
   return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+    <div
+      data-gefahren-rahmen
+      style={{
+        display: 'flex',
+        // Unter `lg` stapeln — dieselbe Schwelle, an der der Einsatzrahmen seine
+        // Navigation in den Drawer legt (`EinsatzLayout.tsx`). KEIN zweites Layout für
+        // die Matrix selbst: sie bleibt eine Tabelle und trägt auf schmalem Schirm
+        // waagerechten Bildlauf (`scroll={{ x: 'max-content' }}`), statt in Karten je
+        // Gefahrentyp aufgelöst zu werden — das zerstörte genau die Eigenschaft, für die
+        // es die Matrix gibt (Muster über beide Achsen auf einen Blick), und ein
+        // Collapse je Gefahrentyp wäre eine zweite Bedienform für dieselbe Sache.
+        // Hier stand einmal eine Breite („~380 px"); sie war falsch gerechnet und ist
+        // ersatzlos weg — die Entscheidung hängt nicht an ihr. Sie steht unabhängig
+        // begründet in der Prüfliste, Kriterium **14** („Tabellenseite vollständig"):
+        // `docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md`.
+        flexDirection: breit ? 'row' : 'column',
+        gap: 16,
+        alignItems: breit ? 'flex-start' : 'stretch',
+      }}
+    >
       <Liste
-        style={{ width: 240, flexShrink: 0 }}
+        style={breit ? { width: 240, flexShrink: 0 } : { width: '100%' }}
         size="small"
         bordered
         header={<Typography.Text strong>Gefahrengebiete</Typography.Text>}
@@ -114,11 +174,26 @@ export default function GefahrenPage() {
         renderItem={(g) => (
           <ListenEintrag
             onClick={() => setGewaehlt(g.id)}
-            style={{ cursor: 'pointer', background: g.id === gewaehlt ? 'rgba(22,119,255,0.08)' : undefined }}
+            style={{
+              // Trefflächenboden ZUERST, die Färbung danach — beides landet über EIN `style`
+              // im Aufrufer, und `ListenEintrag` spreizt es bewusst zuletzt
+              // (`Liste.tsx:171-175`), damit die Kurzform `padding` gegen die Längsformen der
+              // Liste gewinnt. Zöge jemand den Spread dort nach vorn, fiele genau die
+              // Polsterungshälfte der „ZWEI Angaben"-Konvention still weg.
+              ...gebietszeileStil(token),
+              // Die Rolle `bedien`, nicht antds Default-Blau: `rgba(22,119,255,0.08)`
+              // stand hier hartkodiert und blieb im Nachtmodus derselbe helle Schleier
+              // auf dunklem Grund (LFH-368). `colorPrimaryBg` leitet antd aus
+              // `colorPrimary` ab — also aus unserer Rolle, in beiden Modi.
+              background: g.id === gewaehlt ? token.colorPrimaryBg : undefined,
+            }}
           >
             <Space>
-              <Tag color={g.hoechste_warnstufe === 'keine' ? undefined : warnstufeFarbe(g.hoechste_warnstufe)}>
-                {g.hoechste_warnstufe}
+              {/* Etikett, nicht Fläche: `warnstufeKarte` liefert die Rolle, `rollenFarbe`
+                  den Wert des aktiven Modus. Vorher stand hier `warnstufeFarbe` — dieselbe
+                  Sortenverwechslung, die LFH-328 in `ZonenInspector.tsx` behoben hat. */}
+              <Tag color={rollenFarbe(warnstufeKarte[g.hoechste_warnstufe].rolle, token)}>
+                {warnstufeKarte[g.hoechste_warnstufe].label}
               </Tag>
               <span>{gefahrengebietName(g.label, g.id)}</span>
               <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
@@ -137,8 +212,11 @@ export default function GefahrenPage() {
               {gefahrengebietName(aktuell.label, aktuell.id)}
             </Typography.Title>
             {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an. */}
+            {/* Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (30/48/72,
+                LFH-362). Ein `size="small"` nagelte sie hier auf die kompakte Stufe
+                fest — auch im Handschuh-Betrieb, wo derselbe Knopf 72 px braucht. */}
             <Link to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
-              <Button size="small">Auf Karte zeigen</Button>
+              <Button>Auf Karte zeigen</Button>
             </Link>
           </div>
         )}
@@ -151,8 +229,20 @@ export default function GefahrenPage() {
           <GefahrenMatrix
             matrix={matrixQuery.data ?? []}
             darfSchreiben={darfSchreiben}
-            pending={setzen.isPending}
+            // Nur die Zelle des laufenden PUT sperren. `variables` kommt von TanStack
+            // Query und ist genau die Eingabe der laufenden Mutation — kein
+            // Parallel-State, der auseinanderlaufen kann.
+            laufendeZelle={
+              setzen.isPending && setzen.variables
+                ? zellSchluessel(setzen.variables.gefahrentyp, setzen.variables.schutzobjekt)
+                : null
+            }
             onSetzen={(d) => setzen.mutate(d)}
+            // `mutateAsync`: der Detail-Dialog braucht die Ablehnung, sonst leert die
+            // Erfassungshülle den getippten Wortlaut trotz 422. Den Toast macht weiterhin
+            // `onError: fehler`; die abgelehnte Zusage fängt `abschicken` in der Hülle
+            // (`Erfassung.tsx`, `catch {}`) — also keine unbehandelte Ablehnung.
+            onDetailsSpeichern={(d) => setzen.mutateAsync(d)}
           />
         )}
       </div>
