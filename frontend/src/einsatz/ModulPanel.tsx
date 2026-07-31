@@ -195,6 +195,12 @@ export default function ModulPanel({ titel, ...liste }: Props) {
   const { token } = theme.useToken();
   return (
     <div
+      // Testanker für den e2e-Trefflächennachweis (AK2). Der inline-Rahmen hat als einziger
+      // der drei Navigationsträger keine Landmark — die IconRail trägt `<nav
+      // aria-label="Kategorien">`, das Akkordeon `<nav aria-label="Einsatz-Navigation">`.
+      // Eine zweite Landmark hier machte `getByRole('navigation')` ohne Namen mehrdeutig,
+      // deshalb ein Datenmerkmal. Präzedenz: `data-lfh="datensicht-karte"` in Datensicht.tsx.
+      data-lfh="modul-panel"
       style={{ width: 220, padding: 12, borderRight: `1px solid ${token.colorBorderSecondary}` }}
     >
       <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>

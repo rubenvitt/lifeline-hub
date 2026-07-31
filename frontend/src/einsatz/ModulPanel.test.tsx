@@ -129,6 +129,19 @@ describe('ModulPanel', () => {
     expect(onKlick).toHaveBeenCalledWith(expect.objectContaining({ key: 'etb' }));
   });
 
+  it('traegt den Testanker des e2e-Trefflaechennachweises', () => {
+    // `e2e/trefflaeche-tablet.spec.ts` greift die Modulzeilen des inline-Rahmens über
+    // dieses Merkmal. Ohne diesen Pin wäre der Anker unbewacht: wer ihn entfernt, färbt
+    // einen e2e-Lauf rot, dessen Ursache dann in einer anderen Datei liegt.
+    const { container } = renderMitProviders(
+      <ModulPanel
+        titel="Erfassung" module={module} benutzer={ohne}
+        aktiverModulKey={null} onModulKlick={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-lfh="modul-panel"]')).not.toBeNull();
+  });
+
   it('markiert das aktive Modul via aria-current', () => {
     /**
      * Der aktive Zustand hing bis LFH-370 allein an Fläche und Schriftfarbe und war damit
