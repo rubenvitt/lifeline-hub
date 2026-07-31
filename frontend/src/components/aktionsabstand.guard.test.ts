@@ -77,6 +77,15 @@ const MIT_NACHBARSCHAFT = [
   // `Sidebar.test.tsx` geprüft.
   'karten/OfflineKartenVerwaltung.tsx',
   'karten/OnlineQuellenVerwaltung.tsx',
+  // ── B5j · Detailseiten Schäden/Tiere (LFH-370) ────────────────────────────
+  // Erst durch B5j entstanden, nicht vorher übersehen: solange die vier Knöpfe der inneren
+  // Aktionsreihe `size="small"` trugen, standen sie in einer Größe, für die die Frage nach
+  // dem Abstand nicht gestellt war. Mit dem Abbau der Klein-Angabe wächst „Stornieren"
+  // (`danger`) auf bis zu 72 px und stünde bündig neben drei gleich hohen neutralen
+  // Aktionen — genau die Nachbarschaft, die LFH-363 verboten hat.
+  // Gemessen liefert der Scanner für beide Dateien {weit: false, knoepfe: 4, destruktiv: true}.
+  'pages/SchaedenDetailPage.tsx',
+  'pages/TiereDetailPage.tsx',
 ];
 
 /**

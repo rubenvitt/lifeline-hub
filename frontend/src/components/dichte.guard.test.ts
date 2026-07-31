@@ -160,18 +160,19 @@ const OFFEN: string[] = [
   // ── B5i · Kräfte-Listen (LFH-369) ─────────────────────────────────────────
   '/src/pages/MaterialPage.tsx',
   // ── B5j · Rest: Kopfzeile, Profil, Editor, Sonstiges (LFH-370) ────────────
-  '/src/components/MarkdownEditor.tsx',
-  '/src/components/SprechgruppenPicker.tsx',
-  '/src/einsatz/AlarmZentrale.tsx',
-  '/src/pages/LoginPage.tsx',
-  '/src/pages/SchaedenDetailPage.tsx',
-  '/src/pages/TiereDetailPage.tsx',
-  '/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx',
-  // (B5j) Erst durch den Scanner-Fix von LFH-364/B5d sichtbar geworden (`<Select<…>`), nicht
-  // neu entstanden. Die Schuldmenge wächst hier um 1, während die echte Schuld um 23
-  // fällt — B5d ist auf B5c/B5e–B5j ausdrücklich disjunkt gestellt, deshalb wird die
-  // Datei hier verbucht statt fremdes Bündel-Gebiet mitzuräumen.
-  '/src/personen/personenSpalten.tsx',
+  // ABGERÄUMT: 14 Stellen in 9 Dateien (MarkdownEditor, SprechgruppenPicker, AlarmZentrale,
+  // LoginPage, ProfilPage, SchaedenDetailPage, TiereDetailPage, KraefteOhneBrSidebar,
+  // personenSpalten).
+  //
+  // Drei Dinge, die dabei gelernt wurden und die nächste Stelle betreffen:
+  //  - Die zwei danger-Nachbarschaften (SchaedenDetailPage, TiereDetailPage) sind ERST durch
+  //    den Abbau entstanden und hängen seither an `aktionsabstand.guard.test.ts`. Eine
+  //    Klein-Angabe zu entfernen kann eine Abstandsfrage aufwerfen, die vorher keine war.
+  //  - `personenSpalten.tsx` war der Fund des Scanner-Fix von LFH-364 (`<Select<…>` schrieb
+  //    sich am Lookahead vorbei), nicht neu entstanden.
+  //  - Der Dev-Schnellanmeldungs-Knopf in `LoginPage.tsx` steht hinter `import.meta.env.DEV`
+  //    und folgt trotzdem der Staffel: der Dev-Build ist derselbe Betrieb, und ein Knopf, der
+  //    nur für Entwickler zu klein ist, ist immer noch zu klein.
 ];
 
 function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, string> {

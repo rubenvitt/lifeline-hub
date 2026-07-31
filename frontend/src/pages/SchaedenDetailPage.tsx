@@ -202,11 +202,11 @@ export default function SchaedenDetailPage() {
         </Space>
         <Space>
           {darfSchreiben && !s.storniert_at && !bearbeiten && (
-            <Space wrap>
-              <Button size="small" disabled={s.status !== 'offen'} onClick={() => setUebergebenOffen(true)}>
+            <Space wrap size="middle">
+              <Button disabled={s.status !== 'offen'} onClick={() => setUebergebenOffen(true)}>
                 Übergeben
               </Button>
-              <Button size="small" disabled={s.status === 'abgeschlossen'} onClick={() => setAbschlussOffen(true)}>
+              <Button disabled={s.status === 'abgeschlossen'} onClick={() => setAbschlussOffen(true)}>
                 Abschließen
               </Button>
               <Button onClick={() => {
