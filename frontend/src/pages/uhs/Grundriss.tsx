@@ -24,6 +24,56 @@ import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../them
 // groß genug für den Worst Case (2-zeiliger Titel + Tag + Belegung + Aktionszeile).
 const PLATZ_KARTE_HOEHE = 116;
 
+// Feste Karten-Breite — dieselbe Bindung wie die Höhe, nur an der anderen Achse:
+// `raster_position` setzt SCHRITT_X = 160, die 20 px Luft je Seite sind der Spaltengraben.
+const PLATZ_KARTE_BREITE = 140;
+const PLATZ_KARTE_RAND = 2;
+const PLATZ_KARTE_POLSTER = 6;
+
+/** Innenbreite der Aktionszeile: 140 − 2×2 Rand − 2×6 Polsterung = 124 px. */
+const AKTIONSZEILE_BREITE =
+  PLATZ_KARTE_BREITE - 2 * PLATZ_KARTE_RAND - 2 * PLATZ_KARTE_POLSTER;
+
+/** Voll ausgebaute Zeile: Transport, zurückweisen, „als frei", Platzaktionen. */
+const AKTIONEN_MAX = 4;
+
+/**
+ * Abstand zwischen den Knöpfen der Aktionszeile (LFH-378 · B5l).
+ *
+ * Der `danger`-Knopf „zurückweisen" steht neben neutralen Aktionen; LFH-363 verlangt dort
+ * mindestens `token.marginSM`. Der Wert wird aber GEDECKELT, und das ist gemessen, nicht
+ * vorsichtshalber: antd gibt einem icon-only-Knopf `width: controlHeightSM` (24 / 48 / 72),
+ * und als Flex-Items ohne `flex-shrink: 0` schrumpfen die Knöpfe auf diese 124 px. Ab
+ * `komfortabel` brauchen vier Knöpfe allein 192 px — jede Lücke ginge dann direkt von der
+ * Trefffläche ab, ein ungedeckeltes `marginSM` machte die Ziele also KLEINER. Gerechnet
+ * wird mit der vollen Zeile: ein Abstand, der mit der Knopfzahl springt, wäre von Karte zu
+ * Karte verschieden.
+ *
+ * Die Rechnung ist bewusst eine ABSCHÄTZUNG nach oben und keine Pixelbilanz: drei der vier
+ * Knöpfe sind icon-only und damit quadratisch (`width: controlHeightSM`), der vierte ist der
+ * Menü-Auslöser mit „…" als Inhalt — der misst `paddingInlineSM × 2 + Textbreite` und damit
+ * etwas anderes. Ihn ebenfalls als Quadrat zu zählen überschätzt den Bedarf leicht; das ist
+ * die richtige Richtung für einen Deckel, der nichts überlaufen lassen soll. Eine echte
+ * Breitenmessung bräuchte Layout, und jsdom rechnet keins.
+ *
+ * Rein und exportiert aus demselben Grund wie `bedienzielStil` in `lagekarte/Sidebar.tsx`:
+ * nur so ist die Zusicherung über mehrere Dichtestufen prüfbar, ohne zu rendern — jsdom
+ * rechnet kein Layout, und `test/utils.tsx` montiert ein `ConfigProvider` ohne unser Theme.
+ *
+ * DASS die Zeile ab `komfortabel` überhaupt überläuft — vier Knöpfe à 48 px brauchen 192 px
+ * in einer 124 px breiten Zeile, die Knöpfe schrumpfen auf grob 31 px und verfehlen damit den
+ * Trefflächenboden aus Gate 3 —, ist ein EIGENER Befund: **LFH-379**. Weder LFH-367 noch
+ * LFH-378 hatten ihn im Umfang, beide bewerten die Höhe der Zeile, nicht ihre Breite. Diese
+ * Funktion verkleinert den Schaden (mehr Abstand machte die Ziele kleiner), sie behebt ihn
+ * nicht. Wer LFH-379 umsetzt, zieht sie mit oder entfernt sie mit Begründung — ein Deckel,
+ * der danach immer 0 liefert, wäre tote Logik.
+ */
+export function aktionsabstand(token: { marginSM: number; controlHeightSM: number }) {
+  const knoepfe = AKTIONEN_MAX * token.controlHeightSM;
+  const jeLuecke = Math.floor((AKTIONSZEILE_BREITE - knoepfe) / (AKTIONEN_MAX - 1));
+  return Math.max(0, Math.min(token.marginSM, jeLuecke));
+}
+
 // BEFUND zum kleinen `size`-Prop (LFH-328/A1 Festlegung 4, Gate 4) — hier bleiben SECHS
 // stehen, in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene
 // Kollision:
@@ -139,7 +189,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     position: 'absolute',
     left: platz.pos_x ?? 10,
     top: platz.pos_y ?? 10,
-    width: 140,
+    width: PLATZ_KARTE_BREITE,
     // FESTE Höhe + overflow:hidden: die Kartengröße ist invariant gegen Belegung, Titel-
     // Umbruch und Tag-Anzahl (Titel/Tags/Person/Aktionen sind unten je auf feste Höhe
     // gedeckelt). Alle Karten eines Rasters sind damit exakt gleich groß und bleiben unter
@@ -148,12 +198,15 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     overflow: 'hidden',
     boxSizing: 'border-box',
     cursor: bearbeitbar ? 'grab' : zuweisbar ? 'pointer' : 'default',
-    border: `2px solid ${rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token)}`,
+    // Rand und Polsterung aus den Konstanten, nicht als Literale: `AKTIONSZEILE_BREITE`
+    // rechnet mit genau diesen Werten, und eine Kopie hier liesse den Deckel still falsch
+    // rechnen, sobald jemand nur eine der beiden Stellen ändert.
+    border: `${PLATZ_KARTE_RAND}px solid ${rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token)}`,
     // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
     // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
     // Theme-Tokens statt fixer Hex-Werte, damit die Karten im Dark Mode mitziehen.
     background: isOver ? token.colorPrimaryBg : belegtVon ? token.colorInfoBg : token.colorBgContainer,
-    padding: 6,
+    padding: PLATZ_KARTE_POLSTER,
     borderRadius: 4,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
   };
@@ -236,7 +289,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
           durchläuft. Ohne diese Zeile öffnete jeder Aktionsklick zusätzlich den
           Zuweisungsdialog — beide Regressionstests werden ohne sie rot (gemessen). */}
       <div
-        style={{ display: 'flex', gap: 4, height: 24, alignItems: 'center' }}
+        style={{ display: 'flex', gap: aktionsabstand(token), height: 24, alignItems: 'center' }}
         onClick={(e) => e.stopPropagation()}
       >
         {belegtVon && !schreibgeschuetzt && (

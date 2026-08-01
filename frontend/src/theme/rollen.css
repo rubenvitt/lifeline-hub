@@ -38,7 +38,9 @@
   --lfh-marke: #a8071a;
   --lfh-marke-glut: 0 0 10px 0 rgba(168, 7, 26, 0.3);
   --lfh-alarm-fuellung: rgba(176, 35, 24, 0.07);
+  --lfh-alarm-fuellung-stark: rgba(176, 35, 24, 0.2);
   --lfh-achtung-fuellung: rgba(122, 82, 0, 0.08);
+  --lfh-achtung-fuellung-stark: rgba(122, 82, 0, 0.2);
   --lfh-normal-fuellung: rgba(28, 102, 64, 0.07);
 
   /* ── Form ──────────────────────────────────────────────────────────────── */
@@ -107,7 +109,9 @@
   --lfh-marke: #e04552;
   --lfh-marke-glut: 0 0 12px 0 rgba(224, 69, 82, 0.55);
   --lfh-alarm-fuellung: rgba(255, 122, 127, 0.1);
+  --lfh-alarm-fuellung-stark: rgba(255, 122, 127, 0.24);
   --lfh-achtung-fuellung: rgba(245, 185, 66, 0.1);
+  --lfh-achtung-fuellung-stark: rgba(245, 185, 66, 0.24);
   --lfh-normal-fuellung: rgba(92, 196, 141, 0.1);
 }
 

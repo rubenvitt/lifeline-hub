@@ -1,12 +1,14 @@
 import { StrictMode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
-import GefahrenPage from './GefahrenPage';
+import { setzeViewportBreite } from '../../test/viewport';
+import GefahrenPage, { gebietszeileStil } from './GefahrenPage';
+import { dichten } from '../../theme/tokens';
 
 const einsatz = {
   id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv', begonnen_at: '', abgeschlossen_at: null,
@@ -68,6 +70,21 @@ describe('GefahrenPage', () => {
     expect(knoepfe[0]).toHaveTextContent('Zur Lagekarte');
     await userEvent.click(knoepfe[0]);
     expect(await screen.findByText('Kartenfläche')).toBeInTheDocument();
+  });
+
+  it('zeigt die höchste Warnstufe als Etikett, nicht als Flächenfarbe (LFH-368)', async () => {
+    server.use(...handlers());
+    renderPage();
+    const tag = await screen.findByText('hoch');
+    // Der PASTELLWERT ist die Signatur des Fehlgriffs: `warnstufeFarbe('hoch')` = '#ffa39e'
+    // landete als `color=` am `<Tag>`. Der Hex-String selbst steht NICHT im `style` — antd
+    // rechnet ihn beim Rendern in `rgb(...)` um (per Mutationsprobe gemessen:
+    // `color: rgb(255, 163, 158)` bei `#ffa39e`) und trägt ihn als TEXTFARBE, nicht als
+    // Hintergrund; die Hintergrundfläche ist ein daraus abgeleiteter Tint. Geprüft wird
+    // deshalb die ABWESENHEIT des umgerechneten Werts, nicht der neue Wert — den positiv zu
+    // pinnen prüfte antds Vorgaben, weil `test/utils.tsx` ein nacktes `ConfigProvider`
+    // rendert (dieselbe Falle wie bei Höhen).
+    expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain('rgb(255, 163, 158)');
   });
 
   it('bietet „Auf Karte zeigen" mit Reverse-Deeplink auf die Lagekarte (LFH-155)', async () => {
@@ -145,12 +162,19 @@ describe('GefahrenPage', () => {
       }),
     );
     renderPage();
-    const zellen = await screen.findAllByLabelText('Warnstufe brand × menschen');
-    const combobox = zellen[0].querySelector('input[role="combobox"]') ?? zellen[0];
-    await userEvent.click(combobox);
-    await userEvent.click(await screen.findByText('Hoch'));
-    await screen.findAllByText('Nord'); // settle
-    expect(put).toMatchObject({ gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' });
+    // Seit LFH-368/B5h trägt die Zelle EINEN Auslöser statt eines Mini-Selects; der
+    // zugängliche Name nennt Zeile, Spalte und die aktuelle Stufe.
+    await userEvent.click(await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }));
+    // Der Eintrag wird über das OFFENE Menü gegriffen — antd lässt die Portale
+    // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbTabelle.test.tsx`).
+    const menue = document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    if (!menue) throw new Error('kein offenes Menü im Baum');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /hoch/i }));
+    // Auf den PUT selbst warten: es gibt keinen Select-Neuzeichnung mehr, auf die
+    // sich ein Textsucher stützen könnte.
+    await waitFor(() => expect(put).toMatchObject({
+      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
+    }));
   });
 
   it('benennt das gewählte Gefahrengebiet um (PATCH)', async () => {
@@ -176,5 +200,99 @@ describe('GefahrenPage', () => {
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
     fireEvent.blur(input);
     await waitFor(() => expect(patch).toEqual({ label: 'Süd' }));
+  });
+
+  // Task 4 (LFH-368): unter `lg` stapeln Gebietsliste und Matrix, statt sich nebeneinander
+  // zu quetschen. Die Behauptung ist die Flex-RICHTUNG, nicht eine Pixelbreite — jsdom
+  // rechnet kein Layout. Beide Fälle zusammen sind die Behauptung: nur „column bei 800"
+  // wäre auch erfüllt, wenn die Richtung fest auf `column` stünde.
+  it('stapelt Gebietsliste und Matrix unter lg, statt sie nebeneinander zu quetschen', async () => {
+    server.use(...handlers());
+    setzeViewportBreite(800); // < lg (992)
+    renderPage();
+    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    expect(rahmen).toHaveStyle({ flexDirection: 'column' });
+  });
+
+  it('stellt sie ab lg nebeneinander', async () => {
+    server.use(...handlers());
+    setzeViewportBreite(1280);
+    renderPage();
+    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    expect(rahmen).toHaveStyle({ flexDirection: 'row' });
+  });
+
+  /**
+   * Die Gebietszeile ist ein handgebautes Bedienziel und muss den Boden selbst tragen
+   * (Abschluss-Review zu LFH-368, Konvention aus LFH-365). Die reine Funktion prüft die
+   * WERTE, dieser Fall prüft, dass sie überhaupt am `<div onClick>` ankommen — genau die
+   * Regression, die `Liste.tsx:171-175` benennt („kein Test sähe es"), wenn dort jemand den
+   * `...style`-Spread nach vorn zöge.
+   *
+   * Geprüft wird die ANWESENHEIT und die REIHENFOLGE der Angaben im Inline-Style, kein Wert:
+   * `test/utils.tsx` montiert ein nacktes `ConfigProvider` ohne unser Theme, jede Zahl hier
+   * belegte antd-Vorgaben statt der Staffel (gemessen: `min-height: 32px; padding: 12px 16px`
+   * — antds Voreinstellungen, nicht 30/48/72).
+   */
+  it('legt den Trefflächenboden wirklich auf die klickbare Gebietszeile', async () => {
+    server.use(...handlers());
+    renderPage();
+    await screen.findAllByText('Nord');
+    const zeile = document.querySelector<HTMLElement>('.listen-eintrag');
+    if (!zeile) throw new Error('keine Listenzeile im Baum');
+    const stil = zeile.getAttribute('style') ?? '';
+    expect(stil).toContain('min-height');
+    // Die zweite Hälfte der Konvention: die Kurzform `padding` muss NACH den Längsformen
+    // `padding-block`/`padding-inline` der Liste stehen, sonst gewinnen deren kleinere Werte
+    // und die Polsterung fällt still weg. Genau diese Reihenfolge sichert der Spread in
+    // `Liste.tsx:171-175` zu — eine Zusicherung, die es dort selbst nicht gibt.
+    expect(stil.indexOf('padding:')).toBeGreaterThan(stil.indexOf('padding-block'));
+  });
+});
+
+/**
+ * Trefflächenboden der Gebietszeile — die Werte (Abschluss-Review zu LFH-368 · B5h).
+ *
+ * Schablone: `pages/lagekarte/Sidebar.test.tsx:602-637`. Geprüft wird die REINE FUNKTION gegen
+ * die Dichtestufen aus `theme/tokens.ts`, nicht ein gerendertes Pixel — jsdom rechnet kein
+ * Layout, und ein gerenderter Wert käme aus dem nackten `ConfigProvider` von `test/utils.tsx`.
+ *
+ * Die Böden stehen als LITERALE da. Aus dem Token zurückgelesen prüften sie den Token gegen sich
+ * selbst und blieben grün, egal welche Zahl dort steht.
+ */
+describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    paddingSM: dichten[stufe].abstand.sm,
+    padding: dichten[stufe].abstand.md,
+  });
+
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(gebietszeileStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(gebietszeileStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(gebietszeileStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  /**
+   * Die eigentliche Aussage: der Wert ZIEHT MIT. Ein dichteblindes `minHeight: 72` bestünde alle
+   * drei Böden oben und fällt allein hier — deshalb stehen beide Fälle da, einer allein belegte
+   * nichts.
+   */
+  it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
+    const hoehen = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
+      (s) => gebietszeileStil(tokenFuer(s)).minHeight,
+    );
+    expect(hoehen[0]).toBeLessThan(hoehen[1]);
+    expect(hoehen[1]).toBeLessThan(hoehen[2]);
+  });
+
+  /**
+   * ZWEI Angaben, nicht eine: die Polsterung allein trüge den Boden nicht (grob 54 px im
+   * Handschuh-Betrieb gegen die geforderten 72), muss aber da sein und ebenfalls mitziehen —
+   * sonst klebt der Text an der Kante. Auch hier LITERALE.
+   */
+  it('trägt neben der Höhe eine mitziehende Polsterung', () => {
+    expect(gebietszeileStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
+    expect(gebietszeileStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
   });
 });

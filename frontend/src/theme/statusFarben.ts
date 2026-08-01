@@ -46,24 +46,26 @@ import type {
  * `taktischesZeichen.ts` u. a.). Sie hineinzuziehen wäre der Bestands-Sweep, den A2
  * ausdrücklich verbietet.
  *
- * ── ZWEITE GRENZE: eine Farbkarte ÜBER einem Vertrags-Enum, die hier NICHT hergehört ──
+ * ── DIE DRITTE DARSTELLUNGSSORTE: FLÄCHE (aufgelöst mit LFH-368 · B5h) ──────────
  *
- * `pages/gefahren/gefahrenSchema.ts:warnstufeFarbe()` bildet `Warnstufe` — ein
- * Vertrags-Enum — auf eigene Pastelltöne ab (`keine` = `transparent`). Das ist KEIN
- * Versehen und keine vergessene Migration: es ist eine andere **Darstellungssorte**.
- * `warnstufeKarte`/`warnstufeKennzahl` liefern ein Status-**Etikett** (Rolle + Text auf
- * kleiner Fläche); `warnstufeFarbe` hinterlegt eine **Matrixzelle flächig**, wo der Text
- * die Zelle selbst ist und ein gesättigter Rollenton den Inhalt unlesbar machte.
+ * Bis B5h lag sie außerhalb dieses Vertrags: `pages/gefahren/gefahrenSchema.ts`
+ * hielt vier Pastell-Hex für die Matrixzellen — begründet (ein gesättigter Rollenton
+ * macht den Zellinhalt unlesbar), aber am falschen Ort und OHNE Nachtmodus-Gegenwert.
+ * Beides ist erledigt: {@link warnstufeFlaeche} bildet die Stufen auf die
+ * Füllungsrollen aus `tokens.ts` ab, {@link flaechenFarbe} löst sie je Modus auf.
  *
- * Die Konsequenz für Leser dieses Vertrags: „eine Quelle für Statusfarbe" gilt für
- * Etiketten, nicht für Flächencodierung. Wer eine dritte Sorte braucht, benennt sie hier —
- * still danebenzubauen ist der Fehler, nicht das Danebenbauen selbst.
+ * Die Sorte bleibt getrennt, der Ort nicht mehr: „eine Quelle für Statusfarbe" gilt
+ * jetzt für Etikett UND Fläche, und die Fläche kommt mit einem eigenen Typ
+ * ({@link Flaechendarstellung}), weil eine Füllung keine {@link Statusrolle} ist.
+ * Wer eine VIERTE Sorte braucht, benennt sie hier — still danebenzubauen ist der
+ * Fehler, nicht das Danebenbauen selbst.
  *
  * Gefunden im Code-Review zu LFH-328: `pages/lagekarte/ZonenInspector.tsx` benutzte
  * `warnstufeFarbe` für ein Status-Etikett und ist auf {@link warnstufeKarte} gezogen
- * worden — dort war es die falsche Sorte. Ein Guard „kein `Tag color=` über einem
- * Vertrags-Enum außerhalb `theme/`" wäre die maschinelle Fassung dieser Grenze und ist
- * als Folge-Ticket erfasst.
+ * worden. LFH-368 hat denselben Fehlgriff in `pages/gefahren/GefahrenPage.tsx`
+ * gefunden und behandelt ihn im selben Umbau. Ein Guard „kein `Tag color=` über
+ * einem Vertrags-Enum außerhalb `theme/`" wäre die maschinelle Fassung dieser
+ * Grenze und ist als Folge-Ticket erfasst.
  */
 
 /** Eine A0-Statusrolle. Farbwerte stehen ausschließlich in `tokens.ts`/`rollen.css`. */
@@ -242,4 +244,67 @@ function istDunklerModus(token: GlobalToken): boolean {
   // Relative Helligkeit nach ITU-R BT.709 — dieselbe Gewichtung, die WCAG 1.4.3 nutzt.
   const helligkeit = 0.2126 * ((wert >> 16) & 255) + 0.7152 * ((wert >> 8) & 255) + 0.0722 * (wert & 255);
   return helligkeit < 128;
+}
+
+/** Eine Flächen-Füllungsrolle. Bewusst enger als `keyof Farbrollen`: `markeGlut` ist
+ *  ein Schatten, keine Fläche, und `text` schon gar nicht. */
+export type Fuellungsrolle =
+  | 'achtungFuellung'
+  | 'achtungFuellungStark'
+  | 'alarmFuellung'
+  | 'alarmFuellungStark'
+  | 'normalFuellung';
+
+/**
+ * Die dritte Darstellungssorte: eine FLÄCHE, kein Etikett.
+ *
+ * Eigener Typ statt {@link StatusDarstellung}, weil eine Füllung keine
+ * {@link Statusrolle} ist. Sie in `rolle` zu pressen hätte den Kanal-Vertrag der
+ * Etikett-Maps verwässert und `rollenFarbe` einen Fall gegeben, den es nicht
+ * bedienen kann (`antdToken()` bildet die Füllungsrollen nicht ab).
+ */
+export interface Flaechendarstellung {
+  /** `null` = keine Fläche. Kein `'transparent'` als Rollenname — das ist ein Wert. */
+  fuellung: Fuellungsrolle | null;
+  /** Pflicht, zweiter Kanal (WCAG 1.4.1). */
+  label: string;
+  /** Ein Zeichen für die Zelle, in der der volle Text nicht steht. Zweiter Kanal dort. */
+  kuerzel: string;
+}
+
+/**
+ * Warnstufe als **Fläche der Gefahrenmatrix** (LFH-368 · B5h; früher
+ * `pages/gefahren/gefahrenSchema.ts:warnstufeFarbe`).
+ *
+ * FÜNF STUFEN AUF DREI FARBTÖNE, unterschieden durch die INTENSITÄT derselben Rolle
+ * und durch {@link Flaechendarstellung.kuerzel}. Damit hält die Festlegung bei
+ * {@link warnstufeKarte} („nicht eine sechste Farbe") auch hier, wo fünf Flächen
+ * gebraucht werden.
+ *
+ * `keine` ist leer und NICHT `alarm` wie auf der Karte: dort steht ein unbewertetes
+ * Gebiet (⇒ vorsichtshalber Gefahr), hier bedeutet die Stufe ausdrücklich „für dieses
+ * Schutzobjekt besteht keine Gefahr". Eine Matrix, in der 58 unbewertete Zellen rot
+ * stehen, zeigt nichts an.
+ */
+export const warnstufeFlaeche: Record<Warnstufe, Flaechendarstellung> = {
+  keine: { fuellung: null, label: 'keine', kuerzel: '–' },
+  niedrig: { fuellung: 'achtungFuellung', label: 'niedrig', kuerzel: 'N' },
+  mittel: { fuellung: 'achtungFuellungStark', label: 'mittel', kuerzel: 'M' },
+  hoch: { fuellung: 'alarmFuellung', label: 'hoch', kuerzel: 'H' },
+  akut: { fuellung: 'alarmFuellungStark', label: 'akut', kuerzel: 'A' },
+};
+
+/**
+ * Fläche → Farbwert des aktiven Modus.
+ *
+ * Folgt dem `marke`-Zweig in {@link rollenFarbe}, nicht dem antd-Zweig: `antdToken()`
+ * bildet die Füllungsrollen auf KEINEN antd-Token ab, ein `token.colorXxx` gibt es
+ * hier also nicht. Der Modus kommt deshalb über {@link istDunklerModus} — dieselbe
+ * Helligkeitsprobe, mit demselben Verhalten bei fremdem Theme (Rückfall auf Hell,
+ * statt zu werfen).
+ */
+export function flaechenFarbe(w: Warnstufe, token: GlobalToken): string {
+  const rolle = warnstufeFlaeche[w].fuellung;
+  if (rolle === null) return 'transparent';
+  return (istDunklerModus(token) ? farbenDunkel : farbenHell)[rolle];
 }

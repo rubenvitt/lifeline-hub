@@ -40,7 +40,16 @@ export const WARNSTUFEN: Katalogeintrag<Warnstufe>[] = [
   { wert: 'akut', label: 'Akut' },
 ];
 
-/** Ungültige Paare (verbatim aus bluelight-hub) → Zelle ausgegraut/nicht editierbar. */
+/**
+ * Ungültige Paare (verbatim aus bluelight-hub) → die Zelle trägt „n. a." als **Text** und gar
+ * keinen Auslöser.
+ *
+ * „Ausgegraut/nicht editierbar" stand hier bis zum Umbau und beschreibt das Gegenteil dessen,
+ * was `GefahrenMatrix.tsx` seither tut — aus zwei Gründen: eine blasse Fläche ohne Wort ist von
+ * „noch nicht bewertet" nicht zu unterscheiden (WCAG 1.4.1, zweiter Kanal), und ein
+ * deaktivierter Knopf gäbe vor, es gäbe hier eine Entscheidung. Die Weiche steht an `render`
+ * in `GefahrenMatrix.tsx`, das Verdikt in Kriterium 6 der Prüfliste.
+ */
 export function kombinationGueltig(typ: Gefahrentyp, objekt: Schutzobjekt): boolean {
   if (objekt === 'sachwerte') {
     return !['angstreaktion', 'atemgifte', 'erkrankung_verletzung', 'ertrinken'].includes(typ);
@@ -49,16 +58,4 @@ export function kombinationGueltig(typ: Gefahrentyp, objekt: Schutzobjekt): bool
     return !['angstreaktion', 'erkrankung_verletzung', 'ertrinken'].includes(typ);
   }
   return true;
-}
-
-/** Hintergrundfarbe je Warnstufe (Zell-Codierung). `keine` = neutral. */
-export function warnstufeFarbe(w: Warnstufe): string {
-  switch (w) {
-    case 'niedrig': return '#fff7e6';
-    case 'mittel': return '#ffd591';
-    case 'hoch': return '#ffa39e';
-    case 'akut': return '#ff4d4f';
-    case 'keine':
-    default: return 'transparent';
-  }
 }

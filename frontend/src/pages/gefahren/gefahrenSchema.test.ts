@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig, warnstufeFarbe } from './gefahrenSchema';
+import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
 
 describe('gefahrenSchema', () => {
   it('hat 13 Gefahrentypen, 5 Schutzobjekte, 5 Warnstufen', () => {
@@ -24,11 +24,8 @@ describe('gefahrenSchema', () => {
     expect(kombinationGueltig('brand', 'sachwerte')).toBe(true);
   });
 
-  it('warnstufeFarbe liefert für jede Warnstufe einen Wert', () => {
-    for (const w of WARNSTUFEN) {
-      expect(typeof warnstufeFarbe(w.wert)).toBe('string');
-    }
-    expect(warnstufeFarbe('keine')).toBe('transparent');
-    expect(warnstufeFarbe('akut')).toBe('#ff4d4f');
-  });
+  // `warnstufeFarbe` war hier byte-genau gepinnt (`akut` = '#ff4d4f'). Die Skala liegt
+  // seit LFH-368 als `warnstufeFlaeche`/`flaechenFarbe` in `theme/statusFarben.ts`,
+  // der Pin steht dort auf den zwei neuen Fuellungswerten. Nicht hier neu aufbauen —
+  // sonst prueft eine Kopie in `pages/` wieder Farbwerte, die `theme/` besitzt.
 });

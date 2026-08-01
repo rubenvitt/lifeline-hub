@@ -6,7 +6,8 @@ import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { server } from '../../test/server';
 import { App as AntApp } from 'antd';
-import Grundriss from './Grundriss';
+import Grundriss, { aktionsabstand } from './Grundriss';
+import { dichten } from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 
 function person(over: Partial<Person>): Person {
@@ -609,5 +610,69 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     await userEvent.click(await screen.findByText(/R-011|· unbekannt/));
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Aktionszeile der Platzkarte — der Abstand zwischen dem `danger`-Knopf „zurückweisen"
+ * und seinen neutralen Nachbarn (LFH-378 · B5l, Befund 3 aus dem Review zu LFH-367).
+ *
+ * ── WARUM GEDECKELT UND NICHT SCHLICHT `token.marginSM` ─────────────────────────
+ *
+ * Der Befund wollte `gap: 4` gegen `token.marginSM` (7 / 11 / 16) tauschen. Die Rechnung
+ * im Ticket rechnete mit „vier Knöpfen à 24 px" — das gilt aber nur in der KOMPAKTEN
+ * Stufe. Nachgemessen am 31.07.2026: antd gibt einem icon-only-Knopf `width:
+ * controlHeightSM` (`button/style/index.js`, `genSizeSmallButtonStyle`), also 24 / 48 / 72.
+ * Die Knöpfe sind Flex-Items ohne `flex-shrink: 0` und schrumpfen deshalb auf den
+ * Innenraum der Karte. Ab `komfortabel` brauchen allein vier Knöpfe 4 × 48 = 192 px in
+ * einer 124 px breiten Zeile — die Zeile ist schon OHNE Lücke überfüllt, und jede Lücke
+ * nimmt den Knöpfen zusätzlich Trefffläche weg. Ein ungedeckeltes `marginSM` wäre
+ * nominell regelkonform und in der Bedienung schlechter.
+ *
+ * Deshalb: so viel Abstand wie hineinpasst, höchstens `marginSM`. Der Boden aus LFH-363
+ * wird damit im Fükw (kompakt, der PRIMÄRE Einsatzkontext) erfüllt; darüber ist die Zeile
+ * breitenseitig an `SCHRITT_X = 160` gebunden, wie ihre Höhe an `SCHRITT_Y = 120`.
+ *
+ * ── WARUM EINE REINE FUNKTION UND NICHT DAS DOM ─────────────────────────────────
+ *
+ * `test/utils.tsx` montiert ein nacktes `ConfigProvider` OHNE unser Theme, und jsdom
+ * rechnet ohnehin kein Layout — ein gemessener Pixel belegte hier nichts. Geprüft wird der
+ * PROP-WERT je Dichtestufe, gegen LITERALE: aus dem Token zurückgelesen prüfte die
+ * Behauptung den Token gegen sich selbst.
+ */
+describe('Grundriss – Aktionszeilen-Abstand der Platzkarte (LFH-378)', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    marginSM: dichten[stufe].abstand.sm,
+    controlHeightSM: dichten[stufe].kleineZeilenhoehe,
+  });
+
+  it('trägt in der kompakten Stufe den Boden aus marginSM', () => {
+    // 4 × 24 = 96 px Knöpfe in 124 px Zeile → 9 px je Lücke übrig, marginSM = 7 passt.
+    expect(aktionsabstand(tokenFuer('kompakt'))).toBe(7);
+  });
+
+  it('fällt auf 0, wo die Knöpfe die Zeile schon allein füllen', () => {
+    // 4 × 48 = 192 bzw. 4 × 72 = 288 px in 124 px — jede Lücke ginge von der Trefffläche ab.
+    expect(aktionsabstand(tokenFuer('komfortabel'))).toBe(0);
+    expect(aktionsabstand(tokenFuer('handschuh'))).toBe(0);
+  });
+
+  /**
+   * Die eigentliche Aussage: der Wert hängt an der Dichte. Ein dichteblinder Festwert
+   * (`gap: 4`, oder auch ein hart gesetztes `7`) bestünde die Literal-Prüfungen oben
+   * teilweise — erst die UNGLEICHHEIT über zwei Stufen lässt ihn auffliegen.
+   */
+  it('ist über zwei Dichtestufen ungleich, statt auf einem Festwert zu kleben', () => {
+    expect(aktionsabstand(tokenFuer('kompakt')))
+      .not.toBe(aktionsabstand(tokenFuer('komfortabel')));
+  });
+
+  /**
+   * Und der Deckel greift wirklich am Token, nicht an einer Kopie der Zahl: ein künstlich
+   * kleiner `marginSM` bei kompakter Knopfhöhe muss durchschlagen. Ohne `Math.min` gäbe
+   * die Funktion hier den Platz zurück (9), nicht die Vorgabe (3).
+   */
+  it('nimmt marginSM als Obergrenze, nicht als Sollwert', () => {
+    expect(aktionsabstand({ marginSM: 3, controlHeightSM: 24 })).toBe(3);
   });
 });

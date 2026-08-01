@@ -124,10 +124,11 @@ export interface Lagebild {
  * zweite Liste (LFH-328/A2) — sonst käme neben `warnstufeKarte` und `warnstufeKennzahl`
  * noch eine Lesart desselben Enums dazu.
  *
- * Es GIBT eine dritte, und sie ist bewusst draußen: `gefahrenSchema.warnstufeFarbe()`
- * hinterlegt Matrixzellen flächig (Pastelltöne, `keine` = transparent). Das ist eine
- * andere Darstellungssorte — Zellhintergrund statt Status-Etikett — und sie ist im
- * Kopfkommentar von `theme/statusFarben.ts` als Grenze benannt.
+ * Es GIBT eine dritte — die FLÄCHE der Gefahrenmatrix —, und sie liegt seit LFH-368
+ * nicht mehr draußen: `theme/statusFarben.ts:warnstufeFlaeche` bildet die Stufen auf
+ * die Füllungsrollen ab, `flaechenFarbe` löst sie je Modus auf. Alle drei Lesarten
+ * stehen damit im selben Vertrag; welche gilt, entscheidet die Darstellungssorte
+ * (Kennzahl · Objektsignatur · Fläche), nicht der Aufrufort.
  *
  * Gelesen wird ausdrücklich {@link warnstufeKennzahl} und NICHT `warnstufeKarte`: die
  * Karte zeigt ein OBJEKT (dieses eine Gebiet ist unbewertet ⇒ vorsichtshalber Gefahr,

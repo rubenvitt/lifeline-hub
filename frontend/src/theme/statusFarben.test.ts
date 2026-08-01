@@ -102,3 +102,49 @@ describe('Statusfarb-Vertrag', () => {
     expect(sf.rollenFarbe('marke', theme.getDesignToken({}))).toBe(farbenHell.marke);
   });
 });
+
+describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
+  it('pinnt die zwei neuen Intensitäten byte-genau', () => {
+    expect(farbenHell.achtungFuellungStark).toBe('rgba(122, 82, 0, 0.2)');
+    expect(farbenHell.alarmFuellungStark).toBe('rgba(176, 35, 24, 0.2)');
+    expect(farbenDunkel.achtungFuellungStark).toBe('rgba(245, 185, 66, 0.24)');
+    expect(farbenDunkel.alarmFuellungStark).toBe('rgba(255, 122, 127, 0.24)');
+  });
+
+  it('nutzt DREI Farbtöne für fünf Stufen — keine sechste Farbe', () => {
+    expect(sf.warnstufeFlaeche.keine.fuellung).toBeNull();
+    expect(sf.warnstufeFlaeche.niedrig.fuellung).toBe('achtungFuellung');
+    expect(sf.warnstufeFlaeche.mittel.fuellung).toBe('achtungFuellungStark');
+    expect(sf.warnstufeFlaeche.hoch.fuellung).toBe('alarmFuellung');
+    expect(sf.warnstufeFlaeche.akut.fuellung).toBe('alarmFuellungStark');
+  });
+
+  it('gibt jeder Stufe einen zweiten Kanal — Text UND Kürzel', () => {
+    for (const [stufe, d] of Object.entries(sf.warnstufeFlaeche)) {
+      expect(d.label.trim(), `${stufe} ohne Text`).not.toBe('');
+      expect(d.kuerzel.trim(), `${stufe} ohne Kürzel`).not.toBe('');
+    }
+    // Fünf Kürzel, fünf verschiedene — sonst trägt der Kanal nichts.
+    const kuerzel = Object.values(sf.warnstufeFlaeche).map((d) => d.kuerzel);
+    expect(new Set(kuerzel).size).toBe(kuerzel.length);
+  });
+
+  it('folgt dem Modus — genau das konnte `warnstufeFarbe` nicht', () => {
+    expect(sf.flaechenFarbe('akut', hellToken)).toBe(farbenHell.alarmFuellungStark);
+    expect(sf.flaechenFarbe('akut', dunkelToken)).toBe(farbenDunkel.alarmFuellungStark);
+    expect(sf.flaechenFarbe('akut', hellToken)).not.toBe(sf.flaechenFarbe('akut', dunkelToken));
+  });
+
+  it('liefert für `keine` eine leere Fläche, keinen Farbwert', () => {
+    expect(sf.flaechenFarbe('keine', hellToken)).toBe('transparent');
+    expect(sf.flaechenFarbe('keine', dunkelToken)).toBe('transparent');
+  });
+
+  it('bleibt aus der Etikett-Abdeckung heraus — die Neun-Enum-Zusicherung gilt weiter', () => {
+    // `warnstufeFlaeche`-Einträge tragen KEIN `rolle`-Feld und werden von `ALLE_MAPS`
+    // deshalb nicht erfasst. Das ist Absicht: eine Fläche ist keine Statusrolle, und
+    // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
+    expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(9);
+  });
+});

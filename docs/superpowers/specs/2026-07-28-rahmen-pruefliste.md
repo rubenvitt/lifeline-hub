@@ -124,16 +124,20 @@ ohne die Lücke zuzudecken:
   (`fontSize × lineHeight`), gemessen 21 / 24 / 24 px. B5j hat die ZEILE um den Schalter auf den
   Boden gehoben, das Steuerelement selbst bleibt darunter. Verdikt: **offen → LFH-380**.
 
-### Gemessene Baseline am 31.07.2026
+### Gemessene Baseline am 01.08.2026 (nach dem Merge von B5h und B5l)
 
-| Gemessen mit | vorher | nachher |
+| Gemessen mit | vor B5j | nach B5j |
 | --- | --- | --- |
-| `dichte.guard.test.ts` — Schuldmenge `OFFEN` | 24 Stellen in 13 Dateien | **10 Stellen in 4 Dateien** |
+| `dichte.guard.test.ts` — Schuldmenge `OFFEN` | 24 Stellen in 13 Dateien | **5 Stellen in 2 Dateien** |
 | davon Bündel B5j | 14 Stellen in 9 Dateien | **0** |
 | harte `min-height`-Pixel in `sprache.css` | 2 | **0** |
 
-Rest sind `pages/uhs/Grundriss.tsx` (geprüfte Dauerausnahme aus B5g), `pages/gefahren/*` (B5h /
-LFH-368, noch in Arbeit) und `pages/MaterialPage.tsx` (B5i).
+Die Zahl der Restschuld ist **nach** dem Merge von LFH-368 (B5h) und LFH-378 (B5l) neu gemessen,
+nicht aus der B5j-Messung fortgeschrieben: B5h hat `pages/gefahren/*` in der Zwischenzeit selbst
+abgeräumt. Was bleibt, sind die **vier Knöpfe** der UHS-Platzkarte (`pages/uhs/Grundriss.tsx`,
+geprüfte Dauerausnahme aus B5g — die zwei `Card`-Angaben derselben Datei zählen korrekt nicht
+mit, `Card` steht nicht in `INTERAKTIV`) und **ein `InputNumber`** in `pages/MaterialPage.tsx`
+(B5i).
 
 ## Was offen bleibt und wohin es geht
 

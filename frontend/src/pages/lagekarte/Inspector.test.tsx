@@ -128,6 +128,73 @@ describe('Inspector Symbol-Auswahl — Beschriftung (LFH-328)', () => {
   });
 });
 
+describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+    );
+  });
+
+  const schadenMarker = {
+    schluessel: 'schaden-2', typ: 'schaden', id: 2, lat: 52.0, lon: 9.9, label: 'S-002', farbe: '#faad14',
+  } as KarteMarker;
+
+  // Gemessen an der Vorlage: „Im Fach-Modul öffnen" + „Verortung löschen" tragen nebeneinander
+  // rund 300 px Eigenbreite und passen damit in KEINER Dichtestufe in den ~278 px Innenraum
+  // der Karte. `KartenDetailCard` setzt `overflowY: 'auto'`, was per CSS auch `overflow-x`
+  // auf `auto` zieht — der zweite Knopf wird also abgeschnitten statt umzubrechen.
+  // Ein Pixelbeleg ist in jsdom nicht baubar (kein Layout); geprüft wird die Struktur,
+  // die den Überlauf unmöglich macht.
+  it('stapelt die Aktionen senkrecht, jede über die volle Kartenbreite', () => {
+    renderMitProviders(
+      <Inspector einsatzId={1} marker={schadenMarker} darfSchreiben
+        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+    );
+    const modulLink = screen.getByRole('link', { name: 'Im Fach-Modul öffnen' });
+    const loeschen = screen.getByRole('button', { name: 'Verortung löschen' });
+
+    // `size="middle"` statt des Vorgabe-Abstands: der rote Knopf steht sonst 3–7 px unter
+    // einem neutralen (CLAUDE.md, „Rot steht auch nicht bündig neben Neutralem").
+    expect(loeschen.closest('.ant-space')).toHaveClass('ant-space-vertical', 'ant-space-gap-row-middle');
+    expect(loeschen).toHaveClass('ant-btn-block');
+    // Der Anker ist inline — ohne eigenes `display: block` liefe `block` am Knopf darin
+    // ins Leere und die Zeile bliebe schmal.
+    expect(modulLink).toHaveStyle({ display: 'block' });
+    expect(modulLink.querySelector('.ant-btn')).toHaveClass('ant-btn-block');
+  });
+
+  // Zweite Hälfte des Paares (LFH-366): ohne Schreibrecht bleibt EINE Aktion — genau deshalb
+  // ist hier kein Dreipunkt-Menü richtig, und deshalb muss der direkte Knopf dann weg sein.
+  it('ohne Schreibrecht bleibt allein der Modul-Link', () => {
+    renderMitProviders(
+      <Inspector einsatzId={1} marker={schadenMarker} darfSchreiben={false}
+        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+    );
+    expect(screen.getByRole('link', { name: 'Im Fach-Modul öffnen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verortung löschen' })).not.toBeInTheDocument();
+  });
+
+  it('kürzt die Ortsangabe, statt die Karte damit vollzuschreiben', async () => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({
+          peilung: { distanz_m: 20, richtung: 'O', bezug_label: 'S-1' },
+          ortsname: 'St. Michaelis, Bethelner Straße, Burgstemmen, Nordstemmen, Landkreis Hildesheim, Niedersachsen, 31171, Deutschland',
+        }),
+      ),
+    );
+    renderMitProviders(
+      <Inspector einsatzId={1} marker={schadenMarker} darfSchreiben={false}
+        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+    );
+    // Die Kürzung selbst rechnet der Browser (`-webkit-line-clamp`); jsdom meldet keine
+    // Unterstützung und fällt auf den Messpfad zurück. Belegbar ist deshalb, DASS die
+    // Kürzung konfiguriert ist — antd setzt die Klasse unabhängig vom Messweg.
+    const zeile = await screen.findByText(/St\. Michaelis/);
+    expect(zeile).toHaveClass('ant-typography-ellipsis');
+  });
+});
+
 describe('Inspector Typ-Tag (LFH-276)', () => {
   beforeEach(() => {
     server.use(

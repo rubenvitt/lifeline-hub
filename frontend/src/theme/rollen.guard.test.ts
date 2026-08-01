@@ -102,7 +102,9 @@ const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
   marke: '--lfh-marke',
   markeGlut: '--lfh-marke-glut',
   alarmFuellung: '--lfh-alarm-fuellung',
+  alarmFuellungStark: '--lfh-alarm-fuellung-stark',
   achtungFuellung: '--lfh-achtung-fuellung',
+  achtungFuellungStark: '--lfh-achtung-fuellung-stark',
   normalFuellung: '--lfh-normal-fuellung',
 };
 
