@@ -166,12 +166,11 @@ export const personenKarte = (einsatzId: number): KartenPlanZweig<Person, Person
  * Zusatzspalte „Abgleich vorschlagen" (nur Vermisst-Sicht mit Schreibrecht): je Vermisst-Zeile
  * ein Auswahlfeld über die gefundenen Personen. `onAbgleich` löst den Verdachts-Abgleich aus.
  *
- * Die Klein-Variante am Auswahlfeld unten ist BESTAND (LFH-333/B5 baut sie ab, nicht dieses
- * Bündel) und lebt allein im Tabellenzweig — hier ausdrücklich umschrieben statt zitiert,
- * damit ein Zählgate seine eigene Erklärung nicht mitzählt. Der Kartenzweig trägt sie NICHT:
- * ein ~24 px hohes Steuerelement mit fester 200-px-Breite wäre auf einer 390-px-Karte
- * dreifach regelwidrig. Dort ersetzt der Aktions-Deskriptor des Kartenplans es durch einen
- * Knopf, der ein Modal öffnet.
+ * Die Klein-Variante am Auswahlfeld ist seit LFH-370 · B5j ABGEBAUT — das Feld folgt jetzt
+ * der Dichte-Staffel. Damit entfällt das Höhen-Bein der Begründung unten; das Breiten-Bein
+ * trägt weiter: ein Steuerelement mit fester 200-px-Breite bleibt auf einer 390-px-Karte
+ * unbrauchbar. Der Kartenzweig behält deshalb den Aktions-Deskriptor, der statt des
+ * Auswahlfelds einen Knopf mit Modal rendert.
  */
 export function abgleichSpalten(
   gefundene: readonly Person[],
@@ -186,7 +185,6 @@ export function abgleichSpalten(
       render: (_: unknown, v: Person) => (
         <Select<number>
           placeholder="gefundene Person …"
-          size="small"
           style={{ width: 200 }}
           // Bleibt: der Zeilenklick der Tabelle hängt weiter am `onRow` des Primitivs.
           onClick={(e) => e.stopPropagation()}

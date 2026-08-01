@@ -269,7 +269,6 @@ export default function LoginPage() {
                   {devBenutzer.map((b) => (
                     <Button
                       key={b.benutzername}
-                      size="small"
                       onClick={() =>
                         form.setFieldsValue({
                           benutzername: b.benutzername,

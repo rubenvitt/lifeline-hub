@@ -6,7 +6,15 @@
 
   // Rust-Basisimage (Debian bookworm) bringt cargo, rustup, build-essential und
   // pkg-config mit — letztere braucht libsqlite3-sys (feature = "bundled") zum
-  // Kompilieren des mitgelieferten SQLite. rustls statt OpenSSL → kein libssl nötig.
+  // Kompilieren des mitgelieferten SQLite.
+  // Die eigene TLS-Kette ist rustls (axum-server/reqwest/tokio-rustls), ABER das
+  // Projekt braucht trotzdem System-OpenSSL: webauthn-rs → webauthn-rs-core /
+  // webauthn-attestation-ca deklarieren `openssl`/`openssl-sys` unconditional, das
+  // ist per Feature-Wahl nicht abwählbar (Herleitung: Cargo.toml:73-82,
+  // docs/betrieb/packaging.md:33-69). Ohne OpenSSL-Dev-Header bricht `cargo build`
+  // beim Kompilieren von openssl-sys — deshalb installiert post-create.sh libssl-dev.
+  // Der frühere Satz „rustls statt OpenSSL → kein libssl nötig" stimmte vor LFH-275
+  // und ist seit dem WebAuthn-Zugang falsch.
   "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
 
   "features": {

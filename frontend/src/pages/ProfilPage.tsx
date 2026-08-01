@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, Typography } from 'antd';
+import { Alert, App, Button, Form, Input, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { QRCodeSVG } from 'qrcode.react';
@@ -24,6 +24,10 @@ interface TotpEnrollment {
 
 export default function ProfilPage() {
   const { benutzer, aktualisiere } = useAuth();
+  // Kein vierter Alert-Zustand neben `fehler`/`erfolg`/`totpFehler`: das Kopieren ist eine
+  // flüchtige Aktion ohne Folgezustand, die drei Alerts tragen Zustände. `App.useApp()`
+  // hat im Repo breite Präzedenz, `<AntApp>` steht in main.tsx und in test/utils.tsx.
+  const { message } = App.useApp();
   const [provider, setProvider] = useState<AuthProvider[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [erfolg, setErfolg] = useState(false);
@@ -53,6 +57,11 @@ export default function ProfilPage() {
   // `navigator.credentials.create` serverseitig scheitern, bevor überhaupt eine Ceremony
   // beginnt. Der Button erscheint also nur, wenn er auch tatsächlich funktionieren kann.
   const passkeySichtbar = window.isSecureContext && webauthnAktiv;
+  // Dieselbe Frage für die Zwischenablage, aus demselben Grund: `navigator.clipboard` ist
+  // ein Secure-Context-Feature und im Nicht-Secure-Context gar nicht erst vorhanden — die
+  // Zeile darüber belegt, dass diese App dort läuft. Die Fähigkeit wird gefragt, nicht
+  // geraten; ein Knopf, der nichts tut, ist schlimmer als kein Knopf.
+  const kopierenMoeglich = typeof navigator.clipboard?.writeText === 'function';
 
   async function passkeyRegistrieren() {
     setFehler(null);
@@ -103,8 +112,20 @@ export default function ProfilPage() {
 
   function recoveryCodesKopieren() {
     if (!recoveryCodes) return;
-    // `navigator.clipboard` fehlt in manchen (Test-)Umgebungen — best effort, kein harter Fehler.
-    navigator.clipboard?.writeText(recoveryCodes.join('\n')).catch(() => {});
+    // BEIDE Ausgänge melden sich. Vorher stand hier `navigator.clipboard?.writeText(...)
+    // .catch(() => {})`: im Nicht-Secure-Context kurzschloss das `?.` die ganze Kette, und
+    // im Erfolgsfall sagte ohnehin nichts etwas — der einzige Ein-Klick-Weg zu Codes, die
+    // nur EINMAL angezeigt werden, war ein stiller No-Op.
+    // Zwei Zweige, nicht einer: `writeText` kann vorhanden sein und trotzdem ablehnen
+    // (NotAllowedError, fehlende Berechtigung). Das `?.` fällt weg, weil der Aufrufer die
+    // Fähigkeit über `kopierenMoeglich` bereits geprüft hat.
+    navigator.clipboard.writeText(recoveryCodes.join('\n')).then(
+      () => message.success('Recovery-Codes kopiert'),
+      () =>
+        message.error(
+          'Kopieren fehlgeschlagen — die Codes oben lassen sich markieren und kopieren',
+        ),
+    );
   }
 
   const totpAktiv = benutzer?.totp_aktiviert ?? false;
@@ -163,9 +184,21 @@ export default function ProfilPage() {
                 >
                   {recoveryCodes.join('\n')}
                 </pre>
-                <Button size="small" onClick={recoveryCodesKopieren}>
-                  Codes kopieren
-                </Button>
+                {/* `block` statt Klein-Angabe: das ist der einzige Ein-Klick-Weg zu Codes,
+                    die nur einmal angezeigt werden. Ohne Zwischenablage KEIN toter Knopf,
+                    sondern der ehrliche Hinweis auf das `<pre>` darüber — die Codes sind
+                    markierbar, ein zweiter Mechanismus wäre überflüssig. Bewusst ohne
+                    „Strg+C": das Führungs-Tablet hat keine Strg-Taste. */}
+                {kopierenMoeglich ? (
+                  <Button block onClick={recoveryCodesKopieren}>
+                    Codes kopieren
+                  </Button>
+                ) : (
+                  <Typography.Text type="secondary">
+                    Kopieren ist auf dieser Verbindung nicht möglich — die Codes oben lassen
+                    sich markieren und kopieren.
+                  </Typography.Text>
+                )}
               </div>
             }
           />

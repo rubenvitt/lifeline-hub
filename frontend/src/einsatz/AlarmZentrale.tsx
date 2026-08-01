@@ -41,7 +41,7 @@ export default function AlarmZentrale() {
         title: 'Sofortmeldung eingegangen',
         description: 'Eine Sofortmeldung erfordert Aufmerksamkeit — bitte sichten und bestätigen.',
         duration: 0,
-        actions: (<Button type="primary" size="small" onClick={oeffnen}>Öffnen</Button>),
+        actions: (<Button type="primary" onClick={oeffnen}>Öffnen</Button>),
       });
       zeigeDesktopAlarm('Sofortmeldung eingegangen', {
         koerper: 'Bitte sichten und bestätigen.',
@@ -71,7 +71,7 @@ export default function AlarmZentrale() {
         title: titel,
         description: beschreibung,
         duration: 0,
-        actions: (<Button type="primary" size="small" onClick={oeffnen}>Öffnen</Button>),
+        actions: (<Button type="primary" onClick={oeffnen}>Öffnen</Button>),
       };
       if (istAuftrag) notification.warning(config);
       else notification.info(config);

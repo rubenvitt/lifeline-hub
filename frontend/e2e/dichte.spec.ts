@@ -14,9 +14,18 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * ABGRENZUNG: die vollständige Trefflächen-Geometrie (jedes fokussierbare Element
  * je umgebauter Route) bleibt bei den Modulpaketen. Dieses Paket liefert den
- * MECHANISMUS und belegt nur, dass er bis in die Pixel durchschlägt. Die
- * Anmeldeseite trägt dafür bewusst keine Änderung; ihre punktuellen
- * Größen-Angaben sind Bestand und fallen in ihrem eigenen Paket.
+ * MECHANISMUS und belegt nur, dass er bis in die Pixel durchschlägt.
+ *
+ * Gemessen wird der Anmelde-Knopf (`LoginPage.tsx`, `size="large"`). Die frühere
+ * Bemerkung, die Anmeldeseite trage „bewusst keine Änderung, ihre punktuellen
+ * Größen-Angaben sind Bestand", ist mit LFH-370 · B5j überholt: der
+ * Dev-Schnellanmeldungs-Knopf hat seine Klein-Angabe dort verloren. Die hier
+ * gemessenen Fenster hängen daran nicht — sie greifen ausschließlich
+ * `getByRole('button', { name: 'Anmelden', exact: true })`.
+ *
+ * Der Trefflächen-Nachweis am Führungs-Tablet liegt NICHT hier, sondern in
+ * `e2e/trefflaeche-tablet.spec.ts` — er braucht `hasTouch` auf Dateiebene und
+ * einen Login, beides widerspricht der Abgrenzung oben.
  *
  * Bewusst KEIN zweites Playwright-Projekt und kein Device-Descriptor: das zöge
  * einen Browser-Download nach sich, für den es im Repo keinen Guard gibt.

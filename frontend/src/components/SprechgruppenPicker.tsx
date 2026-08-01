@@ -82,7 +82,6 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
       {!anlegenOffen && (
         <Button
           type="link"
-          size="small"
           icon={<PlusOutlined />}
           style={{ padding: 0, marginTop: 4 }}
           onClick={() => setAnlegenOffen(true)}

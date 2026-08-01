@@ -1,4 +1,5 @@
 import { Layout, Space, Typography } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
@@ -25,7 +26,7 @@ const KOPF_STIL = {
   paddingInline: 'var(--lfh-kopf-polsterung)',
 } as const;
 
-/** Topbar-Eintrag: Link wenn frei, sonst ausgegraut mit 🔒 (disabled statt versteckt). */
+/** Topbar-Eintrag: Link wenn frei, sonst ausgegraut mit Schloss (disabled statt versteckt). */
 function GlobalLink({ to, label, gesperrt }: { to: string; label: string; gesperrt: boolean }) {
   if (gesperrt) {
     return (
@@ -33,7 +34,16 @@ function GlobalLink({ to, label, gesperrt }: { to: string; label: string; gesper
         title="Keine Berechtigung"
         style={{ color: 'rgba(255,255,255,0.35)', cursor: 'not-allowed' }}
       >
-        {label} 🔒
+        {/* Ikone statt Emoji („Ein Emoji ist keine Ikone", 30.07.2026). Das ist hier kein
+            reiner Formfehler gewesen: das Emoji stand im Textknoten und damit im
+            zugänglichen Namen — vorgelesen wurde „Verwaltung Schloss". Die
+            `aria-hidden`-Hülle ist Pflicht, weil ein @ant-design/icons-Knoten `role="img"`
+            mit englischem `aria-label` mitbringt. Der zweite Kanal bleibt der `title`
+            oben plus `cursor: not-allowed`. */}
+        {label}{' '}
+        <span aria-hidden>
+          <LockOutlined />
+        </span>
       </Typography.Text>
     );
   }

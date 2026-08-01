@@ -52,10 +52,10 @@ export default function KraefteOhneBrSidebar({
       )}
 
       {freieEinheiten.map((e) => (
-        <div key={`einheit-${e.id}`} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-          <Tag style={{ flex: 1 }}>{e.name}</Tag>
+        <div key={`einheit-${e.id}`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+          <Tag style={{ flex: 1, minWidth: 0 }}>{e.name}</Tag>
           {!schreibgeschuetzt && (
-            <Button size="small" type="primary" onClick={() => onZuweisenEinheit(e)}>
+            <Button type="primary" onClick={() => onZuweisenEinheit(e)}>
               zuweisen
             </Button>
           )}
@@ -63,10 +63,10 @@ export default function KraefteOhneBrSidebar({
       ))}
 
       {freiFahrzeuge.map((f) => (
-        <div key={`fahrzeug-${f.id}`} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-          <Tag style={{ flex: 1 }}>{f.funkrufname}</Tag>
+        <div key={`fahrzeug-${f.id}`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+          <Tag style={{ flex: 1, minWidth: 0 }}>{f.funkrufname}</Tag>
           {!schreibgeschuetzt && (
-            <Button size="small" type="primary" onClick={() => onZuweisenFahrzeug(f)}>
+            <Button type="primary" onClick={() => onZuweisenFahrzeug(f)}>
               zuweisen
             </Button>
           )}

@@ -210,7 +210,12 @@
   align-items: flex-start;
   gap: var(--lfh-luft-1);
   padding: var(--lfh-luft-3);
-  min-height: 62px;
+  /* GEMESSEN eine Nulländerung: der Inhalt (Etikett + Zahl + Zusatz, zwei gaps,
+     Polster rundum) ergibt bereits 81,9 / 99,9 / 119,9 px — die 62 px banden in
+     KEINER Stufe. Sie fallen trotzdem, weil ein harter Pixelwert hier als
+     Zusicherung gelesen wird, die er nie war; als Boden für künftig kürzere
+     Inhalte trägt die Staffel ihn besser. */
+  min-height: var(--lfh-zeilenhoehe);
   background: var(--lfh-flaeche);
   border: 0;
   color: inherit;
@@ -294,9 +299,41 @@
   text-transform: uppercase;
 }
 
+/* Der „Öffnen"-Verweis im Kachelkopf ist ein Knopf (er navigiert), soll aber
+   wie Text aussehen — sonst konkurriert er mit der eigentlichen Aktion.
+
+   STEHT BEWUSST VOR `.lfh-kachel__mehr`. Beide haben eine Klasse, also gleiche
+   Spezifität, und `font: inherit` ist eine KURZFORM: sie setzt font-size und
+   font-weight mit zurück. Solange dieser Block danach stand, waren die Angaben
+   in `.lfh-kachel__mehr` tot — gemessen rendete der Verweis mit 13,5 / 15 px bei
+   Gewicht 400 statt der dort verlangten 11,5 / 600, also GRÖSSER und DÜNNER als
+   der Kacheltitel über ihm. Überlebt hatten nur letter-spacing, text-transform
+   und color; die stehen nicht in der Kurzform. Wer hier sortiert, liest das. */
+.lfh-knopf-blank {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .lfh-kachel__mehr {
   margin-left: auto;
-  font-size: 10.5px;
+  /* Der EINZIGE Navigationsausgang jeder Dashboard-Kachel — und bis LFH-370 der
+     einzige ohne jede Mindesthöhe (gemessen 19,6 / 21,8 / 21,8 px, also schon in
+     der kompakten Stufe unter dem Gate-1-Boden von 24 px).
+     `inline-flex` + `align-items` sind nicht Zierde: ohne sie sitzt das Etikett
+     bei 72 px Höhe oben statt mittig. Die Polsterung gibt der waagerechten Achse
+     eine Fläche, die sonst die blosse Textbreite wäre. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--lfh-zeilenhoehe);
+  padding: 0 var(--lfh-luft-2);
+  /* 11,5 px wie der Kacheltitel, nicht die 10,5 der Bestandsabsicht: die hat wegen
+     des Kaskadenfehlers oben nie gewirkt, gerendert wurden 13,5 / 15 px. Auf 10,5
+     zu gehen wäre für den einzigen Ausgang der Kachel eine echte Verschlechterung
+     gegenüber dem heutigen Bild. */
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -527,8 +564,11 @@
 
 /* Jeder Leerzustand führt zu einer Aktion (Bestand: 1 von 46). */
 .lfh-knopf {
-  padding: 7px 14px;
-  min-height: 32px;
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
+  /* Der eigentliche Fund der Datei: die 32 px BANDEN, gemessen 32/32/32 px über
+     alle drei Stufen. Jetzt 30 / 48 / 72. Die kompakte Stufe schrumpft dabei um
+     2 px — das ist der Stufenwert selbst und liegt über dem Gate-3-Boden 24. */
+  min-height: var(--lfh-zeilenhoehe);
   border: 1px solid var(--lfh-bedien);
   border-radius: var(--lfh-radius-steuer);
   background: transparent;
@@ -610,16 +650,6 @@
   .lfh-zeile__quelle {
     margin-left: auto;
   }
-}
-
-/* Der „Öffnen"-Verweis im Kachelkopf ist ein Knopf (er navigiert), soll aber
-   wie Text aussehen — sonst konkurriert er mit der eigentlichen Aktion. */
-.lfh-knopf-blank {
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
 }
 
 /* ── Zählzeile in einer Tabellenzelle (LFH-330 · B2) ───────────────────────

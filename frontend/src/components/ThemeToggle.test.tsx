@@ -17,7 +17,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
-import ThemeToggle from './ThemeToggle';
+import { dichten } from '../theme/tokens';
+import ThemeToggle, { segmentedMasse } from './ThemeToggle';
 
 function zeige() {
   return render(
@@ -82,5 +83,74 @@ describe('ThemeToggle — zwei Achsen in einer Kopfzeile (LFH-329 · B1)', () =>
       expect(screen.getByRole('radio', { name: titel }), titel).toBeInTheDocument();
     }
     expect(screen.getByRole('radio', { name: 'Kompakt' })).toBeChecked();
+  });
+});
+
+/**
+ * Das Segment-ZIEL, nicht der Track (LFH-370 · B5j).
+ *
+ * antd leitet am Segmented zwei Maße NICHT aus `controlHeight` ab: `trackPadding` steht
+ * per Vorgabe auf 2, und `controlPaddingHorizontal` ist eine harte Konstante 12. Gemessen
+ * hieß das 26×38 / 44×38 / 68×38 gegen die Gate-3-Böden 24 / 48 / 72 — die Vorgabestufe
+ * hielt, und ausgerechnet die beiden Stufen für Finger und Handschuh fielen durch.
+ *
+ * Die Böden stehen als LITERALE da, nicht aus `dichten` zurückgelesen — sonst prüfte die
+ * Zusicherung den Token gegen sich selbst.
+ */
+describe('ThemeToggle · Segmentmaße', () => {
+  const ZIEL = (d: keyof typeof dichten) => {
+    const m = segmentedMasse({
+      controlHeight: dichten[d].zeilenhoehe,
+      lineWidth: 1,
+      controlPaddingHorizontal: 12,
+    });
+    return {
+      hoehe: dichten[d].zeilenhoehe - 2 * m.trackPadding,
+      breite: 16 + 2 * (m.controlPaddingHorizontal - 1),
+    };
+  };
+
+  it('hebt Hoehe UND Breite des Ziels auf den Boden der Stufe', () => {
+    expect(ZIEL('kompakt')).toEqual({ hoehe: 30, breite: 38 });
+    expect(ZIEL('komfortabel')).toEqual({ hoehe: 48, breite: 48 });
+    expect(ZIEL('handschuh')).toEqual({ hoehe: 72, breite: 72 });
+  });
+
+  it('laesst die Breite mit der Stufe wachsen, statt bei 38 zu kleben', () => {
+    // Die eigentliche Aussage: ohne die Korrektur steht hier dreimal 38.
+    expect(ZIEL('kompakt').breite).toBeLessThan(ZIEL('komfortabel').breite);
+    expect(ZIEL('komfortabel').breite).toBeLessThan(ZIEL('handschuh').breite);
+  });
+
+  it('laesst die kompakte Stufe nicht SCHRUMPFEN', () => {
+    // Der 12er-Boden kommt aus dem Token selbst: die Rechnung allein ergaebe dort 8 und
+    // machte das Ziel von 38 auf 30 px schmaler, wo die Breite ohnehin reichlich ist.
+    expect(segmentedMasse({ controlHeight: 30, lineWidth: 1, controlPaddingHorizontal: 12 }))
+      .toEqual({ trackPadding: 0, controlPaddingHorizontal: 12 });
+  });
+
+  it('reicht beide Masse an antd durch — der Tokenname muss einer sein, den es kennt', () => {
+    /**
+     * T1 oben beweist eine RECHNUNG, nicht dass antd die zwei Namen honoriert. Genau daran
+     * scheitert der naheliegende Irrweg: `segmentedPaddingHorizontal` ist der interne Name
+     * aus `segmented/style/index.js`, bietet sich beim Lesen der Quelle als erstes an —
+     * und geht wirkungslos durch.
+     *
+     * Gemessen wird der von cssinjs erzeugte CSS-Text, verankert an der `css-var-…`-Klasse
+     * GENAU dieses Segmenteds. Ohne diese Verankerung färbte ein Segmented aus einem
+     * früheren Test derselben Datei den Nachweis grün.
+     */
+    localStorage.setItem('lifeline-hub.dichte', 'handschuh');
+    zeige();
+    const gruppe = screen.getByRole('radiogroup', { name: 'Bediendichte wählen' });
+    const scope = [...gruppe.classList].find((k) => k.startsWith('css-var-'));
+    expect(scope, 'antd vergibt dem lokalen Provider eine eigene Variablen-Klasse').toBeTruthy();
+
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent ?? '').join('');
+    const regel = css.match(new RegExp(`\\.${scope}\\.ant-segmented\\{([^}]*)\\}`))?.[1] ?? '';
+    expect(regel, 'trackPadding kommt an').toContain('--ant-segmented-track-padding:0px');
+    expect(regel, 'die Breite kommt an — 29 ist der Handschuh-Wert').toContain(
+      '--ant-control-padding-horizontal:29px',
+    );
   });
 });

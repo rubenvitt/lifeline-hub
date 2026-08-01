@@ -747,7 +747,8 @@ export default function Datensicht<T extends object, const K extends string>(
 
   /**
    * DIE ZEILENSCHLEUSE (Prüflisten-Kriterium 12) — Zustand zuerst, weil die Setter der
-   * Sortierung, Suche und Filter unten auf {@link nachBenutzeraktion} zugreifen.
+   * Sortierung, Suche, Filter und des Spaltenschalters unten auf
+   * {@link nachBenutzeraktion} zugreifen.
    *
    * Im Zustand `gefroren` hält `folge` die Schlüsselreihenfolge, die beim Fokuseintritt
    * sichtbar war. Gerendert wird dann diese FOLGE, durch eine frische
@@ -812,8 +813,19 @@ export default function Datensicht<T extends object, const K extends string>(
     (k: K[]) => {
       if (spaltenAus === undefined) setEigeneSpaltenAus(k);
       onSpaltenAus?.(k);
+      // Eine Spaltenumschaltung IST eine Benutzeraktion — und zwar die einzige der
+      // Werkzeugzeile, die das hier lange vergessen hat. Blendet man eine gefilterte
+      // Spalte aus, wird ihr Filter unwirksam (siehe „Spaltensichtbarkeit" unten); die
+      // dadurch freigegebenen Zeilen sind die ANTWORT auf den Klick, kein Zufluss. Ohne
+      // diesen Aufruf zaehlt die gefrorene Schleuse sie als neu und schiebt sie hinter das
+      // Sammelbanner: die Liste bleibt kurz, und daneben behauptet ein Banner „1 neuer
+      // Eintrag" fuer eine Zeile, die nicht neu ist.
+      // Greift nur fuer den eingebauten Schalter: nimmt eine Seite den exportierten
+      // SpaltenSchalter mit kontrolliertem spaltenAus/onSpaltenAus, laeuft die Umschaltung
+      // am Setter vorbei. Heute tut das keine (gemessen).
+      nachBenutzeraktion();
     },
-    [spaltenAus, onSpaltenAus],
+    [spaltenAus, onSpaltenAus, nachBenutzeraktion],
   );
 
   const [suchbegriff, setSuchbegriff] = useState('');

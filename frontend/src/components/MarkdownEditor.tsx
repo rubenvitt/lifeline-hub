@@ -73,7 +73,6 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
         <div style={{ marginTop: 4 }}>
           <Button
             type="text"
-            size="small"
             icon={<EyeOutlined />}
             onClick={() => setVorschauOffen((v) => !v)}
           >
@@ -89,7 +88,6 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     return (
       <div className="markdown-editor markdown-editor--tabs">
         <Tabs
-          size="small"
           activeKey={aktiv}
           onChange={(k) => setAktiv(k as 'schreiben' | 'vorschau')}
           items={[

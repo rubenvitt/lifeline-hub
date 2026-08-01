@@ -217,12 +217,12 @@ export default function TiereDetailPage() {
         </Space>
         <Space>
           {darfSchreiben && !t.storniert_at && !bearbeiten && (
-            <Space wrap>
+            <Space wrap size="middle">
               {naechsteStatus(t.status).map((s) =>
                 s === 'abgeschlossen' ? (
-                  <Button key={s} size="small" onClick={() => setAbschlussOffen(true)}>Abschließen</Button>
+                  <Button key={s} onClick={() => setAbschlussOffen(true)}>Abschließen</Button>
                 ) : (
-                  <Button key={s} size="small" onClick={() => statusMutation.mutate({ status: s })}>
+                  <Button key={s} onClick={() => statusMutation.mutate({ status: s })}>
                     {s === 'vermisst' ? 'Als vermisst markieren' : s === 'aktiv' && t.status === 'vermisst' ? 'Aufgefunden' : `→ ${STATUS_META[s].label}`}
                   </Button>
                 ),
