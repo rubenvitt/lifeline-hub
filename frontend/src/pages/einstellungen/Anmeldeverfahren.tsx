@@ -46,7 +46,7 @@ export function zeilenzielStil(token: {
  *
  * Gewählt ist damit die Familie „Grund zusätzlich als sichtbarer gedämpfter Kurztext"
  * (Präzedenz `pages/lagekarte/Sidebar.tsx:558-572`, `karten/OfflineRegionPicker.tsx:244-247`)
- * statt „Grund am Element, Klick tut nichts" (`ModulPanel.tsx:53-56`, `AppLayout.tsx:29-38`)
+ * statt „Grund am Element, Klick tut nichts" (`ModulPanel.tsx:141-142`, `AppLayout.tsx:29-38`)
  * — die trägt den Grund an einer Stelle, die Touch nicht erreicht.
  *
  * Die Ticket-Frage „was tut ein Label-Klick am GESPERRTEN Switch?" ist damit nicht

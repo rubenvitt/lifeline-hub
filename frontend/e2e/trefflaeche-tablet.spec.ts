@@ -16,7 +16,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  *  - `dichte.spec.ts:11` setzt „kein Login" als Prämisse. Hier wird angemeldet und geseedet.
  *  - `hasTouch` ist eine BrowserContext-Option und lässt sich, anders als der Viewport,
  *    NICHT zur Laufzeit umstellen — es geht nur über `test.use`. Auf Dateiebene in
- *    `dichte.spec.ts` kippte das dessen Tests „ohne Seed bleibt es kompakt" (:77-93) auf
+ *    `dichte.spec.ts` kippte das dessen Test „ohne Seed bleibt es kompakt" (:86-102) auf
  *    `komfortabel`.
  *
  * ── WARUM `hasTouch` ÜBERHAUPT ───────────────────────────────────────────────────────
