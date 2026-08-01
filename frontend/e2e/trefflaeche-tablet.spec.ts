@@ -195,12 +195,21 @@ for (const { dichte, soll } of STAFFEL) {
     } else {
       await page.goto(`/einsaetze/${einsatzId}/personal`);
     }
-    await page.waitForLoadState('networkidle');
 
     /**
-     * DIE WACHE. Im Tablet-Durchgang belegt sie, dass der grobe Zeiger die Stufe vorbelegt
-     * hat (ohne gespeicherte Wahl); im Handschuh-Durchgang, dass die gespeicherte Wahl
-     * angekommen ist. Ohne sie wäre ein verworfener Speicherwert nicht von einem
+     * KEIN `waitForLoadState('networkidle')`. Die Bestands-Specs benutzen es (16 Stellen in
+     * 6 Dateien) und diese Datei hatte es zunächst mitkopiert — es ist auf Einsatzrouten
+     * strukturell fragil, weil dort ein SSE-Strom offen bleibt und die Bedingung „500 ms
+     * keine Netzwerkaktivität" damit nie sauber eintritt. Gemessen: `datensicht-schmal.spec.ts`
+     * fällt daran unter paralleler Ausführung reproduzierbar, isoliert nicht — auf main
+     * genauso wie hier (→ LFH-385).
+     *
+     * Die folgenden Zusicherungen warten von sich aus (Playwright wiederholt sie bis zum
+     * Zeitlimit) und sind inhaltlich, nicht netzwerklich — das ist die tragfähigere Wache.
+     *
+     * DIE WACHE selbst: im Tablet-Durchgang belegt sie, dass der grobe Zeiger die Stufe
+     * vorbelegt hat (ohne gespeicherte Wahl); im Handschuh-Durchgang, dass die gespeicherte
+     * Wahl angekommen ist. Ohne sie wäre ein verworfener Speicherwert nicht von einem
      * Darstellungsfehler zu unterscheiden, und jedes „zu klein" hätte zwei mögliche Ursachen.
      */
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
