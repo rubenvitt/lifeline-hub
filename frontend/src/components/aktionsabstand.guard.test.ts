@@ -97,6 +97,10 @@ const MIT_NACHBARSCHAFT = [
   // steht zur Laufzeit also gar kein roter Knopf in der Reihe. Der Scanner liest Quelltext
   // und kann das nicht unterscheiden; er sichert hier den Abstand für den Fall zu, in dem
   // es ihn braucht. Wer den `danger`-Knopf aus der Reihe nimmt, streicht die Zeile.
+  // Und die Reihe hat ZWEI Renderformen: ab drei Aktionen ein ⋮-Menü, darunter dieselben
+  // Aktionen als direkte Knöpfe (LFH-366). Beide liegen in derselben `<Space size="middle">`
+  // — wer den Direkt-Zweig auf ein eigenes `<Flex gap>` umbaut, fällt aus dem Scanner,
+  // ohne dass sich an dieser Zeile etwas ändert.
   'meldungen/MeldungKarte.tsx',
 ];
 
