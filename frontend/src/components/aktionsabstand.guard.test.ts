@@ -92,6 +92,11 @@ const MIT_NACHBARSCHAFT = [
   // Festwert) auf `<Space size="middle">` gewechselt. Anders als `pages/lagekarte/Sidebar.tsx`
   // gehört diese Datei sehr wohl in die Liste: die destruktive Aktion steht hier NICHT im
   // Menü, sondern in der Reihe, die {@link reihenIn} sieht.
+  // Die Nachbarschaft ist dabei BEDINGT — „Bestätigen" wird nur bei
+  // `bestaetigung_pflicht && !ist_bestaetigt` gerendert, bei einer gewöhnlichen Meldung
+  // steht zur Laufzeit also gar kein roter Knopf in der Reihe. Der Scanner liest Quelltext
+  // und kann das nicht unterscheiden; er sichert hier den Abstand für den Fall zu, in dem
+  // es ihn braucht. Wer den `danger`-Knopf aus der Reihe nimmt, streicht die Zeile.
   'meldungen/MeldungKarte.tsx',
 ];
 

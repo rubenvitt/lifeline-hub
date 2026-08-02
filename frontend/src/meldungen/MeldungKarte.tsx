@@ -105,7 +105,7 @@ export default function MeldungKarte({
         : m.status === 'in_bearbeitung' ? { ziel: 'erledigt', label: 'Erledigt' }
           : null;
 
-  const menuItems: MenuProps['items'] = darfSchreiben
+  const weitere: { key: string; label: string; onClick: () => void }[] = darfSchreiben
     ? [
         // Was der Primär-Knopf gerade NICHT zeigt, bleibt über das Menü erreichbar —
         // sonst verlöre eine neue Meldung den Direktsprung auf „Erledigt", den der
@@ -126,6 +126,15 @@ export default function MeldungKarte({
           : []),
       ]
     : [];
+
+  // Gebündelt wird ERST AB DREI Aktionen, und gezählt wird NACH der Sichtbarkeits- und
+  // Rechteprüfung (LFH-366): fällt die Menge darunter, ist ein Menü keine Bündelung,
+  // sondern ein Umweg. Der Fall ist echt und nicht konstruiert — eine erledigte Meldung
+  // ohne Bestätigungspflicht hat weder eine Vorwärtsbewegung noch etwas zu bestätigen und
+  // stünde sonst mit einem ⋮-Trigger da, hinter dem zwei Einträge und sonst nichts liegen.
+  const gesamt = (kannBestaetigen ? 1 : 0) + (naechster ? 1 : 0) + weitere.length;
+  const buendeln = gesamt >= 3;
+  const menuItems: MenuProps['items'] = buendeln ? weitere : [];
 
   return (
     <Card
@@ -194,7 +203,7 @@ export default function MeldungKarte({
           und steht neben mindestens einer weiteren Aktion — der Vorgabeabstand wäre
           `abstand.xs` = 3/5/7 px je Dichtestufe und damit im Handschuh-Betrieb keine
           Trennung. Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
-      {(kannBestaetigen || naechster || menuItems.length > 0) && (
+      {gesamt > 0 && (
         <Space size="middle" wrap style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}>
           {kannBestaetigen && (
             <Popconfirm
@@ -211,10 +220,14 @@ export default function MeldungKarte({
               ? <Button type="primary" ghost onClick={() => setErledigtOffen(true)}>{naechster.label}</Button>
               : <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
           )}
-          {menuItems.length > 0 && (
-            <Dropdown trigger={['click']} menu={{ items: menuItems }}>
-              <Button type="text" aria-label={`Aktionen zu Meldung ${m.lfd_nr}`} icon={<MoreOutlined />} />
-            </Dropdown>
+          {buendeln ? (
+            menuItems.length > 0 && (
+              <Dropdown trigger={['click']} menu={{ items: menuItems }}>
+                <Button type="text" aria-label={`Aktionen zu Meldung ${m.lfd_nr}`} icon={<MoreOutlined />} />
+              </Dropdown>
+            )
+          ) : (
+            weitere.map((w) => <Button key={w.key} onClick={w.onClick}>{w.label}</Button>)
           )}
         </Space>
       )}

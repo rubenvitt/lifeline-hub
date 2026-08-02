@@ -139,6 +139,26 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     expect(within(menue).queryByRole('menuitem', { name: /Erledigt/ })).not.toBeInTheDocument();
   });
 
+  /**
+   * Gegenprobe zur Bündelung (LFH-366: „gezählt wird NACH der Rechteprüfung"). Der Fall
+   * ist echt: eine erledigte Meldung ohne Bestätigungspflicht hat weder eine
+   * Vorwärtsbewegung noch etwas zu bestätigen — bliebe sie gebündelt, stünde da ein
+   * ⋮-Trigger mit zwei Einträgen und sonst nichts. Zusammen mit dem Worst-Case-Test oben
+   * ist das das Paar, das die Bündelung überhaupt prüfbar macht.
+   */
+  it('bündelt NICHT, wenn nach der Filterung nur zwei Aktionen übrig sind', async () => {
+    const cb = alleCallbacks();
+    renderKarte(<MeldungKarte
+      meldung={meldung({ status: 'erledigt', bestaetigung_pflicht: false, lagerelevant: false, auftrag_id: null })}
+      einsatzId={7}
+      {...cb}
+    />);
+    expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    expect(cb.onLagerelevant).toHaveBeenCalledWith(1);
+    expect(screen.getByRole('button', { name: 'Auftrag erteilen' })).toBeInTheDocument();
+  });
+
   it('erreicht den Trigger mit der Tastatur', async () => {
     const cb = alleCallbacks();
     renderKarte(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} />);
