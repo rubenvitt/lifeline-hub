@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -48,6 +48,23 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   bestaetigt_at: null, bestaetigt_von_id: null, bestaetigt_von_name: null,
   ist_bestaetigt: false, ist_ueberfaellig: false, ...over,
 });
+
+/**
+ * Greift das GEÖFFNETE Dropdown-Portal der Aktionsbündelung (LFH-372/B5k). antd lässt die
+ * Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in
+ * jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern und genau einen
+ * Treffer verlangen. Bewusste Kopie aus `meldungen/MeldungKarte.test.tsx`: ein Import aus
+ * einer fremden `.test.tsx` zöge deren ganze Suite in jeden Lauf dieser hier.
+ */
+async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
+  await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Meldung ${lfdNr}` }));
+  const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')]
+    .filter((d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none');
+  expect(offen).toHaveLength(1);
+  const menue = offen[0].querySelector<HTMLElement>('[role="menu"]');
+  if (!menue) throw new Error(`Das Aktionsmenü zu Meldung ${lfdNr} ließ sich nicht öffnen`);
+  return menue;
+}
 
 /** Macht den aktuellen Query-String im DOM sichtbar (für apply-then-clean-Assertions). */
 function LocationProbe() {
@@ -156,9 +173,9 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'gesichtet' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // Link-Button öffnet Popconfirm; erst nach „Bestätigen" wird geschaltet.
+    // „Sichten" ist die eine Vorwärtsbewegung einer neuen Meldung und steht als sichtbarer
+    // Knopf; die Rückfrage ist mit LFH-372/B5k entfallen (der Schritt ist umkehrbar).
     await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'gesichtet'));
   });
 
@@ -166,8 +183,12 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'erledigt' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    // Die Fixture-Meldung ist `neu` → „Erledigt" ist der Sprung und liegt im Menü. Die
+    // Rückfrage ist dort ein Dialog, kein Popconfirm (LFH-366).
+    const menue = await oeffneAktionsmenue();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Erledigt/ }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'erledigt'));
   });
 
@@ -178,6 +199,10 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.queryByRole('button', { name: 'Sichten' })).not.toBeInTheDocument();
+    // Ohne Schreibrecht gibt es GAR KEINEN Trigger — das ist hier die ehrliche Aussage.
+    // „der Menüeintrag fehlt" wäre schwächer: ein Menü, das nie existiert, hat trivial
+    // keinen Eintrag (LFH-372/B5k).
+    expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).not.toBeInTheDocument();
   });
 
   // --- LFH-95: Lage-Übergabe ---
@@ -186,7 +211,7 @@ describe('MeldungenPage', () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    await userEvent.click(within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }));
     // Modal öffnet sich; ohne Koordinate direkt übergeben.
     await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
@@ -201,7 +226,7 @@ describe('MeldungenPage', () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    await userEvent.click(within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }));
     // Seit der formatbewussten Eingabe (KoordinatenEingabe) ein einzelnes Feld:
     // im WGS84-Default wird "lat, lon" getippt.
     await userEvent.type(await screen.findByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
@@ -218,7 +243,13 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText('Lagerelevant ✓')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'An Lage übergeben' })).not.toBeInTheDocument();
+    // Die Aktion muss IM GEÖFFNETEN MENÜ fehlen. Ein `queryByRole('menuitem')` vor dem
+    // ersten Öffnen ist immer `null` — rc-dropdown mountet lazy —, die Aussage wäre nach
+    // der Bündelung also trivial grün (LFH-372/B5k). Dass andere Einträge dastehen,
+    // belegt zugleich, dass das Menü überhaupt aufging.
+    const menue = await oeffneAktionsmenue();
+    expect(within(menue).getAllByRole('menuitem').length).toBeGreaterThan(0);
+    expect(within(menue).queryByRole('menuitem', { name: /An Lage übergeben/ })).not.toBeInTheDocument();
   });
 
   it('weist einer Meldung einen Bearbeiter zu', async () => {
@@ -266,6 +297,9 @@ describe('MeldungenPage', () => {
     // Bestätigt → orthogonale Quittungs-Achse (QuittungIndikator) statt Status-Badge.
     expect(screen.getByText(/✓ Quittiert/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
+    // „Bestätigen" ist nach LFH-372/B5k ein sichtbarer Knopf und gehört in KEIN Menü —
+    // die zweite Hälfte belegt, dass die Aktion nicht bloss dorthin gewandert ist.
+    expect(within(await oeffneAktionsmenue()).queryByRole('menuitem', { name: /Bestätigen/ })).not.toBeInTheDocument();
   });
 
   // --- LFH-113: Meldung→Auftrag ---
@@ -274,7 +308,7 @@ describe('MeldungenPage', () => {
     erteileAuftragAusMeldung.mockResolvedValue(meldung({ auftrag_id: 42 }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await userEvent.click(within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /Auftrag erteilen/ }));
     // Auftragstext ist mit „Absender: Inhalt" vorbelegt (Meldungsvorblendung).
     const textfeld = await screen.findByLabelText('Auftrag / Was');
     expect(textfeld).toHaveValue('Florian Nord 1: Deich instabil');
@@ -296,6 +330,11 @@ describe('MeldungenPage', () => {
     // F36/LFH-257: Backlink selektiert den ausgelösten Auftrag (?auftrag=) statt nur die Liste.
     expect(backlink).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=42');
     expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
+    // Und auch nicht im Menü — sonst prüfte die Aussage nach der Bündelung nur noch den
+    // Kartenkörper, in dem die Aktion ohnehin nie mehr steht (LFH-372/B5k).
+    const menue = await oeffneAktionsmenue();
+    expect(within(menue).getAllByRole('menuitem').length).toBeGreaterThan(0);
+    expect(within(menue).queryByRole('menuitem', { name: /Auftrag erteilen/ })).not.toBeInTheDocument();
   });
 
   it('Fast-Path-Button erfasst Sofortmeldung mit Bestätigungspflicht', async () => {

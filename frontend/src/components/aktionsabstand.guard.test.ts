@@ -86,6 +86,13 @@ const MIT_NACHBARSCHAFT = [
   // Gemessen liefert der Scanner für beide Dateien {weit: false, knoepfe: 4, destruktiv: true}.
   'pages/SchaedenDetailPage.tsx',
   'pages/TiereDetailPage.tsx',
+  // ── B5k · Meldungskarte (LFH-372) ─────────────────────────────────────────
+  // „Bestätigen" (`danger`) bleibt als sichtbarer Knopf neben der Statusbewegung und dem
+  // ⋮-Trigger stehen — die Reihe ist mit der Bündelung von `<Flex gap={8}>` (dichteblinder
+  // Festwert) auf `<Space size="middle">` gewechselt. Anders als `pages/lagekarte/Sidebar.tsx`
+  // gehört diese Datei sehr wohl in die Liste: die destruktive Aktion steht hier NICHT im
+  // Menü, sondern in der Reihe, die {@link reihenIn} sieht.
+  'meldungen/MeldungKarte.tsx',
 ];
 
 /**
