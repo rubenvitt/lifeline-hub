@@ -73,9 +73,15 @@ export default function AuftragKarte({
   // quittierbar — womit `empfaenger_anzahl == quittiert_anzahl` in
   // `src/routes/auftrag.rs` nie wahr wird und die Auto-Erinnerung aus LFH-118 nicht
   // schliesst. Eigener Task, siehe LFH-371.
-  const offeneQuittungen = darfSchreiben && onQuittieren
-    ? sichtbareEmpf.filter((e) => !e.quittiert_at)
-    : [];
+  //
+  // LFH-372/B5k: der Statuschip zeigt nur noch QUITTIERTE Empfänger. Offene standen nach
+  // LFH-364 doppelt — einmal als Chip, einmal in der Zeile „Quittung offen:" — und
+  // kosteten bei drei Empfängern auf `handschuh` eine ganze Kartenzeile. Die Zeile selbst
+  // hängt bewusst NICHT mehr am Schreibrecht, nur noch ihr Knopf: sonst verlöre ein
+  // Beobachter mit dem Chip zugleich den Namen des offenen Empfängers.
+  const quittierteEmpf = sichtbareEmpf.filter((e) => e.quittiert_at);
+  const offeneEmpf = sichtbareEmpf.filter((e) => !e.quittiert_at);
+  const darfQuittieren = !!(darfSchreiben && onQuittieren);
 
   const aktionen: ReactNode[] = darfSchreiben
     ? [
@@ -148,9 +154,9 @@ export default function AuftragKarte({
           {a.empfaenger_anzahl} Empfänger · {a.quittiert_anzahl}/{a.empfaenger_anzahl} quittiert
         </Text>
         <Space size={4} wrap>
-          {sichtbareEmpf.map((e) => (
-            <Tag key={e.id} variant="filled" color={e.quittiert_at ? 'green' : 'default'} style={{ margin: 0, fontSize: 12 }}>
-              {e.snap_anzeige}{e.quittiert_at ? ' ✓' : ''}
+          {quittierteEmpf.map((e) => (
+            <Tag key={e.id} variant="filled" color="green" style={{ margin: 0, fontSize: 12 }}>
+              {e.snap_anzeige} ✓
             </Tag>
           ))}
           {restEmpf > 0 && <Text type="secondary" style={{ fontSize: 12 }}>+{restEmpf}</Text>}
@@ -165,20 +171,22 @@ export default function AuftragKarte({
           Der Knopftext bleibt wörtlich „quittieren"; wer für WEN quittiert, steht im
           zugänglichen Namen — bei mehreren offenen Empfängern wären sonst mehrere
           gleichnamige Knöpfe nicht auseinanderzuhalten. */}
-      {offeneQuittungen.length > 0 && (
+      {offeneEmpf.length > 0 && (
         <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
           <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Quittung offen:</Text>
-          {offeneQuittungen.map((e) => (
+          {offeneEmpf.map((e) => (
             <Space key={e.id} size={4}>
               <Text style={{ fontSize: 13 }}>{e.snap_anzeige}</Text>
-              <Popconfirm
-                title="Empfang/Kenntnis quittieren?"
-                okText="Bestätigen"
-                cancelText="Abbrechen"
-                onConfirm={() => onQuittieren?.(a.id, e.id)}
-              >
-                <Button aria-label={`Empfang für ${e.snap_anzeige} quittieren`}>quittieren</Button>
-              </Popconfirm>
+              {darfQuittieren && (
+                <Popconfirm
+                  title="Empfang/Kenntnis quittieren?"
+                  okText="Bestätigen"
+                  cancelText="Abbrechen"
+                  onConfirm={() => onQuittieren?.(a.id, e.id)}
+                >
+                  <Button aria-label={`Empfang für ${e.snap_anzeige} quittieren`}>quittieren</Button>
+                </Popconfirm>
+              )}
             </Space>
           ))}
         </Flex>
