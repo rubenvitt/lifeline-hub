@@ -86,6 +86,22 @@ const MIT_NACHBARSCHAFT = [
   // Gemessen liefert der Scanner für beide Dateien {weit: false, knoepfe: 4, destruktiv: true}.
   'pages/SchaedenDetailPage.tsx',
   'pages/TiereDetailPage.tsx',
+  // ── B5k · Meldungskarte (LFH-372) ─────────────────────────────────────────
+  // „Bestätigen" (`danger`) bleibt als sichtbarer Knopf neben der Statusbewegung und dem
+  // ⋮-Trigger stehen — die Reihe ist mit der Bündelung von `<Flex gap={8}>` (dichteblinder
+  // Festwert) auf `<Space size="middle">` gewechselt. Anders als `pages/lagekarte/Sidebar.tsx`
+  // gehört diese Datei sehr wohl in die Liste: die destruktive Aktion steht hier NICHT im
+  // Menü, sondern in der Reihe, die {@link reihenIn} sieht.
+  // Die Nachbarschaft ist dabei BEDINGT — „Bestätigen" wird nur bei
+  // `bestaetigung_pflicht && !ist_bestaetigt` gerendert, bei einer gewöhnlichen Meldung
+  // steht zur Laufzeit also gar kein roter Knopf in der Reihe. Der Scanner liest Quelltext
+  // und kann das nicht unterscheiden; er sichert hier den Abstand für den Fall zu, in dem
+  // es ihn braucht. Wer den `danger`-Knopf aus der Reihe nimmt, streicht die Zeile.
+  // Und die Reihe hat ZWEI Renderformen: ab drei Aktionen ein ⋮-Menü, darunter dieselben
+  // Aktionen als direkte Knöpfe (LFH-366). Beide liegen in derselben `<Space size="middle">`
+  // — wer den Direkt-Zweig auf ein eigenes `<Flex gap>` umbaut, fällt aus dem Scanner,
+  // ohne dass sich an dieser Zeile etwas ändert.
+  'meldungen/MeldungKarte.tsx',
 ];
 
 /**

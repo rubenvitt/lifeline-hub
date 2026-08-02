@@ -197,9 +197,23 @@ Alltag wichtigsten:
   **Teilstring**, nicht per exaktem Namen (LFH-366): ein antd-Icon im Eintrag trägt ein eigenes
   `aria-label` (`role="img"`), das in den zugänglichen Namen einfließt — gemessen heißt der
   Eintrag `delete Bild entfernen …`. Die Beschriftung selbst prüft ein `textContent`-Vergleich.
-  **MeldungKarte ist die begründete Gegenausnahme** — dort wurde die Bündelung geprüft und wegen
-  vier Popconfirms und ~10 Testabfragen verworfen (`meldungen/MeldungKarte.tsx:75-94`, offen als
-  LFH-372/B5k).
+  **Die Gegenausnahme MeldungKarte ist eingelöst** (LFH-372/B5k): `meldungen/MeldungKarte.tsx`
+  bündelt seit 02.08.2026. Was die Vertagung teuer machte, war nicht die Bündelung, sondern die
+  **Rückfragen** — und die Rechnung fiel beim Bauen kleiner aus als beim Schätzen: von „vier
+  Popconfirms im Menü" blieb **eine** übrig. `Sichten`/`In Bearbeitung` haben ihre verloren, weil
+  `src/meldung/repo.rs:223` jeden Status frei zurücksetzt (LFH-378: erst die Umkehrbarkeit, dann
+  die Rückfrage); `Bestätigen` bleibt sichtbarer Knopf und kommt nie ins Menü; `Erledigt` trägt
+  ein `<Modal>` — und zwar auf **beiden** Wegen dasselbe, ob es gerade sichtbar oder gebündelt
+  steht, weil zwei Bauformen für eine Aktion ein Unterschied ohne Bedeutung wären. Sichtbar
+  bleiben genau zwei Aktionen: `Bestätigen` und die **eine** Vorwärtsbewegung des Triage-Status;
+  was der Primär-Knopf gerade nicht zeigt, steht im Menü — sonst verlöre eine neue Meldung den
+  Direktsprung auf „Erledigt", den der Bestand hatte.
+  **Der Rechte-Riegel gehört an die Ableitung, nicht ans Rendern** (gemessen): `MeldungenPage`
+  übergibt `onStatus` auch einem Beobachter, das Vorhandensein des Callbacks ist also **kein**
+  Rechtebeleg — ohne den Riegel sah der Beobachter „Sichten". Und ohne Schreibrecht lautet die
+  Negativ-Aussage „**kein Trigger**", nicht „Eintrag fehlt": ein `queryByRole('menuitem')` vor dem
+  ersten Öffnen ist immer `null` (rc-dropdown mountet lazy), ein reiner Rollentausch
+  `button` → `menuitem` färbte die vier Bestands-Negativaussagen also trivial grün.
   **Wo der Riegel gegen dieses Aufsteigen NICHT hingehört, ist ebenfalls gemessen** (LFH-367/B5g):
   ein `domEvent.stopPropagation()` im `menu.onClick` hält es **nicht** auf — mit ihm allein blieb
   der Regressionstest rot; der Callback läuft zu spät für die Ausbreitung. Wirksam ist ein

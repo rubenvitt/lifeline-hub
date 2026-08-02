@@ -1,7 +1,8 @@
-import { Button, Card, Flex, Popconfirm, Space, Tag, Typography, theme } from 'antd';
+import { Button, Card, Dropdown, Flex, Modal, Popconfirm, Space, Tag, Typography, theme } from 'antd';
+import type { MenuProps } from 'antd';
 import { Select } from '../components/Select';
-import { ClockCircleOutlined } from '@ant-design/icons';
-import type { ReactNode } from 'react';
+import { ClockCircleOutlined, MoreOutlined } from '@ant-design/icons';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
@@ -72,86 +73,68 @@ export default function MeldungKarte({
   // Unübersehbare Hervorhebung (AK1/AK3): unbestätigte überfällige/eskalierte Sofortmeldung.
   const alarmiert = !!(m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert));
 
-  // Bündelung in ein Dreipunkt-Menü: GEPRÜFT und VERWORFEN (LFH-364/B5d).
+  // Aktionsbündelung (LFH-372/B5k, Nachtrag zu LFH-364/B5d): die sechs Aktionen dieser
+  // Karte schliessen sich NICHT aus — eine neue, bestätigungspflichtige, noch nicht
+  // lagerelevante Meldung ohne Auftrag hatte sie alle gleichzeitig, auf `handschuh`
+  // (72 px) also bis zu sechs Knopfzeilen. Sichtbar bleiben deshalb genau zwei:
+  // „Bestätigen" (die dringlichste Aktion der Karte, Kenntnisnahme einer Sofortmeldung)
+  // und die EINE sinnvolle Vorwärtsbewegung des Triage-Status. Alles Weitere hängt an
+  // einem ⋮-Menü (Muster: `chat/NachrichtenStrom.tsx`, `pages/lagekarte/Sidebar.tsx`).
   //
-  // Der Anlass ist echt — die sechs Aktionen unten schliessen sich NICHT aus. Eine neue,
-  // bestätigungspflichtige, noch nicht lagerelevante Meldung ohne Auftrag zeigt alle
-  // sechs gleichzeitig, und auf der Stufe `handschuh` (72 px) wächst die Karte damit um
-  // mehrere Knopfzeilen. Dagegen stehen zwei gemessene Kosten:
-  //
-  //  1. `pages/MeldungenPage.test.tsx` greift diese Aktionen an ~10 Stellen als
-  //     `getByRole('button', { name })` ab (Sichten, Erledigt, An Lage übergeben,
-  //     Auftrag erteilen, Bestätigen). Ein Dropdown macht aus der Rolle `button` ein
-  //     `menuitem` — gleicher Wortlaut rettet die Abfragen also nicht. LFH-364 nennt
-  //     diese Datei nicht als Änderungsziel.
-  //  2. Vier der sechs Aktionen hängen in einem `Popconfirm`. Im Menü braucht jede die
-  //     `stopPropagation`-Konstruktion aus `chat/NachrichtenStrom.tsx` — vier
-  //     Bestätigungsblasen in einem Menü sind eine eigene Interaktionsentscheidung,
-  //     keine Nebenwirkung einer Dichte-Aufgabe.
-  //
-  // Das verbindliche Kriterium von B5 ist die TREFFFLÄCHE, und die trägt jetzt der
-  // `ConfigProvider`. Die Kartenhöhe bei sechs offenen Aktionen bleibt offen und liegt
-  // als LFH-372 (B5k) auf dem Board — dort samt dem Testumbau, den sie erzwingt.
-  const aktionen: ReactNode[] = darfSchreiben
+  // Rückfragen (LFH-378: erst die Umkehrbarkeit, dann die Rückfrage):
+  //  • „Sichten"/„In Bearbeitung" haben ihre verloren — `src/meldung/repo.rs:223` setzt
+  //    jeden Status frei zurück, der Schritt ist folgenlos.
+  //  • „Erledigt" behält eine: es räumt die Karte aus der Offen-Ansicht, und die
+  //    Abgeschlossen-Ansicht trägt keine Aktion zurück. Sie ist ein `<Modal>` mit eigenem
+  //    State und KEIN `Popconfirm` (LFH-366) — im Menü-Label überlebte der nur mit
+  //    `stopPropagation` das Auto-Schliessen. Bewusst DERSELBE Pfad, egal ob „Erledigt"
+  //    gerade sichtbar oder im Menü steht: zwei Bauformen für eine Aktion wären ein
+  //    Unterschied ohne Bedeutung.
+  //  • „Bestätigen" behält seinen `Popconfirm` — sichtbarer Knopf, keine Menü-Falle.
+  const [erledigtOffen, setErledigtOffen] = useState(false);
+
+  const kannBestaetigen = !!(darfSchreiben && m.bestaetigung_pflicht && !m.ist_bestaetigt && onBestaetigen);
+  // Je Status genau eine Vorwärtsbewegung. `erledigt` hat keine.
+  // Der `darfSchreiben`-Riegel steht HIER und nicht erst am Rendern: `MeldungenPage`
+  // übergibt `onStatus` auch einem Beobachter, dessen Vorhandensein ist also kein
+  // Rechtebeleg (gemessen — ohne den Riegel sah der Beobachter „Sichten").
+  const naechster: { ziel: MeldungStatus; label: string } | null = !(darfSchreiben && onStatus)
+    ? null
+    : m.status === 'neu' ? { ziel: 'gesichtet', label: 'Sichten' }
+      : m.status === 'gesichtet' ? { ziel: 'in_bearbeitung', label: 'In Bearbeitung' }
+        : m.status === 'in_bearbeitung' ? { ziel: 'erledigt', label: 'Erledigt' }
+          : null;
+
+  const weitere: { key: string; label: string; onClick: () => void }[] = darfSchreiben
     ? [
-        m.bestaetigung_pflicht && !m.ist_bestaetigt && onBestaetigen
-          ? (
-            <Popconfirm
-              key="be"
-              title="Sofortmeldung bestätigen (Kenntnis genommen)?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onBestaetigen(m.id)}
-            >
-              <Button danger>Bestätigen</Button>
-            </Popconfirm>
-          ) : null,
-        m.status === 'neu' && onStatus
-          ? (
-            <Popconfirm
-              key="si"
-              title="Meldung als gesichtet markieren?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onStatus(m.id, 'gesichtet')}
-            >
-              <Button>Sichten</Button>
-            </Popconfirm>
-          ) : null,
-        (m.status === 'neu' || m.status === 'gesichtet') && onStatus
-          ? (
-            <Popconfirm
-              key="ib"
-              title="Meldung auf „In Bearbeitung“ setzen?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onStatus(m.id, 'in_bearbeitung')}
-            >
-              <Button>In Bearbeitung</Button>
-            </Popconfirm>
-          ) : null,
-        m.status !== 'erledigt' && onStatus
-          ? (
-            <Popconfirm
-              key="er"
-              title="Meldung auf „Erledigt“ setzen?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onStatus(m.id, 'erledigt')}
-            >
-              <Button type="primary" ghost>Erledigt</Button>
-            </Popconfirm>
-          ) : null,
-        // An die Lage übergeben (LFH-95/113): öffnet ein Formular-Modal (optionale
-        // Verortung) statt Popconfirm → eigener Button ohne Popconfirm.
-        !m.lagerelevant && onLagerelevant
-          ? <Button key="lr" onClick={() => onLagerelevant(m.id)}>An Lage übergeben</Button> : null,
-        // Meldung→Auftrag (LFH-113): nur solange noch kein Auftrag erteilt. Öffnet ein
-        // Formular-Modal (kein Popconfirm) → eigener Button.
-        m.auftrag_id == null && onAuftragErteilen
-          ? <Button key="ae" onClick={() => onAuftragErteilen(m)}>Auftrag erteilen</Button> : null,
-      ].filter(Boolean)
+        // Was der Primär-Knopf gerade NICHT zeigt, bleibt über das Menü erreichbar —
+        // sonst verlöre eine neue Meldung den Direktsprung auf „Erledigt", den der
+        // Bestand hatte (`m.status !== 'erledigt'`).
+        ...(m.status === 'neu' && onStatus
+          ? [{ key: 'ib', label: 'In Bearbeitung', onClick: () => onStatus(m.id, 'in_bearbeitung') }]
+          : []),
+        ...(m.status !== 'erledigt' && m.status !== 'in_bearbeitung' && onStatus
+          ? [{ key: 'er', label: 'Erledigt', onClick: () => setErledigtOffen(true) }]
+          : []),
+        // An die Lage übergeben (LFH-95/113) und Meldung→Auftrag (LFH-113) öffnen jeweils
+        // ein Formular-Modal — sie tragen ihre Bestätigung also selbst.
+        ...(!m.lagerelevant && onLagerelevant
+          ? [{ key: 'lr', label: 'An Lage übergeben', onClick: () => onLagerelevant(m.id) }]
+          : []),
+        ...(m.auftrag_id == null && onAuftragErteilen
+          ? [{ key: 'ae', label: 'Auftrag erteilen', onClick: () => onAuftragErteilen(m) }]
+          : []),
+      ]
     : [];
+
+  // Gebündelt wird ERST AB DREI Aktionen, und gezählt wird NACH der Sichtbarkeits- und
+  // Rechteprüfung (LFH-366): fällt die Menge darunter, ist ein Menü keine Bündelung,
+  // sondern ein Umweg. Der Fall ist echt und nicht konstruiert — eine erledigte Meldung
+  // ohne Bestätigungspflicht hat weder eine Vorwärtsbewegung noch etwas zu bestätigen und
+  // stünde sonst mit einem ⋮-Trigger da, hinter dem zwei Einträge und sonst nichts liegen.
+  const gesamt = (kannBestaetigen ? 1 : 0) + (naechster ? 1 : 0) + weitere.length;
+  const buendeln = gesamt >= 3;
+  const menuItems: MenuProps['items'] = buendeln ? weitere : [];
 
   return (
     <Card
@@ -216,11 +199,46 @@ export default function MeldungKarte({
 
       <Text style={{ fontSize: 13, display: 'block' }}>{m.inhalt}</Text>
 
-      {aktionen.length > 0 && (
-        <Flex justify="flex-end" gap={8} wrap style={{ marginTop: 8 }}>
-          {aktionen}
-        </Flex>
+      {/* `<Space size="middle">` statt `<Flex gap={8}>` (LFH-363): „Bestätigen" ist `danger`
+          und steht neben mindestens einer weiteren Aktion — der Vorgabeabstand wäre
+          `abstand.xs` = 3/5/7 px je Dichtestufe und damit im Handschuh-Betrieb keine
+          Trennung. Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
+      {gesamt > 0 && (
+        <Space size="middle" wrap style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}>
+          {kannBestaetigen && (
+            <Popconfirm
+              title="Sofortmeldung bestätigen (Kenntnis genommen)?"
+              okText="Bestätigen"
+              cancelText="Abbrechen"
+              onConfirm={() => onBestaetigen?.(m.id)}
+            >
+              <Button danger>Bestätigen</Button>
+            </Popconfirm>
+          )}
+          {naechster && onStatus && (
+            naechster.ziel === 'erledigt'
+              ? <Button type="primary" ghost onClick={() => setErledigtOffen(true)}>{naechster.label}</Button>
+              : <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
+          )}
+          {buendeln ? (
+            menuItems.length > 0 && (
+              <Dropdown trigger={['click']} menu={{ items: menuItems }}>
+                <Button type="text" aria-label={`Aktionen zu Meldung ${m.lfd_nr}`} icon={<MoreOutlined />} />
+              </Dropdown>
+            )
+          ) : (
+            weitere.map((w) => <Button key={w.key} onClick={w.onClick}>{w.label}</Button>)
+          )}
+        </Space>
       )}
+      <Modal
+        open={erledigtOffen}
+        title="Meldung auf „Erledigt“ setzen?"
+        okText="Bestätigen"
+        cancelText="Abbrechen"
+        onOk={() => { setErledigtOffen(false); onStatus?.(m.id, 'erledigt'); }}
+        onCancel={() => setErledigtOffen(false)}
+      />
     </Card>
   );
 }

@@ -163,6 +163,13 @@ describe('AuftraegePage', () => {
     renderPage();
     await screen.findByText('Deich sichern');
 
+    // LFH-372/B5k: offene Empfänger standen doppelt — einmal als Statuschip, einmal in der
+    // Zeile „Quittung offen:". Bei drei Empfängern kostete das auf `handschuh` eine ganze
+    // Kartenzeile. Der Chip zeigt jetzt nur noch Quittiertes.
+    expect(screen.getAllByText('EA Nord')).toHaveLength(1);
+    expect(screen.getAllByText('EA Süd')).toHaveLength(1);
+    expect(screen.getAllByText(/EA West/)).toHaveLength(1);
+
     // Der quittierte Empfänger hat KEINEN Knopf — sonst wäre die Zeile nur eine
     // zweite Chip-Reihe und die Trennung Status/Aktion bloß behauptet.
     expect(screen.queryByRole('button', { name: /EA West/ })).not.toBeInTheDocument();
@@ -173,6 +180,18 @@ describe('AuftraegePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Süd quittieren' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 2));
+  });
+
+  it('nennt offene Empfänger auch ohne Schreibrecht, nur ohne Quittungs-Knopf', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    renderPage();
+    await screen.findByText('Deich sichern');
+    // Der Chip zeigt nur Quittiertes, der offene Empfänger steht in der Quittungszeile —
+    // hinge sie am Schreibrecht, verlöre ein Beobachter den Namen ganz (LFH-372/B5k).
+    expect(screen.getByText('EA Nord')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /quittieren/ })).not.toBeInTheDocument();
   });
 
   it('meldet Vollzug über das Modal', async () => {
