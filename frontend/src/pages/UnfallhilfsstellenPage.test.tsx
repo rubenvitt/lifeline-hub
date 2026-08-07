@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router';
@@ -11,6 +11,9 @@ import { liesLetzteUhs } from './uhs/uhsAuswahl';
 import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { App as AntApp } from 'antd';
+import { useState } from 'react';
+import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 
 class FakeEventSource {
   url: string; closed = false;
@@ -56,7 +59,71 @@ function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
   ) };
 }
 
+function UhsDrawerHarness(props: { onClose: () => void; onAngelegt: () => void }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <UhsAnlegenDrawer
+      einsatzId={1}
+      open={open}
+      onClose={() => { props.onClose(); setOpen(false); }}
+      onAngelegt={props.onAngelegt}
+    />
+  );
+}
+
+function UhsEinsatzWechselHarness() {
+  const [einsatzId, setEinsatzId] = useState(1);
+  return (
+    <>
+      <button type="button" onClick={() => setEinsatzId(2)}>Zu Einsatz B</button>
+      <UhsAnlegenDrawer einsatzId={einsatzId} open onClose={() => {}} />
+    </>
+  );
+}
+
+function renderUhsDrawer(onClose: () => void, onAngelegt: () => void) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <AntApp>
+        <CommandPaletteProvider>
+          <UhsDrawerHarness onClose={onClose} onAngelegt={onAngelegt} />
+        </CommandPaletteProvider>
+      </AntApp>
+    </QueryClientProvider>,
+  );
+}
+
 describe('UnfallhilfsstellenPage', () => {
+  it('schließt den UHS-Drawer mit Provider per Escape genau einmal', async () => {
+    const onClose = vi.fn();
+    renderUhsDrawer(onClose, vi.fn());
+    await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveFocus());
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('setzt beim Einsatzwechsel alle Werte des offenen UHS-Drawers zurück', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AntApp><UhsEinsatzWechselHarness /></AntApp>
+      </QueryClientProvider>,
+    );
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'UHS Einsatz A');
+    await userEvent.type(screen.getByLabelText('Standort (optional)'), 'Standort A');
+    await userEvent.type(screen.getByLabelText('Notiz (optional)'), 'Notiz A');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveValue(''));
+    expect(screen.getByLabelText('Standort (optional)')).toHaveValue('');
+    expect(screen.getByLabelText('Notiz (optional)')).toHaveValue('');
+    expect(screen.getByTitle('Behandlungsplatz')).toBeInTheDocument();
+  });
+
   it('öffnet via ?neu=1 den Anlegen-Drawer (aktiver Einsatz)', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
@@ -151,7 +218,7 @@ describe('UnfallhilfsstellenPage', () => {
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 
-  it('Anlegen-Flow ruft POST und schließt den Drawer', async () => {
+  it('fokussiert Bezeichnung und legt per Enter aus diesem Feld an', async () => {
     let body: unknown = null;
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
@@ -167,9 +234,52 @@ describe('UnfallhilfsstellenPage', () => {
     );
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
-    await userEvent.type(screen.getByPlaceholderText('z. B. BHP 50'), 'PA 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    const bezeichnung = screen.getByPlaceholderText('z. B. BHP 50');
+    await waitFor(() => expect(bezeichnung).toHaveFocus());
+    await userEvent.keyboard('PA 1{Enter}');
     await waitFor(() => expect(body).toMatchObject({ bezeichnung: 'PA 1' }));
+  });
+
+  it('lässt den Drawer und die Bezeichnung bei einem Anlegefehler stehen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json({ error: 'UHS abgelehnt' }, { status: 500 })),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    const bezeichnung = screen.getByPlaceholderText('z. B. BHP 50');
+    await userEvent.type(bezeichnung, 'PA Fehler');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    expect(await screen.findByText('UHS abgelehnt')).toBeInTheDocument();
+    expect(bezeichnung).toHaveValue('PA Fehler');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('meldet nach Schließen während des Anlegens keinen verspäteten Abschluss', async () => {
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
+    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const onClose = vi.fn();
+    const onAngelegt = vi.fn();
+    server.use(http.post('/api/einsaetze/1/uhs', async () => {
+      postGestartet();
+      await antwortGate;
+      return HttpResponse.json(bhp50, { status: 201 });
+    }));
+    renderUhsDrawer(onClose, onAngelegt);
+
+    await userEvent.type(screen.getByPlaceholderText('z. B. BHP 50'), 'PA 1{Enter}');
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    await act(async () => { antwortFreigeben(); });
+    await screen.findByText('UHS angelegt');
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onAngelegt).not.toHaveBeenCalled();
   });
 });
 

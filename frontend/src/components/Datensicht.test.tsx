@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderMitProviders } from '../test/utils';
+import type { ReactElement } from 'react';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
+import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import Datensicht, {
   MAX_SEKUNDAER,
@@ -16,6 +18,22 @@ import Datensicht, {
   type DatensichtSpalte,
   type Kartenplan,
 } from './Datensicht';
+
+function renderMitProviders(
+  ui: ReactElement,
+  options?: Parameters<typeof renderMitBasisProviders>[1],
+) {
+  const ergebnis = renderMitBasisProviders(
+    <CommandPaletteProvider>{ui}</CommandPaletteProvider>,
+    options,
+  );
+  const basisRerender = ergebnis.rerender;
+  return {
+    ...ergebnis,
+    rerender: (naechstesUi: ReactElement) =>
+      basisRerender(<CommandPaletteProvider>{naechstesUi}</CommandPaletteProvider>),
+  };
+}
 
 /**
  * Prüfungen des Datensicht-Primitivs (LFH-330 · B2).
@@ -910,6 +928,45 @@ describe('Datensicht · Tabellenzweig', () => {
       'Florian 1',
       'Florian 3',
     ]);
+  });
+
+  it('Strg/⌘ + Backspace in der Werkzeugleiste leert Suche und internen Spaltenfilter', async () => {
+    const { container } = rendere({ suche: { platzhalter: 'Funkrufname' } });
+    const namen = () =>
+      [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
+    const suche = screen.getByRole('searchbox', { name: 'Suche in Fahrzeuge im Einsatz' });
+
+    await userEvent.type(suche, 'Florian');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
+    await userEvent.click(await screen.findByTitle('Hilfsorganisation'));
+    await waitFor(() => expect(namen()).toEqual([]));
+
+    suche.focus();
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(suche, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(true);
+    expect(suche).toHaveValue('');
+    await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Rotkreuz 2', 'Florian 3']));
+    expect(screen.getByRole('combobox', { name: 'Träger' })).toHaveValue('');
+  });
+
+  it('übernimmt native Wortlöschung nicht, wenn der Fokus im Ergebnisbereich steht', async () => {
+    rendere({ suche: { platzhalter: 'Funkrufname' } });
+    const suche = screen.getByRole('searchbox', { name: 'Suche in Fahrzeuge im Einsatz' });
+    await userEvent.type(suche, 'Florian');
+
+    const ergebnisLink = screen.getByRole('link', { name: 'Florian 1' });
+    ergebnisLink.focus();
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(ergebnisLink, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(false);
+    expect(suche).toHaveValue('Florian');
   });
 
   it('ein Filter wirkt NICHT mehr, sobald seine Spalte ausgeblendet ist — und wieder, wenn sie zurückkommt', async () => {

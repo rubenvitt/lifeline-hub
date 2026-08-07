@@ -1,6 +1,11 @@
 import { Collapse, Form, Input, InputNumber } from 'antd';
+import { useEffect, useRef } from 'react';
 import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
+import {
+  liesErfassungsSitzungswert,
+  schreibeErfassungsSitzungswert,
+} from '../components/erfassungsSitzung';
 import type { PersonEingabe } from '../api/einsatzPerson';
 
 /** Erfassungs-Modi der Personen-Schnellerfassung. `null` = Modal geschlossen. */
@@ -13,6 +18,8 @@ const TITEL: Record<ErfassungsModus, string> = {
 };
 
 interface Props {
+  /** Einsatzgrenze des sitzungsweiten Antrefforts. */
+  einsatzId: number;
   /** Aktueller Modus (steuert Titel + optionales Vermisst-Feld); `null` schließt das Modal. */
   modus: ErfassungsModus | null;
   /** Läuft die Anlege-Mutation? → beide Speicher-Knöpfe zeigen Ladeanzeige. */
@@ -57,16 +64,35 @@ interface Props {
  *
  * ── KONTEXT-DEFAULT ────────────────────────────────────────────────
  *
- * `uebernahme={['antreff_ort']}`: der Antreffort überlebt ein Serien-Speichern, weil an einer
- * Sammelstelle zehn Personen hintereinander vom selben Ort kommen. Die Übernahme reicht so weit
- * wie der geöffnete Dialog — schließt man ihn, ist sie weg (`destroyOnHidden` an der Hülle).
- * Ein Vorbelegen über das Schließen hinaus wäre ein zweiter Speicher und ist bewusst nicht Teil
- * dieses Umbaus.
+ * `uebernahme={['antreff_ort']}`: bei eingeschaltetem B4-Schalter überlebt der Antreffort den
+ * nächsten Serien-Reset. Davon getrennt merkt `erfassungsSitzung` den Ort nach erfolgreicher
+ * Mutation bis zum Ende des Browser-Tabs und setzt ihn beim nächsten Öffnen genau einmal ein.
+ * Der Sitzungswert wird bewusst nicht zu `initialValues`: sonst füllte jeder Serien-Reset den Ort
+ * auch bei ausgeschaltetem „Werte behalten" heimlich wieder auf.
  */
 export default function PersonErfassungModal({
-  modus, isPending, onErfassen, onFertig, onCancel,
+  einsatzId, modus, isPending, onErfassen, onFertig, onCancel,
 }: Props) {
   const [form] = Form.useForm<PersonEingabe>();
+  const geladeneOeffnung = useRef<string | null>(null);
+
+  useEffect(() => {
+    const oeffnung = modus === null ? null : `${einsatzId}:person`;
+    if (oeffnung === null) {
+      geladeneOeffnung.current = null;
+      return;
+    }
+    if (geladeneOeffnung.current === oeffnung) return;
+    geladeneOeffnung.current = oeffnung;
+    const ort = liesErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort');
+    if (ort !== undefined) form.setFieldValue('antreff_ort', ort);
+  }, [einsatzId, form, modus]);
+
+  const ortMerken = (daten: PersonEingabe) => {
+    if (typeof daten.antreff_ort === 'string') {
+      schreibeErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort', daten.antreff_ort);
+    }
+  };
 
   const weitereAngaben = (
     <>
@@ -86,6 +112,7 @@ export default function PersonErfassungModal({
       titel={modus === null ? '' : TITEL[modus]}
       form={form}
       onErfassen={onErfassen}
+      onErfasst={ortMerken}
       onFertig={onFertig}
       onAbbrechen={onCancel}
       laeuft={isPending}

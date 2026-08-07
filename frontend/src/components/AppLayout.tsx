@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import ThemeToggle from './ThemeToggle';
 import BenutzerMenu from './BenutzerMenu';
+import CommandPaletteTrigger from './CommandPaletteTrigger';
 import { useViewport } from './useViewport';
 
 const { Header, Content } = Layout;
@@ -71,6 +72,7 @@ export default function AppLayout() {
         </Link>
         <GlobalLink to="/admin" label="Verwaltung" gesperrt={!darfVerwaltung(benutzer)} />
         <Space style={{ marginLeft: 'auto' }} size="middle">
+          <CommandPaletteTrigger />
           {/* Unter `lg` wandern Farbschema UND Bediendichte ins Benutzermenü —
               nicht ersatzlos weg. Der Umschalter belegt hier zwei Segmentleisten
               nebeneinander; das ist auf 390 px die Hälfte der Zeile. */}

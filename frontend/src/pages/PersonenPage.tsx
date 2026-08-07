@@ -582,6 +582,7 @@ export default function PersonenPage() {
 
       <PersonErfassungModal
         key={einsatzId}
+        einsatzId={einsatzId}
         modus={modus}
         isPending={
           anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId

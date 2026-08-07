@@ -135,9 +135,9 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     renderGrundriss(uhs, [p]);
     await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
     // Abschluss-Screen: Art ist mit Transport vorbelegt → nur Ziel + Transportmittel erfassen.
-    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte');
     await userEvent.type(screen.getByRole('textbox', { name: /Transportmittel/ }), 'RTW');
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    // Ziel ist das erste Arbeitsfeld; Enter dort muss die native Formularübermittlung auslösen.
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.art).toBe('transport');
     expect(body!.status).toBe('abtransportiert');

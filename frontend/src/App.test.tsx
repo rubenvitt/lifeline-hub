@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from './test/utils';
 import { AuthProvider } from './auth/AuthContext';
+import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
 import App from './App';
 import { http, HttpResponse } from 'msw';
 import { server } from './test/server';
@@ -21,7 +22,9 @@ afterEach(() => vi.restoreAllMocks());
 function renderApp(route: string) {
   return renderMitProviders(
     <AuthProvider>
-      <App />
+      <CommandPaletteProvider>
+        <App />
+      </CommandPaletteProvider>
     </AuthProvider>,
     { route },
   );

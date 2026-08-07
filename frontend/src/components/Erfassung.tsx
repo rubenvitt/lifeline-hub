@@ -1,6 +1,10 @@
 import { Button, Checkbox, Form, Modal, Space, Tooltip, Typography, theme } from 'antd';
 import type { FormInstance, FormProps } from 'antd';
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useCallback, useEffect, useImperativeHandle, useRef, useState,
+  type KeyboardEvent, type ReactNode, type Ref,
+} from 'react';
+import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
 /**
  * Schnellerfassungs-Primitive (LFH-332 · B4) — Formularhülle, Serienmodus,
@@ -114,6 +118,11 @@ const UEBERNAHME_ERKLAERUNG =
   'Beim „Speichern und nächste" bleiben die Wiederholfelder stehen, alle übrigen Felder werden geleert. '
   + 'Auf den Knopf rechts hat der Schalter keinen Einfluss — der schliesst den Dialog.';
 
+export interface ErfassungsFormularSteuerung {
+  /** Bricht über denselben Reset-Pfad wie Knopf und Tastatur-Registry ab. */
+  abbrechen: () => void;
+}
+
 interface ErfassungsFormularProps<T> {
   /** Die Formularinstanz des Aufrufers (`Form.useForm()`). Die Hülle setzt sie zurück. */
   form: FormInstance<T>;
@@ -122,6 +131,11 @@ interface ErfassungsFormularProps<T> {
    * sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam.
    */
   onErfassen: (werte: T) => Promise<unknown>;
+  /**
+   * Nach erfolgreichem Speichern und bestandener Abbruchprüfung. Geeignet für
+   * lokale Folgewirkungen, die ein Abbruch während der Mutation nicht auslösen darf.
+   */
+  onErfasst?: (werte: T) => void | Promise<void>;
   /** Einzel-Erfassen erfolgreich. Der Aufrufer schliesst; die Hülle hat bereits geleert. */
   onFertig: () => void;
   /** Abbrechen. Die Hülle leert vorher — der Aufrufer setzt nur seinen Offen-Zustand. */
@@ -142,6 +156,8 @@ interface ErfassungsFormularProps<T> {
   uebernahme?: (keyof T & string)[];
   /** Startwerte. Werden bei jedem Zurücksetzen wieder wirksam. */
   initialValues?: FormProps<T>['initialValues'];
+  /** Steuerung für äußere Dialoghüllen (Drawer-Kreuz, Maske und Escape). */
+  steuerungRef?: Ref<ErfassungsFormularSteuerung>;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -151,8 +167,8 @@ interface ErfassungsFormularProps<T> {
  * und steckt in `ErfassungsModal` für Dialoge.
  */
 export function ErfassungsFormular<T extends object>({
-  form, onErfassen, onFertig, onAbbrechen, laeuft = false,
-  erfassenText = 'Erfassen', serie = false, uebernahme, initialValues, children,
+  form, onErfassen, onErfasst, onFertig, onAbbrechen, laeuft = false,
+  erfassenText = 'Erfassen', serie = false, uebernahme, initialValues, steuerungRef, children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
   const wurzel = useRef<HTMLDivElement>(null);
@@ -165,6 +181,9 @@ export function ErfassungsFormular<T extends object>({
   // „Ein Absenden ist unterwegs." Gleicher Grund für die Ref: der Riegel muss
   // innerhalb desselben Zuges greifen, in dem er gesetzt wurde.
   const sendetRef = useRef(false);
+  // Jeder Abbruch macht einen bereits laufenden Abschluss ungültig. Die Mutation
+  // darf serverseitig zu Ende laufen, aber danach weder schließen noch navigieren.
+  const abbruchGenerationRef = useRef(0);
 
   /**
    * Der Fokus läuft über **zwei Effekte, nicht über eine Zeitangabe** — und das
@@ -203,33 +222,47 @@ export function ErfassungsFormular<T extends object>({
     // eine gehaltene Taste den Knopf nie, und `loading` blockiert nur Klicks.
     if (sendetRef.current) return;
     sendetRef.current = true;
+    const abbruchGeneration = abbruchGenerationRef.current;
     const serienlauf = serienlaufRef.current;
     serienlaufRef.current = false;
     // Werte VOR dem Zurücksetzen sichern — danach sind sie weg.
     const behaltene = Object.fromEntries(
       (uebernahme ?? []).map((feld) => [feld, werte[feld]]),
     ) as Partial<T>;
-    let angenommen = false;
+    let serverErfolg = false;
     try {
-      await onErfassen(werte);
-      angenommen = true;
-    } catch {
-      // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
-      // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
+      try {
+        await onErfassen(werte);
+        serverErfolg = true;
+      } catch {
+        // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
+        // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
+      }
+      if (!serverErfolg || abbruchGenerationRef.current !== abbruchGeneration) return;
+
+      try {
+        await onErfasst?.(werte);
+      } catch {
+        // Der Server hat bereits erfolgreich gespeichert. Ein lokaler Folgefehler
+        // darf den Satz nicht offen und damit versehentlich wiederholbar lassen.
+      }
+      // Der Hook ist awaitbar: ein Abbruch währenddessen bleibt maßgeblich und
+      // hat Reset/Callback bereits selbst ausgeführt.
+      if (abbruchGenerationRef.current !== abbruchGeneration) return;
+
+      setZaehler((n) => n + 1);
+      if (!serienlauf) {
+        form.resetFields();
+        onFertig();
+        return;
+      }
+      form.resetFields();
+      if (behalten && uebernahme?.length) form.setFieldsValue(behaltene);
+      setFokusTick((n) => n + 1);
     } finally {
       sendetRef.current = false;
     }
-    if (!angenommen) return;
-    setZaehler((n) => n + 1);
-    if (!serienlauf) {
-      form.resetFields();
-      onFertig();
-      return;
-    }
-    form.resetFields();
-    if (behalten && uebernahme?.length) form.setFieldsValue(behaltene);
-    setFokusTick((n) => n + 1);
-  }, [behalten, form, onErfassen, onFertig, uebernahme]);
+  }, [behalten, form, onErfassen, onErfasst, onFertig, uebernahme]);
 
   /**
    * Der Serienlauf — eine Funktion für Knopf UND Tastenkürzel. Zwei Kopien
@@ -249,15 +282,31 @@ export function ErfassungsFormular<T extends object>({
     // Ohne Serienmodus gibt es den Knopf nicht — dann darf das Kürzel auch
     // keine Serien-Marke setzen. Eine stehengebliebene Marke färbt das nächste
     // reguläre Absenden still zum Serienlauf (s. `onFinishFailed` unten).
-    if (!serie || e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return;
+    if (
+      e.nativeEvent.isComposing || e.repeat || e.shiftKey || e.altKey
+      || !serie || e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)
+    ) return;
     e.preventDefault();
     serienSpeichern();
   }
 
-  function abbrechen() {
+  const abbrechen = useCallback(() => {
+    abbruchGenerationRef.current += 1;
+    serienlaufRef.current = false;
     form.resetFields();
     onAbbrechen?.();
-  }
+  }, [form, onAbbrechen]);
+
+  useImperativeHandle(steuerungRef, () => ({ abbrechen }), [abbrechen]);
+
+  useTastaturEbene({
+    name: 'Erfassungsformular',
+    wurzel,
+    aktionen: {
+      speichern: () => form.submit(),
+      verwerfen: abbrechen,
+    },
+  });
 
   return (
     <div ref={wurzel} onKeyDown={aufTaste}>
@@ -355,21 +404,37 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
  * anlegen" öffnen — das Formular trug Name, Personalnummer und Telefon der
  * bearbeiteten Person, und Speichern legte sie als Dublette an.
  *
- * Deshalb liegt der Reset zweimal, aber nie doppelt: der Knopf geht durch
- * `ErfassungsFormular.abbrechen`, die drei anderen Wege durch `schliessen` hier.
+ * Deshalb besitzen alle vier Wege denselben zentralen Abbruch: der Knopf und
+ * Escape gehen direkt durch `ErfassungsFormular.abbrechen`; Kreuz und Maske
+ * rufen dieselbe Funktion über `ErfassungsFormularSteuerung` auf.
  */
 export function ErfassungsModal<T extends object>({
   offen, titel, onAbbrechen, ...rest
 }: ErfassungsModalProps<T>) {
   const { form } = rest;
+  const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
   const schliessen = useCallback(() => {
-    form.resetFields();
-    onAbbrechen();
+    if (formularSteuerung.current) formularSteuerung.current.abbrechen();
+    else {
+      form.resetFields();
+      onAbbrechen();
+    }
   }, [form, onAbbrechen]);
 
   return (
-    <Modal open={offen} title={titel} onCancel={schliessen} footer={null} destroyOnHidden>
-      <ErfassungsFormular<T> onAbbrechen={onAbbrechen} {...rest} />
+    <Modal
+      open={offen}
+      title={titel}
+      onCancel={schliessen}
+      footer={null}
+      destroyOnHidden
+      keyboard={false}
+    >
+      <ErfassungsFormular<T>
+        onAbbrechen={onAbbrechen}
+        {...rest}
+        steuerungRef={formularSteuerung}
+      />
     </Modal>
   );
 }

@@ -47,16 +47,14 @@ describe('Liste', () => {
     expect(container.querySelector('.ant-empty')).toBeNull();
   });
 
-  it('rendert Aktionen und feuert onClick am Eintrag', async () => {
+  it('rendert Aktionen ohne eine Anzeigezeile klickbar zu machen', async () => {
     const user = userEvent.setup();
-    const onKlick = vi.fn();
     const onAktion = vi.fn();
     renderMitProviders(
       <Liste
         dataSource={['Eintrag']}
         renderItem={(t) => (
           <ListenEintrag
-            onClick={onKlick}
             actions={[
               <button key="a" onClick={onAktion}>
                 Aktion
@@ -68,10 +66,26 @@ describe('Liste', () => {
         )}
       />,
     );
-    await user.click(screen.getByText('Eintrag'));
-    expect(onKlick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Eintrag' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Aktion' }));
     expect(onAktion).toHaveBeenCalledTimes(1);
+  });
+
+  it('rendert eine Auswahlzeile über das Klickbar-Primitiv', async () => {
+    const user = userEvent.setup();
+    const onKlick = vi.fn();
+    renderMitProviders(
+      <Liste
+        dataSource={['Eintrag']}
+        renderItem={(t) => <ListenEintrag onClick={onKlick}>{t}</ListenEintrag>}
+      />,
+    );
+
+    const zeile = screen.getByRole('button', { name: 'Eintrag' });
+    zeile.focus();
+    await user.keyboard('{Enter}');
+
+    expect(onKlick).toHaveBeenCalledTimes(1);
   });
 
   it('rendert Einträge als list/listitem (Screenreader-Semantik wie antds List)', () => {

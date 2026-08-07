@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import type { EinsatzMaterial, UhsDetail } from '../../api/types';
+import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
 import MaterialTab from './MaterialTab';
 
 /**
@@ -78,7 +79,9 @@ function render(
   return {
     patches,
     ...renderMitProviders(
-      <MaterialTab einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
+      <CommandPaletteProvider>
+        <MaterialTab einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+      </CommandPaletteProvider>,
       { route: '/einsaetze/1/unfallhilfsstellen/3' },
     ),
   };

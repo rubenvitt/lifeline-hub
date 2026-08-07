@@ -17,6 +17,7 @@ import { Select } from './Select';
 import StatusTag from './StatusTag';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { StatusDarstellung } from '../theme/statusFarben';
+import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
 /**
  * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2).
@@ -744,6 +745,7 @@ export default function Datensicht<T extends object, const K extends string>(
   const { token } = theme.useToken();
   const { abBreite } = useViewport();
   const wurzel = useRef<HTMLElement>(null);
+  const werkzeugWurzel = useRef<HTMLDivElement>(null);
 
   /**
    * DIE ZEILENSCHLEUSE (Prüflisten-Kriterium 12) — Zustand zuerst, weil die Setter der
@@ -830,6 +832,17 @@ export default function Datensicht<T extends object, const K extends string>(
 
   const [suchbegriff, setSuchbegriff] = useState('');
   const [filterWerte, setFilterWerte] = useState<Record<string, readonly string[]>>({});
+  const filterZuruecksetzen = useCallback(() => {
+    setSuchbegriff('');
+    setFilterWerte({});
+    nachBenutzeraktion();
+  }, [nachBenutzeraktion]);
+
+  useTastaturEbene({
+    name: `Datensicht-Filter: ${bezeichnung}`,
+    wurzel: werkzeugWurzel,
+    aktionen: { 'filter-zuruecksetzen': filterZuruecksetzen },
+  });
 
   // ── Spaltensichtbarkeit ───────────────────────────────────────────────────────────
   // Steht VOR der Zeilenmenge, weil die wirksamen Filter davon abhängen (siehe unten).
@@ -1026,6 +1039,7 @@ export default function Datensicht<T extends object, const K extends string>(
      * `katalogtabelle-schmal.spec.ts` die Bildlaufbreite an dessen Wurzelknoten misst.
      */
     <div
+      ref={werkzeugWurzel}
       data-lfh="datensicht-werkzeuge"
       style={{
         display: 'flex',

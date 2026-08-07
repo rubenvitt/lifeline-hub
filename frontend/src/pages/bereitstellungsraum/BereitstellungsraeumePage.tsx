@@ -4,7 +4,7 @@ import {
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
@@ -19,6 +19,20 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../../compone
 import { brStatus } from '../../theme/statusFarben';
 import { flaeche } from '../../theme/tokens';
 import KatalogTabelle from '../../components/KatalogTabelle';
+import {
+  ErfassungsFormular,
+  type ErfassungsFormularSteuerung,
+} from '../../components/Erfassung';
+
+interface BrAnlegenAuftrag {
+  einsatzId: number;
+  daten: BrEingabe;
+}
+
+interface AngelegterBr {
+  einsatzId: number;
+  brId: number;
+}
 
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
@@ -39,22 +53,40 @@ export default function BereitstellungsraeumePage() {
 
   const [anlegen, setAnlegen] = useState(false);
   const [form] = Form.useForm<BrEingabe>();
+  const angelegterBr = useRef<AngelegterBr | null>(null);
+  const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
+  const abbruchGeneration = useRef(0);
+  const formularEinsatzId = useRef(einsatzId);
+
+  useEffect(() => {
+    if (formularEinsatzId.current === einsatzId) return;
+    formularEinsatzId.current = einsatzId;
+    form.resetFields();
+  }, [einsatzId, form]);
 
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
 
   const anlegenMut = useMutation({
-    mutationFn: (daten: BrEingabe) => legeBrAn(einsatzId, daten),
-    onSuccess: (br) => {
+    mutationFn: (auftrag: BrAnlegenAuftrag) => legeBrAn(auftrag.einsatzId, auftrag.daten),
+    onSuccess: (_br, auftrag) => {
       message.success('Bereitstellungsraum angelegt');
-      qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-      setAnlegen(false);
-      form.resetFields();
-      navigate(bereitstellungsraumDetailPfad(einsatzId, br.id));
+      qc.invalidateQueries({ queryKey: einsatzKeys.br(auftrag.einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(auftrag.einsatzId) });
     },
     onError: (e: unknown) =>
       message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
+
+  const anlegenAbbrechen = useCallback(() => {
+    abbruchGeneration.current += 1;
+    angelegterBr.current = null;
+    setAnlegen(false);
+  }, []);
+
+  const drawerSchliessen = () => {
+    if (formularSteuerung.current) formularSteuerung.current.abbrechen();
+    else anlegenAbbrechen();
+  };
 
   const spalten: TableColumnsType<Bereitstellungsraum> = [
     {
@@ -162,14 +194,33 @@ export default function BereitstellungsraeumePage() {
       <Drawer
         title="Bereitstellungsraum anlegen"
         open={anlegen}
-        onClose={() => { setAnlegen(false); form.resetFields(); }}
+        keyboard={false}
+        onClose={drawerSchliessen}
         size={420}
         destroyOnHidden
       >
-        <Form<BrEingabe>
+        <ErfassungsFormular<BrEingabe>
           form={form}
-          layout="vertical"
-          onFinish={(v) => anlegenMut.mutate(v)}
+          steuerungRef={formularSteuerung}
+          onErfassen={async (daten) => {
+            const auftrag: BrAnlegenAuftrag = { einsatzId, daten };
+            const generation = abbruchGeneration.current;
+            const br = await anlegenMut.mutateAsync(auftrag);
+            if (abbruchGeneration.current === generation) {
+              angelegterBr.current = { einsatzId: auftrag.einsatzId, brId: br.id };
+            }
+          }}
+          onFertig={() => {
+            const ergebnis = angelegterBr.current;
+            angelegterBr.current = null;
+            setAnlegen(false);
+            if (ergebnis) {
+              navigate(bereitstellungsraumDetailPfad(ergebnis.einsatzId, ergebnis.brId));
+            }
+          }}
+          onAbbrechen={anlegenAbbrechen}
+          laeuft={anlegenMut.isPending}
+          erfassenText="Anlegen"
         >
           <Form.Item
             label="Bezeichnung"
@@ -184,10 +235,7 @@ export default function BereitstellungsraeumePage() {
           <Form.Item label="Notiz (optional)" name="notiz">
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Button type="primary" htmlType="submit" loading={anlegenMut.isPending}>
-            Anlegen
-          </Button>
-        </Form>
+        </ErfassungsFormular>
       </Drawer>
     </EinsatzSeite>
   );

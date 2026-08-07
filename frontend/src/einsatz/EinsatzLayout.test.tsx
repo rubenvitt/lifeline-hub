@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout from './EinsatzLayout';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
@@ -50,15 +51,17 @@ function setup(
   );
   return renderMitProviders(
     <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-          <Route path="etb" element={<div>ETB-Inhalt</div>} />
-          {/* Zweites Ziel in einer ANDEREN Kategorie: nur damit lässt sich
-              belegen, dass ein Modulklick im Drawer wirklich navigiert und den
-              Drawer dabei schließt. */}
-          <Route path="lagekarte" element={<div>Lagekarte-Inhalt</div>} />
-        </Route>
-      </Routes>
+      <CommandPaletteProvider>
+        <Routes>
+          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+            <Route path="etb" element={<div>ETB-Inhalt</div>} />
+            {/* Zweites Ziel in einer ANDEREN Kategorie: nur damit lässt sich
+                belegen, dass ein Modulklick im Drawer wirklich navigiert und den
+                Drawer dabei schließt. */}
+            <Route path="lagekarte" element={<div>Lagekarte-Inhalt</div>} />
+          </Route>
+        </Routes>
+      </CommandPaletteProvider>
     </AuthProvider>,
     { route: '/einsaetze/7/etb' },
   );
@@ -74,11 +77,13 @@ function setupRoute(route: string, childPath: string) {
   );
   return renderMitProviders(
     <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-          <Route path={childPath} element={<div>Outlet-Inhalt</div>} />
-        </Route>
-      </Routes>
+      <CommandPaletteProvider>
+        <Routes>
+          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+            <Route path={childPath} element={<div>Outlet-Inhalt</div>} />
+          </Route>
+        </Routes>
+      </CommandPaletteProvider>
     </AuthProvider>,
     { route },
   );
@@ -220,6 +225,13 @@ describe('EinsatzLayout', () => {
     expect(screen.getByRole('radiogroup', { name: 'Bediendichte wählen' })).toBeInTheDocument();
   });
 
+  it('rendert den sichtbaren Such-Trigger im Einsatz-Workspace', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+
+    expect(screen.getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
+  });
+
   it('der Einsatzname sitzt im Restbreiten-Rahmen', async () => {
     // Der Rahmen ist die eine Hälfte der Kürzung — die andere (Ellipsis und
     // `title`) sitzt im Switcher und wird dort geprüft. Ohne `min-width: 0`
@@ -355,6 +367,12 @@ describe('EinsatzLayout', () => {
       const hamburger = screen.getByRole('button', { name: 'Navigation öffnen' });
       expect(hamburger.style.width).toBe('48px');
       expect(hamburger.style.height).toBe('48px');
+
+      const suche = screen.getByRole('button', { name: 'Suchen' });
+      expect(suche).toHaveAttribute('aria-label', 'Suchen');
+      expect(suche.style.width).toBe('48px');
+      expect(suche.style.height).toBe('48px');
+      expect(suche.style.color).toBe('var(--lfh-kopf-vordergrund)');
 
       await userEvent.click(hamburger);
       // Der Drawer bringt seinen Schließen-Knopf selbst mit; dessen Trefffläche

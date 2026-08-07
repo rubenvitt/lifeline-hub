@@ -2,7 +2,7 @@ import { App, AutoComplete, Button, Card, DatePicker, Form, Input, Space, Tag, T
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useState, type CSSProperties } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige, EinsatzStatus } from '../api/types';
 import { ApiError } from '../api/client';
@@ -14,6 +14,7 @@ import { Select } from '../components/Select';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { globalKeys } from '../api/queryKeys';
+import { einsatzPfad } from '../routing/deeplinks';
 import EinsatzSeite from '../components/EinsatzSeite';
 import SektionHeader from '../components/SektionHeader';
 import StatusTag from '../components/StatusTag';
@@ -140,7 +141,7 @@ export default function EinsaetzePage() {
       }),
     onSuccess: (neuerEinsatz) => {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
-      navigate(`/einsaetze/${neuerEinsatz.id}`);
+      navigate(einsatzPfad(neuerEinsatz.id));
     },
     onError: (e) =>
       message.error(e instanceof ApiError ? e.message : 'Einsatz konnte nicht angelegt werden'),
@@ -153,9 +154,13 @@ export default function EinsaetzePage() {
     <Card
       key={e.id}
       hoverable
-      title={e.bezeichnung}
+      title={
+        <Link to={einsatzPfad(e.id)} onClick={(event) => event.stopPropagation()}>
+          {e.bezeichnung}
+        </Link>
+      }
       style={klein ? { opacity: 0.65 } : { minHeight: KACHEL_MIN_HOEHE }}
-      onClick={() => navigate(`/einsaetze/${e.id}`)}
+      onClick={() => navigate(einsatzPfad(e.id))}
     >
       <Space orientation="vertical">
         <Space>

@@ -18,6 +18,7 @@ import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
+import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
 import { navDrawerBreite } from '../theme/tokens';
@@ -238,6 +239,7 @@ export default function EinsatzLayout() {
               Einsatz nicht nur über eine Ikone vermittelt werden. Farbschema
               UND Bediendichte wandern unter `lg` dagegen ins Benutzermenü. */}
           <AlarmZentrale />
+          <CommandPaletteTrigger />
           {breit && <ThemeToggle />}
           <BenutzerMenu />
         </Space>

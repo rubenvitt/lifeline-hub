@@ -40,6 +40,7 @@ interface Props {
 }
 
 const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }));
+const ENTER_HINWEIS = 'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
 
 /**
  * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen
@@ -212,11 +213,17 @@ export default function Schnellerfassung({
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.defaultPrevented || e.nativeEvent.isComposing) return;
     if (menuOffen && menuRef.current?.handleKey(e.key)) {
       e.preventDefault();
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey && editFeld == null) {
+    const istSendeTaste = e.key === 'Enter'
+      && !e.repeat
+      && !e.shiftKey
+      && !e.altKey
+      && (e.ctrlKey || e.metaKey || (inhalt.trim() !== '' && !inhalt.includes('\n')));
+    if (istSendeTaste && editFeld == null) {
       e.preventDefault();
       void absenden();
     }
@@ -261,7 +268,7 @@ export default function Schnellerfassung({
           ref={textRef}
           layout="toggle"
           variante="kompakt"
-          placeholder="Inhalt …  ( / für Felder & Bausteine )"
+          placeholder={`${ENTER_HINWEIS} · Inhalt … ( / für Felder & Bausteine )`}
           autoSize={{ minRows: 1, maxRows: 4 }}
           value={inhalt}
           onChange={onInhaltChange}
@@ -279,6 +286,8 @@ export default function Schnellerfassung({
           onSchliessen={() => setMenuOffen(false)}
         />
       </div>
+
+      <Typography.Text type="secondary">{ENTER_HINWEIS}</Typography.Text>
 
       {/* Chip-Leiste */}
       <Space wrap style={{ marginTop: 8 }}>

@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import AppLayout from './AppLayout';
 
 const admin = {
@@ -18,11 +19,13 @@ function setup(me: Record<string, unknown>) {
   server.use(http.get('/api/auth/me', () => HttpResponse.json(me)));
   return renderMitProviders(
     <AuthProvider>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<div>Inhalt</div>} />
-        </Route>
-      </Routes>
+      <CommandPaletteProvider>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<div>Inhalt</div>} />
+          </Route>
+        </Routes>
+      </CommandPaletteProvider>
     </AuthProvider>,
   );
 }
@@ -76,6 +79,13 @@ describe('AppLayout (globale Topbar)', () => {
     expect(screen.getByRole('radiogroup', { name: 'Bediendichte wählen' })).toBeInTheDocument();
   });
 
+  it('rendert den sichtbaren Such-Trigger in der globalen Kopfzeile', async () => {
+    setup(admin);
+    await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
+
+    expect(screen.getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
+  });
+
   describe('unter lg', () => {
     // Breite VOR dem Render: antds Beobachter ruft seinen Zuhörer beim
     // Abonnieren synchron auf und liest dabei nur `matches`.
@@ -93,6 +103,10 @@ describe('AppLayout (globale Topbar)', () => {
       // Der Anzeigename ist mit dem Trigger geschrumpft — die drei
       // Bestandsfälle oben laufen deshalb bewusst auf der Standardbreite.
       expect(screen.queryByText('Chef')).not.toBeInTheDocument();
+      const suche = screen.getByRole('button', { name: 'Suchen' });
+      expect(suche).toHaveAttribute('aria-label', 'Suchen');
+      expect(suche.style.width).toBe('48px');
+      expect(suche.style.height).toBe('48px');
     });
   });
 });

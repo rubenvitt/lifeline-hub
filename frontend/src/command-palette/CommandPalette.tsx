@@ -50,9 +50,13 @@ export function CommandPalette({ befehle, schliesse }: Props) {
   }
 
   function aufTaste(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setAktiv((i) => (flach.length ? (i + 1) % flach.length : 0)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setAktiv((i) => (flach.length ? (i - 1 + flach.length) % flach.length : 0)); }
-    else if (e.key === 'Enter') { e.preventDefault(); fuehreAus(flach[aktiv]); }
+    else if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      e.preventDefault();
+      fuehreAus(flach[aktiv]);
+    }
   }
 
   const aktiverId = flach[aktiv]?.id;
@@ -60,6 +64,7 @@ export function CommandPalette({ befehle, schliesse }: Props) {
   return (
     <Modal
       open
+      keyboard={false}
       onCancel={schliesse}
       footer={null}
       closable={false}
@@ -114,6 +119,7 @@ export function CommandPalette({ befehle, schliesse }: Props) {
                   >
                     {Icon && <Icon size={18} />}
                     <span>{b.label}</span>
+                    {b.kuerzel && <kbd style={{ marginLeft: 'auto' }}>{b.kuerzel}</kbd>}
                   </div>
                 );
               })}

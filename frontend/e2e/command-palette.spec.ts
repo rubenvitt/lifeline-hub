@@ -8,6 +8,7 @@ import { expect, test, type Page, type Locator } from '@playwright/test';
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
+const SCHMAL = { width: 390, height: 844 };
 
 /** Eindeutiges Palette-Signal: das Suchfeld (Placeholder ist projektweit einmalig). */
 function paletteInput(page: Page): Locator {
@@ -37,16 +38,21 @@ async function zumModul(page: Page, id: string, modul: string) {
   await expect(page.locator('header').first()).toBeVisible();
 }
 
-test('öffnet mit STRG+K aus einem Einsatz, filtert per Suche und navigiert per Enter (AK1–AK3)', async ({ page }) => {
+test('öffnet auf 390 px per sichtbarem Trigger, fokussiert die Palette und navigiert per Enter (AK1–AK3)', async ({ page }) => {
   await anmelden(page);
   const id = await einsatzAnlegen(page, `E2E Palette ${Date.now()}`);
+  await page.setViewportSize(SCHMAL);
   await zumModul(page, id, 'etb');
 
-  await page.keyboard.press('Control+k');
-  await expect(paletteInput(page)).toBeVisible();
+  const trigger = page.getByRole('button', { name: 'Suchen' });
+  const kasten = (await trigger.boundingBox())!;
+  expect(Math.min(kasten.width, kasten.height), 'Trefffläche des Such-Triggers').toBeGreaterThanOrEqual(48);
+  await trigger.click();
+  await expect(paletteInput(page)).toBeFocused();
 
   await paletteInput(page).fill('lagekarte');
-  await page.getByRole('option', { name: /Lagekarte/ }).click();
+  await expect(page.getByRole('option', { name: /Lagekarte/ })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Enter');
 
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
   await expect(paletteInput(page)).toBeHidden();
@@ -63,31 +69,46 @@ test('öffnet global mit CMD+K und schließt mit ESC ohne Seiteneffekt (AK1, AK4
   await expect(page).toHaveURL(/\/einsaetze$/);
 });
 
-test('legt sich über einen offenen Drawer, ESC schließt nur die Palette, Drawer bleibt bedienbar (AK6)', async ({ page }) => {
+test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Palette, Drawer bleibt bedienbar (AK6)', async ({ page }) => {
   await anmelden(page);
   const id = await einsatzAnlegen(page, `E2E Drawer ${Date.now()}`);
-  await zumModul(page, id, 'unfallhilfsstellen');
+  await page.setViewportSize(SCHMAL);
+  await zumModul(page, id, 'etb');
 
-  // antd-Drawer öffnen — neuer Einsatz ohne UHS zeigt den Leerzustand-Button
-  // (Ersteller ist Einsatzleitung → darf schreiben).
-  await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
-  const drawerTitel = page.getByText('Unfallhilfsstelle anlegen');
-  await expect(drawerTitel).toBeVisible();
+  // Den echten Navigations-Drawer aus EinsatzLayout öffnen. Ein fachlicher
+  // Anlegen-Drawer belegt den mobilen Navigationsvertrag nicht.
+  await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+  const navDrawer = page.getByRole('dialog', { name: 'Navigation' });
+  await expect(navDrawer).toBeVisible();
+  await expect(navDrawer.getByRole('navigation')).toBeVisible();
 
   // Palette ÜBER dem Drawer öffnen — beide Overlays gleichzeitig sichtbar
   await page.keyboard.press('Control+k');
-  await expect(paletteInput(page)).toBeVisible();
-  await expect(drawerTitel).toBeVisible();
+  const palette = paletteInput(page);
+  const paletteDialog = page.getByRole('dialog').filter({ has: palette });
+  await expect(palette).toBeVisible();
+  await expect(navDrawer).toBeVisible();
+
+  // Der Fokus bleibt sichtbar innerhalb der obersten Palette und läuft nicht
+  // in den darunterliegenden Drawer.
+  await expect(palette).toBeFocused();
+  await expect(page.locator(':focus-visible')).toHaveAttribute('placeholder', /Suchen: Module/);
+  await page.keyboard.press('Tab');
+  await expect(palette).not.toBeFocused();
+  await expect(paletteDialog.locator(':focus-visible')).toBeVisible();
+  await page.keyboard.press('Shift+Tab');
+  await expect(palette).toBeFocused();
+  await expect(page.locator(':focus-visible')).toHaveAttribute('placeholder', /Suchen: Module/);
 
   // ESC schließt NUR die Palette, der Drawer bleibt offen …
   await page.keyboard.press('Escape');
   await expect(paletteInput(page)).toBeHidden();
-  await expect(drawerTitel).toBeVisible();
+  await expect(navDrawer).toBeVisible();
 
-  // … und bleibt bedienbar (kein hängender Body-Scroll-Lock / Focus-Trap-Konflikt):
-  // ein Drawer-Feld lässt sich noch fokussieren und befüllen.
-  await page.getByLabel('Bezeichnung').fill('BHP Koexistenz');
-  await expect(page.getByLabel('Bezeichnung')).toHaveValue('BHP Koexistenz');
+  // … und bleibt bedienbar: die echte Modulnavigation reagiert weiter.
+  await navDrawer.getByRole('button', { name: 'Lage' }).click();
+  await navDrawer.getByRole('button', { name: 'Lagekarte' }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
 });
 
 test('Schnellaktion „Neue Person" navigiert und öffnet die Schnellerfassung (Schnellaktionen)', async ({ page }) => {

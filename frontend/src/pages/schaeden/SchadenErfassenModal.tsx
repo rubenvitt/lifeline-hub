@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { App, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,10 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { legeSchadenAn, type SchadenEingabe } from '../../api/einsatzSchaden';
 import type { Ausmass, SchadenTyp } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
+import {
+  liesErfassungsSitzungswert,
+  schreibeErfassungsSitzungswert,
+} from '../../components/erfassungsSitzung';
 import GeschaedigtPicker, { type GeschaedigtWert } from './GeschaedigtPicker';
 import { AUSMASS_META, TYP_LABEL, geschaedigtFelder } from './schadenHelfer';
 
@@ -28,7 +32,9 @@ interface Props {
  *  SERIENMODUS (LFH-332 · B4): an einer Schadenslage werden Schäden am Stück erfasst, deshalb
  *  `serie` — „Speichern und nächste" lässt den Dialog stehen. Der Ort wiederholt sich dabei
  *  fast immer (dieselbe Straße, dasselbe Objekt) und überlebt als `uebernahme` ein
- *  Serien-Speichern; ein Dialog-Schluss leert ihn (`destroyOnHidden` an der Hülle).
+ *  Serien-Speichern. Zusätzlich wird er nach erfolgreicher Mutation sitzungsweit gemerkt und
+ *  beim nächsten Öffnen einmal per Formularwert eingesetzt — bewusst nicht als `initialValues`,
+ *  damit der ausgeschaltete B4-Schalter einen Serien-Reset leer lässt.
  *
  *  Zurückgesetzt wird NICHT mehr hier: die Hülle leert die Felder auf beiden Wegen (nach dem
  *  Erfassen und beim Abbrechen). Nur „Geschädigt" ist kein `Form.Item`, sondern lokaler State
@@ -37,8 +43,28 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<SchadenEingabe>();
+  const geladeneOeffnung = useRef<string | null>(null);
+  const formularEinsatzId = useRef(einsatzId);
   // Geschädigt ist ein strukturierter Wert → lokaler State (kein Form.Item).
   const [geschaedigt, setGeschaedigt] = useState<GeschaedigtWert>(null);
+
+  useEffect(() => {
+    if (formularEinsatzId.current !== einsatzId) {
+      formularEinsatzId.current = einsatzId;
+      form.resetFields();
+      setGeschaedigt(null);
+      geladeneOeffnung.current = null;
+    }
+    const oeffnung = open ? `${einsatzId}:schaden` : null;
+    if (oeffnung === null) {
+      geladeneOeffnung.current = null;
+      return;
+    }
+    if (geladeneOeffnung.current === oeffnung) return;
+    geladeneOeffnung.current = oeffnung;
+    const ort = liesErfassungsSitzungswert(einsatzId, 'schaden', 'ort');
+    form.setFieldValue('ort', ort);
+  }, [einsatzId, form, open]);
 
   const anlegenMutation = useMutation({
     mutationFn: (v: SchadenEingabe) => legeSchadenAn(einsatzId, v),
@@ -51,8 +77,9 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
 
   /**
    * `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
-   * wirklich angekommen ist — sie erkennt das an der abgelehnten Zusage. Den Fehlertext meldet
-   * weiterhin das `onError` der Mutation.
+   * wirklich angekommen ist — sie erkennt das an der abgelehnten Zusage. Sitzungsort und
+   * lokaler Geschädigt-Wert ändern sich erst in `onErfasst`, also zusätzlich hinter der
+   * zentralen Abbruchprüfung. Den Fehlertext meldet weiterhin das `onError` der Mutation.
    *
    * Der Geschädigt-Reset hängt hier und NICHT nur an `onFertig` (Abweichung von der
    * Auftragsformulierung, bewusst): beim Serien-Speichern läuft `onFertig` nie, die Hülle leert
@@ -67,6 +94,10 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       beschreibung: daten.beschreibung ?? null,
       ...geschaedigtFelder(geschaedigt, orgId),
     });
+  }
+
+  function onErfasst(daten: SchadenEingabe) {
+    schreibeErfassungsSitzungswert(einsatzId, 'schaden', 'ort', daten.ort);
     setGeschaedigt(null);
   }
 
@@ -76,6 +107,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       titel="Schaden erfassen"
       form={form}
       onErfassen={onErfassen}
+      onErfasst={onErfasst}
       onFertig={onClose}
       onAbbrechen={() => {
         setGeschaedigt(null);

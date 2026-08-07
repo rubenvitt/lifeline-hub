@@ -45,6 +45,22 @@ describe('GefahrenPage', () => {
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
+  it('wählt ein Gefahrengebiet mit Enter über die Auswahlzeile', async () => {
+    const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
+    server.use(
+      ...handlers([gebiet, sued]),
+      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const zeile = await screen.findByRole('button', { name: /Süd/ });
+    zeile.focus();
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByRole('heading', { level: 5 })).toHaveTextContent('Süd');
+  });
+
   it('weist Gebietsliste und Matrix mit dem älteren erfolgreichen Stand aus', async () => {
     server.use(...handlers());
     const client = neuerQueryClient();

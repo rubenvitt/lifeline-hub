@@ -90,6 +90,20 @@ test('Kopfzeile: auf 390 px läuft sie nicht über', async ({ page }) => {
   }
 });
 
+test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläche', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Suche ${Date.now()}`);
+
+  await page.setViewportSize(SCHMAL);
+  for (const route of ['/einsaetze', `/einsaetze/${einsatzId}/etb`]) {
+    await page.goto(route);
+    const trigger = page.getByRole('button', { name: 'Suchen' });
+    await expect(trigger, route).toBeVisible();
+    const kasten = (await trigger.boundingBox())!;
+    expect(Math.min(kasten.width, kasten.height), `${route}: Such-Trefffläche`).toBeGreaterThanOrEqual(48);
+  }
+});
+
 test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', async ({ page }) => {
   // DIE EIGENTLICHE ZUSICHERUNG DIESES PAKETS. Die Kopfzeile legt ihre
   // Umschalter unter lg ab; A1 weist dem Führungs-Tablet und dem mobilen

@@ -24,6 +24,22 @@ describe('KanalListe', () => {
     expect(onWechsel).toHaveBeenCalledWith(2);
   });
 
+  it('wechselt den Kanal mit Enter über die Auswahlzeile', async () => {
+    const user = userEvent.setup();
+    const onWechsel = vi.fn();
+    renderMitProviders(
+      <KanalListe kanaele={[kanal(), kanal({ id: 2, name: 'S2/S3' })]} aktiverKanalId={1}
+        onWechsel={onWechsel} darfSchreiben onKanalAnlegen={vi.fn()} />,
+    );
+
+    const kanalZeile = screen.getByRole('button', { name: /S2\/S3/ });
+    kanalZeile.focus();
+    await user.keyboard('{Enter}');
+
+    expect(onWechsel).toHaveBeenCalledWith(2);
+    expect(onWechsel).toHaveBeenCalledTimes(1);
+  });
+
   it('blendet "Kanal anlegen" für Nicht-Schreibberechtigte aus', () => {
     renderMitProviders(
       <KanalListe kanaele={[kanal()]} aktiverKanalId={1} onWechsel={vi.fn()}

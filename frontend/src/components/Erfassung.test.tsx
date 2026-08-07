@@ -1,9 +1,32 @@
 import { Form, Input } from 'antd';
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ErfassungsFormular, ErfassungsModal, serienKuerzel } from './Erfassung';
-import { renderMitProviders } from '../test/utils';
+import { createRef, type ReactElement, type Ref } from 'react';
+import {
+  ErfassungsFormular,
+  ErfassungsModal,
+  serienKuerzel,
+  type ErfassungsFormularSteuerung,
+} from './Erfassung';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
+import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
+
+function renderMitProviders(
+  ui: ReactElement,
+  options?: Parameters<typeof renderMitBasisProviders>[1],
+) {
+  const ergebnis = renderMitBasisProviders(
+    <CommandPaletteProvider>{ui}</CommandPaletteProvider>,
+    options,
+  );
+  const basisRerender = ergebnis.rerender;
+  return {
+    ...ergebnis,
+    rerender: (naechstesUi: ReactElement) =>
+      basisRerender(<CommandPaletteProvider>{naechstesUi}</CommandPaletteProvider>),
+  };
+}
 
 interface Werte { ort: string; melder: string; notiz: string }
 
@@ -18,6 +41,8 @@ function Harness(props: {
   onAbbrechen?: () => void;
   serie?: boolean;
   uebernahme?: (keyof Werte)[];
+  steuerungRef?: Ref<ErfassungsFormularSteuerung>;
+  onErfasst?: (werte: Werte) => void | Promise<void>;
 }) {
   const [form] = Form.useForm<Werte>();
   return (
@@ -28,6 +53,8 @@ function Harness(props: {
       onAbbrechen={props.onAbbrechen}
       serie={props.serie}
       uebernahme={props.uebernahme}
+      steuerungRef={props.steuerungRef}
+      onErfasst={props.onErfasst}
     >
       <Form.Item label="Ort" name="ort"><Input /></Form.Item>
       <Form.Item label="Melder" name="melder"><Input /></Form.Item>
@@ -198,6 +225,24 @@ describe('ErfassungsFormular — Wertübernahme', () => {
 });
 
 describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
+  it('Strg/⌘ + S löst den normalen Submit aus', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    renderMitProviders(<Harness onErfassen={onErfassen} onFertig={onFertig} serie />);
+
+    const ort = screen.getByLabelText('Ort');
+    await waitFor(() => expect(document.activeElement).toBe(ort));
+    await userEvent.type(ort, 'Sammelstelle');
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 's', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(ort, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(true);
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onFertig).toHaveBeenCalledTimes(1);
+  });
+
   it('Strg/⌘ + Enter speichert und hält offen', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onFertig = vi.fn();
@@ -212,6 +257,81 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     // Umweg über die Tastatur.
     expect(onFertig).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  });
+
+  it('lokales Strg/⌘ + Enter verhindert den globalen Normal-Submit und sendet nur einmal', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    renderMitProviders(<Harness onErfassen={onErfassen} onFertig={onFertig} serie />);
+
+    const ort = screen.getByLabelText('Ort');
+    await waitFor(() => expect(document.activeElement).toBe(ort));
+    await userEvent.type(ort, 'Sammelstelle');
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(ort, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(true);
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onErfassen).toHaveBeenCalledTimes(1);
+    expect(onFertig).not.toHaveBeenCalled();
+  });
+
+  it('ignoriert die Wiederholung des lokalen Serien-Kürzels vollständig', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+
+    const ort = screen.getByLabelText('Ort');
+    await waitFor(() => expect(document.activeElement).toBe(ort));
+    await userEvent.type(ort, 'Sammelstelle');
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Enter', ctrlKey: true, repeat: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(ort, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(false);
+    await Promise.resolve();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('ignoriert das lokale Serien-Kürzel während einer IME-Komposition', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    const ort = screen.getByLabelText('Ort');
+    await waitFor(() => expect(document.activeElement).toBe(ort));
+    await userEvent.type(ort, 'Sammelstelle');
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true, cancelable: true,
+    });
+
+    fireEvent(ort, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(false);
+    await Promise.resolve();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('ignoriert Speichern und nächste mit Shift oder Alt', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<Harness onErfassen={onErfassen} serie />);
+    const ort = screen.getByLabelText('Ort');
+    await waitFor(() => expect(document.activeElement).toBe(ort));
+    await userEvent.type(ort, 'Sammelstelle');
+    const shiftEnter = new KeyboardEvent('keydown', {
+      key: 'Enter', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true,
+    });
+    const altEnter = new KeyboardEvent('keydown', {
+      key: 'Enter', metaKey: true, altKey: true, bubbles: true, cancelable: true,
+    });
+
+    fireEvent(ort, shiftEnter);
+    fireEvent(ort, altEnter);
+
+    expect(shiftEnter.defaultPrevented).toBe(false);
+    expect(altEnter.defaultPrevented).toBe(false);
+    await Promise.resolve();
+    expect(onErfassen).not.toHaveBeenCalled();
   });
 
   it('nimmt auch die Meta-Taste (⌘ auf dem Mac)', async () => {
@@ -263,11 +383,9 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     expect(serienKuerzel('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Strg + ↵');
   });
 
-  it('ist ohne Serienmodus wirkungslos', async () => {
-    // Nicht nur „speichert nichts": das Kürzel darf ohne Serien-Knopf auch keine
-    // Serien-Marke setzen. Stünde sie, nähme das nächste reguläre Enter still den
-    // Serien-Zweig — gespeichert, Felder leer, Dialog offen, und wer dann erneut
-    // drückt, legt den Datensatz doppelt an.
+  it('sendet ohne Serienmodus regulär und setzt keine Serien-Marke', async () => {
+    // Ohne lokalen Serienhandler erreicht Strg/⌘ + Enter die Registry und ist ein
+    // normaler Submit. Entscheidend bleibt: Es darf keine Serien-Marke gesetzt werden.
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onFertig = vi.fn();
     renderMitProviders(<Harness onErfassen={onErfassen} onFertig={onFertig} />);
@@ -275,14 +393,169 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
 
     await nutzer.type(screen.getByLabelText('Ort'), 'Sammelstelle');
     await nutzer.keyboard('{Control>}{Enter}{/Control}');
-    expect(onErfassen).not.toHaveBeenCalled();
-
-    await nutzer.keyboard('{Enter}');
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
   });
 });
 
 describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
+  it('meldet akzeptierte Werte vor dem Fertig-Callback', async () => {
+    const reihenfolge: string[] = [];
+    const onErfasst = vi.fn((werte: Werte) => {
+      reihenfolge.push(`akzeptiert:${werte.ort}`);
+    });
+    renderMitProviders(
+      <Harness
+        onErfassen={vi.fn(async () => { reihenfolge.push('gespeichert'); })}
+        onErfasst={onErfasst}
+        onFertig={() => { reihenfolge.push('fertig'); }}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(reihenfolge).toEqual([
+      'gespeichert', 'akzeptiert:Brücke', 'fertig',
+    ]));
+  });
+
+  it('meldet akzeptierte Werte auch im erfolgreichen Serienlauf', async () => {
+    const onErfasst = vi.fn();
+    const onFertig = vi.fn();
+    renderMitProviders(
+      <Harness
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onErfasst={onErfasst}
+        onFertig={onFertig}
+        serie
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Sammelstelle');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    await waitFor(() => expect(onErfasst).toHaveBeenCalledWith(
+      expect.objectContaining({ ort: 'Sammelstelle' }),
+    ));
+    expect(onFertig).not.toHaveBeenCalled();
+  });
+
+  it('schließt nach einem synchron werfenden Akzeptanz-Hook trotzdem erfolgreich ab', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    renderMitProviders(
+      <Harness
+        onErfassen={onErfassen}
+        onErfasst={() => { throw new Error('lokaler Hook gescheitert'); }}
+        onFertig={onFertig}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+    expect(onErfassen).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
+
+  it('wartet einen ablehnenden Akzeptanz-Hook ab und schließt danach genau einmal', async () => {
+    let hookAblehnen!: (grund: Error) => void;
+    const hookAntwort = new Promise<void>((_resolve, reject) => { hookAblehnen = reject; });
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onErfasst = vi.fn(() => hookAntwort);
+    const onFertig = vi.fn();
+    renderMitProviders(
+      <Harness onErfassen={onErfassen} onErfasst={onErfasst} onFertig={onFertig} />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(onErfasst).toHaveBeenCalledTimes(1));
+    const fertigVorHookEnde = onFertig.mock.calls.length;
+    await act(async () => {
+      hookAblehnen(new Error('lokaler Hook abgelehnt'));
+      await hookAntwort.catch(() => undefined);
+    });
+
+    expect(fertigVorHookEnde).toBe(0);
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+    expect(onErfassen).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
+
+  it('blockiert einen zweiten Submit, solange der Akzeptanz-Hook läuft', async () => {
+    let hookFreigeben!: () => void;
+    const hookAntwort = new Promise<void>((resolve) => { hookFreigeben = resolve; });
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onErfasst = vi.fn(() => hookAntwort);
+    const onFertig = vi.fn();
+    renderMitProviders(
+      <Harness onErfassen={onErfassen} onErfasst={onErfasst} onFertig={onFertig} />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(onErfasst).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(onErfassen).toHaveBeenCalledTimes(1);
+    await act(async () => { hookFreigeben(); await hookAntwort; });
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+    expect(onErfassen).toHaveBeenCalledTimes(1);
+  });
+
+  it('räumt den Serienlauf auch nach einem werfenden Akzeptanz-Hook auf', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onFertig = vi.fn();
+    renderMitProviders(
+      <Harness
+        onErfassen={onErfassen}
+        onErfasst={() => { throw new Error('Serien-Hook gescheitert'); }}
+        onFertig={onFertig}
+        serie
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Sammelstelle');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    await waitFor(() => expect(screen.getByText('Erfasst: 1')).toBeInTheDocument());
+    expect(onErfassen).toHaveBeenCalledTimes(1);
+    expect(onFertig).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
+
+  it('führt nach Abbruch während des Akzeptanz-Hooks keinen späten Abschluss aus', async () => {
+    let hookFreigeben!: () => void;
+    const hookAntwort = new Promise<void>((resolve) => { hookFreigeben = resolve; });
+    const steuerung = createRef<ErfassungsFormularSteuerung>();
+    const onAbbrechen = vi.fn();
+    const onFertig = vi.fn();
+    const onErfasst = vi.fn(() => hookAntwort);
+    renderMitProviders(
+      <Harness
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onErfasst={onErfasst}
+        onFertig={onFertig}
+        onAbbrechen={onAbbrechen}
+        steuerungRef={steuerung}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(onErfasst).toHaveBeenCalledTimes(1));
+    expect(onFertig).not.toHaveBeenCalled();
+    await act(async () => { steuerung.current?.abbrechen(); });
+    await act(async () => { hookFreigeben(); await hookAntwort; });
+
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(onFertig).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
+
   it('lässt den Wortlaut stehen, wenn das Speichern abgelehnt wird', async () => {
     // Der teuerste Einzelfehler der Bestandsmasken: dort läuft `resetFields()`
     // synchron neben `mutate()`, der Text ist also auch bei einem 422 weg.
@@ -312,10 +585,34 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Ort')).toHaveValue('');
   });
+
+  it('führt einen äußeren Drawer-Abbruch über denselben Reset-Pfad', async () => {
+    const onAbbrechen = vi.fn();
+    const steuerung = createRef<ErfassungsFormularSteuerung>();
+    renderMitProviders(
+      <Harness
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onAbbrechen={onAbbrechen}
+        steuerungRef={steuerung}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+    await act(async () => { steuerung.current?.abbrechen(); });
+
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Ort')).toHaveValue('');
+  });
 });
 
 describe('ErfassungsModal', () => {
-  function ModalHarness(props: { offen: boolean; onErfassen: (w: Werte) => Promise<unknown> }) {
+  function ModalHarness(props: {
+    offen: boolean;
+    onErfassen: (w: Werte) => Promise<unknown>;
+    onErfasst?: (w: Werte) => void;
+    onFertig?: () => void;
+    onAbbrechen?: () => void;
+  }) {
     const [form] = Form.useForm<Werte>();
     return (
       <ErfassungsModal<Werte>
@@ -323,8 +620,9 @@ describe('ErfassungsModal', () => {
         titel="Person erfassen"
         form={form}
         onErfassen={props.onErfassen}
-        onFertig={() => {}}
-        onAbbrechen={() => {}}
+        onFertig={props.onFertig ?? (() => {})}
+        onAbbrechen={props.onAbbrechen ?? (() => {})}
+        onErfasst={props.onErfasst}
       >
         <Form.Item label="Ort" name="ort"><Input /></Form.Item>
       </ErfassungsModal>
@@ -359,6 +657,66 @@ describe('ErfassungsModal', () => {
       else await nutzer.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
 
       await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+      unmount();
+    }
+  });
+
+  it('Escape läuft genau einmal über die Registry und verwirft die Eingabe', async () => {
+    const onAbbrechen = vi.fn();
+    renderMitProviders(
+      <ModalHarness
+        offen
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onAbbrechen={onAbbrechen}
+      />,
+    );
+
+    const ort = screen.getByLabelText('Ort');
+    await waitFor(() => expect(document.activeElement).toBe(ort));
+    await userEvent.type(ort, 'Brücke');
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Escape', bubbles: true, cancelable: true,
+    });
+    fireEvent(ort, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(true);
+    expect(onAbbrechen).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByLabelText('Ort')).toHaveValue(''));
+  });
+
+  it('verwirft einen laufenden Abschluss über Kreuz und Maskenklick', async () => {
+    for (const weg of ['kreuz', 'maske'] as const) {
+      let antwortFreigeben!: () => void;
+      const antwort = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+      const onAbbrechen = vi.fn();
+      const onFertig = vi.fn();
+      const onErfasst = vi.fn();
+      const onErfassen = vi.fn(() => antwort);
+      const { unmount } = renderMitProviders(
+        <ModalHarness
+          offen
+          onErfassen={onErfassen}
+          onErfasst={onErfasst}
+          onFertig={onFertig}
+          onAbbrechen={onAbbrechen}
+        />,
+      );
+
+      await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
+      await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+      await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+      if (weg === 'kreuz') {
+        await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+      } else {
+        const maske = document.querySelector<HTMLElement>('.ant-modal-wrap');
+        expect(maske).not.toBeNull();
+        await userEvent.click(maske!);
+      }
+      await act(async () => { antwortFreigeben(); await antwort; });
+
+      expect(onAbbrechen).toHaveBeenCalledTimes(1);
+      expect(onErfasst).not.toHaveBeenCalled();
+      expect(onFertig).not.toHaveBeenCalled();
       unmount();
     }
   });

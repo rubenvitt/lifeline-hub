@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
-import { Route, Routes } from 'react-router';
+import { act, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import BereitstellungsraeumePage from './BereitstellungsraeumePage';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, EinsatzAnzeige } from '../../api/types';
+import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return {
@@ -32,9 +34,34 @@ function br(over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {
 
 function renderPage() {
   return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/bereitstellungsraeume" element={<BereitstellungsraeumePage />} />
-    </Routes>,
+    <CommandPaletteProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/bereitstellungsraeume" element={<BereitstellungsraeumePage />} />
+      </Routes>
+    </CommandPaletteProvider>,
+    { route: '/einsaetze/1/bereitstellungsraeume' },
+  );
+}
+
+function EinsatzWechsel() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate('/einsaetze/2/bereitstellungsraeume')}>Zu Einsatz B</button>;
+}
+
+function PfadProbe() {
+  return <output data-testid="pfad">{useLocation().pathname}</output>;
+}
+
+function renderWechselPage() {
+  return renderMitProviders(
+    <CommandPaletteProvider>
+      <EinsatzWechsel />
+      <PfadProbe />
+      <Routes>
+        <Route path="/einsaetze/:id/bereitstellungsraeume" element={<BereitstellungsraeumePage />} />
+        <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<div>BR-DETAIL</div>} />
+      </Routes>
+    </CommandPaletteProvider>,
     { route: '/einsaetze/1/bereitstellungsraeume' },
   );
 }
@@ -162,5 +189,131 @@ describe('BereitstellungsraeumePage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
     expect(screen.queryByText('Bereitstellungsräume konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+
+  it('fokussiert Bezeichnung und legt per Enter aus diesem Feld an', async () => {
+    let body: unknown = null;
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(br({ id: 2, bezeichnung: 'BR West' }), { status: 201 });
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    const bezeichnung = screen.getByPlaceholderText('z. B. BR Ost');
+    await waitFor(() => expect(bezeichnung).toHaveFocus());
+    await userEvent.keyboard('BR West{Enter}');
+
+    await waitFor(() => expect(body).toMatchObject({ bezeichnung: 'BR West' }));
+  });
+
+  it('setzt beim Einsatzwechsel alle Werte des offenen BR-Drawers zurück', async () => {
+    server.use(
+      http.get('/api/einsaetze/:einsatzId', ({ params }) =>
+        HttpResponse.json(einsatz({ id: Number(params.einsatzId) }))),
+      http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
+    );
+    renderWechselPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'BR Einsatz A');
+    await userEvent.type(screen.getByLabelText('Standort (optional)'), 'Standort A');
+    await userEvent.type(screen.getByLabelText('Notiz (optional)'), 'Notiz A');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveValue(''));
+    expect(screen.getByLabelText('Standort (optional)')).toHaveValue('');
+    expect(screen.getByLabelText('Notiz (optional)')).toHaveValue('');
+  });
+
+  it('schließt den BR-Drawer mit Provider per Escape und setzt das Formular zurück', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Wird verworfen');
+
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Neu' }));
+
+    expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');
+  });
+
+  it('lässt den Drawer und die Bezeichnung bei einem Anlegefehler stehen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json({ error: 'Bereitstellungsraum abgelehnt' }, { status: 500 })),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    const bezeichnung = screen.getByPlaceholderText('z. B. BR Ost');
+    await userEvent.type(bezeichnung, 'BR Fehler');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    expect(await screen.findByText('Bereitstellungsraum abgelehnt')).toBeInTheDocument();
+    expect(bezeichnung).toHaveValue('BR Fehler');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('navigiert nach Schließen während des Anlegens nicht verspätet', async () => {
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
+    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume', async () => {
+        postGestartet();
+        await antwortGate;
+        return HttpResponse.json(br({ id: 22 }), { status: 201 });
+      }),
+    );
+    renderWechselPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    await userEvent.type(screen.getByPlaceholderText('z. B. BR Ost'), 'BR West{Enter}');
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    await act(async () => { antwortFreigeben(); });
+    await screen.findByText('Bereitstellungsraum angelegt');
+
+    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/bereitstellungsraeume');
+  });
+
+  it('bindet einen laufenden Auftrag an dessen Einsatz-ID', async () => {
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
+    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    server.use(
+      http.get('/api/einsaetze/:einsatzId', ({ params }) =>
+        HttpResponse.json(einsatz({ id: Number(params.einsatzId) }))),
+      http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume', async () => {
+        postGestartet();
+        await antwortGate;
+        return HttpResponse.json(br({ id: 23 }), { status: 201 });
+      }),
+    );
+    renderWechselPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    await userEvent.type(screen.getByPlaceholderText('z. B. BR Ost'), 'BR Nord{Enter}');
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await waitFor(() => expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/2/'));
+    await act(async () => { antwortFreigeben(); });
+
+    await waitFor(() => expect(screen.getByTestId('pfad')).toHaveTextContent(
+      '/einsaetze/1/bereitstellungsraeume/23',
+    ));
   });
 });

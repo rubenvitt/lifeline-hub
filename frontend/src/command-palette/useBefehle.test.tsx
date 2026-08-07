@@ -41,4 +41,14 @@ describe('useBefehle', () => {
     const { result } = renderHook(() => useBefehle(), { wrapper: wrapper('/profil') });
     expect(result.current.some((b) => b.gruppe === 'module')).toBe(false);
   });
+
+  it('reicht die aktiven Tastaturaktionen als sichtbare Befehle durch', () => {
+    const speichern = vi.fn();
+    const { result } = renderHook(() => useBefehle({ speichern }), { wrapper: wrapper('/profil') });
+
+    const befehl = result.current.find((b) => b.id === 'tastatur:speichern');
+    expect(befehl).toBeDefined();
+    befehl!.ausfuehren();
+    expect(speichern).toHaveBeenCalledTimes(1);
+  });
 });

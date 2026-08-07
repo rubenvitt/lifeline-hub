@@ -2,8 +2,26 @@ import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { TableColumnsType, TableProps } from 'antd';
-import { renderMitProviders } from '../test/utils';
+import type { ReactElement } from 'react';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
+import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import KatalogTabelle, { BLAETTER_SCHWELLE } from './KatalogTabelle';
+
+function renderMitProviders(
+  ui: ReactElement,
+  options?: Parameters<typeof renderMitBasisProviders>[1],
+) {
+  const ergebnis = renderMitBasisProviders(
+    <CommandPaletteProvider>{ui}</CommandPaletteProvider>,
+    options,
+  );
+  const basisRerender = ergebnis.rerender;
+  return {
+    ...ergebnis,
+    rerender: (naechstesUi: ReactElement) =>
+      basisRerender(<CommandPaletteProvider>{naechstesUi}</CommandPaletteProvider>),
+  };
+}
 
 interface Zeile {
   id: number;
@@ -260,6 +278,57 @@ describe('KatalogTabelle · Suche', () => {
     await userEvent.type(feld!, 'LF');
     expect(screen.queryByText('Florian 1/44/1')).not.toBeNull();
     expect(screen.queryByText('Rotkreuz 2/83/1')).toBeNull();
+  });
+
+  it('Strg/⌘ + Backspace im Suchwerkzeug leert den internen Suchzustand', async () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={SPALTEN}
+        dataSource={ZWEI}
+        pagination={false}
+        suche={{ platzhalter: 'Funkrufname, Typ' }}
+      />,
+    );
+    const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+    await userEvent.type(feld, 'Rotkreuz');
+    expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(1);
+
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(feld, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(true);
+    expect(feld).toHaveValue('');
+    expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(2);
+  });
+
+  it('umfasst mit seiner Shortcut-Wurzel keine Werkzeugknöpfe in Tabellenzellen', async () => {
+    const spaltenMitAktion: TableColumnsType<Zeile> = [
+      ...SPALTEN.slice(0, 2),
+      { title: 'Aktionen', key: 'aktionen', render: () => <button type="button">Zeile bearbeiten</button> },
+    ];
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={spaltenMitAktion}
+        dataSource={ZWEI}
+        pagination={false}
+        suche={{ platzhalter: 'Funkrufname, Typ' }}
+      />,
+    );
+    const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+    await userEvent.type(feld, 'Rotkreuz');
+    const aktion = screen.getAllByRole('button', { name: 'Zeile bearbeiten' })[0];
+    aktion.focus();
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(aktion, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(false);
+    expect(feld).toHaveValue('Rotkreuz');
   });
 
   it('die Werkzeugzeile liegt AUSSERHALB des Tabellenrahmens', () => {

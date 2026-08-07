@@ -13,7 +13,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbPfad, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
@@ -22,6 +22,7 @@ import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import Datenstand from '../components/Datenstand';
+import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
 export default function EtbPage() {
   const { id } = useParams();
@@ -37,12 +38,19 @@ export default function EtbPage() {
    * sichtbaren Eingaben stehen.
    */
   const [filterMarke, setFilterMarke] = useState(0);
+  const filterWurzel = useRef<HTMLDivElement>(null);
   const filterAktiv = Object.keys(filter).length > 0;
 
   function filterZuruecksetzen() {
     setFilter({});
     setFilterMarke((m) => m + 1);
   }
+
+  useTastaturEbene({
+    name: 'ETB-Filter',
+    wurzel: filterWurzel,
+    aktionen: { 'filter-zuruecksetzen': filterZuruecksetzen },
+  });
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -294,7 +302,9 @@ export default function EtbPage() {
         </div>
       )}
 
-      <EtbFilterleiste key={filterMarke} onChange={setFilter} />
+      <div ref={filterWurzel}>
+        <EtbFilterleiste key={filterMarke} onChange={setFilter} />
+      </div>
       {abgelehnt.length > 0 && (
         <Alert
           type="error"

@@ -10,10 +10,10 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
-import type { Befehl } from './typen';
+import type { Befehl, TastaturAktionen } from './typen';
 
 /** Verdrahtet Auth/Theme/Router/Query mit der reinen baueBefehle-Funktion. */
-export function useBefehle(): Befehl[] {
+export function useBefehle(tastaturAktionen?: TastaturAktionen): Befehl[] {
   const { benutzer, logout } = useAuth();
   const { setModus } = useThemeMode();
   const { setDichte } = useDichte();
@@ -42,10 +42,12 @@ export function useBefehle(): Befehl[] {
       setDichte,
       setKoordinaten: setzeOverride,
       logout: () => { void logout(); },
+      tastaturAktionen,
+      userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
     }),
     // `setDichte` gehört hier hinein und ist dafür identitätsstabil (useCallback im
     // Provider) — das aus `useDichte()` zurückgegebene Objekt dagegen NICHT: es ist
     // je Aufruf frisch und würde die Liste bei jedem Render neu bauen.
-    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout],
+    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen],
   );
 }

@@ -574,6 +574,25 @@ describe('Sidebar Fehler-Slots', () => {
     expect(screen.queryByText('UHS (—)')).not.toBeInTheDocument();
   });
 
+  it('wählt einen verorteten Marker mit Space über die Auswahlzeile', async () => {
+    const user = userEvent.setup();
+    const onMarkerWaehlen = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        verortet={[{ schluessel: 'uhs-7', typ: 'uhs', id: 7, lat: 50, lon: 8, label: 'UHS Nord', farbe: '#1677ff' }]}
+        onMarkerWaehlen={onMarkerWaehlen}
+      />,
+    );
+
+    const zeile = screen.getByRole('button', { name: 'UHS Nord' });
+    zeile.focus();
+    await user.keyboard(' ');
+
+    expect(onMarkerWaehlen).toHaveBeenCalledWith('uhs-7');
+    expect(onMarkerWaehlen).toHaveBeenCalledTimes(1);
+  });
+
   it('der Slot bietet den erneuten Abruf unter dem einen Wortlaut an', () => {
     const onWiederholen = vi.fn();
     renderMitProviders(

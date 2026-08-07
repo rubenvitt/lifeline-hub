@@ -1,14 +1,32 @@
 import { http, HttpResponse, type RequestHandler } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
+import type { ReactElement } from 'react';
 import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
+import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
+
+function renderMitProviders(
+  ui: ReactElement,
+  options?: Parameters<typeof renderMitBasisProviders>[1],
+) {
+  const ergebnis = renderMitBasisProviders(
+    <CommandPaletteProvider>{ui}</CommandPaletteProvider>,
+    options,
+  );
+  const basisRerender = ergebnis.rerender;
+  return {
+    ...ergebnis,
+    rerender: (naechstesUi: ReactElement) =>
+      basisRerender(<CommandPaletteProvider>{naechstesUi}</CommandPaletteProvider>),
+  };
+}
 
 beforeEach(async () => {
   await entwuerfeLeerenFuerTests();
@@ -62,6 +80,7 @@ function setupMSW() {
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/etb', () => HttpResponse.json([eintrag])),
+    http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     // Schnellerfassung lädt via useFunkrufnamen disponierte Fahrzeuge/Einheiten
     // (Absender/Empfänger-Vorschläge). Leere Listen genügen für diesen Test.
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
@@ -360,5 +379,60 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     // die sichtbare Eingabe stehen — und der nächste Tastendruck mischte sie wieder ein.
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('');
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
+  });
+
+  it('Strg/⌘ + Backspace in der Filterleiste leert sichtbaren und internen Filterzustand', async () => {
+    setupMit([
+      http.get('/api/einsaetze/7/etb', ({ request }) =>
+        HttpResponse.json(new URL(request.url).searchParams.has('q') ? [] : [eintrag]),
+      ),
+    ]);
+    await screen.findByText('Erste Meldung');
+    const suche = screen.getByPlaceholderText('Volltextsuche');
+    await userEvent.type(suche, 'zzz');
+    expect(await screen.findByText('Kein Eintrag passt zum Filter')).toBeInTheDocument();
+
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(suche, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(true);
+    await waitFor(() => expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue(''));
+    expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
+
+    // Der Reset remountet die unkontrollierte Filterleiste. Die Registry darf die damit
+    // veraltete aktive Ebene nicht für ein Folgeereignis außerhalb der Root wiederverwenden.
+    const neueSuche = screen.getByPlaceholderText('Volltextsuche');
+    expect(neueSuche).not.toBe(suche);
+    const ausserhalb = new KeyboardEvent('keydown', {
+      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(document.body, ausserhalb);
+
+    expect(ausserhalb.defaultPrevented).toBe(false);
+    expect(screen.getByPlaceholderText('Volltextsuche')).toBe(neueSuche);
+  });
+
+  it('übernimmt native Wortlöschung nicht aus der Schnellerfassung', async () => {
+    setupMit([
+      http.get('/api/einsaetze/7/etb', ({ request }) =>
+        HttpResponse.json(new URL(request.url).searchParams.has('q') ? [] : [eintrag]),
+      ),
+    ]);
+    await screen.findByText('Erste Meldung');
+    const suche = screen.getByPlaceholderText('Volltextsuche');
+    await userEvent.type(suche, 'zzz');
+    expect(await screen.findByText('Kein Eintrag passt zum Filter')).toBeInTheDocument();
+
+    const schnellerfassung = screen.getByPlaceholderText(/Inhalt/);
+    schnellerfassung.focus();
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    fireEvent(schnellerfassung, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(false);
+    expect(suche).toHaveValue('zzz');
   });
 });

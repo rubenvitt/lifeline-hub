@@ -16,7 +16,10 @@ class FakeEventSource {
   constructor(url: string) { this.url = url; }
   addEventListener() {} removeEventListener() {} close() { this.closed = true; }
 }
-beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+beforeEach(() => {
+  vi.stubGlobal('EventSource', FakeEventSource);
+  sessionStorage.clear();
+});
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
@@ -364,6 +367,9 @@ describe('TierePage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(wortlaute).toHaveLength(1));
+    await waitFor(() => expect(
+      sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort'),
+    ).toBe('Sammelstelle Nord'));
 
     /**
      * Der Dialog bleibt stehen — und die Gegenprobe steckt IM Anstoss.
@@ -396,11 +402,142 @@ describe('TierePage', () => {
     expect(wortlaute[1].rufname ?? '').toBe('');
   });
 
+  it('merkt einen erfolgreichen Antreffort für das Wiederöffnen dieser Tiermaske', async () => {
+    let versuche = 0;
+    server.use(http.post('/api/einsaetze/1/tiere', () => {
+      versuche += 1;
+      return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+    }));
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Tier-Sammelstelle');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(versuche).toBe(1));
+    await warteBisDialogWeg();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
+    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tier-Sammelstelle'));
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+  });
+
+  it('speichert den Antreffort bei einem fehlgeschlagenen Tier nicht', async () => {
+    let versuche = 0;
+    server.use(http.post('/api/einsaetze/1/tiere', () => {
+      versuche += 1;
+      return HttpResponse.json({ error: 'Tier abgelehnt' }, { status: 500 });
+    }));
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Fehlerort Tier');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(versuche).toBe(1));
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('Fehlerort Tier');
+    expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBeNull();
+  });
+
+  it('speichert den Antreffort nach Schließen während des POST nicht', async () => {
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
+    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    server.use(http.post('/api/einsaetze/1/tiere', async () => {
+      postGestartet();
+      await antwortGate;
+      return HttpResponse.json({
+        ...tierBasis,
+        id: 99,
+        registrier_nr: 99,
+        rufname: 'Abbruch-Tier',
+      }, { status: 201 });
+    }));
+    render(einsatzAktiv, []);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Abbruchort Tier');
+    await userEvent.type(screen.getByLabelText('Rufname'), 'Abbruch-Tier');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    await act(async () => { antwortFreigeben(); });
+    await screen.findByText('Abbruch-Tier');
+
+    expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBeNull();
+  });
+
+  it('liest nur den Tierwert des aktuellen Einsatzes und füllt ihn nach Serien-Reset nicht erneut ein', async () => {
+    sessionStorage.setItem('lfh:erfassung:2:tier:antreff_ort', 'Falscher Einsatz');
+    sessionStorage.setItem('lfh:erfassung:1:person:antreff_ort', 'Falsche Maske');
+    sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager Nord');
+    let versuche = 0;
+    server.use(http.post('/api/einsaetze/1/tiere', () => {
+      versuche += 1;
+      return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+    }));
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager Nord'));
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(versuche).toBe(1));
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('');
+  });
+
+  it('setzt beim Einsatzwechsel alle Tierwerte zurück und lädt nur den B-Sitzungsort', async () => {
+    sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager A');
+    sessionStorage.setItem('lfh:erfassung:2:tier:antreff_ort', 'Tierlager B');
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+        const id = Number(params.einsatzId);
+        return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
+      }),
+      http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/tiere" element={<><EinsatzWechsel /><TierePage /></>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/tiere' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager A'));
+    const dialogA = screen.getByRole('dialog');
+    await userEvent.click(within(dialogA).getByRole('combobox'));
+    const katze = (await screen.findAllByText('Katze')).find((el) => el.closest('.ant-select-item-option'));
+    expect(katze).toBeTruthy();
+    await userEvent.click(katze!);
+    await userEvent.type(within(dialogA).getByLabelText('Rufname'), 'Nur Einsatz A');
+    await userEvent.type(within(dialogA).getByLabelText('Notiz'), 'Alte Notiz');
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await warteBisDialogWeg();
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+
+    const dialogB = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialogB).getByLabelText('Antreffort')).toHaveValue('Tierlager B'));
+    expect(within(dialogB).getByTitle('Hund')).toBeInTheDocument();
+    expect(within(dialogB).getByLabelText('Rufname')).toHaveValue('');
+    expect(within(dialogB).getByLabelText('Notiz')).toHaveValue('');
+  });
+
   it('navigiert beim Klick auf eine Zeile zur Detail-Vollseite', async () => {
     render(einsatzAktiv, [tierBasis]);
     await userEvent.click((await screen.findAllByText('Rex'))[0]);
     // Drawer entfernt (LFH-147) → Zeilen-Klick navigiert auf /tiere/:tierId.
     expect(await screen.findByText('DETAIL-SEITE')).toBeInTheDocument();
+  });
+
+  it('rendert genau einen Datensatz-Link pro Tierzeile', async () => {
+    render(einsatzAktiv, [tierBasis, { ...tierBasis, id: 12, registrier_nr: 3, rufname: 'Bello' }]);
+
+    const links = await screen.findAllByRole('link', { name: /^T-00[13]$/ });
+    expect(links).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'T-001' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'T-003' })).toHaveLength(1);
   });
 
   it('sortiert die Liste selbst, statt die Lieferreihenfolge zu übernehmen', async () => {

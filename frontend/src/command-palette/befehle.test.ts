@@ -1,6 +1,6 @@
 // frontend/src/command-palette/befehle.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { baueBefehle } from './befehle';
+import { baueBefehle, kuerzelFuerTastaturAktion, tastaturAktionFuerEreignis } from './befehle';
 import type { BefehlKontext } from './typen';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverride, Koordinatenformat } from '../api/types';
 
@@ -169,5 +169,88 @@ describe('baueBefehle — Schnelleinstellungen', () => {
     expect(k.setDichte).toHaveBeenCalledWith('handschuh');
     // Die Achsen bleiben getrennt: ein Dichte-Befehl rührt das Farbschema nicht an.
     expect(k.setThemeModus).not.toHaveBeenCalled();
+  });
+});
+
+describe('Tastaturaktionen', () => {
+  it.each([
+    [{ key: 's', ctrlKey: true, metaKey: false }, 'speichern'],
+    [{ key: 'S', ctrlKey: false, metaKey: true }, 'speichern'],
+    [{ key: 'Enter', ctrlKey: true, metaKey: false }, 'speichern'],
+    [{ key: 'Backspace', ctrlKey: false, metaKey: true }, 'filter-zuruecksetzen'],
+    [{ key: 'Escape', ctrlKey: false, metaKey: false }, 'verwerfen'],
+    [{ key: 'Enter', ctrlKey: false, metaKey: false }, null],
+    [{ key: 'Backspace', ctrlKey: false, metaKey: false }, null],
+  ] as const)('ordnet %o der Aktion %s zu', (taste, erwartet) => {
+    expect(tastaturAktionFuerEreignis({
+      ...taste,
+      defaultPrevented: false,
+      repeat: false,
+    })).toBe(erwartet);
+  });
+
+  it('ignoriert bereits behandelte und wiederholte Mutationsereignisse', () => {
+    expect(tastaturAktionFuerEreignis({
+      key: 's', ctrlKey: true, metaKey: false, defaultPrevented: true, repeat: false,
+    })).toBeNull();
+    expect(tastaturAktionFuerEreignis({
+      key: 's', ctrlKey: true, metaKey: false, defaultPrevented: false, repeat: true,
+    })).toBeNull();
+  });
+
+  it.each([
+    { key: 's', ctrlKey: true, metaKey: false, shiftKey: true },
+    { key: 'Enter', ctrlKey: false, metaKey: true, altKey: true },
+    { key: 'Backspace', ctrlKey: true, metaKey: false, altKey: true },
+    { key: 'Escape', ctrlKey: false, metaKey: false, shiftKey: true },
+  ])('ignoriert zusätzliche Shift-/Alt-Modifier: %o', (taste) => {
+    expect(tastaturAktionFuerEreignis({
+      ...taste,
+      defaultPrevented: false,
+      repeat: false,
+    })).toBeNull();
+  });
+
+  it('ignoriert Mutationsereignisse während einer IME-Komposition', () => {
+    const ereignis = {
+      key: 'Enter', ctrlKey: true, metaKey: false,
+      defaultPrevented: false, repeat: false, isComposing: true,
+    };
+    expect(tastaturAktionFuerEreignis(ereignis)).toBeNull();
+  });
+
+  it('liefert plattformgerechte sichtbare Kürzel', () => {
+    expect(kuerzelFuerTastaturAktion('speichern', 'Mozilla/5.0 (Macintosh; Intel Mac OS X)'))
+      .toBe('⌘ S / ⌘ ↵');
+    expect(kuerzelFuerTastaturAktion('speichern', 'Mozilla/5.0 (X11; Linux x86_64)'))
+      .toBe('Strg + S / Strg + ↵');
+    expect(kuerzelFuerTastaturAktion('verwerfen', 'Mozilla/5.0 (X11; Linux x86_64)'))
+      .toBe('Esc');
+    expect(kuerzelFuerTastaturAktion('filter-zuruecksetzen', 'Mozilla/5.0 (Macintosh)'))
+      .toBe('⌘ ⌫');
+  });
+
+  it('erzeugt nur für registrierte Callbacks sichtbare Aktionsbefehle', () => {
+    const speichern = vi.fn();
+    const filterZuruecksetzen = vi.fn();
+    const b = baueBefehle(kontext({
+      tastaturAktionen: {
+        speichern,
+        'filter-zuruecksetzen': filterZuruecksetzen,
+      },
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+    }));
+
+    const aktionsbefehle = b.filter((x) => x.gruppe === 'aktionen');
+    expect(aktionsbefehle.map(({ id, label, kuerzel }) => ({ id, label, kuerzel }))).toEqual([
+      { id: 'tastatur:speichern', label: 'Speichern', kuerzel: 'Strg + S / Strg + ↵' },
+      { id: 'tastatur:filter-zuruecksetzen', label: 'Filter zurücksetzen', kuerzel: 'Strg + Rücktaste' },
+    ]);
+    expect(aktionsbefehle.some((x) => x.id === 'tastatur:verwerfen')).toBe(false);
+
+    aktionsbefehle[0].ausfuehren();
+    aktionsbefehle[1].ausfuehren();
+    expect(speichern).toHaveBeenCalledTimes(1);
+    expect(filterZuruecksetzen).toHaveBeenCalledTimes(1);
   });
 });

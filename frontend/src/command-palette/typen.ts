@@ -4,7 +4,11 @@ import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides, Koordinatenformat
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 
-export type BefehlGruppe = 'module' | 'schnellaktionen' | 'einsaetze' | 'einstellungen' | 'navigation';
+export type TastaturAktionId = 'speichern' | 'verwerfen' | 'filter-zuruecksetzen';
+
+export type TastaturAktionen = Partial<Record<TastaturAktionId, () => void>>;
+
+export type BefehlGruppe = 'aktionen' | 'module' | 'schnellaktionen' | 'einsaetze' | 'einstellungen' | 'navigation';
 
 export interface Befehl {
   id: string;
@@ -12,6 +16,7 @@ export interface Befehl {
   label: string;
   schlagworte?: string[];
   icon?: IconType;
+  kuerzel?: string;
   ausfuehren: () => void;
 }
 
@@ -26,13 +31,16 @@ export interface BefehlKontext {
   setDichte: (d: Dichte) => void;
   setKoordinaten: (f: Koordinatenformat) => void;
   logout: () => void;
+  tastaturAktionen?: TastaturAktionen;
+  userAgent?: string;
 }
 
 export const GRUPPEN_REIHENFOLGE: BefehlGruppe[] = [
-  'module', 'schnellaktionen', 'einsaetze', 'einstellungen', 'navigation',
+  'aktionen', 'module', 'schnellaktionen', 'einsaetze', 'einstellungen', 'navigation',
 ];
 
 export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
+  aktionen: 'Aktionen',
   module: 'Module',
   schnellaktionen: 'Schnellaktionen',
   einsaetze: 'Einsatz wechseln',

@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
@@ -14,7 +14,10 @@ class FakeEventSource {
   constructor(url: string) { this.url = url; }
   addEventListener() {} removeEventListener() {} close() { this.closed = true; }
 }
-beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+beforeEach(() => {
+  vi.stubGlobal('EventSource', FakeEventSource);
+  sessionStorage.clear();
+});
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): so prüft der Beobachter-Test die EINSATZ-Rolle,
@@ -69,6 +72,11 @@ function render(einsatzObj: object, schaeden: object[], personen: object[] = [],
     </AuthProvider>,
     { route: '/einsaetze/1/schaeden' },
   );
+}
+
+function SchadenEinsatzWechsel() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate('/einsaetze/2/schaeden')}>Zu Einsatz B</button>;
 }
 
 /** Rendert SchaedenPage mit konfigurierbarer Route (z.B. mit Query-Params). */
@@ -239,6 +247,9 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
 
     await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await vi.waitFor(() => expect(
+      sessionStorage.getItem('lfh:erfassung:1:schaden:ort'),
+    ).toBe('Hauptstr. 17'));
     // Der Datensatz ist angekommen (Zähler der Hülle) …
     expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
     // … der Dialog steht weiter offen, und der Ort hat das Speichern überlebt (Wertübernahme).
@@ -304,6 +315,123 @@ describe('SchaedenPage', () => {
 
     await vi.waitFor(() => expect(koerper).toHaveLength(1));
     await warteBisDialogWeg();
+  });
+
+  it('merkt den Ort nach Erfolg fürs Wiederöffnen, ohne die eigene Organisation vorzuwählen', async () => {
+    let versuche = 0;
+    server.use(http.post('/api/einsaetze/1/schaeden', () => {
+      versuche += 1;
+      return HttpResponse.json(basisSchaden(), { status: 201 });
+    }));
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const ersterDialog = await modalDialog();
+    expect(within(ersterDialog).getAllByRole('combobox')[2]).toHaveValue('');
+    await fuelleSchaden(ersterDialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
+    await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Anlegen' }));
+    await vi.waitFor(() => expect(versuche).toBe(1));
+    await warteBisDialogWeg();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
+    const zweiterDialog = await modalDialog();
+    await vi.waitFor(() => expect(within(zweiterDialog).getByLabelText('Ort')).toHaveValue('Hauptstr. 17'));
+    expect(within(zweiterDialog).getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+    expect(within(zweiterDialog).getAllByRole('combobox')[2]).toHaveValue('');
+  });
+
+  it('merkt den Ort bei einem fehlgeschlagenen Schaden nicht und lässt den Wortlaut stehen', async () => {
+    let versuche = 0;
+    server.use(http.post('/api/einsaetze/1/schaeden', () => {
+      versuche += 1;
+      return HttpResponse.json({ error: 'Schaden abgelehnt' }, { status: 500 });
+    }));
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Fehlerort Schaden');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    await vi.waitFor(() => expect(versuche).toBe(1));
+    expect(within(dialog).getByLabelText('Ort')).toHaveValue('Fehlerort Schaden');
+    expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBeNull();
+  });
+
+  it('merkt den Ort nach Schließen während des POST nicht', async () => {
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    let postBeantwortet = false;
+    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
+    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    render(einsatzAktiv, []);
+    server.use(
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json(
+        postBeantwortet ? [basisSchaden({ id: 99, ort: 'Abbruchort Schaden' })] : [],
+      )),
+      http.post('/api/einsaetze/1/schaeden', async () => {
+        postGestartet();
+        await antwortGate;
+        postBeantwortet = true;
+        return HttpResponse.json(basisSchaden({ id: 99, ort: 'Abbruchort Schaden' }), { status: 201 });
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Abbruchort Schaden');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    await warteBisDialogWeg();
+    await act(async () => { antwortFreigeben(); });
+    await screen.findByText('Abbruchort Schaden');
+
+    expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBeNull();
+  });
+
+  it('setzt beim Einsatzwechsel alle Schadenwerte zurück und lädt nur den B-Sitzungsort', async () => {
+    sessionStorage.setItem('lfh:erfassung:1:schaden:ort', 'Schadenort A');
+    sessionStorage.setItem('lfh:erfassung:2:schaden:ort', 'Schadenort B');
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+        const id = Number(params.einsatzId);
+        return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Lage ${id}` });
+      }),
+      http.get('/api/einsaetze/:einsatzId/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:einsatzId/personen', ({ params }) =>
+        HttpResponse.json(params.einsatzId === '1' ? [einePerson] : [])),
+      http.get('/api/einsaetze/:einsatzId/personal', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route
+            path="/einsaetze/:id/schaeden"
+            element={<><SchadenEinsatzWechsel /><SchaedenPage /></>}
+          />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/schaeden' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialogA = await modalDialog();
+    await vi.waitFor(() => expect(within(dialogA).getByLabelText('Ort')).toHaveValue('Schadenort A'));
+    await userEvent.click(within(dialogA).getAllByRole('combobox')[0]);
+    await waehleOption('Sachschaden');
+    await userEvent.click(within(dialogA).getAllByRole('combobox')[1]);
+    await waehleOption('gering');
+    await userEvent.type(within(dialogA).getByLabelText('Beschreibung'), 'Nur Einsatz A');
+    await userEvent.click(within(dialogA).getAllByRole('combobox')[2]);
+    await waehleOption('R-007 · Anna Meier');
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+
+    const dialogB = await modalDialog();
+    await vi.waitFor(() => expect(within(dialogB).getByLabelText('Ort')).toHaveValue('Schadenort B'));
+    expect(within(dialogB).getAllByRole('combobox')[0]).toHaveValue('');
+    expect(within(dialogB).getAllByRole('combobox')[1]).toHaveValue('');
+    expect(within(dialogB).getByLabelText('Beschreibung')).toHaveValue('');
+    expect(within(dialogB).getAllByRole('combobox')[2]).toHaveValue('');
   });
 
   it('Schnellerfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {
@@ -405,6 +533,25 @@ describe('SchaedenPage', () => {
     render(einsatzAktiv, [basisSchaden({ id: 1, geschaedigt_person_id: 50, geschaedigt_registrier_nr: 7 })]);
     const link = await screen.findByRole('link', { name: /R-007/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/personen/50');
+  });
+
+  it('verlinkt jede Schaden-Registriernummer nativ und lässt Modifier-Klicks nicht zur Zeile hochsteigen', async () => {
+    render(einsatzAktiv, [
+      basisSchaden({ id: 10, registrier_nr: 1 }),
+      basisSchaden({ id: 11, registrier_nr: 3 }),
+    ]);
+    const link = await screen.findByRole('link', { name: 'S-001' });
+    const links = screen.getAllByRole('link', { name: /^S-00[13]$/ });
+    expect(links).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'S-001' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'S-003' })).toHaveLength(1);
+    expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/10');
+
+    const modifierKlick = new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true });
+    fireEvent(link, modifierKlick);
+
+    expect(modifierKlick.defaultPrevented).toBe(false);
+    expect(screen.queryByText('SCHADEN-DETAIL')).not.toBeInTheDocument();
   });
 
   it('verlinkt eine geschädigte Einsatzkraft auf die Personal-Liste (LFH-25)', async () => {

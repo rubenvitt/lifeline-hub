@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import dayjs from 'dayjs';
@@ -189,6 +189,62 @@ describe('EinsaetzePage', () => {
     );
     await userEvent.click(await screen.findByText('Hochwasser Nord'));
     await waitFor(() => expect(screen.getByText('Workspace-7')).toBeInTheDocument());
+  });
+
+  it('macht jede geladene Einsatzkarte per Titel-Link erreichbar und navigiert per Enter', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([
+        einsatz(),
+        einsatz({ id: 8, bezeichnung: 'Sturmtief Abschluss', status: 'abgeschlossen' }),
+      ])),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace</div>} />
+      </Routes>,
+    );
+
+    const titelLinks = await screen.findAllByRole('link', {
+      name: /^(Hochwasser Nord|Sturmtief Abschluss)$/,
+    });
+    expect(titelLinks).toHaveLength(2);
+    expect(titelLinks[0]).toHaveAttribute('href', '/einsaetze/7');
+    expect(titelLinks[1]).toHaveAttribute('href', '/einsaetze/8');
+
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Neuer Einsatz' }));
+    await user.tab();
+    expect(document.activeElement).toBe(titelLinks[0]);
+    await user.tab();
+    expect(document.activeElement).toBe(titelLinks[1]);
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText('Workspace')).toBeInTheDocument();
+  });
+
+  it('lässt Modifier-Klicks auf den Einsatz-Titel browsernativ und ohne Karten-Navigation', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
+    );
+
+    const link = await screen.findByRole('link', { name: 'Hochwasser Nord' });
+    const modifierKlick = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
+    fireEvent(link, modifierKlick);
+
+    expect(modifierKlick.defaultPrevented).toBe(false);
+    expect(screen.queryByText('Workspace-7')).not.toBeInTheDocument();
   });
 
   // ── Die drei Datenzustände (LFH-328 · A2, Task 10) ────────────────────────────

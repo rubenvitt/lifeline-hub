@@ -853,6 +853,16 @@ describe('PersonenPage', () => {
     expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
   });
 
+  it('rendert genau einen Datensatz-Link pro Personenzeile', async () => {
+    render(einsatzAktiv, [person, unbekannt]);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
+
+    const links = await screen.findAllByRole('link', { name: /^R-00[12]$/ });
+    expect(links).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'R-001' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'R-002' })).toHaveLength(1);
+  });
+
   /**
    * AK4-Pflichtstelle (LFH-331 · B3) — das Partnerpaar, nicht die einzelne Zusicherung.
    *

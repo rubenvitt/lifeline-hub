@@ -4,9 +4,16 @@ import {
   modulRegistry, istModulSichtbar, istModulGesperrt, modulZielRoute,
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
-import { etbPfad, personenPfad, schaedenPfad, unfallhilfsstellenListePfad } from '../routing/deeplinks';
+import {
+  einsaetzePfad,
+  einsatzPfad,
+  etbPfad,
+  personenPfad,
+  schaedenPfad,
+  unfallhilfsstellenListePfad,
+} from '../routing/deeplinks';
 import type { IconType } from 'react-icons';
-import type { Befehl, BefehlKontext } from './typen';
+import type { Befehl, BefehlKontext, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import type { Koordinatenformat } from '../api/types';
@@ -52,8 +59,63 @@ const KOORD_BEFEHLE: { format: Koordinatenformat; label: string }[] = [
   { format: 'gk', label: 'Gauß-Krüger' },
 ];
 
+interface TastaturEreignis {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  defaultPrevented: boolean;
+  repeat: boolean;
+  isComposing?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+}
+
+const TASTATUR_AKTIONEN: {
+  id: TastaturAktionId;
+  label: string;
+  schlagworte: string[];
+}[] = [
+  { id: 'speichern', label: 'Speichern', schlagworte: ['sichern', 'formular', 'submit'] },
+  { id: 'verwerfen', label: 'Verwerfen', schlagworte: ['abbrechen', 'schließen', 'escape'] },
+  { id: 'filter-zuruecksetzen', label: 'Filter zurücksetzen', schlagworte: ['suche', 'leeren', 'reset'] },
+];
+
+/** Reine Auflösung der globalen Mutationskürzel. Bereits behandelte und wiederholte
+ * Ereignisse haben bewusst keinen Besitzer mehr. */
+export function tastaturAktionFuerEreignis(e: TastaturEreignis): TastaturAktionId | null {
+  if (e.defaultPrevented || e.repeat || e.isComposing || e.shiftKey || e.altKey) return null;
+  const mitPrimaerModifikator = e.metaKey || e.ctrlKey;
+  if (e.key === 'Escape' && !mitPrimaerModifikator) return 'verwerfen';
+  if (!mitPrimaerModifikator) return null;
+  if (e.key.toLowerCase() === 's' || e.key === 'Enter') return 'speichern';
+  if (e.key === 'Backspace') return 'filter-zuruecksetzen';
+  return null;
+}
+
+/** Sichtbarer Gegenpart zur Ereignisauflösung; der User-Agent ist absichtlich ein
+ * Parameter, damit beide Plattformzweige ohne Manipulation globaler Browserwerte testbar sind. */
+export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: string): string {
+  const mac = /Mac|iPhone|iPad|iPod/.test(userAgent);
+  if (id === 'verwerfen') return 'Esc';
+  if (id === 'speichern') return mac ? '⌘ S / ⌘ ↵' : 'Strg + S / Strg + ↵';
+  return mac ? '⌘ ⌫' : 'Strg + Rücktaste';
+}
+
 export function baueBefehle(k: BefehlKontext): Befehl[] {
   const befehle: Befehl[] = [];
+
+  for (const definition of TASTATUR_AKTIONEN) {
+    const ausfuehren = k.tastaturAktionen?.[definition.id];
+    if (!ausfuehren) continue;
+    befehle.push({
+      id: `tastatur:${definition.id}`,
+      gruppe: 'aktionen',
+      label: definition.label,
+      schlagworte: definition.schlagworte,
+      kuerzel: kuerzelFuerTastaturAktion(definition.id, k.userAgent ?? ''),
+      ausfuehren,
+    });
+  }
 
   // 1. Module — nur im Einsatz-Kontext, fertig, sichtbar, nicht rollen-gesperrt
   if (k.einsatzId != null) {
@@ -89,7 +151,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     befehle.push({
       id: `einsatz:${e.id}`, gruppe: 'einsaetze', label: e.bezeichnung, icon: TbList,
       schlagworte: e.stichwort ? [e.stichwort] : undefined,
-      ausfuehren: () => k.navigate(`/einsaetze/${e.id}`),
+      ausfuehren: () => k.navigate(einsatzPfad(e.id)),
     });
   }
 
@@ -105,7 +167,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
   }
 
   // 5. Navigation — global
-  befehle.push({ id: 'nav:einsaetze', gruppe: 'navigation', label: 'Alle Einsätze', icon: TbList, ausfuehren: () => k.navigate('/einsaetze') });
+  befehle.push({ id: 'nav:einsaetze', gruppe: 'navigation', label: 'Alle Einsätze', icon: TbList, ausfuehren: () => k.navigate(einsaetzePfad()) });
   befehle.push({ id: 'nav:profil', gruppe: 'navigation', label: 'Profil', icon: TbUser, ausfuehren: () => k.navigate('/profil') });
   // Zwei Stufen, bewusst getrennt (LFH-328/M8): Verwaltungsbereich und Stammdaten hängen am
   // AdminLayout-Gate `darfVerwaltung` — vorher standen sie unter `system_rolle === 'admin'`

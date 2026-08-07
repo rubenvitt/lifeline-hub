@@ -24,6 +24,51 @@ describe('BausteinPlatzhalterModal', () => {
     expect(onEinsetzen.mock.calls[0][0]).toMatchObject({ inhalt: 'Melder Florian meldet' });
   });
 
+  it('fokussiert nur das erste dynamische Platzhalterfeld', () => {
+    renderMitProviders(
+      <BausteinPlatzhalterModal
+        baustein={baustein({ inhalt: '{melder} an {ziel}' })}
+        einsatz={einsatz}
+        onEinsetzen={vi.fn()}
+        onAbbrechenAll={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('melder')).toHaveFocus();
+    expect(screen.getByLabelText('ziel')).not.toHaveFocus();
+  });
+
+  it('Enter in einem Platzhalterfeld setzt den Baustein ein', async () => {
+    const onEinsetzen = vi.fn();
+    renderMitProviders(
+      <BausteinPlatzhalterModal baustein={baustein()} einsatz={einsatz} onEinsetzen={onEinsetzen} onAbbrechenAll={vi.fn()} />,
+    );
+    await userEvent.type(screen.getByLabelText('melder'), 'Florian{Enter}');
+    await waitFor(() => expect(onEinsetzen).toHaveBeenCalledTimes(1));
+    expect(onEinsetzen.mock.calls[0][0]).toMatchObject({ inhalt: 'Melder Florian meldet' });
+  });
+
+  it('der sichtbare Submit-Button setzt den Baustein ein', async () => {
+    const onEinsetzen = vi.fn();
+    renderMitProviders(
+      <BausteinPlatzhalterModal baustein={baustein()} einsatz={einsatz} onEinsetzen={onEinsetzen} onAbbrechenAll={vi.fn()} />,
+    );
+    await userEvent.type(screen.getByLabelText('melder'), 'Florian');
+    await userEvent.click(screen.getByRole('button', { name: 'Einsetzen' }));
+    await waitFor(() => expect(onEinsetzen).toHaveBeenCalledTimes(1));
+  });
+
+  it('Abbrechen leert eingegebene Platzhalterwerte', async () => {
+    const onAbbrechenAll = vi.fn();
+    renderMitProviders(
+      <BausteinPlatzhalterModal baustein={baustein()} einsatz={einsatz} onEinsetzen={vi.fn()} onAbbrechenAll={onAbbrechenAll} />,
+    );
+    const feld = screen.getByLabelText('melder');
+    await userEvent.type(feld, 'Florian');
+    await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(onAbbrechenAll).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByLabelText('melder')).toHaveValue(''));
+  });
+
   it('setzt Baustein ohne Platzhalter sofort ein (kein Modal)', async () => {
     const onEinsetzen = vi.fn();
     renderMitProviders(

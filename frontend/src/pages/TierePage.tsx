@@ -11,6 +11,10 @@ import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, { scrolleZurZeile, spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
+import {
+  liesErfassungsSitzungswert,
+  schreibeErfassungsSitzungswert,
+} from '../components/erfassungsSitzung';
 import Datenstand from '../components/Datenstand';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -186,6 +190,25 @@ export default function TierePage() {
   } | null>(null);
   const aktuellerModus = modus?.einsatzId === einsatzId ? modus.wert : null;
   const [form] = Form.useForm<TierEingabe>();
+  const geladeneOeffnung = useRef<string | null>(null);
+  const formularEinsatzId = useRef(einsatzId);
+
+  useEffect(() => {
+    if (formularEinsatzId.current !== einsatzId) {
+      formularEinsatzId.current = einsatzId;
+      form.resetFields();
+      geladeneOeffnung.current = null;
+    }
+    const oeffnung = aktuellerModus === null ? null : `${einsatzId}:tier`;
+    if (oeffnung === null) {
+      geladeneOeffnung.current = null;
+      return;
+    }
+    if (geladeneOeffnung.current === oeffnung) return;
+    geladeneOeffnung.current = oeffnung;
+    const ort = liesErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort');
+    form.setFieldValue('antreff_ort', ort);
+  }, [aktuellerModus, einsatzId, form]);
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
@@ -407,6 +430,11 @@ export default function TierePage() {
         * Kennzeichnung, Halter-Kontakt, Notiz — beschreiben das EINZELNE Tier; sie
         * mitzunehmen hiesse, den vorigen Satz zu wiederholen.
         *
+        * Der sitzungsweite Antreffort ist ein eigener Vertrag: nach erfolgreicher Mutation
+        * wird er einsatz- und maskenbezogen gemerkt und beim Öffnen einmal per Formularwert
+        * eingesetzt. Er gehört nicht zu `initialValues`, damit ein Serien-Reset bei
+        * ausgeschaltetem B4-Schalter leer bleibt.
+        *
         * `status` steht bewusst nicht im Formular: er kommt aus dem Modus, mit dem der
         * Dialog geöffnet wurde, und die Ableitung sitzt deshalb in `onErfassen`.
         */}
@@ -429,6 +457,13 @@ export default function TierePage() {
               status: aktuellerModus === 'vermisst' ? 'vermisst' : 'aktiv',
             },
           });
+        }}
+        onErfasst={(daten) => {
+          // Erst die zentrale Post-Acceptance-Stufe darf den Sitzungswert ändern:
+          // ein Abbruch während des POST besteht die Generation davor nicht.
+          if (typeof daten.antreff_ort === 'string') {
+            schreibeErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort', daten.antreff_ort);
+          }
         }}
         onFertig={() => setModus((alt) => alt?.einsatzId === einsatzId ? null : alt)}
         onAbbrechen={() => setModus((alt) => alt?.einsatzId === einsatzId ? null : alt)}

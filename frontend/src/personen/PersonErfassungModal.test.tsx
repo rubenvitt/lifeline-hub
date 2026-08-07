@@ -1,6 +1,6 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungModal';
 
@@ -16,12 +16,13 @@ import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungMod
  */
 
 /** Modal mit Standard-Zusagen; einzelne Rückrufe überschreibbar. */
-function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock } = {}) {
+function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock; einsatzId?: number } = {}) {
   const onErfassen: Mock = opts.onErfassen ?? vi.fn().mockResolvedValue(undefined);
   const onFertig: Mock = vi.fn();
   const onCancel: Mock = vi.fn();
-  renderMitProviders(
+  const ansicht = renderMitProviders(
     <PersonErfassungModal
+      einsatzId={opts.einsatzId ?? 1}
       modus={opts.modus ?? 'schnell'}
       isPending={false}
       onErfassen={onErfassen}
@@ -29,8 +30,10 @@ function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock } = {}) {
       onCancel={onCancel}
     />,
   );
-  return { onErfassen, onFertig, onCancel };
+  return { ...ansicht, onErfassen, onFertig, onCancel };
 }
+
+beforeEach(() => sessionStorage.clear());
 
 /**
  * Anzahl der Formularfelder IM BAUM.
@@ -97,6 +100,7 @@ describe('PersonErfassungModal — Serienmodus', () => {
 
     await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue(''));
     expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
+    expect(sessionStorage.getItem('lfh:erfassung:1:person:antreff_ort')).toBe('Sammelstelle Süd');
   });
 
   it('der Primär-Knopf meldet stattdessen fertig', async () => {
@@ -134,6 +138,7 @@ describe('PersonErfassungModal — Feldbudget', () => {
   it('Melder / Kontakt gibt es nur im Vermisst-Modus', async () => {
     const { unmount } = renderMitProviders(
       <PersonErfassungModal
+        einsatzId={1}
         modus="vermisst" isPending={false}
         onErfassen={vi.fn().mockResolvedValue(undefined)} onFertig={vi.fn()} onCancel={vi.fn()}
       />,
@@ -184,5 +189,69 @@ describe('PersonErfassungModal — Ablehnung', () => {
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onFertig).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Name')).toHaveValue('Mustermann');
+  });
+});
+
+describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
+  it('merkt den Ort erst nach Erfolg und setzt ihn beim Wiederöffnen ein', async () => {
+    const ersteAnsicht = zeige();
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(ersteAnsicht.onErfassen).toHaveBeenCalledTimes(1));
+    ersteAnsicht.unmount();
+
+    zeige();
+    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'));
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+  });
+
+  it('merkt einen Ort nach abgelehntem Speichern nicht', async () => {
+    const ersteAnsicht = zeige({
+      onErfassen: vi.fn().mockRejectedValue(new Error('abgelehnt')),
+    });
+    const nutzer = userEvent.setup();
+
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Fehlerort');
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(ersteAnsicht.onErfassen).toHaveBeenCalledTimes(1));
+    ersteAnsicht.unmount();
+
+    zeige();
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('');
+  });
+
+  it('merkt einen Ort nach Abbruch während des Speicherns nicht', async () => {
+    let antwortFreigeben!: () => void;
+    const antwort = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const ansicht = zeige({ onErfassen: vi.fn(() => antwort) });
+
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Abbruchort Person');
+    await userEvent.type(screen.getByLabelText('Name'), 'Mustermann');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(ansicht.onErfassen).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    await act(async () => { antwortFreigeben(); await antwort; });
+
+    expect(ansicht.onCancel).toHaveBeenCalledTimes(1);
+    expect(ansicht.onFertig).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('lfh:erfassung:1:person:antreff_ort')).toBeNull();
+  });
+
+  it('füllt den Sitzungsort nach ausgeschaltetem Serien-Reset nicht heimlich erneut ein', async () => {
+    sessionStorage.setItem('lfh:erfassung:1:person:antreff_ort', 'Sammelstelle Süd');
+    const { onErfassen } = zeige();
+    const nutzer = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'));
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
+    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 });

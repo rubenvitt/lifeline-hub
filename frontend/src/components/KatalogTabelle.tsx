@@ -1,5 +1,6 @@
 import { Input, Table, type InputRef, type TableProps } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
 /**
  * Geteiltes Tabellen-Primitiv der Katalog-/Verwaltungsseiten (LFH-329 · B1).
@@ -207,7 +208,14 @@ export default function KatalogTabelle<T extends object>({
 }: KatalogTabelleProps<T>) {
   const [suchbegriff, setSuchbegriff] = useState('');
   const feldRef = useRef<InputRef>(null);
+  const werkzeugWurzel = useRef<HTMLDivElement>(null);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
+  useTastaturEbene({
+    name: 'Katalogtabelle-Filter',
+    wurzel: werkzeugWurzel,
+    aktionen: { 'filter-zuruecksetzen': () => setSuchbegriff('') },
+    aktiv: suche != null,
+  });
 
   /**
    * Fixiert wird die ERSTE Spalte, nicht eine per Prop benannte: in allen Aufrufstellen
@@ -282,7 +290,7 @@ export default function KatalogTabelle<T extends object>({
         // Die Werkzeugzeile liegt AUSSERHALB von `.ant-table`: `katalogtabelle-schmal.spec.ts`
         // misst `scrollWidth` am Tabellenwurzelknoten gegen 390 px, eine Leiste darin zählte
         // in dieses Maß hinein und machte die Messung stumpf.
-        <div data-lfh="katalog-werkzeuge" style={{ marginBlockEnd: 8 }}>
+        <div ref={werkzeugWurzel} data-lfh="katalog-werkzeuge" style={{ marginBlockEnd: 8 }}>
           <Input.Search
             ref={feldRef}
             allowClear

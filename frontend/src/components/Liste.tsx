@@ -1,6 +1,7 @@
 import { Spin, theme } from 'antd';
 import { createContext, useContext } from 'react';
 import type { CSSProperties, Key, ReactNode } from 'react';
+import { KlickbareZeile } from './Klickbar';
 import { SeitenLeer } from './SeitenZustand';
 
 /**
@@ -141,14 +142,25 @@ export function Liste<T>({
   );
 }
 
-interface ListenEintragProps {
+interface ListenEintragBasisProps {
   children?: ReactNode;
-  /** Rechts ausgerichtete Aktionen (analog antd `List.Item` `actions`). */
-  actions?: ReactNode[];
-  onClick?: () => void;
   style?: CSSProperties;
   className?: string;
 }
+
+interface ListenEintragAuswahlProps extends ListenEintragBasisProps {
+  /** Button-semantische Auswahl der Zeile; Navigation bleibt ein nativer Link. */
+  onClick: () => void;
+  actions?: never;
+}
+
+interface ListenEintragAnzeigeProps extends ListenEintragBasisProps {
+  /** Rechts ausgerichtete Aktionen (analog antd `List.Item` `actions`). */
+  actions?: ReactNode[];
+  onClick?: never;
+}
+
+type ListenEintragProps = ListenEintragAuswahlProps | ListenEintragAnzeigeProps;
 
 export function ListenEintrag({ children, actions, onClick, style, className }: ListenEintragProps) {
   const { token } = useToken();
@@ -157,25 +169,26 @@ export function ListenEintrag({ children, actions, onClick, style, className }: 
   const paddingBlock = size === 'small' ? token.paddingXS : token.paddingSM;
   const paddingInline = size === 'small' ? token.padding : bordered ? token.paddingLG : 0;
 
-  return (
-    <div
-      className={['listen-eintrag', className].filter(Boolean).join(' ')}
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: token.padding,
-        paddingBlock,
-        paddingInline,
-        // Die Spread-Position ist TRAGEND, nicht Stil (LFH-366): ein Aufrufer, der einen
-        // Trefflächenboden setzt, übergibt die Kurzform `padding` (`bedienzielStil` in
-        // `pages/lagekarte/Sidebar.tsx`), und die gewinnt nur, weil sie SPÄTER deklariert wird.
-        // Nach vorn gezogen fiele die Polsterungshälfte der „ZWEI Angaben"-Konvention still weg,
-        // während `minHeight` überlebt — und kein Test sähe es.
-        ...style,
-      }}
-    >
+  const eintragProps = {
+    className: ['listen-eintrag', className].filter(Boolean).join(' '),
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: token.padding,
+      paddingBlock,
+      paddingInline,
+      // Die Spread-Position ist TRAGEND, nicht Stil (LFH-366): ein Aufrufer, der einen
+      // Trefflächenboden setzt, übergibt die Kurzform `padding` (`bedienzielStil` in
+      // `pages/lagekarte/Sidebar.tsx`), und die gewinnt nur, weil sie SPÄTER deklariert wird.
+      // Nach vorn gezogen fiele die Polsterungshälfte der „ZWEI Angaben"-Konvention still weg,
+      // während `minHeight` überlebt — und kein Test sähe es.
+      ...style,
+    },
+  };
+
+  const inhalt = (
+    <>
       <div style={{ flex: '1 1 auto', minWidth: 0 }}>{children}</div>
       {actions != null && actions.length > 0 && (
         <ul
@@ -210,7 +223,13 @@ export function ListenEintrag({ children, actions, onClick, style, className }: 
           ))}
         </ul>
       )}
-    </div>
+    </>
+  );
+
+  return onClick ? (
+    <KlickbareZeile {...eintragProps} onAktivieren={onClick}>{inhalt}</KlickbareZeile>
+  ) : (
+    <div {...eintragProps}>{inhalt}</div>
   );
 }
 

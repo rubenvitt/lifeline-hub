@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  einsaetzePfad,
+  einsatzPfad,
   einsatzModulPfad,
   uhsDetailPfad,
   unfallhilfsstellenListePfad,
@@ -31,6 +33,14 @@ import {
 const E = 5; // einsatzId
 
 describe('deeplinks — Basis', () => {
+  it('einsaetzePfad baut die zentrale Einsatzliste', () => {
+    expect(einsaetzePfad()).toBe('/einsaetze');
+  });
+
+  it('einsatzPfad baut den zentralen Einsatz-Workspace', () => {
+    expect(einsatzPfad(7)).toBe('/einsaetze/7');
+  });
+
   it('einsatzModulPfad baut /einsaetze/<id>/<modul>', () => {
     expect(einsatzModulPfad(E, 'etb')).toBe('/einsaetze/5/etb');
   });

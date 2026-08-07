@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -90,6 +90,92 @@ describe('Schnellerfassung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Zeile1{Shift>}{Enter}{/Shift}Zeile2');
     expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('Plain Enter sendet einen Einzeiler', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Einzeiler{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it.each([
+    ['leer', ''],
+    ['nur Whitespace', '  \t'],
+  ])('Plain Enter unterdrückt bei %s keinen nativen Zeilenumbruch', async (_fall, inhalt) => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    if (inhalt) await userEvent.type(feld, inhalt);
+    let nichtVerhindert = false;
+    await act(async () => { nichtVerhindert = fireEvent.keyDown(feld, { key: 'Enter' }); });
+    expect(nichtVerhindert).toBe(true);
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('Plain Enter ergänzt bei mehrzeiligem Inhalt eine weitere Zeile', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Zeile 1{Shift>}{Enter}{/Shift}Zeile 2{Enter}');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('Zeile 1\nZeile 2\n');
+  });
+
+  it.each([
+    ['Ctrl', '{Control>}{Enter}{/Control}'],
+    ['Meta', '{Meta>}{Enter}{/Meta}'],
+  ])('%s+Enter sendet auch mehrzeiligen Inhalt', async (_modifikator, tastaturfolge) => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), `Zeile 1{Shift>}{Enter}{/Shift}Zeile 2${tastaturfolge}`);
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('wiederholtes Enter sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Einzeiler');
+    await act(async () => fireEvent.keyDown(feld, { key: 'Enter', repeat: true }));
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('sendet während einer IME-Komposition weder mit Enter noch mit Strg+Enter', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '変換中');
+
+    fireEvent.keyDown(feld, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(feld, { key: 'Enter', ctrlKey: true, isComposing: true });
+
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('変換中');
+  });
+
+  it('sendet ein bereits behandeltes Enter nicht erneut', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Bereits lokal behandelt');
+    const ereignis = new KeyboardEvent('keydown', {
+      key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true,
+    });
+    ereignis.preventDefault();
+
+    fireEvent(feld, ereignis);
+
+    expect(ereignis.defaultPrevented).toBe(true);
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('Bereits lokal behandelt');
+  });
+
+  it('erklärt den Enter-Vertrag sichtbar und im Placeholder', () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const hinweis = 'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
+    expect(screen.getByText(hinweis)).toBeVisible();
+    expect(screen.getByPlaceholderText((placeholder) => placeholder.startsWith(hinweis))).toBeInTheDocument();
   });
 
   it('/ öffnet Menü; Feld „Von" wird als Chip erfasst und mitgesendet', async () => {

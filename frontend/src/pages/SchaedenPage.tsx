@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad } from '../routing/deeplinks';
 import { Button, Input, Space, Tabs, Tag, Typography } from 'antd';
@@ -88,7 +88,11 @@ export default function SchaedenPage() {
     {
       title: 'Nr.',
       dataIndex: 'registrier_nr',
-      render: (nr: number) => <strong>{schadenRegistrierAnzeige(nr)}</strong>,
+      render: (nr: number, row) => (
+        <Link to={schadenDetailPfad(einsatzId, row.id)} onClick={(event) => event.stopPropagation()}>
+          <strong>{schadenRegistrierAnzeige(nr)}</strong>
+        </Link>
+      ),
     },
     { title: 'Typ', dataIndex: 'typ', render: (t: SchadenTyp) => <Tag>{TYP_LABEL[t]}</Tag> },
     {

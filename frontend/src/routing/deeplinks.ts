@@ -26,6 +26,16 @@
  * Builder).
  */
 
+/** Zentrale Route zur Einsatzliste. */
+export function einsaetzePfad(): string {
+  return '/einsaetze';
+}
+
+/** Zentrale Route zum Einsatz-Workspace. */
+export function einsatzPfad(einsatzId: number): string {
+  return `/einsaetze/${einsatzId}`;
+}
+
 /** Basis-Pfad eines Einsatz-Moduls: `/einsaetze/<einsatzId>/<modulRoute>`. */
 export function einsatzModulPfad(einsatzId: number, modulRoute: string): string {
   return `/einsaetze/${einsatzId}/${modulRoute}`;
