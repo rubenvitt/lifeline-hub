@@ -217,4 +217,4 @@
   `rtk mise exec pnpm@11.10.0 -- pnpm -C frontend exec playwright test e2e/command-palette.spec.ts e2e/kopfzeile-schmal.spec.ts`; der Drawer-Fall prüft sichtbaren Fokus, Tab und Shift+Tab.
 - [x] `rtk ./scripts/check-all.sh` vollständig ausführen.
 - [x] Zwei unabhängige read-only Reviews durchführen: Spezifikationsabdeckung und adversariale Qualitätsprüfung.
-- [ ] ClickUp vorwärts auf Review/Testing/Shipped fortschreiben, aber nur nach belegten Gates.
+- [x] ClickUp vorwärts auf Review/Testing/Shipped fortschreiben, aber nur nach belegten Gates.
