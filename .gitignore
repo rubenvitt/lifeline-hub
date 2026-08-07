@@ -35,3 +35,4 @@ lifeline-tls-*.pem
 
 .claude/worktrees
 .claire/worktrees
+.worktrees/
