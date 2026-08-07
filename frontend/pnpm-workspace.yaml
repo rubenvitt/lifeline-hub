@@ -2,61 +2,39 @@ allowBuilds:
   esbuild: true
   msw: true
 
-# Transitive Advisory-Fixes, die die Abhängigkeitskette selbst nicht hergibt.
+# Transitive Advisory-Fixes mit erzwungenen sicheren Mindestversionen.
 # Ab pnpm 10 werden Overrides hier gelesen, NICHT mehr aus package.json ("pnpm"-Feld
 # wird ignoriert — pnpm warnt darüber nur, es bricht nicht).
 overrides:
-  # GHSA-52cp-r559-cp3m (high): quadratische CPU über YAML-Merge-Key-Ketten.
+  # GHSA-5p4m-2wfm-xmqj (high): quadratische CPU bei !!omap-Auflösung.
   # @redocly/openapi-core pinnt js-yaml exakt auf 4.2.0, openapi-typescript ist bereits
-  # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.0 ist
-  # ein Minor-Sprung; verifiziert durch check-typ-codegen.sh, das genau diese Toolchain
-  # fährt (openapi.json → types.generated.ts).
-  # Bewusst `^4.3.0` und nicht `>=4.3.0`: letzteres zog js-yaml 5.2.1 herein — einen
+  # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.1 ist
+  # ein Same-Major-Update (Minor+Patch); verifiziert durch check-typ-codegen.sh, das
+  # diese Toolchain fährt (openapi.json → types.generated.ts).
+  # Bewusst `^4.3.1` und nicht `>=4.3.1`: letzteres zog js-yaml 5.2.1 herein — einen
   # Major-Sprung mit Breaking Changes in eine Abhängigkeit, die wir gar nicht selbst rufen.
-  js-yaml@>=4.0.0 <4.3.0: ^4.3.0
+  js-yaml@>=4.0.0 <4.3.1: ^4.3.1
 
-  # GHSA-4c8g-83qw-93j6 + GHSA-v2hh-gcrm-f6hx (beide high): Host-Confusion in der
-  # URI-Zerlegung (fehlgeschlagene IDN-Kanonisierung bzw. literaler Backslash als
-  # Authority-Trenner). Kette: vite-plugin-pwa → workbox-build → ajv (bzw.
-  # @apideck/better-ajv-errors → ajv) → fast-uri; workbox-build pinnt ajv, das
-  # seinerseits fast-uri ^3.0.0 zieht — die Kette gibt den Fix nicht her.
-  # Wieder `^3.1.4` statt `>=3.1.4` (siehe js-yaml oben): kein Major-Sprung in eine
+  # GHSA-7p8r-x3mc-p8w7 (high): Host-Confusion über einen Backslash als Authority-Trenner.
+  # Kette: vite-plugin-pwa → workbox-build → ajv (bzw.
+  # @apideck/better-ajv-errors → ajv) → fast-uri. AJV fordert für fast-uri ^3.0.1
+  # und lässt den Fix damit zu; der Lockfile löste jedoch noch 3.1.4. Der Override
+  # erzwingt die sichere Mindestversion.
+  # Wieder `^3.1.5` statt `>=3.1.5` (siehe js-yaml oben): kein Major-Sprung in eine
   # Abhängigkeit, die wir nicht selbst rufen. Reines Build-Zeit-Tooling (PWA-Manifest),
-  # kein Laufzeit-Code im Bundle.
-  fast-uri@>=3.0.0 <3.1.4: ^3.1.4
+  # kein Laufzeit-Code im Bundle; der Frontend-Produktionsbuild und check-all.sh prüfen es.
+  fast-uri@>=3.0.0 <3.1.5: ^3.1.5
 
-# Bewertete Advisories OHNE Fix — dieselbe Doktrin wie .cargo/audit.toml auf der
-# Rust-Seite: hier steht nur, wofür es KEINEN Upgrade-Pfad gibt UND wofür die
-# Nichtbetroffenheit begründet ist. Ein Eintrag braucht: warum kein Upgrade möglich ist,
-# warum das Risiko in DIESEM Projekt nicht trägt, und woran man merkt, dass sich das ändert.
-# Was hier nicht steht, bricht `scripts/check-deps.sh`.
-auditConfig:
-  ignoreGhsas:
-    # GHSA-mh99-v99m-4gvg (high): brace-expansion expandiert Brace-Muster unbegrenzt,
-    # ein bösartiges Glob-Pattern kann den Prozess per OOM killen (DoS).
-    #
-    # Kein Upgrade möglich: das Advisory patcht AUSSCHLIESSLICH die 5.x-Linie (>=5.0.8),
-    # für die 2.x-Linie gibt es keinen Backport. Betroffen ist brace-expansion 2.1.2,
-    # gezogen von minimatch@5.1.9 über zwei Ketten, beide devDependencies:
-    #   openapi-typescript → @redocly/openapi-core → minimatch@5
-    #   vite-plugin-pwa → workbox-build → …ejs → jake → filelist → minimatch@5
-    # Ein Override auf ^5.0.8 ist KEIN Ausweg, sondern ein Bruch: minimatch@5 macht
-    # `const expand = require('brace-expansion')` (minimatch.js:19), brace-expansion 5
-    # exportiert aber keinen Default mehr, sondern nur noch `{ expand, EXPANSION_MAX,
-    # EXPANSION_MAX_LENGTH }` (an der installierten 5.0.8 nachgemessen) — `expand()` wäre
-    # zur Laufzeit kein Callable. minimatch selbst hochzuziehen scheitert am selben Muster
-    # eine Ebene höher (filelist@1.0.6 ruft minimatch als Funktion, minimatch@10 exportiert
-    # named). Die direkten Konsumenten stehen bereits auf der neuesten Version.
-    #
-    # Warum das Risiko hier nicht trägt: reines Build-Zeit-Tooling, kein Byte davon landet
-    # im ausgelieferten Bundle oder im Binary. Die Glob-Patterns, die diese beiden Ketten
-    # sehen, stammen aus unserer eigenen Repo-Konfiguration (Redocly-Defaults beim
-    # Typ-Codegen, workbox-Globs beim PWA-Build) — es gibt keinen Pfad, über den ein
-    # Angreifer ein Pattern einschleust. Der Schaden wäre zudem ein abgestürzter lokaler
-    # Build, kein Zugriff.
-    #
-    # Neu bewerten, wenn: (a) ein 2.x-Backport erscheint (dann Ignore streichen),
-    # (b) openapi-typescript/@redocly/openapi-core oder vite-plugin-pwa/workbox-build auf
-    # minimatch >=10 wechseln (dann fällt die 2.x-Linie von selbst raus), (c) eine dieser
-    # Ketten in Laufzeit-Code wandert.
-    - GHSA-mh99-v99m-4gvg
+  # GHSA-rgw5-rvv9-x895 (high): DoS durch unbeschränkte Zwischenarrays bei Brace-Mustern.
+  # Ketten: openapi-typescript → @redocly/openapi-core → minimatch@5 sowie vite-plugin-pwa →
+  # workbox-build → rollup-plugin-off-main-thread → ejs → jake → filelist →
+  # minimatch@5 → brace-expansion@2.
+  # Der Backport ^2.1.4 bleibt im konsumierten Major und wird durch check-typ-codegen.sh
+  # sowie check-all.sh geprüft.
+  brace-expansion@>=2.0.0 <2.1.4: ^2.1.4
+
+  # GHSA-rgw5-rvv9-x895 (high): dieselbe DoS-Lücke in der 5.x-Linie.
+  # Ketten: @eslint/js → eslint → @eslint/config-array → minimatch sowie vite-plugin-pwa →
+  # workbox-build → glob → minimatch@10 → brace-expansion@5. ^5.0.9 ist ein
+  # Same-Major-Patch und wird durch den Frontend-Produktionsbuild sowie check-all.sh geprüft.
+  brace-expansion@>=5.0.0 <5.0.9: ^5.0.9
