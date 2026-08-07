@@ -207,14 +207,14 @@
 - Consumes: sämtliche vorherigen Task-Ergebnisse.
 - Produces: reviewfähiger, ungecommiteter LFH-335-Diff.
 
-- [ ] `rtk git diff --check` und `rtk git -c core.fsmonitor=false status --short --untracked-files=all` zur Scope-Prüfung ausführen.
-- [ ] `rtk mise exec pnpm@11.10.0 -- pnpm -C frontend lint` ausführen.
-- [ ] `rtk ./scripts/check-typ-codegen.sh` ausführen.
-- [ ] Gesamte Vitest-Suite ausführen:
+- [x] `rtk git diff --check` und `rtk git -c core.fsmonitor=false status --short --untracked-files=all` zur Scope-Prüfung ausführen.
+- [x] `rtk mise exec pnpm@11.10.0 -- pnpm -C frontend lint` ausführen.
+- [x] `rtk ./scripts/check-typ-codegen.sh` ausführen.
+- [x] Gesamte Vitest-Suite ausführen:
   `rtk mise exec pnpm@11.10.0 -- pnpm -C frontend exec vitest run --no-file-parallelism`.
-- [ ] `rtk cargo build --bin lifeline-hub` ausführen und sicherstellen, dass `target/debug/lifeline-hub` ausführbar ist.
-- [ ] Gezielte Playwright-Specs ausführen:
+- [x] `rtk cargo build --bin lifeline-hub` ausführen und sicherstellen, dass `target/debug/lifeline-hub` ausführbar ist.
+- [x] Gezielte Playwright-Specs ausführen:
   `rtk mise exec pnpm@11.10.0 -- pnpm -C frontend exec playwright test e2e/command-palette.spec.ts e2e/kopfzeile-schmal.spec.ts`; der Drawer-Fall prüft sichtbaren Fokus, Tab und Shift+Tab.
-- [ ] `rtk ./scripts/check-all.sh` vollständig ausführen.
-- [ ] Zwei unabhängige read-only Reviews durchführen: Spezifikationsabdeckung und adversariale Qualitätsprüfung.
+- [x] `rtk ./scripts/check-all.sh` vollständig ausführen.
+- [x] Zwei unabhängige read-only Reviews durchführen: Spezifikationsabdeckung und adversariale Qualitätsprüfung.
 - [ ] ClickUp vorwärts auf Review/Testing/Shipped fortschreiben, aber nur nach belegten Gates.
