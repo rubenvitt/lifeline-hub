@@ -17,13 +17,21 @@ pub async fn setup() -> axum::Router {
 /// Router auch direkten DB-Zugriff brauchen (z. B. eine `auth_provider`-Override-Zeile schreiben,
 /// siehe `tests/auth.rs`s OIDC-Enforcement-Tests).
 pub async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
+    let (router, pool, _live) = setup_mit_pool_und_live().await;
+    (router, pool)
+}
+
+/// Wie [`setup_mit_pool`], stellt zusaetzlich den geteilten LiveHub fuer Assertions auf
+/// post-commit SSE-Publikationen bereit.
+pub async fn setup_mit_pool_und_live() -> (axum::Router, sqlx::SqlitePool, LiveHub) {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
+    let live = LiveHub::new();
     let router = build_router(AppState {
         pool: pool.clone(),
-        live: LiveHub::new(),
+        live: live.clone(),
         karten_dir: std::env::temp_dir(),
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         download_client: lifeline_hub::karte::download::download_client(),
@@ -31,7 +39,7 @@ pub async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
         karten_service_url: None,
         karten_service_token: None,
     });
-    (router, pool)
+    (router, pool, live)
 }
 
 /// Legt eine ZWEITE Organisation samt Benutzer an — die Voraussetzung für jeden
@@ -147,6 +155,36 @@ pub async fn anfrage(
         .method(methode)
         .uri(uri)
         .header(header::COOKIE, cookie.to_string());
+    let body = match body {
+        Some(b) => {
+            req = req.header(header::CONTENT_TYPE, "application/json");
+            Body::from(b.to_string())
+        }
+        None => Body::empty(),
+    };
+    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+/// Wie [`anfrage`], aber mit dem Besitz-Nachweis eines Offline-Queue-Eintrags.
+pub async fn anfrage_mit_offline_queue_benutzer(
+    app: &axum::Router,
+    methode: &str,
+    uri: &str,
+    cookie: &str,
+    body: Option<&str>,
+    benutzer_id: i64,
+) -> (StatusCode, Value) {
+    let mut req = Request::builder()
+        .method(methode)
+        .uri(uri)
+        .header(header::COOKIE, cookie.to_string())
+        .header("X-Offline-Queue-Benutzer-Id", benutzer_id.to_string());
     let body = match body {
         Some(b) => {
             req = req.header(header::CONTENT_TYPE, "application/json");

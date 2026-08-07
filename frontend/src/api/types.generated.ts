@@ -383,7 +383,14 @@ export interface components {
             erstellt_von_id: number;
             /** Format: int64 */
             id: number;
+            /** @description Zeitpunkt der jüngsten Nachricht im Kanal (UTC-Wireformat), falls vorhanden. */
+            letzte_nachricht_at?: string | null;
             name: string;
+            /**
+             * Format: int64
+             * @description Ungelesene, nicht selbst verfasste Nachrichten für den aktuell angemeldeten Benutzer.
+             */
+            ungelesen_anzahl: number;
         };
         /**
          * @description Öffentliche Darstellung einer Chat-Nachricht. `inhalt` ist `None`, wenn die

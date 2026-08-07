@@ -92,6 +92,7 @@ describe('EtbPage', () => {
       expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
     );
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
   it('startet mit ausgeschaltetem „Werte behalten"', async () => {

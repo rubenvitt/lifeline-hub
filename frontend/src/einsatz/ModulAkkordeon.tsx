@@ -6,6 +6,7 @@ import {
   type Kategorie, type KategorieKey, type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulZaehlerMap } from './useModulZaehler';
 
 /**
  * Die Einsatz-Navigation als flaches Akkordeon in EINER Spalte (LFH-329 · B1/H11).
@@ -34,6 +35,7 @@ interface Props {
   overrides?: ModulOverrides;
   onKategorieKlick: (key: KategorieKey) => void;
   onModulKlick: (modul: ModulEintrag) => void;
+  zaehler?: ModulZaehlerMap;
 }
 
 /**
@@ -51,6 +53,7 @@ export default function ModulAkkordeon({
   overrides,
   onKategorieKlick,
   onModulKlick,
+  zaehler,
 }: Props) {
   const { token } = theme.useToken();
   return (
@@ -96,6 +99,7 @@ export default function ModulAkkordeon({
                   aktiverModulKey={aktiverModulKey}
                   onModulKlick={onModulKlick}
                   mindestTrefflaeche={TREFFLAECHE}
+                  zaehler={zaehler}
                 />
               </div>
             )}

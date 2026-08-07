@@ -15,6 +15,7 @@ import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
+import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
 
 /**
  * Trefflächenboden der Gebietszeile (Abschluss-Review zu LFH-368 · B5h, Konvention aus
@@ -132,7 +133,8 @@ export default function GefahrenPage() {
      * Aufforderung „zeichnen" gehört jetzt an den Knopf, der auch dorthin führt.
      */
     return (
-      <div style={{ marginTop: 64 }}>
+      <div style={{ marginTop: 64, textAlign: 'center' }}>
+        <Datenstand dataUpdatedAt={gebieteQuery.dataUpdatedAt} />
         <SeitenLeer
           titel="Noch keine Gefahrengebiete"
           hinweis="Auf der Lagekarte ein Gefahrengebiet zeichnen."
@@ -169,7 +171,15 @@ export default function GefahrenPage() {
         style={breit ? { width: 240, flexShrink: 0 } : { width: '100%' }}
         size="small"
         bordered
-        header={<Typography.Text strong>Gefahrengebiete</Typography.Text>}
+        header={(
+          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+            <Typography.Text strong>Gefahrengebiete</Typography.Text>
+            <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
+              gebieteQuery.dataUpdatedAt,
+              matrixQuery.dataUpdatedAt,
+            )} />
+          </Space>
+        )}
         dataSource={gebiete}
         renderItem={(g) => (
           <ListenEintrag

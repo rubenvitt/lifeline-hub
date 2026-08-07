@@ -33,9 +33,9 @@ import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
  * bleiben bewusst als expliziter Code hier.
  */
 /** Verbindungsstatus des Live-Feeds — via window-CustomEvent `lfh:live-status` an einen
- *  sichtbaren Indikator (LiveStatusBanner im EinsatzLayout) gemeldet, damit der Hook
+ *  sichtbaren Indikator (globale Betriebszeile) gemeldet, damit der Hook
  *  render-state-frei und EINE EventSource bleibt. */
-export type LiveVerbindungsStatus = 'open' | 'connecting' | 'lost';
+export type LiveVerbindungsStatus = 'idle' | 'open' | 'connecting' | 'lost';
 
 /** Exponentieller Backoff (ms) für den manuellen Reconnect, wenn der Browser aufgibt
  *  (readyState CLOSED) und die Session noch gültig ist. */
@@ -122,7 +122,10 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       if (abgebrochen) return;
       let sessionGueltig = true;
       try {
-        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        const res = await fetch('/api/auth/me', {
+          credentials: 'same-origin',
+          signal: AbortSignal.timeout(15_000),
+        });
         if (res.status === 401) sessionGueltig = false;
       } catch {
         // Netzfehler bei der Probe → Session-Status unbekannt, wie gültig behandeln und
@@ -179,6 +182,10 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         aktuelle.onerror = null;
         aktuelle.close();
       }
+      // Die Betriebszeile bleibt über dem Router global gemountet. Ohne einen expliziten
+      // inaktiven Zustand würde ein früheres `lost` nach Verlassen des Einsatzes auf
+      // `/profil` oder `/admin` stehenbleiben, obwohl dort gar kein Live-Feed laufen soll.
+      meldeStatus('idle');
     };
   }, [einsatzId, qc]);
 }

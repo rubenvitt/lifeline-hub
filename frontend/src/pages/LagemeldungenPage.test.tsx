@@ -36,6 +36,7 @@ describe('LagemeldungenPage', () => {
     renderPage();
     expect(await screen.findByText('Brücke gesperrt')).toBeInTheDocument();
     expect(screen.getByText('Herkunft: Meldung #5 von Florian Nord 1')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
   /**

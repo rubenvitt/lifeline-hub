@@ -1,7 +1,8 @@
-import { Button, Form, Input, Modal, Typography } from 'antd';
+import { Badge, Button, Form, Input, Modal, Typography } from 'antd';
 import { useState } from 'react';
 import type { ChatKanal } from '../api/types';
 import { Liste, ListenEintrag } from '../components/Liste';
+import { formatZeitKurz } from '../kommunikation';
 
 interface Props {
   kanaele: ChatKanal[];
@@ -14,6 +15,16 @@ interface Props {
 interface KanalFormWerte {
   name: string;
   beschreibung?: string;
+}
+
+/** Ungelesene Kanäle zuerst, innerhalb beider Gruppen die jüngste Aktivität zuerst. */
+export function sortiereKanaele(kanaele: ChatKanal[]): ChatKanal[] {
+  return [...kanaele].sort((a, b) => {
+    const ungelesen = Number(b.ungelesen_anzahl > 0) - Number(a.ungelesen_anzahl > 0);
+    if (ungelesen !== 0) return ungelesen;
+    return (b.letzte_nachricht_at ?? b.erstellt_at)
+      .localeCompare(a.letzte_nachricht_at ?? a.erstellt_at);
+  });
 }
 
 export default function KanalListe({
@@ -32,7 +43,7 @@ export default function KanalListe({
       </div>
       <Liste<ChatKanal>
         size="small"
-        dataSource={kanaele}
+        dataSource={sortiereKanaele(kanaele)}
         renderItem={(k) => (
           <ListenEintrag
             onClick={() => onWechsel(k.id)}
@@ -41,7 +52,16 @@ export default function KanalListe({
               fontWeight: k.id === aktiverKanalId ? 600 : 400,
             }}
           >
-            {k.name}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <Badge dot={k.ungelesen_anzahl > 0} status="processing">
+                <span>{k.name}</span>
+              </Badge>
+              {k.letzte_nachricht_at && (
+                <Typography.Text type="secondary" title="Letzte Nachricht">
+                  {formatZeitKurz(k.letzte_nachricht_at)}
+                </Typography.Text>
+              )}
+            </div>
           </ListenEintrag>
         )}
       />

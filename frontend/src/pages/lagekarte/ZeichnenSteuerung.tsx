@@ -9,6 +9,8 @@ export interface ZeichnenSteuerungProps {
   phase: ZeichnenPhase;
   /** true, wenn in Phase 'bestaetigen' ein Speichern-Request läuft. */
   speichernLaeuft?: boolean;
+  /** Mindestens drei Punkte sind gesetzt; bis dahin ist der explizite Abschluss gesperrt. */
+  abschliessenMoeglich?: boolean;
   onAbschliessen: () => void;
   onAbbrechen: () => void;
   onSpeichern: () => void;
@@ -94,7 +96,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
             </Typography.Text>
             {serienZeile}
             <Space>
-              <Button type="primary" onClick={props.onAbschliessen}>
+              <Button type="primary" disabled={props.abschliessenMoeglich === false} onClick={props.onAbschliessen}>
                 Abschließen
               </Button>
               {beenden}

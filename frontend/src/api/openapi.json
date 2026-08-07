@@ -1078,7 +1078,8 @@
           "einsatz_id",
           "name",
           "erstellt_von_id",
-          "erstellt_at"
+          "erstellt_at",
+          "ungelesen_anzahl"
         ],
         "properties": {
           "archiviert_at": {
@@ -1108,8 +1109,20 @@
             "type": "integer",
             "format": "int64"
           },
+          "letzte_nachricht_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der jüngsten Nachricht im Kanal (UTC-Wireformat), falls vorhanden."
+          },
           "name": {
             "type": "string"
+          },
+          "ungelesen_anzahl": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Ungelesene, nicht selbst verfasste Nachrichten für den aktuell angemeldeten Benutzer."
           }
         }
       },

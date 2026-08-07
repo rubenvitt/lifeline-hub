@@ -129,6 +129,27 @@ describe('ModulPanel', () => {
     expect(onKlick).toHaveBeenCalledWith(expect.objectContaining({ key: 'etb' }));
   });
 
+  it('zeigt einen neutralen Zähler und nimmt seine Bedeutung in den Accessible Name auf', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Kommunikation"
+        module={[basis({
+          key: 'meldungen', label: 'Meldungen', route: 'meldungen', status: 'fertig',
+          zaehlerQuelle: 'meldungen',
+        })]}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        zaehler={{ meldungen: { wert: 5, beschreibung: '5 offene Meldungen, davon 2 ungesehen' } }}
+      />,
+    );
+    const knopf = screen.getByRole('button', {
+      name: 'Meldungen, 5 offene Meldungen, davon 2 ungesehen',
+    });
+    expect(knopf.querySelector('.ant-badge')).not.toBeNull();
+    expect(screen.getByTitle('5 offene Meldungen, davon 2 ungesehen')).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('traegt den Testanker des e2e-Trefflaechennachweises', () => {
     // `e2e/trefflaeche-tablet.spec.ts` greift die Modulzeilen des inline-Rahmens über
     // dieses Merkmal. Ohne diesen Pin wäre der Anker unbewacht: wer ihn entfernt, färbt

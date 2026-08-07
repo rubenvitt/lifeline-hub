@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Space, Typography } from 'antd';
+import { App, Button, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { entferneMitglied, ladeMitglieder, setzeMitglied } from '../api/einsaetz
 import { listeBenutzer } from '../api/benutzer';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import KatalogTabelle from '../components/KatalogTabelle';
+import SektionHeader from '../components/SektionHeader';
 
 const ROLLEN: { value: EinsatzRolle; label: string }[] = [
   { value: 'einsatzleitung', label: 'Einsatzleitung' },
@@ -93,7 +94,7 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
 
   return (
     <section style={{ marginTop: 32 }}>
-      <Typography.Title level={5}>Zugriff</Typography.Title>
+      <SektionHeader titel="Zugriff" dataUpdatedAt={mitgliederQuery.dataUpdatedAt} />
       {darfVerwalten && (
         <Space style={{ marginBottom: 16 }} wrap>
           <Select

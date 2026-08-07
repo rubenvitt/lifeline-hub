@@ -1,9 +1,15 @@
 /// <reference types="vitest/config" />
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+const frontendVersion = (
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 // `frontend/dist` muss zur Compile-Zeit existieren, sonst bricht rust-embed
 // (src/static_files.rs) und damit der komplette Backend-Build — deshalb ist die
@@ -42,7 +48,7 @@ export default defineConfig(({ mode }) => {
       react(),
       gitkeepBewahren(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         includeAssets: ['favicon.svg'],
         workbox: {
           // Der App-Haupt-Chunk überschreitet das 2-MiB-Default-Precache-Limit.
@@ -64,6 +70,9 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
+    define: {
+      __APP_VERSION__: JSON.stringify(frontendVersion),
+    },
     // maplibre-gl aus der Dep-Optimierung heraushalten (ab v6 nötig): der Optimizer bündelt es
     // sonst nach `node_modules/.vite/deps/`, und weil maplibre seine Worker-URL zur Laufzeit als
     // Geschwisterdatei von `import.meta.url` konstruiert, sucht es den Worker dann dort — wo er

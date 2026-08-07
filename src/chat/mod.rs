@@ -85,6 +85,11 @@ pub struct ChatKanalAnzeige {
     pub erstellt_von_id: i64,
     pub erstellt_at: String,
     pub archiviert_at: Option<String>,
+    /// Zeitpunkt der jüngsten Nachricht im Kanal (UTC-Wireformat), falls vorhanden.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letzte_nachricht_at: Option<String>,
+    /// Ungelesene, nicht selbst verfasste Nachrichten für den aktuell angemeldeten Benutzer.
+    pub ungelesen_anzahl: i64,
 }
 
 /// Öffentliche Darstellung einer Chat-Nachricht. `inhalt` ist `None`, wenn die

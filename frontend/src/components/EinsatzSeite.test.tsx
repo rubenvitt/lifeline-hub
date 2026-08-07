@@ -62,6 +62,14 @@ describe('EinsatzSeite', () => {
     expect(wurzel(breit.container).style.maxWidth).toBe(`${flaeche.seiteBreit}px`);
   });
 
+  it('zeigt den Query-Datenstand im Seitenkopf', () => {
+    const zeit = new Date(2026, 5, 10, 14, 7).getTime();
+    renderMitProviders(
+      <EinsatzSeite titel="Liste" dataUpdatedAt={zeit}><div>Inhalt</div></EinsatzSeite>,
+    );
+    expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
+  });
+
   /**
    * Der Akzentstrich lebt als CSS-Klasse, und `vite.config.ts` setzt für Vitest
    * `css: false` — die Klassen-Assertion oben belegt also NUR das Attribut, keine

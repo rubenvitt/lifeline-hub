@@ -45,6 +45,26 @@ pub async fn quittiere_einmalig(
     von_id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
+    let mut conn = pool.acquire().await?;
+    quittiere_einmalig_tx(
+        &mut conn, org_id, einsatz_id, objekt_typ, objekt_id, von_id, jetzt,
+    )
+    .await
+}
+
+/// Transaktionsfaehige Variante von [`quittiere_einmalig`]. Der Aufrufer kann die
+/// Quittung damit atomar mit Folgeaenderungen (z. B. Reminder schliessen und
+/// Eskalations-Flag loeschen) committen oder gemeinsam zurueckrollen.
+#[allow(clippy::too_many_arguments)]
+pub async fn quittiere_einmalig_tx(
+    conn: &mut sqlx::SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
+    objekt_typ: &str,
+    objekt_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
     let r = sqlx::query(
         "INSERT INTO kommunikation_status \
            (org_id, einsatz_id, objekt_typ, objekt_id, quittiert_at, quittiert_von_id) \
@@ -59,7 +79,7 @@ pub async fn quittiere_einmalig(
     .bind(objekt_id)
     .bind(jetzt)
     .bind(von_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(r.rows_affected() > 0)
 }

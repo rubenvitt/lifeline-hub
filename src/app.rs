@@ -167,6 +167,10 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::chat::nachricht_erfassen),
         )
         .route(
+            "/api/einsaetze/{id}/chat/kanaele/{kid}/gelesen",
+            post(routes::chat::kanal_gelesen_markieren),
+        )
+        .route(
             "/api/einsaetze/{id}/chat/nachrichten/{mid}",
             patch(routes::chat::nachricht_bearbeiten),
         )

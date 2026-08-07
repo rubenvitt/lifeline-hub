@@ -24,6 +24,7 @@ import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
@@ -107,7 +108,7 @@ export default function PersonalPage() {
 
   const disponiereMutation = useMutation({
     mutationFn: (personalId: number) => disponierePerson(einsatzId, personalId),
-    onSuccess: invalidate,
+    onSuccess: () => { message.success('Personal disponiert'); invalidate(); },
     onError: fehler,
   });
   const adhocMutation = useMutation({
@@ -120,8 +121,47 @@ export default function PersonalPage() {
   const statusMutation = useMutation({
     mutationFn: (v: { epId: number; statusId: number }) =>
       aktualisiereDisposition(einsatzId, v.epId, { status_id: v.statusId }),
-    onSuccess: invalidate,
-    onError: fehler,
+    onMutate: async (v) => {
+      const queryKey = einsatzKeys.personal(einsatzId);
+      await qc.cancelQueries({ queryKey });
+      const vorher = qc.getQueryData<EinsatzPersonal[]>(queryKey)?.find((ep) => ep.id === v.epId);
+      const status = statusQuery.data?.find((s) => s.id === v.statusId);
+      qc.setQueryData<EinsatzPersonal[]>(queryKey, (alt) =>
+        alt?.map((ep) => ep.id === v.epId
+          ? {
+              ...ep,
+              status_id: v.statusId,
+              status_label: status?.label ?? ep.status_label,
+              status_kategorie: status?.kategorie ?? ep.status_kategorie,
+              status_farbe: status?.farbe ?? null,
+            }
+          : ep),
+      );
+      return { vorher };
+    },
+    onSuccess: (serverStand) => {
+      qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (alt) =>
+        alt?.map((ep) => ep.id === serverStand.id ? serverStand : ep),
+      );
+    },
+    onError: (e, v, kontext) => {
+      const vorher = kontext?.vorher;
+      if (vorher) {
+        qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (aktuell) =>
+          aktuell?.map((ep) => ep.id === v.epId && ep.status_id === v.statusId
+            ? {
+                ...ep,
+                status_id: vorher.status_id,
+                status_label: vorher.status_label,
+                status_kategorie: vorher.status_kategorie,
+                status_farbe: vorher.status_farbe,
+              }
+            : ep),
+        );
+      }
+      fehler(e);
+    },
+    onSettled: invalidate,
   });
   const positionMutation = useMutation({
     mutationFn: (v: { epId: number; position: StaerkePosition | null }) =>
@@ -301,15 +341,23 @@ export default function PersonalPage() {
         trifft: (ep, w) => kategorieVon(ep.status_kategorie) === w,
       },
       render: (_, ep) =>
-        darfSchreiben ? (
-          <Select
-            style={{ minWidth: 150 }}
-            value={ep.status_id ?? undefined}
-            placeholder="Status wählen"
-            options={stati.map((s) => ({ value: s.id, label: s.label }))}
-            onChange={(statusId) => statusMutation.mutate({ epId: ep.id, statusId })}
-          />
-        ) : (
+        darfSchreiben ? (() => {
+          const gesperrt = statusMutation.isPending;
+          const laeuft = gesperrt && statusMutation.variables?.epId === ep.id;
+          return (
+            <Select
+              style={{ minWidth: 150 }}
+              value={laeuft ? statusMutation.variables?.statusId : ep.status_id ?? undefined}
+              placeholder="Status wählen"
+              options={stati.map((s) => ({ value: s.id, label: s.label }))}
+              loading={laeuft}
+              disabled={gesperrt}
+              onChange={(statusId) => {
+                if (!statusMutation.isPending) statusMutation.mutate({ epId: ep.id, statusId });
+              }}
+            />
+          );
+        })() : (
           <StatusBadge ep={ep} />
         ),
     },
@@ -346,6 +394,11 @@ export default function PersonalPage() {
   return (
     <EinsatzSeite
       breite={flaeche.seiteBreit}
+      dataUpdatedAt={gemeinsamerDatenstand(
+        epQuery.dataUpdatedAt,
+        einheitenQuery.dataUpdatedAt,
+        fahrzeugeQuery.dataUpdatedAt,
+      )}
       titel={
         <Space>
           Personal
@@ -370,6 +423,8 @@ export default function PersonalPage() {
               value={null}
               options={poolOptionen}
               notFoundContent={poolInhalt}
+              loading={disponiereMutation.isPending}
+              disabled={disponiereMutation.isPending}
               onSelect={(personalId) => { if (personalId != null) disponiereMutation.mutate(personalId); }}
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>

@@ -473,17 +473,60 @@ export default function Grundriss({
   const flaecheHoehe = Math.max(420, maxY + 140);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    // Promise zurückgeben: React Query hält die Mutation so bis zum Abschluss aller
+    // Refetches auf `pending`. Sonst werden Folgeaktionen bereits wieder freigeschaltet,
+    // während ein später UHS-Refetch z. B. ein gerade geöffnetes Platzmenü abräumt.
+    return Promise.all([
+      qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) }),
+      qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) }),
+      qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) }),
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) }),
+    ]);
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const layoutMut = useMutation({
     mutationFn: ({ pid, pos_x, pos_y }: { pid: number; pos_x: number; pos_y: number }) =>
       aktualisierePlatz(einsatzId, uhs.id, pid, { pos_x, pos_y }),
-    onSuccess: () => invalidate(), onError: fehler,
+    onMutate: async (v) => {
+      const queryKey = einsatzKeys.uhsDetail(einsatzId, uhs.id);
+      await qc.cancelQueries({ queryKey });
+      const vorher = qc.getQueryData<UhsDetail>(queryKey)?.plaetze.find((platz) => platz.id === v.pid);
+      qc.setQueryData<UhsDetail>(queryKey, (alt) => alt ? {
+        ...alt,
+        plaetze: alt.plaetze.map((platz) => platz.id === v.pid
+          ? { ...platz, pos_x: v.pos_x, pos_y: v.pos_y }
+          : platz),
+      } : alt);
+      return { vorher };
+    },
+    onSuccess: (serverStand) => {
+      qc.setQueryData<UhsDetail>(einsatzKeys.uhsDetail(einsatzId, uhs.id), (alt) => alt ? {
+        ...alt,
+        plaetze: alt.plaetze.map((platz) => platz.id === serverStand.id ? serverStand : platz),
+      } : alt);
+    },
+    onError: (e, variablen, kontext) => {
+      const vorher = kontext?.vorher;
+      if (vorher) {
+        qc.setQueryData<UhsDetail>(einsatzKeys.uhsDetail(einsatzId, uhs.id), (alt) => {
+          if (!alt) return alt;
+          const aktuell = alt.plaetze.find((platz) => platz.id === variablen.pid);
+          // Ein inzwischen neuerer Stand derselben Karte darf nicht vom alten Fehler
+          // zurueckgerollt werden. Andere Plaetze werden grundsaetzlich nie angefasst.
+          if (!aktuell || aktuell.pos_x !== variablen.pos_x || aktuell.pos_y !== variablen.pos_y) return alt;
+          return {
+            ...alt,
+            plaetze: alt.plaetze.map((platz) =>
+              platz.id === variablen.pid
+                ? { ...platz, pos_x: vorher.pos_x, pos_y: vorher.pos_y }
+                : platz),
+          };
+        });
+      }
+      fehler(e);
+    },
+    onSettled: invalidate,
   });
   const belegMut = useMutation({
     mutationFn: ({ personId, platzId }: { personId: number; platzId: number | null }) => {
@@ -491,7 +534,41 @@ export default function Grundriss({
       const art = aktuell?.aktuelle_uhs_id ? 'wechsel' : 'eintritt';
       return aenderePersonBelegung(einsatzId, personId, { art, uhs_id: uhs.id, platz_id: platzId });
     },
-    onSuccess: () => invalidate(), onError: fehler,
+    onMutate: async (v) => {
+      const queryKey = einsatzKeys.personen(einsatzId);
+      await qc.cancelQueries({ queryKey });
+      const vorher = qc.getQueryData<Person[]>(queryKey)?.find((person) => person.id === v.personId);
+      qc.setQueryData<Person[]>(queryKey, (alt) => alt?.map((person) => person.id === v.personId
+        ? { ...person, aktuelle_uhs_id: uhs.id, aktueller_platz_id: v.platzId }
+        : person));
+      return { vorher };
+    },
+    onSuccess: (serverStand) => {
+      qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) => alt?.map((person) =>
+        person.id === serverStand.person_id
+          ? { ...person, aktuelle_uhs_id: serverStand.uhs_id, aktueller_platz_id: serverStand.platz_id }
+          : person));
+    },
+    onError: (e, variablen, kontext) => {
+      const vorher = kontext?.vorher;
+      if (vorher) {
+        qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) => alt?.map((person) => {
+          if (person.id !== variablen.personId) return person;
+          // Nur den eigenen optimistischen Stand rueckgaengig machen. Hat ein neuerer
+          // Server-/Live-Stand die Person bereits weiterbewegt, bleibt dieser erhalten.
+          if (person.aktuelle_uhs_id !== uhs.id || person.aktueller_platz_id !== variablen.platzId) {
+            return person;
+          }
+          return {
+            ...person,
+            aktuelle_uhs_id: vorher.aktuelle_uhs_id,
+            aktueller_platz_id: vorher.aktueller_platz_id,
+          };
+        }));
+      }
+      fehler(e);
+    },
+    onSettled: invalidate,
   });
   const austrittMut = useMutation({
     mutationFn: (personId: number) => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
@@ -541,6 +618,7 @@ export default function Grundriss({
     // Platz-Verschiebung: braucht kein Drop-Target — Layout-Fläche ist keine Droppable.
     // delta reicht; auf >= 0 clampen, damit die Karte nicht off-screen landen kann.
     if (data.kind === 'platz' && data.platzId != null) {
+      if (layoutMut.isPending) return;
       const platz = uhs.plaetze.find((p) => p.id === data.platzId);
       if (!platz) return;
       const nx = Math.max(0, (platz.pos_x ?? 10) + delta.x);
@@ -551,6 +629,7 @@ export default function Grundriss({
     }
     // Person-Drop: braucht ein Drop-Target (Platz, Wartebereich oder Transport).
     if (data.kind === 'person' && data.personId != null) {
+      if (belegMut.isPending) return;
       const target = over?.data.current as { kind: string; platzId?: number } | undefined;
       if (!target) return;
       if (target.kind === 'inbox') belegMut.mutate({ personId: data.personId, platzId: null });
@@ -574,14 +653,14 @@ export default function Grundriss({
           <PersonenSpalte
             titel="Noch nicht aufgenommen"
             personen={nichtAufgenommen}
-            schreibgeschuetzt={schreibgeschuetzt}
+            schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
             leerText="keine"
             onOeffnen={setDetailPersonId}
           />
           <PersonenSpalte
             titel="Wartebereich (Eingang)"
             personen={wartebereichPersonen}
-            schreibgeschuetzt={schreibgeschuetzt}
+            schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
             droppableId="drop-inbox"
             leerText="leer"
             onOeffnen={setDetailPersonId}
@@ -615,8 +694,8 @@ export default function Grundriss({
                   key={p.id}
                   platz={p}
                   belegtVon={belegtAn(p.id)}
-                  schreibgeschuetzt={schreibgeschuetzt}
-                  bearbeitbar={platzEditAktiv}
+                  schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+                  bearbeitbar={platzEditAktiv && !layoutMut.isPending}
                   onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                   onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
                   onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
@@ -648,7 +727,11 @@ export default function Grundriss({
 
         {/* RECHTS: Auf Transport gebracht */}
         <div style={{ width: 240, flexShrink: 0, overflow: 'auto' }}>
-          <TransportSpalte personen={transportiert} schreibgeschuetzt={schreibgeschuetzt} onOeffnen={setDetailPersonId} />
+          <TransportSpalte
+            personen={transportiert}
+            schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+            onOeffnen={setDetailPersonId}
+          />
         </div>
       </div>
       {/* Portal-Overlay: folgt dem Cursor auf Body-Ebene, beeinflusst keine Scroll-Region. */}

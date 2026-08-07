@@ -4,9 +4,10 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import EinheitenPage from './EinheitenPage';
 import { einsatzKeys } from '../api/queryKeys';
+import { formatiereDatenstand } from '../components/Datenstand';
 
 const tmoSprechgruppe = {
   id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
@@ -57,6 +58,42 @@ describe('EinheitenPage', () => {
     // Ist 1/0/2 (Σ3) und Soll 1/3/18 (Σ22) werden angezeigt (BOS-Doppelstrich vor Gesamt).
     expect(screen.getByText(/1\/0\/2\/\/3/)).toBeInTheDocument();
     expect(screen.getByText(/1\/3\/18\/\/22/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+  });
+
+  it('weist alle dargestellten Zuordnungsbestände mit dem ältesten erfolgreichen Stand aus', async () => {
+    server.use(...handlers());
+    const client = neuerQueryClient();
+    const einheitenStand = new Date('2026-01-01T10:12:00Z').getTime();
+    const abschnitteStand = new Date('2026-01-01T10:10:00Z').getTime();
+    const personalStand = new Date('2026-01-01T09:05:00Z').getTime();
+    const fahrzeugeStand = new Date('2026-01-01T10:08:00Z').getTime();
+    const materialStand = new Date('2026-01-01T10:09:00Z').getTime();
+    for (const key of [
+      einsatzKeys.einheiten(1),
+      einsatzKeys.abschnitte(1),
+      einsatzKeys.personal(1),
+      einsatzKeys.fahrzeuge(1),
+      einsatzKeys.material(1),
+    ]) client.setQueryDefaults(key, { staleTime: Infinity });
+    client.setQueryData(einsatzKeys.einheiten(1), einheiten, { updatedAt: einheitenStand });
+    client.setQueryData(einsatzKeys.abschnitte(1), [], { updatedAt: abschnitteStand });
+    client.setQueryData(einsatzKeys.personal(1), [], { updatedAt: personalStand });
+    client.setQueryData(einsatzKeys.fahrzeuge(1), [], { updatedAt: fahrzeugeStand });
+    client.setQueryData(einsatzKeys.material(1), [], { updatedAt: materialStand });
+
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client },
+    );
+
+    expect(await screen.findByText('1. Zug')).toBeInTheDocument();
+    expect(screen.getByLabelText(
+      `Datenstand ${formatiereDatenstand(personalStand)}`,
+    )).toBeInTheDocument();
+    expect(screen.queryByLabelText(
+      `Datenstand ${formatiereDatenstand(einheitenStand)}`,
+    )).not.toBeInTheDocument();
   });
 
   it('selektiert per ?einheit=<id> die Einheit (LFH-25 Inspector-Deeplink)', async () => {

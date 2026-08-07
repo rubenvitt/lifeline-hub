@@ -90,6 +90,7 @@ export default function UnfallhilfsstellenPage() {
   return (
     <EinsatzSeite
       titel="Unfallhilfsstellen"
+      dataUpdatedAt={uhsQuery.dataUpdatedAt}
       breadcrumb={
         <Breadcrumb items={[
           { title: <Link to="/einsaetze">Einsätze</Link> },

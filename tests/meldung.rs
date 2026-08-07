@@ -1,9 +1,14 @@
 use axum::http::StatusCode;
 use chrono::{Duration, NaiveDateTime};
+use lifeline_hub::live::LiveEvent;
 use serde_json::Value;
+use std::time::Duration as StdDuration;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen, login_cookie,
+    rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live,
+};
 
 /// Parst einen DB-Zeitstempel aus einer JSON-Antwort.
 fn zeit(v: &Value) -> NaiveDateTime {
@@ -860,6 +865,252 @@ async fn sofortmeldung_ist_bestaetigungspflichtig_mit_frist_und_nachfass() {
         .collect();
     assert_eq!(auto.len(), 1, "eine Nachfass-Erinnerung je Sofortmeldung");
     assert_eq!(auto[0]["bezug_id"], m["id"]);
+}
+
+#[tokio::test]
+async fn meldungs_replay_nach_abschluss_repariert_fehlende_frist_erinnerung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let client_id = "offline-meldung-nach-abschluss";
+    let initial = serde_json::json!({
+        "absender": "Florian Nord 1",
+        "empfaenger": "ELW 1",
+        "meldeweg": "funk",
+        "inhalt": "MANV ausgelöst",
+        "prioritaet": "sofort",
+        "ereigniszeit": "2026-06-12 09:00:00",
+        "bestaetigung_frist_min": 5,
+        "client_id": client_id
+    })
+    .to_string();
+    let (status, original) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &admin,
+        Some(&initial),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{original:?}");
+    let meldung_id = original["id"].as_i64().unwrap();
+
+    // Simuliert: Meldung wurde committed, die nachgelagerte Reminder-Anlage ging verloren.
+    sqlx::query("DELETE FROM erinnerung WHERE bezug_typ = 'meldung' AND bezug_id = ?")
+        .bind(meldung_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Absichtlich widersprüchliche Request-Felder: beim Replay dürfen ausschließlich
+    // die persistierten Felder der bestehenden Meldung den Reminder bestimmen.
+    let replay = serde_json::json!({
+        "absender": "",
+        "meldeweg": "ungueltig",
+        "inhalt": "",
+        "ereigniszeit": "ungueltig",
+        "bestaetigung_pflicht": false,
+        "bestaetigung_frist_min": -10,
+        "client_id": client_id
+    })
+    .to_string();
+    for _ in 0..2 {
+        let (status, erneut) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/meldungen"),
+            &admin,
+            Some(&replay),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{erneut:?}");
+        assert_eq!(erneut["id"], original["id"]);
+        assert_eq!(
+            erneut["bestaetigung_frist_at"],
+            original["bestaetigung_frist_at"]
+        );
+    }
+
+    let reminder: (i64, String, i64, i64) = sqlx::query_as(
+        "SELECT einsatz_id, faellig_at, erstellt_von_id, COUNT(*) \
+         FROM erinnerung WHERE quelle = 'auto_frist' AND status = 'offen' \
+           AND bezug_typ = 'meldung' AND bezug_id = ?",
+    )
+    .bind(meldung_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reminder.0, original["einsatz_id"].as_i64().unwrap());
+    assert_eq!(
+        reminder.1,
+        original["bestaetigung_frist_at"].as_str().unwrap()
+    );
+    assert_eq!(reminder.2, original["erfasst_von_id"].as_i64().unwrap());
+    assert_eq!(reminder.3, 1, "wiederholter Replay bleibt idempotent");
+
+    let neu = serde_json::json!({
+        "absender": "Florian Nord 2",
+        "meldeweg": "funk",
+        "inhalt": "Neue Meldung",
+        "ereigniszeit": "2026-06-12 09:01:00",
+        "client_id": "offline-meldung-neu-nach-abschluss"
+    })
+    .to_string();
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &admin,
+        Some(&neu),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "echter Insert bleibt gesperrt"
+    );
+}
+
+#[tokio::test]
+async fn reminder_fehler_nach_commit_verliert_sofortalarm_nicht_und_replay_dupliziert_nicht() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut events = live.abonniere(e);
+    sqlx::query(
+        "CREATE TRIGGER test_reminder_insert_fehler \
+         BEFORE INSERT ON erinnerung WHEN NEW.quelle = 'auto_frist' \
+         BEGIN SELECT RAISE(ABORT, 'simulierter Reminderfehler'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let body = serde_json::json!({
+        "absender": "Florian Nord 1",
+        "empfaenger": "ELW 1",
+        "meldeweg": "funk",
+        "inhalt": "MANV trotz Reminderfehler",
+        "prioritaet": "sofort",
+        "ereigniszeit": "2026-06-12 09:00:00",
+        "client_id": "alarm-vor-reminder-1"
+    })
+    .to_string();
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "nur der nachgelagerte Reminder scheitert"
+    );
+    let mut empfangen = Vec::new();
+    for _ in 0..3 {
+        empfangen.push(
+            tokio::time::timeout(StdDuration::from_secs(1), events.recv())
+                .await
+                .expect("Live-Publikation vor Reminderfehler")
+                .unwrap()
+                .event,
+        );
+    }
+    assert!(empfangen.contains(&LiveEvent::Etb));
+    assert!(empfangen.contains(&LiveEvent::Meldung));
+    assert!(
+        empfangen.contains(&LiveEvent::Sofortmeldung),
+        "der Sofortalarm darf trotz HTTP-500 nicht verloren gehen"
+    );
+
+    let (meldung_id, marker): (i64, Option<String>) = sqlx::query_as(
+        "SELECT id, live_published_at FROM meldung WHERE client_id = 'alarm-vor-reminder-1'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(marker.is_some(), "Live-Buendel ist persistent markiert");
+
+    sqlx::query("DROP TRIGGER test_reminder_insert_fehler")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (status, replay) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{replay:?}");
+    assert_eq!(replay["id"], meldung_id);
+    let reminder: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' \
+           AND bezug_typ = 'meldung' AND bezug_id = ?",
+    )
+    .bind(meldung_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reminder, 1, "Replay repariert den Reminder");
+    assert!(
+        tokio::time::timeout(StdDuration::from_millis(100), events.recv())
+            .await
+            .is_err(),
+        "gesetzter Marker verhindert eine zweite Alarm-Publikation"
+    );
+}
+
+#[tokio::test]
+async fn meldung_offline_replay_mit_falschem_queue_besitzer_ist_412() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "absender": "Florian Nord 1",
+        "meldeweg": "funk",
+        "inhalt": "Besitzgebunden",
+        "ereigniszeit": "2026-06-12 09:00:00",
+        "client_id": "owner-meldung-1"
+    })
+    .to_string();
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/meldungen"),
+            &admin,
+            Some(&body),
+        )
+        .await
+        .0,
+        StatusCode::CREATED
+    );
+
+    let (status, _) = anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &admin,
+        Some(&body),
+        i64::MAX,
+    )
+    .await;
+    assert_eq!(status, StatusCode::PRECONDITION_FAILED);
 }
 
 #[tokio::test]

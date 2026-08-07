@@ -8,6 +8,7 @@ import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import KatalogTabelle from '../../components/KatalogTabelle';
 import { ErfassungsModal } from '../../components/Erfassung';
+import Datenstand from '../../components/Datenstand';
 
 interface Props {
   einsatzId: number;
@@ -98,6 +99,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }}>
+      <Datenstand dataUpdatedAt={materialQuery.dataUpdatedAt} />
       {!schreibgeschuetzt && (
         <Button
           onClick={() => setZuordnenOffen(true)}

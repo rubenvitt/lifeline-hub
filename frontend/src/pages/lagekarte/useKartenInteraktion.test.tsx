@@ -26,6 +26,11 @@ const lagezonenApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/lagezonen', () => lagezonenApi);
 
+const einsatzUhsApi = vi.hoisted(() => ({
+  aktualisiereUhs: vi.fn(() => Promise.resolve({ id: 2 })),
+}));
+vi.mock('../../api/einsatzUhs', () => einsatzUhsApi);
+
 function wrapper() {
   const client = neuerQueryClient();
   return ({ children }: { children: ReactNode }) => (
@@ -33,7 +38,7 @@ function wrapper() {
   );
 }
 
-function rendere(fehler: (e: unknown) => void = vi.fn()) {
+function rendere(fehler: (e: unknown) => void = vi.fn(), erfolg: (text: string) => void = vi.fn()) {
   return renderHook(
     () =>
       useKartenInteraktion({
@@ -42,6 +47,7 @@ function rendere(fehler: (e: unknown) => void = vi.fn()) {
         darfSchreiben: true,
         alleVerortet: [],
         fehler,
+        erfolg,
       }),
     { wrapper: wrapper() },
   );
@@ -182,6 +188,28 @@ describe('useKartenInteraktion — Exklusivität der Auswahl-Panels (LFH-243)', 
   }
 });
 
+describe('useKartenInteraktion — Verorten', () => {
+  it('sendet bei zwei Klicks im selben Renderfenster nur eine Positionsänderung', async () => {
+    let freigeben: (() => void) | undefined;
+    einsatzUhsApi.aktualisiereUhs.mockReset();
+    einsatzUhsApi.aktualisiereUhs.mockImplementation(() =>
+      new Promise((resolve) => { freigeben = () => resolve({ id: 2 }); }));
+    const { result } = rendere();
+
+    act(() => result.current.onPlatzierenStart({ typ: 'uhs', id: 2 }));
+    act(() => {
+      result.current.onKarteKlick({ lng: 8.6, lat: 50.1 });
+      result.current.onKarteKlick({ lng: 8.7, lat: 50.2 });
+    });
+
+    await waitFor(() => expect(einsatzUhsApi.aktualisiereUhs).toHaveBeenCalledTimes(1));
+    expect(einsatzUhsApi.aktualisiereUhs).toHaveBeenCalledWith(1, 2, { lat: 50.1, lon: 8.6 });
+    await act(async () => { freigeben?.(); });
+    einsatzUhsApi.aktualisiereUhs.mockReset();
+    einsatzUhsApi.aktualisiereUhs.mockImplementation(() => Promise.resolve({ id: 2 }));
+  });
+});
+
 describe('useKartenInteraktion — Selektions-Gate während exklusiver Modi (LFH-208)', () => {
   describe('Baseline: ohne aktiven Modus selektiert der Klick normal', () => {
     it('onZoneKlick setzt zoneAuswahl', () => {
@@ -285,7 +313,8 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
 
   it('onKarteKlick bei aktivem zeichenPlatzieren legt ein freies Zeichen an (POST mit Klick-Koordinate)', async () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
-    const { result } = rendere();
+    const erfolg = vi.fn();
+    const { result } = rendere(vi.fn(), erfolg);
     act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'X' }));
     act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
     await waitFor(() =>
@@ -303,6 +332,20 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     // der eigene Block unten.
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
     expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle', label: 'X' });
+    expect(erfolg).toHaveBeenCalledWith('Taktisches Zeichen angelegt');
+  });
+
+  it('quittiert Zonenänderung und -löschung erst nach erfolgreicher API-Antwort', async () => {
+    const erfolg = vi.fn();
+    const { result } = rendere(vi.fn(), erfolg);
+
+    await act(async () => { await result.current.zoneAendern(5, { label: 'Nord' }); });
+    expect(lagezonenApi.aktualisiereZone).toHaveBeenCalledWith(1, 5, { label: 'Nord' });
+    expect(erfolg).toHaveBeenCalledWith('Zone gespeichert');
+
+    await act(async () => { await result.current.zoneLoeschen(5); });
+    expect(lagezonenApi.loescheZone).toHaveBeenCalledWith(1, 5);
+    expect(erfolg).toHaveBeenCalledWith('Zone aufgehoben');
   });
 
   it('Doppelklick legt nur EIN freies Zeichen an (isPending-Guard, kein Duplikat)', async () => {
@@ -436,13 +479,15 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
 
   it('nach erfolgreichem Speichern ist derselbe Zonen-Typ erneut scharf UND der Nonce gestiegen', async () => {
     lagezonenApi.legeZoneAn.mockClear();
-    const { result } = rendere();
+    const erfolg = vi.fn();
+    const { result } = rendere(vi.fn(), erfolg);
     bisZurBestaetigung(result);
     const nonceVorher = result.current.zoneZeichnenNonce;
 
     act(() => result.current.bestaetigungSpeichern());
     await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.zoneSerieAnzahl).toBe(1));
+    expect(erfolg).toHaveBeenCalledWith('Zone angelegt');
 
     // Erste Hälfte: der Modus steht noch, mit demselben Entwurf und ohne alte Bestätigung.
     expect(result.current.zoneEntwurf).toEqual({ typ: 'gefahrengebiet', modus: 'polygon', farbe: undefined });

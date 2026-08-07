@@ -1,5 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from './test/utils';
 import { AuthProvider } from './auth/AuthContext';
 import App from './App';
@@ -15,6 +15,8 @@ const einsatz = {
   begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null,
   abgeschlossen_von: null, meine_rolle: 'einsatzleitung',
 };
+
+afterEach(() => vi.restoreAllMocks());
 
 function renderApp(route: string) {
   return renderMitProviders(
@@ -51,6 +53,20 @@ describe('App-Routing', () => {
     );
     // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Lage).
     expect(await screen.findByText('Lage')).toBeInTheDocument();
+  });
+
+  it('zeigt auf /einsaetze genau eine globale Betriebszeile, wenn der Browser offline ist', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+    );
+
+    renderApp('/einsaetze');
+
+    const text = 'Offline — keine Verbindung zum Server.';
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getAllByText(text)).toHaveLength(1);
   });
 
   it('WIP-Modul-Route rendert den Stub', async () => {

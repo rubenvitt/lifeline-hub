@@ -8,7 +8,10 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen, login_cookie,
+    rolle_setzen, setup,
+};
 
 // ---------- Harness (identisch zu tests/einsatz_material.rs) ----------
 
@@ -623,6 +626,91 @@ async fn abgeschlossener_einsatz_ist_readonly() {
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn person_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body =
+        r#"{"name":"Replay","status":"vermisst","client_id":"offline-person-abgeschlossen"}"#;
+    let (status, original) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{original:?}");
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, replay) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{replay:?}");
+    assert_eq!(replay["id"], original["id"]);
+    assert_eq!(replay["registrier_nr"], original["registrier_nr"]);
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"name":"Neu","client_id":"offline-person-neu-nach-abschluss"}"#),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "echter Insert bleibt gesperrt"
+    );
+}
+
+#[tokio::test]
+async fn person_offline_replay_mit_falschem_queue_besitzer_ist_412() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = r#"{"name":"Besitzgebunden","client_id":"owner-person-1"}"#;
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/personen"),
+            &admin,
+            Some(body),
+        )
+        .await
+        .0,
+        StatusCode::CREATED
+    );
+
+    let (status, _) = anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(body),
+        i64::MAX,
+    )
+    .await;
+    assert_eq!(status, StatusCode::PRECONDITION_FAILED);
 }
 
 #[tokio::test]

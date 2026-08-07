@@ -56,7 +56,11 @@ const DEFERRED_MODULE: &[&str] = &[
 
 /// Extractor-Typen, die ein Gate strukturell erzwingen (LFH-230). Neue Variante
 /// (z. B. `EinsatzEinsatzleitung`) beim Einführen hier ergänzen.
-const SANKTIONIERTE_GATES: &[&str] = &["EinsatzLesezugriff", "EinsatzSchreibzugriff"];
+const SANKTIONIERTE_GATES: &[&str] = &[
+    "EinsatzLesezugriff",
+    "EinsatzSchreibzugriff",
+    "EinsatzSchreibfreigabe",
+];
 
 /// Handler, die BEWUSST nur den Org-Floor (`EinsatzKontext`) ziehen, ohne Read-/Write-
 /// Gate — z. B. DSGVO-Carve-outs (`aufbewahrungsfrist_setzen`), die auch auf einem

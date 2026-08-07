@@ -1,6 +1,7 @@
 use super::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige, DEFAULT_KANAL_NAME};
 use crate::anhang::AnhangAnzeige;
 use crate::error::AppError;
+use crate::kommunikation::OBJEKT_CHAT_NACHRICHT;
 use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 use std::collections::HashMap;
 
@@ -11,7 +12,7 @@ use std::collections::HashMap;
 pub async fn liste_kanaele(
     pool: &SqlitePool,
     einsatz_id: i64,
-    default_ersteller_id: i64,
+    benutzer_id: i64,
 ) -> Result<Vec<ChatKanalAnzeige>, AppError> {
     sqlx::query(
         "INSERT INTO chat_kanal (einsatz_id, name, erstellt_von_id) \
@@ -20,15 +21,30 @@ pub async fn liste_kanaele(
     )
     .bind(einsatz_id)
     .bind(DEFAULT_KANAL_NAME)
-    .bind(default_ersteller_id)
+    .bind(benutzer_id)
     .bind(einsatz_id)
     .execute(pool)
     .await?;
 
     sqlx::query_as::<_, ChatKanalAnzeige>(
-        "SELECT id, einsatz_id, name, beschreibung, erstellt_von_id, erstellt_at, archiviert_at \
-         FROM chat_kanal WHERE einsatz_id = ? ORDER BY erstellt_at, id",
+        "SELECT k.id, k.einsatz_id, k.name, k.beschreibung, k.erstellt_von_id, \
+                k.erstellt_at, k.archiviert_at, MAX(n.erstellt_at) AS letzte_nachricht_at, \
+                COALESCE(SUM(CASE \
+                  WHEN n.id IS NOT NULL AND n.autor_id <> ? AND n.geloescht_at IS NULL \
+                       AND z.gelesen_at IS NULL THEN 1 ELSE 0 END), 0) AS ungelesen_anzahl \
+         FROM chat_kanal k \
+         LEFT JOIN chat_nachricht n ON n.kanal_id = k.id AND n.einsatz_id = k.einsatz_id \
+         LEFT JOIN kommunikation_zustellung z \
+           ON z.einsatz_id = k.einsatz_id AND z.objekt_typ = ? AND z.objekt_id = n.id \
+          AND z.empfaenger_id = ? \
+         WHERE k.einsatz_id = ? \
+         GROUP BY k.id, k.einsatz_id, k.name, k.beschreibung, k.erstellt_von_id, \
+                  k.erstellt_at, k.archiviert_at \
+         ORDER BY k.erstellt_at, k.id",
     )
+    .bind(benutzer_id)
+    .bind(OBJEKT_CHAT_NACHRICHT)
+    .bind(benutzer_id)
     .bind(einsatz_id)
     .fetch_all(pool)
     .await
@@ -55,13 +71,47 @@ pub async fn kanal_anlegen(
     .await?;
 
     sqlx::query_as::<_, ChatKanalAnzeige>(
-        "SELECT id, einsatz_id, name, beschreibung, erstellt_von_id, erstellt_at, archiviert_at \
+        "SELECT id, einsatz_id, name, beschreibung, erstellt_von_id, erstellt_at, archiviert_at, \
+                NULL AS letzte_nachricht_at, CAST(0 AS INTEGER) AS ungelesen_anzahl \
          FROM chat_kanal WHERE id = ?",
     )
     .bind(id)
     .fetch_one(pool)
     .await
     .map_err(Into::into)
+}
+
+/// Markiert alle aktuell vorhandenen, nicht selbst verfassten Nachrichten eines Kanals
+/// für einen Benutzer gelesen. Der bestehende Zustell-Unterbau macht den Vorgang persistent
+/// und idempotent; neue Nachrichten bleiben danach weiterhin ungelesen.
+pub async fn kanal_gelesen_markieren(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    kanal_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<u64, AppError> {
+    let ergebnis = sqlx::query(
+        "INSERT INTO kommunikation_zustellung \
+           (org_id, einsatz_id, objekt_typ, objekt_id, empfaenger_id, gelesen_at) \
+         SELECT ?, n.einsatz_id, ?, n.id, ?, ? \
+         FROM chat_nachricht n \
+         WHERE n.einsatz_id = ? AND n.kanal_id = ? AND n.autor_id <> ? \
+               AND n.geloescht_at IS NULL \
+         ON CONFLICT(objekt_typ, objekt_id, empfaenger_id) DO UPDATE SET \
+           gelesen_at = COALESCE(kommunikation_zustellung.gelesen_at, excluded.gelesen_at)",
+    )
+    .bind(org_id)
+    .bind(OBJEKT_CHAT_NACHRICHT)
+    .bind(benutzer_id)
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(kanal_id)
+    .bind(benutzer_id)
+    .execute(pool)
+    .await?;
+    Ok(ergebnis.rows_affected())
 }
 
 /// Prüft, ob ein Kanal zum angegebenen Einsatz gehört (Schutz gegen Cross-Einsatz-Zugriff).
@@ -649,6 +699,78 @@ mod tests {
 
         let kanaele = liste_kanaele(&pool, einsatz, benutzer).await.unwrap();
         assert_eq!(kanaele.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn kanal_ungelesen_ist_pro_benutzer_persistent() {
+        let pool = crate::db::test_pool().await;
+        let (autor, einsatz) = setup(&pool).await;
+        let leser: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leser', 'leser', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let kid = kanal(&pool, einsatz, autor).await;
+
+        anlegen(
+            &pool,
+            einsatz,
+            autor,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "eins",
+            },
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            einsatz,
+            autor,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "zwei",
+            },
+        )
+        .await
+        .unwrap();
+
+        let vor = liste_kanaele(&pool, einsatz, leser).await.unwrap();
+        assert_eq!(vor[0].ungelesen_anzahl, 2);
+        assert!(vor[0].letzte_nachricht_at.is_some());
+        // Eigene Nachrichten sind für den Autor nie ungelesen.
+        assert_eq!(
+            liste_kanaele(&pool, einsatz, autor).await.unwrap()[0].ungelesen_anzahl,
+            0
+        );
+
+        kanal_gelesen_markieren(&pool, 1, einsatz, kid, leser, "2026-08-06 12:00:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            liste_kanaele(&pool, einsatz, leser).await.unwrap()[0].ungelesen_anzahl,
+            0
+        );
+
+        // Eine später hinzukommende Nachricht bleibt ungelesen; der Cursor ist kein
+        // pauschales Kanal-Flag, sondern hängt persistent an den einzelnen Nachrichten.
+        anlegen(
+            &pool,
+            einsatz,
+            autor,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "drei",
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            liste_kanaele(&pool, einsatz, leser).await.unwrap()[0].ungelesen_anzahl,
+            1
+        );
     }
 
     #[tokio::test]

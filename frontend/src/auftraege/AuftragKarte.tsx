@@ -41,6 +41,8 @@ export interface AuftragKarteProps {
   darfSchreiben?: boolean;
   /** Deeplink-Hervorhebung (?auftrag=, LFH-153): markierte Karte + scroll-adressierbar. */
   hervorgehoben?: boolean;
+  quittierungLaeuft?: boolean;
+  quittierungZiel?: { auftragId: number; empfaengerId: number } | null;
   onQuittieren?: (auftragId: number, empfaengerId: number) => void;
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
@@ -54,7 +56,7 @@ export interface AuftragKarteProps {
  */
 export default function AuftragKarte({
   auftrag: a, ansicht = 'offen', einsatzId, darfSchreiben, hervorgehoben,
-  onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
+  quittierungLaeuft, quittierungZiel, onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
 }: AuftragKarteProps) {
   const { token } = theme.useToken();
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
@@ -79,8 +81,15 @@ export default function AuftragKarte({
   // kosteten bei drei Empfängern auf `handschuh` eine ganze Kartenzeile. Die Zeile selbst
   // hängt bewusst NICHT mehr am Schreibrecht, nur noch ihr Knopf: sonst verlöre ein
   // Beobachter mit dem Chip zugleich den Namen des offenen Empfängers.
-  const quittierteEmpf = sichtbareEmpf.filter((e) => e.quittiert_at);
-  const offeneEmpf = sichtbareEmpf.filter((e) => !e.quittiert_at);
+  const istQuittierungZiel = (empfaengerId: number) =>
+    !!quittierungLaeuft
+    && quittierungZiel?.auftragId === a.id
+    && quittierungZiel.empfaengerId === empfaengerId;
+  // Der optimistische Cache markiert das Ziel sofort als quittiert. Solange der Request
+  // läuft, bleibt es trotzdem als ladender Aktionsknopf sichtbar; andere Quittierungen
+  // sind serialisiert und damit gesperrt.
+  const quittierteEmpf = sichtbareEmpf.filter((e) => e.quittiert_at && !istQuittierungZiel(e.id));
+  const offeneEmpf = sichtbareEmpf.filter((e) => !e.quittiert_at || istQuittierungZiel(e.id));
   const darfQuittieren = !!(darfSchreiben && onQuittieren);
 
   const aktionen: ReactNode[] = darfSchreiben
@@ -182,9 +191,18 @@ export default function AuftragKarte({
                   title="Empfang/Kenntnis quittieren?"
                   okText="Bestätigen"
                   cancelText="Abbrechen"
-                  onConfirm={() => onQuittieren?.(a.id, e.id)}
+                  disabled={quittierungLaeuft}
+                  onConfirm={() => {
+                    if (!quittierungLaeuft) onQuittieren?.(a.id, e.id);
+                  }}
                 >
-                  <Button aria-label={`Empfang für ${e.snap_anzeige} quittieren`}>quittieren</Button>
+                  <Button
+                    aria-label={`Empfang für ${e.snap_anzeige} quittieren`}
+                    loading={istQuittierungZiel(e.id)}
+                    disabled={quittierungLaeuft}
+                  >
+                    quittieren
+                  </Button>
                 </Popconfirm>
               )}
             </Space>

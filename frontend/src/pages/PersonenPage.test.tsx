@@ -1,23 +1,78 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
+import type { Person } from '../api/types';
 import PersonenPage from './PersonenPage';
 import PersonenDetailPage from './PersonenDetailPage';
+import {
+  personErfassungsQuittungenLaden,
+  queueLeerenFuerTests,
+  queueZaehlerLaden,
+  schreibaktionPersonAbschliessen,
+  schreibaktionEinreihen,
+  schreibaktionenLaden,
+} from '../offline/queue';
+import {
+  meldeOfflineSchreibaktionGesendet,
+  offlineQuittungsKanalZuruecksetzenFuerTests,
+  OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
+} from '../offline/ereignisse';
+import { useOfflineSync } from '../offline/useOfflineSync';
 
 class FakeEventSource {
   url: string; closed = false;
   constructor(url: string) { this.url = url; }
   addEventListener() {} removeEventListener() {} close() { this.closed = true; }
 }
-beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
-afterEach(() => vi.unstubAllGlobals());
+
+class FakeBroadcastChannel {
+  static instanzen: FakeBroadcastChannel[] = [];
+  readonly postMessage = vi.fn();
+  readonly name: string;
+  private readonly listener = new Set<(event: MessageEvent<unknown>) => void>();
+
+  constructor(name: string) {
+    this.name = name;
+    FakeBroadcastChannel.instanzen.push(this);
+  }
+
+  addEventListener(_typ: string, listener: (event: MessageEvent<unknown>) => void) {
+    this.listener.add(listener);
+  }
+
+  removeEventListener(_typ: string, listener: (event: MessageEvent<unknown>) => void) {
+    this.listener.delete(listener);
+  }
+
+  sendeAusAnderemTab(daten: unknown) {
+    for (const listener of this.listener) listener({ data: daten } as MessageEvent<unknown>);
+  }
+
+  close() {
+    this.listener.clear();
+  }
+}
+
+beforeEach(async () => {
+  offlineQuittungsKanalZuruecksetzenFuerTests();
+  FakeBroadcastChannel.instanzen = [];
+  vi.stubGlobal('EventSource', FakeEventSource);
+  vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  await queueLeerenFuerTests();
+});
+afterEach(() => {
+  offlineQuittungsKanalZuruecksetzenFuerTests();
+  vi.unstubAllGlobals();
+});
 
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
@@ -35,7 +90,7 @@ const einsatzAktiv = {
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 
-const person = {
+const person: Person = {
   id: 10, einsatz_id: 1, registrier_nr: 1, status: 'erfasst',
   name: 'Mustermann', vorname: 'Max', geschlecht: 'maennlich', geburtsdatum: null,
   alter_geschaetzt: 40, herkunft_adresse: null, antreff_ort: 'Brücke', melder_kontakt: null,
@@ -59,6 +114,10 @@ function regFolge(): string[] {
   return screen.getAllByText(/^R-\d{3}$/).map((e) => e.textContent ?? '');
 }
 
+function quittungSchliessenButton(): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>('.ant-alert-close-icon');
+}
+
 function render(einsatzObj: typeof einsatzAktiv, personen: unknown[], route = '/einsaetze/1/personen') {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
@@ -76,6 +135,35 @@ function render(einsatzObj: typeof einsatzAktiv, personen: unknown[], route = '/
     </AuthProvider>,
     { route },
   );
+}
+
+function EinsatzNavigation() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button onClick={() => navigate('/einsaetze/1/personen')}>Zu Einsatz A</button>
+      <button onClick={() => navigate('/einsaetze/2/personen')}>Zu Einsatz B</button>
+    </>
+  );
+}
+
+function renderMitEinsatzNavigation(route = '/einsaetze/1/personen') {
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route
+          path="/einsaetze/:id/personen"
+          element={<><EinsatzNavigation /><PersonenPage /></>}
+        />
+      </Routes>
+    </AuthProvider>,
+    { route },
+  );
+}
+
+function OfflineSyncTest({ benutzerId }: { benutzerId: number }) {
+  useOfflineSync(benutzerId);
+  return null;
 }
 
 describe('PersonenPage', () => {
@@ -135,6 +223,433 @@ describe('PersonenPage', () => {
     expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Betroffene/n erfassen' })).toBeInTheDocument();
+  });
+
+  it('bestätigt die Registriernummer, wechselt in die Zielsicht und hebt die neue Person hervor', async () => {
+    const vermisst = {
+      ...person,
+      id: 47,
+      registrier_nr: 47,
+      status: 'vermisst' as const,
+      name: 'Neu',
+    };
+    server.use(
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        const body = await request.json() as { status?: string; client_id?: string };
+        expect(body.status).toBe('vermisst');
+        expect(body.client_id).toBeTruthy();
+        return HttpResponse.json(vermisst, { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText('Erfasst als R-047')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    const kennung = await screen.findByText('R-047');
+    expect(kennung.closest('tr')).toHaveClass('zeile-hervorgehoben');
+  });
+
+  it('cancelt den alten GET und hält die Antwort im Overlay, ohne einen Singleton-Cache zu erfinden', async () => {
+    const alt = {
+      ...person,
+      id: 46,
+      registrier_nr: 46,
+      status: 'vermisst' as const,
+      name: 'Alt',
+    };
+    const neu = {
+      ...person,
+      id: 47,
+      registrier_nr: 47,
+      status: 'vermisst' as const,
+      name: 'Neu',
+    };
+    let ersterAbrufGestartet!: () => void;
+    let ersterAbrufFreigeben!: () => void;
+    let zweiterAbrufGestartet!: () => void;
+    let zweiterAbrufFreigeben!: () => void;
+    const ersterStart = new Promise<void>((resolve) => { ersterAbrufGestartet = resolve; });
+    const ersterGate = new Promise<void>((resolve) => { ersterAbrufFreigeben = resolve; });
+    const zweiterStart = new Promise<void>((resolve) => { zweiterAbrufGestartet = resolve; });
+    const zweiterGate = new Promise<void>((resolve) => { zweiterAbrufFreigeben = resolve; });
+    let abrufe = 0;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/personen', async () => {
+        abrufe += 1;
+        if (abrufe === 1) {
+          ersterAbrufGestartet();
+          await ersterGate;
+          return HttpResponse.json([alt]);
+        }
+        zweiterAbrufGestartet();
+        await zweiterGate;
+        return HttpResponse.json([alt, neu]);
+      }),
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(neu, { status: 201 })),
+    );
+    const { client } = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/personen' },
+    );
+
+    await ersterStart;
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await zweiterStart;
+
+    expect(await screen.findByText('R-047')).toBeInTheDocument();
+    expect(client.getQueryData(einsatzKeys.personen(1))).toBeUndefined();
+    await act(async () => { ersterAbrufFreigeben(); });
+    expect(client.getQueryData(einsatzKeys.personen(1))).toBeUndefined();
+
+    await act(async () => { zweiterAbrufFreigeben(); });
+    await vi.waitFor(() => expect(client.getQueryData(einsatzKeys.personen(1))).toEqual([alt, neu]));
+    expect(await screen.findByText('R-046')).toBeInTheDocument();
+    expect(screen.getByText('R-047')).toBeInTheDocument();
+  });
+
+  it('lässt eine verspätete Online-Antwort aus Einsatz A in B weder Ansicht noch Modal ändern', async () => {
+    const personA = {
+      ...person,
+      id: 77,
+      registrier_nr: 77,
+      status: 'vermisst' as const,
+      name: 'Person A',
+      vorname: null,
+    };
+    const personB = {
+      ...person,
+      id: 77,
+      einsatz_id: 2,
+      registrier_nr: 88,
+      status: 'erfasst' as const,
+      name: 'Person B',
+      vorname: null,
+    };
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
+    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+        const id = Number(params.einsatzId);
+        return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
+      }),
+      http.get('/api/einsaetze/:einsatzId/personen', ({ params }) =>
+        HttpResponse.json(params.einsatzId === '2' ? [personB] : [])),
+      http.post('/api/einsaetze/1/personen', async () => {
+        postGestartet();
+        await antwortGate;
+        return HttpResponse.json(personA, { status: 201 });
+      }),
+    );
+    const { container } = renderMitEinsatzNavigation();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Person A');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    expect(await screen.findByText('Person B')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Schnellerfassung');
+
+    await act(async () => { antwortFreigeben(); });
+    await vi.waitFor(() => expect(screen.queryByText('Erfasst als R-077')).not.toBeInTheDocument());
+    expect(screen.getByText('Person B')).toBeInTheDocument();
+    expect(screen.queryByText('Person A')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'true');
+    expect(container.querySelector('[data-row-key="77"]')).not.toHaveClass('zeile-hervorgehoben');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Schnellerfassung');
+  });
+
+  it('ersetzt die Offline-Warnung nach korreliertem Flush durch Registriernummer und Highlight', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const vermisst = {
+      ...person,
+      id: 48,
+      registrier_nr: 48,
+      status: 'vermisst' as const,
+      name: 'Offline Neu',
+    };
+    const { client } = render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Offline Neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
+
+    const [vorgemerkt] = await schreibaktionenLaden(1, 1);
+    if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
+    await act(async () => {
+      client.setQueryData(einsatzKeys.personen(1), [vermisst]);
+      window.dispatchEvent(new CustomEvent(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, {
+        detail: {
+          art: 'person',
+          benutzerId: 1,
+          einsatzId: 1,
+          clientId: vorgemerkt.aktion.daten.client_id,
+          daten: vermisst,
+        },
+      }));
+    });
+
+    expect(await screen.findByText('Erfasst als R-048')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    expect((await screen.findByText('R-048')).closest('tr')).toHaveClass('zeile-hervorgehoben');
+  });
+
+  it('liefert die Personen-Quittung nach Unmount und globalem Flush beim Remount genau einmal aus', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const vermisst = {
+      ...person,
+      id: 49,
+      registrier_nr: 49,
+      status: 'vermisst' as const,
+      name: 'Nach Reload',
+    };
+    const post = vi.fn();
+    server.use(
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        const body = await request.json() as { client_id?: string; status?: string };
+        post(body);
+        return HttpResponse.json(vermisst, { status: 201 });
+      }),
+    );
+
+    const ersteSeite = render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Nach Reload');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
+    ersteSeite.unmount();
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    const globalerSync = renderMitProviders(<OfflineSyncTest benutzerId={nutzer.id} />);
+    await vi.waitFor(() => expect(post).toHaveBeenCalledOnce());
+    await vi.waitFor(async () =>
+      expect(await queueZaehlerLaden(nutzer.id, 1)).toMatchObject({ ausstehend: 0 }));
+    await vi.waitFor(async () =>
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1));
+    expect(await personErfassungsQuittungenLaden(2, 1)).toHaveLength(0);
+    expect(await personErfassungsQuittungenLaden(nutzer.id, 2)).toHaveLength(0);
+    globalerSync.unmount();
+
+    const zweiteSeite = render(einsatzAktiv, [vermisst]);
+    expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    expect((await screen.findByText('R-049')).closest('tr'))
+      .toHaveClass('zeile-hervorgehoben');
+    // Render allein ist kein globaler Ack: ein anderer sichtbarer Tab muss das
+    // Receipt nach seinem datenarmen Signal noch aus IDB lesen können.
+    expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
+    const schliessen = quittungSchliessenButton();
+    if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
+    await userEvent.click(schliessen);
+    await vi.waitFor(async () =>
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0));
+    zweiteSeite.unmount();
+
+    render(einsatzAktiv, [vermisst]);
+    await screen.findByRole('heading', { name: 'Personen' });
+    expect(screen.queryByText('Erfasst als R-049')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Neu', selected: true })).toBeInTheDocument();
+  });
+
+  it('sendet tabübergreifend ausschließlich den Receipt-Scope ohne Personendaten', () => {
+    const kanalPerson: Person = {
+      ...person,
+      id: 50,
+      registrier_nr: 50,
+      status: 'vermisst' as const,
+      name: 'Nicht im Kanal',
+    };
+    meldeOfflineSchreibaktionGesendet({
+      art: 'person',
+      benutzerId: nutzer.id,
+      einsatzId: 1,
+      clientId: 'nicht-im-kanal',
+      daten: kanalPerson,
+      sicht: 'vermisst',
+    });
+
+    expect(FakeBroadcastChannel.instanzen).toHaveLength(1);
+    expect(FakeBroadcastChannel.instanzen[0].postMessage).toHaveBeenCalledWith({
+      typ: 'person-erfassungsquittung',
+      benutzerId: nutzer.id,
+      einsatzId: 1,
+    });
+    const payload = FakeBroadcastChannel.instanzen[0].postMessage.mock.calls[0][0];
+    expect(JSON.stringify(payload)).not.toContain('Nicht im Kanal');
+    expect(JSON.stringify(payload)).not.toContain('nicht-im-kanal');
+    expect(Object.keys(payload)).toEqual(['typ', 'benutzerId', 'einsatzId']);
+  });
+
+  it('liest im bereits gemounteten Zweittab nach Scope-Signal aus IDB und quittiert erst explizit', async () => {
+    const crossTabPerson: Person = {
+      ...person,
+      id: 50,
+      registrier_nr: 50,
+      status: 'vermisst' as const,
+      name: 'Aus anderem Tab',
+    };
+    render(einsatzAktiv, []);
+    await screen.findByRole('heading', { name: 'Personen' });
+    await schreibaktionEinreihen(nutzer.id, 1, {
+      art: 'person',
+      daten: { name: 'Aus anderem Tab', status: 'vermisst', client_id: 'cross-tab-50' },
+    });
+    const [pending] = await schreibaktionenLaden(nutzer.id, 1);
+    expect(await schreibaktionPersonAbschliessen(nutzer.id, pending, crossTabPerson))
+      .not.toBeNull();
+
+    const kanal = FakeBroadcastChannel.instanzen[0];
+    await act(async () => {
+      kanal.sendeAusAnderemTab({
+        typ: 'person-erfassungsquittung', benutzerId: 2, einsatzId: 1,
+      });
+      kanal.sendeAusAnderemTab({
+        typ: 'person-erfassungsquittung', benutzerId: nutzer.id, einsatzId: 2,
+      });
+    });
+    expect(screen.queryByText('Erfasst als R-050')).not.toBeInTheDocument();
+
+    await act(async () => {
+      kanal.sendeAusAnderemTab({
+        typ: 'person-erfassungsquittung', benutzerId: nutzer.id, einsatzId: 1,
+      });
+    });
+    expect(await screen.findByText('Erfasst als R-050')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    expect((await screen.findByText('R-050')).closest('tr'))
+      .toHaveClass('zeile-hervorgehoben');
+
+    // Wiederholtes Signal und konkurrierender Re-Read bleiben idempotent; erst
+    // das explizite Schließen ist der persistente Ack.
+    await act(async () => {
+      kanal.sendeAusAnderemTab({
+        typ: 'person-erfassungsquittung', benutzerId: nutzer.id, einsatzId: 1,
+      });
+    });
+    expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
+    expect(screen.getAllByText('Erfasst als R-050')).toHaveLength(1);
+    const schliessen = quittungSchliessenButton();
+    if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
+    await userEvent.click(schliessen);
+    await vi.waitFor(async () =>
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0));
+  });
+
+  it('behält das Receipt im Hintergrund und lädt/quittiert es erst nach visible erneut', async () => {
+    const hintergrundPerson: Person = {
+      ...person,
+      id: 51,
+      registrier_nr: 51,
+      status: 'betroffen' as const,
+      name: 'Im Hintergrund',
+    };
+    await schreibaktionEinreihen(nutzer.id, 1, {
+      art: 'person',
+      daten: { name: 'Im Hintergrund', status: 'betroffen', client_id: 'hidden-51' },
+    });
+    const [pending] = await schreibaktionenLaden(nutzer.id, 1);
+    await schreibaktionPersonAbschliessen(nutzer.id, pending, hintergrundPerson);
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+
+    render(einsatzAktiv, []);
+    expect(await screen.findByText('Erfasst als R-051')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Betroffen', selected: true })).toBeInTheDocument();
+    expect(quittungSchliessenButton()).not.toBeInTheDocument();
+    expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await vi.waitFor(() => expect(quittungSchliessenButton()).toBeInTheDocument());
+    const schliessen = quittungSchliessenButton();
+    if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
+    // visibilitychange hat erneut aus IDB gelesen, aber nicht automatisch gelöscht.
+    expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
+    await userEvent.click(schliessen);
+    await vi.waitFor(async () =>
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0));
+  });
+
+  it('ordnet auch einen Offline-Abschluss nach dem Routewechsel ausschließlich Einsatz A zu', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const personA = {
+      ...person,
+      id: 78,
+      registrier_nr: 78,
+      status: 'vermisst' as const,
+      name: 'Offline A',
+      vorname: null,
+    };
+    const personB = {
+      ...person,
+      id: 78,
+      einsatz_id: 2,
+      registrier_nr: 89,
+      status: 'erfasst' as const,
+      name: 'Person B',
+      vorname: null,
+    };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+        const id = Number(params.einsatzId);
+        return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
+      }),
+      http.get('/api/einsaetze/:einsatzId/personen', ({ params }) =>
+        HttpResponse.json(params.einsatzId === '2' ? [personB] : [])),
+    );
+    const { container } = renderMitEinsatzNavigation();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Offline A');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
+    const [vorgemerkt] = await schreibaktionenLaden(1, 1);
+    if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    expect(await screen.findByText('Person B')).toBeInTheDocument();
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, {
+        detail: {
+          art: 'person',
+          benutzerId: 1,
+          einsatzId: 1,
+          clientId: vorgemerkt.aktion.daten.client_id,
+          daten: personA,
+        },
+      }));
+    });
+
+    expect(screen.queryByText('Erfasst als R-078')).not.toBeInTheDocument();
+    expect(screen.queryByText('Offline A')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'true');
+    expect(container.querySelector('[data-row-key="78"]')).not.toHaveClass('zeile-hervorgehoben');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz A' }));
+    expect(await screen.findByText('Offline A')).toBeInTheDocument();
+    expect(screen.getByText('Erfasst als R-078')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst' })).toHaveAttribute('aria-selected', 'true');
+    expect(container.querySelector('[data-row-key="78"]')).toHaveClass('zeile-hervorgehoben');
   });
 
   it('Beobachter sieht keine Schreibaktionen', async () => {

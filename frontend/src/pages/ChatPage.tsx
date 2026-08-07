@@ -1,12 +1,13 @@
 import { Alert, App, Breadcrumb, Button, Col, Row, Spin, Typography } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import {
   CHAT_SEITENGROESSE, bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, ladeAnhaengeHoch, legeKanalAn,
-  listeKanaele, listeNachrichten, loescheBezug, loescheNachricht, sendeNachricht, setzeBezug,
+  listeKanaele, listeNachrichten, loescheBezug, loescheNachricht, markiereKanalGelesen,
+  sendeNachricht, setzeBezug,
 } from '../api/chat';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
@@ -32,6 +33,7 @@ import {
   meldungInfo, meldungLabel, personInfo, personLabel, schadenInfo, schadenLabel, uhsInfo, uhsLabel,
   type BezugKurzinfo, type BezugOptionen,
 } from '../chat/bezug';
+import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -39,12 +41,35 @@ export default function ChatPage() {
   const { message } = App.useApp();
   const { benutzer } = useAuth();
   const qc = useQueryClient();
-  const [aktiverKanal, setAktiverKanal] = useState<number | null>(null);
-  const [heraufstufen, setHeraufstufen] = useState<ChatNachricht | null>(null);
-  const [heraufstufenAuftrag, setHeraufstufenAuftrag] = useState<ChatNachricht | null>(null);
-  const [bearbeiten, setBearbeiten] = useState<ChatNachricht | null>(null);
-  const [bezugNachricht, setBezugNachricht] = useState<ChatNachricht | null>(null);
+  const [kanalAuswahl, setKanalAuswahl] = useState<{
+    einsatzId: number;
+    kanalId: number;
+  } | null>(null);
+  const [heraufstufenAuswahl, setHeraufstufenAuswahl] = useState<{
+    einsatzId: number;
+    nachricht: ChatNachricht;
+  } | null>(null);
+  const [heraufstufenAuftragAuswahl, setHeraufstufenAuftragAuswahl] = useState<{
+    einsatzId: number;
+    nachricht: ChatNachricht;
+  } | null>(null);
+  const [bearbeitenAuswahl, setBearbeitenAuswahl] = useState<{
+    einsatzId: number;
+    nachricht: ChatNachricht;
+  } | null>(null);
+  const [bezugAuswahl, setBezugAuswahl] = useState<{
+    einsatzId: number;
+    nachricht: ChatNachricht;
+  } | null>(null);
+  const [dokumentSichtbar, setDokumentSichtbar] = useState(
+    () => document.visibilityState === 'visible',
+  );
 
+  useEffect(() => {
+    const aktualisieren = () => setDokumentSichtbar(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', aktualisieren);
+    return () => document.removeEventListener('visibilitychange', aktualisieren);
+  }, []);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -65,7 +90,30 @@ export default function ChatPage() {
   });
 
   const kanaele = kanaeleQuery.data ?? [];
-  const kanalId = aktiverKanal ?? kanaele[0]?.id ?? null;
+  const ausgewaehlterKanal = kanalAuswahl?.einsatzId === einsatzId
+    ? kanalAuswahl.kanalId
+    : null;
+  // Beim Routewechsel darf die Kanal-ID des vorherigen Einsatzes nicht einmal für
+  // einen Zwischen-Render in die neue URL geraten. Erst die erfolgreich geladene,
+  // aktuelle Kanalliste darf eine explizite Auswahl oder ihren ersten Kanal freigeben.
+  const kanalId = kanaeleQuery.isSuccess
+    ? kanaele.some((kanal) => kanal.id === ausgewaehlterKanal)
+      ? ausgewaehlterKanal
+      : kanaele[0]?.id ?? null
+    : null;
+  const heraufstufen = heraufstufenAuswahl?.einsatzId === einsatzId
+    ? heraufstufenAuswahl.nachricht
+    : null;
+  const heraufstufenAuftrag = heraufstufenAuftragAuswahl?.einsatzId === einsatzId
+    ? heraufstufenAuftragAuswahl.nachricht
+    : null;
+  const bearbeiten = bearbeitenAuswahl?.einsatzId === einsatzId
+    ? bearbeitenAuswahl.nachricht
+    : null;
+  const bezugNachricht = bezugAuswahl?.einsatzId === einsatzId
+    ? bezugAuswahl.nachricht
+    : null;
+  const ungelesenImAktivenKanal = kanaele.find((kanal) => kanal.id === kanalId)?.ungelesen_anzahl ?? 0;
 
   const nachrichtenQuery = useInfiniteQuery({
     queryKey: einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId),
@@ -79,6 +127,35 @@ export default function ChatPage() {
         : undefined,
     enabled: kanalId !== null,
   });
+
+  // Erst NACH einem erfolgreichen Nachrichtenabruf markieren. Der serverseitige Zustand
+  // ist pro Nachricht und Benutzer persistent; ein späteres SSE-Update hebt den Stand durch
+  // `dataUpdatedAt` erneut an und markiert den gerade sichtbaren Kanal wieder gelesen.
+  useEffect(() => {
+    if (
+      !dokumentSichtbar || document.visibilityState !== 'visible' ||
+      kanalId === null || ungelesenImAktivenKanal === 0 ||
+      !nachrichtenQuery.isSuccess || nachrichtenQuery.dataUpdatedAt === 0
+    ) return;
+    let aktiv = true;
+    void markiereKanalGelesen(einsatzId, kanalId)
+      .then(() => {
+        if (aktiv) void qc.invalidateQueries({ queryKey: einsatzKeys.chatKanaele(einsatzId) });
+      })
+      .catch(() => {
+        // Die Kanalliste behält ihren ungelesenen Stand und macht den Fehlschlag damit sichtbar;
+        // keine störende Toast-Schleife bei jedem Live-Refetch.
+      });
+    return () => { aktiv = false; };
+  }, [
+    einsatzId,
+    dokumentSichtbar,
+    kanalId,
+    nachrichtenQuery.dataUpdatedAt,
+    nachrichtenQuery.isSuccess,
+    qc,
+    ungelesenImAktivenKanal,
+  ]);
 
   // Sachbezug-Picker/Anzeige (LFH-103): Listen je Typ nur laden, wenn der Dialog offen
   // ist (Picker) ODER eine geladene Nachricht diesen Typ referenziert (Label-Auflösung)
@@ -128,7 +205,7 @@ export default function ChatPage() {
     mutationFn: ({ id: nid, text }: { id: number; text: string }) => bearbeiteNachricht(einsatzId, nid, text),
     onSuccess: () => {
       invalidiereNachrichten();
-      setBearbeiten(null);
+      setBearbeitenAuswahl(null);
     },
     onError: fehler,
   });
@@ -147,7 +224,7 @@ export default function ChatPage() {
       heraufstufenZuEtb(einsatzId, nid, typ, text),
     onSuccess: () => {
       invalidiereNachrichten();
-      setHeraufstufen(null);
+      setHeraufstufenAuswahl(null);
       message.success('Zu ETB heraufgestuft');
     },
     onError: fehler,
@@ -158,7 +235,7 @@ export default function ChatPage() {
     onSuccess: () => {
       invalidiereNachrichten();
       qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
-      setHeraufstufenAuftrag(null);
+      setHeraufstufenAuftragAuswahl(null);
       message.success('Zu Auftrag heraufgestuft');
     },
     onError: fehler,
@@ -168,7 +245,7 @@ export default function ChatPage() {
       setzeBezug(einsatzId, nid, typ, zielId),
     onSuccess: () => {
       invalidiereNachrichten();
-      setBezugNachricht(null);
+      setBezugAuswahl(null);
       message.success('Bezug gesetzt');
     },
     onError: fehler,
@@ -231,12 +308,19 @@ export default function ChatPage() {
         ]}
       />
       <Typography.Title level={3} style={{ marginTop: 0 }}>Chat</Typography.Title>
+      <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
+        kanaeleQuery.dataUpdatedAt,
+        nachrichtenQuery.dataUpdatedAt,
+      )} />
       <Row gutter={16}>
         <Col flex="220px">
           <KanalListe
             kanaele={kanaele}
             aktiverKanalId={kanalId}
-            onWechsel={setAktiverKanal}
+            onWechsel={(neuerKanalId) => setKanalAuswahl({
+              einsatzId,
+              kanalId: neuerKanalId,
+            })}
             darfSchreiben={darfSchreiben}
             onKanalAnlegen={(name, beschreibung) => kanalMutation.mutate({ name, beschreibung })}
           />
@@ -260,11 +344,14 @@ export default function ChatPage() {
             nachrichten={nachrichten}
             eigeneBenutzerId={benutzer?.id ?? null}
             darfSchreiben={darfSchreiben}
-            onBearbeiten={(n) => setBearbeiten(n)}
+            onBearbeiten={(n) => setBearbeitenAuswahl({ einsatzId, nachricht: n })}
             onLoeschen={(n) => loeschenMutation.mutate(n.id)}
-            onHeraufstufen={(n) => setHeraufstufen(n)}
-            onHeraufstufenAuftrag={(n) => setHeraufstufenAuftrag(n)}
-            onBezugSetzen={(n) => setBezugNachricht(n)}
+            onHeraufstufen={(n) => setHeraufstufenAuswahl({ einsatzId, nachricht: n })}
+            onHeraufstufenAuftrag={(n) => setHeraufstufenAuftragAuswahl({
+              einsatzId,
+              nachricht: n,
+            })}
+            onBezugSetzen={(n) => setBezugAuswahl({ einsatzId, nachricht: n })}
             onBezugLoeschen={(n) => bezugLoeschenMutation.mutate(n.id)}
             bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
             bezugInfo={bezugInfo}
@@ -294,7 +381,7 @@ export default function ChatPage() {
         nachricht={bezugNachricht}
         optionen={bezugOptionen}
         senden={bezugMutation.isPending}
-        onAbbrechen={() => setBezugNachricht(null)}
+        onAbbrechen={() => setBezugAuswahl(null)}
         onBestaetigen={(typ, zielId) => {
           if (bezugNachricht) bezugMutation.mutate({ nid: bezugNachricht.id, typ, zielId });
         }}
@@ -303,7 +390,7 @@ export default function ChatPage() {
         offen={bearbeiten !== null}
         nachricht={bearbeiten}
         senden={bearbeitenMutation.isPending}
-        onAbbrechen={() => setBearbeiten(null)}
+        onAbbrechen={() => setBearbeitenAuswahl(null)}
         onBestaetigen={(text) => {
           if (bearbeiten) bearbeitenMutation.mutate({ id: bearbeiten.id, text });
         }}
@@ -312,7 +399,7 @@ export default function ChatPage() {
         offen={heraufstufen !== null}
         nachricht={heraufstufen}
         senden={heraufstufenMutation.isPending}
-        onAbbrechen={() => setHeraufstufen(null)}
+        onAbbrechen={() => setHeraufstufenAuswahl(null)}
         onBestaetigen={(typ, text) => {
           if (heraufstufen) heraufstufenMutation.mutate({ nid: heraufstufen.id, typ, text });
         }}
@@ -323,7 +410,7 @@ export default function ChatPage() {
         abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
         einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
         senden={heraufstufenAuftragMutation.isPending}
-        onAbbrechen={() => setHeraufstufenAuftrag(null)}
+        onAbbrechen={() => setHeraufstufenAuftragAuswahl(null)}
         onAnlegen={(daten) => {
           if (heraufstufenAuftrag) heraufstufenAuftragMutation.mutate({ nid: heraufstufenAuftrag.id, daten });
         }}

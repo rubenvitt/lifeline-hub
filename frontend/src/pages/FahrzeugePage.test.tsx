@@ -79,6 +79,50 @@ describe('FahrzeugePage', () => {
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();
   });
 
+  it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
+    let freigeben: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    server.use(http.patch('/api/einsaetze/7/fahrzeuge/10', async () => {
+      await gate;
+      return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
+    }));
+    const zweitesFahrzeug = { ...ef, id: 11, funkrufname: 'Florian 2' };
+    const { container, client } = render(einsatz(), [], [ef, zweitesFahrzeug]);
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+
+    await userEvent.click(within(zeile).getByRole('combobox'));
+    const option = (await screen.findAllByText('vor_ort')).find((el) => el.closest('.ant-select-item-option'));
+    expect(option).toBeTruthy();
+    await userEvent.click(option!);
+
+    await waitFor(() => {
+      expect(client.getQueryData<(typeof ef)[]>(einsatzKeys.fahrzeuge(7))?.[0].status_id).toBe(3);
+    });
+    expect(within(zeile).getByRole('combobox')).toBeDisabled();
+    expect(within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('combobox'))
+      .toBeDisabled();
+
+    let refetchFreigeben: (() => void) | undefined;
+    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    server.use(http.get('/api/einsaetze/7/fahrzeuge', async () => {
+      await refetchGate;
+      return HttpResponse.json([{ ...ef, funkrufname: 'Extern geändert' }, zweitesFahrzeug]);
+    }));
+    act(() => {
+      client.setQueryData<(typeof ef)[]>(einsatzKeys.fahrzeuge(7), (aktuell) =>
+        aktuell?.map((eintrag) => eintrag.id === 10 ? { ...eintrag, funkrufname: 'Extern geändert' } : eintrag));
+    });
+
+    await act(async () => { freigeben?.(); });
+    await waitFor(() => {
+      const stand = client.getQueryData<(typeof ef)[]>(einsatzKeys.fahrzeuge(7));
+      expect(stand?.find((eintrag) => eintrag.id === 10)?.status_id).toBe(2);
+      expect(stand?.find((eintrag) => eintrag.id === 10)?.funkrufname).toBe('Extern geändert');
+    });
+    await act(async () => { refetchFreigeben?.(); });
+  });
+
   it('hebt per ?fahrzeug=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),

@@ -90,24 +90,40 @@ export default function PersonalTab() {
           {
             title: 'Aktionen',
             key: 'aktionen',
-            render: (_, p: Personal) => (
-              <Space size="middle">
-                <Button onClick={() => { setBearbeite(p); setModalOffen(true); }}>Bearbeiten</Button>
-                {p.dienststatus === 'in_dienst' ? (
-                  <Popconfirm
-                    title="Außer Dienst stellen?"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => dienststatusMutation.mutate({ id: p.id, inDienst: false })}
-                  >
-                    <Button danger>Außer Dienst</Button>
-                  </Popconfirm>
-                ) : (
-                  <Button onClick={() => dienststatusMutation.mutate({ id: p.id, inDienst: true })}>
-                    Wieder in Dienst
+            render: (_, p: Personal) => {
+              const gesperrt = dienststatusMutation.isPending;
+              const laeuft = gesperrt && dienststatusMutation.variables?.id === p.id;
+              return (
+                <Space size="middle">
+                  <Button disabled={gesperrt} onClick={() => { setBearbeite(p); setModalOffen(true); }}>
+                    Bearbeiten
                   </Button>
-                )}
-              </Space>
-            ),
+                  {p.dienststatus === 'in_dienst' ? (
+                    <Popconfirm
+                      title="Außer Dienst stellen?"
+                      disabled={gesperrt}
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => {
+                        if (!dienststatusMutation.isPending) {
+                          dienststatusMutation.mutate({ id: p.id, inDienst: false });
+                        }
+                      }}
+                    >
+                      <Button danger loading={laeuft} disabled={gesperrt}>Außer Dienst</Button>
+                    </Popconfirm>
+                  ) : (
+                    <Button loading={laeuft} disabled={gesperrt}
+                      onClick={() => {
+                        if (!dienststatusMutation.isPending) {
+                          dienststatusMutation.mutate({ id: p.id, inDienst: true });
+                        }
+                      }}>
+                      Wieder in Dienst
+                    </Button>
+                  )}
+                </Space>
+              );
+            },
           },
         ] as TableColumnsType<Personal>)
       : []),

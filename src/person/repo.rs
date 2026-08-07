@@ -115,17 +115,51 @@ pub async fn anlegen_tx(
     erfasser_id: i64,
     daten: NeueDaten<'_>,
 ) -> Result<(i64, i64), AppError> {
+    let (id, registrier_nr, _) =
+        anlegen_tx_mit_optionen(conn, einsatz_id, erfasser_id, "erfasst", None, daten).await?;
+    Ok((id, registrier_nr))
+}
+
+/// Variante für die direkte/offlinefähige Erfassung (LFH-334/B6). `status` ist
+/// bereits im Handler validiert. `client_id` bleibt nullable; ist sie gesetzt,
+/// sichert der partielle Unique-Index `(einsatz_id, client_id)` exactly-once bei
+/// einem später wiederholten Request. Die Race-Auflösung geschieht im Handler,
+/// weil dort die gesamte atomare Transaktion einschließlich System-ETB liegt.
+pub async fn anlegen_tx_mit_optionen(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    status: &str,
+    client_id: Option<&str>,
+    daten: NeueDaten<'_>,
+) -> Result<(i64, i64, bool), AppError> {
+    // Unter dem BEGIN-IMMEDIATE-Kontrakt des Aufrufers kann zwischen diesem
+    // Replay-Read und dem Insert kein anderer Writer dazwischenlaufen.
+    if let Some(cid) = client_id {
+        if let Some((id, registrier_nr)) = sqlx::query_as(
+            "SELECT id, registrier_nr FROM einsatz_person \
+             WHERE einsatz_id = ? AND client_id = ?",
+        )
+        .bind(einsatz_id)
+        .bind(cid)
+        .fetch_optional(&mut *conn)
+        .await?
+        {
+            return Ok((id, registrier_nr, false));
+        }
+    }
     let row: (i64, i64) = sqlx::query_as(
         "INSERT INTO einsatz_person \
             (einsatz_id, registrier_nr, status, name, vorname, geschlecht, \
              geburtsdatum, alter_geschaetzt, herkunft_adresse, antreff_ort, \
-             melder_kontakt, notiz, erfasst_von, geaendert_von) \
-         SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, 'erfasst', ?2, ?3, ?4, \
-                ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11 \
+             melder_kontakt, notiz, erfasst_von, geaendert_von, client_id) \
+         SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, ?2, ?3, ?4, ?5, \
+                ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13 \
          FROM einsatz_person WHERE einsatz_id = ?1 \
          RETURNING id, registrier_nr",
     )
     .bind(einsatz_id)
+    .bind(status)
     .bind(daten.name)
     .bind(daten.vorname)
     .bind(daten.geschlecht)
@@ -136,9 +170,28 @@ pub async fn anlegen_tx(
     .bind(daten.melder_kontakt)
     .bind(daten.notiz)
     .bind(erfasser_id)
+    .bind(client_id)
     .fetch_one(&mut *conn)
     .await?;
-    Ok(row)
+    Ok((row.0, row.1, true))
+}
+
+/// Liefert die bestehende Person zu einem Offline-Idempotenzschlüssel. Wird vor
+/// dem Insert (schneller Replay) und nach einer UNIQUE-Race verwendet.
+pub async fn laden_nach_client_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<PersonAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, PersonAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_ALLE} WHERE einsatz_id = ? AND client_id = ?"
+        )))
+        .bind(einsatz_id)
+        .bind(client_id)
+        .fetch_optional(pool)
+        .await?,
+    )
 }
 
 /// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige. Delegiert an [`anlegen_tx`].
@@ -347,6 +400,44 @@ mod tests {
         storniere(&pool, e, p1.id, b).await.unwrap();
         let p2 = anlegen(&pool, e, b, leere_daten()).await.unwrap();
         assert_eq!(p2.registrier_nr, 2, "Soft-Delete recycelt keine Nummern");
+    }
+
+    #[tokio::test]
+    async fn client_id_replay_bleibt_eine_person_mit_initialstatus() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut tx = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        let (id1, reg1, neu1) = anlegen_tx_mit_optionen(
+            &mut tx,
+            e,
+            b,
+            "vermisst",
+            Some("offline-person-1"),
+            leere_daten(),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let mut tx = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        let (id2, reg2, neu2) = anlegen_tx_mit_optionen(
+            &mut tx,
+            e,
+            b,
+            "vermisst",
+            Some("offline-person-1"),
+            leere_daten(),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        assert!(neu1);
+        assert!(!neu2);
+        assert_eq!((id2, reg2), (id1, reg1));
+        let person = laden(&pool, e, id1).await.unwrap();
+        assert_eq!(person.status, PersonStatus::Vermisst);
+        assert_eq!(liste(&pool, e, None).await.unwrap().len(), 1);
     }
 
     #[tokio::test]

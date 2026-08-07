@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -7,7 +7,9 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import PersonenDetailPage from './PersonenDetailPage';
-import type { PersonDetail, Sichtungskategorie } from '../api/types';
+import type { Person, PersonDetail, Sichtungskategorie } from '../api/types';
+import { einsatzKeys } from '../api/queryKeys';
+import { erzeugeQueryClient } from '../api/queryClient';
 
 class FakeEventSource {
   url: string; closed = false;
@@ -44,7 +46,12 @@ const detail = {
   sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
 } as PersonDetail;
 
-function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Parameters<typeof server.use> = []) {
+function render(
+  einsatzObj: typeof einsatzAktiv,
+  person: PersonDetail,
+  extra: Parameters<typeof server.use> = [],
+  cacheBehalten = false,
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
@@ -56,6 +63,12 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
   );
   // extra-Handler separat prependen, damit sie Vorrang vor den Default-Handlern haben.
   if (extra.length > 0) server.use(...extra);
+  const client = cacheBehalten
+    ? erzeugeQueryClient({
+        queries: { retry: false, gcTime: 60_000 },
+        mutations: { retry: false },
+      })
+    : undefined;
   return renderMitProviders(
     <AuthProvider>
       <Routes>
@@ -64,7 +77,7 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
         <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
       </Routes>
     </AuthProvider>,
-    { route: '/einsaetze/1/personen/10' },
+    { route: '/einsaetze/1/personen/10', client },
   );
 }
 
@@ -145,6 +158,142 @@ describe('PersonenDetailPage — med. Verlauf', () => {
 });
 
 describe('PersonenDetailPage — Stammdaten', () => {
+  it('rollt nur den Status zurück und bewahrt neuere Listen- und Detailfelder', async () => {
+    const mitVerlauf = {
+      ...detail,
+      notizen: [{
+        id: 7, einsatz_id: 1, person_id: 10, text: 'bestehender Verlauf',
+        erfasst_at: '2026-05-27 09:30:00', erfasst_von: 1,
+      }],
+    } as PersonDetail;
+    const anderePerson: Person = {
+      ...detail,
+      id: 11,
+      registrier_nr: 2,
+      name: 'Andere Person',
+    };
+    let statusFreigeben!: () => void;
+    let refetchFreigeben!: () => void;
+    const statusGate = new Promise<void>((resolve) => { statusFreigeben = resolve; });
+    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    let detailAbrufe = 0;
+    const { client } = render(einsatzAktiv, mitVerlauf, [
+      http.get('/api/einsaetze/1/personen/10', async () => {
+        detailAbrufe += 1;
+        if (detailAbrufe > 1) await refetchGate;
+        return HttpResponse.json(mitVerlauf);
+      }),
+      http.post('/api/einsaetze/1/personen/10/status', async () => {
+        await statusGate;
+        return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 500 });
+      }),
+    ], true);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), [mitVerlauf, anderePerson]);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /→ vermisst/ }));
+    await vi.waitFor(() => {
+      const optimistisch = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
+      expect(optimistisch?.status).toBe('vermisst');
+      expect(optimistisch?.notizen).toEqual(mitVerlauf.notizen);
+    });
+
+    const neueNotiz = {
+      id: 8,
+      einsatz_id: 1,
+      person_id: 10,
+      text: 'während der Mutation eingetroffen',
+      erfasst_at: '2026-05-27 09:45:00',
+      erfasst_von: 2,
+    };
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), (aktuell) =>
+        aktuell?.map((eintrag) => eintrag.id === 10
+          ? { ...eintrag, name: 'Neuer Listenname' }
+          : { ...eintrag, notiz: 'Andere Zeile aktualisiert' }));
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), (aktuell) => aktuell && ({
+        ...aktuell,
+        name: 'Neuer Detailname',
+        notizen: [...aktuell.notizen, neueNotiz],
+      }));
+    });
+
+    await act(async () => { statusFreigeben(); });
+    await vi.waitFor(() => {
+      const zurueckgerollt = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
+      expect(zurueckgerollt?.status).toBe('erfasst');
+      expect(zurueckgerollt?.name).toBe('Neuer Detailname');
+      expect(zurueckgerollt?.notizen).toEqual([...mitVerlauf.notizen, neueNotiz]);
+    });
+    const liste = client.getQueryData<Person[]>(einsatzKeys.personen(1));
+    expect(liste?.find((eintrag) => eintrag.id === 10)).toMatchObject({
+      status: 'erfasst',
+      name: 'Neuer Listenname',
+    });
+    expect(liste?.find((eintrag) => eintrag.id === 11)?.notiz).toBe('Andere Zeile aktualisiert');
+    await act(async () => { refetchFreigeben(); });
+  });
+
+  it('überschreibt beim Fehler keinen inzwischen neueren Statusstand', async () => {
+    let statusFreigeben!: () => void;
+    let refetchFreigeben!: () => void;
+    const statusGate = new Promise<void>((resolve) => { statusFreigeben = resolve; });
+    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    let detailAbrufe = 0;
+    const { client } = render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', async () => {
+        detailAbrufe += 1;
+        if (detailAbrufe > 1) await refetchGate;
+        return HttpResponse.json(detail);
+      }),
+      http.post('/api/einsaetze/1/personen/10/status', async () => {
+        await statusGate;
+        return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 500 });
+      }),
+    ], true);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), [detail]);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /→ vermisst/ }));
+    await vi.waitFor(() => {
+      expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))?.status).toBe('vermisst');
+    });
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), (aktuell) =>
+        aktuell?.map((eintrag) => ({
+          ...eintrag,
+          status: 'vermisst',
+          name: 'Neuer Listenstand',
+          geaendert_at: '2026-05-27 09:15:00',
+        })));
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), (aktuell) => aktuell && ({
+        ...aktuell,
+        status: 'vermisst',
+        name: 'Neuer Detailstand',
+        geaendert_at: '2026-05-27 09:15:00',
+      }));
+    });
+
+    await act(async () => { statusFreigeben(); });
+    await vi.waitFor(() => {
+      expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))).toMatchObject({
+        status: 'vermisst',
+        name: 'Neuer Detailstand',
+        geaendert_at: '2026-05-27 09:15:00',
+      });
+    });
+    expect(client.getQueryData<Person[]>(einsatzKeys.personen(1))?.[0]).toMatchObject({
+      status: 'vermisst',
+      name: 'Neuer Listenstand',
+      geaendert_at: '2026-05-27 09:15:00',
+    });
+    await act(async () => { refetchFreigeben(); });
+  });
+
   it('zeigt Read-Modus mit Stammdaten', async () => {
     render(einsatzAktiv, detail);
     expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
@@ -166,6 +315,37 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(gesendet).toBe(true));
+  });
+
+  it('friert Formularwerte und CAS-Basis gemeinsam ein, auch wenn der Detailstand refetcht', async () => {
+    let koerper: Record<string, unknown> | undefined;
+    const { client } = render(einsatzAktiv, detail, [
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...detail, name: 'Lokaler Name' });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(client.getQueryCache().find({ queryKey: einsatzKeys.person(1, 10) })?.options.retry).toBe(false);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    const name = screen.getByDisplayValue('Mustermann');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Lokaler Name');
+
+    act(() => {
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
+        ...detail,
+        name: 'Externer Name',
+        geaendert_at: '2026-05-27 09:15:00',
+      });
+    });
+    expect(name).toHaveValue('Lokaler Name');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(koerper).toBeDefined());
+    expect(koerper?.name).toBe('Lokaler Name');
+    expect(koerper?.basis_geaendert_at).toBe('2026-05-27 09:00:00');
   });
 
   it('zeigt bei 409 den Konfliktdialog; „Überschreiben" sendet ohne Baseline (LFH-241/F10)', async () => {

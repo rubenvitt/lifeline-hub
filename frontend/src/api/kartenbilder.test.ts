@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listeHintergrundbilder, ladeHintergrundbildHoch, bildDownloadPfad } from './kartenbilder';
+import {
+  bildDownloadPfad,
+  ladeBildBlobUrl,
+  ladeHintergrundbildHoch,
+  listeHintergrundbilder,
+} from './kartenbilder';
 
 describe('kartenbilder API', () => {
   beforeEach(() => { vi.restoreAllMocks(); });
@@ -14,6 +19,22 @@ describe('kartenbilder API', () => {
 
   it('download-pfad ist stabil', () => {
     expect(bildDownloadPfad(7, 3)).toBe('/api/einsaetze/7/karte/hintergrundbilder/3/download');
+  });
+
+  it('begrenzt auch den direkten Bilddownload auf 15 Sekunden', async () => {
+    const signal = new AbortController().signal;
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new Blob(['bild']), { status: 200 }),
+    );
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+
+    await expect(ladeBildBlobUrl(7, 3)).resolves.toBe('blob:test');
+    expect(timeout).toHaveBeenCalledWith(15_000);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/einsaetze/7/karte/hintergrundbilder/3/download',
+      expect.objectContaining({ credentials: 'same-origin', signal }),
+    );
   });
 
   it('upload hängt datei + ecken als FormData an', async () => {

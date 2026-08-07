@@ -9,7 +9,7 @@ use std::time::Duration;
 use tower::ServiceExt;
 
 mod common;
-use common::{benutzer_anlegen, login_cookie, rolle_setzen};
+use common::{anfrage_mit_offline_queue_benutzer, benutzer_anlegen, login_cookie, rolle_setzen};
 
 /// Router + Bootstrap-Admin (admin / startpw12); liefert zusätzlich den LiveHub,
 /// damit Tests direkt am Broadcast-Kanal lauschen können.
@@ -545,6 +545,74 @@ async fn erfassung_mit_client_id_ist_idempotent() {
         1,
         "kein Duplikat in der ETB-Liste"
     );
+}
+
+#[tokio::test]
+async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let body =
+        r#"{"typ":"meldung","inhalt":"Bereits committed","client_id":"offline-etb-abgeschlossen"}"#;
+    let (status, original) = eintrag_erfassen(&app, &admin, einsatz, body).await;
+    assert_eq!(status, StatusCode::CREATED, "{original:?}");
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{einsatz}/abschliessen"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let (status, replay) = eintrag_erfassen(&app, &admin, einsatz, body).await;
+    assert_eq!(status, StatusCode::CREATED, "{replay:?}");
+    assert_eq!(replay["id"], original["id"]);
+    assert_eq!(replay["lfd_nr"], original["lfd_nr"]);
+
+    let (status, _) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Neu","client_id":"offline-etb-neu-nach-abschluss"}"#,
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "echter Insert bleibt gesperrt"
+    );
+}
+
+#[tokio::test]
+async fn etb_offline_replay_mit_falschem_queue_besitzer_ist_412() {
+    let (app, _) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin, "Queue-Owner").await;
+    let body = r#"{"typ":"meldung","inhalt":"Besitzgebunden","client_id":"owner-etb-1"}"#;
+    assert_eq!(
+        eintrag_erfassen(&app, &admin, e, body).await.0,
+        StatusCode::CREATED
+    );
+
+    // Selbst ein ansonsten idempotent erfolgreicher Replay darf unter einer anderen
+    // Benutzer-Session nicht ausgelesen werden.
+    let (status, _) = anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/etb"),
+        &admin,
+        Some(body),
+        i64::MAX,
+    )
+    .await;
+    assert_eq!(status, StatusCode::PRECONDITION_FAILED);
 }
 
 #[tokio::test]

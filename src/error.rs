@@ -9,6 +9,10 @@ use serde_json::json;
 pub enum AppError {
     /// Nicht angemeldet / ungültige Session (401).
     Unauthorized,
+    /// Offline-Queue-Eintrag gehoert zu einer anderen Benutzer-Session (412).
+    /// Bewusst KEIN 401: ein stale Tab darf die gueltige originweite Session des aktuell
+    /// angemeldeten Benutzers nicht durch den globalen Auth-Logout-Pfad invalidieren.
+    OfflineQueueBenutzerMismatch,
     /// Angemeldet, aber keine Berechtigung (403).
     Forbidden,
     /// Ressource nicht gefunden (404).
@@ -43,6 +47,9 @@ impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AppError::Unauthorized => write!(f, "Nicht angemeldet"),
+            AppError::OfflineQueueBenutzerMismatch => {
+                write!(f, "Offline-Eintrag gehört zu einem anderen Benutzer")
+            }
             AppError::Forbidden => write!(f, "Keine Berechtigung"),
             AppError::NotFound => write!(f, "Nicht gefunden"),
             AppError::Validation(m) => write!(f, "{m}"),
@@ -71,6 +78,7 @@ impl AppError {
     pub fn status(&self) -> StatusCode {
         match self {
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
+            AppError::OfflineQueueBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
@@ -189,6 +197,15 @@ impl IntoResponse for AppError {
 mod tests {
     use super::*;
     use axum::body::to_bytes;
+
+    #[test]
+    fn offline_queue_benutzerwechsel_ist_412_ohne_auth_401_umzudeuten() {
+        assert_eq!(
+            AppError::OfflineQueueBenutzerMismatch.status(),
+            StatusCode::PRECONDITION_FAILED
+        );
+        assert_eq!(AppError::Unauthorized.status(), StatusCode::UNAUTHORIZED);
+    }
 
     /// 1-Verbindungs-In-Memory-Pool mit aktivierten Foreign Keys, damit echte
     /// Constraint-Verletzungen (UNIQUE/FK/CHECK) für das Sicherheitsnetz reproduzierbar sind.

@@ -9,9 +9,11 @@ import type { Person, UhsBelegung, UhsDetail, BelegungsArt } from '../../api/typ
 import Datensicht, { spaltenFuer } from '../../components/Datensicht';
 import StatusTag from '../../components/StatusTag';
 import { belegungsArt } from '../../theme/statusFarben';
+import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
 
 interface Props {
   uhs: UhsDetail;
+  dataUpdatedAt?: number;
 }
 
 /** Stabile Leermenge: `?? []` je Render gäbe `personenById` jedes Mal eine neue Identität. */
@@ -41,7 +43,7 @@ const ART_WERTE = (Object.keys(belegungsArt) as BelegungsArt[]).map((art) => ({
   value: art,
 }));
 
-export default function BewegungenTab({ uhs }: Props) {
+export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
   const personenQuery = useQuery({
     queryKey: einsatzKeys.personen(uhs.einsatz_id),
     queryFn: () => listePersonen(uhs.einsatz_id),
@@ -141,28 +143,31 @@ export default function BewegungenTab({ uhs }: Props) {
      * (Default `'sammelbanner'` ist hier richtig), `gruppen`/`baum`/`aufklappzeile`/
      * `zeilenKlasse`/`werkzeuge`/`onZeileKlick`.
      */
-    <Datensicht
-      bezeichnung="Bewegungen"
-      spalten={spalten}
-      daten={uhs.belegungen}
-      zeilenSchluessel="id"
-      ladend={personenQuery.isLoading}
-      leerText="Keine Bewegungen erfasst"
-      // Spiegelt die Backend-Ordnung (`ORDER BY zeitpunkt_at DESC`), ist aber nicht deren
-      // Wiederholung: die Reihenfolge entsteht jetzt im Primitiv und übersteht eine
-      // unsortiert gelieferte Menge.
-      standardSortierung={{ spalte: 'zeitpunkt_at', richtung: 'ab' }}
-      suche={{ platzhalter: 'Person oder R-Nr.' }}
-      karte={{
-        art: 'plan',
-        // Kartentitel ist die PERSON (die Karte wird gelesen: wer hat sich bewegt),
-        // Tabellenspalte 0 bleibt die Zeit (die Tabelle wird chronologisch verglichen).
-        // Die Rollen sind orthogonal zur Spaltenreihenfolge — wer das „harmonisiert",
-        // verliert eine der beiden Aussagen.
-        titel: { spalte: 'person_id' },
-        status: (b) => belegungsArt[b.art],
-        sekundaer: ['zeitpunkt_at', 'platz_id', 'notiz'],
-      }}
-    />
+    <>
+      <Datenstand dataUpdatedAt={gemeinsamerDatenstand(dataUpdatedAt, personenQuery.dataUpdatedAt)} />
+      <Datensicht
+        bezeichnung="Bewegungen"
+        spalten={spalten}
+        daten={uhs.belegungen}
+        zeilenSchluessel="id"
+        ladend={personenQuery.isLoading}
+        leerText="Keine Bewegungen erfasst"
+        // Spiegelt die Backend-Ordnung (`ORDER BY zeitpunkt_at DESC`), ist aber nicht deren
+        // Wiederholung: die Reihenfolge entsteht jetzt im Primitiv und übersteht eine
+        // unsortiert gelieferte Menge.
+        standardSortierung={{ spalte: 'zeitpunkt_at', richtung: 'ab' }}
+        suche={{ platzhalter: 'Person oder R-Nr.' }}
+        karte={{
+          art: 'plan',
+          // Kartentitel ist die PERSON (die Karte wird gelesen: wer hat sich bewegt),
+          // Tabellenspalte 0 bleibt die Zeit (die Tabelle wird chronologisch verglichen).
+          // Die Rollen sind orthogonal zur Spaltenreihenfolge — wer das „harmonisiert",
+          // verliert eine der beiden Aussagen.
+          titel: { spalte: 'person_id' },
+          status: (b) => belegungsArt[b.art],
+          sekundaer: ['zeitpunkt_at', 'platz_id', 'notiz'],
+        }}
+      />
+    </>
   );
 }

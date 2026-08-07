@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
@@ -9,6 +9,7 @@ import { App as AntApp } from 'antd';
 import Grundriss, { aktionsabstand } from './Grundriss';
 import { dichten } from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
+import { einsatzKeys } from '../../api/queryKeys';
 
 function person(over: Partial<Person>): Person {
   return {
@@ -40,7 +41,7 @@ function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
 function renderGrundriss(uhs: UhsDetail, personen: Person[], schreibgeschuetzt = false) {
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  render(
+  const ergebnis = render(
     // MemoryRouter: der Detail-Drawer (PersonDetailDrawer) nutzt useNavigate; in der App
     // läuft Grundriss immer unter einer Route.
     <MemoryRouter>
@@ -51,6 +52,7 @@ function renderGrundriss(uhs: UhsDetail, personen: Person[], schreibgeschuetzt =
       </QueryClientProvider>
     </MemoryRouter>
   );
+  return { ...ergebnis, client: qc };
 }
 
 describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
@@ -406,6 +408,52 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     await waitFor(() => expect(senke.body).not.toBeNull());
     expect(senke.body).toEqual({ art: 'eintritt', uhs_id: 1, platz_id: 10 });
+  });
+
+  it('zeigt die Platzbelegung optimistisch und rollt eine Serverablehnung zurück', async () => {
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const anderePerson = person({ id: 6, registrier_nr: 6, aktuelle_uhs_id: null });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    let freigeben: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    server.use(http.post('/api/einsaetze/1/personen/5/uhs-belegung', async () => {
+      await gate;
+      return HttpResponse.json({ error: 'Platz inzwischen belegt' }, { status: 409 });
+    }));
+    const { client } = renderGrundriss(uhs, [p, anderePerson]);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+    await waehlePatient(/R-005/);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => {
+      const optimistisch = client.getQueryData<Person[]>(einsatzKeys.personen(1));
+      expect(optimistisch?.[0]).toMatchObject({ aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    });
+    expect(screen.getByText('belegt')).toBeInTheDocument();
+
+    // Ein unabhängiger Live-/Refetch-Stand, der während unseres Requests eintrifft, darf
+    // beim Fehler nicht durch einen Snapshot der gesamten Personenliste verloren gehen.
+    let refetchFreigeben: (() => void) | undefined;
+    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    server.use(http.get('/api/einsaetze/1/personen', async () => {
+      await refetchGate;
+      return HttpResponse.json([{ ...p, name: 'Extern geändert' }, anderePerson]);
+    }));
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), (aktuell) =>
+        aktuell?.map((eintrag) => eintrag.id === 5 ? { ...eintrag, name: 'Extern geändert' } : eintrag));
+    });
+
+    await act(async () => { freigeben?.(); });
+    await waitFor(() => {
+      const zurueckgerollt = client.getQueryData<Person[]>(einsatzKeys.personen(1));
+      expect(zurueckgerollt?.find((eintrag) => eintrag.id === 5))
+        .toMatchObject({ aktuelle_uhs_id: null, aktueller_platz_id: null });
+      expect(zurueckgerollt?.find((eintrag) => eintrag.id === 5)?.name).toBe('Extern geändert');
+    });
+    await act(async () => { refetchFreigeben?.(); });
+    expect(screen.queryByText('belegt')).not.toBeInTheDocument();
   });
 
   it('verlegt eine Person aus dem Wartebereich auf den Platz (art=wechsel)', async () => {

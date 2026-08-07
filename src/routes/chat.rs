@@ -115,6 +115,41 @@ pub async fn kanal_anlegen(
     Ok((StatusCode::CREATED, Json(kanal)))
 }
 
+/// POST /api/einsaetze/{id}/chat/kanaele/{kid}/gelesen — aktuellen Kanal persistent
+/// für den angemeldeten Benutzer als gelesen markieren. Auch Beobachter dürfen lesen.
+pub async fn kanal_gelesen_markieren(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, kanal_id)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+
+    let jetzt = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    repo::kanal_gelesen_markieren(
+        &state.pool,
+        einsatz.org_id,
+        einsatz_id,
+        kanal_id,
+        benutzer.id,
+        &jetzt,
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ---- Nachrichten ----
 
 #[derive(Debug, Deserialize)]

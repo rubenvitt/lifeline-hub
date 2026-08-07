@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react';
-import { theme, Typography } from 'antd';
+import { Badge, theme, Typography } from 'antd';
 import { ExportOutlined, LockOutlined, ToolOutlined } from '@ant-design/icons';
 import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
 import { form } from '../theme/tokens';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulZaehlerMap } from './useModulZaehler';
 
 /** Breite des Aktivbalkens. Markermaß, keine Dichte-Angabe — dieselbe Kategorie wie
  *  die 48 in `IconRail.tsx:43-44`. */
@@ -30,6 +31,8 @@ interface ListeProps {
    * zu ergänzen.
    */
   mindestTrefflaeche?: number;
+  /** Bereits berechnete, berechtigungsgesteuerte Zähler je Registry-Quelle. */
+  zaehler?: ModulZaehlerMap;
 }
 
 /**
@@ -124,6 +127,7 @@ export function ModulListe({
   aktiverModulKey,
   onModulKlick,
   mindestTrefflaeche,
+  zaehler,
 }: ListeProps) {
   const { token } = theme.useToken();
   // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben immer sichtbar).
@@ -134,6 +138,8 @@ export function ModulListe({
         const gesperrt = istModulGesperrt(m, benutzer, overrides);
         const aktiv = m.key === aktiverModulKey;
         const Icon = m.icon;
+        const modulZaehler = m.zaehlerQuelle ? zaehler?.[m.zaehlerQuelle] : undefined;
+        const zaehlerSichtbar = modulZaehler !== undefined && modulZaehler.wert > 0;
         return (
           <button
             key={m.key}
@@ -144,6 +150,7 @@ export function ModulListe({
             // Screenreader unsichtbar. Muster: `IconRail.tsx:40`, dort von
             // `IconRail.test.tsx:30-35` gepinnt.
             aria-current={aktiv ? 'true' : undefined}
+            aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
             onClick={() => !gesperrt && onModulKlick(m)}
             style={modulZeilenStil(token, { aktiv, gesperrt, mindestTrefflaeche })}
           >
@@ -151,6 +158,25 @@ export function ModulListe({
                 schrumpft sie bei „Gefahren-/Absperrzonen" im 220-px-Panel auf 4,1 px. */}
             <Icon size={18} style={{ flexShrink: 0 }} />
             <span style={{ minWidth: 0 }}>{m.label}</span>
+            {zaehlerSichtbar && (
+              <span
+                aria-hidden="true"
+                title={modulZaehler.beschreibung}
+                style={{ display: 'inline-flex', flexShrink: 0, marginLeft: 'auto' }}
+              >
+                <Badge
+                  count={modulZaehler.wert}
+                  overflowCount={999}
+                  styles={{
+                    indicator: {
+                      backgroundColor: token.colorText,
+                      color: token.colorBgContainer,
+                      boxShadow: 'none',
+                    },
+                  }}
+                />
+              </span>
+            )}
             {/* Dekoration neben dem Label. `aria-hidden` an der HÜLLE ist Pflicht, nicht
                 Kosmetik: ein `@ant-design/icons`-Knoten bringt `role="img"` mit eigenem
                 ENGLISCHEM `aria-label` mit („tool"/„lock") und landete sonst im Accessible
@@ -168,7 +194,7 @@ export function ModulListe({
               <span
                 title="Öffnet in der Lagekarte"
                 aria-hidden
-                style={{ display: 'inline-flex', flexShrink: 0, marginLeft: 'auto' }}
+                style={{ display: 'inline-flex', flexShrink: 0, marginLeft: zaehlerSichtbar ? 0 : 'auto' }}
               >
                 <ExportOutlined />
               </span>
@@ -179,7 +205,7 @@ export function ModulListe({
                 gewinnt) und zerlegte ein Bedienelement in zwei Tooltip-Zonen mit
                 verschiedenem Wortlaut, um dieselbe Sache zu sagen. */}
             {gesperrt && (
-              <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0, marginLeft: 'auto' }}>
+              <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0, marginLeft: zaehlerSichtbar ? 0 : 'auto' }}>
                 <LockOutlined />
               </span>
             )}

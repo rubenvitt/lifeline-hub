@@ -9,6 +9,8 @@ import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import EinsatzLayout from './EinsatzLayout';
 
+vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
+
 /**
  * Der gemerkte Rahmen-Zustand wird gegen ein HANDGESCHRIEBENES Literal geprüft,
  * nicht gegen die Konstante aus `navPersistenz` — sonst prüfte der Test die
@@ -44,6 +46,7 @@ function setup(
     http.get('/api/einsaetze/7/modul-overrides', () =>
       fehler.overrides ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(overrides),
     ),
+    http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -67,6 +70,7 @@ function setupRoute(route: string, childPath: string) {
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -340,7 +344,7 @@ describe('EinsatzLayout', () => {
       ).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: 'Alarm-Ton stummschalten' }),
+        screen.getByRole('button', { name: 'Alarmton durch Klick entsperren' }),
       ).toBeInTheDocument();
     });
 

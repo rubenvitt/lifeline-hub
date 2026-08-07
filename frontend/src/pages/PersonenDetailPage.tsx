@@ -2,7 +2,7 @@ import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNu
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -16,10 +16,11 @@ import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { flaeche } from '../theme/tokens';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import KatalogTabelle from '../components/KatalogTabelle';
-import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, VerbleibArt } from '../api/types';
+import type { Person, PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, VerbleibArt } from '../api/types';
 import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
@@ -44,12 +45,17 @@ export default function PersonenDetailPage() {
   const einsatzId = Number(id);
   const personId = Number(personIdParam);
   const idGueltig = parseRouteId(personIdParam) != null;
+  const aktuelleRouteRef = useRef({ einsatzId, personId });
+  aktuelleRouteRef.current = { einsatzId, personId };
   const navigate = useNavigate();
   const { benutzer } = useAuth();
 
   const qc = useQueryClient();
   const { message, modal } = App.useApp();
-  const [bearbeiten, setBearbeiten] = useState(false);
+  const [editSitzung, setEditSitzung] = useState<{
+    basis: string;
+    werte: PersonEingabe;
+  } | null>(null);
   const [editForm] = Form.useForm<PersonEingabe>();
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -68,6 +74,9 @@ export default function PersonenDetailPage() {
     queryKey: einsatzKeys.person(einsatzId, personId),
     queryFn: () => ladePerson(einsatzId, personId),
     enabled: idGueltig,
+    // Dieser GET schreibt serverseitig einen Zugriffsaudit. Ein automatischer Retry
+    // wuerde fuer dieselbe Oeffnung mehrere Auditzeilen erzeugen.
+    retry: false,
   });
   const tiereDerPersonQuery = useQuery({
     queryKey: einsatzKeys.tiereHalter(einsatzId, personId),
@@ -92,15 +101,73 @@ export default function PersonenDetailPage() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: (v: { personId: number; status: PersonStatus }) => setzePersonStatus(einsatzId, v.personId, v.status),
-    onSuccess: invalidateDetail, onError: fehler,
+    mutationFn: (v: { einsatzId: number; personId: number; status: PersonStatus }) =>
+      setzePersonStatus(v.einsatzId, v.personId, v.status),
+    onMutate: async (v) => {
+      const listenKey = einsatzKeys.personen(v.einsatzId);
+      const detailKey = einsatzKeys.person(v.einsatzId, v.personId);
+      await Promise.all([
+        qc.cancelQueries({ queryKey: listenKey }),
+        qc.cancelQueries({ queryKey: detailKey }),
+      ]);
+      const listeVorher = qc.getQueryData<Person[]>(listenKey)
+        ?.find((person) => person.id === v.personId);
+      const detailVorher = qc.getQueryData<PersonDetail>(detailKey);
+      qc.setQueryData<Person[]>(listenKey, (alt) =>
+        alt?.map((person) => person.id === v.personId ? { ...person, status: v.status } : person));
+      qc.setQueryData<PersonDetail>(detailKey, (alt) => alt ? { ...alt, status: v.status } : alt);
+      return { listenKey, detailKey, listeVorher, detailVorher };
+    },
+    onSuccess: (serverStand, variablen) => {
+      qc.setQueryData<Person[]>(einsatzKeys.personen(variablen.einsatzId), (alt) =>
+        alt?.map((person) => person.id === serverStand.id ? serverStand : person));
+      qc.setQueryData<PersonDetail>(
+        einsatzKeys.person(variablen.einsatzId, serverStand.id),
+        (alt) =>
+        alt ? { ...alt, ...serverStand } : alt);
+    },
+    onError: (e, variablen, kontext) => {
+      if (kontext?.listeVorher) {
+        qc.setQueryData<Person[]>(kontext.listenKey, (aktuell) =>
+          aktuell?.map((person) => (
+            person.id === variablen.personId &&
+            person.status === variablen.status &&
+            person.geaendert_at === kontext.listeVorher?.geaendert_at
+              ? { ...person, status: kontext.listeVorher.status }
+              : person
+          )));
+      }
+      if (kontext?.detailVorher) {
+        qc.setQueryData<PersonDetail>(
+          kontext.detailKey,
+          (aktuell) => (
+            aktuell?.status === variablen.status &&
+            aktuell.geaendert_at === kontext.detailVorher?.geaendert_at
+              ? { ...aktuell, status: kontext.detailVorher.status }
+              : aktuell
+          ),
+        );
+      }
+      const aktuelleRoute = aktuelleRouteRef.current;
+      if (
+        aktuelleRoute.einsatzId === variablen.einsatzId &&
+        aktuelleRoute.personId === variablen.personId
+      ) fehler(e);
+    },
+    onSettled: (_daten, _fehler, variablen) => {
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(variablen.einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(variablen.einsatzId) });
+      void qc.invalidateQueries({
+        queryKey: einsatzKeys.person(variablen.einsatzId, variablen.personId),
+      });
+    },
   });
   // Optimistisches Lock (LFH-241/F10): `basis` trägt den beim Laden gelesenen geaendert_at-Stand;
   // ein 409 öffnet den Konfliktdialog (neu laden vs. überschreiben), statt still zu überschreiben.
   const editMutation = useMutation({
     mutationFn: (v: { daten: PersonEingabe; basis?: string; overwrite?: boolean }) =>
       aktualisierePerson(einsatzId, personId, v.daten, v.overwrite ? undefined : v.basis),
-    onSuccess: () => { invalidateDetail(); setBearbeiten(false); },
+    onSuccess: () => { invalidateDetail(); setEditSitzung(null); },
     onError: (e, v) => {
       if (istKonflikt(e)) {
         modal.confirm({
@@ -111,7 +178,7 @@ export default function PersonenDetailPage() {
           okButtonProps: { danger: true },
           cancelText: 'Neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
-          onCancel: () => { detailQuery.refetch(); setBearbeiten(false); },
+          onCancel: () => { detailQuery.refetch(); setEditSitzung(null); },
         });
       } else {
         fehler(e);
@@ -309,7 +376,24 @@ export default function PersonenDetailPage() {
             type="warning" showIcon
             title="Sichtung = tot. Admin-Status wurde NICHT automatisch geändert."
             action={
-              <Button onClick={() => statusMutation.mutate({ personId: person.id, status: 'verstorben' })}>
+              <Button
+                loading={
+                  statusMutation.isPending &&
+                  statusMutation.variables?.einsatzId === einsatzId &&
+                  statusMutation.variables.personId === person.id &&
+                  statusMutation.variables.status === 'verstorben'
+                }
+                disabled={
+                  statusMutation.isPending &&
+                  statusMutation.variables?.einsatzId === einsatzId &&
+                  statusMutation.variables.personId === person.id
+                }
+                onClick={() => statusMutation.mutate({
+                  einsatzId,
+                  personId: person.id,
+                  status: 'verstorben',
+                })}
+              >
                 Status → verstorben
               </Button>
             }
@@ -370,9 +454,9 @@ export default function PersonenDetailPage() {
   function stammdatenSpalte(person: PersonDetail) {
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
-        {bearbeiten ? (
-          <Form form={editForm} layout="vertical" initialValues={person}
-            onFinish={(daten) => editMutation.mutate({ daten, basis: person.geaendert_at })}>
+        {editSitzung ? (
+          <Form form={editForm} layout="vertical" initialValues={editSitzung.werte}
+            onFinish={(daten) => editMutation.mutate({ daten, basis: editSitzung.basis })}>
             <Form.Item label="Name" name="name"><Input /></Form.Item>
             <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
             <Form.Item label="Geschlecht" name="geschlecht">
@@ -389,7 +473,7 @@ export default function PersonenDetailPage() {
             <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
-              <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
+              <Button onClick={() => setEditSitzung(null)}>Abbrechen</Button>
             </Space>
           </Form>
         ) : (
@@ -525,6 +609,13 @@ export default function PersonenDetailPage() {
   return (
     <EinsatzSeite
       breite={flaeche.seiteBreit}
+      dataUpdatedAt={gemeinsamerDatenstand(
+        detailQuery.dataUpdatedAt,
+        tiereDerPersonQuery.dataUpdatedAt,
+        schaedenDerPersonQuery.dataUpdatedAt,
+        uhsListeQuery.dataUpdatedAt,
+        auditQuery.dataUpdatedAt,
+      )}
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
@@ -550,14 +641,44 @@ export default function PersonenDetailPage() {
       }
       aktionen={
         <Space>
-          {darfSchreiben && !p.storniert_at && !bearbeiten && (
+          {darfSchreiben && !p.storniert_at && !editSitzung && (
             <Space wrap>
               {naechsteStatus(p.status).map((s) => (
-                <Button key={s} onClick={() => statusMutation.mutate({ personId: p.id, status: s })}>
+                <Button
+                  key={s}
+                  loading={
+                    statusMutation.isPending &&
+                    statusMutation.variables?.einsatzId === einsatzId &&
+                    statusMutation.variables.personId === p.id &&
+                    statusMutation.variables.status === s
+                  }
+                  disabled={
+                    statusMutation.isPending &&
+                    statusMutation.variables?.einsatzId === einsatzId &&
+                    statusMutation.variables.personId === p.id
+                  }
+                  onClick={() => statusMutation.mutate({ einsatzId, personId: p.id, status: s })}
+                >
                   → {STATUS_META[s].label}
                 </Button>
               ))}
-              <Button onClick={() => { setBearbeiten(true); editForm.setFieldsValue(p); }}>Bearbeiten</Button>
+              <Button onClick={() => {
+                const werte: PersonEingabe = {
+                  name: p.name,
+                  vorname: p.vorname,
+                  geschlecht: p.geschlecht,
+                  geburtsdatum: p.geburtsdatum,
+                  alter_geschaetzt: p.alter_geschaetzt,
+                  herkunft_adresse: p.herkunft_adresse,
+                  antreff_ort: p.antreff_ort,
+                  melder_kontakt: p.melder_kontakt,
+                  notiz: p.notiz,
+                };
+                // Formularwerte und CAS-Basis stammen zwingend aus demselben Snapshot.
+                // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
+                setEditSitzung({ basis: p.geaendert_at, werte });
+                editForm.setFieldsValue(werte);
+              }}>Bearbeiten</Button>
               <Popconfirm title="Person stornieren (Soft-Delete)?" onConfirm={() => stornoMutation.mutate(p.id)}>
                 <Button danger>Stornieren</Button>
               </Popconfirm>

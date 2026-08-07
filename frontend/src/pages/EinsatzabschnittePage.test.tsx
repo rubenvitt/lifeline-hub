@@ -4,9 +4,10 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
+import { formatiereDatenstand } from '../components/Datenstand';
 
 const tmoSprechgruppe = {
   id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
@@ -71,6 +72,44 @@ describe('EinsatzabschnittePage', () => {
     );
     expect(await screen.findByText('Nord')).toBeInTheDocument();
     expect(screen.getByText(/Leiter Nord/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+  });
+
+  it('weist Abschnitt, zugeordnete Einheiten und Personal mit dem ältesten Stand aus', async () => {
+    server.use(...handlers());
+    const client = neuerQueryClient();
+    const abschnittStand = new Date('2026-01-01T10:12:00Z').getTime();
+    const einheitenStand = new Date('2026-01-01T09:05:00Z').getTime();
+    const personalStand = new Date('2026-01-01T08:03:00Z').getTime();
+    for (const key of [
+      einsatzKeys.abschnitte(1),
+      einsatzKeys.einheiten(1),
+      einsatzKeys.personal(1),
+    ]) client.setQueryDefaults(key, { staleTime: Infinity });
+    client.setQueryData(einsatzKeys.abschnitte(1), [funkAbschnitt], { updatedAt: abschnittStand });
+    client.setQueryData(einsatzKeys.einheiten(1), [{
+      id: 10,
+      abschnitt_id: 5,
+      name: '1. Zug',
+      typ_label: 'Zug',
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+    }], { updatedAt: einheitenStand });
+    client.setQueryData(einsatzKeys.personal(1), [], { updatedAt: personalStand });
+
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einsatzabschnitte?abschnitt=5', client },
+    );
+
+    expect(await screen.findByText('1. Zug')).toBeInTheDocument();
+    expect(screen.getByLabelText(
+      `Datenstand ${formatiereDatenstand(personalStand)}`,
+    )).toBeInTheDocument();
+    expect(screen.queryByLabelText(
+      `Datenstand ${formatiereDatenstand(abschnittStand)}`,
+    )).not.toBeInTheDocument();
   });
 
   it('selektiert per ?abschnitt=<id> den Abschnitt (LFH-25 Inspector-Deeplink)', async () => {

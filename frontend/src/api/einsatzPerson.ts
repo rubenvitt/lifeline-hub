@@ -3,7 +3,7 @@ import type {
   Sichtung, Sichtungskategorie, Verbleib, VerbleibArt, VerbleibStatus,
   Verlaufsnotiz, Abgleich,
 } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, type ApiSendOptionen } from './client';
 import { patchBody } from './patchTriState';
 
 /** Felder, die beim Anlegen/Bearbeiten gesetzt werden können (alle optional). */
@@ -19,6 +19,14 @@ export interface PersonEingabe {
   notiz?: string | null;
 }
 
+/** Offline-/Fastpath-fähige Anlage. `client_id` macht einen Replay nach
+ * verloren gegangener Antwort idempotent; `status` vermeidet den unsicheren
+ * zweiten Request bei „Vermisst“/„Betroffen“. */
+export interface PersonAnlegenEingabe extends PersonEingabe {
+  status?: Extract<PersonStatus, 'erfasst' | 'vermisst' | 'betroffen'>;
+  client_id?: string;
+}
+
 export function listePersonen(einsatzId: number, status?: PersonStatus): Promise<Person[]> {
   const q = status ? `?status=${status}` : '';
   return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${q}`);
@@ -30,8 +38,12 @@ export function ladePerson(einsatzId: number, personId: number): Promise<PersonD
   return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
 }
 
-export function legePersonAn(einsatzId: number, daten: PersonEingabe): Promise<Person> {
-  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen`, 'POST', daten);
+export function legePersonAn(
+  einsatzId: number,
+  daten: PersonAnlegenEingabe,
+  optionen?: ApiSendOptionen,
+): Promise<Person> {
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen`, 'POST', daten, optionen);
 }
 
 /** Bearbeitet die Identitäts-/Kontextfelder. `basisGeaendertAt` (der beim Laden gelesene Stand,

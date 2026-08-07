@@ -6,6 +6,7 @@ import { flaeche } from '../theme/tokens';
 // Konsumenten (das Lage-Dashboard). Alle Selektoren der Datei sind klassen-
 // gebunden (`.lfh-*`) — sie färbt also nichts ein, was sie nicht anfasst.
 import '../theme/sprache.css';
+import Datenstand from './Datenstand';
 
 interface EinsatzSeiteProps {
   titel: ReactNode;
@@ -26,6 +27,8 @@ interface EinsatzSeiteProps {
   aktionen?: ReactNode;
   /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
   hinweis?: ReactNode;
+  /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
+  dataUpdatedAt?: number;
   /** Container-Breite in px — `flaeche.seiteSchmal` (Default) oder `flaeche.seiteBreit`. */
   breite?: number;
   children: ReactNode;
@@ -66,6 +69,7 @@ export default function EinsatzSeite({
   breadcrumb,
   aktionen,
   hinweis,
+  dataUpdatedAt,
   breite = flaeche.seiteSchmal,
   children,
 }: EinsatzSeiteProps) {
@@ -109,7 +113,8 @@ export default function EinsatzSeite({
           <Typography.Title level={4} style={{ margin: 0 }}>
             {titel}
           </Typography.Title>
-          {beschreibung && <Typography.Text type="secondary">{beschreibung}</Typography.Text>}
+          {beschreibung && <div><Typography.Text type="secondary">{beschreibung}</Typography.Text></div>}
+          <Datenstand dataUpdatedAt={dataUpdatedAt} />
         </div>
         {aktionen && <div ref={aktionenRef}>{aktionen}</div>}
       </Flex>

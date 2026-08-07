@@ -142,6 +142,20 @@ async fn bestehende_client_id(
         .map_err(Into::into)
 }
 
+/// Lädt einen bereits committeten Offline-Eintrag anhand seines einsatzgebundenen
+/// Idempotenzschlüssels. Die Einsatz-ID ist Teil des Lookups und verhindert, dass dieselbe
+/// `client_id` Daten eines anderen Einsatzes offenlegt.
+pub async fn laden_nach_client_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<EtbEintragAnzeige>, AppError> {
+    match bestehende_client_id(pool, einsatz_id, client_id).await? {
+        Some(id) => laden(pool, id).await.map(Some),
+        None => Ok(None),
+    }
+}
+
 /// Wie `anlegen_tx`, bindet zusätzlich `client_id`. Liefert den rohen sqlx-Fehler,
 /// damit der Aufrufer die UNIQUE-Verletzung (Race) vom übrigen Fehlerbild trennen kann.
 async fn insert_mit_client_id(

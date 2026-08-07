@@ -87,26 +87,40 @@ export default function FahrzeugeTab() {
           {
             title: 'Aktionen',
             key: 'aktionen',
-            render: (_, f: Fahrzeug) => (
-              <Space size="middle">
-                <Button onClick={() => { setBearbeite(f); setModalOffen(true); }}>
-                  Bearbeiten
-                </Button>
-                {f.dienststatus === 'in_dienst' ? (
-                  <Popconfirm
-                    title="Außer Dienst stellen?"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => dienststatusMutation.mutate({ id: f.id, inDienst: false })}
-                  >
-                    <Button danger>Außer Dienst</Button>
-                  </Popconfirm>
-                ) : (
-                  <Button onClick={() => dienststatusMutation.mutate({ id: f.id, inDienst: true })}>
-                    Wieder in Dienst
+            render: (_, f: Fahrzeug) => {
+              const gesperrt = dienststatusMutation.isPending;
+              const laeuft = gesperrt && dienststatusMutation.variables?.id === f.id;
+              return (
+                <Space size="middle">
+                  <Button disabled={gesperrt} onClick={() => { setBearbeite(f); setModalOffen(true); }}>
+                    Bearbeiten
                   </Button>
-                )}
-              </Space>
-            ),
+                  {f.dienststatus === 'in_dienst' ? (
+                    <Popconfirm
+                      title="Außer Dienst stellen?"
+                      disabled={gesperrt}
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => {
+                        if (!dienststatusMutation.isPending) {
+                          dienststatusMutation.mutate({ id: f.id, inDienst: false });
+                        }
+                      }}
+                    >
+                      <Button danger loading={laeuft} disabled={gesperrt}>Außer Dienst</Button>
+                    </Popconfirm>
+                  ) : (
+                    <Button loading={laeuft} disabled={gesperrt}
+                      onClick={() => {
+                        if (!dienststatusMutation.isPending) {
+                          dienststatusMutation.mutate({ id: f.id, inDienst: true });
+                        }
+                      }}>
+                      Wieder in Dienst
+                    </Button>
+                  )}
+                </Space>
+              );
+            },
           },
         ] as TableColumnsType<Fahrzeug>)
       : []),

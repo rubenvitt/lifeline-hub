@@ -21,6 +21,7 @@ import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
+import Datenstand from '../components/Datenstand';
 
 export default function EtbPage() {
   const { id } = useParams();
@@ -88,7 +89,10 @@ export default function EtbPage() {
   const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
-  const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(einsatzId);
+  const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
+    einsatzId,
+    benutzer?.id,
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette, LFH-11).
@@ -222,11 +226,14 @@ export default function EtbPage() {
         ]}
       />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {einsatz.bezeichnung}
-          </Typography.Title>
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+        <Space orientation="vertical" size={0}>
+          <Space>
+            <Typography.Title level={3} style={{ margin: 0 }}>
+              {einsatz.bezeichnung}
+            </Typography.Title>
+            <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          </Space>
+          <Datenstand dataUpdatedAt={etbQuery.dataUpdatedAt} />
         </Space>
         <Space>
           {darfAbschliessen && (

@@ -15,6 +15,11 @@ export function legeKanalAn(einsatzId: number, daten: NeuerKanal): Promise<ChatK
   return apiSend<ChatKanal>(`/api/einsaetze/${einsatzId}/chat/kanaele`, 'POST', daten);
 }
 
+/** Markiert alle aktuell vorhandenen Nachrichten des Kanals für den Benutzer gelesen. */
+export function markiereKanalGelesen(einsatzId: number, kanalId: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/gelesen`, 'POST');
+}
+
 /** Seitengröße der Nachrichten-Pagination. Muss dem Backend-Default (STANDARD_LIMIT,
  *  src/routes/chat.rs) entsprechen, damit die hasNextPage-Heuristik (volle Seite = mehr da)
  *  greift — das Frontend sendet kein eigenes limit. */

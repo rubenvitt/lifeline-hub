@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from './client';
+import { ApiError, NetzFehler } from './client';
 import { erzeugeQueryClient } from './queryClient';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 
@@ -64,8 +64,41 @@ describe('erzeugeQueryClient — globale 401-Erkennung', () => {
     konsole.mockRestore();
   });
 
+  it('behandelt einen klassifizierten NetzFehler als erwarteten Betriebszustand', async () => {
+    const konsole = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await mutationScheitert(new NetzFehler());
+    expect(konsole).not.toHaveBeenCalled();
+    konsole.mockRestore();
+  });
+
   it('übernimmt die übergebenen defaultOptions', () => {
     const client = erzeugeQueryClient({ queries: { retry: false, gcTime: 0 } });
     expect(client.getDefaultOptions().queries?.gcTime).toBe(0);
+  });
+});
+
+describe('erzeugeQueryClient — Produktionsdefaults', () => {
+  it('wiederholt ausschließlich NetzFehler bei Queries höchstens zweimal mit Backoff', () => {
+    const optionen = erzeugeQueryClient().getDefaultOptions().queries;
+    const retry = optionen?.retry;
+    const retryDelay = optionen?.retryDelay;
+
+    expect(typeof retry).toBe('function');
+    expect(typeof retryDelay).toBe('function');
+    if (typeof retry !== 'function' || typeof retryDelay !== 'function') {
+      throw new Error('Query-Retry-Defaults fehlen');
+    }
+
+    expect(retry(0, new NetzFehler())).toBe(true);
+    expect(retry(1, new NetzFehler())).toBe(true);
+    expect(retry(2, new NetzFehler())).toBe(false);
+    expect(retry(0, new ApiError(503, 'nicht verfügbar'))).toBe(false);
+    expect(retry(0, new TypeError('Programmierfehler'))).toBe(false);
+    expect(retryDelay(0, new NetzFehler())).toBe(1_000);
+    expect(retryDelay(1, new NetzFehler())).toBe(2_000);
+  });
+
+  it('wiederholt Mutationen nie automatisch', () => {
+    expect(erzeugeQueryClient().getDefaultOptions().mutations?.retry).toBe(0);
   });
 });

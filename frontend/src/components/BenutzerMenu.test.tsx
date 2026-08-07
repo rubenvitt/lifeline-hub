@@ -85,6 +85,12 @@ describe('BenutzerMenu — ab lg', () => {
     expect(screen.queryByRole('menuitem', { name: /Hell/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Handschuh/ })).not.toBeInTheDocument();
   });
+
+  it('zeigt die gebaute Frontend-Version sichtbar im Dropdown', async () => {
+    zeige();
+    await oeffne();
+    expect(await screen.findByText(/^Version \d+\.\d+\.\d+/)).toBeInTheDocument();
+  });
 });
 
 describe('BenutzerMenu — unter lg', () => {

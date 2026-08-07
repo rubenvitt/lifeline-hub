@@ -118,6 +118,7 @@ export default function BereitstellungsraeumePage() {
   return (
     <EinsatzSeite
       titel="Bereitstellungsräume"
+      dataUpdatedAt={brQuery.dataUpdatedAt}
       breite={flaeche.seiteBreit}
       breadcrumb={
         <Breadcrumb items={[

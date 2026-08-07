@@ -51,6 +51,104 @@ async fn senden_und_lesen() {
 }
 
 #[tokio::test]
+async fn kanal_ungelesen_und_gelesenmarke_sind_pro_benutzer_persistent() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let leser_id = benutzer_anlegen(&app, &admin, "leser", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, leser_id, "beobachter").await;
+    let leser = login_cookie(&app, "leser", "leserpw1").await;
+
+    for inhalt in ["Erste Lage", "Zweite Lage"] {
+        assert_eq!(
+            anfrage(
+                &app,
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+                &admin,
+                Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
+            )
+            .await
+            .0,
+            StatusCode::CREATED,
+        );
+    }
+
+    let (_, kanaele) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &leser,
+        None,
+    )
+    .await;
+    assert_eq!(kanaele[0]["ungelesen_anzahl"], 2);
+    assert!(kanaele[0]["letzte_nachricht_at"].is_string());
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/gelesen"),
+        &leser,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let (_, nachher) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &leser,
+        None,
+    )
+    .await;
+    assert_eq!(nachher[0]["ungelesen_anzahl"], 0);
+
+    // Die Markierung gilt nur für den bisherigen Bestand: neue Nachricht → wieder 1.
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        Some(r#"{"inhalt":"Dritte Lage"}"#),
+    )
+    .await;
+    let (_, neu) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &leser,
+        None,
+    )
+    .await;
+    assert_eq!(neu[0]["ungelesen_anzahl"], 1);
+}
+
+#[tokio::test]
+async fn gelesenmarke_lehnt_fremden_kanal_ab() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz_a = einsatz_anlegen(&app, &admin).await;
+    let einsatz_b = einsatz_anlegen(&app, &admin).await;
+    let kid_b = default_kanal(&app, einsatz_b, &admin).await;
+
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz_a}/chat/kanaele/{kid_b}/gelesen"),
+            &admin,
+            None,
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND,
+    );
+}
+
+#[tokio::test]
 async fn beobachter_liest_aber_schreibt_nicht() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

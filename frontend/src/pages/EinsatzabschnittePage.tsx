@@ -20,6 +20,7 @@ import { Liste, ListenEintrag } from '../components/Liste';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 
 function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -229,9 +230,16 @@ export default function EinsatzabschnittePage() {
       <Breadcrumb style={{ marginBottom: 12 }}
         items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Einsatzabschnitte' }]} />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>Einsatzabschnitte</Typography.Title>
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+        <Space orientation="vertical" size={0}>
+          <Space>
+            <Typography.Title level={3} style={{ margin: 0 }}>Einsatzabschnitte</Typography.Title>
+            <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          </Space>
+          <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
+            abschnitteQuery.dataUpdatedAt,
+            einheitenQuery.dataUpdatedAt,
+            personalQuery.dataUpdatedAt,
+          )} />
         </Space>
         {darfSchreiben && <Button type="primary" onClick={() => anlegen.mutate()}>Abschnitt anlegen</Button>}
       </Space>

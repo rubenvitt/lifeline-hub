@@ -103,6 +103,8 @@ export interface KartenflaecheProps {
   zoneZeichnenNonce?: number;
   /** Callback nach abgeschlossenem Zeichnen einer Zone. */
   onZoneGezeichnet?: (geometrie: GeoJsonGeometry) => void;
+  /** true, sobald im aktiven Abschnitts-/Zonen-Entwurf mindestens drei Punkte gesetzt sind. */
+  onZeichnenBereitAenderung?: (bereit: boolean) => void;
   /** Klick auf eine Zone → Inspector. */
   onZoneKlick?: (id: number) => void;
   /** Aktive Fachebenen mit Daten (externe Overlays). */
@@ -134,15 +136,16 @@ export interface KartenHandle {
   /** Karte auf die Bild-Ecken einpassen (fitBounds). */
   zentriereAufEcken(ecken: Ecken): void;
   /** Aktives Zonen-Zeichnen abschließen (native Finish-Geste). No-op, wenn nicht aktiv. */
-  zoneAbschliessen(): void;
+  zoneAbschliessen(): boolean;
   /** Aktives Abschnitt-Zeichnen abschließen. No-op, wenn nicht aktiv. */
-  abschnittAbschliessen(): void;
+  abschnittAbschliessen(): boolean;
 }
 
 const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
   zonen, zoneZeichnen, zoneZeichnenNonce, onZoneGezeichnet, onZoneKlick,
+  onZeichnenBereitAenderung,
   fachebenen, onBboxAenderung, onZoomAenderung, onFachebeneKlick,
   bilder, platzierBild, onPlatzierGeometrie,
 }, ref) {
@@ -194,6 +197,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   onFlaecheGezeichnetRef.current = onFlaecheGezeichnet;
   const onZoneGezeichnetRef = useRef(onZoneGezeichnet);
   onZoneGezeichnetRef.current = onZoneGezeichnet;
+  const onZeichnenBereitAenderungRef = useRef(onZeichnenBereitAenderung);
+  onZeichnenBereitAenderungRef.current = onZeichnenBereitAenderung;
 
   // Imperative API für die Page: Upload-Platzierung (Viewport-Mitte, Bild-Seitenverhältnis)
   // und Auf-Bild-Zentrieren. Pixel-Raum via project/unproject → exakt, ohne cos(lat)-Verzerrung.
@@ -218,10 +223,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 });
     },
     zoneAbschliessen() {
-      zoneDrawRef.current?.abschliessen();
+      return zoneDrawRef.current?.abschliessen() ?? false;
     },
     abschnittAbschliessen() {
-      drawRef.current?.abschliessen();
+      return drawRef.current?.abschliessen() ?? false;
     },
   }), []);
 
@@ -743,9 +748,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     if (zeichnen) {
       if (!drawRef.current) {
-        drawRef.current = createZeichnung(map, (g) => {
-          if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
-        });
+        drawRef.current = createZeichnung(
+          map,
+          (g) => {
+            if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
+          },
+          (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+        );
       }
       drawRef.current.starten('polygon');
     } else if (drawRef.current) {
@@ -759,7 +768,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     if (zoneZeichnen) {
       if (!zoneDrawRef.current) {
-        zoneDrawRef.current = createZeichnung(map, (g) => onZoneGezeichnetRef.current?.(g));
+        zoneDrawRef.current = createZeichnung(
+          map,
+          (g) => onZoneGezeichnetRef.current?.(g),
+          (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+        );
       }
       zoneDrawRef.current.starten(zoneZeichnen);
     } else if (zoneDrawRef.current) {

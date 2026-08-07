@@ -186,6 +186,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
+            retain("client_id", G_IDEMPOTENZ),
             retain("registrier_nr", G_ZAEHLER),
             retain("status", G_TRIAGE),
             scrub("name", Strategie::NullSetzen),
@@ -915,6 +916,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
+            retain("client_id", G_IDEMPOTENZ),
             retain("lfd_nr", G_ZAEHLER),
             retain("absender", G_FUEHRUNG),
             retain("empfaenger", G_FUEHRUNG),
@@ -931,6 +933,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("auftrag_id", G_FK),
             retain("erfasst_von_id", G_FK),
             retain("erstellt_at", G_ZEIT),
+            retain("live_published_at", G_ZEIT),
             retain("bestaetigung_pflicht", G_KONFIG),
             retain("bestaetigung_frist_at", G_ZEIT),
             retain("eskaliert", G_KONFIG),

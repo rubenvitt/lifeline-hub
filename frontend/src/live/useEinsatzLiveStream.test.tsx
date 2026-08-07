@@ -454,6 +454,24 @@ describe('useEinsatzLiveStream', () => {
     window.removeEventListener('lfh:live-status', onStatus);
   });
 
+  it('meldet beim Unmount idle, damit der globale Hinweis nicht auf anderen Routen stehenbleibt', () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const status: string[] = [];
+    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    const { unmount } = render(
+      <QueryClientProvider client={neuerQueryClient()}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+
+    FakeEventSource.letzte?.emitError(FakeEventSource.CONNECTING);
+    expect(status).toContain('connecting');
+    unmount();
+    expect(status[status.length - 1]).toBe('idle');
+    window.removeEventListener('lfh:live-status', onStatus);
+  });
+
   it('leitet bei CLOSED-Fehler mit 401 in den Login-Flow (F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
@@ -478,6 +496,7 @@ describe('useEinsatzLiveStream', () => {
   it('reconnectet nach CLOSED-Fehler bei gültiger Session statt Login (F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })));
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const authVerloren = vi.fn();
     window.addEventListener(SITZUNG_ABGELAUFEN, authVerloren);
@@ -493,9 +512,11 @@ describe('useEinsatzLiveStream', () => {
     await waitFor(() =>
       expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(true),
     );
+    expect(timeoutSpy).toHaveBeenCalledWith(15_000);
     expect(authVerloren).not.toHaveBeenCalled();
     expect(quelle?.closed).toBe(true); // tote Quelle vor Reconnect geschlossen
     window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     setTimeoutSpy.mockRestore();
+    timeoutSpy.mockRestore();
   });
 });

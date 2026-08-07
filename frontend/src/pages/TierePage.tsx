@@ -2,15 +2,16 @@ import { Alert, App, Breadcrumb, Button, Form, Input, Space, Tabs, Tag, Typograp
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, { scrolleZurZeile, spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
+import Datenstand from '../components/Datenstand';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
@@ -152,8 +153,25 @@ export default function TierePage() {
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const navigate = useNavigate();
-  const [sicht, setSicht] = useState<Sicht>('aktiv');
-  const [speziesFilter, setSpeziesFilter] = useState<Spezies | undefined>(undefined);
+  const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
+  const [speziesNachEinsatz, setSpeziesNachEinsatz] = useState<Record<number, Spezies | undefined>>({});
+  const [highlight, setHighlight] = useState<{ einsatzId: number; tierId: number } | null>(null);
+  const [frischAngelegt, setFrischAngelegt] = useState<Array<{
+    einsatzId: number;
+    tier: Tier;
+    bestaetigenNach: number;
+  }>>([]);
+  const aktuellerEinsatzRef = useRef(einsatzId);
+  aktuellerEinsatzRef.current = einsatzId;
+  const sicht = sichtNachEinsatz[einsatzId] ?? 'aktiv';
+  const speziesFilter = speziesNachEinsatz[einsatzId];
+
+  const setSichtFuer = (zielEinsatzId: number, neueSicht: Sicht) => {
+    setSichtNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: neueSicht }));
+  };
+  const setSpeziesFuer = (zielEinsatzId: number, spezies: Spezies | undefined) => {
+    setSpeziesNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: spezies }));
+  };
 
   // Tier-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
   // im EinsatzLayout, `tier`-Event → 'einsatz-tiere') live gehalten — LFH-75.
@@ -162,14 +180,31 @@ export default function TierePage() {
 
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [modus, setModus] = useState<null | 'schnell' | 'vermisst'>(null);
+  const [modus, setModus] = useState<{
+    einsatzId: number;
+    wert: 'schnell' | 'vermisst';
+  } | null>(null);
+  const aktuellerModus = modus?.einsatzId === einsatzId ? modus.wert : null;
   const [form] = Form.useForm<TierEingabe>();
 
-  function invalidate() {
-    qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-  }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+
+  useEffect(() => {
+    if (highlight?.einsatzId !== einsatzId) return;
+    scrolleZurZeile(highlight.tierId);
+  }, [highlight, einsatzId, sicht]);
+
+  useEffect(() => {
+    const serverIds = new Set((tiereQuery.data ?? []).map((tier) => tier.id));
+    if (serverIds.size === 0) return;
+    setFrischAngelegt((alt) => {
+      const offen = alt.filter((eintrag) =>
+        eintrag.einsatzId !== einsatzId ||
+        tiereQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
+        !serverIds.has(eintrag.tier.id));
+      return offen.length === alt.length ? alt : offen;
+    });
+  }, [einsatzId, tiereQuery.data, tiereQuery.dataUpdatedAt]);
 
   /**
    * Anlegen. `onSuccess` invalidiert nur noch (LFH-332 · B4) — Schliessen macht `onFertig`
@@ -179,9 +214,36 @@ export default function TierePage() {
    * die Hülle sieht nur die Ablehnung und lässt den Wortlaut stehen.
    */
   const anlegenMutation = useMutation({
-    mutationFn: (v: TierEingabe) => legeTierAn(einsatzId, v),
-    onSuccess: () => { invalidate(); },
-    onError: fehler,
+    mutationFn: (v: { einsatzId: number; daten: TierEingabe }) => legeTierAn(v.einsatzId, v.daten),
+    onMutate: async (v) => {
+      // Ein bereits laufender Listen-GET kann vor dem POST gelesen haben und spaeter dessen
+      // Ergebnis aus dem Cache verdrängen. Canceln, bevor der Schreibvorgang startet.
+      await qc.cancelQueries({ queryKey: einsatzKeys.tiere(v.einsatzId) });
+    },
+    onSuccess: (tier, variablen) => {
+      // Die Quittung lebt bis zu dem Refetch, der dieselbe ID erstmals bestaetigt, in einer
+      // kleinen lokalen Overlay-Liste. So kann weder ein alter GET noch Replikationsverzug die
+      // neue Zeile ausblenden; bei noch fehlendem Cache erfinden wir zugleich keine scheinbar
+      // vollstaendige Singleton-Serverliste.
+      setFrischAngelegt((alt) => [
+        {
+          einsatzId: variablen.einsatzId,
+          tier,
+          bestaetigenNach:
+            qc.getQueryState(einsatzKeys.tiere(variablen.einsatzId))?.dataUpdatedAt ?? 0,
+        },
+        ...alt.filter((eintrag) =>
+          eintrag.einsatzId !== variablen.einsatzId || eintrag.tier.id !== tier.id),
+      ]);
+      setHighlight({ einsatzId: variablen.einsatzId, tierId: tier.id });
+      setSichtFuer(variablen.einsatzId, tier.status);
+      setSpeziesFuer(variablen.einsatzId, undefined);
+      qc.invalidateQueries({ queryKey: einsatzKeys.tiere(variablen.einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(variablen.einsatzId) });
+    },
+    onError: (e, variablen) => {
+      if (aktuellerEinsatzRef.current === variablen.einsatzId) fehler(e);
+    },
   });
 
   /**
@@ -204,7 +266,14 @@ export default function TierePage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const alle = tiereQuery.data ?? [];
+  const aktuelleFrische = frischAngelegt
+    .filter((eintrag) => eintrag.einsatzId === einsatzId)
+    .map((eintrag) => eintrag.tier);
+  const frischeIds = new Set(aktuelleFrische.map((tier) => tier.id));
+  const alle = [
+    ...aktuelleFrische,
+    ...(tiereQuery.data ?? []).filter((tier) => !frischeIds.has(tier.id)),
+  ];
   const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
 
   /**
@@ -233,16 +302,17 @@ export default function TierePage() {
         <Space>
           <Typography.Title level={3} style={{ margin: 0 }}>Tiere</Typography.Title>
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <Datenstand dataUpdatedAt={tiereQuery.dataUpdatedAt} />
         </Space>
         {darfSchreiben && (
           <Space>
-            <Button type="primary" onClick={() => setModus('schnell')}>Schnellerfassung</Button>
-            <Button onClick={() => setModus('vermisst')}>Vermisst melden</Button>
+            <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>Schnellerfassung</Button>
+            <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>Vermisst melden</Button>
           </Space>
         )}
       </Space>
 
-      <Tabs activeKey={sicht} onChange={(k) => setSicht(k as Sicht)} items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))} />
+      <Tabs activeKey={sicht} onChange={(k) => setSichtFuer(einsatzId, k as Sicht)} items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))} />
 
       <Space wrap style={{ marginBottom: 12 }}>
         <Typography.Text type="secondary">Spezies:</Typography.Text>
@@ -250,7 +320,7 @@ export default function TierePage() {
             keine Umschließung): ohne ihn hat das Feld keinen zugänglichen Namen und ist nur
             solange eindeutig auffindbar, wie es die einzige Combobox der Seite ist. */}
         <Select<Spezies | undefined> aria-label="Spezies" allowClear placeholder="alle" style={{ width: 180 }}
-          value={speziesFilter} onChange={(v) => setSpeziesFilter(v)}
+          value={speziesFilter} onChange={(v) => setSpeziesFuer(einsatzId, v)}
           options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
       </Space>
 
@@ -316,6 +386,11 @@ export default function TierePage() {
             standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
             onZeileKlick={(t) => navigate(tiereDetailPfad(einsatzId, t.id))}
             karte={tierKarte(einsatzId)}
+            zeilenKlasse={(t) => (
+              highlight?.einsatzId === einsatzId && t.id === highlight.tierId
+                ? 'zeile-hervorgehoben'
+                : undefined
+            )}
           />
         </>
       )}
@@ -336,22 +411,27 @@ export default function TierePage() {
         * Dialog geöffnet wurde, und die Ableitung sitzt deshalb in `onErfassen`.
         */}
       <ErfassungsModal<TierEingabe>
-        offen={modus !== null}
-        titel={modus === 'vermisst' ? 'Vermisst melden' : 'Schnellerfassung'}
+        offen={aktuellerModus !== null}
+        titel={aktuellerModus === 'vermisst' ? 'Vermisst melden' : 'Schnellerfassung'}
         form={form}
-        laeuft={anlegenMutation.isPending}
+        laeuft={
+          anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId
+        }
         initialValues={{ spezies: 'hund' }}
         serie
         uebernahme={['spezies', 'antreff_ort']}
         onErfassen={async (daten) => {
           // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
           await anlegenMutation.mutateAsync({
-            ...daten,
-            status: modus === 'vermisst' ? 'vermisst' : 'aktiv',
+            einsatzId,
+            daten: {
+              ...daten,
+              status: aktuellerModus === 'vermisst' ? 'vermisst' : 'aktiv',
+            },
           });
         }}
-        onFertig={() => setModus(null)}
-        onAbbrechen={() => setModus(null)}
+        onFertig={() => setModus((alt) => alt?.einsatzId === einsatzId ? null : alt)}
+        onAbbrechen={() => setModus((alt) => alt?.einsatzId === einsatzId ? null : alt)}
       >
         <Form.Item label="Spezies" name="spezies" rules={[{ required: true, message: 'Bitte Spezies wählen' }]}>
           <Select options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
@@ -359,7 +439,7 @@ export default function TierePage() {
         <Form.Item label="Rufname" name="rufname"><Input /></Form.Item>
         <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung"><Input placeholder="z. B. Haflinger, Deutscher Schäferhund" /></Form.Item>
         <Form.Item label="Antreffort" name="antreff_ort"><Input placeholder="z. B. Weide, Sammelstelle" /></Form.Item>
-        {modus === 'vermisst' && (
+        {aktuellerModus === 'vermisst' && (
           <>
             <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung"><Input /></Form.Item>
             <Form.Item label="Kennzeichnung (Chip/Tätowierung/Halsband)" name="kennzeichnung"><Input /></Form.Item>

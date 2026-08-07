@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -53,6 +53,50 @@ describe('MaterialPage', () => {
     render(einsatzAktiv, [em]);
     expect(await screen.findByText('Wolldecke')).toBeInTheDocument();
     expect(screen.getByDisplayValue('50')).toBeInTheDocument(); // Mengen-Input (min 1)
+  });
+
+  it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
+    let freigeben: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    server.use(http.patch('/api/einsaetze/1/material/10', async () => {
+      await gate;
+      return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
+    }));
+    const zweitesMaterial = { ...em, id: 11, bezeichnung: 'Zeltbahn' };
+    const { container, client } = render(einsatzAktiv, [em, zweitesMaterial]);
+    await screen.findByText('Wolldecke');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+
+    await userEvent.click(within(zeile).getByRole('combobox'));
+    const option = (await screen.findAllByText('defekt')).find((el) => el.closest('.ant-select-item-option'));
+    expect(option).toBeTruthy();
+    await userEvent.click(option!);
+
+    await waitFor(() => {
+      expect(client.getQueryData<(typeof em)[]>(einsatzKeys.material(1))?.[0].status).toBe('defekt');
+    });
+    expect(within(zeile).getByRole('combobox')).toBeDisabled();
+    expect(within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('combobox'))
+      .toBeDisabled();
+
+    let refetchFreigeben: (() => void) | undefined;
+    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    server.use(http.get('/api/einsaetze/1/material', async () => {
+      await refetchGate;
+      return HttpResponse.json([{ ...em, bezeichnung: 'Extern geändert' }, zweitesMaterial]);
+    }));
+    act(() => {
+      client.setQueryData<(typeof em)[]>(einsatzKeys.material(1), (aktuell) =>
+        aktuell?.map((eintrag) => eintrag.id === 10 ? { ...eintrag, bezeichnung: 'Extern geändert' } : eintrag));
+    });
+
+    await act(async () => { freigeben?.(); });
+    await waitFor(() => {
+      const stand = client.getQueryData<(typeof em)[]>(einsatzKeys.material(1));
+      expect(stand?.find((eintrag) => eintrag.id === 10)?.status).toBe('einsatzbereit');
+      expect(stand?.find((eintrag) => eintrag.id === 10)?.bezeichnung).toBe('Extern geändert');
+    });
+    await act(async () => { refetchFreigeben?.(); });
   });
 
   it('Einsatzleitung sieht Disponier- und Ad-hoc-Aktionen', async () => {

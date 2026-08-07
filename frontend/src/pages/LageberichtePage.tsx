@@ -15,6 +15,7 @@ import type { LageberichtAnzeige, LageberichtVorlageKey } from '../api/types';
 import { VORLAGEN } from '../lageberichte/vorlagen';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
+import Datenstand from '../components/Datenstand';
 
 /**
  * Lageberichte als Kartensicht (LFH-330 · B2, Bündel III) — der Zwilling der Befehlsliste.
@@ -155,6 +156,7 @@ export default function LageberichtePage() {
           <Typography.Text type="secondary">
             {berichte.length} Berichte · {entwuerfe} im Entwurf
           </Typography.Text>
+          <div><Datenstand dataUpdatedAt={berichteQuery.dataUpdatedAt} /></div>
         </div>
         {darfSchreiben && (
           // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.

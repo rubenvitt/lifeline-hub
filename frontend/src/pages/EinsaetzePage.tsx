@@ -108,6 +108,7 @@ export default function EinsaetzePage() {
   // mitten im Hintergrund-Nachladen wieder weg.
   const {
     data: einsaetze = [],
+    dataUpdatedAt: einsaetzeAktualisiertAt,
     isPending,
     isError,
     refetch,
@@ -180,7 +181,11 @@ export default function EinsaetzePage() {
   }
 
   return (
-    <EinsatzSeite titel="Einsätze" breite={flaeche.seiteBreit}>
+    <EinsatzSeite
+      titel="Einsätze"
+      breite={flaeche.seiteBreit}
+      dataUpdatedAt={einsaetzeAktualisiertAt}
+    >
       {/* Leer und anlegeberechtigt schließen sich NICHT aus: vorher lief der
           Leer-Zweig nur für Nutzer ohne Anlegerecht, alle anderen sahen beim
           Laden, bei leerer Liste und im Fehlerfall dieselbe leere Fläche.

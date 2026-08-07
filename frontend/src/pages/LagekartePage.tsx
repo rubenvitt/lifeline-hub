@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, App } from 'antd';
@@ -59,6 +59,7 @@ export default function LagekartePage() {
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
   const kartenRef = useRef<KartenHandle>(null);
+  const [zeichnenBereit, setZeichnenBereit] = useState(false);
 
   // Karten-Config vorziehen — dieselbe globale Query wie in useLagekarteDaten (react-query
   // dedupliziert), aber hier zuerst, weil useKartenAnsicht sie für die config-validierte
@@ -109,6 +110,7 @@ export default function LagekartePage() {
     (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
     [message],
   );
+  const erfolg = useCallback((text: string) => { message.success(text); }, [message]);
 
   // „In dieser Ansicht speichern": aktuellen Karten-Zustand in die AKTIVE Ansicht schreiben
   // (nicht einsatzweit, LFH-320/323), mit Erfolgs-/Fehler-Feedback (die Mutation wirft —
@@ -216,7 +218,15 @@ export default function LagekartePage() {
     onKoordinateEingeben, onEinsatzortPlatzieren, onBildPlatzieren, onBildPlatzierenFertig,
     onFlaecheGezeichnet, onFlaecheKlick, onZoneKlick, onZoneGezeichnet, onFachebeneKlick,
     onZeichnenAbbrechen, zoneAendern, zoneLoeschen,
-  } = useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, aktiveAnsichtId, fehler });
+  } = useKartenInteraktion({
+    einsatzId,
+    einsatz,
+    darfSchreiben,
+    alleVerortet,
+    aktiveAnsichtId,
+    fehler,
+    erfolg,
+  });
 
   const {
     bilder, bildOverlays, aktivesPlatzierBild, bildPlatzierZentrum,
@@ -406,6 +416,7 @@ export default function LagekartePage() {
             zoneZeichnenNonce={zoneZeichnenNonce}
             onZoneKlick={onZoneKlick}
             onZoneGezeichnet={onZoneGezeichnet}
+            onZeichnenBereitAenderung={setZeichnenBereit}
             fachebenen={aktiveFachebenen}
             onBboxAenderung={fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined}
             onZoomAenderung={setKartenZoom}
@@ -425,11 +436,19 @@ export default function LagekartePage() {
             }
             phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
             speichernLaeuft={zoneSpeichern}
-            onAbschliessen={() =>
-              zeichneAbschnittId != null
+            abschliessenMoeglich={zeichnenBereit}
+            onAbschliessen={() => {
+              const abgeschlossen = zeichneAbschnittId != null
                 ? kartenRef.current?.abschnittAbschliessen()
-                : kartenRef.current?.zoneAbschliessen()
-            }
+                : kartenRef.current?.zoneAbschliessen();
+              if (!abgeschlossen) {
+                message.warning(
+                  zeichneAbschnittId == null && zoneEntwurf?.modus === 'linie'
+                    ? 'Mindestens 2 verschiedene Punkte für eine Linie'
+                    : 'Mindestens 3 verschiedene Punkte für eine Fläche',
+                );
+              }
+            }}
             onAbbrechen={onZeichnenAbbrechen}
             onSpeichern={bestaetigungSpeichern}
             onVerwerfen={bestaetigungVerwerfen}

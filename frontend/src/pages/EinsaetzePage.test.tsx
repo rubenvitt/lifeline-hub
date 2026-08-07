@@ -45,6 +45,7 @@ describe('EinsaetzePage', () => {
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
     expect(screen.getByText('einsatzleitung')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
   it('öffnet den neuen Einsatz direkt nach dem Anlegen', async () => {

@@ -394,6 +394,9 @@ export interface NeueMeldung {
   bestaetigung_pflicht?: boolean;
   /** Override der Default-Bestätigungsfrist (Minuten ab Eingang). */
   bestaetigung_frist_min?: number;
+  /** Stabiler Offline-Idempotenzschlüssel; bei Replay liefert der Server die
+   * bereits angelegte Meldung statt einer Dublette. */
+  client_id?: string;
 }
 
 export type LageMeldung = S['LageMeldungAnzeige'];

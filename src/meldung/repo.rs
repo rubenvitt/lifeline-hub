@@ -68,6 +68,130 @@ pub async fn anlegen(
     erfasser_id: i64,
     daten: MeldungDaten<'_>,
 ) -> Result<MeldungAnzeige, AppError> {
+    anlegen_mit_client_id(pool, einsatz_id, erfasser_id, None, daten).await
+}
+
+/// Offline-/Timeout-fähige Variante (LFH-334/B6). Ein stabiler
+/// `(einsatz_id, client_id)`-Schlüssel liefert bei Replay die bestehende Meldung
+/// und unterdrückt damit sowohl eine zweite laufende Nummer als auch den
+/// gekoppelten ETB-Eintrag. `bool` ist nur bei einem echten Insert `true`.
+pub async fn anlegen_idempotent(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    client_id: Option<&str>,
+    daten: MeldungDaten<'_>,
+) -> Result<(MeldungAnzeige, bool), AppError> {
+    if !prioritaet_gueltig(daten.prioritaet) {
+        return Err(AppError::Validation("Ungültige Priorität".into()));
+    }
+    if !meldungsart_gueltig(daten.meldungsart) {
+        return Err(AppError::Validation("Ungültige Meldungsart".into()));
+    }
+    if !super::richtung_gueltig(daten.richtung) {
+        return Err(AppError::Validation("Ungültige Richtung".into()));
+    }
+    let Some(cid) = client_id else {
+        return Ok((anlegen(pool, einsatz_id, erfasser_id, daten).await?, true));
+    };
+    if let Some(id) = bestehende_client_id(pool, einsatz_id, cid).await? {
+        return Ok((laden(pool, id, daten.eingang_at).await?, false));
+    }
+
+    match anlegen_mit_client_id(pool, einsatz_id, erfasser_id, Some(cid), daten).await {
+        Ok(meldung) => Ok((meldung, true)),
+        // Ein paralleler Tab kann zwischen SELECT und INSERT gewonnen haben.
+        // Der Unique-Fehler rollt die ganze Meldung+ETB-Tx zurück; danach lesen
+        // wir den Gewinner und liefern eine idempotente Antwort.
+        Err(e) => match bestehende_client_id(pool, einsatz_id, cid).await? {
+            Some(id) => {
+                let aktuell = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+                Ok((laden(pool, id, &aktuell).await?, false))
+            }
+            None => Err(e),
+        },
+    }
+}
+
+async fn bestehende_client_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<i64>, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT id FROM meldung WHERE einsatz_id = ? AND client_id = ?")
+            .bind(einsatz_id)
+            .bind(client_id)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
+/// Lädt eine bereits committete Meldung anhand ihres einsatzgebundenen
+/// Idempotenzschlüssels. `einsatz_id` bleibt Teil des Lookups, damit eine gleiche
+/// `client_id` in einem anderen Einsatz niemals dessen Datensatz zurückgibt.
+pub async fn laden_nach_client_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    client_id: &str,
+    jetzt: &str,
+) -> Result<Option<MeldungAnzeige>, AppError> {
+    match bestehende_client_id(pool, einsatz_id, client_id).await? {
+        Some(id) => laden(pool, id, jetzt).await.map(Some),
+        None => Ok(None),
+    }
+}
+
+/// Publiziert das persistente Live-/Sofortalarm-Buendel einer Meldung at-least-once.
+///
+/// Der Marker bleibt bis NACH dem synchronen Publish NULL. Ein Prozessabbruch vor dem Publish
+/// wird deshalb durch den naechsten `client_id`-Replay repariert. Ein Abbruch nach Publish, aber
+/// vor dem Marker-Commit, kann bewusst eine Dublette erzeugen; ein verlorener Sofortalarm ist
+/// die gefaehrlichere Richtung. `BEGIN IMMEDIATE` serialisiert konkurrierende Replays und
+/// vermeidet Dubletten im Normalbetrieb. Die Transaktion wird absichtlich NICHT automatisch
+/// wiederholt: ein Commit-Fehler nach dem Seiteneffekt bleibt als NULL-Marker fuer den expliziten
+/// Request-Replay sichtbar.
+pub async fn publiziere_live_ausstehend<F>(
+    pool: &SqlitePool,
+    meldung_id: i64,
+    publiziert_at: &str,
+    publiziere: F,
+) -> Result<bool, AppError>
+where
+    F: FnOnce(),
+{
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let ausstehend: Option<bool> =
+        sqlx::query_scalar("SELECT live_published_at IS NULL FROM meldung WHERE id = ?")
+            .bind(meldung_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let ausstehend = ausstehend.ok_or(AppError::NotFound)?;
+    if !ausstehend {
+        tx.commit().await?;
+        return Ok(false);
+    }
+
+    publiziere();
+    sqlx::query(
+        "UPDATE meldung SET live_published_at = ? \
+         WHERE id = ? AND live_published_at IS NULL",
+    )
+    .bind(publiziert_at)
+    .bind(meldung_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+async fn anlegen_mit_client_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    client_id: Option<&str>,
+    daten: MeldungDaten<'_>,
+) -> Result<MeldungAnzeige, AppError> {
     // Enum-Invariante auch im Release durchsetzen (LFH-259/F34): debug_assert wäre
     // wegkompiliert → ein interner Aufrufer könnte still ungültige Werte persistieren.
     if !prioritaet_gueltig(daten.prioritaet) {
@@ -95,8 +219,8 @@ pub async fn anlegen(
         "INSERT INTO meldung \
            (einsatz_id, lfd_nr, absender, empfaenger, meldeweg, inhalt, meldungsart, \
             prioritaet, richtung, ereigniszeit, eingang_at, bestaetigung_pflicht, bestaetigung_frist_at, \
-            erfasst_von_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+            erfasst_von_id, client_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM meldung WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -114,6 +238,7 @@ pub async fn anlegen(
     .bind(daten.bestaetigung_pflicht)
     .bind(daten.bestaetigung_frist_at)
     .bind(erfasser_id)
+    .bind(client_id)
     .bind(einsatz_id)
     .fetch_one(&mut *tx)
     .await?;
@@ -267,32 +392,36 @@ pub async fn bestaetige(
     von_id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
-    let frisch = crate::kommunikation::repo::quittiere_einmalig(
-        pool,
-        org_id,
-        einsatz_id,
-        crate::kommunikation::OBJEKT_MELDUNG,
-        meldung_id,
-        von_id,
-        jetzt,
-    )
-    .await?;
-    if !frisch {
-        return Ok(false);
-    }
-    crate::erinnerung::repo::schliesse_offene_auto(
-        pool,
-        crate::kommunikation::OBJEKT_MELDUNG,
-        meldung_id,
-        jetzt,
-    )
-    .await?;
-    // Eskalations-Residuum löschen: nach Bestätigung ist die Meldung nicht mehr „eskaliert".
-    sqlx::query("UPDATE meldung SET eskaliert = 0 WHERE id = ?")
-        .bind(meldung_id)
-        .execute(pool)
+    let frisch = crate::write_retry!(pool, |conn| {
+        let frisch = crate::kommunikation::repo::quittiere_einmalig_tx(
+            conn,
+            org_id,
+            einsatz_id,
+            crate::kommunikation::OBJEKT_MELDUNG,
+            meldung_id,
+            von_id,
+            jetzt,
+        )
         .await?;
-    Ok(true)
+        if !frisch {
+            return Ok(false);
+        }
+        crate::erinnerung::repo::schliesse_offene_auto_tx(
+            conn,
+            crate::kommunikation::OBJEKT_MELDUNG,
+            meldung_id,
+            jetzt,
+        )
+        .await?;
+        // Eskalations-Residuum loeschen: nach Bestaetigung ist die Meldung nicht mehr
+        // `eskaliert`. Quittung, Reminder-Abschluss und dieses Flag teilen einen Commit.
+        sqlx::query("UPDATE meldung SET eskaliert = 0 WHERE id = ?")
+            .bind(meldung_id)
+            .execute(&mut *conn)
+            .await?;
+        Ok(true)
+    })?;
+    Ok(frisch)
 }
 
 /// Setzt das Eskalations-Flag — aber NUR wenn die Meldung bestätigungspflichtig, ihre Frist
@@ -560,6 +689,94 @@ mod tests {
         .unwrap();
         assert_eq!(m1.lfd_nr, 1);
         assert_eq!(m2.lfd_nr, 2);
+    }
+
+    #[tokio::test]
+    async fn client_id_replay_erzeugt_weder_meldungs_noch_etb_dublette() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let (m1, neu1) = anlegen_idempotent(
+            &pool,
+            e,
+            b,
+            Some("offline-meldung-1"),
+            daten("A", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        let (m2, neu2) = anlegen_idempotent(
+            &pool,
+            e,
+            b,
+            Some("offline-meldung-1"),
+            daten("A", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+
+        assert!(neu1);
+        assert!(!neu2);
+        assert_eq!((m2.id, m2.lfd_nr), (m1.id, m1.lfd_nr));
+        let meldungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM meldung WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let etb: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND meldung_id = ?",
+        )
+        .bind(e)
+        .bind(m1.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(meldungen, 1);
+        assert_eq!(etb, 1);
+    }
+
+    #[tokio::test]
+    async fn live_marker_publiziert_null_genau_einmal_und_markiert_danach() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Alarm", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        let aufrufe = Arc::new(AtomicUsize::new(0));
+
+        let erster = aufrufe.clone();
+        assert!(
+            publiziere_live_ausstehend(&pool, m.id, "2026-06-12 09:00:01", move || {
+                erster.fetch_add(1, Ordering::SeqCst);
+            },)
+            .await
+            .unwrap()
+        );
+        let marker: Option<String> =
+            sqlx::query_scalar("SELECT live_published_at FROM meldung WHERE id = ?")
+                .bind(m.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(marker.as_deref(), Some("2026-06-12 09:00:01"));
+
+        let replay = aufrufe.clone();
+        assert!(
+            !publiziere_live_ausstehend(&pool, m.id, "2026-06-12 09:00:02", move || {
+                replay.fetch_add(1, Ordering::SeqCst);
+            },)
+            .await
+            .unwrap()
+        );
+        assert_eq!(aufrufe.load(Ordering::SeqCst), 1, "Replay ohne Dublette");
     }
 
     #[tokio::test]
@@ -1074,6 +1291,129 @@ mod tests {
         assert!(
             offen.is_none(),
             "Bestätigung schließt die Nachfass-Erinnerung"
+        );
+    }
+
+    #[tokio::test]
+    async fn bestaetigen_rollt_quittung_reminder_und_eskalation_gemeinsam_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00"),
+        )
+        .await
+        .unwrap();
+        crate::erinnerung::repo::stelle_meldung_auto_frist_sicher(&pool, m.id, "Nachfass")
+            .await
+            .unwrap();
+        sqlx::query("UPDATE meldung SET eskaliert = 1 WHERE id = ?")
+            .bind(m.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TRIGGER test_bestaetigen_fehler \
+             BEFORE UPDATE OF eskaliert ON meldung \
+             BEGIN SELECT RAISE(ABORT, 'simulierter Folgefehler'); END",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:06:00")
+            .await
+            .is_err());
+        let quittungen: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM kommunikation_status \
+             WHERE objekt_typ = 'meldung' AND objekt_id = ? AND quittiert_at IS NOT NULL",
+        )
+        .bind(m.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let reminder_status: String = sqlx::query_scalar(
+            "SELECT status FROM erinnerung \
+             WHERE quelle = 'auto_frist' AND bezug_typ = 'meldung' AND bezug_id = ?",
+        )
+        .bind(m.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let eskaliert: bool = sqlx::query_scalar("SELECT eskaliert FROM meldung WHERE id = ?")
+            .bind(m.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(quittungen, 0, "Quittung muss zurueckgerollt sein");
+        assert_eq!(reminder_status, "offen", "Reminder bleibt gemeinsam offen");
+        assert!(eskaliert, "Eskalationsflag bleibt gemeinsam gesetzt");
+
+        sqlx::query("DROP TRIGGER test_bestaetigen_fehler")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:07:00")
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reminder_ensure_gegen_bestaetigen_hinterlaesst_keinen_offenen_reminder() {
+        use std::sync::Arc;
+        use tokio::sync::Barrier;
+
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00"),
+        )
+        .await
+        .unwrap();
+        let start = Arc::new(Barrier::new(3));
+
+        let ensure_pool = pool.clone();
+        let ensure_start = start.clone();
+        let meldung_id = m.id;
+        let ensure = tokio::spawn(async move {
+            ensure_start.wait().await;
+            crate::erinnerung::repo::stelle_meldung_auto_frist_sicher(
+                &ensure_pool,
+                meldung_id,
+                "Nachfass",
+            )
+            .await
+        });
+        let confirm_pool = pool.clone();
+        let confirm_start = start.clone();
+        let confirm = tokio::spawn(async move {
+            confirm_start.wait().await;
+            bestaetige(&confirm_pool, 1, e, meldung_id, b, "2026-06-12 09:06:00").await
+        });
+        start.wait().await;
+        ensure.await.unwrap().unwrap();
+        assert!(confirm.await.unwrap().unwrap());
+
+        let offen: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM erinnerung \
+             WHERE quelle = 'auto_frist' AND status = 'offen' \
+               AND bezug_typ = 'meldung' AND bezug_id = ?",
+        )
+        .bind(m.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(offen, 0);
+        assert!(
+            laden(&pool, m.id, "2026-06-12 09:07:00")
+                .await
+                .unwrap()
+                .ist_bestaetigt
         );
     }
 

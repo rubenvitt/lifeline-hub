@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
+import { useAuth } from '../auth/AuthContext';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -17,6 +18,7 @@ import {
 import AuftragListe from './AuftragListe';
 import AuftragFormular from './AuftragFormular';
 import VollzugMeldenModal from './VollzugMeldenModal';
+import Datenstand from '../components/Datenstand';
 
 /** Offene Aufträge: nach Prio (sofort→dringend→normal), dann Frist (früheste zuerst). */
 function vergleicheOffen(a: Auftrag, b: Auftrag): number {
@@ -31,6 +33,7 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
 }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const { benutzer } = useAuth();
 
   const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
@@ -80,8 +83,65 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
   const quittierenMutation = useMutation({
     mutationFn: ({ auftragId, empfaengerId }: { auftragId: number; empfaengerId: number }) =>
       quittiereEmpfaenger(einsatzId, auftragId, empfaengerId),
-    onSuccess: invalidiere,
-    onError: fehler,
+    onMutate: async ({ auftragId, empfaengerId }) => {
+      const queryKey = einsatzKeys.auftraege(einsatzId);
+      await qc.cancelQueries({ queryKey });
+      const vorher = qc.getQueriesData<Auftrag[]>({ queryKey }).flatMap(([cacheKey, daten]) => {
+        const auftrag = daten?.find((eintrag) => eintrag.id === auftragId);
+        const empfaenger = auftrag?.empfaenger.find((eintrag) => eintrag.id === empfaengerId);
+        return auftrag && empfaenger
+          ? [{
+              cacheKey,
+              quittiertAnzahl: auftrag.quittiert_anzahl,
+              istUeberfaellig: auftrag.ist_ueberfaellig,
+              empfaenger,
+            }]
+          : [];
+      });
+      const quittiertAt = new Date().toISOString();
+      qc.setQueriesData<Auftrag[]>({ queryKey }, (alt) => alt?.map((auftrag) => {
+        if (auftrag.id !== auftragId) return auftrag;
+        const ziel = auftrag.empfaenger.find((empfaenger) => empfaenger.id === empfaengerId);
+        if (!ziel || ziel.quittiert_at) return auftrag;
+        const quittiertAnzahl = Math.min(auftrag.empfaenger_anzahl, auftrag.quittiert_anzahl + 1);
+        return {
+          ...auftrag,
+          quittiert_anzahl: quittiertAnzahl,
+          ist_ueberfaellig: quittiertAnzahl === auftrag.empfaenger_anzahl
+            ? false
+            : auftrag.ist_ueberfaellig,
+          empfaenger: auftrag.empfaenger.map((empfaenger) => empfaenger.id === empfaengerId
+            ? { ...empfaenger, quittiert_at: quittiertAt, quittiert_von_id: benutzer?.id ?? null }
+            : empfaenger),
+        };
+      }));
+      return { vorher, quittiertAt };
+    },
+    onSuccess: (serverStand) => {
+      qc.setQueriesData<Auftrag[]>({ queryKey: einsatzKeys.auftraege(einsatzId) }, (alt) =>
+        alt?.map((auftrag) => auftrag.id === serverStand.id ? serverStand : auftrag));
+      message.success('Empfang quittiert');
+    },
+    onError: (e, variablen, kontext) => {
+      for (const stand of kontext?.vorher ?? []) {
+        qc.setQueryData<Auftrag[]>(stand.cacheKey, (aktuell) => aktuell?.map((auftrag) => {
+          if (auftrag.id !== variablen.auftragId) return auftrag;
+          const ziel = auftrag.empfaenger.find((empfaenger) => empfaenger.id === variablen.empfaengerId);
+          // Ein inzwischen neuerer Stand darf nicht durch den fehlgeschlagenen Request
+          // überschrieben werden. Zurückgerollt wird nur unser eigener Optimismus.
+          if (!ziel || ziel.quittiert_at !== kontext?.quittiertAt) return auftrag;
+          return {
+            ...auftrag,
+            quittiert_anzahl: stand.quittiertAnzahl,
+            ist_ueberfaellig: stand.istUeberfaellig,
+            empfaenger: auftrag.empfaenger.map((empfaenger) =>
+              empfaenger.id === variablen.empfaengerId ? stand.empfaenger : empfaenger),
+          };
+        }));
+      }
+      fehler(e);
+    },
+    onSettled: invalidiere,
   });
   const [vollzugFuer, setVollzugFuer] = useState<number | null>(null);
   const vollzugMutation = useMutation({
@@ -130,7 +190,11 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
     einsatzId,
     darfSchreiben,
     highlightId: highlightAuftragId,
-    onQuittieren: (auftragId: number, empfaengerId: number) => quittierenMutation.mutate({ auftragId, empfaengerId }),
+    quittierungLaeuft: quittierenMutation.isPending,
+    quittierungZiel: quittierenMutation.variables ?? null,
+    onQuittieren: (auftragId: number, empfaengerId: number) => {
+      if (!quittierenMutation.isPending) quittierenMutation.mutate({ auftragId, empfaengerId });
+    },
     onInArbeit: (auftragId: number) => vollzugMutation.mutate({ auftragId, status: 'in_arbeit' as const }),
     onVollzugMelden: (auftragId: number) => setVollzugFuer(auftragId),
     onAbnehmen: (auftragId: number) => abnahmeMutation.mutate(auftragId),
@@ -144,6 +208,7 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
+          <div><Datenstand dataUpdatedAt={auftraegeQuery.dataUpdatedAt} /></div>
         </div>
         {darfSchreiben && (
           <Button

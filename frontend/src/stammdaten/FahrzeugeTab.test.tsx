@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -50,6 +50,29 @@ describe('FahrzeugeTab', () => {
     await screen.findByText('Florian 1');
     expect(screen.getByRole('button', { name: 'Fahrzeug anlegen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+  });
+
+  it('sperrt während des Dienststatuswechsels alle Zeilen und markiert nur das Ziel als ladend', async () => {
+    let freigeben: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    server.use(http.post('/api/fahrzeuge/1/ausser-dienst', async () => {
+      await gate;
+      return HttpResponse.json({ ...fahrzeug, dienststatus: 'ausser_dienst' });
+    }));
+    const { container } = render(admin, [fahrzeug, { ...fahrzeug, id: 2, funkrufname: 'Florian 2' }]);
+    await screen.findByText('Florian 1');
+    const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
+
+    await userEvent.click(within(erste).getByRole('button', { name: 'Außer Dienst' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+
+    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
+    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Außer Dienst' })).toBeDisabled();
+    expect(within(zweite).getByRole('button', { name: 'Außer Dienst' })).not.toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+    await act(async () => { freigeben?.(); });
   });
 
   it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {

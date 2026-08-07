@@ -214,23 +214,14 @@ pub async fn anlegen_aus_frist(
     faellig_at: &str,
     jetzt: &str,
 ) -> Result<ErinnerungAnzeige, AppError> {
-    // Idempotenz: existiert bereits eine offene Auto-Erinnerung für den Bezug?
-    let vorhanden: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM erinnerung \
-         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ?",
-    )
-    .bind(bezug_typ)
-    .bind(bezug_id)
-    .fetch_optional(pool)
-    .await?;
-    if let Some(id) = vorhanden {
-        return laden(pool, id, jetzt).await;
-    }
-
-    let id: i64 = sqlx::query_scalar(
+    // Atomarer Ensure: konkurrierende Replays dürfen beide bis hier gelangen. Der
+    // partielle Unique-Index lässt genau einen Insert gewinnen; der Verlierer liest
+    // anschließend denselben offenen Datensatz statt mit einem Unique-Fehler zu enden.
+    let eingefuegt: Option<i64> = sqlx::query_scalar(
         "INSERT INTO erinnerung \
            (einsatz_id, titel, faellig_at, bezug_typ, bezug_id, quelle, erstellt_von_id) \
-         VALUES (?, ?, ?, ?, ?, 'auto_frist', ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, 'auto_frist', ?) \
+         ON CONFLICT DO NOTHING RETURNING id",
     )
     .bind(einsatz_id)
     .bind(titel)
@@ -238,9 +229,57 @@ pub async fn anlegen_aus_frist(
     .bind(bezug_typ)
     .bind(bezug_id)
     .bind(ersteller_id)
-    .fetch_one(pool)
+    .fetch_optional(pool)
     .await?;
+    let id = match eingefuegt {
+        Some(id) => id,
+        None => {
+            sqlx::query_scalar(
+                "SELECT id FROM erinnerung \
+             WHERE quelle = 'auto_frist' AND status = 'offen' \
+               AND bezug_typ = ? AND bezug_id = ?",
+            )
+            .bind(bezug_typ)
+            .bind(bezug_id)
+            .fetch_one(pool)
+            .await?
+        }
+    };
     laden(pool, id, jetzt).await
+}
+
+/// Stellt die offene Auto-Frist-Erinnerung einer Meldung mit EINEM atomaren
+/// `INSERT ... SELECT` sicher.
+///
+/// Der Bestaetigungszustand wird nicht vorab im Rust-Code gelesen, sondern ist Guard desselben
+/// SQLite-Statements, das den Reminder schreibt. Da SQLite Schreibvorgaenge serialisiert, sind
+/// damit beide Interleavings sicher: gewinnt die Bestaetigung zuerst, fuegt der Guard nichts ein;
+/// gewinnt der Ensure zuerst, schliesst die nachfolgende Bestaetigungs-Transaktion den Reminder.
+/// Der partielle Unique-Index haelt Replays und parallele Ensures idempotent.
+pub async fn stelle_meldung_auto_frist_sicher(
+    pool: &SqlitePool,
+    meldung_id: i64,
+    titel: &str,
+) -> Result<bool, AppError> {
+    let eingefuegt = sqlx::query(
+        "INSERT INTO erinnerung \
+           (einsatz_id, titel, faellig_at, bezug_typ, bezug_id, quelle, erstellt_von_id) \
+         SELECT m.einsatz_id, ?, m.bestaetigung_frist_at, 'meldung', m.id, \
+                'auto_frist', m.erfasst_von_id \
+         FROM meldung m \
+         WHERE m.id = ? AND m.bestaetigung_pflicht = 1 \
+           AND m.bestaetigung_frist_at IS NOT NULL \
+           AND NOT EXISTS ( \
+             SELECT 1 FROM kommunikation_status ks \
+             WHERE ks.objekt_typ = 'meldung' AND ks.objekt_id = m.id \
+               AND ks.quittiert_at IS NOT NULL) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(titel)
+    .bind(meldung_id)
+    .execute(pool)
+    .await?;
+    Ok(eingefuegt.rows_affected() > 0)
 }
 
 /// Schließt eine offene Auto-Frist-Erinnerung eines Bezugs (z. B. Meldung bestätigt):
@@ -248,6 +287,17 @@ pub async fn anlegen_aus_frist(
 /// Verstummt den Nachfass-Nudge und verhindert weitere Eskalations-Ticks für den Bezug.
 pub async fn schliesse_offene_auto(
     pool: &SqlitePool,
+    bezug_typ: &str,
+    bezug_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    schliesse_offene_auto_tx(&mut conn, bezug_typ, bezug_id, jetzt).await
+}
+
+/// Transaktionsfaehige Variante von [`schliesse_offene_auto`].
+pub async fn schliesse_offene_auto_tx(
+    conn: &mut sqlx::SqliteConnection,
     bezug_typ: &str,
     bezug_id: i64,
     jetzt: &str,
@@ -260,7 +310,7 @@ pub async fn schliesse_offene_auto(
     .bind(jetzt)
     .bind(bezug_typ)
     .bind(bezug_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }

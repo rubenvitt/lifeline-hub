@@ -9,6 +9,8 @@ import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
 import GefahrenPage, { gebietszeileStil } from './GefahrenPage';
 import { dichten } from '../../theme/tokens';
+import { einsatzKeys } from '../../api/queryKeys';
+import { formatiereDatenstand } from '../../components/Datenstand';
 
 const einsatz = {
   id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv', begonnen_at: '', abgeschlossen_at: null,
@@ -40,6 +42,33 @@ describe('GefahrenPage', () => {
     expect((await screen.findAllByText('Nord'))[0]).toBeInTheDocument();
     // Erstes Gebiet automatisch gewählt → Matrix sichtbar.
     expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+  });
+
+  it('weist Gebietsliste und Matrix mit dem älteren erfolgreichen Stand aus', async () => {
+    server.use(...handlers());
+    const client = neuerQueryClient();
+    const gebieteStand = new Date('2026-01-01T10:12:00Z').getTime();
+    const matrixStand = new Date('2026-01-01T09:05:00Z').getTime();
+    for (const key of [
+      einsatzKeys.gefahrengebiete(1),
+      einsatzKeys.gefahrenmatrix(1, 7),
+    ]) client.setQueryDefaults(key, { staleTime: Infinity });
+    client.setQueryData(einsatzKeys.gefahrengebiete(1), [gebiet], { updatedAt: gebieteStand });
+    client.setQueryData(einsatzKeys.gefahrenmatrix(1, 7), [], { updatedAt: matrixStand });
+
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
+      { route: '/einsaetze/1/gefahren', client },
+    );
+
+    await screen.findByRole('list');
+    expect(await screen.findByLabelText(
+      `Datenstand ${formatiereDatenstand(matrixStand)}`,
+    )).toBeInTheDocument();
+    expect(screen.queryByLabelText(
+      `Datenstand ${formatiereDatenstand(gebieteStand)}`,
+    )).not.toBeInTheDocument();
   });
 
   /**

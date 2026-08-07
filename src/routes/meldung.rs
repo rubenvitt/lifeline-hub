@@ -1,5 +1,7 @@
 use crate::app::AppState;
-use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{
+    EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
+};
 use crate::einsatz::modul::{Lagemeldungen, Meldungen};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
@@ -11,7 +13,7 @@ use crate::meldung::{
     PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
 };
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use chrono::{Duration, NaiveDateTime};
 use serde::Deserialize;
@@ -112,15 +114,85 @@ pub struct NeueMeldung {
     pub bestaetigung_pflicht: Option<bool>,
     /// Optionales Override der Default-Bestätigungsfrist (Minuten ab Eingang).
     pub bestaetigung_frist_min: Option<i64>,
+    /// Stabiler, client-generierter Idempotenzschlüssel für Offline-Queue und
+    /// Timeout-Replay. Fehlend/leer behält das Verhalten älterer Clients.
+    pub client_id: Option<String>,
+}
+
+/// Stellt die offene Auto-Frist-Erinnerung ausnahmslos aus dem persistierten
+/// Meldungsstand sicher. Dadurch repariert auch ein Replay nach verlorener/fehlgeschlagener
+/// Reminder-Anlage den abgeleiteten Datensatz, ohne geänderte Request-Felder zu übernehmen.
+async fn auto_frist_erinnerung_sicherstellen(
+    state: &AppState,
+    meldung: &MeldungAnzeige,
+) -> Result<(), AppError> {
+    if meldung.bestaetigung_pflicht && meldung.bestaetigung_frist_at.is_some() {
+        let titel = format!("Sofortmeldung #{} unbestätigt", meldung.lfd_nr);
+        crate::erinnerung::repo::stelle_meldung_auto_frist_sicher(&state.pool, meldung.id, &titel)
+            .await?;
+    }
+    Ok(())
+}
+
+/// Liefert das Live-Buendel einer persistierten Meldung at-least-once aus. Der DB-Marker wird
+/// erst nach ETB-, Meldungs- und ggf. Sofortalarm-Event gesetzt. Ein `client_id`-Replay holt
+/// daher einen Crash vor dem Publish nach; bereits markierte Meldungen erzeugen keine Dublette.
+async fn live_publikation_sicherstellen(
+    state: &AppState,
+    meldung: &MeldungAnzeige,
+) -> Result<(), AppError> {
+    let einsatz_id = meldung.einsatz_id;
+    let meldung_id = meldung.id;
+    let etb_id = meldung.etb_meldung_id;
+    let ist_sofort = meldung.meldungsart.as_str() == ART_SOFORTMELDUNG
+        || meldung.prioritaet.as_str() == PRIO_SOFORT;
+    let publiziert_at = jetzt();
+    repo::publiziere_live_ausstehend(&state.pool, meldung_id, &publiziert_at, || {
+        if let Some(etb_id) = etb_id {
+            state.live.publiziere(einsatz_id, etb_id);
+        }
+        sse(state, einsatz_id);
+        if ist_sofort {
+            sse_sofort(state, einsatz_id, meldung_id);
+        }
+    })
+    .await?;
+    Ok(())
 }
 
 /// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Meldungen>,
+    ctx: EinsatzSchreibfreigabe<Meldungen>,
+    headers: HeaderMap,
     JsonBody(req): JsonBody<NeueMeldung>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+
+    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-Gates, aber vor dem
+    // Aktiv-Gate erkennen. Der Lookup bleibt durch die Einsatz-ID mandantenfest.
+    let client_id = req
+        .client_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    if client_id.is_some_and(|cid| cid.len() > 64) {
+        return Err(AppError::Validation(
+            "client_id zu lang (max. 64 Zeichen)".into(),
+        ));
+    }
+    if let Some(cid) = client_id {
+        let aktuell = jetzt();
+        if let Some(meldung) =
+            repo::laden_nach_client_id(&state.pool, einsatz_id, cid, &aktuell).await?
+        {
+            live_publikation_sicherstellen(&state, &meldung).await?;
+            auto_frist_erinnerung_sicherstellen(&state, &meldung).await?;
+            return Ok((StatusCode::CREATED, Json(meldung)));
+        }
+    }
+    ctx.fordere_aktiv()?;
 
     // Mindestfelder: Absender, Inhalt, Meldeweg.
     let absender = req.absender.trim();
@@ -199,10 +271,11 @@ pub async fn anlegen(
         None
     };
 
-    let m = repo::anlegen(
+    let (m, _war_neu) = repo::anlegen_idempotent(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
+        client_id,
         repo::MeldungDaten {
             absender,
             empfaenger: trimme(&req.empfaenger),
@@ -219,35 +292,11 @@ pub async fn anlegen(
     )
     .await?;
 
-    // Nachfass/Eskalation: bei Bestätigungspflicht eine Auto-Frist-Erinnerung anlegen
-    // (idempotent, quelle='auto_frist'). Der Scheduler-Tick eskaliert bei Fristablauf und
-    // re-highlightet; Bestätigen schließt sie wieder. Erstes reales Wiring von anlegen_aus_frist.
-    if pflicht {
-        if let Some(frist) = frist_at.as_deref() {
-            let titel = format!("Sofortmeldung #{} unbestätigt", m.lfd_nr);
-            crate::erinnerung::repo::anlegen_aus_frist(
-                &state.pool,
-                einsatz_id,
-                ctx.benutzer.id,
-                crate::kommunikation::OBJEKT_MELDUNG,
-                m.id,
-                &titel,
-                frist,
-                &eingang,
-            )
-            .await?;
-        }
-    }
-
-    // Dual-Publish (wie Auftrag): erzeugte ETB-Meldung in den Live-Feed + meldung-Event.
-    if let Some(etb_id) = m.etb_meldung_id {
-        state.live.publiziere(einsatz_id, etb_id);
-    }
-    sse(&state, einsatz_id);
-    // Unübersehbares Sofort-Highlight (AK1): eigener Tag auf derselben Verbindung.
-    if ist_sofort {
-        sse_sofort(&state, einsatz_id, m.id);
-    }
+    // Erst das persistente At-least-once-Live-Buendel, dann den reparierbaren Reminder.
+    // Schlaegt die nachgelagerte Reminder-Anlage fehl, hat der Sofortalarm den Client bereits
+    // erreicht; der idempotente Queue-Replay stellt nur den Reminder nach, ohne Doppelalarm.
+    live_publikation_sicherstellen(&state, &m).await?;
+    auto_frist_erinnerung_sicherstellen(&state, &m).await?;
     Ok((StatusCode::CREATED, Json(m)))
 }
 

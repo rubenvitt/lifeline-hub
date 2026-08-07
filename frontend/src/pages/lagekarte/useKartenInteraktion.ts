@@ -126,6 +126,8 @@ interface KartenInteraktionArgs {
   aktiveAnsichtId?: number;
   /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
   fehler: (e: unknown) => void;
+  /** Sichtbare fachliche Quittung nach serverseitig erfolgreicher Aktion. */
+  erfolg: (text: string) => void;
 }
 
 /**
@@ -135,7 +137,9 @@ interface KartenInteraktionArgs {
  * resettet exakt dieselben States wie zuvor inline auf der Page (LFH-145: sonst bleibt ein
  * Zonen-Entwurf als Orphan liegen — von jsdom-Tests nicht gefangen).
  */
-export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, aktiveAnsichtId, fehler }: KartenInteraktionArgs) {
+export function useKartenInteraktion({
+  einsatzId, einsatz, darfSchreiben, alleVerortet, aktiveAnsichtId, fehler, erfolg,
+}: KartenInteraktionArgs) {
   const qc = useQueryClient();
 
   const [modus, dispatch] = useReducer(modusReducer, { art: 'idle' } as KartenModus);
@@ -175,6 +179,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   // Selektion, null räumt (das gerade offene Panel ist per Konstruktion das einzige).
   const [selektion, setSelektion] = useState<KartenSelektion>({ art: 'keine' });
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
+  const verortenLaeuft = useRef(false);
 
   const auswahl = selektion.art === 'objekt' ? selektion.schluessel : null;
   const zoneAuswahl = selektion.art === 'zone' ? selektion.id : null;
@@ -230,6 +235,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       }
     },
     onSuccess: () => {
+      erfolg('Objekt verortet');
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
@@ -239,6 +245,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       dispatch({ t: 'beenden', arten: ['platzieren'] });
     },
     onError: fehler,
+    onSettled: () => { verortenLaeuft.current = false; },
   });
 
   // Freies Zeichen am Klickpunkt anlegen (LFH-170); Spec kommt aus dem Platzier-Modus.
@@ -253,6 +260,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       });
     },
     onSuccess: () => {
+      erfolg('Taktisches Zeichen angelegt');
       qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       // Serienmodus (LFH-332/M76): der Platzier-Modus überlebt den POST, der Entwurf in der
       // Sidebar ohnehin (er wird dort nie zurückgesetzt). Beendet wird nur noch über
@@ -262,6 +270,12 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     },
     onError: fehler,
   });
+
+  function verorten(lat: number, lon: number) {
+    if (!platzierungZiel || verortenLaeuft.current) return;
+    verortenLaeuft.current = true;
+    verortenMutation.mutate({ lat, lon });
+  }
 
   function onKarteKlick(lngLat: { lng: number; lat: number }) {
     if (!darfSchreiben) return;
@@ -273,8 +287,10 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       if (!legeZeichenMutation.isPending) legeZeichenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
       return;
     }
-    if (!platzierungZiel) return;
-    verortenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
+    // Mutation-State erreicht den naechsten Render asynchron. Der Ref schliesst deshalb
+    // auch zwei Klicks im selben Renderfenster aus; sonst entscheidet die Serverreihenfolge
+    // statt der zuletzt sichtbaren Nutzeraktion ueber die Position.
+    verorten(lngLat.lat, lngLat.lng);
   }
 
   function onMarkerWaehlen(schluessel: string) {
@@ -347,7 +363,10 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       farbe: zu.typ === 'freie_skizze' ? zu.farbe ?? null : null,
       ansicht_id: aktiveAnsichtId ?? null,
     })
-      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }).then(() => true))
+      .then(() => {
+        erfolg('Zone angelegt');
+        return qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }).then(() => true);
+      })
       .catch((e) => {
         fehler(e);
         return false;
@@ -417,7 +436,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   /** Beendet eine laufende Zonen-Serie (LFH-332) — Vorbild: onBildPlatzierenFertig. */
   const onZoneZeichnenFertig = () => dispatch({ t: 'beenden', arten: ['zone'] });
   const onKoordinateEingeben = (lat: number, lon: number) => {
-    if (platzierungZiel && darfSchreiben) verortenMutation.mutate({ lat, lon });
+    if (darfSchreiben) verorten(lat, lon);
   };
   const onEinsatzortPlatzieren = () => {
     dispatch({ t: 'platzieren', ziel: { typ: 'einsatzort', id: 0 } });
@@ -466,16 +485,25 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   const onZeichnenAbbrechen = () => dispatch({ t: 'beenden', arten: ['zone', 'abschnitt'] });
 
   // Zonen-Inspector-CRUD.
-  const zoneAendern = (zoneId: number, patch: ZonePatch) =>
-    aktualisiereZone(einsatzId, zoneId, patch)
-      .then(() => {
-        qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
-        qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
-      })
-      .catch(fehler);
+  const zoneAendern = async (zoneId: number, patch: ZonePatch) => {
+    try {
+      await aktualisiereZone(einsatzId, zoneId, patch);
+      erfolg('Zone gespeichert');
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }),
+        qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
+      ]);
+    } catch (e) {
+      fehler(e);
+      // Der Inspector braucht die Ablehnung, damit „speichert …" nicht faelschlich in
+      // „gespeichert" umspringt. Die sichtbare Fehlermeldung kommt weiterhin zentral.
+      throw e;
+    }
+  };
   const zoneLoeschen = (zoneId: number) =>
     loescheZone(einsatzId, zoneId)
       .then(() => {
+        erfolg('Zone aufgehoben');
         setZoneAuswahl(null);
         qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
         return qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });

@@ -1,15 +1,17 @@
 import { Alert, App, Breadcrumb, Button, Space, Tabs, Tag, Typography } from 'antd';
+import { CloseOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { legePersonAn, listePersonen, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
-import { ApiError } from '../api/client';
+import { listePersonen, registrierAnzeige, schlageAbgleichVor, type PersonEingabe } from '../api/einsatzPerson';
+import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datenstand from '../components/Datenstand';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import type { Person, Sichtungskategorie } from '../api/types';
 import { PATIENT_SK, SK_META, istPatient } from '../personen/personMeta';
@@ -18,9 +20,28 @@ import { filterPersonen, gefundenePersonen, type PersonenSicht } from '../person
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
 import LagebildStreifen from '../personen/LagebildStreifen';
+import { erfassePersonOfflineFaehig } from '../offline/schreiben';
+import {
+  beobachteOfflinePersonQuittungen,
+  OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
+  type OfflineSchreibaktionGesendet,
+} from '../offline/ereignisse';
+import {
+  personErfassungsQuittungEntfernen,
+  personErfassungsQuittungenLaden,
+} from '../offline/queue';
 
 /** Sicht-Tabs: 'alle' = kein Filter; 'patienten' = SK-Achse; sonst Status-Filter. */
 type Sicht = PersonenSicht;
+type ErfassungsQuittung = {
+  typ: 'success' | 'warning';
+  text: string;
+  benutzerId: number;
+  /** Erst beim expliziten Schließen in einem sichtbaren Dokument quittieren;
+   * bis dahin schützt IndexedDB gegen Unmount, Reload und Cross-Tab-Rennen. */
+  persistenzClientIds?: string[];
+};
+
 const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'erfasst', label: 'Neu' },
   { key: 'vermisst', label: 'Vermisst' },
@@ -35,7 +56,12 @@ export default function PersonenPage() {
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const navigate = useNavigate();
-  const [sicht, setSicht] = useState<Sicht>('erfasst');
+  const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
+  const sicht = sichtNachEinsatz[einsatzId] ?? 'erfasst';
+
+  const setSichtFuer = (zielEinsatzId: number, neueSicht: Sicht) => {
+    setSichtNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: neueSicht }));
+  };
 
   // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
@@ -47,7 +73,39 @@ export default function PersonenPage() {
 
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [modus, setModus] = useState<ErfassungsModus | null>(null);
+  const [modusNachEinsatz, setModusNachEinsatz] = useState<Record<number, ErfassungsModus | null>>({});
+  const [highlightNachEinsatz, setHighlightNachEinsatz] = useState<Record<number, number | null>>({});
+  const [quittungNachEinsatz, setQuittungNachEinsatz] = useState<
+    Record<number, ErfassungsQuittung | null>
+  >({});
+  const [frischErfasst, setFrischErfasst] = useState<
+    Array<{ einsatzId: number; person: Person; bestaetigenNach: number }>
+  >([]);
+  const [dokumentSichtbar, setDokumentSichtbar] = useState(
+    () => typeof document === 'undefined' || document.visibilityState === 'visible',
+  );
+  const aktuellerEinsatzRef = useRef(einsatzId);
+  aktuellerEinsatzRef.current = einsatzId;
+  const quittungKontextRef = useRef({ benutzerId: benutzer?.id, einsatzId });
+  quittungKontextRef.current = { benutzerId: benutzer?.id, einsatzId };
+  const quittungLadeFolge = useRef(0);
+  const pageMontiert = useRef(true);
+  const modus = modusNachEinsatz[einsatzId] ?? null;
+  const highlightPersonId = highlightNachEinsatz[einsatzId] ?? null;
+  const roheErfassungsQuittung = quittungNachEinsatz[einsatzId] ?? null;
+  const erfassungsQuittung = roheErfassungsQuittung?.benutzerId === benutzer?.id
+    ? roheErfassungsQuittung
+    : null;
+
+  const setModusFuer = (zielEinsatzId: number, neuerModus: ErfassungsModus | null) => {
+    setModusNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: neuerModus }));
+  };
+  const setHighlightFuer = (zielEinsatzId: number, personId: number | null) => {
+    setHighlightNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: personId }));
+  };
+  const setQuittungFuer = (zielEinsatzId: number, quittung: ErfassungsQuittung | null) => {
+    setQuittungNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: quittung }));
+  };
   /** `null` = kein Abgleich-Dialog offen. Trägt die vermisste Person, zu der gesucht wird. */
   const [abgleichFuer, setAbgleichFuer] = useState<Person | null>(null);
 
@@ -55,19 +113,219 @@ export default function PersonenPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) => message.error(fehlerText(e));
 
   const anlegenMutation = useMutation({
-    mutationFn: async (v: { daten: PersonEingabe; folgeStatus?: 'vermisst' | 'betroffen' }) => {
-      const person = await legePersonAn(einsatzId, v.daten);
-      if (v.folgeStatus) await setzePersonStatus(einsatzId, person.id, v.folgeStatus);
-      return person;
+    mutationFn: async (v: {
+      benutzerId: number;
+      einsatzId: number;
+      daten: PersonEingabe;
+      folgeStatus?: 'vermisst' | 'betroffen';
+    }) => {
+      return erfassePersonOfflineFaehig(v.benutzerId, v.einsatzId, {
+        ...v.daten,
+        status: v.folgeStatus ?? 'erfasst',
+      });
     },
-    // Nur invalidieren. Geschlossen wird über `onFertig` des Erfassungs-Primitivs (LFH-332 · B4):
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: einsatzKeys.personen(v.einsatzId) });
+    },
+    // Geschlossen wird über `onFertig` des Erfassungs-Primitivs (LFH-332 · B4):
     // im Serienmodus ist ein erfolgreiches Speichern gerade KEIN Grund zu schließen.
-    onSuccess: () => invalidate(),
-    onError: fehler,
+    onSuccess: (ergebnis, variablen) => {
+      const zielEinsatzId = variablen.einsatzId;
+      const zielSicht = variablen.folgeStatus ?? 'erfasst';
+      setSichtFuer(zielEinsatzId, zielSicht);
+      if (ergebnis.zustand === 'vorgemerkt') {
+        setHighlightFuer(zielEinsatzId, null);
+        setQuittungFuer(zielEinsatzId, {
+          typ: 'warning',
+          text: 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.',
+          benutzerId: variablen.benutzerId,
+        });
+        return;
+      }
+      const person = ergebnis.daten;
+      setFrischErfasst((alt) => [
+        {
+          einsatzId: zielEinsatzId,
+          person,
+          bestaetigenNach:
+            qc.getQueryState(einsatzKeys.personen(zielEinsatzId))?.dataUpdatedAt ?? 0,
+        },
+        ...alt.filter((eintrag) =>
+          eintrag.einsatzId !== zielEinsatzId || eintrag.person.id !== person.id),
+      ]);
+      setHighlightFuer(zielEinsatzId, person.id);
+      setQuittungFuer(zielEinsatzId, {
+        typ: 'success',
+        text: `Erfasst als ${registrierAnzeige(person.registrier_nr)}`,
+        benutzerId: variablen.benutzerId,
+      });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(zielEinsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(zielEinsatzId) });
+    },
+    onError: (e, variablen) => {
+      if (aktuellerEinsatzRef.current === variablen.einsatzId) fehler(e);
+    },
   });
+
+  useEffect(() => {
+    const serverIds = new Set((personenQuery.data ?? []).map((person) => person.id));
+    if (serverIds.size === 0) return;
+    setFrischErfasst((alt) => {
+      const offen = alt.filter((eintrag) =>
+        eintrag.einsatzId !== einsatzId ||
+        personenQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
+        !serverIds.has(eintrag.person.id));
+      return offen.length === alt.length ? alt : offen;
+    });
+  }, [einsatzId, personenQuery.data, personenQuery.dataUpdatedAt]);
+
+  useEffect(() => {
+    pageMontiert.current = true;
+    return () => { pageMontiert.current = false; };
+  }, []);
+
+  const ladePersistiertePersonQuittungen = useCallback(async () => {
+    const zielBenutzerId = benutzer?.id;
+    if (zielBenutzerId == null || !Number.isSafeInteger(einsatzId)) return;
+    const ladeFolge = ++quittungLadeFolge.current;
+    try {
+      const quittungen = await personErfassungsQuittungenLaden(zielBenutzerId, einsatzId);
+      const kontext = quittungKontextRef.current;
+      if (
+        !pageMontiert.current ||
+        ladeFolge !== quittungLadeFolge.current ||
+        kontext.benutzerId !== zielBenutzerId ||
+        kontext.einsatzId !== einsatzId ||
+        quittungen.length === 0
+      ) return;
+
+      const neueste = quittungen[quittungen.length - 1];
+      const bestaetigenNach =
+        qc.getQueryState(einsatzKeys.personen(einsatzId))?.dataUpdatedAt ?? 0;
+      const quittungsIds = new Set(quittungen.map((quittung) => quittung.person.id));
+      setFrischErfasst((alt) => [
+        ...quittungen.map((quittung) => ({
+          einsatzId,
+          person: quittung.person,
+          bestaetigenNach,
+        })),
+        ...alt.filter((eintrag) =>
+          eintrag.einsatzId !== einsatzId || !quittungsIds.has(eintrag.person.id)),
+      ]);
+      setSichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: neueste.sicht }));
+      setHighlightNachEinsatz((alt) => ({ ...alt, [einsatzId]: neueste.person.id }));
+      setQuittungNachEinsatz((alt) => {
+        const bisher = alt[einsatzId];
+        const bisherigeIds = bisher?.benutzerId === zielBenutzerId
+          ? bisher.persistenzClientIds ?? []
+          : [];
+        return {
+          ...alt,
+          [einsatzId]: {
+            typ: 'success',
+            text: quittungen.length === 1
+              ? `Erfasst als ${registrierAnzeige(neueste.person.registrier_nr)}`
+              : `Erfasst als ${quittungen
+                  .map((quittung) => registrierAnzeige(quittung.person.registrier_nr))
+                  .join(', ')}`,
+            benutzerId: zielBenutzerId,
+            persistenzClientIds: [...new Set([
+              ...bisherigeIds,
+              ...quittungen.map((quittung) => quittung.client_id),
+            ])],
+          },
+        };
+      });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    } catch {
+      // IndexedDB bleibt bei einem Lesefehler unverändert; ein späteres Signal,
+      // visibilitychange oder Mount kann dieselbe Quittung erneut laden.
+    }
+  }, [benutzer?.id, einsatzId, qc]);
+
+  useEffect(() => {
+    void ladePersistiertePersonQuittungen();
+  }, [ladePersistiertePersonQuittungen]);
+
+  useEffect(() => beobachteOfflinePersonQuittungen((signal) => {
+    if (signal.benutzerId !== benutzer?.id || signal.einsatzId !== einsatzId) return;
+    void ladePersistiertePersonQuittungen();
+  }), [benutzer?.id, einsatzId, ladePersistiertePersonQuittungen]);
+
+  useEffect(() => {
+    const sichtbarkeitGeaendert = () => {
+      const sichtbar = document.visibilityState === 'visible';
+      setDokumentSichtbar(sichtbar);
+      if (sichtbar) void ladePersistiertePersonQuittungen();
+    };
+    document.addEventListener('visibilitychange', sichtbarkeitGeaendert);
+    return () => document.removeEventListener('visibilitychange', sichtbarkeitGeaendert);
+  }, [ladePersistiertePersonQuittungen]);
+
+  useEffect(() => {
+    const erfolgreichGesendet = (event: Event) => {
+      const detail = (event as CustomEvent<OfflineSchreibaktionGesendet>).detail;
+      if (
+        detail?.art !== 'person' ||
+        detail.benutzerId !== benutzer?.id
+      ) return;
+      setFrischErfasst((alt) => [
+        {
+          einsatzId: detail.einsatzId,
+          person: detail.daten,
+          bestaetigenNach:
+            qc.getQueryState(einsatzKeys.personen(detail.einsatzId))?.dataUpdatedAt ?? 0,
+        },
+        ...alt.filter((eintrag) =>
+          eintrag.einsatzId !== detail.einsatzId || eintrag.person.id !== detail.daten.id),
+      ]);
+      const zielSicht = detail.sicht ??
+        (detail.daten.status === 'vermisst' || detail.daten.status === 'betroffen'
+          ? detail.daten.status
+          : 'erfasst');
+      setSichtFuer(detail.einsatzId, zielSicht);
+      setHighlightFuer(detail.einsatzId, detail.daten.id);
+      setQuittungNachEinsatz((alt) => {
+        const bisher = alt[detail.einsatzId];
+        const bisherigeIds = bisher?.benutzerId === detail.benutzerId
+          ? bisher.persistenzClientIds ?? []
+          : [];
+        return {
+          ...alt,
+          [detail.einsatzId]: {
+            typ: 'success',
+            text: `Erfasst als ${registrierAnzeige(detail.daten.registrier_nr)}`,
+            benutzerId: detail.benutzerId,
+            persistenzClientIds: [...new Set([...bisherigeIds, detail.clientId])],
+          },
+        };
+      });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(detail.einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(detail.einsatzId) });
+    };
+    window.addEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, erfolgreichGesendet);
+    return () =>
+      window.removeEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, erfolgreichGesendet);
+  }, [benutzer?.id, qc]);
+
+  const quittungSchliessen = () => {
+    if (!erfassungsQuittung || benutzer?.id == null) return;
+    const persistenzClientIds = erfassungsQuittung.persistenzClientIds ?? [];
+    // Persistente Zustellung wird nur durch eine bewusste Aktion in einem
+    // sichtbaren Dokument quittiert. Insbesondere der sendende Tab löscht damit
+    // nicht direkt nach dem lokalen Event, bevor andere Tabs aus IDB lesen konnten.
+    if (persistenzClientIds.length > 0 && document.visibilityState !== 'visible') return;
+    setQuittungFuer(einsatzId, null);
+    if (persistenzClientIds.length === 0) return;
+    void Promise.all(
+      persistenzClientIds.map((clientId) =>
+        personErfassungsQuittungEntfernen(benutzer.id, einsatzId, clientId)),
+    ).catch(() => undefined);
+  };
 
   // Deep-Link: ?person=<id> leitet auf die Detailseite um (rückwärtskompatibel
   // mit dem alten Drawer-Verhalten, z. B. „Vollständig öffnen" aus dem UHS-Drawer).
@@ -84,10 +342,10 @@ export default function PersonenPage() {
     if (einsatzQuery.isLoading) return;
     const e = einsatzQuery.data;
     const darfSchr = darfImEinsatzSchreiben(e, benutzer);
-    if (darfSchr) setModus('schnell');
+    if (darfSchr) setModusFuer(einsatzId, 'schnell');
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, einsatzQuery.data, benutzer]);
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, einsatzQuery.data, benutzer, einsatzId]);
 
   const abgleichVorschlagMutation = useMutation({
     mutationFn: (v: { vermisstId: number; gefundenId: number }) =>
@@ -117,7 +375,14 @@ export default function PersonenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const alle = personenQuery.data ?? [];
+  const aktuelleFrische = frischErfasst
+    .filter((eintrag) => eintrag.einsatzId === einsatzId)
+    .map((eintrag) => eintrag.person);
+  const frischeIds = new Set(aktuelleFrische.map((person) => person.id));
+  const alle = [
+    ...aktuelleFrische,
+    ...(personenQuery.data ?? []).filter((person) => !frischeIds.has(person.id)),
+  ];
   const gefundene = gefundenePersonen(alle);
 
   /**
@@ -164,19 +429,34 @@ export default function PersonenPage() {
         <Space>
           <Typography.Title level={3} style={{ margin: 0 }}>Personen</Typography.Title>
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <Datenstand dataUpdatedAt={personenQuery.dataUpdatedAt} />
         </Space>
         {darfSchreiben && (
           <Space>
-            <Button type="primary" onClick={() => setModus('schnell')}>Schnellerfassung</Button>
-            <Button onClick={() => setModus('vermisst')}>Vermisst melden</Button>
-            <Button onClick={() => setModus('betroffen')}>Betroffene/n erfassen</Button>
+            <Button type="primary" onClick={() => setModusFuer(einsatzId, 'schnell')}>Schnellerfassung</Button>
+            <Button onClick={() => setModusFuer(einsatzId, 'vermisst')}>Vermisst melden</Button>
+            <Button onClick={() => setModusFuer(einsatzId, 'betroffen')}>Betroffene/n erfassen</Button>
           </Space>
         )}
       </Space>
 
+      {erfassungsQuittung && (
+        <Alert
+          style={{ marginBottom: 12 }}
+          type={erfassungsQuittung.typ}
+          showIcon
+          title={erfassungsQuittung.text}
+          closable={dokumentSichtbar ? {
+            onClose: quittungSchliessen,
+            closeIcon: <CloseOutlined />,
+            'aria-label': 'Bestätigung schließen',
+          } : false}
+        />
+      )}
+
       <Tabs
         activeKey={sicht}
-        onChange={(k) => setSicht(k as Sicht)}
+        onChange={(k) => setSichtFuer(einsatzId, k as Sicht)}
         items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))}
       />
 
@@ -234,6 +514,7 @@ export default function PersonenPage() {
               reihenfolge: [...PATIENT_SK],
             }}
             onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
+            zeilenKlasse={(p) => p.id === highlightPersonId ? 'zeile-hervorgehoben' : undefined}
             karte={personenKarte(einsatzId)}
           />
         ) : (
@@ -274,6 +555,7 @@ export default function PersonenPage() {
             suche={{ platzhalter: 'R-Nr. oder Name' }}
             standardSortierung={{ spalte: 'reg', richtung: 'auf' }}
             onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
+            zeilenKlasse={(p) => p.id === highlightPersonId ? 'zeile-hervorgehoben' : undefined}
             karte={{
               ...personenKarte(einsatzId),
               // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (24 px hoch,
@@ -299,19 +581,25 @@ export default function PersonenPage() {
       />
 
       <PersonErfassungModal
+        key={einsatzId}
         modus={modus}
-        isPending={anlegenMutation.isPending}
-        onCancel={() => setModus(null)}
-        onFertig={() => setModus(null)}
+        isPending={
+          anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId
+        }
+        onCancel={() => setModusFuer(einsatzId, null)}
+        onFertig={() => setModusFuer(einsatzId, null)}
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
         // Datensatz wirklich angekommen ist — dafür muss das Versprechen bei einem Fehler
         // ablehnen. Den Fehler-Toast wirft weiterhin `onError` der Mutation.
-        onErfassen={(daten) =>
-          anlegenMutation.mutateAsync({
+        onErfassen={(daten) => {
+          if (!benutzer) return Promise.reject(new Error('Nicht angemeldet'));
+          return anlegenMutation.mutateAsync({
+            benutzerId: benutzer.id,
+            einsatzId,
             daten,
             folgeStatus: modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
-          })
-        }
+          });
+        }}
       />
     </div>
   );

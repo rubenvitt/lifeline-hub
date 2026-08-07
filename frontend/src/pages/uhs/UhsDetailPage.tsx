@@ -135,7 +135,11 @@ export default function UhsDetailPage() {
             label: 'Material',
             children: <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
           },
-          { key: 'bewegungen', label: 'Bewegungen', children: <BewegungenTab uhs={uhs} /> },
+          {
+            key: 'bewegungen',
+            label: 'Bewegungen',
+            children: <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />,
+          },
         ]}
       />
     </div>

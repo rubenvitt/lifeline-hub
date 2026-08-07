@@ -1,5 +1,5 @@
 import type { Auftrag, EtbEintragAnzeige, EtbTyp, MeldeWeg, NeuerAuftrag } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, type ApiSendOptionen } from './client';
 
 export const SEITENGROESSE = 100;
 
@@ -43,8 +43,17 @@ export interface NeuerEintrag {
   client_id?: string;
 }
 
-export function erfasseEtb(einsatzId: number, eintrag: NeuerEintrag): Promise<EtbEintragAnzeige> {
-  return apiSend<EtbEintragAnzeige>(`/api/einsaetze/${einsatzId}/etb`, 'POST', eintrag);
+export function erfasseEtb(
+  einsatzId: number,
+  eintrag: NeuerEintrag,
+  optionen?: ApiSendOptionen,
+): Promise<EtbEintragAnzeige> {
+  return apiSend<EtbEintragAnzeige>(
+    `/api/einsaetze/${einsatzId}/etb`,
+    'POST',
+    eintrag,
+    optionen,
+  );
 }
 
 /** Aus einem ETB-Eintrag direkt einen Auftrag erteilen (ETB→Auftrag, LFH-112).

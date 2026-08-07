@@ -24,7 +24,7 @@ use crate::person::{
 };
 use crate::routes::support::{trimme, trimme_tri};
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
@@ -129,14 +129,21 @@ pub struct AnlegenBody {
     pub antreff_ort: Option<String>,
     pub melder_kontakt: Option<String>,
     pub notiz: Option<String>,
+    /// Optionaler initialer Arbeitsstatus. Für die Erfassungs-Fastpaths sind
+    /// ausschließlich `erfasst`, `vermisst` und `betroffen` zulässig.
+    pub status: Option<String>,
+    /// Stabiler, client-generierter Idempotenzschlüssel für Offline-Queue und
+    /// Timeout-Replay. Leer/fehlend behält das Verhalten älterer Clients.
+    pub client_id: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/personen — Person anlegen (Status `erfasst`).
+/// POST /api/einsaetze/{id}/personen — Person anlegen (initial erfasst/vermisst/betroffen).
 /// Schreibberechtigt + aktiver Einsatz. Schreibt pseudonymen ETB-Eintrag + SSE.
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
+    headers: HeaderMap,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<PersonAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -150,8 +157,44 @@ pub async fn anlegen(
         &benutzer,
     )
     .await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, benutzer.id)?;
+
+    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-Gates, aber vor dem
+    // Aktiv-Gate erkennen. Die Einsatz-ID ist Teil des Lookups (kein Cross-Einsatz-Replay).
+    let client_id = trimme(body.client_id);
+    if client_id.as_deref().is_some_and(|cid| cid.len() > 64) {
+        return Err(AppError::Validation(
+            "client_id zu lang (max. 64 Zeichen)".into(),
+        ));
+    }
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(person) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            return Ok((StatusCode::CREATED, Json(person)));
+        }
+    }
     fordere_aktiv(&einsatz)?;
     pruefe_geschlecht(body.geschlecht.as_deref())?;
+
+    let status = body
+        .status
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("erfasst")
+        .to_owned();
+    let Some(status_enum) = PersonStatus::parse(&status) else {
+        return Err(AppError::Validation(
+            "Unbekannter initialer Personenstatus".into(),
+        ));
+    };
+    if !matches!(
+        status_enum,
+        PersonStatus::Erfasst | PersonStatus::Vermisst | PersonStatus::Betroffen
+    ) {
+        return Err(AppError::Validation(
+            "Initial sind nur erfasst, vermisst oder betroffen zulässig".into(),
+        ));
+    }
 
     let name = trimme(body.name);
     let vorname = trimme(body.vorname);
@@ -167,11 +210,13 @@ pub async fn anlegen(
     let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
         .await?
         .etb_startwert();
-    let person = crate::write_retry!(&state.pool, |conn| {
-        let (id, _reg) = repo::anlegen_tx(
+    let (person, war_neu) = crate::write_retry!(&state.pool, |conn| {
+        let (id, _reg, war_neu) = repo::anlegen_tx_mit_optionen(
             conn,
             einsatz_id,
             benutzer.id,
+            status_enum.as_str(),
+            client_id.as_deref(),
             repo::NeueDaten {
                 name: name.as_deref(),
                 vorname: vorname.as_deref(),
@@ -186,14 +231,18 @@ pub async fn anlegen(
         )
         .await?;
         let person = repo::laden_tx(conn, einsatz_id, id).await?;
-        let text = format!(
-            "Person {} erfasst",
-            registrier_anzeige(person.registrier_nr)
-        );
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
-        Ok(person)
+        if war_neu {
+            let text = format!(
+                "Person {} erfasst",
+                registrier_anzeige(person.registrier_nr)
+            );
+            crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        }
+        Ok((person, war_neu))
     })?;
-    sse_person(&state, einsatz_id, person.id);
+    if war_neu {
+        sse_person(&state, einsatz_id, person.id);
+    }
     Ok((StatusCode::CREATED, Json(person)))
 }
 

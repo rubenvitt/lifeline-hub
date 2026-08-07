@@ -8,16 +8,18 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
-import { bestaetigeMeldung, erteileAuftragAusMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
+import { fehlerText } from '../api/client';
+import { bestaetigeMeldung, erteileAuftragAusMeldung, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import type { Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
+import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
+import Datenstand from '../components/Datenstand';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst
@@ -84,7 +86,7 @@ export default function MeldungenPage() {
     document.querySelector(`[data-meldung-id="${highlightMeldungId}"]`)?.scrollIntoView?.({ block: 'center' });
   }, [highlightMeldungId]);
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) => message.error(fehlerText(e));
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
 
   // LFH-332/B4: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach
@@ -93,8 +95,23 @@ export default function MeldungenPage() {
   // Card). Der conditional Render der Card (unten) würde das Formular sonst
   // unmounten — samt Serienzähler und Wertübernahme.
   const anlegenMutation = useMutation({
-    mutationFn: (d: NeueMeldung) => legeMeldungAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Meldung erfasst'); },
+    mutationFn: (d: NeueMeldung) => {
+      if (!benutzer) throw new Error('Nicht angemeldet');
+      return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);
+    },
+    onSuccess: (ergebnis) => {
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning('Offline vorgemerkt — Meldung wird bei Verbindung gesendet');
+        return;
+      }
+      const meldung = ergebnis.daten;
+      qc.setQueriesData<Meldung[]>({ queryKey: einsatzKeys.meldungen(einsatzId) }, (alt = []) => {
+        const ohne = alt.filter((m) => m.id !== meldung.id);
+        return [meldung, ...ohne];
+      });
+      invalidiere();
+      message.success(`Meldung #${meldung.lfd_nr} erfasst`);
+    },
     onError: fehler,
   });
   const statusMutation = useMutation({
@@ -190,6 +207,7 @@ export default function MeldungenPage() {
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
+          <div><Datenstand dataUpdatedAt={meldungenQuery.dataUpdatedAt} /></div>
         </div>
         {darfSchreiben && (
           <Button

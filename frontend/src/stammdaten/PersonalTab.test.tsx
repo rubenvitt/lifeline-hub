@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -94,6 +94,29 @@ describe('PersonalTab', () => {
     render(admin);
     await screen.findByText('Thomas Müller');
     expect(screen.getByRole('button', { name: 'Person anlegen' })).toBeInTheDocument();
+  });
+
+  it('sperrt während des Dienststatuswechsels alle Zeilen und markiert nur das Ziel als ladend', async () => {
+    let freigeben: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    server.use(http.post('/api/personal/1/ausser-dienst', async () => {
+      await gate;
+      return HttpResponse.json({ ...personal[0], dienststatus: 'ausser_dienst' });
+    }));
+    const { container } = render(admin, [personal[0], { ...personal[0], id: 2, name: 'Erika Muster' }]);
+    await screen.findByText('Thomas Müller');
+    const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
+
+    await userEvent.click(within(erste).getByRole('button', { name: 'Außer Dienst' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+
+    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
+    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Außer Dienst' })).toBeDisabled();
+    expect(within(zweite).getByRole('button', { name: 'Außer Dienst' })).not.toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+    await act(async () => { freigeben?.(); });
   });
 
   it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {

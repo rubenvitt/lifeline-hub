@@ -1,7 +1,17 @@
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
-import { ApiError, apiGet, apiSend, istKonflikt } from './client';
+import {
+  ApiError,
+  NetzFehler,
+  OFFLINE_QUEUE_BENUTZER_HEADER,
+  apiGet,
+  apiSend,
+  fehlerText,
+  istKonflikt,
+} from './client';
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('istKonflikt', () => {
   it('erkennt einen 409-ApiError als optimistischen Sperrkonflikt', () => {
@@ -31,6 +41,32 @@ describe('apiGet', () => {
       message: 'Nicht gefunden',
     });
   });
+
+  it('bricht einen hängenden Fetch nach dem 15-s-Signal als NetzFehler ab', async () => {
+    const controller = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((millisekunden) => {
+      expect(millisekunden).toBe(15_000);
+      return controller.signal;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      const signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    });
+
+    const anfrage = apiGet('/api/haengt');
+    controller.abort(new DOMException('Zeitüberschreitung', 'TimeoutError'));
+
+    await expect(anfrage).rejects.toBeInstanceOf(NetzFehler);
+  });
+
+  it('ordnet auch einen expliziten AbortError als NetzFehler ein', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new DOMException('Verbindung abgebrochen', 'AbortError'),
+    );
+    await expect(apiGet('/api/abgebrochen')).rejects.toBeInstanceOf(NetzFehler);
+  });
 });
 
 describe('apiSend', () => {
@@ -46,6 +82,22 @@ describe('apiSend', () => {
     });
   });
 
+  it('sendet die optionale erwartete Queue-Eigentümer-ID als eigenen Header', async () => {
+    let header: string | null = null;
+    server.use(
+      http.post('/api/offline-ding', ({ request }) => {
+        header = request.headers.get(OFFLINE_QUEUE_BENUTZER_HEADER);
+        return HttpResponse.json({ gespeichert: true }, { status: 201 });
+      }),
+    );
+
+    await apiSend('/api/offline-ding', 'POST', { name: 'Welt' }, {
+      offlineQueueBenutzerId: 17,
+    });
+
+    expect(header).toBe('17');
+  });
+
   it('liefert undefined bei 204 ohne Body', async () => {
     server.use(http.post('/api/logout', () => new HttpResponse(null, { status: 204 })));
     await expect(apiSend('/api/logout', 'POST')).resolves.toBeUndefined();
@@ -56,9 +108,20 @@ describe('apiSend', () => {
     await expect(apiSend('/api/ding', 'POST', {})).resolves.toBeUndefined();
   });
 
-  it('wirft kein ApiError, sondern den nativen TypeError bei Netzwerkfehler', async () => {
+  it('bündelt TypeError und liefert den eindeutigen Bedienhinweis', async () => {
     server.use(http.post('/api/ding', () => HttpResponse.error()));
     const fehler = await apiSend('/api/ding', 'POST', {}).catch((e) => e);
-    expect(fehler).not.toBeInstanceOf(ApiError);
+    expect(fehler).toBeInstanceOf(NetzFehler);
+    expect(fehlerText(fehler)).toBe('Keine Verbindung — die Aktion wurde NICHT abgeschickt');
+  });
+
+  it('lässt eine 409-Antwort unverändert als optimistischen Sperrkonflikt erkennen', async () => {
+    server.use(
+      http.post('/api/ding', () =>
+        HttpResponse.json({ error: 'Zwischenzeitlich geändert' }, { status: 409 }),
+      ),
+    );
+    const fehler = await apiSend('/api/ding', 'POST', {}).catch((e) => e);
+    expect(istKonflikt(fehler)).toBe(true);
   });
 });

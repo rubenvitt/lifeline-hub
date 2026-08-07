@@ -1,5 +1,6 @@
 import { Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
+import Datenstand from './Datenstand';
 
 interface SektionHeaderProps {
   titel: ReactNode;
@@ -7,6 +8,8 @@ interface SektionHeaderProps {
   beschreibung?: ReactNode;
   /** Rechter Slot (z. B. eine Sektions-Aktion). */
   extra?: ReactNode;
+  /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
+  dataUpdatedAt?: number;
   children?: ReactNode;
 }
 
@@ -15,7 +18,9 @@ interface SektionHeaderProps {
  * für die Verwaltungs-Seiten (LFH-281). Zentralisiert die sonst überall manuell
  * gesetzten Typography-Margin-Resets; Abstände aus `theme.useToken()`.
  */
-export default function SektionHeader({ titel, beschreibung, extra, children }: SektionHeaderProps) {
+export default function SektionHeader({
+  titel, beschreibung, extra, dataUpdatedAt, children,
+}: SektionHeaderProps) {
   const { token } = theme.useToken();
   return (
     <div style={{ marginBottom: token.marginSM }}>
@@ -37,6 +42,7 @@ export default function SektionHeader({ titel, beschreibung, extra, children }: 
           {beschreibung}
         </Typography.Paragraph>
       )}
+      <Datenstand dataUpdatedAt={dataUpdatedAt} />
       {children}
     </div>
   );

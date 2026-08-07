@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Outlet, Route, Routes } from 'react-router';
 import { Fragment, lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
@@ -50,6 +50,9 @@ import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
 import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
+import LiveStatusBanner from './live/LiveStatusBanner';
+import { useOfflineSync } from './offline/useOfflineSync';
+import { useAuth } from './auth/AuthContext';
 
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
@@ -101,6 +104,19 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   gefahrenzonen: <GefahrenPage />,
 };
 
+/** Genau eine Betriebszeile für alle angemeldeten Routen. Die beiden vorhandenen
+ *  Layout-Zweige (globale Topbar und Einsatz-Workspace) bleiben darunter Geschwister. */
+function BetriebsLayout() {
+  const { benutzer } = useAuth();
+  useOfflineSync(benutzer?.id);
+  return (
+    <>
+      <LiveStatusBanner benutzerId={benutzer?.id} />
+      <Outlet />
+    </>
+  );
+}
+
 export default function App() {
   // Zentrale 401-Behandlung (LFH-268/F24): hier und nicht tiefer, weil App die oberste
   // Komponente innerhalb von AntApp, BrowserRouter und AuthProvider ist — damit greift der
@@ -111,52 +127,54 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
-        {/* Ebene 1 — globale Shell */}
-        <Route element={<AppLayout />}>
-          <Route path="/einsaetze" element={<EinsaetzePage />} />
-          {/* Benutzer-Verwaltung wohnt jetzt in der Admin-Sidebar; Alt-Link bleibt als Redirect. */}
-          <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
-          {/* Alt-Route bleibt für externe Links / EinsatzSwitcher erhalten */}
-          <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
-          <Route path="/profil" element={<ProfilPage />} />
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
-            {adminGruppen.map((g) => (
-              <Fragment key={g.key}>
-                {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}
-                <Route path={g.key} element={<Navigate to={ersteSektionPfad(g.key)} replace />} />
-                {g.sektionen.map((s) => (
-                  <Route key={s.key} path={`${g.key}/${s.key}`} element={s.element} />
-                ))}
-              </Fragment>
-            ))}
-            <Route path="benutzer" element={<BenutzerPage />} />
+        <Route element={<BetriebsLayout />}>
+          {/* Ebene 1 — globale Shell */}
+          <Route element={<AppLayout />}>
+            <Route path="/einsaetze" element={<EinsaetzePage />} />
+            {/* Benutzer-Verwaltung wohnt jetzt in der Admin-Sidebar; Alt-Link bleibt als Redirect. */}
+            <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
+            {/* Alt-Route bleibt für externe Links / EinsatzSwitcher erhalten */}
+            <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
+            <Route path="/profil" element={<ProfilPage />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
+              {adminGruppen.map((g) => (
+                <Fragment key={g.key}>
+                  {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}
+                  <Route path={g.key} element={<Navigate to={ersteSektionPfad(g.key)} replace />} />
+                  {g.sektionen.map((s) => (
+                    <Route key={s.key} path={`${g.key}/${s.key}`} element={s.element} />
+                  ))}
+                </Fragment>
+              ))}
+              <Route path="benutzer" element={<BenutzerPage />} />
+            </Route>
           </Route>
-        </Route>
-        {/* Ebene 2 — Einsatz-Workspace */}
-        <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-          <Route index element={<DefaultModulRedirect />} />
-          {modulRegistry.map((m) => (
-            <Route
-              key={m.key}
-              path={m.route}
-              element={
-                m.verweistAuf ? (
-                  <ModulRedirect to={m.verweistAuf} />
-                ) : (
-                  (MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />)
-                )
-              }
-            />
-          ))}
-          <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
-          <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-          <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
-          <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
-          <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
-          <Route path="personen/:personId" element={<PersonenDetailPage />} />
-          <Route path="tiere/:tierId" element={<TiereDetailPage />} />
-          <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
+          {/* Ebene 2 — Einsatz-Workspace */}
+          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+            <Route index element={<DefaultModulRedirect />} />
+            {modulRegistry.map((m) => (
+              <Route
+                key={m.key}
+                path={m.route}
+                element={
+                  m.verweistAuf ? (
+                    <ModulRedirect to={m.verweistAuf} />
+                  ) : (
+                    (MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />)
+                  )
+                }
+              />
+            ))}
+            <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
+            <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+            <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
+            <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
+            <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
+            <Route path="personen/:personId" element={<PersonenDetailPage />} />
+            <Route path="tiere/:tierId" element={<TiereDetailPage />} />
+            <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/einsaetze" replace />} />

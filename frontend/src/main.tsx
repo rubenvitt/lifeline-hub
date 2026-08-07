@@ -17,18 +17,23 @@ import { ThemeModeProvider } from './theme/ThemeModeProvider';
 import { AuthProvider } from './auth/AuthContext';
 import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
 import { erzeugeQueryClient } from './api/queryClient';
+import { meldeAppAktualisierungVerfuegbar, setzeAppAktualisierer } from './pwa/appAktualisierung';
 
 dayjs.extend(utc);
 
-registerSW({ immediate: true });
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh: meldeAppAktualisierungVerfuegbar,
+});
+setzeAppAktualisierer(updateSW);
 
-const queryClient = erzeugeQueryClient({ queries: { retry: false, staleTime: 10_000 } });
+const queryClient = erzeugeQueryClient();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeModeProvider>
-        <AntApp>
+        <AntApp notification={{ maxCount: 3 }}>
           <BrowserRouter>
             <AuthProvider>
               <CommandPaletteProvider>

@@ -10,6 +10,7 @@ import type { BefehlAnzeige, BefehlVorlageKey } from '../api/types';
 import { VORLAGEN } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datenstand from '../components/Datenstand';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 
 /**
@@ -124,6 +125,7 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
           <Typography.Text type="secondary">
             {befehle.length} Befehle · {entwuerfe} im Entwurf
           </Typography.Text>
+          <div><Datenstand dataUpdatedAt={befehleQuery.dataUpdatedAt} /></div>
         </div>
         {darfSchreiben && (
           // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.

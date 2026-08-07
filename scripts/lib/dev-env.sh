@@ -31,7 +31,15 @@ ohne_dev_env() {
     [ -n "$name" ] && unset_args+=(-u "$name")
   done < <(env | sed -E 's/=.*//' | grep -E "$DEV_ENV_PRAEFIXE" || true)
 
-  env "${unset_args[@]}" "$@"
+  # macOS liefert im System-Bash weiterhin 3.2 aus. Dort wirft die Expansion
+  # eines leeren Arrays unter `set -u` trotz vorherigem `local unset_args=()`
+  # einen "unbound variable"-Fehler. Ohne Treffer gibt es schlicht nichts zu
+  # entfernen; den leeren Array deshalb gar nicht erst expandieren.
+  if [ "${#unset_args[@]}" -eq 0 ]; then
+    env "$@"
+  else
+    env "${unset_args[@]}" "$@"
+  fi
 }
 
 # Listet die Variablen, die geräumt würden (für Diagnose-Ausgaben).

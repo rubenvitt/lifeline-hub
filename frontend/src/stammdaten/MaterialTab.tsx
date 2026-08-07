@@ -76,26 +76,40 @@ export default function MaterialTab() {
           {
             title: 'Aktionen',
             key: 'aktionen',
-            render: (_, m: Material) => (
-              <Space size="middle">
-                <Button onClick={() => { setBearbeite(m); setModalOffen(true); }}>
-                  Bearbeiten
-                </Button>
-                {m.dienststatus === 'in_dienst' ? (
-                  <Popconfirm
-                    title="Außer Dienst stellen?"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => dienststatusMutation.mutate({ id: m.id, inDienst: false })}
-                  >
-                    <Button danger>Außer Dienst</Button>
-                  </Popconfirm>
-                ) : (
-                  <Button onClick={() => dienststatusMutation.mutate({ id: m.id, inDienst: true })}>
-                    Wieder in Dienst
+            render: (_, m: Material) => {
+              const gesperrt = dienststatusMutation.isPending;
+              const laeuft = gesperrt && dienststatusMutation.variables?.id === m.id;
+              return (
+                <Space size="middle">
+                  <Button disabled={gesperrt} onClick={() => { setBearbeite(m); setModalOffen(true); }}>
+                    Bearbeiten
                   </Button>
-                )}
-              </Space>
-            ),
+                  {m.dienststatus === 'in_dienst' ? (
+                    <Popconfirm
+                      title="Außer Dienst stellen?"
+                      disabled={gesperrt}
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => {
+                        if (!dienststatusMutation.isPending) {
+                          dienststatusMutation.mutate({ id: m.id, inDienst: false });
+                        }
+                      }}
+                    >
+                      <Button danger loading={laeuft} disabled={gesperrt}>Außer Dienst</Button>
+                    </Popconfirm>
+                  ) : (
+                    <Button loading={laeuft} disabled={gesperrt}
+                      onClick={() => {
+                        if (!dienststatusMutation.isPending) {
+                          dienststatusMutation.mutate({ id: m.id, inDienst: true });
+                        }
+                      }}>
+                      Wieder in Dienst
+                    </Button>
+                  )}
+                </Space>
+              );
+            },
           },
         ] as TableColumnsType<Material>)
       : []),

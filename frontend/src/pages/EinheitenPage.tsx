@@ -27,6 +27,7 @@ import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { leerZuNull } from '../api/patchTriState';
+import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
@@ -273,9 +274,18 @@ export default function EinheitenPage() {
       <Breadcrumb style={{ marginBottom: 12 }}
         items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Einheiten' }]} />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>Einheiten</Typography.Title>
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+        <Space orientation="vertical" size={0}>
+          <Space>
+            <Typography.Title level={3} style={{ margin: 0 }}>Einheiten</Typography.Title>
+            <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          </Space>
+          <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
+            einheitenQuery.dataUpdatedAt,
+            abschnitteQuery.dataUpdatedAt,
+            personalQuery.dataUpdatedAt,
+            fahrzeugeQuery.dataUpdatedAt,
+            materialQuery.dataUpdatedAt,
+          )} />
         </Space>
         {darfSchreiben && <Button type="primary" onClick={() => bilden.mutate()}>Einheit bilden</Button>}
       </Space>

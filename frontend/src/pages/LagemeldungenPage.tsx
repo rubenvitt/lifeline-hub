@@ -7,6 +7,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenLeer } from '../components/SeitenZustand';
+import Datenstand from '../components/Datenstand';
 
 export default function LagemeldungenPage() {
   const { id } = useParams();
@@ -35,6 +36,7 @@ export default function LagemeldungenPage() {
         { title: 'Lagemeldungen' },
       ]} />
       <Typography.Title level={3} style={{ marginTop: 0 }}>Lagerelevante Meldungen</Typography.Title>
+      <Datenstand dataUpdatedAt={lageQuery.dataUpdatedAt} />
       {lageQuery.isError && (
         <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Lageobjekte konnten nicht geladen werden" />
       )}

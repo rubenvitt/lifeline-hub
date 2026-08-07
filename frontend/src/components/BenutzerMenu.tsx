@@ -138,6 +138,12 @@ export default function BenutzerMenu() {
                 </Space>
               </div>
             )}
+            <Typography.Text
+              type="secondary"
+              style={{ display: 'block', fontSize: 11, marginTop: 6 }}
+            >
+              Version {__APP_VERSION__}
+            </Typography.Text>
           </div>
         </div>
       ),

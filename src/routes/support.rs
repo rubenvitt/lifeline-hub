@@ -6,6 +6,7 @@
 //! modul-spezifischen `sse_*`-Notify-Wrapper bleiben bewusst lokal (unterscheiden sich in
 //! Event-Name und Payload-Keys).
 
+use crate::error::AppError;
 use crate::live::{LiveEvent, LiveNachricht, Replay};
 use axum::http::{header, HeaderMap, HeaderName};
 use axum::response::sse::Event;
@@ -21,6 +22,38 @@ use tokio_stream::{Stream, StreamExt};
 /// Byte-Wechsel bekäme ohnehin eine neue `id`. Geteilt, damit beide Asset-Download-Pfade
 /// dieselbe Policy tragen.
 pub const ASSET_CACHE_CONTROL: &str = "private, max-age=31536000, immutable";
+
+/// Optionaler Besitz-Nachweis fuer einen Offline-Queue-Eintrag. Der Browser bindet damit
+/// einen zuvor lokal gespeicherten Schreibvorgang an den Benutzer, unter dessen Session er
+/// entstanden ist. Nach einem Benutzerwechsel darf derselbe Queue-Eintrag weder neu
+/// geschrieben noch als idempotenter Replay ausgelesen werden.
+pub const OFFLINE_QUEUE_BENUTZER_ID_HEADER: &str = "x-offline-queue-benutzer-id";
+
+/// Prueft den optionalen Offline-Queue-Besitzer gegen den aktuell authentifizierten Benutzer.
+///
+/// Fehlender Header behaelt die Abwaertskompatibilitaet normaler Online-Requests. Ein
+/// ungueltiger oder abweichender Wert wird absichtlich einheitlich als 412 behandelt: 401
+/// bleibt echten Auth-Fehlern vorbehalten, damit ein stale Tab nicht den globalen Logout der
+/// gueltigen aktuellen Session ausloest. Der Aufrufer muss diesen Guard vor jedem
+/// Idempotenz-Lookup und vor jedem Write ausfuehren.
+pub fn fordere_offline_queue_benutzer(
+    headers: &HeaderMap,
+    aktueller_benutzer_id: i64,
+) -> Result<(), AppError> {
+    let Some(erwartet) = headers.get(OFFLINE_QUEUE_BENUTZER_ID_HEADER) else {
+        return Ok(());
+    };
+    let passt = erwartet
+        .to_str()
+        .ok()
+        .and_then(|wert| wert.trim().parse::<i64>().ok())
+        .is_some_and(|id| id == aktueller_benutzer_id);
+    if passt {
+        Ok(())
+    } else {
+        Err(AppError::OfflineQueueBenutzerMismatch)
+    }
+}
 
 /// Starker ETag aus dem sha256-Hex (gequotet).
 pub fn etag_von(sha256: &str) -> String {
@@ -156,6 +189,36 @@ mod tests {
             trimme(Some("  Wert  ".to_string())),
             Some("Wert".to_string())
         );
+    }
+
+    #[test]
+    fn offline_queue_benutzer_ist_optional_aber_strikt_gebunden() {
+        let mut headers = HeaderMap::new();
+        assert!(fordere_offline_queue_benutzer(&headers, 7).is_ok());
+
+        headers.insert(
+            HeaderName::from_static(OFFLINE_QUEUE_BENUTZER_ID_HEADER),
+            "7".parse().unwrap(),
+        );
+        assert!(fordere_offline_queue_benutzer(&headers, 7).is_ok());
+
+        headers.insert(
+            HeaderName::from_static(OFFLINE_QUEUE_BENUTZER_ID_HEADER),
+            "8".parse().unwrap(),
+        );
+        assert!(matches!(
+            fordere_offline_queue_benutzer(&headers, 7),
+            Err(AppError::OfflineQueueBenutzerMismatch)
+        ));
+
+        headers.insert(
+            HeaderName::from_static(OFFLINE_QUEUE_BENUTZER_ID_HEADER),
+            "keine-id".parse().unwrap(),
+        );
+        assert!(matches!(
+            fordere_offline_queue_benutzer(&headers, 7),
+            Err(AppError::OfflineQueueBenutzerMismatch)
+        ));
     }
 
     #[derive(Deserialize)]

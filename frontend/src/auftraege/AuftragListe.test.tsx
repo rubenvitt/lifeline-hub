@@ -29,6 +29,34 @@ describe('AuftragListe — ETB-Backlink (LFH-112)', () => {
     renderMitProviders(<AuftragListe auftraege={[auftrag()]} einsatzId={7} />);
     expect(screen.queryByRole('link', { name: /ETB-Eintrag/ })).not.toBeInTheDocument();
   });
+
+  it('serialisiert Quittierungen und zeigt nur am Ziel den Ladezustand', () => {
+    const empfaenger = auftrag().empfaenger[0];
+    const zweiEmpfaenger = auftrag({
+      empfaenger_anzahl: 2,
+      empfaenger: [
+        empfaenger,
+        { ...empfaenger, id: 2, snap_anzeige: 'EA Süd' },
+      ],
+    });
+    renderMitProviders(
+      <AuftragListe
+        auftraege={[zweiEmpfaenger]}
+        einsatzId={7}
+        darfSchreiben
+        quittierungLaeuft
+        quittierungZiel={{ auftragId: 1, empfaengerId: 1 }}
+        onQuittieren={() => undefined}
+      />,
+    );
+
+    const ziel = screen.getByRole('button', { name: 'Empfang für EA Nord quittieren' });
+    const anderesZiel = screen.getByRole('button', { name: 'Empfang für EA Süd quittieren' });
+    expect(ziel).toBeDisabled();
+    expect(ziel).toHaveClass('ant-btn-loading');
+    expect(anderesZiel).toBeDisabled();
+    expect(anderesZiel).not.toHaveClass('ant-btn-loading');
+  });
 });
 
 describe('AuftragListe — Leerzustand (LFH-331 · B3)', () => {

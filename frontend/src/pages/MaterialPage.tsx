@@ -3,6 +3,7 @@ import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import Datenstand from '../components/Datenstand';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -77,7 +78,12 @@ export default function MaterialPage() {
 
   const disponiereMutation = useMutation({
     mutationFn: (v: { materialId: number; menge: number }) => disponiereMaterial(einsatzId, v.materialId, v.menge),
-    onSuccess: () => { invalidate(); setPoolAuswahl(null); setPoolMenge(1); },
+    onSuccess: () => {
+      message.success('Material disponiert');
+      invalidate();
+      setPoolAuswahl(null);
+      setPoolMenge(1);
+    },
     onError: fehler,
   });
   const adhocMutation = useMutation({
@@ -100,7 +106,32 @@ export default function MaterialPage() {
   const statusMutation = useMutation({
     mutationFn: (v: { emId: number; status: MaterialStatus }) =>
       aktualisiereDisposition(einsatzId, v.emId, { status: v.status }),
-    onSuccess: invalidate, onError: fehler,
+    onMutate: async (v) => {
+      const queryKey = einsatzKeys.material(einsatzId);
+      await qc.cancelQueries({ queryKey });
+      const vorher = qc.getQueryData<EinsatzMaterial[]>(queryKey)?.find((em) => em.id === v.emId);
+      qc.setQueryData<EinsatzMaterial[]>(queryKey, (alt) =>
+        alt?.map((em) => em.id === v.emId ? { ...em, status: v.status } : em),
+      );
+      return { vorher };
+    },
+    onSuccess: (serverStand) => {
+      qc.setQueryData<EinsatzMaterial[]>(einsatzKeys.material(einsatzId), (alt) =>
+        alt?.map((em) => em.id === serverStand.id ? serverStand : em),
+      );
+    },
+    onError: (e, v, kontext) => {
+      const vorher = kontext?.vorher;
+      if (vorher) {
+        qc.setQueryData<EinsatzMaterial[]>(einsatzKeys.material(einsatzId), (aktuell) =>
+          aktuell?.map((em) => em.id === v.emId && em.status === v.status
+            ? { ...em, status: vorher.status }
+            : em),
+        );
+      }
+      fehler(e);
+    },
+    onSettled: invalidate,
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { emId: number; bemerkung: string }) =>
@@ -223,16 +254,24 @@ export default function MaterialPage() {
       key: 'status',
       filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
       render: (_, em) =>
-        darfSchreiben ? (
-          // Keine Klein-Variante mehr: die Höhe kommt aus `controlHeight` und zieht mit der
-          // Dichtestufe mit (ohnehin angefasste Stelle, Norm aus CLAUDE.md).
-          <Select
-            style={{ minWidth: 170 }}
-            value={em.status}
-            options={STATUS_OPTIONEN}
-            onChange={(status) => statusMutation.mutate({ emId: em.id, status })}
-          />
-        ) : (
+        darfSchreiben ? (() => {
+          const gesperrt = statusMutation.isPending;
+          const laeuft = gesperrt && statusMutation.variables?.emId === em.id;
+          return (
+            // Keine Klein-Variante mehr: die Höhe kommt aus `controlHeight` und zieht mit der
+            // Dichtestufe mit (ohnehin angefasste Stelle, Norm aus CLAUDE.md).
+            <Select
+              style={{ minWidth: 170 }}
+              value={laeuft ? statusMutation.variables?.status : em.status}
+              options={STATUS_OPTIONEN}
+              loading={laeuft}
+              disabled={gesperrt}
+              onChange={(status) => {
+                if (!statusMutation.isPending) statusMutation.mutate({ emId: em.id, status });
+              }}
+            />
+          );
+        })() : (
           <Tag color={STATUS_META[em.status].color}>{STATUS_META[em.status].label}</Tag>
         ),
     },
@@ -275,6 +314,7 @@ export default function MaterialPage() {
         <Space>
           <Typography.Title level={3} style={{ margin: 0 }}>Material</Typography.Title>
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <Datenstand dataUpdatedAt={emQuery.dataUpdatedAt} />
         </Space>
         {darfSchreiben && (
           <Space>
@@ -284,9 +324,11 @@ export default function MaterialPage() {
               value={poolAuswahl}
               options={poolOptionen}
               notFoundContent={poolInhalt}
+              disabled={disponiereMutation.isPending}
               onChange={(v) => setPoolAuswahl(v ?? null)}
             />
-            <InputNumber min={1} value={poolMenge} onChange={(v) => setPoolMenge(v ?? 1)} />
+            <InputNumber min={1} value={poolMenge} disabled={disponiereMutation.isPending}
+              onChange={(v) => setPoolMenge(v ?? 1)} />
             <Button
               type="primary"
               disabled={poolAuswahl == null}

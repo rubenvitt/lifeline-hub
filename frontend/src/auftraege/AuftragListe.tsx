@@ -11,6 +11,8 @@ export interface AuftragListeProps {
   darfSchreiben?: boolean;
   /** Hervorzuhebender Auftrag (?auftrag=-Deeplink, LFH-153). */
   highlightId?: number | null;
+  quittierungLaeuft?: boolean;
+  quittierungZiel?: { auftragId: number; empfaengerId: number } | null;
   onQuittieren?: (auftragId: number, empfaengerId: number) => void;
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
@@ -21,7 +23,7 @@ export interface AuftragListeProps {
  *  AuftragKarte durch; Darstellung/Logik liegen vollständig in der Karte. */
 export default function AuftragListe({
   auftraege, ansicht = 'offen', einsatzId, darfSchreiben, highlightId,
-  onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
+  quittierungLaeuft, quittierungZiel, onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
 }: AuftragListeProps) {
   if (auftraege.length === 0) return <SeitenLeer titel="Keine Aufträge" />;
   return (
@@ -34,6 +36,8 @@ export default function AuftragListe({
           einsatzId={einsatzId}
           darfSchreiben={darfSchreiben}
           hervorgehoben={a.id === highlightId}
+          quittierungLaeuft={quittierungLaeuft}
+          quittierungZiel={quittierungZiel}
           onQuittieren={onQuittieren}
           onInArbeit={onInArbeit}
           onVollzugMelden={onVollzugMelden}

@@ -1,13 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { Route, Routes } from 'react-router';
-import { screen, waitFor } from '@testing-library/react';
+import { Link, Route, Routes } from 'react-router';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import ChatPage from './ChatPage';
 import type { ChatKanal, ChatNachricht, EinsatzAnzeige } from '../api/types';
+
+afterEach(() => vi.restoreAllMocks());
 
 // Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
@@ -28,6 +30,7 @@ const einsatz: EinsatzAnzeige = {
 const kanal: ChatKanal = {
   id: 1, einsatz_id: 7, name: 'Allgemein', beschreibung: null,
   erstellt_von_id: 1, erstellt_at: '2026-06-10 09:00:00', archiviert_at: null,
+  letzte_nachricht_at: '2026-06-10 10:00:00', ungelesen_anzahl: 0,
 };
 
 const nachricht: ChatNachricht = {
@@ -37,13 +40,19 @@ const nachricht: ChatNachricht = {
   bezug_typ: null, bezug_id: null, anhaenge: [],
 };
 
-function setup() {
+function setup(ungelesen = 0, onGelesen?: () => void) {
   const nachrichten: ChatNachricht[] = [nachricht];
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+    http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([{
+      ...kanal, ungelesen_anzahl: ungelesen,
+    }])),
     http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+    http.post('/api/einsaetze/7/chat/kanaele/1/gelesen', () => {
+      onGelesen?.();
+      return new HttpResponse(null, { status: 204 });
+    }),
     http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
       const body = (await request.json()) as { inhalt: string };
       const neu: ChatNachricht = { ...nachricht, id: 6, inhalt: body.inhalt };
@@ -70,6 +79,28 @@ describe('ChatPage', () => {
     await userEvent.type(screen.getByPlaceholderText('Nachricht…'), 'Neue Meldung');
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText('Neue Meldung')).toBeInTheDocument();
+  });
+
+  it('markiert den erfolgreich geöffneten Kanal persistent gelesen', async () => {
+    let markiert = 0;
+    setup(1, () => { markiert += 1; });
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await waitFor(() => expect(markiert).toBeGreaterThan(0));
+  });
+
+  it('markiert neue Nachrichten im Hintergrund erst beim Zurückkehren gelesen', async () => {
+    const sichtbarkeit = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('hidden');
+    let markiert = 0;
+    setup(1, () => { markiert += 1; });
+
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(markiert).toBe(0);
+
+    sichtbarkeit.mockReturnValue('visible');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await waitFor(() => expect(markiert).toBeGreaterThan(0));
   });
 
   it('lädt ältere Nachrichten über den "Ältere laden"-Button nach (before_id)', async () => {
@@ -293,5 +324,83 @@ describe('ChatPage', () => {
 
     await waitFor(() => expect(gesendet).not.toBeNull());
     expect(gesendet!.anhang_ids).toEqual([99]);
+  });
+
+  it('verwendet nach einem Einsatzwechsel ausschließlich einen Kanal des neuen Einsatzes', async () => {
+    const nachrichtenRequests: string[] = [];
+    const gesendetAn: string[] = [];
+    const kanaeleA: ChatKanal[] = [
+      kanal,
+      { ...kanal, id: 2, name: 'A Spezial' },
+    ];
+    const kanalB: ChatKanal = {
+      ...kanal,
+      id: 9,
+      einsatz_id: 8,
+      name: 'B Allgemein',
+    };
+    const nachrichtenNachKanal = new Map<string, ChatNachricht[]>([
+      ['7/1', [{ ...nachricht, inhalt: 'A Allgemein Lage' }]],
+      ['7/2', [{ ...nachricht, id: 6, kanal_id: 2, inhalt: 'A Spezial Lage' }]],
+      ['8/9', [{ ...nachricht, id: 7, einsatz_id: 8, kanal_id: 9, inhalt: 'B Lage' }]],
+    ]);
+
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+        const zielId = Number(params.einsatzId);
+        return HttpResponse.json({ ...einsatz, id: zielId, bezeichnung: `Einsatz ${zielId}` });
+      }),
+      http.get('/api/einsaetze/:einsatzId/chat/kanaele', ({ params }) =>
+        HttpResponse.json(params.einsatzId === '8' ? [kanalB] : kanaeleA)),
+      http.get(
+        '/api/einsaetze/:einsatzId/chat/kanaele/:kanalId/nachrichten',
+        ({ params }) => {
+          const ziel = `${params.einsatzId}/${params.kanalId}`;
+          nachrichtenRequests.push(ziel);
+          return HttpResponse.json(nachrichtenNachKanal.get(ziel) ?? []);
+        },
+      ),
+      http.post(
+        '/api/einsaetze/:einsatzId/chat/kanaele/:kanalId/nachrichten',
+        async ({ params, request }) => {
+          const ziel = `${params.einsatzId}/${params.kanalId}`;
+          gesendetAn.push(ziel);
+          const body = (await request.json()) as { inhalt: string };
+          const neu: ChatNachricht = {
+            ...nachricht,
+            id: 8,
+            einsatz_id: Number(params.einsatzId),
+            kanal_id: Number(params.kanalId),
+            inhalt: body.inhalt,
+          };
+          nachrichtenNachKanal.set(ziel, [...(nachrichtenNachKanal.get(ziel) ?? []), neu]);
+          return HttpResponse.json(neu, { status: 201 });
+        },
+      ),
+    );
+
+    renderMitProviders(
+      <AuthProvider>
+        <Link to="/einsaetze/8/chat">Zu Einsatz B</Link>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('A Allgemein Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('A Spezial'));
+    expect(await screen.findByText('A Spezial Lage')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz B' }));
+    expect(await screen.findByText('B Lage')).toBeInTheDocument();
+    expect(nachrichtenRequests).not.toContain('8/2');
+
+    await userEvent.type(screen.getByPlaceholderText('Nachricht…'), 'Nach B');
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(gesendetAn).toEqual(['8/9']));
+    expect(await screen.findByText('Nach B')).toBeInTheDocument();
   });
 });

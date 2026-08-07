@@ -37,6 +37,15 @@ function zeige(props: Partial<React.ComponentProps<typeof ModulAkkordeon>> = {})
 }
 
 describe('ModulAkkordeon', () => {
+  it('reicht Navigationszähler an die gemeinsame Modulliste durch', async () => {
+    zeige({
+      offeneKategorie: 'kommunikation',
+      zaehler: { chat: { wert: 3, beschreibung: '3 ungelesene Chat-Nachrichten' } },
+    });
+    expect(screen.getByRole('button', { name: 'Chat, 3 ungelesene Chat-Nachrichten' }))
+      .toBeInTheDocument();
+  });
+
   it('listet Kategorie-Kopfzeilen mit aria-expanded und nur unter der offenen die Module', () => {
     zeige();
     // Genau EINE Navigation, und sie heißt NICHT „Kategorien" — sonst wird

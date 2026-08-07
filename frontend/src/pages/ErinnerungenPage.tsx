@@ -18,6 +18,7 @@ import {
 } from '../kommunikation';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
+import Datenstand from '../components/Datenstand';
 
 /** Schluessel-Zeitstempel der Abgeschlossen-Ansicht: erledigt ODER quittiert ODER Anlage. */
 function abschlussZeit(e: Erinnerung): string {
@@ -109,6 +110,7 @@ export default function ErinnerungenPage() {
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
+          <div><Datenstand dataUpdatedAt={erinnerungenQuery.dataUpdatedAt} /></div>
         </div>
         {darfSchreiben && (
           <Button

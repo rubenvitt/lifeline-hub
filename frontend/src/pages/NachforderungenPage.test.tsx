@@ -54,6 +54,7 @@ describe('NachforderungenPage', () => {
     renderPage();
     expect(await screen.findByText('2 RTW zur Verstärkung')).toBeInTheDocument();
     expect(screen.getByText('Angefordert', { selector: '.ant-tag' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
   it('setzt eine Nachforderung ab', async () => {

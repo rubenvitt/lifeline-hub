@@ -15,6 +15,7 @@ import { AUSMASS_META, STATUS_META, TYP_LABEL, filterSchaeden, geschaedigtAnzeig
 import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
+import Datenstand from '../components/Datenstand';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
@@ -114,9 +115,12 @@ export default function SchaedenPage() {
   return (
     <div style={{ padding: 16 }}>
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          Schäden
-        </Typography.Title>
+        <div>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            Schäden
+          </Typography.Title>
+          <Datenstand dataUpdatedAt={schaedenQuery.dataUpdatedAt} />
+        </div>
         {darfSchreiben && (
           <Button type="primary" onClick={() => setErfassenOffen(true)}>
             Schnellerfassung

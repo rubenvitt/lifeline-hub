@@ -22,8 +22,8 @@ import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
 import { navDrawerBreite } from '../theme/tokens';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
-import LiveStatusBanner from '../live/LiveStatusBanner';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { useModulZaehler } from './useModulZaehler';
 
 const { Header, Content } = Layout;
 
@@ -137,6 +137,7 @@ export default function EinsatzLayout() {
     queryFn: () => ladeModulOverrides(einsatzId),
   });
   const modulOverrides = modulOverridesQuery.data;
+  const modulZaehler = useModulZaehler({ einsatzId, benutzer, overrides: modulOverrides });
 
   /**
    * FRÜHER AUSSTIEG, VOR dem Haupt-JSX — nicht als Meldung innerhalb der Schale
@@ -232,16 +233,15 @@ export default function EinsatzLayout() {
           )}
         </div>
         <Space style={{ marginLeft: 'auto' }} size="middle">
-          {/* Die Alarm-Zentrale bleibt auch auf dem Handschirm stehen: sie ist
-              bereits reines Symbol und kostet so wenig Breite wie der Griff
-              links. Farbschema UND Bediendichte wandern unter `lg` dagegen ins
-              Benutzermenü — nicht ersatzlos weg. */}
+          {/* Die Alarm-Zentrale bleibt auch auf dem Handschirm stehen und nennt
+              Desktop-/Tonstatus ausdrücklich; „blockiert“ oder „stumm“ darf im
+              Einsatz nicht nur über eine Ikone vermittelt werden. Farbschema
+              UND Bediendichte wandern unter `lg` dagegen ins Benutzermenü. */}
           <AlarmZentrale />
           {breit && <ThemeToggle />}
           <BenutzerMenu />
         </Space>
       </Header>
-      <LiveStatusBanner />
       {/* Warnung, keine Sackgasse: der Einsatz bleibt vollständig bedienbar, nur die
           Navigation zeigt womöglich mehr, als konfiguriert ist. `istModulSichtbar`
           (`einsatz/modulRegistry.ts`) prüft `sichtbar !== false` und fällt ohne
@@ -278,6 +278,7 @@ export default function EinsatzLayout() {
             module={moduleNachKategorie(offeneKategorie)}
             benutzer={benutzer}
             overrides={modulOverrides}
+            zaehler={modulZaehler}
             aktiverModulKey={aktuellesModul?.key ?? null}
             onModulKlick={onModulKlick}
           />
@@ -311,6 +312,7 @@ export default function EinsatzLayout() {
             aktiverModulKey={aktuellesModul?.key ?? null}
             benutzer={benutzer}
             overrides={modulOverrides}
+            zaehler={modulZaehler}
             onKategorieKlick={onDrawerKategorieKlick}
             onModulKlick={onModulKlick}
           />

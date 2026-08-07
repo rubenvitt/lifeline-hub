@@ -1,6 +1,6 @@
 import { Button, Input, Popconfirm, Space, Typography } from 'antd';
 import { Select } from '../../components/Select';
-import { useId } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import FeldLabel from '../../components/FeldLabel';
 import GeoKennzahlen, { KennzahlZeile } from '../../components/GeoKennzahlen';
 import type { Gefahrengebiet, KartenAnsicht, LageZone, ZoneTyp } from '../../api/types';
@@ -21,7 +21,7 @@ export interface ZonenInspectorProps {
   darfSchreiben: boolean;
   onSchliessen: () => void;
   /** Partielles PATCH (nur geänderte Felder). */
-  onAendern: (patch: { typ?: ZoneTyp; label?: string | null; farbe?: string | null; notiz?: string | null; gefahrengebiet_id?: number | null; ansicht_id?: number | null }) => void;
+  onAendern: (patch: { typ?: ZoneTyp; label?: string | null; farbe?: string | null; notiz?: string | null; gefahrengebiet_id?: number | null; ansicht_id?: number | null }) => Promise<void>;
   onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
   /** Ansichts-Zuordnung (B/LFH-320). */
@@ -30,18 +30,63 @@ export interface ZonenInspectorProps {
 
 export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchliessen, onAendern, onMatrixOeffnen, onLoeschen, ansichten }: ZonenInspectorProps) {
   const gebietId = useId();
-  const istFreieSkizze = zone.typ === 'freie_skizze';
+  const [entwurf, setEntwurf] = useState(() => ({
+    typ: zone.typ,
+    label: zone.label ?? '',
+    farbe: zone.farbe ?? '#1677ff',
+    notiz: zone.notiz ?? '',
+    gefahrengebiet_id: zone.gefahrengebiet_id,
+    ansicht_id: zone.ansicht_id,
+  }));
+  const [speicherStatus, setSpeicherStatus] = useState<'idle' | 'speichert' | 'gespeichert' | 'fehler'>('idle');
+  const speicherLauf = useRef(0);
+  const entwurfZoneId = useRef(zone.id);
+
+  useEffect(() => {
+    // Same-ID-Updates koennen jederzeit ueber SSE/Refetch eintreffen. Der kontrollierte
+    // Entwurf darf dabei nicht mit Serverwerten ueberschrieben werden, solange Label/Notiz
+    // noch auf ihren Blur warten. Bei einer wirklich anderen Zone ist ein Vollreset richtig.
+    if (entwurfZoneId.current === zone.id) return;
+    entwurfZoneId.current = zone.id;
+    setEntwurf({
+      typ: zone.typ,
+      label: zone.label ?? '',
+      farbe: zone.farbe ?? '#1677ff',
+      notiz: zone.notiz ?? '',
+      gefahrengebiet_id: zone.gefahrengebiet_id,
+      ansicht_id: zone.ansicht_id,
+    });
+    setSpeicherStatus('idle');
+  }, [zone.id, zone.typ, zone.label, zone.farbe, zone.notiz, zone.gefahrengebiet_id, zone.ansicht_id]);
+
+  async function speichern(patch: Parameters<ZonenInspectorProps['onAendern']>[0]) {
+    const lauf = ++speicherLauf.current;
+    setSpeicherStatus('speichert');
+    try {
+      await onAendern(patch);
+      if (speicherLauf.current === lauf) setSpeicherStatus('gespeichert');
+    } catch {
+      if (speicherLauf.current === lauf) setSpeicherStatus('fehler');
+    }
+  }
+
+  const gesperrt = !darfSchreiben || speicherStatus === 'speichert';
+  const istFreieSkizze = entwurf.typ === 'freie_skizze';
   const erlaubteTypen = ZONE_TYPEN.filter((t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ);
-  const aktuellesGebiet = gebiete.find((g) => g.id === zone.gefahrengebiet_id) ?? null;
+  const aktuellesGebiet = gebiete.find((g) => g.id === entwurf.gefahrengebiet_id) ?? null;
   const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
   // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie (LFH-146).
   const kennzahlen = geoKennzahlen(parseGeometry(zone.geometrie));
 
-  const umhaengen = (ziel: number) => onAendern({ gefahrengebiet_id: ziel === NEU ? null : ziel });
+  const umhaengen = (ziel: number) => {
+    const gefahrengebiet_id = ziel === NEU ? null : ziel;
+    setEntwurf((alt) => ({ ...alt, gefahrengebiet_id }));
+    void speichern({ gefahrengebiet_id });
+  };
 
   // Nicht-Geo-Zeilen im selben Raster (Warnstufe, Zonen-Anzahl) — null, wenn keine anfallen.
   const zusatzZeilen =
-    zone.typ === 'gefahrengebiet' && aktuellesGebiet ? (
+    entwurf.typ === 'gefahrengebiet' && aktuellesGebiet ? (
       <>
         {aktuellHatWarnstufen && (
           <KennzahlZeile
@@ -59,15 +104,19 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
 
   return (
     <KartenDetailCard
-      titel={zone.label?.trim() ? zone.label : zoneTypLabel(zone.typ)}
-      akzentFarbe={zoneStil(zone.typ, zone.farbe).lineColor}
+      titel={entwurf.label.trim() ? entwurf.label : zoneTypLabel(entwurf.typ)}
+      akzentFarbe={zoneStil(entwurf.typ, entwurf.farbe).lineColor}
       onSchliessen={onSchliessen}
     >
       <Space orientation="vertical" style={{ width: '100%' }}>
         {darfSchreiben ? (
-          <Select<ZoneTyp> aria-label="Zonen-Typ" value={zone.typ} style={{ width: '100%' }}
+          <Select<ZoneTyp> aria-label="Zonen-Typ" value={entwurf.typ} style={{ width: '100%' }}
+            disabled={gesperrt}
             options={erlaubteTypen.map((t) => ({ value: t.typ, label: t.label }))}
-            onChange={(v) => onAendern({ typ: v })} />
+            onChange={(typ) => {
+              setEntwurf((alt) => ({ ...alt, typ }));
+              void speichern({ typ });
+            }} />
         ) : (
           <Typography.Text>{zoneTypLabel(zone.typ)}</Typography.Text>
         )}
@@ -84,23 +133,31 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
           <GeoKennzahlen kennzahlen={kennzahlen} zusatz={zusatzZeilen} />
         )}
 
-        <Input aria-label="Label" placeholder="Bezeichnung" defaultValue={zone.label ?? ''} disabled={!darfSchreiben}
-          onBlur={(e) => { const v = e.target.value.trim(); if (v !== (zone.label ?? '')) onAendern({ label: v || null }); }} />
+        <Input aria-label="Label" placeholder="Bezeichnung" value={entwurf.label} disabled={gesperrt}
+          onChange={(e) => setEntwurf((alt) => ({ ...alt, label: e.target.value }))}
+          onBlur={() => {
+            const label = entwurf.label.trim();
+            setEntwurf((alt) => ({ ...alt, label }));
+            if (label !== (zone.label ?? '')) void speichern({ label: label || null });
+          }} />
 
         {istFreieSkizze && (
-          <Input aria-label="Farbe" type="color" defaultValue={zone.farbe ?? '#1677ff'} disabled={!darfSchreiben}
-            onBlur={(e) => { const v = e.target.value; if (v !== (zone.farbe ?? '#1677ff')) onAendern({ farbe: v }); }} />
+          <Input aria-label="Farbe" type="color" value={entwurf.farbe} disabled={gesperrt}
+            onChange={(e) => setEntwurf((alt) => ({ ...alt, farbe: e.target.value }))}
+            onBlur={() => {
+              if (entwurf.farbe !== (zone.farbe ?? '#1677ff')) void speichern({ farbe: entwurf.farbe });
+            }} />
         )}
 
-        {zone.typ === 'gefahrengebiet' && (
+        {entwurf.typ === 'gefahrengebiet' && (
           <>
             {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen (LFH-328/A2). */}
             <FeldLabel text="Gehört zu Gefahrengebiet" htmlFor={gebietId}>
               <Select<number>
                 id={gebietId}
                 style={{ width: '100%' }}
-                value={zone.gefahrengebiet_id ?? undefined}
-                disabled={!darfSchreiben}
+                value={entwurf.gefahrengebiet_id ?? undefined}
+                disabled={gesperrt}
                 options={[
                   ...gebiete.map((g) => ({ value: g.id, label: gefahrengebietName(g.label, g.id) })),
                   { value: NEU, label: '+ Neues Gefahrengebiet' },
@@ -108,23 +165,39 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
                 onChange={(v) => umhaengen(v)}
               />
             </FeldLabel>
-            {zone.gefahrengebiet_id != null && (
-              <Button block onClick={() => onMatrixOeffnen(zone.gefahrengebiet_id as number)}>
+            {entwurf.gefahrengebiet_id != null && (
+              <Button block onClick={() => onMatrixOeffnen(entwurf.gefahrengebiet_id as number)}>
                 Gefahrenmatrix bearbeiten
               </Button>
             )}
           </>
         )}
 
-        <Input.TextArea aria-label="Notiz" placeholder="Notiz" defaultValue={zone.notiz ?? ''} disabled={!darfSchreiben} rows={2}
-          onBlur={(e) => { const v = e.target.value.trim(); if (v !== (zone.notiz ?? '')) onAendern({ notiz: v || null }); }} />
+        <Input.TextArea aria-label="Notiz" placeholder="Notiz" value={entwurf.notiz} disabled={gesperrt} rows={2}
+          onChange={(e) => setEntwurf((alt) => ({ ...alt, notiz: e.target.value }))}
+          onBlur={() => {
+            const notiz = entwurf.notiz.trim();
+            setEntwurf((alt) => ({ ...alt, notiz }));
+            if (notiz !== (zone.notiz ?? '')) void speichern({ notiz: notiz || null });
+          }} />
 
         <AnsichtZuordnung
           ansichten={ansichten}
-          wert={zone.ansicht_id}
-          disabled={!darfSchreiben}
-          onChange={(ansichtId) => onAendern({ ansicht_id: ansichtId })}
+          wert={entwurf.ansicht_id}
+          disabled={gesperrt}
+          onChange={(ansicht_id) => {
+            setEntwurf((alt) => ({ ...alt, ansicht_id }));
+            void speichern({ ansicht_id });
+          }}
         />
+
+        {speicherStatus !== 'idle' && (
+          <Typography.Text type={speicherStatus === 'fehler' ? 'danger' : 'secondary'} aria-live="polite">
+            {speicherStatus === 'speichert'
+              ? 'speichert …'
+              : speicherStatus === 'gespeichert' ? 'gespeichert' : 'nicht gespeichert'}
+          </Typography.Text>
+        )}
 
         {darfSchreiben && (
           aktuellHatWarnstufen ? (

@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, type ApiSendOptionen } from './client';
 import type { LageMeldung, Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from './types';
 
 export interface MeldungFilter {
@@ -14,8 +14,12 @@ export function listeMeldungen(einsatzId: number, filter: MeldungFilter = {}): P
   return apiGet<Meldung[]>(`/api/einsaetze/${einsatzId}/meldungen${q}`);
 }
 
-export function legeMeldungAn(einsatzId: number, daten: NeueMeldung): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen`, 'POST', daten);
+export function legeMeldungAn(
+  einsatzId: number,
+  daten: NeueMeldung,
+  optionen?: ApiSendOptionen,
+): Promise<Meldung> {
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen`, 'POST', daten, optionen);
 }
 
 /** Triage-Status setzen (sichten/in Bearbeitung/erledigt) (LFH-94). */

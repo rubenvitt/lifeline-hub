@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -7,6 +7,7 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import AuftraegePage from './AuftraegePage';
 import type { Auftrag } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
@@ -48,7 +49,7 @@ function LocationProbe() {
 
 function renderPage(route = '/einsaetze/1/auftraege') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const ergebnis = render(
     <QueryClientProvider client={client}>
       <AntApp>
         <MemoryRouter initialEntries={[route]}>
@@ -58,6 +59,7 @@ function renderPage(route = '/einsaetze/1/auftraege') {
       </AntApp>
     </QueryClientProvider>,
   );
+  return { ...ergebnis, client };
 }
 
 describe('AuftraegePage', () => {
@@ -138,6 +140,38 @@ describe('AuftraegePage', () => {
     await userEvent.click(screen.getByText('quittieren'));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
+  });
+
+  it('quittiert optimistisch in allen gefilterten Caches und rollt einen Fehler zurück', async () => {
+    let ablehnen: ((grund: Error) => void) | undefined;
+    quittiereEmpfaenger.mockImplementation(() => new Promise((_resolve, reject) => { ablehnen = reject; }));
+    const { client } = renderPage();
+    await screen.findByText('Deich sichern');
+    const zweiterKey = einsatzKeys.auftraegeListe(1, 'extern', 'alle');
+    client.setQueryData<Auftrag[]>(zweiterKey, [
+      auftrag(),
+      auftrag({ id: 2, auftrag_text: 'Unabhängiger Auftrag' }),
+    ]);
+
+    await userEvent.click(screen.getByText('quittieren'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+
+    expect(await screen.findByText('1 Empfänger · 1/1 quittiert')).toBeInTheDocument();
+    expect(client.getQueryData<Auftrag[]>(zweiterKey)?.[0].quittiert_anzahl).toBe(1);
+    const laufendeQuittierung = screen.getByRole('button', { name: 'Empfang für EA Nord quittieren' });
+    expect(laufendeQuittierung).toBeDisabled();
+    expect(laufendeQuittierung).toHaveClass('ant-btn-loading');
+
+    act(() => {
+      client.setQueryData<Auftrag[]>(zweiterKey, (aktuell) => aktuell?.map((eintrag) =>
+        eintrag.id === 2 ? { ...eintrag, auftrag_text: 'Extern geändert' } : eintrag));
+    });
+
+    await act(async () => { ablehnen?.(new Error('abgelehnt')); });
+    expect(await screen.findByText('1 Empfänger · 0/1 quittiert')).toBeInTheDocument();
+    expect(client.getQueryData<Auftrag[]>(zweiterKey)?.[0].quittiert_anzahl).toBe(0);
+    expect(client.getQueryData<Auftrag[]>(zweiterKey)?.find((eintrag) => eintrag.id === 2)?.auftrag_text)
+      .toBe('Extern geändert');
   });
 
   // LFH-364/B5d: die Quittungs-Aktion liegt in einer EIGENEN Zeile (Weg (a)), der

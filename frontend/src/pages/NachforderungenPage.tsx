@@ -13,6 +13,7 @@ import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../a
 import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
+import Datenstand from '../components/Datenstand';
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
 function abschlussZeit(n: Nachforderung): string {
@@ -119,6 +120,7 @@ export default function NachforderungenPage() {
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
+          <div><Datenstand dataUpdatedAt={nfQuery.dataUpdatedAt} /></div>
         </div>
         {darfSchreiben && (
           <Button

@@ -20,4 +20,10 @@ describe('SektionHeader', () => {
     renderMitProviders(<SektionHeader titel="Nur Titel" />);
     expect(screen.getByRole('heading', { name: 'Nur Titel' })).toBeInTheDocument();
   });
+
+  it('zeigt den Query-Datenstand im Sektionskopf', () => {
+    const zeit = new Date(2026, 5, 10, 9, 5).getTime();
+    renderMitProviders(<SektionHeader titel="Liste" dataUpdatedAt={zeit} />);
+    expect(screen.getByText('Stand 09:05')).toBeInTheDocument();
+  });
 });

@@ -13,7 +13,7 @@ use crate::live::LiveEvent;
 const MODUL_KEY: &str = "etb";
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::Deserialize;
 
@@ -49,6 +49,7 @@ pub async fn erfassen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
+    headers: HeaderMap,
     JsonBody(req): JsonBody<NeuerEintrag>,
 ) -> Result<(StatusCode, Json<EtbEintragAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -62,6 +63,22 @@ pub async fn erfassen(
         &benutzer,
     )
     .await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, benutzer.id)?;
+
+    // Replay erst NACH Auth-/Schreib-/Modul-Gates, aber VOR dem Aktiv-Gate erkennen:
+    // ein bereits committeter Offline-Eintrag bleibt auch im abgeschlossenen Einsatz
+    // abrufbar. Der Lookup ist durch `einsatz_id` gegen Cross-Einsatz-Treffer geschützt.
+    let client_id = bereinige(req.client_id);
+    if let Some(cid) = &client_id {
+        if cid.chars().count() > 64 {
+            return Err(AppError::Validation(
+                "client_id zu lang (max. 64 Zeichen)".into(),
+            ));
+        }
+        if let Some(anzeige) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            return Ok((StatusCode::CREATED, Json(anzeige)));
+        }
+    }
     fordere_aktiv(&einsatz)?;
 
     // Typ validieren; System ist nicht client-erfassbar.
@@ -115,17 +132,6 @@ pub async fn erfassen(
     let von = bereinige(req.von);
     let an = bereinige(req.an);
     let veranlassung = bereinige(req.veranlassung);
-
-    // Idempotenzschlüssel normalisieren: leer → None (sonst würde "" im partiellen
-    // UNIQUE-Index unbeteiligte Zeilen deduplizieren); Längenguard gegen Missbrauch.
-    let client_id = bereinige(req.client_id);
-    if let Some(cid) = &client_id {
-        if cid.chars().count() > 64 {
-            return Err(AppError::Validation(
-                "client_id zu lang (max. 64 Zeichen)".into(),
-            ));
-        }
-    }
 
     let (anzeige, war_neu) = repo::anlegen_idempotent(
         &state.pool,

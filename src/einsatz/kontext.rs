@@ -180,3 +180,30 @@ impl<M: ModulMarker> Deref for EinsatzSchreibzugriff<M> {
         &self.0
     }
 }
+
+/// Schreibfreigabe ohne vorgezogene Aktiv-Prüfung. Dieser eng begrenzte Gate-Typ ist für
+/// idempotente POST-Routen gedacht, die einen bereits committeten Replay auch nach
+/// Einsatzabschluss zurückgeben müssen. Org-Floor, Schreibrecht und Modul-Gate laufen wie bei
+/// [`EinsatzSchreibzugriff`] strukturell im Extractor; der Handler muss `fordere_aktiv` direkt
+/// nach seinem einsatzgebundenen Replay-Lookup und vor jedem echten Insert aufrufen.
+pub struct EinsatzSchreibfreigabe<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
+
+impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzSchreibfreigabe<M> {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_schreibrecht()?;
+        if let Some(key) = M::KEY {
+            ctx.fordere_modul_zugriff(&state.pool, key).await?;
+        }
+        Ok(Self(ctx, PhantomData))
+    }
+}
+
+impl<M: ModulMarker> Deref for EinsatzSchreibfreigabe<M> {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}

@@ -1,5 +1,5 @@
 import { type Mock, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
 import type { Gefahrengebiet, LageZone } from '../../api/types';
@@ -44,22 +44,63 @@ function renderInspector(opts: {
   const onAendern = opts.onAendern ?? vi.fn<ZonenInspectorProps['onAendern']>();
   const onLoeschen = opts.onLoeschen ?? vi.fn<ZonenInspectorProps['onLoeschen']>();
   const onMatrixOeffnen = opts.onMatrixOeffnen ?? vi.fn<ZonenInspectorProps['onMatrixOeffnen']>();
-  const { container } = renderMitProviders(
+  const gemeinsameProps = {
+    gebiete: opts.gebiete ?? [gebiet],
+    darfSchreiben: opts.darfSchreiben ?? true,
+    onSchliessen: () => {},
+    onAendern,
+    onMatrixOeffnen,
+    onLoeschen,
+    ansichten: [],
+  } satisfies Omit<ZonenInspectorProps, 'zone'>;
+  const ergebnis = renderMitProviders(
     <ZonenInspector
       zone={opts.zone ?? basisZone}
-      gebiete={opts.gebiete ?? [gebiet]}
-      darfSchreiben={opts.darfSchreiben ?? true}
-      onSchliessen={() => {}}
-      onAendern={onAendern}
-      onMatrixOeffnen={onMatrixOeffnen}
-      onLoeschen={onLoeschen}
-      ansichten={[]}
+      {...gemeinsameProps}
     />,
   );
-  return { onAendern, onLoeschen, onMatrixOeffnen, container };
+  return {
+    onAendern,
+    onLoeschen,
+    onMatrixOeffnen,
+    ...ergebnis,
+    rerenderZone: (zone: LageZone) => ergebnis.rerender(
+      <ZonenInspector zone={zone} {...gemeinsameProps} />,
+    ),
+  };
 }
 
 describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
+  it('hält Eingaben kontrolliert und quittiert den laufenden Speichervorgang sichtbar', async () => {
+    let freigeben: (() => void) | undefined;
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() =>
+      new Promise<void>((resolve) => { freigeben = resolve; }));
+    renderInspector({ onAendern });
+
+    const label = screen.getByRole('textbox', { name: 'Label' });
+    await userEvent.type(label, 'Nordzone');
+    fireEvent.blur(label);
+
+    expect(onAendern).toHaveBeenCalledWith({ label: 'Nordzone' });
+    expect(label).toHaveValue('Nordzone');
+    expect(screen.getByText('speichert …')).toBeInTheDocument();
+    expect(label).toBeDisabled();
+
+    await act(async () => { freigeben?.(); });
+    expect(await screen.findByText('gespeichert')).toBeInTheDocument();
+    expect(label).toBeEnabled();
+  });
+
+  it('bewahrt einen noch nicht geblurten Entwurf bei einem Same-ID-Refetch', async () => {
+    const { rerenderZone } = renderInspector({});
+    const label = screen.getByRole('textbox', { name: 'Label' });
+    await userEvent.type(label, 'lokaler Entwurf');
+
+    rerenderZone({ ...basisZone, label: 'neuer Serverstand', notiz: 'extern geändert' });
+
+    expect(label).toHaveValue('lokaler Entwurf');
+  });
+
   it('zeigt das Gruppen-Dropdown mit dem aktuellen Gebiet', () => {
     renderInspector({});
     // Der Inspector soll ein Dropdown für die Gruppen-Zugehörigkeit zeigen.

@@ -57,6 +57,8 @@ const AUSNAHMEN: Record<string, string> = {
   // ── Scanner-/Guard-Infrastruktur: keine API-DTOs, nur zufällig in diesem Ordner. ──
   'apiTypScan.ts#ApiTypFund': 'Rückgabetyp dieses Scanners selbst — kein Wire-Typ.',
   'queryKeyScan.ts#Fund': 'Rückgabetyp des Query-Key-Scanners (LFH-312) — kein Wire-Typ.',
+  'client.ts#ApiSendOptionen':
+    'FE-lokale Transportoptionen für Request-Header — weder Request- noch Response-Wire-DTO.',
 
   // ── Request-/Eingabe-DTOs, die die Namenskonvention nicht treffen. ──
   'lagezonen.ts#ZoneNeu': 'POST-Body einer Lage-Zone (Wortstellung „Neu" hinten statt vorn).',

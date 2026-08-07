@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
@@ -100,6 +100,11 @@ function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[]) {
     </AuthProvider>,
     { route: '/einsaetze/1/tiere' },
   );
+}
+
+function EinsatzWechsel() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate('/einsaetze/2/tiere')}>Zu Einsatz B</button>;
 }
 
 describe('TierePage', () => {
@@ -211,6 +216,91 @@ describe('TierePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await vi.waitFor(() => expect(body.status).toBe('vermisst'));
+  });
+
+  it('wechselt nach dem Erfassen in die Antwort-Sicht und hebt das neue Tier hervor', async () => {
+    const neu = {
+      ...tierBasis,
+      id: 99,
+      registrier_nr: 9,
+      status: 'vermisst' as const,
+      rufname: 'Fundtier Neu',
+    };
+    server.use(http.post('/api/einsaetze/1/tiere', () => HttpResponse.json(neu, { status: 201 })));
+    const { container, client } = render(einsatzAktiv, []);
+    await waitFor(() => expect(client.getQueryState(einsatzKeys.tiere(1))?.status).toBe('success'));
+    let veralteteRefetches = 0;
+    // Replikations-/Refetch-Lücke simulieren: direkt nach dem POST kennt der GET das neue
+    // Tier noch nicht. Die Antwortzeile muss trotzdem stehen bleiben.
+    server.use(http.get('/api/einsaetze/1/tiere', () => {
+      veralteteRefetches += 1;
+      return HttpResponse.json([]);
+    }));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText('T-009')).toBeInTheDocument();
+    await waitFor(() => expect(veralteteRefetches).toBeGreaterThan(0));
+    expect(screen.getByText('T-009')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst' })).toHaveAttribute('aria-selected', 'true');
+    expect(container.querySelector('[data-row-key="99"]')).toHaveClass('zeile-hervorgehoben');
+  });
+
+  it('rendert eine verspätete Antwort aus Einsatz A weder als Overlay noch als Highlight in B', async () => {
+    const tierA: Tier = {
+      ...tierBasis,
+      id: 99,
+      registrier_nr: 9,
+      status: 'vermisst',
+      rufname: 'Tier A',
+    };
+    const tierB: Tier = {
+      ...tierBasis,
+      id: 99,
+      einsatz_id: 2,
+      registrier_nr: 20,
+      status: 'aktiv',
+      rufname: 'Tier B',
+    };
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
+    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+        const id = Number(params.einsatzId);
+        return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
+      }),
+      http.get('/api/einsaetze/:einsatzId/tiere', ({ params }) =>
+        HttpResponse.json(params.einsatzId === '2' ? [tierB] : [])),
+      http.post('/api/einsaetze/1/tiere', async () => {
+        postGestartet();
+        await antwortGate;
+        return HttpResponse.json(tierA, { status: 201 });
+      }),
+    );
+    const { container } = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/tiere" element={<><EinsatzWechsel /><TierePage /></>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/tiere' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    expect(await screen.findByText('Tier B')).toBeInTheDocument();
+
+    await act(async () => { antwortFreigeben(); });
+    await waitFor(() => expect(screen.queryByText('Tier A')).not.toBeInTheDocument());
+    expect(screen.getByText('Tier B')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Aktiv' })).toHaveAttribute('aria-selected', 'true');
+    expect(container.querySelector('[data-row-key="99"]')).not.toHaveClass('zeile-hervorgehoben');
   });
 
   /**

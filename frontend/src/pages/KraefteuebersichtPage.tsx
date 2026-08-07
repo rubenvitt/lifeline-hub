@@ -32,6 +32,7 @@ import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { rollenFarbe, statusKategorie, type Statusrolle } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 import './kraefteuebersichtPrint.css';
@@ -236,6 +237,13 @@ export default function KraefteuebersichtPage() {
       <EinsatzSeite
         breite={flaeche.seiteBreit}
         titel="Kräfteübersicht"
+        dataUpdatedAt={gemeinsamerDatenstand(
+          einheitenQuery.dataUpdatedAt,
+          personalQuery.dataUpdatedAt,
+          fahrzeugeQuery.dataUpdatedAt,
+          materialQuery.dataUpdatedAt,
+          abschnitteQuery.dataUpdatedAt,
+        )}
         breadcrumb={
           <Breadcrumb className="kraefte-no-print"
             items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />

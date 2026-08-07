@@ -62,7 +62,10 @@ export function bildDownloadPfad(einsatzId: number, id: number): string {
 /** Lädt die Bild-Bytes (same-origin, mit Cookies) und liefert eine Object-URL.
  *  Aufrufer MUSS die URL später mit URL.revokeObjectURL freigeben. */
 export async function ladeBildBlobUrl(einsatzId: number, id: number): Promise<string> {
-  const res = await fetch(bildDownloadPfad(einsatzId, id), { credentials: 'same-origin' });
+  const res = await fetch(bildDownloadPfad(einsatzId, id), {
+    credentials: 'same-origin',
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!res.ok) throw new Error(`Bild ${id} konnte nicht geladen werden (${res.status})`);
   return URL.createObjectURL(await res.blob());
 }

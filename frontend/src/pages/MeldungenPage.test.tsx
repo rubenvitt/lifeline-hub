@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,6 +9,8 @@ import MeldungenPage from './MeldungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
+import { server } from '../test/server';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
@@ -72,6 +75,15 @@ function LocationProbe() {
 }
 
 function renderPage(route = '/einsaetze/1/meldungen') {
+  server.use(http.get('/api/auth/me', () => HttpResponse.json({
+    id: 1,
+    anzeigename: 'Leitung',
+    benutzername: 'leitung',
+    system_rolle: 'keiner',
+    org_rolle: 'keine',
+    aktiv: true,
+    erstellt_at: '2026-08-06 10:00:00',
+  })));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -88,7 +100,12 @@ function renderPage(route = '/einsaetze/1/meldungen') {
 }
 
 describe('MeldungenPage', () => {
-  beforeEach(() => { vi.clearAllMocks(); listeMeldungen.mockResolvedValue([meldung()]); });
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    await queueLeerenFuerTests();
+    listeMeldungen.mockResolvedValue([meldung()]);
+  });
 
   it('zeigt eingegangene Meldungen im Posteingang', async () => {
     renderPage();
@@ -108,11 +125,36 @@ describe('MeldungenPage', () => {
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
     // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(1, expect.objectContaining({
-      absender: 'RTW 2', inhalt: 'Eingetroffen', meldeweg: 'funk',
-    })));
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        absender: 'RTW 2', inhalt: 'Eingetroffen', meldeweg: 'funk',
+      }),
+      { offlineQueueBenutzerId: 1 },
+    ));
     // Ereigniszeit wird immer mitgesendet (Pflicht, leer ⇒ jetzt).
     expect(legeMeldungAn.mock.calls[0][1].ereigniszeit).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('merkt den vollständigen Wortlaut offline sichtbar vor', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
+    await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Offline-Lage');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+
+    expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
+    expect(legeMeldungAn).not.toHaveBeenCalled();
+    expect(await schreibaktionenLaden(1, 1)).toEqual([
+      expect.objectContaining({
+        aktion: expect.objectContaining({
+          art: 'meldung',
+          daten: expect.objectContaining({ absender: 'RTW 2', inhalt: 'Offline-Lage' }),
+        }),
+      }),
+    ]);
   });
 
   it('trennt Offen/Abgeschlossen clientseitig und zeigt Offen als Default', async () => {
@@ -348,9 +390,13 @@ describe('MeldungenPage', () => {
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'MANV');
     // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(1, expect.objectContaining({
-      meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true,
-    })));
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true,
+      }),
+      { offlineQueueBenutzerId: 1 },
+    ));
   });
 
   // --- LFH-332/B4: Serienerfassung im Inline-Formular ---

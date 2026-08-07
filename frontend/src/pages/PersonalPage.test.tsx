@@ -52,6 +52,7 @@ function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[]
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/personal-status', () => HttpResponse.json([
       { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+      { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
     ])),
     http.get('/api/personal', () => HttpResponse.json([])), // Pool (nur_im_dienst)
   );
@@ -70,6 +71,53 @@ describe('PersonalPage', () => {
     render(einsatz());
     expect(await screen.findByText('Thomas Müller')).toBeInTheDocument();
     expect(screen.getByText('Sanitäter, Gruppenführer')).toBeInTheDocument();
+  });
+
+  it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
+    let freigeben: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    server.use(http.patch('/api/einsaetze/7/personal/10', async () => {
+      await gate;
+      return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
+    }));
+    const zweitePerson = { ...disponiert[0], id: 11, personal_id: 6, name: 'Erika Muster' };
+    const { container, client } = render(einsatz(), [disponiert[0], zweitePerson]);
+    await screen.findByText('Thomas Müller');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+
+    const auswahlfelder = within(zeile).getAllByRole('combobox');
+    await userEvent.click(auswahlfelder[auswahlfelder.length - 1]);
+    const option = (await screen.findAllByText('einsatzbereit')).find((el) => el.closest('.ant-select-item-option'));
+    expect(option).toBeTruthy();
+    await userEvent.click(option!);
+
+    await waitFor(() => {
+      expect(client.getQueryData<typeof disponiert>(einsatzKeys.personal(7))?.[0].status_id).toBe(3);
+    });
+    const laufendeAuswahlfelder = within(zeile).getAllByRole('combobox');
+    expect(laufendeAuswahlfelder[laufendeAuswahlfelder.length - 1]).toBeDisabled();
+    const zweiteAuswahlfelder = within(container.querySelector('[data-row-key="11"]') as HTMLElement)
+      .getAllByRole('combobox');
+    expect(zweiteAuswahlfelder[zweiteAuswahlfelder.length - 1]).toBeDisabled();
+
+    let refetchFreigeben: (() => void) | undefined;
+    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    server.use(http.get('/api/einsaetze/7/personal', async () => {
+      await refetchGate;
+      return HttpResponse.json([{ ...disponiert[0], name: 'Extern geändert' }, zweitePerson]);
+    }));
+    act(() => {
+      client.setQueryData<typeof disponiert>(einsatzKeys.personal(7), (aktuell) =>
+        aktuell?.map((eintrag) => eintrag.id === 10 ? { ...eintrag, name: 'Extern geändert' } : eintrag));
+    });
+
+    await act(async () => { freigeben?.(); });
+    await waitFor(() => {
+      const stand = client.getQueryData<typeof disponiert>(einsatzKeys.personal(7));
+      expect(stand?.find((eintrag) => eintrag.id === 10)?.status_id).toBe(2);
+      expect(stand?.find((eintrag) => eintrag.id === 10)?.name).toBe('Extern geändert');
+    });
+    await act(async () => { refetchFreigeben?.(); });
   });
 
   it('hebt per ?personal=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {

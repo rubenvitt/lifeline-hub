@@ -21,6 +21,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
@@ -207,7 +208,7 @@ export default function FahrzeugePage() {
 
   const disponiereMutation = useMutation({
     mutationFn: (fahrzeugId: number) => disponiereFahrzeug(einsatzId, fahrzeugId),
-    onSuccess: invalidate,
+    onSuccess: () => { message.success('Fahrzeug disponiert'); invalidate(); },
     onError: fehler,
   });
   // Schliessen und Leeren gehoeren seit LFH-332/B4 der Erfassungshuelle: sie schliesst ueber
@@ -221,8 +222,47 @@ export default function FahrzeugePage() {
   const statusMutation = useMutation({
     mutationFn: (v: { efId: number; statusId: number }) =>
       aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
-    onSuccess: invalidate,
-    onError: fehler,
+    onMutate: async (v) => {
+      const queryKey = einsatzKeys.fahrzeuge(einsatzId);
+      await qc.cancelQueries({ queryKey });
+      const vorher = qc.getQueryData<EinsatzFahrzeug[]>(queryKey)?.find((ef) => ef.id === v.efId);
+      const status = statusQuery.data?.find((s) => s.id === v.statusId);
+      qc.setQueryData<EinsatzFahrzeug[]>(queryKey, (alt) =>
+        alt?.map((ef) => ef.id === v.efId
+          ? {
+              ...ef,
+              status_id: v.statusId,
+              status_label: status?.label ?? ef.status_label,
+              status_kategorie: status?.kategorie ?? ef.status_kategorie,
+              status_farbe: status?.farbe ?? null,
+            }
+          : ef),
+      );
+      return { vorher };
+    },
+    onSuccess: (serverStand) => {
+      qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (alt) =>
+        alt?.map((ef) => ef.id === serverStand.id ? serverStand : ef),
+      );
+    },
+    onError: (e, v, kontext) => {
+      const vorher = kontext?.vorher;
+      if (vorher) {
+        qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (aktuell) =>
+          aktuell?.map((ef) => ef.id === v.efId && ef.status_id === v.statusId
+            ? {
+                ...ef,
+                status_id: vorher.status_id,
+                status_label: vorher.status_label,
+                status_kategorie: vorher.status_kategorie,
+                status_farbe: vorher.status_farbe,
+              }
+            : ef),
+        );
+      }
+      fehler(e);
+    },
+    onSettled: invalidate,
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { efId: number; bemerkung: string }) =>
@@ -379,15 +419,23 @@ export default function FahrzeugePage() {
         trifft: (ef, w) => kategorieVon(ef.status_kategorie) === w,
       },
       render: (_, ef) =>
-        darfSchreiben ? (
-          <Select
-            style={{ minWidth: 150 }}
-            value={ef.status_id ?? undefined}
-            placeholder="Status wählen"
-            options={stati.map((s) => ({ value: s.id, label: s.label }))}
-            onChange={(statusId) => statusMutation.mutate({ efId: ef.id, statusId })}
-          />
-        ) : (
+        darfSchreiben ? (() => {
+          const gesperrt = statusMutation.isPending;
+          const laeuft = gesperrt && statusMutation.variables?.efId === ef.id;
+          return (
+            <Select
+              style={{ minWidth: 150 }}
+              value={laeuft ? statusMutation.variables?.statusId : ef.status_id ?? undefined}
+              placeholder="Status wählen"
+              options={stati.map((s) => ({ value: s.id, label: s.label }))}
+              loading={laeuft}
+              disabled={gesperrt}
+              onChange={(statusId) => {
+                if (!statusMutation.isPending) statusMutation.mutate({ efId: ef.id, statusId });
+              }}
+            />
+          );
+        })() : (
           <StatusBadge ef={ef} />
         ),
     },
@@ -434,6 +482,7 @@ export default function FahrzeugePage() {
   return (
     <EinsatzSeite
       breite={flaeche.seiteBreit}
+      dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
       titel={
         <Space>
           Fahrzeuge
@@ -461,6 +510,8 @@ export default function FahrzeugePage() {
               value={null}
               options={poolOptionen}
               notFoundContent={poolInhalt}
+              loading={disponiereMutation.isPending}
+              disabled={disponiereMutation.isPending}
               onSelect={(fahrzeugId) => { if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId); }}
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>

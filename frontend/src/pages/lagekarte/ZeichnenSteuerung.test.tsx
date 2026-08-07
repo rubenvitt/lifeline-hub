@@ -44,6 +44,14 @@ describe('ZeichnenSteuerung', () => {
     expect(p.onAbbrechen).toHaveBeenCalledTimes(1);
   });
 
+  it('sperrt Abschließen, solange noch keine drei Punkte gesetzt sind', async () => {
+    const p = setup({ abschliessenMoeglich: false });
+    const abschliessen = screen.getByRole('button', { name: 'Abschließen' });
+    expect(abschliessen).toBeDisabled();
+    await userEvent.click(abschliessen);
+    expect(p.onAbschliessen).not.toHaveBeenCalled();
+  });
+
   it('Phase bestaetigen: zeigt Speichern/Verwerfen', async () => {
     const p = setup({ phase: 'bestaetigen' });
     expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeEnabled();
