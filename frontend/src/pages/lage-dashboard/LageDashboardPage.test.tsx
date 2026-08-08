@@ -623,3 +623,20 @@ describe('Die Kennzahlenleiste in sprache.css', () => {
     expect(regel('.lfh-zahl--gross {').match(/font-size/g)).toHaveLength(1);
   });
 });
+
+describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
+  const quelle = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), 'LageDashboardPage.tsx'),
+    'utf8',
+  );
+
+  it('baut keinen Einsatz-Pfad als Template-Literal — die Builder sind die Quelle', () => {
+    // Ein Inline-Pfad umgeht `routing/deeplinks.ts` und damit LFH-25. Er bricht
+    // nichts sichtbar: die Seite navigiert weiter, nur an der Registry vorbei.
+    expect(quelle).not.toMatch(/`\/einsaetze\/\$\{/);
+  });
+
+  it('nutzt den Modul-Builder', () => {
+    expect(quelle).toContain('einsatzModulPfad');
+  });
+});

@@ -20,6 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
+import { einsatzModulPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeTiere } from '../../api/einsatzTier';
@@ -145,7 +146,7 @@ export default function LageDashboardPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  const gehe = (route: string) => navigate(`/einsaetze/${einsatzId}/${route}`);
+  const gehe = (route: string) => navigate(einsatzModulPfad(einsatzId, route));
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
