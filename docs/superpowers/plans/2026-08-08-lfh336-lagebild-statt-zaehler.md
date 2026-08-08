@@ -1176,11 +1176,18 @@ Zeile hätte mehr eine Trennlinie. Das ändert die Erscheinung, und **kein Test 
 rechnet kein Layout). Deshalb den Selektor um die zweite Bauform erweitern:
 
 ```css
-.lfh-zeile:first-child,
+.lfh-zeilen > .lfh-zeile:first-child,
 .lfh-zeilen > li:first-child > .lfh-zeile {
   border-top: 0;
 }
 ```
+
+**Beide Arme müssen auf `.lfh-zeilen >` gescopt sein.** Der erste Entwurf dieses Plans ließ den
+ersten Arm ungescopt (`.lfh-zeile:first-child`) — und der trifft im neuen Markup **jede** Zeile,
+weil der `<a class="lfh-zeile">` das einzige Kind seines `<li>` ist. Der „Fix" hätte die Trennlinie
+also überall entfernt statt nur bei der ersten: derselbe Schaden, gegen den er antritt, nur mit
+gutem Gewissen. Gefunden und behoben beim Umsetzen von Task 4, mit RED-Beleg gegen die
+Erstfassung.
 
 Und die Regel gegen Rückfall festhalten — im Guard-`describe` für `sprache.css`, das die Testdatei
 ab Zeile 512 bereits führt:
