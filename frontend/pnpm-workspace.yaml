@@ -38,3 +38,11 @@ overrides:
   # workbox-build → glob → minimatch@10 → brace-expansion@5. ^5.0.9 ist ein
   # Same-Major-Patch und wird durch den Frontend-Produktionsbuild sowie check-all.sh geprüft.
   brace-expansion@>=5.0.0 <5.0.9: ^5.0.9
+
+  # GHSA-2v37-7h3g-55p8 (high): custom-Generatoren von nanoid loopen unbegrenzt bei size 0.
+  # Kette: postcss → nanoid, postcss selbst über vite (@vitejs/plugin-react,
+  # @vitest/mocker/vitest, vite-plugin-pwa). Reines Build-/Test-Zeit-Tooling (PostCSS läuft
+  # nur beim Bundeln bzw. unter Vitest), kein Laufzeit-Code im ausgelieferten Binary — Fund
+  # 2026-08-08 beim LFH-336-Gate-Lauf, unabhängig vom Ticket. ^3.3.17 ist ein Same-Major-Patch;
+  # verifiziert durch den Frontend-Produktionsbuild und die Vitest-Suite in check-all.sh.
+  nanoid@>=3.0.0 <3.3.17: ^3.3.17
