@@ -19,11 +19,11 @@ offene Teil ein Ziel.
 | 5 | **5 · Kontrast in beiden Modi** — Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1, nie < 4,5 : 1 (MIL 5.2.4.2.2.2; WCAG 1.4.6/1.4.3); Zustände, Rahmen, Fokusring ≥ 3 : 1 (WCAG 1.4.11). | **erfüllt** — alle Farben kommen aus den A0-gemessenen Token (`--lfh-*`): Text 13,47:1 dunkel / 18,17:1 hell, Fokusring 7,67/6,59, Alarm 6,80/6,78, tragende Linie 3,04/3,07 (unverändert). Die neuen Kurzlisten-Zeilen nutzen dieselben, bereits gemessenen Sekundärfarben `--lfh-gedaempft`/`--lfh-schwach` (`theme/rollen.css:32-33,103-104`, seit LFH-352 unverändert) — keine neue Farbe eingeführt. | **erfüllt** — geerbt aus dem antd-Theme (A0); die neue Ortszeile/Zeitstand-Zeile nutzt `Typography.Text type="secondary"` (bereits gemessene antd-Sekundärfarbe, unverändert durch diesen Umbau). |
 | 6 | **6 · Kein Status allein über Farbe** — jede Statusfarbe zusätzlich mit Text, Symbol oder Form, 0 Ausnahmen (WCAG 1.4.1 Level A; MIL 5.4.6.8; 1 von 12 Männern, NEI). | **teilweise erfüllt** — die Aggregat-Plaketten tragen Text (`N überfällig`), die Kennzahlkante nutzt Breite UND Farbe (zwei Kanäle, `sprache.css` Test „die Stufenregeln der Kennzahl ändern Farbe und Kantenbreite"). **Aber**: die neuen Kurzlisten-Zeilen-Marker `.lfh-zeichen--{alarm,achtung,normal}` (`LageDashboardPage.tsx:554,594`) sind immer dasselbe Dreieck — nur `border-bottom-color` unterscheidet die drei Stufen (`theme/sprache.css:79-96`), Breite/Form bleiben gleich. Eine einzelne Zeile trägt keinen Text, der eine überfällige von einer normalen Meldung unterscheidet (nur der Gesamtzähler „N überfällig" außerhalb der Liste tut das). Für farbenblinde Nutzer ist die Dringlichkeit EINER Zeile nicht ablesbar. → offen → **LFH-395** (<https://app.clickup.com/t/86cb2q93b>) | **erfüllt** — `StatusTag` trägt `label` als Pflichtfeld aus dem `StatusDarstellung`-Vertrag (`EinsaetzePage.tsx:54-57`, Text als zweiter Kanal); der Einsatzart-Tag ist reiner Text ohne Farbcodierung; kein Farbwert ohne begleitende Beschriftung. |
 | 7 | **7 · Eine Farbe = eine Bedeutung** — Palette auf Doppelbelegung geprüft, gesättigte Farbe nur für abnorme Zustände, Grundfläche aus A0 (weder `#000000` noch `#ffffff`) — ASM Consortium. | **erfüllt** — `grep -rniE '#(b02318\|ff7a7f\|f5b942\|5cc48d\|1c6640\|7a5200\|1a5fa0\|6fb4ec\|a8071a\|e04552)'` → 0 Treffer in der Datei; unverändert aus A0. | **erfüllt** — gleicher Befund, 0 Treffer. |
-| 8 | **8 · Helligkeits-/Kontrastregler** vorhanden und bei aktiver Warnung nicht bis AUS dimmbar — 1 Regler, 1 Sperre (MIL 5.2.2.1.9, 5.2.4.2.2.3). | **offen (kein Ticket)** — app-weite, bereits in A1 dokumentierte Lücke, kein Regler existiert; A1 verweist ihn ausdrücklich auf einen eigenen Folge-Task (`bedien-leitlinie-einsatzkontexte.md`, Abschnitt „Was diese Leitlinie nicht entscheidet"). Nicht im Scope von LFH-336. | **offen (kein Ticket)** — dieselbe app-weite Lücke, nicht seitenspezifisch. |
+| 8 | **8 · Helligkeits-/Kontrastregler** vorhanden und bei aktiver Warnung nicht bis AUS dimmbar — 1 Regler, 1 Sperre (MIL 5.2.2.1.9, 5.2.4.2.2.3). | **offen → LFH-397** (<https://app.clickup.com/t/86cb2qcq9>) — app-weite, bereits in A1 dokumentierte Lücke, kein Regler existiert; A1 verweist ihn ausdrücklich auf einen eigenen Folge-Task (`bedien-leitlinie-einsatzkontexte.md`, Abschnitt „Was diese Leitlinie nicht entscheidet"). Nicht im Scope von LFH-336. | **offen → LFH-397** (<https://app.clickup.com/t/86cb2qcq9>) — dieselbe app-weite Lücke, nicht seitenspezifisch. |
 | 9 | **9 · Kritische Anzeigen im Blickfeld** — innerhalb 15° der normalen Blickachse, nicht am Layoutrand (MIL 5.2.2.1.7). | **erfüllt** — das Instrumentenband (`.lfh-band`) liegt oben, immer an derselben Stelle, Kennzahlen im oberen Drittel (unverändert seit A0). | **nicht anwendbar** — die Seite ist eine Auswahl-/Listenseite ohne Lagebild-Kennzahlen; es gibt keine „kritischen Anzeigen" im Sinne des Kriteriums. |
 | 10 | **10 · Alarmbudget eingehalten** — 1–2 je 10 min im Dauerbetrieb, < 10 in den ersten 10 min einer Großlage, ≤ 10 je 10-min-Fenster, ~80/15/5 %, 0 flatternde Alarme, ≤ 3 Eskalationsstufen (EEMUA 191 S. 96/97; ISA-18.2). | **nicht anwendbar** — das Dashboard erzeugt keine Alarme, es zeigt Zustände (unverändert). | **nicht anwendbar** — die Seite erzeugt keine Alarme. |
 | 11 | **11 · Warnverhalten** — kein Blinken auf lesbarem Text, ≤ 2 Blinkraten (schnellere ≤ 5 Hz, langsamere ≥ 0,8 Hz), jede Warnung quittierbar, jeder Ton mit visueller Entsprechung (MIL 5.2.1.5.5.3/.4/.5, 5.3.6.3). | **erfüllt** — kein Blinken auf der Seite (`grep -n "animation\|blink" LageDashboardPage.tsx theme/sprache.css` liefert nur den Puls-Indikator, der aria-hidden ist und keinen Text betrifft); der Fehlerzustand trägt `role="alert"` mit Text statt Bewegung. | **erfüllt** — kein Blinken; Fehlerzustand über `SeitenFehler` mit `role="alert"`. |
-| 12 | **12 · Kein Sprung unter dem Cursor** — CLS ≤ 0,1 (75. Perzentil, web.dev); neue Datensätze nur als opt-in-Sammelbanner (WCAG 3.2.5 / G76). | **offen → LFH-334 (B6)** — `einsatzKeys.meldungen`/`einsatzKeys.auftraege` sind Teil des SSE-Fan-outs (`api/queryKeys.ts:86,88,119-121`): eine eingehende Meldung oder ein neuer Auftrag lässt react-query die Abfrage automatisch neu laden, wodurch die Top-3-Kurzliste (`meldungszeilen`/`auftragszeilen`, sortiert nach Ereigniszeit/Frist) ohne Sammelbanner umsortiert. Kein `layout-shift`-Observer im Repo, CLS-Wert nirgends gemessen. | **teilweise erfüllt** — `globalKeys.einsaetze()` ist **kein** Teil des einsatzgebundenen SSE-Fan-outs (`EINSATZ_STREAM_EVENTS` bildet nur `einsatzKeys` ab, `globalKeys` liegt außerhalb) — die Liste bekommt also keine Live-Ereignisse, die unter dem Cursor umsortieren könnten; der Sammelbanner-Teil des Kriteriums greift hier strukturell nicht. Der Skelett→Karte-Wechsel selbst nutzt dieselbe Kachelhöhe (`KACHEL_MIN_HOEHE`) für beide Zustände (Test „zeigt beim Laden Karten-Skelette im Raster … Die Skelett-Kacheln liegen im SELBEN Rasterknoten"), ein CLS-Zahlenwert ist aber nicht gemessen (kein Observer im Repo) → offen (kein Ticket) |
+| 12 | **12 · Kein Sprung unter dem Cursor** — CLS ≤ 0,1 (75. Perzentil, web.dev); neue Datensätze nur als opt-in-Sammelbanner (WCAG 3.2.5 / G76). | **offen → LFH-334 (B6)** — `einsatzKeys.meldungen`/`einsatzKeys.auftraege` sind Teil des SSE-Fan-outs (`api/queryKeys.ts:86,88,119-121`): eine eingehende Meldung oder ein neuer Auftrag lässt react-query die Abfrage automatisch neu laden, wodurch die Top-3-Kurzliste (`meldungszeilen`/`auftragszeilen`, sortiert nach Ereigniszeit/Frist) ohne Sammelbanner umsortiert. Kein `layout-shift`-Observer im Repo, CLS-Wert nirgends gemessen. | **teilweise erfüllt** — `globalKeys.einsaetze()` ist **kein** Teil des einsatzgebundenen SSE-Fan-outs (`EINSATZ_STREAM_EVENTS` bildet nur `einsatzKeys` ab, `globalKeys` liegt außerhalb) — die Liste bekommt also keine Live-Ereignisse, die unter dem Cursor umsortieren könnten; der Sammelbanner-Teil des Kriteriums greift hier strukturell nicht. Der Skelett→Karte-Wechsel selbst nutzt dieselbe Kachelhöhe (`KACHEL_MIN_HOEHE`) für beide Zustände (Test „zeigt beim Laden Karten-Skelette im Raster … Die Skelett-Kacheln liegen im SELBEN Rasterknoten"), ein CLS-Zahlenwert ist aber nicht gemessen (kein Observer im Repo) — CLS lässt sich wie die Trefflächenhöhe nur im Browser messen (jsdom rechnet kein Layout), also derselbe Messtask → offen → **LFH-396** (<https://app.clickup.com/t/86cb2q96u>) |
 | 13 | **13 · Fokus nie verdeckt** — 0 vollständig verdeckte Fokusziele beim Tab-Durchlauf hinter fixierten Köpfen, Fußleisten oder Drawern (WCAG 2.4.11 AA). | **erfüllt** — `grep -n "position:" theme/sprache.css` → 0 Treffer, kein `position: fixed`/`sticky` auf der Seite (unverändert). | **erfüllt** — keine fixierten Köpfe/Fußleisten/Drawer auf der Seite; per RTL belegt: „macht jede geladene Einsatzkarte per Titel-Link erreichbar und navigiert per Enter" tabbt bis zur letzten Karte durch, ohne dass ein Ziel verdeckt bliebe. |
 | 14 | **14 · Tabellenseite vollständig** — fixierte Kopfzeile, fixierte menschenlesbare Identifierspalte, umschaltbarer Spaltensatz mit Zähler ausgeblendeter Spalten, keine Auflösung in Karten, wo verglichen wird (NN/g Data Tables / Mobile Tables). | **nicht anwendbar** — keine `<Table>` auf dem Dashboard (`grep -n "Table"` → 0 Treffer); Kacheln sind Level-1-Überblick. | **nicht anwendbar** — keine `<Table>` auf der Seite (`grep -n "Table"` → 0 Treffer); die Seite ist bewusst eine Kartenliste (Festlegung 2: „wird gelesen, nicht verglichen"). |
 | 15 | **15 · Erfassungsmaske vollständig** — Defaults vorbelegt, sichtbar und einzeln überschreibbar (MIL 5.14.7.1/.3), „Speichern und nächsten anlegen" mit gehaltenem Kontext (5.14.7.4), Sammelliste mit Ändern/Entfernen je Zeile (DWP „Add another thing"), Labels über dem Feld (50 ms statt 500 ms Sakkade, Penzo), volle Tastaturbedienung (WCAG 2.1.1). | **nicht anwendbar** — keine Erfassungsmaske auf dem Dashboard. | **teilweise erfüllt** — die anwendbaren Teile sind erfüllt: Defaults vorbelegt und einzeln überschreibbar (`initialValues={{ einsatzart: 'realeinsatz', begonnen_at: dayjs() }}`, `EinsaetzePage.tsx:326`); Labels über dem Feld (`layout="vertical"`, `components/Erfassung.tsx:320`); volle Tastaturbedienung (Fokus im ersten Feld beim Öffnen, Enter sendet ab — Test „setzt den Fokus beim Öffnen ins erste Feld und sendet per Enter"). „Speichern und nächsten anlegen" mit gehaltenem Kontext und die Sammelliste mit Ändern/Entfernen je Zeile sind **nicht anwendbar**: der Dialog legt EINEN Einsatz an, kein Minutentakt-Vorgang wie Aufnahme/BHP/BTP — `serie` ist bewusst nicht gesetzt (CLAUDE.md, Abschnitt „Erfassungs-Norm"). |
@@ -119,8 +119,16 @@ Ergebnis: siehe Vitest-Lauf, Schritt 5 — alle vier Tests grün.
 
 ### AK6 — Lint und volles Gate grün
 
-Siehe Abschnitt „Volles Gate" unten für die vollständige, Schritt-für-Schritt-Ausgabe von
-`./scripts/check-all.sh` (enthält `pnpm lint --max-warnings 0` als Schritt 2).
+**Zur Hälfte erfüllt — nicht „läuft durch".** `pnpm lint --max-warnings 0` ist grün (Schritt 2),
+und mit ihm die Schritte 1–6 insgesamt (fmt, Lint, Typ-Codegen inkl. `tsc`,
+`cargo test --workspace`, Vitest 2765/2765 über 262 Dateien, `check-deps` nach dem
+nanoid-Override). **Schritt 7 (e2e) ist rot** — im Bestand, nicht durch LFH-336: Merge-Base
+`dd91460a` liefert 20 failed / 27 passed, der Branch 23 / 24; `frontend/src` wurde für die
+Gegenprobe auf den Merge-Base zurückgedreht und dieselbe Suite gefahren. Die Differenz sind
+wandernde Fälle (`trefflaeche-tablet.spec.ts:174`, `seitenrinne.spec.ts`), die eine
+Codeänderung nicht erklären kann, und keiner berührt die beiden LFH-336-Seiten. Eigenes Ticket:
+**LFH-398** (<https://app.clickup.com/t/86cb2qdz1>). Details siehe Abschnitt „Volles Gate"
+unten.
 
 ## Volles Gate
 
@@ -128,25 +136,30 @@ Siehe Abschnitt „Volles Gate" unten für die vollständige, Schritt-für-Schri
 `/Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/dev-clickup-execution-eed38c`, ohne
 `| tail` oder sonstige Pipe, die den Exit-Code maskieren würde.
 
-Der Lauf brauchte zwei Anläufe. Der vollständige, ehrliche Schritt-für-Schritt-Nachweis
-inklusive der Lücke im zweiten Lauf steht in `task-6-report.md` — hier nur die Kurzfassung:
+Der Lauf brauchte drei Anläufe, zwei davon von mir gesehen, der dritte (abschließende) vom
+Coordinator selbst gefahren. Der vollständige Verlauf steht in `task-6-report.md` — hier die
+Kurzfassung mit dem Endstand:
 
-**Lauf 1** (vor dem nanoid-Fix, vollständig gesehen): Schritte 1–5 grün (rustfmt, Lint,
+**Lauf 1** (vor dem nanoid-Fix, von mir vollständig gesehen): Schritte 1–5 grün (rustfmt, Lint,
 Typ-Codegen, `cargo test --workspace`, Vitest — 262 Testdateien / 2765 Tests). Schritt 6
 (`check-deps.sh`) brach mit `EXIT_CODE=1` an einem `pnpm audit --audit-level=high`-Fund
 (GHSA-2v37-7h3g-55p8, nanoid, Build-/Test-Zeit-Tooling) — ein Bestandsproblem ohne
 LFH-336-Bezug (siehe `fix(deps)`-Commit oben). Schritt 7 (e2e) lief wegen `set -euo pipefail`
 nicht mehr an.
 
-**Nach dem Fix isoliert geprüft** (nicht über `check-all.sh`): `pnpm audit --audit-level=high`
-im Frontend meldet „No known vulnerabilities found".
+**Lauf 2** (nach dem Fix, von mir NICHT vollständig gesehen): meine Session wurde während des
+Wartens auf diesen Lauf beendet, bevor er über Schritt 4 hinauskam. Isoliert außerhalb von
+`check-all.sh` bestätigt: `pnpm audit --audit-level=high` im Frontend meldet „No known
+vulnerabilities found".
 
-**Lauf 2** (nach dem Fix, NICHT vollständig gesehen): ein zweiter voller `check-all.sh`-Lauf
-wurde gestartet, um Schritt 6 und — zum ersten Mal überhaupt — Schritt 7 zu verifizieren. Die
-Session wurde während des Wartens auf diesen Lauf beendet. Beim Wiedereinstieg lief der Lauf
-nachweislich noch (PID-Kette bestätigt: `check-all.sh` → `cargo test --workspace` aktiv), stand
-aber weiterhin in Schritt 4 (Rust-Suite) — dieselbe Stelle wie beim letzten Log-Stand vor dem
-Abbruch. **Schritte 5, 6 und 7 dieses zweiten Laufs sind nicht vollständig gesehen** — weder
-Vitest noch `check-deps.sh` noch die Playwright-e2e-Suite wurden nach dem nanoid-Fix
-tatsächlich grün beobachtet. Schritt 7 (e2e) ist in KEINEM der beiden Läufe je erreicht worden
-und bleibt für dieses Ticket vollständig unbelegt.
+**Lauf 3 (abschließend, vom Coordinator gefahren) — der Endstand:** Schritte 1–6 grün (fmt,
+Lint, Typ-Codegen inkl. `tsc`, `cargo test --workspace`, Vitest 2765/2765 über 262 Dateien,
+`check-deps` nach dem nanoid-Override). **Schritt 7 (e2e) ist rot, aber als Bestandsproblem
+belegt, nicht als LFH-336-Regression**: Merge-Base `dd91460a` liefert **20 failed / 27
+passed**, dieser Branch **23 failed / 24 passed** — gemessen per Gegenprobe (`frontend/src` auf
+den Merge-Base zurückgedreht, dieselbe Suite gefahren), nicht vermutet. Die Differenz sind
+wandernde Fälle (`trefflaeche-tablet.spec.ts:174` scheitert mal in „komfortabel", mal in
+„handschuh"; `seitenrinne.spec.ts` mal bei `:43`, mal bei `:67`), die eine Codeänderung nicht
+erklären kann, und keiner der Fälle berührt `LageDashboardPage`/`EinsaetzePage`. Eigenes
+Ticket: **LFH-398** (<https://app.clickup.com/t/86cb2qdz1>) — eigene Ursachensuche, nicht Teil
+von LFH-336.
