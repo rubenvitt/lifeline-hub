@@ -1,5 +1,5 @@
 import { App, AutoComplete, Button, Card, DatePicker, Form, Input, Space, Tag, Typography } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -8,7 +8,8 @@ import type { Einsatzart, EinsatzAnzeige, EinsatzStatus } from '../api/types';
 import { ApiError } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
-import { EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
+import { formatZeitKurz } from '../anzeige/format';
+import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { useAuth } from '../auth/AuthContext';
@@ -63,6 +64,15 @@ const EINSATZ_STATUS: Record<EinsatzStatus, StatusDarstellung> = {
  * (Breiten), aber keine Kachel-Höhenrolle — erfunden wird hier keine.
  */
 const KACHEL_MIN_HOEHE = 120;
+
+/**
+ * Ab wie vielen aktiven Einsätzen ein Suchfeld erscheint.
+ *
+ * Acht, weil das Raster darunter auf dem Fükw-Schirm zwei Reihen füllt — bis
+ * dahin ist Suchen langsamer als Hinsehen. Ein dauerhaft stehendes Suchfeld über
+ * drei Karten wäre Bedienlast ohne Nutzen.
+ */
+const SUCHE_AB = 8;
 
 /** Ein Kartenraster; die Mindestbreite kommt aus `flaeche`, der Abstand aus `abstand`. */
 function rasterStil(minBreite: number, luft: number): CSSProperties {
@@ -147,8 +157,24 @@ export default function EinsaetzePage() {
       message.error(e instanceof ApiError ? e.message : 'Einsatz konnte nicht angelegt werden'),
   });
 
-  const aktive = einsaetze.filter((e: EinsatzAnzeige) => e.status === 'aktiv');
+  const [suche, setSuche] = useState('');
+
+  // Der jüngste Einsatz zuerst: wer die Auswahl öffnet, sucht in aller Regel den,
+  // der gerade läuft. Absteigend nach `begonnen_at` — der Wirestring ist
+  // sortierbar (`YYYY-MM-DD HH:mm:ss`), ein Date-Parse wäre hier überflüssig.
+  const aktive = einsaetze
+    .filter((e: EinsatzAnzeige) => e.status === 'aktiv')
+    .sort((a, b) => (a.begonnen_at < b.begonnen_at ? 1 : -1));
   const abgeschlossene = einsaetze.filter((e: EinsatzAnzeige) => e.status === 'abgeschlossen');
+
+  const suchbegriff = suche.trim().toLowerCase();
+  const passt = (e: EinsatzAnzeige) =>
+    !suchbegriff ||
+    [e.bezeichnung, e.einsatzort, e.stichwort].some((f) =>
+      (f ?? '').toLowerCase().includes(suchbegriff),
+    );
+  const sichtbareAktive = aktive.filter(passt);
+  const sucheZeigen = aktive.length >= SUCHE_AB;
 
   const renderKarte = (e: EinsatzAnzeige, klein = false) => (
     <Card
@@ -163,10 +189,24 @@ export default function EinsaetzePage() {
       onClick={() => navigate(einsatzPfad(e.id))}
     >
       <Space orientation="vertical">
-        <Space>
+        <Space wrap>
           <StatusTag darstellung={EINSATZ_STATUS[e.status]} />
+          <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
           {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
         </Space>
+        {/* Ort und Beginn beantworten „welcher ist meiner?" — vorher standen sie
+            nur im Kopfdatenformular, drei Klicks entfernt (Befund M4). Die Ikone
+            kommt aus `@ant-design/icons` und trägt eine `aria-hidden`-Hülle: der
+            Knoten brächte sonst ein englisches `role="img"`-Label mit. */}
+        {e.einsatzort && (
+          <Typography.Text type="secondary" data-testid="einsatz-ort">
+            <span aria-hidden="true">
+              <EnvironmentOutlined />{' '}
+            </span>
+            {e.einsatzort}
+          </Typography.Text>
+        )}
+        <Typography.Text type="secondary">seit {formatZeitKurz(e.begonnen_at)}</Typography.Text>
         {e.stichwort && <Typography.Text type="secondary">{e.stichwort}</Typography.Text>}
       </Space>
     </Card>
@@ -205,6 +245,18 @@ export default function EinsaetzePage() {
         </div>
       )}
 
+      {!isPending && sucheZeigen && (
+        <div style={{ marginBottom: abstand.md, maxWidth: flaeche.kachelMin * 2 }}>
+          <Input.Search
+            aria-label="Einsätze durchsuchen"
+            placeholder="Bezeichnung, Ort oder Stichwort"
+            allowClear
+            value={suche}
+            onChange={(ev) => setSuche(ev.target.value)}
+          />
+        </div>
+      )}
+
       {/* EIN Rasterknoten für Skelette wie Karten — dieselben Spalten, derselbe
           Abstand, dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
       <div
@@ -231,7 +283,7 @@ export default function EinsaetzePage() {
                 Neuer Einsatz
               </Button>
             )}
-            {aktive.map((e: EinsatzAnzeige) => renderKarte(e))}
+            {sichtbareAktive.map((e: EinsatzAnzeige) => renderKarte(e))}
           </>
         )}
       </div>
