@@ -171,11 +171,24 @@ describe('Schnellerfassung', () => {
     expect(feld).toHaveValue('Bereits lokal behandelt');
   });
 
-  it('erklärt den Enter-Vertrag sichtbar und im Placeholder', () => {
+  /**
+   * Der Wortlaut steht GENAU EINMAL, und zwar in der Steuerzeile.
+   *
+   * Die zweite Hälfte ist die, die die Aussage widerlegbar macht: ohne sie bliebe
+   * der Test grün, wenn der Hinweis dem Platzhalter wieder vorangestellt würde —
+   * und das war der Zustand, in dem das Feld nicht mehr sagte, was hineingehört
+   * (der sichtbare Anfang des Platzhalters war der Tastaturvertrag, „Inhalt …"
+   * stand dahinter). LFH-335 verlangt den Wortlaut im DOM, nicht zweimal.
+   */
+  it('erklärt den Enter-Vertrag genau einmal — sichtbar, nicht im Platzhalter', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     const hinweis = 'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
+    expect(screen.getAllByText(hinweis)).toHaveLength(1);
     expect(screen.getByText(hinweis)).toBeVisible();
-    expect(screen.getByPlaceholderText((placeholder) => placeholder.startsWith(hinweis))).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveAttribute(
+      'placeholder',
+      'Inhalt … ( / für Felder & Bausteine )',
+    );
   });
 
   it('/ öffnet Menü; Feld „Von" wird als Chip erfasst und mitgesendet', async () => {

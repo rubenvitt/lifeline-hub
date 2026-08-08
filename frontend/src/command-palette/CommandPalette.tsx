@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Modal, Input, theme, type InputRef } from 'antd';
+import Tastenkuerzel from '../components/Tastenkuerzel';
+import { form } from '../theme/tokens';
 import { filtereBefehle } from './fuzzy';
 import { GRUPPEN_LABEL, GRUPPEN_REIHENFOLGE, type Befehl } from './typen';
 
@@ -89,13 +91,29 @@ export function CommandPalette({ befehle, schliesse }: Props) {
           onKeyDown={aufTaste}
           style={{ padding: '12px 16px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}
         />
-        <div id="cmd-liste" role="listbox" ref={listeRef} style={{ maxHeight: 380, overflowY: 'auto', padding: 8 }}>
+        <div
+          id="cmd-liste"
+          role="listbox"
+          ref={listeRef}
+          style={{ maxHeight: 380, overflowY: 'auto', padding: token.paddingXS }}
+        >
           {flach.length === 0 && (
-            <div style={{ padding: 16, color: token.colorTextSecondary }}>Keine Treffer</div>
+            <div style={{ padding: token.padding, color: token.colorTextSecondary }}>Keine Treffer</div>
           )}
           {gruppen.map((x) => (
             <div key={x.gruppe} role="group" aria-label={GRUPPEN_LABEL[x.gruppe]}>
-              <div style={{ padding: '6px 8px', fontSize: 12, textTransform: 'uppercase', color: token.colorTextSecondary }}>
+              <div
+                style={{
+                  padding: `${token.paddingXS}px ${token.paddingSM}px`,
+                  fontSize: token.fontSizeSM,
+                  textTransform: 'uppercase',
+                  // Versalien ohne Sperrung sind der Grund, warum eine
+                  // Gruppenüberschrift „gedrängt" aussieht — LFH-352 hält den Wert
+                  // als Formrolle, statt ihn je Stelle zu erfinden.
+                  letterSpacing: form.versalSperrung,
+                  color: token.colorTextSecondary,
+                }}
+              >
                 {GRUPPEN_LABEL[x.gruppe]}
               </div>
               {x.items.map((b) => {
@@ -110,16 +128,28 @@ export function CommandPalette({ befehle, schliesse }: Props) {
                     aria-selected={istAktiv}
                     onMouseEnter={() => setAktiv(i)}
                     onClick={() => fuehreAus(b)}
+                    // Handgebautes Bedienziel (LFH-365): ZWEI Angaben, nicht eine —
+                    // `minHeight` aus `controlHeight` plus Polsterung aus den
+                    // Abstandsrollen. Die Palette ist seit LFH-335 der einzige
+                    // Berührungsweg zu 42+ Befehlen; eine Zeile, die auf dem
+                    // Führungs-Tablet 34 px hoch bleibt, verfehlt genau den Kontext,
+                    // für den der sichtbare Auslöser gebaut wurde. Radius 0 statt des
+                    // früheren Festwerts 6 ist die Formensprache aus LFH-352.
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-                      borderRadius: 6, cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: token.marginSM,
+                      minHeight: token.controlHeight,
+                      padding: `${token.paddingXS}px ${token.paddingSM}px`,
+                      borderRadius: form.radiusFlaeche,
+                      cursor: 'pointer',
                       background: istAktiv ? token.colorPrimaryBg : 'transparent',
                       color: istAktiv ? token.colorPrimary : token.colorText,
                     }}
                   >
                     {Icon && <Icon size={18} />}
                     <span>{b.label}</span>
-                    {b.kuerzel && <kbd style={{ marginLeft: 'auto' }}>{b.kuerzel}</kbd>}
+                    {b.kuerzel && <Tastenkuerzel style={{ marginLeft: 'auto' }}>{b.kuerzel}</Tastenkuerzel>}
                   </div>
                 );
               })}

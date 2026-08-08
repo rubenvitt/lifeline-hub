@@ -268,7 +268,7 @@ export default function Schnellerfassung({
           ref={textRef}
           layout="toggle"
           variante="kompakt"
-          placeholder={`${ENTER_HINWEIS} · Inhalt … ( / für Felder & Bausteine )`}
+          placeholder="Inhalt … ( / für Felder & Bausteine )"
           autoSize={{ minRows: 1, maxRows: 4 }}
           value={inhalt}
           onChange={onInhaltChange}
@@ -286,8 +286,6 @@ export default function Schnellerfassung({
           onSchliessen={() => setMenuOffen(false)}
         />
       </div>
-
-      <Typography.Text type="secondary">{ENTER_HINWEIS}</Typography.Text>
 
       {/* Chip-Leiste */}
       <Space wrap style={{ marginTop: 8 }}>
@@ -342,8 +340,15 @@ export default function Schnellerfassung({
         </div>
       )}
 
-      {/* Steuerzeile */}
-      <Space align="center" style={{ marginTop: 12, width: '100%' }}>
+      {/* Steuerzeile.
+          Der Enter-Vertrag steht HIER und nicht mehr zwischen Feld und Chip-Leiste:
+          er gehört zum Absenden, und als eigene Zeile unter dem Editor schob er die
+          Chips nach unten und las sich wie eine Fehlermeldung. Im Platzhalter stand
+          er bis zum 08.08.2026 zusätzlich VOR dem eigentlichen Hinweis „Inhalt …" —
+          also genau dort, wo das Feld sagen soll, was hineingehört. Einmal sichtbar
+          reicht; die Zusicherung aus LFH-335 verlangt den Wortlaut im DOM, nicht
+          zweimal. `wrap`, weil der Satz auf 390 px sonst die Knöpfe hinausschiebt. */}
+      <Space align="center" wrap style={{ marginTop: 12, width: '100%' }}>
         {!berichtigungZu && (
           <Select value={typ} style={{ minWidth: 150 }} options={TYP_OPTIONEN} onChange={(v) => setTyp(v)} />
         )}
@@ -353,6 +358,9 @@ export default function Schnellerfassung({
             Als strukturierten Lagebericht erfassen →
           </Button>
         )}
+        <Typography.Text type="secondary" style={{ marginLeft: 'auto', fontSize: 'smaller' }}>
+          {ENTER_HINWEIS}
+        </Typography.Text>
       </Space>
 
       <BausteinPlatzhalterModal

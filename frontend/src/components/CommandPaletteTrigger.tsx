@@ -1,6 +1,7 @@
-import { Button } from 'antd';
+import { Button, theme } from 'antd';
 import { TbSearch } from 'react-icons/tb';
 import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
+import Tastenkuerzel from './Tastenkuerzel';
 import { useViewport } from './useViewport';
 
 const TREFFLAECHE = 48;
@@ -18,6 +19,7 @@ export function suchKuerzelFuerUserAgent(userAgent: string): string {
  */
 export default function CommandPaletteTrigger() {
   const { toggle } = useCommandPalette();
+  const { token } = theme.useToken();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const kuerzel = suchKuerzelFuerUserAgent(
@@ -44,10 +46,13 @@ export default function CommandPaletteTrigger() {
       style={stil}
     >
       {breit && (
-        <>
-          <span>Suchen</span>
-          <kbd aria-hidden>{kuerzel}</kbd>
-        </>
+        // Eine Flex-Zeile, kein Fragment: JSX verschluckt den Zeilenumbruch
+        // zwischen zwei Elementen ersatzlos, sodass Beschriftung und Marke bis zum
+        // 08.08.2026 als „Suchen⌘K" in einem Zug standen.
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+          Suchen
+          <Tastenkuerzel aria-hidden>{kuerzel}</Tastenkuerzel>
+        </span>
       )}
     </Button>
   );

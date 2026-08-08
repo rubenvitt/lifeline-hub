@@ -172,6 +172,25 @@ Alltag wichtigsten:
   spreizt `...style` **danach**, die spätere Deklaration gewinnt. Das ist heute richtig und
   ungetestet: zöge jemand den Spread nach vorn, fiele die Polsterungshälfte still weg, während
   `minHeight` überlebt. Der Kommentar an der Spread-Zeile sagt das; wer sie anfasst, liest ihn.
+  **Der Boden gilt auch für die Kommandopalette** (Nacharbeit zu LFH-335, 08.08.2026): ihre
+  `role="option"`-Zeilen sind handgebaute Bedienziele wie jede andere und hingen bis dahin auf
+  einem festen `padding: '8px 10px'` ohne `minHeight`. Solange die Palette nur an `Strg/⌘+K` hing,
+  fiel das nicht auf — mit dem sichtbaren Auslöser aus B7 ist sie der **Berührungsweg** zu 42+
+  Befehlen, und eine 34-px-Zeile verfehlt genau den Kontext, für den der Auslöser gebaut wurde.
+- **Ein Tastenkürzel wird als Marke gesetzt, nicht als Text** (Nacharbeit zu LFH-335, 08.08.2026).
+  Sichtbare Kürzel nehmen `components/Tastenkuerzel.tsx`, nie ein nacktes `<kbd>`: das hat im
+  Browser **keine Vorgabegestaltung außer Monospace** — ohne Rahmen, ohne Polsterung und ohne
+  eigenen Abstand zum Nachbarn. In der Kopfzeile stand deshalb gemessen **„Suchen⌘K"** in einem
+  Zug; JSX verschluckt den Zeilenumbruch zwischen zwei Elementen ersatzlos, ein Fragment reicht
+  als Trennung also nicht, es braucht eine Flex-Zeile mit `gap`.
+  Die Marke nimmt ihre Farbe aus **`currentColor`**, nicht aus einer Farbrolle: dasselbe Element
+  steht einmal auf dem dunklen Kopfzeilengrund und einmal auf Containergrund in der Palette — ein
+  fester Rollenwert wäre an genau einer der beiden Stellen unsichtbar. Und sie ist **kein
+  Bedienziel**: ein `<kbd>` ist Satz, kein Ziel, bekommt also bewusst **keinen**
+  `controlHeight`-Boden (der stünde im Handschuh-Betrieb bei 72 px neben einer Zeile Text) —
+  dieselbe Trennung, aus der `dichte.guard.test.ts` `Card`/`Descriptions` heraushält. Geprüft
+  wird die reine `tastenkuerzelStil`-Funktion nach dem Muster von `bedienzielStil`, samt der
+  **Abwesenheit** von `minHeight`.
 - **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e nach dem Vorbild von
   LFH-364). Ab drei Aktionen an einer Zeile oder Karte: ein `Dropdown` mit `menu={{ items }}`,
   `trigger={['click']}`, `autoFocus` und einem icon-only `<Button type="text">` — kein `Popover`
@@ -463,6 +482,16 @@ dem Absatz darüber. Der Riegel gegen doppeltes Absenden sitzt in `abschicken`
 Taste erreicht ihn nie. Angezeigt wird das Kürzel `aria-hidden` im Knopf — der
 zugängliche Name bleibt „Speichern und nächste", sonst müsste jede der ~10
 Aufrufstellen ihre Knopf-Abfrage umschreiben.
+
+**Ein Tastaturvertrag steht EINMAL, und nicht im Platzhalter** (Nacharbeit zu LFH-335,
+08.08.2026). Der Platzhalter sagt, **was** in das Feld gehört; der Vertrag sagt, **was beim
+Absenden passiert** — das ist die Steuerzeile. Die ETB-Schnellerfassung trug beides doppelt:
+`Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden` stand als
+sichtbare Zeile zwischen Feld und Chip-Leiste **und** noch einmal als **Anfang** des
+Platzhalters — der sichtbare Beginn des leeren Feldes war damit der Tastaturvertrag, „Inhalt
+…" stand dahinter. Wer den Ort ändert, prüft die Gegenaussage mit: ein Test, der nur „der
+Wortlaut ist im DOM" behauptet, bliebe grün, wenn der Vertrag dem Platzhalter wieder
+vorangestellt würde.
 
 **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`**, nicht die Hülle und
 kein Modal: Eingabefeld plus Knopf in einer Zeile, Enter legt an, das Modal bleibt fürs
