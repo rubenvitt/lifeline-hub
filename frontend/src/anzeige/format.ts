@@ -110,6 +110,22 @@ export function formatZeitKurz(
   return d.isSame(jetzt, 'day') ? d.format('HHmm') : d.format('DDHHmm');
 }
 
+/**
+ * Reine Uhrzeit `HH:mm` in der Anzeigezone — für Instrumente, die den Tag schon
+ * aus dem Zusammenhang kennen (Lage-Dashboard: alles vom laufenden Einsatz).
+ *
+ * Der Leerwert ist ein Leerstrich in Ziffernbreite (`——:——`) und nicht der leere
+ * String wie bei den DTG-Formatierern: er steht in einer Instrumentenspalte, und
+ * eine Lücke, die zusammenfällt, verschiebt die Zeilen daneben.
+ */
+export function formatUhrzeit(
+  utcStr?: string | null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  if (!utcStr) return '——:——';
+  return inZone(utcStr, konv).format('HH:mm');
+}
+
 /** WGS84-Koordinate → Anzeige-String je Koordinatenformat (Default: dezimal). */
 export function formatKoordinate(
   lat: number,

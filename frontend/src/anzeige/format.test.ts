@@ -5,6 +5,7 @@ import timezone from 'dayjs/plugin/timezone';
 import {
   formatZeit,
   formatZeitKurz,
+  formatUhrzeit,
   taktischeUhrzeit,
   taktischeDtg,
   taktischeDtgVoll,
@@ -111,6 +112,21 @@ describe('formatKoordinate', () => {
 
   it('WGS84-Default bleibt byte-exakt', () => {
     expect(formatKoordinate(51.16040, 10.45140)).toBe('51.16040, 10.45140');
+  });
+});
+
+describe('formatUhrzeit', () => {
+  it('rechnet den UTC-Wirestring in die Zone um', () => {
+    expect(formatUhrzeit('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('11:00');
+  });
+
+  it('liefert den Leerstrich, wenn nichts da ist', () => {
+    expect(formatUhrzeit(null)).toBe('——:——');
+    expect(formatUhrzeit(undefined)).toBe('——:——');
+  });
+
+  it('fällt bei ungültiger Zone auf lokale Zeit zurück statt zu werfen', () => {
+    expect(() => formatUhrzeit('2026-06-11 09:00:00', { zeitzone: 'Europe/Brelin' })).not.toThrow();
   });
 });
 
