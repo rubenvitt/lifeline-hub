@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Auftrag, LageberichtAnzeige, Meldung } from '../../api/types';
 import { auftragszeilen, lageauszug, meldungszeilen } from './lagebild';
 
@@ -74,6 +74,10 @@ describe('meldungszeilen', () => {
 });
 
 describe('auftragszeilen', () => {
+  // formatUhrzeitMitTag hängt vom Systemdatum ab (heute → HH:mm, sonst DD. HH:mm) —
+  // ungesteuert wäre der Test maschinen-/tagesabhängig.
+  afterEach(() => vi.useRealTimers());
+
   it('sortiert nach Frist, die nächste zuerst', () => {
     const zeilen = auftragszeilen([
       a({ id: 1, lfd_nr: 1, frist_at: '2026-06-11 18:00:00' }),
@@ -110,11 +114,25 @@ describe('auftragszeilen', () => {
   });
 
   it('trägt Text und Frist in der Anzeigezone, überfällig als Alarm', () => {
+    // Systemzeit 12:00 Berlin am 11.06. — derselbe Tag wie die Frist unten.
+    vi.setSystemTime(new Date('2026-06-11T10:00:00Z'));
     const [z] = auftragszeilen(
       [a({ id: 9, lfd_nr: 5, auftrag_text: 'Pumpe setzen', frist_at: '2026-06-11 14:30:00', ist_ueberfaellig: true })],
       BERLIN,
     );
     expect(z).toMatchObject({ id: 9, lfdNr: 5, text: 'Pumpe setzen', frist: '16:30', stufe: 'alarm' });
+  });
+
+  // Eine Frist morgen früh sieht in reiner HH:mm optisch aus wie eine in 20 Minuten —
+  // genau der Befund, den Fix-Runde 1 zu Task 3 behebt.
+  it('stellt bei einer Frist an einem anderen Tag den Tag voran', () => {
+    // Systemzeit 08:00 Berlin am 12.06. — ein Tag nach der Frist unten.
+    vi.setSystemTime(new Date('2026-06-12T06:00:00Z'));
+    const [z] = auftragszeilen(
+      [a({ id: 9, lfd_nr: 5, frist_at: '2026-06-11 14:30:00' })],
+      BERLIN,
+    );
+    expect(z.frist).toBe('11. 16:30');
   });
 
   it('lässt die Frist leer, wenn keine gesetzt ist', () => {

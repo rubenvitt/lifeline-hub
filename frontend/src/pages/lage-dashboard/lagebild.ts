@@ -30,6 +30,7 @@ import type {
 import {
   DEFAULT_KONVENTIONEN,
   formatUhrzeit,
+  formatUhrzeitMitTag,
   type AnzeigeKonventionen,
 } from '../../anzeige/format';
 import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
@@ -238,6 +239,12 @@ export function meldungszeilen(
  *
  * Die Statusmenge ist dieselbe wie bei `auftraegeOffen` weiter unten: alles außer
  * `vollzogen` und `abgenommen`.
+ *
+ * `frist` nutzt `formatUhrzeitMitTag`, NICHT `uhrzeit`/`formatUhrzeit` — eine reine
+ * `HH:mm` ist optisch nicht von „in 20 Minuten" zu „morgen früh" zu unterscheiden,
+ * und eine Frist ist der Fall, nach dem jemand handelt (LFH-336, Fix-Runde 1 zu
+ * Task 3). `meldungszeilen` oben bleibt bewusst bei `uhrzeit`: eine Meldung zeigt
+ * Vergangenes und steht als „die drei jüngsten" ohnehin im Jetzt, keine Deadline.
  */
 export function auftragszeilen(
   auftraege: Auftrag[],
@@ -257,7 +264,7 @@ export function auftragszeilen(
     .map((a) => ({
       id: a.id,
       lfdNr: a.lfd_nr ?? null,
-      frist: a.frist_at ? uhrzeit(a.frist_at, konv) : null,
+      frist: a.frist_at ? formatUhrzeitMitTag(a.frist_at, konv) : null,
       text: a.auftrag_text,
       stufe: a.ist_ueberfaellig ? 'alarm' : 'normal',
     }));

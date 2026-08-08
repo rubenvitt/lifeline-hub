@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -6,6 +6,7 @@ import {
   formatZeit,
   formatZeitKurz,
   formatUhrzeit,
+  formatUhrzeitMitTag,
   taktischeUhrzeit,
   taktischeDtg,
   taktischeDtgVoll,
@@ -127,6 +128,27 @@ describe('formatUhrzeit', () => {
 
   it('fällt bei ungültiger Zone auf lokale Zeit zurück statt zu werfen', () => {
     expect(() => formatUhrzeit('2026-06-11 09:00:00', { zeitzone: 'Europe/Brelin' })).not.toThrow();
+  });
+});
+
+describe('formatUhrzeitMitTag', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('zeigt nur die Uhrzeit, wenn der Zeitpunkt heute liegt (in der Anzeigezone)', () => {
+    // Systemzeit 22:00 Berlin am 11.06. — derselbe Tag wie der Wirestring unten.
+    vi.setSystemTime(new Date('2026-06-11T20:00:00Z'));
+    expect(formatUhrzeitMitTag('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('11:00');
+  });
+
+  it('stellt den Tag voran, wenn der Zeitpunkt nicht heute liegt (in der Anzeigezone)', () => {
+    // Systemzeit 08:00 Berlin am 12.06. — ein Tag nach dem Wirestring unten.
+    vi.setSystemTime(new Date('2026-06-12T06:00:00Z'));
+    expect(formatUhrzeitMitTag('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('11. 11:00');
+  });
+
+  it('liefert den Leerstrich, wenn nichts da ist', () => {
+    expect(formatUhrzeitMitTag(null)).toBe('——:——');
+    expect(formatUhrzeitMitTag(undefined)).toBe('——:——');
   });
 });
 
