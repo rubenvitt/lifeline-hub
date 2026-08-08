@@ -417,16 +417,71 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
 
   it('die Suche filtert über Bezeichnung, Ort und Stichwort', async () => {
     const nutzer = userEvent.setup();
-    mockEinsaetze(
-      Array.from({ length: 9 }, (_, i) =>
-        e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}`, einsatzort: i === 0 ? 'Deichweg' : 'Sonstwo' }),
+    // Je EIN Fall pro Feld mit einem eindeutigen Treffer — vorher trugen alle
+    // Fixtures dasselbe Stichwort und schematische Bezeichnungen, sodass ein
+    // Treffer allein über Bezeichnung oder Stichwort nie belegt war (Task-5-Review,
+    // Finding 3: Testname behauptete mehr, als der Testkörper prüfte).
+    mockEinsaetze([
+      e({ id: 1, bezeichnung: 'Hochwasser Nordkreuz', einsatzort: 'Sonstwo', stichwort: 'THW' }),
+      e({ id: 2, bezeichnung: 'Einsatz Zwei', einsatzort: 'Deichweg 7', stichwort: 'THW' }),
+      e({ id: 3, bezeichnung: 'Einsatz Drei', einsatzort: 'Sonstwo', stichwort: 'MANV' }),
+      ...Array.from({ length: 6 }, (_, i) =>
+        e({ id: i + 4, bezeichnung: `Einsatz ${i + 4}`, einsatzort: 'Sonstwo', stichwort: 'THW' }),
       ),
+    ]);
+    render();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+
+    // Treffer über die BEZEICHNUNG.
+    await nutzer.type(feld, 'Nordkreuz');
+    expect(screen.getByText('Hochwasser Nordkreuz')).toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Zwei')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Drei')).not.toBeInTheDocument();
+
+    // Treffer über den ORT.
+    await nutzer.clear(feld);
+    await nutzer.type(feld, 'Deichweg');
+    expect(screen.getByText('Einsatz Zwei')).toBeInTheDocument();
+    expect(screen.queryByText('Hochwasser Nordkreuz')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Drei')).not.toBeInTheDocument();
+
+    // Treffer über das STICHWORT.
+    await nutzer.clear(feld);
+    await nutzer.type(feld, 'MANV');
+    expect(screen.getByText('Einsatz Drei')).toBeInTheDocument();
+    expect(screen.queryByText('Hochwasser Nordkreuz')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Zwei')).not.toBeInTheDocument();
+  });
+
+  it('bei leergefilterter Suche erscheint ein Hinweis, der den Suchbegriff nennt', async () => {
+    // Finding 1: `leer` (Zeile 215) beruht auf `aktive`, nicht auf `sichtbareAktive`
+    // — filtert die Suche ALLE aktiven Einsätze weg, blieb die Fläche bisher stumm
+    // (nur der „Neuer Einsatz"-Knopf oder gar nichts), statt eine dritte Sorte
+    // Leerzustand zu zeigen.
+    const nutzer = userEvent.setup();
+    mockEinsaetze(
+      Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
     );
     render();
     const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
-    await nutzer.type(feld, 'Deichweg');
+    await nutzer.type(feld, 'kein-treffer-xyz');
+    expect(await screen.findByText(/Keine Treffer/)).toBeInTheDocument();
+    expect(screen.getByText(/kein-treffer-xyz/)).toBeInTheDocument();
+    // Unterscheidbar vom „gar keine Einsätze"-Zustand — der träte hier nie auf, weil
+    // Einsätze vorhanden sind, nur eben weggefiltert.
+    expect(screen.queryByText('Keine Einsätze')).not.toBeInTheDocument();
+  });
+
+  it('bei mindestens einem Treffer erscheint kein „Keine Treffer"-Hinweis', async () => {
+    const nutzer = userEvent.setup();
+    mockEinsaetze(
+      Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+    );
+    render();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await nutzer.type(feld, 'Einsatz 1');
     expect(screen.getByText('Einsatz 1')).toBeInTheDocument();
-    expect(screen.queryByText('Einsatz 2')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Keine Treffer/)).not.toBeInTheDocument();
   });
 
   it('die Suche wirkt nur auf die aktiven Einsätze — Abgeschlossene bleiben unberührt', async () => {

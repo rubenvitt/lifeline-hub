@@ -164,7 +164,7 @@ export default function EinsaetzePage() {
   // sortierbar (`YYYY-MM-DD HH:mm:ss`), ein Date-Parse wäre hier überflüssig.
   const aktive = einsaetze
     .filter((e: EinsatzAnzeige) => e.status === 'aktiv')
-    .sort((a, b) => (a.begonnen_at < b.begonnen_at ? 1 : -1));
+    .sort((a, b) => (a.begonnen_at === b.begonnen_at ? 0 : a.begonnen_at < b.begonnen_at ? 1 : -1));
   const abgeschlossene = einsaetze.filter((e: EinsatzAnzeige) => e.status === 'abgeschlossen');
 
   const suchbegriff = suche.trim().toLowerCase();
@@ -175,6 +175,11 @@ export default function EinsaetzePage() {
     );
   const sichtbareAktive = aktive.filter(passt);
   const sucheZeigen = aktive.length >= SUCHE_AB;
+  // Dritte Sorte stummer Fläche neben „lädt" und „keine Einsätze überhaupt" (Ticket-Leitmotiv:
+  // „Fehler sieht aus wie leer" darf hier nicht wiederkehren): filtert die Suche ALLE aktiven
+  // Einsätze weg, ist `leer` unten weiterhin false (es GIBT ja Einsätze), das Raster zeigte ohne
+  // diesen Zweig nur noch den „Neuer Einsatz"-Knopf oder gar nichts.
+  const keineTreffer = sucheZeigen && suchbegriff !== '' && sichtbareAktive.length === 0;
 
   const renderKarte = (e: EinsatzAnzeige, klein = false) => (
     <Card
@@ -254,6 +259,16 @@ export default function EinsaetzePage() {
             value={suche}
             onChange={(ev) => setSuche(ev.target.value)}
           />
+        </div>
+      )}
+
+      {/* Dritter Zustand neben „lädt" und „gar keine Einsätze" — eine dritte Sorte
+          stummer Fläche wäre genau das, wogegen dieses Ticket antritt (M4/M5). KEINE
+          Primäraktion (LFH-331 · B3): der Weg heraus ist das `allowClear` am Suchfeld
+          unmittelbar darüber, ein zweiter Knopf machte jede Abfrage darauf mehrdeutig. */}
+      {!isPending && keineTreffer && (
+        <div style={{ marginBottom: abstand.lg }}>
+          <SeitenLeer titel={`Keine Treffer für „${suche.trim()}"`} />
         </div>
       )}
 
