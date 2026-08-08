@@ -454,7 +454,8 @@
   font-size: 13px;
 }
 
-.lfh-zeile:first-child {
+.lfh-zeilen > .lfh-zeile:first-child,
+.lfh-zeilen > li:first-child > .lfh-zeile {
   border-top: 0;
 }
 
@@ -478,6 +479,42 @@
   font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+/* Eine Kurzlisten-Zeile, die auf ihren Datensatz springt (LFH-336).
+   Trägt `.lfh-zeile` und damit deren Boden (`--lfh-zeilenhoehe`) und Polsterung —
+   die zwei Angaben, die LFH-365 einem Bedienziel abverlangt, kommen aus der
+   Basisklasse und werden hier NICHT wiederholt. */
+a.lfh-zeile {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.lfh-zeile:hover,
+a.lfh-zeile:focus-visible {
+  background: var(--lfh-flaeche-2);
+}
+
+/* Die laufende Nummer ist ein Ordnungsmerkmal, kein Fließtext — Ziffernbreite
+   fest, damit die Textspalte über alle Zeilen an derselben Stelle beginnt. */
+.lfh-zeile__nr {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--lfh-schwach);
+  font-size: 12px;
+}
+
+/* Der Lageauszug ist Fließtext, nicht Instrument: er darf umbrechen, aber nicht
+   die Kachel sprengen. */
+.lfh-auszug {
+  margin: var(--lfh-luft-1) 0 0;
+  color: var(--lfh-gedaempft);
+  font-size: 13px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 /* ── Datenzustände: LADEN, FEHLER und LEER sehen verschieden aus ───────────

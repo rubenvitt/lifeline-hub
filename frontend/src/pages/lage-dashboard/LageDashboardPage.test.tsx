@@ -12,6 +12,8 @@ import { warnstufeKennzahl } from '../../theme/statusFarben';
 import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, Meldung } from '../../api/types';
+import { uhrzeit } from './lagebild';
+import { formatUhrzeitMitTag } from '../../anzeige/format';
 
 class FakeEventSource {
   url: string;
@@ -259,7 +261,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
   it('Leerzustand führt zu einer Aktion, statt nur leer zu sein', async () => {
     mockEndpunkte({});
     render();
-    expect(await screen.findByText('Keine Aufträge erteilt.')).toBeInTheDocument();
+    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Auftrag erteilen' })).toBeInTheDocument();
     expect(screen.getByText('Noch keine Personen erfasst.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Person aufnehmen' })).toBeInTheDocument();
@@ -303,6 +305,115 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     expect(offen).toHaveTextContent('3');
     const neu = screen.getByText('Neu').closest('div');
     expect(neu).toHaveTextContent('1');
+  });
+
+  // AK2 (LFH-336): Der Zähler bleibt, aber er sagt nicht, WAS los ist. Geprüft
+  // wird der Inhalt der Zeile UND ihr Sprungziel — eine Zeile ohne Ziel wäre
+  // wieder nur Text auf einer Kachel.
+  it('Meldungen: die Kurzliste nennt lfd. Nummer, Zeit, Absender und Inhalt', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      meldungen: [
+        meldung({ id: 77, lfd_nr: 12, absender: 'ELW 1', inhalt: 'Strom ausgefallen', ereigniszeit: '2026-06-11 14:05:00' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const zeile = await screen.findByRole('link', { name: /Strom ausgefallen/ });
+    expect(zeile).toHaveTextContent('12');
+    // `uhrzeit()` rechnet den UTC-Wirestring in die Anzeigezone um (siehe
+    // `lagebild.ts`) — die Erwartung darf deshalb nicht von der Maschinen-TZ
+    // abhängen und wird über dieselbe Funktion berechnet wie die Seite selbst.
+    expect(zeile).toHaveTextContent(uhrzeit('2026-06-11 14:05:00'));
+    expect(zeile).toHaveTextContent('ELW 1');
+    expect(zeile).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=77');
+  });
+
+  it('Aufträge: die Kurzliste nennt Auftragstext und Frist und springt auf den Auftrag', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 88, lfd_nr: 4, auftrag_text: 'Pumpe an Deich 3 setzen', frist_at: '2026-06-11 16:30:00' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const zeile = await screen.findByRole('link', { name: /Pumpe an Deich 3 setzen/ });
+    // `formatUhrzeitMitTag()` rechnet den UTC-Wirestring in die Anzeigezone um und
+    // stellt den Tag voran, wenn die Frist nicht auf den heutigen Tag fällt —
+    // dieselbe Funktion wie in `lagebild.ts`, damit die Erwartung nicht von
+    // Maschinen-TZ oder Testlaufdatum abhängt.
+    expect(zeile).toHaveTextContent(formatUhrzeitMitTag('2026-06-11 16:30:00'));
+    expect(zeile).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=88');
+  });
+
+  // Die zweite Hälfte von AK2: ohne sie wäre „mindestens eine Zeile" auch dann
+  // erfüllt, wenn der Leerzustand genauso aussieht.
+  it('ohne Aufträge zeigt die Kachel den Leerzustand und KEINE Zeile', async () => {
+    mockEndpunkte({ personen: [person('sk3')], auftraege: [] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Auftrag/ })).not.toBeInTheDocument();
+  });
+
+  // DER FALL, DER OHNE DIESEN TEST DURCHRUTSCHT. `leer` hing am ROHEN Response,
+  // die Zeilen am gefilterten. Drei vollzogene Aufträge hießen also: nicht leer,
+  // aber auch keine Zeile — die Kachel zeigte einen leeren Kasten. Ein Test mit
+  // `auftraege: []` erfüllt sich am trivialen Fall und sieht das nicht.
+  it('sind alle Aufträge vollzogen, zeigt die Kachel den Leerzustand statt eines leeren Kastens', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 1, lfd_nr: 1, bearbeitungsstatus: 'vollzogen' }),
+        auftrag({ id: 2, lfd_nr: 2, bearbeitungsstatus: 'abgenommen' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
+  });
+
+  it('sind alle Meldungen erledigt, zeigt die Kachel den Leerzustand', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      meldungen: [meldung({ id: 1, lfd_nr: 1, ist_offen: false, status: 'erledigt' })],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(await screen.findByText('Keine offenen Meldungen.')).toBeInTheDocument();
+  });
+
+  it('die Kurzliste der Aufträge zeigt die fristnächsten zuerst', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 1, lfd_nr: 1, auftrag_text: 'Spaet', frist_at: '2026-06-11 20:00:00' }),
+        auftrag({ id: 2, lfd_nr: 2, auftrag_text: 'Frueh', frist_at: '2026-06-11 10:00:00' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const zeilen = await screen.findAllByRole('link', { name: /Frueh|Spaet/ });
+    expect(zeilen[0]).toHaveTextContent('Frueh');
+  });
+
+  it('der Lagebericht zeigt einen Auszug der Lage, nicht nur Titel und Status', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      lageberichte: [
+        {
+          id: 3, einsatz_id: 1, titel: 'Lage 14:00', status: 'freigegeben',
+          zeitstand: '2026-06-11 14:00:00', ersteller_id: 1, ersteller_name: 'Muster',
+          erstellt_at: '2026-06-11 14:00:00', aktualisiert_at: '2026-06-11 14:00:00',
+          version: 1, vorlage: 'lagebericht',
+          abschnitte: [{ schluessel: 'gefahren_schadenlage', text: 'Pegel bei 6,20 m, weiter steigend.' }],
+        },
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(await screen.findByText(/Pegel bei 6,20 m/)).toBeInTheDocument();
   });
 
   it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt „?", nicht „0"', async () => {
@@ -652,6 +763,20 @@ describe('Die Kennzahlenleiste in sprache.css', () => {
 
     // Und die Grundgröße der Kennzahl ist unbedingt — genau ein `font-size`.
     expect(regel('.lfh-zahl--gross {').match(/font-size/g)).toHaveLength(1);
+  });
+
+  it('die erste Zeile verliert ihre Trennlinie in BEIDEN Bauformen — aber NICHT jede Zeile', () => {
+    // Der `<li>`-Wrapper macht `<a class="lfh-zeile">` zum EINZIGEN Kind seines
+    // `<li>` und damit selbst zu dessen `:first-child`. Ein UNSKOPIERTES
+    // `.lfh-zeile:first-child` träfe dadurch JEDE Zeile, nicht nur die erste der
+    // Liste — genau der Rückfall, den die Erweiterung vermeiden soll. Beide Arme
+    // müssen deshalb an `.lfh-zeilen >` verankert sein.
+    expect(css).toContain('.lfh-zeilen > .lfh-zeile:first-child');
+    expect(css).toContain('.lfh-zeilen > li:first-child > .lfh-zeile');
+    expect(
+      css,
+      'ein unskopiertes .lfh-zeile:first-child träfe jede Zeile im <li>-Wrapper',
+    ).not.toMatch(/^\.lfh-zeile:first-child/m);
   });
 });
 

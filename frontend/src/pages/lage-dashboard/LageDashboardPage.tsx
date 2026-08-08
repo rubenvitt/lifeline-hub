@@ -20,7 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
-import { einsatzModulPfad } from '../../routing/deeplinks';
+import { auftraegePfad, einsatzModulPfad, meldungenPfad } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
 import type { LiveVerbindungsStatus } from '../../live/useEinsatzLiveStream';
 import { ladeEinsatz } from '../../api/einsaetze';
@@ -523,14 +523,17 @@ export default function LageDashboardPage() {
               <span className="lfh-zahl">{lagebild?.bericht?.stand}</span>
             </p>
             <p className="lfh-fussnote">von {lagebild?.bericht?.von}</p>
+            {lagebild?.bericht?.auszug && (
+              <p className="lfh-auszug">{lagebild.bericht.auszug}</p>
+            )}
           </Kachel>
 
           <Kachel
             titel="Aufträge / Befehle"
             mehr="Auftragsliste"
             zustand={zAuftraege}
-            leer={(auftraegeQuery.data ?? []).length === 0}
-            leerText="Keine Aufträge erteilt."
+            leer={(lagebild?.auftragszeilen ?? []).length === 0}
+            leerText="Keine offenen Aufträge."
             leerAktion="Auftrag erteilen"
             aufMehr={() => gehe('auftraege')}
             aufNeuladen={() => void auftraegeQuery.refetch()}
@@ -542,14 +545,28 @@ export default function LageDashboardPage() {
                 <Plakette stufe="alarm">{lagebild?.auftraegeUeberfaellig} überfällig</Plakette>
               </p>
             )}
+            {/* Die drei fristnächsten — der Zähler sagt WIE VIELE, die Zeilen WAS.
+                Jede springt auf die Selektion im Auftragsmodul (LFH-25). */}
+            <ul className="lfh-zeilen">
+              {(lagebild?.auftragszeilen ?? []).map((z) => (
+                <li key={z.id}>
+                  <Link className="lfh-zeile" to={auftraegePfad(einsatzId, { auftrag: z.id })}>
+                    <span className={`lfh-zeichen lfh-zeichen--${z.stufe}`} aria-hidden="true" />
+                    {z.lfdNr != null && <span className="lfh-zeile__nr">{z.lfdNr}</span>}
+                    <span className="lfh-zeile__text">{z.text}</span>
+                    {z.frist && <time className="lfh-zahl">{z.frist}</time>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Kachel>
 
           <Kachel
             titel="Meldungen (eingehend)"
             mehr="Meldebuch"
             zustand={zMeldungen}
-            leer={(meldungenQuery.data ?? []).length === 0}
-            leerText="Keine Meldungen eingegangen."
+            leer={(lagebild?.meldungszeilen ?? []).length === 0}
+            leerText="Keine offenen Meldungen."
             leerAktion="Meldung erfassen"
             aufMehr={() => gehe('meldungen')}
             aufNeuladen={() => void meldungenQuery.refetch()}
@@ -571,12 +588,15 @@ export default function LageDashboardPage() {
               )}
             </div>
             <ul className="lfh-zeilen">
-              {(lagebild?.ereignisse ?? []).map((e, i) => (
-                <li className="lfh-zeile" key={`${e.zeit}-${i}`}>
-                  <span className={`lfh-zeichen lfh-zeichen--${e.stufe}`} aria-hidden="true" />
-                  <time className="lfh-zahl">{e.zeit}</time>
-                  <span className="lfh-zeile__text">{e.text}</span>
-                  <span className="lfh-zeile__quelle">{e.von}</span>
+              {(lagebild?.meldungszeilen ?? []).map((z) => (
+                <li key={z.id}>
+                  <Link className="lfh-zeile" to={meldungenPfad(einsatzId, { meldung: z.id })}>
+                    <span className={`lfh-zeichen lfh-zeichen--${z.stufe}`} aria-hidden="true" />
+                    <span className="lfh-zeile__nr">{z.lfdNr}</span>
+                    <time className="lfh-zahl">{z.zeit}</time>
+                    <span className="lfh-zeile__text">{z.text}</span>
+                    <span className="lfh-zeile__quelle">{z.absender}</span>
+                  </Link>
                 </li>
               ))}
             </ul>
