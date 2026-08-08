@@ -352,6 +352,12 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     mockEinsaetze([e({ einsatzort: 'Musterstadt, Deichweg 3' })]);
     render();
     expect(await screen.findByText(/Musterstadt, Deichweg 3/)).toBeInTheDocument();
+    // Positiv gegen den Testid, nicht nur gegen den Text: die negative Prüfung
+    // weiter unten („ohne Einsatzort … nicht im Dokument") wäre sonst immer grün,
+    // auch wenn `data-testid="einsatz-ort"` nie im DOM ankäme (antds
+    // `Typography.Text` reicht unbekannte Props zwar durch, das ist hier aber nicht
+    // unterstellt, sondern belegt).
+    expect(screen.getByTestId('einsatz-ort')).toHaveTextContent('Musterstadt, Deichweg 3');
   });
 
   it('die Karte nennt einen aus begonnen_at abgeleiteten Zeitstand', async () => {
@@ -421,6 +427,24 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     await nutzer.type(feld, 'Deichweg');
     expect(screen.getByText('Einsatz 1')).toBeInTheDocument();
     expect(screen.queryByText('Einsatz 2')).not.toBeInTheDocument();
+  });
+
+  it('die Suche wirkt nur auf die aktiven Einsätze — Abgeschlossene bleiben unberührt', async () => {
+    const nutzer = userEvent.setup();
+    mockEinsaetze([
+      ...Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+      e({ id: 100, bezeichnung: 'Alter Einsatz', status: 'abgeschlossen' }),
+    ]);
+    render();
+    await screen.findByText('Alter Einsatz');
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    // Suchbegriff trifft weder auf einen aktiven noch auf den abgeschlossenen
+    // Einsatz — die aktive Sektion muss leerlaufen, die abgeschlossene bleibt
+    // trotzdem stehen. Filterte `sichtbareAktive` versehentlich auch die
+    // abgeschlossene Sektion, verschwände „Alter Einsatz" hier mit.
+    await nutzer.type(feld, 'kein-treffer');
+    expect(screen.queryByText('Einsatz 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Alter Einsatz')).toBeInTheDocument();
   });
 
   // AK4. Der Titel ist schon ein `<Link>` — der Test hält diese Eigenschaft fest,
