@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Checkbox, Space, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Checkbox, Space, theme, Tooltip, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -72,6 +72,7 @@ export default function Schnellerfassung({
   werteBehalten = false, onWerteBehaltenChange,
 }: Props) {
   const navigate = useNavigate();
+  const { token } = theme.useToken();
   const textRef = useRef<TextAreaRef>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
@@ -358,7 +359,11 @@ export default function Schnellerfassung({
             Als strukturierten Lagebericht erfassen →
           </Button>
         )}
-        <Typography.Text type="secondary" style={{ marginLeft: 'auto', fontSize: 'smaller' }}>
+        {/* Kein `marginLeft: 'auto'`: `Space` legt jedes Kind in ein eigenes
+            `.ant-space-item`, der Schub ginge also ins Leere. Der Hinweis steht
+            deshalb schlicht hinter den Aktionen und rutscht auf schmalem Schirm
+            per `wrap` in die nächste Zeile. */}
+        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
           {ENTER_HINWEIS}
         </Typography.Text>
       </Space>
