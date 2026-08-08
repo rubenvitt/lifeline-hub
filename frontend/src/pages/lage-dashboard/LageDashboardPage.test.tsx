@@ -9,6 +9,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
+import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, Meldung } from '../../api/types';
 
@@ -26,6 +27,7 @@ class FakeEventSource {
 }
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
+afterEach(() => setzeLiveStatusFuerTest('idle'));
 
 const einsatz = {
   id: 1,
@@ -471,6 +473,35 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe(
       'Hochwasser Musterstadt',
     );
+  });
+
+  // AK1 (LFH-336): der frühere `<Tag color="blue">Live</Tag>` war statisch; sein
+  // Nachfolger im Band hing an QUERY-Fehlern und meldete bei totem SSE weiter
+  // „Live verbunden". Beide Zweige gehören geprüft — nur der Abriss-Zweig allein
+  // wäre auch dann grün, wenn das Band NIE „Live" sagt.
+  it('das Band meldet die Live-Verbindung, solange sie steht', async () => {
+    setzeLiveStatusFuerTest('open');
+    mockEndpunkte({ personen: [person('sk3')] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.getByText('Live verbunden')).toBeInTheDocument();
+  });
+
+  it('bei abgerissener Live-Verbindung meldet das Band NICHT „Live"', async () => {
+    setzeLiveStatusFuerTest('lost');
+    mockEndpunkte({ personen: [person('sk3')] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.queryByText('Live verbunden')).not.toBeInTheDocument();
+    expect(screen.getByText('Verbindung unterbrochen')).toBeInTheDocument();
+  });
+
+  it('während des Wiederverbindens meldet das Band den Zwischenstand', async () => {
+    setzeLiveStatusFuerTest('connecting');
+    mockEndpunkte({ personen: [person('sk3')] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.getByText('Verbindung wird aufgebaut')).toBeInTheDocument();
   });
 
   /**

@@ -15,12 +15,14 @@
  * Deshalb hängt jede Kachel an ihren eigenen Queries und unterscheidet
  * `lädt` / `Fehler` / `leer` sichtbar.
  */
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
 import { einsatzModulPfad } from '../../routing/deeplinks';
+import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
+import type { LiveVerbindungsStatus } from '../../live/useEinsatzLiveStream';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeTiere } from '../../api/einsatzTier';
@@ -57,6 +59,24 @@ function zustandVon(...queries: UseQueryResult<unknown>[]): Datenzustand {
  * nichts", gegen die dieses Ticket antritt.
  */
 const LADETEXT = 'wird abgerufen';
+
+/**
+ * Wortlaut je Verbindungszustand.
+ *
+ * `Record` über die volle {@link LiveVerbindungsStatus}-Union, damit eine fünfte
+ * Variante hier den Build bricht statt still auf einen Vorgabetext zu fallen.
+ *
+ * `idle` heißt „noch keine Meldung" und nicht „gestört" — vor dem ersten
+ * Stream-Ereignis wäre eine Störungsmeldung eine Falschaussage in die andere
+ * Richtung. Es trägt deshalb denselben Wortlaut wie `open`; der Puls schlägt in
+ * beiden Fällen ruhig, alarmiert wird nur bei `lost`.
+ */
+const VERBINDUNG_WORTLAUT: Record<LiveVerbindungsStatus, string> = {
+  idle: 'Live verbunden',
+  open: 'Live verbunden',
+  connecting: 'Verbindung wird aufgebaut',
+  lost: 'Verbindung unterbrochen',
+};
 
 /**
  * Die sechs Kennzahl-Etiketten, in der Reihenfolge aus `lagebild.ts`.
@@ -147,6 +167,13 @@ export default function LageDashboardPage() {
   const einsatzId = Number(id);
   const navigate = useNavigate();
   const gehe = (route: string) => navigate(einsatzModulPfad(einsatzId, route));
+
+  // Der Verbindungszustand kommt aus DERSELBEN Quelle wie die globale
+  // Betriebszeile (LFH-336 · M3). Vorher stand hier eine Ableitung aus
+  // Query-Fehlern — die meldete bei totem SSE weiter „Live verbunden", weil ein
+  // abgerissener Stream keine Abfrage rot färbt: der Cache liefert brav die alten
+  // Daten. Genau das ist der Zustand, in dem jemand eine veraltete Lage funkt.
+  const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -273,18 +300,6 @@ export default function LageDashboardPage() {
     zustandVon(schaedenQuery),
     zustandVon(uhsQuery),
   ];
-  // Der Verbindungszustand im Band spricht für die ganze Seite.
-  const zGesamt: Datenzustand = [
-    zBetroffene,
-    zKraefte,
-    zInfra,
-    zBericht,
-    zAuftraege,
-    zMeldungen,
-    zustandVon(gefahrenQuery),
-  ].includes('fehler')
-    ? 'fehler'
-    : 'daten';
 
   if (einsatzQuery.isError || (!einsatzQuery.isLoading && !einsatz)) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -324,12 +339,10 @@ export default function LageDashboardPage() {
           </div>
           <div className="lfh-band__verbindung">
             <span
-              className={`lfh-puls${zGesamt === 'fehler' ? ' lfh-puls--alarm' : ''}`}
+              className={`lfh-puls${liveStatus === 'lost' ? ' lfh-puls--alarm' : ''}`}
               aria-hidden="true"
             />
-            <span className="lfh-etikett">
-              {zGesamt === 'fehler' ? 'Verbindung gestört' : 'Live verbunden'}
-            </span>
+            <span className="lfh-etikett">{VERBINDUNG_WORTLAUT[liveStatus]}</span>
           </div>
         </header>
 
