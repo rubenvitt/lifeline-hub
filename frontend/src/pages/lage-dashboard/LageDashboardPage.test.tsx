@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { delay, http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -351,11 +351,18 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
   // Die zweite Hälfte von AK2: ohne sie wäre „mindestens eine Zeile" auch dann
   // erfüllt, wenn der Leerzustand genauso aussieht.
   it('ohne Aufträge zeigt die Kachel den Leerzustand und KEINE Zeile', async () => {
+    // Befund M8 (Abschluss-Review): der zugängliche Name einer Zeile ist ihr
+    // Inhalt (lfd. Nr. + Auftragstext + Frist) — eine Regex auf /Auftrag/ träfe
+    // z. B. `auftrag_text: 'Deich sichern'` nie und wäre auch dann grün gewesen,
+    // wenn Zeilen gerendert würden. Geprüft wird deshalb, dass innerhalb DIESER
+    // Kachel (gescopt über den Leertext) gar kein Link steht.
     mockEndpunkte({ personen: [person('sk3')], auftraege: [] });
     render();
     await kennzahlGeladen('Vermisst');
-    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Auftrag/ })).not.toBeInTheDocument();
+    const leerText = await screen.findByText('Keine offenen Aufträge.');
+    const kachel = leerText.closest('section.lfh-kachel');
+    if (kachel == null) throw new Error('Aufträge-Kachel nicht gefunden');
+    expect(within(kachel).queryAllByRole('link')).toHaveLength(0);
   });
 
   // DER FALL, DER OHNE DIESEN TEST DURCHRUTSCHT. `leer` hing am ROHEN Response,
