@@ -1,7 +1,7 @@
 import { App, AutoComplete, Button, Card, DatePicker, Form, Input, Space, Tag, Typography } from 'antd';
 import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige, EinsatzStatus } from '../api/types';
@@ -175,6 +175,23 @@ export default function EinsaetzePage() {
     );
   const sichtbareAktive = aktive.filter(passt);
   const sucheZeigen = aktive.length >= SUCHE_AB;
+
+  // Befund M6 (Abschluss-Review): fällt die Zahl aktiver Einsätze unter SUCHE_AB,
+  // während ein Suchbegriff im Zustand steht (react-query lädt bei Fensterfokus neu
+  // — `refetchOnWindowFocus` ist nicht abgeschaltet), verschwand bisher das Suchfeld
+  // samt `allowClear`, der Filter wirkte aber unbeirrt weiter — Sackgasse: leeres
+  // Raster, kein Hinweis, kein Ausweg. Gewählter Fix: `suche` wird zurückgesetzt,
+  // sobald das Feld selbst verschwindet — NICHT die Alternative „keineTreffer von
+  // sucheZeigen entkoppeln", denn die hätte nur den Hinweistext zurückgebracht, aber
+  // weiterhin keinen Ausweg (das `allowClear` steht ja am unsichtbaren Feld). Ein
+  // zurückgesetzter Suchbegriff macht die Sackgasse ganz zu: der Filter wirkt nicht
+  // mehr, das Raster zeigt wieder alle aktiven Einsätze.
+  useEffect(() => {
+    if (!sucheZeigen && suche !== '') {
+      setSuche('');
+    }
+  }, [sucheZeigen, suche]);
+
   // Dritte Sorte stummer Fläche neben „lädt" und „keine Einsätze überhaupt" (Ticket-Leitmotiv:
   // „Fehler sieht aus wie leer" darf hier nicht wiederkehren): filtert die Suche ALLE aktiven
   // Einsätze weg, ist `leer` unten weiterhin false (es GIBT ja Einsätze), das Raster zeigte ohne

@@ -8,6 +8,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { formatZeitKurz } from '../anzeige/format';
 import type { EinsatzAnzeige } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 import EinsaetzePage from './EinsaetzePage';
 
 const admin = {
@@ -500,6 +501,44 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     await nutzer.type(feld, 'kein-treffer');
     expect(screen.queryByText('Einsatz 1')).not.toBeInTheDocument();
     expect(screen.getByText('Alter Einsatz')).toBeInTheDocument();
+  });
+
+  it('fällt die Zahl aktiver Einsätze unter die Schwelle, bleibt kein leeres Raster ohne Ausweg stehen (M6)', async () => {
+    // Befund M6: sichtbareAktive filtert UNBEDINGT, das Suchfeld erscheint nur ab
+    // SUCHE_AB, und keineTreffer verlangt zusätzlich sucheZeigen. Fällt die Zahl
+    // aktiver Einsätze unter die Schwelle — hier durch einen Refetch, wie ihn
+    // `refetchOnWindowFocus` (Vorgabewert true, nicht abgeschaltet) jederzeit
+    // auslösen kann —, während ein nicht passender Suchbegriff im Zustand steht,
+    // verschwindet das Feld samt allowClear, der Filter wirkt weiter, und der
+    // Nulltreffer-Hinweis erscheint nicht (er hängt an sucheZeigen): ein leeres
+    // Raster ohne Erklärung und ohne Ausweg.
+    const nutzer = userEvent.setup();
+    mockEinsaetze(
+      Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+    );
+    const { client } = render();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await nutzer.type(feld, 'kein-treffer-xyz');
+    expect(await screen.findByText(/Keine Treffer/)).toBeInTheDocument();
+
+    // Die Liste schrumpft unter SUCHE_AB — der Suchbegriff trifft weiterhin nichts.
+    server.use(
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json(
+          Array.from({ length: 3 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+        ),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.einsaetze() });
+
+    // Kein Suchfeld mehr (unter der Schwelle) — trotzdem müssen die drei
+    // verbliebenen Einsätze sichtbar sein statt in einem stummen, leeren Raster
+    // ohne jede Erklärung oder jeden Ausweg zu verschwinden.
+    await waitFor(() => expect(screen.queryByRole('searchbox')).not.toBeInTheDocument());
+    expect(await screen.findByText('Einsatz 1')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz 2')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz 3')).toBeInTheDocument();
+    expect(screen.queryByText(/Keine Treffer/)).not.toBeInTheDocument();
   });
 
   // AK4. Der Titel ist schon ein `<Link>` — der Test hält diese Eigenschaft fest,
