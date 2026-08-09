@@ -1746,8 +1746,12 @@ Prüfliste Einsatztauglichkeit (Task 6).
 
 **Nicht im Umfang** — bewusst, mit Begründung:
 - **Lagebericht-Kachel: Titel/Status/Zeitstand/Ersteller** bleiben unverändert (Ticket: „bleiben").
-- **`ereignisse` im Lagebild** wird nicht entfernt, nur von der Seite nicht mehr gelesen. Es hat
-  einen eigenen, getesteten Vertrag; es zu löschen wäre ein zweiter Umbau in fremdem Testgebiet.
+- **`ereignisse` im Lagebild** wird nicht entfernt, nur von der Seite nicht mehr gelesen. Korrektur
+  aus dem Abschluss-Review (Befund M3): entgegen der ursprünglichen Annahme hier hat es NACH dem
+  Umbau keinen eigenen, getesteten Vertrag mehr — `grep -n 'reignis'
+  frontend/src/pages/lage-dashboard/lageVerdichtung.test.ts` liefert null Treffer. `ereignisse` ist
+  bewusst stehengelassene Altlast ohne Konsumenten (weder Renderer noch Test); es zu löschen wäre
+  ein zweiter Umbau in fremdem Testgebiet.
 - **`useEinsatzLiveStream`** bleibt unangetastet — siehe „Entschiedene Gabelungen".
 - **B7/B2/B3-Primitive** werden konsumiert, nicht erweitert. `components/Klickbar.tsx` existiert
   bereits; ein Hochziehen entfällt.
