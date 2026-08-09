@@ -360,7 +360,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     render();
     await kennzahlGeladen('Vermisst');
     const leerText = await screen.findByText('Keine offenen Aufträge.');
-    const kachel = leerText.closest('section.lfh-kachel');
+    const kachel = leerText.closest<HTMLElement>('section.lfh-kachel');
     if (kachel == null) throw new Error('Aufträge-Kachel nicht gefunden');
     expect(within(kachel).queryAllByRole('link')).toHaveLength(0);
   });
