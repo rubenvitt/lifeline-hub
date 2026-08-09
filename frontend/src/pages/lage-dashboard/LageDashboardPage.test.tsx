@@ -374,6 +374,26 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
   });
 
+  // I1 (LFH-336-Review): Zählung (`ist_ueberfaellig`) und Zeilenfilter
+  // (`bearbeitungsstatus`) laufen im Backend über unabhängige Kriterien
+  // (src/auftrag/repo.rs:73-76) — ein VOLLZOGENER Auftrag mit unquittiertem
+  // Empfänger und abgelaufener Frist ist trotzdem überfällig. Ohne diesen Test
+  // verschwindet die Alarm-Plakette lautlos im selben Moment, in dem der
+  // Leertext einblendet.
+  it('sind alle Aufträge vollzogen und einer davon überfällig, bleibt die Überfällig-Plakette sichtbar', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 1, lfd_nr: 1, bearbeitungsstatus: 'vollzogen', ist_ueberfaellig: true }),
+        auftrag({ id: 2, lfd_nr: 2, bearbeitungsstatus: 'abgenommen' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.queryByText('Keine offenen Aufträge.')).not.toBeInTheDocument();
+    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
+  });
+
   it('sind alle Meldungen erledigt, zeigt die Kachel den Leerzustand', async () => {
     mockEndpunkte({
       personen: [person('sk3')],
@@ -382,6 +402,23 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     render();
     await kennzahlGeladen('Vermisst');
     expect(await screen.findByText('Keine offenen Meldungen.')).toBeInTheDocument();
+  });
+
+  // I1, Meldungen-Spiegel: `ist_ueberfaellig` (bestaetigung_pflicht AND
+  // quittiert_at IS NULL AND frist <= jetzt, src/meldung/repo.rs:42-43) ist von
+  // `ist_offen`/`status` unabhängig — eine erledigte Meldung kann trotzdem
+  // überfällig sein.
+  it('sind alle Meldungen erledigt und eine davon überfällig, bleibt die Überfällig-Plakette sichtbar', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      meldungen: [
+        meldung({ id: 1, lfd_nr: 1, ist_offen: false, status: 'erledigt', ist_ueberfaellig: true }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.queryByText('Keine offenen Meldungen.')).not.toBeInTheDocument();
+    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
   });
 
   it('die Kurzliste der Aufträge zeigt die fristnächsten zuerst', async () => {

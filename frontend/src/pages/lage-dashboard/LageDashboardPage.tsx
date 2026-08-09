@@ -532,7 +532,19 @@ export default function LageDashboardPage() {
             titel="Aufträge / Befehle"
             mehr="Auftragsliste"
             zustand={zAuftraege}
-            leer={(lagebild?.auftragszeilen ?? []).length === 0}
+            // `leer` darf die Überfällig-Plakette nicht verdrängen (LFH-336-Review,
+            // I1): Zählung (`ist_ueberfaellig`) und Zeilenfilter
+            // (`bearbeitungsstatus`) laufen im Backend über unabhängige Kriterien
+            // (src/auftrag/repo.rs:73-76) — ein vollzogener Auftrag mit
+            // unquittiertem Empfänger und abgelaufener Frist ist trotzdem
+            // überfällig. `Kachel` rendert `children` (und darin die Plakette) nur
+            // bei `!leer`; deshalb koppelt `leer` hier zusätzlich an die
+            // Alarmzählung, statt sie strukturell aus `children` herauszuziehen —
+            // der kleinere Eingriff an einer Hülle, die nicht umgebaut werden soll.
+            leer={
+              (lagebild?.auftragszeilen ?? []).length === 0 &&
+              (lagebild?.auftraegeUeberfaellig ?? 0) === 0
+            }
             leerText="Keine offenen Aufträge."
             leerAktion="Auftrag erteilen"
             aufMehr={() => gehe('auftraege')}
@@ -565,7 +577,14 @@ export default function LageDashboardPage() {
             titel="Meldungen (eingehend)"
             mehr="Meldebuch"
             zustand={zMeldungen}
-            leer={(lagebild?.meldungszeilen ?? []).length === 0}
+            // Spiegelt die Aufträge-Kachel (I1): `ist_ueberfaellig`
+            // (bestaetigung_pflicht AND quittiert_at IS NULL AND frist <= jetzt,
+            // src/meldung/repo.rs:42-43) ist von `ist_offen`/`status` unabhängig —
+            // eine erledigte Meldung kann trotzdem überfällig sein.
+            leer={
+              (lagebild?.meldungszeilen ?? []).length === 0 &&
+              (lagebild?.meldungenUeberfaellig ?? 0) === 0
+            }
             leerText="Keine offenen Meldungen."
             leerAktion="Meldung erfassen"
             aufMehr={() => gehe('meldungen')}
