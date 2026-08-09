@@ -6,6 +6,9 @@ import dayjs from 'dayjs';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { formatZeitKurz } from '../anzeige/format';
+import type { EinsatzAnzeige } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 import EinsaetzePage from './EinsaetzePage';
 
 const admin = {
@@ -318,5 +321,250 @@ describe('EinsaetzePage', () => {
     // Der Leerknoten trägt KEINE eigene Aktion: die Anlegen-Kachel steht direkt
     // darunter, ein zweiter „Neuer Einsatz"-Knopf machte die Abfrage mehrdeutig.
     expect(container.querySelector('.ant-empty')).toBeNull();
+  });
+});
+
+describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () => {
+  // Eigene Fixture/Hilfen statt der Datei-Bestandshilfen `einsatz()`/`setup()`: die
+  // Bestandshilfe deckt weder `einsatzort`/`org_id`/`org_name`/`angelegt_at` noch das
+  // `/api/stichwort-vorschlaege`-Mock ab, das der Anlegedialog-Query bei jedem Mount
+  // abruft (`onUnhandledRequest: 'error'` in `test/setup.ts`).
+  function mockEinsaetze(liste: EinsatzAnzeige[]) {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json(liste)),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    );
+  }
+  function render() {
+    return renderMitProviders(<EinsaetzePage />);
+  }
+
+  const e = (over: Partial<EinsatzAnzeige>): EinsatzAnzeige =>
+    ({
+      id: 1, bezeichnung: 'Hochwasser Musterstadt', stichwort: 'TH Hochwasser',
+      status: 'aktiv', einsatzart: 'realeinsatz', begonnen_at: '2026-06-08 06:12:00',
+      angelegt_at: '2026-06-08 06:12:00', einsatzort: 'Musterstadt, Deichweg 3',
+      org_id: 1, org_name: 'THW Musterstadt', meine_rolle: 'einsatzleitung',
+      ...over,
+    }) as EinsatzAnzeige;
+
+  it('die Karte nennt den Einsatzort', async () => {
+    mockEinsaetze([e({ einsatzort: 'Musterstadt, Deichweg 3' })]);
+    render();
+    expect(await screen.findByText(/Musterstadt, Deichweg 3/)).toBeInTheDocument();
+    // Positiv gegen den Testid, nicht nur gegen den Text: die negative Prüfung
+    // weiter unten („ohne Einsatzort … nicht im Dokument") wäre sonst immer grün,
+    // auch wenn `data-testid="einsatz-ort"` nie im DOM ankäme (antds
+    // `Typography.Text` reicht unbekannte Props zwar durch, das ist hier aber nicht
+    // unterstellt, sondern belegt).
+    expect(screen.getByTestId('einsatz-ort')).toHaveTextContent('Musterstadt, Deichweg 3');
+  });
+
+  it('die Karte nennt einen aus begonnen_at abgeleiteten Zeitstand', async () => {
+    mockEinsaetze([e({ begonnen_at: '2026-06-08 06:12:00' })]);
+    render();
+    // `formatZeitKurz` liefert „0806 12" bzw. „0612" je nach Tagesbezug; geprüft
+    // wird das WORT „seit" plus der von der Funktion gelieferte Wert — die
+    // Formatierung selbst ist in `format.test.ts` geprüft und wird hier nicht
+    // zweitgeprüft (sonst stünde die Erwartung an zwei Orten).
+    const erwartet = formatZeitKurz('2026-06-08 06:12:00');
+    expect(await screen.findByText(new RegExp(`seit ${erwartet}`))).toBeInTheDocument();
+  });
+
+  it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
+    mockEinsaetze([e({ einsatzart: 'uebung' })]);
+    render();
+    expect(await screen.findByText('aktiv')).toBeInTheDocument();
+    expect(screen.getByText('Übung')).toBeInTheDocument();
+  });
+
+  it('ohne Einsatzort bleibt die Ortszeile ganz weg statt leer zu stehen', async () => {
+    mockEinsaetze([e({ einsatzort: null })]);
+    render();
+    await screen.findByText('Hochwasser Musterstadt');
+    expect(screen.queryByTestId('einsatz-ort')).not.toBeInTheDocument();
+  });
+
+  it('aktive Einsätze stehen nach Beginn absteigend — der jüngste zuerst', async () => {
+    mockEinsaetze([
+      e({ id: 1, bezeichnung: 'Alt', begonnen_at: '2026-06-01 08:00:00' }),
+      e({ id: 2, bezeichnung: 'Neu', begonnen_at: '2026-06-09 08:00:00' }),
+    ]);
+    render();
+    await screen.findByText('Alt');
+    const karten = screen.getAllByRole('link', { name: /Alt|Neu/ });
+    expect(karten[0]).toHaveTextContent('Neu');
+  });
+
+  it('bei 9 aktiven Einsätzen erscheint das Suchfeld', async () => {
+    mockEinsaetze(
+      Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+    );
+    render();
+    expect(
+      await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('bei 3 aktiven Einsätzen erscheint kein Suchfeld', async () => {
+    mockEinsaetze(
+      Array.from({ length: 3 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+    );
+    render();
+    await screen.findByText('Einsatz 1');
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  });
+
+  it('die Suche filtert über Bezeichnung, Ort und Stichwort', async () => {
+    const nutzer = userEvent.setup();
+    // Je EIN Fall pro Feld mit einem eindeutigen Treffer — vorher trugen alle
+    // Fixtures dasselbe Stichwort und schematische Bezeichnungen, sodass ein
+    // Treffer allein über Bezeichnung oder Stichwort nie belegt war (Task-5-Review,
+    // Finding 3: Testname behauptete mehr, als der Testkörper prüfte).
+    mockEinsaetze([
+      e({ id: 1, bezeichnung: 'Hochwasser Nordkreuz', einsatzort: 'Sonstwo', stichwort: 'THW' }),
+      e({ id: 2, bezeichnung: 'Einsatz Zwei', einsatzort: 'Deichweg 7', stichwort: 'THW' }),
+      e({ id: 3, bezeichnung: 'Einsatz Drei', einsatzort: 'Sonstwo', stichwort: 'MANV' }),
+      ...Array.from({ length: 6 }, (_, i) =>
+        e({ id: i + 4, bezeichnung: `Einsatz ${i + 4}`, einsatzort: 'Sonstwo', stichwort: 'THW' }),
+      ),
+    ]);
+    render();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+
+    // Treffer über die BEZEICHNUNG.
+    await nutzer.type(feld, 'Nordkreuz');
+    expect(screen.getByText('Hochwasser Nordkreuz')).toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Zwei')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Drei')).not.toBeInTheDocument();
+
+    // Treffer über den ORT.
+    await nutzer.clear(feld);
+    await nutzer.type(feld, 'Deichweg');
+    expect(screen.getByText('Einsatz Zwei')).toBeInTheDocument();
+    expect(screen.queryByText('Hochwasser Nordkreuz')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Drei')).not.toBeInTheDocument();
+
+    // Treffer über das STICHWORT.
+    await nutzer.clear(feld);
+    await nutzer.type(feld, 'MANV');
+    expect(screen.getByText('Einsatz Drei')).toBeInTheDocument();
+    expect(screen.queryByText('Hochwasser Nordkreuz')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einsatz Zwei')).not.toBeInTheDocument();
+  });
+
+  it('bei leergefilterter Suche erscheint ein Hinweis, der den Suchbegriff nennt', async () => {
+    // Finding 1: `leer` (Zeile 215) beruht auf `aktive`, nicht auf `sichtbareAktive`
+    // — filtert die Suche ALLE aktiven Einsätze weg, blieb die Fläche bisher stumm
+    // (nur der „Neuer Einsatz"-Knopf oder gar nichts), statt eine dritte Sorte
+    // Leerzustand zu zeigen.
+    const nutzer = userEvent.setup();
+    mockEinsaetze(
+      Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+    );
+    render();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await nutzer.type(feld, 'kein-treffer-xyz');
+    expect(await screen.findByText(/Keine Treffer/)).toBeInTheDocument();
+    expect(screen.getByText(/kein-treffer-xyz/)).toBeInTheDocument();
+    // Unterscheidbar vom „gar keine Einsätze"-Zustand — der träte hier nie auf, weil
+    // Einsätze vorhanden sind, nur eben weggefiltert.
+    expect(screen.queryByText('Keine Einsätze')).not.toBeInTheDocument();
+  });
+
+  it('bei mindestens einem Treffer erscheint kein „Keine Treffer"-Hinweis', async () => {
+    const nutzer = userEvent.setup();
+    mockEinsaetze(
+      Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+    );
+    render();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await nutzer.type(feld, 'Einsatz 1');
+    expect(screen.getByText('Einsatz 1')).toBeInTheDocument();
+    expect(screen.queryByText(/Keine Treffer/)).not.toBeInTheDocument();
+  });
+
+  it('die Suche wirkt nur auf die aktiven Einsätze — Abgeschlossene bleiben unberührt', async () => {
+    const nutzer = userEvent.setup();
+    mockEinsaetze([
+      ...Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+      e({ id: 100, bezeichnung: 'Alter Einsatz', status: 'abgeschlossen' }),
+    ]);
+    render();
+    await screen.findByText('Alter Einsatz');
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    // Suchbegriff trifft weder auf einen aktiven noch auf den abgeschlossenen
+    // Einsatz — die aktive Sektion muss leerlaufen, die abgeschlossene bleibt
+    // trotzdem stehen. Filterte `sichtbareAktive` versehentlich auch die
+    // abgeschlossene Sektion, verschwände „Alter Einsatz" hier mit.
+    await nutzer.type(feld, 'kein-treffer');
+    expect(screen.queryByText('Einsatz 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Alter Einsatz')).toBeInTheDocument();
+  });
+
+  it('fällt die Zahl aktiver Einsätze unter die Schwelle, bleibt kein leeres Raster ohne Ausweg stehen (M6)', async () => {
+    // Befund M6: sichtbareAktive filtert UNBEDINGT, das Suchfeld erscheint nur ab
+    // SUCHE_AB, und keineTreffer verlangt zusätzlich sucheZeigen. Fällt die Zahl
+    // aktiver Einsätze unter die Schwelle — hier durch einen Refetch, wie ihn
+    // `refetchOnWindowFocus` (Vorgabewert true, nicht abgeschaltet) jederzeit
+    // auslösen kann —, während ein nicht passender Suchbegriff im Zustand steht,
+    // verschwindet das Feld samt allowClear, der Filter wirkt weiter, und der
+    // Nulltreffer-Hinweis erscheint nicht (er hängt an sucheZeigen): ein leeres
+    // Raster ohne Erklärung und ohne Ausweg.
+    const nutzer = userEvent.setup();
+    mockEinsaetze(
+      Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+    );
+    const { client } = render();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await nutzer.type(feld, 'kein-treffer-xyz');
+    expect(await screen.findByText(/Keine Treffer/)).toBeInTheDocument();
+
+    // Die Liste schrumpft unter SUCHE_AB — der Suchbegriff trifft weiterhin nichts.
+    server.use(
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json(
+          Array.from({ length: 3 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
+        ),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.einsaetze() });
+
+    // Kein Suchfeld mehr (unter der Schwelle) — trotzdem müssen die drei
+    // verbliebenen Einsätze sichtbar sein statt in einem stummen, leeren Raster
+    // ohne jede Erklärung oder jeden Ausweg zu verschwinden.
+    await waitFor(() => expect(screen.queryByRole('searchbox')).not.toBeInTheDocument());
+    expect(await screen.findByText('Einsatz 1')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz 2')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz 3')).toBeInTheDocument();
+    expect(screen.queryByText(/Keine Treffer/)).not.toBeInTheDocument();
+  });
+
+  // AK4. Der Titel ist schon ein `<Link>` — der Test hält diese Eigenschaft fest,
+  // damit ein späterer Umbau auf ein `<div onClick>` auffliegt statt still die
+  // Tastaturbedienung zu kosten.
+  it('die Tabulatortaste erreicht die Einsatzkarte, Enter navigiert', async () => {
+    const nutzer = userEvent.setup();
+    mockEinsaetze([e({ id: 7, bezeichnung: 'Hochwasser Musterstadt' })]);
+    // Die Zielroute muss MITGERENDERT werden. `renderMitProviders` fährt einen
+    // MemoryRouter (test/utils.tsx:38) — `window.location` bewegt sich dort nie,
+    // eine Zusicherung darauf wäre rot, ohne dass die Navigation kaputt ist.
+    // Dasselbe Muster wie im Dashboard-Test (dort „PERSONEN-MODUL").
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>EINSATZ-DETAIL</div>} />
+      </Routes>,
+      { route: '/einsaetze' },
+    );
+    const karte = await screen.findByRole('link', { name: 'Hochwasser Musterstadt' });
+    // Bis zur Karte tabben, statt sie zu fokussieren: „ist per Tastatur
+    // ERREICHBAR" ist die Aussage, nicht „reagiert, wenn man sie fokussiert".
+    // Vor den Karten liegt bei Anlegerecht der „Neuer Einsatz"-Knopf.
+    for (let i = 0; i < 10 && document.activeElement !== karte; i++) await nutzer.tab();
+    expect(karte).toHaveFocus();
+    await nutzer.keyboard('{Enter}');
+    expect(await screen.findByText('EINSATZ-DETAIL')).toBeInTheDocument();
   });
 });

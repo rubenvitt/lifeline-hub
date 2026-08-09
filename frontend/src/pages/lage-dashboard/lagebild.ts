@@ -27,6 +27,12 @@ import type {
   Uhs,
   Warnstufe,
 } from '../../api/types';
+import {
+  DEFAULT_KONVENTIONEN,
+  formatUhrzeit,
+  formatUhrzeitMitTag,
+  type AnzeigeKonventionen,
+} from '../../anzeige/format';
 import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import {
@@ -80,6 +86,31 @@ export interface Ereigniszeile {
   stufe: Dringlichkeit;
 }
 
+/** Eine Meldung als Kurzlisten-Zeile des Dashboards (LFH-336 · Befund H5). */
+export interface Meldungszeile {
+  id: number;
+  lfdNr: number;
+  zeit: string;
+  absender: string;
+  text: string;
+  stufe: Dringlichkeit;
+}
+
+/** Ein Auftrag als Kurzlisten-Zeile des Dashboards (LFH-336 · Befund H5). */
+export interface Auftragszeile {
+  id: number;
+  lfdNr: number | null;
+  /** Ortszeit der Frist (`14:30`) oder `null`, wenn keine gesetzt ist. */
+  frist: string | null;
+  text: string;
+  stufe: Dringlichkeit;
+}
+
+/** Wie viele Zeilen eine Kurzliste trägt.
+ *  Drei, weil die Kachel darunter noch Kopfzahl und Fußnote hält — eine vierte
+ *  Zeile drückt die Kachelreihe auf dem 13"-Fükw-Schirm in den Umbruch. */
+const KURZLISTE_MAX = 3;
+
 export interface Kennzahl {
   etikett: string;
   wert: string;
@@ -110,7 +141,9 @@ export interface Lagebild {
   schaedenGesamt: number;
   tiereAktiv: number;
   zonen: number;
-  bericht: { titel: string; status: string; stand: string; von: string } | null;
+  bericht: { titel: string; status: string; stand: string; von: string; auszug: string | null } | null;
+  meldungszeilen: Meldungszeile[];
+  auftragszeilen: Auftragszeile[];
   auftraegeOffen: number;
   auftraegeUeberfaellig: number;
   meldungenOffen: number;
@@ -155,11 +188,118 @@ export function dtgJetzt(): string {
   return dtgKurz(new Date());
 }
 
-/** `2026-07-26 14:32:00` → `14:32`. */
-export function uhrzeit(iso: string | null | undefined): string {
-  if (!iso) return '——:——';
-  const m = /[ T](\d{2}:\d{2})/.exec(iso);
-  return m ? m[1] : '——:——';
+/** `2026-06-11 09:00:00` (UTC) → `11:00` in der Anzeigezone.
+ *
+ *  Bis LFH-336 schnitt diese Funktion die Ziffern per Regex aus dem Wirestring —
+ *  also UTC, ohne Umrechnung. Solange nur `ereignisse` und `seit` daran hingen,
+ *  fiel das niemandem auf; mit Meldungszeit und FRIST daran wäre es eine Uhr, die
+ *  zwei Stunden falsch geht, an genau der Stelle, wo jemand danach handelt. */
+export function uhrzeit(
+  iso: string | null | undefined,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  return formatUhrzeit(iso, konv);
+}
+
+/**
+ * Die jüngsten OFFENEN Meldungen als Kurzliste.
+ *
+ * Sortiert nach EREIGNISZEIT, nicht nach Eingangszeit — dieselbe Begründung wie
+ * bei `ereignisse`: im Meldebild zählt, wann es passiert ist, nicht wann es
+ * jemand eingetippt hat.
+ *
+ * Gefiltert auf `ist_offen`, weil die Kopfzahl der Kachel offene Meldungen zählt.
+ * Eine Liste, die erledigte mitzeigt, widerspräche der Zahl über ihr.
+ */
+export function meldungszeilen(
+  meldungen: Meldung[],
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): Meldungszeile[] {
+  return [...meldungen]
+    .filter((m) => m.ist_offen)
+    .sort((a, b) => (a.ereigniszeit < b.ereigniszeit ? 1 : -1))
+    .slice(0, KURZLISTE_MAX)
+    .map((m) => ({
+      id: m.id,
+      lfdNr: m.lfd_nr,
+      zeit: uhrzeit(m.ereigniszeit, konv),
+      absender: m.absender,
+      text: m.inhalt,
+      stufe: m.ist_ueberfaellig ? 'alarm' : m.status === 'neu' ? 'achtung' : 'normal',
+    }));
+}
+
+/**
+ * Die fristnächsten OFFENEN Aufträge als Kurzliste.
+ *
+ * Ein Auftrag ohne Frist sortiert ans ENDE, nicht an den Anfang. Ein leerer
+ * String verglichen sich lexikographisch vor jedes Datum — der fristlose Auftrag
+ * verdrängte dann den überfälligen aus der Dreierliste. Unbestimmt ist nicht
+ * dringend.
+ *
+ * Die Statusmenge ist dieselbe wie bei `auftraegeOffen` weiter unten: alles außer
+ * `vollzogen` und `abgenommen`.
+ *
+ * `frist` nutzt `formatUhrzeitMitTag`, NICHT `uhrzeit`/`formatUhrzeit` — eine reine
+ * `HH:mm` ist optisch nicht von „in 20 Minuten" zu „morgen früh" zu unterscheiden,
+ * und eine Frist ist der Fall, nach dem jemand handelt (LFH-336, Fix-Runde 1 zu
+ * Task 3). `meldungszeilen` oben bleibt bewusst bei `uhrzeit`: eine Meldung zeigt
+ * Vergangenes und steht als „die drei jüngsten" ohnehin im Jetzt, keine Deadline.
+ */
+export function auftragszeilen(
+  auftraege: Auftrag[],
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): Auftragszeile[] {
+  const offen = auftraege.filter(
+    (a) => a.bearbeitungsstatus !== 'vollzogen' && a.bearbeitungsstatus !== 'abgenommen',
+  );
+  return [...offen]
+    .sort((a, b) => {
+      if (!a.frist_at && !b.frist_at) return 0;
+      if (!a.frist_at) return 1;
+      if (!b.frist_at) return -1;
+      return a.frist_at < b.frist_at ? -1 : 1;
+    })
+    .slice(0, KURZLISTE_MAX)
+    .map((a) => ({
+      id: a.id,
+      lfdNr: a.lfd_nr ?? null,
+      frist: a.frist_at ? formatUhrzeitMitTag(a.frist_at, konv) : null,
+      text: a.auftrag_text,
+      stufe: a.ist_ueberfaellig ? 'alarm' : 'normal',
+    }));
+}
+
+/**
+ * Welcher Abschnitt eines Lageberichts DIE LAGE trägt — je Vorlage ein anderer.
+ *
+ * Es gibt keinen Abschnitt namens „lage" (gemessen gegen `src/lagebericht/mod.rs`,
+ * gespiegelt in `lageberichte/vorlagen.ts`). Deshalb eine Vorrangliste über alle
+ * drei Vorlagen statt einer Fallunterscheidung — die Schlüssel sind eindeutig,
+ * eine Vorlage kann keine zwei davon tragen.
+ */
+const LAGE_ABSCHNITTE = ['gefahren_schadenlage', 'beurteilung_schadenlage', 'text'] as const;
+
+/** Wie viel Lagetext die Kachel trägt. 240 Zeichen sind rund drei Zeilen auf
+ *  Kachelbreite — mehr sprengt das Raster, weniger sagt nichts. */
+const AUSZUG_MAX = 240;
+
+/**
+ * Der Lageabschnitt eines Berichts, gekürzt — oder `null`, wenn er nichts hergibt.
+ *
+ * Fällt auf den ersten nicht-leeren Abschnitt zurück: ein leerer Vorrangabschnitt
+ * darf die Kachel nicht verstummen lassen, obwohl der Bericht Inhalt hat.
+ */
+export function lageauszug(bericht: LageberichtAnzeige | null): string | null {
+  if (!bericht) return null;
+  const gefuellt = (s: string | undefined) => (s ?? '').trim().length > 0;
+  const vorrang = LAGE_ABSCHNITTE.map((k) =>
+    bericht.abschnitte.find((a) => a.schluessel === k),
+  ).find((a) => gefuellt(a?.text));
+  const gewaehlt = vorrang ?? bericht.abschnitte.find((a) => gefuellt(a.text));
+  if (!gewaehlt) return null;
+  const text = gewaehlt.text.trim();
+  return text.length > AUSZUG_MAX ? `${text.slice(0, AUSZUG_MAX)}…` : text;
 }
 
 export interface Rohdaten {
@@ -302,8 +442,11 @@ export function baueLagebild(r: Rohdaten): Lagebild {
           status: bericht.status,
           stand: bericht.zeitstand,
           von: bericht.ersteller_name,
+          auszug: lageauszug(bericht),
         }
       : null,
+    meldungszeilen: meldungszeilen(r.meldungen),
+    auftragszeilen: auftragszeilen(r.auftraege),
     auftraegeOffen,
     auftraegeUeberfaellig,
     meldungenOffen,
@@ -339,6 +482,8 @@ export function leeresLagebild(basis: Lagebild): Lagebild {
     tiereAktiv: 0,
     zonen: 0,
     bericht: null,
+    meldungszeilen: [],
+    auftragszeilen: [],
     auftraegeOffen: 0,
     auftraegeUeberfaellig: 0,
     meldungenOffen: 0,

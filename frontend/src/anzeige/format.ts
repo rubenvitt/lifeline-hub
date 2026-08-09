@@ -110,6 +110,40 @@ export function formatZeitKurz(
   return d.isSame(jetzt, 'day') ? d.format('HHmm') : d.format('DDHHmm');
 }
 
+/**
+ * Reine Uhrzeit `HH:mm` in der Anzeigezone — für Instrumente, die den Tag schon
+ * aus dem Zusammenhang kennen (Lage-Dashboard: alles vom laufenden Einsatz).
+ *
+ * Der Leerwert ist ein Leerstrich in Ziffernbreite (`——:——`) und nicht der leere
+ * String wie bei den DTG-Formatierern: er steht in einer Instrumentenspalte, und
+ * eine Lücke, die zusammenfällt, verschiebt die Zeilen daneben.
+ */
+export function formatUhrzeit(
+  utcStr?: string | null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  if (!utcStr) return '——:——';
+  return inZone(utcStr, konv).format('HH:mm');
+}
+
+/**
+ * Tagesbewusste Uhrzeit `HH:mm` (heute) bzw. `DD. HH:mm` (sonst) in der Anzeigezone —
+ * für Fristen, bei denen eine reine `HH:mm`-Angabe „in 20 Minuten" optisch nicht von
+ * „morgen früh" unterscheidet (LFH-336, Fix-Runde 1 zu Task 3, Bedenken Nr. 4).
+ *
+ * Die „heute"-Bestimmung läuft in DERSELBEN Zeitzone wie die Formatierung — sonst
+ * kippt die Tagesgrenze. Gleiches Muster wie `formatZeitKurz` oben.
+ */
+export function formatUhrzeitMitTag(
+  utcStr?: string | null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  if (!utcStr) return '——:——';
+  const d = inZone(utcStr, konv);
+  const jetzt = konv.zeitzone ? dayjs().tz(konv.zeitzone) : dayjs();
+  return d.isSame(jetzt, 'day') ? d.format('HH:mm') : d.format('DD. HH:mm');
+}
+
 /** WGS84-Koordinate → Anzeige-String je Koordinatenformat (Default: dezimal). */
 export function formatKoordinate(
   lat: number,

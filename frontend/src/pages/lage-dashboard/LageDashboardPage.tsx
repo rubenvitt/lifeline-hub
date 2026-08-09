@@ -15,11 +15,14 @@
  * Deshalb hängt jede Kachel an ihren eigenen Queries und unterscheidet
  * `lädt` / `Fehler` / `leer` sichtbar.
  */
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
+import { auftraegePfad, einsatzModulPfad, meldungenPfad } from '../../routing/deeplinks';
+import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
+import type { LiveVerbindungsStatus } from '../../live/useEinsatzLiveStream';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeTiere } from '../../api/einsatzTier';
@@ -56,6 +59,28 @@ function zustandVon(...queries: UseQueryResult<unknown>[]): Datenzustand {
  * nichts", gegen die dieses Ticket antritt.
  */
 const LADETEXT = 'wird abgerufen';
+
+/**
+ * Wortlaut je Verbindungszustand.
+ *
+ * `Record` über die volle {@link LiveVerbindungsStatus}-Union, damit eine fünfte
+ * Variante hier den Build bricht statt still auf einen Vorgabetext zu fallen.
+ *
+ * `idle` heißt „noch keine Meldung" und nicht „gestört" — vor dem ersten
+ * Stream-Ereignis wäre eine Störungsmeldung eine Falschaussage in die andere
+ * Richtung. Es trägt aber auch nicht den Wortlaut von `open`: `meldeStatus('open')`
+ * feuert erst in dessen `onopen` (`useEinsatzLiveStream.ts`), auf dieser vom
+ * Einsatz-Layout gemounteten Route kann `idle` also nur „noch nicht offen"
+ * bedeuten — dauerhaft, wenn eine Verbindung hängt, ohne zu öffnen oder zu
+ * erroren. „Live verbunden" wäre dort eine Zusage an eine Leitung, die noch
+ * nichts überträgt. Alarmiert wird weiterhin nur bei `lost`.
+ */
+const VERBINDUNG_WORTLAUT: Record<LiveVerbindungsStatus, string> = {
+  idle: 'Verbindung wird aufgebaut',
+  open: 'Live verbunden',
+  connecting: 'Verbindung wird aufgebaut',
+  lost: 'Verbindung unterbrochen',
+};
 
 /**
  * Die sechs Kennzahl-Etiketten, in der Reihenfolge aus `lagebild.ts`.
@@ -145,7 +170,14 @@ export default function LageDashboardPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  const gehe = (route: string) => navigate(`/einsaetze/${einsatzId}/${route}`);
+  const gehe = (route: string) => navigate(einsatzModulPfad(einsatzId, route));
+
+  // Der Verbindungszustand kommt aus DERSELBEN Quelle wie die globale
+  // Betriebszeile (LFH-336 · M3). Vorher stand hier eine Ableitung aus
+  // Query-Fehlern — die meldete bei totem SSE weiter „Live verbunden", weil ein
+  // abgerissener Stream keine Abfrage rot färbt: der Cache liefert brav die alten
+  // Daten. Genau das ist der Zustand, in dem jemand eine veraltete Lage funkt.
+  const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -272,18 +304,6 @@ export default function LageDashboardPage() {
     zustandVon(schaedenQuery),
     zustandVon(uhsQuery),
   ];
-  // Der Verbindungszustand im Band spricht für die ganze Seite.
-  const zGesamt: Datenzustand = [
-    zBetroffene,
-    zKraefte,
-    zInfra,
-    zBericht,
-    zAuftraege,
-    zMeldungen,
-    zustandVon(gefahrenQuery),
-  ].includes('fehler')
-    ? 'fehler'
-    : 'daten';
 
   if (einsatzQuery.isError || (!einsatzQuery.isLoading && !einsatz)) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -323,12 +343,10 @@ export default function LageDashboardPage() {
           </div>
           <div className="lfh-band__verbindung">
             <span
-              className={`lfh-puls${zGesamt === 'fehler' ? ' lfh-puls--alarm' : ''}`}
+              className={`lfh-puls${liveStatus === 'lost' ? ' lfh-puls--alarm' : ''}`}
               aria-hidden="true"
             />
-            <span className="lfh-etikett">
-              {zGesamt === 'fehler' ? 'Verbindung gestört' : 'Live verbunden'}
-            </span>
+            <span className="lfh-etikett">{VERBINDUNG_WORTLAUT[liveStatus]}</span>
           </div>
         </header>
 
@@ -493,7 +511,11 @@ export default function LageDashboardPage() {
           <Kachel
             titel="Aktueller Lagebericht"
             mehr="Berichte"
-            zustand={zBericht}
+            // `leer` zieht aus `lagebild`, das erst nach dem Einsatz-Abruf existiert
+            // (I2, LFH-336-Review) — `zustand` muss deshalb dieselbe Quelle spiegeln,
+            // sonst gilt `zustand === 'daten'` UND `leer === true` gleichzeitig,
+            // solange nur der Einsatz-Abruf noch hängt.
+            zustand={lagebild ? zBericht : 'laden'}
             leer={!lagebild?.bericht}
             leerText="Noch kein Lagebericht erstellt."
             leerAktion="Lagebericht schreiben"
@@ -509,14 +531,35 @@ export default function LageDashboardPage() {
               <span className="lfh-zahl">{lagebild?.bericht?.stand}</span>
             </p>
             <p className="lfh-fussnote">von {lagebild?.bericht?.von}</p>
+            {lagebild?.bericht?.auszug && (
+              <p className="lfh-auszug">{lagebild.bericht.auszug}</p>
+            )}
           </Kachel>
 
           <Kachel
             titel="Aufträge / Befehle"
             mehr="Auftragsliste"
-            zustand={zAuftraege}
-            leer={(auftraegeQuery.data ?? []).length === 0}
-            leerText="Keine Aufträge erteilt."
+            // `leer` zieht aus `lagebild`, das erst nach dem Einsatz-Abruf existiert
+            // (I2, LFH-336-Review) — `zustand` hing bisher NUR an `zAuftraege`
+            // (Aufträge-Query). Löst die Aufträge-Query auf, während der Einsatz-Abruf
+            // noch hängt, galt `zustand === 'daten'` UND `leer === true` gleichzeitig,
+            // und die Kachel behauptete „Keine offenen Aufträge.“, obwohl welche
+            // vorliegen.
+            zustand={lagebild ? zAuftraege : 'laden'}
+            // `leer` darf die Überfällig-Plakette nicht verdrängen (LFH-336-Review,
+            // I1): Zählung (`ist_ueberfaellig`) und Zeilenfilter
+            // (`bearbeitungsstatus`) laufen im Backend über unabhängige Kriterien
+            // (src/auftrag/repo.rs:73-76) — ein vollzogener Auftrag mit
+            // unquittiertem Empfänger und abgelaufener Frist ist trotzdem
+            // überfällig. `Kachel` rendert `children` (und darin die Plakette) nur
+            // bei `!leer`; deshalb koppelt `leer` hier zusätzlich an die
+            // Alarmzählung, statt sie strukturell aus `children` herauszuziehen —
+            // der kleinere Eingriff an einer Hülle, die nicht umgebaut werden soll.
+            leer={
+              (lagebild?.auftragszeilen ?? []).length === 0 &&
+              (lagebild?.auftraegeUeberfaellig ?? 0) === 0
+            }
+            leerText="Keine offenen Aufträge."
             leerAktion="Auftrag erteilen"
             aufMehr={() => gehe('auftraege')}
             aufNeuladen={() => void auftraegeQuery.refetch()}
@@ -528,14 +571,37 @@ export default function LageDashboardPage() {
                 <Plakette stufe="alarm">{lagebild?.auftraegeUeberfaellig} überfällig</Plakette>
               </p>
             )}
+            {/* Die drei fristnächsten — der Zähler sagt WIE VIELE, die Zeilen WAS.
+                Jede springt auf die Selektion im Auftragsmodul (LFH-25). */}
+            <ul className="lfh-zeilen">
+              {(lagebild?.auftragszeilen ?? []).map((z) => (
+                <li key={z.id}>
+                  <Link className="lfh-zeile" to={auftraegePfad(einsatzId, { auftrag: z.id })}>
+                    <span className={`lfh-zeichen lfh-zeichen--${z.stufe}`} aria-hidden="true" />
+                    {z.lfdNr != null && <span className="lfh-zeile__nr">{z.lfdNr}</span>}
+                    <span className="lfh-zeile__text">{z.text}</span>
+                    {z.frist && <time className="lfh-zahl">{z.frist}</time>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Kachel>
 
           <Kachel
             titel="Meldungen (eingehend)"
             mehr="Meldebuch"
-            zustand={zMeldungen}
-            leer={(meldungenQuery.data ?? []).length === 0}
-            leerText="Keine Meldungen eingegangen."
+            // Spiegelt die Aufträge-Kachel (I2): `zustand` hing bisher NUR an
+            // `zMeldungen`, `leer` an `lagebild` — siehe Kommentar dort.
+            zustand={lagebild ? zMeldungen : 'laden'}
+            // Spiegelt die Aufträge-Kachel (I1): `ist_ueberfaellig`
+            // (bestaetigung_pflicht AND quittiert_at IS NULL AND frist <= jetzt,
+            // src/meldung/repo.rs:42-43) ist von `ist_offen`/`status` unabhängig —
+            // eine erledigte Meldung kann trotzdem überfällig sein.
+            leer={
+              (lagebild?.meldungszeilen ?? []).length === 0 &&
+              (lagebild?.meldungenUeberfaellig ?? 0) === 0
+            }
+            leerText="Keine offenen Meldungen."
             leerAktion="Meldung erfassen"
             aufMehr={() => gehe('meldungen')}
             aufNeuladen={() => void meldungenQuery.refetch()}
@@ -557,12 +623,15 @@ export default function LageDashboardPage() {
               )}
             </div>
             <ul className="lfh-zeilen">
-              {(lagebild?.ereignisse ?? []).map((e, i) => (
-                <li className="lfh-zeile" key={`${e.zeit}-${i}`}>
-                  <span className={`lfh-zeichen lfh-zeichen--${e.stufe}`} aria-hidden="true" />
-                  <time className="lfh-zahl">{e.zeit}</time>
-                  <span className="lfh-zeile__text">{e.text}</span>
-                  <span className="lfh-zeile__quelle">{e.von}</span>
+              {(lagebild?.meldungszeilen ?? []).map((z) => (
+                <li key={z.id}>
+                  <Link className="lfh-zeile" to={meldungenPfad(einsatzId, { meldung: z.id })}>
+                    <span className={`lfh-zeichen lfh-zeichen--${z.stufe}`} aria-hidden="true" />
+                    <span className="lfh-zeile__nr">{z.lfdNr}</span>
+                    <time className="lfh-zahl">{z.zeit}</time>
+                    <span className="lfh-zeile__text">{z.text}</span>
+                    <span className="lfh-zeile__quelle">{z.absender}</span>
+                  </Link>
                 </li>
               ))}
             </ul>

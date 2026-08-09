@@ -2,15 +2,19 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { delay, http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { einsatzKeys } from '../../api/queryKeys';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
+import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, Meldung } from '../../api/types';
+import { uhrzeit } from './lagebild';
+import { formatUhrzeitMitTag } from '../../anzeige/format';
 
 class FakeEventSource {
   url: string;
@@ -26,6 +30,7 @@ class FakeEventSource {
 }
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
+afterEach(() => setzeLiveStatusFuerTest('idle'));
 
 const einsatz = {
   id: 1,
@@ -257,7 +262,7 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
   it('Leerzustand führt zu einer Aktion, statt nur leer zu sein', async () => {
     mockEndpunkte({});
     render();
-    expect(await screen.findByText('Keine Aufträge erteilt.')).toBeInTheDocument();
+    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Auftrag erteilen' })).toBeInTheDocument();
     expect(screen.getByText('Noch keine Personen erfasst.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Person aufnehmen' })).toBeInTheDocument();
@@ -301,6 +306,159 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     expect(offen).toHaveTextContent('3');
     const neu = screen.getByText('Neu').closest('div');
     expect(neu).toHaveTextContent('1');
+  });
+
+  // AK2 (LFH-336): Der Zähler bleibt, aber er sagt nicht, WAS los ist. Geprüft
+  // wird der Inhalt der Zeile UND ihr Sprungziel — eine Zeile ohne Ziel wäre
+  // wieder nur Text auf einer Kachel.
+  it('Meldungen: die Kurzliste nennt lfd. Nummer, Zeit, Absender und Inhalt', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      meldungen: [
+        meldung({ id: 77, lfd_nr: 12, absender: 'ELW 1', inhalt: 'Strom ausgefallen', ereigniszeit: '2026-06-11 14:05:00' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const zeile = await screen.findByRole('link', { name: /Strom ausgefallen/ });
+    expect(zeile).toHaveTextContent('12');
+    // `uhrzeit()` rechnet den UTC-Wirestring in die Anzeigezone um (siehe
+    // `lagebild.ts`) — die Erwartung darf deshalb nicht von der Maschinen-TZ
+    // abhängen und wird über dieselbe Funktion berechnet wie die Seite selbst.
+    expect(zeile).toHaveTextContent(uhrzeit('2026-06-11 14:05:00'));
+    expect(zeile).toHaveTextContent('ELW 1');
+    expect(zeile).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=77');
+  });
+
+  it('Aufträge: die Kurzliste nennt Auftragstext und Frist und springt auf den Auftrag', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 88, lfd_nr: 4, auftrag_text: 'Pumpe an Deich 3 setzen', frist_at: '2026-06-11 16:30:00' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const zeile = await screen.findByRole('link', { name: /Pumpe an Deich 3 setzen/ });
+    // `formatUhrzeitMitTag()` rechnet den UTC-Wirestring in die Anzeigezone um und
+    // stellt den Tag voran, wenn die Frist nicht auf den heutigen Tag fällt —
+    // dieselbe Funktion wie in `lagebild.ts`, damit die Erwartung nicht von
+    // Maschinen-TZ oder Testlaufdatum abhängt.
+    expect(zeile).toHaveTextContent(formatUhrzeitMitTag('2026-06-11 16:30:00'));
+    expect(zeile).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=88');
+  });
+
+  // Die zweite Hälfte von AK2: ohne sie wäre „mindestens eine Zeile" auch dann
+  // erfüllt, wenn der Leerzustand genauso aussieht.
+  it('ohne Aufträge zeigt die Kachel den Leerzustand und KEINE Zeile', async () => {
+    // Befund M8 (Abschluss-Review): der zugängliche Name einer Zeile ist ihr
+    // Inhalt (lfd. Nr. + Auftragstext + Frist) — eine Regex auf /Auftrag/ träfe
+    // z. B. `auftrag_text: 'Deich sichern'` nie und wäre auch dann grün gewesen,
+    // wenn Zeilen gerendert würden. Geprüft wird deshalb, dass innerhalb DIESER
+    // Kachel (gescopt über den Leertext) gar kein Link steht.
+    mockEndpunkte({ personen: [person('sk3')], auftraege: [] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const leerText = await screen.findByText('Keine offenen Aufträge.');
+    const kachel = leerText.closest<HTMLElement>('section.lfh-kachel');
+    if (kachel == null) throw new Error('Aufträge-Kachel nicht gefunden');
+    expect(within(kachel).queryAllByRole('link')).toHaveLength(0);
+  });
+
+  // DER FALL, DER OHNE DIESEN TEST DURCHRUTSCHT. `leer` hing am ROHEN Response,
+  // die Zeilen am gefilterten. Drei vollzogene Aufträge hießen also: nicht leer,
+  // aber auch keine Zeile — die Kachel zeigte einen leeren Kasten. Ein Test mit
+  // `auftraege: []` erfüllt sich am trivialen Fall und sieht das nicht.
+  it('sind alle Aufträge vollzogen, zeigt die Kachel den Leerzustand statt eines leeren Kastens', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 1, lfd_nr: 1, bearbeitungsstatus: 'vollzogen' }),
+        auftrag({ id: 2, lfd_nr: 2, bearbeitungsstatus: 'abgenommen' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
+  });
+
+  // I1 (LFH-336-Review): Zählung (`ist_ueberfaellig`) und Zeilenfilter
+  // (`bearbeitungsstatus`) laufen im Backend über unabhängige Kriterien
+  // (src/auftrag/repo.rs:73-76) — ein VOLLZOGENER Auftrag mit unquittiertem
+  // Empfänger und abgelaufener Frist ist trotzdem überfällig. Ohne diesen Test
+  // verschwindet die Alarm-Plakette lautlos im selben Moment, in dem der
+  // Leertext einblendet.
+  it('sind alle Aufträge vollzogen und einer davon überfällig, bleibt die Überfällig-Plakette sichtbar', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 1, lfd_nr: 1, bearbeitungsstatus: 'vollzogen', ist_ueberfaellig: true }),
+        auftrag({ id: 2, lfd_nr: 2, bearbeitungsstatus: 'abgenommen' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.queryByText('Keine offenen Aufträge.')).not.toBeInTheDocument();
+    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
+  });
+
+  it('sind alle Meldungen erledigt, zeigt die Kachel den Leerzustand', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      meldungen: [meldung({ id: 1, lfd_nr: 1, ist_offen: false, status: 'erledigt' })],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(await screen.findByText('Keine offenen Meldungen.')).toBeInTheDocument();
+  });
+
+  // I1, Meldungen-Spiegel: `ist_ueberfaellig` (bestaetigung_pflicht AND
+  // quittiert_at IS NULL AND frist <= jetzt, src/meldung/repo.rs:42-43) ist von
+  // `ist_offen`/`status` unabhängig — eine erledigte Meldung kann trotzdem
+  // überfällig sein.
+  it('sind alle Meldungen erledigt und eine davon überfällig, bleibt die Überfällig-Plakette sichtbar', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      meldungen: [
+        meldung({ id: 1, lfd_nr: 1, ist_offen: false, status: 'erledigt', ist_ueberfaellig: true }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.queryByText('Keine offenen Meldungen.')).not.toBeInTheDocument();
+    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
+  });
+
+  it('die Kurzliste der Aufträge zeigt die fristnächsten zuerst', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      auftraege: [
+        auftrag({ id: 1, lfd_nr: 1, auftrag_text: 'Spaet', frist_at: '2026-06-11 20:00:00' }),
+        auftrag({ id: 2, lfd_nr: 2, auftrag_text: 'Frueh', frist_at: '2026-06-11 10:00:00' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const zeilen = await screen.findAllByRole('link', { name: /Frueh|Spaet/ });
+    expect(zeilen[0]).toHaveTextContent('Frueh');
+  });
+
+  it('der Lagebericht zeigt einen Auszug der Lage, nicht nur Titel und Status', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      lageberichte: [
+        {
+          id: 3, einsatz_id: 1, titel: 'Lage 14:00', status: 'freigegeben',
+          zeitstand: '2026-06-11 14:00:00', ersteller_id: 1, ersteller_name: 'Muster',
+          erstellt_at: '2026-06-11 14:00:00', aktualisiert_at: '2026-06-11 14:00:00',
+          version: 1, vorlage: 'lagebericht',
+          abschnitte: [{ schluessel: 'gefahren_schadenlage', text: 'Pegel bei 6,20 m, weiter steigend.' }],
+        },
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(await screen.findByText(/Pegel bei 6,20 m/)).toBeInTheDocument();
   });
 
   it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt „?", nicht „0"', async () => {
@@ -464,6 +622,77 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe('wird abgerufen');
   });
 
+  /**
+   * I2 (LFH-336-Review). `zustand` hing an `zustandVon(auftraegeQuery)` — also
+   * NUR an der Aufträge-Abfrage —, während `leer` an `lagebild` hing, das erst
+   * nach dem Einsatz-Abruf existiert. Löst die Aufträge-Query auf, während
+   * `/api/einsaetze/1` noch hängt (kein Kunstprodukt: `api/queryClient.ts:10-12`
+   * wiederholt Netzfehler zweimal mit bis zu 30 s Backoff), galt `zustand ===
+   * 'daten'` UND `leer === true` gleichzeitig — die Kachel behauptete „Keine
+   * offenen Aufträge.“, obwohl welche vorliegen.
+   *
+   * Gewartet wird auf den QueryClient-Status der Aufträge-Abfrage selbst (nicht
+   * auf einen sichtbaren Text) — genau das ist der Zustand, den `kennzahlGeladen`
+   * hier nicht liefern kann: die Kennzahlenleiste hängt am Lagebild und damit am
+   * (hier absichtlich hängenden) Einsatz-Abruf.
+   */
+  it('während der Einsatz-Abruf hängt, bleibt die Aufträge-Kachel im Ladezustand statt „Keine offenen Aufträge." zu zeigen', async () => {
+    mockEndpunkte({
+      einsatzLaedt: true,
+      auftraege: [auftrag({ id: 1, lfd_nr: 1 })],
+    });
+    const { client } = render();
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.auftraege(1))?.status).toBe('success'),
+    );
+    expect(screen.queryByText('Keine offenen Aufträge.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Aufträge / Befehle wird geladen')).toBeInTheDocument();
+  });
+
+  // I2, Meldungen-Spiegel derselben Falle.
+  it('während der Einsatz-Abruf hängt, bleibt die Meldungen-Kachel im Ladezustand statt „Keine offenen Meldungen." zu zeigen', async () => {
+    mockEndpunkte({
+      einsatzLaedt: true,
+      meldungen: [meldung({ id: 1, lfd_nr: 1 })],
+    });
+    const { client } = render();
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.meldungen(1))?.status).toBe('success'),
+    );
+    expect(screen.queryByText('Keine offenen Meldungen.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Meldungen (eingehend) wird geladen')).toBeInTheDocument();
+  });
+
+  // I2, Lagebericht: derselbe Fehler bestand hier schon vor LFH-336; er wird im
+  // selben Zug behoben, weil die Datei ohnehin angefasst wird.
+  it('während der Einsatz-Abruf hängt, bleibt die Lagebericht-Kachel im Ladezustand statt „Noch kein Lagebericht erstellt." zu zeigen', async () => {
+    mockEndpunkte({
+      einsatzLaedt: true,
+      lageberichte: [
+        {
+          id: 3,
+          einsatz_id: 1,
+          titel: 'Lage 14:00',
+          status: 'freigegeben',
+          zeitstand: '2026-06-11 14:00:00',
+          ersteller_id: 1,
+          ersteller_name: 'Muster',
+          erstellt_at: '2026-06-11 14:00:00',
+          aktualisiert_at: '2026-06-11 14:00:00',
+          version: 1,
+          vorlage: 'lagebericht',
+          abschnitte: [],
+        },
+      ],
+    });
+    const { client } = render();
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.lageberichte(1))?.status).toBe('success'),
+    );
+    expect(screen.queryByText('Noch kein Lagebericht erstellt.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Aktueller Lagebericht wird geladen')).toBeInTheDocument();
+  });
+
   it('das Band nennt nach dem Abruf den Einsatz', async () => {
     mockEndpunkte({});
     render();
@@ -471,6 +700,35 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe(
       'Hochwasser Musterstadt',
     );
+  });
+
+  // AK1 (LFH-336): der frühere `<Tag color="blue">Live</Tag>` war statisch; sein
+  // Nachfolger im Band hing an QUERY-Fehlern und meldete bei totem SSE weiter
+  // „Live verbunden". Beide Zweige gehören geprüft — nur der Abriss-Zweig allein
+  // wäre auch dann grün, wenn das Band NIE „Live" sagt.
+  it('das Band meldet die Live-Verbindung, solange sie steht', async () => {
+    setzeLiveStatusFuerTest('open');
+    mockEndpunkte({ personen: [person('sk3')] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.getByText('Live verbunden')).toBeInTheDocument();
+  });
+
+  it('bei abgerissener Live-Verbindung meldet das Band NICHT „Live"', async () => {
+    setzeLiveStatusFuerTest('lost');
+    mockEndpunkte({ personen: [person('sk3')] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.queryByText('Live verbunden')).not.toBeInTheDocument();
+    expect(screen.getByText('Verbindung unterbrochen')).toBeInTheDocument();
+  });
+
+  it('während des Wiederverbindens meldet das Band den Zwischenstand', async () => {
+    setzeLiveStatusFuerTest('connecting');
+    mockEndpunkte({ personen: [person('sk3')] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    expect(screen.getByText('Verbindung wird aufgebaut')).toBeInTheDocument();
   });
 
   /**
@@ -621,5 +879,36 @@ describe('Die Kennzahlenleiste in sprache.css', () => {
 
     // Und die Grundgröße der Kennzahl ist unbedingt — genau ein `font-size`.
     expect(regel('.lfh-zahl--gross {').match(/font-size/g)).toHaveLength(1);
+  });
+
+  it('die erste Zeile verliert ihre Trennlinie in BEIDEN Bauformen — aber NICHT jede Zeile', () => {
+    // Der `<li>`-Wrapper macht `<a class="lfh-zeile">` zum EINZIGEN Kind seines
+    // `<li>` und damit selbst zu dessen `:first-child`. Ein UNSKOPIERTES
+    // `.lfh-zeile:first-child` träfe dadurch JEDE Zeile, nicht nur die erste der
+    // Liste — genau der Rückfall, den die Erweiterung vermeiden soll. Beide Arme
+    // müssen deshalb an `.lfh-zeilen >` verankert sein.
+    expect(css).toContain('.lfh-zeilen > .lfh-zeile:first-child');
+    expect(css).toContain('.lfh-zeilen > li:first-child > .lfh-zeile');
+    expect(
+      css,
+      'ein unskopiertes .lfh-zeile:first-child träfe jede Zeile im <li>-Wrapper',
+    ).not.toMatch(/^\.lfh-zeile:first-child/m);
+  });
+});
+
+describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
+  const quelle = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), 'LageDashboardPage.tsx'),
+    'utf8',
+  );
+
+  it('baut keinen Einsatz-Pfad als Template-Literal — die Builder sind die Quelle', () => {
+    // Ein Inline-Pfad umgeht `routing/deeplinks.ts` und damit LFH-25. Er bricht
+    // nichts sichtbar: die Seite navigiert weiter, nur an der Registry vorbei.
+    expect(quelle).not.toMatch(/`\/einsaetze\/\$\{/);
+  });
+
+  it('nutzt den Modul-Builder', () => {
+    expect(quelle).toContain('einsatzModulPfad');
   });
 });

@@ -1,6 +1,6 @@
 import { Alert, Badge, Button, Space, theme } from 'antd';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { LiveVerbindungsStatus } from './useEinsatzLiveStream';
+import { abonniereLiveStatus, leseLiveStatus } from './liveStatusStore';
 import {
   abonniereAppAktualisierung,
   aktualisiereAppJetzt,
@@ -24,7 +24,10 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
   // abgelehnte Aktion aus Einsatz A beim Wechsel nach B vollständig aus dem Blick.
   const queue = useOfflineQueueZaehler(benutzerId);
   const { token } = theme.useToken();
-  const [status, setStatus] = useState<LiveVerbindungsStatus>('idle');
+  // EINE Quelle mit dem Instrumentenband des Lage-Dashboards (LFH-336 · M3).
+  // Der frühere lokale Listener war für sich richtig, aber er war die ZWEITE
+  // Kopie desselben Zustands — und die dritte wäre nur eine Datei entfernt.
+  const status = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
   const [istOnline, setIstOnline] = useState(() => navigator.onLine);
   const [aktualisierungLaeuft, setAktualisierungLaeuft] = useState(false);
   const [aktualisierungFehlgeschlagen, setAktualisierungFehlgeschlagen] = useState(false);
@@ -34,15 +37,6 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
     istAppAktualisierungVerfuegbar,
     istAppAktualisierungVerfuegbar,
   );
-
-  useEffect(() => {
-    const onStatus = (e: Event) => {
-      const detail = (e as CustomEvent<{ status?: LiveVerbindungsStatus }>).detail;
-      if (detail?.status) setStatus(detail.status);
-    };
-    window.addEventListener('lfh:live-status', onStatus);
-    return () => window.removeEventListener('lfh:live-status', onStatus);
-  }, []);
 
   useEffect(() => {
     const onOnline = () => setIstOnline(true);
