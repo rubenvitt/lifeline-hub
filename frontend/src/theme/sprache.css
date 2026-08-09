@@ -74,8 +74,11 @@
 }
 
 /* ── Signatur 2 · Das Dreieck als Sektionsmarke (DV 102) ───────────────────
-   Trägt Kachelköpfe und Zeilenmarker. Weil es eine FORM ist, unterscheidet es
-   Statusstufen auch ohne Farbe — der zweite Kanal aus WCAG 1.4.1. */
+   Trägt Kachelköpfe und Zeilenmarker. Die drei Stufen unterscheiden sich
+   heute AUSSCHLIESSLICH über `border-bottom-color` — Breite und Höhe sind
+   identisch, ein zweiter (nicht-farblicher) Kanal fehlt. Die WCAG-1.4.1-Lücke
+   ist LFH-395 zugeordnet und dort in der Prüfliste verdiktiert; dieser
+   Kommentar behauptet den zweiten Kanal deshalb nicht mehr. */
 .lfh-zeichen {
   width: 0;
   height: 0;
