@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { einsatzKeys } from '../../api/queryKeys';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
@@ -612,6 +613,77 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     mockEndpunkte({ einsatzLaedt: true });
     render();
     expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe('wird abgerufen');
+  });
+
+  /**
+   * I2 (LFH-336-Review). `zustand` hing an `zustandVon(auftraegeQuery)` — also
+   * NUR an der Aufträge-Abfrage —, während `leer` an `lagebild` hing, das erst
+   * nach dem Einsatz-Abruf existiert. Löst die Aufträge-Query auf, während
+   * `/api/einsaetze/1` noch hängt (kein Kunstprodukt: `api/queryClient.ts:10-12`
+   * wiederholt Netzfehler zweimal mit bis zu 30 s Backoff), galt `zustand ===
+   * 'daten'` UND `leer === true` gleichzeitig — die Kachel behauptete „Keine
+   * offenen Aufträge.“, obwohl welche vorliegen.
+   *
+   * Gewartet wird auf den QueryClient-Status der Aufträge-Abfrage selbst (nicht
+   * auf einen sichtbaren Text) — genau das ist der Zustand, den `kennzahlGeladen`
+   * hier nicht liefern kann: die Kennzahlenleiste hängt am Lagebild und damit am
+   * (hier absichtlich hängenden) Einsatz-Abruf.
+   */
+  it('während der Einsatz-Abruf hängt, bleibt die Aufträge-Kachel im Ladezustand statt „Keine offenen Aufträge." zu zeigen', async () => {
+    mockEndpunkte({
+      einsatzLaedt: true,
+      auftraege: [auftrag({ id: 1, lfd_nr: 1 })],
+    });
+    const { client } = render();
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.auftraege(1))?.status).toBe('success'),
+    );
+    expect(screen.queryByText('Keine offenen Aufträge.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Aufträge / Befehle wird geladen')).toBeInTheDocument();
+  });
+
+  // I2, Meldungen-Spiegel derselben Falle.
+  it('während der Einsatz-Abruf hängt, bleibt die Meldungen-Kachel im Ladezustand statt „Keine offenen Meldungen." zu zeigen', async () => {
+    mockEndpunkte({
+      einsatzLaedt: true,
+      meldungen: [meldung({ id: 1, lfd_nr: 1 })],
+    });
+    const { client } = render();
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.meldungen(1))?.status).toBe('success'),
+    );
+    expect(screen.queryByText('Keine offenen Meldungen.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Meldungen (eingehend) wird geladen')).toBeInTheDocument();
+  });
+
+  // I2, Lagebericht: derselbe Fehler bestand hier schon vor LFH-336; er wird im
+  // selben Zug behoben, weil die Datei ohnehin angefasst wird.
+  it('während der Einsatz-Abruf hängt, bleibt die Lagebericht-Kachel im Ladezustand statt „Noch kein Lagebericht erstellt." zu zeigen', async () => {
+    mockEndpunkte({
+      einsatzLaedt: true,
+      lageberichte: [
+        {
+          id: 3,
+          einsatz_id: 1,
+          titel: 'Lage 14:00',
+          status: 'freigegeben',
+          zeitstand: '2026-06-11 14:00:00',
+          ersteller_id: 1,
+          ersteller_name: 'Muster',
+          erstellt_at: '2026-06-11 14:00:00',
+          aktualisiert_at: '2026-06-11 14:00:00',
+          version: 1,
+          vorlage: 'lagebericht',
+          abschnitte: [],
+        },
+      ],
+    });
+    const { client } = render();
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.lageberichte(1))?.status).toBe('success'),
+    );
+    expect(screen.queryByText('Noch kein Lagebericht erstellt.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Aktueller Lagebericht wird geladen')).toBeInTheDocument();
   });
 
   it('das Band nennt nach dem Abruf den Einsatz', async () => {

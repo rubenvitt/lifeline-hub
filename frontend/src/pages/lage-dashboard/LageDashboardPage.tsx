@@ -507,7 +507,11 @@ export default function LageDashboardPage() {
           <Kachel
             titel="Aktueller Lagebericht"
             mehr="Berichte"
-            zustand={zBericht}
+            // `leer` zieht aus `lagebild`, das erst nach dem Einsatz-Abruf existiert
+            // (I2, LFH-336-Review) — `zustand` muss deshalb dieselbe Quelle spiegeln,
+            // sonst gilt `zustand === 'daten'` UND `leer === true` gleichzeitig,
+            // solange nur der Einsatz-Abruf noch hängt.
+            zustand={lagebild ? zBericht : 'laden'}
             leer={!lagebild?.bericht}
             leerText="Noch kein Lagebericht erstellt."
             leerAktion="Lagebericht schreiben"
@@ -531,7 +535,13 @@ export default function LageDashboardPage() {
           <Kachel
             titel="Aufträge / Befehle"
             mehr="Auftragsliste"
-            zustand={zAuftraege}
+            // `leer` zieht aus `lagebild`, das erst nach dem Einsatz-Abruf existiert
+            // (I2, LFH-336-Review) — `zustand` hing bisher NUR an `zAuftraege`
+            // (Aufträge-Query). Löst die Aufträge-Query auf, während der Einsatz-Abruf
+            // noch hängt, galt `zustand === 'daten'` UND `leer === true` gleichzeitig,
+            // und die Kachel behauptete „Keine offenen Aufträge.“, obwohl welche
+            // vorliegen.
+            zustand={lagebild ? zAuftraege : 'laden'}
             // `leer` darf die Überfällig-Plakette nicht verdrängen (LFH-336-Review,
             // I1): Zählung (`ist_ueberfaellig`) und Zeilenfilter
             // (`bearbeitungsstatus`) laufen im Backend über unabhängige Kriterien
@@ -576,7 +586,9 @@ export default function LageDashboardPage() {
           <Kachel
             titel="Meldungen (eingehend)"
             mehr="Meldebuch"
-            zustand={zMeldungen}
+            // Spiegelt die Aufträge-Kachel (I2): `zustand` hing bisher NUR an
+            // `zMeldungen`, `leer` an `lagebild` — siehe Kommentar dort.
+            zustand={lagebild ? zMeldungen : 'laden'}
             // Spiegelt die Aufträge-Kachel (I1): `ist_ueberfaellig`
             // (bestaetigung_pflicht AND quittiert_at IS NULL AND frist <= jetzt,
             // src/meldung/repo.rs:42-43) ist von `ist_offen`/`status` unabhängig —
