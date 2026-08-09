@@ -94,6 +94,41 @@ Start in den jeweiligen **Board-Status** wechseln (raus aus `backlog`):
 - Integration → **`superpowers:finishing-a-development-branch`** → nach erfolgreichem Merge
   **Status: `shipped`**; ist damit nichts mehr offen → `done`
 - Wird der Task verworfen statt umgesetzt → **Status: `cancelled`**
+- Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
+  Board-Status.
+
+## Abschlussmeldung an den Menschen
+
+Nach Merge und Board-Status bekommt der Mensch eine kurze Meldung, was er jetzt in der
+Anwendung sehen und ausprobieren kann — keine Commit-Liste (steht in git), keine
+Wiederholung des Tickets, keine Dateinamen statt Bedienwegen. Inhalt:
+
+1. **Was ist neu — aus Bediensicht.** Was sieht/kann jemand jetzt beim Benutzen? Rein
+   interne Änderungen ohne sichtbare Wirkung als solche benennen, nicht zum Feature aufblasen.
+2. **Wo man es findet.** Route bzw. Klickweg (bei einem Einsatzmodul: welcher Einsatz,
+   welches Modul, welche Stelle der Seite).
+3. **Wie man es ausprobiert.** Der Handgriff, an dem der Unterschied sichtbar wird — nicht
+   „Seite öffnen". Braucht es dafür bestimmte Daten (überfälliger Auftrag, >8 Einsätze o.ä.),
+   gehört das dazu.
+4. **Was sich bewusst NICHT geändert hat**, wo jemand es erwarten könnte.
+5. **Offene Nachzüge** mit Ticketnummer, falls beim Umsetzen welche entstanden sind.
+
+**Dev-Stack starten** (damit die Meldung nicht ins Leere zeigt): das Frontend ist per
+`rust-embed` **zur Compile-Zeit** ins Backend-Binary eingebettet — wer nur `cargo run`
+startet, sieht ein **altes** Frontend. Für die Ansicht während der Entwicklung läuft das
+Frontend über den **Vite-Dev-Server**, nicht über das eingebettete Bundle:
+
+- Backend (Repo-Root): `cargo run` (Default-Bind `127.0.0.1:8080`; mit Testdaten
+  `cargo run --features dev-seeds`).
+- Frontend: `mise exec pnpm@11.10.0 -- pnpm -C <absoluter-frontend-pfad> dev` — dann die
+  von Vite ausgegebene URL öffnen (Default-Port 5173, aber nicht garantiert:
+  `strictPort` ist aus, und ein `pnpm run setup` im Frontend-Ordner vergibt bei parallelen
+  Workspaces andere Ports über `.env.local` und nennt dabei auch den passenden
+  `cargo run --bind …`-Befehl).
+
+**Wird dieser Skill von `dev-clickup-orchestrieren` aufgerufen, entfällt diese Meldung
+hier** — der Orchestrator sammelt Bediensicht/Klickweg je Subtask ein und gibt am Ende
+**eine** Gesamtmeldung aus (s. dort, Phase 5).
 
 ## Don'ts
 
@@ -102,3 +137,5 @@ Start in den jeweiligen **Board-Status** wechseln (raus aus `backlog`):
 - Komplexität nicht überspringen — auch „kleine" Features brauchen TDD.
 - Keinen neuen Task anlegen — das ist `clickup-task-anlegen`.
 - Status nicht rückwärts oder redundant setzen — nur vorwärts entlang der Spur.
+- Abschlussmeldung **nicht** als Commit-Liste oder mit Dateinamen — Bediensicht und
+  Klickweg, nicht Code. Und **nicht** ausgeben, wenn `dev-clickup-orchestrieren` aufruft.

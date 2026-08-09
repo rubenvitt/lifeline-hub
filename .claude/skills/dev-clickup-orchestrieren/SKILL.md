@@ -134,6 +134,14 @@ sequenziell — aber das nur, wenn der Schnitt sauber ist.
 - Pro (Sub)Task Board-Status vorwärts: nach Merge `shipped`; ist nichts mehr offen → `done`.
   Parent erst auf `shipped`/`done`, wenn alle Subtasks es sind.
 - Commits/PR auf die jeweilige `custom_id` referenzieren.
+- **Eine** Abschlussmeldung an den Menschen für den ganzen Task — Inhalt/Form und der
+  Startbefehl für den Dev-Stack stehen in `dev-clickup-ausfuehren` (Abschnitt
+  „Abschlussmeldung an den Menschen"), hier nicht duplizieren. `dev-clickup-ausfuehren`
+  gibt pro Subtask **keine eigene** Meldung aus, wenn es von hier aufgerufen wird — die
+  Bediensicht/Klickweg-Angaben je Subtask sammelst du während Phase 3 ein (frisch, nicht
+  aus git rekonstruiert) und fügst sie hier zu **einer zusammenhängenden** Meldung
+  zusammen. Ein Epic mit acht Subtasks bekommt **eine** Meldung, nicht acht
+  aneinandergereihte.
 
 ## Status durchgehen — Entscheidungspunkte
 
@@ -170,3 +178,5 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 - Autonomen Modus **nicht** bei geteilten Files / Abhängigkeiten wählen.
 - Bei jedem Status-Übergang fragen — nur an den drei Verzweigungen oben.
 - Keinen neuen Task anlegen — das ist `clickup-task-anlegen`.
+- Am Ende **nicht** acht Einzelmeldungen aneinanderreihen — eine gebündelte
+  Gesamt-Abschlussmeldung (s. Phase 5).
