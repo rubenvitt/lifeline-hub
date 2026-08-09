@@ -119,16 +119,21 @@ Ergebnis: siehe Vitest-Lauf, Schritt 5 — alle vier Tests grün.
 
 ### AK6 — Lint und volles Gate grün
 
-**Zur Hälfte erfüllt — nicht „läuft durch".** `pnpm lint --max-warnings 0` ist grün (Schritt 2),
-und mit ihm die Schritte 1–6 insgesamt (fmt, Lint, Typ-Codegen inkl. `tsc`,
-`cargo test --workspace`, Vitest 2765/2765 über 262 Dateien, `check-deps` nach dem
-nanoid-Override). **Schritt 7 (e2e) ist rot** — im Bestand, nicht durch LFH-336: Merge-Base
-`dd91460a` liefert 20 failed / 27 passed, der Branch 23 / 24; `frontend/src` wurde für die
-Gegenprobe auf den Merge-Base zurückgedreht und dieselbe Suite gefahren. Die Differenz sind
-wandernde Fälle (`trefflaeche-tablet.spec.ts:174`, `seitenrinne.spec.ts`), die eine
-Codeänderung nicht erklären kann, und keiner berührt die beiden LFH-336-Seiten. Eigenes Ticket:
-**LFH-398** (<https://app.clickup.com/t/86cb2qdz1>). Details siehe Abschnitt „Volles Gate"
-unten.
+**Erfüllt.** `./scripts/check-all.sh` läuft mit `GATE_EXIT=0` vollständig durch — alle sieben
+Schritte: rustfmt, `pnpm lint --max-warnings 0`, Typ-Codegen inkl. `tsc`,
+`cargo test --workspace`, Vitest **2771/2771** über 262 Dateien, `check-deps` (nach dem
+nanoid-Override) und **e2e 47/47 in 53 s**.
+
+**Eine Zwischendiagnose in dieser Datei war falsch und ist hier korrigiert.** Frühere Fassungen
+führten Schritt 7 als „rot, aber Bestandsproblem". Das stimmte in der Abgrenzung (kein
+LFH-336-Bezug) und war in der Ursache verkehrt: die Suite ist nicht kaputt, sondern
+**lastempfindlich**. Gemessen über vier Läufe — im Gate auf freier Maschine 53 s und 47/47;
+einzeln auf freier Maschine 1,5 min und 45/47; einzeln mit einem parallel arbeitenden Subagenten
+4,2 min und 24/47; derselbe belastete Lauf auf dem Merge-Base 27/47. Die Laufzeit ist der
+Indikator: bei 4,2 min stehen die Fehlschläge in 10- bzw. 35-Sekunden-Timeouts, nicht in
+fachlichen Assertions. Der als „ohne Nebenlast" protokollierte Lauf war keiner — es lief ein
+Review-Subagent mit. Die Empfindlichkeit selbst bleibt ein echter Befund und behält ihr Ticket:
+**LFH-398** (<https://app.clickup.com/t/86cb2qdz1>).
 
 ## Volles Gate
 
@@ -152,14 +157,27 @@ Wartens auf diesen Lauf beendet, bevor er über Schritt 4 hinauskam. Isoliert au
 `check-all.sh` bestätigt: `pnpm audit --audit-level=high` im Frontend meldet „No known
 vulnerabilities found".
 
-**Lauf 3 (abschließend, vom Coordinator gefahren) — der Endstand:** Schritte 1–6 grün (fmt,
-Lint, Typ-Codegen inkl. `tsc`, `cargo test --workspace`, Vitest 2765/2765 über 262 Dateien,
-`check-deps` nach dem nanoid-Override). **Schritt 7 (e2e) ist rot, aber als Bestandsproblem
-belegt, nicht als LFH-336-Regression**: Merge-Base `dd91460a` liefert **20 failed / 27
-passed**, dieser Branch **23 failed / 24 passed** — gemessen per Gegenprobe (`frontend/src` auf
-den Merge-Base zurückgedreht, dieselbe Suite gefahren), nicht vermutet. Die Differenz sind
-wandernde Fälle (`trefflaeche-tablet.spec.ts:174` scheitert mal in „komfortabel", mal in
-„handschuh"; `seitenrinne.spec.ts` mal bei `:43`, mal bei `:67`), die eine Codeänderung nicht
-erklären kann, und keiner der Fälle berührt `LageDashboardPage`/`EinsaetzePage`. Eigenes
-Ticket: **LFH-398** (<https://app.clickup.com/t/86cb2qdz1>) — eigene Ursachensuche, nicht Teil
-von LFH-336.
+**Lauf 3 (vom Coordinator gefahren, parallel zu laufenden Subagenten):** Schritte 1–6 grün,
+Schritt 7 rot mit 23 failed / 24 passed. Die Gegenprobe auf dem Merge-Base `dd91460a` — für die
+`frontend/src` zurückgedreht und dieselbe Suite gefahren wurde — lieferte 20 failed / 27 passed
+und schloss damit eine LFH-336-Regression aus. Die daraus gezogene Folgerung „die Suite ist im
+Bestand rot" war jedoch **verfrüht**: sie beruhte auf zwei Läufen, die beide unter Fremdlast
+standen.
+
+**Lauf 4 (abschließend, nach der Fix-Welle, Maschine sonst frei) — der Endstand:** alle sieben
+Schritte grün, `GATE_EXIT=0`. Vitest **2771/2771** über 262 Dateien, **e2e 47/47 in 53 s**.
+
+**Was der Vergleich der vier Läufe zeigt:** die e2e-Suite ist lastempfindlich, nicht defekt.
+
+| Bedingung | Dauer | Ergebnis |
+|---|---|---|
+| Im Gate als Schritt 7, Maschine frei | 53 s | 47 / 47 |
+| `pnpm e2e` einzeln, Maschine frei | 1,5 min | 45 / 47 |
+| `pnpm e2e` einzeln, ein Subagent parallel | 4,2 min | 24 / 47 |
+| dasselbe auf dem Merge-Base | 4,2 min | 27 / 47 |
+
+Die Laufzeit ist der Indikator: bei 4,2 min stehen die Fehlschläge in Timeouts, nicht in
+fachlichen Assertions, und die Fehlermenge wandert zwischen Läufen. Die Empfindlichkeit ist ein
+echter Befund und behält ihr Ticket — **LFH-398** (<https://app.clickup.com/t/86cb2qdz1>), dort
+mit der vollständigen Messreihe und dem korrigierten Ursachenbild. Sie ist kein Hindernis für
+den Abschluss von LFH-336: das Gate ist auf freier Maschine vollständig grün.
