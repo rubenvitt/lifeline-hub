@@ -68,11 +68,15 @@ const LADETEXT = 'wird abgerufen';
  *
  * `idle` heißt „noch keine Meldung" und nicht „gestört" — vor dem ersten
  * Stream-Ereignis wäre eine Störungsmeldung eine Falschaussage in die andere
- * Richtung. Es trägt deshalb denselben Wortlaut wie `open`; der Puls schlägt in
- * beiden Fällen ruhig, alarmiert wird nur bei `lost`.
+ * Richtung. Es trägt aber auch nicht den Wortlaut von `open`: `meldeStatus('open')`
+ * feuert erst in dessen `onopen` (`useEinsatzLiveStream.ts`), auf dieser vom
+ * Einsatz-Layout gemounteten Route kann `idle` also nur „noch nicht offen"
+ * bedeuten — dauerhaft, wenn eine Verbindung hängt, ohne zu öffnen oder zu
+ * erroren. „Live verbunden" wäre dort eine Zusage an eine Leitung, die noch
+ * nichts überträgt. Alarmiert wird weiterhin nur bei `lost`.
  */
 const VERBINDUNG_WORTLAUT: Record<LiveVerbindungsStatus, string> = {
-  idle: 'Live verbunden',
+  idle: 'Verbindung wird aufgebaut',
   open: 'Live verbunden',
   connecting: 'Verbindung wird aufgebaut',
   lost: 'Verbindung unterbrochen',
