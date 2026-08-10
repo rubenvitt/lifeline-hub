@@ -9,6 +9,7 @@ import {
   redirectZiel,
   modulZielRoute,
   aufloeseStandardModul,
+  erstesFreigegebenesModul,
   type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
@@ -196,5 +197,57 @@ describe('modulRegistry', () => {
 
   it('modulZielRoute: ohne Deep-Link die eigene Route', () => {
     expect(modulZielRoute({ ...offen, route: 'etb' })).toBe('etb');
+  });
+});
+
+describe('erstesFreigegebenesModul (LFH-337)', () => {
+  const admin: BenutzerAnzeige = {
+    id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
+    org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
+  };
+
+  it('liefert das erste fertige Modul der Kategorie in Registry-Reihenfolge', () => {
+    const m = erstesFreigegebenesModul('fuehrung', admin);
+    expect(m?.kategorie).toBe('fuehrung');
+    expect(m?.status).toBe('fertig');
+  });
+
+  it('überspringt ausgeblendete Module', () => {
+    // Kategorie 'kraefte', nicht 'fuehrung': deren erstes Modul wäre 'einsatzdaten' —
+    // eines der beiden `NICHT_AUSBLENDBARE_MODULE`, an dem ein Sichtbarkeits-Override
+    // wirkungslos bleibt (`istModulSichtbar` liefert dafür immer `true`). Der Test
+    // bräuchte dann ein Modul, das der Override überhaupt treffen kann.
+    const erstes = erstesFreigegebenesModul('kraefte', admin)!;
+    const m = erstesFreigegebenesModul('kraefte', admin, {
+      [erstes.key]: {
+        einsatz_id: 1, modul_key: erstes.key, sichtbar: false,
+        benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+      },
+    });
+    expect(m?.key).not.toBe(erstes.key);
+  });
+
+  it('überspringt rollen-gesperrte Module', () => {
+    // Dieselbe Begründung wie oben: 'einsatzdaten' ist als nicht-ausblendbares Modul
+    // auch nie rollen-sperrbar (Selbst-Aussperr-Schutz in `istModulGesperrt`) — 'kraefte'
+    // trifft mit 'einheiten' ein Modul, an dem der Rollen-Override tatsächlich greift.
+    const erstes = erstesFreigegebenesModul('kraefte', admin)!;
+    const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
+    const m = erstesFreigegebenesModul('kraefte', ohne, {
+      [erstes.key]: {
+        einsatz_id: 1, modul_key: erstes.key, sichtbar: true,
+        benoetigte_rolle: 'admin', geaendert_at: null, geaendert_von: null,
+      },
+    });
+    expect(m?.key).not.toBe(erstes.key);
+  });
+
+  it('liefert null, wenn die Kategorie kein freigegebenes Modul hat', () => {
+    // Die Gegenaussage: ohne sie bliebe unbewiesen, dass der Resolver überhaupt
+    // ablehnen KANN — und der Aufrufer navigierte auf `undefined`.
+    const nurGeplant: ModulEintrag[] = [
+      { key: 'x', kategorie: 'lage', label: 'X', icon: () => null, route: 'x', status: 'geplant' },
+    ];
+    expect(erstesFreigegebenesModul('lage', admin, undefined, nurGeplant)).toBeNull();
   });
 });

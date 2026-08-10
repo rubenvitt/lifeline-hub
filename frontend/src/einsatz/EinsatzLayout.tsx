@@ -7,8 +7,8 @@ import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  istModulGesperrt, istModulSichtbar, kategorien, modulRegistry, moduleNachKategorie,
-  modulZielRoute, type KategorieKey, type ModulEintrag,
+  erstesFreigegebenesModul, istModulGesperrt, istModulSichtbar, kategorien, modulRegistry,
+  moduleNachKategorie, modulZielRoute, type KategorieKey, type ModulEintrag,
 } from './modulRegistry';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -190,15 +190,34 @@ export default function EinsatzLayout() {
   }
 
   /**
-   * Rail-Klick im inline-Rahmen: derselbe Kategorie-Knopf klappt das Panel zu und
-   * merkt das; ein anderer klappt es wieder auf. Die Rail behält dabei ihre
+   * Rail-Klick im inline-Rahmen.
+   *
+   * SELBSTKLICK = ZUKLAPPEN, FREMDKLICK = SPRUNG (LFH-337 · H12, Entscheidung im Plan).
+   * Derselbe Kategorie-Knopf klappt das Panel zu und merkt das; ein anderer öffnet es und
+   * führt zugleich in das erste freigegebene Modul der Kategorie — vorher lag jedes der
+   * 24 Module exakt zwei Klicks tief.
+   *
+   * WARUM NICHT IMMER NAVIGIEREN: Navigieren ändert `aktuellesModul`, der Effekt oben
+   * setzt daraufhin `offeneKategorie` — ein bedingungsloser Sprung höbe das persistierte
+   * Zuklappen aus LFH-329/B1 in derselben Runde wieder auf. Die Rail behält ihre
    * Hervorhebung, weil sie `offeneKategorie ?? aktiveKategorie` bekommt.
+   *
+   * Hat die Kategorie kein freigegebenes Modul (alles geplant, ausgeblendet oder
+   * entzogen), bleibt es beim reinen Aufklappen: ein Sprung ins Leere wäre schlechter
+   * als keiner.
    */
   function onKategorieKlick(key: KategorieKey) {
-    const zu = offeneKategorie === key ? !panelEingeklappt : false;
+    if (offeneKategorie === key) {
+      const zu = !panelEingeklappt;
+      setPanelEingeklappt(zu);
+      schreibeNavEingeklappt(zu);
+      return;
+    }
     setOffeneKategorie(key);
-    setPanelEingeklappt(zu);
-    schreibeNavEingeklappt(zu);
+    setPanelEingeklappt(false);
+    schreibeNavEingeklappt(false);
+    const ziel = erstesFreigegebenesModul(key, benutzer, modulOverrides);
+    if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
   }
 
   /**

@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -41,6 +41,21 @@ const einsatz = {
 };
 
 /**
+ * Sonde für den aktuellen Pfad (Muster `ModulStub.test.tsx`) — beweist die echte
+ * Navigation aus `onKategorieKlick` (LFH-337 · H12), statt nur den Panel-Zustand zu
+ * lesen. Als Geschwister der `Routes` in `setup()` gerendert, damit sie unabhängig
+ * davon steht, welche Kind-Route gerade matcht.
+ */
+function PfadAnzeige() {
+  return <span data-testid="pfad">{useLocation().pathname}</span>;
+}
+
+/** Liest den aktuellen Pfad aus der `PfadAnzeige`-Sonde. */
+function pfad(): string {
+  return screen.getByTestId('pfad').textContent ?? '';
+}
+
+/**
  * `fehler` schaltet die beiden Abrufe des Rahmens einzeln auf 500 — einzeln, weil
  * die beiden Ausfälle im Layout verschiedene Antworten haben: der Einsatz-Abruf
  * ersetzt die ganze Seite, der Overrides-Abruf nur ein Banner darüber.
@@ -71,8 +86,14 @@ function setup(
                 belegen, dass ein Modulklick im Drawer wirklich navigiert und den
                 Drawer dabei schließt. */}
             <Route path="lagekarte" element={<div>Lagekarte-Inhalt</div>} />
+            {/* Erstes freigegebenes Modul der Kategorie 'lage' (LFH-337 · H12): der
+                Rail-Klick auf eine fremde Kategorie navigiert jetzt dorthin, ohne
+                eigenes Zutun der Tests — ohne diese Route matcht `<Routes>` gar
+                nichts mehr und der Rahmen bliebe leer. */}
+            <Route path="lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
           </Route>
         </Routes>
+        <PfadAnzeige />
       </CommandPaletteProvider>
     </AuthProvider>,
     { route: '/einsaetze/7/etb' },
@@ -474,6 +495,38 @@ describe('EinsatzLayout', () => {
       expect(schliessen.style.minWidth).toBe('48px');
       expect(schliessen.style.minHeight).toBe('48px');
     });
+  });
+});
+
+describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
+  it('springt beim Klick auf eine ANDERE Kategorie in deren erstes Modul', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    // Die Aussage ist der PFAD, nicht der Panel-Zustand (AK5) — die Pfad-Sonde ist
+    // dieselbe wie in `ModulStub.test.tsx`, hier als Geschwister der Routes gerendert.
+    await waitFor(() => expect(pfad()).toMatch(/^\/einsaetze\/7\//));
+    await waitFor(() => expect(pfad()).not.toBe('/einsaetze/7/etb'));
+  });
+
+  it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {
+    // Die Gegenaussage hält LFH-329/B1 am Leben: der Selbstklick ist der
+    // Zuklapp-Umschalter mit Persistenz. Ohne sie wäre „nur fremde Kategorie
+    // navigiert" unbewiesen — ein bedingungslos navigierender Klick färbte den
+    // Test darüber ebenfalls grün.
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const vorher = pfad();
+
+    // „Erfassung" ist die Kategorie des ETB — der Klick trifft die aktive.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
+
+    expect(pfad()).toBe(vorher);
+    // Panel zugeklappt: ein Erfassung-Modul wie ETB steht nicht mehr im Baum
+    // (dieselbe Abfrage wie im Bestandstest zum gemerkten Einklapp-Zustand oben).
+    expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
   });
 });
 

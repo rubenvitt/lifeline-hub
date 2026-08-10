@@ -160,3 +160,28 @@ export function aufloeseStandardModul(
   if (modul && modul.status === 'fertig') return modulZielRoute(modul);
   return redirectZiel(register);
 }
+
+/**
+ * Erstes bedienbares Modul einer Kategorie (LFH-337 · H12) — oder `null`.
+ *
+ * ABGRENZUNG ZU `aufloeseStandardModul`: das dort löst das EINSATZ-Default-Modul auf
+ * (LFH-131) und fällt auf `redirectZiel()` zurück. Hier geht es um eine einzelne
+ * Kategorie, und ein Fallback wäre falsch: er führte beim Klick auf „Lage" in ein Modul
+ * einer anderen Kategorie. Die Verweigerung ist die richtige Antwort, der Aufrufer
+ * entscheidet dann, nur das Panel zu öffnen.
+ *
+ * Dieselben drei Filter wie in `command-palette/befehle.ts` und in der „Zuletzt"-Auflösung
+ * des Rahmens: fertig, sichtbar, nicht rollen-gesperrt. Registry-Reihenfolge ist die
+ * Rangfolge — sie ist im Bestand bewusst gepflegt (Kommentar `// Führung` u. a.).
+ */
+export function erstesFreigegebenesModul(
+  kategorie: KategorieKey,
+  benutzer: BenutzerAnzeige | null,
+  overrides?: ModulOverrides,
+  register: ModulEintrag[] = modulRegistry,
+): ModulEintrag | null {
+  return register.find((m) => m.kategorie === kategorie
+    && m.status === 'fertig'
+    && istModulSichtbar(m, overrides)
+    && !istModulGesperrt(m, benutzer, overrides)) ?? null;
+}
