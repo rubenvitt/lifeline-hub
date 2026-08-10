@@ -9,7 +9,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout from './EinsatzLayout';
-import { leseZuletztModule } from './zuletztModule';
+import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -22,6 +22,16 @@ const EINGEKLAPPT = 'lfh:nav:eingeklappt';
 
 const admin = {
   id: 1, anzeigename: 'Chef', benutzername: 'chef', system_rolle: 'admin',
+  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+};
+/**
+ * Ein Benutzer OHNE Admin-Bypass — `istModulGesperrt` lässt Admins grundsätzlich frei
+ * (`benutzer?.system_rolle === 'admin' → return false`), deshalb belegt der
+ * `admin`-Benutzer keine Rollen-Sperre. Für den Zuletzt-Filtertest auf „rollen-gesperrt"
+ * braucht es einen Benutzer, an dem die Sperre tatsächlich greifen kann.
+ */
+const mitarbeiterOhneRolle = {
+  id: 2, anzeigename: 'Helfer', benutzername: 'helfer', system_rolle: 'keiner',
   org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
 };
 const einsatz = {
@@ -38,9 +48,10 @@ const einsatz = {
 function setup(
   overrides: Record<string, unknown> = {},
   fehler: { einsatz?: boolean; overrides?: boolean } = {},
+  aktuellerBenutzer: typeof admin | typeof mitarbeiterOhneRolle = admin,
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/auth/me', () => HttpResponse.json(aktuellerBenutzer)),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () =>
       fehler.einsatz ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(einsatz),
@@ -105,6 +116,78 @@ describe('EinsatzLayout', () => {
     setup();
     // `waitFor`, weil die Aufzeichnung in einem Effekt nach dem ersten Paint läuft.
     await waitFor(() => expect(leseZuletztModule(7)).toEqual(['etb']));
+  });
+
+  /**
+   * Review-Fix (LFH-337 · H12, Fix-Runde 1): Ohne Kategorie-Filter deckte nur der
+   * Ausschluss des AKTUELLEN Moduls die Zuletzt-Liste ab — der häufigste Pfad blieb
+   * unentdeckt. Kategorie „Erfassung" hat fünf Module; wer von „Personen" zu „ETB"
+   * wechselt (beide Erfassung), sähe „Personen" zweimal: einmal unter „Zuletzt",
+   * einmal in der offenen Kategorieliste, beide als gleichnamiger `<button>`.
+   * „Zuletzt" ist die Abkürzung zu dem, was NICHT ohnehin sichtbar ist — ein Modul der
+   * offenen Kategorie steht bereits zwei Zeilen weiter unten, ein zweiter Eintrag
+   * darüber verkürzt nichts, er verdoppelt nur ein Bedienziel.
+   */
+  it('nennt ein Modul der offenen Kategorie nicht zusätzlich unter „Zuletzt"', async () => {
+    localStorage.clear();
+    // 'personen' liegt wie die Route /etb in der Kategorie 'erfassung' — der
+    // Kollisionsfall wird bewusst HERGESTELLT, nicht durch die Testdatenwahl umgangen.
+    merkeModulBesuch(7, 'personen');
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(screen.getAllByRole('button', { name: 'Personen' })).toHaveLength(1);
+    // Die Zuletzt-Gruppe ist damit ganz leer (einziger gemerkter Eintrag war 'personen',
+    // 'etb' selbst ist das aktuelle Modul) — sie darf dann gar nicht erst stehen.
+    expect(screen.queryByText('Zuletzt')).toBeNull();
+  });
+
+  /**
+   * Review-Fix (LFH-337 · H12, Fix-Runde 1): Der Freigabe-Filter der Zuletzt-Ableitung
+   * (`status === 'fertig' && istModulSichtbar(...) && !istModulGesperrt(...)`) war nur
+   * über den reinen Speicher-Roundtrip geprüft, nie über die gerenderte, gefilterte
+   * Ableitung. Ein entzogenes Modul darf nicht als Abkürzung stehenbleiben und in eine
+   * gesperrte Seite führen.
+   *
+   * 'lagekarte' (Kategorie 'lage') ist bewusst gewählt: eine ANDERE Kategorie als die
+   * offene ('erfassung' via /etb) — sonst griffe schon der Kategorie-Filter aus dem Test
+   * darüber, und die Aussage über den Freigabe-Filter wäre nicht von ihm zu unterscheiden.
+   */
+  describe('Zuletzt-Gruppe respektiert die Freigabe-Filter (Review-Fix)', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      merkeModulBesuch(7, 'lagekarte');
+    });
+
+    it('steht ohne Einschränkung unter „Zuletzt"', async () => {
+      setup();
+      expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
+    });
+
+    it('verschwindet, wenn es per Override ausgeblendet ist', async () => {
+      setup({
+        lagekarte: {
+          einsatz_id: 7, modul_key: 'lagekarte', sichtbar: false,
+          benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        },
+      });
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    });
+
+    it('verschwindet, wenn es rollen-gesperrt ist', async () => {
+      setup(
+        {
+          lagekarte: {
+            einsatz_id: 7, modul_key: 'lagekarte', sichtbar: true,
+            benoetigte_rolle: 'fuehrungskraft', geaendert_at: null, geaendert_von: null,
+          },
+        },
+        {},
+        mitarbeiterOhneRolle,
+      );
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    });
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {

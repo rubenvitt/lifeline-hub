@@ -224,6 +224,15 @@ export default function EinsatzLayout() {
    * Das AKTUELLE Modul steht bewusst nicht in der Liste: es ist die Seite, auf der man
    * gerade steht — ein Sprung dorthin ist keine Abkürzung, und die drei Plätze sind knapp.
    *
+   * DIESELBE Überlegung gilt für die gerade OFFENE Kategorie: „Zuletzt" ist die Abkürzung
+   * zu dem, was NICHT ohnehin sichtbar ist. Steht ein Modul zwei Zeilen weiter unten in der
+   * offenen Kategorieliste, verkürzt ein zweiter Eintrag darüber keinen Weg — er verdoppelt
+   * nur ein Bedienziel und macht dessen Namen mehrdeutig (dieselbe Konsequenz wie „n Zeilen
+   * liefern n gleichnamige Knöpfe", nur zwischen zwei Panel-Bereichen statt zwischen
+   * Zeilen). Der Wert der Zeile liegt gerade im Sprung ÜBER Kategoriegrenzen hinweg. Die
+   * Filterung hängt deshalb an `offeneKategorie` (was das Panel zeigt), nicht an der
+   * Kategorie des aktuellen Moduls.
+   *
    * Kein `useMemo`: die Liste hat höchstens drei Einträge, und `leseZuletztModule` muss
    * bei JEDEM Render laufen — der Speicher ist kein React-Zustand, eine Memoisierung über
    * den Modulschlüssel zeigte nach dem Aufzeichnungs-Effekt noch den vorigen Stand.
@@ -233,6 +242,7 @@ export default function EinsatzLayout() {
     .map((key) => modulRegistry.find((m) => m.key === key))
     .filter((m): m is ModulEintrag => m !== undefined
       && m.status === 'fertig'
+      && m.kategorie !== offeneKategorie
       && istModulSichtbar(m, modulOverrides)
       && !istModulGesperrt(m, benutzer, modulOverrides));
 
