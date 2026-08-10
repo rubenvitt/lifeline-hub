@@ -108,6 +108,13 @@ export function modulListenStil(token: { marginXS: number; marginSM: number }): 
 
 interface Props extends ListeProps {
   titel: string;
+  /**
+   * Bereits aufgelöste, sichtbare und freigegebene Module der „Zuletzt"-Abkürzung
+   * (LFH-337 · H12). Kommt fertig herein statt als Schlüsselliste: die Auflösung
+   * braucht Registry, Overrides und Benutzer, und die hat der Rahmen ohnehin schon —
+   * eine zweite Auflösung hier wäre eine zweite Wahrheit über „freigegeben".
+   */
+  zuletztModule?: ModulEintrag[];
 }
 
 /**
@@ -217,8 +224,12 @@ export function ModulListe({
 }
 
 /** Liste der Module einer Kategorie im inline-Rahmen (Ebene 2). */
-export default function ModulPanel({ titel, ...liste }: Props) {
+export default function ModulPanel({ titel, zuletztModule, ...liste }: Props) {
   const { token } = theme.useToken();
+  const ueberschrift: CSSProperties = {
+    fontSize: 12,
+    textTransform: 'uppercase',
+  };
   return (
     <div
       // Testanker für den e2e-Trefflächennachweis (AK2). Der inline-Rahmen hat als einziger
@@ -229,7 +240,19 @@ export default function ModulPanel({ titel, ...liste }: Props) {
       data-lfh="modul-panel"
       style={{ width: 220, padding: 12, borderRight: `1px solid ${token.colorBorderSecondary}` }}
     >
-      <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+      {/* Die Abkürzung steht ÜBER der Kategorie, nicht darunter: sie soll den Weg
+          verkürzen, und ein Ziel unterhalb der vollständigen Liste verkürzt nichts.
+          Ganz weg, wenn nichts gemerkt ist — eine leere Überschrift belegte Platz im
+          220-px-Panel und verspräche eine Abkürzung, die es nicht gibt. */}
+      {zuletztModule && zuletztModule.length > 0 && (
+        <div style={{ marginBottom: token.marginSM }}>
+          <Typography.Text type="secondary" style={ueberschrift}>
+            Zuletzt
+          </Typography.Text>
+          <ModulListe {...liste} module={zuletztModule} />
+        </div>
+      )}
+      <Typography.Text type="secondary" style={ueberschrift}>
         {titel}
       </Typography.Text>
       <ModulListe {...liste} />

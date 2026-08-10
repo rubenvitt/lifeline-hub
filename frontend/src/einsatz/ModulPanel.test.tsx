@@ -205,6 +205,53 @@ describe('ModulPanel', () => {
   });
 });
 
+describe('ModulPanel · Zuletzt (LFH-337 · H12)', () => {
+  it('zeigt eine Zuletzt-Gruppe über der Kategorieliste', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        module={module}
+        benutzer={null}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        zuletztModule={[basis({ key: 'personen', label: 'Personen', route: 'personen', status: 'fertig' })]}
+      />,
+    );
+    const panel = screen.getByText('Zuletzt');
+    expect(panel).toBeVisible();
+    // Die REIHENFOLGE ist die Aussage: die Abkürzung oben, die Kategorie darunter.
+    // `compareDocumentPosition` statt eines Index — der Titel ist kein Listenelement.
+    const kategorie = screen.getByText('Erfassung');
+    expect(panel.compareDocumentPosition(kategorie) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+  });
+
+  it('lässt die Zuletzt-Gruppe ganz weg, wenn nichts gemerkt ist', () => {
+    // Eine leere Überschrift ohne Inhalt wäre schlimmer als keine: sie belegt Platz
+    // im 220-px-Panel und verspricht eine Abkürzung, die es nicht gibt.
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung" module={module} benutzer={null}
+        aktiverModulKey={null} onModulKlick={() => {}} zuletztModule={[]}
+      />,
+    );
+    expect(screen.queryByText('Zuletzt')).toBeNull();
+  });
+
+  it('meldet den Klick auf ein Zuletzt-Modul mit dem Modul', async () => {
+    const onKlick = vi.fn();
+    const personen = basis({ key: 'personen', label: 'Personen', route: 'personen', status: 'fertig' });
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung" module={module} benutzer={null}
+        aktiverModulKey={null} onModulKlick={onKlick} zuletztModule={[personen]}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Personen' }));
+    expect(onKlick).toHaveBeenCalledWith(personen);
+  });
+});
+
 /**
  * Die Zeilenhöhe OHNE zu rendern — `test/utils.tsx:31` montiert ein nacktes `ConfigProvider`
  * ohne unser Theme, `useToken()` liefert dort den antd-Seed (`controlHeight: 32`), also keine

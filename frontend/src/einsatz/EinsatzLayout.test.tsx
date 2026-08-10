@@ -9,6 +9,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout from './EinsatzLayout';
+import { leseZuletztModule } from './zuletztModule';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -97,6 +98,13 @@ describe('EinsatzLayout', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
     expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
+  });
+
+  it('merkt das besuchte Modul im Zuletzt-Speicher (LFH-337 · H12)', async () => {
+    localStorage.clear();
+    setup();
+    // `waitFor`, weil die Aufzeichnung in einem Effekt nach dem ersten Paint läuft.
+    await waitFor(() => expect(leseZuletztModule(7)).toEqual(['etb']));
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {

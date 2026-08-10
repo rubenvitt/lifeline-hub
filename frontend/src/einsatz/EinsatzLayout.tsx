@@ -7,14 +7,15 @@ import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  kategorien, modulRegistry, moduleNachKategorie, modulZielRoute,
-  type KategorieKey, type ModulEintrag,
+  istModulGesperrt, istModulSichtbar, kategorien, modulRegistry, moduleNachKategorie,
+  modulZielRoute, type KategorieKey, type ModulEintrag,
 } from './modulRegistry';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
+import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
@@ -119,6 +120,22 @@ export default function EinsatzLayout() {
     setOffeneKategorie(aktiveKategorie);
   }, [aktiveKategorie]);
 
+  /**
+   * Besuch aufzeichnen (LFH-337 · H12). Angesetzt am Modul-KEY, nicht am Objekt: die
+   * Registry-Einträge sind zwar Modulkonstanten, aber ein Primitiv in der
+   * Dependency-Liste erfüllt die exhaustive-deps-Regel strukturell statt sie zu
+   * überreden (CLAUDE.md, Lint-Disziplin).
+   *
+   * `Number.isFinite`, weil `einsatzId` aus `useParams` stammt: auf einer Route ohne
+   * gültige ID legte der Speicher sonst einen Eintrag unter `…:NaN` an.
+   */
+  const aktuellerModulKey = aktuellesModul?.key;
+  useEffect(() => {
+    if (aktuellerModulKey && Number.isFinite(einsatzId)) {
+      merkeModulBesuch(einsatzId, aktuellerModulKey);
+    }
+  }, [einsatzId, aktuellerModulKey]);
+
   // Wird der Schirm breit, steht der Rahmen wieder inline — ein gemerktes „Drawer
   // offen" darf dann nicht auf die Rückkehr zum Handschirm warten. `breit` ist ein
   // Primitiv, damit ist die Dependency-Regel strukturell erfüllt.
@@ -197,6 +214,27 @@ export default function EinsatzLayout() {
     navigate(einsatzModulPfad(einsatzId, modulZielRoute(modul)));
     setNavOffen(false);
   }
+
+  /**
+   * Gemerkte Schlüssel → anzeigbare Module. Die Filter sind dieselben, die die Palette
+   * anlegt (`command-palette/befehle.ts`): fertig, sichtbar, nicht rollen-gesperrt. Ein
+   * Modul, das seit dem Besuch ausgeblendet oder entzogen wurde, verschwindet damit aus
+   * der Abkürzung, statt in eine gesperrte Zeile zu führen.
+   *
+   * Das AKTUELLE Modul steht bewusst nicht in der Liste: es ist die Seite, auf der man
+   * gerade steht — ein Sprung dorthin ist keine Abkürzung, und die drei Plätze sind knapp.
+   *
+   * Kein `useMemo`: die Liste hat höchstens drei Einträge, und `leseZuletztModule` muss
+   * bei JEDEM Render laufen — der Speicher ist kein React-Zustand, eine Memoisierung über
+   * den Modulschlüssel zeigte nach dem Aufzeichnungs-Effekt noch den vorigen Stand.
+   */
+  const zuletztModule = leseZuletztModule(einsatzId)
+    .filter((key) => key !== aktuellerModulKey)
+    .map((key) => modulRegistry.find((m) => m.key === key))
+    .filter((m): m is ModulEintrag => m !== undefined
+      && m.status === 'fertig'
+      && istModulSichtbar(m, modulOverrides)
+      && !istModulGesperrt(m, benutzer, modulOverrides));
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -282,6 +320,7 @@ export default function EinsatzLayout() {
             benutzer={benutzer}
             overrides={modulOverrides}
             zaehler={modulZaehler}
+            zuletztModule={zuletztModule}
             aktiverModulKey={aktuellesModul?.key ?? null}
             onModulKlick={onModulKlick}
           />
