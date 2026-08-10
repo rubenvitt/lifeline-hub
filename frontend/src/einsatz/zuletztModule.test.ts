@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ZULETZT_MAX, leseZuletztModule, merkeModulBesuch } from './zuletztModule';
+import {
+  ZULETZT_MAX, leseZuletztModule, loeseZuletztModule, merkeModulBesuch,
+} from './zuletztModule';
 
 describe('zuletztModule', () => {
   // Der Polyfill in `test/setup.ts` ist prozessweit und behält seinen Inhalt zwischen
@@ -49,5 +51,42 @@ describe('zuletztModule', () => {
     // liefe `.slice` auf einer Zahl in einen TypeError im Render-Pfad der Navigation.
     localStorage.setItem('lfh:nav:zuletzt:1', '42');
     expect(leseZuletztModule(1)).toEqual([]);
+  });
+});
+
+/**
+ * Die Auflösung wohnt seit der Fix-Welle (LFH-337 · B3) hier statt inline im
+ * `EinsatzLayout`. Die Filter selbst sind über den gerenderten Rahmen gepinnt
+ * (`EinsatzLayout.test.tsx`); was dort NICHT vorkommt, ist der Aufruf OHNE
+ * Ausschlüsse — der Rahmen übergibt immer beide. Genau der ist hier die Aussage:
+ * `ausser` ist optional, und ein Aufruf ohne es darf nichts wegfiltern.
+ */
+describe('loeseZuletztModule', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('löst ohne Ausschlüsse alle gemerkten Schlüssel auf', () => {
+    merkeModulBesuch(1, 'etb');
+    merkeModulBesuch(1, 'lagekarte');
+    expect(loeseZuletztModule(1, null).map((m) => m.key)).toEqual(['lagekarte', 'etb']);
+  });
+
+  it('verwirft einen Schlüssel, den die Registry nicht kennt', () => {
+    // Ein umbenanntes oder entferntes Modul steht noch im Speicher der Person. Ohne
+    // diesen Zweig führte der Eintrag ins Leere — hier fällt er still heraus.
+    merkeModulBesuch(1, 'gibtesnicht');
+    merkeModulBesuch(1, 'etb');
+    expect(loeseZuletztModule(1, null).map((m) => m.key)).toEqual(['etb']);
+  });
+
+  it('nimmt die beiden Ausschlüsse einzeln entgegen', () => {
+    merkeModulBesuch(1, 'etb');
+    merkeModulBesuch(1, 'lagekarte');
+    // 'etb' liegt in 'erfassung', 'lagekarte' in 'lage' — je Ausschluss bleibt genau
+    // das andere übrig. Getrennt geprüft, weil ein gemeinsamer Aufruf die leere Liste
+    // liefert und damit nicht sagt, WELCHER Ausschluss gegriffen hat.
+    expect(loeseZuletztModule(1, null, undefined, { key: 'lagekarte' }).map((m) => m.key))
+      .toEqual(['etb']);
+    expect(loeseZuletztModule(1, null, undefined, { kategorie: 'erfassung' }).map((m) => m.key))
+      .toEqual(['lagekarte']);
   });
 });
