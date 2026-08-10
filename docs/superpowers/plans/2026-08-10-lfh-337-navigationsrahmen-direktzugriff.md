@@ -1303,29 +1303,32 @@ import { leseZuletztModule } from '../einsatz/zuletztModule';
 Vor dem `useMemo`:
 
 ```ts
-  // Kein `useMemo` und kein React-Zustand: der Speicher liegt in localStorage, ein
-  // memoisierter Lesevorgang zeigte nach einem Modulwechsel noch den vorigen Stand. Die
-  // Liste hat höchstens drei Einträge; die Kosten sind eine Schlüsselsuche pro Render.
-  const zuletztModulKeys = einsatzId == null ? [] : leseZuletztModule(einsatzId);
+  /**
+   * Der Speicher liegt in localStorage, nicht in React: gelesen wird deshalb bei JEDEM
+   * Render — ein memoisierter Lesevorgang zeigte nach einem Modulwechsel noch den
+   * vorigen Stand. Die Liste hat höchstens drei Einträge, die Kosten sind ein
+   * `JSON.parse` pro Render.
+   *
+   * Über das PRIMITIV memoisiert, nicht über das Array: `leseZuletztModule` liefert je
+   * Render ein frisches Array, das als Dependency die Memoisierung darunter wirkungslos
+   * machte. Die Zeichenkette ist bei gleichem Inhalt identisch, das abgeleitete Array
+   * damit identitätsstabil — und die Dependency-Liste bleibt vollständig, ohne
+   * `eslint-disable`. Genau das meint die Lint-Disziplin in CLAUDE.md mit „strukturell
+   * lösen, nicht die fehlende Dependency stumpf hineinzwingen".
+   */
+  const zuletztSchluessel = einsatzId == null ? '' : leseZuletztModule(einsatzId).join(',');
+  const zuletztModulKeys = useMemo(
+    () => (zuletztSchluessel ? zuletztSchluessel.split(',') : []),
+    [zuletztSchluessel],
+  );
 ```
 
-Im `baueBefehle`-Aufruf `zuletztModulKeys,` ergänzen. In der Dependency-Liste des `useMemo`
-**nicht** `zuletztModulKeys` aufnehmen — ein je Render frisches Array machte die
-Memoisierung wirkungslos. Stattdessen die stabile Zeichenkette:
+Im `baueBefehle`-Aufruf `zuletztModulKeys,` ergänzen und die Dependency-Liste des
+bestehenden `useMemo` um `zuletztModulKeys` erweitern — das Array ist jetzt stabil, ein
+`eslint-disable` ist damit **nicht** nötig und wäre ein Fehler:
 
 ```ts
-  const zuletztSchluessel = zuletztModulKeys.join(',');
-```
-
-und in der Dependency-Liste `zuletztSchluessel` statt des Arrays führen, mit
-zeilengenauem Kommentar über der Deps-Zeile:
-
-```ts
-    // `zuletztSchluessel` (Primitiv) statt `zuletztModulKeys`: das Array ist je Render
-    // frisch und machte die Memoisierung wirkungslos. Strukturelle Lösung nach der
-    // Lint-Disziplin in CLAUDE.md — kein `eslint-disable`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen, zuletztSchluessel],
+    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen, zuletztModulKeys],
 ```
 
 - [ ] **Schritt 6: `CommandPalette.tsx` — Listenhöhe**
@@ -1355,8 +1358,10 @@ sind auf die neue Ordnung umzustellen — das ist die beabsichtigte Änderung, k
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-367-dev-clickup-122a26/frontend lint
 ```
 
-Erwartet: 0 Fehler, 0 Warnungen (`--max-warnings 0`). Meldet eslint die Disable-Direktive
-als **ungenutzt**, ist sie ersatzlos zu entfernen — eine tote Direktive ist selbst ein Verstoß.
+Erwartet: 0 Fehler, 0 Warnungen (`--max-warnings 0`). Meldet `react-hooks/exhaustive-deps`
+hier etwas, ist die Ursache die Identitätsstabilität einer Dependency und **nicht** ein
+fehlendes `eslint-disable` — die Regel wird strukturell erfüllt (CLAUDE.md, Lint-Disziplin).
+Ein Disable in dieser Datei ist ein Fehler, kein Ausweg.
 
 - [ ] **Schritt 9: Commit**
 
