@@ -7,7 +7,7 @@ import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  erstesFreigegebenesModul, istModulGesperrt, istModulSichtbar, kategorien, modulRegistry,
+  erstesFreigegebenesModul, kategorien, modulRegistry,
   moduleNachKategorie, modulZielRoute, type KategorieKey, type ModulEintrag,
 } from './modulRegistry';
 import EinsatzSwitcher from './EinsatzSwitcher';
@@ -15,7 +15,7 @@ import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
-import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
+import { loeseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
@@ -120,21 +120,7 @@ export default function EinsatzLayout() {
     setOffeneKategorie(aktiveKategorie);
   }, [aktiveKategorie]);
 
-  /**
-   * Besuch aufzeichnen (LFH-337 · H12). Angesetzt am Modul-KEY, nicht am Objekt: die
-   * Registry-Einträge sind zwar Modulkonstanten, aber ein Primitiv in der
-   * Dependency-Liste erfüllt die exhaustive-deps-Regel strukturell statt sie zu
-   * überreden (CLAUDE.md, Lint-Disziplin).
-   *
-   * `Number.isFinite`, weil `einsatzId` aus `useParams` stammt: auf einer Route ohne
-   * gültige ID legte der Speicher sonst einen Eintrag unter `…:NaN` an.
-   */
   const aktuellerModulKey = aktuellesModul?.key;
-  useEffect(() => {
-    if (aktuellerModulKey && Number.isFinite(einsatzId)) {
-      merkeModulBesuch(einsatzId, aktuellerModulKey);
-    }
-  }, [einsatzId, aktuellerModulKey]);
 
   // Wird der Schirm breit, steht der Rahmen wieder inline — ein gemerktes „Drawer
   // offen" darf dann nicht auf die Rückkehr zum Handschirm warten. `breit` ist ein
@@ -205,6 +191,11 @@ export default function EinsatzLayout() {
    * Hat die Kategorie kein freigegebenes Modul (alles geplant, ausgeblendet oder
    * entzogen), bleibt es beim reinen Aufklappen: ein Sprung ins Leere wäre schlechter
    * als keiner.
+   *
+   * DIESER SPRUNG WIRD NICHT GEMERKT (Fix-Welle, Befund B4). Das Ziel hat niemand
+   * ausgewählt, es ist nur das erste freigegebene Modul der Kategorie — bei drei Plätzen
+   * und sechs Kategorien überschrieben drei Rail-Klicks sonst die ganze „Zuletzt"-Liste.
+   * Die Aufzeichnung sitzt deshalb in `onModulKlick`, dem Weg der bewussten Wahl.
    */
   function onKategorieKlick(key: KategorieKey) {
     if (offeneKategorie === key) {
@@ -229,41 +220,43 @@ export default function EinsatzLayout() {
     setOffeneKategorie((aktuell) => (aktuell === key ? null : key));
   }
 
+  /**
+   * Modulklick — der Weg, auf dem der „Zuletzt"-Speicher gefüllt wird. Panel UND
+   * Drawer-Akkordeon laufen hier durch.
+   *
+   * GEMERKT WIRD, WAS JEMAND GEWÄHLT HAT (LFH-337 · Fix-Welle, Befund B4). Bis dahin hing
+   * die Aufzeichnung an einem Effekt auf den Routenwechsel. Seit der Rail-Klick eine echte
+   * Navigation auslöst, genügten damit DREI Klicks auf fremde Kategorien, um alle drei
+   * Plätze mit „erstes Modul der Kategorie X" zu überschreiben — die Abkürzung erodierte
+   * durch die Bedienung, die im selben Zug dazukam.
+   *
+   * KONSEQUENZ, die kein Fehler ist: ein Deep-Link von außen (Lesezeichen, Verlinkung auf
+   * `/einsaetze/7/personen`) läuft nicht mehr in den Speicher. Das ist gewollt — der
+   * Speicher trägt Wahlen, keine Ankünfte. Wer das später „repariert", holt sich die
+   * Rail-Erosion zurück, denn deren Sprung ist genau so eine Ankunft.
+   *
+   * VOR `navigate`, nicht danach: der Routenwechsel löst den Render aus, der den Speicher
+   * wieder liest. `Number.isFinite`, weil `einsatzId` aus `useParams` stammt — auf einer
+   * Route ohne gültige ID legte der Speicher sonst einen Eintrag unter `…:NaN` an.
+   */
   function onModulKlick(modul: ModulEintrag) {
+    if (Number.isFinite(einsatzId)) merkeModulBesuch(einsatzId, modul.key);
     navigate(einsatzModulPfad(einsatzId, modulZielRoute(modul)));
     setNavOffen(false);
   }
 
   /**
-   * Gemerkte Schlüssel → anzeigbare Module. Die Filter sind dieselben, die die Palette
-   * anlegt (`command-palette/befehle.ts`): fertig, sichtbar, nicht rollen-gesperrt. Ein
-   * Modul, das seit dem Besuch ausgeblendet oder entzogen wurde, verschwindet damit aus
-   * der Abkürzung, statt in eine gesperrte Zeile zu führen.
+   * Die Auflösung selbst wohnt in `zuletztModule.ts` (Fix-Welle, Befund B3) — samt der
+   * Begründung, warum das aktuelle Modul und die offene Kategorie ausgeschlossen sind.
    *
-   * Das AKTUELLE Modul steht bewusst nicht in der Liste: es ist die Seite, auf der man
-   * gerade steht — ein Sprung dorthin ist keine Abkürzung, und die drei Plätze sind knapp.
-   *
-   * DIESELBE Überlegung gilt für die gerade OFFENE Kategorie: „Zuletzt" ist die Abkürzung
-   * zu dem, was NICHT ohnehin sichtbar ist. Steht ein Modul zwei Zeilen weiter unten in der
-   * offenen Kategorieliste, verkürzt ein zweiter Eintrag darüber keinen Weg — er verdoppelt
-   * nur ein Bedienziel und macht dessen Namen mehrdeutig (dieselbe Konsequenz wie „n Zeilen
-   * liefern n gleichnamige Knöpfe", nur zwischen zwei Panel-Bereichen statt zwischen
-   * Zeilen). Der Wert der Zeile liegt gerade im Sprung ÜBER Kategoriegrenzen hinweg. Die
-   * Filterung hängt deshalb an `offeneKategorie` (was das Panel zeigt), nicht an der
-   * Kategorie des aktuellen Moduls.
-   *
-   * Kein `useMemo`: die Liste hat höchstens drei Einträge, und `leseZuletztModule` muss
-   * bei JEDEM Render laufen — der Speicher ist kein React-Zustand, eine Memoisierung über
-   * den Modulschlüssel zeigte nach dem Aufzeichnungs-Effekt noch den vorigen Stand.
+   * Kein `useMemo`: die Liste hat höchstens drei Einträge, und der Speicher muss bei
+   * JEDEM Render gelesen werden — er ist kein React-Zustand, eine Memoisierung über den
+   * Modulschlüssel zeigte nach einem Modulwechsel noch den vorigen Stand.
    */
-  const zuletztModule = leseZuletztModule(einsatzId)
-    .filter((key) => key !== aktuellerModulKey)
-    .map((key) => modulRegistry.find((m) => m.key === key))
-    .filter((m): m is ModulEintrag => m !== undefined
-      && m.status === 'fertig'
-      && m.kategorie !== offeneKategorie
-      && istModulSichtbar(m, modulOverrides)
-      && !istModulGesperrt(m, benutzer, modulOverrides));
+  const zuletztModule = loeseZuletztModule(einsatzId, benutzer, modulOverrides, {
+    key: aktuellerModulKey,
+    kategorie: offeneKategorie,
+  });
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

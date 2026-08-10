@@ -138,11 +138,26 @@ describe('EinsatzLayout', () => {
     expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
   });
 
-  it('merkt das besuchte Modul im Zuletzt-Speicher (LFH-337 · H12)', async () => {
+  /**
+   * Aufzeichnung am KLICK, nicht am Routenwechsel (LFH-337 · Fix-Welle, Befund B4).
+   *
+   * Die Vorfassung dieses Tests behauptete „Route betreten → gemerkt" und prüfte damit
+   * genau das, was jetzt bewusst nicht mehr gilt: der Speicher trägt Wahlen, keine
+   * Ankünfte. Ein Deep-Link von außen füllt ihn deshalb nicht — das ist die Konsequenz
+   * der Entscheidung, nicht eine Lücke.
+   */
+  it('merkt ein per Klick gewähltes Modul im Zuletzt-Speicher (LFH-337 · H12)', async () => {
     localStorage.clear();
     setup();
-    // `waitFor`, weil die Aufzeichnung in einem Effekt nach dem ersten Paint läuft.
-    await waitFor(() => expect(leseZuletztModule(7)).toEqual(['etb']));
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Die Ankunft auf /etb allein merkt NICHTS — die Gegenaussage zur Vorfassung, und
+    // ohne sie bliebe der Test auch mit dem alten Routen-Effekt grün.
+    expect(leseZuletztModule(7)).toEqual([]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Personen' }));
+
+    expect(await screen.findByText('Personen-Inhalt')).toBeInTheDocument();
+    expect(leseZuletztModule(7)).toEqual(['personen']);
   });
 
   /**
@@ -513,8 +528,34 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
 
     // Die Aussage ist der PFAD, nicht der Panel-Zustand (AK5) — die Pfad-Sonde ist
     // dieselbe wie in `ModulStub.test.tsx`, hier als Geschwister der Routes gerendert.
-    await waitFor(() => expect(pfad()).toMatch(/^\/einsaetze\/7\//));
-    await waitFor(() => expect(pfad()).not.toBe('/einsaetze/7/etb'));
+    //
+    // Das ZIEL wird benannt, nicht nur „irgendwohin, aber nicht /etb" (Fix-Welle,
+    // Befund B2): ein Resolver, der das erste Modul einer FALSCHEN Kategorie liefert,
+    // bestünde die schwache Form. Nebenbei hebt die scharfe Fassung einen latenten Fall
+    // ab — `erstesFreigegebenesModul` filtert nach `kategorie`, der Aufrufer navigiert
+    // aber per `modulZielRoute`, das bei gesetztem `verweistAuf` in eine ANDERE
+    // Kategorie spränge. Heute nutzt kein Registry-Eintrag `verweistAuf`; käme einer
+    // dazu, färbte dieser Test rot statt es unbemerkt zu lassen.
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+  });
+
+  /**
+   * Die Gegenaussage zur Aufzeichnung (Fix-Welle, Befund B4): der Rail-Sprung landet NICHT
+   * im „Zuletzt"-Speicher. Bei drei Plätzen und sechs Kategorien überschrieben sonst drei
+   * Rail-Klicks die ganze Liste mit Zielen, die niemand gewählt hat.
+   *
+   * BEIDE Hälften, in dieser Reihenfolge: „nicht gemerkt" ist trivial wahr, wenn der Klick
+   * auch gar nicht navigiert hat. Erst der belegte Pfad macht die leere Liste zur Aussage.
+   */
+  it('merkt den Rail-Sprung NICHT, obwohl er navigiert', async () => {
+    localStorage.clear();
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+    expect(leseZuletztModule(7)).toEqual([]);
   });
 
   it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {

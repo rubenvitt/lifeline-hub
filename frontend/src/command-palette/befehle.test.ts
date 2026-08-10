@@ -310,6 +310,49 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
     expect(befehle.filter((b) => b.gruppe === 'zuletzt')).toEqual([]);
   });
 
+  /**
+   * Die Palette ist ein Weg der BEWUSSTEN Modulwahl und zeichnet deshalb auf
+   * (LFH-337 · Fix-Welle, Befund B4). `baueBefehle` bleibt dabei rein: es ruft nur den
+   * injizierten Callback, die `einsatzId`-Bindung und der Speicherzugriff liegen in
+   * `useBefehle`.
+   */
+  it('meldet beim Ausführen eines Modul-Befehls den Besuch, bevor es navigiert', () => {
+    const reihenfolge: string[] = [];
+    const merkeModulBesuch = vi.fn((key: string) => reihenfolge.push(`merke:${key}`));
+    const navigate = vi.fn((p: string) => reihenfolge.push(`nav:${p}`));
+    const befehle = baueBefehle({ ...kontext({ navigate }), merkeModulBesuch });
+
+    befehle.find((b) => b.id === 'modul:etb')!.ausfuehren();
+
+    expect(merkeModulBesuch).toHaveBeenCalledWith('etb');
+    // Die REIHENFOLGE ist tragend: erst merken, dann navigieren — der Routenwechsel löst
+    // den Render aus, der den Speicher wieder liest.
+    expect(reihenfolge).toEqual(['merke:etb', 'nav:/einsaetze/5/etb']);
+  });
+
+  it('meldet den Besuch auch beim Ausführen eines Zuletzt-Befehls', () => {
+    // Zweiter Weg, eigene Schleife — ohne diese Zeile bliebe unbewiesen, dass sie
+    // dasselbe tut wie die Modul-Schleife.
+    const merkeModulBesuch = vi.fn();
+    const befehle = baueBefehle({ ...kontext(), zuletztModulKeys: ['etb'], merkeModulBesuch });
+
+    befehle.find((b) => b.id === 'zuletzt:etb')!.ausfuehren();
+
+    expect(merkeModulBesuch).toHaveBeenCalledWith('etb');
+  });
+
+  it('lässt eine Schnellaktion den Besuch NICHT melden', () => {
+    // Gegenaussage: eine Schnellaktion („Neue Person erfassen") ist keine Modulwahl,
+    // sondern ein Erfassungssprung. Ohne sie wäre „nur Modul- und Zuletzt-Befehle
+    // zeichnen auf" unbewiesen.
+    const merkeModulBesuch = vi.fn();
+    const befehle = baueBefehle({ ...kontext(), merkeModulBesuch });
+
+    befehle.find((b) => b.id === 'aktion:personen')!.ausfuehren();
+
+    expect(merkeModulBesuch).not.toHaveBeenCalled();
+  });
+
   it('vergibt Zuletzt-Befehlen eigene ids, die nicht mit den Modul-Befehlen kollidieren', () => {
     // Dieselbe id zweimal im Baum macht `aria-activedescendant` mehrdeutig und die
     // React-Keys instabil — die Palette rendert dasselbe Modul in ZWEI Gruppen.

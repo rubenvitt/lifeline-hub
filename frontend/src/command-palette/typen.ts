@@ -31,6 +31,12 @@ export interface BefehlKontext {
   /** Zuletzt besuchte Modulschlüssel des aktuellen Einsatzes (LFH-337 · H12),
    *  jüngstes zuerst. Kommt aus `einsatz/zuletztModule.ts`. */
   zuletztModulKeys?: string[];
+  /**
+   * Aufzeichnung einer BEWUSSTEN Modulwahl (LFH-337 · Fix-Welle, Befund B4). Als Callback
+   * injiziert, damit `baueBefehle` rein bleibt: die Funktion kennt weder `localStorage`
+   * noch die `einsatzId`-Bindung, sie ruft nur, was ihr `useBefehle` gibt.
+   */
+  merkeModulBesuch?: (modulKey: string) => void;
   navigate: (pfad: string) => void;
   setThemeModus: (m: ThemeModus) => void;
   setDichte: (d: Dichte) => void;

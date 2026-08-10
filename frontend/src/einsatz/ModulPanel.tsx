@@ -138,6 +138,13 @@ export function ModulListe({
 }: ListeProps) {
   const { token } = theme.useToken();
   // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben immer sichtbar).
+  //
+  // BLEIBT STEHEN, obwohl die „Zuletzt"-Liste seit der Fix-Welle (LFH-337 · B3) schon
+  // gefiltert hereinkommt: `ModulListe` bedient DREI Aufrufer, und nur einer davon ist
+  // vorgefiltert. Die Kategorielisten — im Panel darunter und im `ModulAkkordeon` —
+  // kommen roh aus `moduleNachKategorie`. Den Filter hier zu entfernen hieße, ihn an
+  // zwei andere Stellen zu kopieren; doppeltes `istModulSichtbar` ist dagegen
+  // idempotent, also Redundanz und kein Fehler.
   const sichtbareModule = module.filter((m) => istModulSichtbar(m, overrides));
   return (
     <div style={modulListenStil(token)}>
