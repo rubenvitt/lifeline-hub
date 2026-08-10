@@ -1,11 +1,12 @@
 // frontend/src/command-palette/befehle.ts
 import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDesktop, TbWorld, TbArrowsMinimize, TbArrowsMaximize, TbHandStop } from 'react-icons/tb';
 import {
-  modulRegistry, istModulSichtbar, istModulGesperrt, modulZielRoute,
+  modulRegistry, istModulFreigegeben, istModulSichtbar, istModulGesperrt, modulZielRoute,
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
   einsaetzePfad,
+  einsatzModulPfad,
   einsatzPfad,
   etbPfad,
   personenPfad,
@@ -104,6 +105,7 @@ export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: strin
 export function baueBefehle(k: BefehlKontext): Befehl[] {
   const befehle: Befehl[] = [];
 
+  // 1. Aktionen — die kontextabhängigen Tastatur-Aktionen der gerade aktiven Maske
   for (const definition of TASTATUR_AKTIONEN) {
     const ausfuehren = k.tastaturAktionen?.[definition.id];
     if (!ausfuehren) continue;
@@ -117,21 +119,36 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     });
   }
 
-  // 1. Module — nur im Einsatz-Kontext, fertig, sichtbar, nicht rollen-gesperrt
+  // 2. bis 4. gelten nur im Einsatz-Kontext.
   if (k.einsatzId != null) {
-    for (const m of modulRegistry) {
-      if (m.status !== 'fertig') continue;
-      if (!istModulSichtbar(m, k.overrides)) continue;
-      if (istModulGesperrt(m, k.benutzer, k.overrides)) continue;
-      const ziel = `/einsaetze/${k.einsatzId}/${modulZielRoute(m)}`;
+    // 2. Zuletzt besucht — Freigabe fragt `istModulFreigegeben` (fertig, sichtbar, nicht
+    //    rollen-gesperrt), dieselbe Funktion wie die Modul-Schleife darunter und der
+    //    Navigationsrahmen. Ein seit dem Besuch entzogenes Modul verschwindet damit aus
+    //    der Abkürzung, statt in eine gesperrte Seite zu führen.
+    //    Eigenes id-Präfix: derselbe Registry-Eintrag steht hier UND unter „Module", und
+    //    zwei gleiche `id` machten `aria-activedescendant` mehrdeutig.
+    for (const key of k.zuletztModulKeys ?? []) {
+      const m = modulRegistry.find((x) => x.key === key);
+      if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+      const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
-        id: `modul:${m.key}`, gruppe: 'module', label: m.label, icon: m.icon,
-        schlagworte: m.beschreibung ? [m.beschreibung] : undefined,
-        ausfuehren: () => k.navigate(ziel),
+        id: `zuletzt:${m.key}`, gruppe: 'zuletzt', label: m.label, icon: m.icon,
+        ausfuehren: () => { k.merkeModulBesuch?.(m.key); k.navigate(ziel); },
       });
     }
 
-    // 2. Schnellaktionen — nur wenn der User schreiben darf (kein Beobachter, aktiver Einsatz)
+    // 3. Module
+    for (const m of modulRegistry) {
+      if (!istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+      const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
+      befehle.push({
+        id: `modul:${m.key}`, gruppe: 'module', label: m.label, icon: m.icon,
+        schlagworte: m.beschreibung ? [m.beschreibung] : undefined,
+        ausfuehren: () => { k.merkeModulBesuch?.(m.key); k.navigate(ziel); },
+      });
+    }
+
+    // 4. Schnellaktionen — nur wenn der User schreiben darf (kein Beobachter, aktiver Einsatz)
     if (k.darfSchreibenImEinsatz) {
       for (const a of SCHNELLAKTIONEN) {
         const m = modulRegistry.find((x) => x.key === a.modulKey);
@@ -145,7 +162,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     }
   }
 
-  // 3. Einsatz-Wechsel — aktive Einsätze (global)
+  // 5. Einsatz-Wechsel — aktive Einsätze (global)
   for (const e of k.einsaetze) {
     if (e.status !== 'aktiv') continue;
     befehle.push({
@@ -155,7 +172,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     });
   }
 
-  // 4. Schnelleinstellungen — global
+  // 6. Schnelleinstellungen — global
   for (const t of THEME_BEFEHLE) {
     befehle.push({ id: t.id, gruppe: 'einstellungen', label: t.label, icon: t.icon, schlagworte: ['theme', 'hell', 'dunkel'], ausfuehren: () => k.setThemeModus(t.modus) });
   }
@@ -166,7 +183,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     befehle.push({ id: `koord:${c.format}`, gruppe: 'einstellungen', label: `Koordinaten: ${c.label}`, icon: TbWorld, schlagworte: ['koordinaten', 'format', c.format], ausfuehren: () => k.setKoordinaten(c.format) });
   }
 
-  // 5. Navigation — global
+  // 7. Navigation — global
   befehle.push({ id: 'nav:einsaetze', gruppe: 'navigation', label: 'Alle Einsätze', icon: TbList, ausfuehren: () => k.navigate(einsaetzePfad()) });
   befehle.push({ id: 'nav:profil', gruppe: 'navigation', label: 'Profil', icon: TbUser, ausfuehren: () => k.navigate('/profil') });
   // Zwei Stufen, bewusst getrennt (LFH-328/M8): Verwaltungsbereich und Stammdaten hängen am

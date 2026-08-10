@@ -95,7 +95,11 @@ export function CommandPalette({ befehle, schliesse }: Props) {
           id="cmd-liste"
           role="listbox"
           ref={listeRef}
-          style={{ maxHeight: 380, overflowY: 'auto', padding: token.paddingXS }}
+          // `min(60vh, 480px)` statt der festen 380 (LFH-337 · M11): auf dem Fükw-Schirm
+          // zeigte der Kasten von 42+ Befehlen rund sieben. Die Obergrenze bleibt, damit
+          // die Liste auf einem hohen Schirm nicht die ganze Seite füllt; `60vh` deckelt
+          // sie auf niedrigen Schirmen, wo 480 px über den Rand liefen.
+          style={{ maxHeight: 'min(60vh, 480px)', overflowY: 'auto', padding: token.paddingXS }}
         >
           {flach.length === 0 && (
             <div style={{ padding: token.padding, color: token.colorTextSecondary }}>Keine Treffer</div>

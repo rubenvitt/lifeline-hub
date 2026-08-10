@@ -30,12 +30,16 @@ const BREIT = { width: 1366, height: 768 };
 
 // Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein
 // geteiltes e2e-Hilfsmodul.
-async function anmelden(page: Page) {
+async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
   await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
+  await page.getByLabel('Benutzername').fill(benutzer);
+  await page.getByLabel('Passwort').fill(passwort);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
+}
+
+async function anmelden(page: Page) {
+  await anmeldenAls(page, ADMIN, PW);
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
@@ -88,6 +92,74 @@ test('Kopfzeile: auf 390 px läuft sie nicht über', async ({ page }) => {
     }));
     expect(masse.scroll, `${route}: Kopfzeile läuft über`).toBeLessThanOrEqual(masse.klient);
   }
+});
+
+/**
+ * DERSELBE Nachweis für den GESPERRTEN Zweig der Topbar (LFH-337 · Fix-Welle, Befund B1).
+ *
+ * Der Test darüber meldet sich als Admin an; `darfVerwaltung(admin)` ist `true`, er läuft
+ * also ausschließlich durch den freien `<Link>`-Zweig von `GlobalLink`
+ * (`src/components/AppLayout.tsx`). Der gesperrte Zweig — gedämpfter Text plus
+ * „Keine Berechtigung"-Tag — war nie gemessen, und genau er ist der breitere: er kann
+ * weder kürzen (`flexShrink: 0`) noch umbrechen (antds `Tag` setzt `white-space: nowrap`).
+ * Ein Guard, der nur den privilegiertesten Benutzer prüft, ist strukturell blind.
+ *
+ * NUR `/einsaetze`, KEINE Einsatzroute: `GlobalLink` wohnt in der Ebene-1-Schale
+ * (`App.tsx:132-133`), der Einsatz-Workspace hat eine eigene Kopfzeile ohne diesen
+ * Eintrag. Damit entfällt zugleich die Mitgliedschaftsfrage an einem vom Admin
+ * angelegten Einsatz.
+ *
+ * Die VORBEDINGUNGEN sind tragend: ohne sie bliebe der Test auch dann grün, wenn
+ * jemand den gesperrten Zweig ganz entfernte — dann liefe die Breitenmessung gegen
+ * eine Kopfzeile ohne den Block, den sie messen soll.
+ */
+test('Kopfzeile: auf 390 px läuft sie auch für einen Benutzer OHNE Verwaltungsrecht nicht über', async ({
+  page,
+}) => {
+  const LAUF = Date.now();
+  const NUTZER = `e2e-kopf-ohne-${LAUF}`;
+  const NUTZER_PW = 'e2e-kopf-ohne-pw-123';
+
+  // Anlegen braucht den Admin. Ohne `system_rolle`/`org_rolle` im Body fällt das
+  // Backend auf 'keiner'/'keine' zurück (`src/routes/benutzer.rs:99-103`) —
+  // `darfVerwaltung` ist damit false. Präzedenz: `fokus-verdeckung.spec.ts:197-209`.
+  await anmelden(page);
+  const angelegt = await page.request.post('/api/benutzer', {
+    data: { anzeigename: `E2E Ohne Recht ${LAUF}`, benutzername: NUTZER, passwort: NUTZER_PW },
+  });
+  expect(
+    angelegt.ok(),
+    `Seeding Benutzer: ${angelegt.status()} ${await angelegt.text()}`,
+  ).toBeTruthy();
+
+  // Sitzung wechseln. Der Cookie-Jar ist zwischen `page` und `page.request` geteilt,
+  // ein Abmelden über die API genügt deshalb.
+  const abgemeldet = await page.request.post('/api/auth/logout');
+  expect(abgemeldet.ok(), `Abmelden: ${abgemeldet.status()}`).toBeTruthy();
+  await anmeldenAls(page, NUTZER, NUTZER_PW);
+
+  await page.setViewportSize(SCHMAL);
+  await page.goto('/einsaetze');
+
+  const kopf = page.locator('header');
+  await expect(kopf).toHaveCount(1);
+  // ── VORBEDINGUNGEN: der gesperrte Zweig muss überhaupt stehen.
+  await expect(
+    page.getByRole('link', { name: 'Verwaltung' }),
+    'Vorbedingung: kein freier Verwaltungs-Link — sonst misst der Test den falschen Zweig',
+  ).toHaveCount(0);
+  await expect(
+    kopf.getByText('Verwaltung', { exact: true }),
+    'Vorbedingung: der gedämpfte Eintrag bleibt auf JEDER Breite stehen (gesperrt statt versteckt)',
+  ).toBeVisible();
+  // Der Tag selbst entfällt unter `lg` — das ist die Änderung, die den Überlauf behebt.
+  await expect(
+    kopf.getByText('Keine Berechtigung'),
+    'unter lg trägt die Kopfzeile den Tag nicht',
+  ).toHaveCount(0);
+
+  const masse = await kopf.evaluate((el) => ({ scroll: el.scrollWidth, klient: el.clientWidth }));
+  expect(masse.scroll, 'Kopfzeile läuft über (gesperrter Zweig)').toBeLessThanOrEqual(masse.klient);
 });
 
 test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläche', async ({ page }) => {

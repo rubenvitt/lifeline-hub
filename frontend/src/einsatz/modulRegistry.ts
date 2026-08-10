@@ -140,6 +140,32 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
   return overrides?.[modul.key]?.sichtbar !== false;
 }
 
+/**
+ * „Ist dieses Modul bedienbar?" — die EINE fachliche Frage hinter dem dreiteiligen
+ * Freigabe-Filter (LFH-337 · Fix-Welle, Befund B3).
+ *
+ * `status === 'fertig' && istModulSichtbar(...) && !istModulGesperrt(...)` stand vorher
+ * viermal wörtlich da: in `erstesFreigegebenesModul` hier, in der „Zuletzt"-Ableitung des
+ * Rahmens und zweimal in `command-palette/befehle.ts`. Vier Kopien einer Bedingung driften
+ * genau an der Stelle auseinander, die niemand testet.
+ *
+ * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerLaden`) führt die
+ * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle vier
+ * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen) sind `fertig`,
+ * beide Fassungen liefern also dasselbe. Ob ein Zähler auch für ein UNFERTIGES Modul laden
+ * darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie steht offen. Wer sie
+ * trifft, zieht die Stelle nach oder schreibt hier hin, warum sie eigenständig bleibt.
+ */
+export function istModulFreigegeben(
+  modul: ModulEintrag,
+  benutzer: BenutzerAnzeige | null,
+  overrides?: ModulOverrides,
+): boolean {
+  return modul.status === 'fertig'
+    && istModulSichtbar(modul, overrides)
+    && !istModulGesperrt(modul, benutzer, overrides);
+}
+
 /** Ziel der Default-Route /einsaetze/:id: Lage-Dashboard sobald fertig, sonst ETB-Fallback. */
 export function redirectZiel(register: ModulEintrag[] = modulRegistry): string {
   const dashboard = register.find((m) => m.key === 'lage-dashboard');
@@ -159,4 +185,28 @@ export function aufloeseStandardModul(
   const modul = register.find((m) => m.key === standardModul);
   if (modul && modul.status === 'fertig') return modulZielRoute(modul);
   return redirectZiel(register);
+}
+
+/**
+ * Erstes bedienbares Modul einer Kategorie (LFH-337 · H12) — oder `null`.
+ *
+ * ABGRENZUNG ZU `aufloeseStandardModul`: das dort löst das EINSATZ-Default-Modul auf
+ * (LFH-131) und fällt auf `redirectZiel()` zurück. Hier geht es um eine einzelne
+ * Kategorie, und ein Fallback wäre falsch: er führte beim Klick auf „Lage" in ein Modul
+ * einer anderen Kategorie. Die Verweigerung ist die richtige Antwort, der Aufrufer
+ * entscheidet dann, nur das Panel zu öffnen.
+ *
+ * Freigabe fragt {@link istModulFreigegeben} — dieselbe Funktion wie die Kommandopalette
+ * und die „Zuletzt"-Auflösung. Registry-Reihenfolge ist die Rangfolge — sie ist im Bestand
+ * bewusst gepflegt (Kommentar `// Führung` u. a.).
+ */
+export function erstesFreigegebenesModul(
+  kategorie: KategorieKey,
+  benutzer: BenutzerAnzeige | null,
+  overrides?: ModulOverrides,
+  register: ModulEintrag[] = modulRegistry,
+): ModulEintrag | null {
+  return register.find(
+    (m) => m.kategorie === kategorie && istModulFreigegeben(m, benutzer, overrides),
+  ) ?? null;
 }

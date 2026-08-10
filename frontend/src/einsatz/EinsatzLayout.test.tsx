@@ -2,13 +2,14 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout from './EinsatzLayout';
+import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -23,11 +24,36 @@ const admin = {
   id: 1, anzeigename: 'Chef', benutzername: 'chef', system_rolle: 'admin',
   org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
 };
+/**
+ * Ein Benutzer OHNE Admin-Bypass — `istModulGesperrt` lässt Admins grundsätzlich frei
+ * (`benutzer?.system_rolle === 'admin' → return false`), deshalb belegt der
+ * `admin`-Benutzer keine Rollen-Sperre. Für den Zuletzt-Filtertest auf „rollen-gesperrt"
+ * braucht es einen Benutzer, an dem die Sperre tatsächlich greifen kann.
+ */
+const mitarbeiterOhneRolle = {
+  id: 2, anzeigename: 'Helfer', benutzername: 'helfer', system_rolle: 'keiner',
+  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+};
 const einsatz = {
   id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
   begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null,
   abgeschlossen_von: null, meine_rolle: 'einsatzleitung',
 };
+
+/**
+ * Sonde für den aktuellen Pfad (Muster `ModulStub.test.tsx`) — beweist die echte
+ * Navigation aus `onKategorieKlick` (LFH-337 · H12), statt nur den Panel-Zustand zu
+ * lesen. Als Geschwister der `Routes` in `setup()` gerendert, damit sie unabhängig
+ * davon steht, welche Kind-Route gerade matcht.
+ */
+function PfadAnzeige() {
+  return <span data-testid="pfad">{useLocation().pathname}</span>;
+}
+
+/** Liest den aktuellen Pfad aus der `PfadAnzeige`-Sonde. */
+function pfad(): string {
+  return screen.getByTestId('pfad').textContent ?? '';
+}
 
 /**
  * `fehler` schaltet die beiden Abrufe des Rahmens einzeln auf 500 — einzeln, weil
@@ -37,9 +63,11 @@ const einsatz = {
 function setup(
   overrides: Record<string, unknown> = {},
   fehler: { einsatz?: boolean; overrides?: boolean } = {},
+  aktuellerBenutzer: typeof admin | typeof mitarbeiterOhneRolle = admin,
+  route: string = '/einsaetze/7/etb',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/auth/me', () => HttpResponse.json(aktuellerBenutzer)),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () =>
       fehler.einsatz ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(einsatz),
@@ -59,11 +87,22 @@ function setup(
                 belegen, dass ein Modulklick im Drawer wirklich navigiert und den
                 Drawer dabei schließt. */}
             <Route path="lagekarte" element={<div>Lagekarte-Inhalt</div>} />
+            {/* Erstes freigegebenes Modul der Kategorie 'lage' (LFH-337 · H12): der
+                Rail-Klick auf eine fremde Kategorie navigiert jetzt dorthin, ohne
+                eigenes Zutun der Tests — ohne diese Route matcht `<Routes>` gar
+                nichts mehr und der Rahmen bliebe leer. */}
+            <Route path="lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
+            {/* Zweites Ziel INNERHALB der Kategorie 'erfassung' (Fix-Runde 1, LFH-337 ·
+                H12): 'personen' ist dort NICHT das erste fertige Modul (das ist 'etb') —
+                nur mit einem Startpunkt jenseits des ersten Moduls sagt die Pfad-Sonde
+                beim Selbstklick-Test überhaupt etwas aus. */}
+            <Route path="personen" element={<div>Personen-Inhalt</div>} />
           </Route>
         </Routes>
+        <PfadAnzeige />
       </CommandPaletteProvider>
     </AuthProvider>,
-    { route: '/einsaetze/7/etb' },
+    { route },
   );
 }
 
@@ -97,6 +136,100 @@ describe('EinsatzLayout', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
     expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
+  });
+
+  /**
+   * Aufzeichnung am KLICK, nicht am Routenwechsel (LFH-337 · Fix-Welle, Befund B4).
+   *
+   * Die Vorfassung dieses Tests behauptete „Route betreten → gemerkt" und prüfte damit
+   * genau das, was jetzt bewusst nicht mehr gilt: der Speicher trägt Wahlen, keine
+   * Ankünfte. Ein Deep-Link von außen füllt ihn deshalb nicht — das ist die Konsequenz
+   * der Entscheidung, nicht eine Lücke.
+   */
+  it('merkt ein per Klick gewähltes Modul im Zuletzt-Speicher (LFH-337 · H12)', async () => {
+    localStorage.clear();
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Die Ankunft auf /etb allein merkt NICHTS — die Gegenaussage zur Vorfassung, und
+    // ohne sie bliebe der Test auch mit dem alten Routen-Effekt grün.
+    expect(leseZuletztModule(7)).toEqual([]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Personen' }));
+
+    expect(await screen.findByText('Personen-Inhalt')).toBeInTheDocument();
+    expect(leseZuletztModule(7)).toEqual(['personen']);
+  });
+
+  /**
+   * Review-Fix (LFH-337 · H12, Fix-Runde 1): Ohne Kategorie-Filter deckte nur der
+   * Ausschluss des AKTUELLEN Moduls die Zuletzt-Liste ab — der häufigste Pfad blieb
+   * unentdeckt. Kategorie „Erfassung" hat fünf Module; wer von „Personen" zu „ETB"
+   * wechselt (beide Erfassung), sähe „Personen" zweimal: einmal unter „Zuletzt",
+   * einmal in der offenen Kategorieliste, beide als gleichnamiger `<button>`.
+   * „Zuletzt" ist die Abkürzung zu dem, was NICHT ohnehin sichtbar ist — ein Modul der
+   * offenen Kategorie steht bereits zwei Zeilen weiter unten, ein zweiter Eintrag
+   * darüber verkürzt nichts, er verdoppelt nur ein Bedienziel.
+   */
+  it('nennt ein Modul der offenen Kategorie nicht zusätzlich unter „Zuletzt"', async () => {
+    localStorage.clear();
+    // 'personen' liegt wie die Route /etb in der Kategorie 'erfassung' — der
+    // Kollisionsfall wird bewusst HERGESTELLT, nicht durch die Testdatenwahl umgangen.
+    merkeModulBesuch(7, 'personen');
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(screen.getAllByRole('button', { name: 'Personen' })).toHaveLength(1);
+    // Die Zuletzt-Gruppe ist damit ganz leer (einziger gemerkter Eintrag war 'personen',
+    // 'etb' selbst ist das aktuelle Modul) — sie darf dann gar nicht erst stehen.
+    expect(screen.queryByText('Zuletzt')).toBeNull();
+  });
+
+  /**
+   * Review-Fix (LFH-337 · H12, Fix-Runde 1): Der Freigabe-Filter der Zuletzt-Ableitung
+   * (`status === 'fertig' && istModulSichtbar(...) && !istModulGesperrt(...)`) war nur
+   * über den reinen Speicher-Roundtrip geprüft, nie über die gerenderte, gefilterte
+   * Ableitung. Ein entzogenes Modul darf nicht als Abkürzung stehenbleiben und in eine
+   * gesperrte Seite führen.
+   *
+   * 'lagekarte' (Kategorie 'lage') ist bewusst gewählt: eine ANDERE Kategorie als die
+   * offene ('erfassung' via /etb) — sonst griffe schon der Kategorie-Filter aus dem Test
+   * darüber, und die Aussage über den Freigabe-Filter wäre nicht von ihm zu unterscheiden.
+   */
+  describe('Zuletzt-Gruppe respektiert die Freigabe-Filter (Review-Fix)', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      merkeModulBesuch(7, 'lagekarte');
+    });
+
+    it('steht ohne Einschränkung unter „Zuletzt"', async () => {
+      setup();
+      expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
+    });
+
+    it('verschwindet, wenn es per Override ausgeblendet ist', async () => {
+      setup({
+        lagekarte: {
+          einsatz_id: 7, modul_key: 'lagekarte', sichtbar: false,
+          benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        },
+      });
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    });
+
+    it('verschwindet, wenn es rollen-gesperrt ist', async () => {
+      setup(
+        {
+          lagekarte: {
+            einsatz_id: 7, modul_key: 'lagekarte', sichtbar: true,
+            benoetigte_rolle: 'fuehrungskraft', geaendert_at: null, geaendert_von: null,
+          },
+        },
+        {},
+        mitarbeiterOhneRolle,
+      );
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    });
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
@@ -383,6 +516,99 @@ describe('EinsatzLayout', () => {
       expect(schliessen.style.minWidth).toBe('48px');
       expect(schliessen.style.minHeight).toBe('48px');
     });
+  });
+});
+
+describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
+  it('springt beim Klick auf eine ANDERE Kategorie in deren erstes Modul', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    // Die Aussage ist der PFAD, nicht der Panel-Zustand (AK5) — die Pfad-Sonde ist
+    // dieselbe wie in `ModulStub.test.tsx`, hier als Geschwister der Routes gerendert.
+    //
+    // Das ZIEL wird benannt, nicht nur „irgendwohin, aber nicht /etb" (Fix-Welle,
+    // Befund B2): ein Resolver, der das erste Modul einer FALSCHEN Kategorie liefert,
+    // bestünde die schwache Form. Nebenbei hebt die scharfe Fassung einen latenten Fall
+    // ab — `erstesFreigegebenesModul` filtert nach `kategorie`, der Aufrufer navigiert
+    // aber per `modulZielRoute`, das bei gesetztem `verweistAuf` in eine ANDERE
+    // Kategorie spränge. Heute nutzt kein Registry-Eintrag `verweistAuf`; käme einer
+    // dazu, färbte dieser Test rot statt es unbemerkt zu lassen.
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+  });
+
+  /**
+   * Die Gegenaussage zur Aufzeichnung (Fix-Welle, Befund B4): der Rail-Sprung landet NICHT
+   * im „Zuletzt"-Speicher. Bei drei Plätzen und sechs Kategorien überschrieben sonst drei
+   * Rail-Klicks die ganze Liste mit Zielen, die niemand gewählt hat.
+   *
+   * BEIDE Hälften, in dieser Reihenfolge: „nicht gemerkt" ist trivial wahr, wenn der Klick
+   * auch gar nicht navigiert hat. Erst der belegte Pfad macht die leere Liste zur Aussage.
+   */
+  it('merkt den Rail-Sprung NICHT, obwohl er navigiert', async () => {
+    localStorage.clear();
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+    expect(leseZuletztModule(7)).toEqual([]);
+  });
+
+  it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {
+    // Die Gegenaussage hält LFH-329/B1 am Leben: der Selbstklick ist der
+    // Zuklapp-Umschalter mit Persistenz. Ohne sie wäre „nur fremde Kategorie
+    // navigiert" unbewiesen — ein bedingungslos navigierender Klick färbte den
+    // Test darüber ebenfalls grün.
+    //
+    // Startpunkt bewusst 'personen', nicht 'etb' (Fix-Runde 1): 'etb' ist das ERSTE
+    // fertige Modul der Kategorie 'erfassung' — eine bedingungslos navigierende
+    // Implementierung landete beim Klick auf „Erfassung" wieder exakt auf 'etb' und
+    // die Pfad-Assertion bliebe grün, obwohl sie genau diesen Bug fangen soll. Mit
+    // 'personen' als Startpunkt ändert ein bedingungsloser Sprung den Pfad wirklich.
+    setup({}, {}, admin, '/einsaetze/7/personen');
+    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
+    const vorher = pfad();
+
+    // „Erfassung" ist die Kategorie von 'personen' — der Klick trifft die aktive.
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
+
+    expect(pfad()).toBe(vorher);
+    // Panel zugeklappt: ein Erfassung-Modul wie „Personen" steht nicht mehr im Baum
+    // (dieselbe Abfrage wie im Bestandstest zum gemerkten Einklapp-Zustand oben).
+    expect(screen.queryByRole('button', { name: 'Personen' })).not.toBeInTheDocument();
+  });
+
+  it('öffnet das Panel auch ohne freigegebenes Modul der Kategorie, navigiert aber nicht', async () => {
+    // Kategorie 'lage' komplett per Override versteckt: der Resolver liefert `null`
+    // (eigens getestet in modulRegistry.test.ts), der Fremdklick bleibt dann beim reinen
+    // Aufklappen — ein Sprung ins Leere wäre schlechter als keiner (Kommentar an
+    // `onKategorieKlick`).
+    const lageVersteckt = Object.fromEntries(
+      ['lage-dashboard', 'lagekarte', 'lageberichte', 'kraefteuebersicht', 'gefahrenzonen', 'lagemeldungen']
+        .map((key) => [key, {
+          einsatz_id: 7, modul_key: key, sichtbar: false,
+          benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        }]),
+    );
+    setup(lageVersteckt);
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const vorher = pfad();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    expect(pfad()).toBe(vorher);
+    // Generischer Typparameter statt `as HTMLElement` (Präzedenz Commit 23386c21,
+    // `LageDashboardPage.test.tsx`): `querySelector` liefert sonst `Element`, `within()`
+    // verlangt `HTMLElement`.
+    await waitFor(() =>
+      expect(document.querySelector<HTMLElement>('[data-lfh="modul-panel"]')).not.toBeNull(),
+    );
+    const panel = document.querySelector<HTMLElement>('[data-lfh="modul-panel"]')!;
+    expect(within(panel).getByText('Lage')).toBeInTheDocument();
   });
 });
 

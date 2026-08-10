@@ -7,14 +7,15 @@ import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  kategorien, modulRegistry, moduleNachKategorie, modulZielRoute,
-  type KategorieKey, type ModulEintrag,
+  erstesFreigegebenesModul, kategorien, modulRegistry,
+  moduleNachKategorie, modulZielRoute, type KategorieKey, type ModulEintrag,
 } from './modulRegistry';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
+import { loeseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
@@ -22,6 +23,7 @@ import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
 import { navDrawerBreite } from '../theme/tokens';
+import { einsatzModulPfad } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
@@ -118,6 +120,8 @@ export default function EinsatzLayout() {
     setOffeneKategorie(aktiveKategorie);
   }, [aktiveKategorie]);
 
+  const aktuellerModulKey = aktuellesModul?.key;
+
   // Wird der Schirm breit, steht der Rahmen wieder inline — ein gemerktes „Drawer
   // offen" darf dann nicht auf die Rückkehr zum Handschirm warten. `breit` ist ein
   // Primitiv, damit ist die Dependency-Regel strukturell erfüllt.
@@ -172,15 +176,39 @@ export default function EinsatzLayout() {
   }
 
   /**
-   * Rail-Klick im inline-Rahmen: derselbe Kategorie-Knopf klappt das Panel zu und
-   * merkt das; ein anderer klappt es wieder auf. Die Rail behält dabei ihre
+   * Rail-Klick im inline-Rahmen.
+   *
+   * SELBSTKLICK = ZUKLAPPEN, FREMDKLICK = SPRUNG (LFH-337 · H12, Entscheidung im Plan).
+   * Derselbe Kategorie-Knopf klappt das Panel zu und merkt das; ein anderer öffnet es und
+   * führt zugleich in das erste freigegebene Modul der Kategorie — vorher lag jedes der
+   * 24 Module exakt zwei Klicks tief.
+   *
+   * WARUM NICHT IMMER NAVIGIEREN: Navigieren ändert `aktuellesModul`, der Effekt oben
+   * setzt daraufhin `offeneKategorie` — ein bedingungsloser Sprung höbe das persistierte
+   * Zuklappen aus LFH-329/B1 in derselben Runde wieder auf. Die Rail behält ihre
    * Hervorhebung, weil sie `offeneKategorie ?? aktiveKategorie` bekommt.
+   *
+   * Hat die Kategorie kein freigegebenes Modul (alles geplant, ausgeblendet oder
+   * entzogen), bleibt es beim reinen Aufklappen: ein Sprung ins Leere wäre schlechter
+   * als keiner.
+   *
+   * DIESER SPRUNG WIRD NICHT GEMERKT (Fix-Welle, Befund B4). Das Ziel hat niemand
+   * ausgewählt, es ist nur das erste freigegebene Modul der Kategorie — bei drei Plätzen
+   * und sechs Kategorien überschrieben drei Rail-Klicks sonst die ganze „Zuletzt"-Liste.
+   * Die Aufzeichnung sitzt deshalb in `onModulKlick`, dem Weg der bewussten Wahl.
    */
   function onKategorieKlick(key: KategorieKey) {
-    const zu = offeneKategorie === key ? !panelEingeklappt : false;
+    if (offeneKategorie === key) {
+      const zu = !panelEingeklappt;
+      setPanelEingeklappt(zu);
+      schreibeNavEingeklappt(zu);
+      return;
+    }
     setOffeneKategorie(key);
-    setPanelEingeklappt(zu);
-    schreibeNavEingeklappt(zu);
+    setPanelEingeklappt(false);
+    schreibeNavEingeklappt(false);
+    const ziel = erstesFreigegebenesModul(key, benutzer, modulOverrides);
+    if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
   }
 
   /**
@@ -192,10 +220,43 @@ export default function EinsatzLayout() {
     setOffeneKategorie((aktuell) => (aktuell === key ? null : key));
   }
 
+  /**
+   * Modulklick — der Weg, auf dem der „Zuletzt"-Speicher gefüllt wird. Panel UND
+   * Drawer-Akkordeon laufen hier durch.
+   *
+   * GEMERKT WIRD, WAS JEMAND GEWÄHLT HAT (LFH-337 · Fix-Welle, Befund B4). Bis dahin hing
+   * die Aufzeichnung an einem Effekt auf den Routenwechsel. Seit der Rail-Klick eine echte
+   * Navigation auslöst, genügten damit DREI Klicks auf fremde Kategorien, um alle drei
+   * Plätze mit „erstes Modul der Kategorie X" zu überschreiben — die Abkürzung erodierte
+   * durch die Bedienung, die im selben Zug dazukam.
+   *
+   * KONSEQUENZ, die kein Fehler ist: ein Deep-Link von außen (Lesezeichen, Verlinkung auf
+   * `/einsaetze/7/personen`) läuft nicht mehr in den Speicher. Das ist gewollt — der
+   * Speicher trägt Wahlen, keine Ankünfte. Wer das später „repariert", holt sich die
+   * Rail-Erosion zurück, denn deren Sprung ist genau so eine Ankunft.
+   *
+   * VOR `navigate`, nicht danach: der Routenwechsel löst den Render aus, der den Speicher
+   * wieder liest. `Number.isFinite`, weil `einsatzId` aus `useParams` stammt — auf einer
+   * Route ohne gültige ID legte der Speicher sonst einen Eintrag unter `…:NaN` an.
+   */
   function onModulKlick(modul: ModulEintrag) {
-    navigate(`/einsaetze/${einsatzId}/${modulZielRoute(modul)}`);
+    if (Number.isFinite(einsatzId)) merkeModulBesuch(einsatzId, modul.key);
+    navigate(einsatzModulPfad(einsatzId, modulZielRoute(modul)));
     setNavOffen(false);
   }
+
+  /**
+   * Die Auflösung selbst wohnt in `zuletztModule.ts` (Fix-Welle, Befund B3) — samt der
+   * Begründung, warum das aktuelle Modul und die offene Kategorie ausgeschlossen sind.
+   *
+   * Kein `useMemo`: die Liste hat höchstens drei Einträge, und der Speicher muss bei
+   * JEDEM Render gelesen werden — er ist kein React-Zustand, eine Memoisierung über den
+   * Modulschlüssel zeigte nach einem Modulwechsel noch den vorigen Stand.
+   */
+  const zuletztModule = loeseZuletztModule(einsatzId, benutzer, modulOverrides, {
+    key: aktuellerModulKey,
+    kategorie: offeneKategorie,
+  });
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -281,6 +342,7 @@ export default function EinsatzLayout() {
             benutzer={benutzer}
             overrides={modulOverrides}
             zaehler={modulZaehler}
+            zuletztModule={zuletztModule}
             aktiverModulKey={aktuellesModul?.key ?? null}
             onModulKlick={onModulKlick}
           />

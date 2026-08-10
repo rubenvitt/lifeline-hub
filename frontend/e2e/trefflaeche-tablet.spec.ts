@@ -3,9 +3,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 /**
  * AK2 aus LFH-333 · B5: der Trefflächen-Nachweis am Führungs-Tablet (LFH-370 · B5j).
  *
- * Gemessen werden zwei Stellen, an denen die Dichte-Staffel bis in die Pixel durchschlagen
- * muss: die Modulzeilen im INLINE-Rahmen und die Aktionsknöpfe einer Bestätigungsblase.
- * Beides auf derselben Route, ein Seitenaufruf für beides.
+ * Gemessen werden drei Stellen, an denen die Dichte-Staffel bis in die Pixel durchschlagen
+ * muss: die Modulzeilen im INLINE-Rahmen, die Kategorie-Ziele der IconRail und die
+ * Aktionsknöpfe einer Bestätigungsblase. Alles auf derselben Route, ein Seitenaufruf.
  *
  * ── WARUM EINE EIGENE DATEI UND NICHT `dichte.spec.ts` ──────────────────────────────
  *
@@ -43,11 +43,18 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * ── WAS HIER BEWUSST NICHT GEMESSEN WIRD ────────────────────────────────────────────
  *
  * Kein routenweiter Scan aller fokussierbaren Elemente. Er bliebe an den bewusst FESTEN
- * 48ern hängen: IconRail (`IconRail.tsx:43-45`), Hamburger und Drawer-Schliesser
- * (`EinsatzLayout.tsx`), `ModulAkkordeon.tsx:44`. Alle drei sind an ihrer Fundstelle
+ * 48ern hängen: Hamburger und Drawer-Schliesser (`EinsatzLayout.tsx`) sowie die
+ * Drawer-Trefffläche in `ModulAkkordeon.tsx:44`. Beide sind an ihrer Fundstelle
  * ausdrücklich als Trefffläche und NICHT als Dichte-Angabe festgeschrieben — ein
  * Handschuh-Durchgang darüber wäre per Konstruktion rot. AK2 misst nur, was der Dichteachse
  * folgt.
+ *
+ * DIE ICONRAIL STAND BIS LFH-337 IN DIESER LISTE UND GEHÖRT NICHT MEHR HINEIN. Seit dem
+ * sichtbaren Etikett trägt `railZielStil` (`IconRail.tsx:41-47`) `Math.max(48,
+ * controlHeight)` — also 48 / 48 / 72 und damit exakt die {@link STAFFEL} dieser Datei;
+ * die 48 ist dort BODEN unter der Staffel, nicht Ersatz für sie. Ein falscher
+ * Ausschlussgrund lädt den nächsten Bearbeiter ein, ihn zu übernehmen, deshalb wird die
+ * Rail seither mitgemessen (Abschnitt (b) unten) statt bloß umgeschrieben.
  *
  * Und keine BREITEN-Zusicherung an beschrifteten Knöpfen: `paddingInlineSM` ist in antds
  * `button/style/token.js:50` das Literal `8 - lineWidth` = 7 und hängt an keinem
@@ -227,7 +234,21 @@ for (const { dichte, soll } of STAFFEL) {
       );
     }
 
-    // ── (b) die AKTIONSKNÖPFE einer Bestätigungsblase, nicht ihr Auslöser ─────────────
+    // ── (b) die Kategorie-Ziele der IconRail ──────────────────────────────────────────
+    //
+    // Auf die Landmarke gescopt: „Lage" steht seit LFH-337 auch als Panel-Überschrift im
+    // Baum, eine seitenweite Namensabfrage träfe zwei Knoten. `drawerIstNichtImBaum` oben
+    // hat die Rail bereits als sichtbar belegt — hier geht es nur noch um die Höhe.
+    const rail = page.getByRole('navigation', { name: 'Kategorien' });
+    for (const kategorie of ['Führung', 'Lage']) {
+      await haeltTreffflaeche(
+        rail.getByRole('button', { name: kategorie, exact: true }),
+        soll,
+        `Kategorie-Ziel „${kategorie}"`,
+      );
+    }
+
+    // ── (c) die AKTIONSKNÖPFE einer Bestätigungsblase, nicht ihr Auslöser ─────────────
     const zeile = page.locator('tr.ant-table-row');
     await expect(zeile, 'genau die eine geseedete Kraft').toHaveCount(1);
 

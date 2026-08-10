@@ -95,3 +95,43 @@ describe('CommandPalette', () => {
     expect(schliesse).not.toHaveBeenCalled();
   });
 });
+
+describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
+  it('stellt bei leerer Suche eine Schnellaktion an die erste Stelle', () => {
+    // OHNE Tastatur-Aktionen: die Gruppe `aktionen` (TASTATUR_AKTIONEN) steht
+    // unverändert vor `schnellaktionen` und wäre sonst die erste — das Ticket
+    // verlangt nur `schnellaktionen` vor `module`, `aktionen` bleibt unangetastet.
+    const befehle: Befehl[] = [
+      { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
+      { id: 'aktion:etb', gruppe: 'schnellaktionen', label: 'Neuer ETB-Eintrag', ausfuehren: () => {} },
+    ];
+    renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
+    const optionen = screen.getAllByRole('option');
+    expect(optionen[0]).toHaveTextContent('Neuer ETB-Eintrag');
+    expect(optionen[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('läuft mit ArrowDown geschlossen über die Gruppengrenze hinweg', async () => {
+    // B7: die Gruppierung ist Darstellung, die Navigation bleibt EINE flache Liste.
+    const befehle: Befehl[] = [
+      { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
+      { id: 'aktion:etb', gruppe: 'schnellaktionen', label: 'Neuer ETB-Eintrag', ausfuehren: () => {} },
+    ];
+    renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
+    await userEvent.keyboard('{ArrowDown}');
+    const optionen = screen.getAllByRole('option');
+    expect(optionen[1]).toHaveTextContent('Einsatztagebuch');
+    expect(optionen[1]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('deckelt die Listenhöhe relativ statt auf 380 px', () => {
+    const befehle: Befehl[] = [
+      { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
+    ];
+    renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
+    // jsdom rechnet kein Layout — prüfbar ist der gesetzte WERT, nicht die Pixelhöhe.
+    expect(document.getElementById('cmd-liste')).toHaveStyle({
+      maxHeight: 'min(60vh, 480px)',
+    });
+  });
+});

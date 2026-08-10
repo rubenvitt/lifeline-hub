@@ -1,6 +1,7 @@
 // frontend/src/command-palette/befehle.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { baueBefehle, kuerzelFuerTastaturAktion, tastaturAktionFuerEreignis } from './befehle';
+import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverride, Koordinatenformat } from '../api/types';
 
@@ -252,5 +253,111 @@ describe('Tastaturaktionen', () => {
     aktionsbefehle[1].ausfuehren();
     expect(speichern).toHaveBeenCalledTimes(1);
     expect(filterZuruecksetzen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () => {
+  it('ordnet Schnellaktionen VOR Module', () => {
+    // Die Aussage hängt an GRUPPEN_REIHENFOLGE, nicht an der Einfügereihenfolge in
+    // baueBefehle — geprüft wird deshalb die Konstante.
+    const s = GRUPPEN_REIHENFOLGE.indexOf('schnellaktionen');
+    const m = GRUPPEN_REIHENFOLGE.indexOf('module');
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThan(m);
+  });
+
+  it('ordnet Zuletzt zwischen Schnellaktionen und Module', () => {
+    const s = GRUPPEN_REIHENFOLGE.indexOf('schnellaktionen');
+    const z = GRUPPEN_REIHENFOLGE.indexOf('zuletzt');
+    const m = GRUPPEN_REIHENFOLGE.indexOf('module');
+    expect(s).toBeLessThan(z);
+    expect(z).toBeLessThan(m);
+  });
+
+  it('baut aus den gemerkten Schlüsseln Zuletzt-Befehle', () => {
+    const befehle = baueBefehle({ ...kontext(), einsatzId: 1, zuletztModulKeys: ['etb'] });
+    const zuletzt = befehle.filter((b) => b.gruppe === 'zuletzt');
+    expect(zuletzt).toHaveLength(1);
+    // modulRegistry führt 'etb' unter dem Kürzel-Label 'ETB' (nicht der Beschreibung
+    // 'Einsatztagebuch.') — baueBefehle übernimmt `m.label` unverändert.
+    expect(zuletzt[0].label).toBe('ETB');
+  });
+
+  it('nimmt ein ausgeblendetes Modul NICHT in Zuletzt auf', () => {
+    // Die Gegenaussage: ohne sie bliebe die Filterung unbewiesen, und ein entzogenes
+    // Modul stünde weiter als Abkürzung in der Palette.
+    const befehle = baueBefehle({
+      ...kontext(),
+      einsatzId: 1,
+      zuletztModulKeys: ['etb'],
+      overrides: { etb: ueberschreibung({ sichtbar: false }) },
+    });
+    expect(befehle.filter((b) => b.gruppe === 'zuletzt')).toEqual([]);
+  });
+
+  it('nimmt ein rollen-gesperrtes Modul NICHT in Zuletzt auf', () => {
+    // Zweiter Freigabe-Filter, unabhängig vom ersten: `istModulSichtbar` und
+    // `istModulGesperrt` sind zwei getrennte Prüfungen in `baueBefehle` — ohne diesen
+    // Test bliebe unbewiesen, dass die Zuletzt-Schleife BEIDE anwendet.
+    const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
+    const befehle = baueBefehle({
+      ...kontext(),
+      benutzer: sichter,
+      einsatzId: 1,
+      zuletztModulKeys: ['etb'],
+      overrides,
+    });
+    expect(befehle.filter((b) => b.gruppe === 'zuletzt')).toEqual([]);
+  });
+
+  /**
+   * Die Palette ist ein Weg der BEWUSSTEN Modulwahl und zeichnet deshalb auf
+   * (LFH-337 · Fix-Welle, Befund B4). `baueBefehle` bleibt dabei rein: es ruft nur den
+   * injizierten Callback, die `einsatzId`-Bindung und der Speicherzugriff liegen in
+   * `useBefehle`.
+   */
+  it('meldet beim Ausführen eines Modul-Befehls den Besuch, bevor es navigiert', () => {
+    const reihenfolge: string[] = [];
+    const merkeModulBesuch = vi.fn((key: string) => reihenfolge.push(`merke:${key}`));
+    const navigate = vi.fn((p: string) => reihenfolge.push(`nav:${p}`));
+    const befehle = baueBefehle({ ...kontext({ navigate }), merkeModulBesuch });
+
+    befehle.find((b) => b.id === 'modul:etb')!.ausfuehren();
+
+    expect(merkeModulBesuch).toHaveBeenCalledWith('etb');
+    // Die REIHENFOLGE ist tragend: erst merken, dann navigieren — der Routenwechsel löst
+    // den Render aus, der den Speicher wieder liest.
+    expect(reihenfolge).toEqual(['merke:etb', 'nav:/einsaetze/5/etb']);
+  });
+
+  it('meldet den Besuch auch beim Ausführen eines Zuletzt-Befehls', () => {
+    // Zweiter Weg, eigene Schleife — ohne diese Zeile bliebe unbewiesen, dass sie
+    // dasselbe tut wie die Modul-Schleife.
+    const merkeModulBesuch = vi.fn();
+    const befehle = baueBefehle({ ...kontext(), zuletztModulKeys: ['etb'], merkeModulBesuch });
+
+    befehle.find((b) => b.id === 'zuletzt:etb')!.ausfuehren();
+
+    expect(merkeModulBesuch).toHaveBeenCalledWith('etb');
+  });
+
+  it('lässt eine Schnellaktion den Besuch NICHT melden', () => {
+    // Gegenaussage: eine Schnellaktion („Neue Person erfassen") ist keine Modulwahl,
+    // sondern ein Erfassungssprung. Ohne sie wäre „nur Modul- und Zuletzt-Befehle
+    // zeichnen auf" unbewiesen.
+    const merkeModulBesuch = vi.fn();
+    const befehle = baueBefehle({ ...kontext(), merkeModulBesuch });
+
+    befehle.find((b) => b.id === 'aktion:personen')!.ausfuehren();
+
+    expect(merkeModulBesuch).not.toHaveBeenCalled();
+  });
+
+  it('vergibt Zuletzt-Befehlen eigene ids, die nicht mit den Modul-Befehlen kollidieren', () => {
+    // Dieselbe id zweimal im Baum macht `aria-activedescendant` mehrdeutig und die
+    // React-Keys instabil — die Palette rendert dasselbe Modul in ZWEI Gruppen.
+    const befehle = baueBefehle({ ...kontext(), einsatzId: 1, zuletztModulKeys: ['etb'] });
+    const ids = befehle.map((b) => b.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
