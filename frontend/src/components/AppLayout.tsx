@@ -1,8 +1,8 @@
-import { Layout, Space, Typography } from 'antd';
-import { LockOutlined } from '@ant-design/icons';
+import { Layout, Space, Tag, Typography } from 'antd';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
+import { farbenDunkel } from '../theme/tokens';
 import ThemeToggle from './ThemeToggle';
 import BenutzerMenu from './BenutzerMenu';
 import CommandPaletteTrigger from './CommandPaletteTrigger';
@@ -27,29 +27,48 @@ const KOPF_STIL = {
   paddingInline: 'var(--lfh-kopf-polsterung)',
 } as const;
 
-/** Topbar-Eintrag: Link wenn frei, sonst ausgegraut mit Schloss (disabled statt versteckt). */
+/** Topbar-Eintrag: Link wenn frei, sonst gedämpft mit sichtbarem Grund (gesperrt statt versteckt). */
 function GlobalLink({ to, label, gesperrt }: { to: string; label: string; gesperrt: boolean }) {
   if (gesperrt) {
     return (
       <Typography.Text
-        title="Keine Berechtigung"
-        style={{ color: 'rgba(255,255,255,0.35)', cursor: 'not-allowed' }}
+        style={{
+          // Farbrolle statt des abgelösten `rgba(255, 255, 255, 0.35)` (Befund M10): der
+          // Hartwert erreichte gegen den Kopfzeilengrund #001529 nur ~3,2:1 und verfehlte
+          // WCAG 1.4.3. `farbenDunkel.schwach` liefert gerechnete 5,3:1 und bleibt dabei
+          // deutlich schwächer als der weisse Aktiv-Link — die Sperre bleibt ablesbar.
+          // `farbenDunkel`, nicht der modusabhängige Token: die Kopfzeile trägt in BEIDEN
+          // Modi denselben dunklen Grund (dieselbe Begründung wie `IconRail.tsx:20-21`).
+          color: farbenDunkel.schwach,
+          cursor: 'not-allowed',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          flexShrink: 0,
+        }}
       >
-        {/* Ikone statt Emoji („Ein Emoji ist keine Ikone", 30.07.2026). Das ist hier kein
-            reiner Formfehler gewesen: das Emoji stand im Textknoten und damit im
-            zugänglichen Namen — vorgelesen wurde „Verwaltung Schloss". Die
-            `aria-hidden`-Hülle ist Pflicht, weil ein @ant-design/icons-Knoten `role="img"`
-            mit englischem `aria-label` mitbringt. Der zweite Kanal bleibt der `title`
-            oben plus `cursor: not-allowed`. */}
-        {label}{' '}
-        <span aria-hidden>
-          <LockOutlined />
-        </span>
+        {label}
+        {/* Der Grund steht als TEXT da, nicht mehr nur im `title` — auf dem
+            Führungs-Tablet gibt es kein Hover, dort war er bis hierher unsichtbar.
+            Damit entfällt zugleich die Schloss-Ikone: sie sagte dasselbe, nur
+            unbeschriftet, und der `title` als einzige Begründung ist genau der Befund.
+            Eigene Farben statt der antd-Vorgabe, weil ein heller Standard-Tag auf dem
+            dunklen Kopfzeilengrund seinerseits den Kontrast verfehlte. */}
+        <Tag
+          style={{
+            margin: 0,
+            color: farbenDunkel.text,
+            background: farbenDunkel.flaeche2,
+            borderColor: farbenDunkel.linieStark,
+          }}
+        >
+          Keine Berechtigung
+        </Tag>
       </Typography.Text>
     );
   }
   return (
-    <Link to={to} style={{ color: '#fff' }}>
+    <Link to={to} style={{ color: '#fff', flexShrink: 0 }}>
       {label}
     </Link>
   );
