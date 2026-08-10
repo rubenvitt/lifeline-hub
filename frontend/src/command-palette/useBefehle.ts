@@ -10,6 +10,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
+import { leseZuletztModule } from '../einsatz/zuletztModule';
 import type { Befehl, TastaturAktionen } from './typen';
 
 /** Verdrahtet Auth/Theme/Router/Query mit der reinen baueBefehle-Funktion. */
@@ -34,9 +35,29 @@ export function useBefehle(tastaturAktionen?: TastaturAktionen): Befehl[] {
   });
   const darfSchreibenImEinsatz = darfImEinsatzSchreiben(aktuellerEinsatz, benutzer);
 
+  /**
+   * Der Speicher liegt in localStorage, nicht in React: gelesen wird deshalb bei JEDEM
+   * Render — ein memoisierter Lesevorgang zeigte nach einem Modulwechsel noch den
+   * vorigen Stand. Die Liste hat höchstens drei Einträge, die Kosten sind ein
+   * `JSON.parse` pro Render.
+   *
+   * Über das PRIMITIV memoisiert, nicht über das Array: `leseZuletztModule` liefert je
+   * Render ein frisches Array, das als Dependency die Memoisierung darunter wirkungslos
+   * machte. Die Zeichenkette ist bei gleichem Inhalt identisch, das abgeleitete Array
+   * damit identitätsstabil — und die Dependency-Liste bleibt vollständig, ohne
+   * `eslint-disable`. Genau das meint die Lint-Disziplin in CLAUDE.md mit „strukturell
+   * lösen, nicht die fehlende Dependency stumpf hineinzwingen".
+   */
+  const zuletztSchluessel = einsatzId == null ? '' : leseZuletztModule(einsatzId).join(',');
+  const zuletztModulKeys = useMemo(
+    () => (zuletztSchluessel ? zuletztSchluessel.split(',') : []),
+    [zuletztSchluessel],
+  );
+
   return useMemo(
     () => baueBefehle({
       einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
+      zuletztModulKeys,
       navigate: (p) => navigate(p),
       setThemeModus: setModus,
       setDichte,
@@ -48,6 +69,6 @@ export function useBefehle(tastaturAktionen?: TastaturAktionen): Befehl[] {
     // `setDichte` gehört hier hinein und ist dafür identitätsstabil (useCallback im
     // Provider) — das aus `useDichte()` zurückgegebene Objekt dagegen NICHT: es ist
     // je Aufruf frisch und würde die Liste bei jedem Render neu bauen.
-    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen],
+    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen, zuletztModulKeys],
   );
 }

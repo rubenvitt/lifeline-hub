@@ -120,6 +120,23 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
 
   // 1. Module — nur im Einsatz-Kontext, fertig, sichtbar, nicht rollen-gesperrt
   if (k.einsatzId != null) {
+    // 0. Zuletzt besucht — dieselben Freigabe-Filter wie bei den Modulen darunter
+    //    (fertig, sichtbar, nicht rollen-gesperrt). Ein seit dem Besuch entzogenes Modul
+    //    verschwindet damit aus der Abkürzung, statt in eine gesperrte Seite zu führen.
+    //    Eigenes id-Präfix: derselbe Registry-Eintrag steht hier UND unter „Module", und
+    //    zwei gleiche `id` machten `aria-activedescendant` mehrdeutig.
+    for (const key of k.zuletztModulKeys ?? []) {
+      const m = modulRegistry.find((x) => x.key === key);
+      if (!m || m.status !== 'fertig') continue;
+      if (!istModulSichtbar(m, k.overrides)) continue;
+      if (istModulGesperrt(m, k.benutzer, k.overrides)) continue;
+      const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
+      befehle.push({
+        id: `zuletzt:${m.key}`, gruppe: 'zuletzt', label: m.label, icon: m.icon,
+        ausfuehren: () => k.navigate(ziel),
+      });
+    }
+
     for (const m of modulRegistry) {
       if (m.status !== 'fertig') continue;
       if (!istModulSichtbar(m, k.overrides)) continue;
