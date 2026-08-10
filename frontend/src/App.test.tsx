@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from './test/utils';
 import { AuthProvider } from './auth/AuthContext';
@@ -55,7 +55,20 @@ describe('App-Routing', () => {
       ).toBe(true),
     );
     // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Lage).
-    expect(await screen.findByText('Lage')).toBeInTheDocument();
+    //
+    // AUF DAS PANEL GESCOPT (LFH-337 · Fix-Welle): seit die Kategorie-Rail ihre Etiketten
+    // als sichtbaren Text trägt statt nur im `aria-label`, steht „Lage" zweimal im Baum —
+    // einmal als Rail-Knopf, einmal als Panel-Überschrift. Eine ungescopte Abfrage bricht
+    // daran mit „Found multiple elements". Der Anker ist das Datenmerkmal des Panels
+    // (`ModulPanel.tsx:240`), nicht die Rail: geprüft werden soll, dass das PANEL auf der
+    // Lage-Kategorie steht — eine Rail-gescopte Abfrage sagte nur, dass es den Knopf gibt,
+    // und wäre auf jeder beliebigen Route grün. Gleiche Bauform wie
+    // `einsatz/EinsatzLayout.test.tsx:566-570`.
+    await waitFor(() => {
+      const panel = document.querySelector<HTMLElement>('[data-lfh="modul-panel"]');
+      expect(panel).not.toBeNull();
+      expect(within(panel!).getByText('Lage')).toBeInTheDocument();
+    });
   });
 
   it('zeigt auf /einsaetze genau eine globale Betriebszeile, wenn der Browser offline ist', async () => {
