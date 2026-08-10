@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { theme } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { farbenDunkel } from '../theme/tokens';
-import IconRail from './IconRail';
+import { dichten, farbenDunkel } from '../theme/tokens';
+import IconRail, { railZielStil } from './IconRail';
 import { kategorien } from './modulRegistry';
 
 /** Legt die Token-Werte des UMGEBENDEN Providers als data-Attribute ab. Bewusst so und
@@ -73,5 +73,65 @@ describe('IconRail', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
     expect(onKlick).toHaveBeenCalledWith('erfassung');
+  });
+
+  it('zeigt jede Kategoriebezeichnung als sichtbaren Text — ohne Hover', () => {
+    renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
+    );
+    // `getByText`, NICHT `getByRole(name:)`: der Name kam schon vorher aus `aria-label`
+    // und wäre auch bei rein bebilderten Knöpfen grün. Die Aussage von Befund H8 ist,
+    // dass der Text SICHTBAR im Baum steht — auf dem Führungs-Tablet gibt es kein Hover.
+    for (const k of kategorien) {
+      expect(screen.getByText(k.label)).toBeVisible();
+    }
+  });
+
+  it('reicht den Tooltip nicht mehr als einzige Textquelle', () => {
+    const { container } = renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
+    );
+    // Gegenaussage zum Test darüber: ohne sie bliebe der Wechsel „Tooltip → Label"
+    // unbewiesen, weil ein zusätzlich gerendertes Label beide Tests grün ließe.
+    expect(container.querySelector('.ant-tooltip')).toBeNull();
+  });
+});
+
+/**
+ * Die Zielhöhe OHNE zu rendern — `test/utils.tsx:31` montiert ein nacktes `ConfigProvider`
+ * ohne unser Theme, `useToken()` liefert dort den antd-Seed (`controlHeight: 32`), also
+ * keine der Stufen 30/48/72. Bauform 1:1 nach `ModulPanel.test.tsx:216-247`.
+ *
+ * Die Böden stehen als LITERALE da und werden NICHT aus `dichten` zurückgelesen — sonst
+ * prüfte der Test den Token gegen sich selbst.
+ */
+describe('IconRail · Dichte', () => {
+  const tokenFuer = (s: keyof typeof dichten) => ({
+    controlHeight: dichten[s].zeilenhoehe,
+    padding: dichten[s].abstand.md,
+    paddingSM: dichten[s].abstand.sm,
+    fontSizeSM: 12,
+  });
+  const hoehe = (s: keyof typeof dichten) =>
+    railZielStil(tokenFuer(s), { aktiv: false }).minHeight;
+
+  it('haelt den A1-Boden von 48 px in JEDER Stufe', () => {
+    // Der Kern des Pakets: `Math.max`, nicht `??`. Mit `??` staende in der kompakten
+    // Stufe 30 — unter dem A1-Boden, den die Rail seit LFH-329 traegt.
+    expect(hoehe('kompakt')).toBe(48);
+    expect(hoehe('komfortabel')).toBe(48);
+    expect(hoehe('handschuh')).toBe(72);
+  });
+
+  it('waechst mit der Staffel, statt auf dem Boden zu kleben', () => {
+    expect(hoehe('kompakt')).toBeLessThan(hoehe('handschuh') as number);
+  });
+
+  it('traegt ZWEI Angaben, nicht eine (LFH-365)', () => {
+    // Die Polsterung allein traegt den Boden nicht, `minHeight` allein klebt den Text
+    // im Handschuh-Betrieb an die Kante.
+    const stil = railZielStil(tokenFuer('handschuh'), { aktiv: false });
+    expect(stil.minHeight).toBe(72);
+    expect(stil.padding).toBeTruthy();
   });
 });
