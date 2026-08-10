@@ -560,10 +560,13 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
 
     expect(pfad()).toBe(vorher);
+    // Generischer Typparameter statt `as HTMLElement` (Präzedenz Commit 23386c21,
+    // `LageDashboardPage.test.tsx`): `querySelector` liefert sonst `Element`, `within()`
+    // verlangt `HTMLElement`.
     await waitFor(() =>
-      expect(document.querySelector('[data-lfh="modul-panel"]')).not.toBeNull(),
+      expect(document.querySelector<HTMLElement>('[data-lfh="modul-panel"]')).not.toBeNull(),
     );
-    const panel = document.querySelector('[data-lfh="modul-panel"]')!;
+    const panel = document.querySelector<HTMLElement>('[data-lfh="modul-panel"]')!;
     expect(within(panel).getByText('Lage')).toBeInTheDocument();
   });
 });
