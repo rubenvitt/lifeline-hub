@@ -224,7 +224,13 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
         benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
       },
     });
-    expect(m?.key).not.toBe(erstes.key);
+    // Konkretes Folgemodul statt bloßer Ungleichheit (Fix-Runde 1): ein Resolver, der bei
+    // gesetztem Override fälschlich kapituliert (`null` statt weiterzusuchen), bestünde
+    // `not.toBe(erstes.key)` trivial — `expect(undefined).not.toBe('einheiten')` ist wahr.
+    // 'personal' ist laut Registry-Reihenfolge das nächste fertige/sichtbare/entsperrte
+    // Modul der Kategorie 'kraefte' nach 'einheiten'.
+    expect(erstes.key).toBe('einheiten');
+    expect(m?.key).toBe('personal');
   });
 
   it('überspringt rollen-gesperrte Module', () => {
@@ -239,7 +245,9 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
         benoetigte_rolle: 'admin', geaendert_at: null, geaendert_von: null,
       },
     });
-    expect(m?.key).not.toBe(erstes.key);
+    // Konkretes Folgemodul statt bloßer Ungleichheit — dieselbe Begründung wie im Test darüber.
+    expect(erstes.key).toBe('einheiten');
+    expect(m?.key).toBe('personal');
   });
 
   it('liefert null, wenn die Kategorie kein freigegebenes Modul hat', () => {

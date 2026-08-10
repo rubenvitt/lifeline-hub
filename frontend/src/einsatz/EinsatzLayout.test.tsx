@@ -64,6 +64,7 @@ function setup(
   overrides: Record<string, unknown> = {},
   fehler: { einsatz?: boolean; overrides?: boolean } = {},
   aktuellerBenutzer: typeof admin | typeof mitarbeiterOhneRolle = admin,
+  route: string = '/einsaetze/7/etb',
 ) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(aktuellerBenutzer)),
@@ -91,12 +92,17 @@ function setup(
                 eigenes Zutun der Tests — ohne diese Route matcht `<Routes>` gar
                 nichts mehr und der Rahmen bliebe leer. */}
             <Route path="lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
+            {/* Zweites Ziel INNERHALB der Kategorie 'erfassung' (Fix-Runde 1, LFH-337 ·
+                H12): 'personen' ist dort NICHT das erste fertige Modul (das ist 'etb') —
+                nur mit einem Startpunkt jenseits des ersten Moduls sagt die Pfad-Sonde
+                beim Selbstklick-Test überhaupt etwas aus. */}
+            <Route path="personen" element={<div>Personen-Inhalt</div>} />
           </Route>
         </Routes>
         <PfadAnzeige />
       </CommandPaletteProvider>
     </AuthProvider>,
-    { route: '/einsaetze/7/etb' },
+    { route },
   );
 }
 
@@ -516,17 +522,49 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // Zuklapp-Umschalter mit Persistenz. Ohne sie wäre „nur fremde Kategorie
     // navigiert" unbewiesen — ein bedingungslos navigierender Klick färbte den
     // Test darüber ebenfalls grün.
-    setup();
-    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    //
+    // Startpunkt bewusst 'personen', nicht 'etb' (Fix-Runde 1): 'etb' ist das ERSTE
+    // fertige Modul der Kategorie 'erfassung' — eine bedingungslos navigierende
+    // Implementierung landete beim Klick auf „Erfassung" wieder exakt auf 'etb' und
+    // die Pfad-Assertion bliebe grün, obwohl sie genau diesen Bug fangen soll. Mit
+    // 'personen' als Startpunkt ändert ein bedingungsloser Sprung den Pfad wirklich.
+    setup({}, {}, admin, '/einsaetze/7/personen');
+    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
     const vorher = pfad();
 
-    // „Erfassung" ist die Kategorie des ETB — der Klick trifft die aktive.
+    // „Erfassung" ist die Kategorie von 'personen' — der Klick trifft die aktive.
     await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
 
     expect(pfad()).toBe(vorher);
-    // Panel zugeklappt: ein Erfassung-Modul wie ETB steht nicht mehr im Baum
+    // Panel zugeklappt: ein Erfassung-Modul wie „Personen" steht nicht mehr im Baum
     // (dieselbe Abfrage wie im Bestandstest zum gemerkten Einklapp-Zustand oben).
-    expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Personen' })).not.toBeInTheDocument();
+  });
+
+  it('öffnet das Panel auch ohne freigegebenes Modul der Kategorie, navigiert aber nicht', async () => {
+    // Kategorie 'lage' komplett per Override versteckt: der Resolver liefert `null`
+    // (eigens getestet in modulRegistry.test.ts), der Fremdklick bleibt dann beim reinen
+    // Aufklappen — ein Sprung ins Leere wäre schlechter als keiner (Kommentar an
+    // `onKategorieKlick`).
+    const lageVersteckt = Object.fromEntries(
+      ['lage-dashboard', 'lagekarte', 'lageberichte', 'kraefteuebersicht', 'gefahrenzonen', 'lagemeldungen']
+        .map((key) => [key, {
+          einsatz_id: 7, modul_key: key, sichtbar: false,
+          benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        }]),
+    );
+    setup(lageVersteckt);
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const vorher = pfad();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    expect(pfad()).toBe(vorher);
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="modul-panel"]')).not.toBeNull(),
+    );
+    const panel = document.querySelector('[data-lfh="modul-panel"]')!;
+    expect(within(panel).getByText('Lage')).toBeInTheDocument();
   });
 });
 
