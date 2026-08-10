@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
+import { einsatzPfad } from '../routing/deeplinks';
 
 /**
  * Switcher im Einsatz-Header: aktive Einsätze + Rückwege.
@@ -34,7 +35,9 @@ export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'alle') navigate('/einsaetze');
     else if (key === 'stammdaten') navigate('/stammdaten');
-    else if (key.startsWith('einsatz-')) navigate(`/einsaetze/${key.slice('einsatz-'.length)}`);
+    else if (key.startsWith('einsatz-')) {
+      navigate(einsatzPfad(Number(key.slice('einsatz-'.length))));
+    }
   };
 
   return (

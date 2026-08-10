@@ -6,6 +6,7 @@ import {
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
   einsaetzePfad,
+  einsatzModulPfad,
   einsatzPfad,
   etbPfad,
   personenPfad,
@@ -123,7 +124,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       if (m.status !== 'fertig') continue;
       if (!istModulSichtbar(m, k.overrides)) continue;
       if (istModulGesperrt(m, k.benutzer, k.overrides)) continue;
-      const ziel = `/einsaetze/${k.einsatzId}/${modulZielRoute(m)}`;
+      const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
         id: `modul:${m.key}`, gruppe: 'module', label: m.label, icon: m.icon,
         schlagworte: m.beschreibung ? [m.beschreibung] : undefined,

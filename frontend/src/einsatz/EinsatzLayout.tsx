@@ -22,6 +22,7 @@ import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
 import { navDrawerBreite } from '../theme/tokens';
+import { einsatzModulPfad } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
@@ -193,7 +194,7 @@ export default function EinsatzLayout() {
   }
 
   function onModulKlick(modul: ModulEintrag) {
-    navigate(`/einsaetze/${einsatzId}/${modulZielRoute(modul)}`);
+    navigate(einsatzModulPfad(einsatzId, modulZielRoute(modul)));
     setNavOffen(false);
   }
 
