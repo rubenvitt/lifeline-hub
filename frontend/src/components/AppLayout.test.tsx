@@ -120,7 +120,7 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
   it('nennt den Grund als sichtbaren Text, nicht nur im title', async () => {
     // Default-`/api/auth/me` liefert 401 → benutzer = null → darfVerwaltung false.
     // CommandPaletteProvider ist hier Pflicht: AppLayout rendert CommandPaletteTrigger,
-    // dessen useCommandPalette() ausserhalb dieses Providers wirft — renderMitProviders
+    // dessen useCommandPalette() außerhalb dieses Providers wirft — renderMitProviders
     // liefert ihn nicht mit, das ist AppLayout-spezifisch wie im `setup()` oben.
     renderMitProviders(
       <CommandPaletteProvider>
@@ -130,7 +130,7 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
     expect(await screen.findByText('Keine Berechtigung')).toBeVisible();
   });
 
-  it('faerbt den gesperrten Link aus der Farbrolle, nicht aus einem rgba-Hartwert', async () => {
+  it('färbt den gesperrten Link aus der Farbrolle, nicht aus einem rgba-Hartwert', async () => {
     renderMitProviders(
       <CommandPaletteProvider>
         <AppLayout />
@@ -138,13 +138,13 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
     );
     const text = (await screen.findByText('Verwaltung')).closest('span');
     // Die ROLLE ist die Aussage, nicht die Zahl: `farbenDunkel.schwach` liefert gegen
-    // den Kopfzeilengrund #001529 gerechnete 5,3:1, der abgeloeste Wert
+    // den Kopfzeilengrund #001529 gerechnete 5,3:1, der abgelöste Wert
     // rgba(255,255,255,0.35) nur ~3,2:1. jsdom rechnet keine Farbmischung — die Zahl
     // steht deshalb im Commit, hier steht die Herkunft.
     expect(text).toHaveStyle({ color: farbenDunkel.schwach });
   });
 
-  it('zeigt fuer Berechtigte den freien Link ohne Sperrhinweis', async () => {
+  it('zeigt für Berechtigte den freien Link ohne Sperrhinweis', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({
         id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
@@ -157,8 +157,8 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
         <AppLayout />
       </CommandPaletteProvider>,
     );
-    // Die Gegenaussage macht die erste ueberhaupt pruefbar: ohne sie waere ein
-    // dauerhaft eingeblendetes „Keine Berechtigung" ebenfalls gruen.
+    // Die Gegenaussage macht die erste überhaupt prüfbar: ohne sie wäre ein
+    // dauerhaft eingeblendetes „Keine Berechtigung" ebenfalls grün.
     expect(await screen.findByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
     expect(screen.queryByText('Keine Berechtigung')).toBeNull();
   });

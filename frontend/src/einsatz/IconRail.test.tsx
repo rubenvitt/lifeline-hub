@@ -117,21 +117,21 @@ describe('IconRail · Dichte', () => {
   const hoehe = (s: keyof typeof dichten) =>
     railZielStil(tokenFuer(s), { aktiv: false }).minHeight;
 
-  it('haelt den A1-Boden von 48 px in JEDER Stufe', () => {
-    // Der Kern des Pakets: `Math.max`, nicht `??`. Mit `??` staende in der kompakten
-    // Stufe 30 — unter dem A1-Boden, den die Rail seit LFH-329 traegt.
+  it('hält den A1-Boden von 48 px in JEDER Stufe', () => {
+    // Der Kern des Pakets: `Math.max`, nicht `??`. Mit `??` stände in der kompakten
+    // Stufe 30 — unter dem A1-Boden, den die Rail seit LFH-329 trägt.
     expect(hoehe('kompakt')).toBe(48);
     expect(hoehe('komfortabel')).toBe(48);
     expect(hoehe('handschuh')).toBe(72);
   });
 
-  it('waechst mit der Staffel, statt auf dem Boden zu kleben', () => {
+  it('wächst mit der Staffel, statt auf dem Boden zu kleben', () => {
     expect(hoehe('kompakt')).toBeLessThan(hoehe('handschuh') as number);
   });
 
-  it('traegt ZWEI Angaben, nicht eine (LFH-365)', () => {
-    // Die Polsterung allein traegt den Boden nicht, `minHeight` allein klebt den Text
-    // im Handschuh-Betrieb an die Kante. `toBeTruthy()` allein wuerde nur Anwesenheit
+  it('trägt ZWEI Angaben, nicht eine (LFH-365)', () => {
+    // Die Polsterung allein trägt den Boden nicht, `minHeight` allein klebt den Text
+    // im Handschuh-Betrieb an die Kante. `toBeTruthy()` allein würde nur Anwesenheit
     // belegen, nicht Korrektheit — deshalb der konkrete Wert als LITERAL: `paddingSM`
     // der Stufe (16) senkrecht, `padding` der Stufe (26) waagerecht auf 8 gedeckelt
     // (`Math.min(token.padding, 8)` in `railZielStil`).

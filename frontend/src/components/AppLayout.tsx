@@ -53,7 +53,7 @@ function GlobalLink({
           // Farbrolle statt des abgelösten `rgba(255, 255, 255, 0.35)` (Befund M10): der
           // Hartwert erreichte gegen den Kopfzeilengrund #001529 nur ~3,2:1 und verfehlte
           // WCAG 1.4.3. `farbenDunkel.schwach` liefert gerechnete 5,3:1 und bleibt dabei
-          // deutlich schwächer als der weisse Aktiv-Link — die Sperre bleibt ablesbar.
+          // deutlich schwächer als der weiße Aktiv-Link — die Sperre bleibt ablesbar.
           // `farbenDunkel`, nicht der modusabhängige Token: die Kopfzeile trägt in BEIDEN
           // Modi denselben dunklen Grund (dieselbe Begründung wie `IconRail.tsx:20-21`).
           color: farbenDunkel.schwach,
