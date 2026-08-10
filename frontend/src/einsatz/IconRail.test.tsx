@@ -82,18 +82,20 @@ describe('IconRail', () => {
     // `getByText`, NICHT `getByRole(name:)`: der Name kam schon vorher aus `aria-label`
     // und wäre auch bei rein bebilderten Knöpfen grün. Die Aussage von Befund H8 ist,
     // dass der Text SICHTBAR im Baum steht — auf dem Führungs-Tablet gibt es kein Hover.
+    //
+    // Dieser Test trägt die GANZE Aussage „nicht mehr nur im Tooltip" allein, ohne
+    // Interaktion: kein `userEvent.hover`, kein Fokus. Ein früherer Gegentest wollte
+    // zusätzlich `.ant-tooltip` im Baum verneinen — das ist eine Attrappe, keine
+    // zweite Zusicherung: antd mountet Tooltip-Inhalt erst bei `open` (ohne Hover nie
+    // im Baum, mit oder ohne diese Änderung) und rendert ihn bei offenem Zustand
+    // ohnehin per Portal an `document.body`, außerhalb des RTL-`container`. Ein
+    // `querySelector('.ant-tooltip')` wäre vor UND nach dem Umbau `null` gewesen. Wer
+    // die Tooltip-Abwesenheit zusätzlich belegen will, braucht einen Timeout-Test auf
+    // ein Portal, das nie kommt — das ist kein Beweis. Diese `getByText`-Schleife
+    // dagegen wäre rot, fände sie den Text nur im (ungeöffneten) Tooltip.
     for (const k of kategorien) {
       expect(screen.getByText(k.label)).toBeVisible();
     }
-  });
-
-  it('reicht den Tooltip nicht mehr als einzige Textquelle', () => {
-    const { container } = renderMitProviders(
-      <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
-    );
-    // Gegenaussage zum Test darüber: ohne sie bliebe der Wechsel „Tooltip → Label"
-    // unbewiesen, weil ein zusätzlich gerendertes Label beide Tests grün ließe.
-    expect(container.querySelector('.ant-tooltip')).toBeNull();
   });
 });
 
@@ -129,9 +131,12 @@ describe('IconRail · Dichte', () => {
 
   it('traegt ZWEI Angaben, nicht eine (LFH-365)', () => {
     // Die Polsterung allein traegt den Boden nicht, `minHeight` allein klebt den Text
-    // im Handschuh-Betrieb an die Kante.
+    // im Handschuh-Betrieb an die Kante. `toBeTruthy()` allein wuerde nur Anwesenheit
+    // belegen, nicht Korrektheit — deshalb der konkrete Wert als LITERAL: `paddingSM`
+    // der Stufe (16) senkrecht, `padding` der Stufe (26) waagerecht auf 8 gedeckelt
+    // (`Math.min(token.padding, 8)` in `railZielStil`).
     const stil = railZielStil(tokenFuer('handschuh'), { aktiv: false });
     expect(stil.minHeight).toBe(72);
-    expect(stil.padding).toBeTruthy();
+    expect(stil.padding).toBe('16px 8px');
   });
 });
