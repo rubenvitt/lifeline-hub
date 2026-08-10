@@ -27,8 +27,25 @@ const KOPF_STIL = {
   paddingInline: 'var(--lfh-kopf-polsterung)',
 } as const;
 
-/** Topbar-Eintrag: Link wenn frei, sonst gedämpft mit sichtbarem Grund (gesperrt statt versteckt). */
-function GlobalLink({ to, label, gesperrt }: { to: string; label: string; gesperrt: boolean }) {
+/**
+ * Topbar-Eintrag: Link wenn frei, sonst gedämpft mit sichtbarem Grund (gesperrt statt versteckt).
+ *
+ * `grundSichtbar` kommt als PROP herein und wird hier NICHT selbst erfragt: die Breitenfrage
+ * stellt ausschließlich `useViewport` im Elternteil (erzwungen von
+ * `useViewport.guard.test.ts`) — eine zweite, handgeschriebene Abfrage driftet still von
+ * antds Schwellen weg.
+ */
+function GlobalLink({
+  to,
+  label,
+  gesperrt,
+  grundSichtbar,
+}: {
+  to: string;
+  label: string;
+  gesperrt: boolean;
+  grundSichtbar: boolean;
+}) {
   if (gesperrt) {
     return (
       <Typography.Text
@@ -53,17 +70,30 @@ function GlobalLink({ to, label, gesperrt }: { to: string; label: string; gesper
             Damit entfällt zugleich die Schloss-Ikone: sie sagte dasselbe, nur
             unbeschriftet, und der `title` als einzige Begründung ist genau der Befund.
             Eigene Farben statt der antd-Vorgabe, weil ein heller Standard-Tag auf dem
-            dunklen Kopfzeilengrund seinerseits den Kontrast verfehlte. */}
-        <Tag
-          style={{
-            margin: 0,
-            color: farbenDunkel.text,
-            background: farbenDunkel.flaeche2,
-            borderColor: farbenDunkel.linieStark,
-          }}
-        >
-          Keine Berechtigung
-        </Tag>
+            dunklen Kopfzeilengrund seinerseits den Kontrast verfehlte.
+
+            ERST AB `lg` (LFH-337 · Fix-Welle): der Block kann weder kürzen noch
+            umbrechen — `flexShrink: 0` oben sperrt das Kürzen (und muss bleiben, sonst
+            bräche der Tag INNERHALB der Kopfzeile um), antds `Tag` setzt
+            `white-space: nowrap`. Auf 390 px verlangte die Kopfzeile damit gemessen
+            rund 458 px bei 366 px nutzbarer Breite. Das Führungs-Tablet liegt bei
+            1024–1280 px, also ≥ `lg` — der „kein Hover"-Fall, für den der sichtbare
+            Grund gebaut wurde, behält dort seinen Grund. Nur der 390-px-Kontext
+            verliert ihn wieder, und dessen Kopfzeilenbudget ist eine bewirtschaftete
+            Größe (LFH-329 · B1). Der gedämpfte Link selbst bleibt auf JEDER Breite
+            stehen: „gesperrt statt versteckt" ist die Regel, nicht der Tag. */}
+        {grundSichtbar && (
+          <Tag
+            style={{
+              margin: 0,
+              color: farbenDunkel.text,
+              background: farbenDunkel.flaeche2,
+              borderColor: farbenDunkel.linieStark,
+            }}
+          >
+            Keine Berechtigung
+          </Tag>
+        )}
       </Typography.Text>
     );
   }
@@ -89,7 +119,12 @@ export default function AppLayout() {
         <Link to="/einsaetze" style={{ color: '#fff', fontWeight: 600, fontSize: 18 }}>
           lifeline-hub
         </Link>
-        <GlobalLink to="/admin" label="Verwaltung" gesperrt={!darfVerwaltung(benutzer)} />
+        <GlobalLink
+          to="/admin"
+          label="Verwaltung"
+          gesperrt={!darfVerwaltung(benutzer)}
+          grundSichtbar={breit}
+        />
         <Space style={{ marginLeft: 'auto' }} size="middle">
           <CommandPaletteTrigger />
           {/* Unter `lg` wandern Farbschema UND Bediendichte ins Benutzermenü —

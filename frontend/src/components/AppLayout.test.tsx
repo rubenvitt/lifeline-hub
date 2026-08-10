@@ -162,4 +162,33 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
     expect(await screen.findByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
     expect(screen.queryByText('Keine Berechtigung')).toBeNull();
   });
+
+  /**
+   * Der Tag steht erst ab `lg` (LFH-337 · Fix-Welle, Befund B1).
+   *
+   * Der Block kann weder kürzen noch umbrechen (`flexShrink: 0` plus antds
+   * `white-space: nowrap` am Tag); auf 390 px sprengte er die Kopfzeile. Die Zahl
+   * misst nur der Browser — die e2e-Wache dafür steht in
+   * `e2e/kopfzeile-schmal.spec.ts`. Hier wird die Verdrahtung geprüft, die sie trägt.
+   *
+   * ZWEI Zusicherungen, nicht eine: ohne die zweite („der gedämpfte Link steht noch")
+   * bliebe der Test auch dann grün, wenn jemand den ganzen gesperrten Zweig entfernte —
+   * und „gesperrt statt versteckt" ist die Regel, die dieser Zweig trägt.
+   */
+  it('lässt auf 390 px nur den Tag weg, nicht den gedämpften Link', async () => {
+    // Breite VOR dem Render: antds Beobachter ruft seinen Zuhörer beim Abonnieren
+    // synchron auf und liest dabei nur `matches`.
+    setzeViewportBreite(390);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <AppLayout />
+      </CommandPaletteProvider>,
+    );
+    const verwaltung = await screen.findByText('Verwaltung');
+    expect(verwaltung).toBeVisible();
+    // Immer noch der GESPERRTE Zweig, nicht der freie Link — sonst prüfte die Zeile
+    // darunter einen Zustand, in dem es ohnehin keinen Tag gäbe.
+    expect(screen.queryByRole('link', { name: 'Verwaltung' })).toBeNull();
+    expect(screen.queryByText('Keine Berechtigung')).toBeNull();
+  });
 });
