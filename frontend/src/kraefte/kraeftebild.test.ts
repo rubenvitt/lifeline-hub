@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { baueKraeftebild, filtereKraefte, rendereMeldebildMarkdown, OHNE_ABSCHNITT_KEY } from './kraeftebild';
+import { baueKraeftebild, filtereKraefte, rendereMeldebildMarkdown, verdichte, OHNE_ABSCHNITT_KEY } from './kraeftebild';
 import type { Einheit, EinsatzPersonal, EinsatzFahrzeug, EinsatzMaterial, Einsatzabschnitt } from '../api/types';
 
 const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzabschnitt =>
@@ -226,4 +226,53 @@ it('Brücke: die Wurzelzeilen summieren sich auf die Verdichtung — beide Achse
   expect(bild.verdichtung.fahrzeugStatus).toEqual({
     verfuegbar: 2, gebunden: 1, nicht_verfuegbar: 0, ohne: 1,
   });
+});
+
+// ── verdichte() als eigenständige reine Funktion (LFH-338 · C3) ────────────────
+//
+// Dieselbe Rechnung wird dreimal gebraucht: gefiltert für die Kopfzahlen, UNGEFILTERT als
+// Bezugswert daneben und in der Verdichtungszeile der vier Kräfte-Modulseiten. Solange sie
+// im Rumpf von `baueKraeftebild` steckte, war der zweite und dritte Aufruf nur über einen
+// vollen Baumaufbau zu haben — inklusive Abschnitten und Einheiten, die keiner der beiden
+// braucht.
+
+it('verdichte summiert Stärke, Status und Mengen über die drei Rohlisten', () => {
+  const v = verdichte(
+    [p(1, null, 'fuehrer'), p(2, null, 'mannschaft'), p(3, null, 'mannschaft', 'verfuegbar')],
+    [fz(1, null, 'verfuegbar'), fz(2, null, 'nicht_verfuegbar')],
+    [mat(1, null, 'einsatzbereit'), mat(2, null, 'defekt'), mat(3, null, 'defekt')],
+  );
+
+  expect(v.staerke).toEqual({ fuehrer: 1, unterfuehrer: 0, mannschaft: 2, gesamt: 3 });
+  expect(v.personalStatus).toEqual({ verfuegbar: 1, gebunden: 2, nicht_verfuegbar: 0, ohne: 0 });
+  expect(v.fahrzeugStatus).toEqual({ verfuegbar: 1, gebunden: 0, nicht_verfuegbar: 1, ohne: 0 });
+  expect(v.materialStatus.einsatzbereit).toBe(1);
+  expect(v.materialStatus.defekt).toBe(2);
+  expect(v.anzahlPersonal).toBe(3);
+  expect(v.anzahlFahrzeuge).toBe(2);
+  expect(v.anzahlMaterialPositionen).toBe(3);
+});
+
+it('verdichte liefert auf leeren Listen Nullen statt undefined', () => {
+  const v = verdichte([], [], []);
+  expect(v.staerke.gesamt).toBe(0);
+  expect(v.anzahlPersonal).toBe(0);
+  expect(v.materialStatus.einsatzbereit).toBe(0);
+  expect(v.fahrzeugStatus.ohne).toBe(0);
+});
+
+// Die Gleichheit ist die eigentliche Zusicherung der Auslösung: `baueKraeftebild` DARF nicht
+// anders rechnen als die herausgelöste Funktion, sonst zeigt der Kopf zwei Wahrheiten.
+it('verdichte stimmt mit der Verdichtung aus baueKraeftebild überein', () => {
+  const personal = [p(1, 10, 'fuehrer'), p(2, 10, 'mannschaft'), p(3, null, 'mannschaft')];
+  const fahrzeuge = [fz(1, 10), fz(2, null, 'gebunden')];
+  const material = [mat(1, 10, 'im_einsatz')];
+  const bild = baueKraeftebild([ab(1)], [eh(10, 1)], personal, fahrzeuge, material);
+  const v = verdichte(personal, fahrzeuge, material);
+
+  expect(v.staerke).toEqual(bild.verdichtung.staerke);
+  expect(v.personalStatus).toEqual(bild.verdichtung.personalStatus);
+  expect(v.fahrzeugStatus).toEqual(bild.verdichtung.fahrzeugStatus);
+  expect(v.materialStatus).toEqual(bild.verdichtung.materialStatus);
+  expect(v.anzahlMaterialPositionen).toBe(bild.verdichtung.anzahlMaterialPositionen);
 });

@@ -496,6 +496,62 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/** Verdichtung ohne `soll` — der Teil, der sich allein aus den drei Mittel-Listen ergibt. */
+export type Kurzverdichtung = Omit<Verdichtung, 'soll'>;
+
+/**
+ * Kopfzahlen aus den ROHLISTEN, nicht aus dem Baum.
+ *
+ * Herausgelöst (LFH-338 · C3), weil dieselbe Rechnung dreimal gebraucht wird: gefiltert für
+ * die Kopfzahlen der Kräfteübersicht, UNGEFILTERT als Bezugswert daneben — ohne ihn
+ * verschwindet die Gesamtstärke des Einsatzes in dem Moment, in dem jemand einen Abschnitt
+ * anwählt, und genau dann wird sie an die übergeordnete Führungsstelle gemeldet — und ein
+ * drittes Mal in der Verdichtungszeile der vier Kräfte-Modulseiten.
+ *
+ * `soll` bleibt DRAUSSEN und ist deshalb kein Feld von `Kurzverdichtung`: es kumuliert über
+ * den Einheitenbaum (`gesammeltesSoll` unten) und ist aus den drei Listen allein nicht
+ * bestimmbar. Wer es hier vermisst, braucht `baueKraeftebild`.
+ */
+export function verdichte(
+  personal: EinsatzPersonal[],
+  fahrzeuge: EinsatzFahrzeug[],
+  material: EinsatzMaterial[],
+): Kurzverdichtung {
+  const staerke = leereStaerke();
+  const personalStatus = leereVert();
+  const fahrzeugStatus = leereVert();
+  const materialStatus: Record<MaterialStatus, number> = {
+    einsatzbereit: 0,
+    im_einsatz: 0,
+    defekt: 0,
+    verbraucht: 0,
+    desinfektion_noetig: 0,
+  };
+
+  for (const ep of personal) {
+    addPosition(staerke, ep.staerke_position);
+    addKategorie(personalStatus, ep.status_kategorie);
+  }
+
+  for (const ef of fahrzeuge) {
+    addKategorie(fahrzeugStatus, ef.status_kategorie);
+  }
+
+  for (const em of material) {
+    materialStatus[em.status] += 1;
+  }
+
+  return {
+    staerke,
+    personalStatus,
+    fahrzeugStatus,
+    materialStatus,
+    anzahlPersonal: personal.length,
+    anzahlFahrzeuge: fahrzeuge.length,
+    anzahlMaterialPositionen: material.length,
+  };
+}
+
 export function baueKraeftebild(
   abschnitte: Einsatzabschnitt[],
   einheiten: Einheit[],
@@ -732,42 +788,12 @@ export function baueKraeftebild(
     });
   }
 
-  // ── Verdichtung: computed from raw lists (NOT from tree) ─────────────────
-  const verdichtungStaerke = leereStaerke();
-  const personalStatus = leereVert();
-  const fahrzeugStatus = leereVert();
-  const materialStatus: Record<MaterialStatus, number> = {
-    einsatzbereit: 0,
-    im_einsatz: 0,
-    defekt: 0,
-    verbraucht: 0,
-    desinfektion_noetig: 0,
-  };
-
-  for (const ep of personal) {
-    addPosition(verdichtungStaerke, ep.staerke_position);
-    addKategorie(personalStatus, ep.status_kategorie);
-  }
-
-  for (const ef of fahrzeuge) {
-    addKategorie(fahrzeugStatus, ef.status_kategorie);
-  }
-
-  for (const em of material) {
-    materialStatus[em.status] += 1;
-  }
-
+  // ── Verdichtung: aus den ROHLISTEN, nicht aus dem Baum ────────────────────
+  // Die Rechnung selbst steht in `verdichte` (oben, exportiert): sie wird außerhalb dieser
+  // Funktion ein zweites Mal über die UNGEFILTERTEN Listen gebraucht. `soll` kommt hier dazu,
+  // weil nur der Baumaufbau es kumulieren kann.
   return {
     baum,
-    verdichtung: {
-      staerke: verdichtungStaerke,
-      soll: gesammeltesSoll,
-      personalStatus,
-      fahrzeugStatus,
-      materialStatus,
-      anzahlPersonal: personal.length,
-      anzahlFahrzeuge: fahrzeuge.length,
-      anzahlMaterialPositionen: material.length,
-    },
+    verdichtung: { ...verdichte(personal, fahrzeuge, material), soll: gesammeltesSoll },
   };
 }
