@@ -1,3 +1,8 @@
+/* Gegenstück zu `.kraefte-no-print`: der Kopf des gedruckten Meldeblatts (LFH-338 · C3).
+   Er steht am Schirm nicht, weil dieselben Angaben dort in Breadcrumb, Kopfzeile und
+   Filterleiste stehen — im Ausdruck fehlten sie ersatzlos. */
+.kraefte-nur-print { display: none; }
+
 @media print {
   body * { visibility: hidden; }
   .kraefte-print-root, .kraefte-print-root * { visibility: visible; }
@@ -29,4 +34,20 @@
      `className`). Ihr stabiles Datenattribut ist der Griff — sonst stünde der
      Spaltenschalter im Ausdruck. */
   .kraefte-print-root [data-lfh="datensicht-werkzeuge"] { display: none !important; }
+
+  /* Der Kopf des Meldeblatts — nur hier sichtbar. */
+  .kraefte-nur-print { display: block !important; }
+
+  /* ── Mehrseitige Bäume ────────────────────────────────────────────────────────
+     Ein Meldebild mit 40 Kräften geht über mehr als ein Blatt. Ohne diese zwei Regeln
+     stehen die Spaltenköpfe nur auf Blatt 1 — ab Blatt 2 sind „1/0/5//6" und drei
+     Statuszahlen unbeschriftete Spalten —, und eine Zeile kann mitten durch den
+     Blattrand laufen.
+
+     Beide sind für jsdom unsichtbar (`@media print` wird dort nicht ausgewertet); geprüft
+     wird deshalb der CSS-TEXT, wie beim Neutralisierer-Block darüber. Der Layoutbeweis
+     über mehrere Blätter ist auch in Playwright nicht zu haben — `emulateMedia` liefert
+     das Druck-Layout, aber keine Seitenumbrüche. */
+  .kraefte-print-root thead { display: table-header-group; }
+  .kraefte-print-root tr { break-inside: avoid; }
 }

@@ -333,6 +333,24 @@ export default function KraefteuebersichtPage() {
           </Space>
         }
       >
+      {/* ── NUR IM DRUCK (LFH-338 · C3, Befund H4) ────────────────────────────────────
+          Das Blatt, das an die übergeordnete Führungsstelle geht, trug weder
+          Einsatzbezeichnung noch Zeitstand noch die Angabe, dass es nur einen Ausschnitt
+          zeigt: die Bezeichnung stand ausschließlich in der Breadcrumb, und die trägt
+          `.kraefte-no-print`. Ein Meldebild ohne diese vier Angaben ist nicht zuordenbar.
+
+          `data-testid`, weil der Knoten am Schirm per CSS verborgen ist und jsdom kein CSS
+          auswertet — eine Sichtbarkeitsabfrage könnte hier Schirm- und Druckzweig gar nicht
+          unterscheiden. Dass er am Schirm weg ist, prüft die CSS-Textzusicherung im Test. */}
+      <div className="kraefte-nur-print" data-testid="kraefte-druckkopf">
+        <div style={{ fontWeight: 600 }}>
+          Kräfteübersicht — {einsatz.bezeichnung}
+          {einsatz.einsatznummer_intern ? ` (${einsatz.einsatznummer_intern})` : ''}
+        </div>
+        <div>Stand: {taktischeDtgVoll(new Date().toISOString())}</div>
+        <div>Erstellt von: {benutzer?.anzeigename ?? '—'}</div>
+        {gefiltert && <div>Auswahl: {chips.map((c) => c.label).join(' · ')}</div>}
+      </div>
       <Card style={{ marginBottom: abstand.lg }} styles={{ body: { overflowX: 'auto' } }}>
         {/* ── WAS DIESE ZAHLEN BEDEUTEN (LFH-338 · C3, Befund H3) ──────────────────────
             Die Kopfzahlen kommen aus den GEFILTERTEN Daten. Solange darüber unverändert

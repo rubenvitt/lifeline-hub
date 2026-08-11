@@ -476,3 +476,52 @@ describe('aktiveFilterChips', () => {
     expect(aktiveFilterChips({ ...LEERER_FILTER, suche: '   ' }, name)).toEqual([]);
   });
 });
+
+/**
+ * ── DAS GEDRUCKTE MELDEBLATT (LFH-338 · C3, Befund H4) ──────────────────────────
+ *
+ * Der Ausdruck ging bis dahin ohne Einsatzbezug, ohne Zeitstand und ohne Angabe der Auswahl
+ * an die übergeordnete Führungsstelle: die Bezeichnung stand ausschließlich in der
+ * Breadcrumb, und die trägt `.kraefte-no-print`.
+ *
+ * Der Knoten wird über `data-testid` gegriffen, nicht über seine Sichtbarkeit: jsdom wertet
+ * kein CSS aus, ein `toBeVisible()` könnte Schirm- und Druckzweig hier gar nicht
+ * unterscheiden. Dass er am Schirm verborgen ist, prüft die CSS-Textzusicherung unten.
+ */
+describe('KraefteuebersichtPage — Druckkopf', () => {
+  it('trägt Einsatzbezeichnung, taktischen Zeitstand und Ersteller', async () => {
+    mitBaum();
+    setup();
+    const kopf = await screen.findByTestId('kraefte-druckkopf');
+    expect(within(kopf).getByText(/Testeinsatz/)).toBeInTheDocument();
+    // Taktische DTG: DDHHmm + dreibuchstabiges Monatskürzel + Jahr, z. B. 111430AUG2026.
+    expect(within(kopf).getByText(/Stand: \d{6}[A-ZÄÖÜ]{3}\d{4}/)).toBeInTheDocument();
+    expect(within(kopf).getByText(/Erstellt von:/)).toBeInTheDocument();
+  });
+
+  it('nennt die Auswahl im Druckkopf, sobald gefiltert wird — und sonst nicht', async () => {
+    mitBaum();
+    setup();
+    const kopf = await screen.findByTestId('kraefte-druckkopf');
+    expect(within(kopf).queryByText(/^Auswahl:/)).toBeNull();
+
+    await waehleAbschnitt('Abschnitt Nord');
+
+    expect(await within(kopf).findByText('Auswahl: Abschnitt: Abschnitt Nord')).toBeInTheDocument();
+  });
+
+  it('verbirgt den Druckkopf am Schirm und wiederholt im Druck die Spaltenköpfe', () => {
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
+    const druckblock = css.slice(css.indexOf('@media print'));
+    const schirmblock = css.slice(0, css.indexOf('@media print'));
+
+    // Am Schirm weg — und zwar AUSSERHALB des Druckblocks, sonst wäre er überall sichtbar.
+    expect(schirmblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*none/);
+    expect(druckblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*block/);
+
+    // Mehrseitige Bäume: Kopfzeile je Blatt, keine Zeile über den Blattrand.
+    expect(druckblock).toMatch(/thead\s*\{[^}]*display:\s*table-header-group/);
+    expect(druckblock).toMatch(/tr\s*\{[^}]*break-inside:\s*avoid/);
+  });
+});
