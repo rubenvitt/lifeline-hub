@@ -390,3 +390,61 @@ test('Druckpfad der Kräfteübersicht: die Neutralisierer WIRKEN, und keine Spal
   // weiterläuft.
   await page.emulateMedia({ media: null });
 });
+
+/**
+ * NACHWEIS 3 — der Monitoring-Kopf bricht um, statt waagerecht zu scrollen
+ * (LFH-338 · C3, Befund H6).
+ *
+ * WARUM HIER: „passt ohne Bildlauf auf einen Führungsschirm" ist eine reine Layoutaussage.
+ * In Vitest wäre sie strukturell unfähig, rot zu werden — jsdom rechnet kein Layout, und
+ * `scrollWidth`/`clientWidth` stehen dort beide auf 0. Was Vitest prüfen kann, ist die
+ * STRUKTUR (ein Raster statt einer Reihe) und die Abwesenheit der zwei verantwortlichen
+ * Angaben im Quelltext; beides steht in `KraefteuebersichtPage.test.tsx`.
+ *
+ * ABWEICHUNG VOM AKZEPTANZKRITERIUM, bewusst und schärfer: das Ticket nennt „950 px
+ * Inhaltsbreite". Gemessen wird stattdessen auf dem Führungs-Tablet (1024 px Sichtfeld),
+ * wo die Inhaltsbreite UNTER 950 px liegt — der Test sichert das eigens zu. Wer bei
+ * weniger als 950 px nicht scrollt, scrollt bei 950 px erst recht nicht. Eine Messung, die
+ * exakt 950 px Inhaltsbreite herstellen wollte, hinge an der jeweiligen Breite von
+ * Seitenleiste und Rinne und würde von jeder Navigationsänderung still verstimmt.
+ *
+ * WARUM GESEEDET WIRD: ein frischer Einsatz hat 0 Kräfte. Ohne Zeilen stehen alle
+ * Kennzahlen auf 0, die Materialachse rendert gar keine Statuszeile — der Kopf wäre schmal
+ * durch Nichtstun, und die Messung grün ohne Aussage.
+ */
+test('Monitoring-Kopf der Kräfteübersicht bricht um statt waagerecht zu scrollen', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `LFH-338 Kopf ${Date.now()}`);
+  await seedeKraefte(page, einsatzId, 4);
+  await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+
+  const kopf = page.locator('.ant-card').first();
+  await expect(kopf.getByText(/Gesamtstärke/)).toBeVisible();
+
+  const mass = await kopf.evaluate((el) => {
+    const leib = el.querySelector('.ant-card-body') as HTMLElement;
+    return { scrollWidth: leib.scrollWidth, clientWidth: leib.clientWidth };
+  });
+
+  expect(
+    mass.clientWidth,
+    `Messung soll auf höchstens 950 px Inhaltsbreite laufen (gemessen ${mass.clientWidth}px)`,
+  ).toBeLessThanOrEqual(950);
+  expect(
+    mass.scrollWidth,
+    `Kopf scrollt waagerecht: ${mass.scrollWidth}px Inhalt in ${mass.clientWidth}px Fläche`,
+  ).toBeLessThanOrEqual(mass.clientWidth + SUBPIXEL);
+
+  // Alle drei Achsen ohne Bildlauf erreichbar — das ist die Hälfte, die der reine
+  // Bildlaufvergleich NICHT abdeckt: ein Kopf, der eine Achse gar nicht rendert, scrollt
+  // ebenfalls nicht.
+  await expect(kopf.getByText(/Gesamtstärke/)).toBeInViewport();
+  await expect(kopf.locator('.ant-statistic-title', { hasText: /^Fahrzeuge$/ })).toBeInViewport();
+  await expect(kopf.getByText(/Material \(Pos\.\)/)).toBeInViewport();
+
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `Kopf bei 1024px Sichtfeld: Inhaltsbreite ${mass.clientWidth}px, Inhalt ${mass.scrollWidth}px`,
+  });
+});

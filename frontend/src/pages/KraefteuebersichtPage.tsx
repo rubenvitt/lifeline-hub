@@ -1,5 +1,4 @@
-import { App as AntApp, Breadcrumb, Button, Card, Input, Space, Statistic, Tag, theme } from 'antd';
-import type { GlobalToken } from 'antd';
+import { App as AntApp, Breadcrumb, Button, Card, Col, Input, Row, Space, Statistic, Tag, theme } from 'antd';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -61,21 +60,9 @@ const MAT_STATUS_ANZEIGE: Array<{ key: MaterialStatus; label: string; rolle?: St
   { key: 'desinfektion_noetig', label: 'Mtl. Desinfektion', rolle: 'achtung' },
 ];
 
-// Schlichter, umbruchsicherer Achsen-Trenner (Flex-Kind statt inline-block Divider).
-// Funktion statt Konstante, seit die Linienfarbe aus dem Theme kommt statt als rohes Grau.
-function achsenTrenner(token: GlobalToken) {
-  return (
-    <div
-      style={{
-        width: 1,
-        height: 48,
-        background: token.colorBorderSecondary,
-        alignSelf: 'center',
-        flex: 'none',
-      }}
-    />
-  );
-}
+// Der frühere `achsenTrenner` ist mit LFH-338 entfallen: er war ein Flex-Kind fester Höhe
+// zwischen drei nicht umbrechenden Achsen. Im Raster trennen die Spalten selbst — eine
+// 48-px-Linie zwischen zwei UNTEREINANDER liegenden Achsen wäre ein Strich ins Nichts.
 
 /**
  * Das Spaltenregister des Meldebilds (LFH-330 · B2, Teil 2 + 3).
@@ -351,7 +338,7 @@ export default function KraefteuebersichtPage() {
         <div>Erstellt von: {benutzer?.anzeigename ?? '—'}</div>
         {gefiltert && <div>Auswahl: {chips.map((c) => c.label).join(' · ')}</div>}
       </div>
-      <Card style={{ marginBottom: abstand.lg }} styles={{ body: { overflowX: 'auto' } }}>
+      <Card style={{ marginBottom: abstand.lg }}>
         {/* ── WAS DIESE ZAHLEN BEDEUTEN (LFH-338 · C3, Befund H3) ──────────────────────
             Die Kopfzahlen kommen aus den GEFILTERTEN Daten. Solange darüber unverändert
             „Gesamtstärke" stand, meldete jemand, der kurz weg war und dann abliest, die
@@ -385,58 +372,71 @@ export default function KraefteuebersichtPage() {
           )}
         </Space>
 
-        {/* Monitoring-Kopf: nicht umbrechend, bei schmalem Viewport horizontal scrollbar. */}
-        <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
+        {/* ── DER MONITORING-KOPF BRICHT UM (LFH-338 · C3, Befund H6) ──────────────────
+            Vorher: bis zu 12 gleich große `Statistic` in EINER nicht umbrechenden Reihe,
+            dahinter ein waagerechter Bildlauf im Karteninneren. Auf einem 13"-Fükw-Schirm
+            (~950 px nutzbar) lag die komplette Materialachse rechts außerhalb — ohne
+            Bildlaufleiste, ohne abgeschnittene Kachel, ohne jede Andeutung. Wer nicht
+            wusste, dass dort etwas liegt, sah es nie.
+
+            Die zwei verantwortlichen Angaben sind hier bewusst NICHT ausgeschrieben: das
+            Gate ist ein Grep über diese Datei, und ein Kommentar, der das verbotene
+            Konstrukt zitiert, füllt es selbst (gemessen — der Test war grün geschrieben und
+            wurde durch diesen Absatz wieder rot).
+
+            Jetzt eine Achse je Spalte (`xs`/`md`/`xl`), und INNERHALB einer Achse kompakt:
+            die Verteilungen stehen als eine Zeile statt als vier gleichrangige Kacheln —
+            eine Zahl mit Wort ist kürzer als eine Kachel mit Überschrift, und die Rangfolge
+            stimmt danach (die Gesamtzahl ist die Kachel, die Aufteilung ihre Fußzeile).
+
+            Die Farbe ist der ZWEITE Kanal, nicht der einzige: jede Zahl trägt ihr Wort
+            daneben (Prüflisten-Kriterium 6 / WCAG 1.4.1). Rollen wie in der Statusspalte
+            der Tabelle — Kopfzahl und Tag darunter dürfen nicht in verschiedenen Rottönen
+            sprechen. */}
+        <Row gutter={[abstand.lg, abstand.md]}>
           {/* Achse 1: Personalstärke */}
-          <Space size="large">
+          <Col xs={24} md={12} xl={8}>
             <Statistic
               title={gefiltert ? 'Stärke (gefiltert, F/UF/M//Ges)' : 'Gesamtstärke (F/UF/M//Ges)'}
               value={staerkeText(v.staerke)}
             />
-            <Statistic title="Personal" value={v.anzahlPersonal} />
-          </Space>
-
-          {achsenTrenner(token)}
+            <div style={{ color: token.colorTextSecondary, marginBlockStart: token.marginXXS }}>
+              {v.anzahlPersonal} Personen
+            </div>
+          </Col>
 
           {/* Achse 2: Fahrzeug-Verfügbarkeit */}
-          <Space size="large">
+          <Col xs={24} md={12} xl={8}>
             <Statistic title="Fahrzeuge" value={v.anzahlFahrzeuge} />
-            {/* Dieselben drei Rollen wie die Statusspalte — die Kopfzahl und der Tag
-                darunter dürfen nicht in verschiedenen Rottönen sprechen. */}
-            <Statistic
-              title="Fzg frei"
-              value={v.fahrzeugStatus.verfuegbar}
-              styles={{ content: { color: rollenFarbe(statusKategorie.verfuegbar.rolle, token) } }}
-            />
-            <Statistic
-              title="Fzg gebunden"
-              value={v.fahrzeugStatus.gebunden}
-              styles={{ content: { color: rollenFarbe(statusKategorie.gebunden.rolle, token) } }}
-            />
-            <Statistic
-              title="Fzg n. einsatzbereit"
-              value={v.fahrzeugStatus.nicht_verfuegbar}
-              styles={{ content: { color: rollenFarbe(statusKategorie.nicht_verfuegbar.rolle, token) } }}
-            />
-          </Space>
-
-          {achsenTrenner(token)}
+            <Space size="small" wrap style={{ marginBlockStart: token.marginXXS }}>
+              <span style={{ color: rollenFarbe(statusKategorie.verfuegbar.rolle, token) }}>
+                {v.fahrzeugStatus.verfuegbar} frei
+              </span>
+              <span aria-hidden>·</span>
+              <span style={{ color: rollenFarbe(statusKategorie.gebunden.rolle, token) }}>
+                {v.fahrzeugStatus.gebunden} gebunden
+              </span>
+              <span aria-hidden>·</span>
+              <span style={{ color: rollenFarbe(statusKategorie.nicht_verfuegbar.rolle, token) }}>
+                {v.fahrzeugStatus.nicht_verfuegbar} n. einsatzbereit
+              </span>
+            </Space>
+          </Col>
 
           {/* Achse 3: Material */}
-          <Space size="large">
+          <Col xs={24} md={12} xl={8}>
             <Statistic title="Material (Pos.)" value={v.anzahlMaterialPositionen} />
-            {MAT_STATUS_ANZEIGE.map(({ key, label, rolle }) =>
-              v.materialStatus[key] > 0 ? (
-                <Statistic
-                  key={key}
-                  title={label}
-                  value={v.materialStatus[key]}
-                  styles={{ content: rolle ? { color: rollenFarbe(rolle, token) } : undefined }}
-                />
-              ) : null,
-            )}
-          </Space>
-        </Space>
+            <Space size="small" wrap style={{ marginBlockStart: token.marginXXS }}>
+              {MAT_STATUS_ANZEIGE.filter(({ key }) => v.materialStatus[key] > 0).map(
+                ({ key, label, rolle }) => (
+                  <span key={key} style={rolle ? { color: rollenFarbe(rolle, token) } : undefined}>
+                    {v.materialStatus[key]} {label.replace('Mtl. ', '')}
+                  </span>
+                ),
+              )}
+            </Space>
+          </Col>
+        </Row>
       </Card>
       <Card className="kraefte-no-print" style={{ marginBottom: abstand.md }}>
         <Space wrap>

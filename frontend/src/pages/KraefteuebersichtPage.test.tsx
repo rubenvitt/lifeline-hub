@@ -144,10 +144,18 @@ describe('KraefteuebersichtPage', () => {
   it('zeigt Fahrzeug-Verfügbarkeits-Achse im Kopf', async () => {
     vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
     setup();
-    // Warten bis die Daten geladen sind
-    const titelEl = await screen.findByText('Fzg frei');
-    const statCard = titelEl.closest('.ant-statistic')!;
-    expect(await within(statCard as HTMLElement).findByText('1')).toBeInTheDocument();
+    /**
+     * Seit LFH-338 · C3 steht die Verteilung als EINE Zeile unter der Fahrzeug-Kachel statt
+     * als drei gleichrangige `Statistic` daneben (Befund H6: bis zu 12 Kacheln in einer
+     * nicht umbrechenden Reihe). Die Aussage bleibt dieselbe — die Zahl der freien
+     * Fahrzeuge ist im Kopf ablesbar —, nur ihre Form ist kompakter.
+     *
+     * Der Wortlaut trägt weiterhin die Bedeutung: Farbe allein reicht nicht
+     * (Prüflisten-Kriterium 6), deshalb wird auf „1 frei" geprüft und nicht auf eine Farbe.
+     */
+    expect(await screen.findByText('1 frei')).toBeInTheDocument();
+    expect(screen.getByText('0 gebunden')).toBeInTheDocument();
+    expect(screen.getByText('0 n. einsatzbereit')).toBeInTheDocument();
   });
 
   it('zeigt Filterleiste mit Trägerorganisation-Select', async () => {
@@ -523,5 +531,41 @@ describe('KraefteuebersichtPage — Druckkopf', () => {
     // Mehrseitige Bäume: Kopfzeile je Blatt, keine Zeile über den Blattrand.
     expect(druckblock).toMatch(/thead\s*\{[^}]*display:\s*table-header-group/);
     expect(druckblock).toMatch(/tr\s*\{[^}]*break-inside:\s*avoid/);
+  });
+});
+
+/**
+ * ── DER MONITORING-KOPF (LFH-338 · C3, Befund H6) ───────────────────────────────
+ *
+ * Bis dahin lagen bis zu 12 Kennzahlen in einem `Space` mit `flexWrap: 'nowrap'` hinter
+ * einem Card-internen `overflowX: 'auto'`. Auf ~950 px nutzbarer Breite (13"-Fükw-Schirm)
+ * lag die komplette Materialachse unsichtbar rechts — ohne jede optische Andeutung.
+ *
+ * jsdom rechnet kein Layout: der eigentliche Beweis („scrollt nicht waagerecht") steht in
+ * `frontend/e2e/meldebild-tabelle.spec.ts`. Hier wird die STRUKTUR geprüft, aus der er
+ * folgt, plus das Verschwinden der beiden Konstrukte im Quelltext — das ist wörtlich das
+ * Akzeptanzkriterium des Tickets.
+ */
+describe('KraefteuebersichtPage — Kopf bricht um', () => {
+  it('setzt den Kopf in ein Raster statt in eine nicht umbrechende Reihe', async () => {
+    mitBaum();
+    const { container } = setup();
+    await screen.findByText(/Gesamtstärke/);
+    expect(container.querySelector('.ant-row')).not.toBeNull();
+  });
+
+  it('zeigt alle drei Achsen — Personal, Fahrzeuge, Material', async () => {
+    mitBaum();
+    setup();
+    expect(await screen.findByText(/Gesamtstärke/)).toBeInTheDocument();
+    expect(screen.getByText('Fahrzeuge', { selector: '.ant-statistic-title' })).toBeInTheDocument();
+    expect(screen.getByText(/Material \(Pos\.\)/)).toBeInTheDocument();
+  });
+
+  it('trägt weder flexWrap: nowrap noch einen Card-internen Horizontalscroll', () => {
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const quelle = readFileSync(join(hier, 'KraefteuebersichtPage.tsx'), 'utf-8');
+    expect(quelle).not.toMatch(/flexWrap:\s*'nowrap'/);
+    expect(quelle).not.toMatch(/overflowX:\s*'auto'/);
   });
 });
