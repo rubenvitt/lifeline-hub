@@ -1,4 +1,4 @@
-import { App as AntApp, Breadcrumb, Button, Card, Col, Input, Row, Space, Statistic, Tag, theme } from 'antd';
+import { App as AntApp, Breadcrumb, Button, Card, Col, Input, Row, Segmented, Space, Statistic, Tag, theme } from 'antd';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -250,6 +250,29 @@ export default function KraefteuebersichtPage() {
     onError: () => message.error('Übernahme fehlgeschlagen'),
   });
 
+  /**
+   * AUFGEKLAPPT STARTEN (LFH-338 · C3, Befund H7).
+   *
+   * Das Blatt ist die Verdichtung, aus der gemeldet wird — und es öffnete vollständig
+   * zugeklappt. Wer die Stärke eines Abschnitts ablesen wollte, klickte sich erst durch n
+   * Ebenen, jedes Mal auf ein rund 16 px breites Symbol.
+   *
+   * DER RIEGEL IST DAS EIGENTLICHE: das Aufklappen darf GENAU EINMAL greifen. Diese Fläche
+   * hängt an sechs Queries; ohne `initialAufgeklappt` klappte jede Invalidierung die
+   * Handarbeit der Einsatzkraft wieder auf. Ein `useRef` und kein `useState`, weil die
+   * Marke keine Neuzeichnung auslösen soll.
+   *
+   * Bedingung ist der erste NICHT LEERE Baum, nicht der erste Lauf: beim ersten Rendern
+   * stehen alle sechs Queries noch aus, `bild.baum` ist leer, und die Marke wäre verbraucht,
+   * bevor es etwas aufzuklappen gab.
+   */
+  const initialAufgeklappt = React.useRef(false);
+  useEffect(() => {
+    if (initialAufgeklappt.current || bild.baum.length === 0) return;
+    initialAufgeklappt.current = true;
+    setExpandedKeys(alleKeys(bild.baum));
+  }, [bild.baum]);
+
   // Erst nach committetem Aufklappen drucken (sonst kollabierte Zeilen bei großen Bäumen).
   useEffect(() => {
     if (printPending) {
@@ -313,6 +336,19 @@ export default function KraefteuebersichtPage() {
         }
         aktionen={
           <Space className="kraefte-no-print">
+            {/* Der Umschalter steht VOR den Knöpfen und ist kein Knopf: „alles" und „nur
+                Abschnitte" sind zwei Zustände desselben Blatts, keine zwei Handlungen.
+                Sein Wert wird aus `expandedKeys` ABGELEITET statt zusätzlich gehalten —
+                ein zweiter Zustand daneben liefe auseinander, sobald jemand eine einzelne
+                Zeile zuklappt. */}
+            <Segmented
+              value={expandedKeys.length > 0 ? 'alle' : 'abschnitte'}
+              onChange={(wert) => setExpandedKeys(wert === 'alle' ? alleKeys(bild.baum) : [])}
+              options={[
+                { value: 'alle', label: 'Alles aufklappen' },
+                { value: 'abschnitte', label: 'Nur Abschnitte' },
+              ]}
+            />
             {darfSchreiben && (
               <Button loading={uebernehmen.isPending} onClick={() => uebernehmen.mutate()}>In Lagebericht übernehmen</Button>
             )}

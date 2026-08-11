@@ -575,11 +575,11 @@ export function sichtbareSpalten<T, K extends string>(args: {
 export function pruefeKartenplan<T extends object, K extends string>(
   props: Pick<
     DatensichtProps<T, K>,
-    'spalten' | 'karte' | 'suche' | 'baum' | 'gruppen' | 'aufklappzeile'
+    'spalten' | 'karte' | 'suche' | 'baum' | 'gruppen' | 'aufklappzeile' | 'onZeileKlick'
   >,
   bezeichnung: string,
 ): string[] {
-  const { spalten, karte, suche, baum, gruppen, aufklappzeile } = props;
+  const { spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick } = props;
   const befunde: string[] = [];
   const bekannt = new Map<string, DatensichtSpalte<T, K>>();
   for (const spalte of spalten) {
@@ -624,6 +624,10 @@ export function pruefeKartenplan<T extends object, K extends string>(
     }
     if (gruppen) befunde.push('gruppen und baum schließen sich aus.');
     if (aufklappzeile) befunde.push('aufklappzeile und baum schließen sich aus.');
+    // Im Baummodus klappt die ganze Zeile auf (LFH-338 · C3). Ein zusätzliches
+    // `onZeileKlick` wäre eine zweite Wirkung auf demselben Klick, und welche einträte,
+    // hinge an der Reihenfolge im DOM.
+    if (onZeileKlick) befunde.push('onZeileKlick und baum schließen sich aus.');
   }
   return befunde;
 }
@@ -988,8 +992,12 @@ export default function Datensicht<T extends object, const K extends string>(
    * `exhaustive-deps` ließe sich dann nur mit einem verbotenen Disable beruhigen.
    */
   const befunde = useMemo(
-    () => pruefeKartenplan({ spalten, karte, suche, baum, gruppen, aufklappzeile }, bezeichnung),
-    [spalten, karte, suche, baum, gruppen, aufklappzeile, bezeichnung],
+    () =>
+      pruefeKartenplan(
+        { spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick },
+        bezeichnung,
+      ),
+    [spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick, bezeichnung],
   );
   const befundSchluessel = befunde.join(' | ');
   useEffect(() => {
@@ -1218,6 +1226,13 @@ export default function Datensicht<T extends object, const K extends string>(
               childrenColumnName: baum.kinder,
               expandedRowKeys: [...baum.aufgeklappt],
               onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
+              // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol
+              // (LFH-338 · C3, Befund H7). Die Dichte-Staffel kann daran nichts ändern —
+              // antd zeichnet das Symbol in fester Größe. Deshalb hier und nicht per
+              // seitenlokalem `onRow`: die Regel gilt für jeden Baum, nicht nur für den
+              // einen, der ihn heute nutzt. `onZeileKlick` ist im Baummodus dafür gesperrt
+              // (siehe `pruefeKartenplan`).
+              expandRowByClick: true,
             }
           : aufklappzeile
             ? { expandedRowRender: (zeile) => aufklappzeile(zeile) }

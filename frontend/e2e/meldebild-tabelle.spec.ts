@@ -118,6 +118,21 @@ async function seedeKraefte(page: Page, einsatzId: string, anzahl: number) {
  * Gemessen wird an der Körperzelle (`td`), nicht am Kopf: mit `sticky` zieht antd Kopf und
  * Körper in zwei getrennte Bildlaufbereiche und gleicht sie per Skript ab.
  */
+/**
+ * Stellt den ZUGEKLAPPTEN Ausgangszustand her.
+ *
+ * Seit LFH-338 · C3 startet das Meldebild aufgeklappt (Befund H7: es ist die Verdichtung,
+ * aus der gemeldet wird, und öffnete vollständig zu). Die beiden Nachweise unten prüfen
+ * aber gerade das Aufklappen — ohne diesen Schritt wären ihre Zeilenzählungen von Anfang an
+ * beim Endwert, und der Klick, um den es geht, bliebe ungeprüft.
+ *
+ * Über den Umschalter und nicht über die Symbole: er nimmt den ganzen Baum in einem Zug,
+ * und sein Vorhandensein ist selbst Teil der Bedienung, die C3 eingeführt hat.
+ */
+async function nurAbschnitte(page: Page) {
+  await page.getByText('Nur Abschnitte').click();
+}
+
 async function symbolLage(page: Page) {
   return page.evaluate(() => {
     const koerper = document.querySelector('.ant-table-body')!;
@@ -165,6 +180,7 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   // (c) Der Sammelknoten steht. Ohne diesen Anker misst der Rest einen Leerzustand.
   await expect(page.getByText('Ohne Abschnitt')).toHaveCount(1);
   const zeilen = page.locator('tr.ant-table-row');
+  await nurAbschnitte(page);
   await expect(zeilen).toHaveCount(1);
 
   // (d) Das Symbol liegt IN der fixierten Zelle — nicht daneben, nicht in einer eigenen
@@ -329,9 +345,13 @@ test('Druckpfad der Kräfteübersicht: die Neutralisierer WIRKEN, und keine Spal
   await expect(page.getByText('Ohne Abschnitt')).toHaveCount(1);
 
   // Aufklappen wie `handleDrucken` es tut — über die Symbole, nicht über `window.print()`.
+  // Vorher zuklappen: das Blatt startet seit C3 aufgeklappt, sonst prüften die zwei Klicks
+  // unten nichts (siehe `nurAbschnitte`).
   const zeilen = page.locator('tr.ant-table-row');
   const symbolIn = (index: number) =>
     zeilen.nth(index).locator('td.ant-table-cell-fix-start .ant-table-row-expand-icon');
+  await nurAbschnitte(page);
+  await expect(zeilen).toHaveCount(1);
   await symbolIn(0).click();
   await expect(zeilen).toHaveCount(2);
   await symbolIn(1).click();

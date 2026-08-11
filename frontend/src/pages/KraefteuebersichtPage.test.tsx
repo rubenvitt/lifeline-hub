@@ -132,13 +132,18 @@ describe('KraefteuebersichtPage', () => {
   it('rendert Abschnitt, Einheit und Einzelmittel als aufklappbare Zeilen', async () => {
     mitBaum();
     const { container } = setup();
-    // Abschnitt-Zeile muss sichtbar sein
+    /**
+     * Seit LFH-338 · C3 startet das Blatt AUFGEKLAPPT (H7) — alle drei Zeilenarten stehen
+     * ohne Zutun da. Der frühere Weg über `.ant-table-row-expand-icon-collapsed` fand nach
+     * dem Umbau nichts mehr; die Aussage („alle drei Ebenen erreichbar") bleibt dieselbe,
+     * nur die Reihenfolge dreht sich: erst sichtbar, dann zuklappbar.
+     */
     expect(await screen.findByText('Abschnitt Nord')).toBeInTheDocument();
-    // Einheit-Zeile ist eingeklappt — Expand-Icon anklicken
-    const expandIcon = container.querySelector('.ant-table-row-expand-icon-collapsed');
-    expect(expandIcon).not.toBeNull();
-    fireEvent.click(expandIcon!);
-    expect(await screen.findByText('1. Zug')).toBeInTheDocument();
+    expect(screen.getByText('1. Zug')).toBeInTheDocument();
+    expect(screen.getByText('FW 1/44-1')).toBeInTheDocument();
+
+    // Und sie bleiben aufklappBAR: das Symbol steht da und trägt jetzt den Auf-Zustand.
+    expect(container.querySelector('.ant-table-row-expand-icon-expanded')).not.toBeNull();
   });
 
   it('zeigt Fahrzeug-Verfügbarkeits-Achse im Kopf', async () => {
@@ -246,11 +251,8 @@ describe('KraefteuebersichtPage', () => {
   it('die Statusspalte trägt nur noch den Einzelstatus der Mittel', async () => {
     mitBaum();
     const { container } = setup();
-    await screen.findByText('Abschnitt Nord');
-    // Bis zur Mittelzeile durchklappen: Abschnitt → Einheit → Fahrzeug.
-    fireEvent.click(container.querySelector('[data-row-key="ab-10"] .ant-table-row-expand-icon')!);
-    await screen.findByText('1. Zug');
-    fireEvent.click(container.querySelector('[data-row-key="eh-20"] .ant-table-row-expand-icon')!);
+    // Seit LFH-338 · C3 steht die Mittelzeile ohne Durchklappen da (H7): das Blatt startet
+    // aufgeklappt. Die beiden früheren Klicks auf die Aufklapp-Symbole sind entfallen.
     await screen.findByText('FW 1/44-1');
 
     const mittel = container.querySelector('[data-row-key="ef-30"]') as HTMLElement;
@@ -322,8 +324,12 @@ describe('KraefteuebersichtPage', () => {
      */
     mitBaum();
     setup();
-    await screen.findByText('Abschnitt Nord');
-    expect(screen.queryByText('1. Zug')).toBeNull();
+    // Seit LFH-338 · C3 startet das Blatt aufgeklappt (H7). Für DIESE Zusicherung wird
+    // deshalb erst von Hand zugeklappt — sonst wäre „Drucken klappt auf" trivial erfüllt
+    // und der Pfad, um den es geht, ungeprüft.
+    await screen.findByText('FW 1/44-1');
+    fireEvent.click(screen.getByText('Nur Abschnitte'));
+    await waitFor(() => expect(screen.queryByText('1. Zug')).toBeNull());
 
     fireEvent.click(screen.getByRole('button', { name: /Drucken/i }));
 
@@ -567,5 +573,71 @@ describe('KraefteuebersichtPage — Kopf bricht um', () => {
     const quelle = readFileSync(join(hier, 'KraefteuebersichtPage.tsx'), 'utf-8');
     expect(quelle).not.toMatch(/flexWrap:\s*'nowrap'/);
     expect(quelle).not.toMatch(/overflowX:\s*'auto'/);
+  });
+});
+
+/**
+ * ── DAS BLATT STARTET AUFGEKLAPPT (LFH-338 · C3, Befund H7) ─────────────────────
+ *
+ * Das Meldebild ist die Verdichtung, aus der gemeldet wird — und es öffnete vollständig
+ * ZUgeklappt. Wer die Stärke eines Abschnitts ablesen wollte, klickte sich erst durch n
+ * Ebenen, jedes Mal auf ein rund 16 px breites Symbol.
+ */
+describe('KraefteuebersichtPage — Aufklappen', () => {
+  it('startet aufgeklappt, sobald der erste Baum geladen ist', async () => {
+    mitBaum();
+    setup();
+    // Abschnitt → Einheit → Fahrzeug: die TIEFSTE Zeile steht ohne einen einzigen Klick da.
+    expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
+  });
+
+  it('klappt über „Nur Abschnitte" auf die oberste Ebene zurück und wieder auf', async () => {
+    mitBaum();
+    setup();
+    await screen.findByText('FW 1/44-1');
+
+    fireEvent.click(screen.getByText('Nur Abschnitte'));
+    await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
+    // Die oberste Ebene bleibt — „zu" heißt nicht „leer".
+    expect(screen.getByText('Abschnitt Nord')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Alles aufklappen'));
+    expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
+  });
+
+  it('klappt eine Zeile per Klick auf die Zeile zu, nicht nur am Symbol', async () => {
+    mitBaum();
+    setup();
+    await screen.findByText('FW 1/44-1');
+
+    // Auf den Text der Abschnittszeile, nicht auf das Aufklapp-Symbol.
+    fireEvent.click(screen.getByText('Abschnitt Nord'));
+    await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
+  });
+
+  it('klappt eine vom Benutzer zugeklappte Zeile NICHT bei jedem Datenzufluss wieder auf', async () => {
+    mitBaum();
+    setup();
+    await screen.findByText('FW 1/44-1');
+    fireEvent.click(screen.getByText('Abschnitt Nord'));
+    await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
+
+    /**
+     * Das automatische Aufklappen darf GENAU EINMAL greifen. Ohne Riegel klappte jeder
+     * Neuaufbau des Baums die Handarbeit der Einsatzkraft wieder auf — und der passiert
+     * dauernd: `bild` hängt an sechs Queries UND am Filter, jeder Tastendruck im Suchfeld
+     * baut ihn neu.
+     *
+     * Als Auslöser dient deshalb genau das: ein Suchbegriff, der die Fahrzeugzeile
+     * ausdrücklich BEHÄLT ('FW' trifft ihren Funkrufnamen). Bliebe sie danach weg, weil sie
+     * herausgefiltert wurde, bewiese der Test nichts über das Aufklappen. Der Druck-Knopf
+     * taugt als Auslöser NICHT — der klappt absichtlich alles auf.
+     */
+    fireEvent.change(screen.getByPlaceholderText('Suche...'), { target: { value: 'FW' } });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('FW 1/44-1')).toBeNull();
+    // Gegenprobe: die Zeile ist zugeklappt, nicht weggefiltert — ihr Elternteil steht da.
+    expect(screen.getByText('Abschnitt Nord')).toBeInTheDocument();
   });
 });

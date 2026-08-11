@@ -558,6 +558,22 @@ describe('pruefeKartenplan()', () => {
     expect(meldung(befunde, 'gruppen')).toHaveLength(1);
   });
 
+  /**
+   * Seit LFH-338 · C3 klappt im Baummodus die ganze Zeile auf. Damit ist der Zeilenklick
+   * belegt — ein zusätzliches `onZeileKlick` wäre eine zweite Wirkung auf demselben Klick,
+   * und welche einträte, hinge an der Reihenfolge im DOM. Ein solcher Widerspruch gehört
+   * gemeldet, nicht ausprobiert.
+   */
+  it('meldet baum zusammen mit onZeileKlick', () => {
+    const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
+    const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
+    const befunde = pruefeKartenplan(
+      { spalten: ohneFilterSpalten, karte, baum, onZeileKlick: () => {} },
+      'Meldebild',
+    );
+    expect(meldung(befunde, 'onzeileklick')).toHaveLength(1);
+  });
+
   it('meldet eine Spaltengruppe mit sortWert', () => {
     // Eine Gruppe ist keine Blattspalte; ein `sortWert` daran wäre wirkungslos und die
     // Sortierauswahl zeigte einen Eintrag, der nichts tut.
@@ -1104,6 +1120,45 @@ describe('Datensicht · Tabellenzweig', () => {
     // Der Druckpfad der Kräfteübersicht setzt hier alle Schlüssel von außen. Ein Primitiv
     // mit internem Aufklappzustand hätte diesen Pfad lautlos stillgelegt.
     expect(auf.getByText('Einheit 1')).toBeInTheDocument();
+  });
+
+  /**
+   * Die ganze Zeile klappt auf, nicht nur das Symbol (LFH-338 · C3, Befund H7).
+   *
+   * Das Aufklapp-Symbol ist rund 16 px breit — im Handschuh-Betrieb ist das kein
+   * Bedienziel, und die Dichte-Staffel kann daran nichts ändern (antd zeichnet es fest).
+   * Statt eines seitenlokalen `onRow` gehört das ins Primitiv: `baum` hat heute genau einen
+   * Konsumenten, aber die Regel „die Zeile ist das Ziel" gilt für jeden weiteren.
+   */
+  it('klappt beim Klick auf die ZEILE auf, nicht nur am Aufklapp-Symbol', async () => {
+    interface Zeile {
+      key: string;
+      bezeichnung: string;
+      kinder?: Zeile[];
+    }
+    const baumSpalten = spaltenFuer<Zeile>()([
+      { key: 'bez', title: 'Bezeichnung', dataIndex: 'bezeichnung', immerSichtbar: true },
+    ]);
+    const daten: Zeile[] = [
+      { key: 'a', bezeichnung: 'Abschnitt Nord', kinder: [{ key: 'a1', bezeichnung: 'Einheit 1' }] },
+    ];
+    const onAufgeklappt = vi.fn();
+    renderMitProviders(
+      <Datensicht<Zeile, 'bez'>
+        bezeichnung="Meldebild"
+        form="tabelle"
+        spalten={baumSpalten}
+        daten={daten}
+        zeilenSchluessel="key"
+        baum={{ kinder: 'kinder', aufgeklappt: [], onAufgeklappt }}
+        karte={{ art: 'plan', titel: { spalte: 'bez' } }}
+      />,
+    );
+
+    // Die TEXTZELLE, nicht `.ant-table-row-expand-icon` — sonst prüfte der Test den Weg,
+    // den es vorher schon gab.
+    await userEvent.click(screen.getByText('Abschnitt Nord'));
+    expect(onAufgeklappt).toHaveBeenCalledWith(['a']);
   });
 });
 
