@@ -27,6 +27,7 @@ import {
   lagekartePfad,
   einsatzdatenPfad,
   erinnerungenPfad,
+  kraefteuebersichtPfad,
   parseRouteId,
 } from './deeplinks';
 
@@ -96,6 +97,14 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   });
   it('erinnerungenPfad zeigt auf die Erinnerungen-Liste', () => {
     expect(erinnerungenPfad(7)).toBe('/einsaetze/7/erinnerungen');
+  });
+  /**
+   * Die aggregierende Kräfteübersicht (LFH-338 · C3, Befund H21). Sie war bis dahin von
+   * KEINER der vier Kräfte-Modulseiten verlinkt — es gab schlicht keinen Builder, und ein
+   * Inline-Literal wäre an dieser Datei vorbeigelaufen.
+   */
+  it('kraefteuebersichtPfad', () => {
+    expect(kraefteuebersichtPfad(E)).toBe('/einsaetze/5/kraefteuebersicht');
   });
 });
 

@@ -106,6 +106,17 @@ export function lageberichtePfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'lageberichte');
 }
 
+/**
+ * Aggregierende Kräfteübersicht (Meldebild) eines Einsatzes.
+ *
+ * Der Routenschlüssel ist der aus `einsatz/modulRegistry.ts` und `App.tsx` — die Seite gab
+ * es längst, sie war nur von keiner der vier Kräfte-Modulseiten aus erreichbar
+ * (LFH-338 · C3, Befund H21).
+ */
+export function kraefteuebersichtPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'kraefteuebersicht');
+}
+
 export function tierePfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'tiere');
 }
