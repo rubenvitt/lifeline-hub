@@ -67,6 +67,20 @@ function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[]
 }
 
 describe('PersonalPage', () => {
+  /**
+   * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
+   *
+   * Die Übersicht war von KEINER der vier Kräfte-Modulseiten verlinkt — die Verdichtung,
+   * für die es eine eigene Seite gibt, war von der Pflegefläche aus unsichtbar. Geprüft
+   * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
+   * Builder wäre sonst von ihm nicht zu unterscheiden.
+   */
+  it('verlinkt die Kräfteübersicht über der Tabelle', async () => {
+    render(einsatz());
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
+    expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
+  });
+
   it('zeigt disponiertes Personal mit Funktion und Position', async () => {
     render(einsatz());
     expect(await screen.findByText('Thomas Müller')).toBeInTheDocument();

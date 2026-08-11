@@ -21,6 +21,8 @@ import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { kraefteuebersichtPfad } from '../routing/deeplinks';
+import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -566,6 +568,7 @@ export default function FahrzeugePage() {
       ) : (
       <>
       {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
+      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
       <Datensicht
         bezeichnung="Fahrzeuge im Einsatz"
         spalten={spalten}

@@ -19,6 +19,8 @@ import {
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
+import { kraefteuebersichtPfad } from '../routing/deeplinks';
+import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 
 const STATUS_META: Record<MaterialStatus, { label: string; color: string }> = {
   einsatzbereit: { label: 'einsatzbereit', color: 'green' },
@@ -371,6 +373,7 @@ export default function MaterialPage() {
       ) : (
       <>
       {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void emQuery.refetch()} />}
+      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
       <Datensicht
         bezeichnung="Material im Einsatz"
         spalten={spalten}

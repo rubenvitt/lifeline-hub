@@ -28,6 +28,8 @@ import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { leerZuNull } from '../api/patchTriState';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
+import { kraefteuebersichtPfad } from '../routing/deeplinks';
+import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
@@ -293,6 +295,7 @@ export default function EinheitenPage() {
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
+      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
       <div style={{ display: 'flex', gap: 16 }}>
         <Card style={{ flex: '0 0 360px' }} size="small" title="Gliederung">
           {/* DREI Zustände, nicht zwei (LFH-331 · B3). Die frühere Weiche hing an

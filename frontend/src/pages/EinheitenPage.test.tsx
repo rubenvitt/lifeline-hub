@@ -48,6 +48,24 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv', sprechgruppen: unk
 }
 
 describe('EinheitenPage', () => {
+  /**
+   * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
+   *
+   * Die Übersicht war von KEINER der vier Kräfte-Modulseiten verlinkt — die Verdichtung,
+   * für die es eine eigene Seite gibt, war von der Pflegefläche aus unsichtbar. Geprüft
+   * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
+   * Builder wäre sonst von ihm nicht zu unterscheiden.
+   */
+  it('verlinkt die Kräfteübersicht über der Tabelle', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht');
+  });
+
   it('zeigt den Einheiten-Baum mit Name und Soll/Ist', async () => {
     server.use(...handlers());
     renderMitProviders(

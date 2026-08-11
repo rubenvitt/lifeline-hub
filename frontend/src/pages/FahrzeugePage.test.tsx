@@ -74,6 +74,20 @@ function render(
 }
 
 describe('FahrzeugePage', () => {
+  /**
+   * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
+   *
+   * Die Übersicht war von KEINER der vier Kräfte-Modulseiten verlinkt — die Verdichtung,
+   * für die es eine eigene Seite gibt, war von der Pflegefläche aus unsichtbar. Geprüft
+   * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
+   * Builder wäre sonst von ihm nicht zu unterscheiden.
+   */
+  it('verlinkt die Kräfteübersicht über der Tabelle', async () => {
+    render(einsatz());
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
+    expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
+  });
+
   it('zeigt disponierte Fahrzeuge', async () => {
     render(einsatz());
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();
@@ -197,7 +211,9 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     // Ist 1/0/0//1 ≥ Soll 1/0/0//1 in jeder Position → grün, ohne redundanten Soll-Text.
     // Über den Stärke-Text wählen (der grüne Einsatz-Status „aktiv" wäre sonst ein zweiter ant-tag-green).
-    const badge = screen.getByText('1/0/0//1');
+    // Seit LFH-338 · C3 steht DIESELBE Stärke auch in der Verdichtungszeile über der Tabelle
+    // (Befund H21) — der Text allein ist damit mehrdeutig, gemeint ist die Marke der Zeile.
+    const badge = screen.getByText('1/0/0//1', { selector: '.ant-tag' });
     expect(badge).toHaveClass('ant-tag-green');
     expect(badge).not.toHaveTextContent('Soll');
   });
@@ -211,7 +227,8 @@ describe('FahrzeugePage', () => {
     render(einsatz(), crew, sollKlein);
     await screen.findByText('Florian 1');
     // Ist 1/0/1//2 ≥ Soll 1/0/0//1 in jeder Position (Mannschaft über Soll) → erfüllt.
-    expect(screen.getByText('1/0/1//2')).toHaveClass('ant-tag-green');
+    // Wie oben: der reine Text steht seit C3 auch in der Verdichtungszeile.
+    expect(screen.getByText('1/0/1//2', { selector: '.ant-tag' })).toHaveClass('ant-tag-green');
   });
 
   it('zeigt fehlendes Soll neutral blau ohne Soll-Kontext', async () => {

@@ -17,7 +17,8 @@ import {
 } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
+import { kraefteuebersichtPfad, einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
+import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
@@ -479,6 +480,7 @@ export default function PersonalPage() {
       ) : (
       <>
       {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
+      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
       <Datensicht
         bezeichnung="Personal im Einsatz"
         spalten={spalten}
