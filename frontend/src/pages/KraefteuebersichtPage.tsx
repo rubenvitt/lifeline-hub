@@ -20,6 +20,7 @@ import {
   filtereKraefte,
   rendereMeldebildMarkdown,
   staerkeText,
+  verdichte,
   type FilterWerte,
   type MeldebildZeile,
   type Rohdaten,
@@ -147,6 +148,51 @@ function alleKeys(zeilen: MeldebildZeile[]): string[] {
   return zeilen.flatMap((z) => [z.key, ...(z.children ? alleKeys(z.children) : [])]);
 }
 
+/**
+ * Der leere Filterzustand — EINE Quelle für Startwert, Zurücksetzen und das Zurücknehmen
+ * einer einzelnen Marke. Vorher stand das Objektliteral nur im `useState`, und ein
+ * Zurücksetzen hätte es ein zweites Mal hinschreiben müssen.
+ */
+export const LEERER_FILTER: FilterWerte = { abschnittId: null, traeger: null, kategorie: null, suche: '' };
+
+export interface FilterChip {
+  schluessel: keyof FilterWerte;
+  label: string;
+}
+
+/**
+ * Die gesetzten Filter als Beschriftungen (LFH-338 · C3, Befund H3).
+ *
+ * REIN und exportiert, nach dem Muster von `bedienzielStil`: nur so ist die Reihenfolge über
+ * mehrere Kombinationen prüfbar, ohne zu rendern.
+ *
+ * Die Reihenfolge ist FEST (Abschnitt · Träger · Status · Suche) und nicht die Setzreihenfolge:
+ * eine Marken-Leiste, deren Einträge je nach Bedienweg springen, ist beim Ablesen unter
+ * Zeitdruck schlechter als keine.
+ *
+ * `suche` wird GETRIMMT geprüft — genauso wie `filtereKraefte` es tut (`f.suche.trim()`).
+ * Eine Marke für eine Suche aus lauter Leerzeichen behauptete eine Einschränkung, die keine
+ * einzige Zeile entfernt.
+ */
+export function aktiveFilterChips(
+  filter: FilterWerte,
+  abschnittName: (id: number) => string,
+): FilterChip[] {
+  const chips: FilterChip[] = [];
+  if (filter.abschnittId != null) {
+    chips.push({ schluessel: 'abschnittId', label: `Abschnitt: ${abschnittName(filter.abschnittId)}` });
+  }
+  if (filter.traeger) chips.push({ schluessel: 'traeger', label: `Träger: ${filter.traeger}` });
+  if (filter.kategorie) {
+    // Das Etikett kommt aus derselben Statusachse wie die Optionen des Auswahlfeldes — sonst
+    // hieße derselbe Wert im Feld anders als in der Marke daneben.
+    const wert = KATEGORIE_WERTE.find((w) => w.value === filter.kategorie);
+    chips.push({ schluessel: 'kategorie', label: `Status: ${wert?.text ?? filter.kategorie}` });
+  }
+  if (filter.suche.trim()) chips.push({ schluessel: 'suche', label: `Suche: „${filter.suche.trim()}"` });
+  return chips;
+}
+
 export default function KraefteuebersichtPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -155,7 +201,7 @@ export default function KraefteuebersichtPage() {
   const { message } = AntApp.useApp();
   const { token } = theme.useToken();
 
-  const [filter, setFilter] = useState<FilterWerte>({ abschnittId: null, traeger: null, kategorie: null, suche: '' });
+  const [filter, setFilter] = useState<FilterWerte>(LEERER_FILTER);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
   const [printPending, setPrintPending] = useState(false);
 
@@ -186,6 +232,22 @@ export default function KraefteuebersichtPage() {
       gefiltert.fahrzeuge, gefiltert.material,
     );
   }, [abschnitteQuery.data, einheitenQuery.data, personalQuery.data, fahrzeugeQuery.data, materialQuery.data, filter]);
+
+  /**
+   * DER BEZUGSWERT — dieselbe Rechnung über die UNGEFILTERTEN Listen.
+   *
+   * Ohne ihn verschwindet die Gesamtstärke des Einsatzes in dem Moment, in dem jemand einen
+   * Abschnitt anwählt. Genau dann wird sie an die übergeordnete Führungsstelle gemeldet
+   * (Befund H3): der Kopf rechnete schon immer gefiltert, war aber unverändert mit
+   * „Gesamtstärke" beschriftet.
+   *
+   * Kein zweiter `baueKraeftebild`-Lauf: der Bezugswert braucht keinen Baum, und ein voller
+   * Aufbau je Tastendruck im Suchfeld wäre Arbeit für ein Ergebnis, das niemand ansieht.
+   */
+  const gesamt = useMemo(
+    () => verdichte(personalQuery.data ?? [], fahrzeugeQuery.data ?? [], materialQuery.data ?? []),
+    [personalQuery.data, fahrzeugeQuery.data, materialQuery.data],
+  );
 
   const uebernehmen = useMutation({
     mutationFn: async () => {
@@ -228,6 +290,20 @@ export default function KraefteuebersichtPage() {
   const v = bild.verdichtung;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
+  const abschnittName = (id: number) =>
+    (abschnitteQuery.data ?? []).find((a) => a.id === id)?.name ?? `Abschnitt ${id}`;
+  const chips = aktiveFilterChips(filter, abschnittName);
+  const gefiltert = chips.length > 0;
+  /**
+   * „Kräfte" zählt Personal UND Fahrzeuge, aber KEIN Material — Material ist Mittel, keine
+   * Kraft. Dazu kommt ein gemessener Grund: `filtereKraefte` unterwirft Material bewusst
+   * nicht dem Kategorie-Filter (es hat eine eigene Statusachse). Ein Zähler, der Material
+   * mitzählte, spränge bei gesetztem Statusfilter also aus einem Grund, den die Zeile
+   * daneben nicht nennt.
+   */
+  const sichtbareKraefte = v.anzahlPersonal + v.anzahlFahrzeuge;
+  const alleKraefte = gesamt.anzahlPersonal + gesamt.anzahlFahrzeuge;
+
   return (
     // `kraefte-print-root` bleibt die ÄUSSERE Hülle: `kraefteuebersichtPrint.css` hängt
     // daran (`visibility` + absolute Positionierung im `@media print`), und `EinsatzSeite`
@@ -258,11 +334,47 @@ export default function KraefteuebersichtPage() {
         }
       >
       <Card style={{ marginBottom: abstand.lg }} styles={{ body: { overflowX: 'auto' } }}>
+        {/* ── WAS DIESE ZAHLEN BEDEUTEN (LFH-338 · C3, Befund H3) ──────────────────────
+            Die Kopfzahlen kommen aus den GEFILTERTEN Daten. Solange darüber unverändert
+            „Gesamtstärke" stand, meldete jemand, der kurz weg war und dann abliest, die
+            Teilstärke eines Abschnitts als Gesamtstärke des Einsatzes. Die Zeile hier sagt
+            deshalb IMMER, wie viel von wie viel gezeigt wird — auch ungefiltert, sonst wäre
+            ihr Erscheinen selbst das Signal und ihr Fehlen keine Aussage. */}
+        <Space wrap align="center" style={{ marginBottom: abstand.md }}>
+          <span style={{ color: token.colorTextSecondary }}>
+            {sichtbareKraefte} von {alleKraefte} Kräften
+          </span>
+          {gefiltert && (
+            <span style={{ color: token.colorTextTertiary }}>
+              (ungefiltert {staerkeText(gesamt.staerke)})
+            </span>
+          )}
+          {chips.map((chip) => (
+            <Tag
+              key={chip.schluessel}
+              closable
+              onClose={() =>
+                setFilter((f) => ({ ...f, [chip.schluessel]: LEERER_FILTER[chip.schluessel] }))
+              }
+            >
+              {chip.label}
+            </Tag>
+          ))}
+          {gefiltert && (
+            <Button type="link" onClick={() => setFilter(LEERER_FILTER)}>
+              Filter zurücksetzen
+            </Button>
+          )}
+        </Space>
+
         {/* Monitoring-Kopf: nicht umbrechend, bei schmalem Viewport horizontal scrollbar. */}
         <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
           {/* Achse 1: Personalstärke */}
           <Space size="large">
-            <Statistic title="Gesamtstärke (F/UF/M//Ges)" value={staerkeText(v.staerke)} />
+            <Statistic
+              title={gefiltert ? 'Stärke (gefiltert, F/UF/M//Ges)' : 'Gesamtstärke (F/UF/M//Ges)'}
+              value={staerkeText(v.staerke)}
+            />
             <Statistic title="Personal" value={v.anzahlPersonal} />
           </Space>
 

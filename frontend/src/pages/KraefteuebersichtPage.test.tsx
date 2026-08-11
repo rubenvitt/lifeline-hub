@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import KraefteuebersichtPage from './KraefteuebersichtPage';
+import KraefteuebersichtPage, { aktiveFilterChips, LEERER_FILTER } from './KraefteuebersichtPage';
 import { Routes, Route } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
@@ -363,5 +363,116 @@ describe('KraefteuebersichtPage', () => {
       expect(druckblock, `Druckregel für ${marke} fehlt`).toContain(marke);
     }
     expect(druckblock).toMatch(/overflow:\s*visible\s*!important/);
+  });
+});
+
+/**
+ * ── FILTERWAHRHEIT IM KOPF (LFH-338 · C3, Befund H3) ────────────────────────────
+ *
+ * Die Kopfzahlen wurden schon immer aus den GEFILTERTEN Daten gerechnet, die Kachel war
+ * aber unverändert mit „Gesamtstärke" beschriftet. Wer im Fükw kurz weggeht, zurückkommt
+ * und abliest, meldete damit die Teilstärke eines Abschnitts als Gesamtstärke des
+ * Einsatzes — eine Falschmeldung an die übergeordnete Führungsstelle.
+ *
+ * Die Selects werden über `getAllByRole('combobox')` mit Index gegriffen (Bestandsmuster
+ * aus `SchaedenPage.test.tsx:158`): die vier Filterfelder tragen nur Platzhalter, keine
+ * Beschriftungen — ein `name`-Matcher hätte hier nichts zu greifen.
+ */
+async function waehleAbschnitt(name: string) {
+  const felder = screen.getAllByRole('combobox');
+  fireEvent.mouseDown(felder[0]); // 0 = Abschnitt, 1 = Trägerorganisation, 2 = Status
+  fireEvent.click(await screen.findByTitle(name));
+}
+
+describe('KraefteuebersichtPage — Filterwahrheit', () => {
+  it('nennt den Kopf ungefiltert „Gesamtstärke" und mit Filter nicht mehr so', async () => {
+    mitBaum();
+    setup();
+    expect(await screen.findByText(/Gesamtstärke/)).toBeInTheDocument();
+
+    await waehleAbschnitt('Abschnitt Nord');
+
+    await waitFor(() => expect(screen.queryByText(/Gesamtstärke/)).toBeNull());
+    expect(screen.getByText(/Stärke \(gefiltert/)).toBeInTheDocument();
+  });
+
+  it('zeigt „X von Y Kräften" und setzt mit einem Klick alle Filter zurück', async () => {
+    // P1 hängt an KEINER Einheit, F1 an Einheit 20 (Abschnitt Nord). Der Abschnittsfilter
+    // trennt die beiden also — sonst wäre „X von Y" mit X = Y trivial erfüllt.
+    vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
+    vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    setup();
+
+    expect(await screen.findByText('2 von 2 Kräften')).toBeInTheDocument();
+
+    await waehleAbschnitt('Abschnitt Nord');
+    expect(await screen.findByText('1 von 2 Kräften')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(await screen.findByText('2 von 2 Kräften')).toBeInTheDocument();
+    // Und der Titel ist wieder der ungefilterte — das Zurücksetzen wirkt auf den ganzen Kopf.
+    expect(screen.getByText(/Gesamtstärke/)).toBeInTheDocument();
+  });
+
+  it('führt die ungefilterte Gesamtstärke als Bezugswert weiter, sobald gefiltert wird', async () => {
+    vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
+    vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]); // 0/0/1//1, ohne Einheit
+    setup();
+    await screen.findByText(/Gesamtstärke/);
+
+    await waehleAbschnitt('Abschnitt Nord');
+
+    // Gefiltert bleibt niemand übrig — der Bezugswert steht trotzdem da. Genau das ist der
+    // Punkt: eine leere gefilterte Menge darf die Gesamtstärke nicht verschwinden lassen.
+    expect(await screen.findByText(/ungefiltert 0\/0\/1\/\/1/)).toBeInTheDocument();
+  });
+
+  it('zeigt den gesetzten Filter als schließbare Marke, die genau ihn zurücknimmt', async () => {
+    vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
+    vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    setup();
+    await screen.findByText('2 von 2 Kräften');
+
+    await waehleAbschnitt('Abschnitt Nord');
+    const marke = await screen.findByText('Abschnitt: Abschnitt Nord');
+    expect(marke).toBeInTheDocument();
+
+    // Das Schließkreuz der Marke, nicht der Zurücksetzen-Knopf.
+    fireEvent.click(marke.closest('.ant-tag')!.querySelector('.ant-tag-close-icon')!);
+    expect(await screen.findByText('2 von 2 Kräften')).toBeInTheDocument();
+    expect(screen.queryByText('Abschnitt: Abschnitt Nord')).toBeNull();
+  });
+});
+
+describe('aktiveFilterChips', () => {
+  const name = () => 'Abschnitt Nord';
+
+  it('ist leer, solange nichts gesetzt ist', () => {
+    expect(aktiveFilterChips(LEERER_FILTER, name)).toEqual([]);
+  });
+
+  it('führt jeden gesetzten Filter mit sprechendem Etikett, in fester Reihenfolge', () => {
+    const chips = aktiveFilterChips(
+      { abschnittId: 10, traeger: 'FF Musterstadt', kategorie: 'verfuegbar', suche: '  HLF  ' },
+      name,
+    );
+    expect(chips.map((c) => c.label)).toEqual([
+      'Abschnitt: Abschnitt Nord',
+      'Träger: FF Musterstadt',
+      'Status: verfügbar',
+      'Suche: „HLF"',
+    ]);
+    expect(chips.map((c) => c.schluessel)).toEqual(['abschnittId', 'traeger', 'kategorie', 'suche']);
+  });
+
+  it('wertet eine Suche aus lauter Leerzeichen NICHT als gesetzten Filter', () => {
+    // `filtereKraefte` trimmt ebenfalls (`f.suche.trim()`); eine Marke für einen Filter, der
+    // nichts filtert, behauptete eine Einschränkung, die es nicht gibt.
+    expect(aktiveFilterChips({ ...LEERER_FILTER, suche: '   ' }, name)).toEqual([]);
   });
 });
