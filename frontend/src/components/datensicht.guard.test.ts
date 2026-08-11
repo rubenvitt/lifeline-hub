@@ -358,6 +358,47 @@ const SICHTSCHALTER: Readonly<Record<string, string>> = {
   'Radio.Group': 'value',
 };
 
+/**
+ * Die Bezeichner, die ein Schalter-Attribut als ACHSE beisteuert — aus dem AST, nicht per
+ * Regex über den Attributtext.
+ *
+ * Gemessen an LFH-338: `<Segmented value={expandedKeys.length > 0 ? 'alle' : 'abschnitte'} />`
+ * lieferte über {@link BEZEICHNER} vier Achsen — `expandedKeys`, `length`, **`alle`** und
+ * **`abschnitte`**. Die letzten beiden sind der Inhalt von ZEICHENKETTEN, und `abschnitte`
+ * kommt in fast jeder Einsatz-Seite als Variable vor: der Guard meldete daraufhin eine
+ * Reiterachse an einer Fläche, die gar keinen Reiter hat, nur einen Aufklapp-Umschalter.
+ *
+ * Ein Gate, das an einem Zeichenkettenwert anschlägt, ist von einem kaputten nicht zu
+ * unterscheiden — und die naheliegende „Behebung" (dem `Datensicht` einen Schlüssel geben,
+ * der am Umschalter hängt) wäre ein echter Schaden: sie hängte die Sicht bei jedem
+ * Aufklappen neu ein und verwürfe Sortierung, Spaltenwahl und Zeilenschleuse.
+ *
+ * Ausgeschlossen wird deshalb beides: Zeichenketten (sie sind keine Bezeichner) und
+ * PROPERTY-Namen (`x.length` steuert `x` bei, nicht `length`) — ein Property-Name ist im
+ * Zielausdruck ein anderer Namensraum und träfe dort zufällig gleichnamige Felder.
+ */
+function achsenBezeichner(
+  knoten: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  attributName: string,
+): string[] {
+  const attribut = knoten.attributes.properties.find(
+    (a): a is ts.JsxAttribute => ts.isJsxAttribute(a) && a.name.getText() === attributName,
+  );
+  const wert = attribut?.initializer;
+  if (wert == null || !ts.isJsxExpression(wert) || wert.expression == null) return [];
+  const gefunden: string[] = [];
+  const sammle = (n: ts.Node): void => {
+    if (ts.isPropertyAccessExpression(n)) {
+      sammle(n.expression); // NUR links vom Punkt — `n.name` ist der Property-Name.
+      return;
+    }
+    if (ts.isIdentifier(n)) gefunden.push(n.text);
+    ts.forEachChild(n, sammle);
+  };
+  sammle(wert.expression);
+  return gefunden;
+}
+
 /** Was EIN AST-Durchlauf über eine Datei hergibt. */
 export interface Dateilage {
   stellen: Sichtstelle[];
@@ -399,8 +440,7 @@ export function leseDatei(pfad: string, quelltext: string): Dateilage {
       const tag = knoten.tagName.getText(quelle);
       const schalterAttribut = SICHTSCHALTER[tag];
       if (schalterAttribut != null) {
-        const wert = attributVon(knoten, schalterAttribut, quelle);
-        for (const bezeichner of wert?.match(BEZEICHNER) ?? []) achsen.add(bezeichner);
+        for (const bezeichner of achsenBezeichner(knoten, schalterAttribut)) achsen.add(bezeichner);
       }
       if (tag === 'Datensicht') {
         stellen.push({
@@ -870,6 +910,47 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // (d) Ohne Schalterachse gibt es keinen Reiter, den ein Schlüssel tragen könnte. Ohne
     // diesen Ausstieg meldete die Regel jede schlüssellose Sicht des Repos.
     expect(lauf(['const y = <Datensicht daten={filterTiere(alle, { sicht })} />;'])).toEqual([]);
+
+    /**
+     * (e) EIN ZEICHENKETTENWERT IM SCHALTER IST KEINE ACHSE (gemessen an LFH-338).
+     *
+     * Der Umschalter „Alles aufklappen / Nur Abschnitte" der Kräfteübersicht trägt seine
+     * beiden Zustände als Zeichenketten im `value`. Über einen Regex-Scan des Attributtexts
+     * wurde daraus die Achse `abschnitte` — ein Bezeichner, den fast jede Einsatz-Seite
+     * führt —, und die Regel meldete eine Reiterachse an einer Fläche ohne jeden Reiter.
+     *
+     * Die naheliegende „Behebung" wäre ein Schlüssel gewesen, der am Umschalter hängt: die
+     * Sicht hinge bei jedem Aufklappen neu ein und verlöre Sortierung, Spaltenwahl und
+     * Zeilenschleuse. Ein Gate, das zu so einer Änderung drängt, ist schlimmer als keins.
+     */
+    expect(
+      lauf([
+        "const s = <Segmented value={offen.length > 0 ? 'alle' : 'abschnitte'} />;",
+        'const y = <Datensicht daten={bild.abschnitte} />;',
+      ]),
+      'ein Zeichenkettenwert im Schalter darf keine Achse werden',
+    ).toEqual([]);
+
+    // (f) …und die Gegenprobe zu (e): steht im selben Schalter ein echter Bezeichner, an dem
+    // die Daten hängen, meldet die Regel weiter. Ohne diese Zeile hätte (e) den Scanner auch
+    // ganz abschalten können.
+    expect(
+      lauf([
+        "const s = <Segmented value={sicht === 'alle' ? 'alle' : 'eng'} />;",
+        'const y = <Datensicht daten={filterTiere(alle, { sicht })} />;',
+      ]),
+    ).toHaveLength(1);
+
+    // (g) Ein PROPERTY-Name ist ebenfalls keine Achse: `offen.length` steuert `offen` bei,
+    // nicht `length`. Sonst träfe die Regel jede Datenmenge, in deren Ausdruck irgendwo ein
+    // `.length` steht — und das ist praktisch jede.
+    expect(
+      lauf([
+        'const s = <Segmented value={offen.length} />;',
+        'const y = <Datensicht daten={alle.length > 0 ? alle : leer} />;',
+      ]),
+      'ein Property-Name im Schalter darf keine Achse werden',
+    ).toEqual([]);
   });
 
   it('Sentinel: der Schlüssel-Scan sieht die zwei Sichten von PersonenPage', () => {
