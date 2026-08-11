@@ -115,20 +115,25 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  *  |                    |       | „Ad-hoc-Person" (`PersonalPage.tsx:329-339`)                    |
  *  | `/personen`        | 120px | `Space` ohne `wrap` mit drei Knöpfen „Schnellerfassung",         |
  *  |                    |       | „Vermisst melden", „Betroffene/n erfassen" (`PersonenPage.tsx:138-144`) |
- *  | `/kraefteuebersicht`|  7px | `Space` ohne `wrap` mit „In Lagebericht übernehmen" +            |
- *  |                    |       | „Drucken / als PDF" (`KraefteuebersichtPage.tsx:241-245`)       |
  *
  * BELEGT ALS BESTAND, nicht vermutet — zwei unabhängige Messungen:
  *  1. Auf dem **leeren** Einsatz (0 Personal, 0 Personen, 0 Kräfte) stehen dieselben Werte
- *     79 / 120 / 7 px. Die Verursacher sind Kopfknöpfe, die ohne jeden Datensatz rendern;
+ *     79 / 120 px. Die Verursacher sind Kopfknöpfe, die ohne jeden Datensatz rendern;
  *     der `Datensicht`-Inhalt ist unbeteiligt.
  *  2. `git diff a06cd0f..HEAD` berührt in allen drei Dateien nur Importe und Spalten — die
  *     schuldigen `Space`-Blöcke sind unverändert.
  * `/tiere` und `/auftraege` messen auf allen drei Breiten 0 px. Auf 1366 und 1024 px sind
- * alle neun Routen sauber; die drei Verstöße treten ausschließlich auf 390 px auf.
+ * alle neun Routen sauber; die verbliebenen zwei Verstöße treten ausschließlich auf 390 px auf.
  *
- * WARUM FREISTELLUNG UND NICHT ROT: die drei Reparaturen sind `wrap` an drei fremden
- * Seitenköpfen — Bestandsarbeit in `frontend/src/pages/`, die dieses Bündel nicht besitzt,
+ * DER DRITTE EINTRAG IST WEG (LFH-338 · C3): `/kraefteuebersicht` stand hier mit 7 px,
+ * verursacht von einem `Space` ohne `wrap` im Aktionen-Slot. C3 hat dem Slot einen dritten
+ * Bedienknopf gegeben (den Aufklapp-Umschalter) — damit sprang der Überlauf auf 246 px und
+ * das Gate schlug an, wie es soll. Der Fix ist das `wrap`, das die Freistellung ohnehin
+ * gefordert hätte; gemessen steht die Route jetzt bei **0 px**, und die Totmeldung des
+ * Gates hat die Streichung dieser Zeile erzwungen.
+ *
+ * WARUM FREISTELLUNG UND NICHT ROT: die zwei verbliebenen Reparaturen sind `wrap` an zwei fremden
+ * Seitenköpfen — Bestandsarbeit in `frontend/src/pages/`, die jenes Bündel nicht besaß,
  * und ein rot geborenes Gate wird abgeschaltet statt befolgt. Freigestellt wird deshalb
  * **namentlich, mit Deckel und mit Totmeldung**, nach dem Muster der `NOCH_OFFEN`-Listen der
  * Vitest-Guards:
@@ -148,7 +153,6 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 const BESTAND_OFFEN = [
   { modul: 'personal', breite: 390, deckel: 130, gemessen: 79 },
   { modul: 'personen', breite: 390, deckel: 180, gemessen: 120 },
-  { modul: 'kraefteuebersicht', breite: 390, deckel: 60, gemessen: 7 },
 ] as const;
 
 /**

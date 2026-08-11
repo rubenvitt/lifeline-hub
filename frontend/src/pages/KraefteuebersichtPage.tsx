@@ -335,7 +335,11 @@ export default function KraefteuebersichtPage() {
             items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
         }
         aktionen={
-          <Space className="kraefte-no-print">
+          // `wrap` ist hier keine Kosmetik, sondern gemessen: mit dem Umschalter stehen drei
+          // Bedienelemente in der Aktionsleiste, und auf 390 px lief die Zeile 246 px über
+          // (Gate 1, Bestand vorher 7 px). Ein Aktionen-Slot, der nicht umbricht, schiebt
+          // seinen Überlauf auf die ganze Seite.
+          <Space className="kraefte-no-print" wrap>
             {/* Der Umschalter steht VOR den Knöpfen und ist kein Knopf: „alles" und „nur
                 Abschnitte" sind zwei Zustände desselben Blatts, keine zwei Handlungen.
                 Sein Wert wird aus `expandedKeys` ABGELEITET statt zusätzlich gehalten —
