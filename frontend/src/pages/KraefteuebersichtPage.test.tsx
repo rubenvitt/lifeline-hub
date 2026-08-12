@@ -641,3 +641,62 @@ describe('KraefteuebersichtPage — Aufklappen', () => {
     expect(screen.getByText('Abschnitt Nord')).toBeInTheDocument();
   });
 });
+
+/**
+ * ── DER EINMAL-RIEGEL DARF NICHT ZU FRÜH ZUSCHNAPPEN (Review zu LFH-338) ────────
+ *
+ * `bild.baum` entsteht aus SECHS unabhängigen Queries, und `baueKraeftebild` legt eine
+ * Abschnittszeile UNBEDINGT an (`kraeftebild.ts:627-643`, kein Kinder-Riegel). „Erster
+ * nicht leerer Baum" ist damit nicht dasselbe wie „erster vollständiger Baum": kommen die
+ * Abschnitte zuerst, klappt der Effekt genau die Abschnittsebene auf, verbraucht seine
+ * Marke — und alles, was danach eintrifft, bleibt zu.
+ *
+ * Das ist kein Rennen, sondern ein alltäglicher Weg: `einsatzKeys.abschnitte` wird von acht
+ * weiteren Flächen geladen (Lage-Dashboard, ETB, Meldungen, Chat, Lagekarte, …). Wer von
+ * dort herüberwechselt, hat die Abschnitte im Zwischenspeicher — sie stehen im ERSTEN
+ * Render, die anderen fünf Queries sind noch offen.
+ *
+ * Das Akzeptanzkriterium („expandedKeys ist nach dem ersten geladenen Baum nicht leer")
+ * bliebe dabei grün: die Abschnitts-Schlüssel stehen ja drin. Genau deshalb prüft dieser
+ * Test die TIEFSTE Zeile.
+ */
+it('klappt auch auf, wenn die Abschnitte VOR den übrigen Listen da sind', async () => {
+  const spaet = <T,>(wert: T) =>
+    () => new Promise<T>((aufloesen) => setTimeout(() => aufloesen(wert), 30));
+
+  vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);       // sofort (im Cache)
+  vi.mocked(listeEinheiten).mockImplementation(spaet([EINHEIT_E10])); // trifft später ein
+  vi.mocked(listeEinsatzFahrzeuge).mockImplementation(spaet([FAHRZEUG_F1]));
+  setup();
+
+  // Die Abschnittszeile steht früh — der Baum ist also „nicht leer", bevor er vollständig ist.
+  await screen.findByText('Abschnitt Nord');
+  // …und die tiefste Zeile muss trotzdem aufgeklappt erscheinen.
+  expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
+});
+
+/**
+ * ── „ALLES AUFKLAPPEN" DARF NICHT VERSTUMMEN (Review zu LFH-338) ────────────────
+ *
+ * Der Umschalterwert wird aus `expandedKeys` abgeleitet — richtig, ein zweiter Zustand
+ * daneben liefe auseinander. Aber die Ableitung „length > 0" ist zu grob: klappt jemand
+ * EINE von mehreren Zeilen zu, bleibt die Liste nicht leer, der Umschalter steht weiter auf
+ * „alles", und ein Klick darauf schaltet ein bereits gesetztes Radio — das feuert kein
+ * `change`. Der Knopf sähe aus wie eine Bedienung und wäre keine; der einzige Weg zurück
+ * wäre der Umweg über „Nur Abschnitte".
+ *
+ * Zugleich behauptete die Beschriftung einen Zustand, der nicht vorliegt.
+ */
+it('klappt nach dem Zuklappen EINER Zeile über „Alles aufklappen" wieder vollständig auf', async () => {
+  mitBaum();
+  setup();
+  await screen.findByText('FW 1/44-1');
+
+  // Eine einzelne Zeile zuklappen (Zeilenklick) — nicht alle.
+  fireEvent.click(screen.getByText('1. Zug'));
+  await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
+  expect(screen.getByText('Abschnitt Nord')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText('Alles aufklappen'));
+  expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
+});

@@ -262,16 +262,42 @@ export default function KraefteuebersichtPage() {
    * Handarbeit der Einsatzkraft wieder auf. Ein `useRef` und kein `useState`, weil die
    * Marke keine Neuzeichnung auslösen soll.
    *
-   * Bedingung ist der erste NICHT LEERE Baum, nicht der erste Lauf: beim ersten Rendern
-   * stehen alle sechs Queries noch aus, `bild.baum` ist leer, und die Marke wäre verbraucht,
-   * bevor es etwas aufzuklappen gab.
+   * Bedingung ist der VOLLSTÄNDIGE Baum, nicht der erste nicht leere — und das ist der
+   * Unterschied, an dem ein erster Anlauf gescheitert ist: `bild.baum` entsteht aus fünf
+   * unabhängigen Listen, und `baueKraeftebild` legt eine Abschnittszeile UNBEDINGT an
+   * (`kraeftebild.ts`, kein Kinder-Riegel). Trafen die Abschnitte zuerst ein, klappte der
+   * Effekt genau die Abschnittsebene auf, verbrauchte seine Marke, und alles, was danach
+   * kam, blieb zu.
+   *
+   * Das war kein Rennen, sondern ein alltäglicher Weg: `einsatzKeys.abschnitte` laden acht
+   * weitere Flächen (Lage-Dashboard, ETB, Meldungen, Chat, Lagekarte …). Wer von dort
+   * herüberwechselt, hat die Abschnitte im Zwischenspeicher — sie stehen im ERSTEN Render,
+   * die übrigen Queries sind noch offen. Das Akzeptanzkriterium („expandedKeys ist nicht
+   * leer") wäre dabei grün geblieben; die Gestaltung nicht.
+   *
+   * Der Einsatzwechsel setzt beides zurück: sonst überlebten Marke UND Filter einen
+   * Wechsel zwischen zwei Kräfteübersichten über die Verlaufstasten, und die Filtermarke
+   * trüge den Abschnittsnamen des vorigen Einsatzes.
    */
   const initialAufgeklappt = React.useRef(false);
   useEffect(() => {
-    if (initialAufgeklappt.current || bild.baum.length === 0) return;
+    initialAufgeklappt.current = false;
+    setExpandedKeys([]);
+    setFilter(LEERER_FILTER);
+  }, [einsatzId]);
+
+  const listenGeladen =
+    abschnitteQuery.isSuccess &&
+    einheitenQuery.isSuccess &&
+    personalQuery.isSuccess &&
+    fahrzeugeQuery.isSuccess &&
+    materialQuery.isSuccess;
+
+  useEffect(() => {
+    if (initialAufgeklappt.current || !listenGeladen || bild.baum.length === 0) return;
     initialAufgeklappt.current = true;
     setExpandedKeys(alleKeys(bild.baum));
-  }, [bild.baum]);
+  }, [listenGeladen, bild.baum]);
 
   // Erst nach committetem Aufklappen drucken (sonst kollabierte Zeilen bei großen Bäumen).
   useEffect(() => {
@@ -300,6 +326,28 @@ export default function KraefteuebersichtPage() {
   const v = bild.verdichtung;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
+  /** Ältester erfolgreicher Listenabruf — trägt Kopfzeile UND Druckstand, damit beide
+   *  denselben Zeitpunkt meinen. */
+  const datenstand = gemeinsamerDatenstand(
+    einheitenQuery.dataUpdatedAt,
+    personalQuery.dataUpdatedAt,
+    fahrzeugeQuery.dataUpdatedAt,
+    materialQuery.dataUpdatedAt,
+    abschnitteQuery.dataUpdatedAt,
+  );
+
+  /**
+   * Steht der Baum VOLLSTÄNDIG offen? Trägt den Zustand des Umschalters.
+   *
+   * Als benannte Zwischenvariable und nicht inline im `value`: dort stünde `bild` im
+   * Schalter-Attribut, und `datensicht.guard.test.ts` liest daraus eine „Reiterachse", an
+   * der die Zeilenmenge hängt. Die Richtung ist hier aber umgekehrt — nicht die Daten
+   * hängen am Schalter, der Schalter liest die Daten. Der Guard kann das strukturell nicht
+   * unterscheiden (vermerkt in seinem Kopfkommentar); die Variable macht die Richtung
+   * sichtbar und ist ohnehin lesbarer als der Vergleich im Attribut.
+   */
+  const alleAufgeklappt = expandedKeys.length === alleKeys(bild.baum).length;
+
   const abschnittName = (id: number) =>
     (abschnitteQuery.data ?? []).find((a) => a.id === id)?.name ?? `Abschnitt ${id}`;
   const chips = aktiveFilterChips(filter, abschnittName);
@@ -323,13 +371,7 @@ export default function KraefteuebersichtPage() {
       <EinsatzSeite
         breite={flaeche.seiteBreit}
         titel="Kräfteübersicht"
-        dataUpdatedAt={gemeinsamerDatenstand(
-          einheitenQuery.dataUpdatedAt,
-          personalQuery.dataUpdatedAt,
-          fahrzeugeQuery.dataUpdatedAt,
-          materialQuery.dataUpdatedAt,
-          abschnitteQuery.dataUpdatedAt,
-        )}
+        dataUpdatedAt={datenstand}
         breadcrumb={
           <Breadcrumb className="kraefte-no-print"
             items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
@@ -344,9 +386,15 @@ export default function KraefteuebersichtPage() {
                 Abschnitte" sind zwei Zustände desselben Blatts, keine zwei Handlungen.
                 Sein Wert wird aus `expandedKeys` ABGELEITET statt zusätzlich gehalten —
                 ein zweiter Zustand daneben liefe auseinander, sobald jemand eine einzelne
-                Zeile zuklappt. */}
+                Zeile zuklappt.
+
+                Verglichen wird gegen die VOLLZÄHLIGKEIT, nicht gegen „mehr als null": mit
+                `length > 0` stand der Umschalter nach dem Zuklappen einer einzelnen Zeile
+                weiter auf „alles", und ein Klick darauf schaltete ein bereits gesetztes
+                Radio — das feuert kein `change`. Der Knopf sähe aus wie eine Bedienung und
+                wäre keine; zurück ginge es nur über den Umweg „Nur Abschnitte". */}
             <Segmented
-              value={expandedKeys.length > 0 ? 'alle' : 'abschnitte'}
+              value={alleAufgeklappt ? 'alle' : 'abschnitte'}
               onChange={(wert) => setExpandedKeys(wert === 'alle' ? alleKeys(bild.baum) : [])}
               options={[
                 { value: 'alle', label: 'Alles aufklappen' },
@@ -374,7 +422,12 @@ export default function KraefteuebersichtPage() {
           Kräfteübersicht — {einsatz.bezeichnung}
           {einsatz.einsatznummer_intern ? ` (${einsatz.einsatznummer_intern})` : ''}
         </div>
-        <div>Stand: {taktischeDtgVoll(new Date().toISOString())}</div>
+        {/* Der Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit. Ein Blatt,
+            das „Stand 1430" meldet, während die Zahlen von 1400 sind, ist genau die Sorte
+            Falschangabe, gegen die dieses Ticket antritt (H3) — nur eine Ebene tiefer. Der
+            Rückfall auf „jetzt" greift nur, wenn noch kein Abruf gelungen ist; dann steht
+            ohnehin nichts Zählbares auf dem Blatt. */}
+        <div>Stand: {taktischeDtgVoll(new Date(datenstand || Date.now()).toISOString())}</div>
         <div>Erstellt von: {benutzer?.anzeigename ?? '—'}</div>
         {gefiltert && <div>Auswahl: {chips.map((c) => c.label).join(' · ')}</div>}
       </div>

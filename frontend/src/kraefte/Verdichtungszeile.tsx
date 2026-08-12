@@ -67,7 +67,16 @@ export default function Verdichtungszeile({
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
 
-  if (personalQuery.isError || fahrzeugeQuery.isError) return null;
+  // Der Datenriegel steht VORN, und die Reihenfolge ist die ganze Aussage: liegen keine
+  // Zahlen vor, ist die Zeile still — ob der Abruf noch läuft oder gescheitert ist, ändert
+  // daran nichts, und ein „0/0/0//0" wäre in beiden Fällen eine erfundene Meldung.
+  //
+  // Liegen ZAHLEN vor und scheitert erst ein Folgeabruf, bleiben sie stehen: sie sind echt,
+  // nur womöglich alt. Dieselbe Entscheidung trifft `SeitenStandVeraltet` für Listen. Stünde
+  // die Fehlerprüfung vorn, spränge die Tabelle darunter bei jeder Störung eine Zeile hoch —
+  // unter dem Cursor, mitten in der Arbeit (Prüflisten-Kriterium 12) — und der einzige Weg
+  // zur Kräfteübersicht wäre für die Dauer der Störung weg. Gemessen, nicht vermutet: mit
+  // der umgekehrten Reihenfolge verschwand die Zeile im Test tatsächlich.
   if (!personalQuery.data || !fahrzeugeQuery.data) return null;
 
   const v = verdichte(personalQuery.data, fahrzeugeQuery.data, []);

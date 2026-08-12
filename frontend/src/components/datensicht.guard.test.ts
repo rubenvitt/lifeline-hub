@@ -125,9 +125,19 @@ import { describe, expect, it } from 'vitest';
  *   aufgelöst, sondern der Bezeichner in seinem Text. Dieselbe Stelle mit `key="liste"`
  *   meldete sofort. Ein konstanter
  *   Schlüssel, der zufällig den Namen einer achsabhängigen lokalen Bindung trägt, kommt also
- *   durch. (c) Aus dem
- *   Schalter-Attribut wird JEDER Bezeichner zur Achse — bei `activeKey={filter.reiter}`
- *   also auch `filter`. (d) Als Schalter gelten nur die drei Tags in {@link SICHTSCHALTER};
+ *   durch. (c) Aus dem Schalter-Attribut werden nur echte BEZEICHNER zur Achse, und zwar
+ *   die links vom Punkt: `activeKey={filter.reiter}` liefert `filter`, nicht `reiter`.
+ *   Zeichenketten und Property-Namen sind ausgeschlossen (Begründung an
+ *   {@link achsenBezeichner}) — ein `value={x ? 'alle' : 'abschnitte'}` steuert also nur
+ *   `x` bei. Wer eine Achse ausschliesslich über einen Property-Namen bindet, wird nicht
+ *   gesehen; im Bestand gibt es diese Form nicht. (c′) Die RICHTUNG erkennt die Regel
+ *   nicht: sie sieht „Schalterwert und Zeilenmenge teilen einen Bezeichner", nicht „die
+ *   Zeilenmenge hängt vom Schalter ab". Ein Schalter, der die Daten LIEST — etwa ein
+ *   Aufklapp-Umschalter, dessen Zustand aus der Vollzähligkeit des Baums folgt — meldet
+ *   deshalb fälschlich, wenn der Vergleich im Attribut steht. Abhilfe an der Fundstelle ist
+ *   eine benannte Zwischenvariable (`KraefteuebersichtPage.tsx`, `alleAufgeklappt`), die
+ *   die Richtung ohnehin lesbarer macht; ein `key` am Element wäre hier die FALSCHE
+ *   Behebung und verwürfe Sortierung, Spaltenwahl und Zeilenschleuse bei jedem Schalten. (d) Als Schalter gelten nur die drei Tags in {@link SICHTSCHALTER};
  *   eine handgebaute Reiterleiste aus `<Button>`n ist keiner. (e) Der EINGANG der Regel ist
  *   das `daten`-Attribut am Element — eine Sicht, die ihre Zeilen aus einem `{...spread}`
  *   bezieht, hat für den Guard keine Daten und wird stillschweigend übersprungen. Dieselbe

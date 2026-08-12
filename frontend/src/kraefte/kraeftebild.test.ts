@@ -261,8 +261,10 @@ it('verdichte liefert auf leeren Listen Nullen statt undefined', () => {
   expect(v.fahrzeugStatus.ohne).toBe(0);
 });
 
-// Die Gleichheit ist die eigentliche Zusicherung der Auslösung: `baueKraeftebild` DARF nicht
-// anders rechnen als die herausgelöste Funktion, sonst zeigt der Kopf zwei Wahrheiten.
+// ANKER, keine Zusicherung: seit der Auslösung RUFT `baueKraeftebild` die Funktion, der
+// Vergleich kann also nicht mehr rot werden. Er steht für den Fall, dass jemand die Rechnung
+// dort wieder von Hand einbaut — dann fällt eine Abweichung sofort auf, statt den Kopf zwei
+// Wahrheiten zeigen zu lassen.
 it('verdichte stimmt mit der Verdichtung aus baueKraeftebild überein', () => {
   const personal = [p(1, 10, 'fuehrer'), p(2, 10, 'mannschaft'), p(3, null, 'mannschaft')];
   const fahrzeuge = [fz(1, 10), fz(2, null, 'gebunden')];

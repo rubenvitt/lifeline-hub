@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router';
 import { renderMitProviders } from '../test/utils';
 import Verdichtungszeile from './Verdichtungszeile';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
+import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 
@@ -57,7 +58,7 @@ describe('Verdichtungszeile', () => {
     );
   });
 
-  it('bleibt bei gescheitertem Abruf stumm, statt eine Null zu behaupten', async () => {
+  it('bleibt beim ERSTEN gescheiterten Abruf stumm, statt eine Null zu behaupten', async () => {
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new Error('kaputt'));
     const { container } = setup();
 
@@ -65,9 +66,48 @@ describe('Verdichtungszeile', () => {
      * „0/0/0//0" auf einer Führungsfläche liest sich wie eine Meldung und ist keine. Ein
      * Nullwert im Fehlerfall wäre schlimmer als gar keine Angabe: er sähe aus wie „keine
      * Kräfte im Einsatz", während in Wahrheit nur der Abruf scheiterte.
+     *
+     * DIESE Zusicherung allein belegt den Fehlerzweig NICHT — ohne Daten ist der Ladezweig
+     * ebenfalls still, die Aussage wäre schon bei t=0 wahr. Was sie trägt, ist der Test
+     * darunter: dort liegen Daten vor, und erst dann unterscheiden sich die beiden Zweige.
      */
     await vi.waitFor(() => expect(container.textContent).not.toContain('Stärke'));
     expect(container.textContent).not.toContain('0/0/0//0');
+  });
+
+  it('lässt die zuletzt bekannten Zahlen stehen, wenn erst der ZWEITE Abruf scheitert', async () => {
+    /**
+     * Der Fall, der im Betrieb häufiger ist als der kalte Fehlschlag: die Zahlen stehen, eine
+     * Invalidierung stößt einen neuen Abruf an, und der scheitert. Verschwände die Zeile
+     * dann, spränge die Tabelle darunter eine Zeile hoch — unter dem Cursor, mitten in der
+     * Arbeit (Prüflisten-Kriterium 12) —, und der einzige Weg zur Kräfteübersicht wäre für
+     * die Dauer der Störung weg.
+     *
+     * Die Zahlen sind dann echt, nur womöglich alt. Dieselbe Entscheidung trifft
+     * `SeitenStandVeraltet` für Listen: stehen lassen, nicht verbergen.
+     */
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([
+      { staerke_position: 'fuehrer', status_kategorie: 'gebunden' },
+    ] as never);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([{ status_kategorie: 'verfuegbar' }] as never);
+    const { client } = setup();
+    expect(await screen.findByText('1/0/0//1')).toBeInTheDocument();
+
+    vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new Error('kaputt'));
+    await client.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(1) });
+
+    // Gewartet wird auf den FEHLERZUSTAND im Zwischenspeicher, nicht auf die Zahl der
+    // Aufrufe: nach dem Aufruf ist der Fehler noch nicht propagiert, und eine Prüfung dort
+    // liefe an beiden möglichen Verhalten vorbei (gemessen — die Zusicherung war in beide
+    // Richtungen grün).
+    await vi.waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.fahrzeuge(1))?.status).toBe('error'),
+    );
+    // …und danach EINEN Tick, damit React den Fehlerzustand auch gerendert hat: direkt nach
+    // dem Cache-Übergang steht die alte Ausgabe noch, und die Zusicherung wäre in beide
+    // Richtungen grün (gemessen).
+    await new Promise((weiter) => setTimeout(weiter, 0));
+    expect(screen.getByText('1/0/0//1')).toBeInTheDocument();
   });
 
   it('zeigt nichts, solange die Listen noch nicht da sind', () => {
