@@ -47,6 +47,106 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv', sprechgruppen: unk
   ];
 }
 
+describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
+  /**
+   * Der Knopf schrieb SOFORT einen Datensatz namens „Neue Einheit" in die Datenbank —
+   * vor jeder Eingabe. Wer ihn versehentlich traf oder es sich anders überlegte, hinterließ
+   * eine Platzhalter-Einheit in der Gliederung, und die stand danach in jedem Baum, jeder
+   * Auswahlliste und jeder Stärkeaggregation.
+   */
+  function bildenHandler() {
+    const angelegt: unknown[] = [];
+    return {
+      angelegt,
+      handler: http.post('/api/einsaetze/1/einheiten', async ({ request }) => {
+        const body = await request.json();
+        angelegt.push(body);
+        return HttpResponse.json({ ...einheiten[0], id: 99, name: (body as { name: string }).name });
+      }),
+    };
+  }
+
+  it('öffnet einen Dialog und legt dabei NOCH NICHTS an', async () => {
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(angelegt).toHaveLength(0);
+  });
+
+  it('Abbrechen legt nichts an und lässt keinen Wortlaut zurück', async () => {
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Verworfen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+
+    /**
+     * KEINE Zusicherung über das Verschwinden des Dialogs. GEMESSEN: antd hält den Knoten
+     * samt `.ant-modal-wrap` für seine Schliessanimation im Baum, und die läuft in jsdom
+     * nie ab — weder `queryByRole('dialog') === null` noch `not.toBeVisible()` wird je
+     * wahr. Beides wäre ein dauerhaft roter Test, der nichts über das Verhalten sagt.
+     *
+     * Geprüft werden stattdessen die zwei Aussagen, die zählen und messbar sind: es ist
+     * nichts angelegt worden, und der verworfene Wortlaut ist beim nächsten Öffnen weg
+     * (Reset auf JEDEM Ausweg, Erfassungs-Norm aus LFH-332 · B4). Die zweite ist die
+     * schärfere — ein stehengebliebener Name legte beim nächsten Mal eine Dublette an.
+     */
+    expect(angelegt).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
+  });
+
+  it('erst das Absenden mit Namen legt an — und nie als „Neue Einheit"', async () => {
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), '2. Zug');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
+
+    await waitFor(() => expect(angelegt).toHaveLength(1));
+    expect((angelegt[0] as { name: string }).name).toBe('2. Zug');
+    expect(JSON.stringify(angelegt[0])).not.toContain('Neue Einheit');
+  });
+
+  it('ohne Namen wird nicht abgesendet', async () => {
+    // Die Gegenprobe zum Test darüber: ohne sie wäre „legt erst beim Absenden an" auch
+    // dann grün, wenn der Dialog jede leere Eingabe durchreichte.
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
+    // Über die Fehlerklasse, nicht über `role="alert"`: antds Form-Erklärung trägt
+    // `.ant-form-item-explain-error` und keine ARIA-Rolle (gemessen). Die eigentliche
+    // Aussage ist die Zeile darunter — der Klick hat nichts angelegt.
+    await waitFor(() =>
+      expect(dialog.querySelector('.ant-form-item-explain-error')).not.toBeNull(),
+    );
+    expect(angelegt).toHaveLength(0);
+  });
+});
+
 describe('EinheitenPage', () => {
   /**
    * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).

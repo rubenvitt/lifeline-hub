@@ -30,6 +30,7 @@ import { leerZuNull } from '../api/patchTriState';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
+import { ErfassungsModal } from '../components/Erfassung';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
@@ -75,6 +76,12 @@ function nachfahrenInkl(einheiten: Einheit[], id: number): Set<number> {
   return ergebnis;
 }
 
+/** Feldsatz des „Einheit bilden"-Dialogs — bewusst zwei Felder (siehe `bilden`). */
+interface BildenWerte {
+  name: string;
+  typ_id?: number | null;
+}
+
 interface KopfWerte {
   name: string;
   typ_id?: number | null;
@@ -95,6 +102,8 @@ export default function EinheitenPage() {
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [form] = Form.useForm<KopfWerte>();
+  const [bildenOffen, setBildenOffen] = useState(false);
+  const [bildenForm] = Form.useForm<BildenWerte>();
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
@@ -143,9 +152,24 @@ export default function EinheitenPage() {
     onError: fehler,
   });
 
+  /**
+   * „Einheit bilden" fragt seit LFH-339 · C4 zuerst (Befund M27).
+   *
+   * Vorher schrieb der Knopf SOFORT `{ name: 'Neue Einheit' }` in die Datenbank — vor
+   * jeder Eingabe. Ein Fehlklick oder ein Sinneswandel hinterliess damit eine
+   * Platzhalter-Einheit, die danach in jedem Baum, jeder Zuordnungsliste und jeder
+   * Stärkeaggregation stand; entfernen liess sie sich nur über „Auflösen".
+   *
+   * ZWEI Felder, nicht neun: Name (Pflicht, `autoFocus`) und Typ. Alles Weitere gehört
+   * auf die Detailseite — das Feldbudget für eine Erfassungsmaske liegt bei ~3.
+   *
+   * KEIN `serie`: eine Einheit zu bilden ist keine Minutentakt-Erfassung wie die
+   * Ad-hoc-Disposition eines Fahrzeugs.
+   */
   const bilden = useMutation({
-    mutationFn: () => bildeEinheit(einsatzId, { name: 'Neue Einheit' }),
-    onSuccess: (e) => { invalidate(); setGewaehlt(e.id); },
+    mutationFn: (werte: BildenWerte) =>
+      bildeEinheit(einsatzId, { name: werte.name.trim(), typ_id: werte.typ_id ?? null }),
+    onSuccess: (e) => { invalidate(); setGewaehlt(e.id); message.success('Einheit gebildet'); },
     onError: fehler,
   });
   const aufloesen = useMutation({
@@ -289,7 +313,9 @@ export default function EinheitenPage() {
             materialQuery.dataUpdatedAt,
           )} />
         </Space>
-        {darfSchreiben && <Button type="primary" onClick={() => bilden.mutate()}>Einheit bilden</Button>}
+        {darfSchreiben && (
+          <Button type="primary" onClick={() => setBildenOffen(true)}>Einheit bilden</Button>
+        )}
       </Space>
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
@@ -326,7 +352,7 @@ export default function EinheitenPage() {
                   // zweite Schreibweise für dieselbe Geste ist genau der Befund, den B3
                   // behebt. Dass damit zwei Knöpfe denselben Namen tragen, ist gewollt —
                   // der Leerzustand führt dorthin, wo sonst nichts hinführt.
-                  ? { label: 'Einheit bilden', onClick: () => bilden.mutate() }
+                  ? { label: 'Einheit bilden', onClick: () => setBildenOffen(true) }
                   : undefined
               }
             />
@@ -378,7 +404,21 @@ export default function EinheitenPage() {
               <Form.Item label="Über-Einheit" name="ueber_einheit_id">
                 <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
               </Form.Item>
-              <Form.Item label="Soll-Override (vollständig oder leer)">
+              {/* BOS-Fachsprache statt Entwickler-Sprache (LFH-339 · C4, Befund N6). Das
+                  frühere Etikett trug einen Programmierbegriff für „überschreiben", der in
+                  der Führungsarbeit nicht vorkommt; die Größe heißt Soll-Stärke und wird
+                  als Führer / Unterführer / Mannschaft angegeben.
+
+                  Der alte Wortlaut steht hier ABSICHTLICH NICHT — das Akzeptanzkriterium
+                  ist ein `grep -c` über diese Datei, und ein Kommentar, der das verbotene
+                  Wort zitiert, füllte sein eigenes Gate.
+
+                  Die Eingaberegel steht als gedämpfte Hilfszeile darunter statt in
+                  Klammern im Etikett. */}
+              <Form.Item
+                label="Soll-Stärke (F/UF/M)"
+                extra="Entweder alle drei Werte angeben oder alle leer lassen — teilweise gefüllt wird nicht übernommen."
+              >
                 <Space align="end" wrap>
                   <Form.Item name="soll" noStyle><StaerkeEingabe /></Form.Item>
                   <span style={{ color: '#888' }}>
@@ -469,6 +509,33 @@ export default function EinheitenPage() {
           )}
         </Card>
       </div>
+
+      {/* Zwei Felder statt neun: der Rest der Kopfdaten lebt auf der Detailansicht. Der
+          Dialog übernimmt das Zurücksetzen auf ALLEN Auswegen selbst (Knopf, Kreuz,
+          Escape, Maskenklick) — deshalb ruft hier niemand `resetFields`. */}
+      <ErfassungsModal<BildenWerte>
+        offen={bildenOffen}
+        titel="Einheit bilden"
+        form={bildenForm}
+        erfassenText="Bilden"
+        laeuft={bilden.isPending}
+        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
+        // Datensatz wirklich ankam. Ein 422 kostete sonst den eingegebenen Namen.
+        onErfassen={(w) => bilden.mutateAsync(w)}
+        onFertig={() => setBildenOffen(false)}
+        onAbbrechen={() => setBildenOffen(false)}
+      >
+        <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+          <Input placeholder="z. B. 2. Zug" />
+        </Form.Item>
+        <Form.Item label="Typ" name="typ_id">
+          <Select allowClear placeholder="Typ wählen"
+            notFoundContent={nichtGefundenInhalt(typenQuery, {
+              allgemein: 'Einheitentypen konnten nicht geladen werden',
+            })}
+            options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))} />
+        </Form.Item>
+      </ErfassungsModal>
     </div>
   );
 }
