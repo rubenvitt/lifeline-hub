@@ -320,23 +320,14 @@ export default function MaterialPage() {
       filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
       // Kein `Select` mehr: `minWidth: 170` war hier sogar breiter als bei Fahrzeug und
       // Personal — die Zahl, an der die 390-px-Karte scheiterte (LFH-339 · C4).
-      render: (_, em) => {
-        const b = statusBedienungVon(em);
-        return (
-          <StatusWahl<MaterialStatus>
-            darstellung={statusDarstellung(em)}
-            aktuell={b.aktuell}
-            optionen={STATUS_OPTIONEN}
-            kennung={em.bezeichnung}
-            onWaehlen={(status) => {
-              if (!statusMutation.isPending) statusMutation.mutate({ emId: em.id, status });
-            }}
-            laeuft={b.laeuft}
-            gesperrt={b.gesperrt}
-            darfSchreiben={darfSchreiben}
-          />
-        );
-      },
+      // Deskriptor GANZ gespreizt — Herleitung siehe `FahrzeugePage.tsx`.
+      render: (_, em) => (
+        <StatusWahl
+          darstellung={statusDarstellung(em)}
+          darfSchreiben={darfSchreiben}
+          {...statusBedienungVon(em)}
+        />
+      ),
     },
     {
       title: 'Bemerkung',

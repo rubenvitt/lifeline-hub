@@ -482,24 +482,16 @@ export default function FahrzeugePage() {
       // Kein `Select` mehr: dessen `minWidth: 150` war der Grund, warum der Statuswechsel
       // in der 390-px-Karte gar nicht erst stattfinden konnte. Der Auslöser IST jetzt das
       // Etikett, das Menü liegt im Portal (LFH-339 · C4, Zielform-Spec §3/§4).
-      render: (_, ef) => {
-        const b = statusBedienungVon(ef);
-        return (
-          <StatusWahl<number>
-            darstellung={statusDarstellung(ef)}
-            farbe={ef.status_farbe}
-            aktuell={b.aktuell}
-            optionen={statusOptionen}
-            kennung={ef.funkrufname}
-            onWaehlen={(statusId) => {
-              if (!statusMutation.isPending) statusMutation.mutate({ efId: ef.id, statusId });
-            }}
-            laeuft={b.laeuft}
-            gesperrt={b.gesperrt}
-            darfSchreiben={darfSchreiben}
-          />
-        );
-      },
+      // Der Deskriptor wird GANZ gespreizt, nicht halb: würden `optionen` und `onWaehlen`
+      // hier eigens gesetzt, könnten Tabelle und Karte auseinanderlaufen, ohne dass ein
+      // Test es merkt — genau die Divergenz, gegen die der gemeinsame Deskriptor gebaut ist.
+      render: (_, ef) => (
+        <StatusWahl
+          darstellung={statusDarstellung(ef)}
+          darfSchreiben={darfSchreiben}
+          {...statusBedienungVon(ef)}
+        />
+      ),
     },
     {
       title: 'Besatzung',

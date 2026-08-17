@@ -376,24 +376,14 @@ export default function PersonalPage() {
       },
       // Kein `Select` mehr: dessen `minWidth: 150` war der Grund, warum der Statuswechsel
       // in der 390-px-Karte gar nicht erst stattfinden konnte (LFH-339 · C4).
-      render: (_, ep) => {
-        const b = statusBedienungVon(ep);
-        return (
-          <StatusWahl<number>
-            darstellung={statusDarstellung(ep)}
-            farbe={ep.status_farbe}
-            aktuell={b.aktuell}
-            optionen={statusOptionen}
-            kennung={ep.name}
-            onWaehlen={(statusId) => {
-              if (!statusMutation.isPending) statusMutation.mutate({ epId: ep.id, statusId });
-            }}
-            laeuft={b.laeuft}
-            gesperrt={b.gesperrt}
-            darfSchreiben={darfSchreiben}
-          />
-        );
-      },
+      // Deskriptor GANZ gespreizt — Herleitung siehe `FahrzeugePage.tsx`.
+      render: (_, ep) => (
+        <StatusWahl
+          darstellung={statusDarstellung(ep)}
+          darfSchreiben={darfSchreiben}
+          {...statusBedienungVon(ep)}
+        />
+      ),
     },
     {
       title: 'Bemerkung',
