@@ -996,6 +996,31 @@ export default function Datensicht<T extends object, const K extends string>(
    */
   const pruefeVerlassen = useCallback((ziel: EventTarget | null) => {
     if (ziel != null && wurzel.current?.contains(ziel as Node)) return;
+    /**
+     * EIN ÜBERLAGERNDES MENÜ IST KEIN VERLASSEN (LFH-339 · C4).
+     *
+     * Seit der Statuswechsel am Etikett hängt, öffnet eine Bedienung in der Zeile ein
+     * `Dropdown` — und dessen Inhalt liegt in einem PORTAL an `document.body`, also
+     * ausserhalb von {@link wurzel}. antds `autoFocus` schiebt den Fokus beim Öffnen
+     * dorthin; ohne diesen Zweig taute die Schleuse damit ausgerechnet in dem Moment auf,
+     * für den sie gebaut ist: jemand hält das Menü offen, und die Zeile darunter wandert
+     * weg.
+     *
+     * GEMESSEN UND DESHALB HIER NOTIERT: in jsdom passiert das NICHT — `autoFocus` lässt
+     * den Fokus dort auf dem Auslöser stehen (nachgemessen am 17.08.2026, der aktive
+     * Knoten war der `ant-dropdown-trigger` selbst, `inSicht: true`). Ein Test, der bloss
+     * ein Menü öffnet und die Reihenfolge prüft, ist deshalb GRÜN, ohne diesen Zweig zu
+     * berühren — er belegt nichts. Prüfbar ist nur der Handler selbst, mit einem
+     * `relatedTarget` im Portal; genau so steht es im Test.
+     *
+     * Absichtlich über die Overlay-Klasse und nicht über eine Portal-Referenz: die
+     * Overlays hängen an `document.body` und gehören keinem Knoten dieser Sicht, es gibt
+     * also nichts, worauf eine Referenz zeigen könnte. Der Preis ist eine Kopplung an
+     * antds Klassennamen — sichtbar hier statt versteckt in einer Hilfsfunktion.
+     */
+    if (ziel instanceof Node && (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')) {
+      return;
+    }
     setSchleuse({ art: 'offen' });
   }, []);
 
@@ -1325,11 +1350,13 @@ export default function Datensicht<T extends object, const K extends string>(
               {statusBedienung ? (
                 <StatusWahl
                   darstellung={status}
+                  farbe={statusBedienung.farbe}
                   aktuell={statusBedienung.aktuell}
                   optionen={statusBedienung.optionen}
                   kennung={statusBedienung.kennung}
                   onWaehlen={statusBedienung.onWaehlen}
                   laeuft={statusBedienung.laeuft}
+                  gesperrt={statusBedienung.gesperrt}
                   darfSchreiben
                 />
               ) : (

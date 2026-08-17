@@ -80,6 +80,8 @@ export interface StatusOption<W> {
    * ungefärbt — zulässig für Kataloge außerhalb des A2-Vertrags.
    */
   darstellung?: StatusDarstellung;
+  /** Mandantenfarbe für den Punkt — überschreibt die Rollenfarbe (siehe `StatusTag`). */
+  farbe?: string | null;
 }
 
 /**
@@ -93,14 +95,23 @@ export interface StatusBedienung {
   optionen: readonly StatusOption<string | number>[];
   /** Aktueller Wert für die Menü-Markierung — siehe {@link StatusWahlProps.aktuell}. */
   aktuell?: string | number | null;
+  /** Mandantenfarbe des aktuellen Status — siehe {@link StatusWahlProps.farbe}. */
+  farbe?: string | null;
   onWaehlen: (wert: string | number) => void;
   laeuft?: boolean;
+  gesperrt?: boolean;
   kennung: string;
 }
 
 export interface StatusWahlProps<W> {
   /** Aktueller Stand als Etikett. `null` = kein Status gesetzt. */
   darstellung: StatusDarstellung | null;
+  /**
+   * Mandantengepflegte Farbe des aktuellen Status — überschreibt die Rollenfarbe im
+   * Etikett. Siehe `components/StatusTag.tsx`: sie steht auf Rand und Text, nie auf der
+   * Fläche.
+   */
+  farbe?: string | null;
   /**
    * Aktueller Wert für die Markierung im Menü. Bewusst EIGENSTÄNDIG und nicht aus
    * {@link StatusWahlProps.darstellung} erschlossen: ein Label-Vergleich koppelte die
@@ -116,8 +127,22 @@ export interface StatusWahlProps<W> {
    */
   kennung: string;
   onWaehlen: (wert: W) => void;
-  /** Schreibt gerade — Auslöser gesperrt, Ladeanzeige. */
+  /**
+   * DIESE Zeile schreibt gerade — Ladeanzeige am Auslöser.
+   *
+   * Getrennt von {@link StatusWahlProps.gesperrt}, weil es zwei verschiedene Aussagen
+   * sind: „hier passiert gerade etwas" und „hier ist gerade nichts anzunehmen". Der
+   * Bestand hatte beides an einem `Select` (`loading` an der laufenden Zeile, `disabled`
+   * an allen) — die Trennung erhält genau das.
+   */
   laeuft?: boolean;
+  /**
+   * Nimmt keine Eingabe an — etwa weil irgendwo in der Liste eine Mutation läuft.
+   *
+   * Der eigentliche Riegel sitzt im `onWaehlen` der Seite; diese Prop macht ihn SICHTBAR.
+   * Ein Auslöser, der klickbar aussieht und nichts tut, ist schlechter als ein gesperrter.
+   */
+  gesperrt?: boolean;
   /** Ohne Schreibrecht wird ein reines Etikett gerendert, KEIN Auslöser. */
   darfSchreiben: boolean;
 }
@@ -127,16 +152,22 @@ const OHNE_STATUS = '—';
 
 export default function StatusWahl<W extends string | number>({
   darstellung,
+  farbe,
   aktuell = null,
   optionen,
   kennung,
   onWaehlen,
   laeuft = false,
+  gesperrt = false,
   darfSchreiben,
 }: StatusWahlProps<W>): ReactElement {
   const { token } = theme.useToken();
 
-  const etikett = darstellung ? <StatusTag darstellung={darstellung} /> : <span>{OHNE_STATUS}</span>;
+  const etikett = darstellung ? (
+    <StatusTag darstellung={darstellung} farbe={farbe} />
+  ) : (
+    <span>{OHNE_STATUS}</span>
+  );
 
   // Ohne Schreibrecht KEIN Auslöser — nicht ein gesperrter. Ein deaktivierter Knopf
   // verspricht eine Fähigkeit, die es hier nicht gibt (Muster: LFH-365, „bleibt keine
@@ -150,7 +181,10 @@ export default function StatusWahl<W extends string | number>({
         {o.darstellung && (
           // Punkt statt Fläche, und für Screenreader unsichtbar: die Bedeutung trägt
           // bereits das Label, sonst läse er sie doppelt (Muster `StatusTag`).
-          <span aria-hidden="true" style={{ color: rollenFarbe(o.darstellung.rolle, token) }}>
+          <span
+            aria-hidden="true"
+            style={{ color: o.farbe?.trim() ? o.farbe.trim() : rollenFarbe(o.darstellung.rolle, token) }}
+          >
             ●
           </span>
         )}
@@ -182,7 +216,7 @@ export default function StatusWahl<W extends string | number>({
         type="text"
         aria-label={`Status von ${kennung} ändern`}
         loading={laeuft}
-        disabled={laeuft}
+        disabled={laeuft || gesperrt}
         style={{ paddingInline: token.paddingXXS }}
       >
         {etikett}
