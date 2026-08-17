@@ -30,7 +30,7 @@ bewertet, was C4 **geändert** hat; `EinheitDetailPage` ist neu und hatte vorher
 | 6 | **Kein Status allein über Farbe** — jede Statusfarbe zusätzlich mit Text, Symbol oder Form, 0 Ausnahmen. | **erfüllt, und zwar typerzwungen** | `StatusWahl` nimmt eine `StatusDarstellung`, deren `label` **Pflichtfeld** ist — ein Etikett ohne Text lässt sich hier nicht bauen, das bricht den Typcheck. Im Menü steht die Farbe als **Punkt neben** dem Wortlaut, nie als Zeilenfläche, und der Punkt ist `aria-hidden`: die Bedeutung trägt bereits das Label, sonst läse ein Screenreader sie doppelt. Gepinnt in `StatusWahl.test.tsx` („zeigt die Statusfarbe als Rand und Text, nie als Hintergrundfläche"). **Material ist der Grenzfall und bleibt es:** sein Katalog liegt ausserhalb des A2-Farbvertrags, seine Menüeinträge haben deshalb **keinen** Punkt — nur den Text. Das ist kein Mangel, sondern die offene Farbfrage sichtbar gelassen statt überschrieben. |
 | 7 | **Eine Farbe = eine Bedeutung** — Palette auf Doppelbelegung geprüft, gesättigte Farbe nur für abnorme Zustände, Grundfläche weder `#000000` noch `#ffffff`. | **erfüllt** | Tabellen- und Kartenzweig lesen bei allen drei Seiten **denselben** Deskriptor (`statusBedienungVon`) und **dieselbe** Darstellungsfunktion (`statusDarstellung`) — zwei Formen für denselben Status wären ein Unterschied ohne Bedeutung, und genau das war vorher der Fall (Tabelle: Auswahlfeld, Karte: Etikett aus einer zweiten Ableitung). Bei Material sind die fünf **antd-Preset-Farbnamen ersatzlos entfallen**: ein Farbwert ohne Rolle ist die zweite Wahrheit, die A2 aufgeräumt hat. Eine Rollenzuordnung wäre eine Farbentscheidung gewesen und bricht an einem gemessenen Punkt — `im_einsatz` war **blau**, und Blau ist im A0-System `bedien` („Rot bedient nichts"). Für diesen Zustand gibt es keine ehrliche Rolle; es wurde keine erfunden. |
 | 8 | **Helligkeits-/Kontrastregler** vorhanden und bei aktiver Warnung nicht bis AUS dimmbar — 1 Regler, 1 Sperre. | **offen → LFH-397** | App-weite Lücke, bereits unter LFH-336/337/338 dokumentiert und dort gebündelt: kein Regler existiert irgendwo in der Anwendung. Nicht seitenspezifisch und nicht im Scope von C4. |
-| 9 | **Kritische Anzeigen im Blickfeld** — innerhalb 15° der normalen Blickachse, nicht am Layoutrand. | **erfüllt** | Zwei Befunde adressiert. **(a)** Der Statuswechsel lag in Spalte 5 von 8 hinter einem waagerechten Bildlauf; auf 390 px war er unerreichbar. Er steht jetzt im Kartenkopf neben dem Namen — dort, wo der Status ohnehin abgelesen wird. **(b)** Die Gliederungskarte hatte `flex: '0 0 360px'` **ohne** `flexWrap`: eine Breite, die auf 390 px nicht passt und nicht ausweichen darf (Befund M25). Jetzt `clamp(260px, 30%, 360px)` mit Umbruch. Gemessen in `e2e/kraefte-schmal.spec.ts`: `document.documentElement.scrollWidth ≤ clientWidth` auf **allen vier** Modulrouten. |
+| 9 | **Kritische Anzeigen im Blickfeld** — innerhalb 15° der normalen Blickachse, nicht am Layoutrand. | **erfüllt** | Zwei Befunde adressiert. **(a)** Der Statuswechsel lag in Spalte 5 von 8 hinter einem waagerechten Bildlauf; auf 390 px war er unerreichbar. Er steht jetzt im Kartenkopf neben dem Namen — dort, wo der Status ohnehin abgelesen wird. **(b)** Die Gliederungskarte hatte `flex: '0 0 360px'` **ohne** `flexWrap`: eine Breite, die auf 390 px nicht passt und nicht ausweichen darf (Befund M25). Jetzt `clamp(260px, 30%, 360px)` mit Umbruch. Gemessen in `e2e/kraefte-schmal.spec.ts`: `document.documentElement.scrollWidth ≤ clientWidth` auf **allen vier** Modulrouten. **(c)** Dabei sind zwei echte Bestandsverstöße aufgefallen und behoben worden — `/material` lief um 327 px über, `/fahrzeuge` um 115 px; Ursache und Fix stehen unten unter „Ein Befund, den erst der zweite Anlauf sichtbar machte". Der Messwert ist erst seit der gehärteten Wache belastbar: die erste Fassung wartete auf `body` und maß den Ladezustand. |
 | 10 | **Alarmbudget eingehalten** — 1–2 je 10 min im Dauerbetrieb, ≤ 10 je 10-min-Fenster, ~80/15/5 %, 0 flatternde Alarme, ≤ 3 Eskalationsstufen. | **nicht anwendbar** | Keine der Flächen erzeugt Alarme. Die Statusmutationen melden per `message.error` nur den eigenen Fehlschlag — das ist eine Quittung auf eine Benutzeraktion, kein Alarm. |
 | 11 | **Warnverhalten** — kein Blinken auf lesbarem Text, ≤ 2 Blinkraten, jede Warnung quittierbar, jeder Ton mit visueller Entsprechung. | **erfüllt** | `grep -rn "animation\|blink\|@keyframes"` über `StatusWahl.tsx`, die drei Kräfteseiten, `EinheitDetailPage.tsx` und `EinheitenPage.tsx` liefert **0 Treffer** — kein Blinken, keine Bewegung, kein Ton. |
 | 12 | **Kein Sprung unter dem Cursor** — CLS ≤ 0,1; neue Datensätze nur als opt-in-Sammelbanner. | **erfüllt, und der Umbau hätte es beinahe gebrochen** | Der wichtigste gemessene Punkt dieses Tickets. Die Zeilenschleuse von `Datensicht` friert Reihenfolge und Zeilenmenge ein, solange der Fokus **in der Sicht** liegt (`pruefeVerlassen`, `wurzel.contains`). Das neue Menü liegt in einem **Portal an `document.body`** — also ausserhalb dieser Wurzel —, und antds `autoFocus` schiebt den Fokus beim Öffnen dorthin. Ohne Gegenmassnahme taute die Schleuse damit ausgerechnet in dem Moment auf, für den sie gebaut ist: jemand hält das Menü offen, und die Zeile darunter wandert weg. `pruefeVerlassen` behandelt ein überlagerndes `.ant-dropdown`/`.ant-select-dropdown`/`.ant-picker-dropdown` deshalb **nicht** als Verlassen. **Gemessen und deshalb festgehalten:** in jsdom passiert dieses Fokus-Wandern NICHT — der aktive Knoten bleibt der Auslöser (`ant-dropdown-trigger`, `sicht.contains(...) === true`, nachgemessen am 17.08.2026). Ein Test, der bloss das Menü öffnet und die Reihenfolge prüft, ist deshalb auch ohne den Zweig grün und belegt nichts; geprüft wird der Handler direkt mit einem `relatedTarget` im Portal, **per Mutationsprobe belegt** (Zweig entfernt → Test rot). Die Gegenprobe („Fokus AUS der Sicht taut weiterhin auf") verhindert, dass ein nie auftauendes `pruefeVerlassen` durchginge. |
@@ -51,7 +51,42 @@ B1/B2/B4/B5, die nach der Ticketerstellung geliefert haben. Gemessen am 17.08.20
 | M22 (kein optimistisches Update) | erledigt durch B6 — **die Tests dazu fehlten**, sie sind Teil von C4 |
 | M23 (keine Sortierung/Filter/Gruppierung) | erledigt durch B2 (`Datensicht`) |
 
-Geschlossen hat C4:
+### Ein Befund, den erst der zweite Anlauf sichtbar machte
+
+**Zwei der vier Routen liefen auf 390 px waagerecht über** — `/material` um **327 px**,
+`/fahrzeuge` um **115 px**. Beides Bestand, keins von C4 verursacht; AK 2 war damit
+verletzt, während der zugehörige Test **grün meldete**.
+
+**Warum er grün war, und das ist die eigentliche Lehre:** die Wache des Tests wartete auf
+`page.locator('main, [role="main"], body')` — und `body` ist **immer** sichtbar. Gemessen
+wurde eine Seite, deren Daten noch nicht angekommen waren; ohne Zeilen gibt es keinen
+Überlauf. Ein Test, der vor dem Inhalt misst, prüft den Ladebildschirm. Aufgeflogen ist es
+nur, weil derselbe Test in einem späteren Lauf zufällig **nach** dem Laden maß und dann
+327 px meldete — also durch einen Zufall, nicht durch das Gate.
+
+Die Wache zeigt jetzt je Route auf einen Wortlaut, der erst **mit** den Daten erscheint.
+
+Drei Ursachen, alle über die innerste sprengende Knotenmenge gemessen:
+
+- `components/EinsatzSeite.tsx` stellte Titel und Aktionen unbedingt nebeneinander. `wrap`
+  allein genügt **nicht** — ein Flex-Kind hat per Vorgabe `min-width: auto` und schrumpft
+  nicht unter seinen Inhalt; es braucht zusätzlich `minWidth: 0` an beiden Kindern.
+- Der `aktionen`-Slot von Fahrzeug und Personal trug ein `Select` mit `minWidth: 260` plus
+  Knopf in einer `Space`-Reihe **ohne** `wrap`. Der Umbruch im Primitiv schiebt den Block
+  nur unter den Titel, wo er weiterhin zu breit ist — beide Ebenen sind nötig.
+- `MaterialPage` baut ihren Kopf **von Hand** statt über `EinsatzSeite` (daher der mit
+  Abstand grösste Überlauf) und trägt dort zusätzlich ein Mengenfeld. Sie auf das Primitiv
+  zu ziehen wäre die gründlichere Antwort und gehört zum Seitenkopf-Bündel (C5).
+
+**Das Bestands-Gate hat mitgezogen:** `e2e/gate1-ueberlauf.spec.ts` führte `/personal` als
+namentlich freigestellten Verstoß (79 px, Deckel 130) mit exakt dieser Ursachenbeschreibung
+und dem Zielticket B5. Nach dem Fix meldete es den Eintrag als **tot** und erzwang seine
+Streichung — genau die Mechanik, für die es gebaut ist. `/fahrzeuge` und `/material` führt
+jenes Gate nicht; sie werden seither von `e2e/kraefte-schmal.spec.ts` gemessen und
+absichtlich **nicht** zusätzlich dort aufgenommen: eine zweite Messung derselben Zusicherung
+an zwei Orten veraltet an einem davon.
+
+### Geschlossen hat C4:
 
 - **H19** — Statuswechsel aus der Tabellenzelle heraus, nach den Festlegungen Z1–Z3 der
   Zielform-Spec. Träger: `components/StatusWahl.tsx` plus `statusBedienung` am Kartenplan.
