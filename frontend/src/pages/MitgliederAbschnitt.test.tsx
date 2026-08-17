@@ -46,6 +46,29 @@ describe('MitgliederAbschnitt', () => {
     await waitFor(() => expect(screen.queryByText('Eva Einsatz')).not.toBeInTheDocument());
   });
 
+  it('beschriftet die Aktionsspalte und trägt einen echten Knopf statt eines Textlinks', async () => {
+    /**
+     * Befund N7 (LFH-339 · C4). Die Aktionsspalte hiess `title: ''` — eine namenlose
+     * Spalte ist für einen Screenreader eine Zelle ohne Zugehörigkeit, und ein
+     * `Button type="link"` sieht aus wie Fliesstext, obwohl er die einzige destruktive
+     * Handlung der Zeile auslöst.
+     */
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+    );
+    renderMitProviders(<MitgliederAbschnitt einsatzId={7} darfVerwalten />);
+    // Erst auf die DATENZEILE warten: die Kopfzeile steht auch ohne Mitglieder im Baum,
+    // ein `findByRole('columnheader')` allein wäre also grün, bevor es etwas zu bedienen
+    // gibt — und der Knopf darunter dann noch nicht da.
+    await screen.findByText('Eva Einsatz');
+    expect(screen.getByRole('columnheader', { name: 'Aktion' })).toBeInTheDocument();
+    const knopf = screen.getByRole('button', { name: 'Entfernen' });
+    expect(knopf.className).not.toMatch(/ant-btn-link\b/);
+    // `danger` bleibt: Löschen IST Gefahr. Rot bedient nichts — aber es warnt.
+    expect(knopf.className).toMatch(/ant-btn-color-dangerous|ant-btn-dangerous/);
+  });
+
   it('blendet Edit-Aktionen aus, wenn nicht verwaltet werden darf', async () => {
     server.use(
       http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),

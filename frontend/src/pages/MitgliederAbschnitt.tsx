@@ -22,6 +22,22 @@ interface Props {
   darfVerwalten: boolean;
 }
 
+/**
+ * Zugriffsverwaltung eines Einsatzes (gemountet in `EinsatzdatenPage`).
+ *
+ * ── WARUM HIER KEINE KARTEN UNTER `md` STEHEN (LFH-339 · C4) ─────────────────────────
+ *
+ * Das Ticket verlangt, die Zeilen unter `md` „als Zeilen-Karte" zu rendern. Das wird
+ * bewusst NICHT getan, und der Grund ist eine Regel, die dem Ticket vorausgeht: Träger ist
+ * `KatalogTabelle`, und für die gilt „auf schmalem Schirm wird eine Tabelle ANGEPASST,
+ * nicht in Karten aufgelöst" — das Primitiv bringt Scrollcontainer, stehende Kopfzeile und
+ * fixierte Kennungsspalte selbst mit. Drei Spalten (Name · Rolle · Aktion) passen damit
+ * auch auf 390 px, ohne dass die Seite quer läuft.
+ *
+ * Was am schmalen Schirm tatsächlich drückte, war die feste `width: 170` am Rollenfeld —
+ * die ist unten zu einem `minWidth` geworden. Das ist die Anpassung, die der Befund
+ * verlangt; die Kartenform wäre eine Formänderung ohne Not.
+ */
 export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props) {
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -66,14 +82,19 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
         <Select
           value={m.einsatz_rolle}
           disabled={!darfVerwalten}
-          style={{ width: 170 }}
+          // `minWidth` statt fester `width` (LFH-339 · C4): eine feste Breite drückt die
+          // Zelle am schmalen Schirm auf, statt mitzugehen. Der Boden bleibt, damit
+          // „Führungspersonal" nicht abgeschnitten wird.
+          style={{ minWidth: 170, maxWidth: '100%' }}
           options={ROLLEN}
           onChange={(rolle) => setzen.mutate({ benutzerId: m.benutzer_id, rolle })}
         />
       ),
     },
     {
-      title: '',
+      // Beschriftet (LFH-339 · C4, Befund N7): eine namenlose Spalte ist für einen
+      // Screenreader eine Zelle ohne Zugehörigkeit.
+      title: 'Aktion',
       key: 'aktion',
       render: (_, m) =>
         darfVerwalten ? (
@@ -84,9 +105,10 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
             okButtonProps={{ danger: true }}
             onConfirm={() => entfernen.mutate(m.benutzer_id)}
           >
-            <Button type="link" danger>
-              Entfernen
-            </Button>
+            {/* Regulärer Knopf statt `type="link"`: ein Textlink sieht aus wie Fliesstext,
+                obwohl er die einzige destruktive Handlung der Zeile auslöst. `danger`
+                bleibt — Löschen IST Gefahr, und die Rückfrage ist der zweite Handgriff. */}
+            <Button danger>Entfernen</Button>
           </Popconfirm>
         ) : null,
     },
