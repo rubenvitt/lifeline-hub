@@ -22,7 +22,7 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
-import StatusWahl, { type StatusOption } from '../kraefte/StatusWahl';
+import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';

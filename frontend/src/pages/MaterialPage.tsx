@@ -21,16 +21,56 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
+import StatusWahl, { type StatusOption } from '../components/StatusWahl';
+import type { StatusDarstellung } from '../theme/statusFarben';
 
-const STATUS_META: Record<MaterialStatus, { label: string; color: string }> = {
-  einsatzbereit: { label: 'einsatzbereit', color: 'green' },
-  im_einsatz: { label: 'im Einsatz', color: 'blue' },
-  defekt: { label: 'defekt', color: 'red' },
-  verbraucht: { label: 'verbraucht', color: 'default' },
-  desinfektion_noetig: { label: 'Desinfektion nötig', color: 'orange' },
+/**
+ * Die fünf Materialzustände — NUR Beschriftung, bewusst OHNE Farbachse.
+ *
+ * ── WARUM HIER KEINE STATUSROLLE STEHT (LFH-339 · C4) ────────────────────────────────
+ *
+ * Der Materialstatus liegt ausserhalb des A2-Statusfarb-Vertrags; `statusFarben.ts` nennt
+ * diese Datei namentlich als draussen, und ihn hineinzuziehen wäre der Bestands-Sweep, den
+ * A2 ausdrücklich verbietet. Die Zielform-Spec §4 zieht die Linie genauso: Material fällt
+ * nicht heraus, aber seine Ausnahme „wirkt auf die FARBE (§4b), nicht auf die Anordnung".
+ *
+ * Eine Rollenzuordnung — auch eine lokale — wäre eine Farbentscheidung, und sie bricht an
+ * einem gemessenen Punkt: `im_einsatz` war Blau, und Blau ist im A0-System `bedien`.
+ * „Rot bedient nichts, `bedien` ist blau" heisst umgekehrt, dass es für diesen Zustand
+ * keine ehrliche Rolle gibt. Erfunden wird deshalb keine.
+ *
+ * Was bleibt: der TEXT trägt den Zustand — er ist der zweite Kanal (WCAG 1.4.1) und war es
+ * immer. Die frühere `color`-Achse (antd-Preset-Namen, als Vollfläche gerendert) ist
+ * ersatzlos weg: sie widersprach §4b, und ein Farbwert ohne Rolle ist genau die Sorte
+ * zweite Wahrheit, die A2 aufgeräumt hat. Die Frage, welche Rollen dieser Katalog
+ * bekommen soll, bleibt offen — sie ist eine eigene Entscheidung, kein Nebenprodukt.
+ */
+const STATUS_META: Record<MaterialStatus, { label: string }> = {
+  einsatzbereit: { label: 'einsatzbereit' },
+  im_einsatz: { label: 'im Einsatz' },
+  defekt: { label: 'defekt' },
+  verbraucht: { label: 'verbraucht' },
+  desinfektion_noetig: { label: 'Desinfektion nötig' },
 };
 const STATUS_REIHENFOLGE = Object.keys(STATUS_META) as MaterialStatus[];
-const STATUS_OPTIONEN = STATUS_REIHENFOLGE.map((s) => ({ value: s, label: STATUS_META[s].label }));
+
+/**
+ * Menüwerte OHNE `darstellung` — damit rendert `StatusWahl` keinen Farbpunkt. Das ist
+ * kein Mangel, sondern die offene Farbfrage, sichtbar gelassen statt überschrieben.
+ */
+const STATUS_OPTIONEN: StatusOption<MaterialStatus>[] = STATUS_REIHENFOLGE.map((s) => ({
+  wert: s,
+  label: STATUS_META[s].label,
+}));
+
+/**
+ * Etikett des Auslösers. `neutral` heisst hier „ausserhalb des Farbvertrags", NICHT
+ * „dieser Zustand ist neutral" — dieselbe Unterscheidung, die `statusFarben.ts` bei
+ * `verfuegbarkeit.gesperrt` schon trifft („ein bewusster Zustand, keine Gefahr").
+ */
+function statusDarstellung(em: EinsatzMaterial): StatusDarstellung {
+  return { rolle: 'neutral', label: STATUS_META[em.status].label };
+}
 /** Filterwerte auf der EIGENEN Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
 const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({ value: s, text: STATUS_META[s].label }));
 
@@ -45,8 +85,11 @@ function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: n
     onChange(wert);
   };
   return (
+    // Keine Klein-Variante: die Höhe kommt aus `controlHeight` und zieht mit der
+    // Dichtestufe mit (LFH-339 · C4 — die letzte Einzelstelle des B5i-Bündels). Die
+    // Breite bleibt fest: sie trägt eine zweistellige Menge, keine Trefffläche.
     <InputNumber
-      size="small" min={1} style={{ width: 80 }} value={wert}
+      min={1} style={{ width: 80 }} value={wert}
       onChange={(v) => setWert(v ?? 1)}
       onBlur={commit}
       onPressEnter={commit}
@@ -167,6 +210,26 @@ export default function MaterialPage() {
   const ems = emQuery.data ?? [];
 
   /**
+   * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig — Herleitung siehe
+   * `FahrzeugePage.tsx`. Ohne `farbe`: der Materialkatalog hat keine (siehe `STATUS_META`).
+   */
+  const statusBedienungVon = (em: EinsatzMaterial) => {
+    const laeuft = statusMutation.isPending && statusMutation.variables?.emId === em.id;
+    return {
+      optionen: STATUS_OPTIONEN,
+      aktuell: laeuft ? statusMutation.variables?.status : em.status,
+      kennung: em.bezeichnung,
+      laeuft,
+      gesperrt: statusMutation.isPending,
+      onWaehlen: (wert: string | number) => {
+        if (!statusMutation.isPending) {
+          statusMutation.mutate({ emId: em.id, status: wert as MaterialStatus });
+        }
+      },
+    };
+  };
+
+  /**
    * LISTENZUSTAND — zwei Lagen, zwei Antworten (D3). Der Fehler allein reicht als
    * Bedingung NICHT.
    *
@@ -255,27 +318,25 @@ export default function MaterialPage() {
       title: 'Status',
       key: 'status',
       filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => m.status === w },
-      render: (_, em) =>
-        darfSchreiben ? (() => {
-          const gesperrt = statusMutation.isPending;
-          const laeuft = gesperrt && statusMutation.variables?.emId === em.id;
-          return (
-            // Keine Klein-Variante mehr: die Höhe kommt aus `controlHeight` und zieht mit der
-            // Dichtestufe mit (ohnehin angefasste Stelle, Norm aus CLAUDE.md).
-            <Select
-              style={{ minWidth: 170 }}
-              value={laeuft ? statusMutation.variables?.status : em.status}
-              options={STATUS_OPTIONEN}
-              loading={laeuft}
-              disabled={gesperrt}
-              onChange={(status) => {
-                if (!statusMutation.isPending) statusMutation.mutate({ emId: em.id, status });
-              }}
-            />
-          );
-        })() : (
-          <Tag color={STATUS_META[em.status].color}>{STATUS_META[em.status].label}</Tag>
-        ),
+      // Kein `Select` mehr: `minWidth: 170` war hier sogar breiter als bei Fahrzeug und
+      // Personal — die Zahl, an der die 390-px-Karte scheiterte (LFH-339 · C4).
+      render: (_, em) => {
+        const b = statusBedienungVon(em);
+        return (
+          <StatusWahl<MaterialStatus>
+            darstellung={statusDarstellung(em)}
+            aktuell={b.aktuell}
+            optionen={STATUS_OPTIONEN}
+            kennung={em.bezeichnung}
+            onWaehlen={(status) => {
+              if (!statusMutation.isPending) statusMutation.mutate({ emId: em.id, status });
+            }}
+            laeuft={b.laeuft}
+            gesperrt={b.gesperrt}
+            darfSchreiben={darfSchreiben}
+          />
+        );
+      },
     },
     {
       title: 'Bemerkung',
@@ -348,10 +409,16 @@ export default function MaterialPage() {
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
-      {/* Kein `karte.status`-Slot: `STATUS_META` sind rohe antd-Preset-Farbnamen und liegen
-          ausdrücklich außerhalb des Statusfarb-Vertrags (A2 nennt diese Seite namentlich als
-          draußen). Sie in eine `StatusDarstellung` zu zwingen wäre der Bestands-Sweep, den
-          A2 verbietet — der Status steht deshalb als beschriftetes Sekundärfeld.
+      {/* DER STATUS STEHT SEIT LFH-339 · C4 IM `karte.status`-SLOT, nicht mehr als
+          Sekundärfeld — hier stand vorher die gegenteilige Regel, und sie ist überholt.
+
+          Was sich geändert hat, ist die ANORDNUNG, nicht die Farbfrage: der Slot trägt ein
+          Etikett mit der Rolle `neutral` („ausserhalb des Farbvertrags", siehe
+          `statusDarstellung` oben), und `statusBedienung` macht es zum Auslöser. Damit ist
+          der Statuswechsel auf der 390-px-Karte überhaupt erst erreichbar — als
+          Sekundärfeld war er reine Anzeige. Die frühere Begründung stimmte in ihrer
+          Prämisse (Material liegt ausserhalb von A2) und zog daraus den zu weiten Schluss:
+          die Zielform-Spec §4 trennt Farbe von Anordnung.
 
           `titel` ohne `ziel`: Material hat keine Detailroute. */}
 
@@ -391,7 +458,11 @@ export default function MaterialPage() {
         karte={{
           art: 'plan',
           titel: { spalte: 'bezeichnung' },
-          sekundaer: ['kategorie', 'menge', 'status'],
+          status: (em) => statusDarstellung(em),
+          statusBedienung: (em) => (darfSchreiben ? statusBedienungVon(em) : null),
+          // Nur noch zwei Sekundärfelder: `status` ist in den Slot darüber gewandert und
+          // stünde sonst doppelt auf der Karte.
+          sekundaer: ['kategorie', 'menge'],
           aktion: darfSchreiben
             ? {
                 etikett: 'Entfernen',

@@ -1,6 +1,6 @@
 import { Button, Dropdown, theme } from 'antd';
 import type { ReactElement } from 'react';
-import StatusTag from '../components/StatusTag';
+import StatusTag from './StatusTag';
 import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
 
 /**

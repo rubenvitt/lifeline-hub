@@ -15,7 +15,7 @@ import KatalogTabelle from './KatalogTabelle';
 import { Liste, ListenEintrag } from './Liste';
 import { Select } from './Select';
 import StatusTag from './StatusTag';
-import StatusWahl, { type StatusBedienung } from '../kraefte/StatusWahl';
+import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';

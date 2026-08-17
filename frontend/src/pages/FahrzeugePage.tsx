@@ -19,7 +19,7 @@ import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import StatusWahl, { type StatusOption } from '../kraefte/StatusWahl';
+import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
@@ -68,7 +68,7 @@ import { abstand, flaeche } from '../theme/tokens';
  * Der Zweig fällt deshalb: die Mandantenfarbe geht über `StatusTag`s `farbe`-Prop auf
  * Rand und Text und bleibt damit erhalten. Das ist KEIN Zurückdrehen von A2, sondern
  * dessen Sorge eingelöst — und es hält die beiden Zweige der Seite bei EINER
- * Darstellung: der Auslöser aus `kraefte/StatusWahl.tsx` trägt dasselbe Etikett wie
+ * Darstellung: der Auslöser aus `components/StatusWahl.tsx` trägt dasselbe Etikett wie
  * diese Anzeige, und zwei Formen für denselben Status wären ein Unterschied ohne
  * Bedeutung.
  */
