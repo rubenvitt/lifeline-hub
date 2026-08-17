@@ -98,13 +98,24 @@ export default function EinsatzSeite({
   return (
     <div style={{ maxWidth: breite, margin: '0 auto' }}>
       {breadcrumb && <div style={{ marginBottom: token.marginXS }}>{breadcrumb}</div>}
+      {/**
+        * `wrap` ist keine Kosmetik (LFH-339 · C4, gemessen). Ohne es steht der
+        * Aktionsblock unbedingt neben dem Titel, und ein einziger Knopf mit langer
+        * Beschriftung sprengt den Schirm: auf `/fahrzeuge` bei 390 px lief die Seite bis
+        * 505 px, der innerste sprengende Knoten war „Ad-hoc-Fahrzeug".
+        *
+        * `minWidth: 0` an beiden Kindern, weil ein Flex-Kind per Vorgabe `min-width: auto`
+        * hat und damit NICHT unter seine Inhaltsbreite schrumpft — ohne das bringt `wrap`
+        * allein nichts, sobald ein Kind für sich schon zu breit ist.
+        */}
       <Flex
+        wrap
         justify="space-between"
         align="flex-start"
         gap={token.margin}
         style={{ marginBottom: token.marginLG }}
       >
-        <div>
+        <div style={{ minWidth: 0 }}>
           <span
             className="lfh-marke__strich"
             style={{ marginBottom: token.marginXS }}
@@ -116,7 +127,7 @@ export default function EinsatzSeite({
           {beschreibung && <div><Typography.Text type="secondary">{beschreibung}</Typography.Text></div>}
           <Datenstand dataUpdatedAt={dataUpdatedAt} />
         </div>
-        {aktionen && <div ref={aktionenRef}>{aktionen}</div>}
+        {aktionen && <div ref={aktionenRef} style={{ minWidth: 0 }}>{aktionen}</div>}
       </Flex>
       {hinweis && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
       {children}

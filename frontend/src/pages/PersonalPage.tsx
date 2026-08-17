@@ -440,9 +440,10 @@ export default function PersonalPage() {
       }
       aktionen={
         darfSchreiben && (
-          <Space>
+          // `wrap` plus `maxWidth` — Herleitung siehe `FahrzeugePage.tsx`.
+          <Space wrap style={{ minWidth: 0 }}>
             <Select
-              style={{ minWidth: 260 }}
+              style={{ minWidth: 260, maxWidth: '100%' }}
               placeholder="Person aus Pool disponieren …"
               value={null}
               options={poolOptionen}

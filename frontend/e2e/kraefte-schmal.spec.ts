@@ -104,12 +104,30 @@ async function seedeAlles(page: Page, einsatzId: string) {
   await seede(page, einsatzId, 'einheiten', { name: '1. Zug' }, 'Einheit');
 }
 
-/** Breite des Dokuments gegen die Sichtfläche — die eigentliche Aussage von AK 2. */
-async function keinQuerlauf(page: Page, pfad: string) {
+/**
+ * Breite des Dokuments gegen die Sichtfläche — die eigentliche Aussage von AK 2.
+ *
+ * ── DIE WACHE MUSS AUF DEN INHALT ZEIGEN, NICHT AUF DIE SEITE ───────────────────────────
+ *
+ * GEMESSEN und teuer gelernt: die erste Fassung wartete auf
+ * `page.locator('main, [role="main"], body')` — und `body` ist IMMER sichtbar. Gemessen
+ * wurde damit eine Seite, deren Daten noch gar nicht da waren; ohne Zeilen gibt es keinen
+ * Überlauf, und der Test war zweimal grün, während `/material` in Wirklichkeit **327 px**
+ * überlief. Ein Test, der vor dem Inhalt misst, prüft den Ladebildschirm.
+ *
+ * Deshalb: der Aufrufer nennt einen Wortlaut, der erst MIT den Daten erscheint. Ohne ihn
+ * gäbe es keine Zusicherung, sondern eine Zufallsmessung.
+ *
+ * Zusätzlich `poll` statt einer Einmalmessung — nicht gegen die Ladezeit (die deckt die
+ * Wache), sondern gegen den umgekehrten Fehler: ein Layout, das erst nach dem ersten
+ * Bildaufbau in seine Endbreite wächst.
+ */
+async function keinQuerlauf(page: Page, pfad: string, inhaltsWortlaut: string | RegExp) {
   await page.goto(pfad);
-  // Inhaltliche Wache statt `networkidle`: erst wenn die Seite steht, ist die Breite eine
-  // Aussage über das Layout und nicht über den Ladezustand.
-  await expect(page.locator('main, [role="main"], body')).toBeVisible();
+  await expect(
+    page.getByText(inhaltsWortlaut).first(),
+    `${pfad}: der Inhalt muss vor der Messung stehen — sonst misst der Test den Ladezustand`,
+  ).toBeVisible();
   await expect
     .poll(async () => page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
@@ -127,8 +145,15 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async (
 
   await page.setViewportSize(HANDSCHIRM);
 
-  for (const modul of ['fahrzeuge', 'personal', 'material', 'einheiten']) {
-    await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`);
+  // Je Route ein Wortlaut, der erst MIT den Daten erscheint — siehe `keinQuerlauf`.
+  const routen: [string, string][] = [
+    ['fahrzeuge', FUNKRUFNAME],
+    ['personal', KRAFT],
+    ['material', MATERIAL],
+    ['einheiten', '1. Zug'],
+  ];
+  for (const [modul, wortlaut] of routen) {
+    await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`, wortlaut);
   }
 });
 

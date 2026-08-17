@@ -557,9 +557,13 @@ export default function FahrzeugePage() {
       }
       aktionen={
         darfSchreiben && (
-          <Space>
+          // `wrap` plus `maxWidth` (LFH-339 · C4, gemessen): das `minWidth: 260` des
+          // Auswahlfeldes und der Knopf daneben ergeben zusammen mehr als 390 px. Der
+          // Umbruch im Seitenkopf-Primitiv allein reicht nicht — er verschiebt den Block
+          // nur unter den Titel, wo er weiterhin zu breit ist.
+          <Space wrap style={{ minWidth: 0 }}>
             <Select
-              style={{ minWidth: 260 }}
+              style={{ minWidth: 260, maxWidth: '100%' }}
               placeholder="Stamm-Fahrzeug disponieren …"
               value={null}
               options={poolOptionen}
