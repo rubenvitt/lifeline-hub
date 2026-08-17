@@ -84,11 +84,13 @@ Alltag wichtigsten:
   `components/dichte.guard.test.ts` mit einer **Schuldmenge**, die nur schrumpfen darf (Stand
   01.08.2026 nach LFH-370/B5j: **5 Stellen in 2 Dateien** — gemessen mit der
   Scan-Funktion des Guards selbst, nicht fortgeschrieben —, je Verzeichnis-Bündel von LFH-333
-  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Rest sind die **vier Knöpfe**
-  der UHS-Platzkarte (`pages/uhs/Grundriss.tsx`, die geprüfte Dauerausnahme unten — die zwei
-  `Card`-Angaben derselben Datei zählen korrekt nicht mit) und **ein `InputNumber`** in
-  `pages/MaterialPage.tsx` (B5i). Damit ist LFH-333/B5 bis auf die begründete Ausnahme und
-  eine Einzelstelle abgetragen.
+  zugeordnet; ein Eintrag ohne Verstoß gilt selbst als Verstoß). Stand 17.08.2026 nach
+  LFH-339/C4: **eine Datei**, die geprüfte Dauerausnahme unten — die **vier Knöpfe** der
+  UHS-Platzkarte (`pages/uhs/Grundriss.tsx`; die zwei `Card`-Angaben derselben Datei zählen
+  korrekt nicht mit). Das `InputNumber` in `pages/MaterialPage.tsx` (B5i) ist gefallen, weil
+  C4 die Datei ohnehin anfasste. **Damit ist LFH-333/B5 bis auf die begründete Ausnahme
+  abgetragen.** Wer eine Zeile aus `OFFEN` streicht, tut es im **selben** Commit wie den Fix
+  und prüft `aktionsabstand.guard.test.ts` mit.
   **Eine Klein-Angabe abzubauen kann eine Regel aufwerfen, die vorher keine war** (gemessen in
   LFH-370): solange die vier Knöpfe der Aktionsreihen in `SchaedenDetailPage`/`TiereDetailPage`
   klein waren, war die Frage nach dem Abstand zum `danger`-Knopf nicht gestellt. Mit der Staffel
@@ -284,21 +286,44 @@ Alltag wichtigsten:
   mit `vi.fn()` als Mutation sieht ihn **nicht** (dort kommt der Wert nie nach): er braucht ein
   `rerender` mit dem gespeicherten Wert. Und `onChange` feuert beim Verlassen **unbedingt**: ohne
   Wertgleichheits-Riegel kostet ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
-- **Die Zielform des Statuswechsels in den Kräfte-Listen liegt fest, gebaut wird sie in
-  LFH-339/C4** (LFH-369 · B5i, `docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
-  Kurzfassung: **Auslöser ist die Statusanzeige selbst** plus senkrechtes Menü im Portal — kein
-  `Segmented`, keine Farbfläche, **kein neuer Drawer** und **kein zweiter Primäraktions-Slot**.
-  Die Zahl dahinter: eine waagerechte Reihe trägt höchstens **2 beschriftete** (dichteunabhängig)
-  bzw. **4 unbeschriftete** Ziele im 480-px-Quick-View; die Kataloge haben 10 / 6 / 5, der
-  Fahrzeugkatalog ist mandantengepflegt. Senkrecht trägt, weil ein Menü scrollen darf und im
-  Portal liegt — womit auch die feste Mindestbreite entfällt, die das `Select` aus der
-  390-px-Karte drängte (`Datensicht.tsx:234-236`). **Statusfarbe nur als Punkt/Rand/Beistrich,
-  nie als Textfläche**: `status_farbe` ist bei Fahrzeug und Personal ungeprüfter Freitext
-  (`statusFarben.ts:28-41`), Kontrast ist dort nicht zugesichert. `fms_anker` bleibt Sortier-Anker
-  und Tastenkürzel, **nicht** tragende Bedienform — die Spalte ist nullable, ein 0–9-Tastenfeld
-  darauf hätte Löcher. Die zwei Eigenwidersprüche des Elterntickets („read-only Quick-View +
-  Statuswahl" gegen LFH-19) sind damit **aufgelöst statt umbenannt**: es entsteht keine Fläche,
-  die sie erzeugen würde.
+- **Der Statuswechsel in den Kräfte-Listen ist gebaut** (Zielform aus LFH-369 · B5i,
+  `docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`; umgesetzt in
+  LFH-339 · C4). **Auslöser ist die Statusanzeige selbst** plus senkrechtes Menü im Portal —
+  kein `Segmented`, keine Farbfläche, **kein neuer Drawer** und **kein zweiter
+  Primäraktions-Slot**. Die Zahl dahinter: eine waagerechte Reihe trägt höchstens
+  **2 beschriftete** (dichteunabhängig) bzw. **4 unbeschriftete** Ziele im 480-px-Quick-View;
+  die Kataloge haben 10 / 6 / 5, der Fahrzeugkatalog ist mandantengepflegt. Senkrecht trägt,
+  weil ein Menü scrollen darf und im Portal liegt — womit auch die feste Mindestbreite
+  entfällt, die das `Select` aus der 390-px-Karte drängte (`Datensicht.tsx:234-236`).
+  **Träger:** `components/StatusWahl.tsx` (nicht `kraefte/` — es ist ein Primitiv neben
+  `StatusTag`/`BemerkungZelle`, und `Datensicht` konsumiert es) plus `statusBedienung` am
+  Kartenplan. Der Bedienweg sitzt am **`status`-Slot**, nie am `aktion`-Slot: der sichert genau
+  EINE Primäraktion zu und ist auf allen drei Seiten mit „Entfernen" belegt.
+  **Statusfarbe nur als Punkt/Rand/Beistrich, nie als Textfläche.** `status_farbe` ist bei
+  Fahrzeug und Personal ungeprüfter Freitext (`statusFarben.ts:28-41`), Kontrast ist dort nicht
+  zugesichert. C4 hat die Fläche deshalb auch im **Bestand** abgetragen: A2 hatte die DB-Achse
+  auf antds `color`-Prop stehenlassen, aus Sorge um den **Verlust** der gepflegten Farbe — die
+  geht über `StatusTag`s `farbe`-Prop auf Rand und Text und bleibt damit erhalten. Das ist
+  A2s Sorge eingelöst, kein Zurückdrehen.
+  **`fms_anker` bleibt Sortier-Anker und Tastenkürzel**, nicht tragende Bedienform — die Spalte
+  ist nullable, ein 0–9-Tastenfeld darauf hätte Löcher.
+  **Material ist der Grenzfall, und die Linie liegt zwischen Farbe und Anordnung** (gemessen in
+  C4): sein Katalog liegt ausserhalb des A2-Vertrags, die **Anordnung** gilt trotzdem. Eine
+  Rollenzuordnung — auch eine lokale — wäre eine Farbentscheidung und bricht an einem Punkt:
+  `im_einsatz` war **blau**, und Blau ist `bedien`. Es gibt dafür keine ehrliche Rolle, also
+  wurde keine erfunden; die Menüeinträge tragen dort nur Text, das Auslöser-Etikett die Rolle
+  `neutral` im Sinne von „ausserhalb des Farbvertrags" (dieselbe Unterscheidung wie bei
+  `verfuegbarkeit.gesperrt`). Die fünf antd-Preset-Farbnamen sind ersatzlos entfallen.
+  **Ein Menü im Portal taut die Zeilenschleuse der `Datensicht` auf, wenn man es lässt.** Das
+  Overlay hängt an `document.body`, also ausserhalb der Sicht-Wurzel, und `autoFocus` schiebt
+  den Fokus dorthin — `pruefeVerlassen` behandelt `.ant-dropdown`/`.ant-select-dropdown`/
+  `.ant-picker-dropdown` deshalb **nicht** als Verlassen. **In jsdom passiert dieses Wandern
+  NICHT** (gemessen: der aktive Knoten bleibt der Auslöser): ein Test, der bloss ein Menü
+  öffnet und die Reihenfolge prüft, ist auch ohne den Zweig grün und belegt nichts. Geprüft
+  wird der Handler direkt, mit einem `relatedTarget` im Portal.
+  Die zwei Eigenwidersprüche des Elterntickets („read-only Quick-View + Statuswahl" gegen
+  LFH-19) sind damit **aufgelöst statt umbenannt**: es ist keine Fläche entstanden, die sie
+  erzeugt hätte.
 - **Ein Emoji ist keine Ikone** (30.07.2026, Kräfteliste). Wo ein Bildzeichen für etwas steht —
   Personal, Fahrzeug, Material, Erreichbarkeit, gesperrt, in Arbeit —, trägt es ein
   `@ant-design/icons`-Element, nie ein Emoji. Begründung: Zeichnung, Farbe und Breite eines
