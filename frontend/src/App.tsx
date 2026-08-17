@@ -21,6 +21,7 @@ import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
 import EinheitenPage from './pages/EinheitenPage';
+import EinheitDetailPage from './pages/EinheitDetailPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import GefahrenPage from './pages/gefahren/GefahrenPage';
 import PersonenPage from './pages/PersonenPage';
@@ -171,6 +172,7 @@ export default function App() {
             <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
             <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
             <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
+            <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
             <Route path="personen/:personId" element={<PersonenDetailPage />} />
             <Route path="tiere/:tierId" element={<TiereDetailPage />} />
             <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
