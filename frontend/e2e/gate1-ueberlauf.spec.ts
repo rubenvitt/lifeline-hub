@@ -106,22 +106,18 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 /**
  * GEMESSENE BESTANDS-VERSTÖSSE — die Burn-down-Liste dieses Gates.
  *
- * Die fünf neuen Zeilen haben auf 390 px drei Verstöße aufgedeckt, und alle drei sind
- * **Bestand des Seitenkopfs**, nicht Werk von LFH-330:
+ * **LEER seit LFH-340 · C5, und das ist die Aussage.** Der eine verbliebene Eintrag war
+ * `/personen` bei 390 px mit 120 px Überlauf: eine `Space`-Reihe ohne `wrap` mit den drei
+ * Knöpfen „Schnellerfassung", „Vermisst melden", „Betroffene/n erfassen". C5 hat den Kopf
+ * dieser Seite auf `EinsatzSeite` gezogen — dessen Aktionen-Slot liegt in einem `Flex wrap`
+ * mit `minWidth: 0` an beiden Kindern (die Herleitung steht dort, gemessen in C4 an
+ * `/fahrzeuge`). Der Überlauf ist damit nicht gedeckelt, sondern weg: der Guard hat die
+ * Freistellung selbst als tot gemeldet, statt dass jemand sie gestrichen hätte.
  *
- *  | Route              | über  | Verursacher                                                     |
- *  |--------------------|-------|-----------------------------------------------------------------|
- *  | `/personen`        | 120px | `Space` ohne `wrap` mit drei Knöpfen „Schnellerfassung",         |
- *  |                    |       | „Vermisst melden", „Betroffene/n erfassen" (`PersonenPage.tsx:138-144`) |
- *
- * BELEGT ALS BESTAND, nicht vermutet — zwei unabhängige Messungen:
- *  1. Auf dem **leeren** Einsatz (0 Personal, 0 Personen, 0 Kräfte) stehen dieselben Werte
- *     79 / 120 px. Die Verursacher sind Kopfknöpfe, die ohne jeden Datensatz rendern;
- *     der `Datensicht`-Inhalt ist unbeteiligt.
- *  2. `git diff a06cd0f..HEAD` berührt in allen drei Dateien nur Importe und Spalten — die
- *     schuldigen `Space`-Blöcke sind unverändert.
- * `/tiere` und `/auftraege` messen auf allen drei Breiten 0 px. Auf 1366 und 1024 px sind
- * alle neun Routen sauber; die verbliebenen zwei Verstöße treten ausschließlich auf 390 px auf.
+ * Das als ZIELTICKET notierte B5 (LFH-333) hat den Fall also nicht erledigt — der Umbau des
+ * Seitenkopfs hat ihn nebenbei mitgenommen. Wer hier wieder einen Eintrag braucht, misst ihn
+ * und schreibt den Verursacher dazu; eine leere Liste ist billiger zu halten als eine, in
+ * der eine behobene Zeile weiterlebt.
  *
  * DER DRITTE EINTRAG IST WEG (LFH-338 · C3): `/kraefteuebersicht` stand hier mit 7 px,
  * verursacht von einem `Space` ohne `wrap` im Aktionen-Slot. C3 hat dem Slot einen dritten
@@ -158,13 +154,26 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  * Der `deckel` liegt bewusst über dem Messwert (Subpixel- und Schriftmetrik-Spielraum), aber
  * weit unter der nächsten Größenordnung.
  *
- * ZIELTICKET: **B5 (LFH-333)** — dort laufen die Kopf- und Bedienflächen ohnehin auf die
- * Dichte-Staffel und den `size`-Abbau; „Kopfaktionen umbrechen unter `sm`" gehört in denselben
- * Griff. Die Zeile steht in der Prüfliste `2026-07-28-einsatzlisten-pruefliste.md`.
+ * DIE MECHANIK BLEIBT, OBWOHL DIE LISTE LEER IST: sie ist der Weg, auf dem ein künftiger
+ * Bestandsbefund benannt statt geduldet wird. Ihre Totmeldung hat sich gerade bewährt — sie
+ * hat gemeldet, dass LFH-340 · C5 den letzten Eintrag eingelöst hat, statt ihn in einer
+ * veralteten Liste weiterleben zu lassen.
  */
-const BESTAND_OFFEN = [
-  { modul: 'personen', breite: 390, deckel: 180, gemessen: 120 },
-] as const;
+type Freistellung = {
+  /** Modulroute wie in {@link ROUTEN}. */
+  modul: string;
+  /** Sichtbreite in px, auf der der Verstoß auftritt. */
+  breite: number;
+  /** Obergrenze: darüber ist der Eintrag rot statt freigestellt. */
+  deckel: number;
+  /** Der Messwert bei Aufnahme — als Beleg, nicht als Schwelle. */
+  gemessen: number;
+};
+
+// Der EXPLIZITE Typ ist nötig, nicht Zierde: `[] as const` hätte den Elementtyp `never`,
+// und der Auswertungscode unten (der auf `modul`/`breite`/`deckel` zugreift) fiele mit
+// „Property does not exist on type never" um. Der Typ hält die Liste befüllbar.
+const BESTAND_OFFEN: readonly Freistellung[] = [];
 
 /**
  * Ein Datensatz je neu aufgenommenem Modul, mit absichtlich langen Werten.

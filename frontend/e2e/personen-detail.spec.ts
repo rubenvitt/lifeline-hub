@@ -39,18 +39,18 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
 
   // Direkt ins Personen-Modul.
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await expect(page.getByRole('heading', { name: 'Personen' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Personen/ })).toBeVisible();
 
   // Person per Schnellerfassung anlegen (Modal: okText „Erfassen").
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel('Name', { exact: true }).fill('Mustermann');
-  // Vorname liegt seit dem Feldbudget (LFH-332 · B4) eingeklappt unter „Weitere
-  // Angaben" — sichtbar sind nur Geschlecht, Alter, Antreffort und Name. Der
-  // Zugangsname trägt das Pfeil-Icon mit („collapsed Weitere Angaben"), deshalb
-  // ein Teiltreffer statt exact.
+  // Name UND Vorname liegen eingeklappt unter „Weitere Angaben": das Feldbudget (LFH-332 · B4)
+  // hält vier sichtbare Felder, und seit LFH-340 · C5 belegt die Sichtungskategorie einen
+  // davon — sichtbar sind Sichtung, Geschlecht, Alter und Antreffort. Der Zugangsname trägt
+  // das Pfeil-Icon mit („collapsed Weitere Angaben"), deshalb ein Teiltreffer statt exact.
   await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
+  await dialog.getByLabel('Name', { exact: true }).fill('Mustermann');
   await dialog.getByLabel('Vorname', { exact: true }).fill('Max');
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
@@ -67,7 +67,9 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
   await expect(page.getByText(/Chronologischer Verlauf/)).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Medizinischer Verlauf' })).toHaveCount(0);
 
-  // Zurück zur Liste.
-  await page.getByRole('button', { name: 'Zurück zur Liste' }).click();
-  await expect(page.getByRole('heading', { name: 'Personen' })).toBeVisible();
+  // Zurück zur Liste — über den Breadcrumb. Der eigene „Zurück zur Liste"-Knopf ist mit
+  // LFH-340 · C5 entfallen: er stand als siebte gleichrangige Aktion neben dem Breadcrumb,
+  // der denselben Weg trägt.
+  await page.getByRole('link', { name: 'Personen', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /Personen/ })).toBeVisible();
 });
