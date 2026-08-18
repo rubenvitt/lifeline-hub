@@ -217,9 +217,22 @@ describe('PersonenPage', () => {
     expect(screen.getByRole('searchbox', { name: 'Suche in Personen' })).toHaveValue('');
   });
 
+  /**
+   * LFH-340 · C5. Der Kopf kam aus einem handgebauten Block (Breadcrumb, `Title level={3}`,
+   * Status-Tag, `Datenstand`, Schreibrecht-Alert) — also genau aus dem Slotsatz, den
+   * `EinsatzSeite` seit LFH-328 · A2 trägt. Die zweite Zeile ist die tragende: „level 4 da"
+   * allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
+   */
+  it('trägt den gemeinsamen Modulkopf statt einer handgebauten Titelzeile', async () => {
+    render(einsatzAktiv, []);
+    expect(await screen.findByRole('heading', { level: 4, name: /Personen/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
+  });
+
   it('Einsatzleitung sieht die Anlege-Buttons', async () => {
     render(einsatzAktiv, []);
-    await screen.findByRole('heading', { name: 'Personen' });
+    await screen.findByRole('heading', { name: /Personen/ });
     expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Betroffene/n erfassen' })).toBeInTheDocument();
@@ -461,7 +474,7 @@ describe('PersonenPage', () => {
     zweiteSeite.unmount();
 
     render(einsatzAktiv, [vermisst]);
-    await screen.findByRole('heading', { name: 'Personen' });
+    await screen.findByRole('heading', { name: /Personen/ });
     expect(screen.queryByText('Erfasst als R-049')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Neu', selected: true })).toBeInTheDocument();
   });
@@ -504,7 +517,7 @@ describe('PersonenPage', () => {
       name: 'Aus anderem Tab',
     };
     render(einsatzAktiv, []);
-    await screen.findByRole('heading', { name: 'Personen' });
+    await screen.findByRole('heading', { name: /Personen/ });
     await schreibaktionEinreihen(nutzer.id, 1, {
       art: 'person',
       daten: { name: 'Aus anderem Tab', status: 'vermisst', client_id: 'cross-tab-50' },
@@ -735,7 +748,7 @@ describe('PersonenPage', () => {
   it('öffnet via ?neu=1 die Schnellerfassung NICHT für Beobachter', async () => {
     render(einsatzBeobachter, [], '/einsaetze/1/personen?neu=1');
     // Seite lädt durch (Tabelle ist leer, kein Spinner mehr)
-    await screen.findByRole('heading', { name: 'Personen' });
+    await screen.findByRole('heading', { name: /Personen/ });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

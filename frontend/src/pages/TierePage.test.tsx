@@ -183,9 +183,21 @@ describe('TierePage', () => {
     expect(screen.queryByText('Rex')).not.toBeInTheDocument();
   });
 
+  /**
+   * LFH-340 · C5, wortgleich zu `PersonenPage.test.tsx`: der Kopf kam aus einem
+   * handgebauten Block statt aus `EinsatzSeite`. Die zweite Zeile ist die tragende —
+   * „level 4 da" allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
+   */
+  it('trägt den gemeinsamen Modulkopf statt einer handgebauten Titelzeile', async () => {
+    render(einsatzAktiv, []);
+    expect(await screen.findByRole('heading', { level: 4, name: /Tiere/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
+  });
+
   it('Einsatzleitung sieht Anlege-Buttons', async () => {
     render(einsatzAktiv, []);
-    await screen.findByRole('heading', { name: 'Tiere' });
+    await screen.findByRole('heading', { name: /Tiere/ });
     expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
   });

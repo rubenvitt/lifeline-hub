@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Space, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Space, Tabs, Tag } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,8 @@ import { listePersonen, registrierAnzeige, schlageAbgleichVor, type PersonEingab
 import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import Datenstand from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { flaeche } from '../theme/tokens';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import type { Person, Sichtungskategorie } from '../api/types';
 import { PATIENT_SK, SK_META, istPatient } from '../personen/personMeta';
@@ -420,26 +421,42 @@ export default function PersonenPage() {
   ]);
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Personen' }]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      dataUpdatedAt={personenQuery.dataUpdatedAt}
+      titel={
         <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>Personen</Typography.Title>
+          Personen
+          {/* BEFUND wie in `PersonalPage`/`SchaedenPage`: `EinsatzStatus` hat keine
+              Statusrolle in `theme/statusFarben.ts`. Der Tag bleibt deshalb auf
+              antd-Farbnamen und rohem Enum-Wert stehen. */}
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
-          <Datenstand dataUpdatedAt={personenQuery.dataUpdatedAt} />
         </Space>
-        {darfSchreiben && (
-          <Space>
+      }
+      breadcrumb={
+        <Breadcrumb
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Personen' }]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
+          <Space wrap style={{ minWidth: 0 }}>
             <Button type="primary" onClick={() => setModusFuer(einsatzId, 'schnell')}>Schnellerfassung</Button>
             <Button onClick={() => setModusFuer(einsatzId, 'vermisst')}>Vermisst melden</Button>
             <Button onClick={() => setModusFuer(einsatzId, 'betroffen')}>Betroffene/n erfassen</Button>
           </Space>
-        )}
-      </Space>
-
+        )
+      }
+      hinweis={
+        !darfSchreiben && einsatz.status !== 'aktiv' && (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        )
+      }
+    >
+      {/* DIE QUITTUNG STEHT IM INHALT, NICHT IM `hinweis`-SLOT (LFH-340 · C5): der trägt den
+          Schreibrecht-Zustand, und beide gleichzeitig verdrängten einander — ausgerechnet in
+          der Lage, in der man beides braucht. Sie bleibt außerdem bewusst ÜBER den Reitern:
+          sie gilt für die Erfassung, nicht für die gerade gewählte Sicht. */}
       {erfassungsQuittung && (
         <Alert
           style={{ marginBottom: 12 }}
@@ -459,10 +476,6 @@ export default function PersonenPage() {
         onChange={(k) => setSichtFuer(einsatzId, k as Sicht)}
         items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))}
       />
-
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-      )}
 
       {listeGescheitert ? (
         <SeitenFehler
@@ -602,6 +615,6 @@ export default function PersonenPage() {
           });
         }}
       />
-    </div>
+    </EinsatzSeite>
   );
 }
