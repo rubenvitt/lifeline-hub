@@ -1,0 +1,69 @@
+# Lokale Dev-Infrastruktur: S3-kompatibles Object-Storage (MinIO) für den
+# `karten-service` (Komponente A, LFH-204). Start über `mise run minio`,
+# Abriss über `mise run clean:docker`.
+#
+# Bewusst NUR Entwicklungs-Infrastruktur. lifeline-hub selbst läuft ohne
+# Laufzeit-Docker (single binary) — siehe
+# docs/ops/lfh-204-karten-service-ops-runbook.md. Diese Datei ersetzt nichts
+# davon, sie stellt nur das lokale Gegenstück zum produktiven S3/R2-Bucket.
+#
+# Zugangsdaten sind absichtlich die MinIO-Vorgabewerte: das Bucket trägt
+# ausschließlich öffentliche ODbL-Kartendaten, und die passenden AWS_*-Werte
+# stehen in der (gitignorten) .env.
+
+name: lfh
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: lfh-minio
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000' # S3-API
+      - '9001:9001' # Web-Console
+    volumes:
+      - lfh-minio-data:/data
+    restart: unless-stopped
+    healthcheck:
+      # curl und mc liegen beide im MinIO-Image (geprüft).
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:9000/minio/health/live']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 3s
+
+  # Legt das Bucket an und macht es öffentlich lesbar; läuft einmal und endet.
+  # Ersetzt die frühere `until mc alias set …; do sleep 1; done`-Warteschleife —
+  # das Warten übernimmt `depends_on: service_healthy`.
+  #
+  # Läuft über `docker compose run --rm minio-init`, NICHT über `up`: ein Service,
+  # der sich beendet, lässt `up --wait` mit Exit 1 aussteigen, obwohl er sauber
+  # mit 0 endete (gemessen). `run` liefert dagegen den echten Exit-Code des
+  # Kommandos und erzwingt einen frischen Lauf. Deshalb auch kein
+  # `container_name` (mit `run` nicht zulässig) und ein Profil, damit ein blankes
+  # `docker compose up` ihn nicht mitzieht.
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-07-21T05-28-08Z
+    profiles: ['init']
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    # Beide Schritte sind idempotent — der Task darf beliebig oft laufen.
+    command: >
+      -c "mc alias set l http://minio:9000 minioadmin minioadmin &&
+          mc mb --ignore-existing l/maps &&
+          mc anonymous set download l/maps"
+    restart: 'no'
+
+volumes:
+  lfh-minio-data:
+    # Fester Name, damit `mise run clean:docker` ihn ohne Projektpräfix trifft.
+    name: lfh-minio-data
+
+networks:
+  default:
+    name: lfh-dev

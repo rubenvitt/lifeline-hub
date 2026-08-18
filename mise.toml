@@ -1,5 +1,5 @@
 # mise.toml — versionierte Projekt-Tasks (wird mit dem lokalen, gitignorierten
-# mise.local.toml gemerged; dort liegen die Dev-Server-Tasks backend/frontend/minio/…).
+# mise.local.toml gemerged; dort liegen die .env-abhängigen Dev-Server-Tasks backend/frontend/karten-service).
 #
 # Cleanup-Tasks (gestuft): `mise run clean` räumt nur BILLIG regenerierbare
 # Build-Artefakte. Teure/destruktive Ziele (Karten, Dev-DB, Docker, Worktrees) sind
@@ -65,11 +65,20 @@ confirm = { message = "Löscht lifeline.db* (lokale Dev-DB inkl. Seed-Daten) + l
 run = [{ task = "_clean:db" }]
 
 # ── Lokales MinIO (Docker) ─────────────────────────────────────────────────────────
+# Steht hier und nicht in der (gitignorten) mise.local.toml: alle Werte stehen in
+# compose.yml, der Task braucht weder .env noch Geheimnisse. Damit funktioniert
+# `mise run minio` auf einem frischen Klon — bacon.toml:30 verweist darauf.
+[tasks.minio]
+description = "Lokales MinIO (S3 für karten-service) starten + Bucket 'maps' anlegen"
+run = "docker compose up -d --wait minio && docker compose run --rm minio-init"
+
 [tasks."_clean:docker"]
 hide = true
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
+docker compose down -v --remove-orphans >/dev/null 2>&1 || true
+# Nachlese für Bestände, die noch vor compose.yml von Hand angelegt wurden.
 docker rm -f lfh-minio >/dev/null 2>&1 || true
 docker volume rm lfh-minio-data >/dev/null 2>&1 || true
 docker network rm lfh-dev >/dev/null 2>&1 || true

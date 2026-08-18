@@ -150,7 +150,9 @@ cargo build --release -p karten-service
 ```
 
 Es existiert **kein** Dockerfile/Compose-File/systemd-Unit für `karten-service` im Repo
-(nur `karten-build/`s eigenes Docker-Image für den Tile-Bau selbst) — Paketierung/Deployment
+(nur `karten-build/`s eigenes Docker-Image für den Tile-Bau selbst; das `compose.yml` im
+Repo-Root ist reine lokale Dev-Infrastruktur — MinIO als S3-Ersatz, siehe `mise run minio` —
+und kein Deployment-Artefakt) — Paketierung/Deployment
 des Service-Binaries ist Operator-Sache (s. Abschnitt 9). Beispiel-systemd-Unit unten unter
 Abschnitt 3.3 ist ein Vorschlag, kein Repo-Artefakt.
 
