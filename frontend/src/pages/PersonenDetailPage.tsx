@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Col, Descriptions, Dropdown, Form, Input, InputNumber, Modal, Row, Space, Spin, Tag, Typography, theme, type MenuProps, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Col, Collapse, Descriptions, Dropdown, Form, Input, InputNumber, Modal, Row, Space, Spin, Tag, Typography, theme, type MenuProps, type TableColumnsType } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -105,26 +105,40 @@ export default function PersonenDetailPage() {
     // wuerde fuer dieselbe Oeffnung mehrere Auditzeilen erzeugen.
     retry: false,
   });
+  /**
+   * Ladehoheit (LFH-340 · C5, Befund M40): die vier Abfragen unten hängen am AUFGEKLAPPTEN
+   * Zustand ihres Abschnitts, nicht am Öffnen der Seite. Beim Öffnen laufen nur noch zwei —
+   * Einsatz und Detail —, und der medizinische Verlauf ist Teil desselben Detail-Abrufs.
+   */
+  const [zuordnungenOffen, setZuordnungenOffen] = useState(false);
+  const [auditOffen, setAuditOffen] = useState(false);
+  // Steht hier oben statt bei den übrigen UHS-Zuständen, weil `uhsListeQuery` ihn liest —
+  // eine `const` weiter unten wäre zur Auswertungszeit noch nicht initialisiert.
+  const [uhsModalOffen, setUhsModalOffen] = useState(false);
+
   const tiereDerPersonQuery = useQuery({
     queryKey: einsatzKeys.tiereHalter(einsatzId, personId),
     queryFn: () => listeTiere(einsatzId, { halterPersonId: personId }),
-    enabled: idGueltig,
+    enabled: idGueltig && zuordnungenOffen,
   });
   const schaedenDerPersonQuery = useQuery({
     queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId),
     queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
-    enabled: idGueltig,
+    enabled: idGueltig && zuordnungenOffen,
   });
   // LFH-152: UHS-Liste für die Klartext-Anzeige der aktuellen Verortung + den Zuweisungs-Picker.
+  // Der Picker ist der Grund für das `|| uhsModalOffen`: er steht IM Zuordnungs-Abschnitt,
+  // aber sein Dialog überlebt dessen Zuklappen — ohne den zweiten Zweig stünde er dann ohne
+  // Auswahlliste da. Bauform aus den beiden Zuweisungs-Pickern weiter unten.
   const uhsListeQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: idGueltig,
+    enabled: idGueltig && (zuordnungenOffen || uhsModalOffen),
   });
   const auditQuery = useQuery({
     queryKey: einsatzKeys.personAudit(einsatzId, personId),
     queryFn: () => ladePersonAudit(einsatzId, personId),
-    enabled: idGueltig && istEinsatzLeitung(einsatzQuery.data),
+    enabled: idGueltig && auditOffen && istEinsatzLeitung(einsatzQuery.data),
   });
 
   const statusMutation = useMutation({
@@ -259,7 +273,6 @@ export default function PersonenDetailPage() {
 
   // LFH-152: UHS-Zuweisung von der Personen-Seite (Gegenrichtung zum Grundriss). art spiegelt
   // die belegMut-Logik des Grundrisses: bereits belegt → wechsel, sonst eintritt. Austragen = austritt.
-  const [uhsModalOffen, setUhsModalOffen] = useState(false);
   const [uhsForm] = Form.useForm<{ uhs_id: number; notiz?: string }>();
   function invalidateUhs() {
     invalidateDetail();
@@ -525,118 +538,159 @@ export default function PersonenDetailPage() {
           </Descriptions>
         )}
 
-        <div>
-          <Space wrap>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-              Zugeordnete Tiere
-            </Typography.Text>
-            {darfZuordnen && (
-              <Button onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
-                Tier zuweisen
-              </Button>
-            )}
-          </Space>
-          {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
-            <div><Typography.Text type="secondary">keine</Typography.Text></div>
-          ) : (
-            <Space wrap style={{ marginTop: 4 }}>
-              {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
-                <Space key={t.id} size={4}>
-                  <Tag
-                    color="cyan"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
-                  >
-                    {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
-                    {t.rufname ? ` „${t.rufname}"` : ''}
-                  </Tag>
-                  {darfZuordnen && (
-                    <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
-                  )}
+        {/**
+          * ZUORDNUNGEN UND AUDIT LADEN ERST BEIM AUFKLAPPEN (LFH-340 · C5, Befund M40).
+          *
+          * Die Seite setzte beim Öffnen sechs Abfragen ab, um eine nachgetragene Sichtung zu
+          * ermöglichen — fünf davon für Blöcke, die man in dieser Lage gar nicht ansieht.
+          * Kopf und medizinischer Verlauf kommen aus DEMSELBEN Detail-Abruf und stehen
+          * deshalb weiterhin sofort.
+          *
+          * KEIN `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim
+          * Aufklappen" wäre nicht mehr von „immer da" zu unterscheiden — die Zählung im
+          * Test bewiese nichts mehr.
+          *
+          * Die UHS-Verortung steht MIT im Panel, obwohl `aktuelle_uhs_id` aus dem Detail
+          * kommt: nur der KLARTEXT-Name braucht die UHS-Liste, und dafür gibt es seit jeher
+          * den Rückfallwert `UHS #id`. Zugeklappt kostet der Name nichts.
+          */}
+        <Collapse
+          ghost
+          activeKey={[
+            ...(zuordnungenOffen ? ['zuordnungen'] : []),
+            ...(auditOffen ? ['audit'] : []),
+          ]}
+          onChange={(offen: string | string[]) => {
+            const schluessel = Array.isArray(offen) ? offen : [offen];
+            setZuordnungenOffen(schluessel.includes('zuordnungen'));
+            setAuditOffen(schluessel.includes('audit'));
+          }}
+          items={[
+            {
+              key: 'zuordnungen',
+              label: 'Zuordnungen (Tiere, Schäden, UHS)',
+              children: (
+                <Space orientation="vertical" style={{ width: '100%' }} size="large">
+                  <div>
+                    <Space wrap>
+                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                        Zugeordnete Tiere
+                      </Typography.Text>
+                      {darfZuordnen && (
+                        <Button onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
+                          Tier zuweisen
+                        </Button>
+                      )}
+                    </Space>
+                    {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
+                      <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                    ) : (
+                      <Space wrap style={{ marginTop: 4 }}>
+                        {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
+                          <Space key={t.id} size={4}>
+                            <Tag
+                              color="cyan"
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
+                            >
+                              {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
+                              {t.rufname ? ` „${t.rufname}"` : ''}
+                            </Tag>
+                            {darfZuordnen && (
+                              <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
+                            )}
+                          </Space>
+                        ))}
+                      </Space>
+                    )}
+                  </div>
+
+                  <div>
+                    <Space wrap>
+                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                        Als Geschädigte bei Schäden
+                      </Typography.Text>
+                      {darfZuordnen && (
+                        <Button onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
+                          Schaden zuweisen
+                        </Button>
+                      )}
+                    </Space>
+                    {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
+                      <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                    ) : (
+                      <Space wrap style={{ marginTop: 4 }}>
+                        {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
+                          <Space key={sch.id} size={4}>
+                            <Link to={schadenDetailPfad(einsatzId, sch.id)}>
+                              <Tag color="orange" style={{ cursor: 'pointer' }}>
+                                {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
+                              </Tag>
+                            </Link>
+                            {darfZuordnen && (
+                              <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
+                            )}
+                          </Space>
+                        ))}
+                      </Space>
+                    )}
+                  </div>
+
+                  <div>
+                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                      UHS-Verortung
+                    </Typography.Text>
+                    <div style={{ marginTop: 4 }}>
+                      {person.aktuelle_uhs_id != null ? (
+                        // `size="middle"` ist nicht Kosmetik (LFH-363): eine Aktionsreihe mit
+                        // einem `danger`-Knopf und mindestens einer weiteren Aktion trägt
+                        // mindestens `token.marginSM` Abstand — antds Vorgabe liegt darunter.
+                        <Space wrap size="middle">
+                          <Tag color="blue">
+                            {uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
+                              ?? `UHS #${person.aktuelle_uhs_id}`}
+                          </Tag>
+                          {darfSchreiben && !person.storniert_at && (
+                            <>
+                              <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                                UHS ändern
+                              </Button>
+                              <Button danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
+                            </>
+                          )}
+                        </Space>
+                      ) : (
+                        <Space wrap>
+                          <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
+                          {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
+                            <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                              UHS zuweisen
+                            </Button>
+                          )}
+                        </Space>
+                      )}
+                    </div>
+                  </div>
                 </Space>
-              ))}
-            </Space>
-          )}
-        </div>
-
-        <div>
-          <Space wrap>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-              Als Geschädigte bei Schäden
-            </Typography.Text>
-            {darfZuordnen && (
-              <Button onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
-                Schaden zuweisen
-              </Button>
-            )}
-          </Space>
-          {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
-            <div><Typography.Text type="secondary">keine</Typography.Text></div>
-          ) : (
-            <Space wrap style={{ marginTop: 4 }}>
-              {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
-                <Space key={sch.id} size={4}>
-                  <Link to={schadenDetailPfad(einsatzId, sch.id)}>
-                    <Tag color="orange" style={{ cursor: 'pointer' }}>
-                      {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
-                    </Tag>
-                  </Link>
-                  {darfZuordnen && (
-                    <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
-                  )}
-                </Space>
-              ))}
-            </Space>
-          )}
-        </div>
-
-        <div>
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-            UHS-Verortung
-          </Typography.Text>
-          <div style={{ marginTop: 4 }}>
-            {person.aktuelle_uhs_id != null ? (
-              <Space wrap>
-                <Tag color="blue">
-                  {uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
-                    ?? `UHS #${person.aktuelle_uhs_id}`}
-                </Tag>
-                {darfSchreiben && !person.storniert_at && (
-                  <>
-                    <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
-                      UHS ändern
-                    </Button>
-                    <Button danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
-                  </>
-                )}
-              </Space>
-            ) : (
-              <Space wrap>
-                <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
-                {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
-                  <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
-                    UHS zuweisen
-                  </Button>
-                )}
-              </Space>
-            )}
-          </div>
-        </div>
-
-        {istEinsatzLeitung(einsatz) && (
-          <div>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-              Zugriffs-Audit
-            </Typography.Text>
-            <KatalogTabelle<PersonZugriff>
-              rowKey="id" pagination={false}
-              loading={auditQuery.isLoading}
-              dataSource={auditQuery.data ?? []}
-              columns={auditSpalten}
-              locale={{ emptyText: 'Noch keine Zugriffe' }}
-            />
-          </div>
-        )}
+              ),
+            },
+            ...(istEinsatzLeitung(einsatz)
+              ? [{
+                  key: 'audit',
+                  label: 'Zugriffs-Audit',
+                  children: (
+                    <KatalogTabelle<PersonZugriff>
+                      rowKey="id" pagination={false}
+                      loading={auditQuery.isLoading}
+                      dataSource={auditQuery.data ?? []}
+                      columns={auditSpalten}
+                      locale={{ emptyText: 'Noch keine Zugriffe' }}
+                    />
+                  ),
+                }]
+              : []),
+          ]}
+        />
       </Space>
     );
   }
