@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Tag, Typography, theme, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Col, Descriptions, Dropdown, Form, Input, InputNumber, Modal, Row, Space, Spin, Tag, Typography, theme, type MenuProps, type TableColumnsType } from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -37,6 +38,32 @@ function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
     case 'verstorben':
     case 'abgemeldet': return ['erfasst', 'vermisst', 'betroffen'];
   }
+}
+
+/**
+ * Statuswechsel, die eine Rückfrage tragen (LFH-363: „Destruktiv ist nicht gleich
+ * destruktiv"). `naechsteStatus` kennt formal auch von `verstorben` einen Weg zurück — ein
+ * versehentlich gebuchter Todesfall ist trotzdem nichts, was man beiläufig zurücknimmt, und
+ * er erzeugt einen ETB-Eintrag, den keine Korrektur wieder einsammelt. `abgemeldet` steht
+ * bewusst NICHT hier: das ist eine Verwaltungsbuchung mit sichtbarem Rückweg.
+ */
+const IRREVERSIBEL: PersonStatus[] = ['verstorben'];
+
+/**
+ * Eine Aktion der Kopfleiste. Deskriptor statt `ReactNode`, damit dieselbe Beschreibung
+ * einmal als Primärknopf und einmal als Menüeintrag gerendert werden kann — und damit die
+ * Rangfolge an EINER Stelle entschieden wird statt im JSX.
+ */
+type Kopfaktion =
+  | { art: 'sichten' | 'verbleib' | 'bearbeiten' | 'stornieren'; key: string; label: string; danger?: boolean; trennerDavor?: boolean }
+  | { art: 'status'; key: string; label: string; status: PersonStatus; danger?: boolean; trennerDavor?: boolean };
+
+/** Kopfaktionen → antd-Menüeinträge, Trenner eingefügt. */
+function menueEintraege(aktionen: Kopfaktion[]): MenuProps['items'] {
+  return aktionen.flatMap((a) => [
+    ...(a.trennerDavor ? [{ type: 'divider' as const, key: `${a.key}:trenner` }] : []),
+    { key: a.key, label: a.label, danger: a.danger },
+  ]);
 }
 
 export default function PersonenDetailPage() {
@@ -189,6 +216,15 @@ export default function PersonenDetailPage() {
     mutationFn: (pid: number) => stornierePerson(einsatzId, pid),
     onSuccess: () => { invalidate(); navigate(personenPfad(einsatzId)); }, onError: fehler,
   });
+
+  /**
+   * Rückfragen der Kopfleiste — als `<Modal>` mit eigenem Zustand, nicht als `Popconfirm`
+   * im Menü-Label (LFH-365): ein `Popconfirm` überlebt dort nur mit `stopPropagation` das
+   * Auto-Schließen des Menüs. Beide Dialoge stehen außerdem AUSSERHALB jeder Aufzählung,
+   * es gibt sie also genau einmal im Baum.
+   */
+  const [statusDialog, setStatusDialog] = useState<PersonStatus | null>(null);
+  const [stornoOffen, setStornoOffen] = useState(false);
 
   // E-2: Sichtung
   const [reSichtenOffen, setReSichtenOffen] = useState(false);
@@ -365,12 +401,11 @@ export default function PersonenDetailPage() {
             : <Tag>ungesichtet</Tag>}
           {person.aktueller_verbleib && <Tag color="purple">{person.aktueller_verbleib}</Tag>}
         </Space>
-        {darfSchreiben && !person.storniert_at && (
-          <Space wrap>
-            <Button onClick={() => setReSichtenOffen(true)}>Re-Sichten</Button>
-            <Button onClick={() => setVerbleibOffen(true)}>Verbleib erfassen</Button>
-          </Space>
-        )}
+        {/* „Re-Sichten" und „Verbleib erfassen" standen bis LFH-340 · C5 hier als eigene
+            Reihe. Sie sind in die Kopfleiste gewandert — eine davon ist dort die
+            Primäraktion, die andere steht im Menü. Zwei Wege zu derselben Aktion wären ein
+            Unterschied ohne Bedeutung, und der Kopf ist der Ort, an dem die Seite sagt,
+            was zu tun ist. */}
         {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
           <Alert
             type="warning" showIcon
@@ -606,6 +641,81 @@ export default function PersonenDetailPage() {
     );
   }
 
+  /** Die Bearbeiten-Sitzung öffnen — Formularwerte und CAS-Basis aus DEMSELBEN Snapshot. */
+  function starteBearbeiten() {
+    const werte: PersonEingabe = {
+      name: p.name,
+      vorname: p.vorname,
+      geschlecht: p.geschlecht,
+      geburtsdatum: p.geburtsdatum,
+      alter_geschaetzt: p.alter_geschaetzt,
+      herkunft_adresse: p.herkunft_adresse,
+      antreff_ort: p.antreff_ort,
+      melder_kontakt: p.melder_kontakt,
+      notiz: p.notiz,
+    };
+    // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
+    setEditSitzung({ basis: p.geaendert_at, werte });
+    editForm.setFieldsValue(werte);
+  }
+
+  function fuehreKopfaktionAus(aktion: Kopfaktion) {
+    if (aktion.art === 'sichten') { setReSichtenOffen(true); return; }
+    if (aktion.art === 'verbleib') { setVerbleibOffen(true); return; }
+    if (aktion.art === 'bearbeiten') { starteBearbeiten(); return; }
+    if (aktion.art !== 'status') { setStornoOffen(true); return; }
+    // Statuswechsel: irreversible Ziele über den Dialog, umkehrbare direkt. „Umkehrbar"
+    // heißt hier, dass `naechsteStatus` einen Weg zurück kennt — bei `verstorben` und
+    // `abgemeldet` steht er zwar formal in der Tabelle, aber ein versehentliches
+    // „verstorben" ist keine Buchung, die man beiläufig zurücknimmt.
+    if (IRREVERSIBEL.includes(aktion.status)) setStatusDialog(aktion.status);
+    else statusMutation.mutate({ einsatzId, personId: p.id, status: aktion.status });
+  }
+
+  /**
+   * Was der Kopf anbietet, und in welcher Rangfolge — abgeleitet, nicht im JSX verzweigt.
+   *
+   * `null` heißt: gar keine Aktion. Ohne Schreibrecht, an einer stornierten Person und
+   * während einer laufenden Bearbeitung wird deshalb WEDER eine Primäraktion NOCH ein
+   * Menü-Auslöser gerendert — ein deaktivierter Auslöser wäre ein Bedienziel, das nichts tut.
+   *
+   * Die Primäraktion hängt am Zustand: eine ungesichtete Person will gesichtet werden, eine
+   * gesichtete braucht als Nächstes ihren Verbleib. Ist beides erledigt, bleibt „Bearbeiten"
+   * — die einzige Aktion, die immer sinnvoll ist.
+   */
+  const aktionenPlan = ((): { primaer: Kopfaktion; weitere: Kopfaktion[] } | null => {
+    if (!darfSchreiben || p.storniert_at || editSitzung) return null;
+    const sichten: Kopfaktion = {
+      art: 'sichten',
+      key: 'sichten',
+      label: p.aktuelle_sichtung ? 'Re-Sichten' : 'Sichten',
+    };
+    const verbleib: Kopfaktion = { art: 'verbleib', key: 'verbleib', label: 'Verbleib erfassen' };
+    const bearbeiten: Kopfaktion = { art: 'bearbeiten', key: 'bearbeiten', label: 'Bearbeiten' };
+    const statuswechsel: Kopfaktion[] = naechsteStatus(p.status).map((s) => ({
+      art: 'status',
+      key: `status:${s}`,
+      label: `→ ${STATUS_META[s].label}`,
+      status: s,
+    }));
+    const stornieren: Kopfaktion = {
+      art: 'stornieren',
+      key: 'stornieren',
+      label: 'Stornieren',
+      danger: true,
+      trennerDavor: true,
+    };
+
+    const primaer = p.aktuelle_sichtung == null ? sichten : verbleib;
+    const uebrig = [primaer === sichten ? verbleib : sichten, bearbeiten, ...statuswechsel, stornieren];
+    return { primaer, weitere: uebrig };
+  })();
+
+  const laeuftStatus =
+    statusMutation.isPending &&
+    statusMutation.variables?.einsatzId === einsatzId &&
+    statusMutation.variables.personId === p.id;
+
   return (
     <EinsatzSeite
       breite={flaeche.seiteBreit}
@@ -640,52 +750,51 @@ export default function PersonenDetailPage() {
         />
       }
       aktionen={
-        <Space>
-          {darfSchreiben && !p.storniert_at && !editSitzung && (
-            <Space wrap>
-              {naechsteStatus(p.status).map((s) => (
+        /**
+         * EINE Primäraktion, alles Weitere im Menü (LFH-340 · C5, Befund M37).
+         *
+         * Vorher standen hier bis zu sieben gleichrangige Knöpfe — vier Statuswechsel,
+         * Bearbeiten, Stornieren und ein „Zurück zur Liste" neben dem Breadcrumb — und
+         * KEINE Primäraktion: nichts sagte, was an dieser Person zu tun ist.
+         *
+         * „Zurück zur Liste" ist ersatzlos entfallen: der Breadcrumb darüber trägt denselben
+         * Weg, und `zurueck` bleibt der Rücksprung nach dem Stornieren.
+         */
+        aktionenPlan && (
+          <Space>
+            {/* Kein `loading` hier: die Primäraktion öffnet in jeder ihrer drei Gestalten
+                nur einen Dialog — sie hat keinen Lauf, auf den man warten könnte. Der
+                laufende Statuswechsel sitzt im Menü und zeigt sich am Auslöser. */}
+            <Button type="primary" onClick={() => fuehreKopfaktionAus(aktionenPlan.primaer)}>
+              {aktionenPlan.primaer.label}
+            </Button>
+            {aktionenPlan.weitere.length > 0 && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  autoFocus: true,
+                  items: menueEintraege(aktionenPlan.weitere),
+                  // Die Zuordnung hängt am MENÜ, nicht an jedem Eintrag: so gibt es genau
+                  // eine Stelle, an der ein Riegel sitzen könnte, und die Einträge bleiben
+                  // reine Beschreibung.
+                  onClick: ({ key }) => {
+                    const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
+                    if (eintrag) fuehreKopfaktionAus(eintrag);
+                  },
+                }}
+              >
                 <Button
-                  key={s}
-                  loading={
-                    statusMutation.isPending &&
-                    statusMutation.variables?.einsatzId === einsatzId &&
-                    statusMutation.variables.personId === p.id &&
-                    statusMutation.variables.status === s
-                  }
-                  disabled={
-                    statusMutation.isPending &&
-                    statusMutation.variables?.einsatzId === einsatzId &&
-                    statusMutation.variables.personId === p.id
-                  }
-                  onClick={() => statusMutation.mutate({ einsatzId, personId: p.id, status: s })}
-                >
-                  → {STATUS_META[s].label}
-                </Button>
-              ))}
-              <Button onClick={() => {
-                const werte: PersonEingabe = {
-                  name: p.name,
-                  vorname: p.vorname,
-                  geschlecht: p.geschlecht,
-                  geburtsdatum: p.geburtsdatum,
-                  alter_geschaetzt: p.alter_geschaetzt,
-                  herkunft_adresse: p.herkunft_adresse,
-                  antreff_ort: p.antreff_ort,
-                  melder_kontakt: p.melder_kontakt,
-                  notiz: p.notiz,
-                };
-                // Formularwerte und CAS-Basis stammen zwingend aus demselben Snapshot.
-                // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
-                setEditSitzung({ basis: p.geaendert_at, werte });
-                editForm.setFieldsValue(werte);
-              }}>Bearbeiten</Button>
-              <Popconfirm title="Person stornieren (Soft-Delete)?" onConfirm={() => stornoMutation.mutate(p.id)}>
-                <Button danger>Stornieren</Button>
-              </Popconfirm>
-            </Space>
-          )}
-          <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
-        </Space>
+                  type="text"
+                  loading={laeuftStatus}
+                  icon={<MoreOutlined />}
+                  // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs (Zeilen,
+                  // Karten) lieferten n gleichnamige Knöpfe kein Ziel mehr.
+                  aria-label={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
+                />
+              </Dropdown>
+            )}
+          </Space>
+        )
       }
     >
       <Row gutter={24}>
@@ -697,6 +806,34 @@ export default function PersonenDetailPage() {
           {medSpalte(p)}
         </Col>
       </Row>
+
+      <Modal
+        open={statusDialog !== null}
+        title={statusDialog ? `Status auf „${STATUS_META[statusDialog].label}" setzen?` : ''}
+        okText="Status setzen"
+        okButtonProps={{ danger: true }}
+        confirmLoading={laeuftStatus}
+        onOk={() => {
+          if (statusDialog) statusMutation.mutate({ einsatzId, personId: p.id, status: statusDialog });
+          setStatusDialog(null);
+        }}
+        onCancel={() => setStatusDialog(null)}
+      >
+        Dieser Schritt erzeugt einen Eintrag im Einsatztagebuch und wird nicht beiläufig
+        zurückgenommen.
+      </Modal>
+
+      <Modal
+        open={stornoOffen}
+        title="Person stornieren (Soft-Delete)?"
+        okText="Stornieren"
+        okButtonProps={{ danger: true }}
+        confirmLoading={stornoMutation.isPending}
+        onOk={() => { stornoMutation.mutate(p.id); setStornoOffen(false); }}
+        onCancel={() => setStornoOffen(false)}
+      >
+        Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
+      </Modal>
 
       <Modal
         open={reSichtenOffen}

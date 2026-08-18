@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -116,6 +116,139 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   });
 });
 
+/**
+ * Kopfleiste (LFH-340 · C5, Befund M37).
+ *
+ * Der Kopf trug sieben gleichrangige Knöpfe — bis zu vier Statuswechsel, Bearbeiten,
+ * Stornieren und ein „Zurück zur Liste" neben dem Breadcrumb — und **keine** Primäraktion.
+ * Es gab also nichts, was sagte, was hier zu tun ist.
+ */
+/**
+ * Das Menü der Kopfleiste öffnen und den Eintragsknoten des GEÖFFNETEN Portals liefern.
+ *
+ * `.ant-dropdown:not(.ant-dropdown-hidden)` ist Pflicht, nicht Zierde: antd lässt die
+ * Portale geschlossener Dropdowns im Baum stehen, ein blankes `[role="menu"]` fände also
+ * auch abgeräumte Menüs.
+ */
+async function oeffneKopfmenue(): Promise<HTMLElement> {
+  await userEvent.click(await screen.findByRole('button', { name: /Weitere Aktionen/ }));
+  const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  expect(menue).not.toBeNull();
+  return menue as HTMLElement;
+}
+
+/** Eine Aktion aus dem Kopfmenü auslösen (Teilstring, wie bei antd-Icons im Eintrag nötig). */
+async function ausMenue(name: RegExp) {
+  const menue = await oeffneKopfmenue();
+  await userEvent.click(within(menue).getByRole('menuitem', { name }));
+}
+
+describe('PersonenDetailPage — Kopfleiste', () => {
+  /**
+   * Die Primärknöpfe IM KOPF — über die Marke des Primitivs eingegrenzt, nicht global
+   * gezählt. Global wäre die Aussage falsch: der Verlauf trägt ein Notiz-Formular, dessen
+   * Absende-Knopf zu Recht primär ist und mit der Kopfleiste nichts zu tun hat.
+   */
+  function kopfPrimaeraktionen(): HTMLElement[] {
+    const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]');
+    if (!kopf) return [];
+    return [...kopf.querySelectorAll('button')].filter((b) =>
+      [...b.classList].some((k) => k.endsWith('-btn-primary')),
+    );
+  }
+
+  it('trägt genau eine Primäraktion, und sie hängt am Zustand: ungesichtet → „Sichten"', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const primaer = kopfPrimaeraktionen();
+    expect(primaer).toHaveLength(1);
+    expect(primaer[0]).toHaveAccessibleName('Sichten');
+  });
+
+  it('… und bei einer gesichteten Person ist es „Verbleib erfassen"', async () => {
+    const patient = { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk2' } as PersonDetail;
+    render(einsatzAktiv, patient);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const primaer = kopfPrimaeraktionen();
+    expect(primaer).toHaveLength(1);
+    expect(primaer[0]).toHaveAccessibleName('Verbleib erfassen');
+  });
+
+  it('bündelt die Statuswechsel im Menü und lässt „Zurück zur Liste" weg', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    // Der Breadcrumb trägt den Rückweg — ein zweiter Knopf daneben ist eine Aktion ohne Anlass.
+    expect(screen.queryByRole('button', { name: 'Zurück zur Liste' })).not.toBeInTheDocument();
+    /**
+     * Die belastbare Negativaussage ist „KEIN direkter Knopf", nicht „kein Eintrag":
+     * rc-dropdown mountet sein Portal lazy, ein `queryByRole('menuitem')` vor dem ersten
+     * Öffnen ist immer `null` und färbte einen reinen Rollentausch trivial grün.
+     */
+    expect(screen.queryByRole('button', { name: '→ vermisst' })).not.toBeInTheDocument();
+    const menue = await oeffneKopfmenue();
+    expect(within(menue).getByRole('menuitem', { name: /vermisst/ })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: /Stornieren/ })).toBeInTheDocument();
+  });
+
+  /**
+   * Der Abstand zwischen „Rot" und dem Rest (LFH-363). `aktionsabstand.guard.test.ts` kann
+   * das hier NICHT prüfen: sein Scanner matcht `<Button` mit `danger` im Tag und sieht einen
+   * `danger`-MENÜEINTRAG nicht. Die Datei gehört deshalb in keine seiner beiden Listen —
+   * geprüft wird stattdessen genau hier, dass das Löschen hinter einem Trenner steht.
+   */
+  it('trennt „Stornieren" durch einen Menü-Trenner vom Rest', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const menue = await oeffneKopfmenue();
+    expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
+    const eintraege = [...menue.querySelectorAll('[role="menuitem"], .ant-dropdown-menu-item-divider')];
+    const trenner = eintraege.findIndex((e) => e.classList.contains('ant-dropdown-menu-item-divider'));
+    const storno = eintraege.findIndex((e) => (e.textContent ?? '').includes('Stornieren'));
+    expect(trenner).toBeGreaterThan(-1);
+    expect(storno).toBeGreaterThan(trenner);
+  });
+
+  it('ein umkehrbarer Statuswechsel läuft ohne Rückfrage', async () => {
+    let gerufen: { status?: string } = {};
+    render(einsatzAktiv, detail, [
+      http.post('/api/einsaetze/1/personen/10/status', async ({ request }) => {
+        gerufen = (await request.json()) as { status?: string };
+        return HttpResponse.json({ ...detail, status: 'vermisst' });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const menue = await oeffneKopfmenue();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /vermisst/ }));
+    await vi.waitFor(() => expect(gerufen.status).toBe('vermisst'));
+  });
+
+  it('„verstorben" fragt über einen Dialog zurück, nicht über ein Popconfirm', async () => {
+    let gerufen: { status?: string } = {};
+    render(einsatzAktiv, detail, [
+      http.post('/api/einsaetze/1/personen/10/status', async ({ request }) => {
+        gerufen = (await request.json()) as { status?: string };
+        return HttpResponse.json({ ...detail, status: 'verstorben' });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const menue = await oeffneKopfmenue();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /verstorben/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/verstorben/i);
+    // Die tragende Hälfte: bis zur Bestätigung ist NICHTS passiert.
+    expect(gerufen.status).toBeUndefined();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Status setzen' }));
+    await vi.waitFor(() => expect(gerufen.status).toBe('verstorben'));
+  });
+
+  it('ohne Schreibrecht steht weder Primäraktion noch Auslöser', async () => {
+    render(einsatzBeobachter, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByRole('button', { name: /Weitere Aktionen/ })).not.toBeInTheDocument();
+    expect(kopfPrimaeraktionen()).toHaveLength(0);
+  });
+});
+
 describe('PersonenDetailPage — med. Verlauf', () => {
   it('Re-Sichten ruft erfasseSichtung mit SK II', async () => {
     let gerufen: { kategorie?: string } = {};
@@ -126,7 +259,9 @@ describe('PersonenDetailPage — med. Verlauf', () => {
           notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }, { status: 201 });
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Re-Sichten' }));
+    // Seit LFH-340 · C5 ist das die PRIMÄRAKTION des Kopfes, und sie heißt bei einer
+    // ungesichteten Person „Sichten" — „Re-Sichten" wäre für die erste Sichtung falsch.
+    await userEvent.click(await screen.findByRole('button', { name: 'Sichten' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
     await userEvent.click(await screen.findByText('SK II'));
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
@@ -193,7 +328,8 @@ describe('PersonenDetailPage — Stammdaten', () => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [mitVerlauf, anderePerson]);
     });
 
-    await userEvent.click(screen.getByRole('button', { name: /→ vermisst/ }));
+    // Statuswechsel liegen seit LFH-340 · C5 im Kopfmenü, nicht als eigener Knopf.
+    await ausMenue(/vermisst/);
     await vi.waitFor(() => {
       const optimistisch = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
       expect(optimistisch?.status).toBe('vermisst');
@@ -258,7 +394,8 @@ describe('PersonenDetailPage — Stammdaten', () => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [detail]);
     });
 
-    await userEvent.click(screen.getByRole('button', { name: /→ vermisst/ }));
+    // Statuswechsel liegen seit LFH-340 · C5 im Kopfmenü, nicht als eigener Knopf.
+    await ausMenue(/vermisst/);
     await vi.waitFor(() => {
       expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))?.status).toBe('vermisst');
     });
@@ -312,7 +449,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await ausMenue(/Bearbeiten/);
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(gesendet).toBe(true));
   });
@@ -328,7 +465,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(client.getQueryCache().find({ queryKey: einsatzKeys.person(1, 10) })?.options.retry).toBe(false);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await ausMenue(/Bearbeiten/);
     const name = screen.getByDisplayValue('Mustermann');
     await userEvent.clear(name);
     await userEvent.type(name, 'Lokaler Name');
@@ -360,7 +497,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await ausMenue(/Bearbeiten/);
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
