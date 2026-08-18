@@ -149,7 +149,11 @@ async function warteBisDialogWeg() {
       fireEvent.transitionEnd(modal);
       fireEvent.animationEnd(modal);
     }
-    expect(screen.queryByLabelText('Ort')).not.toBeInTheDocument();
+    // ÜBER DIE ROLLE, nicht über `queryByLabelText('Ort')` (LFH-340 · C5): seit die Liste
+    // über `Datensicht` läuft, trägt auch die Spalte „Ort" diesen zugänglichen Namen — der
+    // Kopfzellen-Knoten stünde dann für immer im Dokument und die Warteschleife liefe in
+    // den Timeout, obwohl der Dialog längst zu ist. Ein `<th>` ist keine `textbox`.
+    expect(screen.queryByRole('textbox', { name: 'Ort' })).not.toBeInTheDocument();
   });
 }
 
@@ -163,6 +167,51 @@ async function fuelleSchaden(dialog: HTMLElement, typ: string, ausmass: string, 
 }
 
 describe('SchaedenPage', () => {
+  /**
+   * LFH-340 · C5. Die Schadensseite war die einzige der drei Betroffenen-Listen, die den
+   * Seitenrahmen von Hand baute (eigenes `padding: 16` auf die 24 px des Layouts,
+   * `Title level={4}` ohne Breadcrumb, ohne Einsatz-Status, ohne Schreibrecht-Hinweis).
+   * Geprüft wird deshalb nicht „ein Kopf ist da", sondern dass er aus `EinsatzSeite` kommt:
+   * Breadcrumb UND Status-Tag UND die Abwesenheit eines zweiten Überschriftenknotens.
+   */
+  it('trägt den gemeinsamen Modulkopf: Breadcrumb, Einsatz-Status, eine Überschrift', async () => {
+    render(einsatzAktiv, [basisSchaden()]);
+    expect(await screen.findByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 4, name: /Schäden/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading')).toHaveLength(1);
+    expect(screen.getByText('aktiv')).toBeInTheDocument();
+  });
+
+  it('weist Beobachter im Kopf auf die fehlende Schreibberechtigung hin', async () => {
+    render({ ...einsatzBeobachter, status: 'abgeschlossen' }, [basisSchaden()]);
+    expect(await screen.findByText(/nur Ansicht/)).toBeInTheDocument();
+  });
+
+  /**
+   * Die Liste läuft über `Datensicht` statt über eine handgebaute `KatalogTabelle`. Beleg
+   * sind die drei Dinge, die das Primitiv mitbringt und der Handbau nicht hatte: die
+   * „seit"-Spalte, das Suchfeld und der Spaltenschalter.
+   */
+  it('rendert die Liste über das Datensicht-Primitiv mit „seit"-Spalte und Suche', async () => {
+    render(einsatzAktiv, [basisSchaden()]);
+    expect(await screen.findByRole('columnheader', { name: /seit/ })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('S-Nr., Ort, Beschreibung')).toBeInTheDocument();
+    const werkzeuge = document.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
+    expect(within(werkzeuge).getByRole('button', { name: /^Spalten/ })).toBeInTheDocument();
+  });
+
+  it('sucht über Registriernummer, Ort und Beschreibung', async () => {
+    render(einsatzAktiv, [
+      basisSchaden({ id: 10, registrier_nr: 1, ort: 'Hauptstr. 17', beschreibung: 'Dachziegel' }),
+      basisSchaden({ id: 11, registrier_nr: 2, ort: 'Bahnweg 3', beschreibung: 'Ölspur' }),
+    ]);
+    await screen.findByText('S-001');
+    await userEvent.type(screen.getByPlaceholderText('S-Nr., Ort, Beschreibung'), 'Ölspur');
+    expect(await screen.findByText('S-002')).toBeInTheDocument();
+    // Die Gegenhälfte: ohne sie wäre der Fall auch grün, wenn die Suche gar nichts filterte.
+    expect(screen.queryByText('S-001')).not.toBeInTheDocument();
+  });
+
   it('zeigt offene Schäden mit S-Nummer, Typ und Ausmaß', async () => {
     render(einsatzAktiv, [
       basisSchaden(),
@@ -253,7 +302,9 @@ describe('SchaedenPage', () => {
     // Der Datensatz ist angekommen (Zähler der Hülle) …
     expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
     // … der Dialog steht weiter offen, und der Ort hat das Speichern überlebt (Wertübernahme).
-    expect(screen.getByLabelText('Ort')).toHaveValue('Hauptstr. 17');
+    // Über die Rolle: „Ort" ist seit dem Umbau auf `Datensicht` auch ein Spaltenkopf,
+    // `getByLabelText` fände zwei Knoten (dieselbe Kollision wie in `warteBisDialogWeg`).
+    expect(screen.getByRole('textbox', { name: 'Ort' })).toHaveValue('Hauptstr. 17');
   });
 
   /**

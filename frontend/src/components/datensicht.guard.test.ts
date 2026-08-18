@@ -254,6 +254,10 @@ const KONSUMENTEN = [
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
+  // Zehnter seit LFH-340 · C5: die Schadensliste war die letzte der drei Betroffenen-Listen
+  // auf einer handgebauten `KatalogTabelle` — ohne Karten-Fallback, ohne Zeitachse, ohne
+  // Sortierung, und mit drei eigenen Filterelementen über der Tabelle.
+  '/src/pages/SchaedenPage.tsx',
   '/src/pages/TierePage.tsx',
   '/src/pages/uhs/BewegungenTab.tsx',
 ];
@@ -808,7 +812,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('der Scan sieht genau die neun geplanten Konsumenten', () => {
+  it('der Scan sieht genau die zehn geplanten Konsumenten', () => {
     /**
      * Die Gleichheit prüft BEIDE Richtungen: eine Datei, die still aus dem Primitiv
      * herausfällt, verschwindet aus dem Scan und bleibt in {@link KONSUMENTEN} stehen; eine

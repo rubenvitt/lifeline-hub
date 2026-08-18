@@ -884,6 +884,27 @@ describe('Datensicht · Kartenzweig', () => {
 });
 
 describe('Datensicht · Tabellenzweig', () => {
+  /**
+   * LFH-340 · C5. Der Titel-Link und `onZeileKlick` liegen übereinander: ein Klick auf den
+   * Anker löste beide aus. Die Paarung ist Absicht — der erste Fall allein wäre auch grün,
+   * wenn `onZeileKlick` gar nicht mehr feuerte.
+   */
+  it('ein Klick auf einen Link in der Zeile löst NICHT zusätzlich onZeileKlick aus', async () => {
+    const zeileGeklickt = vi.fn();
+    rendere({ onZeileKlick: zeileGeklickt });
+    await userEvent.click(screen.getByRole('link', { name: 'Florian 1' }));
+    expect(zeileGeklickt).not.toHaveBeenCalled();
+  });
+
+  it('ein Klick daneben löst onZeileKlick weiterhin aus', async () => {
+    const zeileGeklickt = vi.fn();
+    const { container } = rendere({ onZeileKlick: zeileGeklickt });
+    // Die Typ-Zelle trägt keinen Anker — dort ist die Zeile das Ziel.
+    const zellen = container.querySelectorAll('tr.ant-table-row td.ant-table-cell');
+    await userEvent.click(zellen[1] as HTMLElement);
+    expect(zeileGeklickt).toHaveBeenCalledTimes(1);
+  });
+
   it('rendert durch KatalogTabelle: Scrollcontainer, stehende Kopfzeile, fixierte Kennung', () => {
     const { container } = rendere();
     expect(container.querySelector('.ant-table-sticky-holder')).not.toBeNull();

@@ -1239,7 +1239,36 @@ export default function Datensicht<T extends object, const K extends string>(
       // Werkzeugzeile oben, und eine Seitenblätterung schnitte die Zeilenschleuse entzwei.
       pagination={false}
       rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
-      onRow={onZeileKlick ? (zeile) => ({ onClick: () => onZeileKlick(zeile) }) : undefined}
+      /**
+       * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340 · C5, gemessen an der Schadensliste).
+       *
+       * Eine Zeile trägt regelmäßig echte `<a>`: den Titel-Link, den das Primitiv aus
+       * `karte.titel.ziel` selbst setzt, und Deeplinks aus einem Spalten-`render` (die
+       * Geschädigt-Spalte der Schäden zeigt auf Personen- und Personal-Seiten). Ohne
+       * diesen Riegel feuern bei EINEM Klick beide Wege: der Link navigiert auf sein
+       * Ziel, und `onZeileKlick` schickt dieselbe Zeile auf ihre Detailseite. Bei
+       * gleichem Ziel bleibt das unbemerkt, bei verschiedenem gewinnt der zweite.
+       *
+       * Am sichtbarsten wird es beim MODIFIER-Klick: Cmd/Strg+Klick öffnet den neuen Tab
+       * (der Browser bedient das, `defaultPrevented` bleibt false) — und die aktuelle
+       * Seite navigiert trotzdem weg. Genau das hat der Bestandstest der Schadensliste
+       * gemessen, als sie noch eine handgebaute Tabelle mit `stopPropagation` am Link war.
+       *
+       * Der Riegel sitzt hier statt an jedem Link: ein `stopPropagation` je Anker müsste
+       * jede Konsumentendatei mitbringen, und die Regel „trägt `titel.ziel` einen Wert,
+       * darf das `render` keinen Anker erzeugen" verbietet dem Konsumenten gerade, den
+       * Titel-Link selbst zu bauen — er kann dort also gar nichts stoppen.
+       */
+      onRow={
+        onZeileKlick
+          ? (zeile) => ({
+              onClick: (event) => {
+                if ((event.target as HTMLElement).closest('a')) return;
+                onZeileKlick(zeile);
+              },
+            })
+          : undefined
+      }
       /**
        * In dieser Sicht ist Sortieren der EINZIGE Auslöser: die Tabelle bekommt von hier
        * weder Blätterung noch Spaltenfilter. Deshalb darf `onChange` die Sortierung auch

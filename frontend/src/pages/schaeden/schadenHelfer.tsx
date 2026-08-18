@@ -51,23 +51,17 @@ export function pad3(nr: number): string {
   return String(nr).padStart(3, '0');
 }
 
-/** Reine Filterkette der Schäden-Liste: Sicht (Status oder „alle"), Typ, Ausmaß und
- *  Freitextsuche über Ort/Beschreibung. Testbar ohne Rendern (SchaedenPage verdrahtet die
- *  UI-Filter-States hierher). */
+/** Reiterachse der Schäden-Liste: Status oder „alle".
+ *
+ *  SEIT LFH-340 · C5 nur noch das. Typ, Ausmaß und Freitextsuche lagen bis dahin ebenfalls
+ *  hier und wurden aus drei Bedienelementen über der Tabelle gespeist; sie sind in das
+ *  `Datensicht`-Primitiv gewandert (Spaltenfilter bzw. `suche`), das beides mitbringt.
+ *  Zwei Filterketten übereinander wären eine, die niemand mehr überblickt. */
 export function filterSchaeden(
   alle: Schaden[],
-  opts: { sicht: SchadenStatus | 'alle'; typ?: SchadenTyp; ausmass?: Ausmass; suche: string },
+  opts: { sicht: SchadenStatus | 'alle' },
 ): Schaden[] {
-  const { sicht, typ, ausmass, suche } = opts;
-  return alle
-    .filter((s) => sicht === 'alle' || s.status === sicht)
-    .filter((s) => !typ || s.typ === typ)
-    .filter((s) => !ausmass || s.ausmass === ausmass)
-    .filter((s) => {
-      if (!suche.trim()) return true;
-      const q = suche.toLowerCase();
-      return s.ort.toLowerCase().includes(q) || s.beschreibung.toLowerCase().includes(q);
-    });
+  return alle.filter((s) => opts.sicht === 'alle' || s.status === opts.sicht);
 }
 
 /** Kompakte Geschädigt-Anzeige inkl. Deeplinks (Person→Detailseite, Einsatzkraft→Personal-Liste). */
