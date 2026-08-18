@@ -141,6 +141,21 @@ export function personenPfad(
   });
 }
 
+/**
+ * Vollseiten-Aufnahme für Personen (LFH-340 · C5).
+ *
+ * Eine eigene Route, obwohl die Schnellerfassung dieselben Felder im Dialog zeigt: sie ist
+ * die ANSPRING-Adresse für andere Module — die UHS-Kopfzeile (C6) schickt von dort in die
+ * Aufnahme, und ein Modal hat keine Adresse. Beide Wege tragen dasselbe Bauteil
+ * (`personen/AufnahmeFelder`), es gibt also nur eine Maske.
+ *
+ * Statisches Segment vor `personen/:personId` — React Router rankt statisch über dynamisch,
+ * die Reihenfolge in `App.tsx` entscheidet also nicht, aber ein Leser muss das nicht prüfen.
+ */
+export function personenAufnahmePfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'personen')}/aufnahme`;
+}
+
 export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'schaeden'), {
     neu: opts.neu ? 1 : undefined,

@@ -14,6 +14,7 @@ import {
   tiereDetailPfad,
   schadenDetailPfad,
   tierePfad,
+  personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
   etbPfad,
@@ -117,6 +118,14 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('personenPfad mit ?neu=1', () => {
     expect(personenPfad(E, { neu: true })).toBe('/einsaetze/5/personen?neu=1');
+  });
+  it('personenAufnahmePfad zeigt auf die Vollseiten-Aufnahme', () => {
+    expect(personenAufnahmePfad(E)).toBe('/einsaetze/5/personen/aufnahme');
+  });
+  it('personenAufnahmePfad ist KEIN Detail-Pfad — die Segmente dürfen nicht kollidieren', () => {
+    // Beide Routen liegen unter `personen/`; ein Detail-Pfad mit numerischer Id und die
+    // Aufnahme mit ihrem statischen Segment müssen unterscheidbar bleiben.
+    expect(personenAufnahmePfad(E)).not.toBe(personDetailPfad(E, 1));
   });
   it('schaedenPfad ohne Optionen', () => {
     expect(schaedenPfad(E)).toBe('/einsaetze/5/schaeden');
