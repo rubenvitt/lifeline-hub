@@ -31,6 +31,7 @@ import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
 import SchaedenDetailPage from './pages/SchaedenDetailPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
+import AufnahmePage from './pages/personen/AufnahmePage';
 import LageberichtePage from './pages/LageberichtePage';
 import LageberichtDetailPage from './pages/LageberichtDetailPage';
 import BefehlDetailPage from './pages/BefehlDetailPage';
@@ -173,6 +174,10 @@ export default function App() {
             <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
             <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
             <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
+            {/* Statisches Segment VOR der dynamischen Detail-Route. React Router rankt
+                statisch ohnehin höher — die Reihenfolge steht so da, damit ein Leser das
+                nicht prüfen muss (LFH-340 · C5). */}
+            <Route path="personen/aufnahme" element={<AufnahmePage />} />
             <Route path="personen/:personId" element={<PersonenDetailPage />} />
             <Route path="tiere/:tierId" element={<TiereDetailPage />} />
             <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />

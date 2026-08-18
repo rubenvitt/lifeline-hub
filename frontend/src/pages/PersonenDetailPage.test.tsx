@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -111,8 +111,220 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden])),
     ]);
+    await klappeZuordnungenAuf();
     const link = await screen.findByRole('link', { name: /sachschaden/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/99');
+  });
+});
+
+/**
+ * Ladehoheit (LFH-340 · C5, Befund M40).
+ *
+ * Die Seite setzte beim Öffnen sechs Abfragen ab — Einsatz, Detail, zugeordnete Tiere,
+ * zugeordnete Schäden, UHS-Liste und Zugriffs-Audit —, um eine nachgetragene Sichtung zu
+ * ermöglichen. Fünf davon speisen Blöcke, die erst nach dem Aufklappen etwas anzeigen.
+ */
+describe('PersonenDetailPage — Ladehoheit', () => {
+  /** Pfade der abgesetzten Einsatz-Abfragen, in Reihenfolge. `/auth/me` zählt nicht mit. */
+  function zaehleAbfragen(): { pfade: string[]; loesen: () => void } {
+    const pfade: string[] = [];
+    const horcher = ({ request }: { request: Request }) => {
+      const pfad = new URL(request.url).pathname;
+      if (pfad.startsWith('/api/einsaetze/')) pfade.push(pfad);
+    };
+    server.events.on('request:start', horcher);
+    return { pfade, loesen: () => server.events.removeListener('request:start', horcher) };
+  }
+
+  it('setzt beim Öffnen höchstens zwei Abfragen ab', async () => {
+    const { pfade, loesen } = zaehleAbfragen();
+    try {
+      render(einsatzAktiv, detail);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      expect(pfade).toEqual(['/api/einsaetze/1', '/api/einsaetze/1/personen/10']);
+    } finally {
+      loesen();
+    }
+  });
+
+  /**
+   * Die zweite Hälfte, und ohne sie belegte die erste nichts: „höchstens zwei" wäre auch
+   * grün, wenn die Zuordnungen gar nicht mehr lüden.
+   */
+  it('lädt die Zuordnungen erst beim Aufklappen', async () => {
+    const { pfade, loesen } = zaehleAbfragen();
+    try {
+      render(einsatzAktiv, detail);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      expect(screen.queryByText('Zugeordnete Tiere')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: /Zuordnungen/ }));
+      expect(await screen.findByText('Zugeordnete Tiere')).toBeInTheDocument();
+      await vi.waitFor(() => {
+        expect(pfade).toContain('/api/einsaetze/1/tiere');
+        expect(pfade).toContain('/api/einsaetze/1/schaeden');
+        expect(pfade).toContain('/api/einsaetze/1/uhs');
+      });
+    } finally {
+      loesen();
+    }
+  });
+
+  it('lädt das Zugriffs-Audit erst beim Aufklappen', async () => {
+    const { pfade, loesen } = zaehleAbfragen();
+    try {
+      render(einsatzAktiv, detail);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      expect(pfade).not.toContain('/api/einsaetze/1/personen/10/audit');
+
+      await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
+      await vi.waitFor(() => expect(pfade).toContain('/api/einsaetze/1/personen/10/audit'));
+    } finally {
+      loesen();
+    }
+  });
+});
+
+/**
+ * Kopfleiste (LFH-340 · C5, Befund M37).
+ *
+ * Der Kopf trug sieben gleichrangige Knöpfe — bis zu vier Statuswechsel, Bearbeiten,
+ * Stornieren und ein „Zurück zur Liste" neben dem Breadcrumb — und **keine** Primäraktion.
+ * Es gab also nichts, was sagte, was hier zu tun ist.
+ */
+/**
+ * Das Menü der Kopfleiste öffnen und den Eintragsknoten des GEÖFFNETEN Portals liefern.
+ *
+ * `.ant-dropdown:not(.ant-dropdown-hidden)` ist Pflicht, nicht Zierde: antd lässt die
+ * Portale geschlossener Dropdowns im Baum stehen, ein blankes `[role="menu"]` fände also
+ * auch abgeräumte Menüs.
+ */
+async function oeffneKopfmenue(): Promise<HTMLElement> {
+  await userEvent.click(await screen.findByRole('button', { name: /Weitere Aktionen/ }));
+  const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  expect(menue).not.toBeNull();
+  return menue as HTMLElement;
+}
+
+/** Eine Aktion aus dem Kopfmenü auslösen (Teilstring, wie bei antd-Icons im Eintrag nötig). */
+async function ausMenue(name: RegExp) {
+  const menue = await oeffneKopfmenue();
+  await userEvent.click(within(menue).getByRole('menuitem', { name }));
+}
+
+/**
+ * Den Zuordnungs-Abschnitt aufklappen. Seit LFH-340 · C5 (Befund M40) liegen Tiere, Schäden
+ * und UHS-Verortung eingeklappt und laden erst dann — jeder Test, der einen dieser Blöcke
+ * greift, muss ihn vorher öffnen. Ohne `forceRender` sind sie vorher gar nicht im Baum.
+ */
+async function klappeZuordnungenAuf() {
+  await screen.findByRole('heading', { name: /Person R-001/ });
+  await userEvent.click(screen.getByRole('button', { name: /Zuordnungen/ }));
+}
+
+describe('PersonenDetailPage — Kopfleiste', () => {
+  /**
+   * Die Primärknöpfe IM KOPF — über die Marke des Primitivs eingegrenzt, nicht global
+   * gezählt. Global wäre die Aussage falsch: der Verlauf trägt ein Notiz-Formular, dessen
+   * Absende-Knopf zu Recht primär ist und mit der Kopfleiste nichts zu tun hat.
+   */
+  function kopfPrimaeraktionen(): HTMLElement[] {
+    const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]');
+    if (!kopf) return [];
+    return [...kopf.querySelectorAll('button')].filter((b) =>
+      [...b.classList].some((k) => k.endsWith('-btn-primary')),
+    );
+  }
+
+  it('trägt genau eine Primäraktion, und sie hängt am Zustand: ungesichtet → „Sichten"', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const primaer = kopfPrimaeraktionen();
+    expect(primaer).toHaveLength(1);
+    expect(primaer[0]).toHaveAccessibleName('Sichten');
+  });
+
+  it('… und bei einer gesichteten Person ist es „Verbleib erfassen"', async () => {
+    const patient = { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk2' } as PersonDetail;
+    render(einsatzAktiv, patient);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const primaer = kopfPrimaeraktionen();
+    expect(primaer).toHaveLength(1);
+    expect(primaer[0]).toHaveAccessibleName('Verbleib erfassen');
+  });
+
+  it('bündelt die Statuswechsel im Menü und lässt „Zurück zur Liste" weg', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    // Der Breadcrumb trägt den Rückweg — ein zweiter Knopf daneben ist eine Aktion ohne Anlass.
+    expect(screen.queryByRole('button', { name: 'Zurück zur Liste' })).not.toBeInTheDocument();
+    /**
+     * Die belastbare Negativaussage ist „KEIN direkter Knopf", nicht „kein Eintrag":
+     * rc-dropdown mountet sein Portal lazy, ein `queryByRole('menuitem')` vor dem ersten
+     * Öffnen ist immer `null` und färbte einen reinen Rollentausch trivial grün.
+     */
+    expect(screen.queryByRole('button', { name: '→ vermisst' })).not.toBeInTheDocument();
+    const menue = await oeffneKopfmenue();
+    expect(within(menue).getByRole('menuitem', { name: /vermisst/ })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: /Stornieren/ })).toBeInTheDocument();
+  });
+
+  /**
+   * Der Abstand zwischen „Rot" und dem Rest (LFH-363). `aktionsabstand.guard.test.ts` kann
+   * das hier NICHT prüfen: sein Scanner matcht `<Button` mit `danger` im Tag und sieht einen
+   * `danger`-MENÜEINTRAG nicht. Die Datei gehört deshalb in keine seiner beiden Listen —
+   * geprüft wird stattdessen genau hier, dass das Löschen hinter einem Trenner steht.
+   */
+  it('trennt „Stornieren" durch einen Menü-Trenner vom Rest', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const menue = await oeffneKopfmenue();
+    expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
+    const eintraege = [...menue.querySelectorAll('[role="menuitem"], .ant-dropdown-menu-item-divider')];
+    const trenner = eintraege.findIndex((e) => e.classList.contains('ant-dropdown-menu-item-divider'));
+    const storno = eintraege.findIndex((e) => (e.textContent ?? '').includes('Stornieren'));
+    expect(trenner).toBeGreaterThan(-1);
+    expect(storno).toBeGreaterThan(trenner);
+  });
+
+  it('ein umkehrbarer Statuswechsel läuft ohne Rückfrage', async () => {
+    let gerufen: { status?: string } = {};
+    render(einsatzAktiv, detail, [
+      http.post('/api/einsaetze/1/personen/10/status', async ({ request }) => {
+        gerufen = (await request.json()) as { status?: string };
+        return HttpResponse.json({ ...detail, status: 'vermisst' });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const menue = await oeffneKopfmenue();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /vermisst/ }));
+    await vi.waitFor(() => expect(gerufen.status).toBe('vermisst'));
+  });
+
+  it('„verstorben" fragt über einen Dialog zurück, nicht über ein Popconfirm', async () => {
+    let gerufen: { status?: string } = {};
+    render(einsatzAktiv, detail, [
+      http.post('/api/einsaetze/1/personen/10/status', async ({ request }) => {
+        gerufen = (await request.json()) as { status?: string };
+        return HttpResponse.json({ ...detail, status: 'verstorben' });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const menue = await oeffneKopfmenue();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /verstorben/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/verstorben/i);
+    // Die tragende Hälfte: bis zur Bestätigung ist NICHTS passiert.
+    expect(gerufen.status).toBeUndefined();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Status setzen' }));
+    await vi.waitFor(() => expect(gerufen.status).toBe('verstorben'));
+  });
+
+  it('ohne Schreibrecht steht weder Primäraktion noch Auslöser', async () => {
+    render(einsatzBeobachter, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByRole('button', { name: /Weitere Aktionen/ })).not.toBeInTheDocument();
+    expect(kopfPrimaeraktionen()).toHaveLength(0);
   });
 });
 
@@ -126,7 +338,9 @@ describe('PersonenDetailPage — med. Verlauf', () => {
           notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }, { status: 201 });
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Re-Sichten' }));
+    // Seit LFH-340 · C5 ist das die PRIMÄRAKTION des Kopfes, und sie heißt bei einer
+    // ungesichteten Person „Sichten" — „Re-Sichten" wäre für die erste Sichtung falsch.
+    await userEvent.click(await screen.findByRole('button', { name: 'Sichten' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
     await userEvent.click(await screen.findByText('SK II'));
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
@@ -193,7 +407,8 @@ describe('PersonenDetailPage — Stammdaten', () => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [mitVerlauf, anderePerson]);
     });
 
-    await userEvent.click(screen.getByRole('button', { name: /→ vermisst/ }));
+    // Statuswechsel liegen seit LFH-340 · C5 im Kopfmenü, nicht als eigener Knopf.
+    await ausMenue(/vermisst/);
     await vi.waitFor(() => {
       const optimistisch = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
       expect(optimistisch?.status).toBe('vermisst');
@@ -258,7 +473,8 @@ describe('PersonenDetailPage — Stammdaten', () => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [detail]);
     });
 
-    await userEvent.click(screen.getByRole('button', { name: /→ vermisst/ }));
+    // Statuswechsel liegen seit LFH-340 · C5 im Kopfmenü, nicht als eigener Knopf.
+    await ausMenue(/vermisst/);
     await vi.waitFor(() => {
       expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))?.status).toBe('vermisst');
     });
@@ -312,7 +528,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await ausMenue(/Bearbeiten/);
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(gesendet).toBe(true));
   });
@@ -328,7 +544,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(client.getQueryCache().find({ queryKey: einsatzKeys.person(1, 10) })?.options.retry).toBe(false);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await ausMenue(/Bearbeiten/);
     const name = screen.getByDisplayValue('Mustermann');
     await userEvent.clear(name);
     await userEvent.type(name, 'Lokaler Name');
@@ -360,7 +576,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await ausMenue(/Bearbeiten/);
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
@@ -426,6 +642,7 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
         return HttpResponse.json([]);
       }),
     ]);
+    await klappeZuordnungenAuf();
     expect(await screen.findByText(/Zugeordnete Tiere/i)).toBeInTheDocument();
     expect(await screen.findByText(/T-007/)).toBeInTheDocument();
     expect(screen.getByText(/Rex/)).toBeInTheDocument();
@@ -452,6 +669,7 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
         return HttpResponse.json([]);
       }),
     ]);
+    await klappeZuordnungenAuf();
     expect(await screen.findByText(/Als Geschädigte bei Schäden/i)).toBeInTheDocument();
     expect(await screen.findByText((t) => t.includes('S-003'))).toBeInTheDocument();
   });
@@ -496,6 +714,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     render(einsatzAktiv, belegt, [
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
     ]);
+    await klappeZuordnungenAuf();
     expect(await screen.findByText('BHP 50')).toBeInTheDocument();
   });
 
@@ -509,6 +728,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
           art: 'eintritt', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
       }),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
     await userEvent.click(await screen.findByText('BHP 50'));
@@ -527,6 +747,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
           art: 'wechsel', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
       }),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'UHS ändern' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
     await userEvent.click(await screen.findByText('PA 1'));
@@ -545,6 +766,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
           art: 'austritt', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
       }),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Austragen' }));
     await vi.waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
   });
@@ -565,6 +787,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
         { id: 7, einsatz_id: 1, bezeichnung: 'BHP geplant', typ: 'behandlungsplatz', status: 'geplant', abschnitt_id: null, standort: null, notiz: null },
       ])),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
     expect(await screen.findByText('BHP 50')).toBeInTheDocument();
@@ -611,6 +834,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json({ ...freiesTier, halter_person_id: 10 });
       }),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Tier zuweisen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
     await userEvent.click(await screen.findByText(/Minka/));
@@ -631,8 +855,9 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json({ ...zugeordnetesTier, halter_person_id: null });
       }),
     ]);
+    await klappeZuordnungenAuf();
     await screen.findByText(/T-007/);
-    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'lösen' }));
     await vi.waitFor(() => expect(patch).toMatchObject({ halter_person_id: null }));
   });
 
@@ -649,6 +874,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json({ ...freierSchaden, geschaedigt_person_id: 10 });
       }),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden zuweisen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
     await userEvent.click(await screen.findByText(/S-009/));
@@ -672,8 +898,9 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json({ ...zugeordneterSchaden, geschaedigt_person_id: null });
       }),
     ]);
+    await klappeZuordnungenAuf();
     await screen.findByText((t) => t.includes('S-003'));
-    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'lösen' }));
     await vi.waitFor(() => expect(patch).toMatchObject({ geschaedigt_person_id: null }));
   });
 
@@ -686,6 +913,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json([freiesTier, { ...zugeordnetesTier, halter_person_id: 99 }]);
       }),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Tier zuweisen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
     expect(await screen.findByText(/Minka/)).toBeInTheDocument();
@@ -704,6 +932,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         ]);
       }),
     ]);
+    await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden zuweisen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
     expect(await screen.findByText(/S-009/)).toBeInTheDocument();

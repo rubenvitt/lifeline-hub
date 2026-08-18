@@ -14,6 +14,8 @@ import {
   tiereDetailPfad,
   schadenDetailPfad,
   tierePfad,
+  parsePlatzierenAuftrag,
+  personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
   etbPfad,
@@ -117,6 +119,38 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('personenPfad mit ?neu=1', () => {
     expect(personenPfad(E, { neu: true })).toBe('/einsaetze/5/personen?neu=1');
+  });
+  it('lagekartePfad mit Platzier-Auftrag', () => {
+    expect(lagekartePfad(E, { platzieren: { typ: 'schaden', id: 7 } }))
+      .toBe('/einsaetze/5/lagekarte?platzieren=schaden:7');
+  });
+  it('parsePlatzierenAuftrag liest den Auftrag zurück', () => {
+    expect(parsePlatzierenAuftrag('schaden:7')).toEqual({ typ: 'schaden', id: 7 });
+    expect(parsePlatzierenAuftrag('uhs:2')).toEqual({ typ: 'uhs', id: 2 });
+  });
+  it('parsePlatzierenAuftrag verwirft Unbrauchbares statt halb zu füllen', () => {
+    // Ein halb gefülltes Objekt schickte die Karte in einen Modus ohne Ziel.
+    expect(parsePlatzierenAuftrag(null)).toBeNull();
+    expect(parsePlatzierenAuftrag('')).toBeNull();
+    expect(parsePlatzierenAuftrag('schaden')).toBeNull();
+    expect(parsePlatzierenAuftrag('schaden:abc')).toBeNull();
+    expect(parsePlatzierenAuftrag('schaden:0')).toBeNull();
+    expect(parsePlatzierenAuftrag('schaden:-1')).toBeNull();
+    expect(parsePlatzierenAuftrag('person:7')).toBeNull();
+  });
+  it('Hin- und Rückweg passen zusammen', () => {
+    // Die belastbare Aussage über das Paar: der Builder erzeugt, was der Parser liest.
+    const pfad = lagekartePfad(E, { platzieren: { typ: 'uhs', id: 12 } });
+    const wert = new URL(pfad, 'http://x').searchParams.get('platzieren');
+    expect(parsePlatzierenAuftrag(wert)).toEqual({ typ: 'uhs', id: 12 });
+  });
+  it('personenAufnahmePfad zeigt auf die Vollseiten-Aufnahme', () => {
+    expect(personenAufnahmePfad(E)).toBe('/einsaetze/5/personen/aufnahme');
+  });
+  it('personenAufnahmePfad ist KEIN Detail-Pfad — die Segmente dürfen nicht kollidieren', () => {
+    // Beide Routen liegen unter `personen/`; ein Detail-Pfad mit numerischer Id und die
+    // Aufnahme mit ihrem statischen Segment müssen unterscheidbar bleiben.
+    expect(personenAufnahmePfad(E)).not.toBe(personDetailPfad(E, 1));
   });
   it('schaedenPfad ohne Optionen', () => {
     expect(schaedenPfad(E)).toBe('/einsaetze/5/schaeden');

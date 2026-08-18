@@ -127,7 +127,16 @@ export default function EinsatzSeite({
           {beschreibung && <div><Typography.Text type="secondary">{beschreibung}</Typography.Text></div>}
           <Datenstand dataUpdatedAt={dataUpdatedAt} />
         </div>
-        {aktionen && <div ref={aktionenRef} style={{ minWidth: 0 }}>{aktionen}</div>}
+        {/* Die Marke macht die Zusicherung von außen prüfbar (LFH-340 · C5): „genau eine
+            Primäraktion IM KOPF" ist ohne sie nur global zählbar, und eine Seite mit einem
+            Formular im Inhalt (dessen Absende-Knopf zu Recht primär ist) fiele durch, ohne
+            im Kopf etwas falsch zu machen. Die Dev-Warnung oben zählt bereits genau diesen
+            Teilbaum — das Attribut gibt dem Test denselben Zuschnitt. */}
+        {aktionen && (
+          <div ref={aktionenRef} data-lfh="seitenkopf-aktionen" style={{ minWidth: 0 }}>
+            {aktionen}
+          </div>
+        )}
       </Flex>
       {hinweis && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
       {children}

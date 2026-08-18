@@ -141,6 +141,24 @@ export function personenPfad(
   });
 }
 
+/**
+ * Vollseiten-Aufnahme für Personen (LFH-340 · C5).
+ *
+ * Eine eigene Route, obwohl die Schnellerfassung dieselben Felder im Dialog zeigt: sie ist
+ * die ANSPRING-Adresse für andere Module — ein Modal hat keine. Beide Wege tragen dasselbe
+ * Bauteil (`personen/AufnahmeFelder`), es gibt also nur eine Maske.
+ *
+ * **Noch ohne Produktivkonsumenten in `frontend/src`**, und das ist kein Versehen: die
+ * UHS-Kopfzeile, die von hier aus in die Aufnahme schicken SOLL, entsteht erst mit C6
+ * (LFH-341). Bis dahin trägt die Route sich selbst über ihre Adresse.
+ *
+ * Statisches Segment vor `personen/:personId` — React Router rankt statisch über dynamisch,
+ * die Reihenfolge in `App.tsx` entscheidet also nicht, aber ein Leser muss das nicht prüfen.
+ */
+export function personenAufnahmePfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'personen')}/aufnahme`;
+}
+
 export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'schaeden'), {
     neu: opts.neu ? 1 : undefined,
@@ -209,14 +227,48 @@ export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number 
  */
 export function lagekartePfad(
   einsatzId: number,
-  opts: { gefahrengebiet?: number; ansicht?: number; snapshot?: number } = {},
+  opts: {
+    gefahrengebiet?: number;
+    ansicht?: number;
+    snapshot?: number;
+    platzieren?: { typ: PlatzierenZielTyp; id: number };
+  } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
     gefahrengebiet: opts.gefahrengebiet,
     ansicht: opts.ansicht,
     // Historien-Modus (C/LFH-321): ?snapshot=<id> zeigt den eingefrorenen Stand (schreibgeschützt).
     snapshot: opts.snapshot,
+    // Platzier-Auftrag (LFH-340 · C5): die Karte geht in den Platzier-Modus für genau
+    // dieses Objekt, der nächste Klick auf die Karte setzt seine Koordinate.
+    platzieren: opts.platzieren ? `${opts.platzieren.typ}:${opts.platzieren.id}` : undefined,
   });
+}
+
+/**
+ * Objekttypen, die von außen zum Verorten auf die Karte geschickt werden können.
+ *
+ * Bewusst eine EIGENE, engere Menge als der karteninterne `PlatzierenPunktTyp`: was hier
+ * steht, muss die Karte auch aus einem Fremd-Link heraus platzieren können. Wer den Typ
+ * erweitert, prüft `pages/LagekartePage.tsx` mit — dort wird der Wert zurückgelesen.
+ */
+export type PlatzierenZielTyp = 'schaden' | 'uhs';
+
+/**
+ * Liest den Platzier-Auftrag aus `?platzieren=<typ>:<id>` zurück.
+ *
+ * Strenger als ein `split(':')`: ein unbekannter Typ oder eine unbrauchbare Id liefern
+ * `null`, nicht ein halb gefülltes Objekt. Der Aufrufer räumt den Parameter danach ohnehin —
+ * ein stehengebliebener Auftrag schickte die Karte bei jedem Neuladen erneut in den Modus.
+ */
+export function parsePlatzierenAuftrag(
+  wert: string | null | undefined,
+): { typ: PlatzierenZielTyp; id: number } | null {
+  if (!wert) return null;
+  const [typ, roheId] = wert.split(':');
+  if (typ !== 'schaden' && typ !== 'uhs') return null;
+  const id = parseRouteId(roheId);
+  return id == null ? null : { typ, id };
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

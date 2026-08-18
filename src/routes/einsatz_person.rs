@@ -132,6 +132,14 @@ pub struct AnlegenBody {
     /// Optionaler initialer Arbeitsstatus. Für die Erfassungs-Fastpaths sind
     /// ausschließlich `erfasst`, `vermisst` und `betroffen` zulässig.
     pub status: Option<String>,
+    /// Optionale Erst-Sichtung (LFH-340 · C5). Schreibt die Sichtung in DERSELBEN
+    /// Transaktion wie die Anlage und hebt `erfasst → betroffen` — dieselbe Mechanik wie
+    /// der dedizierte Sichtungs-Endpunkt (`sichten`), nur ohne zweiten Request.
+    ///
+    /// Der zweite Request wäre nicht bloß langsamer: die Personen-Erfassung hat eine
+    /// Offline-Queue mit `client_id`-Idempotenz (siehe unten), ein nachgeschobener
+    /// Sichtungs-Call hätte keine — ein Replay legte die Sichtung ein zweites Mal an.
+    pub sichtung: Option<String>,
     /// Stabiler, client-generierter Idempotenzschlüssel für Offline-Queue und
     /// Timeout-Replay. Leer/fehlend behält das Verhalten älterer Clients.
     pub client_id: Option<String>,
@@ -196,6 +204,25 @@ pub async fn anlegen(
         ));
     }
 
+    // Erst-Sichtung: das Feld für sich → 400, die Kombination mit dem Status → 422
+    // (LFH-267/F22). Eine vermisste Person ist nicht angetroffen und damit nicht sichtbar;
+    // dieselbe Linie zieht der dedizierte Sichtungs-Endpunkt über `person.status`.
+    let sichtung = trimme(body.sichtung);
+    let kategorie = match sichtung.as_deref() {
+        None => None,
+        Some(roh) => Some(
+            Sichtungskategorie::parse(roh)
+                .ok_or_else(|| AppError::Validation("Unbekannte Sichtungskategorie".into()))?,
+        ),
+    };
+    if kategorie.is_some()
+        && !matches!(status_enum, PersonStatus::Erfasst | PersonStatus::Betroffen)
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Erst-Sichtung ist nur mit Status erfasst oder betroffen zulässig".into(),
+        ));
+    }
+
     let name = trimme(body.name);
     let vorname = trimme(body.vorname);
     let geburtsdatum = trimme(body.geburtsdatum);
@@ -211,7 +238,7 @@ pub async fn anlegen(
         .await?
         .etb_startwert();
     let (person, war_neu) = crate::write_retry!(&state.pool, |conn| {
-        let (id, _reg, war_neu) = repo::anlegen_tx_mit_optionen(
+        let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
             conn,
             einsatz_id,
             benutzer.id,
@@ -230,14 +257,54 @@ pub async fn anlegen(
             },
         )
         .await?;
-        let person = repo::laden_tx(conn, einsatz_id, id).await?;
         if war_neu {
-            let text = format!(
-                "Person {} erfasst",
-                registrier_anzeige(person.registrier_nr)
-            );
+            // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
+            // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
+            // ein zweiter Roundtrip für einen Wert, der schon dasteht.
+            let text = format!("Person {} erfasst", registrier_anzeige(reg));
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+
+            /*
+             * Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
+             * stünde sie sonst ein zweites Mal im Verlauf — in genau der Kette, aus der der
+             * medizinische Verlauf gelesen wird.
+             *
+             * DIESER RIEGEL IST PER HTTP NICHT ERREICHBAR, und das gehört dazu: der
+             * Replay-Lookup oben (`laden_nach_client_id`, vor der Transaktion) trägt
+             * dasselbe Prädikat wie der In-Tx-Zweig und gibt vorher zurück. `war_neu` wird
+             * hier also nur dann false, wenn ein fremder Commit zwischen Pool-Read und
+             * `BEGIN IMMEDIATE` fällt — ein sequentieller Test kann das nicht erzeugen.
+             * `replay_derselben_client_id_legt_die_sichtung_nicht_doppelt_an` belegt
+             * deshalb den WEG (ein Replay erzeugt keine zweite Person und keine zweite
+             * Sichtung), nicht diese Bedingung; sie bliebe auch ohne sie grün. Wer den
+             * Riegel entfernt, bricht keinen Test — er bricht das Rennen.
+             */
+            if let Some(k) = kategorie {
+                sichtung_repo::erfassen_tx(
+                    conn,
+                    einsatz_id,
+                    id,
+                    k.as_str(),
+                    None,
+                    benutzer.id,
+                    // Anheben nur aus `erfasst` — eine bereits als betroffen angelegte
+                    // Person bekäme sonst einen zweiten Statuswechsel ohne Anlass.
+                    matches!(status_enum, PersonStatus::Erfasst),
+                )
+                .await?;
+                let text = format!(
+                    "Person {}: Sichtung {}",
+                    registrier_anzeige(reg),
+                    k.etb_label()
+                );
+                crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
+                    .await?;
+            }
         }
+        // NACH der Sichtung geladen: sonst trüge die Antwort den Vorzustand — Status
+        // `erfasst`, `aktuelle_sichtung` leer —, und der Client zeigte die Quittung zu
+        // einem Datensatz, den es so nie gab.
+        let person = repo::laden_tx(conn, einsatz_id, id).await?;
         Ok((person, war_neu))
     })?;
     if war_neu {

@@ -8,14 +8,14 @@ import { describe, expect, it } from 'vitest';
  *
  * DREI Teile, und sie fangen verschiedene Ausfälle:
  *
- * 1. **Das Inventar** — die namentliche 19er-Liste unten. Diese Tabellen laufen über EIN
+ * 1. **Das Inventar** — die namentliche 18er-Liste unten. Diese Tabellen laufen über EIN
  *    Primitiv (`components/KatalogTabelle.tsx`), das waagerechten Scrollcontainer, stehende
  *    Kopfzeile und fixierte Identifierspalte setzt. Fiele eine davon auf antd zurück, bräche
  *    nichts sichtbar — sie verschwände am schmalen Schirm still aus dem Gate.
  * 2. **Die Schließung** — ein Scan über den ganzen Dateikorpus `frontend/src`: außerhalb des
  *    Primitivs und der namentlich freigestellten Ausnahmen gibt es KEIN rohes
- *    antd-Tabellenelement. Ohne diesen Teil sagte der Guard bloß „diese 19 sind migriert"
- *    und nichts über die zwanzigste, neu hinzukommende. `datensicht.guard.test.ts` verweist
+ *    antd-Tabellenelement. Ohne diesen Teil sagte der Guard bloß „diese 18 sind migriert"
+ *    und nichts über die neunzehnte, neu hinzukommende. `datensicht.guard.test.ts` verweist
  *    im Dateikopf für genau diesen Fall hierher („ein Konsument, der gar nichts von
  *    `Datensicht` weiß") — bis LFH-330 · G1 war das ein Versprechen ohne Gegenstand.
  * 3. **Die Ordnung** — die dreizehn Kataloge tragen Sortierung, Filterachse und Freitextsuche
@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest';
  *
  * ── BEKANNTE GRENZEN, und sie sind Teil des Vertrags ────────────────────────────
  *
- * 1. **Die 19er-Liste bleibt handgepflegt, nicht erschnüffelt.** Eine neue Katalogseite in
+ * 1. **Die 18er-Liste bleibt handgepflegt, nicht erschnüffelt.** Eine neue Katalogseite in
  *    `stammdaten/` taucht dort nicht von selbst auf. Bindet sie antd direkt ein, fängt sie
  *    die Schließung; baut sie korrekt auf dem Primitiv, steht sie danach trotzdem nicht im
  *    Inventar. Das Inventar sichert den benannten Bestand gegen Rückfall, nicht den Zuwachs
@@ -77,15 +77,15 @@ const SRC = (() => {
 })();
 
 /**
- * Die neunzehn Tabellen hinter dem Primitiv — dreizehn Kataloge (zehn Stammdaten-Reiter,
- * zwei Karten-Sektionen, Benutzer) und sechs Einsatz-/Verwaltungstabellen, die LFH-330 · B2
+ * Die achtzehn Tabellen hinter dem Primitiv — dreizehn Kataloge (zehn Stammdaten-Reiter,
+ * zwei Karten-Sektionen, Benutzer) und fünf Einsatz-/Verwaltungstabellen, die LFH-330 · B2
  * als Überlaufschutz nachgezogen hat.
  *
- * Die sechs Neuzugänge sind ausdrücklich KEINE `Datensicht`-Konsumenten (E3/E4): sie
+ * Die fünf Neuzugänge sind ausdrücklich KEINE `Datensicht`-Konsumenten (E3/E4): sie
  * bekommen nur waagerechten Scrollcontainer, stehende Kopfzeile und fixierte Kennung. Ihr
  * Guard-Ort ist deshalb dieses Inventar und nicht `datensicht.guard.test.ts`.
  *
- * `etb/EtbTabelle.tsx` ist die zwanzigste Konsumentin und steht bewusst NICHT hier: sie
+ * `etb/EtbTabelle.tsx` ist die neunzehnte Konsumentin und steht bewusst NICHT hier: sie
  * arbeitet auf einem serverseitigen 100-Zeilen-Fenster. Ihre Aufnahme ist ein benannter
  * Restposten (LFH-330 · AP8), kein stiller Nebeneffekt.
  */
@@ -106,14 +106,21 @@ const KATALOGE = [
 ];
 
 /**
- * Die sechs Nachzügler des Überlaufschutzes. Getrennt gehalten, weil eine Zusicherung nur
- * für die Kataloge gilt (die Blätterungsschwelle unten) — eine flache 19er-Liste könnte das
- * nicht ausdrücken, ohne die sechs mitzuverpflichten.
+ * Die fünf Nachzügler des Überlaufschutzes. Getrennt gehalten, weil eine Zusicherung nur
+ * für die Kataloge gilt (die Blätterungsschwelle unten) — eine flache Gesamtliste könnte das
+ * nicht ausdrücken, ohne die Nachzügler mitzuverpflichten.
+ *
+ * SECHS BIS LFH-340 · C5. `pages/SchaedenPage.tsx` ist herausgefallen, und zwar nach oben:
+ * sie bindet `KatalogTabelle` nicht mehr selbst ein, sondern läuft über `Datensicht` (das
+ * seinerseits durch das Primitiv rendert). Ihr Guard-Ort ist damit
+ * `datensicht.guard.test.ts` — dieselbe Zuordnung wie bei `PersonenPage`/`TierePage`, die
+ * hier ebenfalls nie standen. Der Kommentar über {@link KATALOGE} hatte für genau diesen
+ * Fall vorgesorgt („Rüstet jemand `pages/SchaedenPage.tsx` später Sortierung nach …"); der
+ * Weg ist jetzt gegangen, nur eine Ebene höher als dort vermutet.
  */
 const UEBERLAUF_NACHZUG = [
   'pages/bereitstellungsraum/BereitstellungsraeumePage.tsx',
   'pages/UnfallhilfsstellenPage.tsx',
-  'pages/SchaedenPage.tsx',
   'pages/PersonenDetailPage.tsx',
   'pages/uhs/MaterialTab.tsx',
   'pages/MitgliederAbschnitt.tsx',
@@ -338,8 +345,8 @@ export function rohtabellenBefunde(dateien: Record<string, string>, ausnahmen: s
 const KORPUS = lieseKorpus(SRC);
 
 describe('KatalogTabelle-Inventar', () => {
-  it('alle 19 Tabellen laufen über das Primitiv', () => {
-    expect(QUELLEN).toHaveLength(19);
+  it('alle 18 Tabellen laufen über das Primitiv', () => {
+    expect(QUELLEN).toHaveLength(18);
 
     const ohnePrimitiv = QUELLEN.filter(
       (q) => treffer(q.text, elementMuster('KatalogTabelle')) < 1,
@@ -422,7 +429,7 @@ describe('KatalogTabelle-Inventar', () => {
 });
 
 describe('KatalogTabelle-Ordnung', () => {
-  /** Nur die dreizehn Kataloge — die sechs Nachzügler tragen die Ordnung ausdrücklich nicht. */
+  /** Nur die dreizehn Kataloge — die fünf Nachzügler tragen die Ordnung ausdrücklich nicht. */
   const KATALOG_QUELLEN = QUELLEN.filter((q) => KATALOGE.includes(q.pfad));
 
   it('die dreizehn Kataloge sind vollzählig', () => {
@@ -430,14 +437,16 @@ describe('KatalogTabelle-Ordnung', () => {
      * Der Zuschnitt ist die halbe Zusicherung: fiele ein Katalog aus `KATALOG_QUELLEN`
      * heraus, prüfte der Fall darunter ihn nicht mehr und bliebe still grün.
      *
-     * Warum die sechs Nachzügler des Überlaufschutzes draußen bleiben, ist gemessen: sie
-     * tragen heute 0× `sorter`, 0× `filters` und 0× `suche`. Sie mitzufordern hieße, das Gate
-     * rot zu gebären — ihre Ordnung ist ein eigener Auftrag.
+     * Warum die Nachzügler des Überlaufschutzes draußen bleiben, ist gemessen: sie tragen
+     * heute 0× `sorter`, 0× `filters` und 0× `suche`. Sie mitzufordern hieße, das Gate rot
+     * zu gebären — ihre Ordnung ist ein eigener Auftrag.
      *
-     * Diese Null wird bewusst NICHT festgeschrieben. Rüstet jemand `pages/SchaedenPage.tsx`
-     * später Sortierung nach, ist das eine Verbesserung; ein Gate, das dafür rot wird, wird
-     * gestrichen statt befolgt. Der Weg dann: die Datei wandert nach `KATALOGE` und schuldet
-     * ab da die volle Ordnung.
+     * Diese Null wird bewusst NICHT festgeschrieben, und der Fall ist eingetreten:
+     * `pages/SchaedenPage.tsx` hat mit LFH-340 · C5 Sortierung, Filter und Suche bekommen.
+     * Der hier vorgezeichnete Weg („die Datei wandert nach `KATALOGE`") wurde dabei NICHT
+     * genommen — sie hat das alles über `Datensicht` bekommen, bindet `KatalogTabelle` also
+     * gar nicht mehr selbst ein und ist aus diesem Inventar ganz herausgefallen. Für die
+     * verbliebenen fünf gilt der Weg unverändert.
      */
     expect(KATALOG_QUELLEN).toHaveLength(13);
     expect(KATALOG_QUELLEN.map((q) => q.pfad)).toEqual(KATALOGE);

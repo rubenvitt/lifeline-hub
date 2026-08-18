@@ -25,6 +25,15 @@ export interface PersonEingabe {
 export interface PersonAnlegenEingabe extends PersonEingabe {
   status?: Extract<PersonStatus, 'erfasst' | 'vermisst' | 'betroffen'>;
   client_id?: string;
+  /**
+   * Erst-Sichtung in derselben Anlage (LFH-340 · C5). Das Backend schreibt sie in DERSELBEN
+   * Transaktion und hebt `erfasst → betroffen`; die Antwort trägt bereits `aktuelle_sichtung`.
+   *
+   * Kein nachgeschobener POST auf `/sichtung`: der liefe an der Offline-Queue vorbei, deren
+   * Idempotenz an `client_id` DIESES Requests hängt. Serverseitig ist die Kombination mit
+   * `status: 'vermisst'` ein 422 — eine vermisste Person ist nicht angetroffen.
+   */
+  sichtung?: Sichtungskategorie;
 }
 
 export function listePersonen(einsatzId: number, status?: PersonStatus): Promise<Person[]> {

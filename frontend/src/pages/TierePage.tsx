@@ -10,12 +10,13 @@ import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from 
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, { scrolleZurZeile, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { flaeche } from '../theme/tokens';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
 } from '../components/erfassungsSitzung';
-import Datenstand from '../components/Datenstand';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
@@ -316,25 +317,37 @@ export default function TierePage() {
   const standVeraltet = tiereQuery.isError && alle.length > 0;
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Tiere' }]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      dataUpdatedAt={tiereQuery.dataUpdatedAt}
+      titel={
         <Space>
-          <Typography.Title level={3} style={{ margin: 0 }}>Tiere</Typography.Title>
+          Tiere
+          {/* BEFUND wie in `PersonalPage`/`SchaedenPage`: `EinsatzStatus` hat keine
+              Statusrolle in `theme/statusFarben.ts`. Der Tag bleibt deshalb auf
+              antd-Farbnamen und rohem Enum-Wert stehen. */}
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
-          <Datenstand dataUpdatedAt={tiereQuery.dataUpdatedAt} />
         </Space>
-        {darfSchreiben && (
-          <Space>
+      }
+      breadcrumb={
+        <Breadcrumb
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Tiere' }]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
+          <Space wrap style={{ minWidth: 0 }}>
             <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>Schnellerfassung</Button>
             <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>Vermisst melden</Button>
           </Space>
-        )}
-      </Space>
-
+        )
+      }
+      hinweis={
+        !darfSchreiben && einsatz.status !== 'aktiv' && (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        )
+      }
+    >
       <Tabs activeKey={sicht} onChange={(k) => setSichtFuer(einsatzId, k as Sicht)} items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))} />
 
       <Space wrap style={{ marginBottom: 12 }}>
@@ -346,10 +359,6 @@ export default function TierePage() {
           value={speziesFilter} onChange={(v) => setSpeziesFuer(einsatzId, v)}
           options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
       </Space>
-
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-      )}
 
       {listeGescheitert ? (
         <SeitenFehler
@@ -483,6 +492,6 @@ export default function TierePage() {
         )}
         <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
       </ErfassungsModal>
-    </div>
+    </EinsatzSeite>
   );
 }

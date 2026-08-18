@@ -35,6 +35,9 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `MovePat${Date.now()}`;
+  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
+  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(page.getByText(personName).first()).toBeVisible();
@@ -103,6 +106,9 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `UniPat${Date.now()}`;
+  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
+  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(page.getByText(personName).first()).toBeVisible();
@@ -196,6 +202,9 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `PatScroll${Date.now()}`;
+  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
+  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(page.getByText(personName)).toBeVisible();
@@ -257,6 +266,9 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `Maximiliane-Charlotte von Lindenberg-Hohenfels ${Date.now()}`;
+  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
+  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(page.getByText(personName).first()).toBeVisible();
@@ -323,6 +335,9 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
   const personName = `PatDrop${Date.now()}`;
+  // „Name" liegt seit LFH-340 · C5 eingeklappt — die Sichtungskategorie ist ins sichtbare
+  // Feldbudget gerückt. Der Name bleibt der Anker dieser Specs, er ist nur einen Klick weiter.
+  await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(page.getByText(personName)).toBeVisible();

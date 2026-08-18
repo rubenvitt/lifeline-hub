@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Tag, Typography, theme, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Col, Collapse, Descriptions, Dropdown, Form, Input, InputNumber, Modal, Row, Space, Spin, Tag, Typography, theme, type MenuProps, type TableColumnsType } from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -37,6 +38,32 @@ function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
     case 'verstorben':
     case 'abgemeldet': return ['erfasst', 'vermisst', 'betroffen'];
   }
+}
+
+/**
+ * Statuswechsel, die eine Rückfrage tragen (LFH-363: „Destruktiv ist nicht gleich
+ * destruktiv"). `naechsteStatus` kennt formal auch von `verstorben` einen Weg zurück — ein
+ * versehentlich gebuchter Todesfall ist trotzdem nichts, was man beiläufig zurücknimmt, und
+ * er erzeugt einen ETB-Eintrag, den keine Korrektur wieder einsammelt. `abgemeldet` steht
+ * bewusst NICHT hier: das ist eine Verwaltungsbuchung mit sichtbarem Rückweg.
+ */
+const IRREVERSIBEL: PersonStatus[] = ['verstorben'];
+
+/**
+ * Eine Aktion der Kopfleiste. Deskriptor statt `ReactNode`, damit dieselbe Beschreibung
+ * einmal als Primärknopf und einmal als Menüeintrag gerendert werden kann — und damit die
+ * Rangfolge an EINER Stelle entschieden wird statt im JSX.
+ */
+type Kopfaktion =
+  | { art: 'sichten' | 'verbleib' | 'bearbeiten' | 'stornieren'; key: string; label: string; danger?: boolean; trennerDavor?: boolean }
+  | { art: 'status'; key: string; label: string; status: PersonStatus; danger?: boolean; trennerDavor?: boolean };
+
+/** Kopfaktionen → antd-Menüeinträge, Trenner eingefügt. */
+function menueEintraege(aktionen: Kopfaktion[]): MenuProps['items'] {
+  return aktionen.flatMap((a) => [
+    ...(a.trennerDavor ? [{ type: 'divider' as const, key: `${a.key}:trenner` }] : []),
+    { key: a.key, label: a.label, danger: a.danger },
+  ]);
 }
 
 export default function PersonenDetailPage() {
@@ -78,26 +105,45 @@ export default function PersonenDetailPage() {
     // wuerde fuer dieselbe Oeffnung mehrere Auditzeilen erzeugen.
     retry: false,
   });
+  /**
+   * Ladehoheit (LFH-340 · C5, Befund M40): die vier Abfragen unten hängen am AUFGEKLAPPTEN
+   * Zustand ihres Abschnitts, nicht am Öffnen der Seite. Beim Öffnen laufen nur noch zwei —
+   * Einsatz und Detail —, und der medizinische Verlauf ist Teil desselben Detail-Abrufs.
+   */
+  const [zuordnungenOffen, setZuordnungenOffen] = useState(false);
+  const [auditOffen, setAuditOffen] = useState(false);
+  const [uhsModalOffen, setUhsModalOffen] = useState(false);
+
   const tiereDerPersonQuery = useQuery({
     queryKey: einsatzKeys.tiereHalter(einsatzId, personId),
     queryFn: () => listeTiere(einsatzId, { halterPersonId: personId }),
-    enabled: idGueltig,
+    enabled: idGueltig && zuordnungenOffen,
   });
   const schaedenDerPersonQuery = useQuery({
     queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId),
     queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
-    enabled: idGueltig,
+    enabled: idGueltig && zuordnungenOffen,
   });
-  // LFH-152: UHS-Liste für die Klartext-Anzeige der aktuellen Verortung + den Zuweisungs-Picker.
+  /**
+   * LFH-152: UHS-Liste für die Klartext-Anzeige der aktuellen Verortung + den Zuweisungs-Picker.
+   *
+   * Hängt allein am aufgeklappten Abschnitt. Ein früherer Stand trug hier zusätzlich
+   * `|| uhsModalOffen` mit der Begründung, der Dialog überlebe das Zuklappen — die ist im
+   * Review als unbelegt aufgefallen und wieder abgetragen: **beide** Auslöser des Dialogs
+   * („UHS zuweisen", „UHS ändern") stehen INNERHALB des Abschnitts, er kann also nur offen
+   * sein, während der Abschnitt es ebenfalls ist. Danach deckt die Maske den Collapse-Kopf
+   * ab und der Fokus liegt im Dialog. Es gab keinen erreichbaren Fall, nur einen Zweig, der
+   * sich nicht widerlegen ließ — und kein Test, der ihn getroffen hätte.
+   */
   const uhsListeQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: idGueltig,
+    enabled: idGueltig && zuordnungenOffen,
   });
   const auditQuery = useQuery({
     queryKey: einsatzKeys.personAudit(einsatzId, personId),
     queryFn: () => ladePersonAudit(einsatzId, personId),
-    enabled: idGueltig && istEinsatzLeitung(einsatzQuery.data),
+    enabled: idGueltig && auditOffen && istEinsatzLeitung(einsatzQuery.data),
   });
 
   const statusMutation = useMutation({
@@ -190,6 +236,15 @@ export default function PersonenDetailPage() {
     onSuccess: () => { invalidate(); navigate(personenPfad(einsatzId)); }, onError: fehler,
   });
 
+  /**
+   * Rückfragen der Kopfleiste — als `<Modal>` mit eigenem Zustand, nicht als `Popconfirm`
+   * im Menü-Label (LFH-365): ein `Popconfirm` überlebt dort nur mit `stopPropagation` das
+   * Auto-Schließen des Menüs. Beide Dialoge stehen außerdem AUSSERHALB jeder Aufzählung,
+   * es gibt sie also genau einmal im Baum.
+   */
+  const [statusDialog, setStatusDialog] = useState<PersonStatus | null>(null);
+  const [stornoOffen, setStornoOffen] = useState(false);
+
   // E-2: Sichtung
   const [reSichtenOffen, setReSichtenOffen] = useState(false);
   const [sichtungForm] = Form.useForm<{ kategorie: Sichtungskategorie; notiz?: string }>();
@@ -223,7 +278,6 @@ export default function PersonenDetailPage() {
 
   // LFH-152: UHS-Zuweisung von der Personen-Seite (Gegenrichtung zum Grundriss). art spiegelt
   // die belegMut-Logik des Grundrisses: bereits belegt → wechsel, sonst eintritt. Austragen = austritt.
-  const [uhsModalOffen, setUhsModalOffen] = useState(false);
   const [uhsForm] = Form.useForm<{ uhs_id: number; notiz?: string }>();
   function invalidateUhs() {
     invalidateDetail();
@@ -365,12 +419,11 @@ export default function PersonenDetailPage() {
             : <Tag>ungesichtet</Tag>}
           {person.aktueller_verbleib && <Tag color="purple">{person.aktueller_verbleib}</Tag>}
         </Space>
-        {darfSchreiben && !person.storniert_at && (
-          <Space wrap>
-            <Button onClick={() => setReSichtenOffen(true)}>Re-Sichten</Button>
-            <Button onClick={() => setVerbleibOffen(true)}>Verbleib erfassen</Button>
-          </Space>
-        )}
+        {/* „Re-Sichten" und „Verbleib erfassen" standen bis LFH-340 · C5 hier als eigene
+            Reihe. Sie sind in die Kopfleiste gewandert — eine davon ist dort die
+            Primäraktion, die andere steht im Menü. Zwei Wege zu derselben Aktion wären ein
+            Unterschied ohne Bedeutung, und der Kopf ist der Ort, an dem die Seite sagt,
+            was zu tun ist. */}
         {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
           <Alert
             type="warning" showIcon
@@ -427,7 +480,11 @@ export default function PersonenDetailPage() {
                     R-{String(a.vermisst_person_id === person.id ? a.gefunden_person_id : a.vermisst_person_id).padStart(3, '0')}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
-                    <Space style={{ marginLeft: 12 }}>
+                    /* `size="middle"` wie an der UHS-Zeile (LFH-363): „Verwerfen" ist
+                       `danger` und stünde sonst bündig neben „Bestätigen". Bestandsbefund,
+                       mit LFH-340 · C5 abgetragen, weil das Bündel die Datei ohnehin
+                       anfasste — der Scanner hat ihn selbst gemeldet. */
+                    <Space size="middle" style={{ marginLeft: 12 }}>
                       <Button type="primary"
                         disabled={!darfEinsatzLeiten(einsatz, benutzer)}
                         onClick={() => abgleichEntscheidenMutation.mutate({
@@ -490,121 +547,246 @@ export default function PersonenDetailPage() {
           </Descriptions>
         )}
 
-        <div>
-          <Space wrap>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-              Zugeordnete Tiere
-            </Typography.Text>
-            {darfZuordnen && (
-              <Button onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
-                Tier zuweisen
-              </Button>
-            )}
-          </Space>
-          {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
-            <div><Typography.Text type="secondary">keine</Typography.Text></div>
-          ) : (
-            <Space wrap style={{ marginTop: 4 }}>
-              {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
-                <Space key={t.id} size={4}>
-                  <Tag
-                    color="cyan"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
-                  >
-                    {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
-                    {t.rufname ? ` „${t.rufname}"` : ''}
-                  </Tag>
-                  {darfZuordnen && (
-                    <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
-                  )}
+        {/**
+          * ZUORDNUNGEN UND AUDIT LADEN ERST BEIM AUFKLAPPEN (LFH-340 · C5, Befund M40).
+          *
+          * Die Seite setzte beim Öffnen sechs Abfragen ab, um eine nachgetragene Sichtung zu
+          * ermöglichen — fünf davon für Blöcke, die man in dieser Lage gar nicht ansieht.
+          * Kopf und medizinischer Verlauf kommen aus DEMSELBEN Detail-Abruf und stehen
+          * deshalb weiterhin sofort.
+          *
+          * KEIN `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim
+          * Aufklappen" wäre nicht mehr von „immer da" zu unterscheiden — die Zählung im
+          * Test bewiese nichts mehr.
+          *
+          * Die UHS-Verortung steht MIT im Panel, obwohl `aktuelle_uhs_id` aus dem Detail
+          * kommt: nur der KLARTEXT-Name braucht die UHS-Liste, und dafür gibt es seit jeher
+          * den Rückfallwert `UHS #id`. Zugeklappt kostet der Name nichts.
+          */}
+        <Collapse
+          ghost
+          activeKey={[
+            ...(zuordnungenOffen ? ['zuordnungen'] : []),
+            ...(auditOffen ? ['audit'] : []),
+          ]}
+          onChange={(offen: string | string[]) => {
+            const schluessel = Array.isArray(offen) ? offen : [offen];
+            setZuordnungenOffen(schluessel.includes('zuordnungen'));
+            setAuditOffen(schluessel.includes('audit'));
+          }}
+          items={[
+            {
+              key: 'zuordnungen',
+              label: 'Zuordnungen (Tiere, Schäden, UHS)',
+              children: (
+                <Space orientation="vertical" style={{ width: '100%' }} size="large">
+                  <div>
+                    <Space wrap>
+                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                        Zugeordnete Tiere
+                      </Typography.Text>
+                      {darfZuordnen && (
+                        <Button onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
+                          Tier zuweisen
+                        </Button>
+                      )}
+                    </Space>
+                    {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
+                      <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                    ) : (
+                      <Space wrap style={{ marginTop: 4 }}>
+                        {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
+                          <Space key={t.id} size={4}>
+                            <Tag
+                              color="cyan"
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
+                            >
+                              {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
+                              {t.rufname ? ` „${t.rufname}"` : ''}
+                            </Tag>
+                            {darfZuordnen && (
+                              <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
+                            )}
+                          </Space>
+                        ))}
+                      </Space>
+                    )}
+                  </div>
+
+                  <div>
+                    <Space wrap>
+                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                        Als Geschädigte bei Schäden
+                      </Typography.Text>
+                      {darfZuordnen && (
+                        <Button onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
+                          Schaden zuweisen
+                        </Button>
+                      )}
+                    </Space>
+                    {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
+                      <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                    ) : (
+                      <Space wrap style={{ marginTop: 4 }}>
+                        {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
+                          <Space key={sch.id} size={4}>
+                            <Link to={schadenDetailPfad(einsatzId, sch.id)}>
+                              <Tag color="orange" style={{ cursor: 'pointer' }}>
+                                {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
+                              </Tag>
+                            </Link>
+                            {darfZuordnen && (
+                              <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
+                            )}
+                          </Space>
+                        ))}
+                      </Space>
+                    )}
+                  </div>
+
+                  <div>
+                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                      UHS-Verortung
+                    </Typography.Text>
+                    <div style={{ marginTop: 4 }}>
+                      {person.aktuelle_uhs_id != null ? (
+                        // `size="middle"` ist nicht Kosmetik (LFH-363): eine Aktionsreihe mit
+                        // einem `danger`-Knopf und mindestens einer weiteren Aktion trägt
+                        // mindestens `token.marginSM` Abstand — antds Vorgabe liegt darunter.
+                        <Space wrap size="middle">
+                          <Tag color="blue">
+                            {uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
+                              ?? `UHS #${person.aktuelle_uhs_id}`}
+                          </Tag>
+                          {darfSchreiben && !person.storniert_at && (
+                            <>
+                              <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                                UHS ändern
+                              </Button>
+                              <Button danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
+                            </>
+                          )}
+                        </Space>
+                      ) : (
+                        <Space wrap>
+                          <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
+                          {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
+                            <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                              UHS zuweisen
+                            </Button>
+                          )}
+                        </Space>
+                      )}
+                    </div>
+                  </div>
                 </Space>
-              ))}
-            </Space>
-          )}
-        </div>
-
-        <div>
-          <Space wrap>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-              Als Geschädigte bei Schäden
-            </Typography.Text>
-            {darfZuordnen && (
-              <Button onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
-                Schaden zuweisen
-              </Button>
-            )}
-          </Space>
-          {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
-            <div><Typography.Text type="secondary">keine</Typography.Text></div>
-          ) : (
-            <Space wrap style={{ marginTop: 4 }}>
-              {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
-                <Space key={sch.id} size={4}>
-                  <Link to={schadenDetailPfad(einsatzId, sch.id)}>
-                    <Tag color="orange" style={{ cursor: 'pointer' }}>
-                      {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
-                    </Tag>
-                  </Link>
-                  {darfZuordnen && (
-                    <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
-                  )}
-                </Space>
-              ))}
-            </Space>
-          )}
-        </div>
-
-        <div>
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-            UHS-Verortung
-          </Typography.Text>
-          <div style={{ marginTop: 4 }}>
-            {person.aktuelle_uhs_id != null ? (
-              <Space wrap>
-                <Tag color="blue">
-                  {uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
-                    ?? `UHS #${person.aktuelle_uhs_id}`}
-                </Tag>
-                {darfSchreiben && !person.storniert_at && (
-                  <>
-                    <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
-                      UHS ändern
-                    </Button>
-                    <Button danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
-                  </>
-                )}
-              </Space>
-            ) : (
-              <Space wrap>
-                <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
-                {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
-                  <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
-                    UHS zuweisen
-                  </Button>
-                )}
-              </Space>
-            )}
-          </div>
-        </div>
-
-        {istEinsatzLeitung(einsatz) && (
-          <div>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
-              Zugriffs-Audit
-            </Typography.Text>
-            <KatalogTabelle<PersonZugriff>
-              rowKey="id" pagination={false}
-              loading={auditQuery.isLoading}
-              dataSource={auditQuery.data ?? []}
-              columns={auditSpalten}
-              locale={{ emptyText: 'Noch keine Zugriffe' }}
-            />
-          </div>
-        )}
+              ),
+            },
+            ...(istEinsatzLeitung(einsatz)
+              ? [{
+                  key: 'audit',
+                  label: 'Zugriffs-Audit',
+                  children: (
+                    <KatalogTabelle<PersonZugriff>
+                      rowKey="id" pagination={false}
+                      loading={auditQuery.isLoading}
+                      dataSource={auditQuery.data ?? []}
+                      columns={auditSpalten}
+                      locale={{ emptyText: 'Noch keine Zugriffe' }}
+                    />
+                  ),
+                }]
+              : []),
+          ]}
+        />
       </Space>
     );
   }
+
+  /** Die Bearbeiten-Sitzung öffnen — Formularwerte und CAS-Basis aus DEMSELBEN Snapshot. */
+  function starteBearbeiten() {
+    const werte: PersonEingabe = {
+      name: p.name,
+      vorname: p.vorname,
+      geschlecht: p.geschlecht,
+      geburtsdatum: p.geburtsdatum,
+      alter_geschaetzt: p.alter_geschaetzt,
+      herkunft_adresse: p.herkunft_adresse,
+      antreff_ort: p.antreff_ort,
+      melder_kontakt: p.melder_kontakt,
+      notiz: p.notiz,
+    };
+    // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
+    setEditSitzung({ basis: p.geaendert_at, werte });
+    editForm.setFieldsValue(werte);
+  }
+
+  function fuehreKopfaktionAus(aktion: Kopfaktion) {
+    if (aktion.art === 'sichten') { setReSichtenOffen(true); return; }
+    if (aktion.art === 'verbleib') { setVerbleibOffen(true); return; }
+    if (aktion.art === 'bearbeiten') { starteBearbeiten(); return; }
+    if (aktion.art !== 'status') { setStornoOffen(true); return; }
+    // Statuswechsel: irreversible Ziele über den Dialog, umkehrbare direkt. „Umkehrbar"
+    // heißt hier, dass `naechsteStatus` einen Weg zurück kennt — bei `verstorben` und
+    // `abgemeldet` steht er zwar formal in der Tabelle, aber ein versehentliches
+    // „verstorben" ist keine Buchung, die man beiläufig zurücknimmt.
+    if (IRREVERSIBEL.includes(aktion.status)) setStatusDialog(aktion.status);
+    else statusMutation.mutate({ einsatzId, personId: p.id, status: aktion.status });
+  }
+
+  /**
+   * Was der Kopf anbietet, und in welcher Rangfolge — abgeleitet, nicht im JSX verzweigt.
+   *
+   * `null` heißt: gar keine Aktion. Ohne Schreibrecht, an einer stornierten Person und
+   * während einer laufenden Bearbeitung wird deshalb WEDER eine Primäraktion NOCH ein
+   * Menü-Auslöser gerendert — ein deaktivierter Auslöser wäre ein Bedienziel, das nichts tut.
+   *
+   * Die Primäraktion hängt am Zustand, und zwar an GENAU EINER Frage: ist gesichtet worden?
+   * Nein → „Sichten". Ja → „Verbleib erfassen".
+   *
+   * ZWEI ABWEICHUNGEN VOM AK-WORTLAUT („bei Patient: Verbleib erfassen"), beide bewusst:
+   *
+   * 1. `aktuelle_sichtung: 'unverletzt'` ist nach `PATIENT_SK` KEIN Patient, bekommt hier
+   *    aber trotzdem „Verbleib erfassen". Das ist die richtige Frage an diesem Datensatz:
+   *    Unverletzte werden entlassen oder verbleiben vor Ort, und beides IST ein Verbleib.
+   *    Eine Zusatzbedingung auf `istPatient` machte den Kopf für diese Menge leer.
+   * 2. Ein bereits erfasster Verbleib schaltet nicht weiter. Ein dritter Zweig („dann
+   *    Bearbeiten") wäre eine Regel mehr für einen Zustand, in dem der Verbleib ohnehin
+   *    korrigierbar bleiben muss — „Bearbeiten" steht in beiden Fällen im Menü.
+   */
+  const aktionenPlan = ((): { primaer: Kopfaktion; weitere: Kopfaktion[] } | null => {
+    if (!darfSchreiben || p.storniert_at || editSitzung) return null;
+    const sichten: Kopfaktion = {
+      art: 'sichten',
+      key: 'sichten',
+      label: p.aktuelle_sichtung ? 'Re-Sichten' : 'Sichten',
+    };
+    const verbleib: Kopfaktion = { art: 'verbleib', key: 'verbleib', label: 'Verbleib erfassen' };
+    const bearbeiten: Kopfaktion = { art: 'bearbeiten', key: 'bearbeiten', label: 'Bearbeiten' };
+    const statuswechsel: Kopfaktion[] = naechsteStatus(p.status).map((s) => ({
+      art: 'status',
+      key: `status:${s}`,
+      label: `→ ${STATUS_META[s].label}`,
+      status: s,
+    }));
+    const stornieren: Kopfaktion = {
+      art: 'stornieren',
+      key: 'stornieren',
+      label: 'Stornieren',
+      danger: true,
+      trennerDavor: true,
+    };
+
+    const primaer = p.aktuelle_sichtung == null ? sichten : verbleib;
+    const uebrig = [primaer === sichten ? verbleib : sichten, bearbeiten, ...statuswechsel, stornieren];
+    return { primaer, weitere: uebrig };
+  })();
+
+  const laeuftStatus =
+    statusMutation.isPending &&
+    statusMutation.variables?.einsatzId === einsatzId &&
+    statusMutation.variables.personId === p.id;
 
   return (
     <EinsatzSeite
@@ -640,52 +822,51 @@ export default function PersonenDetailPage() {
         />
       }
       aktionen={
-        <Space>
-          {darfSchreiben && !p.storniert_at && !editSitzung && (
-            <Space wrap>
-              {naechsteStatus(p.status).map((s) => (
+        /**
+         * EINE Primäraktion, alles Weitere im Menü (LFH-340 · C5, Befund M37).
+         *
+         * Vorher standen hier bis zu sieben gleichrangige Knöpfe — vier Statuswechsel,
+         * Bearbeiten, Stornieren und ein „Zurück zur Liste" neben dem Breadcrumb — und
+         * KEINE Primäraktion: nichts sagte, was an dieser Person zu tun ist.
+         *
+         * „Zurück zur Liste" ist ersatzlos entfallen: der Breadcrumb darüber trägt denselben
+         * Weg, und `zurueck` bleibt der Rücksprung nach dem Stornieren.
+         */
+        aktionenPlan && (
+          <Space>
+            {/* Kein `loading` hier: die Primäraktion öffnet in jeder ihrer drei Gestalten
+                nur einen Dialog — sie hat keinen Lauf, auf den man warten könnte. Der
+                laufende Statuswechsel sitzt im Menü und zeigt sich am Auslöser. */}
+            <Button type="primary" onClick={() => fuehreKopfaktionAus(aktionenPlan.primaer)}>
+              {aktionenPlan.primaer.label}
+            </Button>
+            {aktionenPlan.weitere.length > 0 && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  autoFocus: true,
+                  items: menueEintraege(aktionenPlan.weitere),
+                  // Die Zuordnung hängt am MENÜ, nicht an jedem Eintrag: so gibt es genau
+                  // eine Stelle, an der ein Riegel sitzen könnte, und die Einträge bleiben
+                  // reine Beschreibung.
+                  onClick: ({ key }) => {
+                    const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
+                    if (eintrag) fuehreKopfaktionAus(eintrag);
+                  },
+                }}
+              >
                 <Button
-                  key={s}
-                  loading={
-                    statusMutation.isPending &&
-                    statusMutation.variables?.einsatzId === einsatzId &&
-                    statusMutation.variables.personId === p.id &&
-                    statusMutation.variables.status === s
-                  }
-                  disabled={
-                    statusMutation.isPending &&
-                    statusMutation.variables?.einsatzId === einsatzId &&
-                    statusMutation.variables.personId === p.id
-                  }
-                  onClick={() => statusMutation.mutate({ einsatzId, personId: p.id, status: s })}
-                >
-                  → {STATUS_META[s].label}
-                </Button>
-              ))}
-              <Button onClick={() => {
-                const werte: PersonEingabe = {
-                  name: p.name,
-                  vorname: p.vorname,
-                  geschlecht: p.geschlecht,
-                  geburtsdatum: p.geburtsdatum,
-                  alter_geschaetzt: p.alter_geschaetzt,
-                  herkunft_adresse: p.herkunft_adresse,
-                  antreff_ort: p.antreff_ort,
-                  melder_kontakt: p.melder_kontakt,
-                  notiz: p.notiz,
-                };
-                // Formularwerte und CAS-Basis stammen zwingend aus demselben Snapshot.
-                // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
-                setEditSitzung({ basis: p.geaendert_at, werte });
-                editForm.setFieldsValue(werte);
-              }}>Bearbeiten</Button>
-              <Popconfirm title="Person stornieren (Soft-Delete)?" onConfirm={() => stornoMutation.mutate(p.id)}>
-                <Button danger>Stornieren</Button>
-              </Popconfirm>
-            </Space>
-          )}
-          <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
-        </Space>
+                  type="text"
+                  loading={laeuftStatus}
+                  icon={<MoreOutlined />}
+                  // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs (Zeilen,
+                  // Karten) lieferten n gleichnamige Knöpfe kein Ziel mehr.
+                  aria-label={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
+                />
+              </Dropdown>
+            )}
+          </Space>
+        )
       }
     >
       <Row gutter={24}>
@@ -697,6 +878,34 @@ export default function PersonenDetailPage() {
           {medSpalte(p)}
         </Col>
       </Row>
+
+      <Modal
+        open={statusDialog !== null}
+        title={statusDialog ? `Status auf „${STATUS_META[statusDialog].label}" setzen?` : ''}
+        okText="Status setzen"
+        okButtonProps={{ danger: true }}
+        confirmLoading={laeuftStatus}
+        onOk={() => {
+          if (statusDialog) statusMutation.mutate({ einsatzId, personId: p.id, status: statusDialog });
+          setStatusDialog(null);
+        }}
+        onCancel={() => setStatusDialog(null)}
+      >
+        Dieser Schritt erzeugt einen Eintrag im Einsatztagebuch und wird nicht beiläufig
+        zurückgenommen.
+      </Modal>
+
+      <Modal
+        open={stornoOffen}
+        title="Person stornieren (Soft-Delete)?"
+        okText="Stornieren"
+        okButtonProps={{ danger: true }}
+        confirmLoading={stornoMutation.isPending}
+        onOk={() => { stornoMutation.mutate(p.id); setStornoOffen(false); }}
+        onCancel={() => setStornoOffen(false)}
+      >
+        Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
+      </Modal>
 
       <Modal
         open={reSichtenOffen}

@@ -106,6 +106,19 @@ const MIT_NACHBARSCHAFT = [
   // — wer den Direkt-Zweig auf ein eigenes `<Flex gap>` umbaut, fällt aus dem Scanner,
   // ohne dass sich an dieser Zeile etwas ändert.
   'meldungen/MeldungKarte.tsx',
+  // ── C5 · Personen-Detailseite (LFH-340) ───────────────────────────────────
+  // ZWEI Reihen, und nur eine davon ist neu. Die Abgleich-Zeile („Bestätigen" neben
+  // „Verwerfen"/`danger`) stand seit jeher ohne Abstand da — der Scanner hat sie beim
+  // Aufnehmen der Datei selbst gemeldet, sie war nie bewertet worden. Die UHS-Zeile
+  // („UHS ändern" neben „Austragen"/`danger`) ist mit C5 in den Zuordnungs-Expander
+  // gewandert und hat dabei ihren Abstand bekommen.
+  //
+  // Die Datei gehört SEHR WOHL in diese Liste, obwohl das Stornieren mit C5 ins
+  // Kopfmenü gezogen ist: das betrifft nur den Kopf. Beide Reihen hier tragen ihren
+  // `danger`-Knopf weiterhin direkt, und genau die sieht {@link reihenIn}. Der
+  // Menü-Trenner des Kopfes ist eine eigene Zusicherung und wird im Komponententest
+  // geprüft — er ersetzt diese Zeile nicht.
+  'pages/PersonenDetailPage.tsx',
 ];
 
 /**

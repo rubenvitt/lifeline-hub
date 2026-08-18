@@ -903,6 +903,47 @@ describe('LagekartePage', () => {
     expect(screen.getByLabelText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
   });
 
+  /**
+   * Platzier-Auftrag von außen (LFH-340 · C5). Zwei Fälle, und der zweite ist der teure:
+   *
+   * Der Effekt räumt den Parameter, bevor er ihn anwendet (apply-then-clean). `darfSchreiben`
+   * kennt aber kein „noch unbekannt" — für einen noch nicht geladenen Einsatz liefert
+   * `darfImEinsatzSchreiben` schlicht `false`. Ohne Lade-Riegel feuerte der Effekt also im
+   * ersten Commit, löschte den Auftrag und stieg aus: die Karte stünde im Normalmodus, der
+   * Deeplink wäre wirkungslos, und es gäbe weder Meldung noch zweiten Versuch.
+   *
+   * Genau dieser Fall ist der Zweck eines Deeplinks — F5, neuer Tab, geteilter Link. Der
+   * In-App-Weg über die Schadensdetailseite verdeckt ihn, weil er denselben Cache-Eintrag
+   * trifft und `darfSchreiben` dort schon im ersten Render steht.
+   */
+  it('Deeplink ?platzieren= räumt den Param und startet den Platzier-Modus (LFH-340)', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=schaden:10');
+
+    // Der Modus ist an der Anweisungskarte der Sidebar ablesbar — sie steht nur, solange
+    // `platzierungZiel` gesetzt ist (`lagekarte/Sidebar.tsx:408`).
+    expect(await screen.findByText(/Klick auf die Karte setzt die Koordinate/)).toBeInTheDocument();
+    // apply-then-clean: erst nach dem Anwenden ist der Param weg.
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+  });
+
+  it('Deeplink ?platzieren=: ein Beobachter kommt nicht in den Platzier-Modus', async () => {
+    // Der Modus endet in einem PATCH. Ohne Schreibrecht wäre der Klick auf die Karte eine
+    // Einladung in einen 403 — der Param wird trotzdem geräumt, damit ein Neuladen ihn nicht
+    // wieder aufgreift.
+    basisHandler([
+      http.get('/api/einsaetze/1', () => HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' })),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=schaden:10');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+  });
+
   it('hebt eine Zone auf (DELETE)', async () => {
     let geloescht = false;
     const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',

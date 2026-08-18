@@ -81,6 +81,35 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     expect(screen.getByText('Sachschaden')).toBeInTheDocument();
   });
 
+  /**
+   * Verortung (LFH-340 · C5, Befund M39). Beide Zweige, weil einer allein nichts belegte:
+   * „der Link steht da" wäre auch bei verorteten Schäden wahr, wenn der Zweig fehlte.
+   */
+  it('schickt einen unverorteten Schaden mit einem Auftrag auf die Karte', async () => {
+    render(einsatzAktiv, basisSchaden({ lat: null, lon: null }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(screen.getByText('nicht verortet')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Auf Karte verorten' })).toHaveAttribute(
+      'href', '/einsaetze/1/lagekarte?platzieren=schaden:10',
+    );
+  });
+
+  it('zeigt bei vorhandener Koordinate die Koordinate statt des Auftrags', async () => {
+    render(einsatzAktiv, basisSchaden({ lat: 52.1, lon: 8.5 }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(screen.queryByRole('link', { name: 'Auf Karte verorten' })).not.toBeInTheDocument();
+    expect(screen.queryByText('nicht verortet')).not.toBeInTheDocument();
+  });
+
+  it('bietet Beobachtern keinen Verortungs-Auftrag an', async () => {
+    // Der Auftrag endet in einem PATCH — ohne Schreibrecht führte der Link in einen 403,
+    // nachdem jemand bereits auf die Karte geklickt hat.
+    render(einsatzBeobachter, basisSchaden({ lat: null, lon: null }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(screen.getByText('nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Auf Karte verorten' })).not.toBeInTheDocument();
+  });
+
   it('Einsatzleitung kann bearbeiten und speichern (ohne Geschädigt → alle vier null)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, basisSchaden(), [
