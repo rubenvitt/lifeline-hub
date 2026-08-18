@@ -446,7 +446,7 @@ describe('KatalogTabelle-Ordnung', () => {
      * Der hier vorgezeichnete Weg („die Datei wandert nach `KATALOGE`") wurde dabei NICHT
      * genommen — sie hat das alles über `Datensicht` bekommen, bindet `KatalogTabelle` also
      * gar nicht mehr selbst ein und ist aus diesem Inventar ganz herausgefallen. Für die
-     * verbliebenen vier gilt der Weg unverändert.
+     * verbliebenen fünf gilt der Weg unverändert.
      */
     expect(KATALOG_QUELLEN).toHaveLength(13);
     expect(KATALOG_QUELLEN.map((q) => q.pfad)).toEqual(KATALOGE);

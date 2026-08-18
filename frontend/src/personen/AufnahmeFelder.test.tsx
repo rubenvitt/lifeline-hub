@@ -20,9 +20,13 @@ function zeige(modus: AufnahmeModus = 'schnell') {
 }
 
 describe('AufnahmeFelder — Sichtungskategorie', () => {
-  it('stellt die sechs Kategorien als Auswahlflächen bereit', () => {
+  it('stellt die sechs Kategorien als benannte Auswahlflächen bereit', () => {
     zeige();
-    const gruppe = screen.getByRole('radiogroup');
+    // ÜBER DEN NAMEN abgefragt, nicht blank: das `Form.Item`-Label allein benennt die Gruppe
+    // NICHT — `label[for]` gilt nur für labelable elements, und eine `Radio.Group` ist ein
+    // `div[role="radiogroup"]`. Ein blankes `getByRole('radiogroup')` wäre auch ohne
+    // `aria-label` grün und beliebe die Zusicherung schuldig.
+    const gruppe = screen.getByRole('radiogroup', { name: 'Sichtungskategorie' });
     const flaechen = within(gruppe).getAllByRole('radio');
     expect(flaechen).toHaveLength(6);
     // Die Reihenfolge ist die Dringlichkeit, nicht die Aufzählung des Enums.

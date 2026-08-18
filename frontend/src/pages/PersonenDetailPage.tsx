@@ -112,8 +112,6 @@ export default function PersonenDetailPage() {
    */
   const [zuordnungenOffen, setZuordnungenOffen] = useState(false);
   const [auditOffen, setAuditOffen] = useState(false);
-  // Steht hier oben statt bei den übrigen UHS-Zuständen, weil `uhsListeQuery` ihn liest —
-  // eine `const` weiter unten wäre zur Auswertungszeit noch nicht initialisiert.
   const [uhsModalOffen, setUhsModalOffen] = useState(false);
 
   const tiereDerPersonQuery = useQuery({
@@ -126,14 +124,21 @@ export default function PersonenDetailPage() {
     queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
     enabled: idGueltig && zuordnungenOffen,
   });
-  // LFH-152: UHS-Liste für die Klartext-Anzeige der aktuellen Verortung + den Zuweisungs-Picker.
-  // Der Picker ist der Grund für das `|| uhsModalOffen`: er steht IM Zuordnungs-Abschnitt,
-  // aber sein Dialog überlebt dessen Zuklappen — ohne den zweiten Zweig stünde er dann ohne
-  // Auswahlliste da. Bauform aus den beiden Zuweisungs-Pickern weiter unten.
+  /**
+   * LFH-152: UHS-Liste für die Klartext-Anzeige der aktuellen Verortung + den Zuweisungs-Picker.
+   *
+   * Hängt allein am aufgeklappten Abschnitt. Ein früherer Stand trug hier zusätzlich
+   * `|| uhsModalOffen` mit der Begründung, der Dialog überlebe das Zuklappen — die ist im
+   * Review als unbelegt aufgefallen und wieder abgetragen: **beide** Auslöser des Dialogs
+   * („UHS zuweisen", „UHS ändern") stehen INNERHALB des Abschnitts, er kann also nur offen
+   * sein, während der Abschnitt es ebenfalls ist. Danach deckt die Maske den Collapse-Kopf
+   * ab und der Fokus liegt im Dialog. Es gab keinen erreichbaren Fall, nur einen Zweig, der
+   * sich nicht widerlegen ließ — und kein Test, der ihn getroffen hätte.
+   */
   const uhsListeQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: idGueltig && (zuordnungenOffen || uhsModalOffen),
+    enabled: idGueltig && zuordnungenOffen,
   });
   const auditQuery = useQuery({
     queryKey: einsatzKeys.personAudit(einsatzId, personId),

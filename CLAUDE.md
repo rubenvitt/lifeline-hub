@@ -324,6 +324,63 @@ Alltag wichtigsten:
   Die zwei Eigenwidersprüche des Elterntickets („read-only Quick-View + Statuswahl" gegen
   LFH-19) sind damit **aufgelöst statt umbenannt**: es ist keine Fläche entstanden, die sie
   erzeugt hätte.
+- **„Genau eine Primäraktion" ist am Kopf prüfbar, nicht global** (LFH-340 · C5). Der
+  Aktionen-Slot von `components/EinsatzSeite.tsx` trägt `data-lfh="seitenkopf-aktionen"` —
+  denselben Zuschnitt, den die Dev-Warnung des Primitivs ohnehin zählt. Global gezählt wäre die
+  Aussage falsch: eine Seite mit einem Formular im Inhalt hat dort zu Recht einen
+  Absende-Knopf in Primärgestalt und fiele durch, ohne im Kopf etwas falsch zu machen.
+- **Ein Anker in der Zeile bedient den Klick allein** (LFH-340 · C5, im `Datensicht`-Primitiv
+  behoben). Eine Zeile trägt regelmäßig echte `<a>`: den Titel-Link, den das Primitiv aus
+  `karte.titel.ziel` selbst setzt, und Deeplinks aus einem Spalten-`render`. Ohne Riegel feuern
+  bei EINEM Klick beide Wege — der Link navigiert auf sein Ziel, `onZeileKlick` schickt dieselbe
+  Zeile auf ihre Detailseite; bei gleichem Ziel unbemerkt, bei verschiedenem gewinnt der zweite.
+  Am sichtbarsten beim **Modifier-Klick**: Cmd/Strg öffnet den neuen Tab (der Browser bedient
+  das, `defaultPrevented` bleibt false) — und die aktuelle Seite navigiert trotzdem weg. Der
+  Riegel (`event.target.closest('a')`) sitzt im **Primitiv**, nicht an jedem Link: die Regel
+  „trägt `titel.ziel` einen Wert, darf das `render` keinen Anker erzeugen" verbietet dem
+  Konsumenten gerade, den Titel-Link selbst zu bauen — er kann dort nichts stoppen. Gemessen
+  hatte **kein** Konsument dafür einen Test außer der Schadensliste, die vor ihrem Umbau eine
+  handgebaute Tabelle mit eigenem `stopPropagation` war.
+- **Die Sichtungskategorie geht mit dem Anlegen mit, nicht als zweiter Request** (LFH-340 · C5).
+  `POST /api/einsaetze/{id}/personen` nimmt ein optionales `sichtung` und schreibt die Sichtung
+  in **derselben Transaktion** wie die Anlage, inklusive `erfasst → betroffen`. Der naheliegende
+  Weg — anlegen, dann `POST …/sichtung` nachschieben — ist gesperrt, und zwar nicht aus
+  Geschwindigkeit: die Personen-Erfassung hat eine **Offline-Queue mit `client_id`-Idempotenz**
+  (`offline/schreiben.ts`), ein nachgeschobener Call hätte keine, und ein Replay legte die
+  Sichtung ein zweites Mal in die Kette, aus der der medizinische Verlauf gelesen wird. Deshalb
+  steht sie serverseitig unter `war_neu`, und die Antwort wird **nach** der Sichtung geladen —
+  sonst trüge die Quittung einen Zustand, den es nie gab. Die Kombination mit
+  `status: 'vermisst'` ist **422** (eine vermisste Person ist nicht angetroffen), ein unbekannter
+  Kategoriewert **400**.
+- **Eine Erfassungsmaske ist ein Bauteil, kein Ort** (LFH-340 · C5). `personen/AufnahmeFelder.tsx`
+  ist eine reine Feldgruppe **ohne eigenes `<Form>`** und hängt an zwei Mounts: dem
+  Schnellerfassungs-Modal der Liste und der Route `/einsaetze/:id/personen/aufnahme`. Zwei Kopien
+  wären zwei Feldbudgets, zwei Tastaturwege und zwei Stellen, an denen ein Feld fehlen kann.
+  **Das Feldbudget verschiebt, es wächst nicht**: die Sichtung ist ins sichtbare Budget gerückt,
+  der **Name** dafür unter „Weitere Angaben" — an der Aufnahme wird zuerst die Kategorie
+  vergeben, der Name ist der langsamste Teil und meist unbekannt. Wer eine Testabfrage auf
+  `getByLabelText('Name')` findet, klappt auf statt das Budget zu dehnen.
+  **Der Widerspruch „≤ 4 Interaktionen ohne Seitenwechsel" gegen „eigene Vollseite" ist
+  aufgelöst, nicht umbenannt**: den Zählweg erfüllt das Modal (offen → Kategorie → speichern,
+  URL unverändert), die Route ist die **Anspring-Adresse** für andere Module (C6) — ein Dialog
+  hat keine. Beide zeigen dieselbe Maske.
+- **`SK_META` führt antd-TAG-Farbnamen, keine CSS-Werte** (LFH-340 · C5). Sie in ein
+  `style={{ color }}` zu schreiben ergibt einen **anderen** Ton als überall sonst — CSS-`gold`
+  ist nicht antds Gold — und wäre damit ein erfundener Farbwert, den `theme/tokens.ts` nicht
+  kennt. Wo eine Fläche die Kategorie farbig zeigen soll, trägt ein `<Tag color={…}>` **in** der
+  Fläche die Farbe, nicht die Fläche selbst; das hält zugleich „Statusfarbe nur als
+  Punkt/Rand/Beistrich, nie als Textfläche". Der zweite Kanal ist die Beschriftung — „SK I" sagt
+  es auch ohne jede Farbe, weshalb `unverletzt` mit `color: 'default'` vollwertig ist.
+- **Ein Verortungsauftrag geht als Deeplink an die Karte** (LFH-340 · C5):
+  `lagekartePfad(einsatzId, { platzieren: { typ, id } })` erzeugt `?platzieren=<typ>:<id>`,
+  `parsePlatzierenAuftrag` liest ihn zurück, `pages/LagekartePage.tsx` schickt die Karte in den
+  Platzier-Modus und **räumt den Parameter** (apply-then-clean wie beim
+  Gefahrengebiet-Deeplink) — ein stehengebliebener Auftrag schickte die Karte bei jedem
+  Neuladen erneut hinein. Der Parser verwirft Unbrauchbares **ganz** statt halb zu füllen, und
+  ohne Schreibrecht wird der Modus gar nicht erst betreten: er endet in einem PATCH, und ein 403
+  nach dem Klick auf die Karte wäre die späteste denkbare Absage. **Vertagt und benannt:** ein
+  Koordinatenfeld in der Schadens-**Erfassung** — `SchadenEingabe` kennt kein lat/lon (nur
+  `SchadenPatch`), das ist eine Backend-Erweiterung und liegt als **LFH-453**.
 - **Ein Emoji ist keine Ikone** (30.07.2026, Kräfteliste). Wo ein Bildzeichen für etwas steht —
   Personal, Fahrzeug, Material, Erreichbarkeit, gesperrt, in Arbeit —, trägt es ein
   `@ant-design/icons`-Element, nie ein Emoji. Begründung: Zeichnung, Farbe und Breite eines

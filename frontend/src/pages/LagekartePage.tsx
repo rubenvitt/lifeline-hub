@@ -278,16 +278,38 @@ export default function LagekartePage() {
    * `darfSchreiben` ist Bedingung, nicht Höflichkeit: der Platzier-Modus endet in einem
    * PATCH, den ein Beobachter nicht senden darf — ohne den Riegel liefe er in einen 403,
    * nachdem er bereits auf die Karte geklickt hat.
+   *
+   * ── DER LADE-RIEGEL IST DER KERN, NICHT DIE FORMALIE ────────────────────────
+   *
+   * `if (ladt) return` MUSS vor dem Räumen stehen, und zwar wegen einer Kette, die im
+   * Review gemessen wurde: `darfImEinsatzSchreiben` kennt kein „noch unbekannt" — für
+   * `einsatz === undefined` liefert es schlicht `false` (`einsatz/schreibrecht.ts`). Während
+   * des Abrufs ist `einsatz` regulär leer, und `EinsatzLayout` rendert den `<Outlet/>` dabei
+   * weiter (sein Frühausstieg hängt nur an `isError`). Effekte laufen nach dem ersten
+   * Commit, also VOR dem `if (ladt)` weiter unten.
+   *
+   * Ohne diesen Riegel bricht genau der Fall, für den ein Deeplink existiert: F5, neuer Tab
+   * oder ein geteilter Link. Der Effekt feuert mit `darfSchreiben === false`, löscht den
+   * Parameter und steigt aus — die Karte steht im Normalmodus, der Auftrag ist weg, es gibt
+   * keine Meldung und keinen zweiten Versuch. Der In-App-Weg über `SchaedenDetailPage`
+   * verdeckt das: der trifft denselben Cache-Eintrag und hat `darfSchreiben` schon im ersten
+   * Render. Dieselbe Wartebedingung trägt der Gefahrengebiet-Effekt darüber („auf spätere
+   * Runde warten") und `SchaedenPage.tsx` für `?neu=1`.
    */
   useEffect(() => {
     const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
     if (!auftrag) return;
+    if (ladt) return;
+    // ERST ANWENDEN, DANN RÄUMEN — apply-then-clean heißt genau diese Reihenfolge, und der
+    // Gefahrengebiet-Effekt darüber hält sie ebenso (`setZoneAuswahl`/`setFlyToZiel` vor dem
+    // `delete`). Umgekehrt gemessen: mit dem Räumen zuerst kam die Navigation nicht durch,
+    // während der Modus startete — der Parameter blieb in der URL stehen und der nächste
+    // Neuladen-Vorgang schickte die Karte erneut hinein.
+    if (darfSchreiben) onPlatzierenStart(auftrag);
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('platzieren');
     setSearchParams(naechste, { replace: true });
-    if (!darfSchreiben) return;
-    onPlatzierenStart(auftrag);
-  }, [searchParams, setSearchParams, darfSchreiben, onPlatzierenStart]);
+  }, [searchParams, setSearchParams, ladt, darfSchreiben, onPlatzierenStart]);
 
   if (ladt) {
     return <SeitenSkeleton />;

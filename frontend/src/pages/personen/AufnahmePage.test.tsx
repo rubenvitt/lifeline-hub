@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -24,6 +24,7 @@ class FakeEventSource {
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  sessionStorage.clear();
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -135,6 +136,33 @@ describe('AufnahmePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('PERSONENLISTE')).toBeInTheDocument();
+  });
+
+  /**
+   * Der sitzungsweite Antreffort gilt an BEIDEN Mounts (im Review gefunden, LFH-340 · C5).
+   * `uebernahme={['antreff_ort']}` deckt nur innerhalb eines Laufs ab — wer die Route
+   * verlässt und zurückkommt, fand das Feld vorher leer, während derselbe Weg über das
+   * Modal vorbelegt hätte. Ausgerechnet hier, wo der Serienbetrieb der Normalfall ist.
+   *
+   * Beide Richtungen, weil eine allein nichts belegt: Schreiben ohne Lesen wäre unsichtbar,
+   * Lesen ohne Schreiben käme nie an einen Wert.
+   */
+  it('merkt den Antreffort für die Sitzung und setzt ihn beim Wiederkommen ein', async () => {
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 })),
+    ]);
+    await screen.findByRole('radiogroup', { name: 'Sichtungskategorie' });
+
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await screen.findByText(/Erfasst als R-047/);
+    expect(sessionStorage.getItem('lfh:erfassung:1:person:antreff_ort')).toBe('Sammelstelle Süd');
+
+    // Die Seite frisch betreten — wie nach einem Abstecher in die Liste.
+    cleanup();
+    render(einsatzAktiv);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'));
   });
 
   it('zeigt Beobachtern den Hinweis statt der Maske', async () => {

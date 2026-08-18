@@ -417,10 +417,21 @@ export function useKartenInteraktion({
   // --- Start-/Reset-Handler (mutually-exclusive Modi) -------------------------
   // Ein Start setzt nur noch SEINEN Modus — der Reducer verdrängt jeden anderen. Die
   // früheren Reset-Kaskaden (je Handler ein anderes, unvollständiges Subset) entfallen.
-  const onPlatzierenStart = (z: { typ: PlatzierenPunktTyp; id: number }) => {
+  /**
+   * `useCallback` aus demselben Grund wie bei `setAuswahl`/`setZoneAuswahl` oben — und seit
+   * LFH-340 · C5 mit einem zweiten, gemessenen: dieser Handler steht in den Deps eines
+   * Effekts von `LagekartePage` (Platzier-Deeplink `?platzieren=<typ>:<id>`).
+   *
+   * Ohne stabile Identität lief dieser Effekt bei JEDEM Render neu. Da er selbst rendert
+   * (Modus setzen) und danach die URL räumt, drehte sich das: Effekt → Render → Effekt mit
+   * noch nicht aktualisiertem `searchParams` → erneutes Räumen … Der Parameter blieb dabei
+   * in der URL stehen, und der Test lief in seinen Timeout statt in eine Zusicherung.
+   * `dispatch` und `setAuswahl` sind beide stabil, die leeren Deps sind also vollständig.
+   */
+  const onPlatzierenStart = useCallback((z: { typ: PlatzierenPunktTyp; id: number }) => {
     dispatch({ t: 'platzieren', ziel: z });
     setAuswahl(null);
-  };
+  }, [setAuswahl]);
   const onPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['platzieren'] });
   const onAbschnittZeichnenStart = (id: number) => {
     dispatch({ t: 'abschnitt', id });

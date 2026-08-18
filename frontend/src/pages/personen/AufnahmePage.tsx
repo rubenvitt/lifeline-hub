@@ -1,7 +1,7 @@
 import { Alert, App, Breadcrumb, Form, Space, Tag } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -9,6 +9,10 @@ import { registrierAnzeige } from '../../api/einsatzPerson';
 import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ErfassungsFormular } from '../../components/Erfassung';
+import {
+  liesErfassungsSitzungswert,
+  schreibeErfassungsSitzungswert,
+} from '../../components/erfassungsSitzung';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SK_META } from '../../personen/personMeta';
@@ -49,6 +53,27 @@ export default function AufnahmePage() {
   const { message } = App.useApp();
   const [form] = Form.useForm<AufnahmeEingabe>();
   const [quittung, setQuittung] = useState<string | null>(null);
+  const sitzungsortGeladen = useRef<number | null>(null);
+
+  /**
+   * DER SITZUNGSWEITE ANTREFFORT GILT AN BEIDEN MOUNTS (im Review gefunden). Das Modal las
+   * ihn beim Öffnen und schrieb ihn nach jeder erfolgreichen Mutation zurück; diese Route
+   * tat weder das eine noch das andere — ausgerechnet dort, wo der Serienbetrieb der
+   * Normalfall ist. Wer hier fünf Personen von derselben Sammelstelle erfasst, kurz in die
+   * Liste geht und zurückkommt, fand das Feld leer, während derselbe Weg über das Modal
+   * vorbelegt hätte. `uebernahme={['antreff_ort']}` deckt nur INNERHALB eines Laufs ab.
+   *
+   * Der Wert wird als Formularwert gesetzt und NICHT zu `initialValues`: sonst füllte jeder
+   * Serien-Reset den Ort auch bei ausgeschaltetem „Werte behalten" heimlich wieder auf —
+   * dieselbe Begründung wie im Modal. Der Merker sorgt dafür, dass ein späterer Render den
+   * bereits getippten Ort nicht überschreibt.
+   */
+  useEffect(() => {
+    if (sitzungsortGeladen.current === einsatzId) return;
+    sitzungsortGeladen.current = einsatzId;
+    const ort = liesErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort');
+    if (ort !== undefined) form.setFieldValue('antreff_ort', ort);
+  }, [einsatzId, form]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -142,6 +167,14 @@ export default function AufnahmePage() {
           laeuft={anlegenMutation.isPending}
           // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
           onErfassen={(daten) => anlegenMutation.mutateAsync(daten)}
+          // Erst die Post-Acceptance-Stufe der Hülle darf den Sitzungswert ändern: ein
+          // Abbruch während des POST besteht die Generation davor nicht (Muster aus
+          // `PersonErfassungModal`).
+          onErfasst={(daten) => {
+            if (typeof daten.antreff_ort === 'string') {
+              schreibeErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort', daten.antreff_ort);
+            }
+          }}
           /**
            * Die beiden Knöpfe der Hülle bekommen hier ihre Bedeutung aus der Serie:
            * „Speichern und nächste" hält die Seite, der Primär-Knopf „Erfassen" speichert

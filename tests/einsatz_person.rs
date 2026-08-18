@@ -1660,8 +1660,20 @@ async fn anlegen_mit_unbekannter_sichtung_ist_400() {
 #[tokio::test]
 async fn replay_derselben_client_id_legt_die_sichtung_nicht_doppelt_an() {
     // Der Fall, der diese Erweiterung überhaupt rechtfertigt: der Offline-Replay schickt
-    // denselben Body erneut. Ohne die `war_neu`-Bedingung stünde die Sichtung danach zweimal
-    // im Verlauf — der Kette, aus der der medizinische Verlauf gelesen wird.
+    // denselben Body erneut, und danach steht genau EINE Person mit genau EINER Sichtung da.
+    //
+    // WAS DIESER FALL NICHT BELEGT, und das ist wichtiger als was er belegt: er trifft die
+    // `war_neu`-Bedingung im Handler NICHT. Der Replay-Lookup vor der Transaktion
+    // (`repo::laden_nach_client_id`) trägt dasselbe Prädikat wie der In-Tx-Zweig und gibt
+    // vorher zurück — der zweite POST erreicht die Transaktion gar nicht. Der Test bliebe
+    // also auch dann grün, wenn jemand das `if war_neu` um den Sichtungs-Block entfernte.
+    //
+    // Geprüft wird deshalb der WEG (Replay → keine zweite Person, keine zweite Sichtung),
+    // nicht der Riegel. Der ist gegen ein Rennen zwischen Pool-Read und `BEGIN IMMEDIATE`
+    // gebaut, das ein sequentieller HTTP-Test nicht erzeugen kann; die Begründung steht am
+    // Code. Ein ehrlicher Beweis wäre ein Tx-Test nach dem Muster von
+    // `src/person/repo.rs` (zweimal `anlegen_tx_mit_optionen`, `neu1` / `!neu2`) — er müsste
+    // die Sichtungslogik allerdings erst aus dem Handler herauslösen.
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;

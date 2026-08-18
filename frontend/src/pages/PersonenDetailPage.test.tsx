@@ -790,7 +790,6 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
-    await klappeZuordnungenAuf();
     expect(await screen.findByText('BHP 50')).toBeInTheDocument();
     expect(screen.queryByText('BHP geplant')).not.toBeInTheDocument();
   });

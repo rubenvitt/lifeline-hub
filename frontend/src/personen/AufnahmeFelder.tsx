@@ -86,20 +86,45 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
             * `name` ist Pflicht, nicht Zierde: zwei Radio-Gruppen ohne ihn gruppieren im
             * selben Teilbaum nativ zusammen.
             *
-            * DIE FARBE TRÄGT EIN `Tag` IN DER FLÄCHE, nicht die Fläche selbst — und das ist
-            * eine Entscheidung, keine Umständlichkeit. Das Ticket sagt „SK_META-Farben";
-            * `SK_META` führt aber antd-TAG-Farbnamen („red", „gold", „default"), keine
-            * CSS-Werte. Sie in ein `style={{ color }}` zu schreiben, wäre ein ANDERER
-            * Farbton als überall sonst — CSS-`gold` ist nicht antds Gold — und damit ein
-            * erfundener Farbwert, den `theme/tokens.ts` nicht kennt. Mit dem `Tag` steht
-            * hier dieselbe Farbe wie in Liste und Detailseite, und die Regel „Statusfarbe
-            * nur als Punkt/Rand/Beistrich, nie als Textfläche" hält wörtlich.
+            * DIE FARBE TRÄGT EIN `Tag` IN DER FLÄCHE, nicht die Fläche selbst. Das Ticket
+            * sagt „SK_META-Farben"; `SK_META` führt aber antd-TAG-Farbnamen („red", „gold",
+            * „default"), keine CSS-Werte. Sie in ein `style={{ color }}` zu schreiben wäre
+            * ein ANDERER Farbton als überall sonst — CSS-`gold` ist nicht antds Gold — und
+            * damit ein erfundener Farbwert, den `theme/tokens.ts` nicht kennt. Mit dem `Tag`
+            * steht hier dieselbe Farbe wie in Liste und Detailseite.
+            *
+            * WAS DAS NICHT IST: eine Einlösung von „Statusfarbe nur als Punkt/Rand/Beistrich,
+            * nie als Textfläche". Ein früherer Stand dieses Kommentars hat das behauptet und
+            * lag falsch (im Review gemessen): antds `Tag` steht per Vorgabe auf
+            * `variant: 'filled'` und rechnet in JEDEM Zweig einen Hintergrund
+            * (`tag/hooks/useColor.js`). Das `Tag` ist gegenüber einer eingefärbten
+            * Auswahlfläche die kleinere Fläche und die im Repo etablierte SK-Darstellung —
+            * mehr sagt es nicht.
+            *
+            * DAZU EIN OFFENER BESTANDSBEFUND, den C5 nicht verursacht, aber stärker belichtet
+            * hat: `SK_META.tot.color = 'black'` ist KEIN antd-Preset (die Liste führt 13
+            * Namen, `black` ist keiner). Für Nicht-Presets rechnet `useColor` ein statisches
+            * Paar aus der Zeichenkette — Grund auf `hsl.l = 0.95`, Text im Ton —, das weder
+            * `theme/tokens.ts` noch den Nachtmodus kennt und dort unverändert hell steht.
+            * Die Farbachse der Betroffenen-Module liegt als LFH-455.
             *
             * Der zweite Kanal (WCAG 1.4.1) ist die Beschriftung selbst: „SK I" sagt es auch
             * ohne jede Farbe. Deshalb ist auch „unverletzt" mit `color: 'default'`
             * vollwertig und braucht keinen erfundenen Ton.
             */}
-          <Radio.Group name="sichtung" optionType="button" buttonStyle="outline">
+          {/* `aria-label` zusätzlich zum `Form.Item`-Label, und das ist kein Gürtel-plus-
+              Hosenträger: antds `FormItemLabel` rendert ausschließlich `<label htmlFor>`,
+              und `label[for]` benennt in HTML nur *labelable elements*. Eine
+              `Radio.Group` ist ein `div[role="radiogroup"]` und gehört nicht dazu — ohne
+              den Namen stünden hier sechs Auswahlflächen in einer namenlosen Gruppe.
+              Dieselbe Lösung tragen die benannten Gruppen der Kopfzeile
+              („Farbschema wählen", „Bediendichte wählen"). */}
+          <Radio.Group
+            name="sichtung"
+            aria-label="Sichtungskategorie"
+            optionType="button"
+            buttonStyle="outline"
+          >
             {SK_REIHE.map((k) => (
               <Radio.Button key={k} value={k} style={flaeche}>
                 <Tag color={SK_META[k].color} style={{ marginInlineEnd: 0 }}>

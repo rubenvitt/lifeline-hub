@@ -238,7 +238,7 @@ pub async fn anlegen(
         .await?
         .etb_startwert();
     let (person, war_neu) = crate::write_retry!(&state.pool, |conn| {
-        let (id, _reg, war_neu) = repo::anlegen_tx_mit_optionen(
+        let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
             conn,
             einsatz_id,
             benutzer.id,
@@ -258,18 +258,27 @@ pub async fn anlegen(
         )
         .await?;
         if war_neu {
-            // Der Reload steht bewusst NACH der Sichtung, aber der ETB-Text braucht die
-            // Registriernummer schon davor — deshalb hier ein erster, schlanker Griff.
-            let angelegt = repo::laden_tx(conn, einsatz_id, id).await?;
-            let text = format!(
-                "Person {} erfasst",
-                registrier_anzeige(angelegt.registrier_nr)
-            );
+            // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
+            // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
+            // ein zweiter Roundtrip für einen Wert, der schon dasteht.
+            let text = format!("Person {} erfasst", registrier_anzeige(reg));
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
 
-            // Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
-            // (`client_id` bereits bekannt) stünde die Sichtung sonst ein zweites Mal im
-            // Verlauf — in genau der Kette, aus der der medizinische Verlauf gelesen wird.
+            /*
+             * Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
+             * stünde sie sonst ein zweites Mal im Verlauf — in genau der Kette, aus der der
+             * medizinische Verlauf gelesen wird.
+             *
+             * DIESER RIEGEL IST PER HTTP NICHT ERREICHBAR, und das gehört dazu: der
+             * Replay-Lookup oben (`laden_nach_client_id`, vor der Transaktion) trägt
+             * dasselbe Prädikat wie der In-Tx-Zweig und gibt vorher zurück. `war_neu` wird
+             * hier also nur dann false, wenn ein fremder Commit zwischen Pool-Read und
+             * `BEGIN IMMEDIATE` fällt — ein sequentieller Test kann das nicht erzeugen.
+             * `replay_derselben_client_id_legt_die_sichtung_nicht_doppelt_an` belegt
+             * deshalb den WEG (ein Replay erzeugt keine zweite Person und keine zweite
+             * Sichtung), nicht diese Bedingung; sie bliebe auch ohne sie grün. Wer den
+             * Riegel entfernt, bricht keinen Test — er bricht das Rennen.
+             */
             if let Some(k) = kategorie {
                 sichtung_repo::erfassen_tx(
                     conn,
@@ -285,7 +294,7 @@ pub async fn anlegen(
                 .await?;
                 let text = format!(
                     "Person {}: Sichtung {}",
-                    registrier_anzeige(angelegt.registrier_nr),
+                    registrier_anzeige(reg),
                     k.etb_label()
                 );
                 crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
