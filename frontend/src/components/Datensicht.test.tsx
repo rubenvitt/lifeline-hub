@@ -818,6 +818,50 @@ describe('Datensicht · Kartenzweig', () => {
     expect(screen.getAllByText('verfügbar')).toHaveLength(3);
   });
 
+  it('ohne statusBedienung bleibt das Etikett reine Anzeige — kein Auslöser', () => {
+    // Die Gegenaussage zum Test darunter. Ohne sie wäre „der Slot ist bedienbar" auch dann
+    // grün, wenn JEDES Etikett zum Knopf würde.
+    setzeViewportBreite(390);
+    const { container } = rendere({
+      karte: { ...karte, status: () => ({ rolle: 'normal', label: 'verfügbar' }) },
+    });
+    const etiketten = container.querySelectorAll('[data-lfh="datensicht-karte"] .ant-tag');
+    expect(etiketten).toHaveLength(3);
+    for (const t of etiketten) expect(t.closest('button')).toBeNull();
+  });
+
+  it('mit statusBedienung wird das Statusetikett zum Auslöser der Statuswahl', async () => {
+    // Der Bedienweg sitzt am STATUS-Slot, nicht am Aktions-Slot: `Datensicht` sichert
+    // genau EINE Primäraktion zu, und die ist auf den drei Kräfteseiten mit „Entfernen"
+    // belegt. Bedient wird deshalb dort, wo der Status schon steht (LFH-339 · C4, Z3).
+    setzeViewportBreite(390);
+    const onWaehlen = vi.fn();
+    rendere({
+      karte: {
+        ...karte,
+        status: () => ({ rolle: 'normal', label: 'verfügbar' }),
+        statusBedienung: (f) => ({
+          kennung: f.funkrufname,
+          aktuell: 'frei',
+          optionen: [
+            { wert: 'frei', label: 'verfügbar' },
+            { wert: 'gebunden', label: 'gebunden' },
+          ],
+          onWaehlen,
+        }),
+      },
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Status von Florian 1 ändern' }));
+    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+    );
+    expect(offen).toHaveLength(1);
+    const menue = offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /gebunden/ }));
+    expect(onWaehlen).toHaveBeenCalledWith('gebunden');
+  });
+
   it('Gruppen erscheinen im Kartenzweig als Köpfe mit Zähler', () => {
     setzeViewportBreite(390);
     rendere({

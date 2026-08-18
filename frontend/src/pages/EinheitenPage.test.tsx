@@ -47,6 +47,106 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv', sprechgruppen: unk
   ];
 }
 
+describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
+  /**
+   * Der Knopf schrieb SOFORT einen Datensatz namens „Neue Einheit" in die Datenbank —
+   * vor jeder Eingabe. Wer ihn versehentlich traf oder es sich anders überlegte, hinterließ
+   * eine Platzhalter-Einheit in der Gliederung, und die stand danach in jedem Baum, jeder
+   * Auswahlliste und jeder Stärkeaggregation.
+   */
+  function bildenHandler() {
+    const angelegt: unknown[] = [];
+    return {
+      angelegt,
+      handler: http.post('/api/einsaetze/1/einheiten', async ({ request }) => {
+        const body = await request.json();
+        angelegt.push(body);
+        return HttpResponse.json({ ...einheiten[0], id: 99, name: (body as { name: string }).name });
+      }),
+    };
+  }
+
+  it('öffnet einen Dialog und legt dabei NOCH NICHTS an', async () => {
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(angelegt).toHaveLength(0);
+  });
+
+  it('Abbrechen legt nichts an und lässt keinen Wortlaut zurück', async () => {
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Verworfen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+
+    /**
+     * KEINE Zusicherung über das Verschwinden des Dialogs. GEMESSEN: antd hält den Knoten
+     * samt `.ant-modal-wrap` für seine Schliessanimation im Baum, und die läuft in jsdom
+     * nie ab — weder `queryByRole('dialog') === null` noch `not.toBeVisible()` wird je
+     * wahr. Beides wäre ein dauerhaft roter Test, der nichts über das Verhalten sagt.
+     *
+     * Geprüft werden stattdessen die zwei Aussagen, die zählen und messbar sind: es ist
+     * nichts angelegt worden, und der verworfene Wortlaut ist beim nächsten Öffnen weg
+     * (Reset auf JEDEM Ausweg, Erfassungs-Norm aus LFH-332 · B4). Die zweite ist die
+     * schärfere — ein stehengebliebener Name legte beim nächsten Mal eine Dublette an.
+     */
+    expect(angelegt).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
+  });
+
+  it('erst das Absenden mit Namen legt an — und nie als „Neue Einheit"', async () => {
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), '2. Zug');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
+
+    await waitFor(() => expect(angelegt).toHaveLength(1));
+    expect((angelegt[0] as { name: string }).name).toBe('2. Zug');
+    expect(JSON.stringify(angelegt[0])).not.toContain('Neue Einheit');
+  });
+
+  it('ohne Namen wird nicht abgesendet', async () => {
+    // Die Gegenprobe zum Test darüber: ohne sie wäre „legt erst beim Absenden an" auch
+    // dann grün, wenn der Dialog jede leere Eingabe durchreichte.
+    const { angelegt, handler } = bildenHandler();
+    server.use(...handlers(), handler);
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
+    // Über die Fehlerklasse, nicht über `role="alert"`: antds Form-Erklärung trägt
+    // `.ant-form-item-explain-error` und keine ARIA-Rolle (gemessen). Die eigentliche
+    // Aussage ist die Zeile darunter — der Klick hat nichts angelegt.
+    await waitFor(() =>
+      expect(dialog.querySelector('.ant-form-item-explain-error')).not.toBeNull(),
+    );
+    expect(angelegt).toHaveLength(0);
+  });
+});
+
 describe('EinheitenPage', () => {
   /**
    * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
@@ -79,48 +179,61 @@ describe('EinheitenPage', () => {
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
-  it('weist alle dargestellten Zuordnungsbestände mit dem ältesten erfolgreichen Stand aus', async () => {
+  it('weist den Stand der Gliederung aus', async () => {
+    /**
+     * Die Seite trägt seit LFH-339 · C4 nur noch die Gliederung — die Zusicherung über den
+     * ÄLTESTEN Stand mehrerer Bestände ist mit der Detailansicht auf
+     * `EinheitDetailPage.test.tsx` gezogen. Hier gibt es genau eine dargestellte Quelle,
+     * und ihr Stand ist der angezeigte.
+     */
     server.use(...handlers());
     const client = neuerQueryClient();
     const einheitenStand = new Date('2026-01-01T10:12:00Z').getTime();
-    const abschnitteStand = new Date('2026-01-01T10:10:00Z').getTime();
-    const personalStand = new Date('2026-01-01T09:05:00Z').getTime();
-    const fahrzeugeStand = new Date('2026-01-01T10:08:00Z').getTime();
-    const materialStand = new Date('2026-01-01T10:09:00Z').getTime();
-    for (const key of [
-      einsatzKeys.einheiten(1),
-      einsatzKeys.abschnitte(1),
-      einsatzKeys.personal(1),
-      einsatzKeys.fahrzeuge(1),
-      einsatzKeys.material(1),
-    ]) client.setQueryDefaults(key, { staleTime: Infinity });
+    client.setQueryDefaults(einsatzKeys.einheiten(1), { staleTime: Infinity });
     client.setQueryData(einsatzKeys.einheiten(1), einheiten, { updatedAt: einheitenStand });
-    client.setQueryData(einsatzKeys.abschnitte(1), [], { updatedAt: abschnitteStand });
-    client.setQueryData(einsatzKeys.personal(1), [], { updatedAt: personalStand });
-    client.setQueryData(einsatzKeys.fahrzeuge(1), [], { updatedAt: fahrzeugeStand });
-    client.setQueryData(einsatzKeys.material(1), [], { updatedAt: materialStand });
 
     renderMitProviders(
       <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
       { route: '/einsaetze/1/einheiten', client },
     );
 
-    expect(await screen.findByText('1. Zug')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
     expect(screen.getByLabelText(
-      `Datenstand ${formatiereDatenstand(personalStand)}`,
-    )).toBeInTheDocument();
-    expect(screen.queryByLabelText(
       `Datenstand ${formatiereDatenstand(einheitenStand)}`,
-    )).not.toBeInTheDocument();
+    )).toBeInTheDocument();
   });
 
-  it('selektiert per ?einheit=<id> die Einheit (LFH-25 Inspector-Deeplink)', async () => {
+  it('leitet den Bestands-Deeplink ?einheit=<id> auf die Item-Route weiter', async () => {
+    /**
+     * Der Query-Param war das Muster für Module OHNE Detailansicht (LFH-25). Seit C4 hat
+     * die Einheit eine — andere Module verlinken aber weiter mit `?einheit=`, deshalb wird
+     * der Param übersetzt statt fallengelassen.
+     */
     server.use(...handlers());
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<div>Detail von Einheit</div>} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten?einheit=10' },
     );
-    expect(await screen.findByText('Einheit: 1. Zug')).toBeInTheDocument();
+    expect(await screen.findByText('Detail von Einheit')).toBeInTheDocument();
+  });
+
+  it('eine unbekannte Kennung in ?einheit= bleibt auf der Gliederung', async () => {
+    // Die Gegenprobe: ohne sie wäre die Weiterleitung auch dann grün, wenn sie JEDE Zahl
+    // in eine Detailroute übersetzte — und die Detailseite zeigte dann einen Leerzustand,
+    // wo eine Gliederung stehen sollte.
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<div>Detail von Einheit</div>} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten?einheit=999' },
+    );
+    expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
+    expect(screen.queryByText('Detail von Einheit')).toBeNull();
   });
 
   it('zeigt „Einheit bilden" bei Schreibrecht', async () => {
@@ -144,66 +257,6 @@ describe('EinheitenPage', () => {
     );
   });
 
-  it('zeigt SprechgruppenPicker im Einheit-Formular', async () => {
-    server.use(...handlers());
-    renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
-      { route: '/einsaetze/1/einheiten' },
-    );
-    // Klick auf die Einheit im Baum öffnet das Formular
-    await userEvent.click(await screen.findByText('1. Zug'));
-    // Picker-Label ist sichtbar
-    expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
-    // Die zugeordnete Sprechgruppe erscheint (als Picker-Tag und in der Funk-Zusammenfassung).
-    expect((await screen.findAllByText('412_F_DRK')).length).toBeGreaterThanOrEqual(1);
-  });
-
-  // LFH-108: Funk-/Kommunikationsdaten auch an der Einheit pflegbar + sichtbar.
-  it('zeigt und sendet Kommunikationsmittel + Erreichbarkeit der Einheit', async () => {
-    let patchBody: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers(),
-      http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...einheiten[0], ...patchBody });
-      }),
-    );
-    renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
-      { route: '/einsaetze/1/einheiten' },
-    );
-    await userEvent.click(await screen.findByText('1. Zug'));
-
-    await userEvent.type(await screen.findByLabelText('Erreichbarkeit / Nummer'), '0151 23456');
-    await userEvent.click(screen.getByLabelText('Kommunikationsmittel'));
-    await userEvent.click(await screen.findByText('Digitalfunk'));
-
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody).not.toBeNull());
-    expect(patchBody).toMatchObject({ kommunikationsmittel: 'digitalfunk', erreichbarkeit: '0151 23456' });
-  });
-
-  it('sendet sprechgruppe_ids beim Speichern einer Einheit', async () => {
-    let patchBody: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers(),
-      http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...einheiten[0], ...patchBody });
-      }),
-    );
-    renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
-      { route: '/einsaetze/1/einheiten' },
-    );
-    await userEvent.click(await screen.findByText('1. Zug'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody).not.toBeNull());
-
-    // sprechgruppe_ids wird gesendet (vorbelegt mit tmoSprechgruppe.id=7)
-    expect(patchBody).toHaveProperty('sprechgruppe_ids');
-    expect((patchBody!['sprechgruppe_ids'] as number[])).toContain(7);
-  });
 });
 
 /**
@@ -302,63 +355,8 @@ describe('EinheitenPage · Datenzustände', () => {
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
   });
 
-  it('ohne Auswahl steht die Aufforderung — und trägt KEINE Aktion', async () => {
-    const { container } = zeige();
-    expect(await screen.findByText('Wähle eine Einheit im Baum')).toBeInTheDocument();
-    const karte = [...container.querySelectorAll<HTMLElement>('.ant-card')]
-      .find((k) => k.textContent?.includes('Wähle eine Einheit im Baum'));
-    expect(karte, 'die Detailkarte muss die Aufforderung tragen').toBeTruthy();
-    // Eine Primäraktion wäre hier sinnlos: die Handlung liegt im Baum, nicht in dieser
-    // Karte. Geprüft wird die KARTE, nicht die Seite — der Kopf trägt „Einheit bilden".
-    expect(within(karte!).queryByRole('button')).toBeNull();
-  });
-
-  /**
-   * Das Typ-Feld wird über sein FORMULARLABEL gegriffen, nicht über den Platzhalter: die
-   * gewählte Einheit trägt `typ_id: 1`, das Feld zeigt also einen Wert und gar keinen
-   * Platzhalter mehr (gemessen — der Griff über „Typ wählen" fand nichts).
-   */
-  it('gescheiterter Typkatalog: das Auswahlfeld nennt den Ausfall', async () => {
-    zeige(http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })));
-    await userEvent.click(await screen.findByText('1. Zug'));
-    await userEvent.click(await screen.findByLabelText('Typ'));
-    expect(await screen.findByText('Einheitentypen konnten nicht geladen werden')).toBeInTheDocument();
-  });
-
-  it('Partnerhälfte: mit Typkatalog steht die Auswahl statt der Meldung', async () => {
-    zeige();
-    await userEvent.click(await screen.findByText('1. Zug'));
-    await userEvent.click(await screen.findByLabelText('Typ'));
-    expect((await screen.findAllByTitle('Zug')).length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText('Einheitentypen konnten nicht geladen werden')).not.toBeInTheDocument();
-  });
-
-  it('gescheiterte Personalliste: der Zuordnungs-Pool nennt den Ausfall', async () => {
-    const { container } = zeige(
-      http.get('/api/einsaetze/1/personal', () => new HttpResponse(null, { status: 500 })),
-    );
-    await userEvent.click(await screen.findByText('1. Zug'));
-    await oeffneEinheitenAuswahl(container, 'Person zuordnen …');
-    expect(await screen.findByText('Kräfte konnten nicht geladen werden')).toBeInTheDocument();
-    expect(screen.queryByText('Keine freien Personen')).not.toBeInTheDocument();
-  });
-
-  it('Partnerhälfte: leere Personalliste behält „Keine freien Personen"', async () => {
-    const { container } = zeige();
-    await userEvent.click(await screen.findByText('1. Zug'));
-    await oeffneEinheitenAuswahl(container, 'Person zuordnen …');
-    expect(await screen.findByText('Keine freien Personen')).toBeInTheDocument();
-    expect(screen.queryByText('Kräfte konnten nicht geladen werden')).not.toBeInTheDocument();
-  });
 });
 
-/**
- * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den
- * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` (gemessen).
- */
-async function oeffneEinheitenAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
-    .find((s) => s.textContent?.includes(platzhalter));
-  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
-  await userEvent.click(within(feld!).getByRole('combobox'));
-}
+// Der Helfer `oeffneEinheitenAuswahl` ist mit den Zuordnungs-Tests auf
+// `EinheitDetailPage.test.tsx` gezogen (LFH-339 · C4) — diese Seite trägt kein
+// Auswahlfeld mehr, das über einen Platzhalter zu greifen wäre.

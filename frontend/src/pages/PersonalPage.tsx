@@ -22,13 +22,13 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
-import StatusTag from '../components/StatusTag';
+import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
-import { statusKategorie } from '../theme/statusFarben';
+import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 
 /**
@@ -53,14 +53,18 @@ import { abstand, flaeche } from '../theme/tokens';
  * weißem Text. Die Rollenfarbe dort hineinzureichen (`rollenFarbe(...)` liefert Hex,
  * nie einen Preset-Namen) hätte aus jedem Fallback-Tag — dem Normalfall, solange kein
  * Mandant eine Farbe pflegt — eine gefüllte Fläche gemacht, im Dunkelmodus mit weißer
- * Schrift auf aufgehelltem Rot. Der Zweig hält die DB-Achse byte-gleich und stellt die
- * Fallback-Achse auf die Umrissform, die der Rest der Anwendung nach A2 trägt.
+ * Schrift auf aufgehelltem Rot.
+ *
+ * ── DIE DB-ACHSE VERLIERT MIT LFH-339 · C4 IHRE FLÄCHE, NICHT IHRE FARBE ──────────
+ *
+ * Gleichlautend zu `FahrzeugePage.tsx`, wo die Herleitung ausführlich steht: A2s Sorge
+ * war der VERLUST der gepflegten Farbe, nicht die Fläche. Die Zielform-Spec §4b
+ * entscheidet die Fläche eigens — `status_farbe` ist ungeprüfter Freitext, Kontrast
+ * (WCAG 1.4.11) ist nicht zugesichert. Die Farbe geht deshalb auf Rand und Text.
  */
-function StatusBadge({ ep }: { ep: EinsatzPersonal }) {
-  if (!ep.status_label || !ep.status_kategorie) return <Tag>kein Status</Tag>;
-  if (ep.status_farbe) return <Tag color={ep.status_farbe}>{ep.status_label}</Tag>;
-  const meta = statusKategorie[ep.status_kategorie];
-  return <StatusTag darstellung={{ ...meta, label: ep.status_label }} />;
+export function statusDarstellung(ep: EinsatzPersonal): StatusDarstellung {
+  if (!ep.status_label || !ep.status_kategorie) return { rolle: 'neutral', label: 'kein Status' };
+  return { ...statusKategorie[ep.status_kategorie], label: ep.status_label };
 }
 
 export default function PersonalPage() {
@@ -223,6 +227,35 @@ export default function PersonalPage() {
   const einheitById = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e] as const));
   const fahrzeugById = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f] as const));
   const stati = statusQuery.data ?? [];
+
+  /**
+   * Der Katalog als Menüwerte — EINMAL gebaut, von Tabellen- und Kartenzweig gelesen.
+   * Sechs Werte im Seed (`migrations/0012:18-30`), mandantengepflegt wie beim Fahrzeug;
+   * beides liegt über jeder waagerechten Schwelle (Zielform-Spec §3).
+   */
+  const statusOptionen: StatusOption<number>[] = stati.map((s) => ({
+    wert: s.id,
+    label: s.label,
+    darstellung: s.kategorie ? statusKategorie[s.kategorie] : undefined,
+    farbe: s.farbe,
+  }));
+
+  /** Gemeinsamer Bedienweg für beide Zweige — Herleitung siehe `FahrzeugePage.tsx`. */
+  const statusBedienungVon = (ep: EinsatzPersonal) => {
+    const laeuft = statusMutation.isPending && statusMutation.variables?.epId === ep.id;
+    return {
+      optionen: statusOptionen,
+      aktuell: laeuft ? statusMutation.variables?.statusId : ep.status_id,
+      farbe: ep.status_farbe,
+      kennung: ep.name,
+      laeuft,
+      gesperrt: statusMutation.isPending,
+      onWaehlen: (wert: string | number) => {
+        if (!statusMutation.isPending) statusMutation.mutate({ epId: ep.id, statusId: Number(wert) });
+      },
+    };
+  };
+
   const disponierteIds = new Set(eps.map((e) => e.personal_id).filter((x): x is number => x != null));
   const poolOptionen = (poolQuery.data ?? [])
     .filter((p) => !disponierteIds.has(p.id))
@@ -341,26 +374,16 @@ export default function PersonalPage() {
         werte: KATEGORIE_WERTE,
         trifft: (ep, w) => kategorieVon(ep.status_kategorie) === w,
       },
-      render: (_, ep) =>
-        darfSchreiben ? (() => {
-          const gesperrt = statusMutation.isPending;
-          const laeuft = gesperrt && statusMutation.variables?.epId === ep.id;
-          return (
-            <Select
-              style={{ minWidth: 150 }}
-              value={laeuft ? statusMutation.variables?.statusId : ep.status_id ?? undefined}
-              placeholder="Status wählen"
-              options={stati.map((s) => ({ value: s.id, label: s.label }))}
-              loading={laeuft}
-              disabled={gesperrt}
-              onChange={(statusId) => {
-                if (!statusMutation.isPending) statusMutation.mutate({ epId: ep.id, statusId });
-              }}
-            />
-          );
-        })() : (
-          <StatusBadge ep={ep} />
-        ),
+      // Kein `Select` mehr: dessen `minWidth: 150` war der Grund, warum der Statuswechsel
+      // in der 390-px-Karte gar nicht erst stattfinden konnte (LFH-339 · C4).
+      // Deskriptor GANZ gespreizt — Herleitung siehe `FahrzeugePage.tsx`.
+      render: (_, ep) => (
+        <StatusWahl
+          darstellung={statusDarstellung(ep)}
+          darfSchreiben={darfSchreiben}
+          {...statusBedienungVon(ep)}
+        />
+      ),
     },
     {
       title: 'Bemerkung',
@@ -417,9 +440,10 @@ export default function PersonalPage() {
       }
       aktionen={
         darfSchreiben && (
-          <Space>
+          // `wrap` plus `maxWidth` — Herleitung siehe `FahrzeugePage.tsx`.
+          <Space wrap style={{ minWidth: 0 }}>
             <Select
-              style={{ minWidth: 260 }}
+              style={{ minWidth: 260, maxWidth: '100%' }}
               placeholder="Person aus Pool disponieren …"
               value={null}
               options={poolOptionen}
@@ -500,13 +524,10 @@ export default function PersonalPage() {
         karte={{
           art: 'plan',
           titel: { spalte: 'name' },
-          status: (ep) =>
-            ep.status_kategorie
-              ? {
-                  ...statusKategorie[ep.status_kategorie],
-                  label: ep.status_label ?? statusKategorie[ep.status_kategorie].label,
-                }
-              : null,
+          status: (ep) => statusDarstellung(ep),
+          // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entfernen"
+          // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
+          statusBedienung: (ep) => (darfSchreiben ? statusBedienungVon(ep) : null),
           sekundaer: ['funktion', 'einheit', 'fahrzeug'],
           aktion: darfSchreiben
             ? {

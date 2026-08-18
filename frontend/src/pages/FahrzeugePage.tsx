@@ -19,7 +19,7 @@ import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import StatusTag from '../components/StatusTag';
+import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
@@ -28,7 +28,7 @@ import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensic
 import { ErfassungsModal } from '../components/Erfassung';
 import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
-import { statusKategorie } from '../theme/statusFarben';
+import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 
 /**
@@ -53,14 +53,30 @@ import { abstand, flaeche } from '../theme/tokens';
  * weißem Text. Die Rollenfarbe dort hineinzureichen (`rollenFarbe(...)` liefert Hex,
  * nie einen Preset-Namen) hätte aus jedem Fallback-Tag — dem Normalfall, solange kein
  * Mandant eine Farbe pflegt — eine gefüllte Fläche gemacht, im Dunkelmodus mit weißer
- * Schrift auf aufgehelltem Rot. Der Zweig hält die DB-Achse byte-gleich und stellt die
- * Fallback-Achse auf die Umrissform, die der Rest der Anwendung nach A2 trägt.
+ * Schrift auf aufgehelltem Rot.
+ *
+ * ── DIE DB-ACHSE VERLIERT MIT LFH-339 · C4 IHRE FLÄCHE, NICHT IHRE FARBE ──────────
+ *
+ * A2 liess die DB-Achse auf antds `color` stehen; die Sorge dort war ausdrücklich der
+ * VERLUST der gepflegten Farbe („wer sie aufräumt, nimmt dem Mandanten seine Farbe
+ * weg"), nicht die Fläche als solche. Die Zielform-Spec §4b entscheidet die Fläche
+ * inzwischen eigens und mit derselben Vertragsgrenze als Begründung: `status_farbe` ist
+ * ungeprüfter Freitext, Kontrast (WCAG 1.4.11) ist dort NICHT zugesichert — auf einer
+ * grossen Fläche mit erzwungen weissem Text ist das eine Lesbarkeitszusage, die niemand
+ * geben kann; auf Rand und Text trägt dieselbe Farbe keine Textlesbarkeit.
+ *
+ * Der Zweig fällt deshalb: die Mandantenfarbe geht über `StatusTag`s `farbe`-Prop auf
+ * Rand und Text und bleibt damit erhalten. Das ist KEIN Zurückdrehen von A2, sondern
+ * dessen Sorge eingelöst — und es hält die beiden Zweige der Seite bei EINER
+ * Darstellung: der Auslöser aus `components/StatusWahl.tsx` trägt dasselbe Etikett wie
+ * diese Anzeige, und zwei Formen für denselben Status wären ein Unterschied ohne
+ * Bedeutung.
  */
-function StatusBadge({ ef }: { ef: EinsatzFahrzeug }) {
-  if (!ef.status_label || !ef.status_kategorie) return <Tag>kein Status</Tag>;
-  if (ef.status_farbe) return <Tag color={ef.status_farbe}>{ef.status_label}</Tag>;
-  const meta = statusKategorie[ef.status_kategorie];
-  return <StatusTag darstellung={{ ...meta, label: ef.status_label }} />;
+export function statusDarstellung(ef: EinsatzFahrzeug): StatusDarstellung {
+  // Ohne Status bleibt es beim neutralen Wortlaut des Bestands — ein „—" sagt in einer
+  // Statusspalte weniger, und die Zeile muss von hier aus einen Status BEKOMMEN können.
+  if (!ef.status_label || !ef.status_kategorie) return { rolle: 'neutral', label: 'kein Status' };
+  return { ...statusKategorie[ef.status_kategorie], label: ef.status_label };
 }
 
 /**
@@ -328,6 +344,49 @@ export default function FahrzeugePage() {
 
   const stati = statusQuery.data ?? [];
   const personal = personalQuery.data ?? [];
+
+  /**
+   * Der Katalog als Menüwerte — EINMAL gebaut, von beiden Zweigen gelesen.
+   *
+   * Der Fahrzeugkatalog ist mandantengepflegt (FMS 0–9 ist der Seed, nicht die
+   * Obergrenze), deshalb kommen Beschriftung, Kategorie und Farbe aus der Antwort und
+   * nicht aus einer Konstante. `fms_anker` bleibt Sortierachse und ist bewusst KEINE
+   * Bedienform: die Spalte ist nullable, ein Ziffernfeld darauf hätte Löcher
+   * (Zielform-Spec §4).
+   */
+  const statusOptionen: StatusOption<number>[] = stati.map((s) => ({
+    wert: s.id,
+    label: s.label,
+    darstellung: s.kategorie ? statusKategorie[s.kategorie] : undefined,
+    farbe: s.farbe,
+  }));
+
+  /**
+   * Der gemeinsame Bedienweg für Tabellen- und Kartenzweig. Zwei Formen für dieselbe
+   * Handlung wären ein Unterschied ohne Bedeutung — und die Falle, in die man beim
+   * Umstellen genau einer der beiden Stellen läuft.
+   *
+   * `aktuell` zeigt WÄHREND der Mutation den angefragten Wert: der Zeilendatensatz trägt
+   * ihn durch das optimistische `setQueryData` zwar schon, aber der Riegel hier hält die
+   * Anzeige auch dann stabil, wenn ein Refetch dazwischenfunkt.
+   */
+  const statusBedienungVon = (ef: EinsatzFahrzeug) => {
+    const laeuft = statusMutation.isPending && statusMutation.variables?.efId === ef.id;
+    return {
+      optionen: statusOptionen,
+      aktuell: laeuft ? statusMutation.variables?.statusId : ef.status_id,
+      farbe: ef.status_farbe,
+      kennung: ef.funkrufname,
+      laeuft,
+      // Sichtbar gesperrt, solange IRGENDWO eine Statusmutation läuft — der Riegel im
+      // `onWaehlen` unten wirkt ohnehin, aber ein Auslöser, der klickbar aussieht und
+      // nichts tut, ist schlechter als ein gesperrter (Bestandsverhalten des `Select`).
+      gesperrt: statusMutation.isPending,
+      onWaehlen: (wert: string | number) => {
+        if (!statusMutation.isPending) statusMutation.mutate({ efId: ef.id, statusId: Number(wert) });
+      },
+    };
+  };
   const disponierteIds = new Set(efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null));
   const poolOptionen = (poolQuery.data ?? [])
     .filter((f) => !disponierteIds.has(f.id))
@@ -420,26 +479,19 @@ export default function FahrzeugePage() {
         werte: KATEGORIE_WERTE,
         trifft: (ef, w) => kategorieVon(ef.status_kategorie) === w,
       },
-      render: (_, ef) =>
-        darfSchreiben ? (() => {
-          const gesperrt = statusMutation.isPending;
-          const laeuft = gesperrt && statusMutation.variables?.efId === ef.id;
-          return (
-            <Select
-              style={{ minWidth: 150 }}
-              value={laeuft ? statusMutation.variables?.statusId : ef.status_id ?? undefined}
-              placeholder="Status wählen"
-              options={stati.map((s) => ({ value: s.id, label: s.label }))}
-              loading={laeuft}
-              disabled={gesperrt}
-              onChange={(statusId) => {
-                if (!statusMutation.isPending) statusMutation.mutate({ efId: ef.id, statusId });
-              }}
-            />
-          );
-        })() : (
-          <StatusBadge ef={ef} />
-        ),
+      // Kein `Select` mehr: dessen `minWidth: 150` war der Grund, warum der Statuswechsel
+      // in der 390-px-Karte gar nicht erst stattfinden konnte. Der Auslöser IST jetzt das
+      // Etikett, das Menü liegt im Portal (LFH-339 · C4, Zielform-Spec §3/§4).
+      // Der Deskriptor wird GANZ gespreizt, nicht halb: würden `optionen` und `onWaehlen`
+      // hier eigens gesetzt, könnten Tabelle und Karte auseinanderlaufen, ohne dass ein
+      // Test es merkt — genau die Divergenz, gegen die der gemeinsame Deskriptor gebaut ist.
+      render: (_, ef) => (
+        <StatusWahl
+          darstellung={statusDarstellung(ef)}
+          darfSchreiben={darfSchreiben}
+          {...statusBedienungVon(ef)}
+        />
+      ),
     },
     {
       title: 'Besatzung',
@@ -505,9 +557,13 @@ export default function FahrzeugePage() {
       }
       aktionen={
         darfSchreiben && (
-          <Space>
+          // `wrap` plus `maxWidth` (LFH-339 · C4, gemessen): das `minWidth: 260` des
+          // Auswahlfeldes und der Knopf daneben ergeben zusammen mehr als 390 px. Der
+          // Umbruch im Seitenkopf-Primitiv allein reicht nicht — er verschiebt den Block
+          // nur unter den Titel, wo er weiterhin zu breit ist.
+          <Space wrap style={{ minWidth: 0 }}>
             <Select
-              style={{ minWidth: 260 }}
+              style={{ minWidth: 260, maxWidth: '100%' }}
               placeholder="Stamm-Fahrzeug disponieren …"
               value={null}
               options={poolOptionen}
@@ -601,18 +657,14 @@ export default function FahrzeugePage() {
         karte={{
           art: 'plan',
           titel: { spalte: 'funkrufname' },
-          // NICHT das `render` der Statusspalte: dort steht im Schreibmodus ein
-          // Auswahlfeld mit `minWidth: 150`, das eine 390-px-Karte breit drückt. Der Slot
-          // nimmt die Vertragsachse mit dem Mandantenlabel — der TEXT ist damit in beiden
-          // Zweigen identisch, die Farbe weicht ab, wenn der Mandant `status_farbe` pflegt
-          // (ungeprüfter Freitext außerhalb des A2-Vertrags).
-          status: (ef) =>
-            ef.status_kategorie
-              ? {
-                  ...statusKategorie[ef.status_kategorie],
-                  label: ef.status_label ?? statusKategorie[ef.status_kategorie].label,
-                }
-              : null,
+          // NICHT das `render` der Statusspalte — der Slot nimmt die Vertragsachse als
+          // Deskriptor. Seit LFH-339 · C4 tragen beide Zweige damit dieselbe Darstellung
+          // UND denselben Bedienweg; die Mandantenfarbe geht über `statusBedienung.farbe`
+          // mit und steht auf Rand und Text, nie auf der Fläche.
+          status: (ef) => statusDarstellung(ef),
+          // Der Bedienweg sitzt hier und NICHT im `aktion`-Slot: der ist mit „Entfernen"
+          // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
+          statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
           sekundaer: ['typ', 'traeger', 'besatzung'],
           aktion: darfSchreiben
             ? {

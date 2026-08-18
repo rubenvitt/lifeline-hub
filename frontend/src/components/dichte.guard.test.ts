@@ -159,8 +159,13 @@ const OFFEN: string[] = [
   // `Select` je Zelle, den ein einziger dichte-treuer Auslöser ersetzt hat. Die
   // `Liste size="small"` in `GefahrenPage.tsx` zählte korrekt NICHT mit — sie steht in
   // {@link EIGENE_SEMANTIK} und trägt dort ein Abstandsmaß, keine Trefffläche.
-  // ── B5i · Kräfte-Listen (LFH-369) ─────────────────────────────────────────
-  '/src/pages/MaterialPage.tsx',
+  // ── B5i · Kräfte-Listen (LFH-369) ── ABGERÄUMT mit LFH-339 · C4 ───────────
+  // Die eine verbliebene Stelle war das Mengen-Eingabefeld in `MaterialPage.tsx`. Sie
+  // fiel, weil C4 die Datei ohnehin anfasste (Statuswechsel) — die Breite von 80 px
+  // bleibt, sie trägt eine zweistellige Menge und keine Trefffläche.
+  //
+  // Damit ist die Schuldmenge auf die EINE geprüfte Dauerausnahme geschrumpft: die vier
+  // Knöpfe der UHS-Platzkarte, deren Höhe an der Backend-Konstante SCHRITT_Y hängt.
   // ── B5j · Rest: Kopfzeile, Profil, Editor, Sonstiges (LFH-370) ────────────
   // ABGERÄUMT: 14 Stellen in 9 Dateien (MarkdownEditor, SprechgruppenPicker, AlarmZentrale,
   // LoginPage, ProfilPage, SchaedenDetailPage, TiereDetailPage, KraefteOhneBrSidebar,

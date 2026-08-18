@@ -54,7 +54,51 @@ function render(einsatzObj: typeof einsatzAktiv, materialListe: typeof em[]) {
   );
 }
 
+/**
+ * Öffnet das Statusmenü einer Zeile und liefert das GEÖFFNETE Menü-Portal. antd lässt die
+ * Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in
+ * jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern.
+ */
+async function oeffneStatusmenue(wurzel: HTMLElement, bezeichnung: string): Promise<HTMLElement> {
+  await userEvent.click(within(wurzel).getByRole('button', { name: `Status von ${bezeichnung} ändern` }));
+  const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+    (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+  );
+  expect(offen).toHaveLength(1);
+  const menue = offen[0].querySelector<HTMLElement>('[role="menu"]');
+  if (!menue) throw new Error(`Statusmenü zu ${bezeichnung} ließ sich nicht öffnen`);
+  return menue;
+}
+
 describe('MaterialPage', () => {
+  it('bedient den Status am Etikett, nicht über ein Auswahlfeld in der Zelle', async () => {
+    /**
+     * Befund H19 an der Materialseite. Das `Select` hier trug `minWidth: 170` — noch
+     * breiter als die 150 bei Fahrzeug und Personal, und damit die Zahl, an der die
+     * 390-px-Karte am deutlichsten scheiterte.
+     */
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+
+    expect(within(zeile).queryByRole('combobox')).toBeNull();
+    const menue = await oeffneStatusmenue(zeile, 'Wolldecke');
+    // Alle fünf Zustände senkrecht im Menü (Zielform-Spec §3).
+    for (const label of ['einsatzbereit', 'im Einsatz', 'defekt', 'verbraucht', 'Desinfektion nötig']) {
+      expect(within(menue).getByRole('menuitem', { name: new RegExp(label) })).toBeInTheDocument();
+    }
+  });
+
+  it('das Mengenfeld folgt der Dichtestufe statt einer festen Kleingröße', async () => {
+    // Letzte Einzelstelle des B5i-Bündels; die zugehörige Zeile in `dichte.guard.test.ts`
+    // ist im selben Zug gefallen (ein Eintrag ohne Verstoß gilt selbst als Verstoß).
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const feld = container.querySelector('[data-row-key="10"] .ant-input-number');
+    expect(feld).not.toBeNull();
+    expect(feld!.className).not.toMatch(/ant-input-number-sm\b/);
+  });
+
   /**
    * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
    *
@@ -87,17 +131,19 @@ describe('MaterialPage', () => {
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
-    await userEvent.click(within(zeile).getByRole('combobox'));
-    const option = (await screen.findAllByText('defekt')).find((el) => el.closest('.ant-select-item-option'));
-    expect(option).toBeTruthy();
-    await userEvent.click(option!);
+    const menue = await oeffneStatusmenue(zeile, 'Wolldecke');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /defekt/ }));
 
     await waitFor(() => {
       expect(client.getQueryData<(typeof em)[]>(einsatzKeys.material(1))?.[0].status).toBe('defekt');
     });
-    expect(within(zeile).getByRole('combobox')).toBeDisabled();
-    expect(within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('combobox'))
-      .toBeDisabled();
+    // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im Cache.
+    expect(zeile.textContent).toContain('defekt');
+    expect(within(zeile).getByRole('button', { name: /Status von Wolldecke/ })).toBeDisabled();
+    expect(
+      within(container.querySelector('[data-row-key="11"]') as HTMLElement)
+        .getByRole('button', { name: /Status von Zeltbahn/ }),
+    ).toBeDisabled();
 
     let refetchFreigeben: (() => void) | undefined;
     const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
@@ -179,7 +225,7 @@ describe('MaterialPage', () => {
     expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
   });
 
-  it('unter md stehen Karten mit Status als beschriftetem Feld, keine Tabelle', async () => {
+  it('unter md steht der Status als BEDIENBARES Etikett, nicht als Sekundärfeld', async () => {
     setzeViewportBreite(390);
     const { container } = render(einsatzAktiv, [em]);
     expect(await screen.findByText('Wolldecke')).toBeInTheDocument();
@@ -187,13 +233,20 @@ describe('MaterialPage', () => {
     const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
     expect(karte).not.toBeNull();
     /**
-     * KEIN `karte.status`-Slot: `STATUS_META` sind rohe antd-Preset-Farbnamen und liegen
-     * ausdrücklich außerhalb des Statusfarb-Vertrags (A2 nennt MaterialPage namentlich als
-     * draußen). Sie in eine `StatusDarstellung` zu zwingen wäre der Bestands-Sweep, den A2
-     * verbietet. Der Status steht deshalb als beschriftetes Sekundärfeld.
+     * UMGEDREHT MIT LFH-339 · C4 — hier stand die gegenteilige Zusicherung.
+     *
+     * Der Status war ein beschriftetes Sekundärfeld und damit auf der 390-px-Karte reine
+     * ANZEIGE: der Statuswechsel, die häufigste Einzelaktion des Moduls, war am schmalen
+     * Schirm gar nicht erreichbar. Die alte Begründung stimmte in ihrer Prämisse (Material
+     * liegt ausserhalb des A2-Farbvertrags) und zog daraus den zu weiten Schluss — die
+     * Zielform-Spec §4 trennt Farbe von Anordnung.
+     *
+     * Beide Hälften geprüft: das Feld ist WEG und der Auslöser ist DA. Nur die zweite wäre
+     * auch grün, wenn der Status doppelt stünde.
      */
     const felder = [...karte.querySelectorAll('[data-lfh="datensicht-feld"]')].map((f) => f.textContent);
-    expect(felder.some((t) => t?.startsWith('Status'))).toBe(true);
+    expect(felder.some((t) => t?.startsWith('Status'))).toBe(false);
+    expect(within(karte).getByRole('button', { name: 'Status von Wolldecke ändern' })).toBeInTheDocument();
     expect(karte.textContent).toContain('einsatzbereit');
   });
 

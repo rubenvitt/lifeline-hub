@@ -111,8 +111,6 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  *
  *  | Route              | über  | Verursacher                                                     |
  *  |--------------------|-------|-----------------------------------------------------------------|
- *  | `/personal`        |  79px | `Space` ohne `wrap` mit Auswahlfeld `minWidth: 260` + Knopf     |
- *  |                    |       | „Ad-hoc-Person" (`PersonalPage.tsx:329-339`)                    |
  *  | `/personen`        | 120px | `Space` ohne `wrap` mit drei Knöpfen „Schnellerfassung",         |
  *  |                    |       | „Vermisst melden", „Betroffene/n erfassen" (`PersonenPage.tsx:138-144`) |
  *
@@ -132,8 +130,22 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  * gefordert hätte; gemessen steht die Route jetzt bei **0 px**, und die Totmeldung des
  * Gates hat die Streichung dieser Zeile erzwungen.
  *
- * WARUM FREISTELLUNG UND NICHT ROT: die zwei verbliebenen Reparaturen sind `wrap` an zwei fremden
- * Seitenköpfen — Bestandsarbeit in `frontend/src/pages/`, die jenes Bündel nicht besaß,
+ * DER ZWEITE EINTRAG IST WEG (LFH-339 · C4): `/personal` stand hier mit 79 px. C4 hat den
+ * Verursacher an der Wurzel behoben — `wrap` samt `minWidth: 0` im Seitenkopf-Primitiv
+ * `components/EinsatzSeite.tsx` PLUS `wrap` und ein `maxWidth` am Auswahlfeld der
+ * Aktionsreihe selbst. Beides zusammen ist nötig: der Umbruch im Primitiv schiebt den
+ * Aktionsblock nur unter den Titel, wo er weiterhin zu breit ist. Gemessen steht die Route
+ * jetzt bei **0 px**, und die Totmeldung dieses Gates hat die Streichung erzwungen — genau
+ * die Mechanik, die der Absatz darunter beschreibt.
+ *
+ * BEI DER GELEGENHEIT GEMESSEN, ohne hier gelistet zu sein: `/fahrzeuge` (115 px) und
+ * `/material` (327 px) liefen ebenfalls über — dieselbe Ursache, nur auf Routen, die dieses
+ * Gate nicht führt. Beide sind mit C4 behoben und werden seither von
+ * `e2e/kraefte-schmal.spec.ts` gemessen. Wer diese Liste erweitert, nimmt sie NICHT auf:
+ * eine zweite Messung derselben Zusicherung an zwei Orten veraltet an einem davon.
+ *
+ * WARUM FREISTELLUNG UND NICHT ROT: die verbliebene Reparatur ist `wrap` an einem fremden
+ * Seitenkopf — Bestandsarbeit in `frontend/src/pages/`, die jenes Bündel nicht besaß,
  * und ein rot geborenes Gate wird abgeschaltet statt befolgt. Freigestellt wird deshalb
  * **namentlich, mit Deckel und mit Totmeldung**, nach dem Muster der `NOCH_OFFEN`-Listen der
  * Vitest-Guards:
@@ -151,7 +163,6 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  * Griff. Die Zeile steht in der Prüfliste `2026-07-28-einsatzlisten-pruefliste.md`.
  */
 const BESTAND_OFFEN = [
-  { modul: 'personal', breite: 390, deckel: 130, gemessen: 79 },
   { modul: 'personen', breite: 390, deckel: 180, gemessen: 120 },
 ] as const;
 

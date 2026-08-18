@@ -1,38 +1,55 @@
-import { Alert, App, Breadcrumb, Button, Card, Form, Input, Popconfirm, Space, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Form, Input, Space, Tag, Tree, Typography, type TreeDataNode } from 'antd';
+import { UserOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import {
-  nichtGefundenInhalt, SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet,
+  SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet, nichtGefundenInhalt,
 } from '../components/SeitenZustand';
-import { Link, useParams } from 'react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeEinheitTypen } from '../api/einheitTypen';
-import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { listeEinsatzPersonal } from '../api/einsatzPersonal';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { gibMaterialFrei, listeEinsatzMaterial, ordneMaterialZu } from '../api/einsatzMaterial';
-import {
-  aktualisiereEinheit, bildeEinheit, gibFahrzeugFrei, gibPersonalFrei, listeEinheiten,
-  loeseEinheitAuf, ordneFahrzeugZu, ordnePersonalZu, type EinheitEingabe,
-} from '../api/einheiten';
+import { bildeEinheit, listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { Einheit, Staerke } from '../api/types';
+import type { Einheit } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import StaerkeEingabe from '../anzeige/StaerkeEingabe';
-import SprechgruppenPicker from '../components/SprechgruppenPicker';
-import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
-import { leerZuNull } from '../api/patchTriState';
-import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
-import { kraefteuebersichtPfad } from '../routing/deeplinks';
+import Datenstand from '../components/Datenstand';
+import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
+import { ErfassungsModal } from '../components/Erfassung';
 
-/** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
-function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
+/**
+ * Gliederung der Einheiten eines Einsatzes (LFH-339 · C4).
+ *
+ * ── DIE SEITE TRÄGT SEIT C4 NUR NOCH DIE GLIEDERUNG ────────────────────────────────────
+ *
+ * Vorher lag rechts daneben die Detailansicht: NEUN Formularfelder plus DREI sofort
+ * wirkende Zuordnungslisten in einer Karte, mit dem Speichern-Knopf mitten im Inhalt
+ * (Befund M26). Nach LFH-19 gehört das auf eine eigene Route — sie liegt jetzt in
+ * `EinheitDetailPage.tsx` unter `/einsaetze/:id/einheiten/:einheitId`.
+ *
+ * Was hier bleibt, ist die Auswahl. Und die darf umbrechen: die Gliederungskarte hatte
+ * `flex: '0 0 360px'` ohne `flexWrap` — eine Breite, die auf 390 px nicht passt und nicht
+ * ausweichen darf (Befund M25).
+ */
+
+/**
+ * Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id).
+ *
+ * Jeder Knoten trägt einen echten `<Link>` auf die Detailroute: das ist das TASTATURZIEL
+ * der Zeile und macht die Gliederung deep-link-fähig. Ein `onSelect` am Baum allein wäre
+ * für die Tastatur ein Umweg und für „im neuen Tab öffnen" gar kein Weg.
+ *
+ * Das Führer-Emoji (👤) ist einer Ikone gewichen: Zeichnung, Farbe und Breite eines Emojis
+ * kommen aus der Systemschrift statt aus dem Entwurf, und im Ausdruck verhält es sich
+ * anders als der übrige Satz. Die Hülle ist `aria-hidden`, weil ein
+ * `@ant-design/icons`-Knoten sonst sein eigenes ENGLISCHES `aria-label` („user") als
+ * eigenes Vorleseziel in jede Zeile stellte.
+ */
+function baueBaum(einheiten: Einheit[], einsatzId: number): TreeDataNode[] {
   const kinder = new Map<number | null, Einheit[]>();
   for (const e of einheiten) {
     const key = e.ueber_einheit_id ?? null;
@@ -44,10 +61,17 @@ function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
       key: e.id,
       title: (
         <Space size={4}>
-          <span>{e.name}</span>
+          <Link to={einheitDetailPfad(einsatzId, e.id)}>{e.name}</Link>
           {e.typ_label && <Tag>{e.typ_label}</Tag>}
-          <Tag color="blue"><StaerkeAnzeige wert={e.ist} />{e.soll ? <> / Soll <StaerkeAnzeige wert={e.soll} /></> : null}</Tag>
-          {e.fuehrer_name && <span style={{ color: '#888' }}>👤 {e.fuehrer_name}</span>}
+          <Tag color="blue">
+            <StaerkeAnzeige wert={e.ist} />
+            {e.soll ? <> / Soll <StaerkeAnzeige wert={e.soll} /></> : null}
+          </Tag>
+          {e.fuehrer_name && (
+            <span style={{ color: '#888' }}>
+              <span aria-hidden="true"><UserOutlined /></span> {e.fuehrer_name}
+            </span>
+          )}
         </Space>
       ),
       children: baue(e.id),
@@ -55,36 +79,10 @@ function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
   return baue(null);
 }
 
-/** Menge der Nachfahren-IDs (inkl. self) — für die zyklenfreie Parent-Auswahl. */
-function nachfahrenInkl(einheiten: Einheit[], id: number): Set<number> {
-  const kinder = new Map<number, number[]>();
-  for (const e of einheiten) {
-    if (e.ueber_einheit_id != null) {
-      if (!kinder.has(e.ueber_einheit_id)) kinder.set(e.ueber_einheit_id, []);
-      kinder.get(e.ueber_einheit_id)!.push(e.id);
-    }
-  }
-  const ergebnis = new Set<number>();
-  const stack = [id];
-  while (stack.length) {
-    const n = stack.pop()!;
-    if (ergebnis.has(n)) continue;
-    ergebnis.add(n);
-    for (const c of kinder.get(n) ?? []) stack.push(c);
-  }
-  return ergebnis;
-}
-
-interface KopfWerte {
+/** Feldsatz des „Einheit bilden"-Dialogs — bewusst zwei Felder (siehe `bilden`). */
+interface BildenWerte {
   name: string;
   typ_id?: number | null;
-  abschnitt_id?: number | null;
-  ueber_einheit_id?: number | null;
-  soll?: Staerke | null;
-  bemerkung?: string;
-  sprechgruppe_ids?: number[];
-  kommunikationsmittel?: string;
-  erreichbarkeit?: string;
 }
 
 export default function EinheitenPage() {
@@ -92,155 +90,73 @@ export default function EinheitenPage() {
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { message } = App.useApp();
-  const [gewaehlt, setGewaehlt] = useState<number | null>(null);
-  const [form] = Form.useForm<KopfWerte>();
+  const [bildenOffen, setBildenOffen] = useState(false);
+  const [bildenForm] = Form.useForm<BildenWerte>();
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
-  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
-  const personalQuery = useQuery({ queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId) });
-  const fahrzeugeQuery = useQuery({ queryKey: einsatzKeys.fahrzeuge(einsatzId), queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
-  const materialQuery = useQuery({ queryKey: einsatzKeys.material(einsatzId), queryFn: () => listeEinsatzMaterial(einsatzId) });
-
-  // Cross-Modul-Deeplink (LFH-25): ?einheit=<id> selektiert die Einheit, sofern vorhanden.
-  useQueryParamSelektion('einheit', einheitenQuery.isSuccess, (id) => {
-    if ((einheitenQuery.data ?? []).some((e) => e.id === id)) setGewaehlt(id);
-  });
-
-  function invalidate() {
-    qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-  }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
-  const aktuell = einheiten.find((e) => e.id === gewaehlt) ?? null;
-
-  const speichern = useMutation({
-    mutationFn: (werte: KopfWerte) => {
-      const daten: EinheitEingabe = {
-        name: werte.name.trim(),
-        typ_id: werte.typ_id ?? null,
-        abschnitt_id: werte.abschnitt_id ?? null,
-        ueber_einheit_id: werte.ueber_einheit_id ?? null,
-        fuehrer_id: aktuell?.fuehrer_id ?? null, // Führer unverändert (authoritativ)
-        soll_fuehrer: werte.soll?.fuehrer ?? null,
-        soll_unterfuehrer: werte.soll?.unterfuehrer ?? null,
-        soll_mannschaft: werte.soll?.mannschaft ?? null,
-        bemerkung: leerZuNull(werte.bemerkung),
-        sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
-        kommunikationsmittel: leerZuNull(werte.kommunikationsmittel),
-        erreichbarkeit: leerZuNull(werte.erreichbarkeit),
-      };
-      return aktuell ? aktualisiereEinheit(einsatzId, aktuell.id, daten) : bildeEinheit(einsatzId, daten);
-    },
-    onSuccess: (e) => { invalidate(); setGewaehlt(e.id); message.success('Gespeichert'); },
-    onError: fehler,
-  });
-
-  const bilden = useMutation({
-    mutationFn: () => bildeEinheit(einsatzId, { name: 'Neue Einheit' }),
-    onSuccess: (e) => { invalidate(); setGewaehlt(e.id); },
-    onError: fehler,
-  });
-  const aufloesen = useMutation({
-    mutationFn: (eid: number) => loeseEinheitAuf(einsatzId, eid),
-    onSuccess: () => { invalidate(); setGewaehlt(null); },
-    onError: fehler,
-  });
-  const personalZu = useMutation({
-    mutationFn: (epId: number) => ordnePersonalZu(einsatzId, aktuell!.id, epId),
-    onSuccess: invalidate, onError: fehler,
-  });
-  const personalFrei = useMutation({
-    mutationFn: (epId: number) => gibPersonalFrei(einsatzId, aktuell!.id, epId),
-    onSuccess: invalidate, onError: fehler,
-  });
-  const fahrzeugZu = useMutation({
-    mutationFn: (efId: number) => ordneFahrzeugZu(einsatzId, aktuell!.id, efId),
-    onSuccess: invalidate, onError: fehler,
-  });
-  const fahrzeugFrei = useMutation({
-    mutationFn: (efId: number) => gibFahrzeugFrei(einsatzId, aktuell!.id, efId),
-    onSuccess: invalidate, onError: fehler,
-  });
-  const materialZu = useMutation({
-    mutationFn: (emId: number) => ordneMaterialZu(einsatzId, aktuell!.id, emId),
-    onSuccess: invalidate, onError: fehler,
-  });
-  const materialFrei = useMutation({
-    mutationFn: (emId: number) => gibMaterialFrei(einsatzId, aktuell!.id, emId),
-    onSuccess: invalidate, onError: fehler,
-  });
-  const fuehrerSetzen = useMutation({
-    // Baut den PATCH-Body bewusst aus dem Server-Stand (`aktuell`), nicht aus dem
-    // Formular: ungespeicherte Kopf-Edits werden NICHT mitgesendet (Vollersatz-Vertrag).
-    // Führer-Markieren ist eine eigenständige Aktion; zuerst Kopfdaten „Speichern".
-    mutationFn: (epId: number | null) => {
-      const e = aktuell!;
-      return aktualisiereEinheit(einsatzId, e.id, {
-        name: e.name, typ_id: e.typ_id, abschnitt_id: e.abschnitt_id, ueber_einheit_id: e.ueber_einheit_id,
-        fuehrer_id: epId, soll_fuehrer: e.soll?.fuehrer ?? null, soll_unterfuehrer: e.soll?.unterfuehrer ?? null,
-        soll_mannschaft: e.soll?.mannschaft ?? null, bemerkung: e.bemerkung,
-      });
-    },
-    onSuccess: invalidate, onError: fehler,
-  });
-
-  // Formular bei Auswahlwechsel mit den Kopfdaten der Einheit füllen.
-  useEffect(() => {
-    if (aktuell) {
-      form.setFieldsValue({
-        name: aktuell.name, typ_id: aktuell.typ_id ?? undefined, abschnitt_id: aktuell.abschnitt_id ?? undefined,
-        ueber_einheit_id: aktuell.ueber_einheit_id ?? undefined, soll: aktuell.soll,
-        bemerkung: aktuell.bemerkung ?? undefined,
-        sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
-        kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
-        erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
-      });
-    }
-  }, [aktuell, form]);
-
-  const baumDaten = useMemo(() => baueBaum(einheiten), [einheiten]);
-  const verbotenAlsParent = aktuell ? nachfahrenInkl(einheiten, aktuell.id) : new Set<number>();
-  const parentOptionen = einheiten
-    .filter((e) => !verbotenAlsParent.has(e.id))
-    .map((e) => ({ value: e.id, title: e.name }));
-  const abschnittOptionen = (abschnitteQuery.data ?? []).map((a) => ({ value: a.id, title: a.name }));
-
-  // Frei-Pool: disponierte Kräfte ohne Einheit.
-  const freiesPersonal = (personalQuery.data ?? []).filter((p) => p.einheit_id == null);
-  const freieFahrzeuge = (fahrzeugeQuery.data ?? []).filter((f) => f.einheit_id == null);
-  const freiesMaterial = (materialQuery.data ?? []).filter((m) => m.einheit_id == null);
 
   /**
-   * Was ein leerer Zuordnungs-Pool bedeutet, hängt daran, OB die Liste überhaupt ankam
-   * (LFH-331 · B3). Scheitert der Abruf, filtern die drei Ausdrücke oben auf die leere
-   * Menge, und das Auswahlfeld behauptete „Keine freien Personen" — eine Aussage über den
-   * Bestand, die niemand geprüft hat. Ohne Fehler bleibt der Bestandswortlaut byte-gleich.
+   * Bestands-Deeplink `?einheit=<id>` LEITET WEITER auf die Item-Route (LFH-25/LFH-339).
    *
-   * KEIN `kein403`: die Einsatz-Listen und `src/routes/einheit_typ.rs` sind org-lesbar
-   * ohne Admin-Schranke — ein „nur für Admins" wäre hier ein erfundener Fehlerfall.
+   * Der Query-Param war das Muster für Module OHNE Detailansicht — seit C4 hat die Einheit
+   * eine. Andere Module verlinken weiterhin mit `?einheit=`, deshalb wird der Param nicht
+   * fallengelassen, sondern übersetzt.
+   *
+   * BEWUSST NICHT über `useQueryParamSelektion`, und das ist gemessen: der Hook ist
+   * apply-then-clean — er ruft `anwenden(id)` und räumt den Param DANACH mit einem eigenen
+   * `setSearchParams(..., { replace: true })` aus der URL. Diese zweite Navigation
+   * überschreibt eine Weiterleitung aus der Closure sofort wieder; der Aufrufer landet
+   * zurück auf der Gliederung. Der Hook ist für eine SELEKTION auf derselben Seite gebaut,
+   * nicht für einen Routenwechsel.
+   *
+   * `<Navigate replace>` ist hier zudem die ehrlichere Form: es passiert beim Rendern, nicht
+   * als Nebenwirkung, und der Zurück-Knopf bleibt nicht in der Weiterleitung hängen. Die ID
+   * wird gegen die GELADENE Liste geprüft — eine erfundene Kennung soll auf der Gliederung
+   * landen, nicht auf einer Detailseite ohne Datensatz.
    */
-  const personalInhalt = nichtGefundenInhalt(personalQuery, {
-    allgemein: 'Kräfte konnten nicht geladen werden',
-  }) ?? 'Keine freien Personen';
-  const fahrzeugInhalt = nichtGefundenInhalt(fahrzeugeQuery, {
-    allgemein: 'Fahrzeuge konnten nicht geladen werden',
-  }) ?? 'Keine freien Fahrzeuge';
-  const materialInhalt = nichtGefundenInhalt(materialQuery, {
-    allgemein: 'Material konnte nicht geladen werden',
-  }) ?? 'Kein freies Material';
+  const [searchParams] = useSearchParams();
+  const deeplinkZiel = parseRouteId(searchParams.get('einheit') ?? undefined);
+
+  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+
+  /**
+   * „Einheit bilden" fragt seit LFH-339 · C4 zuerst (Befund M27).
+   *
+   * Vorher schrieb der Knopf SOFORT `{ name: 'Neue Einheit' }` in die Datenbank — vor jeder
+   * Eingabe. Ein Fehlklick oder ein Sinneswandel hinterliess damit eine Platzhalter-Einheit,
+   * die danach in jedem Baum, jeder Zuordnungsliste und jeder Stärkeaggregation stand;
+   * entfernen liess sie sich nur über „Auflösen".
+   *
+   * ZWEI Felder, nicht neun: Name (Pflicht, `autoFocus` durch die Hülle) und Typ. Alles
+   * Weitere gehört auf die Detailseite — das Feldbudget einer Erfassungsmaske liegt bei ~3.
+   *
+   * KEIN `serie`: eine Einheit zu bilden ist keine Minutentakt-Erfassung wie die
+   * Ad-hoc-Disposition eines Fahrzeugs.
+   */
+  const bilden = useMutation({
+    mutationFn: (werte: BildenWerte) =>
+      bildeEinheit(einsatzId, { name: werte.name.trim(), typ_id: werte.typ_id ?? null }),
+    onSuccess: (e) => {
+      qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      message.success('Einheit gebildet');
+      // Direkt in die frische Einheit: dort stehen die Kopfdaten, die gerade NICHT
+      // abgefragt wurden, und genau dorthin will, wer eine Einheit bildet.
+      void navigate(einheitDetailPfad(einsatzId, e.id));
+    },
+    onError: fehler,
+  });
+
+  const baumDaten = useMemo(() => baueBaum(einheiten, einsatzId), [einheiten, einsatzId]);
 
   // Seitenzustand: NUR `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
-  // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden, nie
-  // als Frühausstieg. Kreisel und knopfloses Alert von früher hatten beide keinen Weg
-  // zurück; jetzt steht überall derselbe „Erneut abrufen".
+  // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden.
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
   }
@@ -256,6 +172,12 @@ export default function EinheitenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
+  // Erst NACH dem Laden weiterleiten: vorher ist die Prüfung „gibt es die Einheit?" nicht
+  // beantwortbar, und ein Sprung ins Blaue landete auf einem Leerzustand.
+  if (deeplinkZiel != null && einheiten.some((e) => e.id === deeplinkZiel)) {
+    return <Navigate to={einheitDetailPfad(einsatzId, deeplinkZiel)} replace />;
+  }
+
   /**
    * LISTENZUSTAND der Gliederungs-Karte — zwei Lagen, zwei Antworten (D3). Der Fehler
    * allein reicht als Bedingung NICHT.
@@ -263,10 +185,7 @@ export default function EinheitenPage() {
    * Ohne Einheiten im Zwischenspeicher tritt der Fehler an die Stelle des Baums. MIT
    * Einheiten bleibt der Baum stehen und bekommt ein Banner: er ist echt, nur womöglich
    * alt. Ein Fehler, der ihn wegräumt, nähme der Einsatzkraft die Gliederung, die sie eben
-   * noch vor sich hatte — und mit ihr die Auswahl, über die alles Weitere dieser Seite
-   * läuft. Genau das Gegenteil dessen, wofür `SeitenStandVeraltet` gebaut ist.
-   *
-   * Gemessen an der UNGEFILTERTEN Menge (Muster aus `TierePage`/`SchaedenPage`).
+   * noch vor sich hatte.
    */
   const listeGescheitert = einheitenQuery.isError && einheiten.length === 0;
   const standVeraltet = einheitenQuery.isError && einheiten.length > 0;
@@ -281,33 +200,35 @@ export default function EinheitenPage() {
             <Typography.Title level={3} style={{ margin: 0 }}>Einheiten</Typography.Title>
             <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
           </Space>
-          <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
-            einheitenQuery.dataUpdatedAt,
-            abschnitteQuery.dataUpdatedAt,
-            personalQuery.dataUpdatedAt,
-            fahrzeugeQuery.dataUpdatedAt,
-            materialQuery.dataUpdatedAt,
-          )} />
+          <Datenstand dataUpdatedAt={einheitenQuery.dataUpdatedAt} />
         </Space>
-        {darfSchreiben && <Button type="primary" onClick={() => bilden.mutate()}>Einheit bilden</Button>}
+        {darfSchreiben && (
+          <Button type="primary" onClick={() => setBildenOffen(true)}>Einheit bilden</Button>
+        )}
       </Space>
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
       <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
-      <div style={{ display: 'flex', gap: 16 }}>
-        <Card style={{ flex: '0 0 360px' }} size="small" title="Gliederung">
+
+      {/**
+        * Die Gliederung ist seit C4 die GANZE Seite — die Detailhälfte ist auf eine eigene
+        * Route gezogen. Was von M25 bleibt, ist der Umbruch: die Karte hatte
+        * `flex: '0 0 360px'` ohne `flexWrap`, also eine Breite, die auf 390 px nicht passt
+        * und nicht ausweichen darf. Jetzt wächst sie mit und deckelt bei 360 px auf breitem
+        * Schirm, wo ein Baum nicht über die ganze Fläche laufen soll.
+        */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <Card style={{ flex: '1 1 clamp(260px, 30%, 360px)' }} size="small" title="Gliederung">
           {/* DREI Zustände, nicht zwei (LFH-331 · B3). Die frühere Weiche hing an
               `einheiten.length === 0` — und das ist während des Ladens und im Fehlerfall
-              genauso wahr wie bei einer tatsächlich leeren Gliederung. Zweimal von dreien
-              behauptete die Karte damit etwas, das niemand geprüft hatte. Gefragt wird
-              deshalb die QUERY; die Länge entscheidet erst, wenn sie überhaupt etwas
-              bedeutet. Reihenfolge ist Teil der Aussage: laden vor Fehler vor leer.
+              genauso wahr wie bei einer tatsächlich leeren Gliederung. Gefragt wird
+              deshalb die QUERY; die Länge entscheidet erst, wenn sie etwas bedeutet.
+              Reihenfolge ist Teil der Aussage: laden vor Fehler vor leer.
 
               Der Fehlerzweig trägt zusätzlich die MENGENBEDINGUNG (`listeGescheitert`):
-              er verdrängt den Baum nur, wenn es keinen gibt. Steht einer im
-              Zwischenspeicher, bleibt er und bekommt das Veraltet-Banner (unten). */}
+              er verdrängt den Baum nur, wenn es keinen gibt. */}
           {einheitenQuery.isLoading ? (
             <SeitenSkeleton zeilen={3} />
           ) : listeGescheitert ? (
@@ -324,9 +245,8 @@ export default function EinheitenPage() {
                 darfSchreiben
                   // Wortlaut BYTE-GLEICH zum Kopfknopf: es ist dieselbe Handlung, und eine
                   // zweite Schreibweise für dieselbe Geste ist genau der Befund, den B3
-                  // behebt. Dass damit zwei Knöpfe denselben Namen tragen, ist gewollt —
-                  // der Leerzustand führt dorthin, wo sonst nichts hinführt.
-                  ? { label: 'Einheit bilden', onClick: () => bilden.mutate() }
+                  // behebt.
+                  ? { label: 'Einheit bilden', onClick: () => setBildenOffen(true) }
                   : undefined
               }
             />
@@ -335,140 +255,41 @@ export default function EinheitenPage() {
               {standVeraltet && (
                 <SeitenStandVeraltet onWiederholen={() => void einheitenQuery.refetch()} />
               )}
-              <Tree
-                treeData={baumDaten}
-                selectedKeys={gewaehlt != null ? [gewaehlt] : []}
-                defaultExpandAll
-                onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)}
-              />
+              {/* `selectable={false}`: das Bedienziel ist der Link im Knoten, nicht die
+                  Zeilenauswahl. Zwei Wege zur selben Handlung, von denen einer nur
+                  hervorhebt, wären ein Unterschied ohne Bedeutung. */}
+              <Tree treeData={baumDaten} defaultExpandAll selectable={false} />
             </>
           )}
         </Card>
-
-        <Card style={{ flex: 1 }} size="small" title={aktuell ? `Einheit: ${aktuell.name}` : 'Keine Einheit gewählt'}>
-          {/* KEIN Leerzustand, sondern eine AUFFORDERUNG bei fehlender Auswahl — und
-              deshalb bewusst ohne Primäraktion: die Handlung liegt im Baum nebenan, ein
-              Knopf hier führte nirgendwohin. Die Unterscheidung ist dieselbe, die die
-              Gliederungs-Karte oben trifft, nur andersherum. */}
-          {!aktuell ? (
-            <SeitenLeer
-              titel="Wähle eine Einheit im Baum"
-              hinweis="Kopfdaten, Funk und Zuordnung erscheinen, sobald eine Einheit gewählt ist."
-            />
-          ) : (
-            <Form<KopfWerte> form={form} layout="vertical" disabled={!darfSchreiben} onFinish={(w) => speichern.mutate(w)}>
-              <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
-              <Form.Item label="Typ" name="typ_id">
-                {/* Der Typkatalog ist die einzige Fremdquelle dieses Formulars. Fällt er
-                    aus, stünde hier ein Auswahlfeld ohne Einträge — die Typzuordnung wäre
-                    unmöglich, und zwar lautlos. Der Ausfall steht deshalb im Feld selbst,
-                    dort wo die Fähigkeit verloren geht. */}
-                <Select allowClear placeholder="Typ wählen"
-                  notFoundContent={nichtGefundenInhalt(typenQuery, {
-                    allgemein: 'Einheitentypen konnten nicht geladen werden',
-                  })}
-                  options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))} />
-              </Form.Item>
-              <Form.Item label="Abschnitt" name="abschnitt_id">
-                <TreeSelect allowClear placeholder="Abschnitt zuordnen" treeData={abschnittOptionen}
-                  notFoundContent={nichtGefundenInhalt(abschnitteQuery, {
-                    allgemein: 'Abschnitte konnten nicht geladen werden',
-                  })} />
-              </Form.Item>
-              <Form.Item label="Über-Einheit" name="ueber_einheit_id">
-                <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
-              </Form.Item>
-              <Form.Item label="Soll-Override (vollständig oder leer)">
-                <Space align="end" wrap>
-                  <Form.Item name="soll" noStyle><StaerkeEingabe /></Form.Item>
-                  <span style={{ color: '#888' }}>
-                    Ist: <StaerkeAnzeige wert={aktuell.ist} /> · kumuliert: <StaerkeAnzeige wert={aktuell.ist_kumuliert} />
-                  </span>
-                </Space>
-              </Form.Item>
-              <Typography.Title level={5} style={{ marginTop: 4 }}>Funk / Kommunikation</Typography.Title>
-              <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
-                <SprechgruppenPicker einsatzId={einsatzId} />
-              </Form.Item>
-              <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
-                <Select allowClear placeholder="Digitalfunk / Mobil / Festnetz" options={KOMMUNIKATIONSMITTEL_OPTIONEN} />
-              </Form.Item>
-              <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
-                <Input placeholder="z. B. 0151 23456" allowClear />
-              </Form.Item>
-              <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
-              {darfSchreiben && (
-                <Space size="middle">
-                  <Button type="primary" htmlType="submit" loading={speichern.isPending}>Speichern</Button>
-                  <Popconfirm
-                    title="Einheit auflösen?"
-                    description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => aufloesen.mutate(aktuell.id)}
-                  >
-                    <Button danger>Auflösen</Button>
-                  </Popconfirm>
-                </Space>
-              )}
-
-              <div style={{ marginTop: 8 }}>
-                <FunkErreichbarkeit
-                  sprechgruppen={aktuell.sprechgruppen}
-                  kommunikationsmittel={aktuell.kommunikationsmittel}
-                  erreichbarkeit={aktuell.erreichbarkeit}
-                />
-              </div>
-
-              <Typography.Title level={5} style={{ marginTop: 16 }}>Personal</Typography.Title>
-              {aktuell.personal_mitglieder.map((m) => (
-                <Space key={m.ep_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}{m.ist_fuehrer && <Tag color="gold" style={{ marginLeft: 4 }}>Einheitsführer</Tag>}</span>
-                  {darfSchreiben && (
-                    <Space size="middle">
-                      {!m.ist_fuehrer && <Button onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Einheitsführer</Button>}
-                      <Button danger onClick={() => personalFrei.mutate(m.ep_id)}>Entfernen</Button>
-                    </Space>
-                  )}
-                </Space>
-              ))}
-              {darfSchreiben && (
-                <Select style={{ width: '100%', marginTop: 8 }} placeholder="Person zuordnen …" value={null}
-                  notFoundContent={personalInhalt}
-                  options={freiesPersonal.map((p) => ({ value: p.id, label: p.name }))}
-                  onSelect={(epId) => personalZu.mutate(Number(epId))} />
-              )}
-
-              <Typography.Title level={5} style={{ marginTop: 16 }}>Fahrzeuge</Typography.Title>
-              {aktuell.fahrzeug_mitglieder.map((m) => (
-                <Space key={m.ef_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{m.funkrufname}{m.fahrzeugtyp ? ` (${m.fahrzeugtyp})` : ''}</span>
-                  {darfSchreiben && <Button danger onClick={() => fahrzeugFrei.mutate(m.ef_id)}>Entfernen</Button>}
-                </Space>
-              ))}
-              {darfSchreiben && (
-                <Select style={{ width: '100%', marginTop: 8 }} placeholder="Fahrzeug zuordnen …" value={null}
-                  notFoundContent={fahrzeugInhalt}
-                  options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
-                  onSelect={(efId) => fahrzeugZu.mutate(Number(efId))} />
-              )}
-
-              <Typography.Title level={5} style={{ marginTop: 16 }}>Material</Typography.Title>
-              {aktuell.material_mitglieder.map((m) => (
-                <Space key={m.em_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{m.bezeichnung} ×{m.menge}</span>
-                  {darfSchreiben && <Button danger onClick={() => materialFrei.mutate(m.em_id)}>Entfernen</Button>}
-                </Space>
-              ))}
-              {darfSchreiben && (
-                <Select style={{ width: '100%', marginTop: 8 }} placeholder="Material zuordnen …" value={null}
-                  notFoundContent={materialInhalt}
-                  options={freiesMaterial.map((m) => ({ value: m.id, label: `${m.bezeichnung} ×${m.menge}` }))}
-                  onSelect={(emId) => materialZu.mutate(Number(emId))} />
-              )}
-            </Form>
-          )}
-        </Card>
       </div>
+
+      {/* Zwei Felder statt neun: der Rest der Kopfdaten lebt auf der Detailansicht. Der
+          Dialog übernimmt das Zurücksetzen auf ALLEN Auswegen selbst (Knopf, Kreuz,
+          Escape, Maskenklick) — deshalb ruft hier niemand `resetFields`. */}
+      <ErfassungsModal<BildenWerte>
+        offen={bildenOffen}
+        titel="Einheit bilden"
+        form={bildenForm}
+        erfassenText="Bilden"
+        laeuft={bilden.isPending}
+        // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
+        // Datensatz wirklich ankam. Ein 422 kostete sonst den eingegebenen Namen.
+        onErfassen={(w) => bilden.mutateAsync(w)}
+        onFertig={() => setBildenOffen(false)}
+        onAbbrechen={() => setBildenOffen(false)}
+      >
+        <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+          <Input placeholder="z. B. 2. Zug" />
+        </Form.Item>
+        <Form.Item label="Typ" name="typ_id">
+          <Select allowClear placeholder="Typ wählen"
+            notFoundContent={nichtGefundenInhalt(typenQuery, {
+              allgemein: 'Einheitentypen konnten nicht geladen werden',
+            })}
+            options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))} />
+        </Form.Item>
+      </ErfassungsModal>
     </div>
   );
 }

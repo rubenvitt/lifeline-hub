@@ -15,6 +15,7 @@ import KatalogTabelle from './KatalogTabelle';
 import { Liste, ListenEintrag } from './Liste';
 import { Select } from './Select';
 import StatusTag from './StatusTag';
+import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
@@ -236,6 +237,20 @@ export type Kartenplan<T, K extends string> =
        * Auswahlfeld mit fester Mindestbreite, das eine 390-px-Karte breit drückt.
        */
       status?: (zeile: T) => StatusDarstellung | null;
+      /**
+       * Macht das Statusetikett BEDIENBAR (LFH-339 · C4, Zielform-Spec §5). Deskriptor,
+       * kein `ReactNode`-Slot — damit behält das Primitiv Form, Höhe und Trefffläche;
+       * eine Klein-Variante oder eine Farbfläche sind von außen nicht einschmuggelbar.
+       *
+       * Der Bedienweg sitzt bewusst HIER und nicht am {@link PrimaerAktion}-Slot: dort ist
+       * genau EINE Aktion zugesichert, und die ist auf allen drei Kräfteseiten mit
+       * „Entfernen" belegt. Die Antwort ist nicht, den Slot zu verdoppeln, sondern ihn
+       * nicht zu brauchen — bedient wird, wo der Status schon steht. Die
+       * Ein-Aktion-Zusicherung bleibt damit unangetastet.
+       *
+       * Fehlt das Feld oder liefert es `null`, bleibt das Etikett reine Anzeige.
+       */
+      statusBedienung?: (zeile: T) => StatusBedienung | null;
       /** HÖCHSTENS DREI Sekundärfelder — der Tupeltyp erzwingt die Obergrenze. */
       sekundaer?: readonly [K?, K?, K?];
       aktion?: PrimaerAktion<T>;
@@ -981,6 +996,31 @@ export default function Datensicht<T extends object, const K extends string>(
    */
   const pruefeVerlassen = useCallback((ziel: EventTarget | null) => {
     if (ziel != null && wurzel.current?.contains(ziel as Node)) return;
+    /**
+     * EIN ÜBERLAGERNDES MENÜ IST KEIN VERLASSEN (LFH-339 · C4).
+     *
+     * Seit der Statuswechsel am Etikett hängt, öffnet eine Bedienung in der Zeile ein
+     * `Dropdown` — und dessen Inhalt liegt in einem PORTAL an `document.body`, also
+     * ausserhalb von {@link wurzel}. antds `autoFocus` schiebt den Fokus beim Öffnen
+     * dorthin; ohne diesen Zweig taute die Schleuse damit ausgerechnet in dem Moment auf,
+     * für den sie gebaut ist: jemand hält das Menü offen, und die Zeile darunter wandert
+     * weg.
+     *
+     * GEMESSEN UND DESHALB HIER NOTIERT: in jsdom passiert das NICHT — `autoFocus` lässt
+     * den Fokus dort auf dem Auslöser stehen (nachgemessen am 17.08.2026, der aktive
+     * Knoten war der `ant-dropdown-trigger` selbst, `inSicht: true`). Ein Test, der bloss
+     * ein Menü öffnet und die Reihenfolge prüft, ist deshalb GRÜN, ohne diesen Zweig zu
+     * berühren — er belegt nichts. Prüfbar ist nur der Handler selbst, mit einem
+     * `relatedTarget` im Portal; genau so steht es im Test.
+     *
+     * Absichtlich über die Overlay-Klasse und nicht über eine Portal-Referenz: die
+     * Overlays hängen an `document.body` und gehören keinem Knoten dieser Sicht, es gibt
+     * also nichts, worauf eine Referenz zeigen könnte. Der Preis ist eine Kopplung an
+     * antds Klassennamen — sichtbar hier statt versteckt in einer Hilfsfunktion.
+     */
+    if (ziel instanceof Node && (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')) {
+      return;
+    }
     setSchleuse({ art: 'offen' });
   }, []);
 
@@ -1250,6 +1290,7 @@ export default function Datensicht<T extends object, const K extends string>(
     const titelInhalt = titelSpalte ? zelle(titelSpalte, zeile, index) : null;
     const ziel = karte.titel.ziel?.(zeile);
     const status = karte.status?.(zeile) ?? null;
+    const statusBedienung = karte.statusBedienung?.(zeile) ?? null;
     const felder = (karte.sekundaer ?? [])
       .filter((k): k is K => k != null)
       .map((k) => spalten.find((s) => s.key === k))
@@ -1302,7 +1343,25 @@ export default function Datensicht<T extends object, const K extends string>(
               ) : (
                 <Typography.Text strong>{titelInhalt}</Typography.Text>
               )}
-              {status && <StatusTag darstellung={status} />}
+              {/* Das Statusetikett ist der Auslöser, wenn es einen Bedienweg gibt — und
+                  sonst reine Anzeige. Ein `Select` passte hier nicht: seine feste
+                  Mindestbreite drückte die 390-px-Karte breit, das Menü liegt dagegen im
+                  Portal (LFH-339 · C4). */}
+              {statusBedienung ? (
+                <StatusWahl
+                  darstellung={status}
+                  farbe={statusBedienung.farbe}
+                  aktuell={statusBedienung.aktuell}
+                  optionen={statusBedienung.optionen}
+                  kennung={statusBedienung.kennung}
+                  onWaehlen={statusBedienung.onWaehlen}
+                  laeuft={statusBedienung.laeuft}
+                  gesperrt={statusBedienung.gesperrt}
+                  darfSchreiben
+                />
+              ) : (
+                status && <StatusTag darstellung={status} />
+              )}
             </div>
             {felder.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: token.padding }}>

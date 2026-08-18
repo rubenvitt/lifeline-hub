@@ -43,6 +43,16 @@ overrides:
   # Kette: postcss → nanoid, postcss selbst über vite (@vitejs/plugin-react,
   # @vitest/mocker/vitest, vite-plugin-pwa). Reines Build-/Test-Zeit-Tooling (PostCSS läuft
   # nur beim Bundeln bzw. unter Vitest), kein Laufzeit-Code im ausgelieferten Binary — Fund
-  # 2026-08-08 beim LFH-336-Gate-Lauf, unabhängig vom Ticket. ^3.3.17 ist ein Same-Major-Patch;
-  # verifiziert durch den Frontend-Produktionsbuild und die Vitest-Suite in check-all.sh.
-  nanoid@>=3.0.0 <3.3.17: ^3.3.17
+  # 2026-08-08 beim LFH-336-Gate-Lauf, unabhängig vom Ticket.
+  #
+  # NACHGEZOGEN 2026-08-17 (LFH-339-Gate-Lauf): DAS ADVISORY WURDE VERSCHÄRFT. Beim ersten
+  # Fix galt 3.3.17 als gepatcht; inzwischen nennt GHSA-2v37-7h3g-55p8 „<3.3.18" als
+  # verwundbar. Der Override griff weiterhin korrekt und hob auf 3.3.17 — nur reichte diese
+  # Zielversion nicht mehr, und `pnpm audit` brach Schritt 6 des Gates. Das ist die Sorte
+  # Bestandsbefund, die ohne eigenes Zutun rot wird: ein Override pinnt eine Zahl, das
+  # Advisory bewegt sich darunter weg. Wer hier etwas ändert, prüft BEIDE Grenzen — die
+  # Untergrenze des Bereichs UND die Zielversion.
+  #
+  # ^3.3.18 bleibt ein Same-Major-Patch; verifiziert durch den Frontend-Produktionsbuild und
+  # die Vitest-Suite in check-all.sh.
+  nanoid@>=3.0.0 <3.3.18: ^3.3.18

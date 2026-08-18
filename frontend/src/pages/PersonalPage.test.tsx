@@ -66,7 +66,39 @@ function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[]
   );
 }
 
+/**
+ * Öffnet das Statusmenü einer Zeile und liefert das GEÖFFNETE Menü-Portal. antd lässt die
+ * Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes Portal bekommt in
+ * jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern.
+ */
+async function oeffneStatusmenue(zeile: HTMLElement, name: string): Promise<HTMLElement> {
+  await userEvent.click(within(zeile).getByRole('button', { name: `Status von ${name} ändern` }));
+  const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+    (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+  );
+  expect(offen).toHaveLength(1);
+  const menue = offen[0].querySelector<HTMLElement>('[role="menu"]');
+  if (!menue) throw new Error(`Statusmenü zu ${name} ließ sich nicht öffnen`);
+  return menue;
+}
+
 describe('PersonalPage', () => {
+  it('bedient den Status am Etikett, nicht über eines von zwei Auswahlfeldern der Zeile', async () => {
+    /**
+     * Befund H19 an der Personalseite. Hier war der Mangel schärfer als bei den Fahrzeugen:
+     * die Zeile trägt ZWEI Auswahlfelder (Stärke-Position und Status), und im Bestandstest
+     * musste der richtige über `getAllByRole('combobox')[length-1]` gegriffen werden — eine
+     * Positionsabhängigkeit, die beim Umsortieren der Spalten still das falsche Feld
+     * getroffen hätte. Übrig bleibt genau ein `combobox`: die Position.
+     */
+    const { container } = render(einsatz());
+    await screen.findByText('Thomas Müller');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+
+    expect(within(zeile).getAllByRole('combobox')).toHaveLength(1);
+    expect(within(zeile).getByRole('button', { name: 'Status von Thomas Müller ändern' })).toBeInTheDocument();
+  });
+
   /**
    * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
    *
@@ -99,20 +131,22 @@ describe('PersonalPage', () => {
     await screen.findByText('Thomas Müller');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
-    const auswahlfelder = within(zeile).getAllByRole('combobox');
-    await userEvent.click(auswahlfelder[auswahlfelder.length - 1]);
-    const option = (await screen.findAllByText('einsatzbereit')).find((el) => el.closest('.ant-select-item-option'));
-    expect(option).toBeTruthy();
-    await userEvent.click(option!);
+    // Vorher musste der Statuswechsel über `getAllByRole('combobox')[length-1]` gegriffen
+    // werden — die Zeile trägt noch ein zweites Auswahlfeld für die Stärke-Position. Der
+    // Auslöser ist jetzt über seinen Namen eindeutig (LFH-339 · C4).
+    const menue = await oeffneStatusmenue(zeile, 'Thomas Müller');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /einsatzbereit/ }));
 
     await waitFor(() => {
       expect(client.getQueryData<typeof disponiert>(einsatzKeys.personal(7))?.[0].status_id).toBe(3);
     });
-    const laufendeAuswahlfelder = within(zeile).getAllByRole('combobox');
-    expect(laufendeAuswahlfelder[laufendeAuswahlfelder.length - 1]).toBeDisabled();
-    const zweiteAuswahlfelder = within(container.querySelector('[data-row-key="11"]') as HTMLElement)
-      .getAllByRole('combobox');
-    expect(zweiteAuswahlfelder[zweiteAuswahlfelder.length - 1]).toBeDisabled();
+    // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im Cache.
+    expect(zeile.textContent).toContain('einsatzbereit');
+    expect(within(zeile).getByRole('button', { name: /Status von Thomas Müller/ })).toBeDisabled();
+    expect(
+      within(container.querySelector('[data-row-key="11"]') as HTMLElement)
+        .getByRole('button', { name: /Status von Erika Muster/ }),
+    ).toBeDisabled();
 
     let refetchFreigeben: (() => void) | undefined;
     const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });

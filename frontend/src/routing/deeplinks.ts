@@ -165,6 +165,23 @@ export function einheitenPfad(einsatzId: number, opts: { einheit?: number } = {}
   return mitQuery(einsatzModulPfad(einsatzId, 'einheiten'), { einheit: opts.einheit });
 }
 
+/**
+ * Vollseiten-Detail je Einheit (LFH-339 · C4).
+ *
+ * Die Einheit ist damit vom Query-Param- auf das Item-Route-Muster gewechselt: sie hat
+ * seit C4 eine eigene Detailansicht, und die Faustregel dieses Moduls lautet
+ * „Vollseiten-Detail vorhanden → Item-Route".
+ *
+ * Der Grund ist LFH-19, nicht Symmetrie: die Kopfdaten sind neun Felder, dazu kommen drei
+ * sofort wirkende Zuordnungslisten. Das ist keine Auswahl in einer Listenhälfte mehr.
+ *
+ * `einheitenPfad(id, { einheit })` bleibt bestehen und ist NICHT tot: Bestands-Deeplinks
+ * aus anderen Modulen zeigen darauf, und die Listenseite leitet sie auf diese Route weiter.
+ */
+export function einheitDetailPfad(einsatzId: number, einheitId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'einheiten')}/${einheitId}`;
+}
+
 export function fahrzeugePfad(einsatzId: number, opts: { fahrzeug?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'fahrzeuge'), { fahrzeug: opts.fahrzeug });
 }

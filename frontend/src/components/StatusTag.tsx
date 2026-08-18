@@ -13,6 +13,21 @@ interface StatusTagProps {
   darstellung: StatusDarstellung;
   /** Zusatzinformation als Tooltip-Attribut (z. B. Stand der Meldung). */
   title?: string;
+  /**
+   * Mandantengepflegte Farbe, die die Rollenfarbe überschreibt — für Kataloge AUSSERHALB
+   * des A2-Vertrags (`fahrzeug_status.status_farbe`, `personal_status.status_farbe`;
+   * das Backend trimmt sie nur, es validiert sie nicht).
+   *
+   * Sie landet auf Rand und Text, NIE auf der Fläche (LFH-339 · C4, Zielform-Spec §4b):
+   * Kontrast (WCAG 1.4.11) ist bei ungeprüftem Freitext nicht zugesichert, und auf einem
+   * Rand trägt die Farbe keine Textlesbarkeit. Der Bestand rendert sie heute noch über
+   * antds `color`-Prop als Vollfläche mit erzwungen weißem Text — genau die Form, die
+   * dieser Baustein für die Rollenachse ausdrücklich verwirft.
+   *
+   * Leerer String und `null` zählen als „nicht gepflegt": das Backend trimmt, ein
+   * getrimmtes Nichts ist keine Farbe.
+   */
+  farbe?: string | null;
 }
 
 /**
@@ -32,9 +47,9 @@ interface StatusTagProps {
  * Keine Klein-Variante am Steuerelement (A1 Gate 4) — die Höhe kommt aus der
  * Dichte-Staffel am `ConfigProvider`.
  */
-export default function StatusTag({ darstellung, title }: StatusTagProps) {
+export default function StatusTag({ darstellung, title, farbe: ueberschrieben }: StatusTagProps) {
   const { token } = theme.useToken();
-  const farbe = rollenFarbe(darstellung.rolle, token);
+  const farbe = ueberschrieben?.trim() ? ueberschrieben.trim() : rollenFarbe(darstellung.rolle, token);
   return (
     <Tag
       title={title}

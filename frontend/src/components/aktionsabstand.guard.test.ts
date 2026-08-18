@@ -63,7 +63,11 @@ const MIT_NACHBARSCHAFT = [
   'stammdaten/SprechgruppenTab.tsx',
   'stammdaten/StatusKatalogTab.tsx',
   'pages/BenutzerPage.tsx',
-  'pages/EinheitenPage.tsx',
+  // Mit LFH-339 · C4 von `EinheitenPage.tsx` hierher gezogen: die Reihe
+  // Speichern + Auflösen(danger) sitzt jetzt in der sticky Aktionsleiste der eigenen
+  // Detailroute. Der Guard hat den Umzug selbst gemeldet — der alte Eintrag war eine
+  // Zusicherung ohne Fundstelle.
+  'pages/EinheitDetailPage.tsx',
   'pages/EinsatzabschnittePage.tsx',
   // ── B5f · Kartenverwaltung (LFH-366) ──────────────────────────────────────
   // Beide tragen in ihrer Aktionsspalte „Löschen" neben mindestens einer neutralen Aktion.
@@ -192,14 +196,13 @@ interface Reihe {
  * Alle Aktionsreihen einer Datei, die eine destruktive UND mindestens eine weitere
  * Aktion tragen.
  *
- * Der Stack ist der Punkt: `EinheitenPage` schachtelt eine Knopfreihe in ein
- * äußeres `<Space justifyContent: space-between>`. Gezählt wird deshalb je
- * UNMITTELBAR umschließendem `<Space>` — ein Knopf im äußeren zählt nicht als
- * Nachbar eines Knopfs im inneren.
+ * Der Stack ist der Punkt: `EinheitDetailPage` schachtelt eine Knopfreihe in ein
+ * äußeres `<Space>`. Gezählt wird deshalb je UNMITTELBAR umschließendem `<Space>` —
+ * ein Knopf im äußeren zählt nicht als Nachbar eines Knopfs im inneren.
  *
  * Ein `<Space>` mit nur EINER Aktion bleibt draußen: dort gibt es keine
  * Nachbarschaft, vor der zu trennen wäre (`StichworteTab`, die
- * Zuordnungs-Zeilen in `EinheitenPage`).
+ * Zuordnungs-Zeilen in `EinheitDetailPage`).
  */
 export function reihenIn(quelltext: string): Reihe[] {
   const text = ohneKommentare(quelltext);

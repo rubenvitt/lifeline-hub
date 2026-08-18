@@ -73,6 +73,24 @@ function render(
   );
 }
 
+/**
+ * Öffnet das Statusmenü einer Zeile und liefert das GEÖFFNETE Menü-Portal.
+ *
+ * antd lässt die Portale geschlossener Dropdowns im Baum stehen, und ein verlassendes
+ * Portal bekommt in jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern
+ * und genau einen Treffer verlangen (Muster `meldungen/MeldungKarte.test.tsx`).
+ */
+async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promise<HTMLElement> {
+  await userEvent.click(within(zeile).getByRole('button', { name: `Status von ${funkrufname} ändern` }));
+  const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+    (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+  );
+  expect(offen).toHaveLength(1);
+  const menue = offen[0].querySelector<HTMLElement>('[role="menu"]');
+  if (!menue) throw new Error(`Statusmenü zu ${funkrufname} ließ sich nicht öffnen`);
+  return menue;
+}
+
 describe('FahrzeugePage', () => {
   /**
    * Der Weg zur aggregierenden Kräfteübersicht (LFH-338 · C3, Befund H21).
@@ -93,6 +111,30 @@ describe('FahrzeugePage', () => {
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();
   });
 
+  it('bedient den Status am Etikett, nicht über ein Auswahlfeld in der Zelle', async () => {
+    /**
+     * Befund H19 (LFH-339 · C4). Der Statuswechsel sass in einem `Select` mit fester
+     * `minWidth: 150` mitten in der Zeile — die Zahl, an der die 390-px-Karte scheiterte.
+     *
+     * Geprüft werden BEIDE Hälften: das Auswahlfeld ist weg UND der Auslöser trägt die
+     * Zeilenkennung. Die erste allein wäre auch grün, wenn gar kein Bedienweg mehr da
+     * wäre.
+     */
+    const { container } = render(einsatz());
+    await screen.findByText('Florian 1');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+
+    expect(within(zeile).queryByRole('combobox')).toBeNull();
+    expect(within(zeile).getByRole('button', { name: 'Status von Florian 1 ändern' })).toBeInTheDocument();
+
+    // Der ganze Katalog steht im Menü — senkrecht, weil zehn Werte in keine waagerechte
+    // Reihe passen (Zielform-Spec §3).
+    const menue = await oeffneStatusmenue(zeile, 'Florian 1');
+    for (const s of stati) {
+      expect(within(menue).getByRole('menuitem', { name: new RegExp(s.label) })).toBeInTheDocument();
+    }
+  });
+
   it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
     let freigeben: (() => void) | undefined;
     const gate = new Promise<void>((resolve) => { freigeben = resolve; });
@@ -105,17 +147,22 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
-    await userEvent.click(within(zeile).getByRole('combobox'));
-    const option = (await screen.findAllByText('vor_ort')).find((el) => el.closest('.ant-select-item-option'));
-    expect(option).toBeTruthy();
-    await userEvent.click(option!);
+    const menue = await oeffneStatusmenue(zeile, 'Florian 1');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /vor_ort/ }));
 
     await waitFor(() => {
       expect(client.getQueryData<(typeof ef)[]>(einsatzKeys.fahrzeuge(7))?.[0].status_id).toBe(3);
     });
-    expect(within(zeile).getByRole('combobox')).toBeDisabled();
-    expect(within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('combobox'))
-      .toBeDisabled();
+    // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im
+    // Zwischenspeicher — das ist die Aussage des AK, und sie ist eine andere.
+    expect(zeile.textContent).toContain('vor_ort');
+    // Der Riegel sperrt zeilenübergreifend: solange eine Statusmutation läuft, nimmt KEINE
+    // Zeile eine zweite an.
+    expect(within(zeile).getByRole('button', { name: /Status von Florian 1/ })).toBeDisabled();
+    expect(
+      within(container.querySelector('[data-row-key="11"]') as HTMLElement)
+        .getByRole('button', { name: /Status von Florian 2/ }),
+    ).toBeDisabled();
 
     let refetchFreigeben: (() => void) | undefined;
     const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
@@ -308,9 +355,9 @@ describe('FahrzeugePage', () => {
     const vorher = zeilenFolge(container);
     expect(vorher).toEqual(['11', '10']);
 
-    // Fokus in die Statusauswahl DERSELBEN Zeile, die gleich wandern würde.
+    // Fokus auf den Statusauslöser DERSELBEN Zeile, die gleich wandern würde.
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    const auswahl = within(zeile).getByRole('combobox');
+    const auswahl = within(zeile).getByRole('button', { name: /Status von Florian 1/ });
     act(() => auswahl.focus());
     // Die Schleuse hängt an Fokus-CONTAINMENT. Das wird gemessen, nicht angenommen —
     // ein Test, der grün ist, weil nichts umsortiert wurde, sieht sonst identisch aus.
@@ -324,9 +371,9 @@ describe('FahrzeugePage', () => {
       ]);
     });
 
-    // Zellinhalt AKTUALISIERT: die Auswahl der Zeile zeigt den neuen Status. Über
-    // `textContent` statt `getByText`, weil antds Auswahlfeld den gewählten Text mehrfach
-    // in den Baum legt (Anzeige + Messknoten) und eine Einzeltreffer-Abfrage dort wirft.
+    // Zellinhalt AKTUALISIERT: der Auslöser der Zeile zeigt den neuen Status. Über
+    // `textContent` statt `getByText`, weil derselbe Wortlaut zugleich als Menüeintrag im
+    // Portal stehen kann und eine Einzeltreffer-Abfrage dort wirft.
     await waitFor(() => expect(zeile.textContent).toContain('vor_ort'));
     // Reihenfolge EINGEFROREN: die Zeile wandert nicht unter dem offenen Auswahlfeld weg.
     expect(zeilenFolge(container)).toEqual(vorher);
@@ -342,6 +389,70 @@ describe('FahrzeugePage', () => {
     expect(screen.getByText('verfügbar · 2')).toBeInTheDocument();
     expect(screen.queryByText(/^gebunden · /)).toBeNull();
     expect(screen.queryByRole('button', { name: /neue? Ein(trag|träge)/ })).toBeNull();
+  });
+
+  it('ein Fokuswechsel INS Statusmenü taut die Schleuse nicht auf', async () => {
+    /**
+     * Die Hälfte von Kriterium 12, die der Umbau von LFH-339 überhaupt erst nötig macht:
+     * das Menü liegt in einem PORTAL an `document.body`, also außerhalb der Sicht-Wurzel.
+     * `pruefeVerlassen` in `Datensicht` taut auf, sobald der Fokus die Wurzel verlässt —
+     * und antds `autoFocus` schiebt ihn beim Öffnen genau dorthin. Ohne den
+     * Overlay-Zweig dort wanderte die Zeile weg, während jemand das Menü offen hält.
+     *
+     * ── WARUM DER FOKUS HIER VON HAND GESETZT WIRD ──────────────────────────────────
+     *
+     * GEMESSEN am 17.08.2026: in jsdom verschiebt `autoFocus` den Fokus NICHT ins Portal
+     * — der aktive Knoten bleibt der Auslöser selbst (`ant-dropdown-trigger`,
+     * `sicht.contains(...) === true`). Ein Test, der bloß das Menü öffnet und dann die
+     * Reihenfolge prüft, ist deshalb auch OHNE den Zweig grün und belegt nichts. Geprüft
+     * wird darum der Handler direkt: ein `focusout`, dessen `relatedTarget` im Menü liegt.
+     */
+    const { container, client } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
+    await screen.findByText('Florian 1');
+    const vorher = zeilenFolge(container);
+    expect(vorher).toEqual(['11', '10']);
+
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    const ausloeser = within(zeile).getByRole('button', { name: /Status von Florian 1/ });
+    act(() => ausloeser.focus());
+    const menue = await oeffneStatusmenue(zeile, 'Florian 1');
+
+    // Der Fokus verlässt die Sicht-Wurzel Richtung Portal — im Browser tut das antd selbst.
+    const sicht = screen.getByRole('region', { name: 'Fahrzeuge im Einsatz' });
+    expect(sicht.contains(menue)).toBe(false);
+    fireEvent.focusOut(ausloeser, { relatedTarget: menue });
+
+    act(() => {
+      client.setQueryData(einsatzKeys.fahrzeuge(7), [
+        { ...efGebunden, status_id: 3, status_label: 'vor_ort', status_kategorie: 'verfuegbar' },
+        efVerfuegbar,
+      ]);
+    });
+
+    await waitFor(() => expect(zeile.textContent).toContain('vor_ort'));
+    expect(zeilenFolge(container)).toEqual(vorher);
+  });
+
+  it('Gegenprobe: ein Fokuswechsel AUS der Sicht heraus taut sie weiterhin auf', async () => {
+    // Ohne diese Gegenprobe belegt der Test darüber nichts über den Overlay-Zweig — ein
+    // `pruefeVerlassen`, das NIE auftaut, wäre dort ebenfalls grün.
+    const { container, client } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
+    await screen.findByText('Florian 1');
+    expect(zeilenFolge(container)).toEqual(['11', '10']);
+
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    const ausloeser = within(zeile).getByRole('button', { name: /Status von Florian 1/ });
+    act(() => ausloeser.focus());
+    fireEvent.focusOut(ausloeser, { relatedTarget: document.body });
+
+    act(() => {
+      client.setQueryData(einsatzKeys.fahrzeuge(7), [
+        { ...efGebunden, status_id: 3, status_label: 'vor_ort', status_kategorie: 'verfuegbar' },
+        efVerfuegbar,
+      ]);
+    });
+
+    await waitFor(() => expect(zeilenFolge(container)).toEqual(['10', '11']));
   });
 
   it('Gegenprobe: OHNE Fokus in der Sicht ordnet sich die Liste sofort neu', async () => {
