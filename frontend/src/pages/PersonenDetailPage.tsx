@@ -475,7 +475,11 @@ export default function PersonenDetailPage() {
                     R-{String(a.vermisst_person_id === person.id ? a.gefunden_person_id : a.vermisst_person_id).padStart(3, '0')}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
-                    <Space style={{ marginLeft: 12 }}>
+                    /* `size="middle"` wie an der UHS-Zeile (LFH-363): „Verwerfen" ist
+                       `danger` und stünde sonst bündig neben „Bestätigen". Bestandsbefund,
+                       mit LFH-340 · C5 abgetragen, weil das Bündel die Datei ohnehin
+                       anfasste — der Scanner hat ihn selbst gemeldet. */
+                    <Space size="middle" style={{ marginLeft: 12 }}>
                       <Button type="primary"
                         disabled={!darfEinsatzLeiten(einsatz, benutzer)}
                         onClick={() => abgleichEntscheidenMutation.mutate({
@@ -733,9 +737,18 @@ export default function PersonenDetailPage() {
    * während einer laufenden Bearbeitung wird deshalb WEDER eine Primäraktion NOCH ein
    * Menü-Auslöser gerendert — ein deaktivierter Auslöser wäre ein Bedienziel, das nichts tut.
    *
-   * Die Primäraktion hängt am Zustand: eine ungesichtete Person will gesichtet werden, eine
-   * gesichtete braucht als Nächstes ihren Verbleib. Ist beides erledigt, bleibt „Bearbeiten"
-   * — die einzige Aktion, die immer sinnvoll ist.
+   * Die Primäraktion hängt am Zustand, und zwar an GENAU EINER Frage: ist gesichtet worden?
+   * Nein → „Sichten". Ja → „Verbleib erfassen".
+   *
+   * ZWEI ABWEICHUNGEN VOM AK-WORTLAUT („bei Patient: Verbleib erfassen"), beide bewusst:
+   *
+   * 1. `aktuelle_sichtung: 'unverletzt'` ist nach `PATIENT_SK` KEIN Patient, bekommt hier
+   *    aber trotzdem „Verbleib erfassen". Das ist die richtige Frage an diesem Datensatz:
+   *    Unverletzte werden entlassen oder verbleiben vor Ort, und beides IST ein Verbleib.
+   *    Eine Zusatzbedingung auf `istPatient` machte den Kopf für diese Menge leer.
+   * 2. Ein bereits erfasster Verbleib schaltet nicht weiter. Ein dritter Zweig („dann
+   *    Bearbeiten") wäre eine Regel mehr für einen Zustand, in dem der Verbleib ohnehin
+   *    korrigierbar bleiben muss — „Bearbeiten" steht in beiden Fällen im Menü.
    */
   const aktionenPlan = ((): { primaer: Kopfaktion; weitere: Kopfaktion[] } | null => {
     if (!darfSchreiben || p.storniert_at || editSitzung) return null;

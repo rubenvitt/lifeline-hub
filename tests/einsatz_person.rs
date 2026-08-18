@@ -1553,3 +1553,152 @@ async fn patch_unbekanntes_geschlecht_bleibt_400() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+// ---------- Erst-Sichtung beim Anlegen (LFH-340 · C5) ----------
+//
+// Die Sichtungskategorie gehört in die Schnellerfassung: ohne sie kostet eine gesichtete
+// Person neun Interaktionen und zwei Seitenwechsel (anlegen, Detailseite öffnen, sichten).
+// Der Client schiebt sie NICHT als zweiten Request nach — die Personen-Erfassung hat eine
+// Offline-Queue mit `client_id`-Idempotenz, ein nachgeschobener Sichtungs-Call hätte keine.
+
+#[tokio::test]
+async fn anlegen_mit_sichtung_setzt_kategorie_und_hebt_auf_betroffen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"antreff_ort":"Sammelstelle","sichtung":"sk2"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    // Beides in EINER Antwort: der Status ist angehoben, die Kategorie steht im Cache-Feld.
+    assert_eq!(json["status"], "betroffen");
+    assert_eq!(json["aktuelle_sichtung"], "sk2");
+    assert!(!json["aktuelle_sichtung_at"].is_null());
+}
+
+#[tokio::test]
+async fn anlegen_mit_sichtung_schreibt_die_sichtung_in_den_verlauf() {
+    // Der Cache-Wert allein bewiese nichts: er könnte auch ohne Zeile in `person_sichtung`
+    // gesetzt sein, und die Sichtungskette wäre still leer.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"sichtung":"sk1"}"#).await;
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        None,
+    )
+    .await;
+    let sichtungen = detail["sichtungen"].as_array().unwrap();
+    assert_eq!(sichtungen.len(), 1);
+    assert_eq!(sichtungen[0]["kategorie"], "sk1");
+}
+
+#[tokio::test]
+async fn anlegen_mit_sichtung_und_status_betroffen_laesst_den_status_stehen() {
+    // `hebe_auf_betroffen` gilt nur für `erfasst`. Eine schon als betroffen angelegte Person
+    // darf durch die Erst-Sichtung keinen zweiten Statuswechsel erfahren.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"status":"betroffen","sichtung":"sk3"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(json["status"], "betroffen");
+    assert_eq!(json["aktuelle_sichtung"], "sk3");
+}
+
+#[tokio::test]
+async fn anlegen_mit_sichtung_und_status_vermisst_ist_422() {
+    // Jedes Feld für sich ist in Ordnung — erst die KOMBINATION verbietet die Aktion
+    // (LFH-267/F22): eine vermisste Person ist nicht angetroffen und damit nicht sichtbar.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"status":"vermisst","sichtung":"sk1"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn anlegen_mit_unbekannter_sichtung_ist_400() {
+    // Das Feld ist schon für sich unbrauchbar → 400, nicht 422.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"sichtung":"sk9"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn replay_derselben_client_id_legt_die_sichtung_nicht_doppelt_an() {
+    // Der Fall, der diese Erweiterung überhaupt rechtfertigt: der Offline-Replay schickt
+    // denselben Body erneut. Ohne die `war_neu`-Bedingung stünde die Sichtung danach zweimal
+    // im Verlauf — der Kette, aus der der medizinische Verlauf gelesen wird.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = r#"{"client_id":"abc-123","sichtung":"sk2"}"#;
+    let p = person_anlegen(&app, &admin, e, body).await;
+    let zweite = person_anlegen(&app, &admin, e, body).await;
+    assert_eq!(
+        p, zweite,
+        "derselbe client_id-Replay liefert dieselbe Person"
+    );
+
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(detail["sichtungen"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn anlegen_mit_sichtung_schreibt_zwei_etb_zeilen_ohne_identitaet() {
+    // Erfassung UND Sichtung sind je ein Vorgang im Tagebuch. Der ETB bleibt dabei
+    // pseudonym — dieselbe Zusicherung wie beim dedizierten Sichtungs-Endpunkt.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Mustermann","sichtung":"sk1"}"#).await;
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    let eigene: Vec<&String> = inhalte.iter().filter(|i| i.contains("Person R-")).collect();
+    assert_eq!(eigene.len(), 2, "Erfassung und Sichtung, je eine Zeile");
+    assert!(eigene.iter().any(|i| i.contains("erfasst")));
+    assert!(eigene.iter().any(|i| i.contains("Sichtung")));
+    assert!(
+        !inhalte.iter().any(|i| i.contains("Mustermann")),
+        "der ETB bleibt pseudonym"
+    );
+}
