@@ -6,7 +6,7 @@ import { ApiError } from '../api/client';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
-import { gefahrenPfad, parseRouteId } from '../routing/deeplinks';
+import { gefahrenPfad, parsePlatzierenAuftrag, parseRouteId } from '../routing/deeplinks';
 import { parsePolygon, polygonZentroid } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
@@ -267,6 +267,27 @@ export default function LagekartePage() {
     naechste.delete('gefahrengebiet');
     setSearchParams(naechste, { replace: true });
   }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
+
+  /**
+   * Platzier-Auftrag von außen (LFH-340 · C5): `?platzieren=schaden:5` schickt die Karte in
+   * den Platzier-Modus für genau dieses Objekt — der nächste Klick setzt seine Koordinate.
+   * Dasselbe apply-then-clean wie beim Gefahrengebiet-Deeplink darüber: `searchParams` wird
+   * NICHT in-place mutiert (StrictMode-fest), und der Parameter wird geräumt, weil ein
+   * stehengebliebener Auftrag die Karte bei jedem Neuladen erneut in den Modus schickte.
+   *
+   * `darfSchreiben` ist Bedingung, nicht Höflichkeit: der Platzier-Modus endet in einem
+   * PATCH, den ein Beobachter nicht senden darf — ohne den Riegel liefe er in einen 403,
+   * nachdem er bereits auf die Karte geklickt hat.
+   */
+  useEffect(() => {
+    const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
+    if (!auftrag) return;
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('platzieren');
+    setSearchParams(naechste, { replace: true });
+    if (!darfSchreiben) return;
+    onPlatzierenStart(auftrag);
+  }, [searchParams, setSearchParams, darfSchreiben, onPlatzierenStart]);
 
   if (ladt) {
     return <SeitenSkeleton />;

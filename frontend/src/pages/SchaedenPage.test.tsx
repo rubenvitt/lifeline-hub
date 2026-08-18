@@ -212,6 +212,21 @@ describe('SchaedenPage', () => {
     expect(screen.queryByText('S-001')).not.toBeInTheDocument();
   });
 
+  /**
+   * Verortungsstand (LFH-340 · C5, Befund M39). Beide Hälften sind Pflicht: eine Aussage
+   * allein wäre auch grün, wenn die Spalte in jeder Zeile dasselbe zeigte.
+   */
+  it('zeigt in der Liste, ob ein Schaden verortet ist', async () => {
+    render(einsatzAktiv, [
+      basisSchaden({ id: 10, registrier_nr: 1, lat: 52.1, lon: 8.5 }),
+      basisSchaden({ id: 11, registrier_nr: 2 }),
+    ]);
+    await screen.findByText('S-001');
+    expect(screen.getByRole('columnheader', { name: /Verortet/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('verortet')).toBeInTheDocument();
+    expect(screen.getByLabelText('nicht verortet')).toBeInTheDocument();
+  });
+
   it('zeigt offene Schäden mit S-Nummer, Typ und Ausmaß', async () => {
     render(einsatzAktiv, [
       basisSchaden(),

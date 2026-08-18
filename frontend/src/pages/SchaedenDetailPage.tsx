@@ -18,7 +18,8 @@ import {
 } from '../api/einsatzSchaden';
 import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
+import { lagekartePfad, parseRouteId, schaedenPfad } from '../routing/deeplinks';
+import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import type { Ausmass, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
 import {
@@ -164,6 +165,30 @@ export default function SchaedenDetailPage() {
       </Descriptions.Item>
       <Descriptions.Item label="Beschreibung">
         {zelle('beschreibung', <Input.TextArea rows={2} />, s.beschreibung || '—')}
+      </Descriptions.Item>
+      {/**
+        * VERORTUNG (LFH-340 · C5, Befund M39). Bis dahin sagte die Seite kein Wort darüber,
+        * ob dieser Schaden auf der Karte steht — obwohl `lat`/`lon` seit jeher am Datensatz
+        * hängen und die Karte sie setzen kann. Eine Lage, die man nicht verorten kann, weil
+        * niemand sieht, dass sie unverortet ist, ist so gut wie nicht erfasst.
+        *
+        * Die Koordinate wird hier NICHT eingegeben: `SchadenEingabe` kennt kein lat/lon
+        * (nur `SchadenPatch` tut es), und ein Eingabefeld wäre eine Backend-Erweiterung.
+        * Der Weg ist deshalb der Auftrag an die Karte — sie hat die Mechanik bereits.
+        */}
+      <Descriptions.Item label="Verortung">
+        {s.lat != null && s.lon != null ? (
+          <KoordinatenAnzeige lat={s.lat} lon={s.lon} einsatzId={einsatzId} />
+        ) : (
+          <Space wrap>
+            <Typography.Text type="secondary">nicht verortet</Typography.Text>
+            {darfSchreiben && (
+              <Link to={lagekartePfad(einsatzId, { platzieren: { typ: 'schaden', id: s.id } })}>
+                Auf Karte verorten
+              </Link>
+            )}
+          </Space>
+        )}
       </Descriptions.Item>
       <Descriptions.Item label="Geschädigt">
         {zelle('geschaedigt',

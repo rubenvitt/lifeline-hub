@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad } from '../routing/deeplinks';
 import { Alert, Breadcrumb, Button, Space, Tabs, Tag, Typography } from 'antd';
+import { EnvironmentOutlined } from '@ant-design/icons';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -109,6 +110,41 @@ const schaedenSpalten = (einsatzId: number) =>
        */
       sortWert: (s) => s.erfasst_at,
       render: (_, s) => <ZeitAnzeige wert={s.erfasst_at} />,
+    },
+    {
+      title: 'Verortet',
+      key: 'verortet',
+      /**
+       * LFH-340 · C5, Befund M39. Die Liste sagte kein Wort darüber, welche Schäden auf der
+       * Karte stehen — und genau das ist die Frage, mit der man vor der Karte sitzt.
+       *
+       * Als IKONE, nicht als Emoji: ein Emoji nimmt Zeichnung, Farbe und Breite aus der
+       * Systemschrift statt aus dem Entwurf und stünde in eigener Farbe neben einer Zeile,
+       * deren Farbgebung Bedeutung trägt. Die `aria-hidden`-Hülle ist Pflicht — ein
+       * `@ant-design/icons`-Knoten bringt ein eigenes englisches `aria-label` mit
+       * („environment"), das sonst in jeder Zeile als eigenes Vorleseziel steht.
+       *
+       * Filterachse statt Sortierung: „zeig mir die Unverorteten" ist die Arbeitsfrage,
+       * „sortiere nach verortet" ist keine.
+       */
+      sortWert: (s) => (s.lat != null && s.lon != null ? 1 : 0),
+      filter: {
+        werte: [
+          { text: 'verortet', value: 'ja' },
+          { text: 'nicht verortet', value: 'nein' },
+        ],
+        trifft: (s, wert) => (s.lat != null && s.lon != null) === (wert === 'ja'),
+      },
+      render: (_, s) =>
+        s.lat != null && s.lon != null ? (
+          <span aria-label="verortet" role="img">
+            <EnvironmentOutlined aria-hidden />
+          </span>
+        ) : (
+          <Typography.Text type="secondary" aria-label="nicht verortet" role="img">
+            —
+          </Typography.Text>
+        ),
     },
     {
       title: 'Geschädigt',

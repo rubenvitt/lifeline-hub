@@ -224,14 +224,48 @@ export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number 
  */
 export function lagekartePfad(
   einsatzId: number,
-  opts: { gefahrengebiet?: number; ansicht?: number; snapshot?: number } = {},
+  opts: {
+    gefahrengebiet?: number;
+    ansicht?: number;
+    snapshot?: number;
+    platzieren?: { typ: PlatzierenZielTyp; id: number };
+  } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
     gefahrengebiet: opts.gefahrengebiet,
     ansicht: opts.ansicht,
     // Historien-Modus (C/LFH-321): ?snapshot=<id> zeigt den eingefrorenen Stand (schreibgeschützt).
     snapshot: opts.snapshot,
+    // Platzier-Auftrag (LFH-340 · C5): die Karte geht in den Platzier-Modus für genau
+    // dieses Objekt, der nächste Klick auf die Karte setzt seine Koordinate.
+    platzieren: opts.platzieren ? `${opts.platzieren.typ}:${opts.platzieren.id}` : undefined,
   });
+}
+
+/**
+ * Objekttypen, die von außen zum Verorten auf die Karte geschickt werden können.
+ *
+ * Bewusst eine EIGENE, engere Menge als der karteninterne `PlatzierenPunktTyp`: was hier
+ * steht, muss die Karte auch aus einem Fremd-Link heraus platzieren können. Wer den Typ
+ * erweitert, prüft `pages/LagekartePage.tsx` mit — dort wird der Wert zurückgelesen.
+ */
+export type PlatzierenZielTyp = 'schaden' | 'uhs';
+
+/**
+ * Liest den Platzier-Auftrag aus `?platzieren=<typ>:<id>` zurück.
+ *
+ * Strenger als ein `split(':')`: ein unbekannter Typ oder eine unbrauchbare Id liefern
+ * `null`, nicht ein halb gefülltes Objekt. Der Aufrufer räumt den Parameter danach ohnehin —
+ * ein stehengebliebener Auftrag schickte die Karte bei jedem Neuladen erneut in den Modus.
+ */
+export function parsePlatzierenAuftrag(
+  wert: string | null | undefined,
+): { typ: PlatzierenZielTyp; id: number } | null {
+  if (!wert) return null;
+  const [typ, roheId] = wert.split(':');
+  if (typ !== 'schaden' && typ !== 'uhs') return null;
+  const id = parseRouteId(roheId);
+  return id == null ? null : { typ, id };
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────
