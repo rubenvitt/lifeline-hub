@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { renderMitProviders } from '../test/utils';
@@ -51,22 +51,42 @@ function feldZahl(): number {
 describe('PersonErfassungModal — Tastaturweg', () => {
   it('setzt den Fokus beim Öffnen auf das erste Feld', async () => {
     zeige();
-    // Geschlecht ist ein Select — antd rendert dort ein echtes `<input>`, der Fokus
-    // landet also im Suchfeld der Combobox.
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Geschlecht')));
+    /**
+     * Seit LFH-340 · C5 ist das erste Feld die Sichtungskategorie, und der Fokus landet auf
+     * ihrer ERSTEN Auswahlfläche. Das ist keine Auslegung, sondern die Mechanik der Hülle:
+     * `fokussiereErstesFeld` greift das erste `input` im Baum (`components/Erfassung.tsx`),
+     * und antds `Radio.Button` rendert je Fläche ein echtes `<input type="radio">`.
+     * Vorher stand hier das Suchfeld der Geschlechts-Combobox.
+     */
+    const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
+    await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
   });
 
   it('Enter im letzten sichtbaren Eingabefeld sendet ab', async () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann{Enter}');
+    // Letztes SICHTBARES Eingabefeld ist seit C5 der Antreffort — der Name ist unter
+    // „Weitere Angaben" gewandert.
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
-    expect(onErfassen.mock.calls[0][0]).toMatchObject({
-      antreff_ort: 'Sammelstelle Süd', name: 'Mustermann',
-    });
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ antreff_ort: 'Sammelstelle Süd' });
+  });
+
+  it('schickt die gewählte Sichtungskategorie mit', async () => {
+    const { onErfassen } = zeige();
+    const nutzer = userEvent.setup();
+
+    // Geklickt wird der WRAPPER, nicht das `input`: antd blendet die Radio-Eingabe mit
+    // `pointer-events: none` aus, sichtbar und klickbar ist das umgebende `<label>`.
+    const skZwei = within(screen.getByRole('radiogroup')).getAllByRole('radio')[1];
+    await nutzer.click(skZwei.closest('label')!);
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    // Zweite Fläche = SK II (die Reihenfolge ist die Dringlichkeit, siehe AufnahmeFelder).
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ sichtung: 'sk2' });
   });
 });
 
@@ -75,15 +95,16 @@ describe('PersonErfassungModal — Serienmodus', () => {
     const { onErfassen, onFertig } = zeige();
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     // Offen heißt: der Aufrufer wurde NICHT zum Schließen aufgefordert und der Dialog steht.
     expect(onFertig).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue(''));
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Geschlecht')));
+    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue(''));
+    const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
+    await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
   });
 
   it('der Antreffort überlebt das Serien-Speichern (Kontext-Default)', async () => {
@@ -95,10 +116,11 @@ describe('PersonErfassungModal — Serienmodus', () => {
 
     await nutzer.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
     await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
+    await nutzer.type(screen.getByLabelText('Geschätztes Alter (Jahre)'), '40');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
-    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue(''));
+    // Das Nebeneinander ist der Beleg: das Einzelfeld ist leer, der Wiederholwert steht.
+    await waitFor(() => expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toHaveValue(''));
     expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
     expect(sessionStorage.getItem('lfh:erfassung:1:person:antreff_ort')).toBe('Sammelstelle Süd');
   });
@@ -107,7 +129,7 @@ describe('PersonErfassungModal — Serienmodus', () => {
     const { onFertig } = zeige();
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
@@ -120,10 +142,13 @@ describe('PersonErfassungModal — Feldbudget', () => {
     const nutzer = userEvent.setup();
 
     expect(feldZahl()).toBeLessThanOrEqual(4);
+    // Seit LFH-340 · C5 steht die Sichtungskategorie im Budget, und der Name ist dafür unter
+    // „Weitere Angaben" gewandert — an der Aufnahme wird zuerst die Kategorie vergeben.
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschlecht')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toBeInTheDocument();
     expect(screen.getByLabelText('Antreffort')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Vorname')).not.toBeInTheDocument();
 
     // Die zweite Hälfte: ohne sie wäre „höchstens vier" auch dann wahr, wenn es die
@@ -132,6 +157,7 @@ describe('PersonErfassungModal — Feldbudget', () => {
 
     await waitFor(() => expect(screen.getByLabelText('Vorname')).toBeInTheDocument());
     expect(feldZahl()).toBeGreaterThan(4);
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
     expect(screen.getByLabelText('Notiz')).toBeInTheDocument();
   });
 
@@ -165,13 +191,16 @@ describe('PersonErfassungModal — Feldbudget', () => {
     const kopf = screen.getByRole('button', { name: /Weitere Angaben/ });
     await nutzer.click(kopf);
     await waitFor(() => expect(screen.getByLabelText('Vorname')).toBeInTheDocument());
+    // Beide Felder liegen seit LFH-340 · C5 eingeklappt — der Name ist mit der
+    // Sichtungskategorie aus dem sichtbaren Budget gewichen.
+    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
     await nutzer.type(screen.getByLabelText('Vorname'), 'Max');
     await nutzer.click(kopf);
     // Ohne diese Zeile bewiese der Fall nichts: wäre der zweite Klick wirkungslos, stünde der
     // Bereich noch offen und „der Wert geht mit" wäre der triviale Normalfall.
     await waitFor(() => expect(kopf).toHaveAttribute('aria-expanded', 'false'));
 
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann{Enter}');
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onErfassen.mock.calls[0][0]).toMatchObject({ name: 'Mustermann', vorname: 'Max' });
@@ -184,11 +213,11 @@ describe('PersonErfassungModal — Ablehnung', () => {
     const { onFertig } = zeige({ onErfassen });
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann{Enter}');
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onFertig).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Name')).toHaveValue('Mustermann');
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
   });
 });
 
@@ -198,7 +227,6 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
     const nutzer = userEvent.setup();
 
     await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(ersteAnsicht.onErfassen).toHaveBeenCalledTimes(1));
     ersteAnsicht.unmount();
@@ -229,7 +257,6 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
     const ansicht = zeige({ onErfassen: vi.fn(() => antwort) });
 
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Abbruchort Person');
-    await userEvent.type(screen.getByLabelText('Name'), 'Mustermann');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(ansicht.onErfassen).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
@@ -247,7 +274,7 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
 
     await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
-    await nutzer.type(screen.getByLabelText('Name'), 'Mustermann');
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));

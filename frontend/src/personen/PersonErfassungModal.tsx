@@ -1,15 +1,14 @@
-import { Collapse, Form, Input, InputNumber } from 'antd';
+import { Form } from 'antd';
 import { useEffect, useRef } from 'react';
-import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
 } from '../components/erfassungsSitzung';
-import type { PersonEingabe } from '../api/einsatzPerson';
+import AufnahmeFelder, { type AufnahmeEingabe, type AufnahmeModus } from './AufnahmeFelder';
 
 /** Erfassungs-Modi der Personen-Schnellerfassung. `null` = Modal geschlossen. */
-export type ErfassungsModus = 'schnell' | 'vermisst' | 'betroffen';
+export type ErfassungsModus = AufnahmeModus;
 
 const TITEL: Record<ErfassungsModus, string> = {
   schnell: 'Schnellerfassung',
@@ -20,7 +19,7 @@ const TITEL: Record<ErfassungsModus, string> = {
 interface Props {
   /** Einsatzgrenze des sitzungsweiten Antrefforts. */
   einsatzId: number;
-  /** Aktueller Modus (steuert Titel + optionales Vermisst-Feld); `null` schließt das Modal. */
+  /** Aktueller Modus (steuert Titel, Sichtungsfeld und Melder-Feld); `null` schließt das Modal. */
   modus: ErfassungsModus | null;
   /** Läuft die Anlege-Mutation? → beide Speicher-Knöpfe zeigen Ladeanzeige. */
   isPending: boolean;
@@ -29,7 +28,7 @@ interface Props {
    * die Hülle die Felder, obwohl der Datensatz nie ankam. Der Aufrufer leitet den Folgestatus
    * aus `modus` ab.
    */
-  onErfassen: (daten: PersonEingabe) => Promise<unknown>;
+  onErfassen: (daten: AufnahmeEingabe) => Promise<unknown>;
   /** Einzel-Erfassen erfolgreich. Der Aufrufer setzt `modus` auf `null`. */
   onFertig: () => void;
   /** Abbrechen/Schließen. Der Aufrufer setzt `modus` auf `null`. */
@@ -45,35 +44,29 @@ interface Props {
  * (nach dem Erfassen UND beim Abbrechen); ein zusätzlicher Reset an dieser Stelle wäre doppelt
  * und verdeckte Fehler.
  *
- * ── FELDBUDGET: VIER SICHTBARE FELDER ──────────────────────────────
+ * ── DIE FELDER LIEGEN NICHT MEHR HIER ──────────────────────────────
  *
- * Sichtbar sind Geschlecht, Geschätztes Alter, Antreffort, Name — in dieser Reihenfolge, weil
- * das die Reihenfolge ist, in der an der Aufnahme gesprochen wird. Vorname, Notiz und (nur im
- * Vermisst-Modus) Melder/Kontakt liegen eingeklappt unter „Weitere Angaben". Pflichtfelder gibt
- * es weiterhin keine: eine Person, von der man nichts weiß, muss trotzdem erfassbar sein.
- *
- * **Kein `forceRender` am Panel — gemessen, nicht angenommen.** Der naheliegende Verdacht ist,
- * dass eingeklappte Felder beim Absenden fehlen. Das trifft hier nicht zu, aus zwei
- * unabhängigen Gründen: (1) antds Collapse hängt den Inhalt nach dem ersten Aufklappen NICHT
- * wieder ab (`destroyOnHidden` ist aus), das Feld bleibt also samt Wert registriert; (2) selbst
- * wenn es ihn abhinge, hält antds Form-Speicher den Wert (`preserve` ist an). Ein Feld, das nie
- * aufgeklappt war, kann umgekehrt gar keinen Wert tragen. `forceRender` hätte den Preis, dass
- * die drei Zusatzfelder von Anfang an im Baum stehen — womit „vier sichtbare Felder" nur noch
- * über gerechnete CSS-Sichtbarkeit prüfbar wäre statt über die Anwesenheit im Baum. Der Beleg
- * für (1)/(2) steht als eigener Fall in `PersonErfassungModal.test.tsx`.
+ * Seit LFH-340 · C5 kommen sie aus `AufnahmeFelder` — dasselbe Bauteil trägt die
+ * Aufnahme-Route (`pages/personen/AufnahmePage`). Feldbudget, Reihenfolge, das
+ * Sichtungsfeld und seine Abwesenheit im Vermisst-Modus sind dort begründet und gelten für
+ * beide Mounts; zwei Kopien wären zwei Stellen, an denen die Sichtung fehlen kann.
  *
  * ── KONTEXT-DEFAULT ────────────────────────────────────────────────
  *
  * `uebernahme={['antreff_ort']}`: bei eingeschaltetem B4-Schalter überlebt der Antreffort den
  * nächsten Serien-Reset. Davon getrennt merkt `erfassungsSitzung` den Ort nach erfolgreicher
  * Mutation bis zum Ende des Browser-Tabs und setzt ihn beim nächsten Öffnen genau einmal ein.
- * Der Sitzungswert wird bewusst nicht zu `initialValues`: sonst füllte jeder Serien-Reset den Ort
- * auch bei ausgeschaltetem „Werte behalten" heimlich wieder auf.
+ * Der Sitzungswert wird bewusst nicht zu `initialValues`: sonst füllte jeder Serien-Reset den
+ * Ort auch bei ausgeschaltetem „Werte behalten" heimlich wieder auf.
+ *
+ * Die SICHTUNG steht ausdrücklich NICHT in `uebernahme`: sie ist die eine Angabe, die je
+ * Person neu erhoben wird. Sie stehen zu lassen hieße, die vorige Kategorie auf die nächste
+ * Person zu übertragen — der teuerste denkbare Übernahmefehler an einer Aufnahme.
  */
 export default function PersonErfassungModal({
   einsatzId, modus, isPending, onErfassen, onFertig, onCancel,
 }: Props) {
-  const [form] = Form.useForm<PersonEingabe>();
+  const [form] = Form.useForm<AufnahmeEingabe>();
   const geladeneOeffnung = useRef<string | null>(null);
 
   useEffect(() => {
@@ -88,26 +81,14 @@ export default function PersonErfassungModal({
     if (ort !== undefined) form.setFieldValue('antreff_ort', ort);
   }, [einsatzId, form, modus]);
 
-  const ortMerken = (daten: PersonEingabe) => {
+  const ortMerken = (daten: AufnahmeEingabe) => {
     if (typeof daten.antreff_ort === 'string') {
       schreibeErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort', daten.antreff_ort);
     }
   };
 
-  const weitereAngaben = (
-    <>
-      <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
-      {modus === 'vermisst' && (
-        <Form.Item label="Melder / Kontakt" name="melder_kontakt">
-          <Input placeholder="Angehöriger, Kontaktdaten" />
-        </Form.Item>
-      )}
-      <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
-    </>
-  );
-
   return (
-    <ErfassungsModal<PersonEingabe>
+    <ErfassungsModal<AufnahmeEingabe>
       offen={modus !== null}
       titel={modus === null ? '' : TITEL[modus]}
       form={form}
@@ -119,31 +100,7 @@ export default function PersonErfassungModal({
       serie
       uebernahme={['antreff_ort']}
     >
-      <Form.Item label="Geschlecht" name="geschlecht">
-        <Select
-          allowClear
-          placeholder="unbekannt"
-          options={[
-            { value: 'maennlich', label: 'männlich' },
-            { value: 'weiblich', label: 'weiblich' },
-            { value: 'divers', label: 'divers' },
-            { value: 'unbekannt', label: 'unbekannt' },
-          ]}
-        />
-      </Form.Item>
-      <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
-        <InputNumber min={0} max={120} style={{ width: 140 }} />
-      </Form.Item>
-      <Form.Item label="Antreffort" name="antreff_ort">
-        <Input placeholder="z. B. Brücke, Sammelstelle" />
-      </Form.Item>
-      {/* „Name" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab
-          (Zusicherung 1 der Hülle), und der Name ist das, was zuletzt gefragt wird. */}
-      <Form.Item label="Name" name="name"><Input /></Form.Item>
-      <Collapse
-        ghost
-        items={[{ key: 'weitere', label: 'Weitere Angaben', children: weitereAngaben }]}
-      />
+      <AufnahmeFelder modus={modus ?? 'schnell'} />
     </ErfassungsModal>
   );
 }

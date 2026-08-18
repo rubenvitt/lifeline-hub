@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
@@ -256,13 +256,60 @@ describe('PersonenPage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Neu');
+    // Der Name liegt seit LFH-340 · C5 unter „Weitere Angaben" — für diesen Fall genügt der
+    // Antreffort, die Maske hat ohnehin keine Pflichtfelder.
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Brücke');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Erfasst als R-047')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
     const kennung = await screen.findByText('R-047');
     expect(kennung.closest('tr')).toHaveClass('zeile-hervorgehoben');
+  });
+
+  /**
+   * Die Quittung nennt die Sichtung mit (LFH-340 · C5). Sie kommt aus der ANTWORT, nicht aus
+   * den gesendeten Werten: das Backend schreibt die Sichtung in derselben Transaktion und
+   * kann sie mit 422 verwerfen — aus dem Formularwert gelesen behauptete die Quittung dann
+   * eine Kategorie, die es nie gab.
+   */
+  it('nennt die vergebene Sichtung in der Quittung', async () => {
+    const gesichtet = {
+      ...person,
+      id: 48,
+      registrier_nr: 48,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const,
+    };
+    let gesendet: { sichtung?: string } = {};
+    server.use(
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        gesendet = (await request.json()) as { sichtung?: string };
+        return HttpResponse.json(gesichtet, { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const skZwei = within(screen.getByRole('radiogroup')).getAllByRole('radio')[1];
+    await userEvent.click(skZwei.closest('label')!);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText('Erfasst als R-048 · SK II')).toBeInTheDocument();
+    expect(gesendet.sichtung).toBe('sk2');
+  });
+
+  it('lässt die Quittung ohne Sichtung bei der reinen Registriernummer', async () => {
+    // Die Gegenhälfte: ohne sie wäre der Fall oben auch grün, wenn dort immer ein Zusatz
+    // stünde — etwa ein „undefined" aus einem fehlenden Nachschlag.
+    server.use(
+      http.post('/api/einsaetze/1/personen', () =>
+        HttpResponse.json({ ...person, id: 49, registrier_nr: 49 }, { status: 201 })),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
   });
 
   it('cancelt den alten GET und hält die Antwort im Overlay, ohne einen Singleton-Cache zu erfinden', async () => {
@@ -316,7 +363,7 @@ describe('PersonenPage', () => {
 
     await ersterStart;
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Neu');
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Neu');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await zweiterStart;
 
@@ -370,7 +417,7 @@ describe('PersonenPage', () => {
     const { container } = renderMitEinsatzNavigation();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Person A');
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Person A');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
@@ -398,7 +445,7 @@ describe('PersonenPage', () => {
     };
     const { client } = render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Offline Neu');
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline Neu');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
 
@@ -442,7 +489,7 @@ describe('PersonenPage', () => {
 
     const ersteSeite = render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Nach Reload');
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Nach Reload');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     ersteSeite.unmount();
@@ -633,7 +680,7 @@ describe('PersonenPage', () => {
     );
     const { container } = renderMitEinsatzNavigation();
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Offline A');
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline A');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);

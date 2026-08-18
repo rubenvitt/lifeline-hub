@@ -7,7 +7,7 @@ import { personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { listePersonen, registrierAnzeige, schlageAbgleichVor, type PersonEingabe } from '../api/einsatzPerson';
+import { listePersonen, registrierAnzeige, schlageAbgleichVor } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
@@ -20,6 +20,7 @@ import { abgleichSpalten, personenKarte, personenSpalten } from '../personen/per
 import { filterPersonen, gefundenePersonen, type PersonenSicht } from '../personen/personenFilter';
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
+import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
 import LagebildStreifen from '../personen/LagebildStreifen';
 import { erfassePersonOfflineFaehig } from '../offline/schreiben';
 import {
@@ -120,7 +121,7 @@ export default function PersonenPage() {
     mutationFn: async (v: {
       benutzerId: number;
       einsatzId: number;
-      daten: PersonEingabe;
+      daten: AufnahmeEingabe;
       folgeStatus?: 'vermisst' | 'betroffen';
     }) => {
       return erfassePersonOfflineFaehig(v.benutzerId, v.einsatzId, {
@@ -160,7 +161,13 @@ export default function PersonenPage() {
       setHighlightFuer(zielEinsatzId, person.id);
       setQuittungFuer(zielEinsatzId, {
         typ: 'success',
-        text: `Erfasst als ${registrierAnzeige(person.registrier_nr)}`,
+        // Die Sichtung kommt aus der ANTWORT, nicht aus den gesendeten Werten: das Backend
+        // schreibt sie in derselben Transaktion, und nur die Antwort belegt, dass sie
+        // angekommen ist. Aus dem Formularwert gelesen behauptete die Quittung eine
+        // Kategorie, die ein 422 gerade verworfen hätte.
+        text: person.aktuelle_sichtung
+          ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
+          : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`,
         benutzerId: variablen.benutzerId,
       });
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(zielEinsatzId) });
