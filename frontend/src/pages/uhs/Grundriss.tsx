@@ -111,8 +111,19 @@ function personLabel(person: Person): string {
   return person.name ? `${nr} · ${person.name}` : `${nr} · unbekannt`;
 }
 
-interface PersonenkartenProps { person: Person | undefined; kompakt?: boolean; }
-function Personenkarte({ person, kompakt }: PersonenkartenProps) {
+interface PersonenkartenProps {
+  person: Person | undefined;
+  kompakt?: boolean;
+  /**
+   * Test-Marke am gerenderten Tag. Nur das DragOverlay setzt sie (LFH-341 · C6): ohne
+   * eine Marke am schwebenden Knoten ist „der Drag läuft WIRKLICH" im Playwright nicht
+   * behauptbar, und der Scroll-Nachweis fällt auf den billigen Scrolltest zurück, den B5g
+   * schon hat. Am Tag statt an einer zusätzlichen Hülle, damit der Overlay-Teilbaum
+   * unverändert bleibt.
+   */
+  testId?: string;
+}
+function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
   if (!person) return null;
   // `kompakt` (auf der Platz-Karte): Label einzeilig mit Ellipsis kappen, damit die
   // absolut positionierte, belegte Karte unabhängig von der Namenslänge eine stabile
@@ -120,7 +131,7 @@ function Personenkarte({ person, kompakt }: PersonenkartenProps) {
   const style: React.CSSProperties = kompakt
     ? { margin: 2, maxWidth: 124, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
     : { margin: 2 };
-  return <Tag color="default" style={style} title={kompakt ? personLabel(person) : undefined}>{personLabel(person)}</Tag>;
+  return <Tag color="default" style={style} data-testid={testId} title={kompakt ? personLabel(person) : undefined}>{personLabel(person)}</Tag>;
 }
 
 function PersonenkarteDrag({ person, disabled, kompakt, onOeffnen }: { person: Person; disabled: boolean; kompakt?: boolean; onOeffnen?: (personId: number) => void }) {
@@ -671,7 +682,13 @@ export default function Grundriss({
   // Wahrheiten über dieselbe Spalte — und die Droppable-IDs kämen doppelt vor, sobald
   // irgendwann jemand `forceRender` setzt (LFH-341 · H40).
   const wartebereich = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'auto', height: '100%' }}>
+    // Test-Marke am SCROLLCONTAINER, nicht an einer der beiden Karten darin: die
+    // touchAction-Entscheidung aus LFH-367/B5g hängt genau an diesem Knoten — er trägt
+    // `overflow: auto`, hier scrollt also der Finger (LFH-341 · C6).
+    <div
+      data-testid="warteliste-scroll"
+      style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'auto', height: '100%' }}
+    >
       <PersonenSpalte
         titel="Noch nicht aufgenommen"
         personen={nichtAufgenommen}
@@ -825,7 +842,7 @@ export default function Grundriss({
       )}
       {/* Portal-Overlay: folgt dem Cursor auf Body-Ebene, beeinflusst keine Scroll-Region. */}
       <DragOverlay>
-        {aktivePerson ? <Personenkarte person={aktivePerson} /> : null}
+        {aktivePerson ? <Personenkarte person={aktivePerson} testId="drag-overlay" /> : null}
       </DragOverlay>
 
       {/* Abschluss-Screen „Verbleib erfassen" — Art wählbar (Default Transport, vom
