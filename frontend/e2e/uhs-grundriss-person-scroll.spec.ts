@@ -148,24 +148,32 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   // Präfix-Selektor (LFH-341 · H40): der Auslöser trägt seit der Zeilenkennung
   // `Platzaktionen zu <bezeichnung>` — hier „Platzaktionen zu Behandlungsplatz 2".
   //
-  // HIER WIRD EIN ECHTER BEDIENBEFUND GEDÄMPFT, KEIN TESTFEHLER (Folgeticket zu LFH-341):
-  // wer im Betrieb unmittelbar nach einer Belegung ein Platzmenü öffnet, VERLIERT es. Die
-  // Zuweisung eine Zeile weiter oben invalidiert vier Queries, und der nachlaufende Refetch
-  // räumt das gerade geöffnete Dropdown ab — der Kommentar an `invalidate()` in
-  // `pages/uhs/Grundriss.tsx` benennt genau diesen Fall bereits. Gemessen flackerte die
-  // Zeile darunter jeden zweiten bis dritten Lauf rot; `playwright.config.ts` setzt keine
-  // `retries`, ein solcher Schritt macht also das Sammel-Gate hart rot.
+  // ┌─ HIER WIRD EIN ECHTER BEDIENBEFUND GEDÄMPFT, KEIN TESTFEHLER — LFH-457 ──────────────┐
+  // │ Wer im Betrieb unmittelbar nach einer Belegung ein Platzmenü öffnet, VERLIERT es.    │
+  // │ Das ist kein Wackeln der Testumgebung, sondern das Verhalten der Seite: die          │
+  // │ Zuweisung eine Zeile weiter oben stößt eine Nachladung an, und die räumt das gerade  │
+  // │ geöffnete Dropdown ab. Wer diesen Block anfasst, glättet also nichts Kaputtes am     │
+  // │ Test — der Befund bleibt offen und steht in LFH-457.                                 │
+  // │                                                                                      │
+  // │ Warum die Dämpfung hier trotzdem vertretbar ist: dieser Test MISST etwas anderes —   │
+  // │ gleiche Kartenhöhen und nicht abgeschnittene Icons. Das Menü ist Aufbau, nicht        │
+  // │ Gegenstand. Beide Messungen bleiben unverändert scharf.                              │
+  // │                                                                                      │
+  // │ MIT DEM FIX ZU LFH-457 GEHÖRT DIESER BLOCK ZURÜCKGEBAUT — ein stehengebliebener      │
+  // │ Wiederholversuch fängt dann nichts mehr ab und verdeckt nur den nächsten Rückfall.   │
+  // └──────────────────────────────────────────────────────────────────────────────────────┘
   //
-  // Gedämpft wird über ein begrenztes NEU-ÖFFNEN, nicht über eine längere Frist: ist das
-  // Menü zwischenzeitlich abgeräumt worden, wird es wieder aufgemacht. Doppelt angewandt
-  // werden kann die Verfügbarkeit dabei nicht — der Wiederholblock greift nur, wenn der
-  // Eintrag gar nicht geklickt wurde (Eigenfrist am `menuitem`).
-  //
-  // Was dieser Test MISST — gleiche Kartenhöhen, keine geclippten Icons — bleibt davon
-  // unberührt und unverändert scharf. Nicht auf `networkidle` warten: auf Einsatzrouten
-  // bleibt ein SSE-Strom offen, die Bedingung tritt nie ein (LFH-385).
+  // Zur Mechanik, knapp: gedämpft wird über ein begrenztes NEU-ÖFFNEN, nicht über eine
+  // längere Frist. Die Eigenfrist am `menuitem` bleibt KURZ (2 s), damit ein abgeräumtes
+  // Menü schnell auffällt und neu aufgemacht wird — der Block soll nicht 20 s auf ein Menü
+  // warten, das aus einem anderen Grund ausbleibt. Auch der Auslöser-Klick ist befristet:
+  // verschwände der Knopf selbst, scheiterte der Test sonst erst am Test-Timeout und damit
+  // ohne brauchbare Diagnose. Doppelt angewandt werden kann die Verfügbarkeit nicht — der
+  // Wiederholblock greift nur, wenn der Eintrag gar nicht geklickt wurde.
+  // Nicht auf `networkidle` warten: auf Einsatzrouten bleibt ein SSE-Strom offen, die
+  // Bedingung tritt nie ein (LFH-385).
   await expect(async () => {
-    await bp2.locator('button[aria-label^="Platzaktionen"]').click();
+    await bp2.locator('button[aria-label^="Platzaktionen"]').click({ timeout: 5_000 });
     await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' })
       .click({ timeout: 2_000 });
   }).toPass({ timeout: 20_000, intervals: [500, 1_000, 2_000] });
