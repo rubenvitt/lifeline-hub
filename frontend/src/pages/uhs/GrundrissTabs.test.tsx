@@ -108,6 +108,11 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     expect(screen.getByText('Wartebereich (Eingang)')).toBeInTheDocument();
     expect(screen.getByText('Auf Transport gebracht')).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    // Beide Richtungen behauptet, nicht nur die Abwesenheit der Reiter — sonst bliebe der
+    // Test grün, wenn der breite Zweig irgendwann selbst stapelte (Muster der `md`-Tests
+    // in `EinsatzabschnittePage`/`BrDetailPage`). jsdom rechnet kein Layout, prüfbar ist
+    // der Inline-Style.
+    expect((await screen.findByTestId('grundriss-rahmen')).style.flexDirection).toBe('row');
   });
 
   it('stapelt unter lg zu drei Reitern mit der Fläche voran', async () => {
@@ -129,13 +134,23 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
 
     await screen.findByRole('tablist');
-    // Ohne diese Zusicherung wäre `forceRender` eine unbemerkte Rückkehr zum
-    // 504-px-Zustand mit anderer Optik: die Spalten STÜNDEN im DOM, nur unsichtbar,
+    // Ohne diese Zusicherung wäre ein verborgener zweiter Zweig eine unbemerkte Rückkehr
+    // zum 504-px-Zustand mit anderer Optik: die Spalten STÜNDEN im DOM, nur unsichtbar,
     // und der Wartebereich trüge sein Droppable ein zweites Mal.
     expect(screen.queryByText('Wartebereich (Eingang)')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: 'Wartebereich' }));
     expect(await screen.findByText('Wartebereich (Eingang)')).toBeInTheDocument();
+
+    // DIE ZWEITE HÄLFTE, und sie ist die eigentliche Aussage (Abschluss-Review LFH-341).
+    // Die Zeilen darüber prüfen nur den ANFANGSZUSTAND — und der ist auch ohne
+    // `destroyOnHidden` so: `@rc-component/tabs` montiert eine Pane erst beim ersten
+    // Besuch. Ohne die Prop bliebe sie DANACH montiert (`removeOnLeave: false`, nur
+    // `display: none` + `aria-hidden`), und genau das behauptet der Testname als
+    // ausgeschlossen. Der Rückklick ist die Stelle, an der die Aussage kippt.
+    await userEvent.click(screen.getByRole('tab', { name: 'Fläche' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Wartebereich (Eingang)')).not.toBeInTheDocument());
   });
 
   it('bietet den Rückweg in den Wartebereich als Menüeintrag — auf beiden Breiten', async () => {
@@ -236,6 +251,82 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     expect(
       within(menue).queryByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
     ).not.toBeInTheDocument();
+  });
+
+  /**
+   * DER ZWEITE BEDIENWEG, DEN DER UMBRUCH SONST GENOMMEN HÄTTE (Abschluss-Review LFH-341).
+   *
+   * Der Rückweg `Platz → Wartebereich` hat in Task 3 einen Menüeintrag bekommen, weil der
+   * Reiter-Umbruch ihn sonst genommen hätte. Für die zweite Richtung wurde dieselbe
+   * Rechnung nicht gestellt: `onDragEnd` nimmt `kind: 'transport'` von JEDER Person
+   * entgegen — auch aus dem Wartebereich und aus „Noch nicht aufgenommen" —, und
+   * `drop-transport` liegt unter `lg` im dritten Reiter. Die direkten Knöpfe sitzen
+   * ausschliesslich auf der PlatzKarte und nur bei belegtem Platz, `PersonDetailDrawer` ist
+   * mutationsfrei: eine Person im Wartebereich hätte im Grundriss keinen Verbleib mehr
+   * bekommen können.
+   */
+  it('erfasst den Verbleib aus beiden Wartelisten heraus — auf beiden Breiten', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    for (const breite of [1280, 800]) {
+      setzeViewportBreite(breite);
+      const { unmount } = renderMitProviders(
+        <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />,
+      );
+      if (breite < 992) await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
+
+      // Beide Listen, je eigener Auslöser mit ZEILENKENNUNG im Namen — n Zeilen dürfen
+      // nicht n gleichnamige Knöpfe liefern. Ein blosses `getAllByRole` mit Zählung
+      // liesse offen, ob die Namen unterscheidbar sind.
+      const ausloeser = await screen.findByRole('button', {
+        name: 'Verbleib / Entlassung erfassen — R-006 · unbekannt',
+      });
+      expect(ausloeser, `Wartebereich, Breite ${breite}`).toBeInTheDocument();
+      // Die Ikone ist Zierde und darf KEIN eigenes Vorleseziel sein: ein
+      // `@ant-design/icons`-Knoten bringt `role="img"` mit englischem `aria-label` („car")
+      // mit und stünde sonst in jeder Zeile als zweites Ziel daneben. Die `aria-hidden`-Hülle
+      // nimmt ihn aus dem Barrierefreiheitsbaum — geprüft, nicht bloss behauptet
+      // (Muster `kraefte/AmpelZelle.test.tsx`, dort per Mutationsprobe belegt).
+      expect(within(ausloeser).queryByRole('img'), `Ikone stumm, Breite ${breite}`).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Verbleib / Entlassung erfassen — R-005 · unbekannt' }),
+        `Noch nicht aufgenommen, Breite ${breite}`,
+      ).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('öffnet damit denselben Verbleib-Dialog wie der Drag auf „Auf Transport gebracht"', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeViewportBreite(800);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen — R-006 · unbekannt' }),
+    );
+
+    // Der Titel trägt die Person — das ist der Beleg, dass `setTransportPerson` mit DIESER
+    // Zeile gerufen wurde und nicht bloss irgendein Dialog aufging.
+    expect(
+      await screen.findByText('Verbleib erfassen — R-006 · unbekannt'),
+    ).toBeInTheDocument();
+  });
+
+  it('rendert den Verbleib-Auslöser ohne Schreibrecht gar nicht erst', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeViewportBreite(1280);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt />);
+
+    // AUF DIE ZEILE warten, nicht auf den Spaltentitel — der steht sofort, auch bevor die
+    // Personen-Query aufgelöst hat. Gemessen: mit `findByText('Wartebereich (Eingang)')`
+    // als Anker lief dieser Test auch dann grün, wenn der Rechte-Riegel ganz entfernt war
+    // (Mutationsprobe), weil zum Prüfzeitpunkt schlicht noch keine Zeile im Baum stand.
+    expect(await screen.findByText('R-006 · unbekannt')).toBeInTheDocument();
+    // … und trägt trotzdem keinen Auslöser. GAR NICHT gerendert, nicht deaktiviert.
+    expect(screen.queryByRole('button', { name: /Verbleib \/ Entlassung erfassen/ })).not.toBeInTheDocument();
   });
 
   it('setzt an keiner Seitenspalte mehr eine feste Breite, wenn gestapelt wird', async () => {

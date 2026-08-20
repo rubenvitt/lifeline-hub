@@ -141,8 +141,19 @@ export default function AufnahmePage() {
             zusatz = ' · im Wartebereich';
           } catch (e) {
             // Die Person IST angelegt — das darf die Quittung nicht verschweigen, nur
-            // weil der zweite Schritt gescheitert ist.
-            message.error(fehlerText(e));
+            // weil der zweite Schritt gescheitert ist. Und der Toast muss es MITSAGEN,
+            // spiegelbildlich zum Offline-Zweig oben: auf dem PRIMÄR-Knopf löst
+            // `mutateAsync` erst nach diesem `onSuccess` auf, die Hülle ruft dann
+            // `onFertig()` und navigiert zur UHS — die stehende `<Alert>`-Quittung hängt
+            // dabei mit der Seite aus. Sichtbar bliebe allein `fehlerText(e)`, also
+            // „Aktion fehlgeschlagen" oder die Servermeldung, und BEIDE sagen nicht, dass
+            // die Person angelegt wurde. Der Bediener fände den Patienten nicht im
+            // Wartebereich, schlösse „nicht angelegt" und erfasste ihn erneut — zwei
+            // Registriernummern für einen Patienten an einer Unfallhilfsstelle.
+            message.error(
+              `Erfasst als ${registrierAnzeige(person.registrier_nr)} — die Zuordnung zur `
+              + `Unfallhilfsstelle ist fehlgeschlagen (${fehlerText(e)}). Bitte von Hand zuordnen.`,
+            );
             zusatz = ' · Zuordnung zur Unfallhilfsstelle fehlgeschlagen';
           }
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsAuftrag) });

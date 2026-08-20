@@ -293,9 +293,42 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     expect(
       await screen.findByText(/R-003.*Zuordnung zur Unfallhilfsstelle fehlgeschlagen/),
     ).toBeInTheDocument();
-    // Der Fehler wird zusätzlich gemeldet — derselbe Kanal wie jeder andere Mutationsfehler
-    // dieser Seite (`fehlerText` liefert für einen generischen `Error` den Standardtext).
-    expect(await screen.findByText('Aktion fehlgeschlagen')).toBeInTheDocument();
+    // Der Fehler wird zusätzlich gemeldet — und zwar MIT der Registriernummer. Bis zum
+    // Abschluss-Review stand hier nur `fehlerText(e)`, also „Aktion fehlgeschlagen"; auf
+    // dem Primär-Knopf ist das der einzige überlebende Text (Test darunter), und er sagt
+    // nicht, dass die Person angelegt wurde.
+    expect(await screen.findByText(
+      'Erfasst als R-003 — die Zuordnung zur Unfallhilfsstelle ist fehlgeschlagen '
+      + '(Aktion fehlgeschlagen). Bitte von Hand zuordnen.',
+    )).toBeInTheDocument();
+  });
+
+  it('sagt auch über den Primär-Knopf hinweg, dass die Person trotz Fehler angelegt ist', async () => {
+    // DER GEFÄHRLICHERE ZWEIG, und bis zum Abschluss-Review der ungeprüfte. Der Test
+    // darüber nimmt „Speichern und nächste", weil dort die Seite hält — auf dem
+    // PRIMÄR-Knopf löst `mutateAsync` erst nach dem `async onSuccess` auf, die Hülle ruft
+    // `onFertig()` und navigiert zur UHS. Die stehende `<Alert>`-Quittung hängt dabei mit
+    // der Seite aus; sichtbar bliebe allein der Toast. Trüge der nur `fehlerText(e)`, läse
+    // der Bediener „Aktion fehlgeschlagen", fände den Patienten nicht im Wartebereich und
+    // erfasste ihn erneut — zwei Registriernummern für einen Patienten.
+    const patient = { ...angelegt, id: 42, registrier_nr: 3 };
+    vi.mocked(aenderePersonBelegung).mockRejectedValueOnce(new Error('Netzwerkfehler'));
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(patient, { status: 201 })),
+    ], '/einsaetze/1/personen/aufnahme?uhs=7');
+    await screen.findByRole('radiogroup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    // Erst der Beleg, dass die Seite WIRKLICH weitergezogen ist — sonst prüfte die Zeile
+    // darunter womöglich noch die Quittung auf der alten Seite (Bauform aus dem
+    // Offline-Test daneben).
+    await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7'));
+    // Die Registriernummer überlebt die Navigation, weil `message` am `App`-Kontext hängt.
+    expect(await screen.findByText(/Erfasst als R-003 —/)).toBeInTheDocument();
+    // Und die Quittung, die es NICHT tut, ist wirklich weg — sonst wäre der zweite Kanal
+    // gar nicht nötig gewesen und dieser Test bewiese nichts.
+    expect(screen.queryByText(/R-003.*Zuordnung zur Unfallhilfsstelle fehlgeschlagen/)).not.toBeInTheDocument();
   });
 
   it('kehrt mit „Erfassen" zur beauftragenden UHS zurück, nicht in die Personenliste', async () => {

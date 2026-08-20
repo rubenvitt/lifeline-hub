@@ -241,8 +241,15 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     items: [
       ...(zuweisbar ? [{ key: 'zuweisen', label: 'Patient zuweisen', icon: <UserAddOutlined /> }, { type: 'divider' as const }] : []),
       // Rückweg in den Wartebereich (LFH-341 · H40): der Drag auf `drop-inbox` ist unter
-      // `lg` strukturell weg (anderer Reiter, kein `forceRender`). Ein `icon` im
-      // Menü-Item trägt der Eintragstext — die `aria-hidden`-Frage stellt sich hier nicht.
+      // `lg` strukturell weg — das Droppable liegt in einem anderen Reiter, und die Tabs
+      // tragen `destroyOnHidden` (Begründung am Reiter-Zweig unten; ohne die Prop bliebe
+      // eine einmal besuchte Pane montiert).
+      // Das `icon` ist Zierde neben dem Eintragstext, aber NICHT unsichtbar für die
+      // Vorlesehilfe: ein `@ant-design/icons`-Knoten bringt sein eigenes englisches
+      // `aria-label` mit, das in den zugänglichen Namen einfliesst (gemessen, CLAUDE.md —
+      // der Eintrag heisst „rollback Zurück in den Wartebereich"). Eine `aria-hidden`-Hülle
+      // ist im Menü-Item nicht vorgesehen; die Tests greifen deshalb per TEILSTRING, nie
+      // per exaktem Namen — dieselbe Regel wie bei der Aktionsbündelung.
       ...(onZurueckInWartebereich
         ? [{ key: 'wartebereich', label: 'Zurück in den Wartebereich', icon: <RollbackOutlined /> }]
         : []),
@@ -371,7 +378,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
 
 /** Schmale Personen-Liste als Spalten-Karte (links: Eingang/Wartebereich). */
 function PersonenSpalte({
-  titel, personen, schreibgeschuetzt, droppableId, leerText, onOeffnen,
+  titel, personen, schreibgeschuetzt, droppableId, leerText, onOeffnen, onVerbleib,
 }: {
   titel: string;
   personen: Person[];
@@ -379,6 +386,24 @@ function PersonenSpalte({
   droppableId?: string;
   leerText: string;
   onOeffnen: (personId: number) => void;
+  /**
+   * Verbleib erfassen — der ZWEITE Bedienweg, den der Reiter-Umbruch sonst genommen hätte
+   * (Abschluss-Review LFH-341 · C6). Gemessen: `onDragEnd` nimmt `kind === 'transport'`
+   * von JEDER Person entgegen, also auch aus dem Wartebereich und aus „Noch nicht
+   * aufgenommen"; das Droppable `drop-transport` liegt unter `lg` aber im Reiter
+   * „Transport". Die direkten Knöpfe „Verbleib / Entlassung erfassen" und „zurückweisen"
+   * sitzen ausschliesslich auf der PlatzKarte und nur bei BELEGTEM Platz, und
+   * `PersonDetailDrawer` ist mutationsfrei — eine Person im Wartebereich, die
+   * abtransportiert wird oder weggeht, hätte im Grundriss also keinen Verbleib mehr
+   * bekommen können. Dieselbe Einsicht wie beim Rückweg-Menüeintrag oben; zwei Bewegungen
+   * mit derselben Ursache verschieden zu behandeln wäre ein Unterschied ohne Bedeutung.
+   *
+   * NICHT gesetzt heisst „kein Schreibrecht" — der Auslöser wird dann GAR NICHT gerendert,
+   * nicht deaktiviert. Die Prop-Anwesenheit ist bewusst der Riegel und nicht das
+   * `schreibgeschuetzt` daneben: das trägt zusätzlich `belegMut.isPending`, der Auslöser
+   * flackerte damit während jeder Belegung weg.
+   */
+  onVerbleib?: (person: Person) => void;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({ id: droppableId ?? `nodrop-${titel}`, data: { kind: 'inbox' }, disabled: !droppableId });
@@ -391,7 +416,34 @@ function PersonenSpalte({
       style={{ background: droppableId && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
       <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
-        {personen.map((p) => <PersonenkarteDrag key={p.id} person={p} disabled={schreibgeschuetzt} onOeffnen={onOeffnen} />)}
+        {personen.map((p) => (
+          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <PersonenkarteDrag person={p} disabled={schreibgeschuetzt} onOeffnen={onOeffnen} />
+            {onVerbleib && (
+              <Tooltip title="Verbleib / Entlassung erfassen">
+                {/* GESCHWISTERKNOTEN der Drag-Karte, nicht ihr Kind: so hängt der Auslöser
+                    in keinem klickbaren Vorfahren und braucht weder `stopPropagation` noch
+                    den `onPointerDown`-Riegel, den die vier Knöpfe INNERHALB der Platzkarte
+                    schulden (dort ist die Karte selbst Drag-Source). Dieselbe Auflösung,
+                    die `MetaChip` in LFH-367 genommen hat.
+                    Ein echter antd-`Button` OHNE `size`: er erbt `controlHeight` vom
+                    `ConfigProvider` und schuldet damit nicht die zwei Angaben, die
+                    LFH-365 einem handgebauten Bedienziel auferlegt. Der zugängliche Name
+                    trägt die Zeilenkennung — n Zeilen lieferten sonst n gleichnamige
+                    Knöpfe. Die Ikone steckt in einer `aria-hidden`-Hülle: ein
+                    `@ant-design/icons`-Knoten brächte sonst sein eigenes englisches
+                    `aria-label` als zweites Vorleseziel in jede Zeile (CLAUDE.md,
+                    Muster `kraefte/AmpelZelle.tsx`). */}
+                <Button
+                  type="text"
+                  aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
+                  icon={<span aria-hidden="true"><CarOutlined /></span>}
+                  onClick={() => onVerbleib(p)}
+                />
+              </Tooltip>
+            )}
+          </div>
+        ))}
         {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
       </div>
     </Card>
@@ -689,12 +741,18 @@ export default function Grundriss({
       data-testid="warteliste-scroll"
       style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'auto', height: '100%' }}
     >
+      {/* `onVerbleib` an BEIDEN Listen, nicht nur am Wartebereich: die Lücke ist an beiden
+          dieselbe (nachgemessen im Abschluss-Review) — `onDragEnd` nahm `kind: 'transport'`
+          von jeder Person entgegen, und `drop-transport` liegt unter `lg` im dritten
+          Reiter. Eine Person unter „Noch nicht aufgenommen" verlässt die Liste sauber,
+          sobald sie einen Verbleib trägt (`!p.aktueller_verbleib` im Filter oben). */}
       <PersonenSpalte
         titel="Noch nicht aufgenommen"
         personen={nichtAufgenommen}
         schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
         leerText="keine"
         onOeffnen={setDetailPersonId}
+        onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
       />
       <PersonenSpalte
         titel="Wartebereich (Eingang)"
@@ -703,6 +761,7 @@ export default function Grundriss({
         droppableId="drop-inbox"
         leerText="leer"
         onOeffnen={setDetailPersonId}
+        onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
       />
     </div>
   );
@@ -814,10 +873,18 @@ export default function Grundriss({
          * Fläche, deren Innenbreite bei `Math.max(700, …)` beginnt — bei 390 px sprengten
          * allein die Spalten den Schirm.
          *
-         * KEIN `forceRender`: das ist dieselbe Entscheidung wie beim Navigations-Drawer aus
-         * B1 und die erste Zusicherung von `Datensicht` — genau EIN Zweig im Baum. Ein
-         * verborgener zweiter machte die Prüfung „unter lg nicht nebeneinander"
-         * bedeutungslos und trüge `drop-inbox` doppelt.
+         * GENAU EIN ZWEIG IM BAUM — dieselbe Entscheidung wie beim Navigations-Drawer aus
+         * B1 und die erste Zusicherung von `Datensicht`. Ein verborgener zweiter machte die
+         * Prüfung „unter lg nicht nebeneinander" bedeutungslos und trüge `drop-inbox`
+         * doppelt.
+         *
+         * Getragen wird sie von `destroyOnHidden`, NICHT vom Fehlen eines `forceRender` —
+         * das ist gemessen und korrigiert eine Behauptung, die dieser Bau vier Mal aufstellte:
+         * antd reicht `destroyOnHidden ?? destroyInactiveTabPane` an `@rc-component/tabs`
+         * durch (`antd/es/tabs/index.js:157`); sind beide `undefined`, ergibt das
+         * `removeOnLeave: false`, und eine einmal BESUCHTE Pane bleibt dauerhaft montiert —
+         * nur mit `display: none` und `aria-hidden`. Ohne die Prop hielte die Aussage also
+         * exakt bis zum ersten Reiterwechsel.
          *
          * FOLGE, und sie ist gewollt: der Drag von der Warteliste auf einen Platz ist hier
          * strukturell unmöglich — Quelle und Ziel liegen in verschiedenen Reitern. Der Weg
@@ -831,6 +898,7 @@ export default function Grundriss({
         >
           <Tabs
             defaultActiveKey="flaeche"
+            destroyOnHidden
             style={{ height: '100%' }}
             items={[
               { key: 'flaeche', label: 'Fläche', children: flaeche },

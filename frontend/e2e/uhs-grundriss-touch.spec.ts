@@ -7,9 +7,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  *
  * Das ist keine Bequemlichkeit, sondern folgt aus dem Bau. Unter `lg` (992 px) bricht
  * `pages/uhs/Grundriss.tsx` in drei Reiter um — „Fläche | Wartebereich | Transport", die
- * Fläche voran — und zwar **ohne `forceRender`**: der inaktive Reiter steht wirklich nicht
- * im Baum. Damit liegen bei 390 px die Personenliste (Quelle) und die Platzkarte (Ziel) in
- * verschiedenen Reitern; das Droppable existiert gar nicht, während die Quelle sichtbar ist.
+ * Fläche voran — und zwar mit **`destroyOnHidden`**: der inaktive Reiter steht wirklich nicht
+ * im Baum. Die Prop ist dafür nötig und nicht bloss Zierde (gemessen im Abschluss-Review):
+ * antds Vorgabe reicht `destroyOnHidden ?? destroyInactiveTabPane` durch, beide `undefined`
+ * ergeben `removeOnLeave: false` — eine einmal BESUCHTE Pane bliebe montiert, nur mit
+ * `display: none`. Damit liegen bei 390 px die Personenliste (Quelle) und die Platzkarte
+ * (Ziel) in verschiedenen Reitern; das Droppable existiert gar nicht, während die Quelle
+ * sichtbar ist.
  *
  * Ein Drag-Test bei 390 px könnte deshalb **nicht grün werden** — nicht weil etwas kaputt
  * wäre, sondern weil die Geste dort strukturell keine ist. Wer ihn dennoch hinzufügt,
@@ -387,8 +391,8 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(page.getByRole('tab', { name: 'Wartebereich' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Transport' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Fläche' })).toHaveAttribute('aria-selected', 'true');
-    // Die Gegenprobe zur Reiter-Weiche: ohne `forceRender` steht der Wartebereich WIRKLICH
-    // nicht im Baum — genau deshalb ist ein Drag hier keine Geste mehr.
+    // Die Gegenprobe zur Reiter-Weiche: mit `destroyOnHidden` steht der Wartebereich
+    // WIRKLICH nicht im Baum — genau deshalb ist ein Drag hier keine Geste mehr.
     await expect(page.getByTestId('warteliste-scroll'), 'kein zweiter, verborgener Zweig').toHaveCount(0);
 
     // AK 1: der Klickweg aus B5g, hier per echtem Touch-Tap. Getippt wird auf den TITEL

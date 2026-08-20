@@ -85,8 +85,9 @@ export default function UhsDetailPage() {
 
   const meta = [
     // Der Typ ist eine Kategorie und trägt im Vertrag durchgängig `neutral` — hier zählt
-    // nur seine Beschriftung. `UHS_TYP_LABEL` gab es doppelt (UnfallhilfsstellenPage,
-    // UhsAnlegenDrawer); die dritte Kopie wäre eine zu viel gewesen (LFH-341 · M54).
+    // nur seine Beschriftung. Die liegt seit LFH-328/A2 im Vertrag (`theme/statusFarben.ts`,
+    // `uhsTyp`); `UnfallhilfsstellenPage` und `UhsAnlegenDrawer` lesen bereits von dort,
+    // diese Seite ist der dritte Konsument (LFH-341 · M54).
     `Typ: ${uhsTyp[uhs.typ].label}`,
     `Standort: ${uhs.standort ?? '—'}`,
     ...(uhs.notiz ? [`Notiz: ${uhs.notiz}`] : []),
