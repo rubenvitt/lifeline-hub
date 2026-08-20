@@ -40,7 +40,9 @@ Der Ticketstand ist vom 30.07.2026. Seither haben LFH-367/B5g, LFH-330/B2, LFH-3
 | Breakpoint `EinsatzabschnittePage`, `KraefteOhneBrSidebar` | **offen** | 4 |
 | Patientenaufnahme ohne Modulwechsel (H38) | **offen** | 5 |
 | Optimistisches Feedback `belegMut`/`layoutMut` (M52) | **erledigt in B5g** — `onMutate`+`onError`-Rollback an *beiden* Mutationen, `Grundriss.tsx:491,537`, inkl. Schutz gegen Rückrollen eines neueren Stands | — |
-| Live-/Offline-Indikator im UHS-Kopf | **offen** (Tabs haben `Datenstand`, der Kopf nicht) | 2 |
+| Live-/Offline-Indikator im UHS-Kopf | **offen** (beide Reiter haben `Datenstand`, der Kopf nicht) | 2 |
+| Gemeinsamer Modul-Seitenkopf für die UHS-Seiten (Abhängigkeitszeile zu C5) | **offen** — `UnfallhilfsstellenPage` nutzt `EinsatzSeite`, die Detailseite nicht | 2 |
+| Rückweg „Patient zurück in den Wartebereich" | **hängt heute allein am Drag** und fällt unter `lg` weg — siehe Task 3 | 3 |
 | `BewegungenTab` Sortierung/Filter/Suche/Zeitleiste (M53) | **erledigt in B2** — läuft vollständig über `Datensicht` | — |
 | `Grundriss` Verfügbarkeit als Label (M54) | **erledigt in A2** — `verfuegbarkeit[…]` via `StatusTag` | — |
 | `MaterialTab` Status, `UhsDetailPage` Typ (M54) | **offen** | 1, 2 |
@@ -79,7 +81,7 @@ Wer stattdessen einen 390-px-Drag-Test schreibt, schreibt einen Test, der nicht 
 - `frontend/src/pages/uhs/MaterialTab.tsx` / `.test.tsx` — `render` mit `StatusTag` (Task 1).
 - `frontend/src/pages/MaterialPage.tsx` / `.test.tsx` — `STATUS_META` fällt, Vertrag zieht ein (Task 1).
 - `CLAUDE.md` — der C4-Absatz zur Materialfarbe wird korrigiert (Task 1).
-- `frontend/src/pages/uhs/UhsDetailPage.tsx` / `.test.tsx` — Typ-Label, `Datenstand`, „Patient aufnehmen" (Tasks 2, 5).
+- `frontend/src/pages/uhs/UhsDetailPage.tsx` / `.test.tsx` — Umzug auf `EinsatzSeite`, Typ-Label, „Patient aufnehmen" (Tasks 2, 5).
 - `frontend/src/pages/uhs/Grundriss.tsx` / `.test.tsx` — Tabs-Weiche (Task 3).
 - `frontend/src/pages/EinsatzabschnittePage.tsx` / `.test.tsx` — Umbruch unter `md` (Task 4).
 - `frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx`, `BrDetailPage.tsx` / `.test.tsx` — Umbruch unter `md` (Task 4).
@@ -199,14 +201,23 @@ export const materialStatus: Record<MaterialStatus, StatusDarstellung> = {
 
 Im Dateikopf von `statusFarben.ts` steht eine Aufzählung, welche Dateien **draußen** sind; `pages/MaterialPage.tsx` wird dort namentlich genannt. Diese Nennung streichen und durch einen Verweis auf `materialStatus` ersetzen — sonst widerspricht der Kopf dem Inhalt derselben Datei.
 
-- [ ] **Step 4: Test laufen lassen, grün bestätigen**
+- [ ] **Step 4: Das Inventar-Gate derselben Datei nachziehen**
+
+`statusFarben.test.ts` führt zwei Zusicherungen, die ein **zusätzlicher** Export bricht — und zwar an einer Stelle, die mit Material nichts zu tun hat:
+
+- Zeile 32–43: `expect(Object.keys(ALLE_MAPS).sort()).toEqual([…neun Namen…])` unter der Überschrift *„eine zehnte Map rutscht nicht still durch"*.
+- Zeile 148: `expect(Object.keys(ALLE_MAPS)).toHaveLength(9)`.
+
+`ALLE_MAPS` sammelt automatisch jeden Export, dessen Werte ein `rolle`-Feld tragen — `materialStatus` landet also von selbst darin. **Das ist der Zweck des Gates, kein Fehlalarm.** Beide Stellen nachziehen: `'materialStatus'` alphabetisch in die Liste (zwischen `etbTyp` und `statusKategorie`), `toHaveLength(9)` → `toHaveLength(10)`, und die beiden Beschreibungstexte „neun"/„zehnte" auf zehn/elfte. Wer stattdessen die Zusicherung lockert, schaltet das Gate ab, statt es zu bedienen.
+
+- [ ] **Step 5: Tests laufen lassen, grün bestätigen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/theme/statusFarben.test.ts
 ```
-Erwartet: PASS.
+Erwartet: PASS, beide neuen Blöcke und das nachgezogene Inventar.
 
-- [ ] **Step 5: MaterialTab-Test schreiben (rot)**
+- [ ] **Step 6: MaterialTab-Test schreiben (rot)**
 
 An `frontend/src/pages/uhs/MaterialTab.test.tsx` anhängen. Der bestehende Test-Setup dieser Datei (Query-Mocks, `renderMitProviders`) wird wiederverwendet — beim Schreiben oben abschauen, wie ein Material mit Status in die Fixture kommt.
 
@@ -230,14 +241,14 @@ it('lässt in keiner Statuszelle einen Unterstrich stehen', async () => {
 });
 ```
 
-- [ ] **Step 6: Test laufen lassen, Fehlschlag bestätigen**
+- [ ] **Step 7: Test laufen lassen, Fehlschlag bestätigen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/uhs/MaterialTab.test.tsx
 ```
 Erwartet: FAIL — „Desinfektion nötig" nicht gefunden, `desinfektion_noetig` steht im DOM.
 
-- [ ] **Step 7: Statusspalte umstellen**
+- [ ] **Step 8: Statusspalte umstellen**
 
 `frontend/src/pages/uhs/MaterialTab.tsx`, Zeile 66 ersetzen (Imports `StatusTag` und `materialStatus` ergänzen):
 
@@ -257,14 +268,14 @@ Erwartet: FAIL — „Desinfektion nötig" nicht gefunden, `desinfektion_noetig`
 },
 ```
 
-- [ ] **Step 8: Test laufen lassen, grün bestätigen**
+- [ ] **Step 9: Test laufen lassen, grün bestätigen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/uhs/MaterialTab.test.tsx
 ```
 Erwartet: PASS.
 
-- [ ] **Step 9: MaterialPage auf den Vertrag ziehen**
+- [ ] **Step 10: MaterialPage auf den Vertrag ziehen**
 
 `frontend/src/pages/MaterialPage.tsx`:
 
@@ -320,7 +331,7 @@ const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({
 
 5. Import `materialStatus` ergänzen, `MaterialStatus`-Import prüfen.
 
-- [ ] **Step 10: Bestandstests von MaterialPage laufen lassen**
+- [ ] **Step 11: Bestandstests von MaterialPage laufen lassen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/MaterialPage.test.tsx
@@ -328,7 +339,7 @@ mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claud
 
 Erwartet: Tests, die auf `rolle: 'neutral'` oder auf die **Abwesenheit** eines Farbpunkts im Statusmenü pinnen, schlagen jetzt fehl. Das ist der Zweck der Änderung, nicht ein Fehler. Diese Zusicherungen **umschreiben, nicht löschen** — die Gegenaussage lautet jetzt: „das Auslöser-Etikett trägt die Vertragsrolle" und „die Menüeinträge tragen einen Farbpunkt". Wer sie streicht statt umzuschreiben, verliert die Zusicherung, dass der Katalog überhaupt eine Darstellung hat.
 
-- [ ] **Step 11: CLAUDE.md korrigieren**
+- [ ] **Step 12: CLAUDE.md korrigieren**
 
 Im Abschnitt „Frontend — Bedien-Leitlinie", Absatz „**Der Statuswechsel in den Kräfte-Listen ist gebaut**", den Teilabsatz „**Material ist der Grenzfall, und die Linie liegt zwischen Farbe und Anordnung**" ersetzen durch:
 
@@ -349,14 +360,14 @@ Im Abschnitt „Frontend — Bedien-Leitlinie", Absatz „**Der Statuswechsel in
   Auslöser) bleibt davon unberührt.
 ```
 
-- [ ] **Step 12: Betroffene Suiten laufen lassen**
+- [ ] **Step 13: Betroffene Suiten laufen lassen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/theme src/pages/MaterialPage.test.tsx src/pages/uhs/MaterialTab.test.tsx
 ```
 Erwartet: PASS.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 14: Commit**
 
 ```bash
 git add frontend/src/theme/statusFarben.ts frontend/src/theme/statusFarben.test.ts \
@@ -378,17 +389,23 @@ EOF
 
 ---
 
-### Task 2: UHS-Kopf — Typ als Label, Datenstand sichtbar
+### Task 2: UHS-Detailseite auf den gemeinsamen Modul-Seitenkopf ziehen
 
 **Files:**
-- Modify: `frontend/src/pages/uhs/UhsDetailPage.tsx:82-86` (die `meta`-Zeile) und der Kopfbereich (~Zeile 96-123)
+- Modify: `frontend/src/pages/uhs/UhsDetailPage.tsx:78-125` (Meta-Zeile, Breadcrumb, Kopfzeile)
 - Modify: `frontend/src/pages/uhs/UhsDetailPage.test.tsx`
 
 **Interfaces:**
-- Consumes: `uhsTyp` aus `theme/statusFarben.ts` (Bestand, `statusFarben.ts:136-143`), `Datenstand` aus `components/Datenstand.tsx` (Bestand, Prop `dataUpdatedAt: number | undefined`).
-- Produces: nichts, was spätere Tasks brauchen — außer der Kopfzeile selbst, in die Task 5 den Aufnahme-Knopf hängt.
+- Consumes: `EinsatzSeite` aus `components/EinsatzSeite.tsx` (Bestand) mit den Props `titel`, `beschreibung`, `breadcrumb`, `aktionen`, `hinweis`, `dataUpdatedAt`, `breite`, `children`; `uhsTyp` aus `theme/statusFarben.ts` (Bestand, `statusFarben.ts:136-143`); `flaeche.seiteBreit` aus `theme/tokens.ts`.
+- Produces: den `aktionen`-Slot der Seite, in den Task 5 den Aufnahme-Knopf hängt.
 
-Der Live-/Offline-Indikator wird **nicht erfunden**: `Datenstand` ist das B6-Muster und läuft in `MaterialTab.tsx:102` und `BewegungenTab.tsx:147` bereits, nur eben nicht im Seitenkopf. `UhsDetailPage` hat `detailQuery.dataUpdatedAt` bereits zur Hand (es reicht es in Zeile 141 an `BewegungenTab` durch).
+**Warum die Seite umzieht, statt nur zwei Zeilen zu bekommen.** Die Abhängigkeitszeile des Tickets sagt es ausdrücklich: *„C5 liefert außerdem den gemeinsamen Modul-Seitenkopf, den die UHS-Seiten mitnutzen."* `UnfallhilfsstellenPage` nutzt ihn seit C5, die **Detail**seite nicht — ihr Kopf ist handgebaut. Drei Dinge folgen daraus, und alle drei betreffen diesen Plan:
+
+1. **Der Datenstand kommt umsonst.** `EinsatzSeite` hat einen `dataUpdatedAt`-Prop und rendert den Indikator selbst. Ein eigenes `<Datenstand>` in einen handgebauten Kopf zu hängen wäre die zweite Bauform für dieselbe Sache.
+2. **„Genau eine Primäraktion" wird prüfbar, statt gezählt.** Das Gate hängt an `data-lfh="seitenkopf-aktionen"` und der Dev-Warnung des Primitivs (`EinsatzSeite.tsx:42,87-91`) — außerhalb davon ist die Zusicherung eine Handzählung. Task 5 setzt eine zweite Primäraktion in genau diesen Kopf; ohne den Umzug stünde sie in einem Bereich, den kein Gate sieht.
+3. **`data-testid="uhs-kopf"` wird überflüssig.** Der Slot trägt bereits eine Marke.
+
+**Was der Umzug NICHT ändert:** der Grundriss bleibt Hauptinhalt mit bemessener Höhe, die Reiter bleiben darunter, die drei Statuswechsel-Knöpfe behalten Beschriftung und Bedingung. `breite={flaeche.seiteBreit}` — der Grundriss ist eine Arbeitsfläche, keine Formularseite.
 
 - [ ] **Step 1: Test schreiben (rot)**
 
@@ -397,35 +414,53 @@ An `frontend/src/pages/uhs/UhsDetailPage.test.tsx` anhängen:
 ```tsx
 it('zeigt den UHS-Typ als Beschriftung, nicht als Wire-Wert', async () => {
   // Fixture-UHS mit typ: 'patientenablage'
-  renderMitProviders(<UhsDetailPage />, { route: `/einsaetze/1/unfallhilfsstellen/7` });
+  renderMitProviders(<UhsDetailPage />, { route: '/einsaetze/1/unfallhilfsstellen/7' });
 
   expect(await screen.findByText(/Patientenablage/)).toBeInTheDocument();
   expect(screen.queryByText(/patientenablage/)).not.toBeInTheDocument();
 });
 
-it('trägt den Datenstand im Seitenkopf, nicht nur in den Reitern', async () => {
-  renderMitProviders(<UhsDetailPage />, { route: `/einsaetze/1/unfallhilfsstellen/7` });
+it('trägt den Seitenkopf des Moduls, nicht einen eigenen', async () => {
+  renderMitProviders(<UhsDetailPage />, { route: '/einsaetze/1/unfallhilfsstellen/7' });
 
-  // `Datenstand` rendert einen datierten Hinweis; der Kopf ist der Ausschnitt
-  // OBERHALB des Grundrisses — sonst zählte der Reiter-Datenstand mit und der
-  // Test wäre schon vor der Änderung grün.
-  const kopf = await screen.findByTestId('uhs-kopf');
-  expect(within(kopf).getByTestId('datenstand')).toBeInTheDocument();
+  // Der Slot IST die Zusicherung: an ihm hängt die Primäraktions-Zählung des
+  // Primitivs. Ohne ihn ist „genau eine Primäraktion im Kopf" eine Handzählung.
+  const aktionen = await screen.findByTestId('uhs-detail-seite');
+  expect(aktionen.querySelector('[data-lfh="seitenkopf-aktionen"]')).not.toBeNull();
+});
+
+it('zeigt genau eine Primäraktion im Kopf — im Betrieb wie in der Planung', async () => {
+  // Beide Zustände, weil die Knöpfe zustandsabhängig sind und sich genau deshalb
+  // NICHT gegenseitig aufheben müssen: eine Zählung in nur einem Zustand liesse
+  // den anderen offen.
+  for (const status of ['geplant', 'aktiv'] as const) {
+    const { unmount } = renderMitProviders(<UhsDetailPage />, {
+      route: '/einsaetze/1/unfallhilfsstellen/7',
+      // UHS-Fixture mit diesem Status — wie, steht in der Bestandssuite.
+    });
+    const slot = (await screen.findByTestId('uhs-detail-seite'))
+      .querySelector('[data-lfh="seitenkopf-aktionen"]')!;
+    const primaer = Array.from(slot.querySelectorAll('button')).filter((k) =>
+      Array.from(k.classList).some((c) => c.endsWith('-btn-primary')),
+    );
+    expect(primaer, `Status ${status}`).toHaveLength(1);
+    unmount();
+  }
 });
 ```
 
-**Vor dem Schreiben prüfen:** trägt `components/Datenstand.tsx` bereits ein `data-testid`? Wenn nicht, ist die tragfähige Abfrage der gerenderte Text (`/Stand:/` o. ä.) — nachsehen, nicht raten. Ein `data-testid` in ein Primitiv einzuziehen ist zulässig, wenn es dort fehlt.
+**Vor dem Schreiben prüfen:** trägt `EinsatzSeite` selbst eine greifbare Marke, oder muss `UhsDetailPage` das `data-testid="uhs-detail-seite"` an ein umschließendes Element hängen? In `components/EinsatzSeite.tsx` nachsehen — falls das Primitiv keine Wurzel-Marke hat, ist der `container` aus `renderMitProviders` der ehrlichere Anker. Und: wie setzt die Bestandssuite den UHS-Status in der Fixture? Auch das steht dort.
 
 - [ ] **Step 2: Test laufen lassen, Fehlschlag bestätigen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/uhs/UhsDetailPage.test.tsx
 ```
-Erwartet: FAIL — „Patientenablage" fehlt, `uhs-kopf` existiert nicht.
+Erwartet: FAIL — „Patientenablage" fehlt, kein `seitenkopf-aktionen` im Baum.
 
-- [ ] **Step 3: Umstellen**
+- [ ] **Step 3: Auf `EinsatzSeite` umstellen**
 
-`frontend/src/pages/uhs/UhsDetailPage.tsx`:
+`frontend/src/pages/uhs/UhsDetailPage.tsx` — die Meta-Zeile zuerst:
 
 ```tsx
 const meta = [
@@ -438,44 +473,95 @@ const meta = [
 ].join('  ·  ');
 ```
 
-Den Kopfbereich (das `<div>` mit `justifyContent: 'space-between'`, ~Zeile 96) mit `data-testid="uhs-kopf"` markieren und den Datenstand neben den Status-Tag setzen:
+Dann den handgebauten Kopf (Breadcrumb + das `<div>` mit `justifyContent: 'space-between'` + die `Typography.Text`-Metazeile, zusammen ~Zeilen 89–123) durch die Hülle ersetzen. `children` sind der Grundriss-Container und die Reiter, unverändert:
 
 ```tsx
-<Space>
-  <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
-  <StatusTag darstellung={uhsStatus[uhs.status]} />
-  {/* Betriebs-Feedback im Kopf (B6-Muster): die Reiter tragen es seit B2, die Seite
-      selbst nicht — ausgerechnet dort, wo der Grundriss live mitläuft. */}
-  <Datenstand dataUpdatedAt={detailQuery.dataUpdatedAt} />
-</Space>
+<EinsatzSeite
+  breite={flaeche.seiteBreit}
+  /* Der Titel trägt den Umschalter, nicht bloß den Namen: die UHS-Detailseite ist der
+     Ort, an dem zwischen mehreren Hilfsstellen gewechselt wird (LFH-25). */
+  titel={
+    <Space>
+      <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
+      <StatusTag darstellung={uhsStatus[uhs.status]} />
+    </Space>
+  }
+  beschreibung={meta}
+  /* Betriebs-Feedback im Kopf (B6-Muster): die beiden Reiter tragen es seit B2, die
+     Seite selbst nicht — ausgerechnet dort, wo der Grundriss live mitläuft. Das
+     Primitiv rendert den Indikator; eine eigene `<Datenstand>`-Zeile daneben wäre die
+     zweite Bauform für dieselbe Sache. */
+  dataUpdatedAt={detailQuery.dataUpdatedAt}
+  breadcrumb={
+    <Breadcrumb items={[
+      { title: <Link to="/einsaetze">Einsätze</Link> },
+      { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
+      { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
+      { title: uhs.bezeichnung },
+    ]} />
+  }
+  aktionen={
+    <Space wrap>
+      {/* Die Zustände schliessen sich aus — aber das ist ab jetzt nicht mehr
+          handgezählt: die Dev-Warnung des Primitivs zählt die Primäraktionen in
+          diesem Slot, und der Test daneben prüft beide Zustände. */}
+      {!schreibgeschuetzt && uhs.status === 'geplant' && (
+        <>
+          <Button type="primary" onClick={() => statusMut.mutate('aktiv')} loading={statusMut.isPending}>
+            In Betrieb nehmen
+          </Button>
+          <Popconfirm title="UHS stornieren?" onConfirm={() => stornoMut.mutate()} okButtonProps={{ danger: true }}>
+            <Button danger>Stornieren</Button>
+          </Popconfirm>
+        </>
+      )}
+      {!schreibgeschuetzt && uhs.status === 'aktiv' && (
+        <Popconfirm
+          title="UHS auflösen?"
+          description="Nur möglich, wenn keine Person mehr belegt ist."
+          onConfirm={() => statusMut.mutate('aufgeloest')}
+          okButtonProps={{ danger: true }}
+        >
+          <Button danger>Auflösen</Button>
+        </Popconfirm>
+      )}
+    </Space>
+  }
+>
 ```
 
-Imports `uhsTyp` und `Datenstand` ergänzen.
+Zwei Mitnahmen, weil die Datei ohnehin angefasst wird:
+
+- **`okButtonProps={{ danger: true }}` an beiden `Popconfirm`.** CLAUDE.md: *„Jedes `Popconfirm` an einer destruktiven Aktion trägt `okButtonProps={{ danger: true }}` — sonst bestätigt man das Löschen mit einem blauen Knopf."* Beide fehlten. Die Rückfragen selbst **bleiben**: Stornieren und Auflösen sind nicht umkehrbar (es gibt keinen Knopf, der eine aufgelöste UHS zurückholt), und damit fallen sie auf die Seite der Trennlinie aus LFH-363, auf der die Reibung bleibt.
+- Die `<Space wrap>`-Reihe trägt `danger` neben mindestens einer weiteren Aktion → **`size="middle"`** setzen, sobald Task 5 den Aufnahme-Knopf dazustellt (`aktionsabstand.guard.test.ts`). Im `geplant`-Zweig gilt das schon jetzt.
+
+Imports: `EinsatzSeite`, `uhsTyp`, `flaeche`. `Typography` und `Datenstand` fallen möglicherweise ganz weg — ungenutzte Importe brechen den Lint.
 
 - [ ] **Step 4: Test laufen lassen, grün bestätigen**
 
 ```bash
-mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/uhs/UhsDetailPage.test.tsx
+mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/uhs/UhsDetailPage.test.tsx src/components/aktionsabstand.guard.test.ts
 ```
-Erwartet: PASS.
+
+Erwartet: PASS. Die Bestandstests der Datei greifen den Kopf womöglich über seine alte Struktur ab — die Abfragen umschreiben, nicht die Aussagen. Und in der Browser-Konsole des Dev-Laufs auf die Dev-Warnung des Primitivs achten: sie ist der eigentliche Gewinn dieses Umzugs.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/pages/uhs/UhsDetailPage.tsx frontend/src/pages/uhs/UhsDetailPage.test.tsx frontend/src/components/Datenstand.tsx
+git add frontend/src/pages/uhs/UhsDetailPage.tsx frontend/src/pages/uhs/UhsDetailPage.test.tsx
 git commit -m "$(cat <<'EOF'
-feat(lfh-341): nennt den UHS-Typ beim Namen und zeigt den Datenstand im Kopf
+feat(lfh-341): zieht die UHS-Detailseite auf den gemeinsamen Modul-Seitenkopf
 
-Der Typ stand als Wire-Wert auf dem Bildschirm, obwohl die Label-Karte in
-theme/statusFarben.ts seit A2 liegt. Der Datenstand lief in beiden Reitern,
-nur nicht auf der Seite, deren Grundriss live mitlaeuft.
+Die Abhaengigkeitszeile des Tickets verlangt es, und drei Dinge folgen daraus:
+der Datenstand kommt aus dem Primitiv statt aus einer zweiten Bauform, „genau
+eine Primaeraktion" wird vom Gate gezaehlt statt von Hand, und der Typ steht als
+Beschriftung statt als Wire-Wert. Beide Popconfirms bekommen den roten
+Bestaetigungsknopf nach, den CLAUDE.md fordert.
 
 LFH-341
 EOF
 )"
 ```
-
----
 
 ### Task 3: Grundriss — unter `lg` stapeln statt 504-px-Sockel
 
@@ -492,6 +578,13 @@ EOF
 1. **Der `DndContext` umschließt die Weiche**, nicht umgekehrt. Er tut das heute schon (`Grundriss.tsx:645`) — beim Umbau darf er nicht in einen Tab rutschen, sonst verliert der Drag innerhalb der Fläche seinen Kontext.
 2. **Kein `forceRender` an den Tabs.** Das ist dieselbe Entscheidung wie beim Navigations-Drawer aus B1 und die erste der fünf Zusicherungen von `Datensicht`: *„Genau EIN Zweig im Baum. Kein Umschalten per verborgener Fläche."* Ein zweiter, verborgener Zweig machte die Prüfung „unter `lg` stehen die Spalten nicht nebeneinander" bedeutungslos und montierte die Droppables doppelt — zwei Elemente mit `droppableId="drop-inbox"` sind ein stiller Fehler, kein lauter.
 3. **Die Fläche ist der Default-Tab.** Wer die UHS auf dem Telefon öffnet, will den Belegungsstand sehen, nicht die Warteliste.
+4. **Der Rückweg braucht einen zweiten Pfad** — sonst nimmt der Umbruch eine Bewegung weg. Siehe den Kasten direkt darunter; das ist keine Zugabe, sondern Bedingung dafür, dass Punkt 2 tragbar ist.
+
+**DER RÜCKWEG AUS DEM PLATZ HÄNGT HEUTE AM DRAG, UND ZWAR AUSSCHLIESSLICH.** Gemessen, nicht vermutet: „Person zurück in den Wartebereich" läuft nur über `onDragEnd` → `target.kind === 'inbox'` → `belegMut.mutate({ platzId: null })` (`Grundriss.tsx:635`). Das Droppable `drop-inbox` hängt an der `PersonenSpalte` im Wartebereich-Zweig, und der Kommentar an der Platzkarte sagt es selbst: *„Belegte Person ist ziehbar (→ Wartebereich links oder Transport rechts)"* (`Grundriss.tsx:279`). Die Props der `PlatzKarte` sind `onVerfuegbarkeit`, `onAustritt`, `onTransport`, `onStorno`, `onZuweisen`, `onOeffnen` — **keiner davon setzt `platz_id: null`**. „Austritt" ist etwas anderes: er beendet die Belegung, statt die Person in den Wartebereich zurückzustellen.
+
+Unter `lg` auf dem Reiter „Fläche" ist `drop-inbox` **nicht im Baum** (kein `forceRender`, Punkt 2). Ohne Gegenmaßnahme verliert der schmale Schirm damit eine Bewegung, die es im Betrieb gibt — den Patienten vom Platz zurück in den Wartebereich nehmen. Das wäre eine Verschlechterung durch einen Umbau, der Bedienbarkeit herstellen soll.
+
+**Die Gegenmaßnahme ist ein Menüeintrag an der Platzkarte, kein zweites Droppable.** Er ruft dieselbe Mutation — `belegMut` errechnet `art` selbst aus `aktuelle_uhs_id` und liefert für eine belegte Person korrekt `'wechsel'`. Damit hat `belegMut` **drei** Aufrufer; die Zusicherung aus Task 6 gilt für alle drei, und das AK „für beide Aufrufer" ist damit erfüllt und überschritten. Der Eintrag steht auf **beiden** Breiten, nicht nur schmal: zwei Bedienwege je nach Fensterbreite wären ein Unterschied ohne Bedeutung, und der Klickweg ist auch mit Maus der schnellere.
 
 - [ ] **Step 1: Test schreiben (rot)**
 
@@ -540,6 +633,57 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: 'Wartebereich' }));
     expect(await screen.findByText('Wartebereich (Eingang)')).toBeInTheDocument();
+  });
+
+  it('bietet den Rückweg in den Wartebereich als Menüeintrag — auf beiden Breiten', async () => {
+    // Der Drag auf `drop-inbox` ist unter lg strukturell weg (anderer Reiter). Ohne
+    // diesen Eintrag hätte der schmale Schirm KEINEN Weg mehr, einen Patienten vom
+    // Platz zurückzunehmen — der Umbau nähme eine Bewegung, statt eine zu geben.
+    for (const breite of [1280, 800]) {
+      setzeViewportBreite(breite);
+      const { unmount } = renderMitProviders(
+        <Grundriss einsatzId={1} uhs={uhsMitBelegtemPlatz} schreibgeschuetzt={false} />,
+      );
+      if (breite < 992) await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
+
+      await userEvent.click(await screen.findByRole('button', { name: /Aktionen zu Bett 1/ }));
+      // Immer über das GEÖFFNETE Menü greifen: antd lässt die Portale geschlossener
+      // Dropdowns im Baum stehen.
+      const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!;
+      expect(
+        within(menue as HTMLElement).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
+        `Breite ${breite}`,
+      ).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('schickt den Rückweg über dieselbe Mutation wie Drag und Zuweisungsdialog', async () => {
+    setzeViewportBreite(800);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsMitBelegtemPlatz} schreibgeschuetzt={false} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: /Aktionen zu Bett 1/ }));
+    const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!;
+    await userEvent.click(within(menue as HTMLElement).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }));
+
+    // `art: 'wechsel'`, weil die Person bereits an dieser UHS liegt — das rechnet
+    // `belegMut` selbst aus, und genau deshalb geht der Eintrag durch die Mutation
+    // statt an ihr vorbei.
+    await waitFor(() => expect(aenderePersonBelegung).toHaveBeenCalledWith(1, 42, {
+      art: 'wechsel', uhs_id: 1, platz_id: null,
+    }));
+  });
+
+  it('bietet den Rückweg an einem unbelegten Platz gar nicht erst an', async () => {
+    setzeViewportBreite(1280);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsFixture} schreibgeschuetzt={false} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Aktionen zu Bett 1/ }));
+    const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!;
+    expect(
+      within(menue as HTMLElement).queryByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('setzt an keiner Seitenspalte mehr eine feste Breite, wenn gestapelt wird', async () => {
@@ -658,14 +802,63 @@ Dann die Weiche. Der `DndContext` bleibt **außen**:
 
 **Achtung Guards:** kein `size`-Prop an `Tabs` und keins in den `items`-Objekten — `dichte.guard.test.ts` liest die Attributebene und `Grundriss.tsx` ist seine letzte Schuldzeile. Der `Tabs`-Import kommt aus `antd`.
 
-- [ ] **Step 4: Test laufen lassen, grün bestätigen**
+- [ ] **Step 4: Den Rückweg als Menüeintrag bauen**
+
+`PlatzKarte` bekommt eine sechste Aktions-Prop. In der Props-Schnittstelle (`Grundriss.tsx:157-163`) und im Destructuring der Funktion ergänzen:
+
+```tsx
+/** Nur gesetzt, wenn der Platz belegt ist — sonst gibt es nichts zurückzustellen. */
+onZurueckInWartebereich?: () => void;
+```
+
+Im Menü (`Grundriss.tsx:226-231`), direkt nach dem `zuweisen`-Block:
+
+```tsx
+...(onZurueckInWartebereich
+  ? [{ key: 'wartebereich', label: 'Zurück in den Wartebereich', icon: <RollbackOutlined /> }]
+  : []),
+```
+
+Und in `menu.onClick` — die Zuordnung bleibt am **Menü**, nicht je Eintrag, damit der Riegel gegen das Aufsteigen einen Ort hat:
+
+```tsx
+onClick: ({ key }: { key: string }) => {
+  if (key === 'zuweisen') onZuweisen();
+  else if (key === 'wartebereich') onZurueckInWartebereich?.();
+  else if (key === 'storno') onStorno();
+  else onVerfuegbarkeit(key as Verfuegbarkeit);
+},
+```
+
+An der Aufrufstelle (`Grundriss.tsx:695-720`), neben den anderen Handlern:
+
+```tsx
+onZurueckInWartebereich={
+  // Nur bei belegtem Platz und nur mit Schreibrecht. `belegMut` errechnet `art`
+  // selbst — für eine Person, die bereits an dieser UHS liegt, ergibt das
+  // `'wechsel'`. Der Eintritt in den Wartebereich IST ein Wechsel, kein Austritt.
+  (() => {
+    const belegt = belegtAn(p.id);
+    if (!belegt || schreibgeschuetzt || belegMut.isPending) return undefined;
+    return () => belegMut.mutate({ personId: belegt.id, platzId: null });
+  })()
+}
+```
+
+Den Kommentar an `Grundriss.tsx:279` („Belegte Person ist ziehbar (→ Wartebereich links oder Transport rechts)") ergänzen: der Drag ist nicht mehr der einzige Weg, und unter `lg` ist er für diese Richtung gar keiner.
+
+`RollbackOutlined` aus `@ant-design/icons` importieren — die `aria-hidden`-Frage stellt sich hier nicht, ein `icon` im Menü-Item trägt der Eintragstext.
+
+**Bündelungsschwelle prüfen:** das Menü hatte bisher je nach Zustand 1–3 Einträge plus Verfügbarkeiten. Mit dem sechsten steigt keine Regel auf, die vorher keine war — die Aktionen liegen schon gebündelt im Dropdown, das ist der Zielzustand aus LFH-365. Die vier direkten Knöpfe der Platzkarte bleiben unverändert (geprüfte Dauerausnahme, `SCHRITT_Y = 120`).
+
+- [ ] **Step 5: Test laufen lassen, grün bestätigen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/uhs/GrundrissTabs.test.tsx
 ```
 Erwartet: PASS.
 
-- [ ] **Step 5: Bestandssuite des Grundrisses laufen lassen**
+- [ ] **Step 6: Bestandssuite des Grundrisses laufen lassen**
 
 ```bash
 mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/lfh-341/frontend test --run src/pages/uhs/Grundriss.test.tsx src/components/dichte.guard.test.ts src/components/aktionsabstand.guard.test.ts
@@ -673,7 +866,7 @@ mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claud
 
 Erwartet: PASS. `Grundriss.test.tsx` rendert in der jsdom-Vorgabebreite — prüfen, welche das ist (`test/viewport.ts` bzw. `test/setup.ts`). Liegt sie unter 992, laufen die Bestandstests plötzlich im Tabs-Zweig und finden die Spalten nicht mehr. **Dann nicht die Erwartungen anpassen**, sondern in der Bestandssuite `setzeViewportBreite(1280)` in ein `beforeEach` setzen: die Tests prüfen den breiten Fall, das war vor der Weiche nur nicht sagbar.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add frontend/src/pages/uhs/Grundriss.tsx frontend/src/pages/uhs/Grundriss.test.tsx frontend/src/pages/uhs/GrundrissTabs.test.tsx
@@ -869,7 +1062,11 @@ EOF
 
 1. **Der Auftrag reist im Query-Param**, nicht im Router-State: ein `?uhs=<id>` überlebt einen Neuladen und ist die Adresse, die C5 ausdrücklich vorgesehen hat (`deeplinks.ts:149-153`).
 2. **Nach dem Anlegen wird der Eintritt gebucht**, `art: 'eintritt'`, `platz_id: null` → Wartebereich. Serienbetrieb bleibt, wie er ist: die Hülle zählt, jeder Durchlauf bucht.
-3. **Offline hat keine Person-ID.** `erfassePersonOfflineFaehig` kann `zustand: 'vorgemerkt'` liefern — dann existiert kein `person.id`, und die Belegung kann nicht gebucht werden. Das wird **gesagt**, nicht verschluckt: die Quittung nennt es. Eine Belegung, die stillschweigend ausfällt, wäre eine Person, die niemand an der UHS sucht.
+3. **Offline hat keine Person-ID, und die Zuordnung kommt auch später nicht von selbst.** `erfassePersonOfflineFaehig` liefert bei fehlender Verbindung `{ zustand: 'vorgemerkt', client_id }` und legt die Person in die Queue (`offline/schreiben.ts:21-24`). Es gibt **keinen** Drain-Hook, der danach `aenderePersonBelegung` nachschöbe — der Aufruf steht in `onSuccess` dieser Seite, und die ist beim Drain längst verlassen. **Gemessen, nicht angenommen.**
+
+   Der Wortlaut der Quittung muss das sagen. „Zuordnung folgt nach der Übertragung" wäre ein Versprechen, das kein Code einlöst — und dieselbe Kette, aus der der medizinische Verlauf gelesen wird (`uhs.belegungen`), hätte still eine Lücke. Die Quittung lautet deshalb: **„Offline vorgemerkt — Registriernummer folgt nach der Übertragung, die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen."**
+
+   **Der saubere Weg ist der C5-Weg und er wird vertagt:** so wie die Sichtung seit LFH-340 als optionales Feld am `POST …/personen` mitgeht und serverseitig in derselben Transaktion geschrieben wird, gehörte auch `uhs_id` dorthin — dann trüge die Offline-Vormerkung sie in ihrer `client_id`-Idempotenz mit. Das ist eine **Backend-Erweiterung** und damit außerhalb dieses Tickets; sie wird als Folgeticket angelegt (Task 8, Schritt 3) und in der Prüfliste als offen mit Zielticket geführt.
 
 - [ ] **Step 1: Deeplink-Test schreiben (rot)**
 
@@ -929,19 +1126,33 @@ An `frontend/src/pages/uhs/UhsDetailPage.test.tsx`:
 it('bietet „Patient aufnehmen" und schickt in die Aufnahme mit UHS-Auftrag', async () => {
   renderMitProviders(<UhsDetailPage />, { route: '/einsaetze/1/unfallhilfsstellen/7' });
 
-  const knopf = await screen.findByRole('link', { name: 'Patient aufnehmen' });
-  expect(knopf).toHaveAttribute('href', '/einsaetze/1/personen/aufnahme?uhs=7');
+  await userEvent.click(await screen.findByRole('button', { name: 'Patient aufnehmen' }));
+  // Die ADRESSE ist die Zusicherung, nicht der Klick: der `uhs`-Auftrag ist das,
+  // woran die Aufnahmeseite den Wartebereich-Eintritt erkennt.
+  await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/personen/aufnahme?uhs=7'));
+});
+
+it('bietet die Aufnahme in einer geplanten UHS nicht an', async () => {
+  // Eine geplante UHS nimmt niemanden auf — dort ist „In Betrieb nehmen" die
+  // Primäraktion. Ohne diese Gegenaussage wäre „genau eine Primäraktion" in Task 2
+  // eine Zählung ohne Fall, der sie verletzen könnte.
+  renderMitProviders(<UhsDetailPage />, { route: '/einsaetze/1/unfallhilfsstellen/8' }); // Status geplant
+
+  expect(await screen.findByRole('button', { name: 'In Betrieb nehmen' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Patient aufnehmen' })).not.toBeInTheDocument();
 });
 
 it('bietet die Aufnahme ohne Schreibrecht gar nicht erst an', async () => {
   // Der Weg endet in einem POST; ein 403 nach dem Ausfüllen der Maske wäre die
-  // spaeteste denkbare Absage. Gegenaussage zum Test darüber.
+  // spaeteste denkbare Absage.
   renderMitProviders(<UhsDetailPage />, { route: '/einsaetze/1/unfallhilfsstellen/7', benutzer: beobachter });
 
-  expect(await screen.findByText(/Grundriss|Bett/)).toBeInTheDocument(); // Seite ist da
-  expect(screen.queryByRole('link', { name: 'Patient aufnehmen' })).not.toBeInTheDocument();
+  expect(await screen.findByText(/Bett/)).toBeInTheDocument(); // Seite ist da
+  expect(screen.queryByRole('button', { name: 'Patient aufnehmen' })).not.toBeInTheDocument();
 });
 ```
+
+`aktuellerPfad()` ist ein Platzhalter für den Weg, den die Bestandssuite zum Ablesen der Route nutzt — ein `useLocation`-Anzeiger im Testbaum oder der Router-State. **In `UhsDetailPage.test.tsx` bzw. `AufnahmePage.test.tsx` nachsehen**; `window.location` ist unter einem Memory-Router falsch.
 
 **Vor dem Schreiben prüfen:** wie setzt die Bestandssuite einen Benutzer ohne Schreibrecht (`renderMitProviders`-Option, Mock von `darfImEinsatzSchreiben`)? Das Muster steht in `UhsDetailPage.test.tsx` oder in `Grundriss.test.tsx` — abschauen, nicht erfinden.
 
@@ -958,21 +1169,27 @@ Erwartet: FAIL — kein Link „Patient aufnehmen".
 
 ```tsx
 {!schreibgeschuetzt && uhs.status === 'aktiv' && (
-  /* Die Aufnahme ohne Modulwechsel (LFH-341 · H38). Ein `Link`, kein `onClick`:
-     die Adresse ist der Punkt — sie lässt sich teilen, neu laden und mit
-     Cmd-Klick in einen zweiten Tab legen, was am ortsfesten BHP der Normalfall ist.
-     Nur im Betrieb sichtbar: eine geplante UHS nimmt niemanden auf. */
-  <Link to={personenAufnahmePfad(einsatzId, { uhs: uhs.id })}>
-    <Button type="primary" icon={<UserAddOutlined aria-hidden />}>
-      Patient aufnehmen
-    </Button>
-  </Link>
+  /* Die Aufnahme ohne Modulwechsel (LFH-341 · H38). Nur im Betrieb: eine geplante
+     UHS nimmt niemanden auf, und dort steht „In Betrieb nehmen" als Primäraktion.
+     Die beiden schliessen sich damit aus — nicht mehr handgezählt, sondern von der
+     Dev-Warnung des Seitenkopfs (Task 2) und ihrem Test gedeckt. */
+  <Button
+    type="primary"
+    icon={<UserAddOutlined aria-hidden />}
+    onClick={() => navigate(personenAufnahmePfad(einsatzId, { uhs: uhs.id }))}
+  >
+    Patient aufnehmen
+  </Button>
 )}
 ```
 
-**Achtung:** die Kopfzeile trägt bereits „In Betrieb nehmen" als `type="primary"` — aber im Zustand `geplant`, und dieser Knopf steht nur bei `aktiv`. Die beiden schließen sich also aus, „genau eine Primäraktion" hält. Beim Umsetzen prüfen, ob eine Dev-Warnung des Seitenkopf-Primitivs anschlägt.
+**Warum `onClick` und nicht `<Link><Button>`.** Das Verschachteln ergäbe `<button>` in `<a>` — interaktiv in interaktiv, invalides HTML, und Screenreader melden es unterschiedlich. Antds eigener `href`-Weg (`<Button href=…>`) rendert zwar einen sauberen `<a class="ant-btn">`, umgeht aber den Router: react-router fängt nur `<Link>` ab, ein nacktes `href` lädt die SPA komplett neu. `onClick` + `useNavigate` kostet den Cmd-Klick in einen zweiten Tab, und das ist hier verkraftbar — der Aufnahmeweg ist Serienbetrieb **auf** der Zielseite, nicht ein Nachschlagen nebenher. Das Repo hat für Navigations-**Knöpfe** kein anderes Muster; `<Link>` wird durchgängig für Text-Links verwendet (`BefehlDetailPage.tsx:170`, `EinheitenPage.tsx:64`).
 
-Imports: `personenAufnahmePfad`, `UserAddOutlined` aus `@ant-design/icons` (Emoji ist verboten, die `aria-hidden`-Hülle ist Pflicht — sonst trägt der Knopf zusätzlich das englische `user-add` im zugänglichen Namen).
+**Der Test greift entsprechend `getByRole('button', …)` plus den Navigationsnachweis**, nicht ein `href`-Attribut — Task 5 Schritt 5 ist darauf abzustimmen, wenn es dort noch `getByRole('link')` sagt.
+
+**`size="middle"` an der `<Space wrap>`-Reihe** nachziehen: mit diesem Knopf steht `danger` („Auflösen") neben mindestens einer weiteren Aktion, und `aktionsabstand.guard.test.ts` deckt die Datei ab.
+
+Imports: `personenAufnahmePfad`, `useNavigate`, `UserAddOutlined` aus `@ant-design/icons` (Emoji ist verboten, die `aria-hidden`-Hülle ist Pflicht — sonst trägt der Knopf zusätzlich das englische `user-add` im zugänglichen Namen).
 
 - [ ] **Step 8: Test laufen lassen, grün bestätigen**
 
@@ -1023,7 +1240,9 @@ it('sagt es, wenn die Zuordnung offline nicht gebucht werden konnte', async () =
   renderMitProviders(<AufnahmePage />, { route: '/einsaetze/1/personen/aufnahme?uhs=7' });
   await userEvent.click(await screen.findByRole('button', { name: 'Erfassen', exact: true }));
 
-  expect(await screen.findByText(/Zuordnung zur Unfallhilfsstelle folgt/)).toBeInTheDocument();
+  // „muss von Hand erfolgen", NICHT „folgt": die Queue schiebt keine Belegung nach.
+  // Ein Test auf /folgt/ waere auch mit dem falschen Versprechen gruen.
+  expect(await screen.findByText(/von Hand erfolgen/)).toBeInTheDocument();
   expect(belegung).not.toHaveBeenCalled();
 });
 
@@ -1074,9 +1293,12 @@ onSuccess: async (ergebnis) => {
   if (ergebnis.zustand === 'vorgemerkt') {
     setQuittung(
       uhsAuftrag
-        // Ehrlich statt still: ohne Person-ID gibt es keine Belegung, und eine
-        // ausgefallene Zuordnung ist eine Person, die an der UHS niemand sucht.
-        ? 'Offline vorgemerkt — Registriernummer und Zuordnung zur Unfallhilfsstelle folgen nach der Übertragung.'
+        // KEIN Versprechen, das kein Code einlöst: die Queue trägt die Person, aber
+        // niemand schiebt danach die Belegung nach (gemessen — `offline/schreiben.ts`
+        // hat keinen Drain-Hook für Folgeaktionen). Eine still ausgefallene Zuordnung
+        // wäre eine Person, die an der UHS niemand sucht; ein falsches „folgt" wäre
+        // schlimmer, weil dann auch niemand nachsieht. Zielticket: uhs_id am POST.
+        ? 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung, die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen.'
         : 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.',
     );
   } else {
@@ -1158,7 +1380,7 @@ EOF
 
 ---
 
-### Task 6: Vitest für die Zuweisung — beide Aufrufer von `belegMut`
+### Task 6: Vitest für die Zuweisung — alle Aufrufer von `belegMut`
 
 **Files:**
 - Modify: `frontend/src/pages/uhs/Grundriss.test.tsx`
@@ -1167,7 +1389,9 @@ EOF
 - Consumes: die in B5g gebauten `onMutate`/`onError`-Zweige von `belegMut` (`Grundriss.tsx:537-570`), unverändert.
 - Produces: nichts.
 
-**Warum diese Task existiert, obwohl die Funktion steht.** Das optimistische Update ist Bestand aus B5g — das AK von C6 verlangt aber den **Nachweis für beide Aufrufer** (`onDragEnd` und der Zuweisungsdialog). Erst prüfen, ob die Bestandssuite ihn schon führt; wenn ja, ist die Task ein reines Verdikt für die Prüfliste und es wird nichts geschrieben.
+**Warum diese Task existiert, obwohl die Funktion steht.** Das optimistische Update ist Bestand aus B5g — das AK von C6 verlangt aber den **Nachweis je Aufrufer**. Zum Ticketzeitpunkt waren es zwei (`onDragEnd`, Zuweisungsdialog); mit Task 3 sind es **drei** (der Menüeintrag „Zurück in den Wartebereich"). Erst prüfen, ob die Bestandssuite die ersten beiden schon führt; für den dritten ist die Zusicherung neu.
+
+**Läuft Task 3 vor dieser Task**, deckt deren Test „schickt den Rückweg über dieselbe Mutation" den Aufruf ab, nicht aber das optimistische Verhalten dabei — das ist hier zu ergänzen. Die Reihenfolge im Plan ist so gewählt, dass Task 3 zuerst kommt.
 
 - [ ] **Step 1: Prüfen, was die Bestandssuite belegt**
 
@@ -1176,7 +1400,7 @@ grep -n "optimist\|vor der Server-Antwort\|Rollback\|zurückgerollt\|onMutate" \
   frontend/src/pages/uhs/Grundriss.test.tsx
 ```
 
-Ergibt das für **beide** Wege je eine Zusicherung „Karte steht vor der Antwort am Ziel" **und** „bei Ablehnung zurück am Ausgangsplatz", ist die Task erledigt → Schritt 4. Fehlt einer der vier Fälle, weiter mit Schritt 2. **Das Ergebnis dieser Prüfung gehört in die Prüfliste** (Task 8), egal wie es ausfällt.
+Ergibt das für **alle drei** Wege je eine Zusicherung „Karte steht vor der Antwort am Ziel" **und** „bei Ablehnung zurück am Ausgangsplatz", ist die Task erledigt → Schritt 4. Fehlt einer der vier Fälle, weiter mit Schritt 2. **Das Ergebnis dieser Prüfung gehört in die Prüfliste** (Task 8), egal wie es ausfällt.
 
 - [ ] **Step 2: Fehlende Zusicherung schreiben (rot)**
 
@@ -1230,10 +1454,11 @@ Ein neu geschriebener Test gegen bestehende Funktion ist **sofort grün** — da
 ```bash
 git add frontend/src/pages/uhs/Grundriss.test.tsx
 git commit -m "$(cat <<'EOF'
-test(lfh-341): misst das optimistische Update auf BEIDEN Wegen zur Belegung
+test(lfh-341): misst das optimistische Update auf ALLEN Wegen zur Belegung
 
-belegMut hat seit B5g zwei Aufrufer; die Zusicherung gehoert an die Mutation,
-nicht an einen der Wege. Per Mutationsprobe belegt.
+belegMut hatte seit B5g zwei Aufrufer und hat seit dem Umbruch drei; die
+Zusicherung gehoert an die Mutation, nicht an einen der Wege. Per
+Mutationsprobe belegt.
 
 LFH-341
 EOF
@@ -1313,21 +1538,46 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(platz).toContainText(personName);
   });
 
-  test('Führungs-Tablet: die Warteliste bleibt während des Drags scrollbar', async ({ page }) => {
+  test('Führungs-Tablet: die Warteliste scrollt bei ANGEHALTENEM Drag weiter', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 900 });
-    await setupPatientUndPlatz(page);
+    const { personName } = await setupPatientUndPlatz(page);
 
-    // `touchAction: 'none'` wurde in LFH-367/B5g ABGELEHNT, weil es natives Scrollen
-    // auf dem Element abschaltet. Diese Zusicherung hält die Entscheidung fest —
-    // beide Hälften, denn der Stil allein sagt noch nicht, dass wirklich gescrollt wird.
+    // Das AK verlangt den Scroll WÄHREND des Drags. Ein Scrolltest ohne laufenden
+    // Drag prüft etwas anderes — und `touchAction !== 'none'` allein halten die
+    // beiden Bestands-Zusicherungen aus B5g in `Grundriss.test.tsx` schon billiger.
+    // Deshalb: pointerdown + Moves, dann scrollen, ERST DANN pointerup.
     const spalte = page.locator('[data-testid="warteliste-scroll"]');
-    const stil = await spalte.evaluate((el) => getComputedStyle(el).touchAction);
-    expect(stil).not.toBe('none');
-
     await spalte.evaluate((el) => { el.scrollTop = 0; });
-    await page.mouse.move(200, 400);
+
+    await page.evaluate((sel) => {
+      const quelle = document.querySelector(sel)!;
+      const r = quelle.getBoundingClientRect();
+      const opt = (x: number, y: number) => ({
+        pointerId: 1, pointerType: 'touch', isPrimary: true,
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+      });
+      const x = r.x + r.width / 2, y = r.y + r.height / 2;
+      quelle.dispatchEvent(new PointerEvent('pointerdown', opt(x, y)));
+      for (let i = 1; i <= 6; i++) {
+        document.dispatchEvent(new PointerEvent('pointermove', opt(x + i * 4, y + i * 4)));
+      }
+    }, `[data-testid="person-karte-${personName}"]`);
+
+    // Der Drag läuft jetzt (dnd-kit hat den 5-px-Constraint genommen).
+    await expect(page.locator('.uhs-drag-overlay, [data-testid="drag-overlay"]')).toBeVisible();
+
+    const box = (await spalte.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.wheel(0, 300);
     await expect.poll(async () => spalte.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+
+    // Drag sauber beenden, damit der nächste Test nicht auf einem hängenden
+    // Pointer-Capture aufsetzt.
+    await page.evaluate(() => {
+      document.dispatchEvent(new PointerEvent('pointerup', {
+        pointerId: 1, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true,
+      }));
+    });
   });
 
   test('Mobil (390 px): der Klickweg weist zu, und der Body scrollt nicht waagerecht', async ({ page }) => {
@@ -1360,7 +1610,8 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
 **Zwei Dinge sind beim Umsetzen zu prüfen und ggf. anzupassen, nicht zu raten:**
 - Die Testids `person-karte-<name>` und `warteliste-scroll` gibt es heute womöglich nicht. Dann in `Grundriss.tsx` ergänzen (das ist zulässig) oder auf eine vorhandene Abfrage umstellen. `platz-karte` ist Bestand (`uhs-grundriss-dnd.spec.ts:46`).
-- Der Wortlaut der Zuweisungs-Bedienung („Patient zuweisen", „Zuweisen") kommt aus B5g — in `Grundriss.tsx` nachlesen.
+- Der Wortlaut der Zuweisungs-Bedienung („Patient zuweisen", „Zuweisen") kommt aus B5g — in `Grundriss.tsx` nachlesen. Ebenso der neue Menüeintrag „Zurück in den Wartebereich" aus Task 3, falls er im 390-px-Test mitgeprüft werden soll.
+- Der Selektor für den laufenden `DragOverlay` ist ein Platzhalter. Antds/dnd-kits Overlay hat im Repo heute keine Marke — entweder eine setzen (`data-testid="drag-overlay"` am `<DragOverlay>`-Kind in `Grundriss.tsx`) oder auf die Personenkarte im Portal abfragen. Ohne eine Zusicherung, dass der Drag WIRKLICH läuft, fällt der Test auf den billigen Scrolltest zurück, den B5g schon hat.
 
 - [ ] **Step 2: Backend-Binary bereitstellen und Suite laufen lassen**
 
@@ -1421,9 +1672,29 @@ Wörtlich, mit Begründung und Fundstelle:
 3. **„Aufklappbarer Kopfbereich" für Gliederungsbaum und BR-Spalte — gestapelt statt Collapse**, nach der Präzedenz `GefahrenPage.tsx:160`.
 4. **Materialfarbe — C4s offene Frage ist entschieden**, nicht zurückgedreht; `MaterialPage` ist im selben Commit mitgezogen worden, weil zwei Farbbehandlungen eines Enums der Fehlerfall wären.
 
-Dazu das Ergebnis der Prüfung aus Task 6, Schritt 1: was die Bestandssuite für die beiden `belegMut`-Aufrufer schon belegte und was C6 ergänzt hat.
+5. **Der Rückweg in den Wartebereich hat einen zweiten Pfad bekommen** (Task 3). Er hing allein am Drag auf `drop-inbox` und wäre unter `lg` ersatzlos entfallen — der Umbruch hätte eine Bewegung genommen, statt eine zu geben. `belegMut` hat damit **drei** Aufrufer; das AK „für beide Aufrufer" ist erfüllt und überschritten.
+6. **Die Offline-Zuordnung ist ehrlich benannt, nicht gelöst** (Task 5). Die Quittung verspricht nichts, was kein Code einlöst; der saubere Weg (`uhs_id` am POST, in derselben Transaktion wie bei der Sichtung in C5) liegt als Folgeticket vor.
+7. **Die UHS-Detailseite nutzt jetzt den gemeinsamen Modul-Seitenkopf** (Task 2) — die Abhängigkeitszeile des Tickets verlangte es, und ohne ihn wäre „genau eine Primäraktion" auf dieser Seite nicht prüfbar gewesen, sondern gezählt.
 
-- [ ] **Step 3: Volles Gate fahren**
+Dazu das Ergebnis der Prüfung aus Task 6, Schritt 1: was die Bestandssuite für die `belegMut`-Aufrufer schon belegte und was C6 ergänzt hat.
+
+**Und der Satz, warum es keine zweite Prüfliste gibt:** `EinsatzabschnittePage` und `BrDetailPage` haben in C6 je eine Layout-Weiche bekommen, keinen Umbau. Die Prüfliste gilt neuen oder umgebauten **Seiten**; ein Umbruch ist keine neue Seite. Wer diese beiden Seiten das nächste Mal inhaltlich anfasst, legt eine an.
+
+- [ ] **Step 3: Das vertagte Backend-Ticket anlegen**
+
+Über den Skill `clickup-task-anlegen` auf dem Entwicklungsboard (`901523554968`), unter das lebende Sammel-Epic, in das die C-Band-Nachzüge gehören:
+
+> **`uhs_id` optional am `POST /api/einsaetze/{id}/personen` — Wartebereich-Eintritt in derselben Transaktion**
+>
+> LFH-341/C6 schickt Patienten von der UHS-Kopfzeile in die Aufnahme (`?uhs=<id>`) und bucht danach `aenderePersonBelegung({ art: 'eintritt', uhs_id, platz_id: null })` als zweiten Request. **Offline geht diese Zuordnung verloren:** `erfassePersonOfflineFaehig` legt die Person mit `client_id`-Idempotenz in die Queue, aber es gibt keinen Drain-Hook, der die Belegung nachschöbe — die Quittung sagt deshalb heute ehrlich „muss danach von Hand erfolgen".
+>
+> Die Lösung ist dieselbe, die LFH-340/C5 für die **Sichtung** gewählt hat und die CLAUDE.md als Regel führt: das Feld geht **mit** dem Anlegen mit und wird serverseitig in derselben Transaktion geschrieben. Dann trägt die Offline-Vormerkung es in ihrer `client_id` mit, und der Replay legt die Belegung nicht doppelt in die Kette, aus der der medizinische Verlauf gelesen wird.
+>
+> Umfang: `uhs_id: Option<i64>` am Anlege-DTO, Belegung unter `war_neu` in derselben Transaktion, Antwort **nach** der Belegung laden (sonst trägt die Quittung einen Zustand, den es nie gab); 422 bei `status: 'vermisst'`, 404 bei unbekannter UHS. Frontend: den zweiten Request in `pages/personen/AufnahmePage.tsx` ersetzen und den Offline-Wortlaut zurücknehmen.
+
+Die Ticketnummer in die Prüfliste eintragen — ein Verdikt „offen" ohne Zielticket ist keins.
+
+- [ ] **Step 4: Volles Gate fahren**
 
 ```bash
 ./scripts/check-all.sh
@@ -1431,7 +1702,7 @@ Dazu das Ergebnis der Prüfung aus Task 6, Schritt 1: was die Bestandssuite für
 
 Erwartet: alle sieben Schritte grün. Kein `| tail`. Bei Rot: die Ursache beheben, nicht die Erwartung.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-07-30-uhs-grundriss-pruefliste.md
@@ -1457,4 +1728,6 @@ EOF
 
 **Typkonsistenz.** `personenAufnahmePfad(einsatzId, { uhs })` heißt in Task 5 Schritt 3, Schritt 5 und Schritt 7 gleich. `materialStatus` ist in Task 1 definiert und wird in Task 1 Schritt 9 sowie Task 8 unter demselben Namen konsumiert. `aenderePersonBelegung(einsatzId, personId, { art, uhs_id, platz_id })` ist in Task 5 mit derselben Signatur gerufen, mit der `Grundriss.tsx:534` sie heute ruft. Die Testids `grundriss-rahmen` (Task 3), `abschnitte-rahmen`/`abschnitte-gliederung` (Task 4), `kraefte-ohne-br` (Task 4), `uhs-kopf` (Task 2) und `material-status-zelle` (Task 1) kommen je genau einmal vor.
 
-**Reihenfolge.** Tasks 1–4 sind untereinander unabhängig. Task 5 setzt auf Task 2 auf (die Kopfzeile, in die der Knopf kommt). Task 7 setzt auf Task 3 (die Reiter, die sie prüft) und Task 5 (nicht zwingend, aber der 390-px-Test läuft leichter, wenn der Aufnahmeweg steht). Task 8 kommt zuletzt.
+**Reihenfolge.** Tasks 1, 2, 3 und 4 sind untereinander unabhängig. Task 5 setzt auf Task 2 auf (der `aktionen`-Slot, in den der Knopf kommt — ohne den Umzug stünde er in einem Kopf, den kein Gate zählt). Task 6 setzt auf Task 3 auf (der dritte `belegMut`-Aufrufer). Task 7 setzt auf Task 3 (die Reiter und der Rückweg, die sie prüft) und Task 5 (nicht zwingend, aber der 390-px-Test läuft leichter, wenn der Aufnahmeweg steht). Task 8 kommt zuletzt und braucht das Ergebnis aller anderen.
+
+**Was sich nach dem ersten Advisor-Durchgang geändert hat** — drei Befunde, alle am Code gemessen, alle vor dem ersten Handgriff eingearbeitet: der Rückweg in den Wartebereich hing allein am Drag und wäre unter `lg` weggefallen (Task 3); die Offline-Quittung versprach eine Zuordnung, die kein Code nachschiebt (Task 5 plus Folgeticket); und die UHS-Detailseite hatte gar keinen `EinsatzSeite`-Kopf, in dem „genau eine Primäraktion" prüfbar gewesen wäre (Task 2). Dazu zwei kleinere: das Inventar-Gate in `statusFarben.test.ts` bricht bei einem zehnten Export (Task 1, Schritt 4), und der Scroll-Nachweis prüfte am AK vorbei, weil er ohne laufenden Drag scrollte (Task 7).
