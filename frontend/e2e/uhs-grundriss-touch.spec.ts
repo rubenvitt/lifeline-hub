@@ -249,7 +249,11 @@ test.describe('UHS-Grundriss unter Touch', () => {
         await route.continue();
         return;
       }
-      await new Promise((fertig) => setTimeout(fertig, 8000));
+      // 3000, nicht mehr: Playwright wartet beim Kontextabbau auf laufende Route-Handler,
+      // eine Bremse, die den Test überlebt, kostet jeden Lauf Leerlauf und kann ein
+      // `route.continue()` gegen eine geschlossene Seite werfen. Die Zusicherungen unten
+      // laufen mit 2500 ms — die Aussage trägt genauso.
+      await new Promise((fertig) => setTimeout(fertig, 3000));
       nachladungDurchgelassen = true;
       await route.continue();
     });
@@ -327,16 +331,23 @@ test.describe('UHS-Grundriss unter Touch', () => {
     //     (dnd-kit setzt `touchAction: 'none'` sehr wohl — aber auf sein eigenes
     //     DragOverlay, das `position: fixed` neben der Liste schwebt und nicht in dieser
     //     Kette liegt.)
-    const gesperrt = await spalte.evaluate((container) => {
+    // Der Startknoten hängt am NAMEN, nicht am ersten Tag im Container: die gezogene Person
+    // steht heute zufällig oben (sie wird zuerst angelegt), und ein `querySelector('.ant-tag')`
+    // wäre damit von der Anlagereihenfolge abhängig statt von der Aussage. Die Mutationsprobe
+    // deckt das nicht auf — sie trifft nur das obere Ende der Kette.
+    const gesperrt = await spalte.evaluate((container, name) => {
+      const start = Array.from(container.querySelectorAll<HTMLElement>('.ant-tag'))
+        .find((tag) => tag.textContent?.includes(name));
+      if (!start) throw new Error(`gezogene Karte „${name}" steht nicht in der Warteliste`);
       const treffer: string[] = [];
-      let n: HTMLElement | null = container.querySelector('.ant-tag');
+      let n: HTMLElement | null = start;
       while (n) {
         if (getComputedStyle(n).touchAction === 'none') treffer.push(n.className || n.tagName);
         if (n === container) break;
         n = n.parentElement;
       }
       return treffer;
-    });
+    }, personName);
     expect(gesperrt, 'kein Knoten der Warteliste schaltet natives Scrollen ab').toEqual([]);
 
     // (b) DIE SCROLL-SEITE: der Container ist mitten im Drag noch ein lebender Scroller.
