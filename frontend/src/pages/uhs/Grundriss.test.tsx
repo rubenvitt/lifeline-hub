@@ -317,7 +317,7 @@ describe('Grundriss – Platz-Verfügbarkeit ohne Edit-Modus (LFH-17)', () => {
     renderGrundriss(uhs, []);
     await screen.findByText('Bett 1');
     // Kein „Plätze bearbeiten" aktiviert → trotzdem Platzaktionen erreichbar.
-    expect(screen.getByRole('button', { name: 'Platzaktionen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ })).toBeInTheDocument();
   });
 
   it('zeigt „als frei markieren" als direkte Primäraktion für einen Platz in Aufbereitung', async () => {
@@ -341,7 +341,7 @@ describe('Grundriss – Platz-Verfügbarkeit ohne Edit-Modus (LFH-17)', () => {
     await screen.findByText('Bett 1');
     expect(screen.queryByRole('button', { name: 'als frei markieren' })).not.toBeInTheDocument();
     // Das vollständige Menü bleibt aber erreichbar.
-    expect(screen.getByRole('button', { name: 'Platzaktionen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ })).toBeInTheDocument();
   });
 });
 
@@ -355,7 +355,7 @@ describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
     // … aber keine Schreibaktionen.
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Verbleib / Entlassung erfassen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Platzaktionen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Platzaktionen zu Bett 1/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Plätze anlegen' })).not.toBeInTheDocument();
   });
 });
@@ -488,7 +488,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Platzaktionen' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
     await userEvent.click(within(offenesMenue()).getByText('Patient zuweisen'));
 
     expect(await screen.findByRole('combobox', { name: 'Patient' })).toBeInTheDocument();
@@ -506,7 +506,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     server.use(http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})));
     renderGrundriss(uhs, [p]);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Platzaktionen' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
     await userEvent.click(within(offenesMenue()).getByText('als frei markieren'));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -542,7 +542,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // Auch der Menü-Weg schweigt: der Eintrag steht nur an zuweisbaren Plätzen.
-    await userEvent.click(screen.getByRole('button', { name: 'Platzaktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ }));
     expect(within(offenesMenue()).queryByText('Patient zuweisen')).not.toBeInTheDocument();
   });
 
