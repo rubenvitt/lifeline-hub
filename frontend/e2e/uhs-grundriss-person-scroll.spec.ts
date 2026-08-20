@@ -145,7 +145,9 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   const bp2 = page.locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 2' });
   // CSS-Selektor auf das echte <button> — nicht getByRole, sonst trifft der von dnd-kit
   // mit role="button"+aria-disabled versehene Karten-Div (im Nicht-Edit deaktiviert).
-  await bp2.locator('button[aria-label="Platzaktionen"]').click();
+  // Präfix-Selektor (LFH-341 · H40): der Auslöser trägt seit der Zeilenkennung
+  // `Platzaktionen zu <bezeichnung>` — hier „Platzaktionen zu Behandlungsplatz 2".
+  await bp2.locator('button[aria-label^="Platzaktionen"]').click();
   await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' }).click();
   await expect(bp2.getByText('aufbereitung')).toBeVisible();
 

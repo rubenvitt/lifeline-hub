@@ -762,12 +762,18 @@ export default function Grundriss({
     </div>
   );
 
+  // Eigener Scroll-Container wie bei `wartebereich`: der Bereich trägt seine
+  // Overflow-Eigenschaft SELBST, damit sie im Tabs-Zweig nicht fehlt (dort steht der
+  // Knoten nackt im Reiterinhalt — ohne diesen Wrapper liefe eine lange Transport-Liste
+  // auf schmalem Schirm über den Reiter hinaus).
   const transport = (
-    <TransportSpalte
-      personen={transportiert}
-      schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
-      onOeffnen={setDetailPersonId}
-    />
+    <div style={{ height: '100%', minHeight: 0, overflow: 'auto' }}>
+      <TransportSpalte
+        personen={transportiert}
+        schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+        onOeffnen={setDetailPersonId}
+      />
+    </div>
   );
 
   return (
@@ -782,7 +788,7 @@ export default function Grundriss({
           {/* MITTE: Unfallhilfsstelle */}
           {flaeche}
           {/* RECHTS: Auf Transport gebracht */}
-          <div style={{ width: 240, flexShrink: 0, overflow: 'auto' }}>{transport}</div>
+          <div style={{ width: 240, flexShrink: 0, minHeight: 0 }}>{transport}</div>
         </div>
       ) : (
         /**

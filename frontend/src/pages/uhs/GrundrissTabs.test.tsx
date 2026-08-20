@@ -15,6 +15,15 @@ vi.mock('../../api/einsatzUhs', async (importOriginal) => {
   return { ...echt, aenderePersonBelegung: vi.fn() };
 });
 
+// Auto-Mock deckt auch `listePersonen` ab — die Personenliste kommt hier über React
+// Query, deren Fetcher greift also ebenfalls auf den gemockten Modulnamen. Da `Grundriss`
+// `listePersonen` aus `../../api/einsatzPerson` bezieht, wird DIESES Modul separat
+// gemockt (sonst bliebe die Personen-Query dauerhaft leer).
+vi.mock('../../api/einsatzPerson', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('../../api/einsatzPerson')>();
+  return { ...echt, listePersonen: vi.fn() };
+});
+
 function person(over: Partial<Person>): Person {
   return {
     id: 1, einsatz_id: 1, registrier_nr: 42, status: 'betroffen', name: null, vorname: null,
@@ -42,51 +51,55 @@ function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
   };
 }
 
-// Warteliste + Wartebereich + Transport gefüllt, damit alle drei Bereiche im Baum etwas
-// zeigen — die Aussage „nebeneinander"/„gestapelt" braucht in JEDEM Bereich einen Beleg.
-const nichtAufgenommen = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
-const wartebereich = person({ id: 6, registrier_nr: 6, aktuelle_uhs_id: 1, aktueller_platz_id: null });
+/** Öffnet das geladene Dropdown-Menü der Platzkarte — Muster aus `Grundriss.test.tsx`
+ *  (`offenesMenue()`). antd lässt Portale GESCHLOSSENER Dropdowns im Baum stehen: ein
+ *  bloßer erster Treffer (`document.querySelector`) bewiese deshalb nicht, dass genau EIN
+ *  Portal offen ist — in einer Schleife über mehrere Renderdurchläufe könnte er ebenso gut
+ *  ein Relikt des vorigen Durchlaufs treffen. Wirft laut, wenn die Zahl nicht exakt eins
+ *  ist: ein zweites offenes Portal wäre ein echter Befund (z. B. ein Leck über `unmount()`
+ *  hinweg), keine Testschwäche, die sich stillschweigend wegfiltern ließe. */
+function offenesMenue(): HTMLElement {
+  const treffer = document.querySelectorAll('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  if (treffer.length !== 1) {
+    throw new Error(`erwartet genau EIN offenes Dropdown-Menü, gefunden: ${treffer.length}`);
+  }
+  return treffer[0] as HTMLElement;
+}
+
+// EINE UHS für alle Tests — Warteliste + Wartebereich + Transport gefüllt, damit alle
+// drei Bereiche im Baum etwas zeigen (die Aussage „nebeneinander"/„gestapelt" braucht in
+// JEDEM Bereich einen Beleg). Der Platz „Bett 1" ist in JEDER Variante derselbe Platz;
+// ob er belegt ist, entscheidet sich für `Grundriss` ausschließlich über die Personen-
+// liste (`person.aktueller_platz_id`), nie über ein Feld an der UHS selbst — deshalb gibt
+// es hier bewusst NUR eine `uhs`-Fixture, keine zweite „mit belegtem Platz".
+const nichtAufgenommenPerson = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+const wartebereichPerson = person({ id: 6, registrier_nr: 6, aktuelle_uhs_id: 1, aktueller_platz_id: null });
 const transportPerson = person({
   id: 9, registrier_nr: 9, aktuelle_uhs_id: null, aktueller_verbleib: 'Transport → KH Mitte',
 });
+const belegendePerson = person({ id: 42, registrier_nr: 42, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
 const transportBelegung = {
   id: 1, einsatz_id: 1, person_id: 9, uhs_id: 1, platz_id: null,
   art: 'austritt' as const, notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
 };
 
-const uhsFixture = uhsDetail({
+const uhs = uhsDetail({
   plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
   belegungen: [transportBelegung],
 });
 
-// Bett 1 ist hier BELEGT — der Rückweg-Menüeintrag existiert nur an einem belegten Platz.
-const belegendePerson = person({ id: 42, registrier_nr: 42, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
-const uhsMitBelegtemPlatz = uhsDetail({
-  plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
-  belegungen: [transportBelegung],
-});
-
-function personenFuer(uhs: UhsDetail): Person[] {
-  return uhs === uhsMitBelegtemPlatz
-    ? [belegendePerson, nichtAufgenommen, wartebereich, transportPerson]
-    : [nichtAufgenommen, wartebereich, transportPerson];
-}
-
-// Auto-Mock deckt auch `listePersonen`/`ladeUhs` ab — die Personenliste kommt hier über
-// React Query, deren Fetcher greift also ebenfalls auf den gemockten Modulnamen. Da
-// `Grundriss` `listePersonen` aus `../../api/einsatzPerson` bezieht, wird DIESES Modul
-// separat gemockt (sonst bliebe die Personen-Query dauerhaft leer).
-vi.mock('../../api/einsatzPerson', async (importOriginal) => {
-  const echt = await importOriginal<typeof import('../../api/einsatzPerson')>();
-  return { ...echt, listePersonen: vi.fn() };
-});
+// Zwei Personenlisten, EXPLIZIT ausgewählt je Test — keine Ableitung über einen
+// Referenzvergleich auf `uhs` (die früher hier stand): der Unterschied „Bett 1 belegt
+// oder nicht" lebt allein in dieser Liste.
+const personenOhneBelegung: Person[] = [nichtAufgenommenPerson, wartebereichPerson, transportPerson];
+const personenMitBelegung: Person[] = [belegendePerson, nichtAufgenommenPerson, wartebereichPerson, transportPerson];
 
 describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
   it('stellt ab lg alle drei Bereiche nebeneinander, ohne Reiter', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
-    vi.mocked(listePersonen).mockResolvedValue(personenFuer(uhsFixture));
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(1280);
-    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsFixture} schreibgeschuetzt={false} />);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
 
     // Beide Seitenspalten UND die Fläche gleichzeitig im Baum — das ist die Aussage
     // „nebeneinander", die unter lg nicht mehr gilt.
@@ -98,9 +111,9 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
   it('stapelt unter lg zu drei Reitern mit der Fläche voran', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
-    vi.mocked(listePersonen).mockResolvedValue(personenFuer(uhsFixture));
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(800); // < lg (992)
-    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsFixture} schreibgeschuetzt={false} />);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
 
     const reiter = await screen.findByRole('tablist');
     expect(within(reiter).getByRole('tab', { name: 'Fläche' })).toHaveAttribute('aria-selected', 'true');
@@ -110,9 +123,9 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
   it('hält unter lg genau EINEN Zweig im Baum — der inaktive Reiter ist nicht bloß verborgen', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
-    vi.mocked(listePersonen).mockResolvedValue(personenFuer(uhsFixture));
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(800);
-    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsFixture} schreibgeschuetzt={false} />);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
 
     await screen.findByRole('tablist');
     // Ohne diese Zusicherung wäre `forceRender` eine unbemerkte Rückkehr zum
@@ -126,23 +139,22 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
   it('bietet den Rückweg in den Wartebereich als Menüeintrag — auf beiden Breiten', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
-    vi.mocked(listePersonen).mockResolvedValue(personenFuer(uhsMitBelegtemPlatz));
+    vi.mocked(listePersonen).mockResolvedValue(personenMitBelegung);
     // Der Drag auf `drop-inbox` ist unter lg strukturell weg (anderer Reiter). Ohne
     // diesen Eintrag hätte der schmale Schirm KEINEN Weg mehr, einen Patienten vom
     // Platz zurückzunehmen — der Umbau nähme eine Bewegung, statt eine zu geben.
     for (const breite of [1280, 800]) {
       setzeViewportBreite(breite);
       const { unmount } = renderMitProviders(
-        <Grundriss einsatzId={1} uhs={uhsMitBelegtemPlatz} schreibgeschuetzt={false} />,
+        <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />,
       );
       if (breite < 992) await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
 
       await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
-      // Immer über das GEÖFFNETE Menü greifen: antd lässt die Portale geschlossener
-      // Dropdowns im Baum stehen.
-      const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!;
+      // Genau EIN offenes Portal — nicht bloß „irgendeins" (offenesMenue() wirft sonst).
+      const menue = offenesMenue();
       expect(
-        within(menue as HTMLElement).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
+        within(menue).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
       ).toBeInTheDocument();
       unmount();
     }
@@ -150,18 +162,18 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
   it('schickt den Rückweg über dieselbe Mutation wie Drag und Zuweisungsdialog', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
-    vi.mocked(listePersonen).mockResolvedValue(personenFuer(uhsMitBelegtemPlatz));
+    vi.mocked(listePersonen).mockResolvedValue(personenMitBelegung);
     vi.mocked(aenderePersonBelegung).mockResolvedValue({
       id: 1, einsatz_id: 1, person_id: 42, uhs_id: 1, platz_id: null,
       art: 'wechsel', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
     });
     setzeViewportBreite(800);
-    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsMitBelegtemPlatz} schreibgeschuetzt={false} />);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
     await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
-    const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!;
-    await userEvent.click(within(menue as HTMLElement).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }));
+    const menue = offenesMenue();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }));
 
     // `art: 'wechsel'`, weil die Person bereits an dieser UHS liegt — das rechnet
     // `belegMut` selbst aus, und genau deshalb geht der Eintrag durch die Mutation
@@ -173,26 +185,30 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
   it('bietet den Rückweg an einem unbelegten Platz gar nicht erst an', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
-    vi.mocked(listePersonen).mockResolvedValue(personenFuer(uhsFixture));
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(1280);
-    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsFixture} schreibgeschuetzt={false} />);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
-    const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')!;
+    const menue = offenesMenue();
     expect(
-      within(menue as HTMLElement).queryByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
+      within(menue).queryByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
     ).not.toBeInTheDocument();
   });
 
   it('setzt an keiner Seitenspalte mehr eine feste Breite, wenn gestapelt wird', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
-    vi.mocked(listePersonen).mockResolvedValue(personenFuer(uhsFixture));
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(800);
-    renderMitProviders(<Grundriss einsatzId={1} uhs={uhsFixture} schreibgeschuetzt={false} />);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
 
     // jsdom rechnet kein Layout — prüfbar ist der INLINE-STYLE, nicht ein Pixelwert.
+    // Die 240 px sassen NIE am Rahmen selbst, sondern an den inneren Wrapper-Divs der
+    // Seitenspalten (LINKS/RECHTS) — ein `not.toHaveStyle({ width: '240px' })` auf dem
+    // Rahmen wäre also trivial erfüllt, unabhängig vom Umbau. Geprüft wird deshalb, dass
+    // KEIN Nachkomme des Rahmens eine feste 240-px-Breite trägt.
     const rahmen = await screen.findByTestId('grundriss-rahmen');
-    expect(rahmen).not.toHaveStyle({ width: '240px' });
+    expect(rahmen.querySelectorAll('[style*="width: 240px"]')).toHaveLength(0);
     expect(rahmen.style.flexDirection).toBe('column');
   });
 });
