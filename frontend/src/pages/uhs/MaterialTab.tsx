@@ -3,12 +3,14 @@ import { Button, Space, Form, App } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
-import type { EinsatzMaterial, UhsDetail } from '../../api/types';
+import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import KatalogTabelle from '../../components/KatalogTabelle';
 import { ErfassungsModal } from '../../components/Erfassung';
 import Datenstand from '../../components/Datenstand';
+import StatusTag from '../../components/StatusTag';
+import { materialStatus } from '../../theme/statusFarben';
 
 interface Props {
   einsatzId: number;
@@ -63,7 +65,19 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
     { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie',
       render: (v: string | null) => v ?? '—' },
     { title: 'Menge', dataIndex: 'menge', key: 'menge' },
-    { title: 'Status', dataIndex: 'status', key: 'status' },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      // Der Wire-Wert ist kein Bildschirmtext (LFH-341 · M54). Farbe und Beschriftung
+      // kommen aus `theme/statusFarben.ts` — dieselbe Quelle, aus der `MaterialPage`
+      // liest, damit dasselbe Enum nicht zwei Farbbehandlungen bekommt.
+      render: (status: MaterialStatus) => (
+        <span data-testid="material-status-zelle">
+          <StatusTag darstellung={materialStatus[status]} />
+        </span>
+      ),
+    },
     {
       title: 'Aktion', key: 'aktion',
       render: (_: unknown, em: EinsatzMaterial) =>

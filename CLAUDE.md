@@ -307,13 +307,20 @@ Alltag wichtigsten:
   A2s Sorge eingelöst, kein Zurückdrehen.
   **`fms_anker` bleibt Sortier-Anker und Tastenkürzel**, nicht tragende Bedienform — die Spalte
   ist nullable, ein 0–9-Tastenfeld darauf hätte Löcher.
-  **Material ist der Grenzfall, und die Linie liegt zwischen Farbe und Anordnung** (gemessen in
-  C4): sein Katalog liegt ausserhalb des A2-Vertrags, die **Anordnung** gilt trotzdem. Eine
-  Rollenzuordnung — auch eine lokale — wäre eine Farbentscheidung und bricht an einem Punkt:
-  `im_einsatz` war **blau**, und Blau ist `bedien`. Es gibt dafür keine ehrliche Rolle, also
-  wurde keine erfunden; die Menüeinträge tragen dort nur Text, das Auslöser-Etikett die Rolle
-  `neutral` im Sinne von „ausserhalb des Farbvertrags" (dieselbe Unterscheidung wie bei
-  `verfuegbarkeit.gesperrt`). Die fünf antd-Preset-Farbnamen sind ersatzlos entfallen.
+  **Material war der Grenzfall, und die Linie ist seit LFH-341/C6 gezogen.** C4 hatte für
+  `MaterialStatus` bewusst keine Rolle vergeben — `im_einsatz` war **blau**, und Blau ist
+  `bedien`, also schien es keine ehrliche Rolle zu geben — und die Frage ausdrücklich als
+  „eigene Entscheidung, kein Nebenprodukt" offen gelassen. C6 hat sie entschieden:
+  `theme/statusFarben.ts:materialStatus` trägt jetzt alle fünf Werte. `bedien` wird dabei
+  **nicht erfunden, sondern erkannt** — die Rolle steht in derselben Datei schon dreimal für
+  eine aktive Beziehung (`verfuegbarkeit.reserviert`, `belegungsArt.wechsel`,
+  `etbTyp.meldung`). `defekt`/`verbraucht` teilen sich `alarm`, unterschieden durch das
+  Pflichtfeld `label` (WCAG 1.4.1), wie die fünf Warnstufen sich drei Rollen teilen.
+  **EIN Behandlungsweg:** `pages/MaterialPage.tsx` und `pages/uhs/MaterialTab.tsx` lesen
+  beide von dort. Zwei Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der
+  Kompromiss — und das ist der Grund, warum C6 die Kräfte-Seite mit angefasst hat, obwohl
+  ihr Ticket sie nicht nennt. Die **Anordnung** aus C4 (Menü statt Farbfläche, Etikett als
+  Auslöser) bleibt davon unberührt.
   **Ein Menü im Portal taut die Zeilenschleuse der `Datensicht` auf, wenn man es lässt.** Das
   Overlay hängt an `document.body`, also ausserhalb der Sicht-Wurzel, und `autoFocus` schiebt
   den Fokus dorthin — `pruefeVerlassen` behandelt `.ant-dropdown`/`.ant-select-dropdown`/

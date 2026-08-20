@@ -22,57 +22,38 @@ import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
-import type { StatusDarstellung } from '../theme/statusFarben';
+import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 
 /**
- * Die fünf Materialzustände — NUR Beschriftung, bewusst OHNE Farbachse.
+ * ── DIE FARBFRAGE IST ENTSCHIEDEN (LFH-341 · C6) ─────────────────────────────────────
  *
- * ── WARUM HIER KEINE STATUSROLLE STEHT (LFH-339 · C4) ────────────────────────────────
+ * Hier stand bis zum 20.08.2026 die Begründung, warum dieser Katalog KEINE Statusrolle
+ * trägt. Sie endete auf den Satz, die Frage sei „eine eigene Entscheidung, kein
+ * Nebenprodukt" — und genau als solche ist sie in C6 getroffen worden. Die Karte liegt
+ * jetzt in `theme/statusFarben.ts` (`materialStatus`), samt der Herleitung für
+ * `im_einsatz`, an dem C4 gebrochen war.
  *
- * Der Materialstatus liegt ausserhalb des A2-Statusfarb-Vertrags; `statusFarben.ts` nennt
- * diese Datei namentlich als draussen, und ihn hineinzuziehen wäre der Bestands-Sweep, den
- * A2 ausdrücklich verbietet. Die Zielform-Spec §4 zieht die Linie genauso: Material fällt
- * nicht heraus, aber seine Ausnahme „wirkt auf die FARBE (§4b), nicht auf die Anordnung".
- *
- * Eine Rollenzuordnung — auch eine lokale — wäre eine Farbentscheidung, und sie bricht an
- * einem gemessenen Punkt: `im_einsatz` war Blau, und Blau ist im A0-System `bedien`.
- * „Rot bedient nichts, `bedien` ist blau" heisst umgekehrt, dass es für diesen Zustand
- * keine ehrliche Rolle gibt. Erfunden wird deshalb keine.
- *
- * Was bleibt: der TEXT trägt den Zustand — er ist der zweite Kanal (WCAG 1.4.1) und war es
- * immer. Die frühere `color`-Achse (antd-Preset-Namen, als Vollfläche gerendert) ist
- * ersatzlos weg: sie widersprach §4b, und ein Farbwert ohne Rolle ist genau die Sorte
- * zweite Wahrheit, die A2 aufgeräumt hat. Die Frage, welche Rollen dieser Katalog
- * bekommen soll, bleibt offen — sie ist eine eigene Entscheidung, kein Nebenprodukt.
+ * Diese Datei hält davon nur noch die Reihenfolge und die Filterwerte — beide leiten sich
+ * aus der Vertragskarte AB und werden nicht abgetippt. Das ist der Punkt: EIN
+ * Behandlungsweg für dieses Enum, gemeinsam mit `pages/uhs/MaterialTab.tsx`.
  */
-const STATUS_META: Record<MaterialStatus, { label: string }> = {
-  einsatzbereit: { label: 'einsatzbereit' },
-  im_einsatz: { label: 'im Einsatz' },
-  defekt: { label: 'defekt' },
-  verbraucht: { label: 'verbraucht' },
-  desinfektion_noetig: { label: 'Desinfektion nötig' },
-};
-const STATUS_REIHENFOLGE = Object.keys(STATUS_META) as MaterialStatus[];
+const STATUS_REIHENFOLGE = Object.keys(materialStatus) as MaterialStatus[];
 
 /**
- * Menüwerte OHNE `darstellung` — damit rendert `StatusWahl` keinen Farbpunkt. Das ist
- * kein Mangel, sondern die offene Farbfrage, sichtbar gelassen statt überschrieben.
+ * Menüwerte MIT `darstellung` — der Farbpunkt im Statusmenü kommt jetzt aus dem Vertrag.
+ * Bis C6 stand hier keiner, weil die Farbfrage offen war; sie ist es nicht mehr.
  */
 const STATUS_OPTIONEN: StatusOption<MaterialStatus>[] = STATUS_REIHENFOLGE.map((s) => ({
   wert: s,
-  label: STATUS_META[s].label,
+  label: materialStatus[s].label,
+  darstellung: materialStatus[s],
 }));
 
-/**
- * Etikett des Auslösers. `neutral` heisst hier „ausserhalb des Farbvertrags", NICHT
- * „dieser Zustand ist neutral" — dieselbe Unterscheidung, die `statusFarben.ts` bei
- * `verfuegbarkeit.gesperrt` schon trifft („ein bewusster Zustand, keine Gefahr").
- */
 function statusDarstellung(em: EinsatzMaterial): StatusDarstellung {
-  return { rolle: 'neutral', label: STATUS_META[em.status].label };
+  return materialStatus[em.status];
 }
 /** Filterwerte auf der EIGENEN Materialachse (fünf Werte), nicht auf der Kräfte-Kategorie. */
-const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({ value: s, text: STATUS_META[s].label }));
+const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({ value: s, text: materialStatus[s].label }));
 
 /** Inline-Mengen-Editor: lokaler Zustand, committet erst bei Blur/Enter (min 1). */
 function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: number) => void }) {
@@ -211,7 +192,8 @@ export default function MaterialPage() {
 
   /**
    * Gemeinsamer Bedienweg für Tabellen- und Kartenzweig — Herleitung siehe
-   * `FahrzeugePage.tsx`. Ohne `farbe`: der Materialkatalog hat keine (siehe `STATUS_META`).
+   * `FahrzeugePage.tsx`. Ohne `farbe`: das ist die Mandantenfarbe aus Fahrzeug-/
+   * Personalstammdaten, `materialStatus` kennt kein solches Feld (nur `rolle`+`label`).
    */
   const statusBedienungVon = (em: EinsatzMaterial) => {
     const laeuft = statusMutation.isPending && statusMutation.variables?.emId === em.id;
@@ -428,21 +410,21 @@ export default function MaterialPage() {
       {/* DER STATUS STEHT SEIT LFH-339 · C4 IM `karte.status`-SLOT, nicht mehr als
           Sekundärfeld — hier stand vorher die gegenteilige Regel, und sie ist überholt.
 
-          Was sich geändert hat, ist die ANORDNUNG, nicht die Farbfrage: der Slot trägt ein
-          Etikett mit der Rolle `neutral` („ausserhalb des Farbvertrags", siehe
-          `statusDarstellung` oben), und `statusBedienung` macht es zum Auslöser. Damit ist
-          der Statuswechsel auf der 390-px-Karte überhaupt erst erreichbar — als
-          Sekundärfeld war er reine Anzeige. Die frühere Begründung stimmte in ihrer
-          Prämisse (Material liegt ausserhalb von A2) und zog daraus den zu weiten Schluss:
-          die Zielform-Spec §4 trennt Farbe von Anordnung.
+          Was sich mit C4 geändert hat, war die ANORDNUNG, nicht die Farbfrage: der Slot
+          trug ein Etikett ohne Rolle, weil die Farbfrage offen war. LFH-341 · C6 hat sie
+          entschieden — der Slot trägt jetzt die Vertragsrolle aus `theme/statusFarben.ts`
+          (`materialStatus`, siehe `statusDarstellung` oben), und `statusBedienung` macht
+          das Etikett zum Auslöser. Damit ist der Statuswechsel auf der 390-px-Karte
+          überhaupt erst erreichbar — als Sekundärfeld war er reine Anzeige.
 
           `titel` ohne `ziel`: Material hat keine Detailroute. */}
 
       {/* KEIN Katalog-Banner auf dieser Seite, und das ist gemessen statt vergessen: der
-          Materialstatus ist das lokale Enum `MaterialStatus` (`STATUS_META`, fünf Werte).
-          Er kommt nicht über die Leitung und kann deshalb nicht ausfallen — anders als der
-          Statuskatalog der Fahrzeug- und Personalseite. Eine Meldung „Statuskatalog konnte
-          nicht geladen werden" wäre hier ein erfundener Fehlerfall.
+          Materialstatus ist das lokale Enum `MaterialStatus` (`materialStatus` in
+          `theme/statusFarben.ts`, fünf Werte). Er kommt nicht über die Leitung und kann
+          deshalb nicht ausfallen — anders als der Statuskatalog der Fahrzeug- und
+          Personalseite. Eine Meldung „Statuskatalog konnte nicht geladen werden" wäre hier
+          ein erfundener Fehlerfall.
 
           Der Listenfehler tauscht die Datensicht aus, statt durch sie hindurchgereicht zu
           werden (D3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps` kennt
@@ -468,7 +450,7 @@ export default function MaterialPage() {
         standardSortierung={{ spalte: 'bezeichnung', richtung: 'auf' }}
         gruppen={{
           schluessel: (m) => m.status,
-          etikett: (w) => STATUS_META[w as MaterialStatus]?.label ?? w,
+          etikett: (w) => materialStatus[w as MaterialStatus]?.label ?? w,
           reihenfolge: STATUS_REIHENFOLGE,
         }}
         karte={{
