@@ -224,7 +224,7 @@ Richtungen danebenliegt → **LFH-459**.
 | #  | Verdikt | Beleg / Zielticket |
 | -- | ------- | ------------------ |
 | 1 · Treffläche | **erfüllt über den Bedienweg, unverändert über die Grösse** | Die Kartenfläche von 140 × 116 px bleibt das Ziel (Zeile 1 oben, unverändert gültig). **Neu hinzugekommen unter `lg`:** drei Reiterköpfe („Fläche | Wartebereich | Transport"), die ihre Höhe vom `ConfigProvider` erben — keine Grössen-Prop, kein neuer Eintrag in der Schuldliste; `dichte.guard.test.ts` zählt für `pages/uhs/` weiterhin **vier** Stellen in **einer** Datei, alle vier die geprüfte Dauerausnahme. Der Deckel selbst bleibt an `SCHRITT_Y = 120` → **LFH-359** |
-| 2 · Handschuh-Modus | **erfüllt für die neuen Wege, mit einem gemessenen Nebenbefund** | Reiter, Menü-Eintrag und Aufnahme-Knopf tragen keine Grössen-Prop und erben die Stufe. Gemessen wurde diesmal wirklich im Browser: die Seite steht in allen drei Stufen ohne Überlappung. **Zwei Befunde daraus, beide ausserhalb des C6-Umfangs:** die Höhenreserve ist dichteblind → **LFH-459**, und die **globale Kopfzeile** läuft in der Handschuh-Stufe quer über den Schirm hinaus (71 px bei 1024, 18 px bei 390, 0 bei 1366) → **LFH-460**. Die Ableitung der Stufe aus dem Einsatzkontext hängt weiter an der gespeicherten Wahl mit Vorbelegung über die Zeigerart — LFH-333/B5 ist **shipped**, der Grundriss-Sonderfall lebt in **LFH-359** weiter |
+| 2 · Handschuh-Modus | **erfüllt für die neuen Wege, mit einem gemessenen Nebenbefund** | Reiter, Menü-Eintrag und Aufnahme-Knopf tragen keine Grössen-Prop und erben die Stufe. Gemessen wurde diesmal wirklich im Browser: die Seite steht in allen drei Stufen ohne Überlappung. **Ein Befund daraus im Umfang dieser Seite:** die Höhenreserve ist dichteblind → **LFH-459**. Ein **zweiter** trifft nicht diese Seite, sondern die globale Kopfzeile; er steht deshalb unten unter „Ein zweiter Befund, der aus dem Umfang fällt" → **LFH-460**. Die Ableitung der Stufe aus dem Einsatzkontext hängt weiter an der gespeicherten Wahl mit Vorbelegung über die Zeigerart; LFH-333/B5 ist **shipped** (Dichteachse und Umschalter stehen), der Grundriss-Sonderfall war dort von Anfang an ausgelagert und lebt in **LFH-359** weiter |
 | 3 · Rückmeldung vor der Serverantwort | **erfüllt — und das ist die Korrektur an der alten Zeile 3** | Sie sagte „optimistische Updates gibt es hier so wenig wie sonst im Repo → B6". Das stimmt nicht mehr: `belegMut` und `layoutMut` tragen `onMutate` mit `setQueryData` und Rollback im `onError` (gemessen an `main` vor diesem Branch: 2 Treffer). **C6 hat nicht das Feature gebaut, sondern den Nachweis geführt** — und die Bestandsaufnahme aus Task 6 sagt, wie schmal der war: von sechs Fällen (drei Aufrufer × zwei Richtungen) waren **zwei** belegt (Zuweisungsdialog, `Grundriss.test.tsx`), **zwei** hat C6 in Vitest ergänzt (Rückweg-Menüeintrag, `GrundrissTabs.test.tsx`), **zwei** waren in jsdom strukturell unmöglich und stehen jetzt in Playwright (`uhs-grundriss-touch.spec.ts`, Vorbehalt A unten). B6/LFH-334 ist **shipped** und ist kein offenes Ziel mehr |
 | 4 · Kritische Aktion hat eine zweite Handlung | **erfüllt, und der Rückweg ist jetzt vollständig** | Die Zuweisung bleibt umkehrbar — aber unter `lg` hing die Umkehrung **allein am Drag auf `drop-inbox`**, und den gibt es im Reiter-Zweig nicht mehr (Quelle und Ziel liegen in verschiedenen Reitern). Ohne Nacharbeit hätte der Umbruch eine Bewegung **genommen**. „Zurück in den Wartebereich" im Platzaktionen-Menü ist diese Nacharbeit (`Grundriss.tsx:247`, nur am belegten Platz). Weiterhin **keine** Rückfrage: umkehrbar → kein zusätzlicher Reibungsschritt (LFH-363) |
 | 5 · Kontrast in beiden Modi | **erfüllt** | C6 führt keinen Farbwert ein. `materialStatus` (`theme/statusFarben.ts:168-174`) bildet auf **bestehende** Rollen ab; `bedien` für `im_einsatz` wird nicht erfunden, sondern erkannt (dieselbe Rolle trägt `verfuegbarkeit.reserviert`, `belegungsArt.wechsel`, `etbTyp.meldung`). Reiter und Aufnahme-Knopf liegen im Theme |
@@ -234,7 +234,7 @@ Richtungen danebenliegt → **LFH-459**.
 | 9 · Kritische Anzeigen im Blickfeld | **erfüllt — die alte Zeile 9 ist durch den Umbruch falsch geworden** | Sie sagte „Die Drei-Spalten-Ordnung bleibt". Unter `lg` bleibt sie **nicht**: es sind drei Reiter, und ohne `forceRender` stehen die beiden anderen gar nicht im Baum. Genau deshalb ist die **Fläche der Default-Reiter** (`Grundriss.tsx:833`) — die Arbeitsfläche des BHP ist die kritische Anzeige, die anderen beiden sind eine Berührung entfernt. Breit ist die Ordnung unverändert. Der Zuweisungsdialog trägt den Zielplatz weiterhin im Titel |
 | 10 · Alarmbudget | **nicht anwendbar** | Der Grundriss erzeugt keine Alarme |
 | 11 · Warnverhalten | **erfüllt** | Kein Blinken, kein Ton. Neu und bewusst: der Offline-Fall der Aufnahme meldet über `message.warning` statt stumm zu bleiben (`AufnahmePage.tsx:130`) — Text, keine Bewegung |
-| 12 · Kein Sprung unter dem Cursor | **erfüllt für den Umbau, offen im Bestand — und das Ziel ist nicht mehr B6** | Der Reiter-Wechsel verändert kein Layout unter dem Finger, die Karten behalten ihre feste Grösse, und der Rückweg-Eintrag erscheint nur am belegten Platz. **Offen bleibt:** Belegungsänderungen anderer Stellen fahren über den SSE-Fan-out direkt in die handgebauten Personenspalten des Grundrisses. B6/LFH-334 ist **shipped** und hat den Sammelbanner im `Datensicht`-Primitiv gebaut (`Datensicht.tsx:754`, `zufluss: 'sammelbanner'`); die Spalten des Grundrisses sind **kein** `Datensicht` und haben ihn nie bekommen. Die **Fläche** braucht ihn nicht — ihre Karten stehen absolut auf `pos_x`/`pos_y` und schieben einander nicht. → **noch nicht getickt**, und das steht hier so, statt auf ein erledigtes Ticket zu zeigen |
+| 12 · Kein Sprung unter dem Cursor | **erfüllt für den Umbau, offen im Bestand — und das Ziel ist nicht mehr B6** | Der Reiter-Wechsel verändert kein Layout unter dem Finger, die Karten behalten ihre feste Grösse, und der Rückweg-Eintrag erscheint nur am belegten Platz. **Offen bleibt:** Belegungsänderungen anderer Stellen fahren über den SSE-Fan-out direkt in die handgebauten Personenspalten des Grundrisses. B6/LFH-334 ist **shipped** und hat den Sammelbanner gebaut — aber ausdrücklich für **Listenseiten** („Stand hh:mm … je Listenseite", „N neue Einträge — anzeigen"), getragen vom `Datensicht`-Primitiv (`Datensicht.tsx:754`, `zufluss: 'sammelbanner'`). Die Spalten des Grundrisses sind **kein** `Datensicht`, standen in keinem Akzeptanzkriterium von B6 und haben den Banner nie bekommen. B6 hat den Grundriss dabei durchaus angefasst — die Refetch-Sperre nach optimistischer Belegung steht in seinem Umsetzungsstand —, die Stelle ist also gesehen und nicht gemacht worden, nicht übersehen. Die **Fläche** braucht ihn nicht — ihre Karten stehen absolut auf `pos_x`/`pos_y` und schieben einander nicht. → **noch nicht getickt**, und das steht hier so, statt auf ein erledigtes Ticket zu zeigen |
 | 13 · Fokus nie verdeckt | **teilweise erfüllt** | Unverändert gilt: der Dialog führt den Fokus, der Menü-Eintrag ist über Tastatur gedacht und in jsdom nicht belegbar. **Neu:** die drei Reiterköpfe sind reguläre antd-Tabs mit ihrer Tastaturbedienung; die Reihenfolge im Tab-Durchlauf ist Fläche → Wartebereich → Transport, also die der sichtbaren Köpfe. **Offen bleibt** die Frage, ob ein Fokusziel beim Durchtabben der absolut positionierten Platzkarten hinter dem Rand des Scrollcontainers landet. Die alte Fassung nannte das „wäre der erste Dichte-/Fokus-e2e-Nachweis des Repos" — **das stimmt nicht mehr**: `frontend/e2e/fokus-verdeckung.spec.ts` führt das Verfahren samt Selbstbeweis, für `KatalogTabelle` und den Tabellenzweig der `Datensicht`. Es fehlt nur die Anwendung auf den Grundriss → **noch nicht getickt** |
 | 14 · Tabellenseite vollständig | **dreigeteilt: nicht anwendbar / erfüllt / offen** | **Grundriss:** nicht anwendbar — hier wird verortet, nicht verglichen. **Bewegungen-Reiter:** **erfüllt**, und das ist die Korrektur an der alten Zeile: er ist seit B2 kein handgebautes `Table` mehr, sondern `Datensicht` mit Standardsortierung, Art-Filter und Suche (`BewegungenTab.tsx:148-169`). Ein Spaltenschalter fehlt dort **absichtlich** — alle fünf Spalten tragen `immerSichtbar`, weil es keine gibt, die man sinnvoll abwählt; ein Schalter samt Zähler wäre ein Bedienelement für eine Entscheidung, die niemand treffen muss. Das steht als Begründung im Code. **Material-Reiter:** **offen** — er nutzt weiterhin `KatalogTabelle` (Scrollcontainer und stehende Kopfzeile ✓, Spaltenschalter mit Zähler ✗) → **noch nicht getickt**, Bestand, weder von B5g noch von C6 verursacht |
 | 15a · Erfassungsmaske — Zuweisungsdialog | **erfüllt, unverändert** | `ErfassungsModal`, ein Feld, Zielplatz im Titel, kein Serienmodus mit Begründung. C6 fasst die Maske nicht an |
@@ -259,6 +259,7 @@ die Begründung von 2026 heute nicht mehr stimmt.
 | 13 | Fokus-Sichtbarkeit beim Durchtabben der absolut positionierten Platzkarten | **noch nicht getickt** — das Verfahren steht seit `fokus-verdeckung.spec.ts`, nur die Anwendung auf den Grundriss fehlt |
 | 14 | Spaltenschalter mit Zähler im Material-Reiter | **noch nicht getickt** — Bestand |
 | 15c | Offline-Zuordnung zur UHS bei der Aufnahme | **LFH-458** — neu angelegt |
+| (Suite) | `uhs-grundriss-person-scroll.spec.ts:82` reisst in 1 von 8 Sammelläufen, Ursache ungemessen | **LFH-398** — Ticket existiert und führt genau die Lastempfindlichkeit dieser Datei |
 
 Die drei „noch nicht getickt" zeigen weiterhin bewusst auf **keine** Nummer. Sie auf ein
 erledigtes Ticket zu richten wäre schlimmer als sie ohne Ziel zu lassen: eine Nummer im Status
@@ -315,7 +316,7 @@ gewesen, sondern gezählt: die Zusicherung hängt an `data-lfh="seitenkopf-aktio
 Primitiv setzt. Gemessen und gepinnt sind die Ist-Zahlen je Zustand — `geplant` = 1, `aktiv` = 1;
 der zweite Wert war vor C6 **null** und ist der Befund H38 in einer Zahl.
 
-## Zwei Vorbehalte
+## Zwei Vorbehalte — und eine offen gelassene Zuordnung
 
 **A · Der Drag-Nachweis des optimistischen Updates ist in jsdom strukturell unmöglich, und der
 Playwright-Ersatz belegt nicht dasselbe.** Der Layout-Drag (`kind: 'platz'`) läuft ohne Drop-Ziel
@@ -343,6 +344,31 @@ deshalb: „die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen", 
 `message.warning`, weil der Wortlaut auf dem Primärweg die Navigation überleben muss. Der saubere
 Weg ist der, den LFH-340/C5 für die **Sichtung** gewählt hat und den `CLAUDE.md` als Regel führt:
 das Feld geht **mit** dem Anlegen mit, serverseitig in derselben Transaktion → **LFH-458**.
+
+## Ein zweiter Befund, der aus dem Umfang fällt
+
+**Die globale Kopfzeile läuft im Handschuh-Modus quer über den Schirm hinaus.** Gefunden beim
+Browser-Blick dieser Prüfliste, gemessen als `document.documentElement.scrollWidth -
+window.innerWidth` auf der UHS-Detailseite:
+
+| Breite | kompakt | komfortabel | handschuh |
+| --- | --- | --- | --- |
+| 1366 | 0 px | — | **0 px** |
+| 1024 | 0 px | 0 px | **71 px** |
+| 390 | 0 px | — | **18 px** |
+
+Der überlaufende Knoten ist gemessen die `ant-space`-Reihe der Kopfzeile — Textinhalt
+`Desktop blockiert · Ton bereit · Suchen Strg+K · AD Administrator` —, also
+`components/AppLayout.tsx` und damit **jede** Seite der Anwendung, nicht der UHS-Grundriss.
+Er steht hier, weil er hier gefunden wurde, und **nicht** in einer der 15 Zeilen, weil eine
+Kriterienzeile dieser Prüfliste sonst einen Fremdbefund als UHS-Mangel führte.
+
+Warum ihn bis jetzt niemand gesehen hat: die vorhandenen Überlaufprüfungen der e2e-Suite laufen
+in der **kompakten** Stufe (B6/LFH-334 führt „390/1024/1366-px-Überlaufprüfungen" in seinem
+Umsetzungsstand — alle kompakt). Und auf einem Berührungsgerät wird `handschuh` nicht von selbst
+gesetzt: `useViewport.zeigerIstGrob` belegt ohne gespeicherte Wahl `komfortabel` vor, und dort
+ist der Querlauf noch 0. Es bricht genau die Stufe, die jemand **absichtlich** wählt.
+→ **LFH-460**.
 
 ## Warum es keine zweite Prüfliste gibt
 
