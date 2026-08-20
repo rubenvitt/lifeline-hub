@@ -47,7 +47,11 @@ describe('UhsDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 
 describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () => {
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
-  const uhs = { id: 9, einsatz_id: 1, bezeichnung: 'UHS Nord', typ: 'sammelplatz', status: 'aktiv', standort: 'Halle 1', notiz: null };
+  // `typ` war hier `'sammelplatz'` — kein gültiger `UhsTyp` (patientenablage/behandlungsplatz/
+  // verletztensammelstelle/sonstige). Solange die Meta-Zeile den Wert roh ausgab, fiel das
+  // nicht auf; seit dem Umzug auf `uhsTyp[uhs.typ].label` (LFH-341 · C6) wäre das ein
+  // `undefined.label`-Absturz. Korrigiert auf einen echten Typ.
+  const uhs = { id: 9, einsatz_id: 1, bezeichnung: 'UHS Nord', typ: 'patientenablage', status: 'aktiv', standort: 'Halle 1', notiz: null };
 
   it('zeigt Material/Bewegungen als Tabs (kein Drawer) und schaltet zwischen ihnen', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
@@ -64,5 +68,63 @@ describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () =
     // Tab-Wechsel zeigt die Bewegungen inline.
     await userEvent.click(screen.getByRole('tab', { name: 'Bewegungen' }));
     expect(await screen.findByText('BEWEGUNGEN-TAB')).toBeInTheDocument();
+  });
+});
+
+describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () => {
+  // Schreibberechtigt (aktiv + Einsatzleitung) — sonst rendert keiner der Statuswechsel-Knöpfe,
+  // und „genau eine Primäraktion" hätte keinen Fall, den sie prüfen könnte.
+  const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
+  const uhsBasis = { id: 9, einsatz_id: 1, bezeichnung: 'UHS Nord', standort: 'Halle 1', notiz: null };
+
+  it('zeigt den UHS-Typ als Beschriftung, nicht als Wire-Wert', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue(
+      { ...uhsBasis, typ: 'patientenablage', status: 'aktiv' } as Awaited<ReturnType<typeof ladeUhs>>,
+    );
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    expect(await screen.findByText(/Patientenablage/)).toBeInTheDocument();
+    expect(screen.queryByText(/patientenablage/)).not.toBeInTheDocument();
+  });
+
+  it('trägt den Seitenkopf des Moduls, nicht einen eigenen', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue(
+      { ...uhsBasis, typ: 'patientenablage', status: 'aktiv' } as Awaited<ReturnType<typeof ladeUhs>>,
+    );
+    const { container } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
+    await screen.findByText('GRUNDRISS');
+
+    // `EinsatzSeite` trägt keine eigene Wurzel-Marke (nur den Aktionen-Slot). Der Slot IST die
+    // Zusicherung: an ihm hängt die Primäraktions-Zählung des Primitivs — ohne ihn ist „genau
+    // eine Primäraktion im Kopf" eine Handzählung. `container` ist deshalb der ehrlichere Anker
+    // als ein erfundenes `data-testid="uhs-detail-seite"`.
+    expect(container.querySelector('[data-lfh="seitenkopf-aktionen"]')).not.toBeNull();
+  });
+
+  it('zeigt genau eine Primäraktion im Kopf, wo eine vorgesehen ist', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+
+    // `geplant` und `aktiv` sind (noch) NICHT symmetrisch: `geplant` trägt „In Betrieb
+    // nehmen" als Primäraktion, `aktiv` hat zu diesem Zeitpunkt nur „Auflösen" (`danger`,
+    // bewusst OHNE `type="primary"` — Rot bedient nichts, LFH-352). Die Symmetrie kommt erst
+    // mit Task 5/H38, deren „Patient aufnehmen"-Knopf ausdrücklich nur im Betrieb greift.
+    // Beide Fälle stehen trotzdem in einem Test, weil beide dieselbe Zusicherung — höchstens
+    // eine Primäraktion, keine Handzählung — am selben Slot belegen.
+    for (const [status, erwartetePrimaeraktionen] of [['geplant', 1], ['aktiv', 0]] as const) {
+      vi.mocked(ladeUhs).mockResolvedValue(
+        { ...uhsBasis, typ: 'patientenablage', status } as Awaited<ReturnType<typeof ladeUhs>>,
+      );
+      const { container, unmount } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
+      await screen.findByText('GRUNDRISS');
+
+      const slot = container.querySelector('[data-lfh="seitenkopf-aktionen"]')!;
+      const primaer = Array.from(slot.querySelectorAll('button')).filter((knopf) =>
+        Array.from(knopf.classList).some((klasse) => klasse.endsWith('-btn-primary')),
+      );
+      expect(primaer, `Status ${status}`).toHaveLength(erwartetePrimaeraktionen);
+      unmount();
+    }
   });
 });
