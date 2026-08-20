@@ -1,4 +1,5 @@
 import { Button, Card, Tag, Typography } from 'antd';
+import { useViewport } from '../../components/useViewport';
 import type { BrEinheitKurz, BrFahrzeugKurz, Einheit, EinsatzFahrzeug } from '../../api/types';
 
 interface Props {
@@ -30,6 +31,8 @@ export default function KraefteOhneBrSidebar({
   onZuweisenEinheit,
   onZuweisenFahrzeug,
 }: Props) {
+  const { abBreite } = useViewport();
+  const breit = abBreite('md');
   const brEinheitIds = new Set(brEinheiten.map((e) => e.id));
   const brFahrzeugIds = new Set(brFahrzeuge.map((f) => f.id));
 
@@ -46,7 +49,15 @@ export default function KraefteOhneBrSidebar({
   const leer = freieEinheiten.length === 0 && freiFahrzeuge.length === 0;
 
   return (
-    <Card title="Kräfte ohne BR" size="small" style={{ width: 240, minHeight: 400 }}>
+    // Unter `md` volle Breite und gestapelt (LFH-341 · H40) — dieselbe Form wie bei
+    // Gefahrengebietsliste und Gliederungsbaum. Die Zuweisung läuft hier ohnehin über
+    // den „zuweisen"-Knopf, nicht über einen Drag: der Umbruch kostet keinen Bedienweg.
+    <Card
+      data-testid="kraefte-ohne-br"
+      title="Kräfte ohne BR"
+      size="small"
+      style={breit ? { width: 240, minHeight: 400 } : { width: '100%' }}
+    >
       {leer && (
         <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>
       )}

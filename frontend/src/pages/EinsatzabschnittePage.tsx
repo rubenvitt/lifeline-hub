@@ -21,6 +21,7 @@ import { SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet } from '.
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
+import { useViewport } from '../components/useViewport';
 
 function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -82,6 +83,8 @@ export default function EinsatzabschnittePage() {
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<AbschnittWerte>();
+  const { abBreite } = useViewport();
+  const breit = abBreite('md');
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
@@ -247,8 +250,20 @@ export default function EinsatzabschnittePage() {
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
-      <div style={{ display: 'flex', gap: 16 }}>
-        <Card style={{ flex: '0 0 360px' }} size="small" title="Gliederung">
+      {/* Unter `md` stapeln statt einer 360-px-Spalte neben dem Detail (LFH-341 · H40).
+          Kein Collapse: `GefahrenPage` hat die Frage für den Geschwisterfall entschieden —
+          eine zweite Bedienform für dieselbe Liste. Gestapelt trägt die Gliederung dieselbe
+          Bedienung wie breit, nur untereinander. */}
+      <div
+        data-testid="abschnitte-rahmen"
+        style={{ display: 'flex', flexDirection: breit ? 'row' : 'column', gap: 16, alignItems: breit ? 'flex-start' : 'stretch' }}
+      >
+        <Card
+          data-testid="abschnitte-gliederung"
+          style={breit ? { flex: '0 0 360px' } : { width: '100%' }}
+          size="small"
+          title="Gliederung"
+        >
           {/* Drei Zustände, in dieser Reihenfolge (LFH-331 · B3). Vorher stand hier eine
               einzige Weiche auf die Länge der Liste — die ist während des Ladens und im
               Fehlerfall genauso wahr wie bei einer wirklich leeren Gliederung. Die Seite
