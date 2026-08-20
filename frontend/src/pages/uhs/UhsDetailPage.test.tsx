@@ -73,7 +73,7 @@ describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () =
 
 describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () => {
   // Schreibberechtigt (aktiv + Einsatzleitung) — sonst rendert keiner der Statuswechsel-Knöpfe,
-  // und „genau eine Primäraktion" hätte keinen Fall, den sie prüfen könnte.
+  // und die Primäraktions-Zählung im Kopf hätte keinen Fall, den sie prüfen könnte.
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
   const uhsBasis = { id: 9, einsatz_id: 1, bezeichnung: 'UHS Nord', standort: 'Halle 1', notiz: null };
 
@@ -97,22 +97,23 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
     await screen.findByText('GRUNDRISS');
 
     // `EinsatzSeite` trägt keine eigene Wurzel-Marke (nur den Aktionen-Slot). Der Slot IST die
-    // Zusicherung: an ihm hängt die Primäraktions-Zählung des Primitivs — ohne ihn ist „genau
-    // eine Primäraktion im Kopf" eine Handzählung. `container` ist deshalb der ehrlichere Anker
-    // als ein erfundenes `data-testid="uhs-detail-seite"`.
+    // Zusicherung: an ihm hängt die Primäraktions-Zählung des Primitivs — ohne ihn wäre „wie
+    // viele Primäraktionen stehen im Kopf" eine Handzählung. `container` ist deshalb der
+    // ehrlichere Anker als ein erfundenes `data-testid="uhs-detail-seite"`.
     expect(container.querySelector('[data-lfh="seitenkopf-aktionen"]')).not.toBeNull();
   });
 
-  it('zeigt genau eine Primäraktion im Kopf, wo eine vorgesehen ist', async () => {
+  it('hält die Primäraktionen im Kopf je Zustand auf der gezählten Zahl', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
 
-    // `geplant` und `aktiv` sind (noch) NICHT symmetrisch: `geplant` trägt „In Betrieb
-    // nehmen" als Primäraktion, `aktiv` hat zu diesem Zeitpunkt nur „Auflösen" (`danger`,
-    // bewusst OHNE `type="primary"` — Rot bedient nichts, LFH-352). Die Symmetrie kommt erst
-    // mit Task 5/H38, deren „Patient aufnehmen"-Knopf ausdrücklich nur im Betrieb greift.
-    // Beide Fälle stehen trotzdem in einem Test, weil beide dieselbe Zusicherung — höchstens
-    // eine Primäraktion, keine Handzählung — am selben Slot belegen.
-    for (const [status, erwartetePrimaeraktionen] of [['geplant', 1], ['aktiv', 0]] as const) {
+    for (const { status, primaer: erwartetePrimaeraktionen } of [
+      { status: 'geplant', primaer: 1 },
+      // Heute NULL, und das ist der Befund, nicht der Zielzustand: eine UHS im Betrieb bietet
+      // im Kopf keine Aufnahme an, jeder Patient kostet einen Modulwechsel (H38). LFH-341/C6
+      // zieht die Zahl in der Aufnahme-Task auf 1 — wer diesen Wert ändert, ändert ihn dort
+      // und nicht hier.
+      { status: 'aktiv', primaer: 0 },
+    ] as const) {
       vi.mocked(ladeUhs).mockResolvedValue(
         { ...uhsBasis, typ: 'patientenablage', status } as Awaited<ReturnType<typeof ladeUhs>>,
       );
