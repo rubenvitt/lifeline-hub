@@ -110,16 +110,24 @@ export default function AufnahmePage() {
     },
     onSuccess: async (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        setQuittung(
-          uhsAuftrag
-            // KEIN Versprechen, das kein Code einlöst: die Queue trägt die Person, aber
-            // niemand schiebt danach die Belegung nach (gemessen — `offline/schreiben.ts`
-            // hat keinen Drain-Hook für Folgeaktionen). Eine still ausgefallene Zuordnung
-            // wäre eine Person, die an der UHS niemand sucht; ein falsches „folgt" wäre
-            // schlimmer, weil dann auch niemand nachsieht. Zielticket: uhs_id am POST.
-            ? 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung, die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen.'
-            : 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.',
-        );
+        const text = uhsAuftrag
+          // KEIN Versprechen, das kein Code einlöst: die Queue trägt die Person, aber
+          // niemand schiebt danach die Belegung nach (gemessen — `offline/schreiben.ts`
+          // hat keinen Drain-Hook für Folgeaktionen). Eine still ausgefallene Zuordnung
+          // wäre eine Person, die an der UHS niemand sucht; ein falsches „folgt" wäre
+          // schlimmer, weil dann auch niemand nachsieht. Zielticket: uhs_id am POST.
+          ? 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung, die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen.'
+          : 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.';
+        setQuittung(text);
+        // Auf dem PRIMÄR-Knopf navigiert `onFertig` sofort zur UHS (bzw. in die Liste) —
+        // die stehende Quittung hängt dabei aus, bevor sie ein Frame lang sichtbar war
+        // (gemessen: ein Test auf den Primär-Knopf lief rot, DOM zeigte bereits das
+        // Navigationsziel). Bei einem Auftrag steht in ihr aber keine Statusnotiz mehr,
+        // sondern eine HANDLUNGSANWEISUNG — genau der Fall, den der Brief mit „eine
+        // Person, die an der UHS niemand sucht" benennt. `message.warning` nutzt denselben
+        // Kanal wie der Fehlerzweig unten (der überlebt die Navigation, weil er am
+        // `App`-Kontext hängt, nicht am Baum dieser Seite).
+        if (uhsAuftrag) message.warning(text);
       } else {
         const person = ergebnis.daten;
         let zusatz = '';
@@ -188,7 +196,17 @@ export default function AufnahmePage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={personenPfad(einsatzId)}>Personen</Link> },
+            {
+              // Zeigt den Auftrag, statt „Personen" zu behaupten (Brief-Vorgabe): der
+              // Rückweg geht bei einem Auftrag zur UHS, nicht in die Personenliste — der
+              // Breadcrumb führt denselben Weg, sonst weiß niemand, wohin der Patient
+              // läuft. Der UHS-NAME wird hier bewusst nicht geladen: das bräuchte eine
+              // zusätzliche Query nur für einen Breadcrumb-Titel; die Rückverlinkung
+              // allein beantwortet die Frage aus dem Brief.
+              title: uhsAuftrag
+                ? <Link to={uhsDetailPfad(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
+                : <Link to={personenPfad(einsatzId)}>Personen</Link>,
+            },
             { title: 'Aufnahme' },
           ]}
         />

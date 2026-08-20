@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { AuthProvider } from '../../auth/AuthContext';
@@ -64,6 +64,19 @@ const angelegt = {
   geaendert_at: '2026-05-27 09:05:00', geaendert_von: 1, storniert_at: null,
 };
 
+/** Macht den aktuellen Pfad+Query im DOM sichtbar (Muster aus `UhsDetailPage.test.tsx`s
+ *  `LocationProbe`) — die Marker-Route unten matcht JEDE `:uhsId`, „kehrt zur beauftragenden
+ *  UHS zurück" bliebe also grün, wenn `onFertig` auf die FALSCHE UHS navigierte. Nur die
+ *  Adresse selbst ist die belastbare Zusicherung. */
+function LocationProbe() {
+  const loc = useLocation();
+  return <span data-testid="pfad">{loc.pathname}{loc.search}</span>;
+}
+
+function aktuellerPfad() {
+  return screen.getByTestId('pfad').textContent;
+}
+
 function render(
   einsatzObj: typeof einsatzAktiv = einsatzAktiv,
   extra: Parameters<typeof server.use> = [],
@@ -77,6 +90,7 @@ function render(
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
     <AuthProvider>
+      <LocationProbe />
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<div>PERSONENLISTE</div>} />
         <Route path="/einsaetze/:id/personen/aufnahme" element={<AufnahmePage />} />
@@ -193,6 +207,20 @@ describe('AufnahmePage', () => {
 });
 
 describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
+  it('zeigt im Breadcrumb den Weg zur beauftragenden UHS statt zu Personen', async () => {
+    // Brief wörtlich: „Die Seitenbeschreibung UND der Breadcrumb sollen den Auftrag
+    // zeigen, sonst weiß niemand, wohin der Patient läuft." Der UHS-NAME wird hier bewusst
+    // nicht geprüft (die Seite lädt ihn nicht extra) — die Rückverlinkung selbst ist die
+    // Zusicherung.
+    render(einsatzAktiv, [], '/einsaetze/1/personen/aufnahme?uhs=7');
+    await screen.findByRole('radiogroup');
+
+    expect(screen.getByRole('link', { name: 'Unfallhilfsstelle' })).toHaveAttribute(
+      'href', '/einsaetze/1/unfallhilfsstellen/7',
+    );
+    expect(screen.queryByRole('link', { name: 'Personen' })).not.toBeInTheDocument();
+  });
+
   it('bucht nach dem Anlegen den Eintritt in den Wartebereich der beauftragten UHS', async () => {
     const patient = { ...angelegt, id: 42, registrier_nr: 3 };
     render(einsatzAktiv, [
@@ -225,20 +253,49 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
   it('sagt es, wenn die Zuordnung offline nicht gebucht werden konnte', async () => {
     // Ohne Person-ID gibt es keine Belegung. Eine still ausgefallene Zuordnung
     // waere eine Person, die an der UHS niemand sucht.
+    //
+    // ÜBER DEN PRIMÄR-KNOPF, nicht „Speichern und nächste": genau hier lag ein gemessener
+    // Defekt. `onFertig` navigiert nach dem Primär-Knopf sofort zur UHS — die stehende
+    // `<Alert>`-Quittung hängt dabei aus dem Baum, bevor sie ein Frame lang sichtbar war
+    // (roter Lauf vor dem Fix: `findByText(/von Hand erfolgen/)` fand nichts, das DOM
+    // zeigte bereits das Navigationsziel). Der Fix ist ein zweiter Kanal (`message.warning`,
+    // überlebt die Navigation, weil er am `App`-Kontext hängt statt am Baum dieser Seite) —
+    // dieser Test bleibt deshalb auf dem Primär-Knopf, sonst prüft er den Fix nicht.
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     render(einsatzAktiv, [], '/einsaetze/1/personen/aufnahme?uhs=7');
     await screen.findByRole('radiogroup');
 
-    // „Speichern und nächste" statt des Primär-Knopfes: der navigiert nach Erfolg sofort
-    // zur UHS zurück (Test unten) und riss die Quittung dabei aus dem Baum, bevor RTL sie
-    // fassen konnte (gemessen — der Primär-Knopf-Pfad war hier eine Attrappe). Die Aussage
-    // dieses Tests ist der WORTLAUT der Quittung, nicht der Rückweg.
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     // „muss von Hand erfolgen", NICHT „folgt": die Queue schiebt keine Belegung nach.
     // Ein Test auf /folgt/ waere auch mit dem falschen Versprechen gruen.
     expect(await screen.findByText(/von Hand erfolgen/)).toBeInTheDocument();
     expect(aenderePersonBelegung).not.toHaveBeenCalled();
+    // Beleg, dass die Meldung wirklich die Navigation überlebt hat und nicht bloß VOR ihr
+    // gefasst wurde: die Seite ist tatsächlich weitergezogen.
+    await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7'));
+  });
+
+  it('sagt es, wenn die Zuordnung zur Unfallhilfsstelle fehlschlägt', async () => {
+    // Die Person IST angelegt — nur der zweite Schritt (Belegung) scheitert. Das darf die
+    // Quittung nicht verschweigen (Auftrag Auflösung 7).
+    const patient = { ...angelegt, id: 42, registrier_nr: 3 };
+    vi.mocked(aenderePersonBelegung).mockRejectedValueOnce(new Error('Netzwerkfehler'));
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(patient, { status: 201 })),
+    ], '/einsaetze/1/personen/aufnahme?uhs=7');
+    await screen.findByRole('radiogroup');
+
+    // „Speichern und nächste" hält die Seite offen — die Aussage dieses Tests ist der
+    // Quittungszusatz, nicht der Rückweg (den prüfen die beiden Tests daneben).
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    expect(
+      await screen.findByText(/R-003.*Zuordnung zur Unfallhilfsstelle fehlgeschlagen/),
+    ).toBeInTheDocument();
+    // Der Fehler wird zusätzlich gemeldet — derselbe Kanal wie jeder andere Mutationsfehler
+    // dieser Seite (`fehlerText` liefert für einen generischen `Error` den Standardtext).
+    expect(await screen.findByText('Aktion fehlgeschlagen')).toBeInTheDocument();
   });
 
   it('kehrt mit „Erfassen" zur beauftragenden UHS zurück, nicht in die Personenliste', async () => {
@@ -250,5 +307,8 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
+    // Nicht nur „irgendeine" UHS-Route (die Marker-Route matcht jede `:uhsId`) — genau die
+    // beauftragende.
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7');
   });
 });
