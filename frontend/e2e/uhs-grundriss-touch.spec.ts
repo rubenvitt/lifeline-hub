@@ -305,6 +305,10 @@ test.describe('UHS-Grundriss unter Touch', () => {
     //     das Overlay dem Zeiger folgt, zieht ein `page.mouse.move` an die Radposition es
     //     genau dorthin. Deshalb wird die Maus ZUERST gesetzt und der Touch-Drag danach
     //     woanders angehalten; die synthetischen Ereignisse bewegen den echten Zeiger nicht.
+    // Die beiden Abstände sind aus der Spaltenhöhe bei `TABLET` hergeleitet: der Grundriss
+    // steht in `calc(100vh - 300px)`, bei 900 px Fensterhöhe also 600 px. Beide Punkte
+    // liegen damit im mittleren Drittel. Wer `TABLET.height` ändert, rechnet sie nach —
+    // die beiden Gegenproben unten melden es sonst, aber erst zur Laufzeit.
     const kasten = (await spalte.boundingBox())!;
     const radPunkt = { x: kasten.x + kasten.width / 2, y: kasten.y + 300 };
     const haltePunkt = { x: kasten.x + kasten.width / 2, y: kasten.y + 420 };
