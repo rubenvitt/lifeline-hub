@@ -119,6 +119,14 @@ const MIT_NACHBARSCHAFT = [
   // Menü-Trenner des Kopfes ist eine eigene Zusicherung und wird im Komponententest
   // geprüft — er ersetzt diese Zeile nicht.
   'pages/PersonenDetailPage.tsx',
+  // ── C6 · UHS-Kopfzeile (LFH-341) ──────────────────────────────────────────
+  // „Patient aufnehmen" (primary) steht im Betrieb neben „Auflösen" (danger), im geplanten
+  // Zustand steht „In Betrieb nehmen" neben „Stornieren" (danger) — zur Laufzeit nie alle
+  // vier zugleich (die Zustände schliessen sich aus), aber der Scanner liest Quelltext und
+  // sieht alle vier `<Button>` im selben unmittelbar umschließenden `<Space>`. Der Abstand
+  // (`size="middle"`) kam bereits mit Task 2 dieses Tickets — die Zeile hier macht die
+  // Zusicherung nur ausdrücklich, statt sie unbewertet zu lassen.
+  'pages/uhs/UhsDetailPage.tsx',
 ];
 
 /**

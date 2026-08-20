@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { AuthProvider } from '../../auth/AuthContext';
+import { aenderePersonBelegung } from '../../api/einsatzUhs';
 import AufnahmePage from './AufnahmePage';
 
 /**
@@ -15,7 +16,18 @@ import AufnahmePage from './AufnahmePage';
  * deshalb nicht die Maske (das tut `personen/AufnahmeFelder.test.tsx`), sondern was nur hier
  * gilt: die Route existiert, sie erfasst in Serie ohne den Ort zu verlassen, und die
  * Quittung bleibt stehen.
+ *
+ * **Der UHS-Auftrag (LFH-341 · C6)** hängt am Query-Param `?uhs=<id>` und bucht nach dem
+ * Anlegen den Eintritt in den Wartebereich. Die Person-Anlage selbst bleibt über MSW real
+ * (wie im restlichen File) — nur `aenderePersonBelegung` wird zum Mock, sonst bräuchte jeder
+ * Bestandstest hier einen Belegungs-Endpunkt, den H38 gar nicht anfasst. Gleiche Bauform wie
+ * `GrundrissTabs.test.tsx`.
  */
+vi.mock('../../api/einsatzUhs', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('../../api/einsatzUhs')>();
+  return { ...echt, aenderePersonBelegung: vi.fn() };
+});
+
 class FakeEventSource {
   url: string; closed = false;
   constructor(url: string) { this.url = url; }
@@ -25,6 +37,7 @@ beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   sessionStorage.clear();
+  vi.mocked(aenderePersonBelegung).mockReset();
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -51,7 +64,11 @@ const angelegt = {
   geaendert_at: '2026-05-27 09:05:00', geaendert_von: 1, storniert_at: null,
 };
 
-function render(einsatzObj: typeof einsatzAktiv = einsatzAktiv, extra: Parameters<typeof server.use> = []) {
+function render(
+  einsatzObj: typeof einsatzAktiv = einsatzAktiv,
+  extra: Parameters<typeof server.use> = [],
+  route = '/einsaetze/1/personen/aufnahme',
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
@@ -63,9 +80,12 @@ function render(einsatzObj: typeof einsatzAktiv = einsatzAktiv, extra: Parameter
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<div>PERSONENLISTE</div>} />
         <Route path="/einsaetze/:id/personen/aufnahme" element={<AufnahmePage />} />
+        {/* Rückweg des UHS-Auftrags (LFH-341 · C6) — Marker statt echter UhsDetailPage,
+            dieselbe Bauform wie „PERSONENLISTE" oben. */}
+        <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<div>UHS-DETAIL</div>} />
       </Routes>
     </AuthProvider>,
-    { route: '/einsaetze/1/personen/aufnahme' },
+    { route },
   );
 }
 
@@ -169,5 +189,66 @@ describe('AufnahmePage', () => {
     render(einsatzBeobachter);
     expect(await screen.findByText(/Keine Schreibberechtigung/)).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+  });
+});
+
+describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
+  it('bucht nach dem Anlegen den Eintritt in den Wartebereich der beauftragten UHS', async () => {
+    const patient = { ...angelegt, id: 42, registrier_nr: 3 };
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(patient, { status: 201 })),
+    ], '/einsaetze/1/personen/aufnahme?uhs=7');
+    await screen.findByRole('radiogroup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    await waitFor(() => expect(aenderePersonBelegung).toHaveBeenCalledWith(1, 42, {
+      art: 'eintritt', uhs_id: 7, platz_id: null,
+    }));
+  });
+
+  it('bucht ohne UHS-Auftrag gar keine Belegung', async () => {
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 })),
+    ]);
+    await screen.findByRole('radiogroup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    // Der Primär-Knopf navigiert nach dem Speichern zurück in die Liste — die Quittung
+    // selbst ist danach nicht mehr im Baum (Muster aus dem Bestandstest oben, „geht nach
+    // dem Primär-Knopf zurück in die Liste"). Der belastbare Beleg ist der Mock.
+    await screen.findByText('PERSONENLISTE');
+    expect(aenderePersonBelegung).not.toHaveBeenCalled();
+  });
+
+  it('sagt es, wenn die Zuordnung offline nicht gebucht werden konnte', async () => {
+    // Ohne Person-ID gibt es keine Belegung. Eine still ausgefallene Zuordnung
+    // waere eine Person, die an der UHS niemand sucht.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    render(einsatzAktiv, [], '/einsaetze/1/personen/aufnahme?uhs=7');
+    await screen.findByRole('radiogroup');
+
+    // „Speichern und nächste" statt des Primär-Knopfes: der navigiert nach Erfolg sofort
+    // zur UHS zurück (Test unten) und riss die Quittung dabei aus dem Baum, bevor RTL sie
+    // fassen konnte (gemessen — der Primär-Knopf-Pfad war hier eine Attrappe). Die Aussage
+    // dieses Tests ist der WORTLAUT der Quittung, nicht der Rückweg.
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    // „muss von Hand erfolgen", NICHT „folgt": die Queue schiebt keine Belegung nach.
+    // Ein Test auf /folgt/ waere auch mit dem falschen Versprechen gruen.
+    expect(await screen.findByText(/von Hand erfolgen/)).toBeInTheDocument();
+    expect(aenderePersonBelegung).not.toHaveBeenCalled();
+  });
+
+  it('kehrt mit „Erfassen" zur beauftragenden UHS zurück, nicht in die Personenliste', async () => {
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 })),
+    ], '/einsaetze/1/personen/aufnahme?uhs=7');
+    await screen.findByRole('radiogroup');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
   });
 });

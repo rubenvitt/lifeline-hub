@@ -1,11 +1,12 @@
 import { Alert, App, Breadcrumb, Form, Space, Tag } from 'antd';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { registrierAnzeige } from '../../api/einsatzPerson';
+import { aenderePersonBelegung } from '../../api/einsatzUhs';
 import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ErfassungsFormular } from '../../components/Erfassung';
@@ -18,7 +19,7 @@ import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SK_META } from '../../personen/personMeta';
 import AufnahmeFelder, { type AufnahmeEingabe } from '../../personen/AufnahmeFelder';
 import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
-import { personenPfad } from '../../routing/deeplinks';
+import { parseRouteId, personenPfad, uhsDetailPfad } from '../../routing/deeplinks';
 import { flaeche } from '../../theme/tokens';
 
 /**
@@ -28,7 +29,7 @@ import { flaeche } from '../../theme/tokens';
  *
  * Nicht wegen des Feldumfangs — die Maske ist Zeichen für Zeichen dieselbe
  * (`personen/AufnahmeFelder`, ein Bauteil, zwei Mounts). Sondern wegen der ADRESSE: andere
- * Module springen die Aufnahme an (die UHS-Kopfzeile aus C6), und ein Dialog hat keine.
+ * Module springen die Aufnahme an, und ein Dialog hat keine.
  *
  * Das AK des Tickets verlangt „≤ 4 Interaktionen UND ohne Seitenwechsel" und gleichzeitig
  * eine eigene Route. Beides wörtlich zugleich geht nicht — eine angesprungene Route IST ein
@@ -43,6 +44,16 @@ import { flaeche } from '../../theme/tokens';
  * geht in die Liste zurück. Die Quittung bleibt bis zur nächsten Erfassung stehen — an ihr
  * wird die Registriernummer abgelesen und auf das Band geschrieben, ein Toast wäre weg,
  * bevor jemand ihn abschreiben kann.
+ *
+ * ── DER ERSTE KONSUMENT VON AUSSEN: DIE UHS-KOPFZEILE (LFH-341 · C6) ────────
+ *
+ * „Patient aufnehmen" in der UHS-Detailseite schickt hierher mit `?uhs=<id>` (der
+ * `uhsAuftrag` unten). Wer über diesen Weg kommt, erfasst keine Person im Allgemeinen,
+ * sondern einen Patienten dieser Unfallhilfsstelle: nach dem Anlegen bucht die Seite den
+ * Eintritt in den Wartebereich (`aenderePersonBelegung`, `art: 'eintritt'`,
+ * `platz_id: null`) und kehrt zur UHS zurück statt in die Personenliste. Offline gibt es
+ * keine Person-ID und damit keine Belegung — die Quittung sagt das ehrlich, statt eine
+ * Zuordnung zu versprechen, die kein Code nachträgt (Details an der Mutation unten).
  */
 export default function AufnahmePage() {
   const { id } = useParams();
@@ -54,6 +65,18 @@ export default function AufnahmePage() {
   const [form] = Form.useForm<AufnahmeEingabe>();
   const [quittung, setQuittung] = useState<string | null>(null);
   const sitzungsortGeladen = useRef<number | null>(null);
+  const [searchParams] = useSearchParams();
+  /**
+   * DER UHS-AUFTRAG (LFH-341 · C6). Wer von der UHS-Kopfzeile kommt, erfasst einen
+   * PATIENTEN, keine Person im Allgemeinen: nach dem Anlegen wird der Eintritt in den
+   * Wartebereich gebucht, und der Rückweg geht zur UHS statt in die Personenliste.
+   *
+   * Unbrauchbares wird GANZ verworfen, nicht halb übernommen — dieselbe Regel wie beim
+   * Platzier-Auftrag der Lagekarte (`parsePlatzierenAuftrag`): ein halb gelesener Auftrag
+   * bucht auf eine UHS, die es nicht gibt. Derselbe Validator wie dort, `parseRouteId` —
+   * eine `uhs`-ID ist eine Route-ID wie jede andere.
+   */
+  const uhsAuftrag = parseRouteId(searchParams.get('uhs') ?? undefined);
 
   /**
    * DER SITZUNGSWEITE ANTREFFORT GILT AN BEIDEN MOUNTS (im Review gefunden). Das Modal las
@@ -85,17 +108,44 @@ export default function AufnahmePage() {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfassePersonOfflineFaehig(benutzer.id, einsatzId, daten);
     },
-    onSuccess: (ergebnis) => {
+    onSuccess: async (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        setQuittung('Offline vorgemerkt — Registriernummer folgt nach der Übertragung.');
+        setQuittung(
+          uhsAuftrag
+            // KEIN Versprechen, das kein Code einlöst: die Queue trägt die Person, aber
+            // niemand schiebt danach die Belegung nach (gemessen — `offline/schreiben.ts`
+            // hat keinen Drain-Hook für Folgeaktionen). Eine still ausgefallene Zuordnung
+            // wäre eine Person, die an der UHS niemand sucht; ein falsches „folgt" wäre
+            // schlimmer, weil dann auch niemand nachsieht. Zielticket: uhs_id am POST.
+            ? 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung, die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen.'
+            : 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.',
+        );
       } else {
         const person = ergebnis.daten;
+        let zusatz = '';
+        if (uhsAuftrag) {
+          try {
+            await aenderePersonBelegung(einsatzId, person.id, {
+              art: 'eintritt',
+              uhs_id: uhsAuftrag,
+              platz_id: null,
+            });
+            zusatz = ' · im Wartebereich';
+          } catch (e) {
+            // Die Person IST angelegt — das darf die Quittung nicht verschweigen, nur
+            // weil der zweite Schritt gescheitert ist.
+            message.error(fehlerText(e));
+            zusatz = ' · Zuordnung zur Unfallhilfsstelle fehlgeschlagen';
+          }
+          void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsAuftrag) });
+          void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+        }
         // Aus der ANTWORT gelesen, nicht aus den gesendeten Werten: das Backend schreibt
         // die Sichtung in derselben Transaktion und kann sie verwerfen.
         setQuittung(
-          person.aktuelle_sichtung
+          (person.aktuelle_sichtung
             ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
-            : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`,
+            : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`) + zusatz,
         );
       }
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
@@ -128,7 +178,11 @@ export default function AufnahmePage() {
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
       }
-      beschreibung="Sichtungskategorie zuerst — die übrigen Angaben sind optional."
+      beschreibung={
+        uhsAuftrag
+          ? 'Sichtungskategorie zuerst — die Person landet danach im Wartebereich der Unfallhilfsstelle.'
+          : 'Sichtungskategorie zuerst — die übrigen Angaben sind optional.'
+      }
       breadcrumb={
         <Breadcrumb
           items={[
@@ -181,7 +235,9 @@ export default function AufnahmePage() {
            * die LETZTE Person und geht zurück in die Liste. Der Primär-Knopf behält seine
            * Vorgabebeschriftung — ihn „Fertig" zu nennen wäre eine Lüge: er speichert.
            */
-          onFertig={() => navigate(personenPfad(einsatzId))}
+          onFertig={() =>
+            navigate(uhsAuftrag ? uhsDetailPfad(einsatzId, uhsAuftrag) : personenPfad(einsatzId))
+          }
         >
           <AufnahmeFelder modus="schnell" />
         </ErfassungsFormular>

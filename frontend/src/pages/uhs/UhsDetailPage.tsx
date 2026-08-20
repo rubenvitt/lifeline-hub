@@ -1,11 +1,12 @@
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tabs } from 'antd';
-import { Link, Navigate, useParams } from 'react-router';
+import { UserAddOutlined } from '@ant-design/icons';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
-import { parseRouteId, unfallhilfsstellenListePfad } from '../../routing/deeplinks';
+import { parseRouteId, personenAufnahmePfad, unfallhilfsstellenListePfad } from '../../routing/deeplinks';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -23,6 +24,7 @@ import BewegungenTab from './BewegungenTab';
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
+  const navigate = useNavigate();
   const { benutzer } = useAuth();
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
@@ -120,6 +122,19 @@ export default function UhsDetailPage() {
           {/* Die Zustände schliessen sich aus — aber das ist ab jetzt nicht mehr
               handgezählt: die Dev-Warnung des Primitivs zählt die Primäraktionen in
               diesem Slot, und der Test daneben prüft beide Zustände. */}
+          {!schreibgeschuetzt && uhs.status === 'aktiv' && (
+            /* Die Aufnahme ohne Modulwechsel (LFH-341 · H38). Nur im Betrieb: eine geplante
+               UHS nimmt niemanden auf, und dort steht „In Betrieb nehmen" als Primäraktion.
+               Die beiden schliessen sich damit aus — nicht mehr handgezählt, sondern von der
+               Dev-Warnung des Seitenkopfs (Task 2) und ihrem Test gedeckt. */
+            <Button
+              type="primary"
+              icon={<UserAddOutlined aria-hidden />}
+              onClick={() => navigate(personenAufnahmePfad(einsatzId, { uhs: uhs.id }))}
+            >
+              Patient aufnehmen
+            </Button>
+          )}
           {!schreibgeschuetzt && uhs.status === 'geplant' && (
             <>
               <Button type="primary" onClick={() => statusMut.mutate('aktiv')} loading={statusMut.isPending}>

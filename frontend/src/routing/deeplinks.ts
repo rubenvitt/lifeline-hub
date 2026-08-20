@@ -148,15 +148,16 @@ export function personenPfad(
  * die ANSPRING-Adresse für andere Module — ein Modal hat keine. Beide Wege tragen dasselbe
  * Bauteil (`personen/AufnahmeFelder`), es gibt also nur eine Maske.
  *
- * **Noch ohne Produktivkonsumenten in `frontend/src`**, und das ist kein Versehen: die
- * UHS-Kopfzeile, die von hier aus in die Aufnahme schicken SOLL, entsteht erst mit C6
- * (LFH-341). Bis dahin trägt die Route sich selbst über ihre Adresse.
+ * **Der Konsument ist da (LFH-341 · C6):** die UHS-Kopfzeile springt hierher. Der
+ * optionale `uhs`-Auftrag reist im Query-Param, nicht im Router-State — er überlebt
+ * damit einen Neuladen, und genau dafür gibt es diese Route statt eines Dialogs.
+ * Die Aufnahmeseite bucht nach dem Anlegen den Eintritt in den Wartebereich.
  *
  * Statisches Segment vor `personen/:personId` — React Router rankt statisch über dynamisch,
  * die Reihenfolge in `App.tsx` entscheidet also nicht, aber ein Leser muss das nicht prüfen.
  */
-export function personenAufnahmePfad(einsatzId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'personen')}/aufnahme`;
+export function personenAufnahmePfad(einsatzId: number, opts: { uhs?: number } = {}): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'personen')}/aufnahme`, { uhs: opts.uhs });
 }
 
 export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
