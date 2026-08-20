@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setzeViewportBreite } from '../../test/viewport';
 import { renderMitProviders } from '../../test/utils';
 import Grundriss from './Grundriss';
 import { aenderePersonBelegung } from '../../api/einsatzUhs';
+import { ApiError } from '../../api/client';
 import type { Person, UhsDetail, UhsPlatz } from '../../api/types';
 
 // Auto-Mock: dieselbe Bauform wie `UhsDetailPage.test.tsx` — die realen HTTP-Aufrufe sind
@@ -181,6 +182,47 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     await waitFor(() => expect(aenderePersonBelegung).toHaveBeenCalledWith(1, 42, {
       art: 'wechsel', uhs_id: 1, platz_id: null,
     }));
+  });
+
+  it('zeigt den Rückweg optimistisch als freien Platz und rollt eine Serverablehnung zurück', async () => {
+    // Dritter Aufrufer von `belegMut` (Task 3 dieses Plans, LFH-341/C6-AK): der Test oben
+    // prüft nur den abgesetzten Body, nicht das optimistische Verhalten — `onMutate`/
+    // `onError` sind Bestand aus B5g, aber bisher nur für Drag und Zuweisungsdialog
+    // belegt. Muster wie die kombinierte Zusicherung
+    // „zeigt die Platzbelegung optimistisch und rollt eine Serverablehnung zurück" in
+    // Grundriss.test.tsx.
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    // Erster Ruf lädt die Ausgangslage; jeder weitere ist der `onSettled`-Refetch, den
+    // `invalidate()` nach JEDER Mutation auslöst — auch nach einer Ablehnung. Der hängt
+    // hier bewusst: die Fixture liefert unverändert „belegt" zurück, ein sofort
+    // aufgelöster Refetch überschriebe den Rollback-Beleg unten also selbst dann korrekt,
+    // wenn `onError` gar nicht liefe. Ohne diesen Riegel wäre die Zusicherung blind für
+    // einen fehlenden Rollback-Zweig.
+    let anrufe = 0;
+    vi.mocked(listePersonen).mockImplementation(() => {
+      anrufe += 1;
+      return anrufe === 1 ? Promise.resolve(personenMitBelegung) : new Promise<Person[]>(() => {});
+    });
+    // Die Zusage bleibt offen, bis wir sie gezielt ablehnen — nur so ist der Zustand
+    // ZWISCHEN Klick und Antwort beobachtbar. Mit einer sofort abgelehnten Zusage bliebe
+    // die Karte ohne `onMutate` die ganze Zeit „belegt", und der Test belegte nichts.
+    let ablehnen: (grund: unknown) => void = () => {};
+    vi.mocked(aenderePersonBelegung).mockReturnValue(new Promise((_res, rej) => { ablehnen = rej; }));
+    setzeViewportBreite(800);
+    renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
+    expect(await screen.findByText('belegt')).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }));
+
+    // Optimistisch: der Platz zeigt sich schon frei, bevor die Zusage entschieden ist.
+    await waitFor(() => expect(screen.queryByText('belegt')).not.toBeInTheDocument());
+
+    await act(async () => { ablehnen(new ApiError(422, 'abgelehnt')); });
+
+    // Rollback: die Ablehnung stellt den Ausgangszustand wieder her.
+    expect(await screen.findByText('belegt')).toBeInTheDocument();
   });
 
   it('bietet den Rückweg an einem unbelegten Platz gar nicht erst an', async () => {
