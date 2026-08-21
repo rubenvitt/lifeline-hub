@@ -1,5 +1,6 @@
-import { Button, Card, Col, DatePicker, Input, InputNumber, Form, Row } from 'antd';
+import { Card, Col, DatePicker, Input, InputNumber, Form, Row } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
+import { ErfassungsFormular } from '../components/Erfassung';
 import type { NeueErinnerung } from '../api/types';
 
 const { TextArea } = Input;
@@ -18,9 +19,21 @@ interface FormWerte {
   empfaenger: string;
 }
 
+/**
+ * Wiederholfelder einer Erinnerungs-Serie (LFH-343 · C8, Befund H52). Wer mehrere
+ * Erinnerungen hintereinander setzt, adressiert meist dieselbe Funktion im selben
+ * Takt; der ANLASS wechselt und wird geleert.
+ */
+const UEBERNAHME: (keyof FormWerte & string)[] = ['empfaenger', 'intervall'];
+
 interface Props {
   senden: boolean;
-  onAnlegen: (daten: NeueErinnerung) => void;
+  /**
+   * Anlegen. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
+   * die Erfassungshülle lässt die Eingabe nur dann stehen, wenn sie den
+   * Fehlschlag sieht (LFH-332/B4).
+   */
+  onAnlegen: (daten: NeueErinnerung) => Promise<unknown>;
   /** Umschließende Card mit Titel rendern. `false` für Inline-/Modal-Einbettung,
    *  wo der Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
@@ -29,24 +42,34 @@ interface Props {
 export default function ErinnerungFormular({ senden, onAnlegen, card = true }: Props) {
   const [form] = Form.useForm<FormWerte>();
 
-  const onFinish = (w: FormWerte) => {
-    if (!w.faellig) return; // durch Pflicht-Rule abgedeckt, hier nur Typ-Guard
-    onAnlegen({
+  // Das `return` ist tragend: die Hülle wartet auf diese Zusage und lässt die
+  // Felder stehen, wenn sie bricht (LFH-332/B4).
+  const absenden = (w: FormWerte) => {
+    // Durch die Pflicht-Rule abgedeckt; hier nur Typ-Guard. Ablehnen statt still
+    // zurückkehren, sonst räumte die Hülle ein Formular, das nichts gespeichert hat.
+    if (!w.faellig) return Promise.reject(new Error('Keine Fälligkeit'));
+    return onAnlegen({
       titel: w.titel.trim(),
       beschreibung: w.beschreibung?.trim() || undefined,
       faellig_at: dayjsZuWire(w.faellig),
       intervall_minuten: w.intervall ?? undefined,
       empfaenger_funktion: w.empfaenger?.trim() || undefined,
     });
-    form.resetFields(); // Default-Datum (initialValues) bleibt erhalten
   };
 
   const formular = (
-    <Form<FormWerte>
+    <ErfassungsFormular<FormWerte>
       form={form}
-      layout="vertical"
-      onFinish={onFinish}
       initialValues={{ titel: '', beschreibung: '', faellig: dayjs(), intervall: null, empfaenger: '' }}
+      onErfassen={absenden}
+      // Das Inline-Formular schliesst sich nach dem Anlegen NICHT — Zuklappen ist
+      // ausdrückliche Nutzeraktion über den Kopf-Umschalter oder das Kreuz an der
+      // Card (LFH-332/B4, angewandt in LFH-343 · C8).
+      onFertig={() => {}}
+      laeuft={senden}
+      erfassenText="Anlegen"
+      serie
+      uebernahme={UEBERNAHME}
     >
       <Form.Item
         name="titel"
@@ -77,8 +100,7 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true }: P
       <Form.Item name="empfaenger" label="Empfänger/Funktion (optional)">
         <Input aria-label="Empfänger" />
       </Form.Item>
-      <Button type="primary" htmlType="submit" loading={senden} block>Anlegen</Button>
-    </Form>
+    </ErfassungsFormular>
   );
 
   if (!card) return formular;

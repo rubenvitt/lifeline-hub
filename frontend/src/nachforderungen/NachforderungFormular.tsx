@@ -1,5 +1,6 @@
-import { Button, Card, Col, Form, Input, InputNumber, Row } from 'antd';
+import { Card, Col, Form, Input, InputNumber, Row } from 'antd';
 import { Select } from '../components/Select';
+import { ErfassungsFormular } from '../components/Erfassung';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
 
 const { TextArea } = Input;
@@ -22,17 +23,32 @@ interface FormWerte {
   begruendung: string;
 }
 
+/**
+ * Wiederholfelder einer Nachforderungs-Serie (LFH-343 · C8, Befund H52). Wer
+ * nachfordert, fordert meist mehreres bei DERSELBEN Stelle nach; Art und
+ * Bezeichnung wechseln und werden geleert.
+ */
+const UEBERNAHME: (keyof FormWerte & string)[] = [
+  'adressatKategorie', 'adressatBezeichnung', 'prioritaet',
+];
+
 export default function NachforderungFormular({ senden, onAnlegen, card = true }: {
   senden: boolean;
-  onAnlegen: (d: NeueNachforderung) => void;
+  /**
+   * Absetzen. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
+   * die Erfassungshülle lässt die Eingabe nur dann stehen, wenn sie den
+   * Fehlschlag sieht (LFH-332/B4).
+   */
+  onAnlegen: (d: NeueNachforderung) => Promise<unknown>;
   /** Umschließende Card mit Titel rendern. `false` für Inline-Einbettung, wo der
    *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
 }) {
   const [form] = Form.useForm<FormWerte>();
 
-  const onFinish = (w: FormWerte) => {
-    onAnlegen({
+  // Das `return` ist tragend: die Hülle wartet auf diese Zusage (LFH-332/B4).
+  const absenden = (w: FormWerte) => {
+    return onAnlegen({
       art: w.art.trim(),
       bezeichnung: w.bezeichnung.trim(),
       anzahl: w.anzahl ?? undefined,
@@ -41,18 +57,23 @@ export default function NachforderungFormular({ senden, onAnlegen, card = true }
       begruendung: w.begruendung?.trim() || undefined,
       prioritaet: w.prioritaet,
     });
-    form.resetFields();
   };
 
   const formular = (
-    <Form<FormWerte>
+    <ErfassungsFormular<FormWerte>
       form={form}
-      layout="vertical"
-      onFinish={onFinish}
       initialValues={{
         art: '', anzahl: null, bezeichnung: '', adressatKategorie: 'leitstelle',
         adressatBezeichnung: '', prioritaet: 'normal', begruendung: '',
       }}
+      onErfassen={absenden}
+      // Das Inline-Formular schliesst sich nach dem Absetzen NICHT — Zuklappen ist
+      // ausdrückliche Nutzeraktion (LFH-332/B4, angewandt in LFH-343 · C8).
+      onFertig={() => {}}
+      laeuft={senden}
+      erfassenText="Nachforderung absetzen"
+      serie
+      uebernahme={UEBERNAHME}
     >
       <Row gutter={16}>
         <Col xs={24} sm={16}>
@@ -105,8 +126,7 @@ export default function NachforderungFormular({ senden, onAnlegen, card = true }
           </Form.Item>
         </Col>
       </Row>
-      <Button type="primary" htmlType="submit" loading={senden} block>Nachforderung absetzen</Button>
-    </Form>
+    </ErfassungsFormular>
   );
 
   if (!card) return formular;

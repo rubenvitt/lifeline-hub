@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import { App as AntApp } from 'antd';
 import ErinnerungenPage from './ErinnerungenPage';
+import { erledigeErinnerung, oeffneErinnerung, quittiereErinnerung } from '../api/erinnerungen';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
@@ -27,6 +28,10 @@ vi.mock('../api/erinnerungen', () => {
         status: 'quittiert', erledigt_at: null, quittiert_at: '2026-06-10 12:30:00', ist_faellig: false },
     ]),
     legeErinnerungAn: vi.fn(), erledigeErinnerung: vi.fn(), quittiereErinnerung: vi.fn(),
+    // Rückweg der beiden Abschluss-Aktionen (LFH-343 · C8). Fehlte der Eintrag,
+    // wäre der Import zur Laufzeit `undefined` — und der Bruch fiele erst auf,
+    // wenn jemand tatsächlich auf „Rückgängig" klickt.
+    oeffneErinnerung: vi.fn(),
   };
 });
 
@@ -61,5 +66,35 @@ describe('ErinnerungenPage', () => {
     expect(await screen.findByText('Ablöse erledigt')).toBeInTheDocument();
     expect(screen.getByText('Zur Kenntnis')).toBeInTheDocument();
     expect(screen.queryByText('Lagemeldung')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Befund H50 (LFH-343 · C8): beide Abschluss-Aktionen kosteten zwei Klicks
+   * (Knopf + Popconfirm-Bestätigung). Seither schaltet der erste Klick, und der
+   * Rückweg steht im Toast — er ist erst seit derselben Änderung baubar, vorher
+   * kannte das Backend keine Rücknahme.
+   */
+  it('erledigt mit einem Klick und nimmt es über den Rückgängig-Knopf zurück', async () => {
+    vi.mocked(erledigeErinnerung).mockResolvedValue({} as Awaited<ReturnType<typeof erledigeErinnerung>>);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Lagemeldung')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Erledigt/ }));
+    await waitFor(() => expect(erledigeErinnerung).toHaveBeenCalledWith(1, 7));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(oeffneErinnerung).toHaveBeenCalledWith(1, 7));
+  });
+
+  it('quittiert mit einem Klick und bietet denselben Rückweg an', async () => {
+    vi.mocked(quittiereErinnerung).mockResolvedValue({} as Awaited<ReturnType<typeof quittiereErinnerung>>);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Lagemeldung')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Quittieren/ }));
+    await waitFor(() => expect(quittiereErinnerung).toHaveBeenCalledWith(1, 7));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(oeffneErinnerung).toHaveBeenCalledWith(1, 7));
   });
 });

@@ -52,7 +52,11 @@ export default function NachforderungenPage() {
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueNachforderung) => legeNachforderungAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); setFormOffen(false); },
+    // LFH-343/C8: kein `setFormOffen(false)` mehr — das Inline-Formular bleibt
+    // offen, damit die nächste Nachforderung ohne Aufklappen weitergeht. Der
+    // conditional Render der Card würde es sonst unmounten, samt Serienzähler
+    // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
+    onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); },
     onError: fehler,
   });
   /**
@@ -173,7 +177,9 @@ export default function NachforderungenPage() {
           <NachforderungFormular
             card={false}
             senden={anlegenMutation.isPending}
-            onAnlegen={(d) => anlegenMutation.mutate(d)}
+            // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die
+            // Nachforderung wirklich angekommen ist (LFH-332/B4).
+            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
         </Card>
       )}
