@@ -85,9 +85,12 @@ const SRC = (() => {
  * bekommen nur waagerechten Scrollcontainer, stehende Kopfzeile und fixierte Kennung. Ihr
  * Guard-Ort ist deshalb dieses Inventar und nicht `datensicht.guard.test.ts`.
  *
- * `etb/EtbTabelle.tsx` ist die neunzehnte Konsumentin und steht bewusst NICHT hier: sie
- * arbeitet auf einem serverseitigen 100-Zeilen-Fenster. Ihre Aufnahme ist ein benannter
- * Restposten (LFH-330 · AP8), kein stiller Nebeneffekt.
+ * `etb/EtbTabelle.tsx` war die neunzehnte Konsumentin und ist seit LFH-342 · C7 **nach
+ * oben** herausgefallen — dieselbe Bewegung wie bei `pages/SchaedenPage.tsx` in C5: sie
+ * bindet `KatalogTabelle` nicht mehr selbst ein, sondern läuft über `Datensicht` (das
+ * seinerseits durch das Primitiv rendert). Ihr Guard-Ort ist damit
+ * `datensicht.guard.test.ts`, wo sie zugleich der erste und einzige Eintrag in
+ * `KARTEN_EIGENBAU` ist. Der Restposten LFH-330 · AP8 ist eingelöst und nicht mehr offen.
  */
 const KATALOGE = [
   'stammdaten/QualifikationenTab.tsx',

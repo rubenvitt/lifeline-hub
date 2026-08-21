@@ -45,10 +45,19 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
 
   const zeile = page.locator('tr', { hasText: inhalt });
   await expect(zeile).toBeVisible();
-  const eintragId = await zeile.getAttribute('data-row-key');
-  expect(eintragId).toBeTruthy();
+  const zeilenSchluessel = await zeile.getAttribute('data-row-key');
+  expect(zeilenSchluessel).toBeTruthy();
+  /*
+   * Der Zeilenschlüssel trägt seit LFH-342 · C7 das Sortenpräfix (`eintrag-<id>`) — die
+   * Queue-`id` eines offline gepufferten Eintrags kollidierte sonst mit der DB-`id`. Der
+   * Query-Param nimmt weiterhin die nackte DB-`id`; ohne diese Trennung ginge
+   * `?eintrag=eintrag-9` an `parseRouteId` vorbei und der Sprung liefe still ins Leere.
+   */
+  const eintragId = zeilenSchluessel!.replace(/^eintrag-/, '');
+  expect(eintragId).toMatch(/^\d+$/);
 
   // Deeplink auf den Eintrag → Highlight-Klasse muss am <tr> erscheinen.
   await page.goto(`/einsaetze/${eid}/etb?eintrag=${eintragId}`);
-  await expect(page.locator(`tr[data-row-key="${eintragId}"]`)).toHaveClass(/zeile-hervorgehoben/);
+  await expect(page.locator(`tr[data-row-key="${zeilenSchluessel}"]`))
+    .toHaveClass(/zeile-hervorgehoben/);
 });

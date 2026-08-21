@@ -4,15 +4,53 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import type { ComponentProps } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
+import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
+import { setzeViewportBreite } from '../test/viewport';
+import { baueZeilen, type EtbZeile } from './etbZeile';
 import EtbTabelle from './EtbTabelle';
 
-/** EtbTabelle ist seit den Backlink-Badges router-abhängig → in MemoryRouter rendern. */
-function renderTabelle(props: Omit<ComponentProps<typeof EtbTabelle>, 'einsatzId'> & { einsatzId?: number }) {
+type TabellenProps = ComponentProps<typeof EtbTabelle>;
+
+/**
+ * EtbTabelle ist seit den Backlink-Badges router-abhängig → in MemoryRouter rendern.
+ *
+ * Der Helfer nimmt weiterhin `eintraege` entgegen und baut daraus die Chronologie: die
+ * Bestandsfälle prüfen Aussagen über gesendete Einträge, und die haben sich durch den
+ * Umbau auf `Datensicht` (LFH-342 · C7) nicht geändert — nur die Prop-Form. Wer eine
+ * gepufferte Zeile braucht, gibt `zeilen` direkt.
+ */
+function renderTabelle(
+  props: Omit<Partial<TabellenProps>, 'zeilen'>
+    & { eintraege?: EtbEintragAnzeige[]; zeilen?: readonly EtbZeile[] },
+) {
+  const { eintraege, zeilen, ...rest } = props;
   return render(
     <MemoryRouter>
-      <EtbTabelle einsatzId={1} {...props} />
+      <EtbTabelle
+        einsatzId={1}
+        zeilen={zeilen ?? baueZeilen({ eintraege: eintraege ?? [], ausstehend: [], abgelehnt: [] })}
+        {...rest}
+      />
     </MemoryRouter>,
   );
+}
+
+function ausstehend(over: Partial<AusstehenderEintrag> = {}): AusstehenderEintrag {
+  return {
+    id: 1, benutzer_id: 1, einsatz_id: 1,
+    eintrag: { typ: 'meldung', inhalt: 'Noch nicht gesendet' },
+    erstellt_at: '2026-05-23 10:05:00',
+    ...over,
+  };
+}
+
+function abgelehnt(over: Partial<AbgelehnterEintrag> = {}): AbgelehnterEintrag {
+  return {
+    ...ausstehend(),
+    grund: 'Einsatz abgeschlossen',
+    abgelehnt_at: '2026-05-23 10:06:00',
+    ...over,
+  };
 }
 
 function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
@@ -40,6 +78,11 @@ function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
 
 describe('EtbTabelle', () => {
   it('zeigt Inhalt, Typ-Label und Von→An', () => {
+    // 1600 px, weil `Von → An` seit LFH-342 `abBreite: 'xxl'` trägt: bei der
+    // Testvorgabe 1024 ist die Spalte zu Recht ausgeblendet. Die Aussage dieses
+    // Bestandsfalls ist „die Spalte zeigt den Wert", nicht „sie ist immer da" —
+    // dafür gibt es unten einen eigenen Fall.
+    setzeViewportBreite(1600);
     renderTabelle({ eintraege: [eintrag()] });
     expect(screen.getByText('Lage erkundet')).toBeInTheDocument();
     expect(screen.getByText('Meldung')).toBeInTheDocument();
@@ -121,7 +164,9 @@ describe('EtbTabelle', () => {
 
   it('hebt den per highlightId adressierten Eintrag hervor (LFH-25 ?eintrag=)', () => {
     const { container } = renderTabelle({ eintraege: [eintrag({ id: 9 })], highlightId: 9 });
-    expect(container.querySelector('[data-row-key="9"]')).toHaveClass('zeile-hervorgehoben');
+    // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix — die Queue-`id` eines
+    // gepufferten Eintrags kollidierte sonst mit der DB-`id`.
+    expect(container.querySelector('[data-row-key="eintrag-9"]')).toHaveClass('zeile-hervorgehoben');
   });
 });
 
@@ -292,5 +337,136 @@ describe('EtbTabelle – Datenzustände (LFH-331 · B3)', () => {
     // Ruhezustand, eine Zusicherung darauf wäre unabhängig vom Prop grün (gemessen).
     const { container } = renderTabelle({ eintraege: [], ladend: true });
     expect(container.querySelector('.ant-spin-spinning')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Der Umbau auf `Datensicht` (LFH-342 · C7, Befunde H59/H64/M82).
+ *
+ * Die Chronologie war auf jedem Schirm eine Tabelle mit sieben Spalten; im Fükw blieben
+ * dem Meldungstext 149 px von 1033. Die Zusicherungen hier decken die drei Hälften ab,
+ * die jsdom belegen KANN — die tatsächlichen Pixelbreiten misst erst Playwright.
+ */
+describe('EtbTabelle – Chronologie auf dem Datensicht-Primitiv (LFH-342 · C7)', () => {
+  it('löst die Tabelle unter md in Ereigniszeilen auf', () => {
+    setzeViewportBreite(390);
+    renderTabelle({ eintraege: [eintrag()] });
+    // GENAU EIN Zweig im Baum: eine verborgene Tabelle daneben machte jede
+    // Schmal-Zusicherung bedeutungslos (Datensicht-Zusicherung 1).
+    expect(screen.queryAllByRole('table')).toHaveLength(0);
+    expect(screen.getAllByTestId('etb-ereigniszeile')).toHaveLength(1);
+  });
+
+  it('bleibt ab md eine Tabelle', () => {
+    setzeViewportBreite(768);
+    renderTabelle({ eintraege: [eintrag()] });
+    // `getAllBy…`: antd rendert bei fixierter Kennungsspalte zwei `<table>` (Kopf und
+    // Rumpf getrennt) — `getByRole` schlüge an der Mehrzahl fehl, nicht an der Sache.
+    expect(screen.getAllByRole('table').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('etb-ereigniszeile')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Das Spaltenbudget IST die ≥50-%-Zusicherung des Tickets, in jsdom prüfbarer Form:
+   * bei 1366 px (antd `xl`, nicht `xxl`) sind Von→An und Erfasser aus, und der Zähler
+   * sagt es. Ohne die zweite Hälfte wäre „Spalte weg" von „Spalte kaputt" nicht zu
+   * unterscheiden.
+   */
+  it('blendet Von→An und Erfasser bei 1366 px aus und zählt sie', () => {
+    setzeViewportBreite(1366);
+    renderTabelle({ eintraege: [eintrag()] });
+    expect(screen.queryByRole('columnheader', { name: 'Von → An' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Erfasser' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
+    // Der Inhalt bleibt — er ist der Grund für die Ausblendung.
+    expect(screen.getByRole('columnheader', { name: 'Inhalt' })).toBeInTheDocument();
+  });
+
+  it('zeigt beide Spalten wieder, sobald der Schirm sie trägt', () => {
+    setzeViewportBreite(1600);
+    renderTabelle({ eintraege: [eintrag()] });
+    expect(screen.getByRole('columnheader', { name: 'Von → An' })).toBeInTheDocument();
+    // Der zugängliche Name trägt die Sicht-Bezeichnung („Spalten — Einsatztagebuch");
+    // die Gegenaussage ist die Abwesenheit des Zählers — steht dort einer, ist etwas
+    // ausgeblendet, obwohl der Schirm es trägt.
+    expect(screen.getByRole('button', { name: 'Spalten — Einsatztagebuch' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ausgeblendet/ })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Der Deeplink-Sprung muss in BEIDEN Zweigen ankommen. `Datensicht` gibt beim
+   * Eigenbau `karte.render(...)` roh zurück — die Marke `data-lfh="datensicht-karte"`
+   * und die Hervorhebungsklasse muss der Renderer selbst setzen, sonst liefe
+   * `scrolleZurZeile` unter md ins Leere.
+   */
+  it('markiert die adressierte Zeile auch im Kartenzweig', () => {
+    setzeViewportBreite(390);
+    const { container } = renderTabelle({ eintraege: [eintrag({ id: 9 })], highlightId: 9 });
+    const karte = container.querySelector('[data-lfh="datensicht-karte"]');
+    expect(karte).not.toBeNull();
+    expect(karte).toHaveClass('zeile-hervorgehoben');
+  });
+});
+
+/**
+ * Gepufferte Einträge stehen IN der Chronologie, nicht nur im Banner (Befund M82).
+ *
+ * Vorher sah, wer das Tagebuch las, einen Stand, in dem die eigene gerade erfasste
+ * Meldung nicht vorkam — in einer beweissichernden Unterlage der teuerste Fehlermodus.
+ */
+describe('EtbTabelle – gepufferte Einträge (LFH-342 · C7, Befund M82)', () => {
+  it('zeigt einen ausstehenden Eintrag als eigene Zeile', () => {
+    renderTabelle({
+      zeilen: baueZeilen({ eintraege: [eintrag()], ausstehend: [ausstehend()], abgelehnt: [] }),
+    });
+    expect(screen.getByText('Noch nicht gesendet')).toBeInTheDocument();
+    // Statt einer laufenden Nummer der Sendezustand: die Nummer vergibt der Server,
+    // eine erfundene verschwiege, dass hier etwas aussteht.
+    expect(screen.getByText('wird gesendet …')).toBeInTheDocument();
+  });
+
+  it('gibt einer ausstehenden Zeile keine Zeilenaktionen', async () => {
+    renderTabelle({
+      zeilen: baueZeilen({ eintraege: [], ausstehend: [ausstehend()], abgelehnt: [] }),
+      onBerichtigen: vi.fn(),
+      onWiedervorlage: vi.fn(),
+      onAuftragErteilen: vi.fn(),
+    });
+    // Ein Eintrag, der noch nicht im Tagebuch steht, lässt sich nicht berichtigen und
+    // trägt keinen Auftrag.
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Eintrag/ })).not.toBeInTheDocument();
+  });
+
+  it('bietet an einer abgelehnten Zeile beide Auswege offen an', async () => {
+    const onErneutSenden = vi.fn();
+    const onVerwerfen = vi.fn();
+    const zeilen = baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [abgelehnt()] });
+    renderTabelle({ zeilen, onErneutSenden, onVerwerfen });
+    expect(screen.getByText('abgelehnt')).toBeInTheDocument();
+    // Kein Menü: eine Ablehnung verlangt eine Entscheidung, und beide Wege stehen da.
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
+    expect(onErneutSenden).toHaveBeenCalledWith(expect.objectContaining({ grund: 'Einsatz abgeschlossen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    expect(onVerwerfen).toHaveBeenCalledWith(expect.objectContaining({ grund: 'Einsatz abgeschlossen' }));
+  });
+
+  /**
+   * Die Zusicherung, die der reine Render-Test NICHT trägt: eine Zeile, die WÄHREND
+   * der Anzeige eintrifft, muss erscheinen. `Datensicht` friert bei `zufluss:
+   * 'sammelbanner'` (Vorgabe) Zeilenmenge und -reihenfolge ein, SOLANGE der Fokus in
+   * der Sicht liegt — im Betrieb liegt er in der Schnellerfassung, also außerhalb.
+   */
+  it('nimmt eine nachträglich eintreffende Zeile auf, solange der Fokus außerhalb liegt', () => {
+    const { rerender } = renderTabelle({ eintraege: [eintrag()] });
+    expect(screen.queryByText('Noch nicht gesendet')).not.toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <EtbTabelle
+          einsatzId={1}
+          zeilen={baueZeilen({ eintraege: [eintrag()], ausstehend: [ausstehend()], abgelehnt: [] })}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Noch nicht gesendet')).toBeInTheDocument();
   });
 });

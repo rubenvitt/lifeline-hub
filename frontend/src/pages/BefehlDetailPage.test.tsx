@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -15,7 +16,7 @@ const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'e
 
 function renderAt(bid: number | string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const ergebnis = render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
@@ -29,6 +30,33 @@ function renderAt(bid: number | string) {
       </AntApp>
     </QueryClientProvider>,
   );
+  return {
+    ...ergebnis,
+    /**
+     * Stellt den Serverstand um und löst denselben Weg aus wie der SSE-Listener:
+     * Invalidierung → Refetch → neues `befehlQuery.data`.
+     *
+     * Ein `vi.fn()`-Ersatz oder ein bloßes `rerender` träfe den Fall NICHT — der
+     * gemessene Fehlermodus entsteht genau dann, wenn ein FRISCHER Datensatz eine
+     * Runde später eintrifft, während im Formular schon getippt wurde.
+     */
+    rerenderMitBefehl: async (neu: object) => {
+      const vorher = vi.mocked(befehleApi.ladeBefehl).mock.calls.length;
+      vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(neu as never);
+      await act(async () => {
+        await qc.invalidateQueries();
+      });
+      /*
+       * Auf den ABGESCHLOSSENEN Refetch warten, nicht bloß auf das Invalidieren.
+       * Ohne das besteht ein nachfolgendes `waitFor(… 'Meine Fassung')` beim ERSTEN
+       * Versuch — der alte Wert steht ja noch da —, und die Zusicherung wäre grün,
+       * auch wenn der Refetch das Feld gleich darauf überschriebe (gemessen: der
+       * Test war ohne diese Zeile grün, bevor es einen Riegel gab).
+       */
+      await waitFor(() =>
+        expect(vi.mocked(befehleApi.ladeBefehl).mock.calls.length).toBeGreaterThan(vorher));
+    },
+  };
 }
 
 beforeEach(() => {
@@ -69,5 +97,132 @@ describe('BefehlDetailPage', () => {
     renderAt(7);
     const link = await screen.findByRole('link', { name: /ETB-Eintrag/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=5');
+  });
+});
+
+/**
+ * Verlustschutz am Befehlsentwurf (LFH-342 · C7, Befund N18).
+ *
+ * Ein Befehl entsteht in mehreren Minuten Schreibarbeit, und der Entwurf lag bis hierher
+ * ausschließlich im Formularspeicher: kein Autosave, kein Verlassen-Schutz — und der
+ * SSE-Refetch schrieb bei jeder Invalidierung den Serverstand über das, was gerade
+ * getippt wurde.
+ */
+describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () => {
+  beforeEach(() => {
+    // `mockClear` ist hier nicht Kosmetik: die Suite läuft ohne `clearMocks`, und die
+    // Aufrufzählungen dieses Blocks sind die Zusicherung. Ohne das Räumen zählte
+    // „speichert nichts" die Aufrufe des vorigen Falls mit und wäre rot, ohne dass am
+    // Produktivcode etwas falsch ist (gemessen).
+    vi.mocked(befehleApi.aktualisiereBefehl).mockClear();
+    vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
+  });
+
+  it('überschreibt ein berührtes Feld NICHT mit dem nachgelieferten Serverstand', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    const { rerenderMitBefehl } = renderAt(7);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.clear(titel);
+    await userEvent.type(titel, 'Meine Fassung');
+
+    // Der Server liefert eine fremde Fassung nach (SSE-Invalidierung → Refetch).
+    await rerenderMitBefehl({ ...befehl('entwurf'), titel: 'Fremde Fassung' });
+
+    /*
+     * ZUERST warten, bis der neue Stand nachweislich ANGEKOMMEN ist — die Überschrift
+     * kommt aus `befehlQuery.data` und nicht aus dem Formular, sie ist also der
+     * unabhängige Zeuge. Ohne diesen Schritt bestünde die Zusicherung darunter beim
+     * ersten Versuch (der alte Wert steht ja noch im Feld) und wäre auch ohne jeden
+     * Riegel grün — gemessen.
+     */
+    await screen.findByRole('heading', { name: 'Fremde Fassung' });
+    expect(screen.getByLabelText('Titel')).toHaveValue('Meine Fassung');
+  });
+
+  it('übernimmt den Serverstand weiterhin, solange nichts berührt wurde', async () => {
+    // Die Gegenaussage, und sie ist die eigentliche Prüfung: ein Riegel, der IMMER
+    // blockiert, machte die Seite still veraltet — und wäre mit dem Test darüber
+    // allein nicht davon zu unterscheiden.
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    const { rerenderMitBefehl } = renderAt(7);
+    await screen.findByLabelText('Titel');
+
+    await rerenderMitBefehl({ ...befehl('entwurf'), titel: 'Neu vom Server' });
+
+    await screen.findByRole('heading', { name: 'Neu vom Server' });
+    expect(screen.getByLabelText('Titel')).toHaveValue('Neu vom Server');
+  });
+
+  it('speichert eine berührte Fassung nach der Autosave-Frist von selbst', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+      const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderAt(7);
+      const titel = await screen.findByLabelText('Titel');
+      await nutzer.type(titel, 'x');
+      expect(befehleApi.aktualisiereBefehl).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(31_000);
+      });
+      await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalled());
+      // Und der Zeitstempel sagt es sichtbar — ein Autosave, den niemand sieht,
+      // ist von „nicht gespeichert" nicht zu unterscheiden.
+      expect(await screen.findByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('speichert nichts, solange nichts berührt wurde', () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+      renderAt(7);
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      // Ein Autosave ohne Änderung erzeugte alle 30 s ein PATCH samt Invalidierung
+      // und Live-Ereignis — für nichts.
+      expect(befehleApi.aktualisiereBefehl).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('speichert beim Verlassen eines Feldes, ohne auf die Frist zu warten', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, 'x');
+    // Ein verlassenes Feld ist der Moment, in dem ein Abschnitt fertig gedacht ist —
+    // und der Griff, der einem In-App-Seitenwechsel IMMER vorausgeht: der Klick auf
+    // die Brotkrume blurrt das Feld zuerst.
+    await userEvent.tab();
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalled());
+  });
+
+  it('warnt beim Reload, solange eine Fassung ungespeichert ist', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, 'noch nicht gespeichert');
+
+    const ereignis = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(ereignis);
+    expect(ereignis.defaultPrevented).toBe(true);
+  });
+
+  it('warnt NICHT, wenn nichts offen ist', async () => {
+    // Die Gegenaussage: ein Warner, der immer hängt, macht jeden Reload zur Rückfrage
+    // und wird nach dem dritten Mal weggeklickt, ohne gelesen zu werden.
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    await screen.findByLabelText('Titel');
+
+    const ereignis = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(ereignis);
+    expect(ereignis.defaultPrevented).toBe(false);
   });
 });

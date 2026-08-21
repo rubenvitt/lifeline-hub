@@ -89,8 +89,12 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     render(einsatzAktiv, basisSchaden({ lat: null, lon: null }));
     await screen.findByRole('heading', { name: /Schaden S-001/ });
     expect(screen.getByText('nicht verortet')).toBeInTheDocument();
+    // `%3A` statt `:` seit LFH-342: `mitQuery` kodiert seine Werte, seit der
+    // ETB-Volltextfilter Freitext durchreicht. Der Aufrufer liest über
+    // `searchParams.get()` und bekommt den Doppelpunkt zurück — der Round-Trip ist in
+    // `routing/deeplinks.test.ts` gepinnt.
     expect(screen.getByRole('link', { name: 'Auf Karte verorten' })).toHaveAttribute(
-      'href', '/einsaetze/1/lagekarte?platzieren=schaden:10',
+      'href', '/einsaetze/1/lagekarte?platzieren=schaden%3A10',
     );
   });
 

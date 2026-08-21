@@ -171,12 +171,27 @@ const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
 /**
  * Dateien, die `art: 'eigen'` im Kartenplan setzen dürfen.
  *
- * Am Tag 1 LEER, und das ist der Unterschied zu Entwurf 2, dessen Ausnahme schon am ersten
+ * Am Tag 1 LEER, und das war der Unterschied zu Entwurf 2, dessen Ausnahme schon am ersten
  * Tag belegt war und über das Band auf etwa fünf gewachsen wäre. Die UHS-Zeitleiste läuft
  * über den Plan-Modus, weil `Liste` mit ihren Trennlinien bereits die Struktur von
- * `personen/PersonVerlauf.tsx` liefert. → Bündel V füllt, falls überhaupt.
+ * `personen/PersonVerlauf.tsx` liefert.
+ *
+ * ── DER ERSTE EINTRAG, UND WARUM DER PLAN-MODUS IHN NICHT TRÄGT (LFH-342 · C7) ──
+ *
+ * Die ETB-Chronologie braucht **fünf** Kopffelder (Nr. · Zeit · Typ · Von→An · Erfasser),
+ * einen Markdown-Block über die **volle Breite** und **drei** Zeilenaktionen. Der
+ * Plan-Modus bietet Titel + Status + höchstens DREI Sekundärfelder + genau EINE
+ * Primäraktion — im Plan-Modus fielen Berichtigen, Wiedervorlage und Auftrag unter `md`
+ * also ersatzlos weg, und der Meldungstext stünde als Etikett/Wert-Paar neben den
+ * anderen Feldern statt darunter. An einem beweissichernden Tagebuch ist beides kein
+ * hinnehmbarer Verlust; genau H59/H64 war der Anlass des Umbaus.
+ *
+ * Was der Eigenbau dafür SELBST tragen muss, steht im Dateikopf von `etb/EtbTabelle.tsx`:
+ * `data-lfh="datensicht-karte"` (sonst findet `scrolleZurZeile` die Karte nicht) und die
+ * Zeilenklasse (sonst gilt sie nur im Tabellenzweig). Das Primitiv legt beim Eigenbau
+ * keinen Wrapper darum — wer den zweiten Eintrag hier hinzufügt, prüft beides mit.
  */
-const KARTEN_EIGENBAU: string[] = [];
+const KARTEN_EIGENBAU: string[] = ['/src/etb/EtbTabelle.tsx'];
 
 /**
  * Dateien, die `form="karte"` tragen MÜSSEN — Module, die heute schon kartenbasiert gelesen
@@ -248,6 +263,11 @@ const REITERSCHLUESSEL_OFFEN: string[] = [];
  */
 const KONSUMENTEN = [
   '/src/auftraege/BefehlListe.tsx',
+  // Elfte seit LFH-342 · C7: die ETB-Chronologie lief als neunzehnte Konsumentin direkt
+  // auf `KatalogTabelle` und war damit auf jedem Schirm eine Tabelle mit sieben Spalten.
+  // Sie ist damit — wie `SchaedenPage` in C5 — nach OBEN aus dem Katalogtabellen-Inventar
+  // herausgefallen; der Restposten LFH-330 · AP8 ist eingelöst.
+  '/src/etb/EtbTabelle.tsx',
   '/src/pages/FahrzeugePage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
@@ -786,10 +806,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
   });
 
   it('die fünf gepflegten Listen stehen auf dem entschiedenen Stand', () => {
-    // `KARTEN_EIGENBAU` bleibt leer, und das ist die Aussage: kein Modul dieses Pakets
-    // brauchte einen eigenen Kartenrenderer. Wer den ersten einträgt, muss begründen, warum
-    // der Plan-Modus nicht reicht — sonst wächst die Ausnahme über das Band auf fünf.
-    expect(KARTEN_EIGENBAU).toHaveLength(0);
+    // GENAU EINER seit LFH-342 · C7, und die Begründung steht über der Liste: die
+    // ETB-Ereigniszeile passt strukturell nicht in den Plan-Modus (fünf Kopffelder,
+    // Volltextblock, drei Aktionen gegen Titel + Status + drei Felder + eine Aktion).
+    // Wer den zweiten einträgt, begründet ebenso — sonst wächst die Ausnahme über das
+    // Band auf fünf und der Kartenplan wäre nur noch ein Vorschlag.
+    expect(KARTEN_EIGENBAU).toHaveLength(1);
     // Zwei Kartenmodule, eine Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am
     // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
     expect(NUR_KARTE).toHaveLength(2);

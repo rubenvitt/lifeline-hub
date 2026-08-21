@@ -126,7 +126,9 @@ describe('EtbPage', () => {
     const { container } = setup('/einsaetze/7/etb?eintrag=1');
     await screen.findByText('Erste Meldung');
     await waitFor(() =>
-      expect(container.querySelector('[data-row-key="1"]')).toHaveClass('zeile-hervorgehoben'),
+      // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix (`eintrag-<id>`) —
+      // die Queue-`id` eines gepufferten Eintrags kollidierte sonst mit der DB-`id`.
+      expect(container.querySelector('[data-row-key="eintrag-1"]')).toHaveClass('zeile-hervorgehoben'),
     );
     // Adressier-Param wird nach dem Anwenden geräumt (apply-then-clean).
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
@@ -160,7 +162,7 @@ describe('EtbPage', () => {
     // Der Ziel-Eintrag liegt erst auf Seite 2 → muss automatisch nachgeladen werden.
     expect(await screen.findByText('Ziel-Eintrag')).toBeInTheDocument();
     await waitFor(() =>
-      expect(container.querySelector('[data-row-key="5"]')).toHaveClass('zeile-hervorgehoben'),
+      expect(container.querySelector('[data-row-key="eintrag-5"]')).toHaveClass('zeile-hervorgehoben'),
     );
   });
 
@@ -434,5 +436,81 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
 
     expect(ereignis.defaultPrevented).toBe(false);
     expect(suche).toHaveValue('zzz');
+  });
+
+  /**
+   * Der Filter steht in der URL (LFH-342 · C7, Befund M80). Vorher lag er allein im
+   * Seitenzustand: ein Reload warf ihn weg, teilen ließ er sich nicht.
+   */
+  describe('Filter in der URL', () => {
+    it('liest einen Filter beim Kaltstart aus der URL — Abruf UND sichtbare Leiste', async () => {
+      const abrufe: string[] = [];
+      setupMit(
+        [
+          http.get('/api/einsaetze/7/etb', ({ request }) => {
+            const p = new URL(request.url).searchParams;
+            abrufe.push(p.toString());
+            return HttpResponse.json(p.get('q') === 'brand' ? [eintrag] : []);
+          }),
+        ],
+        '/einsaetze/7/etb?q=brand&typ=meldung',
+      );
+      await screen.findByText('Erste Meldung');
+      // Der Abruf trägt den Filter — ohne das wäre die Leiste bloß Zierde.
+      expect(abrufe.some((a) => a.includes('q=brand') && a.includes('typ=meldung'))).toBe(true);
+      // Und die Leiste zeigt ihn. Beide Hälften: ein Filter, der nur im Query-Key
+      // steht, ist von außen nicht als gesetzt erkennbar.
+      expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
+      expect(screen.getByTitle('Meldung')).toBeInTheDocument();
+    });
+
+    it('schreibt einen getippten Suchbegriff in die URL', async () => {
+      setupMit([
+        http.get('/api/einsaetze/7/etb', ({ request }) =>
+          HttpResponse.json(new URL(request.url).searchParams.has('q') ? [] : [eintrag]),
+        ),
+      ]);
+      await screen.findByText('Erste Meldung');
+      await userEvent.type(screen.getByPlaceholderText('Volltextsuche'), 'zzz');
+      await waitFor(() =>
+        expect(screen.getByTestId('ort-suche')).toHaveTextContent('q=zzz'));
+    });
+
+    it('räumt beim Zurücksetzen die URL, nicht nur den Seitenzustand', async () => {
+      setupMit(
+        [
+          http.get('/api/einsaetze/7/etb', ({ request }) =>
+            HttpResponse.json(new URL(request.url).searchParams.has('q') ? [] : [eintrag]),
+          ),
+        ],
+        '/einsaetze/7/etb?q=zzz',
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'Filter zurücksetzen' }));
+      await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+      // Die Leiste wird dabei neu aufgesetzt — die Gegenaussage zum Batching-Fall:
+      // ein Remount in DERSELBEN Runde schriebe den alten Begriff zurück ins Feld.
+      expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('');
+    });
+
+    it('lässt die Sprungmarke ?eintrag= unberührt neben dem Filter stehen', async () => {
+      const abrufe: string[] = [];
+      setupMit(
+        [
+          http.get('/api/einsaetze/7/etb', ({ request }) => {
+            abrufe.push(new URL(request.url).searchParams.toString());
+            return HttpResponse.json([eintrag]);
+          }),
+        ],
+        '/einsaetze/7/etb?typ=meldung&eintrag=1',
+      );
+      await screen.findByText('Erste Meldung');
+      // `eintrag` wird nach dem Sprung geräumt, der Filter NICHT mitgerissen.
+      await waitFor(() =>
+        expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('eintrag='));
+      expect(screen.getByTestId('ort-suche')).toHaveTextContent('typ=meldung');
+      // Und `eintrag` ist nie in den Abruf geraten — es ist eine Sprungmarke,
+      // kein Filter.
+      expect(abrufe.every((a) => !a.includes('eintrag='))).toBe(true);
+    });
   });
 });
