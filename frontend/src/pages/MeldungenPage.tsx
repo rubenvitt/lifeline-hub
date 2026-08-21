@@ -181,7 +181,7 @@ export default function MeldungenPage() {
       // eine Rücknahme, die keine ist.
       const quelle = (meldungenQuery.data ?? []).find((m) => m.id === meldungId);
       if (quelle && quelle.status !== 'in_bearbeitung' && quelle.status !== 'erledigt') {
-        statusMutation.mutate({ meldungId, status: 'in_bearbeitung', zurueck: true });
+        statusMutation.mutate({ meldungId, status: 'in_bearbeitung' });
       }
       message.success('Auftrag aus Meldung erteilt');
     },

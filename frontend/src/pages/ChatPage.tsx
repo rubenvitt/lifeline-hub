@@ -1,5 +1,5 @@
-import { Alert, App, Breadcrumb, Button, Col, Row, Spin, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { Alert, App, Badge, Breadcrumb, Button, Col, Row, Segmented, Spin, Typography } from 'antd';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -21,7 +21,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { BezugTyp, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import KanalListe from '../chat/KanalListe';
+import KanalListe, { sortiereKanaele } from '../chat/KanalListe';
 import NachrichtenStrom from '../chat/NachrichtenStrom';
 import NachrichtEingabe from '../chat/NachrichtEingabe';
 import HeraufstufenModal from '../chat/HeraufstufenModal';
@@ -34,11 +34,13 @@ import {
   type BezugKurzinfo, type BezugOptionen,
 } from '../chat/bezug';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
+import { useViewport } from '../components/useViewport';
 
 export default function ChatPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { message } = App.useApp();
+  const { istSchmal } = useViewport();
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const [kanalAuswahl, setKanalAuswahl] = useState<{
@@ -70,6 +72,58 @@ export default function ChatPage() {
     document.addEventListener('visibilitychange', aktualisieren);
     return () => document.removeEventListener('visibilitychange', aktualisieren);
   }, []);
+
+  /**
+   * Die Höhenkette der Chat-Seite (LFH-343 · C8, Befund H51).
+   *
+   * `flex: 1; min-height: 0; overflow-y: auto` scrollt NICHTS, solange kein
+   * Vorfahr eine begrenzte Höhe hat — und keiner hat sie: `AppLayout` und
+   * `EinsatzLayout` setzen `minHeight: '100vh'`, der `<Content>` wächst mit
+   * seinem Inhalt. Die Begrenzung muss also von dieser Seite selbst kommen.
+   *
+   * Gemessen statt gerechnet: die Wurzel liest ihren eigenen Abstand zum
+   * Dokumentanfang und nimmt den Rest des Fensters. Ein fester Abzug bräuchte
+   * die Kopfhöhe als Zahl — und die gibt es nirgends als Variable (`rollen.css`
+   * kennt nur `--lfh-kopf-polsterung`), sie käme aus antds Layout-Token und
+   * wäre bei jeder Themeänderung falsch.
+   *
+   * `dvh`, nicht `vh`: auf dem Handschirm frisst die Browserleiste sonst genau
+   * so viel, wie die Eingabe hoch ist.
+   */
+  const wurzel = useRef<HTMLDivElement | null>(null);
+  const [hoehe, setHoehe] = useState<string | undefined>(undefined);
+
+  const messen = useCallback(() => {
+    const el = wurzel.current;
+    if (!el) return;
+    // `scrollY` addieren: `top` ist viewport-relativ und wäre nach einem Scroll
+    // zu klein. Die Seite scrollt zwar nicht mehr, aber die Messung darf sich
+    // nicht darauf verlassen.
+    const oben = Math.round(el.getBoundingClientRect().top + window.scrollY);
+    setHoehe(`calc(100dvh - ${oben}px - var(--lfh-seiten-polsterung))`);
+  }, []);
+
+  /**
+   * Callback-Ref statt `useEffect(…, [])` — und das ist kein Stilfrage.
+   *
+   * Die Seite kehrt oberhalb dieser Stelle früh zurück, solange der Einsatz lädt
+   * (Spinner). Ein Mount-Effekt liefe also, WÄHREND es die Wurzel noch gar nicht
+   * gibt: `ref.current` wäre null, die Messung fiele aus, und der Effekt käme
+   * nie wieder — die Höhe bliebe für immer `undefined`. Gemessen: genau so blieb
+   * die Eingabe unterhalb des Bildes (Playwright „viewport ratio 0").
+   *
+   * Der Callback-Ref feuert dagegen in dem Moment, in dem der Knoten wirklich
+   * eingehängt wird.
+   */
+  const wurzelRef = useCallback((el: HTMLDivElement | null) => {
+    wurzel.current = el;
+    if (el) messen();
+  }, [messen]);
+
+  useEffect(() => {
+    window.addEventListener('resize', messen);
+    return () => window.removeEventListener('resize', messen);
+  }, [messen]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -298,7 +352,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div>
+    <div ref={wurzelRef} style={{ display: 'flex', flexDirection: 'column', height: hoehe }}>
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
@@ -312,20 +366,55 @@ export default function ChatPage() {
         kanaeleQuery.dataUpdatedAt,
         nachrichtenQuery.dataUpdatedAt,
       )} />
-      <Row gutter={16}>
-        <Col flex="220px">
-          <KanalListe
-            kanaele={kanaele}
-            aktiverKanalId={kanalId}
-            onWechsel={(neuerKanalId) => setKanalAuswahl({
-              einsatzId,
-              kanalId: neuerKanalId,
-            })}
-            darfSchreiben={darfSchreiben}
-            onKanalAnlegen={(name, beschreibung) => kanalMutation.mutate({ name, beschreibung })}
+      {/* Unter `md` steht die Kanalauswahl als waagerechte Leiste ÜBER dem Strom,
+          statt als Spalte daneben — auf 390 px bliebe für den Strom sonst nichts
+          übrig. Sie wird bedingt gerendert und nicht bloß ausgeblendet: sonst
+          stünden beide Navigationen im Baum und die Aussage „unter md ist es die
+          Leiste" wäre nicht prüfbar (dieselbe Regel wie beim Navigations-Drawer,
+          LFH-329/B1). */}
+      {istSchmal && (
+        <div data-testid="kanal-leiste" style={{ marginBottom: 12, overflowX: 'auto' }}>
+          <Segmented
+            value={kanalId ?? undefined}
+            onChange={(v) => setKanalAuswahl({ einsatzId, kanalId: Number(v) })}
+            options={sortiereKanaele(kanaele).map((k) => ({
+              value: k.id,
+              // Ungelesen-Punkt am Etikett — dieselbe Auskunft wie in der Spalte.
+              label: <Badge dot={k.ungelesen_anzahl > 0} status="processing" offset={[6, 0]}>{k.name}</Badge>,
+            }))}
           />
-        </Col>
-        <Col flex="auto">
+        </div>
+      )}
+      {/* `flexWrap: 'nowrap'` ist tragend und keine Kosmetik — gemessen im Browser:
+          `ant-row` bringt `flex-wrap: wrap` mit, und eine umbrechende Flex-Zeile
+          bemisst sich an ihrem Inhalt, statt ihre Kinder auf die Containerhöhe zu
+          strecken. Der Col stand damit auf 1081 px in einem 619 px hohen Row, die
+          Begrenzung lief ins Leere und die Eingabe blieb unter dem Bild.
+          Unbedenklich, weil unter `md` ohnehin nur EIN Col in der Zeile steht. */}
+      <Row gutter={16} style={{ flex: 1, minHeight: 0, flexWrap: 'nowrap', alignItems: 'stretch' }}>
+        {!istSchmal && (
+          <Col data-testid="kanal-spalte" md={6} lg={5} style={{ overflowY: 'auto' }}>
+            <KanalListe
+              kanaele={kanaele}
+              aktiverKanalId={kanalId}
+              onWechsel={(neuerKanalId) => setKanalAuswahl({
+                einsatzId,
+                kanalId: neuerKanalId,
+              })}
+              darfSchreiben={darfSchreiben}
+              onKanalAnlegen={(name, beschreibung) => kanalMutation.mutate({ name, beschreibung })}
+            />
+          </Col>
+        )}
+        {/* Der Strom ist selbst eine Flex-Spalte: Nachrichten wachsen (mit eigenem
+            Scroll-Container), Eingabe und Hinweise bleiben als nicht scrollende
+            Geschwister darunter verankert. */}
+        <Col
+          xs={24}
+          md={istSchmal ? 24 : 18}
+          lg={istSchmal ? 24 : 19}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}
+        >
           {nachrichtenQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }}
               title="Nachrichten konnten nicht geladen werden" />

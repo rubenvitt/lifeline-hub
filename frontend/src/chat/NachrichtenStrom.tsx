@@ -1,6 +1,7 @@
 import { MoreOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { Button, Dropdown, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
 import type { MenuProps } from 'antd';
+import { useEffect, useRef } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../kommunikation';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
@@ -36,7 +37,39 @@ export default function NachrichtenStrom({
   nachrichten, eigeneBenutzerId, darfSchreiben, onBearbeiten, onLoeschen, onHeraufstufen, onHeraufstufenAuftrag,
   onBezugSetzen, onBezugLoeschen, bezugLabel, bezugInfo,
 }: Props) {
+  const behaelter = useRef<HTMLDivElement>(null);
+  // Die id der JÜNGSTEN Nachricht — sie unterscheidet die beiden Wachstumsrichtungen
+  // (Begründung am Effekt unten). `nachrichten` ist aufsteigend sortiert.
+  const juengsteId = nachrichten.length > 0 ? nachrichten[nachrichten.length - 1].id : null;
+
+  /**
+   * „Stick to bottom" — aber nur nach unten (LFH-343 · C8, Befund H51).
+   *
+   * Der Strom wächst an ZWEI Enden: hinten durch neue Nachrichten und den
+   * Kanalwechsel, vorne durch „Ältere laden". Ein Effekt auf `nachrichten.length`
+   * träfe beide und risse den Lesenden beim Nachladen aus dem, was er gerade
+   * liest. Die jüngste id wächst nur im ersten Fall — beim Anbau vorne bleibt sie
+   * gleich, obwohl die Länge steigt.
+   *
+   * `scrollTo` wird optional gerufen: jsdom kennt die Methode auf Elementen nicht
+   * (dieselbe Vorsichtsmaßnahme wie bei `scrollIntoView` in `MeldungenPage`).
+   */
+  useEffect(() => {
+    if (juengsteId === null) return;
+    const el = behaelter.current;
+    el?.scrollTo?.({ top: el.scrollHeight });
+  }, [juengsteId]);
+
   return (
+    <div
+      ref={behaelter}
+      data-testid="nachrichten-strom"
+      // Der eigene Scroll-Container ist der Kern von H51: ohne ihn wächst der
+      // Strom die Seite lang, und die Eingabe darunter wandert aus dem Bild.
+      // `minHeight: 0` ist tragend — ein Flex-Kind schrumpft ohne die Aufhebung
+      // seiner Mindestgröße nicht unter seinen Inhalt, und dann scrollt nichts.
+      style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+    >
     <Liste<ChatNachricht>
       dataSource={nachrichten}
       emptyText="Noch keine Nachrichten"
@@ -172,5 +205,6 @@ export default function NachrichtenStrom({
         );
       }}
     />
+    </div>
   );
 }
