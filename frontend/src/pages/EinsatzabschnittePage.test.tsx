@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
@@ -344,5 +345,30 @@ describe('EinsatzabschnittePage', () => {
     // Edit-Modus: keine Zusammenfassung mehr (nur Inputs)
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     expect(screen.queryByTestId('funk-erreichbarkeit')).not.toBeInTheDocument();
+  });
+
+  // Task 4 (LFH-341 · H40): unter `md` stapeln Gliederung und Detail, statt die 360-px-Karte
+  // neben den Inhalt zu quetschen. Wie bei `GefahrenPage` (dort `lg`) ist die Behauptung die
+  // Flex-RICHTUNG, nicht eine Pixelbreite — jsdom rechnet kein Layout. Beide Fälle zusammen
+  // sind die Behauptung: nur „column bei 600" wäre auch bei fest verdrahtetem `column` erfüllt.
+  it('stellt Gliederung und Detail ab md nebeneinander', async () => {
+    server.use(...handlers());
+    setzeViewportBreite(1024);
+    renderPage();
+
+    const rahmen = await screen.findByTestId('abschnitte-rahmen');
+    expect(rahmen.style.flexDirection).toBe('row');
+  });
+
+  it('stapelt unter md und nimmt der Gliederung die feste Breite', async () => {
+    server.use(...handlers());
+    setzeViewportBreite(600); // < md (768)
+    renderPage();
+
+    const rahmen = await screen.findByTestId('abschnitte-rahmen');
+    expect(rahmen.style.flexDirection).toBe('column');
+    // Die 360-px-Karte ist der halbe Schirm bei 768 und mehr als der ganze bei 390.
+    const gliederung = await screen.findByTestId('abschnitte-gliederung');
+    expect(gliederung.style.flex).not.toContain('360px');
   });
 });

@@ -16,6 +16,7 @@ import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import SektionHeader from '../../components/SektionHeader';
 import StatusTag from '../../components/StatusTag';
+import { useViewport } from '../../components/useViewport';
 import { brStatus } from '../../theme/statusFarben';
 import { abstand, flaeche } from '../../theme/tokens';
 
@@ -26,6 +27,8 @@ export default function BrDetailPage() {
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
   const listenPfad = bereitstellungsraeumePfad(einsatzId);
+  const { abBreite } = useViewport();
+  const breit = abBreite('md');
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -161,7 +164,14 @@ export default function BrDetailPage() {
         <Descriptions.Item label="Notiz" span={2}>{br.notiz ?? '—'}</Descriptions.Item>
       </Descriptions>
 
-      <div style={{ display: 'flex', gap: abstand.lg, alignItems: 'flex-start' }}>
+      {/* Unter `md` stapeln statt der 240-px-Sidebar neben dem Hauptbereich (LFH-341 · H40) —
+          dieselbe Form wie Gefahrengebietsliste und Gliederungsbaum. Ohne diese Weiche würde
+          die volle Breite der `KraefteOhneBrSidebar`-Karte den Flex-Container weiterhin in
+          eine Spalte quetschen, obwohl die Karte selbst schon auf `100%` steht. */}
+      <div
+        data-testid="br-detail-rahmen"
+        style={{ display: 'flex', flexDirection: breit ? 'row' : 'column', gap: abstand.lg, alignItems: breit ? 'flex-start' : 'stretch' }}
+      >
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
           <SektionHeader titel="Bereitgestellte Einheiten" />

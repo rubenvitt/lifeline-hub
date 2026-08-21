@@ -1,8 +1,8 @@
-import { App, Button, Card, Dropdown, Form, Input, InputNumber, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { App, Button, Card, Dropdown, Form, Input, InputNumber, Space, Tabs, Tag, Tooltip, Typography, theme } from 'antd';
 import { Select } from '../../components/Select';
 import {
   CarOutlined, CheckCircleOutlined, DeleteOutlined, LockOutlined, LogoutOutlined,
-  SyncOutlined, ToolOutlined, UserAddOutlined,
+  RollbackOutlined, SyncOutlined, ToolOutlined, UserAddOutlined,
 } from '@ant-design/icons';
 import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
+import { useViewport } from '../../components/useViewport';
 
 // Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
 // im Backend) bleiben, damit absolut platzierte Karten einander nicht überlappen, und
@@ -110,8 +111,19 @@ function personLabel(person: Person): string {
   return person.name ? `${nr} · ${person.name}` : `${nr} · unbekannt`;
 }
 
-interface PersonenkartenProps { person: Person | undefined; kompakt?: boolean; }
-function Personenkarte({ person, kompakt }: PersonenkartenProps) {
+interface PersonenkartenProps {
+  person: Person | undefined;
+  kompakt?: boolean;
+  /**
+   * Test-Marke am gerenderten Tag. Nur das DragOverlay setzt sie (LFH-341 · C6): ohne
+   * eine Marke am schwebenden Knoten ist „der Drag läuft WIRKLICH" im Playwright nicht
+   * behauptbar, und der Scroll-Nachweis fällt auf den billigen Scrolltest zurück, den B5g
+   * schon hat. Am Tag statt an einer zusätzlichen Hülle, damit der Overlay-Teilbaum
+   * unverändert bleibt.
+   */
+  testId?: string;
+}
+function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
   if (!person) return null;
   // `kompakt` (auf der Platz-Karte): Label einzeilig mit Ellipsis kappen, damit die
   // absolut positionierte, belegte Karte unabhängig von der Namenslänge eine stabile
@@ -119,7 +131,7 @@ function Personenkarte({ person, kompakt }: PersonenkartenProps) {
   const style: React.CSSProperties = kompakt
     ? { margin: 2, maxWidth: 124, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
     : { margin: 2 };
-  return <Tag color="default" style={style} title={kompakt ? personLabel(person) : undefined}>{personLabel(person)}</Tag>;
+  return <Tag color="default" style={style} data-testid={testId} title={kompakt ? personLabel(person) : undefined}>{personLabel(person)}</Tag>;
 }
 
 function PersonenkarteDrag({ person, disabled, kompakt, onOeffnen }: { person: Person; disabled: boolean; kompakt?: boolean; onOeffnen?: (personId: number) => void }) {
@@ -160,9 +172,11 @@ interface PlatzKarteProps {
   onStorno: () => void;
   onOeffnen: (personId: number) => void;
   onZuweisen: () => void;
+  /** Nur gesetzt, wenn der Platz belegt ist — sonst gibt es nichts zurückzustellen. */
+  onZurueckInWartebereich?: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen, onZuweisen }: PlatzKarteProps) {
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen, onZuweisen, onZurueckInWartebereich }: PlatzKarteProps) {
   // Platz-Karte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus —
   // Drag-Source (Layout verschieben). Mit @dnd-kit beides am selben Knoten.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
@@ -226,6 +240,19 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
   const menu = {
     items: [
       ...(zuweisbar ? [{ key: 'zuweisen', label: 'Patient zuweisen', icon: <UserAddOutlined /> }, { type: 'divider' as const }] : []),
+      // Rückweg in den Wartebereich (LFH-341 · H40): der Drag auf `drop-inbox` ist unter
+      // `lg` strukturell weg — das Droppable liegt in einem anderen Reiter, und die Tabs
+      // tragen `destroyOnHidden` (Begründung am Reiter-Zweig unten; ohne die Prop bliebe
+      // eine einmal besuchte Pane montiert).
+      // Das `icon` ist Zierde neben dem Eintragstext, aber NICHT unsichtbar für die
+      // Vorlesehilfe: ein `@ant-design/icons`-Knoten bringt sein eigenes englisches
+      // `aria-label` mit, das in den zugänglichen Namen einfliesst (gemessen, CLAUDE.md —
+      // der Eintrag heisst „rollback Zurück in den Wartebereich"). Eine `aria-hidden`-Hülle
+      // ist im Menü-Item nicht vorgesehen; die Tests greifen deshalb per TEILSTRING, nie
+      // per exaktem Namen — dieselbe Regel wie bei der Aktionsbündelung.
+      ...(onZurueckInWartebereich
+        ? [{ key: 'wartebereich', label: 'Zurück in den Wartebereich', icon: <RollbackOutlined /> }]
+        : []),
       ...verfItems,
       ...(bearbeitbar ? [{ type: 'divider' as const }, { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }] : []),
     ],
@@ -239,6 +266,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     // Dropdown hängt. Wer den Auslöser von dort wegbewegt, muss den Riegel mitnehmen.
     onClick: ({ key }: { key: string }) => {
       if (key === 'zuweisen') onZuweisen();
+      else if (key === 'wartebereich') onZurueckInWartebereich?.();
       else if (key === 'storno') onStorno();
       else onVerfuegbarkeit(key as Verfuegbarkeit);
     },
@@ -277,7 +305,12 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
       </div>
       {/* Belegung: feste Höhe reserviert, auch wenn leer → Karte bleibt gleich groß.
           Belegte Person ist ziehbar (→ Wartebereich links oder Transport rechts); im
-          Bearbeiten-Modus deaktiviert, damit sie nicht mit dem Platz-Drag kollidiert. */}
+          Bearbeiten-Modus deaktiviert, damit sie nicht mit dem Platz-Drag kollidiert.
+          Der Drag ist seit LFH-341/H40 NICHT mehr der einzige Weg zurück in den
+          Wartebereich — „Zurück in den Wartebereich" im Menü ruft dieselbe Mutation.
+          Unter `lg` (Reiter-Weiche) ist der Drag für DIESE Richtung sogar gar keiner
+          mehr: Quelle (Platz) und Ziel (`drop-inbox`) liegen dann in verschiedenen
+          Reitern, das Droppable ist nicht im Baum. */}
       <div style={{ height: 24, overflow: 'hidden' }}>
         {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || bearbeitbar} kompakt onOeffnen={onOeffnen} />}
       </div>
@@ -332,7 +365,10 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
         {/* Weitere Platz-Aktionen (Verfügbarkeit, im Edit auch Löschen) — auch Nicht-Edit. */}
         {!schreibgeschuetzt && (
           <Dropdown menu={menu} trigger={['click']}>
-            <Button size="small" type="text" aria-label="Platzaktionen" onPointerDown={(e) => e.stopPropagation()}>…</Button>
+            {/* Zeilenkennung im Namen (LFH-378-Folgeauflösung): n Plätze lieferten mit
+                bloßem „Platzaktionen" n gleichnamige Knöpfe — CLAUDE.md verlangt den
+                Bezug auf den Datensatz, für Neues UND ohnehin Angefasstes. */}
+            <Button size="small" type="text" aria-label={`Platzaktionen zu ${platz.bezeichnung}`} onPointerDown={(e) => e.stopPropagation()}>…</Button>
           </Dropdown>
         )}
       </div>
@@ -342,7 +378,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
 
 /** Schmale Personen-Liste als Spalten-Karte (links: Eingang/Wartebereich). */
 function PersonenSpalte({
-  titel, personen, schreibgeschuetzt, droppableId, leerText, onOeffnen,
+  titel, personen, schreibgeschuetzt, droppableId, leerText, onOeffnen, onVerbleib,
 }: {
   titel: string;
   personen: Person[];
@@ -350,6 +386,24 @@ function PersonenSpalte({
   droppableId?: string;
   leerText: string;
   onOeffnen: (personId: number) => void;
+  /**
+   * Verbleib erfassen — der ZWEITE Bedienweg, den der Reiter-Umbruch sonst genommen hätte
+   * (Abschluss-Review LFH-341 · C6). Gemessen: `onDragEnd` nimmt `kind === 'transport'`
+   * von JEDER Person entgegen, also auch aus dem Wartebereich und aus „Noch nicht
+   * aufgenommen"; das Droppable `drop-transport` liegt unter `lg` aber im Reiter
+   * „Transport". Die direkten Knöpfe „Verbleib / Entlassung erfassen" und „zurückweisen"
+   * sitzen ausschliesslich auf der PlatzKarte und nur bei BELEGTEM Platz, und
+   * `PersonDetailDrawer` ist mutationsfrei — eine Person im Wartebereich, die
+   * abtransportiert wird oder weggeht, hätte im Grundriss also keinen Verbleib mehr
+   * bekommen können. Dieselbe Einsicht wie beim Rückweg-Menüeintrag oben; zwei Bewegungen
+   * mit derselben Ursache verschieden zu behandeln wäre ein Unterschied ohne Bedeutung.
+   *
+   * NICHT gesetzt heisst „kein Schreibrecht" — der Auslöser wird dann GAR NICHT gerendert,
+   * nicht deaktiviert. Die Prop-Anwesenheit ist bewusst der Riegel und nicht das
+   * `schreibgeschuetzt` daneben: das trägt zusätzlich `belegMut.isPending`, der Auslöser
+   * flackerte damit während jeder Belegung weg.
+   */
+  onVerbleib?: (person: Person) => void;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({ id: droppableId ?? `nodrop-${titel}`, data: { kind: 'inbox' }, disabled: !droppableId });
@@ -362,7 +416,34 @@ function PersonenSpalte({
       style={{ background: droppableId && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
       <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
-        {personen.map((p) => <PersonenkarteDrag key={p.id} person={p} disabled={schreibgeschuetzt} onOeffnen={onOeffnen} />)}
+        {personen.map((p) => (
+          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <PersonenkarteDrag person={p} disabled={schreibgeschuetzt} onOeffnen={onOeffnen} />
+            {onVerbleib && (
+              <Tooltip title="Verbleib / Entlassung erfassen">
+                {/* GESCHWISTERKNOTEN der Drag-Karte, nicht ihr Kind: so hängt der Auslöser
+                    in keinem klickbaren Vorfahren und braucht weder `stopPropagation` noch
+                    den `onPointerDown`-Riegel, den die vier Knöpfe INNERHALB der Platzkarte
+                    schulden (dort ist die Karte selbst Drag-Source). Dieselbe Auflösung,
+                    die `MetaChip` in LFH-367 genommen hat.
+                    Ein echter antd-`Button` OHNE `size`: er erbt `controlHeight` vom
+                    `ConfigProvider` und schuldet damit nicht die zwei Angaben, die
+                    LFH-365 einem handgebauten Bedienziel auferlegt. Der zugängliche Name
+                    trägt die Zeilenkennung — n Zeilen lieferten sonst n gleichnamige
+                    Knöpfe. Die Ikone steckt in einer `aria-hidden`-Hülle: ein
+                    `@ant-design/icons`-Knoten brächte sonst sein eigenes englisches
+                    `aria-label` als zweites Vorleseziel in jede Zeile (CLAUDE.md,
+                    Muster `kraefte/AmpelZelle.tsx`). */}
+                <Button
+                  type="text"
+                  aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
+                  icon={<span aria-hidden="true"><CarOutlined /></span>}
+                  onClick={() => onVerbleib(p)}
+                />
+              </Tooltip>
+            )}
+          </div>
+        ))}
         {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
       </div>
     </Card>
@@ -411,6 +492,10 @@ export default function Grundriss({
   // Sensors: PointerSensor mit 5px-Aktivierungsdistanz (sonst klickt jeder Click den Drag aus),
   // KeyboardSensor für Tests/Accessibility.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
+  // Breakpoint-Weiche (LFH-341 · H40): ab `lg` wie bisher nebeneinander, darunter drei
+  // Reiter. Details am Rahmen-`div` im JSX unten.
+  const { abBreite } = useViewport();
+  const breit = abBreite('lg');
 
   // Bauphase (geplant) → Plätze-Bearbeitung ist Primäraktion und standardmäßig an.
   // Aktiv → Patienten zuweisen steht im Vordergrund, Bearbeiten ist sekundär (Toggle).
@@ -645,98 +730,187 @@ export default function Grundriss({
 
   const aktivePerson = aktivePersonId != null ? personen.find((p) => p.id === aktivePersonId) : undefined;
 
-  return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-      <div style={{ display: 'flex', gap: 12, height: '100%', minHeight: 0, alignItems: 'stretch' }}>
-        {/* LINKS: Eingang / Wartebereich */}
-        <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
-          <PersonenSpalte
-            titel="Noch nicht aufgenommen"
-            personen={nichtAufgenommen}
-            schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
-            leerText="keine"
-            onOeffnen={setDetailPersonId}
-          />
-          <PersonenSpalte
-            titel="Wartebereich (Eingang)"
-            personen={wartebereichPersonen}
-            schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
-            droppableId="drop-inbox"
-            leerText="leer"
-            onOeffnen={setDetailPersonId}
-          />
-        </div>
+  // Die drei Bereiche stehen EINMAL. Zwei Zweige mit je eigener Kopie wären zwei
+  // Wahrheiten über dieselbe Spalte — und die Droppable-IDs kämen doppelt vor, sobald
+  // irgendwann jemand `forceRender` setzt (LFH-341 · H40).
+  const wartebereich = (
+    // Test-Marke am SCROLLCONTAINER, nicht an einer der beiden Karten darin: die
+    // touchAction-Entscheidung aus LFH-367/B5g hängt genau an diesem Knoten — er trägt
+    // `overflow: auto`, hier scrollt also der Finger (LFH-341 · C6).
+    <div
+      data-testid="warteliste-scroll"
+      style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'auto', height: '100%' }}
+    >
+      {/* `onVerbleib` an BEIDEN Listen, nicht nur am Wartebereich: die Lücke ist an beiden
+          dieselbe (nachgemessen im Abschluss-Review) — `onDragEnd` nahm `kind: 'transport'`
+          von jeder Person entgegen, und `drop-transport` liegt unter `lg` im dritten
+          Reiter. Eine Person unter „Noch nicht aufgenommen" verlässt die Liste sauber,
+          sobald sie einen Verbleib trägt (`!p.aktueller_verbleib` im Filter oben). */}
+      <PersonenSpalte
+        titel="Noch nicht aufgenommen"
+        personen={nichtAufgenommen}
+        schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+        leerText="keine"
+        onOeffnen={setDetailPersonId}
+        onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
+      />
+      <PersonenSpalte
+        titel="Wartebereich (Eingang)"
+        personen={wartebereichPersonen}
+        schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+        droppableId="drop-inbox"
+        leerText="leer"
+        onOeffnen={setDetailPersonId}
+        onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
+      />
+    </div>
+  );
 
-        {/* MITTE: Unfallhilfsstelle */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-            <Typography.Text strong>Unfallhilfsstelle</Typography.Text>
-            {!schreibgeschuetzt && (
-              uhs.status === 'geplant'
-                ? <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
-                : (
-                  <Space>
-                    <Button
-                      type={platzBearbeitung ? 'primary' : 'text'}
-                      onClick={() => setPlatzBearbeitung((v) => !v)}
-                    >
-                      {platzBearbeitung ? 'Bearbeiten beenden' : 'Plätze bearbeiten'}
-                    </Button>
-                    {platzEditAktiv && <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />}
-                  </Space>
-                )
-            )}
-          </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', border: `1px dashed ${token.colorBorder}`, background: token.colorBgLayout, borderRadius: 4 }}>
-            <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
-              {uhs.plaetze.map((p) => (
-                <PlatzKarte
-                  key={p.id}
-                  platz={p}
-                  belegtVon={belegtAn(p.id)}
-                  schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
-                  bearbeitbar={platzEditAktiv && !layoutMut.isPending}
-                  onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
-                  onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
-                  onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
-                  onStorno={() => stornoMut.mutate(p.id)}
-                  onOeffnen={setDetailPersonId}
-                  onZuweisen={() => {
-                    // Ohne Kandidaten gar nicht erst öffnen: der Dialog trüge einen
-                    // Primär-Knopf, der nichts erfasst und nur schliesst — eine tote
-                    // Hauptaktion. Die Hülle kennt keinen Weg, ihn zu unterdrücken,
-                    // und sie dafür umzubauen träfe alle ihre Aufrufer.
-                    if (zuweisbarePersonen.length === 0) {
-                      message.info('Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.');
-                      return;
-                    }
-                    setZuweisenPlatz(p);
-                  }}
-                />
-              ))}
-              {uhs.plaetze.length === 0 && (
-                <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
-                  {schreibgeschuetzt
-                    ? 'Keine Plätze angelegt.'
-                    : 'Keine Plätze. Lege Plätze über „Plätze anlegen" an.'}
-                </Typography.Text>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* RECHTS: Auf Transport gebracht */}
-        <div style={{ width: 240, flexShrink: 0, overflow: 'auto' }}>
-          <TransportSpalte
-            personen={transportiert}
-            schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
-            onOeffnen={setDetailPersonId}
-          />
+  const flaeche = (
+    <div style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+        <Typography.Text strong>Unfallhilfsstelle</Typography.Text>
+        {!schreibgeschuetzt && (
+          uhs.status === 'geplant'
+            ? <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
+            : (
+              <Space>
+                <Button
+                  type={platzBearbeitung ? 'primary' : 'text'}
+                  onClick={() => setPlatzBearbeitung((v) => !v)}
+                >
+                  {platzBearbeitung ? 'Bearbeiten beenden' : 'Plätze bearbeiten'}
+                </Button>
+                {platzEditAktiv && <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />}
+              </Space>
+            )
+        )}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', border: `1px dashed ${token.colorBorder}`, background: token.colorBgLayout, borderRadius: 4 }}>
+        <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
+          {uhs.plaetze.map((p) => {
+            const belegt = belegtAn(p.id);
+            return (
+              <PlatzKarte
+                key={p.id}
+                platz={p}
+                belegtVon={belegt}
+                schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+                bearbeitbar={platzEditAktiv && !layoutMut.isPending}
+                onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
+                onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
+                onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
+                onStorno={() => stornoMut.mutate(p.id)}
+                onOeffnen={setDetailPersonId}
+                onZuweisen={() => {
+                  // Ohne Kandidaten gar nicht erst öffnen: der Dialog trüge einen
+                  // Primär-Knopf, der nichts erfasst und nur schliesst — eine tote
+                  // Hauptaktion. Die Hülle kennt keinen Weg, ihn zu unterdrücken,
+                  // und sie dafür umzubauen träfe alle ihre Aufrufer.
+                  if (zuweisbarePersonen.length === 0) {
+                    message.info('Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.');
+                    return;
+                  }
+                  setZuweisenPlatz(p);
+                }}
+                onZurueckInWartebereich={
+                  // Nur bei belegtem Platz und nur mit Schreibrecht. `belegMut` errechnet
+                  // `art` selbst — für eine Person, die bereits an dieser UHS liegt,
+                  // ergibt das `'wechsel'`. Der Eintritt in den Wartebereich IST ein
+                  // Wechsel, kein Austritt.
+                  (() => {
+                    if (!belegt || schreibgeschuetzt || belegMut.isPending) return undefined;
+                    return () => belegMut.mutate({ personId: belegt.id, platzId: null });
+                  })()
+                }
+              />
+            );
+          })}
+          {uhs.plaetze.length === 0 && (
+            <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
+              {schreibgeschuetzt
+                ? 'Keine Plätze angelegt.'
+                : 'Keine Plätze. Lege Plätze über „Plätze anlegen" an.'}
+            </Typography.Text>
+          )}
         </div>
       </div>
+    </div>
+  );
+
+  // Eigener Scroll-Container wie bei `wartebereich`: der Bereich trägt seine
+  // Overflow-Eigenschaft SELBST, damit sie im Tabs-Zweig nicht fehlt (dort steht der
+  // Knoten nackt im Reiterinhalt — ohne diesen Wrapper liefe eine lange Transport-Liste
+  // auf schmalem Schirm über den Reiter hinaus).
+  const transport = (
+    <div style={{ height: '100%', minHeight: 0, overflow: 'auto' }}>
+      <TransportSpalte
+        personen={transportiert}
+        schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+        onOeffnen={setDetailPersonId}
+      />
+    </div>
+  );
+
+  return (
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+      {breit ? (
+        <div
+          data-testid="grundriss-rahmen"
+          style={{ display: 'flex', flexDirection: 'row', gap: 12, height: '100%', minHeight: 0, alignItems: 'stretch' }}
+        >
+          {/* LINKS: Eingang / Wartebereich */}
+          <div style={{ width: 240, flexShrink: 0, minHeight: 0 }}>{wartebereich}</div>
+          {/* MITTE: Unfallhilfsstelle */}
+          {flaeche}
+          {/* RECHTS: Auf Transport gebracht */}
+          <div style={{ width: 240, flexShrink: 0, minHeight: 0 }}>{transport}</div>
+        </div>
+      ) : (
+        /**
+         * UNTER `lg` GESTAPELT (LFH-341 · H40). Die beiden Seitenspalten waren mit
+         * `width: 240, flexShrink: 0` plus zweimal `gap: 12` ein 504-px-Sockel VOR einer
+         * Fläche, deren Innenbreite bei `Math.max(700, …)` beginnt — bei 390 px sprengten
+         * allein die Spalten den Schirm.
+         *
+         * GENAU EIN ZWEIG IM BAUM — dieselbe Entscheidung wie beim Navigations-Drawer aus
+         * B1 und die erste Zusicherung von `Datensicht`. Ein verborgener zweiter machte die
+         * Prüfung „unter lg nicht nebeneinander" bedeutungslos und trüge `drop-inbox`
+         * doppelt.
+         *
+         * Getragen wird sie von `destroyOnHidden`, NICHT vom Fehlen eines `forceRender` —
+         * das ist gemessen und korrigiert eine Behauptung, die dieser Bau vier Mal aufstellte:
+         * antd reicht `destroyOnHidden ?? destroyInactiveTabPane` an `@rc-component/tabs`
+         * durch (`antd/es/tabs/index.js:157`); sind beide `undefined`, ergibt das
+         * `removeOnLeave: false`, und eine einmal BESUCHTE Pane bleibt dauerhaft montiert —
+         * nur mit `display: none` und `aria-hidden`. Ohne die Prop hielte die Aussage also
+         * exakt bis zum ersten Reiterwechsel.
+         *
+         * FOLGE, und sie ist gewollt: der Drag von der Warteliste auf einen Platz ist hier
+         * strukturell unmöglich — Quelle und Ziel liegen in verschiedenen Reitern. Der Weg
+         * auf schmalem Schirm ist der Klickweg aus LFH-367/B5g („Patient zuweisen" am
+         * unbelegten Platz), der Rückweg ist „Zurück in den Wartebereich" im Platzaktionen-
+         * Menü. Deshalb ist die Fläche der Default-Reiter.
+         */
+        <div
+          data-testid="grundriss-rahmen"
+          style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', minHeight: 0 }}
+        >
+          <Tabs
+            defaultActiveKey="flaeche"
+            destroyOnHidden
+            style={{ height: '100%' }}
+            items={[
+              { key: 'flaeche', label: 'Fläche', children: flaeche },
+              { key: 'warte', label: 'Wartebereich', children: wartebereich },
+              { key: 'transport', label: 'Transport', children: transport },
+            ]}
+          />
+        </div>
+      )}
       {/* Portal-Overlay: folgt dem Cursor auf Body-Ebene, beeinflusst keine Scroll-Region. */}
       <DragOverlay>
-        {aktivePerson ? <Personenkarte person={aktivePerson} /> : null}
+        {aktivePerson ? <Personenkarte person={aktivePerson} testId="drag-overlay" /> : null}
       </DragOverlay>
 
       {/* Abschluss-Screen „Verbleib erfassen" — Art wählbar (Default Transport, vom

@@ -205,6 +205,16 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
 });
 
+describe('personenAufnahmePfad', () => {
+  it('bleibt ohne UHS-Auftrag die nackte Route', () => {
+    expect(personenAufnahmePfad(4)).toBe('/einsaetze/4/personen/aufnahme');
+  });
+
+  it('trägt den UHS-Auftrag als Query-Param', () => {
+    expect(personenAufnahmePfad(4, { uhs: 7 })).toBe('/einsaetze/4/personen/aufnahme?uhs=7');
+  });
+});
+
 describe('parseRouteId — strenger als nur NaN (Number.isInteger && > 0)', () => {
   it.each([
     ['1', 1],

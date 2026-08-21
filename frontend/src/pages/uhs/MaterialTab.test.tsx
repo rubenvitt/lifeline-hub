@@ -4,7 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import type { EinsatzMaterial, UhsDetail } from '../../api/types';
+import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
 import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
 import MaterialTab from './MaterialTab';
 
@@ -230,5 +230,34 @@ describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-3
     await screen.findByText('Trage');
     expect(screen.queryByRole('button', { name: 'Lösen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Material zuordnen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Statusspalte (LFH-341 · C6). Der Wire-Wert (`desinfektion_noetig`) ist kein
+ * Bildschirmtext — Farbe und Beschriftung kommen aus `theme/statusFarben.ts`
+ * (`materialStatus`), derselben Quelle, aus der `MaterialPage` liest.
+ */
+describe('MaterialTab · Statusspalte (LFH-341 · C6)', () => {
+  it('zeigt den Materialstatus als Etikett, nie den rohen Wire-Wert', async () => {
+    render([{ ...verortet, status: 'desinfektion_noetig' as MaterialStatus }]);
+
+    expect(await screen.findByText('Desinfektion nötig')).toBeInTheDocument();
+    expect(screen.queryByText('desinfektion_noetig')).not.toBeInTheDocument();
+  });
+
+  it('lässt in keiner Statuszelle einen Unterstrich stehen', async () => {
+    const alleStatus: MaterialStatus[] = [
+      'einsatzbereit', 'im_einsatz', 'defekt', 'verbraucht', 'desinfektion_noetig',
+    ];
+    render(alleStatus.map((status, i) => ({
+      ...verortet, id: 20 + i, bezeichnung: `Material ${i}`, status,
+    })));
+
+    // Gegen die ZELLEN, nicht gegen den ganzen Baum: ein Unterstrich in einer
+    // Bezeichnung oder einem Testid wäre kein Befund und färbte den Test grundlos rot.
+    const zellen = await screen.findAllByTestId('material-status-zelle');
+    expect(zellen.length).toBeGreaterThan(0);
+    for (const zelle of zellen) expect(zelle.textContent).not.toMatch(/_/);
   });
 });

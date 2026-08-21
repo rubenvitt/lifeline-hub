@@ -8,6 +8,7 @@ import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
+import { setzeViewportBreite } from '../../test/viewport';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
 
 // -------- Fixture-Builder --------
@@ -244,5 +245,50 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'zuweisen' })).not.toBeInTheDocument();
+  });
+});
+
+// Task 4 (LFH-341 · H40): unter `md` nimmt die „Kräfte ohne BR"-Spalte die feste 240-px-Breite
+// und stellt sich mit dem Hauptbereich gestapelt statt gequetscht dar — dieselbe Form wie
+// Gefahrengebietsliste und Gliederungsbaum. Geprüft wird der Inline-Style der Karte selbst
+// (`kraefte-ohne-br`), nicht der tragende Flex-Container: nur der Karten-Style zeigt, ob die
+// feste Breite tatsächlich WEG ist, nicht bloß, dass der Rahmen umbricht.
+describe('BrDetailPage — Kräfte-Spalte bricht unter md um (LFH-341)', () => {
+  it('nimmt der Kräfte-Spalte unter md die feste Breite', async () => {
+    const br = brDetail({ einheiten: [], fahrzeuge: [] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    setzeViewportBreite(600); // < md (768)
+    renderBrDetail();
+
+    const spalte = await screen.findByTestId('kraefte-ohne-br');
+    expect(spalte.style.width).not.toBe('240px');
+    // Ohne diese Weiche quetschte der Flex-Container die 100%-Karte weiterhin in eine
+    // Spalte, obwohl ihre feste Breite schon weg ist — deshalb auch der Container selbst.
+    expect(screen.getByTestId('br-detail-rahmen').style.flexDirection).toBe('column');
+  });
+
+  it('behält die Spalte ab md bei 240 px', async () => {
+    const br = brDetail({ einheiten: [], fahrzeuge: [] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    setzeViewportBreite(1024);
+    renderBrDetail();
+
+    const spalte = await screen.findByTestId('kraefte-ohne-br');
+    expect(spalte.style.width).toBe('240px');
+    expect(screen.getByTestId('br-detail-rahmen').style.flexDirection).toBe('row');
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import * as sf from './statusFarben';
 import { antdToken, farbenDunkel, farbenHell, type Farbrollen } from './tokens';
+import type { MaterialStatus } from '../api/types';
 
 /** Vollständiger GlobalToken eines Modus — dieselbe Ableitung wie im `ThemeModeProvider`,
  *  damit der Test die echte Kette Rolle → antd-Token prüft und nicht ein Stück davon. */
@@ -17,7 +18,7 @@ const dunkelToken = tokenFuer(farbenDunkel, true);
 const ALLE_ROLLEN: sf.Statusrolle[] = ['alarm', 'achtung', 'normal', 'neutral', 'bedien', 'marke'];
 
 /** Bewusst AUS DEM MODUL abgeleitet statt handgepflegt: eine handgeschriebene Liste
- *  ließe eine zehnte Map still am Kanal-Test vorbeilaufen. Die Zahl unten ist der
+ *  ließe eine elfte Map still am Kanal-Test vorbeilaufen. Die Zahl unten ist der
  *  Wächter — kommt ein Enum dazu, wird sie laut, statt dass die Abdeckung schrumpft. */
 const ALLE_MAPS = Object.fromEntries(
   Object.entries(sf).filter(
@@ -29,11 +30,12 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle neun Vertrags-Enums ab — eine zehnte Map rutscht nicht still durch', () => {
+  it('deckt alle zehn Vertrags-Enums ab — eine elfte Map rutscht nicht still durch', () => {
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
       'belegungsArt',
       'brStatus',
       'etbTyp',
+      'materialStatus',
       'statusKategorie',
       'uhsStatus',
       'uhsTyp',
@@ -140,11 +142,40 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(sf.flaechenFarbe('keine', dunkelToken)).toBe('transparent');
   });
 
-  it('bleibt aus der Etikett-Abdeckung heraus — die Neun-Enum-Zusicherung gilt weiter', () => {
+  it('bleibt aus der Etikett-Abdeckung heraus — die Zehn-Enum-Zusicherung gilt weiter', () => {
     // `warnstufeFlaeche`-Einträge tragen KEIN `rolle`-Feld und werden von `ALLE_MAPS`
     // deshalb nicht erfasst. Das ist Absicht: eine Fläche ist keine Statusrolle, und
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(9);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(10);
+  });
+});
+
+describe('materialStatus', () => {
+  // Byte-Pin gegen HANDGESCHRIEBENE Literale, nie gegen die Konstante selbst:
+  // sonst prüfte der Test die Karte gegen sich selbst.
+  it('bildet alle fünf Wire-Werte auf Rolle und Label ab', () => {
+    expect(sf.materialStatus.einsatzbereit).toEqual({ rolle: 'normal', label: 'einsatzbereit' });
+    expect(sf.materialStatus.im_einsatz).toEqual({ rolle: 'bedien', label: 'im Einsatz' });
+    expect(sf.materialStatus.defekt).toEqual({ rolle: 'alarm', label: 'defekt' });
+    expect(sf.materialStatus.verbraucht).toEqual({ rolle: 'alarm', label: 'verbraucht' });
+    expect(sf.materialStatus.desinfektion_noetig).toEqual({
+      rolle: 'achtung',
+      label: 'Desinfektion nötig',
+    });
+  });
+
+  it('deckt das Enum vollständig ab — eine sechste Variante bricht hier', () => {
+    const alle: MaterialStatus[] = [
+      'einsatzbereit', 'im_einsatz', 'defekt', 'verbraucht', 'desinfektion_noetig',
+    ];
+    expect(Object.keys(sf.materialStatus).sort()).toEqual([...alle].sort());
+  });
+
+  it('trägt an jedem Wert den zweiten Kanal — zwei Werte teilen sich `alarm`', () => {
+    // `defekt` und `verbraucht` sind beide rot. Ohne unterscheidbares Label wäre die
+    // Farbe der einzige Kanal, und genau das verbietet WCAG 1.4.1.
+    expect(sf.materialStatus.defekt.label).not.toBe(sf.materialStatus.verbraucht.label);
+    for (const d of Object.values(sf.materialStatus)) expect(d.label.length).toBeGreaterThan(0);
   });
 });

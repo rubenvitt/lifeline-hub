@@ -4,6 +4,7 @@ import type {
   BelegungsArt,
   BrStatus,
   EtbTyp,
+  MaterialStatus,
   StatusKategorie,
   UhsStatus,
   UhsTyp,
@@ -42,9 +43,10 @@ import type {
  *
  * Ebenfalls bewusst draußen: die rund 20 Farb-/Label-Maps außerhalb der hier gelisteten
  * Enums (`personen/personMeta.ts`, `pages/schaeden/schadenHelfer.tsx`,
- * `kommunikation/phase.ts`, `MaterialPage`, `TierePage`, `clusterDonut.ts`,
- * `taktischesZeichen.ts` u. a.). Sie hineinzuziehen wäre der Bestands-Sweep, den A2
- * ausdrücklich verbietet.
+ * `kommunikation/phase.ts`, `TierePage`, `clusterDonut.ts`, `taktischesZeichen.ts` u. a.).
+ * Sie hineinzuziehen wäre der Bestands-Sweep, den A2 ausdrücklich verbietet.
+ * Der Materialstatus (`pages/MaterialPage.tsx`) stand bis LFH-341/C6 in dieser Liste —
+ * seither trägt er seine Karte HIER ({@link materialStatus}), nicht mehr draußen.
  *
  * ── DIE DRITTE DARSTELLUNGSSORTE: FLÄCHE (aufgelöst mit LFH-368 · B5h) ──────────
  *
@@ -138,6 +140,37 @@ export const uhsTyp: Record<UhsTyp, StatusDarstellung> = {
   behandlungsplatz: { rolle: 'neutral', label: 'Behandlungsplatz' },
   verletztensammelstelle: { rolle: 'neutral', label: 'Verletztensammelstelle' },
   sonstige: { rolle: 'neutral', label: 'Sonstige' },
+};
+
+/**
+ * Status eines Einsatzmaterials (früher `STATUS_META`, `pages/MaterialPage.tsx`).
+ *
+ * ── DIE FRAGE, DIE C4 OFFEN GELASSEN HAT, IST HIER BEANTWORTET (LFH-341 · C6) ────
+ *
+ * LFH-339/C4 hat für diesen Katalog bewusst KEINE Rolle vergeben und den Grund
+ * hingeschrieben: `im_einsatz` war Blau, „Rot bedient nichts, `bedien` ist blau" —
+ * also schien es für diesen Zustand keine ehrliche Rolle zu geben. C4 hat daraus
+ * nicht „nie" gemacht, sondern „eine eigene Entscheidung, kein Nebenprodukt".
+ *
+ * Die Entscheidung ist getroffen, und sie erfindet nichts: `bedien` ist in DIESER
+ * Datei bereits dreimal Kategoriefarbe für eine aktive Beziehung — `verfuegbarkeit
+ * .reserviert`, `belegungsArt.wechsel`, `etbTyp.meldung`. Material im Einsatz ist
+ * derselbe Zustand, nicht ein neuer. Die Rolle war da, sie war nur nicht erkannt.
+ *
+ * `defekt` und `verbraucht` teilen sich `alarm` — dasselbe Muster wie bei
+ * {@link warnstufeKarte}, wo fünf Stufen auf drei Rollen fallen. Der zweite Kanal ist
+ * das Pflichtfeld `label`; eine sechste Farbe gibt es dafür nicht.
+ *
+ * EIN Behandlungsweg für dieses Enum: `pages/MaterialPage.tsx` (Kräfte) und
+ * `pages/uhs/MaterialTab.tsx` (UHS) lesen beide von hier. Zwei Farbbehandlungen
+ * desselben Enums wären der Fehlerfall, nicht der Kompromiss.
+ */
+export const materialStatus: Record<MaterialStatus, StatusDarstellung> = {
+  einsatzbereit: { rolle: 'normal', label: 'einsatzbereit' },
+  im_einsatz: { rolle: 'bedien', label: 'im Einsatz' },
+  defekt: { rolle: 'alarm', label: 'defekt' },
+  verbraucht: { rolle: 'alarm', label: 'verbraucht' },
+  desinfektion_noetig: { rolle: 'achtung', label: 'Desinfektion nötig' },
 };
 
 /** Status eines Bereitstellungsraums (früher `STATUS_META`,
