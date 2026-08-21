@@ -19,6 +19,7 @@ import {
   personenPfad,
   schaedenPfad,
   etbPfad,
+  parseEtbFilter,
   personalPfad,
   einheitenPfad,
   fahrzeugePfad,
@@ -121,8 +122,22 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(personenPfad(E, { neu: true })).toBe('/einsaetze/5/personen?neu=1');
   });
   it('lagekartePfad mit Platzier-Auftrag', () => {
+    /*
+     * Der Doppelpunkt steht seit LFH-342 als `%3A` in der URL: `mitQuery` kodiert die
+     * Werte, seit der ETB-Volltextfilter Freitext durchreicht. Das ist die EINZIGE
+     * Bestandsstelle, an der die Kodierung nicht die Identität ist — und sie ist
+     * unschädlich, weil der Aufrufer den Wert über `searchParams.get()` liest, das
+     * dekodiert. Die tragende Zusicherung ist deshalb der Round-Trip darunter, nicht
+     * das rohe Zeichen in der Zeile hier.
+     */
     expect(lagekartePfad(E, { platzieren: { typ: 'schaden', id: 7 } }))
-      .toBe('/einsaetze/5/lagekarte?platzieren=schaden:7');
+      .toBe('/einsaetze/5/lagekarte?platzieren=schaden%3A7');
+  });
+  it('der Platzier-Auftrag überlebt den Weg durch die URL', () => {
+    const pfad = lagekartePfad(E, { platzieren: { typ: 'uhs', id: 3 } });
+    const params = new URLSearchParams(pfad.split('?')[1]);
+    expect(parsePlatzierenAuftrag(params.get('platzieren')))
+      .toEqual({ typ: 'uhs', id: 3 });
   });
   it('parsePlatzierenAuftrag liest den Auftrag zurück', () => {
     expect(parsePlatzierenAuftrag('schaden:7')).toEqual({ typ: 'schaden', id: 7 });
@@ -227,5 +242,43 @@ describe('parseRouteId — strenger als nur NaN (Number.isInteger && > 0)', () =
     [undefined, null],
   ])('parseRouteId(%o) -> %o', (input, expected) => {
     expect(parseRouteId(input as string | undefined)).toBe(expected);
+  });
+});
+
+describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
+  it('baut alle vier Filterwerte in die Query', () => {
+    expect(etbPfad(7, { q: 'brand', typ: 'meldung', von: '2026-08-21 06:00:00' }))
+      .toBe('/einsaetze/7/etb?q=brand&typ=meldung&von=2026-08-21%2006%3A00%3A00');
+  });
+
+  it('lässt leere Werte weg statt leere Parameter zu schreiben', () => {
+    expect(etbPfad(7, { q: '', typ: undefined })).toBe('/einsaetze/7/etb');
+  });
+
+  it('kodiert einen Suchbegriff mit Trennzeichen, statt die Query zu zerlegen', () => {
+    // Der Volltext ist Freitext. Unkodiert machte ein `&` aus einem Suchbegriff zwei
+    // Parameter, ein `=` verschöbe die Grenze zwischen Name und Wert.
+    const pfad = etbPfad(7, { q: 'a&b=c' });
+    expect(new URLSearchParams(pfad.split('?')[1]).get('q')).toBe('a&b=c');
+  });
+
+  it('parseEtbFilter liest zurück, was etbPfad geschrieben hat', () => {
+    const pfad = etbPfad(7, { q: 'br and', typ: 'meldung', von: '2026-08-21 06:00:00' });
+    const params = new URLSearchParams(pfad.split('?')[1]);
+    expect(parseEtbFilter(params)).toEqual({
+      q: 'br and', typ: 'meldung', von: '2026-08-21 06:00:00',
+    });
+  });
+
+  it('verwirft einen unbekannten Typ GANZ statt halb zu füllen', () => {
+    // Dieselbe Regel wie bei `parsePlatzierenAuftrag` (LFH-340 · C5): ein unbrauchbarer
+    // Wert ergibt keinen Filter auf diesen Wert, sondern gar keinen.
+    expect(parseEtbFilter(new URLSearchParams('q=x&typ=quatsch'))).toEqual({ q: 'x' });
+  });
+
+  it('liefert für eine leere Query ein leeres Filterobjekt', () => {
+    // Trägt die Gegenaussage zu `filterAktiv` in `EtbPage`: ohne Parameter ist kein
+    // Filter gesetzt, und der leer-OHNE-Filter-Zweig aus B3 greift.
+    expect(parseEtbFilter(new URLSearchParams(''))).toEqual({});
   });
 });

@@ -25,6 +25,8 @@
  * Stellen mit potenziell fehlender ID guarden vor dem Aufruf (kein doppelter Guard im
  * Builder).
  */
+import type { EtbFilterWerte } from '../api/etb';
+import type { EtbTyp } from '../api/types';
 
 /** Zentrale Route zur Einsatzliste. */
 export function einsaetzePfad(): string {
@@ -43,8 +45,17 @@ export function einsatzModulPfad(einsatzId: number, modulRoute: string): string 
 
 function mitQuery(pfad: string, params: Record<string, string | number | undefined>): string {
   const qs = Object.entries(params)
-    .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `${k}=${v}`)
+    // Der leere String fällt seit LFH-342 mit heraus: die ETB-Filterachse leert ihre
+    // Felder auf `''`, und `?q=` wäre ein gesetzter Filter auf nichts — `parseEtbFilter`
+    // müsste ihn wieder wegwerfen, und die URL zeigte einen Filter, den es nicht gibt.
+    .filter(([, v]) => v !== undefined && v !== '')
+    /*
+     * Kodiert seit LFH-342 · C7. Der ETB-Suchbegriff ist Freitext und darf `&`, `=` und
+     * Leerzeichen tragen; unkodiert machte ein `&` aus einem Suchbegriff zwei Parameter.
+     * Für alle Bestandswerte (Zahlen, `1`, Modulschlüssel) ist die Kodierung die
+     * Identität — deshalb ändert sich an den Bestandspins nichts.
+     */
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join('&');
   return qs ? `${pfad}?${qs}` : pfad;
 }
@@ -166,14 +177,76 @@ export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): s
   });
 }
 
+/**
+ * Erlaubte Werte des ETB-Typfilters.
+ *
+ * Ein **exhaustiver Record**, kein Array: fehlt hier eine Variante von `EtbTyp`, bricht
+ * der Typcheck (TS2739), statt dass `parseEtbFilter` sie zur Laufzeit still verwirft und
+ * ein aus der URL geladener Filter ohne Meldung leer bliebe. Dasselbe Muster wie beim
+ * Enum-Wire-Kontrakt im Backend — der exhaustive Match ist die Zusicherung, nicht der
+ * Assert daneben.
+ *
+ * Bewusst NICHT `Object.keys(etbTyp)` aus `theme/statusFarben`: das zöge die Theme- und
+ * Token-Schicht in ein reines String-Modul (und in dessen Test). Der Typimport oben
+ * verschwindet dagegen beim Übersetzen vollständig.
+ */
+const ETB_TYP_ERLAUBT: Record<EtbTyp, true> = {
+  meldung: true,
+  anordnung: true,
+  lage: true,
+  entscheidung: true,
+  system: true,
+  berichtigung: true,
+};
+
 export function etbPfad(
   einsatzId: number,
-  opts: { eintrag?: number; neu?: boolean } = {},
+  opts: {
+    eintrag?: number;
+    neu?: boolean;
+    /** Filterachse (LFH-342 · C7). Leere Werte fallen in `mitQuery` heraus. */
+    q?: string;
+    typ?: EtbTyp;
+    von?: string;
+    bis?: string;
+  } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'etb'), {
     eintrag: opts.eintrag,
     neu: opts.neu ? 1 : undefined,
+    q: opts.q,
+    typ: opts.typ,
+    von: opts.von,
+    bis: opts.bis,
   });
+}
+
+/**
+ * Umkehr der Filterachse von {@link etbPfad} (LFH-342 · C7).
+ *
+ * Verwirft Unbrauchbares GANZ statt halb zu übernehmen — dieselbe Regel wie bei
+ * {@link parsePlatzierenAuftrag} (LFH-340 · C5): ein unbekannter Typ ergibt keinen Filter
+ * auf diesen Typ, sondern gar keinen. Ein halb gefüllter Filter erzeugte sonst einen
+ * Query-Key, den der Server mit 400 quittiert, während die Leiste einen gültigen Stand
+ * anzeigt.
+ *
+ * Die Zeitwerte gehen ungeprüft durch: sie sind Wire-Strings, und ihre Umkehr in einen
+ * anzeigbaren Zeitpunkt macht `etb/filterZeit.ts` — dort fällt ein unbrauchbarer Wert auf
+ * `undefined`, statt hier als `Invalid Date` in den `DatePicker` zu geraten.
+ */
+export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
+  const werte: EtbFilterWerte = {};
+  const q = params.get('q');
+  if (q) werte.q = q;
+  const typ = params.get('typ');
+  if (typ && Object.prototype.hasOwnProperty.call(ETB_TYP_ERLAUBT, typ)) {
+    werte.typ = typ as EtbTyp;
+  }
+  const von = params.get('von');
+  if (von) werte.von = von;
+  const bis = params.get('bis');
+  if (bis) werte.bis = bis;
+  return werte;
 }
 
 export function personalPfad(einsatzId: number, opts: { personal?: number } = {}): string {
