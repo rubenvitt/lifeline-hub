@@ -35,6 +35,32 @@ unter `md` (`form="auto"`) ist die begründungspflichtige Ausnahme, nicht der No
 Begründung steht im Dateikopf von `Datensicht.tsx`, die Regel in Abschnitt AK3b des
 Drawer-Specs. Keine der 13 Katalogtabellen wird zu Karten.
 
+**Die erste eingelöste Karten-Ausnahme ist die ETB-Chronologie** (LFH-342/C7,
+`etb/EtbTabelle.tsx`). Sie zeigt, woran die Formfrage wirklich hängt, und korrigiert dabei ein
+früheres Verdikt: die B5e-Prüfliste hatte „die Chronologie wird verglichen, sie bleibt eine
+Tabelle" geschrieben. Ein **Tagebuch wird gelesen** — die Frage ist „was ist passiert?", nicht
+„welcher von diesen ist der richtige?"; es gibt keine Sortierung, keinen Spaltenfilter und
+keine Suche über die Spalten, die Ordnung ist die Zeit und serverseitig festgelegt. Der Satz
+„keine der 13" traf sie ohnehin nie: `katalogTabelle.guard.test.ts` führte sie ausdrücklich als
+**neunzehnte** Konsumentin und benannten Restposten (LFH-330/AP8) — der ist damit eingelöst,
+das ETB ist **nach oben** aus dem Inventar herausgefallen wie `SchaedenPage` in C5.
+**Der Kartenzweig ist ein Eigenbau** (`art: 'eigen'`, erster und einziger Eintrag in
+`KARTEN_EIGENBAU`), und auch das ist begründungspflichtig: der Plan-Modus trägt Titel + Status
++ höchstens **drei** Sekundärfelder + genau **eine** Primäraktion, die Ereigniszeile braucht
+fünf Kopffelder, einen Volltextblock und **drei** Aktionen. Wer den zweiten Eigenbau einträgt,
+begründet ebenso — und prüft zwei gemessene Fallen mit: `Datensicht` gibt beim Eigenbau
+`karte.render(...)` **roh** zurück, der Wrapper mit `zeilenKlasse` und
+`data-lfh="datensicht-karte"` entsteht nur im Plan-Modus. Ohne die Marke findet
+`scrolleZurZeile` die Karte nicht, und ein Deeplink läuft unter `md` still ins Leere; ohne die
+Klasse gilt jede Zeilenmarkierung nur im Tabellenzweig.
+**Das Spaltenbudget ist die Zusicherung, nicht die Kartenauflösung**: dass der Meldungstext im
+Fükw ≥ 50 % der Contentbreite bekommt, tragen `abBreite: 'xxl'` an den zwei Nebenspalten und
+der Zähler des Spaltenschalters — beide Ausblendungsgründe laufen durch dieselbe Funktion, der
+Zähler kann also nicht lügen. Gemessen wird das in Playwright gegen die **Contentbreite**, nie
+gegen die Tabellenbreite: `KatalogTabelle` rendert mit `width: max-content`, bei langem Inhalt
+wächst die Tabelle über den Container und ein Verhältnis Spalte-zu-Tabelle würde kleiner,
+obwohl der Text mehr Platz hat.
+
 **Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
 mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem
 Drawer statt inline. Er zeigt **Navigation, keine Entität** — kein Datensatz, kein Formular,
@@ -473,6 +499,24 @@ Alltag wichtigsten:
   an `SCHRITT_Y = 120` (`uhs/platz_repo.rs`, `raster_position`); das ist dieselbe Ausnahme, nur
   an der anderen Achse. Der Ergebniswert ist **7 / 0 / 0** — die Ungleichheit über zwei Stufen
   ist das, was einen dichteblinden Festwert auffliegen lässt.
+- **Ein Entwurf, der Minuten Schreibarbeit kostet, wird gesichert — und der Refetch darf ihn
+  nicht überschreiben** (LFH-342 · C7, `pages/BefehlDetailPage.tsx`). Drei Teile, jeder mit
+  einer eigenen Falle: **(1)** Der Effekt, der Serverdaten ins Formular schreibt, braucht einen
+  Riegel — die Invalidierung kommt über den Live-Stream auch von **fremden** Änderungen am
+  Einsatz, und wer gerade schrieb, sah seinen Text ohne Vorwarnung ersetzt. Die Umkehrung
+  gehört als **Paar** getestet: ohne eigene Fassung übernimmt die Seite den Serverstand weiter,
+  ein Riegel der immer hält macht sie still veraltet. **(2)** Der Merker ist ein eigener State,
+  **nicht** `form.isFieldsTouched()`: antd setzt das Flag beim Speichern nicht zurück, ein
+  Autosave darauf schriebe alle 30 s ein PATCH samt Invalidierung und Live-Ereignis für nichts.
+  **(3)** Autosave meldet sich **nicht** per Erfolgs-Toast (eine Meldung alle 30 s ist eine
+  Alarmquelle nach EEMUA 191), sondern über „zuletzt gespeichert HH:MM" neben dem Knopf — der
+  Fehlerfall dagegen sehr wohl.
+  **`useBlocker` steht nicht zur Verfügung** und das ist gemessen: er verlangt einen **Data
+  Router**, die Anwendung hängt an `<BrowserRouter>` (`main.tsx`), der Aufruf wirft dort beim
+  Rendern. Wer ihn will, stellt zuerst die ganze Routenlandschaft um. Bis dahin trägt den
+  In-App-Wechsel der **Blur-Autosave** (jeder Klick auf eine Brotkrume verlässt das Feld
+  zuerst) und Reload/Tab-Schluss ein `beforeunload` — mit Gegenaussage, dass er ohne offene
+  Fassung schweigt.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
@@ -619,6 +663,39 @@ laufende Anzeigennummer).
 URL-Builder) — keine inline-Template-Literals für Einsatz-Pfade. `parseRouteId` dort
 validiert Route-IDs (positive Ganzzahl, sonst Redirect auf die Liste).
 Details: `docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md`.
+
+**Ein Filter gehört ebenfalls in die URL, und `mitQuery` kodiert seit LFH-342 seine Werte.**
+Der ETB-Filter (`etbPfad(einsatzId, { q, typ, von, bis })` / `parseEtbFilter`) überlebt damit
+einen Reload und ist teilbar. Drei Festlegungen daran:
+- **Der Volltext ist Freitext** und darf `&`, `=` und Leerzeichen tragen — unkodiert machte
+  ein `&` aus einem Suchbegriff zwei Parameter. Für alle Bestandswerte ist die Kodierung die
+  Identität; die **einzige** sichtbare Ausnahme ist der Doppelpunkt in
+  `?platzieren=schaden%3A10`, unschädlich, weil der Aufrufer über `searchParams.get()` liest.
+  Ein Pin auf den rohen Pfad ist deshalb schwächer als der Round-Trip durch `URLSearchParams`.
+- **Ein unbekannter Enum-Wert wird GANZ verworfen**, nicht halb übernommen (dieselbe Regel wie
+  `parsePlatzierenAuftrag`). Die Prüfung läuft über einen **exhaustiven Record**
+  (`Record<EtbTyp, true>`), nicht über ein Array: eine neue Variante bricht dann den Typcheck,
+  statt zur Laufzeit still zu verschwinden.
+- **Eine Zeitachse in der URL braucht die Umkehr, und die braucht einen eigenen Test**
+  (`etb/filterZeit.ts` mit `filterZeit.test.ts`). Der Wire-String ist UTC **ohne**
+  Zonenkennung; `dayjs(s)` läse ihn als Ortszeit. Der Fehlermodus ist eine STILLE Verschiebung
+  um den Zonenversatz — kein roter Test, kein Fehlerbild, nur ein falscher Zeitraum in einer
+  beweissichernden Unterlage. Der Test misst beidseits beider Sommerzeit-Grenzen **und** gegen
+  den absoluten Zeitpunkt: ein Round-Trip, der beide Richtungen um denselben Betrag
+  verschiebt, wäre sonst grün.
+- **Wer den Filter in die URL hebt, braucht eine Weiche „eigene gegen fremde Änderung"**
+  (gemessen an `pages/EtbPage.tsx`). Die unkontrollierte Filterleiste wird bei jeder FREMDEN
+  Änderung neu aufgesetzt (Zurücksetzen, Deeplink), bei eigener nicht — sonst nähme der
+  Remount dem Suchfeld bei jedem entprellten Wort den Fokus. Und der Remount muss in der Runde
+  **nach** der Navigation laufen: react-router liefert die geräumte URL erst dann, ein
+  `setState` neben dem `navigate` setzte die Leiste mit dem noch gültigen Filter neu auf und
+  schriebe den Suchbegriff ins Feld zurück.
+- **Entprellt wird in der Leiste, nicht in der Seite**: nur sie unterscheidet die Achsen — `q`
+  wächst zeichenweise (~300 ms Frist), `typ`/`von`/`bis` springen und greifen sofort. Der
+  sichtbare Text hängt **nicht** an der Frist, sonst sähe die Bedienung aus wie ein hängendes
+  Feld. Testfalle dabei: `userEvent.type` kommt unter Fake-Timern nicht voran und endet im
+  Test-Timeout statt in einer Aussage — Tippen läuft dort über `fireEvent.change`, und
+  `findBy*` ist gesperrt (sein `waitFor` hängt an echten Timern).
 
 ## Frontend — Query-Key-Registry (LFH-122/307/312)
 
