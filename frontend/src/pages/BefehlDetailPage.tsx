@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Form, Input, Space, Spin, Tag, Typography } from 'antd';
+import { App, Breadcrumb, Button, Flex, Form, Input, Space, Spin, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -250,16 +250,36 @@ export default function BefehlDetailPage() {
           { title: befehl.titel },
         ]}
       />
-      <Space className="befehl-no-print" style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
+      {/*
+        Umbruchfähige Kopfzeile (LFH-343 · C8, Befund M73). Vorher trug sie ein
+        `<Space>` ohne `wrap`: auf schmalem Schirm schob der Titel die Aktionen aus
+        dem sichtbaren Bereich, und „Freigeben" — die einzige Aktion, die den
+        Entwurf abschliesst — war nicht mehr erreichbar. Muster sind die vier
+        Schwesterseiten (`MeldungenPage`, `ErinnerungenPage`, `NachforderungenPage`,
+        `AuftraegeListe`), die alle `<Flex justify="space-between" … wrap>` tragen.
+
+        Die Tag-Gruppe rutscht UNTER den Titel: nebeneinander sind es fünf Elemente
+        in einer Zeile, und auf 390 px bleibt für den Titel dann nichts.
+      */}
+      <Flex
+        className="befehl-no-print"
+        justify="space-between"
+        align="center"
+        gap={16}
+        wrap
+        style={{ marginBottom: 16 }}
+      >
+        <div>
           <Typography.Title level={3} style={{ margin: 0 }}>
             {befehl.titel}
           </Typography.Title>
-          <Tag color={istEntwurf ? 'default' : 'green'}>{istEntwurf ? 'Entwurf' : 'Freigegeben'}</Tag>
-          <Tag>{v?.label ?? befehl.vorlage}</Tag>
-          <Tag>v{befehl.version}</Tag>
-        </Space>
-        <Space>
+          <Space size={6} wrap style={{ marginTop: 4 }}>
+            <Tag color={istEntwurf ? 'default' : 'green'}>{istEntwurf ? 'Entwurf' : 'Freigegeben'}</Tag>
+            <Tag>{v?.label ?? befehl.vorlage}</Tag>
+            <Tag>v{befehl.version}</Tag>
+          </Space>
+        </div>
+        <Space wrap>
           <Button onClick={() => window.print()}>Drucken / als PDF</Button>
           {!istEntwurf && befehl.etb_eintrag_id != null && (
             <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
@@ -287,7 +307,7 @@ export default function BefehlDetailPage() {
             </>
           )}
         </Space>
-      </Space>
+      </Flex>
 
       <Typography.Paragraph type="secondary">Zeitstand: {befehl.zeitstand}</Typography.Paragraph>
 

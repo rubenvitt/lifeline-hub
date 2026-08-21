@@ -62,6 +62,11 @@ export default function AuftragKarte({
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
   const prio = PRIO_META[a.prioritaet] ?? PRIO_META.normal;
   const ueberfaellig = a.ist_ueberfaellig;
+  // Eingangszustand (LFH-343 · C8, Befund H47) — derselbe Fall wie
+  // `MELDUNG_STATUS.neu`: ein Auftrag, den noch niemand angefasst hat, trug
+  // dasselbe graue Etikett wie einer in Bearbeitung. Der linke Rand ist schon vom
+  // Überfällig-Alarm belegt; Gefahr gewinnt, das Etikett bleibt davon unberührt.
+  const unbearbeitet = !!status.unbearbeitet && !ueberfaellig;
   const sichtbareEmpf = a.empfaenger.slice(0, 3);
   const restEmpf = a.empfaenger.length - sichtbareEmpf.length;
   const details = gefuellteFelder(a);
@@ -94,18 +99,14 @@ export default function AuftragKarte({
 
   const aktionen: ReactNode[] = darfSchreiben
     ? [
+        // EIN Klick (LFH-343 · C8, Befund H50): der Rückfrage-Dialog, der hier stand,
+        // kostete die häufigste Routine-Aktion der Karte zwei. Der Rückweg steht
+        // im Rückgängig-Toast der Seite; `POST …/vollzug` nimmt seit derselben
+        // Änderung `status: 'offen'` an — aber NUR aus `in_arbeit`.
+        // „Abnehmen" (unten) behält seine Rückfrage: die Abnahme ist der
+        // fachliche Schlusspunkt und hat keinen Rückweg.
         a.bearbeitungsstatus === 'offen' && onInArbeit
-          ? (
-            <Popconfirm
-              key="ia"
-              title="Auftrag auf „In Bearbeitung“ setzen?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onInArbeit(a.id)}
-            >
-              <Button>In Bearbeitung</Button>
-            </Popconfirm>
-          ) : null,
+          ? <Button key="ia" onClick={() => onInArbeit(a.id)}>In Bearbeitung</Button> : null,
         // „Vollzug melden" öffnet das Modal (= eigene Bestätigung) → kein Popconfirm.
         (a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') && onVollzugMelden
           ? <Button key="vm" onClick={() => onVollzugMelden(a.id)}>Vollzug melden</Button> : null,
@@ -129,9 +130,13 @@ export default function AuftragKarte({
       size="small"
       data-auftrag-id={a.id}
       data-hervorgehoben={hervorgehoben ? 'true' : undefined}
+      data-ueberfaellig={ueberfaellig ? 'true' : undefined}
+      data-unbearbeitet={unbearbeitet ? 'true' : undefined}
       style={{
         marginBottom: 10,
-        borderInlineStart: `3px solid ${ueberfaellig ? token.colorError : 'transparent'}`,
+        borderInlineStart: `3px solid ${
+          ueberfaellig ? token.colorError : unbearbeitet ? token.colorWarning : 'transparent'
+        }`,
         background: ueberfaellig ? token.colorErrorBg : undefined,
         boxShadow: hervorgehoben ? `0 0 0 2px ${token.colorPrimary}` : undefined,
       }}
@@ -140,7 +145,7 @@ export default function AuftragKarte({
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
           <Tag color={prio.color} style={{ margin: 0, fontWeight: 600 }}>{prio.label}</Tag>
-          <StatusBadge phase={status.phase} label={status.label} />
+          <StatusBadge phase={status.phase} label={status.label} unbearbeitet={!!status.unbearbeitet} />
           {a.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
           {a.quell_etb_eintrag_id != null && einsatzId != null && (
             <Link to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>↗ ETB-Eintrag</Link>

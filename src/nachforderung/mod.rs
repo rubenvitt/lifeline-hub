@@ -100,8 +100,22 @@ pub fn status_gueltig(s: &str) -> bool {
 pub fn uebergang_erlaubt(von: &str, nach: &str) -> bool {
     match von {
         STATUS_ANGEFORDERT => matches!(nach, STATUS_ZUGESAGT | STATUS_ABGELEHNT),
-        STATUS_ZUGESAGT => matches!(nach, STATUS_UNTERWEGS | STATUS_ABGELEHNT),
-        STATUS_UNTERWEGS => matches!(nach, STATUS_EINGETROFFEN | STATUS_ABGELEHNT),
+        // Die Rücknahme um genau eine Stufe (LFH-343 · C8) ist der Gegenweg zur
+        // Direktaktion ohne Rückfrage: die Fortschaltung kostet seither einen Klick
+        // statt zweier, und der Rückgängig-Toast braucht einen Weg, den der Server
+        // annimmt. Zwei Stufen zurück bleiben zu — sonst wäre die Kette keine.
+        STATUS_ZUGESAGT => matches!(
+            nach,
+            STATUS_UNTERWEGS | STATUS_ABGELEHNT | STATUS_ANGEFORDERT
+        ),
+        STATUS_UNTERWEGS => matches!(
+            nach,
+            STATUS_EINGETROFFEN | STATUS_ABGELEHNT | STATUS_ZUGESAGT
+        ),
+        // `eingetroffen` bekommt NUR den Rückweg, nicht den Abzweig auf `abgelehnt`:
+        // was da ist, wird nicht nachträglich abgelehnt.
+        STATUS_EINGETROFFEN => matches!(nach, STATUS_UNTERWEGS),
+        // `abgelehnt` bleibt terminal.
         _ => false,
     }
 }
@@ -162,10 +176,32 @@ mod tests {
         assert!(uebergang_erlaubt(STATUS_UNTERWEGS, STATUS_EINGETROFFEN));
         assert!(uebergang_erlaubt(STATUS_ANGEFORDERT, STATUS_ABGELEHNT));
         assert!(uebergang_erlaubt(STATUS_UNTERWEGS, STATUS_ABGELEHNT));
-        // Verboten: Sprünge, Rückschritte, aus terminalen Zuständen.
+        // Verboten: Sprünge und der Abzweig aus terminalen Zuständen.
         assert!(!uebergang_erlaubt(STATUS_ANGEFORDERT, STATUS_UNTERWEGS));
-        assert!(!uebergang_erlaubt(STATUS_ZUGESAGT, STATUS_ANGEFORDERT));
         assert!(!uebergang_erlaubt(STATUS_EINGETROFFEN, STATUS_ABGELEHNT));
         assert!(!uebergang_erlaubt(STATUS_ABGELEHNT, STATUS_ZUGESAGT));
+    }
+
+    /// Die Rücknahme ist der Gegenweg zur Direktaktion ohne Rückfrage
+    /// (LFH-343 · C8, Befund H50). Sie ersetzt die frühere Zusicherung
+    /// „keine Rückschritte" — bewusst: ohne serverseitigen Rückweg wäre ein
+    /// Rückgängig-Knopf ein 422, und das ist schlechter als kein Knopf.
+    #[test]
+    fn ruecknahme_um_eine_stufe_erlaubt_terminales_bleibt_zu() {
+        // Genau EINE Stufe zurück.
+        assert!(uebergang_erlaubt(STATUS_ZUGESAGT, STATUS_ANGEFORDERT));
+        assert!(uebergang_erlaubt(STATUS_UNTERWEGS, STATUS_ZUGESAGT));
+        assert!(uebergang_erlaubt(STATUS_EINGETROFFEN, STATUS_UNTERWEGS));
+        // Zwei Stufen zurück NICHT — sonst wäre die Kette keine.
+        assert!(!uebergang_erlaubt(STATUS_EINGETROFFEN, STATUS_ANGEFORDERT));
+        assert!(!uebergang_erlaubt(STATUS_UNTERWEGS, STATUS_ANGEFORDERT));
+        // `abgelehnt` bleibt terminal: das Ablehnen trägt einen Grund und ein
+        // eigenes Modal, seine Rücknahme ist eine fachliche Entscheidung und
+        // kein Undo-Klick.
+        assert!(!uebergang_erlaubt(STATUS_ABGELEHNT, STATUS_ANGEFORDERT));
+        assert!(!uebergang_erlaubt(STATUS_ABGELEHNT, STATUS_UNTERWEGS));
+        // Und aus `eingetroffen` führt kein Weg auf `abgelehnt` (oben gepinnt) —
+        // die Rücknahme öffnet nur die eine Stufe, nicht den Abzweig.
+        assert!(!uebergang_erlaubt(STATUS_EINGETROFFEN, STATUS_ABGELEHNT));
     }
 }

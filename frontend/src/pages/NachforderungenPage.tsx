@@ -11,6 +11,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { legeNachforderungAn, lehneNachforderungAb, listeNachforderungen, setzeNachforderungStatus } from '../api/nachforderungen';
 import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../api/types';
 import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
 import Datenstand from '../components/Datenstand';
@@ -51,13 +52,35 @@ export default function NachforderungenPage() {
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueNachforderung) => legeNachforderungAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); setFormOffen(false); },
+    // LFH-343/C8: kein `setFormOffen(false)` mehr — das Inline-Formular bleibt
+    // offen, damit die nächste Nachforderung ohne Aufklappen weitergeht. Der
+    // conditional Render der Card würde es sonst unmounten, samt Serienzähler
+    // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
+    onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); },
     onError: fehler,
   });
+  /**
+   * Fortschaltung und Rücknahme laufen durch DIESELBE Mutation (LFH-343 · C8).
+   * `vorher` ist der Stand VOR dem Klick und damit das Ziel des Rückwegs — er
+   * wird übergeben statt abgeleitet, weil `NAECHSTER` rückwärts mehrdeutig wäre,
+   * sobald die Kette einmal einen Abzweig bekommt.
+   *
+   * `zurueck` unterscheidet die beiden Richtungen: die Rücknahme darf keinen
+   * eigenen Rückgängig-Toast erzeugen, sonst schaukelte sich das Paar endlos auf.
+   */
   const statusMutation = useMutation({
-    mutationFn: ({ nfId, status }: { nfId: number; status: NachforderungStatus }) =>
-      setzeNachforderungStatus(einsatzId, nfId, status),
-    onSuccess: invalidiere,
+    mutationFn: ({ nfId, status }: {
+      nfId: number; status: NachforderungStatus; vorher?: NachforderungStatus; zurueck?: boolean;
+    }) => setzeNachforderungStatus(einsatzId, nfId, status),
+    onSuccess: (_daten, { nfId, status, vorher, zurueck }) => {
+      invalidiere();
+      if (zurueck || !vorher) return;
+      zeigeRueckgaengig(
+        message,
+        `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`,
+        () => statusMutation.mutate({ nfId, status: vorher, zurueck: true }),
+      );
+    },
     onError: fehler,
   });
   const ablehnenMutation = useMutation({
@@ -100,7 +123,10 @@ export default function NachforderungenPage() {
 
   const listenProps = {
     darfSchreiben,
-    onStatus: (nfId: number, status: NachforderungStatus) => statusMutation.mutate({ nfId, status }),
+    onStatus: (nfId: number, status: NachforderungStatus) => {
+      const vorher = alle.find((n) => n.id === nfId)?.status;
+      statusMutation.mutate({ nfId, status, vorher });
+    },
     onAblehnen: (nfId: number) => { setAblehnenId(nfId); setAblehnenGrund(''); },
   };
 
@@ -151,7 +177,9 @@ export default function NachforderungenPage() {
           <NachforderungFormular
             card={false}
             senden={anlegenMutation.isPending}
-            onAnlegen={(d) => anlegenMutation.mutate(d)}
+            // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die
+            // Nachforderung wirklich angekommen ist (LFH-332/B4).
+            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
         </Card>
       )}

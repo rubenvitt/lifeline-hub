@@ -89,7 +89,8 @@ describe('AuftraegePage', () => {
     // (accessible name „plus Auftrag erteilen") → Regex; nach dem Öffnen heißt er „Formular schließen",
     // sodass der spätere exakte „Auftrag erteilen"-Treffer eindeutig der Formular-Submit ist.
     await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
-    await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
+    // Empfänger seit LFH-343 · C8 in EINEM Feld (Optionen + freier Funktionstext).
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     // Robust statt index-abhängig: die "Auftrag / Was"-TextArea trägt aria-label.
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
@@ -112,9 +113,14 @@ describe('AuftraegePage', () => {
     await screen.findByText('Deich sichern');
     // Kopf-Button trägt Icon → Regex zum Aufklappen (siehe Hinweis oben).
     await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
-    await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
+    // Empfänger seit LFH-343 · C8 in EINEM Feld (Optionen + freier Funktionstext).
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
-    await userEvent.type(screen.getByPlaceholderText('z. B. sofort, bis 14:00, nach Eintreffen'), 'sofort');
+    // Die sieben SKK-Felder liegen seit LFH-343 · C8 hinter einem zugeklappten
+    // Collapse (Befund H49: 14 Felder in einem 520-px-Modal). Ohne `forceRender`
+    // stehen sie vor dem Aufklappen gar nicht im DOM.
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    await userEvent.type(await screen.findByLabelText('Zeit / Wann'), 'sofort');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(legeAuftragAn).toHaveBeenCalledWith(1, expect.objectContaining({
       auftrag_text: 'Erkunden',
@@ -264,15 +270,31 @@ describe('AuftraegePage', () => {
     expect(screen.getByText(/Vollzugsvermerk: Deich gehalten/)).toBeInTheDocument();
   });
 
-  it('setzt einen offenen Auftrag auf „In Bearbeitung"', async () => {
+  /**
+   * Vorher öffnete der Knopf einen `Popconfirm`. Seit LFH-343 · C8 schaltet der
+   * erste Klick — der Rückweg steht im Rückgängig-Toast, und der Server nimmt ihn
+   * seit derselben Änderung an (`POST …/vollzug` mit `status: 'offen'`).
+   */
+  it('setzt einen offenen Auftrag mit EINEM Klick auf „In Bearbeitung"', async () => {
     listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'offen' })]);
     setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
     renderPage();
     await screen.findByText('Deich sichern');
-    // Aktion ist jetzt ein Button mit Popconfirm (kein <a>, kein Status-Segmented mehr).
     await userEvent.click(screen.getByRole('button', { name: 'In Bearbeitung' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'in_arbeit', undefined));
+    expect(document.querySelector('.ant-popconfirm')).toBeNull();
+  });
+
+  it('bietet den Rückweg auf „Offen" als Rückgängig-Knopf an', async () => {
+    listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'offen' })]);
+    setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.click(screen.getByRole('button', { name: 'In Bearbeitung' }));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenLastCalledWith(1, 1, 'offen', undefined));
   });
 
   it('nimmt einen vollzogenen Auftrag ab', async () => {

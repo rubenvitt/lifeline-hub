@@ -71,14 +71,31 @@ describe('NachforderungenPage', () => {
     })));
   });
 
-  it('schaltet den Status linear weiter (Popconfirm)', async () => {
+  /**
+   * Vorher öffnete der Knopf einen `Popconfirm`, und erst dessen „Bestätigen"
+   * schaltete. Seit LFH-343 · C8 schaltet der erste Klick — der Rückweg steht im
+   * Rückgängig-Toast, und `uebergang_erlaubt` nimmt seit derselben Änderung die
+   * Rücknahme um eine Stufe an.
+   */
+  it('schaltet den Status mit EINEM Klick linear weiter', async () => {
     setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    // Link-Button öffnet Popconfirm; erst nach Bestätigen wird geschaltet.
     await userEvent.click(screen.getByRole('button', { name: '→ Zugesagt' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'zugesagt'));
+    expect(document.querySelector('.ant-popconfirm')).toBeNull();
+  });
+
+  it('bietet den Rückweg als Rückgängig-Knopf an und nimmt genau eine Stufe zurück', async () => {
+    setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: '→ Zugesagt' }));
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    // Zurück auf den Zustand VOR dem Klick — nicht auf den Anfang der Kette.
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenLastCalledWith(1, 1, 'angefordert'));
   });
 
   it('lehnt eine Nachforderung mit Grund ab (über Dialog)', async () => {

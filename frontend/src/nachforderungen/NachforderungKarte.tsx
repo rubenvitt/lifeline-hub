@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Card, Flex, Space, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge, formatZeit } from '../kommunikation';
@@ -42,19 +42,15 @@ export default function NachforderungKarte({
 
   const aktionen: ReactNode[] = darfSchreiben && n.ist_offen
     ? [
+        // Fortschaltung mit EINEM Klick (LFH-343 · C8, Befund H50). Der
+        // Rückfrage-Dialog, der hier stand, kostete jeden Schritt der Kette zwei
+        // Klicks; der Rückweg steht stattdessen im Rückgängig-Toast der Seite,
+        // und `uebergang_erlaubt` nimmt seit derselben Änderung die Rücknahme um
+        // genau eine Stufe an.
         next && onStatus
-          ? (
-            <Popconfirm
-              key="next"
-              title={`Status auf „${NACHFORDERUNG_STATUS[next].label}“ setzen?`}
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onStatus(n.id, next)}
-            >
-              <Button>→ {NACHFORDERUNG_STATUS[next].label}</Button>
-            </Popconfirm>
-          ) : null,
-        // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → kein Popconfirm.
+          ? <Button key="next" onClick={() => onStatus(n.id, next)}>→ {NACHFORDERUNG_STATUS[next].label}</Button>
+          : null,
+        // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → keine Rückfrage.
         onAblehnen
           ? <Button key="ab" danger onClick={() => onAblehnen(n.id)}>Ablehnen</Button> : null,
       ].filter(Boolean)
@@ -105,10 +101,17 @@ export default function NachforderungKarte({
         )}
       </Space>
 
+      {/* `<Space size="middle">` statt `<Flex gap={8}>` (LFH-363, nachgezogen in
+          LFH-343 · C8): „Ablehnen" ist `danger` und steht neben der Fortschaltung.
+          Der Vorgabeabstand wäre `abstand.xs` = 3/5/7 px je Dichtestufe und damit
+          im Handschuh-Betrieb keine Trennung. Die Zeile war schon vorher so — C8
+          fasst sie an (die Rückfrage der Fortschaltung ist weg) und trägt sie
+          deshalb nach der Norm „verbindlich für ohnehin Angefasstes" nach.
+          Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
       {aktionen.length > 0 && (
-        <Flex justify="flex-end" gap={8} wrap style={{ marginTop: 8 }}>
+        <Space size="middle" wrap style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}>
           {aktionen}
-        </Flex>
+        </Space>
       )}
     </Card>
   );

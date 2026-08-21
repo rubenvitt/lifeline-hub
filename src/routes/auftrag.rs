@@ -6,6 +6,7 @@ use crate::einsatz::modul::Auftraege;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::kommunikation::VOLLZUG_IN_ARBEIT;
 use crate::live::LiveEvent;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -189,7 +190,8 @@ pub async fn quittieren(
 
 #[derive(Debug, Deserialize)]
 pub struct VollzugReq {
-    /// 'in_arbeit' | 'vollzogen'.
+    /// 'offen' | 'in_arbeit' | 'vollzogen'. `offen` ist die Rücknahme von
+    /// „In Bearbeitung" (LFH-343 · C8) und nur von dort aus erlaubt.
     pub status: String,
     pub vollzugsmeldung: Option<String>,
 }
@@ -204,6 +206,28 @@ pub async fn vollzug(
     let org_id = gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     let now = jetzt();
     match req.status.as_str() {
+        // Rücknahme (LFH-343 · C8): nur aus `in_arbeit`. Aus `vollzogen`/`abgenommen`
+        // wäre das die Rücknahme einer Vollzugsmeldung — ein fachlicher Vorgang mit
+        // eigenem Weg, kein Undo eines Triage-Klicks. Aus `offen` heraus wäre es ein
+        // No-op, der wie Erfolg aussieht. Beides ist ein Zustandsfehler, nicht ein
+        // Feldfehler → 422 (src/error.rs).
+        "offen" => {
+            let aktuell = repo::laden(&state.pool, auftrag_id, &now).await?;
+            if aktuell.auftrag.vollzug_status != VOLLZUG_IN_ARBEIT {
+                return Err(AppError::UnprocessableEntity(
+                    "Zurücknehmen ist nur aus „In Bearbeitung“ möglich".into(),
+                ));
+            }
+            repo::setze_offen(
+                &state.pool,
+                org_id,
+                einsatz_id,
+                auftrag_id,
+                ctx.benutzer.id,
+                &now,
+            )
+            .await?;
+        }
         "in_arbeit" => {
             repo::setze_in_arbeit(
                 &state.pool,

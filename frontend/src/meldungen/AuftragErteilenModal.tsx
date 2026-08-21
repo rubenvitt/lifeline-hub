@@ -1,4 +1,4 @@
-import { Modal } from 'antd';
+import { Modal, Typography } from 'antd';
 import type { Meldung, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
 
@@ -8,7 +8,7 @@ interface Props {
   einheiten: ZielOption[];
   senden: boolean;
   onAbbrechen: () => void;
-  onAnlegen: (d: NeuerAuftrag) => void;
+  onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
 }
 
 /** Vorbelegung des Auftragstexts aus der Meldung (Absender + Inhalt, LFH-113). */
@@ -38,6 +38,15 @@ export default function AuftragErteilenModal({
         abschnitte={abschnitte}
         einheiten={einheiten}
         initialText={initialText(meldung)}
+        zitat={meldung && (
+          // Read-only Wortlaut der Quellmeldung (LFH-343 · C8, Befund H49). Der
+          // vorbelegte Auftragstext ist bearbeitbar und wird beim Formulieren
+          // überschrieben — dann fehlte ohne dieses Zitat der Urtext, auf den sich
+          // der Auftrag bezieht.
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            <Typography.Text strong>{meldung.absender}:</Typography.Text> {meldung.inhalt}
+          </Typography.Paragraph>
+        )}
         onAnlegen={onAnlegen}
       />
     </Modal>

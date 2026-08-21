@@ -1,4 +1,4 @@
-import { Modal } from 'antd';
+import { Modal, Typography } from 'antd';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
 
@@ -8,7 +8,7 @@ interface Props {
   einheiten: ZielOption[];
   senden: boolean;
   onAbbrechen: () => void;
-  onAnlegen: (d: NeuerAuftrag) => void;
+  onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
 }
 
 /** Vorbelegung des Auftragstexts aus dem ETB-Eintrag (Inhalt, LFH-112). */
@@ -37,6 +37,14 @@ export default function AuftragAusEtbModal({
         abschnitte={abschnitte}
         einheiten={einheiten}
         initialText={initialText(eintrag)}
+        zitat={eintrag && (
+          // Read-only Wortlaut des Quell-Eintrags (LFH-343 · C8) — dieselbe
+          // Begründung wie bei Meldung→Auftrag: der vorbelegte Auftragstext wird
+          // beim Formulieren überschrieben, das ETB ist beweissichernd.
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            {eintrag.inhalt}
+          </Typography.Paragraph>
+        )}
         onAnlegen={onAnlegen}
       />
     </Modal>

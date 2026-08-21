@@ -877,3 +877,56 @@ async fn quittieren_schliesst_frist_erinnerung_erst_beim_letzten_empfaenger() {
         "nach dem letzten Quittieren ist die Frist-Erinnerung erledigt"
     );
 }
+
+/// Rücknahme von „In Bearbeitung" (LFH-343 · C8, Befund H50).
+///
+/// Die Direktaktion ohne Rückfrage braucht einen Rückweg, den der Server annimmt —
+/// ein Rückgängig-Knopf, der 422 liefert, wäre schlechter als keiner. Aus
+/// `vollzogen` gibt es ihn bewusst NICHT: das wäre die Rücknahme einer
+/// Vollzugsmeldung (im ETB append-only), kein Undo eines Triage-Klicks.
+#[tokio::test]
+async fn vollzug_offen_nimmt_in_arbeit_zurueck_und_ist_sonst_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&body_mit_funktion("X", "EA1")),
+    )
+    .await;
+    let aid = a["id"].as_i64().unwrap();
+    let pfad = format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug");
+
+    // Aus `offen` heraus ist die Rücknahme ein No-op, der wie Erfolg aussähe → 422.
+    let (leerlauf, _) = anfrage(&app, "POST", &pfad, &admin, Some(r#"{"status":"offen"}"#)).await;
+    assert_eq!(leerlauf, StatusCode::UNPROCESSABLE_ENTITY);
+
+    anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(r#"{"status":"in_arbeit"}"#),
+    )
+    .await;
+    let (status, json) = anfrage(&app, "POST", &pfad, &admin, Some(r#"{"status":"offen"}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["bearbeitungsstatus"], "offen");
+    // Der Zeitstempel muss MITgehen: bliebe er stehen, behauptete der Auftrag einen
+    // Fortschritt, den es nicht mehr gibt.
+    assert!(json["in_arbeit_at"].is_null());
+
+    anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(r#"{"status":"vollzogen","vollzugsmeldung":"Deich gehalten"}"#),
+    )
+    .await;
+    let (verboten, _) = anfrage(&app, "POST", &pfad, &admin, Some(r#"{"status":"offen"}"#)).await;
+    assert_eq!(verboten, StatusCode::UNPROCESSABLE_ENTITY);
+}

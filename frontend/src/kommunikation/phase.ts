@@ -33,12 +33,28 @@ export function prioRang(prio: string): number {
   return rang === -1 ? PRIO_ORDNUNG.length : rang;
 }
 
-/** Status-Deskriptor eines Moduls: Fachlabel + gemeinsame Ober-Phase. */
-export type StatusDeskriptor = Record<string, { label: string; phase: KommPhase }>;
+/**
+ * Status-Deskriptor eines Moduls: Fachlabel + gemeinsame Ober-Phase.
+ *
+ * `unbearbeitet` markiert den EINGANGSZUSTAND — den, den noch niemand angefasst
+ * hat (LFH-343 · C8, Befund H47). Er trägt einen eigenen Akzent und ein fettes
+ * Warn-Etikett, während der angefasste Zustand neutral bleibt.
+ *
+ * Es ist bewusst KEINE fünfte {@link KommPhase}: `BEFEHL_STATUS.entwurf`,
+ * `LAGEBERICHT_STATUS.entwurf`, `ERINNERUNG_STATUS.offen` und
+ * `NACHFORDERUNG_STATUS.angefordert` liegen alle auf der Phase `offen` und wären
+ * von einer neuen Phase stillschweigend zu „neu" umklassifiziert worden — samt
+ * Durchschlag auf `PHASE_META` und `istAbgeschlossen`. Die Marke gehört an den
+ * einzelnen Status, nicht an die Achse.
+ */
+export type StatusDeskriptor = Record<
+  string,
+  { label: string; phase: KommPhase; unbearbeitet?: true }
+>;
 
 /** AUFTRAG (AuftragBearbeitungsstatus). */
 export const AUFTRAG_STATUS: StatusDeskriptor = {
-  offen: { label: 'Offen', phase: 'offen' },
+  offen: { label: 'Offen', phase: 'offen', unbearbeitet: true },
   in_arbeit: { label: 'In Bearbeitung', phase: 'in_arbeit' },
   vollzogen: { label: 'Vollzogen', phase: 'abgeschlossen' },
   abgenommen: { label: 'Abgenommen', phase: 'abgeschlossen' },
@@ -46,7 +62,7 @@ export const AUFTRAG_STATUS: StatusDeskriptor = {
 
 /** MELDUNG (MeldungStatus). */
 export const MELDUNG_STATUS: StatusDeskriptor = {
-  neu: { label: 'Neu', phase: 'offen' },
+  neu: { label: 'Neu', phase: 'offen', unbearbeitet: true },
   gesichtet: { label: 'Gesichtet', phase: 'offen' },
   in_bearbeitung: { label: 'In Bearbeitung', phase: 'in_arbeit' },
   erledigt: { label: 'Erledigt', phase: 'abgeschlossen' },

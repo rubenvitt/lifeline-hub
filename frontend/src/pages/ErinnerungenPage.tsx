@@ -9,13 +9,14 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import {
-  erledigeErinnerung, legeErinnerungAn, listeErinnerungen, quittiereErinnerung,
+  erledigeErinnerung, legeErinnerungAn, listeErinnerungen, oeffneErinnerung, quittiereErinnerung,
 } from '../api/erinnerungen';
 import type { Erinnerung, NeueErinnerung } from '../api/types';
 import {
   ERINNERUNG_STATUS, GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, istAbgeschlossen,
   type FaelligGruppe,
 } from '../kommunikation';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import Datenstand from '../components/Datenstand';
@@ -48,16 +49,38 @@ export default function ErinnerungenPage() {
 
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeueErinnerung) => legeErinnerungAn(einsatzId, daten),
-    onSuccess: () => { invalidiere(); message.success('Erinnerung angelegt'); setFormOffen(false); },
+    // LFH-343/C8: kein `setFormOffen(false)` mehr — das Inline-Formular bleibt
+    // offen, damit die nächste Erinnerung ohne Aufklappen weitergeht. Der
+    // conditional Render der Card würde es sonst unmounten, samt Serienzähler
+    // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
+    onSuccess: () => { invalidiere(); message.success('Erinnerung angelegt'); },
     onError: fehler,
+  });
+  /**
+   * Der Rückweg beider Abschluss-Aktionen (LFH-343 · C8, Befund H50). Seit C8
+   * schalten „Erledigt" und „Quittieren" mit EINEM Klick statt mit Rückfrage;
+   * `POST …/erinnerungen/{eid}/oeffnen` räumt dafür alle drei Achsen — Status,
+   * Vollzug und Quittung. Ohne diese Route wäre der Rückgängig-Knopf ein 422.
+   */
+  const oeffnenMutation = useMutation({
+    mutationFn: (eid: number) => oeffneErinnerung(einsatzId, eid),
+    onSuccess: invalidiere, onError: fehler,
   });
   const erledigenMutation = useMutation({
     mutationFn: (eid: number) => erledigeErinnerung(einsatzId, eid),
-    onSuccess: invalidiere, onError: fehler,
+    onSuccess: (_daten, eid) => {
+      invalidiere();
+      zeigeRueckgaengig(message, 'Erinnerung erledigt', () => oeffnenMutation.mutate(eid));
+    },
+    onError: fehler,
   });
   const quittierenMutation = useMutation({
     mutationFn: (eid: number) => quittiereErinnerung(einsatzId, eid),
-    onSuccess: invalidiere, onError: fehler,
+    onSuccess: (_daten, eid) => {
+      invalidiere();
+      zeigeRueckgaengig(message, 'Erinnerung quittiert', () => oeffnenMutation.mutate(eid));
+    },
+    onError: fehler,
   });
 
   if (einsatzQuery.isLoading) {
@@ -138,7 +161,9 @@ export default function ErinnerungenPage() {
             />
           )}
         >
-          <ErinnerungFormular card={false} senden={anlegenMutation.isPending} onAnlegen={(d) => anlegenMutation.mutate(d)} />
+          {/* mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die
+              Erinnerung wirklich angekommen ist (LFH-332/B4). */}
+          <ErinnerungFormular card={false} senden={anlegenMutation.isPending} onAnlegen={(d) => anlegenMutation.mutateAsync(d)} />
         </Card>
       )}
 

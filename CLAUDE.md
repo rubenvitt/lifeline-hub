@@ -517,6 +517,68 @@ Alltag wichtigsten:
   In-App-Wechsel der **Blur-Autosave** (jeder Klick auf eine Brotkrume verlässt das Feld
   zuerst) und Reload/Tab-Schluss ein `beforeunload` — mit Gegenaussage, dass er ohne offene
   Fassung schweigt.
+- **Erst die Umkehrbarkeit, dann der Rückgängig-Knopf** (LFH-343 · C8, Fortschreibung von
+  LFH-378). Eine Rückfrage vor einer umkehrbaren Aktion ist Reibung; sie ersatzlos zu
+  streichen macht die Aktion aber nur dann einklickbar, wenn es einen **serverseitigen**
+  Rückweg gibt. Gemessen hatte den im Bestand genau **eines** von vier Kommunikations-Modulen:
+  `meldung/repo.rs:setze_status` nimmt jeden gültigen Status; `auftrag`s Vollzug-Achse kannte
+  nur vorwärts, die Erinnerungs-Routen ebenso, und `nachforderung::uebergang_erlaubt` war
+  streng linear. C8 hat deshalb **zuerst die Rückwege gebaut** (`POST …/vollzug` mit
+  `status: 'offen'` — nur aus `in_arbeit`, sonst 422; `POST …/erinnerungen/{eid}/oeffnen`,
+  das ALLE DREI Achsen räumt (Status, Vollzug, Quittung); Rücknahme um **genau eine** Stufe
+  in `uebergang_erlaubt`, `abgelehnt` bleibt terminal) und dann die Rückfragen entfernt.
+  **Wo kein Rückweg existiert, bleibt sie** — heute „Bestätigen" an der Meldungskarte
+  (`quittiere_einmalig` ist atomar einmalig, die zweite Bestätigung ist 422) und „quittieren"
+  am Auftragsempfänger (es gibt keine Ent-Quittierung). Ein Rückgängig-Knopf, der 422 liefert,
+  ist schlechter als keiner. Träger des Toasts: `kommunikation/rueckgaengig.tsx` mit **festem
+  Schlüssel**, damit eine zweite Aktion den stehenden Toast ersetzt statt zu stapeln — wer in
+  Serie sichtet, erzeugt sie im Sekundentakt, und zwei sichtbare Rückwege sagen nicht, welcher
+  zu welchem Datensatz gehört.
+  **Ein handlungsfähiger Toast ist keine Alarmmeldung.** Das EEMUA-191-Budget, das CLAUDE.md
+  gegen den Autosave-Erfolgstoast zitiert, zielt auf **ungefragte Zustandsmeldungen**. Der
+  Rückgängig-Toast erscheint ausschließlich nach einer Nutzeraktion, nie nach einem
+  Live-Ereignis, und er ersetzt eine Rückfrage, die vorher **zwei** Interaktionen kostete —
+  die Zahl der Unterbrechungen sinkt, sie steigt nicht. Wer diese Grenze verschiebt, verschiebt
+  sie für beide Seiten.
+- **Der linke Kartenrand trägt EINE Farbe, und Gefahr gewinnt** (LFH-343 · C8, Befund H47).
+  Alle vier Kommunikations-Karten akzentuieren ihren Alarmzustand über
+  `borderInlineStart: 3px solid token.colorError` — Meldung `alarmiert`, Auftrag `ueberfaellig`,
+  Erinnerung `faellig`, Nachforderung `abgelehnt`. Der Eingangszustand („hat noch niemand
+  angefasst") belegt denselben Rand mit `token.colorWarning`, und der Vorrang ist entschieden
+  statt zufällig: eine unbestätigte überfällige Sofortmeldung ist **rot**, nicht gelb. Das
+  **Etikett** bleibt davon unberührt — vergeben ist der Rand, nicht die Aussage. Beide Zustände
+  gehören als Paar getestet, prüfbar über `data-alarm` / `data-unbearbeitet` an der Karte.
+- **Die „unbearbeitet"-Marke sitzt am Deskriptor, nicht an der Phase** (LFH-343 · C8). Sie ist
+  ein optionales Feld am `StatusDeskriptor`-Eintrag (`MELDUNG_STATUS.neu`,
+  `AUFTRAG_STATUS.offen`) und **keine fünfte `KommPhase`**: `BEFEHL_STATUS.entwurf`,
+  `LAGEBERICHT_STATUS.entwurf`, `ERINNERUNG_STATUS.offen` und
+  `NACHFORDERUNG_STATUS.angefordert` liegen alle auf der Phase `offen` und wären von einer
+  neuen Phase stillschweigend zu „neu" umklassifiziert worden — samt Durchschlag auf
+  `PHASE_META` und `istAbgeschlossen`. Der zweite Kanal ist Pflicht (WCAG 1.4.1) und hier
+  dreifach: Farbe, Schriftgewicht am Etikett, Wortlaut. Ein Test, der nur die Tag-Klasse prüft,
+  belegt ihn nicht.
+- **Eine Höhenkette endet nicht am Layout** (LFH-343 · C8, Befund H51). `flex: 1;
+  min-height: 0; overflow-y: auto` scrollt **nichts**, solange kein Vorfahr eine begrenzte Höhe
+  hat — und keiner hat sie: `components/AppLayout.tsx` und `einsatz/EinsatzLayout.tsx` setzen
+  `minHeight: '100vh'`, der `<Content>` wächst mit seinem Inhalt. Wer einen Scroll-Container
+  braucht, begrenzt die **Seite selbst**, in `dvh` statt `vh` (die Browserleiste des
+  Handschirms frisst sonst genau die Eingabezeile). Eine Kopfhöhen-Konstante gibt es nicht
+  (`theme/rollen.css` kennt nur `--lfh-kopf-polsterung`) — `pages/ChatPage.tsx` misst deshalb
+  den eigenen Abstand zum Dokumentanfang, statt eine Zahl zu raten.
+  **Zwei Fallen, beide im Browser gemessen und in jsdom unsichtbar:** (1) ein
+  `useEffect(…, [])` läuft, während die Seite noch ihren Ladespinner zeigt — die Wurzel gibt
+  es dann nicht, die Messung fällt aus und der Effekt kommt nie wieder; der Träger ist ein
+  **Callback-Ref**, der beim Einhängen feuert. (2) `ant-row` bringt `flex-wrap: wrap` mit, und
+  eine umbrechende Flex-Zeile bemisst sich an ihrem Inhalt, statt ihre Kinder auf die
+  Containerhöhe zu strecken — der `Col` stand gemessen auf 1081 px in einem 619 px hohen `Row`.
+  Ohne `flexWrap: 'nowrap'` läuft die ganze Begrenzung ins Leere.
+  **Geprüft wird das in Playwright mit `toBeInViewport()`, nie mit `toBeVisible()`**: ein
+  Element unterhalb des sichtbaren Bereichs ist im Sinne von `toBeVisible` sichtbar — genau der
+  Zustand, den H51 beschreibt.
+- **Stick-to-bottom hängt an der jüngsten id, nicht an der Länge** (LFH-343 · C8). Ein
+  Nachrichtenstrom wächst an zwei Enden: hinten durch neue Nachrichten, vorne durch „Ältere
+  laden". Ein Effekt auf `nachrichten.length` träfe beide und risse den Lesenden beim Nachladen
+  aus seiner Stelle; die id der jüngsten Nachricht wächst nur im ersten Fall.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
@@ -637,6 +699,20 @@ dabei: ein `<Collapse>` rendert seinen Inhalt ohne `forceRender` erst beim Aufkl
 dann ist die Zählung „≤ 4" trivial erfüllt und beweist nichts; mit `forceRender` stehen
 die Felder im DOM und werden mitgezählt. Und eine „≤ 4"-Behauptung ohne die zweite
 Hälfte (**Aufklappen → Zahl steigt**) ist nicht widerlegbar.
+
+**Ein Pflichtfeld gehört nie hinter den Collapse** (LFH-343 · C8, Befund H49). Das
+Auftragsformular kam von 14 sichtbaren Feldern auf vier — und der Empfänger, der einzige
+zweite Pflichtwert neben dem Auftragstext, war der Grenzfall: er stand in **zwei** Feldern
+nebeneinander (Ziele-`Select` + Funktions-Freitext), und beide zusammen sprengten das
+Budget. Den Freitext einzuklappen ging nicht: **ohne gepflegte Abschnitte und Einheiten ist
+er der einzige Weg**, überhaupt einen Empfänger zu setzen. Die Auflösung ist ein
+`Select mode="tags"` — es nimmt die strukturierten Optionen UND freie Eingaben, getrennt
+wird beim Absenden am Präfix (`abschnitt:<id>` / `einheit:<id>` gegen alles andere). Wer ein
+Budget drückt, prüft zuerst, welche der Felder eine Ablehnung auslösen können; die dürfen
+sichtbar bleiben, auch wenn das die bequemere Aufteilung kostet.
+`richtung` ging trotz Steuerwirkung (sie blendet die Extern-Felder ein) mit hinein — `intern`
+ist der Normalfall, und die Extern-Felder gehören dann **mit** in den Collapse, sonst stünden
+sie sichtbar unter einem eingeklappten Auslöser.
 
 **Was hier nicht hingehört:** Trefferflächen und Dichte. Die erbt jedes Element vom
 `ConfigProvider` (Dichteachse aus LFH-329/B1); neues punktuelles `size` auf interaktiven
