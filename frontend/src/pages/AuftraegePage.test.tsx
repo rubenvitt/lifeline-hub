@@ -89,7 +89,8 @@ describe('AuftraegePage', () => {
     // (accessible name „plus Auftrag erteilen") → Regex; nach dem Öffnen heißt er „Formular schließen",
     // sodass der spätere exakte „Auftrag erteilen"-Treffer eindeutig der Formular-Submit ist.
     await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
-    await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
+    // Empfänger seit LFH-343 · C8 in EINEM Feld (Optionen + freier Funktionstext).
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     // Robust statt index-abhängig: die "Auftrag / Was"-TextArea trägt aria-label.
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
@@ -112,9 +113,14 @@ describe('AuftraegePage', () => {
     await screen.findByText('Deich sichern');
     // Kopf-Button trägt Icon → Regex zum Aufklappen (siehe Hinweis oben).
     await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
-    await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
+    // Empfänger seit LFH-343 · C8 in EINEM Feld (Optionen + freier Funktionstext).
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
-    await userEvent.type(screen.getByPlaceholderText('z. B. sofort, bis 14:00, nach Eintreffen'), 'sofort');
+    // Die sieben SKK-Felder liegen seit LFH-343 · C8 hinter einem zugeklappten
+    // Collapse (Befund H49: 14 Felder in einem 520-px-Modal). Ohne `forceRender`
+    // stehen sie vor dem Aufklappen gar nicht im DOM.
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    await userEvent.type(await screen.findByLabelText('Zeit / Wann'), 'sofort');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(legeAuftragAn).toHaveBeenCalledWith(1, expect.objectContaining({
       auftrag_text: 'Erkunden',

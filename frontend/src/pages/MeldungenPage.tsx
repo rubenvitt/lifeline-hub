@@ -350,9 +350,11 @@ export default function MeldungenPage() {
         einheiten={auftragsZiele.einheiten}
         senden={auftragMutation.isPending}
         onAbbrechen={() => setAuftragMeldung(null)}
-        onAnlegen={(daten) => {
-          if (auftragMeldung) auftragMutation.mutate({ meldungId: auftragMeldung.id, daten });
-        }}
+        // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
+        // wenn der Auftrag wirklich angekommen ist (LFH-332/B4).
+        onAnlegen={(daten) => (auftragMeldung
+          ? auftragMutation.mutateAsync({ meldungId: auftragMeldung.id, daten })
+          : Promise.reject(new Error('Keine Quellmeldung')))}
       />
     </div>
   );

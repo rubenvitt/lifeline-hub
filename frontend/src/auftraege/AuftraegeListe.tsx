@@ -76,9 +76,14 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
 
+  // LFH-343/C8: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach
+  // dem Erteilen offen, damit der nächste Auftrag ohne Aufklappen weitergeht;
+  // Zuklappen ist ausdrückliche Nutzeraktion (Kopf-Umschalter oder Kreuz an der
+  // Card). Der conditional Render der Card würde das Formular sonst unmounten —
+  // samt Serienzähler und Wertübernahme. Muster: `pages/MeldungenPage.tsx`.
   const anlegenMutation = useMutation({
     mutationFn: (d: NeuerAuftrag) => legeAuftragAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Auftrag erteilt'); setFormOffen(false); },
+    onSuccess: () => { invalidiere(); message.success('Auftrag erteilt'); },
     onError: fehler,
   });
   const quittierenMutation = useMutation({
@@ -255,7 +260,12 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
             senden={anlegenMutation.isPending}
             abschnitte={abschnitte}
             einheiten={einheiten}
-            onAnlegen={(d) => anlegenMutation.mutate(d)}
+            // Serienerfassung an der Liste (LFH-343 · C8): hier entstehen mehrere
+            // Aufträge hintereinander, an derselben Lage meist an dieselbe Stelle.
+            serie
+            // mutateAsync, nicht mutate: die Erfassungshülle darf die Felder nur
+            // leeren, wenn der Auftrag wirklich angekommen ist.
+            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
         </Card>
       )}

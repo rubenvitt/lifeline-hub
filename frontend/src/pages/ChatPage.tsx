@@ -411,9 +411,11 @@ export default function ChatPage() {
         einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
         senden={heraufstufenAuftragMutation.isPending}
         onAbbrechen={() => setHeraufstufenAuftragAuswahl(null)}
-        onAnlegen={(daten) => {
-          if (heraufstufenAuftrag) heraufstufenAuftragMutation.mutate({ nid: heraufstufenAuftrag.id, daten });
-        }}
+        // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
+        // wenn der Auftrag wirklich angekommen ist (LFH-332/B4).
+        onAnlegen={(daten) => (heraufstufenAuftrag
+          ? heraufstufenAuftragMutation.mutateAsync({ nid: heraufstufenAuftrag.id, daten })
+          : Promise.reject(new Error('Keine Quellnachricht')))}
       />
     </div>
   );

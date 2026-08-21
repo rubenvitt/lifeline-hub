@@ -355,7 +355,7 @@ describe('MeldungenPage', () => {
     const textfeld = await screen.findByLabelText('Auftrag / Was');
     expect(textfeld).toHaveValue('Florian Nord 1: Deich instabil');
     // Minimal validen Empfänger über das Funktions-Freitextfeld ergänzen.
-    await userEvent.type(screen.getByLabelText(/Weitere Empfänger/), 'S3');
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
     // Submit-Button des Formulars heißt ebenfalls „Auftrag erteilen".
     const buttons = await screen.findAllByRole('button', { name: 'Auftrag erteilen' });
     await userEvent.click(buttons[buttons.length - 1]);
@@ -532,7 +532,7 @@ describe('MeldungenPage', () => {
     const menue = await oeffneAktionsmenue();
     await userEvent.click(within(menue).getByText(/Auftrag erteilen/));
     await userEvent.type(await screen.findByLabelText('Auftrag / Was'), 'Riegelstellung');
-    await userEvent.type(screen.getByLabelText(/Weitere Empfänger/), 'EA Nord');
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
     await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalled());
@@ -548,7 +548,7 @@ describe('MeldungenPage', () => {
     const menue = await oeffneAktionsmenue();
     await userEvent.click(within(menue).getByText(/Auftrag erteilen/));
     await userEvent.type(await screen.findByLabelText('Auftrag / Was'), 'Riegelstellung');
-    await userEvent.type(screen.getByLabelText(/Weitere Empfänger/), 'EA Nord');
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
     await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalled());

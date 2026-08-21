@@ -25,7 +25,7 @@ describe('HeraufstufenAuftragModal', () => {
     // Chat-Text ist als Auftragstext vorbelegt (LFH-101).
     expect(screen.getByLabelText('Auftrag / Was')).toHaveValue('Tank 5000 anfordern');
 
-    await userEvent.type(screen.getByPlaceholderText(/Fachberater/), 'S4');
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S4{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
       auftrag_text: 'Tank 5000 anfordern',

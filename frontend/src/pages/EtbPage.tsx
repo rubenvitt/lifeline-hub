@@ -469,9 +469,12 @@ export default function EtbPage() {
           einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
           senden={auftragMutation.isPending}
           onAbbrechen={() => setAuftragZu(null)}
-          onAnlegen={(daten) => {
-            if (auftragZu) auftragMutation.mutate({ eintragId: auftragZu.id, daten });
-          }}
+          // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
+          // wenn der Auftrag wirklich angekommen ist (LFH-332/B4, gezogen von
+          // LFH-343 · C8 — dieselbe Bauform wie Meldung→Auftrag und Chat→Auftrag).
+          onAnlegen={(daten) => (auftragZu
+            ? auftragMutation.mutateAsync({ eintragId: auftragZu.id, daten })
+            : Promise.reject(new Error('Kein Quell-Eintrag')))}
         />
       )}
     </div>

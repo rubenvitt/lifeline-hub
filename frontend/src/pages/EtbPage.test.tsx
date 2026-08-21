@@ -210,8 +210,9 @@ describe('EtbPage', () => {
     await waehleZeilenaktion(user, 'Auftrag erteilen');
     // Auftragstext ist aus dem Eintragstext vorbefüllt.
     expect(await screen.findByDisplayValue('Erste Meldung')).toBeInTheDocument();
-    // Einen Funktions-Empfänger ergänzen (Pflicht: >=1 Empfänger).
-    await user.type(screen.getByPlaceholderText(/S3, Fachberater/), 'S3');
+    // Einen Funktions-Empfänger ergänzen (Pflicht: >=1 Empfänger). Seit
+    // LFH-343 · C8 tragen strukturierte Ziele und freie Funktionstexte EIN Feld.
+    await user.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
     /*
      * Der Modal-Submit ist jetzt der EINZIGE Knopf dieses Namens. Vorher gab es zwei
      * gleichnamige (Zeilen-Auslöser + Submit) und dieser Griff nahm den letzten; seit
