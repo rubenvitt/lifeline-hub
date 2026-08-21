@@ -99,18 +99,14 @@ export default function AuftragKarte({
 
   const aktionen: ReactNode[] = darfSchreiben
     ? [
+        // EIN Klick (LFH-343 · C8, Befund H50): der Rückfrage-Dialog, der hier stand,
+        // kostete die häufigste Routine-Aktion der Karte zwei. Der Rückweg steht
+        // im Rückgängig-Toast der Seite; `POST …/vollzug` nimmt seit derselben
+        // Änderung `status: 'offen'` an — aber NUR aus `in_arbeit`.
+        // „Abnehmen" (unten) behält seine Rückfrage: die Abnahme ist der
+        // fachliche Schlusspunkt und hat keinen Rückweg.
         a.bearbeitungsstatus === 'offen' && onInArbeit
-          ? (
-            <Popconfirm
-              key="ia"
-              title="Auftrag auf „In Bearbeitung“ setzen?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onInArbeit(a.id)}
-            >
-              <Button>In Bearbeitung</Button>
-            </Popconfirm>
-          ) : null,
+          ? <Button key="ia" onClick={() => onInArbeit(a.id)}>In Bearbeitung</Button> : null,
         // „Vollzug melden" öffnet das Modal (= eigene Bestätigung) → kein Popconfirm.
         (a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') && onVollzugMelden
           ? <Button key="vm" onClick={() => onVollzugMelden(a.id)}>Vollzug melden</Button> : null,

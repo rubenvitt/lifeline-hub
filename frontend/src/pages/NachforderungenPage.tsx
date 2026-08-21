@@ -11,6 +11,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { legeNachforderungAn, lehneNachforderungAb, listeNachforderungen, setzeNachforderungStatus } from '../api/nachforderungen';
 import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../api/types';
 import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
 import Datenstand from '../components/Datenstand';
@@ -54,10 +55,28 @@ export default function NachforderungenPage() {
     onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); setFormOffen(false); },
     onError: fehler,
   });
+  /**
+   * Fortschaltung und Rücknahme laufen durch DIESELBE Mutation (LFH-343 · C8).
+   * `vorher` ist der Stand VOR dem Klick und damit das Ziel des Rückwegs — er
+   * wird übergeben statt abgeleitet, weil `NAECHSTER` rückwärts mehrdeutig wäre,
+   * sobald die Kette einmal einen Abzweig bekommt.
+   *
+   * `zurueck` unterscheidet die beiden Richtungen: die Rücknahme darf keinen
+   * eigenen Rückgängig-Toast erzeugen, sonst schaukelte sich das Paar endlos auf.
+   */
   const statusMutation = useMutation({
-    mutationFn: ({ nfId, status }: { nfId: number; status: NachforderungStatus }) =>
-      setzeNachforderungStatus(einsatzId, nfId, status),
-    onSuccess: invalidiere,
+    mutationFn: ({ nfId, status }: {
+      nfId: number; status: NachforderungStatus; vorher?: NachforderungStatus; zurueck?: boolean;
+    }) => setzeNachforderungStatus(einsatzId, nfId, status),
+    onSuccess: (_daten, { nfId, status, vorher, zurueck }) => {
+      invalidiere();
+      if (zurueck || !vorher) return;
+      zeigeRueckgaengig(
+        message,
+        `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`,
+        () => statusMutation.mutate({ nfId, status: vorher, zurueck: true }),
+      );
+    },
     onError: fehler,
   });
   const ablehnenMutation = useMutation({
@@ -100,7 +119,10 @@ export default function NachforderungenPage() {
 
   const listenProps = {
     darfSchreiben,
-    onStatus: (nfId: number, status: NachforderungStatus) => statusMutation.mutate({ nfId, status }),
+    onStatus: (nfId: number, status: NachforderungStatus) => {
+      const vorher = alle.find((n) => n.id === nfId)?.status;
+      statusMutation.mutate({ nfId, status, vorher });
+    },
     onAblehnen: (nfId: number) => { setAblehnenId(nfId); setAblehnenGrund(''); },
   };
 

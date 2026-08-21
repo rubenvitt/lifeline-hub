@@ -264,15 +264,31 @@ describe('AuftraegePage', () => {
     expect(screen.getByText(/Vollzugsvermerk: Deich gehalten/)).toBeInTheDocument();
   });
 
-  it('setzt einen offenen Auftrag auf „In Bearbeitung"', async () => {
+  /**
+   * Vorher öffnete der Knopf einen `Popconfirm`. Seit LFH-343 · C8 schaltet der
+   * erste Klick — der Rückweg steht im Rückgängig-Toast, und der Server nimmt ihn
+   * seit derselben Änderung an (`POST …/vollzug` mit `status: 'offen'`).
+   */
+  it('setzt einen offenen Auftrag mit EINEM Klick auf „In Bearbeitung"', async () => {
     listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'offen' })]);
     setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
     renderPage();
     await screen.findByText('Deich sichern');
-    // Aktion ist jetzt ein Button mit Popconfirm (kein <a>, kein Status-Segmented mehr).
     await userEvent.click(screen.getByRole('button', { name: 'In Bearbeitung' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'in_arbeit', undefined));
+    expect(document.querySelector('.ant-popconfirm')).toBeNull();
+  });
+
+  it('bietet den Rückweg auf „Offen" als Rückgängig-Knopf an', async () => {
+    listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'offen' })]);
+    setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.click(screen.getByRole('button', { name: 'In Bearbeitung' }));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenLastCalledWith(1, 1, 'offen', undefined));
   });
 
   it('nimmt einen vollzogenen Auftrag ab', async () => {

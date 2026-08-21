@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Card, Flex, Space, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge, formatZeit } from '../kommunikation';
@@ -42,19 +42,15 @@ export default function NachforderungKarte({
 
   const aktionen: ReactNode[] = darfSchreiben && n.ist_offen
     ? [
+        // Fortschaltung mit EINEM Klick (LFH-343 · C8, Befund H50). Der
+        // Rückfrage-Dialog, der hier stand, kostete jeden Schritt der Kette zwei
+        // Klicks; der Rückweg steht stattdessen im Rückgängig-Toast der Seite,
+        // und `uebergang_erlaubt` nimmt seit derselben Änderung die Rücknahme um
+        // genau eine Stufe an.
         next && onStatus
-          ? (
-            <Popconfirm
-              key="next"
-              title={`Status auf „${NACHFORDERUNG_STATUS[next].label}“ setzen?`}
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onStatus(n.id, next)}
-            >
-              <Button>→ {NACHFORDERUNG_STATUS[next].label}</Button>
-            </Popconfirm>
-          ) : null,
-        // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → kein Popconfirm.
+          ? <Button key="next" onClick={() => onStatus(n.id, next)}>→ {NACHFORDERUNG_STATUS[next].label}</Button>
+          : null,
+        // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → keine Rückfrage.
         onAblehnen
           ? <Button key="ab" danger onClick={() => onAblehnen(n.id)}>Ablehnen</Button> : null,
       ].filter(Boolean)

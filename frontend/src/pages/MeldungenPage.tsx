@@ -15,6 +15,7 @@ import { listeEinheiten } from '../api/einheiten';
 import type { Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
@@ -114,10 +115,28 @@ export default function MeldungenPage() {
     },
     onError: fehler,
   });
+  /**
+   * Triage-Schritt und seine Rücknahme laufen durch DIESELBE Mutation
+   * (LFH-343 · C8, Befund H50). `vorher` ist der Stand VOR dem Klick und damit das
+   * Ziel des Rückwegs; `src/meldung/repo.rs:setze_status` nimmt jeden gültigen
+   * Status an, die Rücknahme braucht also keine eigene Route.
+   *
+   * `zurueck` unterscheidet die Richtungen: die Rücknahme darf keinen eigenen
+   * Rückgängig-Toast erzeugen, sonst schaukelte sich das Paar endlos auf.
+   */
   const statusMutation = useMutation({
-    mutationFn: ({ meldungId, status }: { meldungId: number; status: MeldungStatus }) =>
-      setzeMeldungStatus(einsatzId, meldungId, status),
-    onSuccess: invalidiere,
+    mutationFn: ({ meldungId, status }: {
+      meldungId: number; status: MeldungStatus; vorher?: MeldungStatus; zurueck?: boolean;
+    }) => setzeMeldungStatus(einsatzId, meldungId, status),
+    onSuccess: (_daten, { meldungId, status, vorher, zurueck }) => {
+      invalidiere();
+      if (zurueck || !vorher) return;
+      zeigeRueckgaengig(
+        message,
+        `Meldung ${MELDUNG_STATUS[status]?.label ?? status}`,
+        () => statusMutation.mutate({ meldungId, status: vorher, zurueck: true }),
+      );
+    },
     onError: fehler,
   });
   const zuweisenMutation = useMutation({
@@ -145,10 +164,25 @@ export default function MeldungenPage() {
   const auftragMutation = useMutation({
     mutationFn: ({ meldungId, daten }: { meldungId: number; daten: NeuerAuftrag }) =>
       erteileAuftragAusMeldung(einsatzId, meldungId, daten),
-    onSuccess: () => {
+    onSuccess: (_daten, { meldungId }) => {
       invalidiere();
       qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
       setAuftragMeldung(null);
+      // Wer aus einer Meldung einen Auftrag erteilt, HAT sie bearbeitet
+      // (LFH-343 · C8, Befund H50). Ohne diesen Schritt stand sie danach weiter
+      // auf „neu", und der Weg Meldung→Auftrag→erledigt kostete zwei zusätzliche
+      // Klicks. Der Riegel auf den Ausgangsstatus ist tragend: ohne ihn schriebe
+      // die Seite bei einer schon laufenden Meldung denselben Status noch einmal
+      // — ein PATCH samt Invalidierung und Live-Ereignis für nichts.
+      //
+      // Bewusst OHNE Rückgängig-Toast (`vorher` bleibt leer): der sichtbare
+      // Vorgang ist das Erteilen des Auftrags, und ein Rückweg, der nur den
+      // Meldungsstatus zurückdreht, ließe den Auftrag stehen — er verspräche
+      // eine Rücknahme, die keine ist.
+      const quelle = (meldungenQuery.data ?? []).find((m) => m.id === meldungId);
+      if (quelle && quelle.status !== 'in_bearbeitung' && quelle.status !== 'erledigt') {
+        statusMutation.mutate({ meldungId, status: 'in_bearbeitung', zurueck: true });
+      }
       message.success('Auftrag aus Meldung erteilt');
     },
     onError: fehler,
@@ -189,7 +223,10 @@ export default function MeldungenPage() {
     darfSchreiben,
     mitglieder,
     highlightId: highlightMeldungId,
-    onStatus: (meldungId: number, status: MeldungStatus) => statusMutation.mutate({ meldungId, status }),
+    onStatus: (meldungId: number, status: MeldungStatus) => {
+      const vorher = alleMeldungen.find((m) => m.id === meldungId)?.status;
+      statusMutation.mutate({ meldungId, status, vorher });
+    },
     onZuweisen: (meldungId: number, bearbeiterId: number | null) => zuweisenMutation.mutate({ meldungId, bearbeiterId }),
     onLagerelevant: (meldungId: number) => {
       const m = alleMeldungen.find((x) => x.id === meldungId) ?? null;

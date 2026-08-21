@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Popconfirm, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { Button, Card, Flex, Space, Tag, Tooltip, Typography, theme } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
@@ -66,32 +66,20 @@ export default function ErinnerungKarte({
   // abgeschlossenen Erinnerungen true → Hervorhebung nur in der Offen-Ansicht zeigen.
   const faellig = e.ist_faellig && !istAbg;
 
+  // Beide Schritte schalten mit EINEM Klick (LFH-343 · C8, Befund H50). Der
+  // Rückfrage-Dialog, der hier stand, kostete jede Routine-Aktion zwei Klicks; der
+  // Rückweg steht stattdessen im Rückgängig-Toast der Seite, und seit derselben
+  // Änderung nimmt der Server ihn auch an (`POST …/erinnerungen/{eid}/oeffnen`).
+  // Die Tooltips BLEIBEN — sie tragen die fachliche Trennung Quittiert/Erledigt
+  // (LFH-106), die der Rückfrage-Dialog nur mit übernommen hatte.
   const aktionen: ReactNode[] = darfSchreiben && !istAbg
     ? [
-        <Popconfirm
-          key="q"
-          title="Zur Kenntnis genommen?"
-          description={TOOLTIP_QUITTIEREN}
-          okText="Quittieren"
-          cancelText="Abbrechen"
-          onConfirm={() => onQuittieren?.(e.id)}
-        >
-          <Tooltip title={TOOLTIP_QUITTIEREN}>
-            <Button>Quittieren</Button>
-          </Tooltip>
-        </Popconfirm>,
-        <Popconfirm
-          key="e"
-          title="Handlung durchgeführt?"
-          description={TOOLTIP_ERLEDIGT}
-          okText="Erledigt"
-          cancelText="Abbrechen"
-          onConfirm={() => onErledigen?.(e.id)}
-        >
-          <Tooltip title={TOOLTIP_ERLEDIGT}>
-            <Button type="primary">Erledigt</Button>
-          </Tooltip>
-        </Popconfirm>,
+        <Tooltip key="q" title={TOOLTIP_QUITTIEREN}>
+          <Button onClick={() => onQuittieren?.(e.id)}>Quittieren</Button>
+        </Tooltip>,
+        <Tooltip key="e" title={TOOLTIP_ERLEDIGT}>
+          <Button type="primary" onClick={() => onErledigen?.(e.id)}>Erledigt</Button>
+        </Tooltip>,
       ]
     : [];
 

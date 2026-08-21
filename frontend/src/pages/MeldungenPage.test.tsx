@@ -506,6 +506,57 @@ describe('MeldungenPage', () => {
     expect(screen.getByText('In Arbeit (2)')).toBeInTheDocument();
   });
 
+  it('bietet nach dem Sichten den Rückweg auf den vorherigen Status an', async () => {
+    setzeMeldungStatus.mockResolvedValue(meldung({ status: 'gesichtet' }));
+    renderPage();
+    await screen.findByText('Deich instabil');
+    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'gesichtet'));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    // Zurück auf den Stand VOR dem Klick, nicht auf einen erratenen Anfang.
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenLastCalledWith(1, 1, 'neu'));
+  });
+
+  /**
+   * Befund H50, zweiter Teil: der Weg Meldung → Auftrag → erledigt kostete sechs
+   * Klicks, weil die Quellmeldung nach dem Auftrag unverändert auf „neu" stand.
+   * Wer aus einer Meldung einen Auftrag erteilt, HAT sie bearbeitet.
+   */
+  it('setzt die Quellmeldung auf „In Bearbeitung", wenn aus ihr ein Auftrag wird', async () => {
+    erteileAuftragAusMeldung.mockResolvedValue({ id: 5 });
+    setzeMeldungStatus.mockResolvedValue(meldung({ status: 'in_bearbeitung' }));
+    renderPage();
+    await screen.findByText('Deich instabil');
+
+    const menue = await oeffneAktionsmenue();
+    await userEvent.click(within(menue).getByText(/Auftrag erteilen/));
+    await userEvent.type(await screen.findByLabelText('Auftrag / Was'), 'Riegelstellung');
+    await userEvent.type(screen.getByLabelText(/Weitere Empfänger/), 'EA Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalled());
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'in_bearbeitung'));
+  });
+
+  it('lässt eine bereits laufende Meldung beim Auftrag-Erteilen in Ruhe', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ status: 'in_bearbeitung' })]);
+    erteileAuftragAusMeldung.mockResolvedValue({ id: 5 });
+    renderPage();
+    await screen.findByText('Deich instabil');
+
+    const menue = await oeffneAktionsmenue();
+    await userEvent.click(within(menue).getByText(/Auftrag erteilen/));
+    await userEvent.type(await screen.findByLabelText('Auftrag / Was'), 'Riegelstellung');
+    await userEvent.type(screen.getByLabelText(/Weitere Empfänger/), 'EA Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalled());
+    // Ohne diesen Riegel schriebe die Seite denselben Status noch einmal — ein
+    // PATCH samt Invalidierung und Live-Ereignis für nichts.
+    expect(setzeMeldungStatus).not.toHaveBeenCalled();
+  });
+
   it('lässt eine leere Gruppe ganz weg, statt „Neu (0)" zu zeigen', async () => {
     listeMeldungen.mockResolvedValue([
       meldung({ id: 3, lfd_nr: 3, status: 'gesichtet', inhalt: 'Bereits gesichtet' }),

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import ErinnerungListe from './ErinnerungListe';
 import type { Erinnerung } from '../api/types';
@@ -32,14 +32,28 @@ describe('ErinnerungListe', () => {
     expect(screen.getByText(/^fällig$/i)).toBeInTheDocument();
   });
 
-  it('löst onErledigen nach Popconfirm-Bestätigung mit der ID aus', async () => {
+  /**
+   * Vorher stand hier ein `Popconfirm`: der erste Klick öffnete nur ein Popover,
+   * der Callback kam mit dem zweiten. Seit LFH-343 · C8 schaltet der Knopf sofort —
+   * der Rückweg steht im Rückgängig-Toast, und seit derselben Änderung nimmt ihn
+   * der Server auch an (`POST …/erinnerungen/{eid}/oeffnen`).
+   */
+  it('löst onErledigen mit EINEM Klick aus, ohne Rückfrage', () => {
     const onErledigen = vi.fn();
     renderListe(<ErinnerungListe erinnerungen={[erinnerung({})]} darfSchreiben onErledigen={onErledigen} onQuittieren={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /erledigt/i }));
-    // Popconfirm öffnet ein Bestätigungs-Popover mit eigenem „Erledigt"-OK-Button.
-    const popconfirm = await screen.findByRole('tooltip');
-    fireEvent.click(within(popconfirm).getByRole('button', { name: /erledigt/i }));
     expect(onErledigen).toHaveBeenCalledWith(1);
+    // Die Gegenaussage: ohne sie bliebe der Test grün, wenn jemand die Rückfrage
+    // wieder einzöge und der Knopftext zufällig auch im Popover steht.
+    expect(document.querySelector('.ant-popconfirm')).toBeNull();
+  });
+
+  it('löst onQuittieren mit EINEM Klick aus, ohne Rückfrage', () => {
+    const onQuittieren = vi.fn();
+    renderListe(<ErinnerungListe erinnerungen={[erinnerung({})]} darfSchreiben onErledigen={() => {}} onQuittieren={onQuittieren} />);
+    fireEvent.click(screen.getByRole('button', { name: /quittieren/i }));
+    expect(onQuittieren).toHaveBeenCalledWith(1);
+    expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
 
   it('blendet Aktionen ohne Schreibrecht aus', () => {

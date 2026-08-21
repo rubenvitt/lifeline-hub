@@ -15,6 +15,7 @@ import {
   AUFTRAG_STATUS, GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, istAbgeschlossen, prioRang,
   type FaelligGruppe,
 } from '../kommunikation';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import AuftragListe from './AuftragListe';
 import AuftragFormular from './AuftragFormular';
 import VollzugMeldenModal from './VollzugMeldenModal';
@@ -144,10 +145,23 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
     onSettled: invalidiere,
   });
   const [vollzugFuer, setVollzugFuer] = useState<number | null>(null);
+  /**
+   * Fortschaltung und Rücknahme laufen durch DIESELBE Mutation (LFH-343 · C8).
+   * Der Rückgängig-Toast erscheint nur bei `in_arbeit`: „Vollzogen" trägt eine
+   * Vollzugsmeldung, geht ins ETB (append-only) und ist deshalb serverseitig
+   * nicht über diese Achse rücknehmbar — ein Knopf dafür liefe in ein 422.
+   */
   const vollzugMutation = useMutation({
-    mutationFn: ({ auftragId, status, text }: { auftragId: number; status: 'in_arbeit' | 'vollzogen'; text?: string }) =>
-      setzeVollzug(einsatzId, auftragId, status, text),
-    onSuccess: () => { invalidiere(); setVollzugFuer(null); },
+    mutationFn: ({ auftragId, status, text }: {
+      auftragId: number; status: 'offen' | 'in_arbeit' | 'vollzogen'; text?: string;
+    }) => setzeVollzug(einsatzId, auftragId, status, text),
+    onSuccess: (_daten, { auftragId, status }) => {
+      invalidiere();
+      setVollzugFuer(null);
+      if (status !== 'in_arbeit') return;
+      zeigeRueckgaengig(message, 'Auftrag in Bearbeitung', () =>
+        vollzugMutation.mutate({ auftragId, status: 'offen' }));
+    },
     onError: fehler,
   });
   const abnahmeMutation = useMutation({
