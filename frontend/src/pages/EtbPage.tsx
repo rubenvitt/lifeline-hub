@@ -1,5 +1,5 @@
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Tag, Typography } from 'antd';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
 import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -11,9 +11,9 @@ import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
-import { etbPfad, parseRouteId } from '../routing/deeplinks';
+import { etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
@@ -28,22 +28,70 @@ export default function EtbPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207-C):
   // der etb-Listener dort invalidiert ['etb', einsatzId] (Prefix deckt die gefilterte Liste ab).
-  const [filter, setFilter] = useState<EtbFilterWerte>({});
   /**
-   * Zählmarke, die `EtbFilterleiste` neu aufsetzt. Die Leiste hält eine eigene Kopie des
-   * Filters und ihre Felder sind unkontrolliert — Begründung samt Zeitzonen-Fehlermodus im
-   * Dateikopf von `etb/EtbFilterleiste.tsx`. Ein Reset allein auf `filter` ließe die
-   * sichtbaren Eingaben stehen.
+   * Der Filter steht in der URL, nicht im Seitenzustand (LFH-342 · C7, Befund M80).
+   *
+   * Damit überlebt er einen Reload, ist teilbar („schau dir den Zeitraum an") und
+   * landet im Verlauf. Der Query-Key hängt weiter an denselben Werten — die Umstellung
+   * bewegt die QUELLE, nicht die Achse.
+   *
+   * `useMemo` über den Query-String: `parseEtbFilter` gäbe sonst bei jedem Render ein
+   * frisches Objekt, und jede Effekt-Abhängigkeit darauf liefe im Kreis.
+   */
+  const filter = useMemo<EtbFilterWerte>(
+    () => parseEtbFilter(searchParams),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- der String IST der Wert;
+    // `searchParams` ist bei jedem Render eine neue Instanz (react-router).
+    [searchParams.toString()],
+  );
+  /**
+   * Zählmarke, die `EtbFilterleiste` neu aufsetzt. Die Leiste nimmt ihren Anfangsstand
+   * aus `startWerte`, hält den sichtbaren Stand danach aber selbst — Begründung samt
+   * Zeitzonen-Fehlermodus im Dateikopf von `etb/EtbFilterleiste.tsx`. Ein Reset allein
+   * auf der URL ließe die sichtbaren Eingaben stehen.
    */
   const [filterMarke, setFilterMarke] = useState(0);
   const filterWurzel = useRef<HTMLDivElement>(null);
   const filterAktiv = Object.keys(filter).length > 0;
 
-  function filterZuruecksetzen() {
-    setFilter({});
+  /**
+   * Kam die Filteränderung von der Leiste selbst? Dann darf sie NICHT neu aufgesetzt
+   * werden — der Remount nähme dem Suchfeld bei jedem entprellten Wort den Fokus.
+   *
+   * Jede FREMDE Änderung (Zurücksetzen, Deeplink, Zurück-Taste) setzt sie dagegen neu
+   * auf, und zwar in der Runde NACH der Navigation. Das ist der Grund für den Umweg
+   * über den Effekt statt eines `setFilterMarke` direkt im Zurücksetzen: react-router
+   * liefert die geräumte URL erst in der Folgerunde, ein Remount in derselben Runde
+   * setzte die Leiste mit dem noch gültigen Filter neu auf und schriebe den
+   * Suchbegriff ins Feld zurück (gemessen an
+   * `EtbPage.test.tsx` › „setzt beim Zurücksetzen auch das Eingabefeld zurück").
+   */
+  const eigeneFilteraenderung = useRef(false);
+  const filterText = searchParams.toString();
+  const vorigerFilterText = useRef(filterText);
+  useEffect(() => {
+    if (vorigerFilterText.current === filterText) return;
+    vorigerFilterText.current = filterText;
+    if (eigeneFilteraenderung.current) {
+      eigeneFilteraenderung.current = false;
+      return;
+    }
     setFilterMarke((m) => m + 1);
+  }, [filterText]);
+
+  function filterAendern(werte: EtbFilterWerte) {
+    eigeneFilteraenderung.current = true;
+    // `replace`, damit eine Suche keine dreißig Verlaufseinträge hinterlässt — der
+    // Rückweg soll auf die vorige SEITE führen, nicht auf den vorigen Buchstaben.
+    navigate(etbPfad(einsatzId, werte), { replace: true });
+  }
+
+  function filterZuruecksetzen() {
+    navigate(etbPfad(einsatzId), { replace: true });
   }
 
   useTastaturEbene({
@@ -102,7 +150,6 @@ export default function EtbPage() {
     benutzer?.id,
   );
 
-  const [searchParams, setSearchParams] = useSearchParams();
   // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette, LFH-11).
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
@@ -303,7 +350,7 @@ export default function EtbPage() {
       )}
 
       <div ref={filterWurzel}>
-        <EtbFilterleiste key={filterMarke} onChange={setFilter} />
+        <EtbFilterleiste key={filterMarke} startWerte={filter} onChange={filterAendern} />
       </div>
       {abgelehnt.length > 0 && (
         <Alert
