@@ -175,3 +175,55 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     expect(screen.queryByRole('button', { name: 'Sichten' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Befund H47 (LFH-343 · C8): eine neue Meldung sah exakt aus wie eine bereits
+ * gesichtete — beide `phase: 'offen'`, zwei graue Tags, drei Buchstaben Unterschied.
+ * Wer 20–40 Karten quer scannt, konnte „hat noch niemand angefasst" nicht von
+ * „ist erledigt gesichtet" trennen.
+ */
+describe('MeldungKarte · Eingangszustand', () => {
+  it('gibt der neuen Meldung einen eigenen Akzent, der gesichteten keinen', () => {
+    const { container, rerender } = renderKarte(
+      <MeldungKarte meldung={meldung({ status: 'neu' })} einsatzId={7} />,
+    );
+    expect(container.querySelector('.ant-card')).toHaveAttribute('data-unbearbeitet', 'true');
+    expect(screen.getByText('Neu').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+
+    rerender(
+      <MemoryRouter><MeldungKarte meldung={meldung({ status: 'gesichtet' })} einsatzId={7} /></MemoryRouter>,
+    );
+    expect(container.querySelector('.ant-card')).not.toHaveAttribute('data-unbearbeitet');
+    expect(screen.getByText('Gesichtet').closest('.ant-tag')).not.toHaveClass('ant-tag-warning');
+  });
+
+  it('lässt den Alarm den Neu-Akzent schlagen', () => {
+    // Eine unbestätigte überfällige Sofortmeldung ist BEIDES. Der linke Rand kann
+    // nur eine Farbe tragen — Gefahr gewinnt, sonst färbte C8 einen Alarm gelb.
+    const { container } = renderKarte(<MeldungKarte
+      meldung={meldung({
+        status: 'neu', bestaetigung_pflicht: true, ist_bestaetigt: false, ist_ueberfaellig: true,
+      })}
+      einsatzId={7}
+    />);
+    const karte = container.querySelector('.ant-card')!;
+    expect(karte).toHaveAttribute('data-alarm', 'true');
+    expect(karte).not.toHaveAttribute('data-unbearbeitet');
+    // Das ETIKETT bleibt trotzdem das der neuen Meldung — nur der Rand ist vergeben.
+    expect(screen.getByText('Neu').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+  });
+
+  it('macht den Wortlaut zum größten Text der Karte (M69)', () => {
+    renderKarte(<MeldungKarte
+      meldung={meldung({ inhalt: 'Wasser im Keller', absender: 'Florian 1' })}
+      einsatzId={7}
+    />);
+    const inhalt = screen.getByText('Wasser im Keller');
+    const absender = screen.getByText('Florian 1');
+    // Vorher war der Wortlaut mit 13 px der KLEINSTE Text der Karte und der
+    // Absender mit 15 px strong der größte — genau verkehrt herum.
+    expect(parseFloat(inhalt.style.fontSize)).toBeGreaterThanOrEqual(15);
+    expect(inhalt.style.lineHeight).toBe('1.5');
+    expect(parseFloat(absender.style.fontSize)).toBeLessThan(parseFloat(inhalt.style.fontSize));
+  });
+});

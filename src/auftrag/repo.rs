@@ -1,5 +1,7 @@
 use crate::error::AppError;
-use crate::kommunikation::{repo as krepo, OBJEKT_AUFTRAG, VOLLZUG_IN_ARBEIT, VOLLZUG_VOLLZOGEN};
+use crate::kommunikation::{
+    repo as krepo, OBJEKT_AUFTRAG, VOLLZUG_IN_ARBEIT, VOLLZUG_OFFEN, VOLLZUG_VOLLZOGEN,
+};
 use sqlx::SqlitePool;
 
 use super::{
@@ -471,6 +473,43 @@ pub async fn setze_in_arbeit(
     .await?;
     sqlx::query("UPDATE auftrag SET in_arbeit_at = COALESCE(in_arbeit_at, ?) WHERE id = ?")
         .bind(jetzt)
+        .bind(auftrag_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Nimmt den Bearbeitungsfortschritt auf 'offen' zurück (LFH-343 · C8, Befund H50).
+///
+/// Der Gegenweg zu {@link setze_in_arbeit}: seit C8 kostet „In Bearbeitung" einen
+/// Klick statt zweier, und der Rückgängig-Toast braucht einen Weg, den der Server
+/// annimmt. Der Zeitstempel geht MIT zurück — bliebe er stehen, behauptete der
+/// Auftrag einen Fortschritt, den es nicht mehr gibt, und `COALESCE` in
+/// `setze_in_arbeit` schriebe beim nächsten Mal den alten Stempel fort.
+///
+/// Anders als der Vollzug erzeugt die Rücknahme KEINEN ETB-Eintrag: das Setzen auf
+/// „In Bearbeitung" erzeugt selbst keinen, ein Eintrag nur für dessen Rücknahme
+/// hinterließe im Tagebuch eine Zeile ohne Gegenstück.
+pub async fn setze_offen(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    krepo::setze_vollzug(
+        pool,
+        org_id,
+        einsatz_id,
+        OBJEKT_AUFTRAG,
+        auftrag_id,
+        VOLLZUG_OFFEN,
+        von_id,
+        jetzt,
+    )
+    .await?;
+    sqlx::query("UPDATE auftrag SET in_arbeit_at = NULL WHERE id = ?")
         .bind(auftrag_id)
         .execute(pool)
         .await?;

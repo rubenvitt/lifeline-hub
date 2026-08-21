@@ -207,3 +207,71 @@ async fn erledigen_anderer_einsatz_ist_404() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+/// Rücknahme von Erledigt/Quittiert (LFH-343 · C8, Befund H50).
+///
+/// Beide Knöpfe schalten seither mit EINEM Klick statt mit Rückfrage; der
+/// Rückgängig-Toast braucht dafür einen Weg, den der Server annimmt.
+#[tokio::test]
+async fn oeffnen_nimmt_erledigt_und_quittiert_zurueck() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/erinnerungen"),
+        &admin,
+        Some(r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00"}"#),
+    )
+    .await;
+    let eid = json["id"].as_i64().unwrap();
+    let oeffnen = format!("/api/einsaetze/{e}/erinnerungen/{eid}/oeffnen");
+
+    // Aus `offen` heraus wäre die Rücknahme ein No-op, der wie Erfolg aussieht → 422.
+    let (leerlauf, _) = anfrage(&app, "POST", &oeffnen, &admin, None).await;
+    assert_eq!(leerlauf, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Weg 1: erledigt → offen.
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/erinnerungen/{eid}/erledigen"),
+        &admin,
+        None,
+    )
+    .await;
+    let (status, zurueck) = anfrage(&app, "POST", &oeffnen, &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(zurueck["status"], "offen");
+    // Die Vollzugsachse muss MITgehen: bliebe sie stehen, zeigte die Karte „offen"
+    // und trüge gleichzeitig den grünen Vollzugs-Tag.
+    assert_eq!(zurueck["vollzug_status"], "offen");
+    assert!(zurueck["erledigt_at"].is_null());
+
+    // Weg 2: quittiert → offen. Die Quittungsachse ist eine ANDERE Spalte als der
+    // Vollzug — eine Rücknahme, die nur eine von beiden räumt, ist keine.
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/erinnerungen/{eid}/quittieren"),
+        &admin,
+        None,
+    )
+    .await;
+    let (status, zurueck) = anfrage(&app, "POST", &oeffnen, &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(zurueck["status"], "offen");
+    assert!(zurueck["quittiert_at"].is_null());
+
+    // Und sie taucht in der Offen-Liste wieder auf — das ist der sichtbare Zweck.
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/erinnerungen?nur_offen=true"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste.as_array().unwrap().len(), 1);
+}

@@ -131,6 +131,26 @@ pub async fn status_setzen(
     laden(pool, id, jetzt).await
 }
 
+/// Setzt eine erledigte/quittierte Erinnerung auf `offen` zurück (LFH-343 · C8).
+///
+/// Bewusst NICHT als dritter erlaubter Wert in [`status_setzen`]: dessen Riegel
+/// („nur erledigt/quittiert") ist eine Zusicherung über die Vorwärtsrichtung, und
+/// die Rücknahme räumt zusätzlich `erledigt_at` — was `status_setzen` gerade
+/// setzt. Zwei gegenläufige Wirkungen in einer Funktion wären ein Schalter, kein
+/// Vorgang.
+pub async fn wieder_oeffnen(
+    pool: &SqlitePool,
+    id: i64,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
+    sqlx::query("UPDATE erinnerung SET status = ?, erledigt_at = NULL WHERE id = ?")
+        .bind(STATUS_OFFEN)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    laden(pool, id, jetzt).await
+}
+
 /// Eine fällige, offene Erinnerung, die ein Scheduler-Nudge braucht.
 /// `intervall_minuten` entscheidet einmalig vs. wiederkehrend in `tick_einmal`.
 #[derive(Debug, Clone, sqlx::FromRow)]

@@ -10,10 +10,11 @@ use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "erinnerungen";
-use crate::erinnerung::{repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_QUITTIERT};
+use crate::erinnerung::{repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT};
 use crate::error::AppError;
 use crate::kommunikation::{
-    repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_VOLLZOGEN,
+    repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_OFFEN,
+    VOLLZUG_VOLLZOGEN,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -258,6 +259,50 @@ pub async fn quittieren(
         &now,
     )
     .await?;
+    let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(r))
+}
+
+/// POST /api/einsaetze/{id}/erinnerungen/{eid}/oeffnen — Rücknahme von
+/// Erledigt/Quittiert (LFH-343 · C8, Befund H50).
+///
+/// Der Gegenweg zur Direktaktion ohne Rückfrage: beide Knöpfe schalten seither mit
+/// EINEM Klick, und der Rückgängig-Toast braucht einen Weg, den der Server annimmt.
+/// Geräumt werden ALLE DREI Achsen — Triage-Status, Vollzug und Quittung. Bliebe eine
+/// stehen, zeigte die Karte „offen" und trüge zugleich den Vollzugs- oder
+/// Quittungsvermerk.
+pub async fn oeffnen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, erinnerung_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<ErinnerungAnzeige>, AppError> {
+    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
+    let now = jetzt();
+    let aktuell = repo::laden(&state.pool, erinnerung_id, &now).await?;
+    if aktuell.status == STATUS_OFFEN {
+        // Zustandsverletzung, kein Feldfehler → 422 (src/error.rs). Ein stiller
+        // Erfolg wäre schlimmer: der Toast behauptete eine Rücknahme, die keine war.
+        return Err(AppError::UnprocessableEntity(
+            "Die Erinnerung ist bereits offen".into(),
+        ));
+    }
+    repo::wieder_oeffnen(&state.pool, erinnerung_id, &now).await?;
+    krepo::setze_vollzug(
+        &state.pool,
+        org_id,
+        einsatz_id,
+        OBJEKT_ERINNERUNG,
+        erinnerung_id,
+        VOLLZUG_OFFEN,
+        benutzer.id,
+        &now,
+    )
+    .await?;
+    krepo::loesche_quittung(&state.pool, einsatz_id, OBJEKT_ERINNERUNG, erinnerung_id).await?;
+    // NACH den beiden Achsen laden — sonst trüge die Antwort einen Zustand, den es
+    // nie gab (dieselbe Regel wie bei der Sichtung in LFH-340/C5). Deshalb wird der
+    // Rückgabewert von `wieder_oeffnen` oben verworfen.
     let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(r))

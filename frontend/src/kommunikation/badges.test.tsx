@@ -21,6 +21,21 @@ describe('StatusBadge', () => {
     render(<StatusBadge phase="ausnahme" label="Abgelehnt" />);
     expect(screen.getByText('Abgelehnt').closest('.ant-tag')).toHaveClass('ant-tag-error');
   });
+
+  it('hebt das unbearbeitete Etikett strukturell ab, nicht nur im Wortlaut', () => {
+    const { rerender } = render(<StatusBadge phase="offen" label="Neu" unbearbeitet />);
+    const neu = screen.getByText('Neu').closest('.ant-tag')!;
+    expect(neu).toHaveClass('ant-tag-warning');
+    // Zweiter Kanal neben der Farbe (WCAG 1.4.1): Gewicht UND Wortlaut.
+    expect((neu as HTMLElement).style.fontWeight).toBe('600');
+
+    rerender(<StatusBadge phase="offen" label="Gesichtet" />);
+    const gesichtet = screen.getByText('Gesichtet').closest('.ant-tag')!;
+    // Der Kern von H47: beide tragen die Phase `offen`. Ohne die Marke wären sie
+    // an derselben Klasse und demselben Gewicht nicht zu unterscheiden.
+    expect(gesichtet).not.toHaveClass('ant-tag-warning');
+    expect((gesichtet as HTMLElement).style.fontWeight).toBe('');
+  });
 });
 
 describe('PrioBadge', () => {

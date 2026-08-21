@@ -224,6 +224,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/erinnerungen/{eid}/quittieren",
             post(routes::erinnerung::quittieren),
         )
+        .route(
+            "/api/einsaetze/{id}/erinnerungen/{eid}/oeffnen",
+            post(routes::erinnerung::oeffnen),
+        )
         .route("/api/einsaetze/{id}/auftraege", get(routes::auftrag::liste))
         .route(
             "/api/einsaetze/{id}/auftraege",

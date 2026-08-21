@@ -32,6 +32,30 @@ pub async fn quittiere(
     Ok(())
 }
 
+/// Löscht die Quittungs-Achse (LFH-343 · C8). Vollzug bleibt unberührt — die beiden
+/// Achsen sind orthogonal, und eine Rücknahme, die nur eine von beiden räumt, wäre
+/// keine.
+///
+/// Kein UPSERT: existiert keine Zeile, gibt es nichts zu löschen. Das `UPDATE` trifft
+/// dann null Zeilen, und genau das ist richtig.
+pub async fn loesche_quittung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    objekt_typ: &str,
+    objekt_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE kommunikation_status SET quittiert_at = NULL, quittiert_von_id = NULL \
+         WHERE einsatz_id = ? AND objekt_typ = ? AND objekt_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(objekt_typ)
+    .bind(objekt_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Wie [`quittiere`], aber **einmalig**: schreibt die Quittung nur, wenn noch keine
 /// existiert (Guard `quittiert_at IS NULL` im DO-UPDATE). Liefert `true`, wenn DIESER Aufruf
 /// quittiert hat — sonst `false` (bereits quittiert). Macht „Doppel-Bestätigung → 422" atomar,

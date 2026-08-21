@@ -31,17 +31,35 @@ describe('PRIO_META', () => {
 
 describe('Status-Deskriptoren', () => {
   it('AUFTRAG mappt jeden Bearbeitungsstatus auf Phase + Fachlabel', () => {
-    expect(AUFTRAG_STATUS.offen).toEqual({ label: 'Offen', phase: 'offen' });
+    expect(AUFTRAG_STATUS.offen).toEqual({ label: 'Offen', phase: 'offen', unbearbeitet: true });
     expect(AUFTRAG_STATUS.in_arbeit).toEqual({ label: 'In Bearbeitung', phase: 'in_arbeit' });
     expect(AUFTRAG_STATUS.vollzogen).toEqual({ label: 'Vollzogen', phase: 'abgeschlossen' });
     expect(AUFTRAG_STATUS.abgenommen).toEqual({ label: 'Abgenommen', phase: 'abgeschlossen' });
   });
 
   it('MELDUNG mappt neu/gesichtet→offen, in_bearbeitung→in_arbeit, erledigt→abgeschlossen', () => {
-    expect(MELDUNG_STATUS.neu).toEqual({ label: 'Neu', phase: 'offen' });
+    expect(MELDUNG_STATUS.neu).toEqual({ label: 'Neu', phase: 'offen', unbearbeitet: true });
     expect(MELDUNG_STATUS.gesichtet).toEqual({ label: 'Gesichtet', phase: 'offen' });
     expect(MELDUNG_STATUS.in_bearbeitung).toEqual({ label: 'In Bearbeitung', phase: 'in_arbeit' });
     expect(MELDUNG_STATUS.erledigt).toEqual({ label: 'Erledigt', phase: 'abgeschlossen' });
+  });
+
+  it('markiert genau die unbearbeiteten Eingangszustände, nicht jede offene Phase', () => {
+    // Der Kern von H47: „neu" und „gesichtet" tragen DIESELBE Phase und sahen
+    // deshalb identisch aus — zwei graue Tags, drei Buchstaben Unterschied.
+    expect(MELDUNG_STATUS.neu.unbearbeitet).toBe(true);
+    expect(AUFTRAG_STATUS.offen.unbearbeitet).toBe(true);
+    expect(MELDUNG_STATUS.gesichtet.unbearbeitet).toBeUndefined();
+    expect(MELDUNG_STATUS.gesichtet.phase).toBe('offen');
+
+    // Und die Marke hängt NICHT an der Phase: Entwurf, offene Erinnerung und
+    // angeforderte Nachforderung liegen ebenfalls auf `offen`. Eine fünfte
+    // KommPhase hätte sie alle stillschweigend zu „neu" umklassifiziert — das ist
+    // der Grund, warum der Träger ein Flag am Deskriptor ist.
+    expect(BEFEHL_STATUS.entwurf.unbearbeitet).toBeUndefined();
+    expect(LAGEBERICHT_STATUS.entwurf.unbearbeitet).toBeUndefined();
+    expect(ERINNERUNG_STATUS.offen.unbearbeitet).toBeUndefined();
+    expect(NACHFORDERUNG_STATUS.angefordert.unbearbeitet).toBeUndefined();
   });
 
   it('NACHFORDERUNG mappt abgelehnt auf die Ausnahme-Phase', () => {

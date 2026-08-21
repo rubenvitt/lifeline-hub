@@ -72,6 +72,13 @@ export default function MeldungKarte({
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
   // Unübersehbare Hervorhebung (AK1/AK3): unbestätigte überfällige/eskalierte Sofortmeldung.
   const alarmiert = !!(m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert));
+  // Eingangszustand (LFH-343 · C8, Befund H47): eine neue Meldung sah exakt aus wie
+  // eine bereits gesichtete — beide `phase: 'offen'`, zwei graue Tags, drei
+  // Buchstaben Unterschied. Der Akzent liegt auf DEMSELBEN linken Rand wie der
+  // Alarm; der kann nur eine Farbe tragen, und Gefahr schlägt Eingangszustand.
+  // Das ETIKETT bleibt davon unberührt (`status.unbearbeitet` roh weitergereicht) —
+  // vergeben ist nur der Rand.
+  const unbearbeitet = !!status.unbearbeitet && !alarmiert;
 
   // Aktionsbündelung (LFH-372/B5k, Nachtrag zu LFH-364/B5d): die sechs Aktionen dieser
   // Karte schliessen sich NICHT aus — eine neue, bestätigungspflichtige, noch nicht
@@ -141,9 +148,13 @@ export default function MeldungKarte({
       size="small"
       data-meldung-id={m.id}
       data-hervorgehoben={hervorgehoben ? 'true' : undefined}
+      data-alarm={alarmiert ? 'true' : undefined}
+      data-unbearbeitet={unbearbeitet ? 'true' : undefined}
       style={{
         marginBottom: 10,
-        borderInlineStart: `3px solid ${alarmiert ? token.colorError : 'transparent'}`,
+        borderInlineStart: `3px solid ${
+          alarmiert ? token.colorError : unbearbeitet ? token.colorWarning : 'transparent'
+        }`,
         background: alarmiert ? token.colorErrorBg : undefined,
         boxShadow: hervorgehoben ? `0 0 0 2px ${token.colorPrimary}` : undefined,
       }}
@@ -153,7 +164,7 @@ export default function MeldungKarte({
         <Space size={6} wrap>
           <Text type="secondary" style={{ fontSize: 12 }}>#{m.lfd_nr}</Text>
           <PrioBadge prio={m.prioritaet} />
-          <StatusBadge phase={status.phase} label={status.label} />
+          <StatusBadge phase={status.phase} label={status.label} unbearbeitet={!!status.unbearbeitet} />
           {m.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
           {m.lagerelevant && <Tag color="gold" style={{ margin: 0 }}>Lagerelevant ✓</Tag>}
           {m.auftrag_id != null && (
@@ -170,9 +181,12 @@ export default function MeldungKarte({
         </Space>
       </Flex>
 
+      {/* M69: Absender und Empfänger sind Metadaten der Meldung, nicht ihr Inhalt —
+          sie fallen auf Metazeilen-Größe zurück. Vorher trug der Absender mit
+          15 px strong den größten Schriftgrad der Karte. */}
       <Space size={6} wrap style={{ marginBottom: 6 }}>
-        <Text strong style={{ fontSize: 15, lineHeight: 1.4 }}>{m.absender}</Text>
-        {m.empfaenger && <Text type="secondary" style={{ fontSize: 14 }}>→ {m.empfaenger}</Text>}
+        <Text type="secondary" style={{ fontSize: 12 }}>{m.absender}</Text>
+        {m.empfaenger && <Text type="secondary" style={{ fontSize: 12 }}>→ {m.empfaenger}</Text>}
       </Space>
 
       <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
@@ -197,7 +211,11 @@ export default function MeldungKarte({
         )}
       </Flex>
 
-      <Text style={{ fontSize: 13, display: 'block' }}>{m.inhalt}</Text>
+      {/* M69: der Wortlaut ist der Grund, warum die Karte existiert — er trägt den
+          größten Schriftgrad. Muster ist die Schwesterkarte `AuftragKarte.tsx`
+          (`auftrag_text`, 15 px). Die Zeilenhöhe 1.5 statt 1.4, weil dieser Text im
+          Gegensatz zum Auftragstext regelmäßig mehrzeilig ist. */}
+      <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
 
       {/* `<Space size="middle">` statt `<Flex gap={8}>` (LFH-363): „Bestätigen" ist `danger`
           und steht neben mindestens einer weiteren Aktion — der Vorgabeabstand wäre

@@ -75,3 +75,39 @@ describe('AuftragListe — Leerzustand (LFH-331 · B3)', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });
+
+/**
+ * Befund H47 (LFH-343 · C8), zweite Hälfte: `AUFTRAG_STATUS.offen` ist derselbe
+ * Fall wie `MELDUNG_STATUS.neu` — ein Auftrag, den noch niemand angefasst hat,
+ * trug dasselbe graue Etikett wie einer in Bearbeitung.
+ */
+describe('AuftragKarte — Eingangszustand', () => {
+  it('hebt den offenen Auftrag ab, den in Bearbeitung nicht', () => {
+    const { container } = renderMitProviders(
+      <AuftragListe auftraege={[auftrag({ bearbeitungsstatus: 'offen' })]} einsatzId={7} />,
+    );
+    expect(container.querySelector('.ant-card')).toHaveAttribute('data-unbearbeitet', 'true');
+    expect(screen.getByText('Offen').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+  });
+
+  it('lässt „In Bearbeitung" neutral', () => {
+    const { container } = renderMitProviders(
+      <AuftragListe auftraege={[auftrag({ bearbeitungsstatus: 'in_arbeit' })]} einsatzId={7} />,
+    );
+    expect(container.querySelector('.ant-card')).not.toHaveAttribute('data-unbearbeitet');
+    expect(screen.getByText('In Bearbeitung').closest('.ant-tag')).not.toHaveClass('ant-tag-warning');
+  });
+
+  it('lässt Überfällig den Rand gewinnen, behält aber das Etikett', () => {
+    const { container } = renderMitProviders(
+      <AuftragListe
+        auftraege={[auftrag({ bearbeitungsstatus: 'offen', ist_ueberfaellig: true })]}
+        einsatzId={7}
+      />,
+    );
+    const karte = container.querySelector('.ant-card')!;
+    expect(karte).toHaveAttribute('data-ueberfaellig', 'true');
+    expect(karte).not.toHaveAttribute('data-unbearbeitet');
+    expect(screen.getByText('Offen').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+  });
+});

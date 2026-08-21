@@ -168,8 +168,21 @@ export default function MeldungenPage() {
   const phaseVon = (m: Meldung) => MELDUNG_STATUS[m.status]?.phase ?? 'offen';
   const offene = alleMeldungen.filter((m) => !istAbgeschlossen(phaseVon(m))).sort(vergleicheMeldung);
   const abgeschlossene = alleMeldungen.filter((m) => istAbgeschlossen(phaseVon(m))).sort(vergleicheAbgeschlossen);
-  const sichtbare = ansicht === 'offen' ? offene : abgeschlossene;
   const mitglieder = mitgliederQuery.data ?? [];
+
+  // Zwei Gruppen in der Offen-Ansicht (LFH-343 · C8, Befund H47). Die Seite war
+  // bewusst flach — der Kommentar an `vergleicheMeldung` sagt das noch —, und
+  // dieser Kopf ändert es: die erste Frage der Triage lautet „was hat noch niemand
+  // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung
+  // steht danach unter einer neuen Normalmeldung; das ist gewollt.
+  // Innerhalb jeder Gruppe bleibt `vergleicheMeldung` die Ordnung — `offene` ist
+  // bereits sortiert, `filter` erhält die Reihenfolge.
+  const neue = offene.filter((m) => MELDUNG_STATUS[m.status]?.unbearbeitet);
+  const angefasste = offene.filter((m) => !MELDUNG_STATUS[m.status]?.unbearbeitet);
+  const offeneGruppen = [
+    { titel: `Neu (${neue.length})`, meldungen: neue },
+    { titel: `In Arbeit (${angefasste.length})`, meldungen: angefasste },
+  ].filter((g) => g.meldungen.length > 0);
 
   const listenProps = {
     einsatzId,
@@ -268,7 +281,22 @@ export default function MeldungenPage() {
           ]}
         />
       </div>
-      <MeldungListe meldungen={sichtbare} ansicht={ansicht} {...listenProps} />
+      {ansicht === 'offen' ? (
+        offeneGruppen.length === 0 ? (
+          <MeldungListe meldungen={[]} ansicht="offen" {...listenProps} />
+        ) : (
+          offeneGruppen.map(({ titel, meldungen }) => (
+            <div key={titel} style={{ marginBottom: 16 }}>
+              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+                {titel}
+              </Typography.Text>
+              <MeldungListe meldungen={meldungen} ansicht="offen" {...listenProps} />
+            </div>
+          ))
+        )
+      ) : (
+        <MeldungListe meldungen={abgeschlossene} ansicht="abgeschlossen" {...listenProps} />
+      )}
       <LagerelevantModal
         offen={lageMeldung !== null}
         meldung={lageMeldung}
