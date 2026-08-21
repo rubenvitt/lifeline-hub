@@ -130,6 +130,29 @@ const MIT_NACHBARSCHAFT = [
 ];
 
 /**
+ * BEWERTET, ABER FÜR DEN SCANNER UNSICHTBAR (LFH-343 · C8).
+ *
+ * `nachforderungen/NachforderungKarte.tsx` trägt „Ablehnen" (`danger`) neben der
+ * Status-Fortschaltung und hat mit C8 den Abstand aus LFH-363 bekommen — die Datei
+ * wurde ohnehin angefasst (die Rückfrage vor der Fortschaltung ist weg). Sie steht
+ * trotzdem **nicht** in {@link MIT_NACHBARSCHAFT}, und der Versuch ist gemessen:
+ * {@link reihenIn} findet dort keine Reihe.
+ *
+ * Grund: die Karte baut ihre Aktionen als `ReactNode[]`-Konstante und spreizt sie
+ * mit `{aktionen}` in die Reihe. Im `<Space>` steht damit kein `<Button … danger>`,
+ * das der Scanner sehen könnte — er liest Quelltext, keine Renderergebnisse.
+ * Dieselbe Bauweise haben `AuftragKarte` und `ErinnerungKarte`; beide tragen in
+ * ihrer Reihe kein `danger` und wären auch inhaltlich keine Kandidaten.
+ *
+ * Ein Eintrag in `MIT_NACHBARSCHAFT` färbte diesen Guard rot (der Test „jede
+ * bewertete Nachbarschaft ist noch da" verlangt einen echten Fund), einer in
+ * {@link OHNE_NACHBARSCHAFT} behauptete das Gegenteil des Wahren. Die Zusicherung
+ * steht deshalb als Kommentar in der Karte selbst — dieselbe Auflösung wie bei
+ * `etb/EtbTabelle.tsx` in LFH-342/C7: die Regel gilt, nicht der Scanner.
+ */
+const BEWERTET_OHNE_SCANNER_DECKUNG = ['nachforderungen/NachforderungKarte.tsx'];
+
+/**
  * Ebenfalls in LFH-363 bewertet, aber OHNE Nachbarschaft: die destruktive Aktion
  * steht dort allein in der Zelle, es gibt nichts zu trennen. Sie werden trotzdem
  * mitgescannt, damit ein später danebengestellter Knopf auffällt — und hier
@@ -291,6 +314,24 @@ describe('Abstands-Guard (LFH-363 · B5c)', () => {
   it('die Einzelaktionen tragen weiterhin keinen Nachbarn', () => {
     const unerwartet = OHNE_NACHBARSCHAFT.filter((p) => reihenIn(dateien[p]).length > 0);
     expect(unerwartet).toEqual([]);
+  });
+
+  /**
+   * Der Blindfleck ist gepinnt, nicht bloß beschrieben (LFH-343 · C8).
+   *
+   * Beide Hälften sind nötig: dass der Scanner die Datei NICHT sieht (sonst gehörte
+   * sie in `MIT_NACHBARSCHAFT` und dieser Test wäre eine Ausrede), und dass der
+   * Abstand trotzdem im Quelltext steht (sonst wäre die Ausnahme eine Lücke). Fängt
+   * die Karte an, ihre Knöpfe direkt in die Reihe zu schreiben, wird die erste
+   * Hälfte rot — und dann gehört die Datei in die Liste darüber.
+   */
+  it('die bewertete Reihe ohne Scanner-Deckung ist unsichtbar UND trägt den Abstand', () => {
+    for (const pfad of BEWERTET_OHNE_SCANNER_DECKUNG) {
+      const inhalt = readFileSync(join(SRC, pfad), 'utf8');
+      expect(reihenIn(inhalt), `${pfad}: der Scanner sieht die Reihe jetzt`).toEqual([]);
+      expect(inhalt, `${pfad}: Abstand fehlt`).toContain('<Space size="middle"');
+      expect(inhalt, `${pfad}: kein danger mehr in der Reihe?`).toContain('danger');
+    }
   });
 
   it('„middle" liegt in jeder Dichtestufe über token.marginSM', () => {

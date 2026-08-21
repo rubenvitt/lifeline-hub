@@ -101,10 +101,17 @@ export default function NachforderungKarte({
         )}
       </Space>
 
+      {/* `<Space size="middle">` statt `<Flex gap={8}>` (LFH-363, nachgezogen in
+          LFH-343 · C8): „Ablehnen" ist `danger` und steht neben der Fortschaltung.
+          Der Vorgabeabstand wäre `abstand.xs` = 3/5/7 px je Dichtestufe und damit
+          im Handschuh-Betrieb keine Trennung. Die Zeile war schon vorher so — C8
+          fasst sie an (die Rückfrage der Fortschaltung ist weg) und trägt sie
+          deshalb nach der Norm „verbindlich für ohnehin Angefasstes" nach.
+          Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
       {aktionen.length > 0 && (
-        <Flex justify="flex-end" gap={8} wrap style={{ marginTop: 8 }}>
+        <Space size="middle" wrap style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}>
           {aktionen}
-        </Flex>
+        </Space>
       )}
     </Card>
   );
