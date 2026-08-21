@@ -126,7 +126,9 @@ describe('EtbPage', () => {
     const { container } = setup('/einsaetze/7/etb?eintrag=1');
     await screen.findByText('Erste Meldung');
     await waitFor(() =>
-      expect(container.querySelector('[data-row-key="1"]')).toHaveClass('zeile-hervorgehoben'),
+      // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix (`eintrag-<id>`) —
+      // die Queue-`id` eines gepufferten Eintrags kollidierte sonst mit der DB-`id`.
+      expect(container.querySelector('[data-row-key="eintrag-1"]')).toHaveClass('zeile-hervorgehoben'),
     );
     // Adressier-Param wird nach dem Anwenden geräumt (apply-then-clean).
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
@@ -160,7 +162,7 @@ describe('EtbPage', () => {
     // Der Ziel-Eintrag liegt erst auf Seite 2 → muss automatisch nachgeladen werden.
     expect(await screen.findByText('Ziel-Eintrag')).toBeInTheDocument();
     await waitFor(() =>
-      expect(container.querySelector('[data-row-key="5"]')).toHaveClass('zeile-hervorgehoben'),
+      expect(container.querySelector('[data-row-key="eintrag-5"]')).toHaveClass('zeile-hervorgehoben'),
     );
   });
 

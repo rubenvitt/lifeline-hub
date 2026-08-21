@@ -21,6 +21,9 @@ import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
+import { baueZeilen } from '../etb/etbZeile';
+import { scrolleZurZeile } from '../components/Datensicht';
+import type { AbgelehnterEintrag } from '../offline/queue';
 import Datenstand from '../components/Datenstand';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
@@ -39,14 +42,15 @@ export default function EtbPage() {
    * landet im Verlauf. Der Query-Key hängt weiter an denselben Werten — die Umstellung
    * bewegt die QUELLE, nicht die Achse.
    *
-   * `useMemo` über den Query-String: `parseEtbFilter` gäbe sonst bei jedem Render ein
-   * frisches Objekt, und jede Effekt-Abhängigkeit darauf liefe im Kreis.
+   * `useMemo` über den Query-STRING, nicht über das `searchParams`-Objekt: react-router
+   * gibt bei jedem Render eine neue Instanz zurück, ein Memo darauf wäre wirkungslos und
+   * jede Effekt-Abhängigkeit am Ergebnis liefe im Kreis. Der String ist der Wert — die
+   * Instanz wird deshalb hier gar nicht erst referenziert, sondern aus ihm gebaut.
    */
+  const filterText = searchParams.toString();
   const filter = useMemo<EtbFilterWerte>(
-    () => parseEtbFilter(searchParams),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- der String IST der Wert;
-    // `searchParams` ist bei jedem Render eine neue Instanz (react-router).
-    [searchParams.toString()],
+    () => parseEtbFilter(new URLSearchParams(filterText)),
+    [filterText],
   );
   /**
    * Zählmarke, die `EtbFilterleiste` neu aufsetzt. Die Leiste nimmt ihren Anfangsstand
@@ -71,7 +75,6 @@ export default function EtbPage() {
    * `EtbPage.test.tsx` › „setzt beim Zurücksetzen auch das Eingabefeld zurück").
    */
   const eigeneFilteraenderung = useRef(false);
-  const filterText = searchParams.toString();
   const vorigerFilterText = useRef(filterText);
   useEffect(() => {
     if (vorigerFilterText.current === filterText) return;
@@ -121,9 +124,9 @@ export default function EtbPage() {
         : undefined,
   });
 
-  // Die leere Ersatzliste bleibt: `dataSource` braucht ein Array, und solange der Abruf
-  // läuft, gibt es keins. Falsch war daran nie die Ersatzliste, sondern das fehlende
-  // Lade-/Fehler-Gate daneben — das steht jetzt in `leerInhalt` weiter unten.
+  // Die leere Ersatzliste bleibt: die Chronologie braucht ein Array, und solange der
+  // Abruf läuft, gibt es keins. Falsch war daran nie die Ersatzliste, sondern das
+  // fehlende Lade-/Fehler-Gate daneben — das steht in `leerInhalt` weiter unten.
   const eintraege = etbQuery.data?.pages.flat() ?? [];
 
   const qc = useQueryClient();
@@ -149,6 +152,24 @@ export default function EtbPage() {
     einsatzId,
     benutzer?.id,
   );
+
+  /**
+   * Ein abgelehnter Eintrag geht auf demselben Weg zurück, den er gekommen ist —
+   * `erfassen` reiht ihn wieder ein bzw. sendet direkt. Die `client_id` bleibt dabei
+   * erhalten: sie ist die Idempotenzmarke (F03/LFH-261), und ohne sie erzeugte ein
+   * Erneut-Senden nach einem Timeout-nach-Commit eine Dublette in der Beweiskette.
+   *
+   * Erst nach erfolgreichem Wiedereinreihen wird der abgelehnte Stand verworfen —
+   * andersherum wäre der Eintrag zwischen den beiden Schritten nirgends mehr.
+   */
+  async function abgelehntErneutSenden(puffer: AbgelehnterEintrag) {
+    try {
+      await erfassen(puffer.eintrag);
+      if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
+    } catch (err) {
+      message.error(err instanceof ApiError ? err.message : 'Erneut senden fehlgeschlagen');
+    }
+  }
 
   // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette, LFH-11).
   useEffect(() => {
@@ -183,7 +204,18 @@ export default function EtbPage() {
 
   useEffect(() => {
     if (highlightId == null) return;
-    document.querySelector(`[data-row-key="${highlightId}"]`)?.scrollIntoView?.({ block: 'center' });
+    /*
+     * Über das Primitiv, nicht über einen eigenen Selektor (LFH-342 · C7). Zwei Gründe,
+     * beide gemessen:
+     *
+     *   · Der Zeilenschlüssel trägt seit dem Zeilentyp-Union das Sortenpräfix
+     *     (`eintrag-<id>`) — ein roher `[data-row-key="<id>"]` träfe nichts mehr, und
+     *     `tsc` sieht einen String-Selektor nicht.
+     *   · Unter `md` gibt es überhaupt kein `data-row-key`; dort findet
+     *     `scrolleZurZeile` die Karte über ihre Marke. Genau auf dem Gerät, auf dem eine
+     *     lange Liste am wenigsten überschaubar ist, lief der Sprung sonst ins Leere.
+     */
+    scrolleZurZeile(`eintrag-${highlightId}`);
   }, [highlightId]);
 
   const abschliessenMutation = useMutation({
@@ -209,6 +241,15 @@ export default function EtbPage() {
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Auftrag erteilen fehlgeschlagen'),
   });
+
+  /**
+   * Gesendete und gepufferte Einträge als EINE Chronologie (LFH-342 · C7, Befund M82).
+   *
+   * Die beiden Banner unten bleiben — sie fassen zusammen, die Zeilen zeigen. Wer nur
+   * das Banner hat, sieht in der Chronologie einen Stand, in dem die eigene, gerade
+   * erfasste Meldung nicht vorkommt.
+   */
+  const chronologie = baueZeilen({ eintraege, ausstehend, abgelehnt });
 
   async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
@@ -393,7 +434,7 @@ export default function EtbPage() {
         />
       )}
       <EtbTabelle
-        eintraege={eintraege}
+        zeilen={chronologie}
         einsatzId={einsatzId}
         highlightId={highlightId}
         ladend={etbQuery.isLoading}
@@ -402,6 +443,8 @@ export default function EtbPage() {
         onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
         onWiedervorlage={darfSchreiben ? (e) => setWiedervorlageZu(e) : undefined}
         onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
+        onErneutSenden={(p) => void abgelehntErneutSenden(p)}
+        onVerwerfen={(p) => { if (p.id != null) void abgelehntVerwerfen(p.id); }}
       />
 
       {etbQuery.hasNextPage && (
