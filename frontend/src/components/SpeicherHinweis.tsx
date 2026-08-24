@@ -1,4 +1,4 @@
-import { Alert } from 'antd';
+import { Alert, Flex, theme } from 'antd';
 import { ApiError } from '../api/client';
 
 /**
@@ -60,4 +60,40 @@ interface RechteHinweisProps {
 export function RechteHinweis({ text, sichtbar }: RechteHinweisProps) {
   if (!sichtbar) return null;
   return <Alert type="info" showIcon title={text} />;
+}
+
+interface SeitenHinweiseProps {
+  /** `mutation.error`; mehrere Mutationen einer Seite werden mit `??` verkettet. */
+  fehler?: unknown;
+  /** Erklärung der fehlenden Berechtigung; ohne Text kein Hinweis. */
+  rechteText?: string;
+  /** Nur bei FEHLENDER Berechtigung. */
+  rechteFehlt?: boolean;
+  fehlerTitel?: string;
+}
+
+/**
+ * Beide Hinweise für EINEN Slot (`AdminPage`/`EinsatzSeite` haben genau einen `hinweis`).
+ *
+ * Der Grund für die Bündelung ist nicht Bequemlichkeit, sondern der **Leerfall**: die
+ * Slot-Hülle rendert ihren eigenen Abstand, sobald ihr Inhalt truthy ist. Ein Fragment mit
+ * zwei `null`-Kindern ist truthy — die Seite bekäme dann einen sichtbaren Leerraum, wo
+ * nichts steht. Diese Komponente liefert in dem Fall selbst `null`.
+ */
+export function SeitenHinweise({
+  fehler,
+  rechteText,
+  rechteFehlt = false,
+  fehlerTitel,
+}: SeitenHinweiseProps) {
+  const { token } = theme.useToken();
+  const zeigtRecht = rechteFehlt && rechteText != null;
+  const zeigtFehler = fehlerText(fehler) !== null;
+  if (!zeigtRecht && !zeigtFehler) return null;
+  return (
+    <Flex vertical gap={token.marginSM}>
+      {zeigtRecht && <RechteHinweis sichtbar text={rechteText} />}
+      <SpeicherFehler fehler={fehler} titel={fehlerTitel} />
+    </Flex>
+  );
 }

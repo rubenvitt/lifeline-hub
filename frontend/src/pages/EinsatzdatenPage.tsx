@@ -1,4 +1,4 @@
-import { App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions, Form, Input, InputNumber, Space, Tag } from 'antd';
+import { App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions, Form, Input, InputNumber, Space, Tag, theme } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -14,7 +14,7 @@ import utc from 'dayjs/plugin/utc';
 import { aktualisiereEinsatz, ladeEinsatz, ladeMitglieder, type KopfdatenUpdate } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import { ApiError } from '../api/client';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
 import type { Einsatzart } from '../api/types';
@@ -66,6 +66,7 @@ export default function EinsatzdatenPage() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<FormWerte>();
 
@@ -84,14 +85,15 @@ export default function EinsatzdatenPage() {
 
   const speichernMutation = useMutation({
     mutationFn: (felder: KopfdatenUpdate) => aktualisiereEinsatz(einsatzId, felder),
+    // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): der Fehler hängt an `mutation.error`
+    // und steht als `<SpeicherFehler>` über dem Formular. Ein Toast verfällt nach ~3 s,
+    // das ausgefüllte Formular stand danach unverändert da und wirkte gespeichert.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       setBearbeiten(false);
       message.success('Einsatzdaten gespeichert');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   if (einsatzQuery.isLoading) {
@@ -218,7 +220,10 @@ export default function EinsatzdatenPage() {
           <Form.Item label="Anzahl Betroffene (initial)" name="anzahl_betroffene_initial">
             <InputNumber min={0} style={{ width: 180 }} />
           </Form.Item>
-          <Space>
+          {/* Der Fehler steht ÜBER dem Knopf, an dem er entsteht — dort ist der Blick nach
+              dem Klick, und dort bleibt er stehen, bis das nächste Absenden ihn räumt. */}
+          <SpeicherFehler fehler={speichernMutation.error} />
+          <Space style={{ marginTop: token.margin }}>
             <Button type="primary" htmlType="submit" loading={speichernMutation.isPending}>
               Speichern
             </Button>

@@ -229,3 +229,55 @@ describe('EinsatzdatenPage', () => {
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Persistenter Speicherfehler (LFH-345 · C10, Befund H14).
+ *
+ * ── Warum hier KEIN Fake-Timer-Vorlauf steht ────────────────────────────────────
+ * Das AK verlangt ihn, aber er belegt an dieser Stelle nichts: nach dem Klick läuft antds
+ * Message-Timer bereits mit echten Timern, ein danach aktivierter Fake-Timer erreicht ihn
+ * nicht mehr — der Test wäre grün gewesen, bevor es Produktivcode gab (gemessen 24.08.2026,
+ * ausführlich in `einstellungen/EinsatzDefaults.test.tsx`). Und ihn VOR dem Rendern zu
+ * setzen geht hier nicht: diese Seite lädt über MSW, dessen Antwortweg unter Fake-Timern
+ * hängen bliebe. Bleibt die stärkere Aussage — die Meldung steht in der Seite, nicht in
+ * antds Message-Container. Genau die dreht ein zurückgebautes `message.error` wieder um.
+ */
+describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
+  it('meldet den Fehler an der Seite, NICHT als Toast', async () => {
+    setup();
+    server.use(
+      http.patch('/api/einsaetze/7', () =>
+        HttpResponse.json({ error: 'Bezeichnung bereits vergeben' }, { status: 409 }),
+      ),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const treffer = await screen.findByText('Bezeichnung bereits vergeben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+  });
+
+  // Die zweite Haelfte: ein Alert, der NIE geht, ist so falsch wie einer, der zu frueh geht.
+  it('raeumt den Fehler beim naechsten Absenden weg', async () => {
+    setup();
+    let abgelehnt = true;
+    server.use(
+      http.patch('/api/einsaetze/7', () => {
+        if (abgelehnt) {
+          return HttpResponse.json({ error: 'Bezeichnung bereits vergeben' }, { status: 409 });
+        }
+        return HttpResponse.json({ ...basisEinsatz });
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Bezeichnung bereits vergeben');
+
+    abgelehnt = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Bezeichnung bereits vergeben')).not.toBeInTheDocument(),
+    );
+  });
+});

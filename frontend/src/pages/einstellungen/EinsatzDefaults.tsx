@@ -8,9 +8,9 @@ import {
   ladeOrgModulEinstellungen,
   setzeOrgModulEinstellung,
 } from '../../api/orgEinstellungen';
-import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
 import SektionHeader from '../../components/SektionHeader';
+import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
 import {
@@ -44,6 +44,9 @@ export default function EinsatzDefaults() {
     queryFn: ladeOrgModulEinstellungen,
   });
 
+  // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): der Fehler hängt an `mutation.error` und
+  // wird als `<SpeicherFehler>` gerendert. Ein Toast verfällt nach ~3 s, das ausgefüllte
+  // Formular stand danach unverändert da und wirkte gespeichert.
   const speichernMutation = useMutation({
     mutationFn: (felder: Parameters<typeof speichereOrgEinstellungen>[0]) =>
       speichereOrgEinstellungen(felder),
@@ -51,8 +54,6 @@ export default function EinsatzDefaults() {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
       message.success('Einstellungen gespeichert');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   const modulMutation = useMutation({
@@ -62,8 +63,6 @@ export default function EinsatzDefaults() {
       qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
       message.success('Modul-Default gespeichert');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   if (einstellungenQuery.isLoading || modulQuery.isLoading) {
@@ -92,11 +91,24 @@ export default function EinsatzDefaults() {
       titel="Einsatz-Defaults"
       beschreibung="Org-weite Defaults für neue Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte."
       aktionen={
-        istAdmin ? (
-          <Button type="primary" onClick={() => form.submit()} loading={speichernMutation.isPending}>
-            Speichern
-          </Button>
-        ) : undefined
+        // Der Knopf VERSCHWINDET nicht mehr (LFH-345 · C10, M16) — er steht gesperrt da, und
+        // der Grund steht als `RechteHinweis` darunter. Ein fehlender Knopf ist von „diese
+        // Seite kann das gar nicht" nicht zu unterscheiden.
+        <Button
+          type="primary"
+          onClick={() => form.submit()}
+          loading={speichernMutation.isPending}
+          disabled={!istAdmin}
+        >
+          Speichern
+        </Button>
+      }
+      hinweis={
+        <SeitenHinweise
+          fehler={speichernMutation.error ?? modulMutation.error}
+          rechteFehlt={!istAdmin}
+          rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Defaults ändern — die Werte stehen hier zum Nachlesen."
+        />
       }
     >
       <Form<FormWerteEinsatz>

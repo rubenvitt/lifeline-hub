@@ -3,8 +3,8 @@ import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeOrgEinstellungen, speichereOrgEinstellungen } from '../../api/orgEinstellungen';
-import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
+import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
 import {
@@ -42,12 +42,12 @@ export default function AnzeigeEinstellungen() {
     // nicht an speichereOrgEinstellungen durchreichen (sonst 2. Arg im PUT-Wrapper).
     mutationFn: (felder: Parameters<typeof speichereOrgEinstellungen>[0]) =>
       speichereOrgEinstellungen(felder),
+    // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): der Fehler hängt an `mutation.error`
+    // und steht als `<SeitenHinweise>` über dem Formular. Ein Toast verfällt nach ~3 s.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
       message.success('Einstellungen gespeichert');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   if (einstellungenQuery.isLoading) {
@@ -75,11 +75,22 @@ export default function AnzeigeEinstellungen() {
       titel="Anzeige-Konventionen"
       beschreibung="Org-weite Darstellungs-Defaults für alle Einsätze. Leer = hartkodierter Fallback."
       aktionen={
-        istAdmin ? (
-          <Button type="primary" onClick={() => form.submit()} loading={speichernMutation.isPending}>
-            Speichern
-          </Button>
-        ) : undefined
+        // Der Knopf VERSCHWINDET nicht mehr (LFH-345 · C10, M16) — gesperrt mit Grund daneben.
+        <Button
+          type="primary"
+          onClick={() => form.submit()}
+          loading={speichernMutation.isPending}
+          disabled={!istAdmin}
+        >
+          Speichern
+        </Button>
+      }
+      hinweis={
+        <SeitenHinweise
+          fehler={speichernMutation.error}
+          rechteFehlt={!istAdmin}
+          rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen die Anzeige-Konventionen ändern — die Werte stehen hier zum Nachlesen."
+        />
       }
     >
       <Form<FormWerteAnzeige>

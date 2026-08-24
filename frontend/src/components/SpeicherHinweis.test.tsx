@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../api/client';
-import { RechteHinweis, SpeicherFehler, fehlerText } from './SpeicherHinweis';
+import { RechteHinweis, SeitenHinweise, SpeicherFehler, fehlerText } from './SpeicherHinweis';
 
 describe('fehlerText', () => {
   it('nimmt die Servermeldung eines ApiError', () => {
@@ -46,5 +46,32 @@ describe('RechteHinweis', () => {
   it('schweigt bei vorhandener Berechtigung', () => {
     const { container } = render(<RechteHinweis sichtbar={false} text="egal" />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('SeitenHinweise', () => {
+  it('traegt beide Hinweise nebeneinander', () => {
+    render(
+      <SeitenHinweise
+        fehler={new ApiError(422, 'Startwert zu groß')}
+        rechteFehlt
+        rechteText="Nur Admins"
+      />,
+    );
+    expect(screen.getByText('Nur Admins')).toBeInTheDocument();
+    expect(screen.getByText('Startwert zu groß')).toBeInTheDocument();
+  });
+
+  // Der eigentliche Grund für diese Komponente: der Slot der Seiten-Hülle rendert seinen
+  // Abstand, sobald der Inhalt truthy ist — ein Fragment mit zwei `null`-Kindern IST truthy
+  // und hinterliesse einen sichtbaren Leerraum.
+  it('liefert im Leerfall selbst null, statt eine leere Huelle zu rendern', () => {
+    const { container } = render(<SeitenHinweise fehler={null} rechteText="egal" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('traegt den Fehler auch ohne Rechte-Text', () => {
+    render(<SeitenHinweise fehler={new ApiError(500, 'Serverfehler')} />);
+    expect(screen.getByText('Serverfehler')).toBeInTheDocument();
   });
 });
