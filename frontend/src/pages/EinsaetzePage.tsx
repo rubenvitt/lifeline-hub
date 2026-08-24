@@ -4,12 +4,13 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Einsatzart, EinsatzAnzeige, EinsatzStatus } from '../api/types';
+import type { Einsatzart, EinsatzAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { formatZeitKurz } from '../anzeige/format';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
+import { EINSATZ_STATUS } from '../einsatz/einsatzStatus';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { useAuth } from '../auth/AuthContext';
@@ -20,7 +21,6 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import SektionHeader from '../components/SektionHeader';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
-import type { StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache. Der Import steht
 // bewusst HIER und nicht nur transitiv über `SeitenZustand`/`EinsatzSeite`: ohne
@@ -35,26 +35,6 @@ interface AnlegeWerte {
   einsatzart: Einsatzart;
   begonnen_at: Dayjs;
 }
-
-/**
- * Status eines Einsatzes als Statusrolle (LFH-328 · A2).
- *
- * Trägt bewusst den Vertragstyp {@link StatusDarstellung} aus `theme/statusFarben.ts`:
- * damit ist `label` Pflichtfeld (zweiter Kanal, WCAG 1.4.1 — vorher rendete der Tag
- * den ROHEN Enum-String, was nur zufällig auch ein Text war), und der `Record` bricht
- * bei einer neuen `EinsatzStatus`-Variante aus dem Codegen.
- *
- * BEFUND, warum die Zeile hier und nicht in `statusFarben.ts` steht: die
- * Vertragstabelle der Spec (§1.3) listet acht Enums, `EinsatzStatus` ist keins davon —
- * es gibt dort also (noch) keinen Platz dafür. Der Zielzustand ist ein
- * `einsatzStatus`-Export in `statusFarben.ts`. Die Zuordnung selbst ist nicht hier
- * entschieden, sondern zitiert (Spec §6, Prüflistenzeile 7: `aktiv` → `normal`,
- * `abgeschlossen` → `neutral`).
- */
-const EINSATZ_STATUS: Record<EinsatzStatus, StatusDarstellung> = {
-  aktiv: { rolle: 'normal', label: 'aktiv' },
-  abgeschlossen: { rolle: 'neutral', label: 'abgeschlossen' },
-};
 
 /**
  * Mindesthöhe einer Kachel. KEIN neuer Wert — die 120 px standen schon am

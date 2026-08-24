@@ -346,3 +346,59 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
       `Kopf ${kopfHoehe}px`,
   });
 });
+
+/**
+ * Die sticky Speicherleiste der Einstellungs-Sektionen (LFH-345 · C10, Prüflisten-Zeile 13).
+ *
+ * DIE DRITTE HÄLFTE VON Z13. Die Tabellen-Hälfte fiel mit B2, die Drawer-Hälfte mit B7 —
+ * C10 zieht ein NEUES `position: sticky` ein, und zwar genau die Konstruktion, auf die
+ * WCAG 2.4.11 zielt: eine am unteren Rand verankerte Leiste über einem langen Formular. Das
+ * unterste Feld liegt dann potenziell dahinter.
+ *
+ * Die Sektion „Verhalten" ist der scharfe Fall: neun Felder, das letzte steht unmittelbar
+ * über der Leiste. „Allgemein" (5) und „Aufbewahrung" (1) kommen ohne Bildlauf aus.
+ *
+ * ── WARUM ES DIESEN TEST GIBT ───────────────────────────────────────────────────────────
+ * Die Prüfliste führte Zeile 13 zunächst als „erfüllt — wird gegen `fokus-verdeckung.spec.ts`
+ * gehalten". Diese Datei enthielt die Einstellungen aber gar nicht; das Verdikt stand auf
+ * nicht existierender Evidenz. Im eigenen Review aufgefallen — das hier ist die Nachbesserung.
+ */
+test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Fokus Einstellungen ${Date.now()}`);
+
+  // Verkürzte Höhe ist die Vorbedingung: ohne Bildlaufreserve klebt die Leiste am Seitenende
+  // statt über dem Inhalt, und die Zusicherung wäre trivial wahr.
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/verhalten`);
+  await expect(page.getByLabel('Präfix ETB')).toBeVisible();
+
+  const reserve = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(reserve, 'Vorbedingung: die Seite muss überhaupt scrollen').toBeGreaterThan(0);
+
+  const ergebnis = await pruefeFokusVerdeckung(page, 40);
+
+  expect(
+    ergebnis.fixierteKandidaten,
+    'Vorbedingung: die sticky Speicherleiste muss im Baum stehen',
+  ).toBeGreaterThanOrEqual(1);
+
+  expect(
+    ergebnis.stoppsGesamt,
+    'Vorbedingung: der Durchlauf muss die Formularfelder erreichen',
+  ).toBeGreaterThanOrEqual(8);
+
+  expect(
+    ergebnis.verdeckt,
+    `Fokusziele vollständig verdeckt:\n${ergebnis.verdeckt.join('\n')}`,
+  ).toEqual([]);
+
+  test.info().annotations.push({
+    type: 'messwert',
+    description:
+      `Einstellungen/verhalten 390×420: ${ergebnis.stoppsGesamt} Stopps, ` +
+      `${ergebnis.fixierteKandidaten} fixierte Knoten, Reserve ${reserve}px`,
+  });
+});

@@ -8,9 +8,9 @@ import {
   ladeOrgModulEinstellungen,
   setzeOrgModulEinstellung,
 } from '../../api/orgEinstellungen';
-import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
 import SektionHeader from '../../components/SektionHeader';
+import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
 import {
@@ -44,6 +44,9 @@ export default function EinsatzDefaults() {
     queryFn: ladeOrgModulEinstellungen,
   });
 
+  // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): der Fehler hängt an `mutation.error` und
+  // wird als `<SpeicherFehler>` gerendert. Ein Toast verfällt nach ~3 s, das ausgefüllte
+  // Formular stand danach unverändert da und wirkte gespeichert.
   const speichernMutation = useMutation({
     mutationFn: (felder: Parameters<typeof speichereOrgEinstellungen>[0]) =>
       speichereOrgEinstellungen(felder),
@@ -51,8 +54,6 @@ export default function EinsatzDefaults() {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
       message.success('Einstellungen gespeichert');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   const modulMutation = useMutation({
@@ -62,8 +63,6 @@ export default function EinsatzDefaults() {
       qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
       message.success('Modul-Default gespeichert');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   if (einstellungenQuery.isLoading || modulQuery.isLoading) {
@@ -92,11 +91,29 @@ export default function EinsatzDefaults() {
       titel="Einsatz-Defaults"
       beschreibung="Org-weite Defaults für neue Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte."
       aktionen={
-        istAdmin ? (
-          <Button type="primary" onClick={() => form.submit()} loading={speichernMutation.isPending}>
-            Speichern
-          </Button>
-        ) : undefined
+        // Der Knopf VERSCHWINDET nicht mehr (LFH-345 · C10, M16) — er steht gesperrt da, und
+        // der Grund steht als `RechteHinweis` darunter. Ein fehlender Knopf ist von „diese
+        // Seite kann das gar nicht" nicht zu unterscheiden.
+        <Button
+          type="primary"
+          onClick={() => form.submit()}
+          loading={speichernMutation.isPending}
+          disabled={!istAdmin}
+        >
+          Speichern
+        </Button>
+      }
+      hinweis={
+        // NUR der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
+        // Ablehnung deshalb bei sich (unten) — die beiden mit `??` zu verketten erzeugte
+        // einen erreichbaren Zustand, in dem der Text hier den einen Vorgang beschreibt,
+        // während der rote Zeilenrand unten den anderen markiert. Zwei Fehler, ein Kopf:
+        // dann sagt keiner mehr, was gerade schiefgegangen ist.
+        <SeitenHinweise
+          fehler={speichernMutation.error}
+          rechteFehlt={!istAdmin}
+          rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Defaults ändern — die Werte stehen hier zum Nachlesen."
+        />
       }
     >
       <Form<FormWerteEinsatz>
@@ -178,6 +195,13 @@ export default function EinsatzDefaults() {
           beschreibung="Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden. Änderungen werden sofort gespeichert."
         />
       </div>
+      {/* Die Ablehnung der Liste steht BEI der Liste, nicht im Seitenkopf: der Kopf trägt den
+          Formular-Fehler, und zwei Vorgänge in einem Kasten sagen nicht mehr, welcher gemeint
+          ist. Zusammen mit der Zeilenmarke (`fehlerKey`) ergibt das beide Kanäle am selben
+          Ort — Text und Rand zeigen auf dieselbe Zeile. */}
+      <div style={{ marginBottom: token.marginSM }}>
+        <SpeicherFehler fehler={modulMutation.error} />
+      </div>
 
       <ModulEinstellungsListe
         rollenSpalte="Benötigte Rolle (Default)"
@@ -189,7 +213,11 @@ export default function EinsatzDefaults() {
           })
         }
         darfVerwalten={istAdmin}
-        laeuft={modulMutation.isPending}
+        // Nur die schreibende Zeile ist gesperrt (H15) und nur die gescheiterte markiert
+        // (H14). `variables` traegt die Zeile, die react-query gerade bearbeitet — bzw. die
+        // zuletzt gescheiterte, solange `error` steht.
+        laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}
+        fehlerKey={modulMutation.isError ? modulMutation.variables.modulKey : null}
       />
     </AdminPage>
   );

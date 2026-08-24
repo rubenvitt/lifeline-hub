@@ -54,8 +54,11 @@
     0 0 0 1px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(16px) saturate(120%);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
-  animation: login-karte-ein 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: 0.15s;
+  /* Ohne Versatz und kürzer (LFH-345 · C10, Befund M18). Die Karte trug 0,15 s Vorlauf
+     plus 0,7 s Dauer; zusammen mit dem gestaffelten Knopf darunter stand der Anmelden-
+     Knopf erst nach 1,06 s vollständig da. Die Bewegung bleibt — sie ist entstaffelt,
+     nicht abgeschafft. */
+  animation: login-karte-ein 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @keyframes login-karte-ein {
@@ -154,20 +157,15 @@
   font-size: 20px;
 }
 
-/* Eingangsanimation für die Formularzeilen (gestaffelt). */
+/* Eingangsanimation für die Formularzeilen — ENTSTAFFELT (LFH-345 · C10, Befund M18).
+   Felder und Absende-Knopf ziehen gemeinsam auf, ohne Versatz gegeneinander. Der Grund
+   ist nicht Geschmack: der Anmelden-Knopf erschien 0,08 s nach dem Passwortfeld und
+   0,16 s nach dem Benutzernamen — wer schnell tippt und Enter drückt, drückt auf einen
+   Knopf, der noch halb durchsichtig ist. Ein Absende-Ziel darf nie später da sein als
+   die Felder, die es absendet. */
 .login-karte .ant-form-item,
 .login-karte .ant-btn {
-  animation: login-feld-ein 0.6s ease-out both;
-}
-
-.login-karte .ant-form-item:nth-of-type(1) {
-  animation-delay: 0.3s;
-}
-.login-karte .ant-form-item:nth-of-type(2) {
-  animation-delay: 0.38s;
-}
-.login-karte .login-absenden {
-  animation-delay: 0.46s;
+  animation: login-feld-ein 0.35s ease-out both;
 }
 
 @keyframes login-feld-ein {

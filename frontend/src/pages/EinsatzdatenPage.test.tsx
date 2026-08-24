@@ -124,11 +124,14 @@ describe('EinsatzdatenPage', () => {
 
   it('zeigt Kopfdaten im Lesemodus, leere Felder als —', async () => {
     setup();
-    expect(await screen.findByText('2026-001')).toBeInTheDocument();
-    expect(screen.getByText('Realeinsatz')).toBeInTheDocument();
-    // 'Admin' erscheint als Einsatzleitung in den Kopfdaten und zusätzlich in der Zugriff-Tabelle.
+    expect(await screen.findByText('Realeinsatz')).toBeInTheDocument();
+    // 'Admin' erscheint als Einsatzleitung in der Kopfleiste und zusätzlich in der Zugriff-Tabelle.
     expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    // Die Einsatznummer ist seit der Gliederung (M14) eine TECHNISCHE Angabe und steht im
+    // eingeklappten Abschnitt. Ohne `forceRender` ist sie gar nicht im Baum — die
+    // Gegenaussage steht deshalb hier, das Aufklappen im Gliederungs-Block weiter unten.
+    expect(screen.queryByText('2026-001')).toBeNull();
   });
 
   it('zeigt Koordinaten über formatKoordinate (WGS84-Default: toFixed(5))', async () => {
@@ -162,13 +165,13 @@ describe('EinsatzdatenPage', () => {
 
   it('versteckt den Bearbeiten-Button für Beobachter', async () => {
     setup({ einsatz: { meine_rolle: 'beobachter' }, benutzer: { ...admin, system_rolle: 'keiner' } });
-    await screen.findByText('2026-001');
+    await screen.findByText('Realeinsatz');
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
   it('versteckt den Bearbeiten-Button bei abgeschlossenem Einsatz', async () => {
     setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
-    await screen.findByText('2026-001');
+    await screen.findByText('Realeinsatz');
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
@@ -227,5 +230,96 @@ describe('EinsatzdatenPage', () => {
     expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Persistenter Speicherfehler (LFH-345 · C10, Befund H14).
+ *
+ * ── Warum hier KEIN Fake-Timer-Vorlauf steht ────────────────────────────────────
+ * Das AK verlangt ihn, aber er belegt an dieser Stelle nichts: nach dem Klick läuft antds
+ * Message-Timer bereits mit echten Timern, ein danach aktivierter Fake-Timer erreicht ihn
+ * nicht mehr — der Test wäre grün gewesen, bevor es Produktivcode gab (gemessen 24.08.2026,
+ * ausführlich in `einstellungen/EinsatzDefaults.test.tsx`). Und ihn VOR dem Rendern zu
+ * setzen geht hier nicht: diese Seite lädt über MSW, dessen Antwortweg unter Fake-Timern
+ * hängen bliebe. Bleibt die stärkere Aussage — die Meldung steht in der Seite, nicht in
+ * antds Message-Container. Genau die dreht ein zurückgebautes `message.error` wieder um.
+ */
+describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
+  it('meldet den Fehler an der Seite, NICHT als Toast', async () => {
+    setup();
+    server.use(
+      http.patch('/api/einsaetze/7', () =>
+        HttpResponse.json({ error: 'Bezeichnung bereits vergeben' }, { status: 409 }),
+      ),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const treffer = await screen.findByText('Bezeichnung bereits vergeben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+  });
+
+  // Die zweite Haelfte: ein Alert, der NIE geht, ist so falsch wie einer, der zu frueh geht.
+  it('raeumt den Fehler beim naechsten Absenden weg', async () => {
+    setup();
+    let abgelehnt = true;
+    server.use(
+      http.patch('/api/einsaetze/7', () => {
+        if (abgelehnt) {
+          return HttpResponse.json({ error: 'Bezeichnung bereits vergeben' }, { status: 409 });
+        }
+        return HttpResponse.json({ ...basisEinsatz });
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Bezeichnung bereits vergeben');
+
+    abgelehnt = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Bezeichnung bereits vergeben')).not.toBeInTheDocument(),
+    );
+  });
+});
+
+/**
+ * Gliederung der Leseansicht (LFH-345 · C10, Befund M14).
+ *
+ * Die drei Aussagen sind die drei Hälften des Befunds: der Status stand als ROHER
+ * Wire-Wert im Titel-Tag, die zwölf Zeilen standen als Datenwand ohne Gewichtung
+ * nebeneinander, und der Wechsel in den Bearbeiten-Modus ließ den Fokus auf dem
+ * gerade verschwundenen Knopf zurück.
+ */
+describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
+  it('zeigt den Status als Wort, nicht als Wire-Wert', async () => {
+    setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
+    const tag = await screen.findByText('Abgeschlossen');
+    expect(screen.queryByText('abgeschlossen')).toBeNull();
+
+    // Die zweite, unterscheidende Hälfte: ein lokales `status[0].toUpperCase()` erfüllte
+    // das Paar oben vollständig. Erst `data-rolle` belegt, dass der Wert durch
+    // `EINSATZ_STATUS` und `StatusTag` gelaufen ist — und damit über die Rollenachse des
+    // Statusfarb-Vertrags statt über eine erfundene Farbe.
+    expect(tag.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'neutral');
+  });
+
+  it('hält die technischen Angaben eingeklappt, die Kopfangaben aber sichtbar', async () => {
+    // `basisEinsatz` trägt für beide Felder `null` — ohne diese Werte prüfte der Test
+    // gegen zwei Gedankenstriche und wäre über den Umbau hinweg blind.
+    setup({ einsatz: { einsatzort: 'Musterstraße 1', leitstellen_nr: 'LS-4711' } });
+    expect(await screen.findByText('Musterstraße 1')).toBeInTheDocument();
+    expect(screen.queryByText('LS-4711')).toBeNull();
+
+    await userEvent.click(screen.getByText('Technische Angaben'));
+    expect(await screen.findByText('LS-4711')).toBeInTheDocument();
+  });
+
+  it('setzt den Fokus beim Bearbeiten aufs erste Feld', async () => {
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(screen.getByLabelText('Bezeichnung')).toHaveFocus();
   });
 });

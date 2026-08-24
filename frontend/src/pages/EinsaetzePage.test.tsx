@@ -175,7 +175,11 @@ describe('EinsaetzePage', () => {
     );
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
-    expect(screen.getByText('Abgeschlossen')).toBeInTheDocument();
+    // Über die ÜBERSCHRIFT gegriffen, nicht über den Text: seit LFH-345 · C10 trägt das
+    // Status-Etikett der Karte dieselbe Beschriftung („Abgeschlossen" statt des
+    // Wire-Werts), `getByText` fände also zwei Knoten. Die Rollen-Abfrage sagt ohnehin
+    // genauer, was der Test behauptet — es geht um die SEKTION, nicht um ein Etikett.
+    expect(screen.getByRole('heading', { name: 'Abgeschlossen' })).toBeInTheDocument();
     expect(screen.getByText('Sturmtief Abschluss')).toBeInTheDocument();
   });
 
@@ -375,7 +379,10 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
     mockEinsaetze([e({ einsatzart: 'uebung' })]);
     render();
-    expect(await screen.findByText('aktiv')).toBeInTheDocument();
+    // Grossgeschrieben seit LFH-345 · C10 (M14): die Map liegt jetzt in
+    // `einsatz/einsatzStatus.ts` und trägt eine BESCHRIFTUNG statt des Wire-Werts.
+    // Vorher stand hier 'aktiv' — also der Enum-Schlüssel, der nur zufällig lesbar war.
+    expect(await screen.findByText('Aktiv')).toBeInTheDocument();
     expect(screen.getByText('Übung')).toBeInTheDocument();
   });
 

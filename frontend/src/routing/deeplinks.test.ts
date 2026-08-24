@@ -29,6 +29,8 @@ import {
   gefahrenPfad,
   lagekartePfad,
   einsatzdatenPfad,
+  einsatzEinstellungenPfad,
+  EINSTELLUNGEN_SEKTIONEN,
   erinnerungenPfad,
   kraefteuebersichtPfad,
   parseRouteId,
@@ -280,5 +282,37 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
     // Trägt die Gegenaussage zu `filterAktiv` in `EtbPage`: ohne Parameter ist kein
     // Filter gesetzt, und der leer-OHNE-Filter-Zweig aus B3 greift.
     expect(parseEtbFilter(new URLSearchParams(''))).toEqual({});
+  });
+});
+
+describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
+  it('zeigt ohne Sektion auf den Einstieg — der bare Modulpfad leitet dorthin um', () => {
+    expect(einsatzEinstellungenPfad(E)).toBe('/einsaetze/5/einstellungen/allgemein');
+  });
+
+  it('baut alle vier Sektionen', () => {
+    expect(einsatzEinstellungenPfad(E, 'allgemein')).toBe('/einsaetze/5/einstellungen/allgemein');
+    expect(einsatzEinstellungenPfad(E, 'verhalten')).toBe('/einsaetze/5/einstellungen/verhalten');
+    expect(einsatzEinstellungenPfad(E, 'aufbewahrung')).toBe(
+      '/einsaetze/5/einstellungen/aufbewahrung',
+    );
+    expect(einsatzEinstellungenPfad(E, 'module')).toBe('/einsaetze/5/einstellungen/module');
+  });
+
+  /**
+   * Die Liste ist die Wahrheit für das Tab-Band UND für die Routentabelle. Ein Pin auf ihre
+   * Reihenfolge, weil das erste Element zugleich das Ziel des baren Pfades ist: eine
+   * Umsortierung ohne diesen Test verschöbe stillschweigend den Einstieg.
+   */
+  it('führt die Sektionen in Bedienreihenfolge; die erste ist das Redirect-Ziel', () => {
+    expect(EINSTELLUNGEN_SEKTIONEN.map((s) => s.key)).toEqual([
+      'allgemein',
+      'verhalten',
+      'aufbewahrung',
+      'module',
+    ]);
+    expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
+      einsatzEinstellungenPfad(E),
+    );
   });
 });

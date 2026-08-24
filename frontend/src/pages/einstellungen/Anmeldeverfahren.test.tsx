@@ -71,14 +71,84 @@ describe('Anmeldeverfahren', () => {
     expect(await screen.findByRole('switch', { name: 'Anmeldeverfahren: Passwort' })).toBeDisabled();
   });
 
-  it('zeigt eine Fehlermeldung, wenn der Server ablehnt (409)', async () => {
+  // Die Ablehnung steht seit LFH-345/C10 an der SEITE, nicht in der Toast-Queue (H14):
+  // sie verfiel sonst nach ~3 s, waehrend der Schalter zurueckgesprungen war und niemand
+  // mehr sagen konnte, warum. Geprueft wird die Abwesenheit des Message-Containers — genau
+  // die dreht ein zurueckgebautes `message.error` wieder um.
+  it('haelt die Ablehnung an der Seite fest, statt sie als Toast verfallen zu lassen', async () => {
     const meldung = 'Der letzte admin-taugliche Login-Weg kann nicht deaktiviert werden';
     vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, meldung));
 
     renderMitProviders(<Anmeldeverfahren />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
 
-    expect(await screen.findByText(meldung)).toBeInTheDocument();
+    const treffer = await screen.findByText(meldung);
+    expect(treffer.closest('.ant-message')).toBeNull();
+  });
+
+  it('markiert die abgelehnte Zeile — und nur die', async () => {
+    vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, 'Letzter Login-Weg'));
+
+    renderMitProviders(<Anmeldeverfahren />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+
+    await waitFor(() => {
+      const markiert = document.querySelectorAll('[data-provider-zeile][data-fehler="true"]');
+      expect(markiert).toHaveLength(1);
+      expect(markiert[0].getAttribute('data-provider-zeile')).toBe('oidc');
+    });
+  });
+
+  /**
+   * Die Marke WANDERT — sie sammelt sich nicht an.
+   *
+   * Quelle ist `mutation.variables`, also die Zeile der ZULETZT gescheiterten Mutation. Eine
+   * Umsetzung, die den gescheiterten Key in einem eigenen State sammelte, stünde nach zwei
+   * Fehlschlägen mit zwei Marken da — und keine der beiden sagte mehr, was gerade
+   * schiefgegangen ist. Der Test davor (eine Zeile, ein Fehlschlag) kann das nicht von der
+   * richtigen Umsetzung unterscheiden.
+   */
+  it('traegt nach einem zweiten Fehlschlag die Marke an der ZWEITEN Zeile — und nur dort', async () => {
+    vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, 'Letzter Login-Weg'));
+
+    renderMitProviders(<Anmeldeverfahren />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]')).not.toBeNull(),
+    );
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passkey' }));
+
+    await waitFor(() => {
+      const markiert = document.querySelectorAll('[data-provider-zeile][data-fehler="true"]');
+      expect(markiert).toHaveLength(1);
+      expect(markiert[0].getAttribute('data-provider-zeile')).toBe('webauthn');
+    });
+  });
+
+  // Die Gegenrichtung: ein ERFOLG anderswo raeumt die Marke ab. `isError` faellt dabei, die
+  // Marke haengt also nicht an einem Zustand, den nur ein weiterer Fehler zuruecksetzen koennte.
+  it('raeumt die Marke, sobald irgendeine Zeile erfolgreich schaltet', async () => {
+    vi.mocked(providerSchalten).mockRejectedValueOnce(new ApiError(409, 'Letzter Login-Weg'));
+
+    renderMitProviders(<Anmeldeverfahren />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]')).not.toBeNull(),
+    );
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passkey' }));
+
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-provider-zeile][data-fehler="true"]')).toHaveLength(0),
+    );
+  });
+
+  it('markiert ohne Ablehnung gar keine Zeile', async () => {
+    renderMitProviders(<Anmeldeverfahren />);
+    await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
+
+    expect(document.querySelectorAll('[data-provider-zeile][data-fehler="true"]')).toHaveLength(0);
   });
 
   it('ist read-only für Nicht-Admins (fuehrungskraft)', async () => {

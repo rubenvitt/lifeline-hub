@@ -2,6 +2,7 @@ import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
+import { ApiError } from '../../api/client';
 import EinsatzDefaults from './EinsatzDefaults';
 
 vi.mock('../../auth/AuthContext', () => ({
@@ -119,7 +120,10 @@ describe('EinsatzDefaults', () => {
     expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' })).not.toBeDisabled();
   });
 
-  it('ist read-only für Nicht-Admins (fuehrungskraft): kein Speichern-Button, Felder disabled', async () => {
+  // Der Knopf VERSCHWINDET seit LFH-345/C10 nicht mehr — er steht gesperrt da, und der
+  // Grund steht daneben (M16). Ein fehlender Knopf ist von „diese Seite kann das nicht"
+  // nicht zu unterscheiden.
+  it('ist read-only für Nicht-Admins (fuehrungskraft): Speichern-Button gesperrt, Felder disabled', async () => {
     vi.mocked(useAuth).mockReturnValue({
       benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
       laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
@@ -128,7 +132,107 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />);
 
     await screen.findByText('Aufbewahrung');
-    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(screen.getByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
+  });
+});
+
+/**
+ * Persistenter Speicherfehler und erklärte Berechtigung (LFH-345 · C10, Befunde H14/M16).
+ *
+ * ── Warum hier KEIN Fake-Timer-Vorlauf steht (gemessen 24.08.2026) ──────────────
+ * Das AK verlangt „nach Vorlauf der Toast-Dauer (Fake-Timer) noch im DOM". Diese Aussage
+ * ist in dieser Umgebung NICHT prüfbar, und zwar in beiden Bauformen:
+ *
+ *  1. Fake-Timer NACH dem Klick aktiviert — antds Message-Timer läuft dann längst mit
+ *     echten Timern, `advanceTimersByTime` erreicht ihn nicht. Alle drei Seiten waren so
+ *     grün, bevor eine Zeile Produktivcode existierte.
+ *  2. Fake-Timer ab dem Rendern, mit `shouldAdvanceTime` (ohne das bleibt die Seite im
+ *     Ladeskelett stehen und der Knopf existiert nie) — auch dann bleibt der Toast beim
+ *     Vorlauf einfach stehen. Per Mutationsprobe belegt: mit zurückgedrehtem
+ *     `message.error` statt des Alerts blieb genau dieser Test GRÜN, während die beiden
+ *     Aussagen unten rot wurden.
+ *
+ * Ein Test, der nicht rot werden kann, behauptet eine Deckung, die er nicht hat. Die
+ * Zusicherung tragen deshalb zwei andere: die Meldung steht außerhalb von antds
+ * Message-Container (also ist sie kein Toast und hat keine Queue-Lebensdauer), und sie
+ * verschwindet erst beim nächsten Absenden. Beide sind mutationsgeprüft.
+ */
+describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
+  beforeEach(() => {
+    alsAdmin();
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({} as never);
+    vi.mocked(setzeOrgModulEinstellung).mockResolvedValue(undefined as never);
+  });
+
+  it('meldet den Fehler an der Seite, NICHT als Toast', async () => {
+    vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
+    renderMitProviders(<EinsatzDefaults />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    const treffer = await screen.findByText('Startwert zu groß');
+    expect(treffer.closest('.ant-message')).toBeNull();
+  });
+
+  // Die zweite Haelfte: ein Alert, der NIE geht, ist so falsch wie einer, der zu frueh geht.
+  it('raeumt den Fehler beim naechsten Absenden weg', async () => {
+    vi.mocked(speichereOrgEinstellungen)
+      .mockRejectedValueOnce(new ApiError(422, 'Startwert zu groß'))
+      .mockResolvedValue({ ...VOLL } as never);
+    renderMitProviders(<EinsatzDefaults />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Startwert zu groß');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(screen.queryByText('Startwert zu groß')).not.toBeInTheDocument());
+  });
+
+  it('erklaert der Fuehrungskraft den Grund UND laesst den Knopf stehen', async () => {
+    vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
+    vi.mocked(useAuth).mockReturnValue({
+      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
+      laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+    } as never);
+
+    renderMitProviders(<EinsatzDefaults />);
+
+    expect(await screen.findByText(/Nur Benutzer mit der Systemrolle/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
+  /**
+   * Zwei Vorgänge, zwei Orte — der Seitenkopf trägt den Formular-Fehler, die Liste ihren
+   * eigenen.
+   *
+   * Vorher waren beide mit `??` im Kopf verkettet. Erreichbarer Zustand: das Formular
+   * scheitert, danach scheitert eine Modulzeile — dann trug die Zeile ihren roten Rand,
+   * während der Text im Kopf einen ANDEREN Vorgang beschrieb und bis zum nächsten
+   * Formular-Absenden stehenblieb. Der zweite Kanal zeigte damit auf die falsche Sache.
+   */
+  it('haelt Formular- und Modulfehler auseinander', async () => {
+    vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
+    vi.mocked(setzeOrgModulEinstellung).mockRejectedValue(new ApiError(409, 'Modul gesperrt'));
+    renderMitProviders(<EinsatzDefaults />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Startwert zu groß');
+
+    const etb = screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' });
+    fireEvent.mouseDown(etb);
+    fireEvent.click(await screen.findByText('Admin'));
+
+    // BEIDE stehen — und zwar nebeneinander, nicht einer statt des anderen.
+    expect(await screen.findByText('Modul gesperrt')).toBeInTheDocument();
+    expect(screen.getByText('Startwert zu groß')).toBeInTheDocument();
+  });
+
+  it('schweigt ueber Berechtigungen, wenn welche da sind', async () => {
+    vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
+    renderMitProviders(<EinsatzDefaults />);
+
+    await screen.findByText('Aufbewahrung');
+    expect(screen.queryByText(/Nur Benutzer mit der Systemrolle/)).not.toBeInTheDocument();
   });
 });

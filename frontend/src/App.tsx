@@ -17,6 +17,10 @@ import NachforderungenPage from './pages/NachforderungenPage';
 import LagemeldungenPage from './pages/LagemeldungenPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import EinsatzEinstellungenPage from './pages/EinsatzEinstellungenPage';
+import EinsatzAllgemein from './pages/einstellungen/EinsatzAllgemein';
+import EinsatzVerhalten from './pages/einstellungen/EinsatzVerhalten';
+import EinsatzAufbewahrung from './pages/einstellungen/EinsatzAufbewahrung';
+import EinsatzModule from './pages/einstellungen/EinsatzModule';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
@@ -52,6 +56,7 @@ import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
 import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
+import { EINSTELLUNGEN_SEKTIONEN } from './routing/deeplinks';
 import LiveStatusBanner from './live/LiveStatusBanner';
 import { useOfflineSync } from './offline/useOfflineSync';
 import { useAuth } from './auth/AuthContext';
@@ -105,6 +110,36 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   ),
   gefahrenzonen: <GefahrenPage />,
 };
+
+/**
+ * Sektions-Routen der Einsatz-Einstellungen (LFH-345 · C10, H15/M15).
+ *
+ * Der bare Modulpfad `…/einstellungen` — den `modulZielRoute` und damit die Modul-Navigation
+ * baut — leitet auf die ERSTE Sektion um. Ohne diese Index-Route rendert das Layout mit einem
+ * leeren `<Outlet>`: Reiterband über weißer Fläche, und jeder Klick aus der Navigation landete
+ * dort. Das Ziel kommt aus `EINSTELLUNGEN_SEKTIONEN` statt als Literal — dieselbe Liste trägt
+ * das Reiterband, ein Auseinanderlaufen ist damit ausgeschlossen (Muster `ersteSektionPfad`
+ * aus `admin/adminNav`).
+ *
+ * `Navigate` mit RELATIVEM Ziel, weil `App` die `:id` des Einsatzes nicht kennt; react-router
+ * löst es gegen die Elternroute auf. Dasselbe tut `einsatz/DefaultModulRedirect`.
+ */
+const EINSTELLUNGEN_ROUTEN = (
+  <>
+    <Route index element={<Navigate to={EINSTELLUNGEN_SEKTIONEN[0].key} replace />} />
+    <Route path="allgemein" element={<EinsatzAllgemein />} />
+    <Route path="verhalten" element={<EinsatzVerhalten />} />
+    <Route path="aufbewahrung" element={<EinsatzAufbewahrung />} />
+    <Route path="module" element={<EinsatzModule />} />
+    {/* Ein unbekanntes Segment (Tippfehler, veralteter Link) trifft sonst KEIN Kind: das
+        Layout stünde mit leerem `<Outlet>` da, und das Reiterband markierte trotzdem die
+        erste Sektion — „Allgemein" ausgewählt über weißer Fläche. Dieselbe Regel wie bei
+        `parseRouteId` und `parseEtbFilter`: Unbrauchbares wird GANZ verworfen, nicht halb
+        angezeigt. Damit ist der Rückfall in `sektionAus` eine Zusicherung statt einer
+        Behauptung — es gibt keinen Pfad mehr, auf dem er greifen könnte. */}
+    <Route path="*" element={<Navigate to={`../${EINSTELLUNGEN_SEKTIONEN[0].key}`} replace />} />
+  </>
+);
 
 /** Genau eine Betriebszeile für alle angemeldeten Routen. Die beiden vorhandenen
  *  Layout-Zweige (globale Topbar und Einsatz-Workspace) bleiben darunter Geschwister. */
@@ -166,7 +201,14 @@ export default function App() {
                     (MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />)
                   )
                 }
-              />
+              >
+                {/* Das Einstellungs-Modul ist seit LFH-345 · C10 ein Layout mit vier
+                    Sektions-Routen. Die Kinder hängen HIER statt in einem eigenen
+                    <Route path="einstellungen">, weil zwei Routen mit demselben Pfad
+                    nebeneinander stünden; und nicht per Filter aus dem `map`, weil ein
+                    Filter beim nächsten verschachtelten Modul still auseinanderginge. */}
+                {m.key === 'einsatz-einstellungen' && EINSTELLUNGEN_ROUTEN}
+              </Route>
             ))}
             <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
             <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />

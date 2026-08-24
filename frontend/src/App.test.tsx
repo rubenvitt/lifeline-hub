@@ -108,6 +108,47 @@ describe('App-Routing', () => {
     expect((await screen.findAllByText('Brand'))[0]).toBeInTheDocument();
   });
 
+  /**
+   * Der BARE Einstellungs-Pfad landet auf der ersten Sektion (LFH-345 · C10, H15/M15).
+   *
+   * Genau diesen Pfad baut `modulZielRoute` und damit jeder Klick aus der Modul-Navigation —
+   * nach der Zerlegung in vier Sektionen trägt ihn keine Sektionsroute mehr, sondern eine
+   * Index-Umleitung. Bricht sie, steht ein Reiterband über weißer Fläche: der Layout-Test
+   * montiert die Sektionen selbst und der e2e-Spec springt direkt auf `…/module`, keiner von
+   * beiden käme hier vorbei.
+   */
+  function einstellungenServer() {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 7, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false }),
+      ),
+    );
+  }
+
+  it('barer Einstellungs-Pfad landet auf der ersten Sektion', async () => {
+    einstellungenServer();
+    renderApp('/einsaetze/7/einstellungen');
+    // Ein sektionseigenes Feld beweist, dass NICHT nur das Reiterband gerendert hat.
+    expect(await screen.findByLabelText('Standard-Modul (Einstieg)')).toBeInTheDocument();
+  });
+
+  it('ein unbekanntes Einstellungs-Segment landet ebenfalls dort', async () => {
+    einstellungenServer();
+    renderApp('/einsaetze/7/einstellungen/quatsch');
+    expect(await screen.findByLabelText('Standard-Modul (Einstieg)')).toBeInTheDocument();
+  });
+
+  // Gegenaussage: die Umleitung ist keine Zwangsumleitung — eine benannte Sektion kommt an.
+  it('eine benannte Sektion wird NICHT auf die erste umgeleitet', async () => {
+    einstellungenServer();
+    renderApp('/einsaetze/7/einstellungen/aufbewahrung');
+    expect(await screen.findByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Standard-Modul (Einstieg)')).toBeNull();
+  });
+
   it('fahrzeuge-Route rendert die echte FahrzeugePage statt Stub', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),

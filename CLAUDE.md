@@ -579,6 +579,119 @@ Alltag wichtigsten:
   Nachrichtenstrom wächst an zwei Enden: hinten durch neue Nachrichten, vorne durch „Ältere
   laden". Ein Effekt auf `nachrichten.length` träfe beide und risse den Lesenden beim Nachladen
   aus seiner Stelle; die id der jüngsten Nachricht wächst nur im ersten Fall.
+- **Ein Speicherfehler gehört an die Seite, ein Erfolg an den Toast** (LFH-345 · C10, Befund
+  H14). Sieben Speicherpfade der Einstellungs-/Profil-Gruppe meldeten Fehler ausschließlich
+  über `message.error`; nach rund drei Sekunden war die Meldung weg, das ausgefüllte Formular
+  stand unverändert da und **wirkte gespeichert** — bei Aufbewahrungsfrist, Nummernkreisen und
+  Fristen fällt das erst Stunden später auf. Träger ist `components/SpeicherHinweis.tsx`
+  (`SpeicherFehler` · `RechteHinweis` · `SeitenHinweise`); die Mutationen haben ihr
+  `onError` **verloren**, der Erfolgs-Toast bleibt. Der Alert räumt sich beim nächsten
+  Absenden selbst weg (react-query setzt `error` beim Übergang nach `pending` zurück) — das
+  ist die zweite Hälfte der Zusicherung und gehört mitgetestet.
+  **`SeitenHinweise` bündelt beide für EINEN Slot, und der Grund ist der Leerfall:** die
+  `hinweis`-Hüllen von `AdminPage`/`EinsatzSeite` rendern ihren Abstand, sobald der Inhalt
+  truthy ist. Ein Fragment mit zwei `null`-Kindern **ist** truthy und hinterließe einen
+  sichtbaren Leerraum.
+  **Die vom AK verlangte Fake-Timer-Prüfung ist in dieser Umgebung nicht möglich** — und das
+  ist gemessen, nicht vermutet. Beide Bauformen scheitern: nach dem Klick aktivierte
+  Fake-Timer erreichen antds längst laufenden Message-Timer nicht, und mit
+  `useFakeTimers({ shouldAdvanceTime: true })` ab dem Rendern (ohne das bleibt die Seite im
+  Ladeskelett und der Knopf existiert nie) bleibt der Toast beim Vorlauf trotzdem stehen. Die
+  **Mutationsprobe** entscheidet: mit zurückgedrehtem `message.error` blieb genau dieser Test
+  grün, während „die Meldung steht außerhalb von `.ant-message`" und „sie geht beim nächsten
+  Absenden" rot wurden. Ein Test, der nicht rot werden kann, behauptet eine Deckung, die er
+  nicht hat — die beiden tragenden Aussagen stehen deshalb an seiner Stelle.
+- **Fehlende Berechtigung wird erklärt, nicht stumm weggeschaltet** (LFH-345 · C10, M16). Ein
+  `RechteHinweis` (`Alert type="info"`) über dem Block nennt den Grund, und **der
+  Speichern-Knopf verschwindet nicht mehr** — er steht gesperrt da. „Ausgegraut" allein ist
+  eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1) und nennt keinen Grund; ein
+  fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden. Das ist
+  derselbe Befund, den LFH-370/B5j je Zeile gelöst hat (`Anmeldeverfahren`), hier auf
+  Blockebene. Die Bestandstests „kein Speichern-Button" heißen entsprechend jetzt „Knopf
+  **gesperrt**".
+- **Eine Sofort-Speichern-Zeile sperrt sich selbst, nicht die Liste** (LFH-345 · C10, H15).
+  `ModulEinstellungsListe` nahm ein `laeuft: boolean` und sperrte damit bei jeder Mutation
+  **alle 50** Steuerelemente; jetzt `laeuftKey`/`fehlerKey` mit Key-Vergleich. Die Zeile, an
+  der eine Mutation scheitert, trägt `data-fehler` und den linken Rand aus `token.colorError`
+  — der Wert selbst springt ohnehin von allein zurück (die Anzeige liest aus dem Query, es
+  gibt kein optimistisches Update), was fehlte, war die Angabe **welche** Zeile. Die Quelle
+  ist `mutation.variables`, nicht ein eigener State.
+- **Eine feste Spaltenbreite ist ein Breakpoint, den niemand gesetzt hat** (LFH-345 · C10,
+  H16). Die Modulzeile belegte fest 268 px (64 Sichtbar + 180 Rolle + zwei Abstände); bei
+  390 px blieben unter 100 px fürs Label. Jetzt CSS-Grid `minmax(0, 1fr) auto auto`, unter
+  `md` gestapelt — **und die Spaltenköpfe fallen dann GANZ weg**: ein Kopf über gestapelten
+  Zeilen benennt keine Spalten mehr, sondern behauptet eine Ordnung, die es nicht gibt. Der
+  Rollen-`Select` nimmt `width: '100%'` statt einer festen Breite (dieselbe Beobachtung wie
+  bei `Datensicht.tsx:234-236`, LFH-369: eine feste Mindestbreite drängt das Steuerelement aus
+  der schmalen Karte) — dass die `auto`-Spalte dabei nicht auf ihre Pfeil-Ikone zusammenfällt,
+  ist **in Playwright gemessen**, nicht angenommen; jsdom rechnet kein Layout.
+  Die Beschriftung ist ein handgebautes Bedienziel und trägt deshalb die ZWEI Angaben aus
+  LFH-365 (`modulZeilenStil`, rein und exportiert), plus ein `<label htmlFor>` **nur an der
+  bedienbaren Zeile** — dieselbe Regel wie in `Anmeldeverfahren` (LFH-370).
+- **Ein Absende-Ziel darf nie später erscheinen als die Felder, die es absendet**
+  (LFH-345 · C10, M18). Die Anmeldekarte staffelte ihre Eingangsanimation: Karte 0,15 s
+  Versatz + 0,7 s Dauer, Felder bei 0,3/0,38 s, Absende-Knopf bei 0,46 s — der Knopf stand
+  gemessen erst nach **1,06 s** vollständig da. Wer schnell tippt und Enter drückt, drückt auf
+  einen Knopf, der noch halb durchsichtig ist. Jetzt eine gemeinsame Regel ohne Versatz,
+  0,35 s. Geprüft wird die **CSS-Quelle** (`pages/LoginPage.animation.test.ts`), nicht ein
+  gerechneter Stil: jsdom führt keine Animationen aus. Die schärfere der beiden Aussagen ist
+  die **Abwesenheit** einer eigenen Versatz-Regel je Zeile — ein niedriger Wert ließe sich
+  vortäuschen, ein fehlender Selektor nicht. Der `prefers-reduced-motion`-Block bleibt.
+- **Dieselbe Eingabe wird nicht zweimal gebaut** (LFH-345 · C10, M20).
+  `components/OtpEingabe.tsx` trägt die sechsstellige TOTP-Eingabe für Anmeldung **und**
+  Profil; vorher hatte die Anmeldeseite `inputMode`/`pattern`/`maxLength`/Ziffern-Optik und
+  die Profilseite ein nacktes `<Input>` — die schlechtere Bauform stand ausgerechnet dort, wo
+  2FA **eingerichtet** wird. Drei gemessene Festlegungen daran:
+  **(1) `Form.Item` injiziert die `id`, und sie MUSS durchgereicht werden** — ohne sie zeigt
+  das `<label for>` ins Leere; zehn Bestandstests fielen mit „no form control was found
+  associated to that label" aus, und Vorlesende verlieren denselben Bezug.
+  **(2) Zwei Absendewege brauchen einen Riegel.** Seit die sechste Ziffer selbst absendet,
+  führen Auto-Weg und Knopf zum selben Aufruf; ohne `sendetRef` lief `totp/finish` zweimal
+  gegen einen Code, der serverseitig **genau einmal** gültig ist — der zweite Aufruf meldete
+  „Code ungültig" für einen Code, der gerade funktioniert hat (gemessen:
+  `['login','totpFinish','totpFinish']`). Der Riegel sitzt in der Absende-Funktion, nicht am
+  Knopf, und fällt im `finally`; dieselbe Bauform wie in `components/Erfassung.tsx`.
+  **(3) Der Merker im Primitiv hält den zuletzt GEMELDETEN Code**, kein Flag auf „ist
+  sechsstellig" — und er wird beim Kürzen zurückgesetzt: wer nach einer Ablehnung dieselbe
+  Ziffer erneut tippt, muss einen neuen Versuch bekommen. Ein Riegel, der das verhindert,
+  hielte die Person fest. **Keine `size`-Angabe** am Primitiv (beide Aufrufer hatten
+  `size="large"`): die Höhe erbt es vom `ConfigProvider`, die auffällige Ziffern-Optik kommt
+  aus `login-otp`.
+- **Eine aufgeteilte Route erbt den Vollersatz-Vertrag ihrer Vorgängerin** (LFH-345 · C10,
+  H15/M15). Die Einsatz-Einstellungen liegen seit C10 auf vier Sektions-Routen
+  (`…/einstellungen/{allgemein,verhalten,aufbewahrung,module}`, Builder
+  `einsatzEinstellungenPfad` in `routing/deeplinks.ts`, Reiter-Layout nach dem Muster von
+  `AdminLayout`). `PUT …/einstellungen` ist **Vollersatz**: jede Sektion schickt die Felder
+  der anderen als Bestandswert mit, sonst nullt ein Speichern in „Aufbewahrung" die
+  Nummernkreise — **ohne roten Test und ohne Fehlerbild**. Träger ist
+  `einstellungen/einsatzEinstellungenForm.ts` mit `zuUpdate` als Basis, exakt die Bauform,
+  die die Org-Ebene seit LFH-281 fährt. `basemap_modus`, `karten_zoom_start` und
+  `fachebenen_sichtbar` (seit LFH-319 auf der Karte zuhause) fahren in **jedem** Payload mit
+  und stehen im Test namentlich.
+  **Jede Sektion stellt ihre Queries selbst**, statt sie über `useOutletContext` vom Layout
+  zu bekommen — nicht aus Bequemlichkeit: `Form initialValues` wird genau einmal beim Mount
+  gelesen; eine Sektion, die ohne Daten montiert, zeigt ein leeres Formular, und der nächste
+  Klick auf Speichern schickt einen Vollersatz-PUT aus lauter `null`. TanStack führt gleiche
+  Query-Keys ohnehin zusammen, der doppelte Aufruf kostet keinen zweiten Request.
+  **Die Speichern-Leiste liegt sticky am unteren Rand, nicht im Kopf-Slot** — dadurch steht
+  der Knopf IM `<form>` und trägt `htmlType="submit"`, womit Enter absendet (Erfassungs-Norm
+  B4/LFH-332; ein Knopf im Kopf-Slot ist ein DOM-Geschwister außerhalb des `<form>` und kann
+  nichts übermitteln). „Genau eine Primäraktion im Kopf" (LFH-340 · C5) ist damit trivial
+  erfüllt statt verletzt. `speicherLeisteStil`/`feldrasterStil` sind **rein und exportiert**,
+  damit die Zusicherungen ohne Render prüfbar sind — die Breiten-Schwelle liest der Aufrufer
+  aus `useViewport`, nicht die Stilfunktion: eine reine Funktion, die selbst einen Hook ruft,
+  wäre kein Prüfobjekt mehr.
+- **Ein Status gehört nicht in die Seite, die ihn zufällig zuerst brauchte**
+  (LFH-345 · C10, M14). `EINSATZ_STATUS` liegt jetzt in `einsatz/einsatzStatus.ts` neben
+  `einsatzart.ts`; vorher war es eine modul-lokale Konstante in `EinsaetzePage`, und der
+  zweite Leser (`EinsatzdatenPage`) hatte sie **nicht** — dort stand der rohe Wire-Wert im
+  Titel-Tag. Das ist die Sorte Abweichung, die niemandem auffällt: beide Seiten sahen für
+  sich plausibel aus, und „aktiv" ist zufällig auch ein deutsches Wort. Der Eintrag trägt den
+  Vertragstyp `StatusDarstellung` aus `theme/statusFarben.ts` (damit ist `label` Pflichtfeld
+  — zweiter Kanal, WCAG 1.4.1), liegt aber **nicht** in dieser Datei: deren Abdeckungsguard
+  zählt die Maps gegen eine Literal-Liste **und** `toHaveLength(10)`; ein elfter Eintrag wäre
+  eine Änderung am Vertrag und an seinem Guard, also eine eigene Entscheidung statt eines
+  Nebenprodukts.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
