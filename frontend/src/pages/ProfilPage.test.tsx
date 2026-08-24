@@ -19,7 +19,9 @@ const webauthnProvider = [
 function benutzerBody(totpAktiviert: boolean) {
   return {
     id: 1,
-    anzeigename: 'Admin',
+    // Bewusst NICHT „Admin": der Anzeigename stand sonst gleichlautend neben der
+    // Rollen-Beschriftung, und `getByText('Admin')` träfe beide.
+    anzeigename: 'Rita Beispiel',
     benutzername: 'admin',
     system_rolle: 'admin',
     org_rolle: 'keine',
@@ -35,6 +37,11 @@ function setup(totpAktiviert = false, providerListe: unknown[] = []) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(totpAktiviert))),
     http.get('/api/auth/providers', () => HttpResponse.json(providerListe)),
+    // Die Organisation steht NICHT am Benutzer (`BenutzerAnzeige` kennt sie nicht) —
+    // die Kopfsektion holt sie aus `GET /api/organisation` (LFH-345 · C10, N5).
+    http.get('/api/organisation', () =>
+      HttpResponse.json({ id: 1, name: 'DRK Musterstadt', tz_organisation: null }),
+    ),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -63,6 +70,53 @@ afterEach(() => {
 
 beforeEach(() => {
   startRegistrationMock.mockReset();
+});
+
+/**
+ * Kopfsektion statt Baustellen-Platzhalter (LFH-345 · C10, Befund N5).
+ *
+ * Die Seite endete in einem `<Platzhalter titel="Profil">` — ausgerechnet unter zwei
+ * fertigen Sicherheits-Abschnitten stand „hier entsteht etwas". Wer sein eigenes Konto
+ * ansah, fand weder Namen noch Rolle noch Organisation.
+ */
+describe('ProfilPage — Kopfdaten (LFH-345)', () => {
+  it('zeigt Anzeigename, Benutzername und Systemrolle', async () => {
+    setup();
+
+    expect(await screen.findByText('Rita Beispiel')).toBeInTheDocument();
+    expect(screen.getByText('admin')).toBeInTheDocument();
+    // Die Rolle als WORT, nicht als Wire-Wert — dieselbe Regel wie beim Einsatz-Status.
+    // Die Schreibweise folgt `BenutzerPage` („Admin" / „Führungskraft" / „Benutzer"),
+    // damit dieselbe Rolle nicht an zwei Stellen zwei Namen trägt.
+    expect(screen.getByText('Admin')).toBeInTheDocument();
+  });
+
+  it('zeigt die Organisation', async () => {
+    setup();
+    expect(await screen.findByText('DRK Musterstadt')).toBeInTheDocument();
+  });
+
+  // Die Organisation kommt aus einem eigenen Abruf; faellt der aus, darf die Seite nicht
+  // leer bleiben — sie zeigt dann „—" wie jede andere unbekannte Angabe.
+  it('bleibt lesbar, wenn die Organisation nicht ladbar ist', async () => {
+    server.use(http.get('/api/organisation', () => HttpResponse.json({}, { status: 500 })));
+    setup();
+
+    expect(await screen.findByText('Rita Beispiel')).toBeInTheDocument();
+    expect(screen.getByText('Organisation')).toBeInTheDocument();
+  });
+
+  it('endet nicht mehr im Baustellen-Platzhalter', async () => {
+    setup();
+
+    await screen.findByText('Zwei-Faktor (TOTP)');
+    expect(screen.queryByText('Eigener Account und app-weite Einstellungen.')).toBeNull();
+  });
+
+  it('fasst die Sicherheits-Abschnitte unter einer Ueberschrift zusammen', async () => {
+    setup();
+    expect(await screen.findByText('Sicherheit')).toBeInTheDocument();
+  });
 });
 
 describe('ProfilPage — Passkey-Enroll (LFH-275)', () => {

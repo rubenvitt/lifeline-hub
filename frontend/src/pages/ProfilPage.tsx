@@ -1,11 +1,13 @@
-import { Alert, App, Button, Form, Typography } from 'antd';
+import { Alert, App, Button, Descriptions, Form, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
 import { QRCodeSVG } from 'qrcode.react';
-import Platzhalter from '../components/Platzhalter';
 import OtpEingabe from '../components/OtpEingabe';
 import { ApiError } from '../api/client';
 import { providerListe } from '../api/auth';
+import { ladeOrganisation } from '../api/organisation';
+import { globalKeys } from '../api/queryKeys';
 import { enrollFinish, enrollStart } from '../api/totp';
 import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
@@ -13,6 +15,22 @@ import { useAuth } from '../auth/AuthContext';
 
 interface TotpCodeWerte {
   code: string;
+}
+
+/**
+ * Rollen-Beschriftung als WORT statt als Wire-Wert (LFH-345 · C10, N5).
+ *
+ * Die Schreibweise folgt den Etiketten in `pages/BenutzerPage.tsx` („Admin" /
+ * „Führungskraft" / „Benutzer") — dieselbe Rolle darf nicht an zwei Stellen zwei Namen
+ * tragen. Bewusst KEINE geteilte Map: die gäbe es dann an drei Orten (hier, BenutzerPage,
+ * `auth/`), und ihr richtiger Platz wäre `theme`/`auth`, nicht diese Seite. Wer die dritte
+ * Stelle baut, zieht sie hoch.
+ */
+function rollenText(benutzer: { system_rolle: string; org_rolle: string } | null): string {
+  if (!benutzer) return '—';
+  if (benutzer.system_rolle === 'admin') return 'Admin';
+  if (benutzer.org_rolle === 'fuehrungskraft') return 'Führungskraft';
+  return 'Benutzer';
 }
 
 /** Laufendes TOTP-Enrollment (LFH-43): das Secret ist bereits serverseitig gespeichert, aber
@@ -30,6 +48,13 @@ export default function ProfilPage() {
   // hat im Repo breite Präzedenz, `<AntApp>` steht in main.tsx und in test/utils.tsx.
   const { message } = App.useApp();
   const [provider, setProvider] = useState<AuthProvider[]>([]);
+  // Die Organisation steht nicht an `BenutzerAnzeige` — sie kommt aus einem eigenen Abruf.
+  // Nicht-blockierend und ohne Fehlerzweig: schlägt er fehl, zeigt die Kopfsektion „—",
+  // und die beiden Sicherheits-Abschnitte darunter bleiben unberührt bedienbar.
+  const { data: organisation } = useQuery({
+    queryKey: globalKeys.organisation(),
+    queryFn: ladeOrganisation,
+  });
   const [fehler, setFehler] = useState<string | null>(null);
   const [erfolg, setErfolg] = useState(false);
   const [laedt, setLaedt] = useState(false);
@@ -141,8 +166,30 @@ export default function ProfilPage() {
 
   const totpAktiv = benutzer?.totp_aktiviert ?? false;
 
+  const kopfEintraege = [
+    { key: 'anzeigename', label: 'Anzeigename', children: benutzer?.anzeigename ?? '—' },
+    { key: 'benutzername', label: 'Benutzername', children: benutzer?.benutzername ?? '—' },
+    { key: 'rolle', label: 'Systemrolle', children: rollenText(benutzer) },
+    // Die Organisation steht nicht am Benutzer, sie kommt aus einem eigenen Abruf. Fällt
+    // der aus, bleibt „—" — die Kopfsektion ist deshalb nicht weniger brauchbar.
+    { key: 'org', label: 'Organisation', children: organisation?.name ?? '—' },
+  ];
+
   return (
     <div>
+      <div style={{ maxWidth: 480, marginBottom: 32 }}>
+        <Typography.Title level={4} style={{ marginTop: 0 }}>
+          Profil
+        </Typography.Title>
+        {/* Ohne Klein-Angabe: an einer `Descriptions` wäre sie zwar kein Trefflächen-
+            Verstoß (`dichte.guard.test.ts` hält nicht-interaktive Flächen bewusst
+            draußen), das Kriterium dieses Tasks zählt aber dateiweit — und gebraucht
+            wird sie hier nicht. */}
+        <Descriptions column={1} bordered items={kopfEintraege} />
+      </div>
+
+      <Typography.Title level={4}>Sicherheit</Typography.Title>
+
       {passkeySichtbar && (
         <div style={{ maxWidth: 480, marginBottom: 32 }}>
           <Typography.Title level={5} style={{ marginTop: 0 }}>
@@ -176,7 +223,8 @@ export default function ProfilPage() {
             type="warning"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Recovery-Codes jetzt sichern"
+            // `title` statt des in antd 6 abgelösten `message` (LFH-345 · C10, N5).
+            title="Recovery-Codes jetzt sichern"
             description={
               <div>
                 <Typography.Paragraph style={{ marginBottom: 8 }}>
@@ -281,10 +329,6 @@ export default function ProfilPage() {
         )}
       </div>
 
-      <Platzhalter
-        titel="Profil"
-        beschreibung="Eigener Account und app-weite Einstellungen."
-      />
     </div>
   );
 }
