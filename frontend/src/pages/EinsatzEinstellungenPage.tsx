@@ -1,70 +1,44 @@
-import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, theme } from 'antd';
-import { Select } from '../components/Select';
+import { Alert, Tabs } from 'antd';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import EinsatzSeite from '../components/EinsatzSeite';
-import SektionHeader from '../components/SektionHeader';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
-import ModulEinstellungsListe from './einstellungen/ModulEinstellungsListe';
-import {
-  EINHEITEN_OPTIONEN,
-  KOORDINATEN_OPTIONEN,
-  ZEITFORMAT_OPTIONEN,
-  ZEITZONEN_OPTIONEN,
-} from './einstellungen/optionen';
-import { useParams } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ladeEinsatz, ladeEinstellungen, speichereEinstellungen,
-  ladeModulOverrides, setzeModulOverride,
-} from '../api/einsaetze';
-import { ladeOrgModulEinstellungen } from '../api/orgEinstellungen';
-import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import { ApiError } from '../api/client';
+import { ladeEinsatz, ladeEinstellungen } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
-import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
-import { modulRegistry } from '../einsatz/modulRegistry';
-import type {
-  EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
-  Koordinatenformat, ModulOverrideUpdate, OrgModulEinstellungen, Zeitformat,
-} from '../api/types';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import {
+  EINSTELLUNGEN_SEKTIONEN,
+  einsatzEinstellungenPfad,
+  type EinstellungenSektion,
+} from '../routing/deeplinks';
+import type { EinsatzEinstellungen } from '../api/types';
 
-/** Tristate-Optionen für automatische ETB-Einträge (null=erbt Org, true=An, false=Aus).
- *  Bleibt bewusst hier: diese Liste gibt es nur auf der Einsatz-Ebene. */
-const AUTO_ETB_OPTIONEN: { value: boolean; label: string }[] = [
-  { value: true, label: 'An' },
-  { value: false, label: 'Aus' },
-];
-
-/** Formularwerte; Fachebenen als Liste der aktiven Keys (Checkbox.Group). */
-interface FormWerte {
-  standard_modul?: string;
-  zeitzone?: string;
-  zeitformat?: Zeitformat;
-  einheiten?: EinheitenSystem;
-  koordinatenformat?: Koordinatenformat;
-  // Verhalten & Automatik (LFH-133).
-  etb_nummer_praefix?: string;
-  etb_nummer_start?: number;
-  meldung_nummer_praefix?: string;
-  meldung_nummer_start?: number;
-  auftrag_nummer_praefix?: string;
-  auftrag_nummer_start?: number;
-  meldung_bestaetigung_frist_min?: number;
-  auftrag_quittierung_frist_min?: number;
-  // undefined = Org-Standard erben; true = An; false = Aus.
-  auto_etb_eintraege: boolean | undefined;
-  // Aufbewahrung & Archiv (LFH-135).
-  retention_dauer_tage?: number;
+/**
+ * Datenkontext der vier Einstellungs-Sektionen (LFH-345 · C10, H15/M15).
+ *
+ * **Bewusst ein Hook, kein `useOutletContext`.** Jede Sektion stellt ihre Queries selbst und
+ * hat ihren eigenen Lade-/Fehler-Riegel; sie ist damit ohne dieses Layout montierbar — was
+ * nicht nur die Tests trägt, sondern eine echte Falle schließt: `Form initialValues` wird
+ * genau einmal beim Mount gelesen. Eine Sektion, die ohne Daten montiert, zeigt ein leeres
+ * Formular, und der nächste Klick auf Speichern schickt einen Vollersatz-PUT aus lauter
+ * `null` — der Datensatz wäre weg, ohne Fehlermeldung. Ein Kontext vom Elternteil verschöbe
+ * diese Frage nur nach oben. TanStack führt die gleichen Query-Keys ohnehin zusammen, der
+ * doppelte Aufruf kostet also keinen zweiten Request.
+ */
+export interface EinstellungenDaten {
+  laedt: boolean;
+  einsatz?: Awaited<ReturnType<typeof ladeEinsatz>>;
+  einstellungen?: EinsatzEinstellungen;
+  /** Einsatz läuft noch — abgeschlossene Einsätze sind eingefroren. */
+  istAktiv: boolean;
+  /** Allgemeines Einsatz-Schreibrecht (schließt „aktiv" bereits ein). */
+  darfBearbeiten: boolean;
+  neuLaden: () => void;
 }
 
-export default function EinsatzEinstellungenPage() {
-  const { id } = useParams();
-  const einsatzId = Number(id);
+export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
   const { benutzer } = useAuth();
-  const qc = useQueryClient();
-  const { message } = App.useApp();
-  const [form] = Form.useForm<FormWerte>();
-  const { token } = theme.useToken();
-
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
@@ -73,178 +47,76 @@ export default function EinsatzEinstellungenPage() {
     queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
-  });
-  // Org-Modul-Rollen-Defaults (optional, nicht-blockierend).
-  const orgModulQuery = useQuery({
-    queryKey: globalKeys.orgModulEinstellungen(),
-    queryFn: () => ladeOrgModulEinstellungen(),
-  });
-
-  const overrideMutation = useMutation({
-    mutationFn: (vars: { modulKey: string; update: ModulOverrideUpdate }) =>
-      setzeModulOverride(einsatzId, vars.modulKey, vars.update),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.modulOverrides(einsatzId) });
-      message.success('Modul-Einstellung gespeichert');
+  return {
+    laedt: einsatzQuery.isLoading || einstellungenQuery.isLoading,
+    einsatz: einsatzQuery.data,
+    einstellungen: einstellungenQuery.data,
+    istAktiv: einsatzQuery.data?.status === 'aktiv',
+    darfBearbeiten: darfImEinsatzSchreiben(einsatzQuery.data, benutzer),
+    neuLaden: () => {
+      void einsatzQuery.refetch();
+      void einstellungenQuery.refetch();
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
-  });
-
-  const speichernMutation = useMutation({
-    mutationFn: (felder: EinstellungenUpdate) => speichereEinstellungen(einsatzId, felder),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.einstellungen(einsatzId) });
-      message.success('Einstellungen gespeichert');
-    },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
-  });
-
-  if (einsatzQuery.isLoading || einstellungenQuery.isLoading || overridesQuery.isLoading) {
-    return <SeitenSkeleton />;
-  }
-  if (einsatzQuery.isError || !einsatzQuery.data || einstellungenQuery.isError || !einstellungenQuery.data) {
-    return (
-      <SeitenFehler
-        text="Einstellungen nicht ladbar oder kein Zugriff"
-        onWiederholen={() => {
-          void einsatzQuery.refetch();
-          void einstellungenQuery.refetch();
-        }}
-      />
-    );
-  }
-  const einsatz = einsatzQuery.data;
-  const einstellungen = einstellungenQuery.data;
-  const orgDefaults = einstellungen.org_defaults;
-  const orgModulDefaults: OrgModulEinstellungen = orgModulQuery.data ?? {};
-
-  const istAktiv = einsatz.status === 'aktiv';
-  const darfBearbeiten = darfImEinsatzSchreiben(einsatz, benutzer);
-  // Modul-Overrides darf nur die Einsatzleitung oder ein System-Admin verwalten
-  // (deckt das Backend-Gate einsatzleitung|admin ab).
-  const darfModuleVerwalten = darfEinsatzLeiten(einsatz, benutzer);
-  const overrides = overridesQuery.data ?? {};
-
-  /** Sichtbarkeit einer Modul-Zeile aus dem Override-Bestand (Default: sichtbar). */
-  const sichtbarVon = (modulKey: string) => overrides[modulKey]?.sichtbar ?? true;
-
-  // Nur fertige Module sind als Default-Modul wählbar (Pre-Mortem: kein Sprung
-  // auf geplante/WIP-Module).
-  const standardModulOptionen = modulRegistry
-    .filter((m) => m.status === 'fertig')
-    .map((m) => ({ value: m.key, label: m.label }));
-
-  const initialWerte: FormWerte = {
-    standard_modul: einstellungen.standard_modul ?? undefined,
-    zeitzone: einstellungen.zeitzone ?? undefined,
-    zeitformat: einstellungen.zeitformat ?? undefined,
-    einheiten: einstellungen.einheiten ?? undefined,
-    koordinatenformat: einstellungen.koordinatenformat ?? undefined,
-    // Verhalten & Automatik (LFH-133).
-    etb_nummer_praefix: einstellungen.etb_nummer_praefix ?? undefined,
-    etb_nummer_start: einstellungen.etb_nummer_start ?? undefined,
-    meldung_nummer_praefix: einstellungen.meldung_nummer_praefix ?? undefined,
-    meldung_nummer_start: einstellungen.meldung_nummer_start ?? undefined,
-    auftrag_nummer_praefix: einstellungen.auftrag_nummer_praefix ?? undefined,
-    auftrag_nummer_start: einstellungen.auftrag_nummer_start ?? undefined,
-    meldung_bestaetigung_frist_min: einstellungen.meldung_bestaetigung_frist_min ?? undefined,
-    auftrag_quittierung_frist_min: einstellungen.auftrag_quittierung_frist_min ?? undefined,
-    // null = Org-Standard erben (tristate); 0 = Aus; 1 = An.
-    auto_etb_eintraege:
-      einstellungen.auto_etb_eintraege === null
-        ? undefined
-        : einstellungen.auto_etb_eintraege === 0
-          ? false
-          : true,
-    // Aufbewahrung & Archiv (LFH-135).
-    retention_dauer_tage: einstellungen.retention_dauer_tage ?? undefined,
   };
+}
 
-  /** Gibt „Standard (Org): X" zurück wenn ein Org-Default gesetzt ist, sonst undefined. */
-  function orgHinweisWert(wert: string | number | null | undefined, suffix?: string): string | undefined {
-    if (wert == null) return undefined;
-    return `Standard (Org): ${wert}${suffix ? ` ${suffix}` : ''}`;
-  }
+/**
+ * Erklärt die fehlende Berechtigung auf allen vier Sektionen gleich (M16).
+ *
+ * Ausgegraut allein ist eine Ein-Kanal-Aussage und nennt keinen Grund; der Text steht hier
+ * statt viermal daneben, damit er nicht auseinanderläuft.
+ */
+export const RECHTE_TEXT =
+  'Nur die Einsatzleitung, Führungspersonal oder ein System-Admin darf die Einstellungen dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen.';
 
-  function orgHinweisSelect<T extends string>(
-    wert: T | null | undefined,
-    optionen: { value: T; label: string }[],
-  ): string | undefined {
-    if (wert == null) return undefined;
-    const opt = optionen.find((o) => o.value === wert);
-    return opt ? `Standard (Org): ${opt.label}` : undefined;
-  }
+/** Aktive Sektion aus dem Pfad: `/einsaetze/1/einstellungen/verhalten` → `verhalten`. */
+function sektionAus(pathname: string): EinstellungenSektion {
+  // Kein `.at(-1)`: `tsconfig.lib` steht auf ES2020, die Methode bricht dort den Typecheck.
+  const teile = pathname.split('/').filter(Boolean);
+  const letztes = teile[teile.length - 1];
+  const treffer = EINSTELLUNGEN_SEKTIONEN.find((s) => s.key === letztes);
+  return treffer?.key ?? EINSTELLUNGEN_SEKTIONEN[0].key;
+}
 
-  /** Hint für auto_etb_eintraege: 0 = Aus, 1/andere = An. */
-  function orgHinweisAutoEtb(wert: number | null | undefined): string | undefined {
-    if (wert == null) return undefined;
-    return `Standard (Org): ${wert === 0 ? 'Aus' : 'An'}`;
-  }
+/**
+ * Sektions-Layout der Einsatz-Einstellungen (LFH-345 · C10, Befunde H15/M15).
+ *
+ * Die Seite trug bis dahin fünfzehn Formularfelder UND die Modul-Sichtbarkeitsliste in einem
+ * Zug, mit einem Speichern-Knopf im Kopf, der die Liste gar nicht betraf (die speichert je
+ * Zeile sofort). Zerlegt in vier Reiter: drei Formular-Sektionen, die sich einen
+ * **Vollersatz-Merge** teilen (`einstellungen/einsatzEinstellungenForm.ts`), und die Liste
+ * als eigene Sektion — sie hat kein Speichern und gehört deshalb nicht unter einen
+ * Speichern-Knopf.
+ *
+ * **Der Kopf-Aktionen-Slot bleibt leer.** Die Speichern-Leiste liegt sticky am unteren Rand
+ * der jeweiligen Sektion und damit IM `<form>`; nur so sendet Enter ab (Erfassungs-Norm
+ * B4/LFH-332 — ein Knopf im Kopf-Slot ist ein DOM-Geschwister außerhalb des `<form>` und
+ * kann nichts übermitteln). „Genau eine Primäraktion im Kopf" (LFH-340 · C5) ist damit
+ * trivial erfüllt statt verletzt.
+ *
+ * Die aktive Sektion kommt aus der URL, nicht aus eigenem State — dasselbe Muster wie
+ * `AdminLayout` (LFH-284). Ein zweiter Zustand neben dem Pfad ginge bei jedem Deeplink
+ * auseinander.
+ */
+export default function EinsatzEinstellungenPage() {
+  const { id } = useParams();
+  const einsatzId = Number(id);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const daten = useEinstellungenDaten(einsatzId);
+  const aktiv = sektionAus(pathname);
 
-  /** Org-Rollen-Hinweis im Modul-Override (z.B. „Org: Führungskraft"). */
-  function orgRollenHinweis(rolle: 'admin' | 'fuehrungskraft' | null | undefined): string | undefined {
-    if (rolle == null) return undefined;
-    if (rolle === 'fuehrungskraft') return 'Org: Führungskraft';
-    if (rolle === 'admin') return 'Org: Admin';
-    return undefined;
-  }
-
-  function speichern(werte: FormWerte) {
-    const felder: EinstellungenUpdate = {
-      standard_modul: werte.standard_modul || null,
-      // Karten-Defaults (basemap_modus/fachebenen_sichtbar/karten_zoom_start) leben seit LFH-319
-      // auf der Karte („Für den Einsatz speichern") und sind aus diesem Formular entfernt. Die
-      // Spalten bleiben als Saat der Standardansicht — deshalb MUSS ihr Bestandswert hier
-      // mitfahren, sonst nullt dieser Vollersatz-UPSERT-PUT sie beim nächsten Save.
-      basemap_modus: einstellungen.basemap_modus ?? null,
-      karten_zoom_start: einstellungen.karten_zoom_start ?? null,
-      fachebenen_sichtbar: (einstellungen.fachebenen_sichtbar as FachebenenSichtbar | null) ?? null,
-      // Anzeige-Konventionen (LFH-136); leer = projektweiter Default (null).
-      zeitzone: werte.zeitzone?.trim() || null,
-      zeitformat: werte.zeitformat ?? null,
-      einheiten: werte.einheiten ?? null,
-      koordinatenformat: werte.koordinatenformat ?? null,
-      // Verhalten & Automatik (LFH-133) — alle Felder durchreichen (Vollersatz-PUT).
-      etb_nummer_praefix: werte.etb_nummer_praefix?.trim() || null,
-      etb_nummer_start: werte.etb_nummer_start ?? null,
-      meldung_nummer_praefix: werte.meldung_nummer_praefix?.trim() || null,
-      meldung_nummer_start: werte.meldung_nummer_start ?? null,
-      auftrag_nummer_praefix: werte.auftrag_nummer_praefix?.trim() || null,
-      auftrag_nummer_start: werte.auftrag_nummer_start ?? null,
-      meldung_bestaetigung_frist_min: werte.meldung_bestaetigung_frist_min ?? null,
-      auftrag_quittierung_frist_min: werte.auftrag_quittierung_frist_min ?? null,
-      // undefined (Org-Standard) → null im Payload (Backend-Semantik: erbt Org-Default).
-      auto_etb_eintraege: werte.auto_etb_eintraege ?? null,
-      // Aufbewahrung & Archiv (LFH-135); leer = keine Auto-Frist (null).
-      retention_dauer_tage: werte.retention_dauer_tage ?? null,
-    };
-    speichernMutation.mutate(felder);
+  if (daten.laedt) return <SeitenSkeleton />;
+  if (!daten.einsatz) {
+    return <SeitenFehler text="Einstellungen nicht ladbar oder kein Zugriff" onWiederholen={daten.neuLaden} />;
   }
 
   return (
     <EinsatzSeite
       titel="Einstellungen"
-      beschreibung={`Einsatzbezogene Einstellungen für „${einsatz.bezeichnung}". Gelten nur für diesen Einsatz.`}
-      aktionen={
-        // Der Aktionen-Slot liegt AUSSERHALB des <Form> — deshalb `form.submit()`
-        // statt `htmlType="submit"`, und deshalb das explizite `disabled`: das
-        // Form-weite `disabled` erreicht diesen Knopf nicht.
-        <Button
-          type="primary"
-          onClick={() => form.submit()}
-          loading={speichernMutation.isPending}
-          disabled={!darfBearbeiten}
-        >
-          Speichern
-        </Button>
-      }
+      beschreibung={`Einsatzbezogene Einstellungen für „${daten.einsatz.bezeichnung}". Gelten nur für diesen Einsatz.`}
       hinweis={
-        !istAktiv && (
+        !daten.istAktiv && (
           <Alert
             type="info"
             showIcon
@@ -253,196 +125,18 @@ export default function EinsatzEinstellungenPage() {
         )
       }
     >
-      <Form<FormWerte>
-        form={form}
-        layout="vertical"
-        initialValues={initialWerte}
-        onFinish={speichern}
-        disabled={!darfBearbeiten}
-      >
-        <SektionHeader titel="Einstieg" />
-        <Form.Item
-          label="Standard-Modul (Einstieg)"
-          name="standard_modul"
-          tooltip="Modul, das beim Öffnen des Einsatzes angezeigt wird. Leer = Standard (Lage-Dashboard bzw. ETB)."
-        >
-          <Select
-            allowClear
-            placeholder="Standard (Lage-Dashboard bzw. ETB)"
-            options={standardModulOptionen}
-          />
-        </Form.Item>
-
-        <SektionHeader
-          titel="Anzeige-Konventionen"
-          beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Standard."
-        />
-        <Form.Item
-          label="Zeitzone"
-          name="zeitzone"
-          tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
-          extra={orgHinweisWert(orgDefaults?.zeitzone)}
-        >
-          <AutoComplete
-            allowClear
-            options={ZEITZONEN_OPTIONEN}
-            placeholder="Europe/Berlin (Standard)"
-            showSearch={{
-              filterOption: (eingabe, option) =>
-                (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
-            }}
-          />
-        </Form.Item>
-        <Form.Item
-          label="Zeitformat"
-          name="zeitformat"
-          extra={orgHinweisSelect(orgDefaults?.zeitformat, ZEITFORMAT_OPTIONEN)}
-        >
-          <Select allowClear placeholder="24 Stunden (Standard)" options={ZEITFORMAT_OPTIONEN} />
-        </Form.Item>
-        <Form.Item
-          label="Einheiten"
-          name="einheiten"
-          extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
-        >
-          <Select allowClear placeholder="Metrisch (Standard)" options={EINHEITEN_OPTIONEN} />
-        </Form.Item>
-        <Form.Item
-          label="Koordinatenformat"
-          name="koordinatenformat"
-          extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
-        >
-          <Select allowClear placeholder="WGS84 dezimal (Standard)" options={KOORDINATEN_OPTIONEN} />
-        </Form.Item>
-
-        <SektionHeader
-          titel="Verhalten & Automatik"
-          beschreibung="Nummernkreise (Präfix + Startwert), Default-Fristen und automatische ETB-Einträge für diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises vergeben ist, sind Präfix und Startwert nicht mehr änderbar."
-        />
-
-        {([
-          {
-            key: 'etb', label: 'ETB', eingefroren: einstellungen.etb_nummer_eingefroren,
-            orgPraefix: orgDefaults?.etb_nummer_praefix,
-          },
-          {
-            key: 'meldung', label: 'Meldungen', eingefroren: einstellungen.meldung_nummer_eingefroren,
-            orgPraefix: orgDefaults?.meldung_nummer_praefix,
-          },
-          {
-            key: 'auftrag', label: 'Aufträge', eingefroren: einstellungen.auftrag_nummer_eingefroren,
-            orgPraefix: orgDefaults?.auftrag_nummer_praefix,
-          },
-        ] as const).map((nk) => (
-          <div key={nk.key} style={{ display: 'flex', gap: token.margin, alignItems: 'flex-start' }}>
-            <Form.Item
-              label={`Präfix ${nk.label}`}
-              name={`${nk.key}_nummer_praefix`}
-              style={{ flex: 1 }}
-              tooltip="Wird der laufenden Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
-              extra={
-                nk.eingefroren
-                  ? 'Erste Nummer bereits vergeben — nicht mehr änderbar'
-                  : orgHinweisWert(nk.orgPraefix)
-              }
-            >
-              <Input maxLength={8} placeholder="z. B. EB-" disabled={nk.eingefroren} />
-            </Form.Item>
-            <Form.Item
-              label={`Startwert ${nk.label}`}
-              name={`${nk.key}_nummer_start`}
-              style={{ width: 160 }}
-              tooltip="Erste laufende Nummer (Default 1)."
-            >
-              <InputNumber min={1} max={999999} style={{ width: '100%' }} placeholder="1" disabled={nk.eingefroren} />
-            </Form.Item>
-          </div>
-        ))}
-
-        <Form.Item
-          label="Default-Bestätigungsfrist Meldungen (Minuten)"
-          name="meldung_bestaetigung_frist_min"
-          tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = projektweiter Standard."
-          extra={orgHinweisWert(orgDefaults?.meldung_bestaetigung_frist_min, 'Min.')}
-        >
-          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="Standard" />
-        </Form.Item>
-        <Form.Item
-          label="Default-Quittierfrist Aufträge (Minuten)"
-          name="auftrag_quittierung_frist_min"
-          tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = keine automatische Frist."
-          extra={orgHinweisWert(orgDefaults?.auftrag_quittierung_frist_min, 'Min.')}
-        >
-          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="keine" />
-        </Form.Item>
-        <Form.Item
-          label="Automatische ETB-Einträge"
-          name="auto_etb_eintraege"
-          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Leer = Org-Standard erben."
-          extra={orgHinweisAutoEtb(orgDefaults?.auto_etb_eintraege)}
-        >
-          <Select
-            allowClear
-            placeholder="Org-Standard"
-            options={AUTO_ETB_OPTIONEN}
-            style={{ width: 200 }}
-          />
-        </Form.Item>
-
-        <SektionHeader
-          titel="Aufbewahrung & Archiv"
-          beschreibung="Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Die Frist greift erst beim Abschluss (sie wird daraus als Zeitpunkt berechnet) und wirkt nie auf den laufenden Einsatz. Nach Fristablauf wird der Einsatz zunächst gesperrt und später unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben erhalten). Leer = keine automatische Frist. Eine spätere Verkürzung einer bereits gesetzten Frist ist gesondert (manuelle Frist) bestätigungspflichtig."
-        />
-        <Form.Item
-          label="Aufbewahrungs-Dauer (Tage)"
-          name="retention_dauer_tage"
-          tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
-          extra={orgHinweisWert(orgDefaults?.retention_dauer_tage, 'Tage')}
-        >
-          <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
-        </Form.Item>
-      </Form>
-
-      <div style={{ marginTop: token.marginXL }}>
-        <SektionHeader
-          titel="Modul-Sichtbarkeit & Berechtigungen"
-          beschreibung="Module für diesen Einsatz ausblenden oder auf eine Rolle beschränken. Einsatzdaten und Einstellungen lassen sich nicht ausblenden. Änderungen werden sofort gespeichert."
-        />
-      </div>
-      <ModulEinstellungsListe
-        rollenSpalte="Benötigte Rolle"
-        rolleVon={(key) => overrides[key]?.benoetigte_rolle ?? ''}
-        aufRolle={(modulKey, val) =>
-          overrideMutation.mutate({
-            modulKey,
-            update: {
-              // Die Sichtbarkeit MUSS mitfahren: der PUT ist Vollersatz — ohne den
-              // Bestandswert nullt eine reine Rollen-Änderung das Ausblenden.
-              sichtbar: sichtbarVon(modulKey),
-              benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
-            },
-          })
-        }
-        sichtbarSpalte={{
-          titel: 'Sichtbar',
-          sichtbarVon,
-          aufSichtbar: (modulKey, checked) =>
-            overrideMutation.mutate({
-              modulKey,
-              update: {
-                sichtbar: checked,
-                // LFH-120: Backend typisiert benoetigte_rolle als freien Option<String>
-                // (generiert `string | null`); FE verengt auf die gültigen Rollen-Codes.
-                benoetigte_rolle: (overrides[modulKey]?.benoetigte_rolle ??
-                  null) as ModulOverrideUpdate['benoetigte_rolle'],
-              },
-            }),
-        }}
-        darfVerwalten={darfModuleVerwalten}
-        // Nur die schreibende Zeile ist gesperrt (H15), nur die gescheiterte markiert (H14).
-        laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
-        fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}
-        hinweisVon={(key) => orgRollenHinweis(orgModulDefaults[key])}
+      {/* Der `<Outlet>` haengt IM aktiven Reiterfeld, nicht als Geschwister daneben: antd
+          rendert je Eintrag ein `role="tabpanel"`, und ein leeres Panel neben dem eigentlichen
+          Inhalt waere fuer Hilfsmittel eine Beschriftung ohne Gegenstand. antd baut ohnehin nur
+          das AKTIVE Feld auf, der Ausdruck laeuft also genau einmal. */}
+      <Tabs
+        activeKey={aktiv}
+        onChange={(key) => navigate(einsatzEinstellungenPfad(einsatzId, key as EinstellungenSektion))}
+        items={EINSTELLUNGEN_SEKTIONEN.map((s) => ({
+          key: s.key,
+          label: s.label,
+          children: s.key === aktiv ? <Outlet /> : null,
+        }))}
       />
     </EinsatzSeite>
   );

@@ -358,3 +358,40 @@ export function parseRouteId(param: string | undefined): number | null {
   const n = Number(param);
   return Number.isInteger(n) && n > 0 ? n : null;
 }
+
+// ── Sektions-Routen der Einsatz-Einstellungen (LFH-345 · C10) ────────────────
+
+/** Die vier Sektionen von `/einsaetze/:id/einstellungen`. */
+export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module';
+
+/**
+ * Sektionen in Bedienreihenfolge — EINE Wahrheit für das Tab-Band, die Routentabelle und
+ * das Ziel des baren Modulpfades.
+ *
+ * Der Grund für die Liste statt dreier Stellen mit denselben Strings ist derselbe wie bei
+ * `adminNav` (LFH-284): ein Tab ohne Route ist ein toter Klick, eine Route ohne Tab ist eine
+ * unerreichbare Seite, und beide Fehler sind vom Bildschirm aus nicht zu sehen, solange man
+ * nicht genau diesen einen Reiter anfasst.
+ *
+ * Die **erste** Sektion ist das Redirect-Ziel des baren Pfades (Muster `ersteSektionPfad`
+ * aus `admin/adminNav`); die Reihenfolge ist deshalb gepinnt, nicht Geschmack.
+ */
+export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; label: string }[] = [
+  { key: 'allgemein', label: 'Allgemein' },
+  { key: 'verhalten', label: 'Verhalten & Automatik' },
+  { key: 'aufbewahrung', label: 'Aufbewahrung' },
+  { key: 'module', label: 'Module' },
+];
+
+/**
+ * Sektions-Route der Einsatz-Einstellungen (LFH-345 · C10, H15/M15).
+ *
+ * Ohne Sektion zeigt sie auf den Einstieg: der bare Modulpfad `…/einstellungen` (den die
+ * Modul-Navigation aus `modulZielRoute` baut) leitet genau dorthin um.
+ */
+export function einsatzEinstellungenPfad(
+  einsatzId: number,
+  sektion: EinstellungenSektion = 'allgemein',
+): string {
+  return `${einsatzModulPfad(einsatzId, 'einstellungen')}/${sektion}`;
+}
