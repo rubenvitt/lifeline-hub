@@ -145,6 +145,12 @@ describe('ProfilPage — Passkey-Enroll (LFH-275)', () => {
   });
 });
 
+/**
+ * Seit LFH-345 · C10 (M20) sendet die SECHSTE ZIFFER selbst ab — die Klicks auf
+ * „Bestätigen" sind aus den Abläufen unten deshalb verschwunden, nicht vergessen worden.
+ * Der Knopf bleibt als Rückfallweg und wird eigens geprüft (s. „Rückfallweg" unten), ebenso
+ * der Riegel gegen den doppelten Absendeversuch.
+ */
 describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
   it('zeigt „2FA einrichten", wenn totp_aktiviert=false, und durchläuft enroll/start → QR/Secret → enroll/finish → Recovery-Codes', async () => {
     setup(false);
@@ -166,7 +172,6 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
-    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
 
     expect(await screen.findByText('Recovery-Codes jetzt sichern')).toBeInTheDocument();
     expect(screen.getByText(/aaaa-1111/)).toBeInTheDocument();
@@ -179,6 +184,67 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 
     expect(await screen.findByText('2FA aktiv')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '2FA einrichten' })).not.toBeInTheDocument();
+  });
+
+  // Der Rückfallweg (LFH-345 · C10, M20): der Knopf bleibt und trägt einen unvollständigen
+  // Code, den das Auto-Absenden nicht anfasst. Ohne diese Aussage wäre die Bündelung oben
+  // nicht von „der Knopf ist weg" zu unterscheiden.
+  it('sendet einen unvollstaendigen Code weiterhin ueber den Bestaetigen-Knopf', async () => {
+    setup(false);
+    const gesendet: string[] = [];
+    server.use(
+      http.post('/api/auth/totp/enroll/start', () =>
+        HttpResponse.json({
+          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          secret_base32: 'JBSWY3DPEHPK3PXP',
+        }),
+      ),
+      http.post('/api/auth/totp/enroll/finish', async ({ request }) => {
+        gesendet.push(((await request.json()) as { code: string }).code);
+        return HttpResponse.json({ recovery_codes: ['aaaa-1111'] });
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: '2FA einrichten' }));
+    await screen.findByText('JBSWY3DPEHPK3PXP');
+    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '12345');
+    expect(gesendet).toEqual([]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
+    await waitFor(() => expect(gesendet).toEqual(['12345']));
+  });
+
+  // Ein TOTP-Code ist serverseitig genau einmal gueltig: der zweite Aufruf meldete
+  // „Code ungueltig" fuer einen Code, der gerade funktioniert hat.
+  it('schickt den Code auch dann nur EINMAL, wenn nach der sechsten Ziffer noch geklickt wird', async () => {
+    setup(false);
+    let aufrufe = 0;
+    server.use(
+      http.post('/api/auth/totp/enroll/start', () =>
+        HttpResponse.json({
+          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          secret_base32: 'JBSWY3DPEHPK3PXP',
+        }),
+      ),
+      http.post('/api/auth/totp/enroll/finish', async () => {
+        aufrufe += 1;
+        // Verzoegert, damit der Klick den laufenden Absendevorgang tatsaechlich trifft —
+        // ein sofort aufloesender Handler liesse den Riegel schon wieder gefallen sein.
+        await new Promise((r) => setTimeout(r, 50));
+        return HttpResponse.json({ recovery_codes: ['aaaa-1111'] });
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: '2FA einrichten' }));
+    await screen.findByText('JBSWY3DPEHPK3PXP');
+
+    const feld = screen.getByLabelText('Code aus deiner Authenticator-App');
+    await userEvent.type(feld, '123456');
+    const knopf = screen.queryByRole('button', { name: 'Bestätigen' });
+    if (knopf) await userEvent.click(knopf);
+
+    await screen.findByText('Recovery-Codes jetzt sichern');
+    expect(aufrufe).toBe(1);
   });
 
   it('zeigt eine Fehlermeldung, wenn der Bestätigungscode ungültig ist', async () => {
@@ -200,7 +266,6 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '000000');
-    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
 
     expect(await screen.findByText('Code ungültig')).toBeInTheDocument();
   });
@@ -231,7 +296,6 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(true))));
 
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
-    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
 
     expect(await screen.findByText('2FA aktiv')).toBeInTheDocument();
     expect(screen.getByText(/CODE-1111/)).toBeInTheDocument();
@@ -268,7 +332,6 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
     await userEvent.click(await screen.findByRole('button', { name: '2FA einrichten' }));
     await screen.findByText('JBSWY3DPEHPK3PXP');
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
-    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
     await screen.findByText('Recovery-Codes jetzt sichern');
   }
 

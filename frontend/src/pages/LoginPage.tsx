@@ -1,10 +1,11 @@
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
 import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError } from '../api/client';
+import OtpEingabe from '../components/OtpEingabe';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
 import { totpFinish } from '../api/totp';
@@ -37,6 +38,8 @@ export default function LoginPage() {
   // Welche Aktion gerade läuft — steuert den Spinner GEZIELT (nur der geklickte Button lädt),
   // während `disabled` über das Form weiterhin ALLE Wege sperrt (kein paralleler Doppel-Login).
   const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | null>(null);
+  /** Riegel gegen zwei gleichzeitige `totp/finish` — s. `totpAbsenden`. */
+  const sendetRef = useRef(false);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
   const [provider, setProvider] = useState<AuthProvider[]>([]);
   // Zweite Login-Stufe (LFH-43, TOTP): `login()` meldet „MFA erforderlich" statt eines
@@ -127,6 +130,17 @@ export default function LoginPage() {
   // Passkey-Pfad muss der Client den Benutzer nur noch per `aktualisiere()` (`/api/auth/me`) in
   // den Context nachladen.
   async function totpAbsenden(werte: TotpFormWerte) {
+    // Doppelabsende-Riegel (LFH-345 · C10, M20). Seit die sechste Ziffer selbst absendet,
+    // gibt es ZWEI Wege zu diesem Aufruf — der Auto-Weg und der Knopf darunter, der als
+    // Rückfallweg bleibt. Wer die letzte Ziffer tippt und sofort auf „Anmelden" drückt,
+    // löste sonst zwei `totp/finish` aus; der zweite scheitert, weil ein TOTP-Code genau
+    // einmal gültig ist, und meldete „Code ungültig" für einen Code, der gerade
+    // funktioniert hat (im Test gemessen: ['login','totpFinish','totpFinish']).
+    // Der Riegel steht HIER und nicht am Knopf: ein `loading`-Knopf ignoriert Klicks,
+    // aber die Eingabetaste erreicht ihn gar nicht erst — dieselbe Begründung wie beim
+    // `sendetRef` in `components/Erfassung.tsx`.
+    if (sendetRef.current) return;
+    sendetRef.current = true;
     setFehler(null);
     setLaedt('totp');
     try {
@@ -136,6 +150,9 @@ export default function LoginPage() {
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Code ungültig');
     } finally {
+      // Der Riegel fällt IM finally, nicht erst beim nächsten Render: nach einer Ablehnung
+      // muss der nächste Versuch sofort möglich sein.
+      sendetRef.current = false;
       setLaedt(null);
     }
   }
@@ -229,15 +246,10 @@ export default function LoginPage() {
                 name="code"
                 rules={[{ required: true, message: 'Bitte Code eingeben' }]}
               >
-                <Input
-                  className="login-otp"
-                  size="large"
-                  autoFocus
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                />
+                {/* Seit LFH-345 · C10 das geteilte Primitiv (M20) — dieselbe Eingabe stand
+                    auf der Profilseite als nacktes `<Input>` ohne eine dieser Angaben. Sechs
+                    Ziffern senden ab, der Knopf darunter bleibt der Rückfallweg. */}
+                <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
               </Form.Item>
             )}
             <Button

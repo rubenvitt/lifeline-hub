@@ -1,8 +1,9 @@
-import { Alert, App, Button, Form, Input, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { Alert, App, Button, Form, Typography } from 'antd';
+import { useEffect, useRef, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { QRCodeSVG } from 'qrcode.react';
 import Platzhalter from '../components/Platzhalter';
+import OtpEingabe from '../components/OtpEingabe';
 import { ApiError } from '../api/client';
 import { providerListe } from '../api/auth';
 import { enrollFinish, enrollStart } from '../api/totp';
@@ -38,6 +39,8 @@ export default function ProfilPage() {
   const [totpEnrollment, setTotpEnrollment] = useState<TotpEnrollment | null>(null);
   const [totpFehler, setTotpFehler] = useState<string | null>(null);
   const [totpLaedt, setTotpLaedt] = useState(false);
+  /** Riegel gegen zwei gleichzeitige `enrollFinish` — s. `totpBestaetigen`. */
+  const sendetRef = useRef(false);
   // Die Recovery-Codes werden vom Server NUR EINMALIG (bei `enrollFinish`) zurückgegeben —
   // lokaler State, UNABHÄNGIG vom `totp_aktiviert`-Status im Context: sobald `aktualisiere()`
   // danach den Status auf „aktiv" dreht, darf die Box mit den Codes nicht verschwinden (sie ist
@@ -95,6 +98,12 @@ export default function ProfilPage() {
   }
 
   async function totpBestaetigen(werte: TotpCodeWerte) {
+    // Doppelabsende-Riegel (LFH-345 · C10, M20) — dieselbe Begründung wie in `LoginPage`:
+    // seit die sechste Ziffer selbst absendet, führen zwei Wege hierher, und ein TOTP-Code
+    // ist serverseitig genau einmal gültig. Der zweite Aufruf verbrauchte kein Recht,
+    // sondern erzeugte eine Fehlermeldung für einen Code, der gerade funktioniert hat.
+    if (sendetRef.current) return;
+    sendetRef.current = true;
     setTotpFehler(null);
     setTotpLaedt(true);
     try {
@@ -106,6 +115,8 @@ export default function ProfilPage() {
     } catch (e) {
       setTotpFehler(e instanceof ApiError ? e.message : 'Code ungültig');
     } finally {
+      // Fällt im finally: nach einer Ablehnung muss der nächste Versuch sofort gehen.
+      sendetRef.current = false;
       setTotpLaedt(false);
     }
   }
@@ -247,7 +258,11 @@ export default function ProfilPage() {
                 name="code"
                 rules={[{ required: true, message: 'Bitte Code eingeben' }]}
               >
-                <Input size="large" autoFocus autoComplete="one-time-code" />
+                {/* Dasselbe Primitiv wie auf der Anmeldeseite (LFH-345 · C10, M20). Hier
+                    stand ein nacktes `<Input>` — ohne Ziffern-Tastatur, ohne Längengrenze,
+                    ohne Ziffern-Optik. Ausgerechnet an der Stelle, an der 2FA eingerichtet
+                    wird, war die schlechtere der beiden Bauformen. */}
+                <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
               </Form.Item>
               <Button type="primary" htmlType="submit" loading={totpLaedt}>
                 Bestätigen

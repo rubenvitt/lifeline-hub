@@ -476,8 +476,9 @@ describe('LoginPage', () => {
       const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
       expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument();
 
+      // KEIN Klick auf „Anmelden" mehr: seit LFH-345 · C10 (M20) sendet die sechste Ziffer
+      // selbst ab. Der Knopf bleibt als Rückfallweg und wird unten eigens geprüft.
       await userEvent.type(codeFeld, '123456');
-      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       // Reihenfolge OHNE die 'me'-Aufrufe: login (mfa_erforderlich) → totpFinish. `aktualisiere()`
       // nach `totpFinish` löst einen weiteren 'me'-Aufruf aus (analog Passkey-Pfad) — die
@@ -488,6 +489,74 @@ describe('LoginPage', () => {
       // Erfolgspfad bis zum Ende durchlaufen (kein Absturz in den catch-Zweig) — sonst bliebe
       // hier die Fehlermeldung stehen.
       expect(screen.queryByText('Code ungültig')).not.toBeInTheDocument();
+    });
+
+    // Der Rückfallweg (LFH-345 · C10, M20): ein unvollständiger Code geht weiterhin über
+    // den Knopf raus. Ohne diese Aussage wäre „der Knopf ist weg" nicht auszuschließen.
+    it('sendet einen unvollstaendigen Code weiterhin ueber den Anmelden-Knopf', async () => {
+      const gesendet: string[] = [];
+      server.use(
+        http.get('/api/dev/users', () => HttpResponse.json([])),
+        http.get('/api/auth/providers', () => HttpResponse.json([])),
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+        http.post('/api/auth/totp/finish', async ({ request }) => {
+          gesendet.push(((await request.json()) as { code: string }).code);
+          return HttpResponse.json(adminBody);
+        }),
+      );
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      await userEvent.type(codeFeld, '12345');
+      expect(gesendet).toEqual([]);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+      await waitFor(() => expect(gesendet).toEqual(['12345']));
+    });
+
+    // Ein TOTP-Code ist serverseitig genau einmal gueltig: der zweite Aufruf meldete
+    // „Code ungueltig" fuer einen Code, der gerade funktioniert hat.
+    it('schickt den Code auch dann nur EINMAL, wenn nach der sechsten Ziffer noch geklickt wird', async () => {
+      let aufrufe = 0;
+      server.use(
+        http.get('/api/dev/users', () => HttpResponse.json([])),
+        http.get('/api/auth/providers', () => HttpResponse.json([])),
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+        http.post('/api/auth/totp/finish', async () => {
+          aufrufe += 1;
+          // Verzoegert, damit der Klick den LAUFENDEN Absendevorgang trifft — ein sofort
+          // aufloesender Handler liesse den Riegel schon wieder gefallen sein.
+          await new Promise((r) => setTimeout(r, 50));
+          return HttpResponse.json(adminBody);
+        }),
+      );
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      await userEvent.type(codeFeld, '123456');
+      const knopf = screen.queryByRole('button', { name: 'Anmelden' });
+      if (knopf) await userEvent.click(knopf);
+
+      await waitFor(() => expect(aufrufe).toBeGreaterThan(0));
+      expect(aufrufe).toBe(1);
     });
 
     it('richtet die Code-Eingabe auf Ziffern aus (inputMode, one-time-code, maxLength)', async () => {
