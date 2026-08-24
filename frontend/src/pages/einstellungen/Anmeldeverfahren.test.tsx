@@ -99,6 +99,51 @@ describe('Anmeldeverfahren', () => {
     });
   });
 
+  /**
+   * Die Marke WANDERT — sie sammelt sich nicht an.
+   *
+   * Quelle ist `mutation.variables`, also die Zeile der ZULETZT gescheiterten Mutation. Eine
+   * Umsetzung, die den gescheiterten Key in einem eigenen State sammelte, stünde nach zwei
+   * Fehlschlägen mit zwei Marken da — und keine der beiden sagte mehr, was gerade
+   * schiefgegangen ist. Der Test davor (eine Zeile, ein Fehlschlag) kann das nicht von der
+   * richtigen Umsetzung unterscheiden.
+   */
+  it('traegt nach einem zweiten Fehlschlag die Marke an der ZWEITEN Zeile — und nur dort', async () => {
+    vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, 'Letzter Login-Weg'));
+
+    renderMitProviders(<Anmeldeverfahren />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]')).not.toBeNull(),
+    );
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passkey' }));
+
+    await waitFor(() => {
+      const markiert = document.querySelectorAll('[data-provider-zeile][data-fehler="true"]');
+      expect(markiert).toHaveLength(1);
+      expect(markiert[0].getAttribute('data-provider-zeile')).toBe('webauthn');
+    });
+  });
+
+  // Die Gegenrichtung: ein ERFOLG anderswo raeumt die Marke ab. `isError` faellt dabei, die
+  // Marke haengt also nicht an einem Zustand, den nur ein weiterer Fehler zuruecksetzen koennte.
+  it('raeumt die Marke, sobald irgendeine Zeile erfolgreich schaltet', async () => {
+    vi.mocked(providerSchalten).mockRejectedValueOnce(new ApiError(409, 'Letzter Login-Weg'));
+
+    renderMitProviders(<Anmeldeverfahren />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]')).not.toBeNull(),
+    );
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passkey' }));
+
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-provider-zeile][data-fehler="true"]')).toHaveLength(0),
+    );
+  });
+
   it('markiert ohne Ablehnung gar keine Zeile', async () => {
     renderMitProviders(<Anmeldeverfahren />);
     await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
