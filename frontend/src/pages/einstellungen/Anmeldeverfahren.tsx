@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react';
-import { Alert, App, Spin, Switch, theme, Tooltip, Typography } from 'antd';
+import { Alert, Spin, Switch, theme, Tooltip, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { providerListeAdmin, providerSchalten } from '../../api/auth';
-import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
+import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
 
@@ -58,7 +58,6 @@ export function zeilenzielStil(token: {
 export default function Anmeldeverfahren() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const { token } = theme.useToken();
   const istAdmin = benutzer?.system_rolle === 'admin';
 
@@ -76,8 +75,10 @@ export default function Anmeldeverfahren() {
       // Server-Wahrheit (inkl. abgelehntem Zustand) direkt übernehmen.
       qc.setQueryData(globalKeys.authProvider(), liste);
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Umschalten fehlgeschlagen'),
+    // KEIN `onError`-Toast mehr (LFH-345 · C10, H14): die Ablehnung hängt an
+    // `mutation.error` und steht als `<SpeicherFehler>` über der Liste, die betroffene
+    // Zeile trägt zusätzlich eine Marke. Der Schalter selbst springt ohnehin von selbst
+    // zurück — die Anzeige liest aus dem Query, es gibt kein optimistisches Update.
   });
 
   const provider = providerQuery.data ?? [];
@@ -86,6 +87,14 @@ export default function Anmeldeverfahren() {
     <AdminPage
       titel="Anmeldeverfahren"
       beschreibung="Verfügbare Login-Wege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren erscheinen hier. Änderungen werden sofort gespeichert."
+      hinweis={
+        <SeitenHinweise
+          fehler={schaltenMutation.error}
+          fehlerTitel="Nicht umgeschaltet"
+          rechteFehlt={!istAdmin}
+          rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen Anmeldeverfahren umschalten — die Liste steht hier zum Nachlesen."
+        />
+      }
     >
       {providerQuery.isLoading ? (
         <Spin />
@@ -109,8 +118,22 @@ export default function Anmeldeverfahren() {
               ? 'Nur Benutzer mit der Systemrolle „Admin" dürfen Anmeldeverfahren umschalten'
               : 'Garantierter Admin-Login-Weg — nicht deaktivierbar';
             const feldId = `anmeldeverfahren-${p.id}`;
+            // Nur die abgelehnte Zeile wird markiert (H14). `variables` trägt die Zeile,
+            // an der die Mutation zuletzt gescheitert ist.
+            const hatFehler =
+              schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
             return (
-              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                key={p.id}
+                data-provider-zeile={p.id}
+                data-fehler={hatFehler ? 'true' : undefined}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
+                }}
+              >
                 {/* Ein `<label htmlFor>` NUR an der bedienbaren Zeile — sonst ein `<span>`
                     ohne Zeigerform. Das `aria-label` am Switch bleibt und schlägt das Label
                     (gemessen), die Bestandsnamen ändern sich also nicht. Wer es später als

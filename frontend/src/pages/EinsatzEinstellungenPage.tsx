@@ -439,7 +439,9 @@ export default function EinsatzEinstellungenPage() {
             }),
         }}
         darfVerwalten={darfModuleVerwalten}
-        laeuft={overrideMutation.isPending}
+        // Nur die schreibende Zeile ist gesperrt (H15), nur die gescheiterte markiert (H14).
+        laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
+        fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}
         hinweisVon={(key) => orgRollenHinweis(orgModulDefaults[key])}
       />
     </EinsatzSeite>

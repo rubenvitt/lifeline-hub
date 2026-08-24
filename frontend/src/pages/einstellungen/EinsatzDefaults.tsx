@@ -201,7 +201,11 @@ export default function EinsatzDefaults() {
           })
         }
         darfVerwalten={istAdmin}
-        laeuft={modulMutation.isPending}
+        // Nur die schreibende Zeile ist gesperrt (H15) und nur die gescheiterte markiert
+        // (H14). `variables` traegt die Zeile, die react-query gerade bearbeitet — bzw. die
+        // zuletzt gescheiterte, solange `error` steht.
+        laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}
+        fehlerKey={modulMutation.isError ? modulMutation.variables.modulKey : null}
       />
     </AdminPage>
   );

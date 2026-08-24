@@ -71,14 +71,39 @@ describe('Anmeldeverfahren', () => {
     expect(await screen.findByRole('switch', { name: 'Anmeldeverfahren: Passwort' })).toBeDisabled();
   });
 
-  it('zeigt eine Fehlermeldung, wenn der Server ablehnt (409)', async () => {
+  // Die Ablehnung steht seit LFH-345/C10 an der SEITE, nicht in der Toast-Queue (H14):
+  // sie verfiel sonst nach ~3 s, waehrend der Schalter zurueckgesprungen war und niemand
+  // mehr sagen konnte, warum. Geprueft wird die Abwesenheit des Message-Containers — genau
+  // die dreht ein zurueckgebautes `message.error` wieder um.
+  it('haelt die Ablehnung an der Seite fest, statt sie als Toast verfallen zu lassen', async () => {
     const meldung = 'Der letzte admin-taugliche Login-Weg kann nicht deaktiviert werden';
     vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, meldung));
 
     renderMitProviders(<Anmeldeverfahren />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
 
-    expect(await screen.findByText(meldung)).toBeInTheDocument();
+    const treffer = await screen.findByText(meldung);
+    expect(treffer.closest('.ant-message')).toBeNull();
+  });
+
+  it('markiert die abgelehnte Zeile — und nur die', async () => {
+    vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, 'Letzter Login-Weg'));
+
+    renderMitProviders(<Anmeldeverfahren />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+
+    await waitFor(() => {
+      const markiert = document.querySelectorAll('[data-provider-zeile][data-fehler="true"]');
+      expect(markiert).toHaveLength(1);
+      expect(markiert[0].getAttribute('data-provider-zeile')).toBe('oidc');
+    });
+  });
+
+  it('markiert ohne Ablehnung gar keine Zeile', async () => {
+    renderMitProviders(<Anmeldeverfahren />);
+    await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
+
+    expect(document.querySelectorAll('[data-provider-zeile][data-fehler="true"]')).toHaveLength(0);
   });
 
   it('ist read-only für Nicht-Admins (fuehrungskraft)', async () => {
