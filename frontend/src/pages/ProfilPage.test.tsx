@@ -268,9 +268,21 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     await waitFor(() => expect(gesendet).toEqual(['12345']));
   });
 
-  // Ein TOTP-Code ist serverseitig genau einmal gueltig: der zweite Aufruf meldete
-  // „Code ungueltig" fuer einen Code, der gerade funktioniert hat.
-  it('schickt den Code auch dann nur EINMAL, wenn nach der sechsten Ziffer noch geklickt wird', async () => {
+  /**
+   * Nach dem Auto-Absenden gibt es hier keinen zweiten Weg mehr — und das ist gemessen,
+   * nicht angenommen.
+   *
+   * Der erste Anlauf dieses Tests klickte nach der sechsten Ziffer zusätzlich auf
+   * „Bestätigen" und erwartete dank `sendetRef` genau einen Aufruf. Der Klick schlug fehl:
+   * mit dem Erfolg fällt `totpEnrollment` auf `null`, der ganze Enrollment-Zweig
+   * verschwindet, und mit ihm der Knopf. Auf dieser Seite ist der Doppelaufruf also
+   * strukturell ausgeschlossen statt nur verriegelt.
+   *
+   * Der Riegel bleibt trotzdem richtig — er deckt den Klick WÄHREND des laufenden Requests,
+   * den `userEvent` nicht nachstellen kann (es wartet die Zusage ab). Belegt ist er auf der
+   * Anmeldeseite, wo der Knopf nach `totpFinish` stehen bleibt.
+   */
+  it('schickt den Code nach dem Auto-Absenden genau einmal — und laesst keinen zweiten Weg stehen', async () => {
     setup(false);
     let aufrufe = 0;
     server.use(
@@ -294,11 +306,13 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 
     const feld = screen.getByLabelText('Code aus deiner Authenticator-App');
     await userEvent.type(feld, '123456');
-    const knopf = screen.queryByRole('button', { name: 'Bestätigen' });
-    if (knopf) await userEvent.click(knopf);
 
     await screen.findByText('Recovery-Codes jetzt sichern');
     expect(aufrufe).toBe(1);
+    // Die zweite Haelfte, und der Grund fuer die Umformulierung: der Knopf ist WEG. Ohne
+    // diese Aussage koennte der Test auch dann gruen sein, wenn ein zweiter Absendeweg
+    // offenstuende und nur zufaellig nicht benutzt wurde.
+    expect(screen.queryByRole('button', { name: 'Bestätigen' })).toBeNull();
   });
 
   it('zeigt eine Fehlermeldung, wenn der Bestätigungscode ungültig ist', async () => {

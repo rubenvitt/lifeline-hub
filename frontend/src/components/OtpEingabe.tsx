@@ -32,13 +32,19 @@ interface OtpEingabeProps {
  * verschieden gebaut, und die schlechtere Hälfte stand dort, wo man 2FA EINRICHTET.
  *
  * ── Warum ein Merker statt eines Effekts ────────────────────────────────────────
- * `onChange` feuert erneut, sobald der Wert wieder sechsstellig ist — eine Korrektur der
- * letzten Ziffer erzeugt also einen zweiten vollen Code. Ohne Riegel liefe daraus ein
- * zweites `enrollFinish`/`totp/finish`, und ein TOTP-Code ist serverseitig genau einmal
- * gültig: der zweite Aufruf scheitert und meldet „Code ungültig" für einen Code, der
- * gerade funktioniert hat. Der Merker hält den zuletzt GEMELDETEN Code, nicht ein Flag auf
- * „ist sechsstellig" — eine Flanke wäre nach dem Rerender längst vorbei (dieselbe
- * Beobachtung wie beim Fokus-Nachlauf in LFH-369).
+ * `onChange` feuert erneut, sobald der Wert wieder sechsstellig ist — eine zweite Meldung
+ * mit demselben vollen Code (Einfügen auf die Auswahl, Rerender-Echo) löste sonst ein
+ * zweites `enrollFinish`/`totp/finish` aus, und ein TOTP-Code ist serverseitig genau einmal
+ * gültig: der zweite Aufruf scheitert und meldet „Code ungültig" für einen Code, der gerade
+ * funktioniert hat. Der Merker hält den zuletzt GEMELDETEN Code, nicht ein Flag auf „ist
+ * sechsstellig" — eine Flanke wäre nach dem Rerender längst vorbei (dieselbe Beobachtung wie
+ * beim Fokus-Nachlauf in LFH-369).
+ *
+ * **Der Merker überlebt ein `resetFields()` des Aufrufers**, weil er nicht am Wert hängt:
+ * wird das Feld von außen geleert und danach derselbe Code EINGEFÜGT (also ohne Zwischenwert
+ * kürzerer Länge), bleibt das Auto-Absenden aus. Das ist kein Deadlock — der Bestätigen-Knopf
+ * steht daneben und ist genau dafür der Rückfallweg —, aber es ist die Grenze des Riegels und
+ * gehört hier hin statt in eine Überraschung.
  *
  * ── Warum keine Größen-Angabe ───────────────────────────────────────────────────
  * Beide Aufrufer trugen `size="large"`. Am Primitiv wäre das eine neue Größen-Prop an einem

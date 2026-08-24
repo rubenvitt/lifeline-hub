@@ -202,6 +202,32 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 
+  /**
+   * Zwei Vorgänge, zwei Orte — der Seitenkopf trägt den Formular-Fehler, die Liste ihren
+   * eigenen.
+   *
+   * Vorher waren beide mit `??` im Kopf verkettet. Erreichbarer Zustand: das Formular
+   * scheitert, danach scheitert eine Modulzeile — dann trug die Zeile ihren roten Rand,
+   * während der Text im Kopf einen ANDEREN Vorgang beschrieb und bis zum nächsten
+   * Formular-Absenden stehenblieb. Der zweite Kanal zeigte damit auf die falsche Sache.
+   */
+  it('haelt Formular- und Modulfehler auseinander', async () => {
+    vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
+    vi.mocked(setzeOrgModulEinstellung).mockRejectedValue(new ApiError(409, 'Modul gesperrt'));
+    renderMitProviders(<EinsatzDefaults />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Startwert zu groß');
+
+    const etb = screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' });
+    fireEvent.mouseDown(etb);
+    fireEvent.click(await screen.findByText('Admin'));
+
+    // BEIDE stehen — und zwar nebeneinander, nicht einer statt des anderen.
+    expect(await screen.findByText('Modul gesperrt')).toBeInTheDocument();
+    expect(screen.getByText('Startwert zu groß')).toBeInTheDocument();
+  });
+
   it('schweigt ueber Berechtigungen, wenn welche da sind', async () => {
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
     renderMitProviders(<EinsatzDefaults />);

@@ -164,6 +164,12 @@ describe('EinsatzModule', () => {
     rendern();
     fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: ETB' }));
 
-    expect(await screen.findByText('Modul gesperrt')).toBeInTheDocument();
+    // Die Abwesenheit des Message-Containers IST die Aussage — ohne sie waere der Test eine
+    // Attrappe: `renderMitProviders` huellt in `<AntApp>` (`test/utils.tsx`), ein
+    // `message.error` rendert also INNERHALB des RTL-Containers und `findByText` faende es
+    // genauso. Mit zurueckgedrehtem `onError`-Toast bliebe der Test dann gruen und koennte
+    // den Befund, fuer den er existiert, nicht widerlegen.
+    const treffer = await screen.findByText('Modul gesperrt');
+    expect(treffer.closest('.ant-message')).toBeNull();
   });
 });

@@ -552,8 +552,10 @@ describe('LoginPage', () => {
 
       const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
       await userEvent.type(codeFeld, '123456');
-      const knopf = screen.queryByRole('button', { name: 'Anmelden' });
-      if (knopf) await userEvent.click(knopf);
+      // `getByRole` statt eines bedingten Klicks: verschwaende der Knopf je, degenerierte der
+      // Test stillschweigend zu „ein Aufruf" und belegte den Riegel nicht mehr. Dass der Klick
+      // real durchgeht, zeigt die gemessene Ausgangslage ['login','totpFinish','totpFinish'].
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       await waitFor(() => expect(aufrufe).toBeGreaterThan(0));
       expect(aufrufe).toBe(1);

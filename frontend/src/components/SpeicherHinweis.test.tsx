@@ -62,10 +62,9 @@ describe('SeitenHinweise', () => {
     expect(screen.getByText('Startwert zu groß')).toBeInTheDocument();
   });
 
-  // Der eigentliche Grund für diese Komponente: der Slot der Seiten-Hülle rendert seinen
-  // Abstand, sobald der Inhalt truthy ist — ein Fragment mit zwei `null`-Kindern IST truthy
-  // und hinterliesse einen sichtbaren Leerraum.
-  it('liefert im Leerfall selbst null, statt eine leere Huelle zu rendern', () => {
+  // Die Hülle der Seite rendert ihr `<div>` ohnehin (ein JSX-Element ist immer truthy) —
+  // geprüft ist hier, dass INNEN nichts steht, also auch kein leerer Alert-Rahmen.
+  it('rendert im Leerfall gar nichts', () => {
     const { container } = render(<SeitenHinweise fehler={null} rechteText="egal" />);
     expect(container).toBeEmptyDOMElement();
   });

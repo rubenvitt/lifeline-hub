@@ -75,10 +75,15 @@ interface SeitenHinweiseProps {
 /**
  * Beide Hinweise für EINEN Slot (`AdminPage`/`EinsatzSeite` haben genau einen `hinweis`).
  *
- * Der Grund für die Bündelung ist nicht Bequemlichkeit, sondern der **Leerfall**: die
- * Slot-Hülle rendert ihren eigenen Abstand, sobald ihr Inhalt truthy ist. Ein Fragment mit
- * zwei `null`-Kindern ist truthy — die Seite bekäme dann einen sichtbaren Leerraum, wo
- * nichts steht. Diese Komponente liefert in dem Fall selbst `null`.
+ * Die Bündelung hält den **Abstand zwischen** den beiden Alerts an einer Stelle, statt ihn
+ * an jeder der fünf Aufrufstellen zu wiederholen; ohne sie stünden zwei Alerts bündig
+ * aufeinander.
+ *
+ * Das `null` im Leerfall spart den Slot dagegen **nicht** ein — das wäre eine Behauptung, die
+ * nicht hält, und stand hier zunächst so: `<SeitenHinweise/>` ist als JSX-Element immer
+ * truthy, die Hüllen in `AdminPage`/`EinsatzSeite` rendern ihr `<div>` also ohnehin. Sichtbar
+ * bleibt trotzdem nichts (ein leeres `<div>` kollabiert, die Ränder fallen zusammen). Wer
+ * hier einmal einen festen Abstand hineinschreibt, muss die Hülle mit anfassen.
  */
 export function SeitenHinweise({
   fehler,

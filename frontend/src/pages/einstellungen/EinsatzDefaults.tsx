@@ -10,7 +10,7 @@ import {
 } from '../../api/orgEinstellungen';
 import AdminPage from '../../components/AdminPage';
 import SektionHeader from '../../components/SektionHeader';
-import { SeitenHinweise } from '../../components/SpeicherHinweis';
+import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
 import {
@@ -104,8 +104,13 @@ export default function EinsatzDefaults() {
         </Button>
       }
       hinweis={
+        // NUR der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
+        // Ablehnung deshalb bei sich (unten) — die beiden mit `??` zu verketten erzeugte
+        // einen erreichbaren Zustand, in dem der Text hier den einen Vorgang beschreibt,
+        // während der rote Zeilenrand unten den anderen markiert. Zwei Fehler, ein Kopf:
+        // dann sagt keiner mehr, was gerade schiefgegangen ist.
         <SeitenHinweise
-          fehler={speichernMutation.error ?? modulMutation.error}
+          fehler={speichernMutation.error}
           rechteFehlt={!istAdmin}
           rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Defaults ändern — die Werte stehen hier zum Nachlesen."
         />
@@ -189,6 +194,13 @@ export default function EinsatzDefaults() {
           titel="Modul-Rollen-Default"
           beschreibung="Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden. Änderungen werden sofort gespeichert."
         />
+      </div>
+      {/* Die Ablehnung der Liste steht BEI der Liste, nicht im Seitenkopf: der Kopf trägt den
+          Formular-Fehler, und zwei Vorgänge in einem Kasten sagen nicht mehr, welcher gemeint
+          ist. Zusammen mit der Zeilenmarke (`fehlerKey`) ergibt das beide Kanäle am selben
+          Ort — Text und Rand zeigen auf dieselbe Zeile. */}
+      <div style={{ marginBottom: token.marginSM }}>
+        <SpeicherFehler fehler={modulMutation.error} />
       </div>
 
       <ModulEinstellungsListe
