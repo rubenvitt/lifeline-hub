@@ -1,4 +1,4 @@
-import { App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions, Form, Input, InputNumber, Space, Tag, theme } from 'antd';
+import { App, AutoComplete, Breadcrumb, Button, Collapse, DatePicker, Descriptions, Form, Input, InputNumber, Space, Typography, theme } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -8,7 +8,7 @@ import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../anzeige/koordinaten';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { aktualisiereEinsatz, ladeEinsatz, ladeMitglieder, type KopfdatenUpdate } from '../api/einsaetze';
@@ -21,6 +21,8 @@ import type { Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
+import { EINSATZ_STATUS } from '../einsatz/einsatzStatus';
+import StatusTag from '../components/StatusTag';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -58,6 +60,47 @@ interface FormWerte {
   sachverhalt?: string;
   anzahl_betroffene_initial?: number;
   begonnen_at: Dayjs;
+}
+
+/**
+ * Mindestbreite einer Kopfangabe. KEIN neuer Wert — dasselbe Mass wie
+ * `flaeche.kachelMinKlein` (220). Es steht hier lokal statt als sechster Schlüssel in
+ * `flaeche`: das trägt die gemessenen §2.2-Baselines und ist als geschlossene Menge
+ * gepinnt, und eine Kopfleiste ist kein Nebenraster. Präzedenz für die lokale Konstante
+ * mit genau dieser Begründung: `KACHEL_MIN_HOEHE` in `EinsaetzePage`.
+ *
+ * Die Wirkung ist die Staffelung ohne Umbruchregel: `auto-fit` legt bei ~900 px
+ * Lesebreite vier Spalten nebeneinander (Fükw), auf dem Handschirm (~390 px minus
+ * Seitenrinne) genau eine.
+ */
+const KOPF_MIN_BREITE = 220;
+
+/**
+ * Eine Angabe der Kopfleiste: gedämpftes Etikett, darunter der Wert mit Gewicht.
+ *
+ * Die Gewichtung IST der Befund (M14): zwölf gleich schwere `Descriptions`-Zeilen
+ * beantworten die Frage „was ist hier los?" genauso langsam wie eine Volltextsuche.
+ * Vier Angaben sind herausgestellt, weil sie im Fükw zuerst gebraucht werden —
+ * Stichwort, Alarmzeit, Einsatzort, Einsatzleitung.
+ *
+ * Ein leerer Wert lässt den Platz stehen und zeigt „—", statt die Angabe wegzulassen:
+ * eine Kopfleiste mit wechselnder Spaltenzahl wäre bei jedem Einsatz anders zu lesen.
+ * (Die Karten auf `EinsaetzePage` lassen ihre Ortszeile weg — das ist eine Karte in
+ * einem Raster, keine feste Vierergruppe, und die Regel überträgt sich nicht.)
+ *
+ * Nichts hier ist bedienbar, also gilt die Zwei-Angaben-Regel für handgebaute
+ * Bedienziele (LFH-365) NICHT — es gibt kein Ziel.
+ */
+function KopfAngabe({ etikett, wert }: { etikett: string; wert: ReactNode }) {
+  const { token } = theme.useToken();
+  return (
+    <div>
+      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, display: 'block' }}>
+        {etikett}
+      </Typography.Text>
+      <div style={{ fontSize: token.fontSizeLG, fontWeight: token.fontWeightStrong }}>{wert}</div>
+    </div>
+  );
 }
 
 export default function EinsatzdatenPage() {
@@ -163,9 +206,12 @@ export default function EinsatzdatenPage() {
       titel={
         <Space>
           {einsatz.bezeichnung}
-          {/* Der Einsatz-Status hat (noch) keinen Eintrag im Statusfarb-Vertrag —
-              die Map dazu lebt in `EinsaetzePage` und zieht in Task 8/10 um. */}
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          {/* Vorher stand hier der ROHE Wire-Wert in einem `Tag color="green"` — also
+              „aktiv"/„abgeschlossen" klein geschrieben und mit einer Farbe, die an
+              keiner Rolle hing. Beides kommt jetzt aus `einsatz/einsatzStatus.ts`
+              (Beschriftung als zweiter Kanal) über `StatusTag` (Rollenfarbe auf Rand
+              und Text, nie als Fläche). */}
+          <StatusTag darstellung={EINSATZ_STATUS[einsatz.status]} />
         </Space>
       }
       breadcrumb={
@@ -188,7 +234,12 @@ export default function EinsatzdatenPage() {
             name="bezeichnung"
             rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
           >
-            <Input />
+            {/* Der Knopf, der hierher geführt hat, verschwindet im selben Rendern — ohne
+                `autoFocus` fiele der Fokus auf `<body>` und die Tastaturbedienung finge
+                wieder ganz oben an. Das Formular wird beim Wechsel frisch eingehängt,
+                also genügt Reacts Mount-Fokus; das `requestAnimationFrame` aus dem
+                Erfassungs-Primitiv braucht es nur, wo ein Dialog stehen BLEIBT. */}
+            <Input autoFocus />
           </Form.Item>
           <Form.Item label="Einsatzstichwort" name="stichwort">
             <AutoComplete options={stichwortOptionen} allowClear placeholder="z. B. H1, MANV …" />
@@ -231,36 +282,78 @@ export default function EinsatzdatenPage() {
           </Space>
         </Form>
       ) : (
-        <Descriptions bordered column={1} size="middle">
-          <Descriptions.Item label="Einsatzstichwort">{einsatz.stichwort ?? '—'}</Descriptions.Item>
-          <Descriptions.Item label="Einsatzart">
-            {EINSATZART_LABELS[einsatz.einsatzart]}
-          </Descriptions.Item>
-          <Descriptions.Item label="Einsatznummer (intern)">
-            {einsatz.einsatznummer_intern ?? '—'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Leitstellen-Nr.">
-            {einsatz.leitstellen_nr ?? '—'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Einsatzleitung">{leitung || '—'}</Descriptions.Item>
-          <Descriptions.Item label="Alarmzeit"><ZeitAnzeige wert={einsatz.begonnen_at} format="dtgVoll" /></Descriptions.Item>
-          <Descriptions.Item label="Angelegt am (techn.)"><ZeitAnzeige wert={einsatz.angelegt_at} format="dtgVoll" /></Descriptions.Item>
-          <Descriptions.Item label="Einsatzort">{einsatz.einsatzort ?? '—'}</Descriptions.Item>
-          <Descriptions.Item label="Koordinate">
-            {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
-              ? <KoordinatenAnzeige lat={einsatz.einsatzort_lat} lon={einsatz.einsatzort_lon} einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
-              : '—'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Meldende Stelle">
-            {einsatz.meldende_stelle ?? '—'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Sachverhalt / Meldebild">
-            {einsatz.sachverhalt ?? '—'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Anzahl Betroffene (initial)">
-            {einsatz.anzahl_betroffene_initial ?? '—'}
-          </Descriptions.Item>
-        </Descriptions>
+        <>
+          {/* KOPFLEISTE — die vier Angaben, die im Fükw zuerst gebraucht werden.
+              Sie stehen NICHT zusätzlich in der Tabelle darunter: doppelter Text hiesse
+              zweimal dieselbe Frage beantworten, und im Test lieferte `findByText` dann
+              zwei Treffer statt einem. */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(auto-fit, minmax(${KOPF_MIN_BREITE}px, 1fr))`,
+              gap: token.margin,
+              marginBottom: token.marginLG,
+            }}
+          >
+            <KopfAngabe etikett="Einsatzstichwort" wert={einsatz.stichwort ?? '—'} />
+            <KopfAngabe
+              etikett="Alarmzeit"
+              wert={<ZeitAnzeige wert={einsatz.begonnen_at} format="dtgVoll" />}
+            />
+            <KopfAngabe etikett="Einsatzort" wert={einsatz.einsatzort ?? '—'} />
+            <KopfAngabe etikett="Einsatzleitung" wert={leitung || '—'} />
+          </div>
+
+          <Descriptions bordered column={1} size="middle">
+            <Descriptions.Item label="Einsatzart">
+              {EINSATZART_LABELS[einsatz.einsatzart]}
+            </Descriptions.Item>
+            <Descriptions.Item label="Koordinate">
+              {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
+                ? <KoordinatenAnzeige lat={einsatz.einsatzort_lat} lon={einsatz.einsatzort_lon} einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
+                : '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Meldende Stelle">
+              {einsatz.meldende_stelle ?? '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Sachverhalt / Meldebild">
+              {einsatz.sachverhalt ?? '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Anzahl Betroffene (initial)">
+              {einsatz.anzahl_betroffene_initial ?? '—'}
+            </Descriptions.Item>
+          </Descriptions>
+
+          {/* TECHNISCHE ANGABEN — Aktenzeichen und der Anlege-Zeitstempel. Sie werden
+              gebraucht, wenn jemand nachweist oder rückfragt, nicht wenn jemand führt;
+              eingeklappt kosten sie keine Zeile im Blickfeld.
+              KEIN `forceRender`: hier wird keine Feldzahl gezählt (die Falle aus der
+              Erfassungs-Norm), und der eingeklappte Zustand IST die Aussage — mit
+              `forceRender` stünde der Inhalt im Baum und die Gegenprobe „vorher nicht
+              sichtbar" wäre nicht mehr formulierbar. */}
+          <Collapse
+            style={{ marginTop: token.margin }}
+            items={[
+              {
+                key: 'technik',
+                label: 'Technische Angaben',
+                children: (
+                  <Descriptions bordered column={1} size="middle">
+                    <Descriptions.Item label="Einsatznummer (intern)">
+                      {einsatz.einsatznummer_intern ?? '—'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Leitstellen-Nr.">
+                      {einsatz.leitstellen_nr ?? '—'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Angelegt am (techn.)">
+                      <ZeitAnzeige wert={einsatz.angelegt_at} format="dtgVoll" />
+                    </Descriptions.Item>
+                  </Descriptions>
+                ),
+              },
+            ]}
+          />
+        </>
       )}
 
       <MitgliederAbschnitt einsatzId={einsatzId} darfVerwalten={darfVerwaltenMitglieder} />

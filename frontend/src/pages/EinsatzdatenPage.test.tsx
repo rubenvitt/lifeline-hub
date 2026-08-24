@@ -124,11 +124,14 @@ describe('EinsatzdatenPage', () => {
 
   it('zeigt Kopfdaten im Lesemodus, leere Felder als —', async () => {
     setup();
-    expect(await screen.findByText('2026-001')).toBeInTheDocument();
-    expect(screen.getByText('Realeinsatz')).toBeInTheDocument();
-    // 'Admin' erscheint als Einsatzleitung in den Kopfdaten und zusätzlich in der Zugriff-Tabelle.
+    expect(await screen.findByText('Realeinsatz')).toBeInTheDocument();
+    // 'Admin' erscheint als Einsatzleitung in der Kopfleiste und zusätzlich in der Zugriff-Tabelle.
     expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    // Die Einsatznummer ist seit der Gliederung (M14) eine TECHNISCHE Angabe und steht im
+    // eingeklappten Abschnitt. Ohne `forceRender` ist sie gar nicht im Baum — die
+    // Gegenaussage steht deshalb hier, das Aufklappen im Gliederungs-Block weiter unten.
+    expect(screen.queryByText('2026-001')).toBeNull();
   });
 
   it('zeigt Koordinaten über formatKoordinate (WGS84-Default: toFixed(5))', async () => {
@@ -162,13 +165,13 @@ describe('EinsatzdatenPage', () => {
 
   it('versteckt den Bearbeiten-Button für Beobachter', async () => {
     setup({ einsatz: { meine_rolle: 'beobachter' }, benutzer: { ...admin, system_rolle: 'keiner' } });
-    await screen.findByText('2026-001');
+    await screen.findByText('Realeinsatz');
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
   it('versteckt den Bearbeiten-Button bei abgeschlossenem Einsatz', async () => {
     setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
-    await screen.findByText('2026-001');
+    await screen.findByText('Realeinsatz');
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
@@ -279,5 +282,44 @@ describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
     await waitFor(() =>
       expect(screen.queryByText('Bezeichnung bereits vergeben')).not.toBeInTheDocument(),
     );
+  });
+});
+
+/**
+ * Gliederung der Leseansicht (LFH-345 · C10, Befund M14).
+ *
+ * Die drei Aussagen sind die drei Hälften des Befunds: der Status stand als ROHER
+ * Wire-Wert im Titel-Tag, die zwölf Zeilen standen als Datenwand ohne Gewichtung
+ * nebeneinander, und der Wechsel in den Bearbeiten-Modus ließ den Fokus auf dem
+ * gerade verschwundenen Knopf zurück.
+ */
+describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
+  it('zeigt den Status als Wort, nicht als Wire-Wert', async () => {
+    setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
+    const tag = await screen.findByText('Abgeschlossen');
+    expect(screen.queryByText('abgeschlossen')).toBeNull();
+
+    // Die zweite, unterscheidende Hälfte: ein lokales `status[0].toUpperCase()` erfüllte
+    // das Paar oben vollständig. Erst `data-rolle` belegt, dass der Wert durch
+    // `EINSATZ_STATUS` und `StatusTag` gelaufen ist — und damit über die Rollenachse des
+    // Statusfarb-Vertrags statt über eine erfundene Farbe.
+    expect(tag.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'neutral');
+  });
+
+  it('hält die technischen Angaben eingeklappt, die Kopfangaben aber sichtbar', async () => {
+    // `basisEinsatz` trägt für beide Felder `null` — ohne diese Werte prüfte der Test
+    // gegen zwei Gedankenstriche und wäre über den Umbau hinweg blind.
+    setup({ einsatz: { einsatzort: 'Musterstraße 1', leitstellen_nr: 'LS-4711' } });
+    expect(await screen.findByText('Musterstraße 1')).toBeInTheDocument();
+    expect(screen.queryByText('LS-4711')).toBeNull();
+
+    await userEvent.click(screen.getByText('Technische Angaben'));
+    expect(await screen.findByText('LS-4711')).toBeInTheDocument();
+  });
+
+  it('setzt den Fokus beim Bearbeiten aufs erste Feld', async () => {
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(screen.getByLabelText('Bezeichnung')).toHaveFocus();
   });
 });
