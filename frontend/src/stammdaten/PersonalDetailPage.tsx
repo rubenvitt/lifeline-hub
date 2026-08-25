@@ -1,5 +1,4 @@
 import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, Row, theme } from 'antd';
-import { useEffect } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
@@ -76,12 +75,6 @@ export default function PersonalDetailPage() {
 
   const person = id == null ? undefined : personalQuery.data?.find((p) => p.id === id);
 
-  // Vorbelegung per Effekt — `initialValues` wird einmal beim Mount gelesen, die Zeile steht
-  // erst nach dem ersten Abruf da (Begründung im Kopf von `FahrzeugDetailPage`).
-  useEffect(() => {
-    if (!person) return;
-    form.setFieldsValue(zuFormWerten(person));
-  }, [person, form]);
 
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => aktualisierePerson(id!, zuEingabe(werte)),
@@ -149,7 +142,20 @@ export default function PersonalDetailPage() {
           />
         }
       >
+        {/*
+          SEEDING NUR BEIM MOUNT — und `key={id}` fuer den Fall, dass dieselbe Seite auf
+          einen ANDEREN Datensatz umgehaengt wird (Link von Detail zu Detail): antds
+          `initialValues` wird genau einmal gelesen, ohne den Schluessel truege das
+          Formular die Werte des vorigen Satzes.
+
+          Ein Effekt, der bei jeder Query-Aenderung `setFieldsValue` ruft, stand hier
+          zunaechst und ist WEG: die Query wird auch von FREMDEN Aenderungen invalidiert,
+          und wer gerade schrieb, saehe seinen Text ohne Vorwarnung ersetzt (LFH-342 · C7,
+          derselbe Befund). Noetig war er ohnehin nicht — die Rueckgaben oben stellen
+          sicher, dass das Formular erst mit vorhandenem Datensatz montiert.
+        */}
         <Form<FormWerte>
+          key={id}
           form={form}
           layout="vertical"
           disabled={!istAdmin}

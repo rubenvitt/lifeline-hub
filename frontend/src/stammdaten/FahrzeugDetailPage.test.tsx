@@ -1,9 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
+import { globalKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import FahrzeugDetailPage from './FahrzeugDetailPage';
 import FahrzeugeTab from './FahrzeugeTab';
@@ -152,6 +153,50 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     handler(admin);
     renderRoute('/admin/stammdaten/fahrzeuge/7');
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeEnabled();
+  });
+
+  /**
+   * Ein laufender Entwurf überlebt eine FREMDE Änderung (LFH-342 · C7). Die Listen-Query
+   * wird auch von Änderungen invalidiert, die jemand anders ausgelöst hat; ein Effekt, der
+   * bei jeder Query-Änderung `setFieldsValue` ruft, ersetzte den gerade getippten Text ohne
+   * Vorwarnung. Deshalb seedet die Seite NUR beim Mount.
+   *
+   * Der Abrufzähler ist hier nicht Beiwerk: ohne ihn wäre die Behauptung trivial grün,
+   * solange der Refetch noch gar nicht gelandet ist.
+   */
+  it('ersetzt einen getippten Entwurf NICHT, wenn die Liste neu geladen wird', async () => {
+    let abrufe = 0;
+    handler();
+    server.use(
+      http.get('/api/fahrzeuge', () => {
+        abrufe += 1;
+        // Ab dem zweiten Abruf steht dort ein FREMDER Wert.
+        return HttpResponse.json([
+          abrufe === 1 ? fahrzeug : { ...fahrzeug, funkrufname: 'Florian 9', bemerkung: 'Fremd' },
+        ]);
+      }),
+    );
+    const nutzer = userEvent.setup();
+    const { client } = renderRoute('/admin/stammdaten/fahrzeuge/7');
+
+    await nutzer.clear(await screen.findByLabelText('Bemerkung'));
+    await nutzer.type(screen.getByLabelText('Bemerkung'), 'Mein Entwurf');
+
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: globalKeys.fahrzeugeListe('alle') });
+    });
+    /*
+     * Gewartet wird auf die ÜBERSCHRIFT, nicht auf den Abrufzähler: der zählt im
+     * MSW-Handler hoch, also bevor React die neuen Daten überhaupt gerendert hat — eine
+     * Behauptung an dieser Stelle liefe dem Effekt davon, den sie widerlegen soll.
+     * Die Überschrift liest direkt aus der Query; steht dort der fremde Funkrufname, ist
+     * der neue Stand im Baum und ein Seeding-Effekt hätte längst gefeuert. (Per
+     * Mutationsprobe belegt: mit wieder eingebautem Effekt färbt genau diese Zeile rot.)
+     */
+    expect(await screen.findByRole('heading', { name: 'Florian 9' })).toBeInTheDocument();
+    expect(abrufe).toBe(2);
+
+    expect(screen.getByLabelText('Bemerkung')).toHaveValue('Mein Entwurf');
   });
 
   it('leitet eine kaputte Route-ID auf die Liste um, statt einen leeren Datensatz zu zeigen', async () => {

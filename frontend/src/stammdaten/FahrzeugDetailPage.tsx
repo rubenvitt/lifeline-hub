@@ -1,5 +1,4 @@
 import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, InputNumber, Row, Switch, theme } from 'antd';
-import { useEffect } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
@@ -81,16 +80,6 @@ export default function FahrzeugDetailPage() {
 
   const fahrzeug = id == null ? undefined : fahrzeugeQuery.data?.find((f) => f.id === id);
 
-  /**
-   * Vorbelegung per Effekt statt `initialValues`: die Zeile steht erst nach dem ersten
-   * erfolgreichen Abruf zur Verfügung, `initialValues` wird aber genau einmal beim Mount
-   * gelesen (derselbe Befund wie in LFH-345 · C10). Ein Formular, das damit leer bliebe,
-   * schickte beim nächsten Speichern lauter Leerwerte.
-   */
-  useEffect(() => {
-    if (!fahrzeug) return;
-    form.setFieldsValue(zuFormWerten(fahrzeug));
-  }, [fahrzeug, form]);
 
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => aktualisiereFahrzeug(id!, zuEingabe(werte)),
@@ -168,7 +157,20 @@ export default function FahrzeugDetailPage() {
         {/* `disabled` am Formular sperrt über antds DisabledContext auch den Speichern-Knopf
             — er steht gesperrt DA, statt zu verschwinden (M16, LFH-345 · C10). Ein fehlender
             Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden. */}
+        {/*
+          SEEDING NUR BEIM MOUNT — und `key={id}` fuer den Fall, dass dieselbe Seite auf
+          einen ANDEREN Datensatz umgehaengt wird (Link von Detail zu Detail): antds
+          `initialValues` wird genau einmal gelesen, ohne den Schluessel truege das
+          Formular die Werte des vorigen Satzes.
+
+          Ein Effekt, der bei jeder Query-Aenderung `setFieldsValue` ruft, stand hier
+          zunaechst und ist WEG: die Query wird auch von FREMDEN Aenderungen invalidiert,
+          und wer gerade schrieb, saehe seinen Text ohne Vorwarnung ersetzt (LFH-342 · C7,
+          derselbe Befund). Noetig war er ohnehin nicht — die Rueckgaben oben stellen
+          sicher, dass das Formular erst mit vorhandenem Datensatz montiert.
+        */}
         <Form<FormWerte>
+          key={id}
           form={form}
           layout="vertical"
           disabled={!istAdmin}
