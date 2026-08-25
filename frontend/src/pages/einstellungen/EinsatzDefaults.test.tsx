@@ -236,3 +236,86 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     expect(screen.queryByText(/Nur Benutzer mit der Systemrolle/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Speicherleiste im Fuß und Verlassen-Guard (LFH-346 · A9, Befund M49).
+ *
+ * Der Speichern-Knopf lag im Kopf-Slot von `AdminPage` — also als DOM-Geschwister
+ * AUSSERHALB des `<form>`, wo er nichts übermitteln kann (Erfassungs-Norm B4/LFH-332).
+ * Und eine Seite mit sechs ausgefüllten Feldern liess sich verlassen, ohne dass irgendetwas
+ * darauf hinwies.
+ */
+describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () => {
+  beforeEach(() => {
+    alsAdmin();
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
+    vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({} as never);
+    vi.mocked(setzeOrgModulEinstellung).mockResolvedValue(undefined as never);
+  });
+
+  it('traegt den Speichern-Knopf IM Formular, nicht im Kopf-Slot', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+
+    const knopf = await screen.findByRole('button', { name: 'Speichern' });
+    // Nur im `<form>` traegt er `htmlType="submit"`, und nur dann sendet Enter. Geprueft
+    // wird die STRUKTUR, aus der die Zusicherung folgt — ein Tastendruck ist bei einer
+    // Maske mit `Select`/`InputNumber` kein belastbarer Beleg (LFH-378).
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(knopf).toHaveAttribute('type', 'submit');
+  });
+
+  /**
+   * Das Verhalten, nicht ein `addEventListener`-Spy: der haenge sonst daran, dass sonst
+   * niemand im Baum je dasselbe Ereignis registriert — eine Zusicherung ueber fremden Code,
+   * die beim naechsten Hook still bricht.
+   */
+  function beforeUnloadGefeuert(): boolean {
+    const e = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(e);
+    return e.defaultPrevented;
+  }
+
+  it('warnt beim Verlassen nur mit ungespeicherter Fassung', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+    const feld = await screen.findByLabelText('Präfix ETB');
+
+    // Gegenaussage zuerst: ohne offene Fassung schweigt der Guard.
+    expect(beforeUnloadGefeuert()).toBe(false);
+
+    fireEvent.change(feld, { target: { value: 'EB2-' } });
+    await waitFor(() => expect(beforeUnloadGefeuert()).toBe(true));
+  });
+
+  /**
+   * Die dritte Aussage ist die, die den eigenen `useState` von `form.isFieldsTouched()`
+   * unterscheidet: antd setzt sein Flag beim Speichern NICHT zurueck (gemessen in
+   * LFH-342/C7). Ohne diese Zeile waere ein Merker, der einmal auf `true` faellt und dort
+   * bleibt, ebenfalls gruen — und die Seite warnte nach dem Speichern weiter vor einer
+   * Fassung, die es nicht mehr gibt.
+   */
+  it('schweigt wieder, sobald gespeichert ist', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+    const feld = await screen.findByLabelText('Präfix ETB');
+
+    fireEvent.change(feld, { target: { value: 'EB2-' } });
+    await waitFor(() => expect(beforeUnloadGefeuert()).toBe(true));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(speichereOrgEinstellungen).toHaveBeenCalled());
+    await waitFor(() => expect(beforeUnloadGefeuert()).toBe(false));
+  });
+
+  it('gruppiert die Modul-Rollen-Defaults und filtert sie (M48, Durchgriff der Liste)', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+
+    // Ueber Rollen abgefragt, nicht ueber `getByText('Einstellungen')`: „Einstellungen" ist
+    // zugleich Kategorie-Label UND Modul-Label (`einsatz-einstellungen`).
+    expect(await screen.findByRole('heading', { name: 'Kommunikation' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Modul filtern'), { target: { value: 'chat' } });
+
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Chat' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Benötigte Rolle: ETB' })).toBeNull();
+  });
+});

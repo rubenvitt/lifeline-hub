@@ -51,7 +51,11 @@ export default function AdminPage({
           </Typography.Title>
           {beschreibung && <Typography.Text type="secondary">{beschreibung}</Typography.Text>}
         </div>
-        {aktionen && <div>{aktionen}</div>}
+        {/* `data-lfh` markiert den Kopf-Slot, damit „genau eine Primäraktion im Kopf" AM KOPF
+          prüfbar ist statt global (LFH-340 · C5, dieselbe Bauform wie
+          `data-lfh="seitenkopf-aktionen"` an `EinsatzSeite`). Global gezählt wäre die Aussage
+          falsch: eine Sektion mit Formular im Inhalt hat dort zu Recht einen Absende-Knopf. */}
+      {aktionen && <div data-lfh="adminpage-aktionen">{aktionen}</div>}
       </Flex>
       {hinweis && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
       {children}

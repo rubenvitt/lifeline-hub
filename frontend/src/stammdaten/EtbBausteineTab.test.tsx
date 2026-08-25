@@ -31,9 +31,17 @@ const zweiBausteine = [
   },
 ];
 
-/** Die Leitspalte aller Datenzeilen — der Kopf ist ein eigenes `<table>`, siehe KatalogTabelle. */
+/**
+ * Die Leitspalte aller Datenzeilen — der Kopf ist ein eigenes `<table>`, siehe KatalogTabelle.
+ *
+ * Gegriffen wird die MARKE, nicht `td:first-child`: seit LFH-346 · A4 teilen Label und Inhalt
+ * eine Zelle, deren `textContent` sonst „Lage unverändertLage unverändert." lautete. Die
+ * Marke sitzt am Label-Knoten und hält die Aussage scharf, statt sie zu lockern.
+ */
 const labels = (c: HTMLElement) =>
-  [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
+  [...c.querySelectorAll('tr.ant-table-row [data-lfh="baustein-label"]')].map(
+    (z) => z.textContent,
+  );
 
 /**
  * Der Eintrag IM Filtermenü. Das Typ-Label steht zweimal im Dokument — in der Zelle als `Tag`
@@ -73,10 +81,17 @@ describe('EtbBausteineTab', () => {
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
+   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
+   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
+   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
+   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   */
+  it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
     await screen.findByText('Lage unverändert');
-    expect(screen.queryByRole('button', { name: 'Baustein anlegen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Baustein anlegen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
@@ -91,13 +106,21 @@ describe('EtbBausteineTab', () => {
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(labels(container)).toEqual(['Abschnitt gebildet', 'Lage unverändert']);
 
-    // „Einsatzabschnitt" steht NUR im Inhalt, nicht im Label — die Suche greift also
-    // nachweislich über beide Textspalten, wie es der Platzhalter verspricht.
-    const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
-    await userEvent.type(feld, 'Einsatzabschnitt');
+    // Gesucht wird über das LABEL — „gebildet" steht nur dort, nicht im zweiten Label.
+    const feld = screen.getByPlaceholderText('Label oder Inhalt');
+    await userEvent.type(feld, 'gebildet');
     expect(labels(container)).toEqual(['Abschnitt gebildet']);
     await userEvent.clear(feld);
     expect(labels(container)).toHaveLength(2);
+
+    // Die andere Hälfte derselben Zusicherung: seit LFH-346 · C11 trägt die Leitspalte einen
+    // `suchText`-Haken, der Label UND Inhalt in den Korpus hebt — die Zwei-Zeilen-Zelle
+    // (A4) hatte den Inhalt ins `render` geschoben und damit aus der Suche genommen.
+    // „Einsatzabschnitt" steht ausschließlich im Inhalt der zweiten Zeile; „Abschnitt" allein
+    // träfe deren Label mit und bewiese nichts.
+    await userEvent.type(feld, 'Einsatzabschnitt');
+    expect(labels(container)).toEqual(['Abschnitt gebildet']);
+    await userEvent.clear(feld);
 
     // Gefiltert wird die ZEILENMENGE, nicht die Anwesenheit des Trichters: antd zeichnet ihn
     // schon bei gesetztem `filters`, gefiltert wird aber erst mit `onFilter`.
@@ -135,5 +158,51 @@ describe('EtbBausteineTab', () => {
 
     expect(await screen.findByText('Keine Bausteine')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Zwei-Zeilen-Zelle und Freitext-Begrenzung (LFH-346 · A4, Befund N13).
+ *
+ * Label und Inhalt gehören zusammen gelesen („was fügt dieser Baustein ein?"), nicht
+ * verglichen — als zwei Spalten zwangen sie den Blick zum Springen, und der ungekürzte
+ * Inhalt trieb die Zeilenhöhe. Warum die Kappung an der ZELLE sitzt und nicht an der
+ * Spalte, steht ausführlich und im Browser gemessen in
+ * `karten/OnlineQuellenVerwaltung.test.tsx`.
+ */
+describe('EtbBausteineTab — Zwei-Zeilen-Zelle (LFH-346 · A4)', () => {
+  const langerInhalt = `${'Einsatzabschnitt gebildet, Führung übernommen, Kräfte angefordert. '.repeat(4)}Ende`;
+
+  it('trägt Label und Inhalt in EINER Zelle, gekürzt und mit Tooltip', async () => {
+    const { container } = render(admin, [{ ...bausteine[0], inhalt: langerInhalt }]);
+    await screen.findByText('Lage unverändert');
+
+    // Eine Spalte statt zweier: die Kopfzeile kennt „Inhalt" nicht mehr.
+    expect(screen.getByRole('columnheader', { name: /Baustein/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Inhalt' })).not.toBeInTheDocument();
+
+    // Beide Werte im SELBEN `<td>` — sonst wäre die Zelle nur umbenannt, nicht vereint.
+    const labelKnoten = container.querySelector('[data-lfh="baustein-label"]')!;
+    const zelle = labelKnoten.closest('td')!;
+    expect(zelle).toContainElement(screen.getByText(langerInhalt));
+
+    const tabelle = container.querySelector('.ant-table-tbody')!.closest('table')!;
+    expect(tabelle.style.tableLayout).toBe('auto');
+    expect(zelle).toHaveStyle({ maxWidth: '320px' });
+
+    // Die Kürzung selbst rechnet der Browser; jsdom meldet keine Unterstützung. Belegbar ist,
+    // DASS sie konfiguriert ist — antd setzt die Klasse unabhängig vom Messweg
+    // (Muster `pages/lagekarte/Inspector.test.tsx`).
+    expect(screen.getByText(langerInhalt)).toHaveClass('ant-typography-ellipsis');
+  });
+
+  it('nennt im Suchplatzhalter nur, was die Suche wirklich liest', async () => {
+    render(admin);
+    await screen.findByText('Lage unverändert');
+    // Der Testname bleibt richtig, das Verdikt kehrt sich um: der `suchText`-Haken der
+    // Leitspalte (LFH-346 · C11) liest wieder beides, der Platzhalter darf es also wieder
+    // versprechen. Dass er es hält, misst der Ordnungs-Test oben mit „Einsatzabschnitt".
+    expect(screen.getByPlaceholderText('Label oder Inhalt')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Label')).toBeNull();
   });
 });

@@ -52,13 +52,23 @@ describe('QualifikationenTab', () => {
   it('Admin sieht „Qualifikation anlegen"', async () => {
     render(admin);
     await screen.findByText('Sanitäter');
-    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeEnabled();
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
+   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
+   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
+   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
+   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
+   * eine als Versehen der anderen.
+   */
+  it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
     await screen.findByText('Sanitäter');
-    expect(screen.queryByRole('button', { name: 'Qualifikation anlegen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });
 
   it('Ordnung: die Leitspalte sortiert, die Suche verengt, ein Filter fehlt mit Grund', async () => {
@@ -149,5 +159,65 @@ describe('QualifikationenTab', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Qualifikation bearbeiten')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Label')).toHaveValue('Sanitäter');
+  });
+
+  /**
+   * LFH-346 · A6. DIE Zusicherung des Umbaus auf `ErfassungsModal`, und die
+   * einzige, die hier strukturell prüfbar ist: die Maske trägt ein `Select` nicht,
+   * aber die Regel gilt gleich — Enter kommt aus der eingebauten
+   * Formularübermittlung des Browsers, und die greift nur, wenn der Knopf IM
+   * `<form>` liegt. Beide Hälften zusammen sind die Aussage: keine antd-Fusszeile
+   * (dort stünde der Knopf als DOM-Geschwister ausserhalb, Befund H69) UND der
+   * Knopf hat tatsächlich ein `form` als Vorfahr. Mutationsprobe: dreht man auf
+   * `<Modal onOk okText="Speichern">` zurück, fallen beide Abfragen.
+   */
+  it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
+    render(admin);
+    await screen.findByText('Sanitäter');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+    const dialog = await screen.findByRole('dialog');
+
+    expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Speichern' }).closest('form')).not.toBeNull();
+  });
+
+  /**
+   * Die zweite Zusicherung der Hülle: der Fokus steht beim Öffnen im ersten Feld.
+   * Vorher fokussierte dieser Dialog nichts — wer bearbeiten wollte, musste erst
+   * ins Feld klicken.
+   */
+  it('setzt den Fokus beim Öffnen ins erste Feld', async () => {
+    render(admin);
+    await screen.findByText('Sanitäter');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Label')).toHaveFocus());
+  });
+
+  /**
+   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den
+   * Erfolgszweig aus, während der Server ablehnt: Felder leer, Dialog zu, nichts
+   * gespeichert. Geprüft wird das Ergebnis, nicht die Schreibweise: nach einem 422
+   * steht der Dialog noch offen und der Wortlaut noch im Feld.
+   */
+  it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
+    server.use(
+      http.patch('/api/qualifikationen/1', () =>
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 })),
+    );
+    render(admin);
+    await screen.findByText('Sanitäter');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Label');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Gruppenführer');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await screen.findByText('Label bereits vergeben');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByLabelText('Label')).toHaveValue('Gruppenführer');
   });
 });

@@ -35,10 +35,26 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  * und `Datensicht` nutzt dieses Primitiv intern und brächte sein eigenes Feld daneben.
  *
  * Die Suche liest die Rohdaten über {@link zellenWert}, also nur Spalten mit auflösbarem
- * Datenbezug. **Render-only-Spalten tragen NICHT bei** — der Zellinhalt entsteht erst beim
- * Rendern. Das ist eine Grenze, keine Lücke, und in `KatalogTabelle.test.tsx` steht sie
- * als negative Zusicherung. Wer Volltext über gerenderte Zellen braucht, nimmt
- * `Datensicht` mit seinem `suchText`-Haken je Spalte.
+ * Datenbezug. **Render-only-Spalten tragen ohne Zutun NICHT bei** — der Zellinhalt entsteht
+ * erst beim Rendern. Das bleibt die Vorgabe und steht in `KatalogTabelle.test.tsx` als
+ * negative Zusicherung.
+ *
+ * **Die Grenze ist seit LFH-346 · C11 eine ANNAHME mit Ausweg, keine Wand:** eine Spalte darf
+ * einen {@link KatalogSpalte.suchText}-Haken tragen — dieselbe Signatur und denselben Namen
+ * wie `DatensichtSpalte.suchText`, damit es EIN Begriff bleibt und nicht zwei. Anlass war die
+ * ETB-Baustein-Tabelle, deren Inhaltstext mit der Zwei-Zeilen-Zelle in ein `render` wanderte
+ * und damit aus dem Korpus fiel; wer einen Baustein an einer Wendung des Vorlagentextes
+ * sucht, ist der häufigere Fall.
+ *
+ * **Vorrang: `suchText` gewinnt.** Trägt eine Spalte beides, wird NUR der Haken bewertet, nie
+ * zusätzlich der `dataIndex` — sonst hinge der Korpus einer Spalte an der Frage, ob ihr
+ * Datenbezug zufällig noch dasteht, und ein Haken könnte nur erweitern, nie ersetzen. Ein
+ * Haken, der weniger liefert als der Rohwert, ist damit eine bewusste Verengung. Gepinnt von
+ * `KatalogTabelle.test.tsx` mit einer Spalte, deren Haken den `dataIndex`-Wert VERDECKT.
+ *
+ * `Datensicht` bleibt der Weg für die grössere Kür (Spaltenschalter, Kartenzweig, Gruppen);
+ * es reicht seine eigenen Spalten OHNE `suchText` hier herein und ist von diesem Haken
+ * unberührt.
  *
  * **Blätterung — ab {@link BLAETTER_SCHWELLE} Zeilen, sonst nicht.** Antds Default wäre
  * zehn Zeilen und blätterte damit fast jede Aufrufstelle. Die Schwelle rechnet gegen
@@ -83,10 +99,33 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  *   Das ist gemessenes antd-Verhalten, kein zugesicherter Vertrag — es steht deshalb als
  *   Pin in `KatalogTabelle.test.tsx` und bricht sichtbar bei einem antd-Bump.
  */
-export type KatalogTabelleProps<T> = Omit<TableProps<T>, 'scroll' | 'sticky'> & {
+export type KatalogSpalte<T> = NonNullable<TableProps<T>['columns']>[number] & {
+  /**
+   * Beitrag dieser Spalte zur Freitextsuche. Gleiche Signatur und gleicher Name wie
+   * `DatensichtSpalte.suchText` (`components/Datensicht.tsx`) — EIN Begriff, zwei Träger.
+   *
+   * Fehlt er, bleibt es beim alten Verhalten (Rohwert über den `dataIndex`-Pfad). Ist er da,
+   * gewinnt er: der `dataIndex` derselben Spalte wird dann NICHT zusätzlich bewertet.
+   *
+   * Das Feld gehört diesem Primitiv, nicht antd. Es fällt trotzdem mit an `<Table>` durch,
+   * und das ist gemessen statt vermutet: `@rc-component/table` reicht an eine Zelle nur die
+   * Rückgabe von `onCell`/`onHeaderCell` durch (`es/Cell/index.js`, `additionalProps`), nie
+   * die Spaltenfelder selbst — ein unbekanntes Feld landet also in keinem DOM-Attribut.
+   */
+  suchText?: (zeile: T) => string | null | undefined;
+};
+
+export type KatalogTabelleProps<T> = Omit<TableProps<T>, 'scroll' | 'sticky' | 'columns'> & {
+  /**
+   * Wie antds `columns`, je Spalte um {@link KatalogSpalte.suchText} erweitert. Der Zusatz ist
+   * OPTIONAL — eine als `TableColumnsType<T>` annotierte Spaltenliste bleibt zuweisbar, und
+   * genau deshalb ändert sich an den übrigen Aufrufstellen nichts.
+   */
+  columns?: KatalogSpalte<T>[];
   /**
    * Schaltet Werkzeugzeile und Freitextsuche ein. Ohne dieses Prop existiert beides nicht.
-   * Die Suche greift Spalten mit auflösbarem `dataIndex` — siehe Dateikopf.
+   * Die Suche greift Spalten mit auflösbarem `dataIndex` sowie Spalten mit `suchText` —
+   * siehe Dateikopf.
    */
   suche?: { platzhalter: string };
 };
@@ -242,10 +281,14 @@ export default function KatalogTabelle<T extends object>({
   const sichtbareZeilen = useMemo(() => {
     const begriff = suchbegriff.trim().toLowerCase();
     if (begriff === '' || !dataSource) return dataSource;
-    const bezogene = (columns ?? []).filter((s) => !('children' in s) && 'dataIndex' in s);
+    // `suchText` gewinnt über `dataIndex` — Begründung im Dateikopf. Eine Spalte ohne beides
+    // (render-only, Gruppe) fällt hier heraus und trägt wie bisher nicht bei.
+    const suchbar = (columns ?? []).filter(
+      (s) => s.suchText != null || (!('children' in s) && 'dataIndex' in s),
+    );
     return dataSource.filter((zeile) =>
-      bezogene.some((spalte) => {
-        const wert = zellenWert(spalte, zeile);
+      suchbar.some((spalte) => {
+        const wert = spalte.suchText ? spalte.suchText(zeile) : zellenWert(spalte, zeile);
         return wert != null && String(wert).toLowerCase().includes(begriff);
       }),
     );

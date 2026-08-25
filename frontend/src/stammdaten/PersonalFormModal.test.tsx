@@ -94,12 +94,25 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
     await waitFor(() => expect(geschlossen).toHaveBeenCalledTimes(1));
   });
 
-  it('ist KEIN Serienmodus — „Speichern und nächste" gibt es hier nicht', async () => {
-    // Die Maske dient auch dem Bearbeiten; eine Serie ergäbe dort keinen Sinn.
+  /**
+   * Das Paar zu `serie={person == null}` (LFH-346/A6). Beide Hälften zusammen sind die
+   * Aussage: erst „im Anlegen-Fall DA" und „im Bearbeiten-Fall WEG" machen die
+   * Modus-Bedingung prüfbar — eine der beiden allein bliebe auch bei einem festen
+   * `serie`-Wert grün.
+   */
+  it('Anlegen: der Serienweg steht — hier wird Personal am Stück erfasst', async () => {
     handler();
     renderMitProviders(<Harness />);
     await screen.findByLabelText('Name');
-    expect(screen.queryByRole('button', { name: 'Speichern und nächste' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Speichern und nächste/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+  });
+
+  it('Bearbeiten: KEIN Serienweg — „Speichern und nächste" wäre ein toter Knopf', async () => {
+    handler();
+    renderMitProviders(<Harness bestand={person} />);
+    await screen.findByLabelText('Name');
+    expect(screen.queryByRole('button', { name: /Speichern und nächste/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
 
@@ -118,11 +131,14 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
   });
 
   it('Bearbeiten: die Vorbelegung steht — sie ist kein Reset und bleibt erhalten', async () => {
+    // Das Telefon stand hier bis LFH-346 · A7 als dritte Zusicherung. Es ist auf die
+    // Detailseite gewandert; die Trägerorganisation nimmt seinen Platz ein — sie ist
+    // ebenfalls vorbelegt und bleibt sichtbar.
     handler();
     renderMitProviders(<Harness bestand={person} />);
     expect(await screen.findByLabelText('Name')).toHaveValue('Thomas Müller');
     expect(screen.getByLabelText('Personalnummer')).toHaveValue('P-42');
-    expect(screen.getByLabelText('Telefon')).toHaveValue('0170 1234567');
+    expect(screen.getByLabelText('Trägerorganisation')).toHaveValue('DRK Musterstadt');
   });
 
   it('nach erfolgreichem Bearbeiten startet das nächste Anlegen leer', async () => {
@@ -138,5 +154,61 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
     expect(screen.getByLabelText('Name')).toHaveValue('');
     expect(screen.getByLabelText('Personalnummer')).toHaveValue('');
+  });
+});
+
+describe('PersonalFormModal — Schnellerfassung (LFH-346/A7)', () => {
+  /**
+   * Feldbudget (LFH-19: ≤ ~4). Über die Label gezählt, nicht über Rollen: die
+   * Trägerorganisation ist eine AutoComplete und die Qualifikationen ein Mehrfach-`Select`
+   * — beide tragen `combobox`, eine Rollenzählung ergäbe eine andere Zahl als die Aussage.
+   * Die Abwesenheits-Hälfte trägt: „vier sind da" bliebe auch mit acht Feldern grün.
+   */
+  it('zeigt genau die vier Felder, ohne die eine Person nicht auffindbar ist', async () => {
+    handler();
+    renderMitProviders(<Harness />);
+    await screen.findByLabelText('Name');
+
+    for (const label of ['Name', 'Personalnummer', 'Trägerorganisation', 'Qualifikationen']) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    for (const label of ['Telefon', 'Stärke-Position', 'Benutzer-Konto (optional)', 'Bemerkung']) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+  });
+
+  /**
+   * Wie bei `FahrzeugFormModal`: der PATCH ist ein echter Teil-Patch (LFH-306). Ein
+   * mitgeschicktes `telefon: null` für ein Feld, das diese Maske gar nicht mehr zeigt,
+   * löschte die Nummer — ohne Fehler und ohne roten Test. Geprüft werden die KEYS.
+   */
+  it('schickt beim Bearbeiten NUR seine vier Felder — der Teil-Patch lässt den Rest stehen', async () => {
+    const gesendet = vi.fn();
+    handler(gesendet);
+    renderMitProviders(<Harness bestand={person} />);
+    const nutzer = userEvent.setup();
+
+    await nutzer.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
+    expect(Object.keys(gesendet.mock.calls[0][0] as object).sort()).toEqual([
+      'name', 'personalnummer', 'qualifikation_ids', 'traegerorganisation',
+    ]);
+  });
+
+  it('führt beim Bearbeiten auf die Detailseite', async () => {
+    handler();
+    renderMitProviders(<Harness bestand={person} />);
+    expect(await screen.findByRole('link', { name: /Mehr Details/ })).toHaveAttribute(
+      'href',
+      '/admin/stammdaten/personal/5',
+    );
+  });
+
+  it('zeigt beim Anlegen KEINEN Detail-Link — es gibt noch keine id', async () => {
+    handler();
+    renderMitProviders(<Harness />);
+    await screen.findByLabelText('Name');
+    expect(screen.queryByRole('link', { name: /Mehr Details/ })).not.toBeInTheDocument();
   });
 });

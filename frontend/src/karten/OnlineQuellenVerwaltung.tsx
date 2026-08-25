@@ -77,13 +77,38 @@ export default function OnlineQuellenVerwaltung() {
       title: 'URL',
       dataIndex: 'url',
       key: 'url',
-      render: (u: string) => (
-        <span style={{ fontSize: 12, wordBreak: 'break-all' }} title={u}>
-          {u}
-        </span>
-      ),
+      /**
+       * Eine Kachel-URL ist 60–200 Zeichen lang und trägt ihre Aussage vorn (Schema, Host).
+       * Der frühere `word-break: break-all` machte daraus eine mehrzeilig hohe Zelle und
+       * damit die Zeilenhöhe der ganzen Tabelle (Befund N13); `showTitle` hält den vollen
+       * Wert erreichbar — die Kürzung ist eine Anzeige-, keine Datenentscheidung. Kein
+       * eigenes `render` mehr: nur so steht der Rohwert direkt im `<td>`, und Klasse,
+       * Kappung und Titel sitzen an EINEM Knoten statt an zweien.
+       *
+       * DIE KAPPUNG SITZT AN DER ZELLE, NICHT AN DER SPALTE — im Browser gemessen
+       * (25.08.2026), weil die naheliegende `width`-Angabe hier nichts tut: `KatalogTabelle`
+       * fährt `scroll={{ x: 'max-content' }}` mit fixierter erster Spalte, und genau dafür
+       * wählt rc-table `table-layout: auto` (`lib/Table.js:427-434`). Unter `auto` ist eine
+       * Spaltenbreite nur ein Wunsch — dieselbe Zelle maß trotz `<col width="280">` 1177 px
+       * in einer 1578 px breiten Tabelle und kürzte nichts, weil antds
+       * `.ant-table-cell-ellipsis` allein `overflow`/`white-space`/`text-overflow` setzt und
+       * keins davon den Platzbedarf senkt. `maxWidth` allein bindet dagegen (gemessen: lange
+       * Zelle auf 280 px gekappt und gekürzt, kurze Zelle unbehelligt) — und ist zugleich die
+       * Form, die `components/feldbreiten.guard.test.ts` ausdrücklich will. Eine zusätzliche
+       * `width` wäre also nicht bloß wirkungslos, sondern ein Guard-Verstoß.
+       */
+      ellipsis: { showTitle: true },
+      onCell: () => ({ style: { maxWidth: 280 } }),
     },
-    { title: 'Attribution', dataIndex: 'attribution', key: 'attribution', render: (a: string | null) => a ?? '—' },
+    {
+      title: 'Attribution',
+      dataIndex: 'attribution',
+      key: 'attribution',
+      // Freitext wie die URL, nur kürzer im Regelfall — gleiche Bauform, gleiche Begründung.
+      ellipsis: { showTitle: true },
+      onCell: () => ({ style: { maxWidth: 200 } }),
+      render: (a: string | null) => a ?? '—',
+    },
     {
       title: 'Sortierung',
       dataIndex: 'sortier',

@@ -5,7 +5,7 @@ import type { TableColumnsType, TableProps } from 'antd';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
-import KatalogTabelle, { BLAETTER_SCHWELLE } from './KatalogTabelle';
+import KatalogTabelle, { BLAETTER_SCHWELLE, type KatalogSpalte } from './KatalogTabelle';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -353,8 +353,11 @@ describe('KatalogTabelle · Suche', () => {
     /**
      * Muster `stammdaten/FahrzeugeTab.tsx:40`: `{ title: 'Stärke', key: 'staerke', render }`
      * ohne `dataIndex`. Der Zellinhalt ist erst nach dem Rendern bekannt, die Suche läuft
-     * über die Rohdaten — der Begriff „Sonderrecht" ist hier also unerreichbar. Diese
-     * negative Zusicherung pinnt die Grenze, statt sie später zu entdecken.
+     * über die Rohdaten — der Begriff „Sonderrecht" ist hier also unerreichbar.
+     *
+     * Die Zusicherung gilt seit LFH-346 · C11 für Spalten OHNE `suchText`, also für die
+     * Vorgabe und damit für elf der zwölf Aufrufstellen. Der Gegenlauf steht direkt
+     * darunter; erst das Paar sagt, dass der Haken der Unterschied ist.
      */
     const mitRenderOnly: TableColumnsType<Zeile> = [
       { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
@@ -376,6 +379,79 @@ describe('KatalogTabelle · Suche', () => {
     expect(screen.queryByText('Florian 1/44/1')).toBeNull();
     expect(screen.queryByText('Rotkreuz 2/83/1')).toBeNull();
     expect(screen.queryAllByText('Sonderrecht')).toHaveLength(0);
+  });
+
+  it('MIT suchText trägt dieselbe render-only-Spalte sehr wohl bei', async () => {
+    /**
+     * Die zweite Hälfte des Paares darüber, und die einzige, die den Haken belegt: gleiche
+     * Spaltenliste, gleicher Begriff — nur der `suchText` kommt dazu. Ohne diesen Gegenlauf
+     * wäre die negative Zusicherung von einer kaputten Suche nicht zu unterscheiden.
+     *
+     * Anlass ist `stammdaten/EtbBausteineTab.tsx`: dort war der Inhaltstext mit der
+     * Zwei-Zeilen-Zelle aus dem Korpus gefallen (LFH-346).
+     */
+    const mitHaken: KatalogSpalte<Zeile>[] = [
+      { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
+      {
+        title: 'Merkmal',
+        key: 'merkmal',
+        render: (_wert: unknown, z: Zeile) => (z.id === 1 ? 'Sonderrecht' : 'ohne'),
+        suchText: (z) => (z.id === 1 ? 'Sonderrecht' : 'ohne'),
+      },
+    ];
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={mitHaken}
+        dataSource={ZWEI}
+        pagination={false}
+        suche={{ platzhalter: 'suchen' }}
+      />,
+    );
+    await userEvent.type(
+      container.querySelector<HTMLInputElement>('input[type="search"]')!,
+      'Sonderrecht',
+    );
+    expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(1);
+    expect(screen.queryByText('Florian 1/44/1')).not.toBeNull();
+    expect(screen.queryByText('Rotkreuz 2/83/1')).toBeNull();
+  });
+
+  it('suchText GEWINNT über den dataIndex derselben Spalte, es summiert sich nicht', async () => {
+    /**
+     * Die Vorrangregel ist nur an einer Spalte prüfbar, deren Haken den Rohwert VERDECKT
+     * statt ihn zu erweitern: hier liefert `suchText` allein „Sonderrecht", der `dataIndex`
+     * derselben Spalte trüge „Florian 1/44/1" bei. Ein Haken, der bloss zum `dataIndex`
+     * hinzuträte, liesse „Florian" weiter treffen — genau das ist die Mutation, die dieser
+     * Test rot färbt. Der ETB-Fall kann das nicht belegen: sein Haken ist eine Obermenge
+     * seines `dataIndex`, dort sehen Vorrang und Vereinigung gleich aus.
+     */
+    const verdeckend: KatalogSpalte<Zeile>[] = [
+      {
+        title: 'Funkrufname',
+        dataIndex: 'funkrufname',
+        key: 'funkrufname',
+        suchText: () => 'Sonderrecht',
+      },
+    ];
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={verdeckend}
+        dataSource={ZWEI}
+        pagination={false}
+        suche={{ platzhalter: 'suchen' }}
+      />,
+    );
+    const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
+    await userEvent.type(feld, 'Florian');
+    expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(0);
+
+    // Gegenprobe: der Haken selbst trifft — sonst bewiese die Null oben nur, dass die
+    // Suche gar nichts findet.
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Sonderrecht');
+    expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(2);
   });
 
   it('gesucht wird nur in ANGEZEIGTEN Spalten, nicht über alle Datenfelder', async () => {

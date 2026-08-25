@@ -1,8 +1,10 @@
-import { App, Button, Input, Popconfirm, Space, Typography, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Typography, type TableColumnsType } from 'antd';
+import AdminPage from '../components/AdminPage';
+import SchnellAnlegen from '../components/SchnellAnlegen';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import {
@@ -12,13 +14,13 @@ import {
 } from '../api/stichwortVorschlaege';
 import type { StichwortVorschlag } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
+import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 export default function StichworteTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [neuerText, setNeuerText] = useState('');
 
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
@@ -27,10 +29,12 @@ export default function StichworteTab() {
 
   const anlegenMutation = useMutation({
     mutationFn: (text: string) => legeStichwortVorschlagAn(text),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() });
-      setNeuerText('');
-    },
+    // KEIN `setNeuerText('')` mehr: das Leeren gehoert seit der Umstellung auf
+    // `SchnellAnlegen` dem Primitiv, und zwar BEDINGT — es leert nur, wenn im Feld
+    // noch der abgeschickte Text steht. Das unbedingte Leeren hier frass die
+    // naechste Eingabe, wenn jemand weitertippte, waehrend der vorherige Eintrag
+    // noch unterwegs war.
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Hinzufügen fehlgeschlagen'),
   });
 
@@ -39,11 +43,6 @@ export default function StichworteTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
   });
-
-  function hinzufuegen() {
-    const text = neuerText.trim();
-    if (text) anlegenMutation.mutate(text);
-  }
 
   const vorschlaege = vorschlaegeQuery.data ?? [];
 
@@ -90,7 +89,10 @@ export default function StichworteTab() {
                 okButtonProps={{ danger: true }}
                 onConfirm={() => loeschenMutation.mutate(v.id)}
               >
-                <Button danger loading={loeschenMutation.isPending}>
+                {/* Der Lauf gehört GENAU der gelöschten Zeile (LFH-346 · A1): am blanken
+                    `isPending` drehte der Spinner in JEDER Zeile und behauptete Fortschritt
+                    an fremden Datensätzen. `variables` ist hier die nackte id. */}
+                <Button danger loading={loeschenMutation.isPending && loeschenMutation.variables === v.id}>
                   Löschen
                 </Button>
               </Popconfirm>
@@ -101,7 +103,14 @@ export default function StichworteTab() {
   ];
 
   return (
-    <>
+    <AdminPage
+      titel="Einsatz-Stichworte"
+      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+    >
+    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+        SchnellAnlegen-Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
+        zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
+        einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
       <Typography.Paragraph type="secondary">
         Vorschläge für die Stichwort-Combobox im Einsatzdaten-Modul. Freie Eingabe bleibt im
         Einsatz unabhängig davon möglich.
@@ -132,19 +141,27 @@ export default function StichworteTab() {
         />
       )}
 
-      {istAdmin && (
-        <Space.Compact style={{ marginTop: 12, width: '100%' }}>
-          <Input
-            value={neuerText}
-            onChange={(e) => setNeuerText(e.target.value)}
-            onPressEnter={hinzufuegen}
-            placeholder="Neues Stichwort, z. B. H1Y"
-          />
-          <Button type="primary" loading={anlegenMutation.isPending} onClick={hinzufuegen}>
-            Hinzufügen
-          </Button>
-        </Space.Compact>
-      )}
-    </>
+      {/* Auf dem Primitiv seit LFH-346 (Nacharbeit zu Befund M45). Diese Zeile WAR das
+          Vorbild, aus dem `SchnellAnlegen` herausgehoben wurde (Dateikopf dort) — die
+          handgebaute Kopie blieb danach als einzige zurueck und hatte damit weder den
+          bedingten Reset noch den `mutateAsync`-Vertrag noch eine Beschriftung.
+          Sie steht IMMER, auch ohne Recht — dann gesperrt: sie zu verstecken war die
+          vierte Auspraegung von „nur lesen", die M45 abschaffen sollte. Den Grund nennt
+          der `RechteHinweis` im `hinweis`-Slot oben.
+          Sie bleibt UNTER der Tabelle, anders als in den vier Schwestersektionen: der
+          Ortswechsel waere eine Gestaltungsaenderung ohne Anlass, und die Eigenschaft,
+          derentwegen die anderen oben stehen (ausserhalb der Fehlerweiche), hat sie hier
+          ebenso. */}
+      <SchnellAnlegen
+        beschriftung="Neues Stichwort"
+        // Der Platzhalter wiederholt die Beschriftung NICHT — er ergänzt sie um das
+        // Beispiel. „Neues Stichwort" stünde sonst zweimal übereinander.
+        platzhalter="z. B. H1Y"
+        knopfText="Hinzufügen"
+        onAnlegen={(text) => anlegenMutation.mutateAsync(text)}
+        laeuft={anlegenMutation.isPending}
+        gesperrt={!istAdmin}
+      />
+    </AdminPage>
   );
 }

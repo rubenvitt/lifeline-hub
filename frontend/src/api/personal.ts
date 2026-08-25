@@ -14,7 +14,7 @@ export const POSITION_OPTIONEN = (Object.keys(POSITION_LABELS) as StaerkePositio
   label: POSITION_LABELS[p],
 }));
 
-/** Editierbare Stammfelder (Anlegen + Vollersatz-PATCH). */
+/** Die VOLLE Menge editierbarer Stammfelder — was `PersonalDetailPage` zeigt und schickt. */
 export interface PersonalEingabe {
   name: string;
   benutzer_id: number | null;
@@ -35,11 +35,24 @@ export function ladePersonalVorschlaege(): Promise<PersonalVorschlaege> {
   return apiGet<PersonalVorschlaege>('/api/personal-vorschlaege');
 }
 
-export function legePersonAn(daten: PersonalEingabe): Promise<Personal> {
+/** Anlegen: nur `name` ist Pflicht (`PersonalBody`, alles Weitere `Option<T>`). */
+export type PersonalNeu = { name: string } & Partial<Omit<PersonalEingabe, 'name'>>;
+
+/**
+ * PATCH ist ein ECHTER Teil-Patch (LFH-306) — Begruendung wortgleich bei `FahrzeugPatch`:
+ * die auf vier Felder gekuerzte Schnellerfassung darf die vier NICHT gezeigten (Telefon,
+ * Staerke-Position, Benutzer-Konto, Bemerkung) nicht als `null` mitschicken.
+ *
+ * `qualifikation_ids` ist dabei der gefaehrlichste Key: `Some([])` LEERT die Zuordnung
+ * vollstaendig (`src/routes/personal.rs:86`), absent laesst sie stehen.
+ */
+export type PersonalPatch = Partial<PersonalEingabe>;
+
+export function legePersonAn(daten: PersonalNeu): Promise<Personal> {
   return apiSend<Personal>('/api/personal', 'POST', daten);
 }
 
-export function aktualisierePerson(id: number, daten: PersonalEingabe): Promise<Personal> {
+export function aktualisierePerson(id: number, daten: PersonalPatch): Promise<Personal> {
   return apiSend<Personal>(`/api/personal/${id}`, 'PATCH', daten);
 }
 

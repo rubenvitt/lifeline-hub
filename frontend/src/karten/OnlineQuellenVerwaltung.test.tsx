@@ -339,12 +339,74 @@ describe('OnlineQuellenVerwaltung', () => {
 
     // Default ist an (LFH-190); den „Über Server proxen"-Switch gezielt AUSschalten
     // (zwei Switches im Form) → proxy:false (Fall: Anbieter verbietet Proxying).
-    const proxyItem = within(dialog).getByText('Über Server proxen').closest('.ant-form-item');
+    // Der Schalter liegt seit LFH-346 · A8 unter „Weitere Angaben" und ist ohne
+    // `forceRender` bis zum Aufklappen gar nicht im Baum — deshalb der Klick davor.
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    const proxyItem = (await within(dialog).findByText('Über Server proxen'))
+      .closest('.ant-form-item');
     await userEvent.click(within(proxyItem as HTMLElement).getByRole('switch'));
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(postBody).not.toBeNull());
     expect(postBody).toMatchObject({ name: 'MapTiler', proxy: false });
+  });
+});
+
+/**
+ * Freitext-Spalten begrenzen (LFH-346 · A4, Befund N13).
+ *
+ * DIE KAPPUNG SITZT AN DER ZELLE, NICHT AN DER SPALTE — im Browser gemessen (25.08.2026),
+ * weil der Plan hier eine Annahme trug, die nicht hält. `KatalogTabelle` fährt
+ * `scroll={{ x: 'max-content' }}` mit fixierter erster Spalte; genau dafür wählt rc-table
+ * ausdrücklich `table-layout: auto` (`@rc-component/table/lib/Table.js:427-434`, Kommentar:
+ * „When scroll.x is max-content, no need to fix table layout"). Unter `auto` ist die `width`
+ * einer Spalte nur ein Wunsch: dieselbe Zelle mit einer 200-Zeichen-URL maß **1177 px in
+ * einer 1578 px breiten Tabelle, ungekürzt**, obwohl `<col width="280">` stand — antds
+ * `.ant-table-cell-ellipsis` setzt nur `overflow/white-space/text-overflow`, und keins davon
+ * senkt den Platzbedarf einer Zelle. `max-width` an der Zelle bindet dagegen allein (gemessen:
+ * lange Zelle gekappt und gekürzt, kurze Zelle unbehelligt) — weshalb die Spalten GAR KEINE
+ * `width` tragen: sie wäre wirkungslos und zugleich ein Verstoß gegen
+ * `components/feldbreiten.guard.test.ts`, der genau die `maxWidth`-Form verlangt.
+ *
+ * Deshalb stehen unten drei getrennte Aussagen statt einer: die Klasse (Kürzung
+ * konfiguriert), die Kappung (sie greift auch) und der Titel (der volle Wert bleibt
+ * erreichbar). Jede kann für sich rot werden. Pixel misst keine davon — jsdom rechnet
+ * kein Layout.
+ */
+describe('OnlineQuellenVerwaltung — Freitext-Spalten (LFH-346 · A4)', () => {
+  const langeUrl = `https://tiles.example.org/${'sehr-langer-pfad/'.repeat(12)}{z}/{x}/{y}.png`;
+  const langeAttribution = `© ${'Sehr ausführlich genannte Mitwirkende, '.repeat(6)}ODbL`;
+
+  it('kürzt die URL-Spalte und hält den vollen Wert im Titel', async () => {
+    mockBasis(admin, [{ ...quelle, url: langeUrl }]);
+    const { container } = render();
+    await screen.findByText('OpenStreetMap');
+
+    // Der Layout-Pin ist die BEGRÜNDUNG der Kappung darunter, kein Selbstzweck: legt ein
+    // antd-Bump die Weiche auf `fixed` um, bände `width` allein und die Zusicherung wäre
+    // eine andere. Dann bricht diese Zeile sichtbar, statt dass die Kappung still
+    // überflüssig wird.
+    const tabelle = container.querySelector('.ant-table-tbody')!.closest('table')!;
+    expect(tabelle.style.tableLayout).toBe('auto');
+
+    // Über den TEXT gegriffen, nicht über den Titel: fehlte der Titel, stürbe ein
+    // `findByTitle` an „unable to find" und bewiese weder Klasse noch Kappung.
+    const zelle = screen.getByText(langeUrl);
+    expect(zelle.tagName).toBe('TD');
+    expect(zelle).toHaveClass('ant-table-cell-ellipsis');
+    expect(zelle).toHaveStyle({ maxWidth: '280px' });
+    expect(zelle).toHaveAttribute('title', langeUrl);
+  });
+
+  it('kürzt die Attribution-Spalte ebenso', async () => {
+    mockBasis(admin, [{ ...quelle, attribution: langeAttribution }]);
+    render();
+    await screen.findByText('OpenStreetMap');
+
+    const zelle = screen.getByText(langeAttribution);
+    expect(zelle).toHaveClass('ant-table-cell-ellipsis');
+    expect(zelle).toHaveStyle({ maxWidth: '200px' });
+    expect(zelle).toHaveAttribute('title', langeAttribution);
   });
 });

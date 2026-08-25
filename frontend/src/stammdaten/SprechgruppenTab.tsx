@@ -1,4 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import AdminPage from '../components/AdminPage';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +11,7 @@ import { deaktiviereSprechgruppe, listeSprechgruppen } from '../api/sprechgruppe
 import type { Sprechgruppe } from '../api/types';
 import SprechgruppeFormModal from './SprechgruppeFormModal';
 import { globalKeys } from '../api/queryKeys';
+import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 export default function SprechgruppenTab() {
   const { benutzer } = useAuth();
@@ -59,6 +62,17 @@ export default function SprechgruppenTab() {
       title: 'Hinweis',
       dataIndex: 'hinweis',
       key: 'hinweis',
+      /**
+       * Die einzige Freitextspalte dieser Tabelle — sie trägt Belegungshinweise und trieb
+       * ungekürzt die Zeilenhöhe (Befund N13). `showTitle` hält den vollen Wert erreichbar,
+       * und der Bezug bleibt: der Hinweis steht namentlich im Suchplatzhalter.
+       * Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im Browser gemessene
+       * Begründung steht in `karten/OnlineQuellenVerwaltung.tsx`: unter `table-layout: auto`,
+       * das `KatalogTabelle` mit `scroll={{ x: 'max-content' }}` erzwingt, ist eine
+       * Spaltenbreite wirkungslos.
+       */
+      ellipsis: { showTitle: true },
+      onCell: () => ({ style: { maxWidth: 240 } }),
       render: (h: string | null) => h ?? '—',
     },
     {
@@ -111,11 +125,18 @@ export default function SprechgruppenTab() {
   ];
 
   return (
-    <>
-      {istAdmin && (
+    <AdminPage
+      titel="Sprechgruppen"
+      aktionen={
+        /* Der Knopf VERSCHWINDET nicht mehr, wenn das Recht fehlt (M16, LFH-345 · C10) —
+           er steht gesperrt, den Grund nennt der Hinweis darunter. Ein fehlender Knopf ist
+           von „diese Seite kann das gar nicht" nicht zu unterscheiden; „ausgegraut" allein
+           wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
+           Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
+           deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
         <Button
           type="primary"
-          style={{ marginBottom: 12 }}
+          disabled={!istAdmin}
           onClick={() => {
             setBearbeite(null);
             setModalOffen(true);
@@ -123,7 +144,9 @@ export default function SprechgruppenTab() {
         >
           Sprechgruppe anlegen
         </Button>
-      )}
+      }
+      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+    >
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
           (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
           kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
@@ -150,6 +173,6 @@ export default function SprechgruppenTab() {
         sprechgruppe={bearbeite}
         onClose={() => setModalOffen(false)}
       />
-    </>
+    </AdminPage>
   );
 }

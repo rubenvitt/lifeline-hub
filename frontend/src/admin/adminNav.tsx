@@ -1,6 +1,5 @@
-import type { ReactNode } from 'react';
-import AdminPage from '../components/AdminPage';
-// Stammdaten-Sektionen (die Tab-Komponenten wrappen sich NICHT selbst in AdminPage).
+import type { ReactElement } from 'react';
+// Alle Sektionen bringen ihren `AdminPage`-Rahmen selbst mit (LFH-346 · A3).
 import StichworteTab from '../stammdaten/StichworteTab';
 import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import MaterialTab from '../stammdaten/MaterialTab';
@@ -12,7 +11,6 @@ import EtbBausteineTab from '../stammdaten/EtbBausteineTab';
 import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
 import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
-// Einstellungs- + Karten-Sektionen bringen ihren AdminPage-Rahmen selbst mit.
 import AnzeigeEinstellungen from '../pages/einstellungen/AnzeigeEinstellungen';
 import EinsatzDefaults from '../pages/einstellungen/EinsatzDefaults';
 import Anmeldeverfahren from '../pages/einstellungen/Anmeldeverfahren';
@@ -28,7 +26,12 @@ import KartenOfflineSektion from '../karten/KartenOfflineSektion';
 export interface AdminSektion {
   key: string;
   label: string;
-  element: ReactNode;
+  /**
+   * Ein ELEMENT, nicht `ReactNode`: jeder Eintrag hier ist eins, und nur so lässt sich die
+   * Sektion in einem Test rendern, ohne den Typ von Hand aufzuweiten (LFH-346 · A3).
+   * `ReactElement` ist Teilmenge von `ReactNode` — für `App.tsx` ändert sich nichts.
+   */
+  element: ReactElement;
 }
 
 export interface AdminGruppe {
@@ -37,27 +40,35 @@ export interface AdminGruppe {
   sektionen: AdminSektion[];
 }
 
-/** Stammdaten-Tab in den geteilten Seiten-Rahmen wickeln (die Tabs bringen keinen mit). */
-function stammdatenSektion(key: string, label: string, tab: ReactNode): AdminSektion {
-  return { key, label, element: <AdminPage titel={label}>{tab}</AdminPage> };
-}
-
 export const adminGruppen: AdminGruppe[] = [
   {
     key: 'stammdaten',
     label: 'Stammdaten',
     sektionen: [
-      stammdatenSektion('stichworte', 'Einsatz-Stichworte', <StichworteTab />),
-      stammdatenSektion('fahrzeuge', 'Fahrzeuge', <FahrzeugeTab />),
-      stammdatenSektion('material', 'Material', <MaterialTab />),
-      stammdatenSektion('status', 'Fahrzeug-Status', <StatusKatalogTab />),
-      stammdatenSektion('personal', 'Personal', <PersonalTab />),
-      stammdatenSektion('qualifikationen', 'Qualifikationen', <QualifikationenTab />),
-      stammdatenSektion('personal-status', 'Personal-Status', <PersonalStatusTab />),
-      stammdatenSektion('etb-bausteine', 'ETB-Schnellbausteine', <EtbBausteineTab />),
-      stammdatenSektion('einheit-typen', 'Einheitstypen', <EinheitTypenTab />),
-      stammdatenSektion('organisation', 'Organisation', <OrganisationTab />),
-      stammdatenSektion('sprechgruppen', 'Sprechgruppen', <SprechgruppenTab />),
+      /**
+       * Die Stammdaten-Tabs wurden bis LFH-346 · A3 hier von `stammdatenSektion()` in
+       * `<AdminPage titel={label}>` gewickelt — und konnten deshalb weder den `aktionen`-
+       * noch den `hinweis`-Slot erreichen (Befund M46). Nur die Sektion weiß, WAS ihre
+       * Primäraktion ist und OB sie gerade gesperrt gehört; ein Wrapper von außen kann den
+       * Slot nicht füllen, und ein durchgereichter Context wäre ein neuer Mechanismus für
+       * einen Fall, den die Karten- und Einstellungssektionen daneben längst lösen.
+       *
+       * Der Preis ist eine Dopplung: der Titel steht in der Registry (`label`, fürs Menü)
+       * UND in der Sektion (`titel`, für den Kopf). Sie war bei den fünf selbstwickelnden
+       * Sektionen schon da, unbemerkt und ungeprüft — `adminNav.test.tsx` schließt sie jetzt
+       * für die elf Stammdaten-Sektionen mit einem Drift-Test.
+       */
+      { key: 'stichworte', label: 'Einsatz-Stichworte', element: <StichworteTab /> },
+      { key: 'fahrzeuge', label: 'Fahrzeuge', element: <FahrzeugeTab /> },
+      { key: 'material', label: 'Material', element: <MaterialTab /> },
+      { key: 'status', label: 'Fahrzeug-Status', element: <StatusKatalogTab /> },
+      { key: 'personal', label: 'Personal', element: <PersonalTab /> },
+      { key: 'qualifikationen', label: 'Qualifikationen', element: <QualifikationenTab /> },
+      { key: 'personal-status', label: 'Personal-Status', element: <PersonalStatusTab /> },
+      { key: 'etb-bausteine', label: 'ETB-Schnellbausteine', element: <EtbBausteineTab /> },
+      { key: 'einheit-typen', label: 'Einheitstypen', element: <EinheitTypenTab /> },
+      { key: 'organisation', label: 'Organisation', element: <OrganisationTab /> },
+      { key: 'sprechgruppen', label: 'Sprechgruppen', element: <SprechgruppenTab /> },
     ],
   },
   {

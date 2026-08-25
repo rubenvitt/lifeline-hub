@@ -1,8 +1,15 @@
-import { Switch, Typography, theme } from 'antd';
+import { Input, Switch, Typography, theme } from 'antd';
+import { useId, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import SektionHeader from '../../components/SektionHeader';
 import { Select } from '../../components/Select';
 import { useViewport } from '../../components/useViewport';
-import { modulRegistry, istModulAusblendbar } from '../../einsatz/modulRegistry';
+import {
+  kategorien,
+  moduleNachKategorie,
+  istModulAusblendbar,
+  type ModulEintrag,
+} from '../../einsatz/modulRegistry';
 import { ROLLEN_OPTIONEN } from './optionen';
 
 /**
@@ -90,6 +97,26 @@ interface ModulEinstellungsListeProps {
  * Anzeige liest aus dem Query, es gibt kein optimistisches Update) — was fehlte, war die
  * Angabe, WELCHE Zeile es war. Der linke Rand trägt sie, nach dem Muster der
  * Kommunikations-Karten aus LFH-343/C8.
+ *
+ * ── Was LFH-346 · A9 geändert hat (Befund M48) ──────────────────────────────────
+ * **Gruppierung statt 25 flacher Zeilen.** Die Blöcke und ihre Reihenfolge kommen aus
+ * `kategorien` (`einsatz/modulRegistry.ts`) — dieselbe Quelle, aus der die Icon-Rail liest.
+ * Eine eigene Sortierung hier wäre eine zweite Wahrheit, die beim nächsten Modul auseinander
+ * liefe.
+ *
+ * **Filterfeld über der Liste**, mit echtem `<label htmlFor>` (antd erzeugt keins) und ohne
+ * `size`-Angabe — die Höhe erbt vom `ConfigProvider` (Dichteachse LFH-329/B1). Eine
+ * Kategorie ohne Treffer fällt GANZ weg: eine Überschrift ohne Zeilen darunter behauptet eine
+ * Gruppe, die die gefilterte Liste nicht hat. Trifft der Filter nirgends, sagt die Liste das,
+ * statt eine leere Fläche unter dem Feld stehen zu lassen.
+ *
+ * **Die Spaltenköpfe stehen EINMAL über allen Blöcken**, nicht je Block: sie benennen die
+ * Spalten des Rasters, und das Raster ist über alle Gruppen dasselbe. Sechsmal wiederholt
+ * wären sie Zierde, die den Blick auf die Gruppenwechsel zerschneidet.
+ *
+ * **„immer sichtbar, nicht ausblendbar" an den zwei gesperrten Zeilen.** Sie standen grau da,
+ * ohne Grund — und Grau allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1), dieselbe Sorte
+ * Befund, die LFH-345/M16 auf Blockebene gelöst hat.
  */
 export default function ModulEinstellungsListe({
   rollenSpalte,
@@ -103,6 +130,20 @@ export default function ModulEinstellungsListe({
 }: ModulEinstellungsListeProps) {
   const { token } = theme.useToken();
   const { istSchmal } = useViewport();
+  const [filter, setFilter] = useState('');
+  // `useId`, nicht ein fester String: die Liste ist ein Bauteil, und zwei Instanzen auf einer
+  // Seite trügen sonst dieselbe `id` — das `<label for>` zeigte dann auf das falsche Feld.
+  const filterId = useId();
+
+  const suchtext = filter.trim().toLowerCase();
+  const gruppen = kategorien
+    .map((kategorie) => ({
+      kategorie,
+      module: moduleNachKategorie(kategorie.key).filter(
+        (m) => !suchtext || m.label.toLowerCase().includes(suchtext),
+      ),
+    }))
+    .filter((g) => g.module.length > 0);
 
   // Gestapelt: eine Spalte, Label oben. Breit: Label dehnbar, die beiden Steuerspalten
   // nehmen ihren Inhalt. `minmax(0, 1fr)` statt `1fr`, damit ein langes Label die
@@ -116,74 +157,119 @@ export default function ModulEinstellungsListe({
         gap: token.margin,
       };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
-      {!istSchmal && (
-        <div style={{ ...raster, fontSize: token.fontSizeSM, opacity: 0.6 }}>
-          <span>Modul</span>
-          {sichtbarSpalte && <span style={{ textAlign: 'center' }}>{sichtbarSpalte.titel}</span>}
-          <span>{rollenSpalte}</span>
-        </div>
-      )}
-      {modulRegistry.map((m) => {
-        const ausblendbar = istModulAusblendbar(m.key);
-        const gesperrt = !darfVerwalten || !ausblendbar || laeuftKey === m.key;
-        const hinweis = hinweisVon?.(m.key);
-        const hatFehler = fehlerKey === m.key;
-        const feldId = `modul-sichtbar-${m.key}`;
-        // Ein `<label htmlFor>` NUR an der bedienbaren Zeile — sonst ein `<span>` ohne
-        // Zeigerform. Dieselbe Regel wie in `Anmeldeverfahren` (LFH-370): ein Label-Klick
-        // auf ein `disabled` Steuerelement leitet der Browser nicht weiter, er waere also
-        // eine Aufforderung ohne Reaktion. Das `aria-label` am Switch bleibt und schlaegt
-        // das Label (gemessen) — die Bestandsnamen aendern sich dadurch nicht.
-        const bedienbar = Boolean(sichtbarSpalte) && !gesperrt;
-        const beschriftungStil = { ...modulZeilenStil(token), minWidth: 0 };
-        return (
-          <div
-            key={m.key}
-            data-modul-zeile={m.key}
-            data-fehler={hatFehler ? 'true' : undefined}
-            style={{
-              ...raster,
-              borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
-            }}
-          >
-            {bedienbar ? (
-              <label htmlFor={feldId} style={{ ...beschriftungStil, cursor: 'pointer' }}>
-                {m.label}
-              </label>
-            ) : (
-              <span style={beschriftungStil}>{m.label}</span>
-            )}
-            {sichtbarSpalte && (
-              <div style={{ textAlign: istSchmal ? 'start' : 'center' }}>
-                <Switch
-                  id={feldId}
-                  aria-label={`Sichtbar: ${m.label}`}
-                  checked={ausblendbar ? sichtbarSpalte.sichtbarVon(m.key) : true}
-                  disabled={gesperrt}
-                  onChange={(checked) => sichtbarSpalte.aufSichtbar(m.key, checked)}
-                />
-              </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-              <Select
-                aria-label={`Benötigte Rolle: ${m.label}`}
-                style={{ width: '100%' }}
-                value={rolleVon(m.key)}
-                disabled={gesperrt}
-                options={ROLLEN_OPTIONEN}
-                onChange={(val) => aufRolle(m.key, val)}
-              />
-              {hinweis && (
-                <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                  {hinweis}
-                </Typography.Text>
-              )}
-            </div>
+  function zeile(m: ModulEintrag) {
+    const ausblendbar = istModulAusblendbar(m.key);
+    const gesperrt = !darfVerwalten || !ausblendbar || laeuftKey === m.key;
+    const hinweis = hinweisVon?.(m.key);
+    const hatFehler = fehlerKey === m.key;
+    const feldId = `modul-sichtbar-${m.key}`;
+    // Ein `<label htmlFor>` NUR an der bedienbaren Zeile — sonst ein `<span>` ohne
+    // Zeigerform. Dieselbe Regel wie in `Anmeldeverfahren` (LFH-370): ein Label-Klick
+    // auf ein `disabled` Steuerelement leitet der Browser nicht weiter, er waere also
+    // eine Aufforderung ohne Reaktion. Das `aria-label` am Switch bleibt und schlaegt
+    // das Label (gemessen) — die Bestandsnamen aendern sich dadurch nicht.
+    const bedienbar = Boolean(sichtbarSpalte) && !gesperrt;
+    const beschriftungStil: CSSProperties = {
+      ...modulZeilenStil(token),
+      minWidth: 0,
+      gap: token.marginXS,
+      flexWrap: 'wrap',
+    };
+    // Der Modulname steht in einem EIGENEN Element, nicht als nackter Textknoten neben dem
+    // Zusatz: sonst trüge die Hülle beide Texte, und eine Abfrage auf den Modulnamen fände
+    // die Zeile nicht mehr (`textContent` der Hülle wäre „Einsatzdatenimmer sichtbar …").
+    const beschriftung = (
+      <>
+        <span>{m.label}</span>
+        {!ausblendbar && (
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+            immer sichtbar, nicht ausblendbar
+          </Typography.Text>
+        )}
+      </>
+    );
+    return (
+      <div
+        key={m.key}
+        data-modul-zeile={m.key}
+        data-fehler={hatFehler ? 'true' : undefined}
+        style={{
+          ...raster,
+          borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
+        }}
+      >
+        {bedienbar ? (
+          <label htmlFor={feldId} style={{ ...beschriftungStil, cursor: 'pointer' }}>
+            {beschriftung}
+          </label>
+        ) : (
+          <span style={beschriftungStil}>{beschriftung}</span>
+        )}
+        {sichtbarSpalte && (
+          <div style={{ textAlign: istSchmal ? 'start' : 'center' }}>
+            <Switch
+              id={feldId}
+              aria-label={`Sichtbar: ${m.label}`}
+              checked={ausblendbar ? sichtbarSpalte.sichtbarVon(m.key) : true}
+              disabled={gesperrt}
+              onChange={(checked) => sichtbarSpalte.aufSichtbar(m.key, checked)}
+            />
           </div>
-        );
-      })}
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+          <Select
+            aria-label={`Benötigte Rolle: ${m.label}`}
+            style={{ width: '100%' }}
+            value={rolleVon(m.key)}
+            disabled={gesperrt}
+            options={ROLLEN_OPTIONEN}
+            onChange={(val) => aufRolle(m.key, val)}
+          />
+          {hinweis && (
+            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+              {hinweis}
+            </Typography.Text>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <div style={{ maxWidth: 260 }}>
+        <label htmlFor={filterId} style={{ display: 'block', marginBottom: token.marginXXS }}>
+          Modul filtern
+        </label>
+        <Input
+          id={filterId}
+          allowClear
+          placeholder="Modulname"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      </div>
+      {gruppen.length === 0 ? (
+        <Typography.Text type="secondary">Kein Modul passt zum Filter.</Typography.Text>
+      ) : (
+        <>
+          {!istSchmal && (
+            <div style={{ ...raster, fontSize: token.fontSizeSM, opacity: 0.6 }}>
+              <span>Modul</span>
+              {sichtbarSpalte && <span style={{ textAlign: 'center' }}>{sichtbarSpalte.titel}</span>}
+              <span>{rollenSpalte}</span>
+            </div>
+          )}
+          {gruppen.map((g) => (
+            <div key={g.kategorie.key}>
+              <SektionHeader titel={g.kategorie.label} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
+                {g.module.map(zeile)}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

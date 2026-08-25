@@ -1,4 +1,5 @@
 import { App, Button, Form, Input, InputNumber, Switch, theme } from 'antd';
+import { useEffect, useState } from 'react';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ import SektionHeader from '../../components/SektionHeader';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
+import { speicherLeisteStil } from './einsatzEinstellungenForm';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
@@ -33,6 +35,7 @@ export default function EinsatzDefaults() {
   const [form] = Form.useForm<FormWerteEinsatz>();
   const { token } = theme.useToken();
   const istAdmin = benutzer?.system_rolle === 'admin';
+  const [hatFassung, setHatFassung] = useState(false);
 
   const einstellungenQuery = useQuery({
     queryKey: globalKeys.orgEinstellungen(),
@@ -52,6 +55,7 @@ export default function EinsatzDefaults() {
       speichereOrgEinstellungen(felder),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
+      setHatFassung(false);
       message.success('Einstellungen gespeichert');
     },
   });
@@ -64,6 +68,17 @@ export default function EinsatzDefaults() {
       message.success('Modul-Default gespeichert');
     },
   });
+
+  // Ungespeicherte Fassung: eigener State (siehe Kopfkommentar), gesetzt bei jeder
+  // Feldänderung, zurückgesetzt beim erfolgreichen Speichern.
+  useEffect(() => {
+    if (!hatFassung) return;
+    // `preventDefault()` allein ist der heutige Weg — eine eigene Rückfrage zeigt der
+    // Browser nicht mehr an, `returnValue` ist überall abgekündigt.
+    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hatFassung]);
 
   if (einstellungenQuery.isLoading || modulQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -90,19 +105,6 @@ export default function EinsatzDefaults() {
     <AdminPage
       titel="Einsatz-Defaults"
       beschreibung="Org-weite Defaults für neue Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte."
-      aktionen={
-        // Der Knopf VERSCHWINDET nicht mehr (LFH-345 · C10, M16) — er steht gesperrt da, und
-        // der Grund steht als `RechteHinweis` darunter. Ein fehlender Knopf ist von „diese
-        // Seite kann das gar nicht" nicht zu unterscheiden.
-        <Button
-          type="primary"
-          onClick={() => form.submit()}
-          loading={speichernMutation.isPending}
-          disabled={!istAdmin}
-        >
-          Speichern
-        </Button>
-      }
       hinweis={
         // NUR der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
         // Ablehnung deshalb bei sich (unten) — die beiden mit `??` zu verketten erzeugte
@@ -121,6 +123,7 @@ export default function EinsatzDefaults() {
         layout="vertical"
         initialValues={initialEinsatz(einstellungen)}
         onFinish={speichern}
+        onValuesChange={() => setHatFassung(true)}
         disabled={!istAdmin}
       >
         <SektionHeader
@@ -186,6 +189,20 @@ export default function EinsatzDefaults() {
         >
           <Switch />
         </Form.Item>
+
+        {/* Der Knopf VERSCHWINDET ohne Recht nicht (LFH-345 · C10, M16) — er steht gesperrt
+            da, und der Grund steht als `RechteHinweis` im Kopf. Ein fehlender Knopf ist von
+            „diese Seite kann das gar nicht" nicht zu unterscheiden. */}
+        <div style={speicherLeisteStil(token)}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={speichernMutation.isPending}
+            disabled={!istAdmin}
+          >
+            Speichern
+          </Button>
+        </div>
       </Form>
 
       {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ──────── */}

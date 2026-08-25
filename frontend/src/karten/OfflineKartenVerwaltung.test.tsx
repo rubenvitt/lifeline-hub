@@ -449,3 +449,29 @@ describe('OfflineKartenVerwaltung', () => {
     expect(await screen.findByText('bayern: baut')).toBeInTheDocument();
   });
 });
+
+/**
+ * Freitext-Spalte begrenzen (LFH-346 · A4, Befund N13). Warum die Kappung an der ZELLE
+ * sitzt und nicht an der Spalte, steht ausführlich und im Browser gemessen in
+ * `OnlineQuellenVerwaltung.test.tsx` — kurz: `KatalogTabelle` fährt unter
+ * `scroll={{ x: 'max-content' }}` mit `table-layout: auto`, und dort ist eine Spaltenbreite
+ * wirkungslos.
+ */
+describe('OfflineKartenVerwaltung — Freitext-Spalte (LFH-346 · A4)', () => {
+  const langeLizenz = `© ${'OpenStreetMap contributors und weitere Quellen, '.repeat(5)}ODbL`;
+
+  it('kürzt die Attribution-Spalte und hält den vollen Wert im Titel', async () => {
+    mockBasis(admin, [{ ...karte, lizenz: langeLizenz }]);
+    const { container } = render();
+    await screen.findByText('Deutschland – Bremen');
+
+    const tabelle = container.querySelector('.ant-table-tbody')!.closest('table')!;
+    expect(tabelle.style.tableLayout).toBe('auto');
+
+    const zelle = screen.getByText(langeLizenz);
+    expect(zelle.tagName).toBe('TD');
+    expect(zelle).toHaveClass('ant-table-cell-ellipsis');
+    expect(zelle).toHaveStyle({ maxWidth: '200px' });
+    expect(zelle).toHaveAttribute('title', langeLizenz);
+  });
+});

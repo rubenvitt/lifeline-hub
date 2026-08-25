@@ -692,6 +692,54 @@ Alltag wichtigsten:
   zählt die Maps gegen eine Literal-Liste **und** `toHaveLength(10)`; ein elfter Eintrag wäre
   eine Änderung am Vertrag und an seinem Guard, also eine eigene Entscheidung statt eines
   Nebenprodukts.
+- **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET** (LFH-346 · C11). Die
+  Anlegen-Knöpfe der elf Stammdaten-Sektionen sind in den `aktionen`-Slot von `AdminPage`
+  gewandert, der Speichern-Knopf der Einsatz-Defaults im selben Ticket **heraus** in eine
+  sticky Leiste im Fuß. Beides ist richtig, und der Unterschied ist die Ursache: „Fahrzeug
+  anlegen" öffnet ein Modal und braucht kein `<form>`; ein Speichern-Knopf **muss** im
+  `<form>` liegen, sonst sendet Enter nicht (Erfassungs-Norm B4 — der Slot rendert
+  ausserhalb jedes `<form>`, `AdminPage` sagt das im eigenen Doc-Kommentar). Wer die beiden
+  „harmonisiert", tötet die Enter-Zusicherung auf der einen oder die Kopf-Regel auf der
+  anderen Seite.
+- **Eine Sektion wickelt ihren Seitenrahmen selbst** (LFH-346 · C11, Befund M46). Bis dahin
+  wickelte `admin/adminNav.tsx` die elf Stammdaten-Tabs in `<AdminPage titel={label}>` — sie
+  konnten damit weder `aktionen` noch `hinweis` erreichen. Nur die Sektion weiss, WAS ihre
+  Primäraktion ist und OB sie gerade gesperrt gehört; ein Wrapper von aussen kann den Slot
+  nicht füllen, und ein durchgereichter Context wäre ein neuer Mechanismus für einen Fall,
+  den die Karten- und Einstellungssektionen seit LFH-281 anders lösen. **Der Preis ist eine
+  Dopplung** — der Titel steht in der Registry (`label`, fürs Menü) UND in der Sektion
+  (`titel`, für den Kopf). Sie war bei den fünf selbstwickelnden Sektionen schon da,
+  unbemerkt; `adminNav.test.tsx` schliesst sie jetzt mit einem Drift-Test, der **auf die elf
+  Stammdaten-Sektionen gescopt** ist: über alle sechzehn zu iterieren zöge die Queries der
+  Karten- und Einstellungssektionen in die Datei und färbte sie aus Mock-Gründen rot, die
+  mit Titel-Drift nichts zu tun haben.
+- **Fehlende Berechtigung hat zwei Zuschnitte, nicht einen** (LFH-346 · C11, M45). Die
+  **Primäraktion** steht gesperrt mit `RechteHinweis` darüber (Fortschreibung von C10/M16),
+  die **Zeilenaktionsspalte** entfällt weiterhin ganz. Das ist kein Widerspruch: n Zeilen ×
+  2 gesperrte Knöpfe kosten waagerechten Platz für null Handlungsmöglichkeit, und das
+  M16-Argument („ein fehlender Knopf ist von ‚diese Seite kann das gar nicht' nicht zu
+  unterscheiden") greift genau dann nicht mehr, wenn ein Satz auf der Seite den Grund nennt.
+  Der Wortlaut steht **einmal** in `stammdaten/rechteText.ts`; vorher hatte jede Sektion
+  ihre eigene Ausprägung von „nur lesen", vier gezählt, drei davon stumm.
+- **Eine Detailseite braucht nicht zwingend einen Einzel-Endpunkt** (LFH-346 · C11, H36).
+  `/admin/stammdaten/{fahrzeuge,personal}/:id` liest die **Listen**-Query
+  (`globalKeys.fahrzeuge()`) und selektiert die Zeile — `FahrzeugAnzeige`
+  (`src/fahrzeug/mod.rs:92-108`) trägt alle Stammdatenfelder, ein `GET /api/fahrzeuge/{id}`
+  läge Byte für Byte darauf. Ein zweiter Endpunkt wäre ein zweites Cache-Fach für dieselben
+  Bytes und eine zweite Invalidierung. Den 404-Fall erzeugt die Seite selbst. **Nicht
+  übertragbar** auf Entitäten, deren Detailform mehr trägt als die Listenform (`PersonDetail`
+  gegen `Person`) — dort ist der Einzel-GET richtig, und `PersonenDetailPage` bleibt das
+  Muster dafür. Die Admin-Pfad-Builder liegen in `admin/adminNav.tsx`, **nicht** in
+  `routing/deeplinks.ts`: das trägt Einsatz-Pfade, und zwei Quellen für dieselbe
+  Adressfamilie sind genau die Lage, gegen die LFH-25 gebaut wurde.
+- **Ein Collapse im Erfassungsformular liegt in Reichweite von Enter** (LFH-346 · C11,
+  gemessen). Er steht IM `<form>` und damit vor dem Speichern-Knopf; Enter löst den
+  **ersten** Übermittlungsknopf im Baum aus. Wäre der Klapp-Kopf ein `<button>` ohne
+  `type="button"`, klappte Enter im ersten Feld den Bereich auf, statt zu speichern — und
+  die beiden Struktur-Abfragen der Erfassungs-Norm (keine `.ant-modal-footer`, Knopf im
+  `<form>`) blieben dabei **beide grün**. In antd 6 ist er gemessen ein
+  `<div role="button">`, die Zusicherung hält; `MaterialFormModal.test.tsx` ist die Stelle,
+  an der ein antd-Sprung das auffliegen liesse.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.

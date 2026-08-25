@@ -163,10 +163,17 @@ describe('SprechgruppenTab', () => {
     await waitFor(() => expect(bezeichnungen(container)).toEqual(['208_D_DRK']));
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
+   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
+   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
+   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
+   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   */
+  it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
     await screen.findByText('412_F_DRK');
-    expect(screen.queryByRole('button', { name: 'Sprechgruppe anlegen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sprechgruppe anlegen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
@@ -201,5 +208,30 @@ describe('SprechgruppenTab', () => {
 
     expect(await screen.findByText('Noch keine Sprechgruppen')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Freitext-Spalte begrenzen (LFH-346 · A4, Befund N13). Warum die Kappung an der ZELLE
+ * sitzt und nicht an der Spalte, steht ausführlich und im Browser gemessen in
+ * `karten/OnlineQuellenVerwaltung.test.tsx` — kurz: `KatalogTabelle` fährt unter
+ * `scroll={{ x: 'max-content' }}` mit `table-layout: auto`, und dort ist eine Spaltenbreite
+ * wirkungslos.
+ */
+describe('SprechgruppenTab — Freitext-Spalte (LFH-346 · A4)', () => {
+  const langerHinweis = `${'Führungskanal des Abschnitts, nur nach Freigabe belegen. '.repeat(4)}Ende`;
+
+  it('kürzt die Hinweis-Spalte und hält den vollen Wert im Titel', async () => {
+    const { container } = render(admin, [{ ...sprechgruppe, hinweis: langerHinweis }]);
+    await screen.findByText('412_F_DRK');
+
+    const tabelle = container.querySelector('.ant-table-tbody')!.closest('table')!;
+    expect(tabelle.style.tableLayout).toBe('auto');
+
+    const zelle = screen.getByText(langerHinweis);
+    expect(zelle.tagName).toBe('TD');
+    expect(zelle).toHaveClass('ant-table-cell-ellipsis');
+    expect(zelle).toHaveStyle({ maxWidth: '240px' });
+    expect(zelle).toHaveAttribute('title', langerHinweis);
   });
 });

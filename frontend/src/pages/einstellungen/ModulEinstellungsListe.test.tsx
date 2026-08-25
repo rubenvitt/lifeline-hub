@@ -1,7 +1,8 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
+import { kategorien } from '../../einsatz/modulRegistry';
 import ModulEinstellungsListe, { modulZeilenStil } from './ModulEinstellungsListe';
 
 /** Basis-Props der Einsatz-Ebene (drei Spalten, mit Sichtbar-Schalter). */
@@ -190,5 +191,69 @@ describe('ModulEinstellungsListe · Trefffläche und Stapelung (LFH-345)', () =>
     renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
 
     expect(screen.getByText('Sichtbar')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Kategorie-Gruppierung, Filterfeld und der Text an den nicht ausblendbaren Modulen
+ * (LFH-346 · A9, Befund M48).
+ *
+ * 25 Modulzeilen lagen flach untereinander — ohne Ordnung, ohne Weg, eine bestimmte Zeile zu
+ * finden, und ohne Auskunft darüber, WARUM zwei von ihnen gesperrt sind.
+ */
+describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
+  it('gruppiert die Module in die sechs Registry-Kategorien — in der Ordnung der Icon-Rail', async () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
+
+    const koepfe = await screen.findAllByRole('heading', { level: 5 });
+    // Gepinnt gegen `kategorien` selbst, nicht gegen eine Literal-Liste: die Reihenfolge ist
+    // die der Icon-Rail (`modulRegistry.ts`), eine eigene Sortierung hier waere eine zweite
+    // Wahrheit. Der Plan nannte ein `modulNachKategorie()` — das gibt es nicht, die Registry
+    // fuehrt `kategorien` + `moduleNachKategorie(key)`.
+    expect(koepfe.map((h) => h.textContent)).toEqual(kategorien.map((k) => k.label));
+  });
+
+  it('filtert die Liste und laesst leere Kategorien GANZ weg', async () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
+
+    fireEvent.change(screen.getByLabelText('Modul filtern'), { target: { value: 'lagekarte' } });
+
+    expect(screen.getByText('Lagekarte')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Sichtbar: ETB' })).toBeNull();
+    // Eine Kategorie-Ueberschrift ohne Zeilen darunter behauptet eine Gruppe, die die
+    // gefilterte Liste nicht hat. Mutationsprobe: faellt der Leer-Riegel weg, stehen alle
+    // sechs Koepfe ueber einer einzigen Zeile und diese Aussage wird rot — ohne sie waere
+    // sie trivial gruen, weil es vor A9 ueberhaupt keine Ueberschriften gab.
+    expect(screen.queryByRole('heading', { name: 'Kommunikation' })).toBeNull();
+    // Die Gegenaussage: die Kategorie MIT Treffer behaelt ihren Kopf.
+    expect(screen.getByRole('heading', { name: 'Lage' })).toBeInTheDocument();
+  });
+
+  it('sagt es, wenn der Filter nichts trifft — statt einer leeren Flaeche unter dem Feld', () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
+
+    fireEvent.change(screen.getByLabelText('Modul filtern'), { target: { value: 'zzz' } });
+
+    expect(screen.getByText('Kein Modul passt zum Filter.')).toBeInTheDocument();
+    expect(screen.queryAllByRole('heading', { level: 5 })).toHaveLength(0);
+  });
+
+  it('benennt die nicht ausblendbaren Module als solche', async () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
+
+    const zeile = (await screen.findByText('Einsatzdaten')).closest('[data-modul-zeile]');
+    expect(
+      within(zeile as HTMLElement).getByText('immer sichtbar, nicht ausblendbar'),
+    ).toBeInTheDocument();
+  });
+
+  // Die Gegenaussage: der Text steht NUR an den zwei gesperrten Zeilen, nicht an allen 25.
+  it('haengt den Text NICHT an ein ausblendbares Modul', () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
+
+    const zeile = screen.getByText('ETB').closest('[data-modul-zeile]');
+    expect(
+      within(zeile as HTMLElement).queryByText('immer sichtbar, nicht ausblendbar'),
+    ).toBeNull();
   });
 });
