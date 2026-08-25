@@ -154,7 +154,9 @@ export default function StichworteTab() {
           ebenso. */}
       <SchnellAnlegen
         beschriftung="Neues Stichwort"
-        platzhalter="Neues Stichwort, z. B. H1Y"
+        // Der Platzhalter wiederholt die Beschriftung NICHT — er ergänzt sie um das
+        // Beispiel. „Neues Stichwort" stünde sonst zweimal übereinander.
+        platzhalter="z. B. H1Y"
         knopfText="Hinzufügen"
         onAnlegen={(text) => anlegenMutation.mutateAsync(text)}
         laeuft={anlegenMutation.isPending}

@@ -108,7 +108,11 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
     renderMitProviders(<Komp />);
     // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
     await screen.findByText(STAMMDATEN_RECHTE_TEXT);
-    expect(screen.getByRole('button', { name: aktion })).toBeDisabled();
+    // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der
+    // elf Primäraktionen aber im INHALT — auf den Hinweis zu warten sichert für die also
+    // strenggenommen nichts zu. `waitFor` maskiert dabei nichts: ein Knopf, der nie
+    // gesperrt wird, läuft in die Zeitüberschreitung statt grün zu werden.
+    await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeDisabled());
   });
 
   /**
