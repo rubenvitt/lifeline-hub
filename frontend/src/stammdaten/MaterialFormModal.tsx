@@ -1,4 +1,4 @@
-import { App, AutoComplete, Form, Input } from 'antd';
+import { App, AutoComplete, Collapse, Form, Input } from 'antd';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -80,7 +80,18 @@ export default function MaterialFormModal({
       uebernahme={['traegerorganisation', 'standort']}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen, sonst leert die Hülle
       // die Felder trotz 422 (LFH-332).
-      onErfassen={(w) => mutation.mutateAsync(w)}
+      //
+      // Der Formularspeicher statt der `onFinish`-Werte (LFH-346 · A8): ohne
+      // `forceRender` sind Träger, Standort und Bemerkung nicht montiert, und
+      // `onFinish` liefert nur montierte Felder. `MaterialEingabe` ist Vollersatz —
+      // ein bearbeitetes Material verlöre die drei bei jedem Speichern, an dem
+      // niemand aufgeklappt hat. Ein Rückfall auf `material?.standort` wäre die
+      // falsche Reparatur: er kann „nie montiert" nicht von „aufgeklappt und bewusst
+      // geleert" unterscheiden. `getFieldsValue(true)` liest den Speicher ganz aus.
+      //
+      // Beachten: `getFieldsValue(true)` ist bei antd `any`-typisiert — die Feldnamen
+      // prüft nicht dieser Aufruf, sondern der Parametertyp von `mutationFn`.
+      onErfassen={() => mutation.mutateAsync(form.getFieldsValue(true))}
       onFertig={onClose}
       onAbbrechen={onClose}
     >
@@ -105,9 +116,36 @@ export default function MaterialFormModal({
       <Form.Item label="Bestandsnummer" name="bestandsnummer">
         <Input placeholder="Inventarnr. (nur für einzeln verfolgte Geräte)" />
       </Form.Item>
-      <Form.Item label="Trägerorganisation" name="traegerorganisation"><Input /></Form.Item>
-      <Form.Item label="Standort" name="standort"><Input placeholder="z. B. Lagerhalle 2" /></Form.Item>
-      <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
+      {/* FELDBUDGET (LFH-346 · A8, Befund N20): drei sichtbare Felder, drei eingeklappt.
+          Pflicht ist allein die Bezeichnung, und die steht oben — kein Pflichtfeld
+          wandert hinter den Collapse (LFH-343 · H49).
+
+          Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur wenn die
+          eingeklappten Felder gar nicht im DOM stehen, ist „im Ausgangszustand drei
+          Felder" prüfbar. Den Preis dafür — unmontierte Felder fehlen in `onFinish` —
+          zahlt das `onErfassen` oben, nicht `forceRender`.
+
+          Träger und Standort sind zugleich die Wiederholfelder des Serienlaufs
+          (`uebernahme`). Das passt zusammen: wer sie in einer Serie stehen lassen
+          will, hat sie im ersten Datensatz eingetragen — und dafür aufgeklappt.
+          Danach bleibt der Bereich offen, ein `resetFields` schliesst ihn nicht. */}
+      <Collapse
+        ghost
+        style={{ marginInline: -8 }}
+        items={[{
+          key: 'weitere',
+          label: 'Weitere Angaben',
+          children: (
+            <>
+              <Form.Item label="Trägerorganisation" name="traegerorganisation"><Input /></Form.Item>
+              <Form.Item label="Standort" name="standort">
+                <Input placeholder="z. B. Lagerhalle 2" />
+              </Form.Item>
+              <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
+            </>
+          ),
+        }]}
+      />
     </ErfassungsModal>
   );
 }

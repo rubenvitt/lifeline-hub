@@ -228,7 +228,12 @@ describe('StatusKatalogTab', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Status bearbeiten')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Label')).toHaveValue('einsatzbereit');
-    expect(within(dialog).getByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('1');
+    // Der FMS-Anker liegt seit LFH-346 · A8 unter „Weitere Angaben" — die Vorbelegung
+    // muss ihn trotzdem erreichen, obwohl das Feld beim Öffnen des Dialogs noch gar
+    // nicht montiert ist (`setFieldsValue` schreibt in den Speicher, das Feld liest ihn
+    // beim Einhängen). Genau das prüft der Griff nach dem Aufklappen.
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    expect(await within(dialog).findByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('1');
   });
 
   /**
@@ -259,7 +264,9 @@ describe('StatusKatalogTab', () => {
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
     const ersterDialog = await screen.findByRole('dialog');
-    expect(within(ersterDialog).getByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('5');
+    await userEvent.click(within(ersterDialog).getByRole('button', { name: /Weitere Angaben/ }));
+    expect(await within(ersterDialog).findByLabelText('FMS-Anker (0–9, optional)'))
+      .toHaveValue('5');
     await userEvent.click(within(ersterDialog).getByRole('button', { name: /Cancel|Abbrechen/ }));
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[1]);
@@ -267,7 +274,11 @@ describe('StatusKatalogTab', () => {
     await waitFor(() =>
       expect(within(zweiterDialog).getByLabelText('Label')).toHaveValue('disponiert'),
     );
-    expect(within(zweiterDialog).getByLabelText('FMS-Anker (0–9, optional)')).toHaveValue('');
+    // Der Collapse ist im frisch montierten Dialog wieder zu (`destroyOnHidden`) — das
+    // Aufklappen gehört also zur Prüfung, nicht bloss der Griff danach.
+    await userEvent.click(within(zweiterDialog).getByRole('button', { name: /Weitere Angaben/ }));
+    expect(await within(zweiterDialog).findByLabelText('FMS-Anker (0–9, optional)'))
+      .toHaveValue('');
     expect(within(zweiterDialog).getByLabelText('Farbe (Hex, optional)')).toHaveValue('');
   });
 
@@ -330,5 +341,98 @@ describe('StatusKatalogTab', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(screen.getByRole('dialog')).getByLabelText('Label'))
       .toHaveValue('bedingt einsatzbereit');
+  });
+
+  /**
+   * LFH-346 · A8, Befund N20. DIE tragende Prüfung des Collapse-Umbaus — und nicht
+   * die Zählung darunter: beide Hälften der Zählung können grün stehen, während jedes
+   * Speichern drei Felder still leert.
+   *
+   * `StatusEingabe` ist Vollersatz. Ohne `forceRender` sind die eingeklappten Felder
+   * nicht montiert, und `onFinish` liefert nur montierte Felder — ein `onErfassen`,
+   * das seine Werte von dort nimmt, schickte `farbe: null`, `fms_anker: null`,
+   * `sortier: 0` an einen Datensatz, an dem niemand etwas davon angefasst hat. Kein
+   * Fehler, kein roter Test, nur ein Katalog, der nach der ersten Label-Korrektur
+   * seine Farben und seine Reihenfolge verloren hat.
+   *
+   * Der Vorrat trägt deshalb in allen drei Feldern echte Werte, und der Weg klappt
+   * bewusst NICHT auf.
+   */
+  it('behält Farbe, FMS-Anker und Sortierung, wenn niemand aufklappt', async () => {
+    let ruempf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/fahrzeug-status/1', async ({ request }) => {
+        ruempf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
+    render(admin, [
+      { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: '#112233', fms_anker: 5, sortier: 10 },
+    ]);
+    await screen.findByText('einsatzbereit');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Label');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'bedingt einsatzbereit');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(ruempf).not.toBeNull());
+    expect(ruempf).toEqual({
+      label: 'bedingt einsatzbereit',
+      kategorie: 'verfuegbar',
+      farbe: '#112233',
+      fms_anker: 5,
+      sortier: 10,
+    });
+  });
+
+  /**
+   * Die Gegenprobe zur Prüfung darüber: ein SICHTBAR geleertes Feld muss auch geleert
+   * ankommen. Ein Rückfall auf den Bestandswert (`werte.farbe ?? bearbeite.farbe`)
+   * bestünde die Prüfung oben und fiele hier — er kann „nie montiert" nicht von
+   * „aufgeklappt und bewusst geräumt" unterscheiden.
+   */
+  it('ein aufgeklappt geleertes Feld kommt auch geleert an', async () => {
+    let ruempf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/fahrzeug-status/1', async ({ request }) => {
+        ruempf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
+    render(admin, [
+      { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: '#112233', fms_anker: 5, sortier: 10 },
+    ]);
+    await screen.findByText('einsatzbereit');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.clear(await within(dialog).findByLabelText('Farbe (Hex, optional)'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(ruempf).not.toBeNull());
+    expect(ruempf).toMatchObject({ farbe: null, fms_anker: 5, sortier: 10 });
+  });
+
+  /**
+   * Das Feldbudget selbst (LFH-346 · A8): zwei sichtbare Felder statt fünf.
+   *
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist
+   * ein `Select` und hätte in der Rollenzählung gefehlt. Und die zweite Hälfte ist
+   * Pflicht: „höchstens zwei" allein erfüllte auch ein Dialog ganz ohne Felder.
+   */
+  it('zeigt zwei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
+    render(admin);
+    await screen.findByText('einsatzbereit');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+    const dialog = await screen.findByRole('dialog');
+
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(2);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(5));
   });
 });

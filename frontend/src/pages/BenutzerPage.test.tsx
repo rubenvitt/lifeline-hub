@@ -552,4 +552,109 @@ describe('BenutzerPage', () => {
     expect(within(dialog).getByLabelText('Anzeigename')).toHaveValue('Eva');
     expect(within(dialog).getByLabelText('Benutzername')).toHaveValue('admin');
   });
+
+  /**
+   * LFH-346 · A8, Befund N20. Die tragende Prüfung des Collapse-Umbaus — nicht die
+   * Zählung darunter: beide Hälften der Zählung stünden grün, während der Rumpf zwei
+   * Felder verliert.
+   *
+   * Ohne `forceRender` sind die beiden Rollen-Selects nicht montiert, und `onFinish`
+   * liefert nur montierte Felder. `system_rolle` und `org_rolle` sind im DTO optional
+   * — sie fielen also lautlos aus dem Rumpf, und der Server setzte SEINE Vorgabe
+   * statt der, die die Maske eingeklappt zusagt. Kein Fehler, kein roter Test.
+   */
+  it('schickt die Rollen-Vorgaben mit, auch wenn niemand aufklappt', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      http.post('/api/benutzer', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(benutzer({ id: 2 }), { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
+    await userEvent.type(screen.getByLabelText('Anzeigename'), 'Eva');
+    await userEvent.type(screen.getByLabelText('Benutzername'), 'eva');
+    await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toEqual({
+      anzeigename: 'Eva',
+      benutzername: 'eva',
+      passwort: 'geheim123',
+      system_rolle: 'keiner',
+      org_rolle: 'keine',
+    });
+  });
+
+  /**
+   * Die Gegenprobe: eine aufgeklappt GEWÄHLTE Rolle schlägt die Vorgabe. Ohne sie
+   * belegte die Prüfung darüber nur, dass irgendwoher zwei Vorgabewerte kommen —
+   * nicht, dass der Speicher gelesen wird, in dem auch die Wahl landet.
+   */
+  it('eine aufgeklappt gewählte Rolle kommt gewählt an', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      http.post('/api/benutzer', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(benutzer({ id: 2 }), { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
+    await userEvent.type(screen.getByLabelText('Anzeigename'), 'Eva');
+    await userEvent.type(screen.getByLabelText('Benutzername'), 'eva');
+    await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
+    const dialog = dialogMitTitel('Neuen Benutzer anlegen');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.click(await within(dialog).findByLabelText('Org-Rolle'));
+    // Die Optionsliste hängt im Portal, nicht im Dialog — gegriffen wird sie global,
+    // und zwar über den echten Options-Knoten (antd hört auf dessen Klick).
+    await userEvent.click(await screen.findByText('Führungskraft (darf Einsätze anlegen)'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toMatchObject({ system_rolle: 'keiner', org_rolle: 'fuehrungskraft' });
+  });
+
+  /**
+   * Das Feldbudget des Anlegen-Dialogs (LFH-346 · A8): drei sichtbare Felder statt
+   * fünf. Der Bearbeiten-Dialog hat drei und bleibt unangetastet.
+   *
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die beiden
+   * Rollen sind `Select` und fehlten in der Rollenzählung. Die zweite Hälfte ist
+   * Pflicht: „höchstens drei" allein erfüllte auch ein Dialog ganz ohne Felder.
+   */
+  it('der Anlegen-Dialog zeigt drei Felder und deckt zwei beim Aufklappen auf', async () => {
+    renderMitZwei();
+    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
+    await screen.findByRole('dialog');
+    const dialog = dialogMitTitel('Neuen Benutzer anlegen');
+
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(3);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(5));
+  });
 });

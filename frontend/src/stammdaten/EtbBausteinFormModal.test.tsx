@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { useState } from 'react';
@@ -70,18 +70,106 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness bestand={baustein} />);
     expect(await screen.findByLabelText('Label')).toHaveValue('Lage unverändert');
-    expect(screen.getByLabelText('Sortierung')).toHaveValue('7');
     expect(screen.getByLabelText('Typ').closest('.ant-select')).toHaveTextContent('Lage');
+    // Die Sortierung liegt seit LFH-346 · A8 unter „Weitere Angaben"; die Vorbelegung
+    // muss sie trotzdem erreichen, obwohl das Feld beim Öffnen noch nicht montiert ist.
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    expect(await screen.findByLabelText('Sortierung')).toHaveValue('7');
 
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(screen.getByLabelText('Label')).toHaveValue(''));
 
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
     expect(screen.getByLabelText('Label')).toHaveValue('');
-    expect(screen.getByLabelText('Sortierung')).toHaveValue('0');
+    // Nach dem Wiederöffnen ist der Bereich zu (`destroyOnHidden`) — erneut aufklappen.
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    expect(await screen.findByLabelText('Sortierung')).toHaveValue('0');
     // antd 6 rendert die gewählte Option als `.ant-select-content` (nicht mehr
     // `-selection-item`); gegriffen wird sie über das Feld, damit der zweite Select
     // (Meldeweg) nicht mitzählt.
     expect(screen.getByLabelText('Typ').closest('.ant-select')).toHaveTextContent('Meldung');
+  });
+
+  /**
+   * LFH-346 · A8, Befund N20. Die tragende Prüfung des Collapse-Umbaus — nicht die
+   * Zählung darunter: beide Hälften der Zählung stünden grün, während jedes Speichern
+   * drei Felder still leert.
+   *
+   * `BausteinEingabe` ist Vollersatz. Ohne `forceRender` sind Meldeweg, Veranlassung
+   * und Sortierung nicht montiert, und `onFinish` liefert nur montierte Felder — ein
+   * `onErfassen`, das seine Werte von dort nimmt, schickte `meldeweg: null` und
+   * `sortier: 0` an einen Baustein, an dem niemand etwas davon angefasst hat.
+   */
+  it('behält Meldeweg, Veranlassung und Sortierung, wenn niemand aufklappt', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/etb-bausteine/2', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(baustein);
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(
+      <Harness bestand={{ ...baustein, meldeweg: 'funk', veranlassung: 'Lagemeldung' }} />,
+    );
+    const label = await screen.findByLabelText('Label');
+    await nutzer.clear(label);
+    await nutzer.type(label, 'Lage unverändert (kurz)');
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toEqual({
+      label: 'Lage unverändert (kurz)',
+      typ: 'lage',
+      inhalt: 'Lage unverändert bei {einheit}',
+      meldeweg: 'funk',
+      veranlassung: 'Lagemeldung',
+      sortier: 7,
+    });
+  });
+
+  /**
+   * Die Gegenprobe: eine aufgeklappt geleerte Veranlassung kommt auch geleert an. Ein
+   * Rückfall auf `baustein?.veranlassung` bestünde die Prüfung darüber und fiele hier.
+   */
+  it('eine aufgeklappt geleerte Veranlassung kommt geleert an', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/etb-bausteine/2', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(baustein);
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(
+      <Harness bestand={{ ...baustein, meldeweg: 'funk', veranlassung: 'Lagemeldung' }} />,
+    );
+    await screen.findByLabelText('Label');
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await nutzer.clear(await screen.findByLabelText('Veranlassung (optional)'));
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toMatchObject({ veranlassung: null, meldeweg: 'funk', sortier: 7 });
+  });
+
+  /**
+   * Das Feldbudget (LFH-346 · A8): drei sichtbare Felder statt sechs.
+   *
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — der Typ ist ein
+   * `Select` und fehlte in der Rollenzählung. Die zweite Hälfte ist Pflicht:
+   * „höchstens drei" allein erfüllte auch ein Dialog ganz ohne Felder.
+   */
+  it('zeigt drei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
+    handler();
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    // Der Dialog, NICHT `container`: antds Modal hängt in einem Portal an `body`.
+    const dialog = await screen.findByRole('dialog');
+
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(3);
+
+    await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(6));
   });
 });

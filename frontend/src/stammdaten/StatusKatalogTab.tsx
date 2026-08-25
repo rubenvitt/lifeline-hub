@@ -1,4 +1,6 @@
-import { App, Button, Form, Input, InputNumber, Popconfirm, Space, type TableColumnsType } from 'antd';
+import {
+  App, Button, Collapse, Form, Input, InputNumber, Popconfirm, Space, type TableColumnsType,
+} from 'antd';
 import AdminPage from '../components/AdminPage';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -217,7 +219,8 @@ export default function StatusKatalogTab() {
           Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
           also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
           war ein DOM-Geschwister ausserhalb. KEIN `serie`: hier wird bearbeitet,
-          nicht in Serie erfasst. Die Feldzahl bleibt unverändert. */}
+          nicht in Serie erfasst. Die Feldzahl ist seit LFH-346 · A8 gekürzt: zwei
+          sichtbare Felder, drei unter „Weitere Angaben". */}
       <ErfassungsModal<FormWerte>
         offen={bearbeite !== null}
         titel="Status bearbeiten"
@@ -228,9 +231,22 @@ export default function StatusKatalogTab() {
         // sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam. Der
         // Wurf im Leerfall ist derselbe Gedanke — ein stilles `return` läse sich
         // für die Hülle als Erfolg und schlösse den Dialog ohne Request.
-        onErfassen={async (w) => {
+        // NICHT die Werte aus `onFinish` (`w`), sondern der Formularspeicher (LFH-346 · A8):
+        // ohne `forceRender` sind die eingeklappten Felder nicht montiert, und `onFinish`
+        // liefert ausschliesslich montierte Felder. Farbe, FMS-Anker und Sortierung eines
+        // bearbeiteten Status fielen sonst bei jedem Speichern heraus, an dem niemand
+        // aufgeklappt hat — `StatusEingabe` ist Vollersatz, `farbe: null` löschte sie still.
+        // Ein Rückfall auf `bearbeite.farbe` wäre die FALSCHE Reparatur: er kann „nie
+        // montiert" nicht von „aufgeklappt und bewusst geleert" unterscheiden und füllte ein
+        // absichtlich geräumtes Feld wieder. `getFieldsValue(true)` liest den Speicher ganz
+        // aus — dort steht, was `setFieldsValue` beim Öffnen geschrieben hat, und dort steht
+        // `undefined`, wenn jemand das Feld sichtbar geleert hat.
+        //
+        // Beachten: der Aufruf ist bei antd `any`-typisiert — die Feldnamen prüft nicht
+        // er, sondern der Parametertyp von `mutationFn`.
+        onErfassen={async () => {
           if (!bearbeite) throw new Error('Kein Datensatz zum Bearbeiten');
-          await speichern.mutateAsync({ id: bearbeite.id, werte: w });
+          await speichern.mutateAsync({ id: bearbeite.id, werte: form.getFieldsValue(true) });
         }}
         onFertig={() => setBearbeite(null)}
         onAbbrechen={() => setBearbeite(null)}
@@ -246,15 +262,42 @@ export default function StatusKatalogTab() {
             }))}
           />
         </Form.Item>
-        <Form.Item label="Farbe (Hex, optional)" name="farbe">
-          <Input placeholder="#22aa55" />
-        </Form.Item>
-        <Form.Item label="FMS-Anker (0–9, optional)" name="fms_anker">
-          <InputNumber min={0} max={9} style={{ width: '100%', maxWidth: 120 }} />
-        </Form.Item>
-        <Form.Item label="Sortierung" name="sortier">
-          <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-        </Form.Item>
+        {/* FELDBUDGET (LFH-346 · A8, Befund N20): zwei sichtbare Felder, drei eingeklappt.
+            Sichtbar bleiben genau die Pflichtwerte — Farbe, FMS-Anker und Sortierung sind
+            optional und tragen einen brauchbaren Bestandswert; kein Pflichtfeld wandert
+            hinter den Collapse (LFH-343 · H49).
+
+            Bewusst OHNE `forceRender` — dieselbe Entscheidung wie in `AuftragFormular`:
+            nur wenn die eingeklappten Felder gar nicht im DOM stehen, ist „im
+            Ausgangszustand zwei Felder" überhaupt prüfbar, und erst zusammen mit der
+            zweiten Hälfte („Aufklappen bringt die drei") ist die Zusicherung widerlegbar.
+            Der Preis dafür — unmontierte Felder fehlen in `onFinish` — ist am
+            `onErfassen` oben bezahlt, nicht mit `forceRender`.
+
+            Beschriftung „Weitere Angaben" wie in `AufnahmeFelder`, `MaterialPage` und
+            `FahrzeugePage`; der Plan schrieb „Erweitert", eine zweite Sprachvariante für
+            dieselbe Sache wäre das Gegenteil des Ticketziels. */}
+        <Collapse
+          ghost
+          style={{ marginInline: -8 }}
+          items={[{
+            key: 'weitere',
+            label: 'Weitere Angaben',
+            children: (
+              <>
+                <Form.Item label="Farbe (Hex, optional)" name="farbe">
+                  <Input placeholder="#22aa55" />
+                </Form.Item>
+                <Form.Item label="FMS-Anker (0–9, optional)" name="fms_anker">
+                  <InputNumber min={0} max={9} style={{ width: '100%', maxWidth: 120 }} />
+                </Form.Item>
+                <Form.Item label="Sortierung" name="sortier">
+                  <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
+                </Form.Item>
+              </>
+            ),
+          }]}
+        />
       </ErfassungsModal>
     </AdminPage>
   );

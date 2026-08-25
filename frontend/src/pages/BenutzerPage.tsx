@@ -1,4 +1,6 @@
-import { App, Button, Form, Input, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import {
+  App, Button, Collapse, Form, Input, Popconfirm, Space, Tag, type TableColumnsType,
+} from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -203,8 +205,15 @@ export default function BenutzerPage() {
           also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
           war ein DOM-Geschwister ausserhalb. KEIN `serie`: ein Benutzerkonto legt man
           nicht im Minutentakt an. Das `autoFocus` am ersten Feld ist weg — den Fokus
-          setzt die Hülle, und zwei Quellen dafür sind eine zu viel. Die Feldzahl
-          bleibt unverändert (Kürzung ist A8). */}
+          setzt die Hülle, und zwei Quellen dafür sind eine zu viel.
+
+          FELDBUDGET seit A8 (Befund N20): drei sichtbare Felder, zwei eingeklappt.
+          Sichtbar bleiben die Pflichtwerte Anzeigename, Benutzername und Passwort;
+          die beiden Rollen tragen mit `keiner`/`keine` einen brauchbaren Vorgabewert
+          und sind damit die einzigen zwei Felder, die eingeklappt sein DÜRFEN
+          (LFH-343 · H49) — die schwächste Rolle ist beim Anlegen zugleich die
+          richtige Vorgabe. Der Bearbeiten-Dialog darunter hat drei Felder und bleibt
+          unverändert. */}
       <ErfassungsModal<NeuerBenutzer>
         offen={offen}
         titel="Neuen Benutzer anlegen"
@@ -214,7 +223,18 @@ export default function BenutzerPage() {
         initialValues={{ system_rolle: 'keiner', org_rolle: 'keine' }}
         // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
         // sonst leert die Hülle die Felder, obwohl das Konto nie angelegt wurde.
-        onErfassen={(w) => anlegen.mutateAsync(w)}
+        //
+        // Der Formularspeicher statt der `onFinish`-Werte (LFH-346 · A8): ohne
+        // `forceRender` sind die beiden Rollen-Selects nicht montiert, und `onFinish`
+        // liefert nur montierte Felder. Ohne diesen Griff fehlten `system_rolle` und
+        // `org_rolle` im Rumpf, sobald niemand aufklappt — beide sind im DTO optional,
+        // der Server setzte also SEINE Vorgabe statt der hier sichtbar zugesagten.
+        // `getFieldsValue(true)` liest den Speicher ganz aus; dort stehen die
+        // `initialValues` und, nach einem Aufklappen, die getroffene Wahl.
+        //
+        // Beachten: der Aufruf ist bei antd `any`-typisiert — die Feldnamen prüft
+        // nicht er, sondern der Parametertyp von `mutationFn`.
+        onErfassen={() => anlegen.mutateAsync(form.getFieldsValue(true))}
         onFertig={() => setOffen(false)}
         onAbbrechen={() => setOffen(false)}
       >
@@ -239,12 +259,27 @@ export default function BenutzerPage() {
         >
           <Input.Password autoComplete="new-password" />
         </Form.Item>
-        <Form.Item label="System-Rolle" name="system_rolle">
-          <Select options={SYSTEM_ROLLEN} />
-        </Form.Item>
-        <Form.Item label="Org-Rolle" name="org_rolle">
-          <Select options={ORG_ROLLEN} />
-        </Form.Item>
+        {/* Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur wenn die
+            eingeklappten Felder gar nicht im DOM stehen, ist „im Ausgangszustand drei
+            Felder" prüfbar. Begründung und Gegenmittel am `onErfassen` oben. */}
+        <Collapse
+          ghost
+          style={{ marginInline: -8 }}
+          items={[{
+            key: 'rollen',
+            label: 'Weitere Angaben',
+            children: (
+              <>
+                <Form.Item label="System-Rolle" name="system_rolle">
+                  <Select options={SYSTEM_ROLLEN} />
+                </Form.Item>
+                <Form.Item label="Org-Rolle" name="org_rolle">
+                  <Select options={ORG_ROLLEN} />
+                </Form.Item>
+              </>
+            ),
+          }]}
+        />
       </ErfassungsModal>
 
       {/* Der Dialog steht jetzt UNBEDINGT im Baum (`offen` statt `{zuBearbeiten && …}`):

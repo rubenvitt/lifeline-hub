@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
@@ -111,5 +111,109 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
     expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');
     expect(screen.getByLabelText('Bestandsnummer')).toHaveValue('');
+  });
+
+  /**
+   * LFH-346 · A8, Befund N20. Die tragende Prüfung des Collapse-Umbaus — nicht die
+   * Zählung darunter: beide Hälften der Zählung stünden grün, während jedes Speichern
+   * drei Felder still leert.
+   *
+   * `MaterialEingabe` ist Vollersatz. Ohne `forceRender` sind Träger, Standort und
+   * Bemerkung nicht montiert, und `onFinish` liefert nur montierte Felder — ein
+   * `onErfassen`, das seine Werte von dort nimmt, schickte drei `null` an ein
+   * Material, an dem niemand etwas davon angefasst hat.
+   */
+  it('behält Träger, Standort und Bemerkung, wenn niemand aufklappt', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/material/3', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(material);
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness bestand={{ ...material, bemerkung: 'Zweite Reihe' }} />);
+    const feld = await screen.findByLabelText('Bezeichnung');
+    await nutzer.clear(feld);
+    await nutzer.type(feld, 'Wolldecke groß');
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toEqual({
+      bezeichnung: 'Wolldecke groß',
+      kategorie: 'Betreuung',
+      bestandsnummer: 'INV-7',
+      traegerorganisation: 'DRK Musterstadt',
+      standort: 'Lagerhalle 2',
+      bemerkung: 'Zweite Reihe',
+    });
+  });
+
+  /**
+   * Die Gegenprobe: ein aufgeklappt geleerter Standort kommt auch geleert an. Ein
+   * Rückfall auf `material?.standort` bestünde die Prüfung darüber und fiele hier.
+   */
+  it('ein aufgeklappt geleerter Standort kommt geleert an', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/material/3', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(material);
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness bestand={material} />);
+    await screen.findByLabelText('Bezeichnung');
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await nutzer.clear(await screen.findByLabelText('Standort'));
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toMatchObject({ standort: null, traegerorganisation: 'DRK Musterstadt' });
+  });
+
+  /**
+   * Träger und Standort sind zugleich die Wiederholfelder des Serienlaufs
+   * (`uebernahme`) und liegen seit A8 hinter dem Collapse. Die Hülle liest sie aus
+   * den `onFinish`-Werten, also nur, solange sie montiert sind — was sie sind,
+   * sobald jemand aufgeklappt hat, um sie überhaupt einzutragen. Und der Bereich
+   * bleibt über ein `resetFields` hinweg offen. Beides zusammen ist die Aussage;
+   * ohne diese Prüfung wäre „Wiederholfeld hinter dem Collapse" eine Vermutung.
+   */
+  it('Wiederholfelder überleben den Serienlauf auch hinter dem Collapse', async () => {
+    handler();
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    await nutzer.type(await screen.findByLabelText('Bezeichnung'), 'Wolldecke');
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await nutzer.type(await screen.findByLabelText('Trägerorganisation'), 'DRK Musterstadt');
+    await nutzer.type(screen.getByLabelText('Standort'), 'Lagerhalle 2');
+    await nutzer.click(screen.getByRole('checkbox', { name: /Werte behalten/ }));
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveValue(''));
+    expect(screen.getByLabelText('Trägerorganisation')).toHaveValue('DRK Musterstadt');
+    expect(screen.getByLabelText('Standort')).toHaveValue('Lagerhalle 2');
+  });
+
+  /**
+   * Das Feldbudget (LFH-346 · A8): drei sichtbare Felder statt sechs.
+   *
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist
+   * ein `AutoComplete` und zählte in der Rollenzählung als `combobox`. Die zweite
+   * Hälfte ist Pflicht: „höchstens drei" allein erfüllte auch ein Dialog ohne Felder.
+   */
+  it('zeigt drei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
+    handler();
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    // Der Dialog, NICHT `container`: antds Modal hängt in einem Portal an `body`.
+    const dialog = await screen.findByRole('dialog');
+
+    expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(3);
+
+    await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(6));
   });
 });

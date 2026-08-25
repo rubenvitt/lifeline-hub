@@ -339,7 +339,11 @@ describe('OnlineQuellenVerwaltung', () => {
 
     // Default ist an (LFH-190); den „Über Server proxen"-Switch gezielt AUSschalten
     // (zwei Switches im Form) → proxy:false (Fall: Anbieter verbietet Proxying).
-    const proxyItem = within(dialog).getByText('Über Server proxen').closest('.ant-form-item');
+    // Der Schalter liegt seit LFH-346 · A8 unter „Weitere Angaben" und ist ohne
+    // `forceRender` bis zum Aufklappen gar nicht im Baum — deshalb der Klick davor.
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    const proxyItem = (await within(dialog).findByText('Über Server proxen'))
+      .closest('.ant-form-item');
     await userEvent.click(within(proxyItem as HTMLElement).getByRole('switch'));
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));

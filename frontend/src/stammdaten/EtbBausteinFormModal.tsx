@@ -1,4 +1,4 @@
-import { App, Form, Input, InputNumber, Typography } from 'antd';
+import { App, Collapse, Form, Input, InputNumber, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -77,7 +77,19 @@ export default function EtbBausteinFormModal({
       laeuft={mutation.isPending}
       initialValues={{ typ: 'meldung', sortier: 0 }}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
-      onErfassen={(w) => mutation.mutateAsync(w)}
+      //
+      // Der Formularspeicher statt der `onFinish`-Werte (LFH-346 · A8): ohne
+      // `forceRender` sind Meldeweg, Veranlassung und Sortierung nicht montiert, und
+      // `onFinish` liefert nur montierte Felder. `BausteinEingabe` ist Vollersatz —
+      // ein bearbeiteter Baustein verlöre seinen Meldeweg und seine Reihenfolge bei
+      // jedem Speichern, an dem niemand aufgeklappt hat. Ein Rückfall auf
+      // `baustein?.meldeweg` wäre die falsche Reparatur: er kann „nie montiert" nicht
+      // von „aufgeklappt und bewusst geleert" unterscheiden — und der Meldeweg-Select
+      // trägt `allowClear`, das Leeren ist also ein vorgesehener Weg.
+      //
+      // Beachten: `getFieldsValue(true)` ist bei antd `any`-typisiert — die Feldnamen
+      // prüft nicht dieser Aufruf, sondern der Parametertyp von `mutationFn`.
+      onErfassen={() => mutation.mutateAsync(form.getFieldsValue(true))}
       onFertig={onClose}
       onAbbrechen={onClose}
     >
@@ -106,15 +118,35 @@ export default function EtbBausteinFormModal({
       >
         <Input.TextArea rows={2} placeholder="Vorlagentext mit {platzhalter}" />
       </Form.Item>
-      <Form.Item label="Meldeweg (optional)" name="meldeweg">
-        <Select allowClear options={MELDEWEG_OPTIONEN} />
-      </Form.Item>
-      <Form.Item label="Veranlassung (optional)" name="veranlassung">
-        <Input />
-      </Form.Item>
-      <Form.Item label="Sortierung" name="sortier">
-        <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-      </Form.Item>
+      {/* FELDBUDGET (LFH-346 · A8, Befund N20): drei sichtbare Felder, drei eingeklappt.
+          Label, Typ und Inhalt sind die Pflichtwerte und bleiben oben; Meldeweg und
+          Veranlassung sind ausdrücklich optional, die Sortierung hat mit 0 einen
+          brauchbaren Vorgabewert — kein Pflichtfeld wandert (LFH-343 · H49).
+
+          Bewusst OHNE `forceRender` (wie `AuftragFormular`) — sonst wäre „im
+          Ausgangszustand drei Felder" nicht prüfbar. Begründung und Gegenmittel am
+          `onErfassen` oben. */}
+      <Collapse
+        ghost
+        style={{ marginInline: -8 }}
+        items={[{
+          key: 'weitere',
+          label: 'Weitere Angaben',
+          children: (
+            <>
+              <Form.Item label="Meldeweg (optional)" name="meldeweg">
+                <Select allowClear options={MELDEWEG_OPTIONEN} />
+              </Form.Item>
+              <Form.Item label="Veranlassung (optional)" name="veranlassung">
+                <Input />
+              </Form.Item>
+              <Form.Item label="Sortierung" name="sortier">
+                <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
+              </Form.Item>
+            </>
+          ),
+        }]}
+      />
     </ErfassungsModal>
   );
 }
