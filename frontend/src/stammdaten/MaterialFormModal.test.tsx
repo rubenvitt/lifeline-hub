@@ -198,6 +198,40 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
+   * Der Collapse liegt IM `<form>` — also in Reichweite der eingebauten
+   * Formularübermittlung. Der Dateikopf von `components/Erfassung.tsx` benennt die
+   * Falle: Enter löst den ERSTEN Übermittlungsknopf im Baum aus, und der Klapp-Kopf
+   * steht vor dem Speichern-Knopf. Wäre er ein `<button>` ohne `type="button"`,
+   * klappte Enter im ersten Feld den Bereich auf, statt zu speichern.
+   *
+   * GEMESSEN ist er ein `<div role="button">` (antd 6) — die Zusicherung hält also.
+   * Diese Prüfung ist die Stelle, an der ein antd-Sprung das auffliegen liesse; die
+   * Struktur-Abfragen daneben (keine Fusszeile, Knopf im `<form>`) blieben dabei
+   * beide grün. Hier ist Enter ausnahmsweise per Tastendruck belegbar: das erste
+   * sichtbare Feld ist ein einfaches `Input`, `@rc-component/select` kommt nicht
+   * dazwischen.
+   */
+  it('Enter im ersten Feld speichert — der Klapp-Kopf fängt es nicht ab', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/material', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...material, id: 9 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    await nutzer.type(await screen.findByLabelText('Bezeichnung'), 'Wolldecke{Enter}');
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toMatchObject({ bezeichnung: 'Wolldecke' });
+    // Die Gegenaussage: der Bereich ist NICHT aufgeklappt — Enter hat gespeichert,
+    // nicht den Klapp-Kopf ausgelöst.
+    expect(screen.queryByLabelText('Standort')).toBeNull();
+  });
+
+  /**
    * Das Feldbudget (LFH-346 · A8): drei sichtbare Felder statt sechs.
    *
    * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist
