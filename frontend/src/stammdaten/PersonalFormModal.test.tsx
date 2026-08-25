@@ -94,12 +94,25 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
     await waitFor(() => expect(geschlossen).toHaveBeenCalledTimes(1));
   });
 
-  it('ist KEIN Serienmodus — „Speichern und nächste" gibt es hier nicht', async () => {
-    // Die Maske dient auch dem Bearbeiten; eine Serie ergäbe dort keinen Sinn.
+  /**
+   * Das Paar zu `serie={person == null}` (LFH-346/A6). Beide Hälften zusammen sind die
+   * Aussage: erst „im Anlegen-Fall DA" und „im Bearbeiten-Fall WEG" machen die
+   * Modus-Bedingung prüfbar — eine der beiden allein bliebe auch bei einem festen
+   * `serie`-Wert grün.
+   */
+  it('Anlegen: der Serienweg steht — hier wird Personal am Stück erfasst', async () => {
     handler();
     renderMitProviders(<Harness />);
     await screen.findByLabelText('Name');
-    expect(screen.queryByRole('button', { name: 'Speichern und nächste' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Speichern und nächste/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+  });
+
+  it('Bearbeiten: KEIN Serienweg — „Speichern und nächste" wäre ein toter Knopf', async () => {
+    handler();
+    renderMitProviders(<Harness bestand={person} />);
+    await screen.findByLabelText('Name');
+    expect(screen.queryByRole('button', { name: /Speichern und nächste/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
 

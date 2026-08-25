@@ -1,8 +1,9 @@
-import { App, Form, Input, Modal } from 'antd';
+import { App, Form, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
+import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereSprechgruppe, legeSprechgruppeAn } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
@@ -27,17 +28,14 @@ export default function SprechgruppeFormModal({
   const qc = useQueryClient();
   const { message } = App.useApp();
 
+  // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal` (LFH-346/A6).
   useEffect(() => {
-    if (!offen) return;
-    if (sprechgruppe) {
-      form.setFieldsValue({
-        bezeichnung: sprechgruppe.bezeichnung,
-        betriebsart: sprechgruppe.betriebsart,
-        hinweis: sprechgruppe.hinweis ?? undefined,
-      });
-    } else {
-      form.resetFields();
-    }
+    if (!offen || !sprechgruppe) return;
+    form.setFieldsValue({
+      bezeichnung: sprechgruppe.bezeichnung,
+      betriebsart: sprechgruppe.betriebsart,
+      hinweis: sprechgruppe.hinweis ?? undefined,
+    });
   }, [offen, sprechgruppe, form]);
 
   const mutation = useMutation({
@@ -51,47 +49,47 @@ export default function SprechgruppeFormModal({
         ? aktualisiereSprechgruppe(sprechgruppe.id, eingabe)
         : legeSprechgruppeAn(eingabe);
     },
+    // Kein `onClose()` mehr: das Schliessen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() });
-      onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   return (
-    <Modal
-      open={offen}
-      title={sprechgruppe ? 'Sprechgruppe bearbeiten' : 'Sprechgruppe anlegen'}
-      okText="Speichern"
-      confirmLoading={mutation.isPending}
-      onOk={() => form.submit()}
-      onCancel={onClose}
-      destroyOnHidden
+    <ErfassungsModal<FormWerte>
+      offen={offen}
+      titel={sprechgruppe ? 'Sprechgruppe bearbeiten' : 'Sprechgruppe anlegen'}
+      form={form}
+      erfassenText="Speichern"
+      laeuft={mutation.isPending}
+      // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
+      onErfassen={(w) => mutation.mutateAsync(w)}
+      onFertig={onClose}
+      onAbbrechen={onClose}
     >
-      <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => mutation.mutate(w)}>
-        <Form.Item
-          label="Bezeichnung"
-          name="bezeichnung"
-          rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
-        >
-          <Input placeholder="z. B. 412_F_DRK" />
-        </Form.Item>
-        <Form.Item
-          label="Betriebsart"
-          name="betriebsart"
-          rules={[{ required: true, message: 'Betriebsart ist erforderlich' }]}
-        >
-          <Select
-            options={[
-              { value: 'TMO', label: 'TMO – Trunked Mode' },
-              { value: 'DMO', label: 'DMO – Direct Mode' },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item label="Hinweis" name="hinweis">
-          <Input placeholder="Optionaler Hinweis" />
-        </Form.Item>
-      </Form>
-    </Modal>
+      <Form.Item
+        label="Bezeichnung"
+        name="bezeichnung"
+        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+      >
+        <Input placeholder="z. B. 412_F_DRK" />
+      </Form.Item>
+      <Form.Item
+        label="Betriebsart"
+        name="betriebsart"
+        rules={[{ required: true, message: 'Betriebsart ist erforderlich' }]}
+      >
+        <Select
+          options={[
+            { value: 'TMO', label: 'TMO – Trunked Mode' },
+            { value: 'DMO', label: 'DMO – Direct Mode' },
+          ]}
+        />
+      </Form.Item>
+      <Form.Item label="Hinweis" name="hinweis">
+        <Input placeholder="Optionaler Hinweis" />
+      </Form.Item>
+    </ErfassungsModal>
   );
 }

@@ -106,8 +106,12 @@ export default function PersonalFormModal({
    * und liegt damit weit über der Modal-Leitlinie aus LFH-19 (≤ ~3 Felder). Das ist
    * bekannt und hier bewusst NICHT angefasst: umgestellt wird die Hülle
    * (Enter-Absenden, Fokus, symmetrisches Zurücksetzen), nicht der Feldbestand.
-   * Ebenso bewusst OHNE `serie` — die Maske dient auch dem Bearbeiten einer
-   * bestehenden Person, und „Speichern und nächste" ergibt dort keinen Sinn.
+   * `serie` stand hier zunächst bewusst NICHT, weil die Maske auch dem Bearbeiten
+   * einer bestehenden Person dient und „Speichern und nächste" dort ein toter Knopf
+   * wäre. Dieser Einwand ist mit der Modus-Bedingung erledigt (LFH-346/A6):
+   * `serie={person == null}` zeigt den Serienweg genau im Anlegen-Fall — dem, in dem
+   * eine Einheit ihr Personal am Stück erfasst. `uebernahme` trägt nur, was über eine
+   * Serie hinweg gleich bleibt: die Trägerorganisation, nie Name oder Personalnummer.
    */
   return (
     <ErfassungsModal<FormWerte>
@@ -117,6 +121,8 @@ export default function PersonalFormModal({
       erfassenText="Speichern"
       laeuft={mutation.isPending}
       initialValues={{ qualifikation_ids: [] }}
+      serie={person == null}
+      uebernahme={['traegerorganisation']}
       onErfassen={(w) => mutation.mutateAsync(w)}
       onFertig={onClose}
       onAbbrechen={onClose}

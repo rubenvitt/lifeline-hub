@@ -1,8 +1,9 @@
-import { Alert, App, Form, Input, InputNumber, Modal, Switch } from 'antd';
+import { Alert, App, Form, Input, InputNumber, Switch } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
+import { ErfassungsModal } from '../components/Erfassung';
 import type { OnlineStyleTyp } from '../api/karte';
 import {
   aktualisiereOnlineQuelle,
@@ -54,24 +55,22 @@ export default function OnlineQuelleFormModal({
   const { message } = App.useApp();
   const typ = Form.useWatch('typ', form) ?? 'vektor';
 
+  // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal` (LFH-346/A6).
+  // Die Vorgaben des Anlegen-Zweigs stehen jetzt als `initialValues` an der Hülle;
+  // von dort holt sie jedes `resetFields` wieder, inklusive der aktuellen
+  // `naechsteSortier` (das Literal wird bei jedem Rendern neu übergeben).
   useEffect(() => {
-    if (!offen) return;
-    if (quelle) {
-      form.setFieldsValue({
-        name: quelle.name,
-        url: quelle.url,
-        typ: quelle.typ,
-        attribution: quelle.attribution ?? '',
-        sortier: quelle.sortier,
-        aktiv: quelle.aktiv,
-        proxy: quelle.proxy,
-      });
-    } else {
-      form.resetFields();
-      // LFH-190: Proxy ist Default-an (key-frei + serverseitig gecacht).
-      form.setFieldsValue({ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: true });
-    }
-  }, [offen, quelle, naechsteSortier, form]);
+    if (!offen || !quelle) return;
+    form.setFieldsValue({
+      name: quelle.name,
+      url: quelle.url,
+      typ: quelle.typ,
+      attribution: quelle.attribution ?? '',
+      sortier: quelle.sortier,
+      aktiv: quelle.aktiv,
+      proxy: quelle.proxy,
+    });
+  }, [offen, quelle, form]);
 
   const mutation = useMutation({
     mutationFn: (werte: FormWerte) => {
@@ -87,22 +86,26 @@ export default function OnlineQuelleFormModal({
       };
       return quelle ? aktualisiereOnlineQuelle(quelle.id, body) : legeOnlineQuelleAn(body);
     },
+    // Kein `onClose()` mehr: das Schliessen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => {
       invalidiereKarte(qc);
-      onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   return (
-    <Modal
-      open={offen}
-      title={quelle ? 'Online-Quelle bearbeiten' : 'Online-Quelle hinzufügen'}
-      okText="Speichern"
-      confirmLoading={mutation.isPending}
-      onOk={() => form.submit()}
-      onCancel={onClose}
-      destroyOnHidden
+    <ErfassungsModal<FormWerte>
+      offen={offen}
+      titel={quelle ? 'Online-Quelle bearbeiten' : 'Online-Quelle hinzufügen'}
+      form={form}
+      erfassenText="Speichern"
+      laeuft={mutation.isPending}
+      // LFH-190: Proxy ist Default-an (key-frei + serverseitig gecacht).
+      initialValues={{ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: true }}
+      // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
+      onErfassen={(w) => mutation.mutateAsync(w)}
+      onFertig={onClose}
+      onAbbrechen={onClose}
     >
       <Alert
         type="info"
@@ -110,63 +113,61 @@ export default function OnlineQuelleFormModal({
         style={{ marginBottom: 16 }}
         title="Über Server proxen (Standard)"
         description={
-          'Empfohlen: Der Server holt Style/Tiles/Sprite/Glyphs und speichert sie zwischen — ' +
-          'Schlüssel bleiben server-seitig (erscheinen nie im Browser) und gleiche Kacheln treffen ' +
-          'den Anbieter nur einmal. Für key-basierte Anbieter (z. B. MapTiler, Stadia) die volle ' +
-          'URL inkl. Schlüssel eintragen. Proxy nur abschalten, wenn der Anbieter Proxying/Caching ' +
-          'untersagt (z. B. OSM-Standard-Tiles) — dann läuft die URL direkt im Browser.'
+          'Empfohlen: Der Server holt Style/Tiles/Sprite/Glyphs und speichert sie zwischen — '
+          + 'Schlüssel bleiben server-seitig (erscheinen nie im Browser) und gleiche Kacheln treffen '
+          + 'den Anbieter nur einmal. Für key-basierte Anbieter (z. B. MapTiler, Stadia) die volle '
+          + 'URL inkl. Schlüssel eintragen. Proxy nur abschalten, wenn der Anbieter Proxying/Caching '
+          + 'untersagt (z. B. OSM-Standard-Tiles) — dann läuft die URL direkt im Browser.'
         }
       />
-      <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => mutation.mutate(w)}>
-        <Form.Item
-          label="Name"
-          name="name"
-          rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-        >
-          <Input placeholder="z. B. OpenStreetMap" />
-        </Form.Item>
-        <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
-          <Select options={TYP_OPTIONEN} />
-        </Form.Item>
-        <Form.Item
-          label="URL"
-          name="url"
-          rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
-        >
-          <Input placeholder={URL_PLATZHALTER[typ]} />
-        </Form.Item>
-        <Form.Item
-          label="Attribution"
-          name="attribution"
-          tooltip="Pflichtangabe — Urheber/Lizenz der Kartendaten (rechtlich erforderlich)."
-          rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
-        >
-          <Input.TextArea rows={2} placeholder="© OpenStreetMap-Mitwirkende" />
-        </Form.Item>
-        <Form.Item
-          label="Sortierung"
-          name="sortier"
-          tooltip="Reihenfolge im Basemap-Switcher (kleiner = weiter oben)."
-        >
-          <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
-        </Form.Item>
-        <Form.Item
-          label="Aktiv"
-          name="aktiv"
-          valuePropName="checked"
-          tooltip="Nur aktive Quellen erscheinen im Basemap-Switcher der Lagekarte."
-        >
-          <Switch />
-        </Form.Item>
-        <Form.Item
-          label="Über Server proxen"
-          name="proxy"
-          valuePropName="checked"
-          tooltip="Standard an: Server holt Style/Tiles/Sprite/Glyphs, hält Schlüssel server-seitig und cacht die Antworten (LFH-182/190). Abschalten nur, wenn der Anbieter Proxying/Caching untersagt."
-        >
-          <Switch />
-        </Form.Item>
-      </Form>
-    </Modal>
+      <Form.Item
+        label="Name"
+        name="name"
+        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
+      >
+        <Input placeholder="z. B. OpenStreetMap" />
+      </Form.Item>
+      <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
+        <Select options={TYP_OPTIONEN} />
+      </Form.Item>
+      <Form.Item
+        label="URL"
+        name="url"
+        rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
+      >
+        <Input placeholder={URL_PLATZHALTER[typ]} />
+      </Form.Item>
+      <Form.Item
+        label="Attribution"
+        name="attribution"
+        tooltip="Pflichtangabe — Urheber/Lizenz der Kartendaten (rechtlich erforderlich)."
+        rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
+      >
+        <Input.TextArea rows={2} placeholder="© OpenStreetMap-Mitwirkende" />
+      </Form.Item>
+      <Form.Item
+        label="Sortierung"
+        name="sortier"
+        tooltip="Reihenfolge im Basemap-Switcher (kleiner = weiter oben)."
+      >
+        <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
+      </Form.Item>
+      <Form.Item
+        label="Aktiv"
+        name="aktiv"
+        valuePropName="checked"
+        tooltip="Nur aktive Quellen erscheinen im Basemap-Switcher der Lagekarte."
+      >
+        <Switch />
+      </Form.Item>
+      <Form.Item
+        label="Über Server proxen"
+        name="proxy"
+        valuePropName="checked"
+        tooltip="Standard an: Server holt Style/Tiles/Sprite/Glyphs, hält Schlüssel server-seitig und cacht die Antworten (LFH-182/190). Abschalten nur, wenn der Anbieter Proxying/Caching untersagt."
+      >
+        <Switch />
+      </Form.Item>
+    </ErfassungsModal>
   );
 }
