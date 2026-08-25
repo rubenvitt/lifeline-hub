@@ -41,7 +41,7 @@ describe('EinheitTypenTab', () => {
   it('Admin sieht „Typ anlegen"', async () => {
     render(admin);
     await screen.findByText('Zug');
-    expect(screen.getByRole('button', { name: 'Typ anlegen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Typ anlegen' })).toBeEnabled();
   });
 
   // Ordnung statt bloßer Anwesenheit: geprüft wird, was Sortierung und Suche mit den Zeilen TUN.
@@ -67,12 +67,24 @@ describe('EinheitTypenTab', () => {
     await waitFor(() => expect(labels()).toEqual(['Zug']));
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
+   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
+   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
+   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
+   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
+   * eine als Versehen der anderen.
+   */
+  it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
     await screen.findByText('Zug');
+    // `waitFor`, weil der Knopf beim ersten Anstrich noch ungesperrt sein kann: das
+    // Recht kommt aus `auth/me` und trifft eine Runde nach der Tabelle ein.
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Typ anlegen' })).not.toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: 'Typ anlegen' })).toBeDisabled(),
     );
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });
 
   /**

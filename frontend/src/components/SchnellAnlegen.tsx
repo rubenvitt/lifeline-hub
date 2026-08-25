@@ -41,6 +41,12 @@ import { useId, useRef, useState } from 'react';
  *    nichts — wie im Vorbild. Ein ausgegrauter Primaerknopf ist auf einer sonst
  *    leeren Katalogseite die einzige sichtbare Handlung; ausgegraut sieht sie
  *    aus wie fehlendes Recht, nicht wie fehlender Text.
+ *    **Genau deshalb ist `gesperrt` eine eigene Prop** (LFH-346, Nacharbeit zu
+ *    Befund M45) und kein abgeleiteter Zustand: das Grau bedeutet hier nun
+ *    tatsaechlich fehlendes Recht — und den Unterschied zum leeren Feld traegt
+ *    nicht die Faerbung, sondern der `RechteHinweis` ueber der Zeile. Ohne diese
+ *    Prop konnte eine Sektion die Zeile nur ganz VERSTECKEN, und ein fehlender
+ *    Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden.
  * 2. Der Fokus kehrt **im naechsten Bild** ins Feld zurueck, nicht sofort —
  *    dieselbe Vorsichtsmassnahme wie in `Erfassung.tsx`, wo gemessen wurde, dass
  *    ein direkter `focus()` nach dem Speichern auf `<body>` landet. Ehrlich
@@ -73,6 +79,12 @@ interface SchnellAnlegenProps {
   onAnlegen: (text: string) => Promise<unknown>;
   /** Laeuft die Mutation? Setzt den Knopf auf Ladeanzeige. */
   laeuft?: boolean;
+  /**
+   * Fehlt das Recht? Sperrt **Feld und Knopf** — die Zeile bleibt sichtbar, statt
+   * zu verschwinden (Kopf, 1.). Den Grund nennt der Aufrufer ueber seinen
+   * `RechteHinweis`; dieses Primitiv kennt ihn nicht und erfindet ihn nicht.
+   */
+  gesperrt?: boolean;
 }
 
 /**
@@ -81,6 +93,7 @@ interface SchnellAnlegenProps {
  */
 export default function SchnellAnlegen({
   beschriftung, platzhalter, knopfText = 'Anlegen', onAnlegen, laeuft = false,
+  gesperrt = false,
 }: SchnellAnlegenProps) {
   const { token } = theme.useToken();
   const feldId = useId();
@@ -92,6 +105,13 @@ export default function SchnellAnlegen({
     // und Enter im Feld. Ob antd einen Klick auf einen ladenden Knopf ohnehin
     // verwirft, ist damit gleichgueltig und wird hier nicht vorausgesetzt.
     if (laeuft) return;
+    // Kein Recht: nichts anlegen. Der Riegel sitzt HIER und nicht am Knopf —
+    // ein gesperrter Knopf verwirft Klicks von selbst, aber `onPressEnter` haengt
+    // am Feld, und ein Tastendruck erreicht dessen React-Handler auch dann noch.
+    // Verlassen wird sich darauf nicht: dass antd/der Browser eine gesperrte
+    // Eingabe stumm schaltet, ist eine Annahme ueber die Bibliothek, dieser
+    // Riegel ist eine Zusicherung dieses Primitivs.
+    if (gesperrt) return;
     const abgeschickt = text;
     const wert = abgeschickt.trim();
     // Leer oder nur Leerzeichen: nichts tun. Kein Fehlerton — es ist kein
@@ -130,8 +150,9 @@ export default function SchnellAnlegen({
           onChange={(e) => setText(e.target.value)}
           onPressEnter={() => void anlegen()}
           placeholder={platzhalter}
+          disabled={gesperrt}
         />
-        <Button type="primary" loading={laeuft} onClick={() => void anlegen()}>
+        <Button type="primary" loading={laeuft} disabled={gesperrt} onClick={() => void anlegen()}>
           {knopfText}
         </Button>
       </Space.Compact>

@@ -53,13 +53,23 @@ describe('StatusKatalogTab', () => {
   it('Admin sieht „Status anlegen", Nicht-Admin nicht', async () => {
     render(admin);
     await screen.findByText('einsatzbereit');
-    expect(screen.getByRole('button', { name: 'Status anlegen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Status anlegen' })).toBeEnabled();
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
+   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
+   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
+   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
+   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
+   * eine als Versehen der anderen.
+   */
+  it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
     await screen.findByText('einsatzbereit');
-    expect(screen.queryByRole('button', { name: 'Status anlegen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Status anlegen' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });
 
   it('Label sortierbar, Kategorie filterbar — die fachliche Reihenfolge bleibt Voreinstellung', async () => {

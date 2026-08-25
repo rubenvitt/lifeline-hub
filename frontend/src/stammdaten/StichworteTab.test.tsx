@@ -40,14 +40,25 @@ describe('StichworteTab', () => {
   it('Admin sieht Hinzufügen und Löschen', async () => {
     renderTab(admin);
     await screen.findByText('H1');
-    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeInTheDocument();
   });
 
-  it('Nicht-Admin sieht weder Hinzufügen noch Löschen', async () => {
+  /**
+   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
+   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
+   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
+   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
+   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
+   * eine als Versehen der anderen.
+   */
+  it('Nicht-Admin: Hinzufügen GESPERRT (samt Feld), Löschen weg', async () => {
     renderTab(nichtAdmin);
     await screen.findByText('H1');
-    expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
+    // Das Feld gehört mit dazu: ein gesperrter Knopf über einem beschreibbaren Feld
+    // lädt zum Tippen ein, das nirgends ankommt.
+    expect(screen.getByLabelText('Neues Stichwort')).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
   });
 

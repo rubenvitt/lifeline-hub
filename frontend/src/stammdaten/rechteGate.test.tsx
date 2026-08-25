@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -63,18 +63,24 @@ function handler(benutzer: typeof admin) {
   );
 }
 
+/**
+ * `aktion` ist der zugängliche Name der PRIMÄRAKTION der Sektion — bei sechs Sektionen der
+ * Knopf im `aktionen`-Slot, bei fünf der Anlegen-Knopf ihrer `SchnellAnlegen`-Zeile, bei
+ * `Organisation` der Speichern-Knopf ihres Formulars. Dass „Status anlegen" zweimal
+ * vorkommt, ist unschädlich: je Durchlauf steht genau eine Sektion im Baum.
+ */
 const SEKTIONEN = [
-  { name: 'Einsatz-Stichworte', Komp: StichworteTab },
-  { name: 'Fahrzeuge', Komp: FahrzeugeTab },
-  { name: 'Material', Komp: MaterialTab },
-  { name: 'Fahrzeug-Status', Komp: StatusKatalogTab },
-  { name: 'Personal', Komp: PersonalTab },
-  { name: 'Qualifikationen', Komp: QualifikationenTab },
-  { name: 'Personal-Status', Komp: PersonalStatusTab },
-  { name: 'ETB-Schnellbausteine', Komp: EtbBausteineTab },
-  { name: 'Einheitstypen', Komp: EinheitTypenTab },
-  { name: 'Organisation', Komp: OrganisationTab },
-  { name: 'Sprechgruppen', Komp: SprechgruppenTab },
+  { name: 'Einsatz-Stichworte', Komp: StichworteTab, aktion: 'Hinzufügen' },
+  { name: 'Fahrzeuge', Komp: FahrzeugeTab, aktion: 'Fahrzeug anlegen' },
+  { name: 'Material', Komp: MaterialTab, aktion: 'Material anlegen' },
+  { name: 'Fahrzeug-Status', Komp: StatusKatalogTab, aktion: 'Status anlegen' },
+  { name: 'Personal', Komp: PersonalTab, aktion: 'Person anlegen' },
+  { name: 'Qualifikationen', Komp: QualifikationenTab, aktion: 'Qualifikation anlegen' },
+  { name: 'Personal-Status', Komp: PersonalStatusTab, aktion: 'Status anlegen' },
+  { name: 'ETB-Schnellbausteine', Komp: EtbBausteineTab, aktion: 'Baustein anlegen' },
+  { name: 'Einheitstypen', Komp: EinheitTypenTab, aktion: 'Typ anlegen' },
+  { name: 'Organisation', Komp: OrganisationTab, aktion: 'Speichern' },
+  { name: 'Sprechgruppen', Komp: SprechgruppenTab, aktion: 'Sprechgruppe anlegen' },
 ];
 
 describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
@@ -90,15 +96,34 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
   });
 
   /**
+   * Die zweite Hälfte derselben Regel (LFH-346, Nacharbeit zu Befund M45) — und die, die
+   * hier gefehlt hat: gepinnt war nur der HINWEISTEXT, nicht die BEHANDLUNG der
+   * Primäraktion. Fünf der elf Sektionen versteckten sie deshalb weiter, ohne dass etwas
+   * rot wurde, während CLAUDE.md „steht gesperrt" für alle elf behauptete. Ein zwölfter
+   * Tab, der wieder versteckt, fällt jetzt hier auf: `getByRole` wirft, wenn der Knopf
+   * fehlt, `toBeDisabled` schlägt fehl, wenn er offen steht.
+   */
+  it.each(SEKTIONEN)('$name zeigt die Primäraktion GESPERRT statt versteckt', async ({ Komp, aktion }) => {
+    handler(nichtAdmin);
+    renderMitProviders(<Komp />);
+    // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
+    await screen.findByText(STAMMDATEN_RECHTE_TEXT);
+    expect(screen.getByRole('button', { name: aktion })).toBeDisabled();
+  });
+
+  /**
    * Die Gegenaussage. Ohne sie bliebe ein Hinweis, der IMMER steht, unentdeckt — und ein
    * Alert, der auch dem Admin erklärt, er dürfe nichts, wäre schlimmer als gar keiner.
    */
-  it.each(SEKTIONEN)('$name zeigt dem Admin KEINEN Rechte-Hinweis', async ({ name, Komp }) => {
+  it.each(SEKTIONEN)('$name zeigt dem Admin KEINEN Rechte-Hinweis', async ({ name, Komp, aktion }) => {
     handler(admin);
     renderMitProviders(<Komp />);
     // Erst auf den gerenderten Seitenkopf warten — ein `queryBy` vor dem ersten Anstrich
     // wäre trivial `null` und belegte nichts.
     expect(await screen.findByRole('heading', { level: 4, name })).toBeInTheDocument();
     expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
+    // Die Gegenaussage zur Sperre. Ohne sie bliebe eine fest verdrahtete `disabled`-Angabe
+    // unentdeckt: elf `toBeDisabled` wären dann grün, und die Seite unbedienbar.
+    await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeEnabled());
   });
 });

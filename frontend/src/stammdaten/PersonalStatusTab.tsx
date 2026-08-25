@@ -164,15 +164,19 @@ export default function PersonalStatusTab() {
           „Status anlegen" stand, und bewusst AUSSERHALB der Fehlerweiche darunter: ein
           gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit
           der Seite verschwinden zu lassen. */}
-      {istAdmin && (
-        <SchnellAnlegen
-          beschriftung="Neuer Personal-Status"
-          platzhalter="z. B. dienstbereit"
-          knopfText="Status anlegen"
-          onAnlegen={(label) => schnellAnlegen.mutateAsync(label)}
-          laeuft={schnellAnlegen.isPending}
-        />
-      )}
+      {/* Die Zeile steht IMMER, auch ohne Recht — dann gesperrt (LFH-346,
+          Nacharbeit zu Befund M45). Sie zu verstecken war die vierte Ausprägung
+          von „nur lesen", die M45 abschaffen sollte: ein fehlender Knopf ist von
+          „diese Seite kann das gar nicht" nicht zu unterscheiden. Den Grund nennt
+          der `RechteHinweis` im `hinweis`-Slot darüber. */}
+      <SchnellAnlegen
+        beschriftung="Neuer Personal-Status"
+        platzhalter="z. B. dienstbereit"
+        knopfText="Status anlegen"
+        onAnlegen={(label) => schnellAnlegen.mutateAsync(label)}
+        laeuft={schnellAnlegen.isPending}
+        gesperrt={!istAdmin}
+      />
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
           (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
           kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer

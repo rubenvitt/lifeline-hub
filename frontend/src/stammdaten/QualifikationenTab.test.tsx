@@ -52,13 +52,23 @@ describe('QualifikationenTab', () => {
   it('Admin sieht „Qualifikation anlegen"', async () => {
     render(admin);
     await screen.findByText('Sanitäter');
-    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeEnabled();
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
+   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
+   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
+   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
+   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
+   * eine als Versehen der anderen.
+   */
+  it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
     await screen.findByText('Sanitäter');
-    expect(screen.queryByRole('button', { name: 'Qualifikation anlegen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Qualifikation anlegen' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });
 
   it('Ordnung: die Leitspalte sortiert, die Suche verengt, ein Filter fehlt mit Grund', async () => {
