@@ -173,3 +173,49 @@ describe('EinsatzModule', () => {
     expect(treffer.closest('.ant-message')).toBeNull();
   });
 });
+
+/**
+ * Durchgriff der Listen-Gruppierung (LFH-346 · A9, Befund M48). `ModulEinstellungsListe` hat
+ * ZWEI Konsumenten — die Gruppierung und das Filterfeld gelten hier genauso, ohne dass diese
+ * Datei dafür eine Zeile Produktivcode braucht.
+ *
+ * Die Sektion behält ihre Sofort-Speicher-Semantik: **kein** Verlassen-Guard, **keine**
+ * Speicherleiste. Beides wäre hier falsch — es gibt keine Fassung, die verloren gehen kann.
+ */
+describe('EinsatzModule · Gruppierung und Filter (LFH-346)', () => {
+  beforeEach(() => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue(EINSTELLUNGEN as never);
+    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
+    benutzerRolle.wert = 'admin';
+  });
+
+  it('gruppiert und filtert die Modulzeilen', async () => {
+    rendern();
+
+    expect(await screen.findByRole('heading', { name: 'Kräfte & Mittel' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Modul filtern'), { target: { value: 'chat' } });
+
+    expect(screen.getByRole('switch', { name: 'Sichtbar: Chat' })).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Sichtbar: ETB' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Kräfte & Mittel' })).toBeNull();
+  });
+
+  it('warnt NICHT beim Verlassen — jede Zeile ist bereits gespeichert', async () => {
+    rendern();
+    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: ETB' }));
+    await waitFor(() => expect(setzeModulOverride).toHaveBeenCalled());
+
+    const e = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(false);
+  });
+});
