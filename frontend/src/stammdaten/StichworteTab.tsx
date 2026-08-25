@@ -1,4 +1,5 @@
 import { App, Button, Input, Popconfirm, Space, Typography, type TableColumnsType } from 'antd';
+import AdminPage from '../components/AdminPage';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -104,7 +105,11 @@ export default function StichworteTab() {
   ];
 
   return (
-    <>
+    <AdminPage titel="Einsatz-Stichworte">
+    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+        handgebaute Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
+        zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
+        einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
       <Typography.Paragraph type="secondary">
         Vorschläge für die Stichwort-Combobox im Einsatzdaten-Modul. Freie Eingabe bleibt im
         Einsatz unabhängig davon möglich.
@@ -148,6 +153,6 @@ export default function StichworteTab() {
           </Button>
         </Space.Compact>
       )}
-    </>
+    </AdminPage>
   );
 }

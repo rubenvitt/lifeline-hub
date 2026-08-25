@@ -1,6 +1,7 @@
 import {
   App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType,
 } from 'antd';
+import AdminPage from '../components/AdminPage';
 import KatalogTabelle from '../components/KatalogTabelle';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -134,7 +135,11 @@ export default function EinheitTypenTab() {
   ];
 
   return (
-    <>
+    <AdminPage titel="Einheitstypen">
+    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+        SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
+        zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
+        einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
       {/* Die Schnellerfassung steht ÜBER der Tabelle — dort, wo bis LFH-332 der Knopf
           „Typ anlegen" stand, und bewusst AUSSERHALB der Fehlerweiche darunter: ein
           gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit
@@ -199,6 +204,6 @@ export default function EinheitTypenTab() {
           <Form.Item label="Sortierung" name="sortier"><InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} /></Form.Item>
         </Form>
       </Modal>
-    </>
+    </AdminPage>
   );
 }

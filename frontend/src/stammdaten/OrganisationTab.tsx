@@ -1,4 +1,5 @@
 import { App, Button, Form, Space, Typography } from 'antd';
+import AdminPage from '../components/AdminPage';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -44,24 +45,29 @@ export default function OrganisationTab() {
   });
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%', maxWidth: 480 }}>
-      <Typography.Paragraph type="secondary">
-        Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar.
-      </Typography.Paragraph>
-      <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
-        <Form.Item label="DV-102-Organisation" name="tz_organisation">
-          <Select
-            options={ORG_OPTIONEN}
-            placeholder="Organisation wählen"
-            loading={orgQuery.isLoading}
-          />
-        </Form.Item>
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-            Speichern
-          </Button>
-        </Form.Item>
-      </Form>
-    </Space>
+    /* KEIN `aktionen`-Slot (LFH-346 · A3): der Speichern-Knopf gehört INS `<form>` und
+       trägt `htmlType="submit"` — der Kopf-Slot von `AdminPage` liegt außerhalb jedes
+       `<form>` und könnte nichts übermitteln (Erfassungs-Norm B4/LFH-332). */
+    <AdminPage titel="Organisation">
+      <Space orientation="vertical" size="middle" style={{ width: '100%', maxWidth: 480 }}>
+        <Typography.Paragraph type="secondary">
+          Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar.
+        </Typography.Paragraph>
+        <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
+          <Form.Item label="DV-102-Organisation" name="tz_organisation">
+            <Select
+              options={ORG_OPTIONEN}
+              placeholder="Organisation wählen"
+              loading={orgQuery.isLoading}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={speichern.isPending}>
+              Speichern
+            </Button>
+          </Form.Item>
+        </Form>
+      </Space>
+    </AdminPage>
   );
 }

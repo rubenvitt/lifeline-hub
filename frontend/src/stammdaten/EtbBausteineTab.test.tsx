@@ -81,10 +81,17 @@ describe('EtbBausteineTab', () => {
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
+   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
+   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
+   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
+   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   */
+  it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
     await screen.findByText('Lage unverändert');
-    expect(screen.queryByRole('button', { name: 'Baustein anlegen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Baustein anlegen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 

@@ -156,10 +156,17 @@ describe('PersonalTab', () => {
     await act(async () => { freigeben?.(); });
   });
 
-  it('Nicht-Admin sieht keine Schreib-Aktionen', async () => {
+  /**
+   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
+   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
+   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
+   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
+   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   */
+  it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
     await screen.findByText('Thomas Müller');
-    expect(screen.queryByRole('button', { name: 'Person anlegen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Person anlegen' })).toBeDisabled();
   });
 
   it('Ordnung: die Leitspalte sortiert, Suche und Dienststatus-Filter verengen', async () => {
