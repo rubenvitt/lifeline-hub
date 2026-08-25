@@ -123,10 +123,15 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
 
   /**
    * `uebernahme` einmal vollständig durchgemessen — die übrigen Masken erben dieselbe
-   * Mechanik aus der Hülle. Träger und Standort sind bei einer Einheit dieselben,
-   * der Funkrufname ist es nie.
+   * Mechanik aus der Hülle. Der Träger ist bei einer Einheit derselbe, der Funkrufname
+   * und das Kennzeichen sind es nie.
+   *
+   * Der Standort stand hier bis LFH-346 · A7 als zweites Wiederholfeld. Er ist mit den
+   * sechs anderen auf die Detailseite gewandert; `uebernahme` darf ausschliesslich
+   * SICHTBARE Felder nennen, sonst behauptet „Werte behalten" etwas über ein Feld, das in
+   * diesem Dialog nicht existiert. Die Gegenaussage steht deshalb hier: kein Standort mehr.
    */
-  it('hält beim Serien-Speichern Träger und Standort und leert den Rest', async () => {
+  it('hält beim Serien-Speichern den Träger und leert den Rest', async () => {
     handler();
     const geschlossen = vi.fn();
     const nutzer = userEvent.setup();
@@ -137,14 +142,14 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
     await nutzer.type(screen.getByLabelText('Trägerorganisation'), 'FF Musterstadt');
     // Die AutoComplete-Liste legt sich sonst über die Knopfreihe und frisst den Klick.
     await nutzer.keyboard('{Escape}');
-    await nutzer.type(screen.getByLabelText('Standort'), 'Wache Mitte');
-    await nutzer.keyboard('{Escape}');
+    await nutzer.type(screen.getByLabelText('Kennzeichen'), 'XX-AB 1');
 
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     await waitFor(() => expect(screen.getByLabelText('Funkrufname')).toHaveValue(''));
     expect(screen.getByLabelText('Trägerorganisation')).toHaveValue('FF Musterstadt');
-    expect(screen.getByLabelText('Standort')).toHaveValue('Wache Mitte');
+    expect(screen.getByLabelText('Kennzeichen')).toHaveValue('');
+    expect(screen.queryByLabelText('Standort')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Funkrufname')).toHaveFocus();
     // Die schärfere Hälfte: der Dialog bleibt OFFEN. Ein im `onSuccess` der Mutation
     // stehengebliebenes `onClose()` schlösse ihn auch im Serienlauf und machte den
@@ -205,5 +210,75 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
 
     await waitFor(() => expect(screen.getByLabelText('Funkrufname')).toHaveValue(''));
+  });
+});
+
+describe('FahrzeugFormModal — Schnellerfassung (LFH-346/A7)', () => {
+  /**
+   * Das Feldbudget (LFH-19: Schnellerfassung ≤ ~4). Gezählt wird über die LABEL, nicht über
+   * `getAllByRole('textbox')`: von den vier Feldern sind zwei AutoComplete und tragen die
+   * Rolle `combobox` — eine Rollenzählung ergäbe 2 und ginge an der Aussage vorbei.
+   *
+   * Die ABWESENHEITS-Hälfte ist die tragende: „vier sind da" bliebe auch dann grün, wenn
+   * die sieben übrigen nebendran stünden. Und es gibt hier bewusst KEINEN `<Collapse>` —
+   * die Felder sind nicht eingeklappt, sie sind auf der Detailseite.
+   */
+  it('zeigt genau die vier Felder, ohne die ein Fahrzeug nicht auffindbar ist', async () => {
+    handler();
+    renderMitProviders(<Harness />);
+    await screen.findByLabelText('Funkrufname');
+
+    for (const label of ['Funkrufname', 'Fahrzeugtyp', 'Trägerorganisation', 'Kennzeichen']) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    for (const label of [
+      'OPTA', 'Standort', 'FMS-ISSI', 'Sonder-/Wegerecht', 'Tragenkapazität',
+      'Soll-Stärke (alle drei oder keiner)', 'Bemerkung',
+    ]) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+  });
+
+  /**
+   * DER Fehler, den die Kürzung erst erzeugt hätte. `PATCH /api/fahrzeuge/{id}` ist ein
+   * echter Teil-Patch (LFH-306): fehlender Key = unverändert, `null` = LEEREN. Und
+   * `leerZuNull(undefined)` ist `null` — hätte die Maske ihren alten Vollersatz-Mapper
+   * behalten, löschte jedes Bearbeiten in der Liste OPTA, Standort, FMS-ISSI,
+   * Tragenkapazität, Soll-Stärke und Bemerkung. Ohne Fehlermeldung, ohne roten Test.
+   *
+   * Geprüft werden die KEYS des Bodys, nicht ihre Werte: `body.opta === undefined` ist für
+   * einen fehlenden Key trivial wahr und belegte nichts (dieselbe Regel wie
+   * `contains_key` auf der Backend-Seite).
+   */
+  it('schickt beim Bearbeiten NUR seine vier Felder — der Teil-Patch lässt den Rest stehen', async () => {
+    const gesendet = vi.fn();
+    handler(gesendet);
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness bestand={fahrzeug} />);
+
+    await nutzer.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
+    expect(Object.keys(gesendet.mock.calls[0][0] as object).sort()).toEqual([
+      'fahrzeugtyp', 'funkrufname', 'kennzeichen', 'traegerorganisation',
+    ]);
+  });
+
+  /**
+   * Der Weg zu den sieben gewanderten Feldern. Beide Hälften: beim ANLEGEN gibt es noch
+   * keine id und damit keine Route — ein Link stünde dort ins Leere.
+   */
+  it('führt beim Bearbeiten auf die Detailseite', async () => {
+    handler();
+    renderMitProviders(<Harness bestand={fahrzeug} />);
+    const link = await screen.findByRole('link', { name: /Mehr Details/ });
+    expect(link).toHaveAttribute('href', '/admin/stammdaten/fahrzeuge/1');
+  });
+
+  it('zeigt beim Anlegen KEINEN Detail-Link — es gibt noch keine id', async () => {
+    handler();
+    renderMitProviders(<Harness />);
+    await screen.findByLabelText('Funkrufname');
+    expect(screen.queryByRole('link', { name: /Mehr Details/ })).not.toBeInTheDocument();
   });
 });

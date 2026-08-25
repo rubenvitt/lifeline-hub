@@ -130,7 +130,12 @@ describe('Feldbreiten im Verwaltungsteil', () => {
       'stammdaten/PersonalStatusTab.tsx': 1,
       'stammdaten/EinheitTypenTab.tsx': 1,
       'stammdaten/StatusKatalogTab.tsx': 2,
-      'stammdaten/FahrzeugFormModal.tsx': 1,
+      // Die Tragenkapazität ist mit LFH-346 · A7 aus `FahrzeugFormModal` auf
+      // `FahrzeugDetailPage` gewandert (elf Felder passen nicht in ein Modal). Die
+      // Obergrenze ist MITGEZOGEN, nicht verschwunden — die Summe unten bleibt 14. Ein
+      // Eintrag ohne Fund färbte den Guard rot, ein stillschweigend gestrichener liesse
+      // die Zahl im Testnamen unbelegt.
+      'stammdaten/FahrzeugDetailPage.tsx': 1,
       'karten/OnlineQuelleFormModal.tsx': 1,
     };
     const gemessen: Record<string, number> = {};
