@@ -73,10 +73,16 @@ Library, Playwright.
 - A8: `karten/OnlineQuelleFormModal`
 - A9: `pages/einstellungen/ModulEinstellungsListe`, `EinsatzDefaults`, `EinsatzModule`
 
-**Reihenfolge:** A1 → A2 → A3 → (A4 ‖ A9) → A6 → (A7 ‖ A8) → A10. A2 muss vor A3 laufen (A3
-braucht den `hinweis`-Slot, den A2 füllt); A6 muss vor A7 **und** A8 laufen (beide kürzen
-Masken, die A6 gerade auf die Hülle zieht); A4 und A9 sind unabhängig und können parallel.
-A5 ist entfallen — siehe dort.
+**Reihenfolge:** (A1 ‖ A4 ‖ A9) → A2 → A3 → A6 → (A7 ‖ A8) → A10.
+
+- A1, A4 und A9 fassen disjunkte Dateien an und laufen parallel.
+- A2 vor A3 (A3 braucht den `hinweis`-Slot, den A2 füllt) — beide fassen **alle** elf Tabs
+  an und können mit nichts parallel laufen.
+- **A6 nach A2/A3**, nicht parallel: vier der zwölf Masken liegen *in* Katalog-Tabs
+  (`QualifikationenTab`, `PersonalStatusTab`, `StatusKatalogTab`, `EinheitTypenTab`), die
+  A2/A3 ohnehin umbauen. Das war im ersten Entwurf falsch geplant.
+- A6 vor A7 **und** A8 (beide kürzen Masken, die A6 gerade auf die Hülle zieht).
+- A5 ist entfallen — siehe dort.
 
 ---
 
@@ -559,9 +565,39 @@ Beide Dateien behalten ihre `<Space size="middle">`-Reihe und bleiben im Scope v
 
 ## Task A6: Die Erfassungsmasken auf die Hülle heben
 
-Befunde M42, M43. Sieben Masken sind rohes `<Modal onOk={() => form.submit()}>` — der Knopf
-liegt **außerhalb** des `<form>`, Enter ist dort tot (Befund H69), es gibt kein `autoFocus`
-und kein symmetrisches Zurücksetzen.
+Befunde M42, M43. **Zwölf von dreizehn** Masken sind rohes
+`<Modal onOk={() => form.submit()}>` — der Knopf liegt **außerhalb** des `<form>`, Enter ist
+dort tot (Befund H69). Nur `PersonalFormModal` nutzt die Hülle (Pilot aus LFH-332);
+`autoFocus` existiert in genau **zwei** der dreizehn (beide in `BenutzerPage`), ein
+Serienweg in **null**.
+
+**Vollständige Liste (gemessen 25.08.2026)** — der erste Planentwurf führte sieben und
+übersah, dass die vier `SchnellAnlegen`-Tabs zwar ihren *Anlegen*-Weg abgegeben haben, ihren
+*Bearbeiten*-Dialog aber weiterhin roh führen:
+
+| Datei | Zeile | sichtbare Felder | Anmerkung |
+| --- | --- | --- | --- |
+| `stammdaten/FahrzeugFormModal.tsx` | 92 | 11 | Kürzung in A7 |
+| `stammdaten/MaterialFormModal.tsx` | 71 | 6 | Kürzung in A8 |
+| `stammdaten/EtbBausteinFormModal.tsx` | 74 | 6 | Kürzung in A8 |
+| `stammdaten/SprechgruppeFormModal.tsx` | 62 | 3 | konform |
+| `stammdaten/QualifikationenTab.tsx` | 158 | 2 | nur Bearbeiten |
+| `stammdaten/PersonalStatusTab.tsx` | 190 | 4 | nur Bearbeiten |
+| `stammdaten/StatusKatalogTab.tsx` | 206 | **5** | nur Bearbeiten, Kürzung in A8 |
+| `stammdaten/EinheitTypenTab.tsx` | 179 | 3 | nur Bearbeiten |
+| `karten/OnlineQuelleFormModal.tsx` | 98 | 7 | Kürzung in A8 |
+| `karten/OfflineDownloadUrlModal.tsx` | 51 | 3 | konform |
+| `pages/BenutzerPage.tsx` | 179 | **5** | Anlegen, Kürzung in A8 |
+| `pages/BenutzerPage.tsx` | 227 | 3 | Bearbeiten; nutzt `key={id}` statt Reset |
+
+**Folge für die Reihenfolge:** vier dieser Masken liegen **in** Katalog-Tabs, die A2/A3
+ohnehin umbauen. A6 läuft deshalb **nach** A2/A3, nicht parallel dazu.
+
+**`BenutzerPage.tsx:227` ist der Sonderfall:** dieser Dialog setzt nicht zurück, sondern
+hängt über `key={zuBearbeiten.id}` am `<Form>` einen frischen Baum ein. Das löst dasselbe
+Problem auf anderem Weg und ist heute korrekt — beim Umstieg auf die Hülle fällt der `key`
+weg, weil die Hülle selbst zurücksetzt. Wer ihn stehen lässt, hat zwei Mechanismen für eine
+Sache.
 
 **Gemessene Falle (LFH-378):** eine Maske auf `ErfassungsModal` zu ziehen **baut die
 rc-field-form-Lücke erst ein** — `destroyOnHidden` hängt die Kinder ab, aber der Speicher
@@ -773,8 +809,22 @@ der Knopf `htmlType="submit"` und Enter sendet).
 
 - [ ] **Step 5: Routen eintragen**
 
-In der Routen-Definition unter `/admin` die zwei Kind-Routen ergänzen:
-`stammdaten/fahrzeuge/:fahrzeugId` und `stammdaten/personal/:personalId`.
+`frontend/src/App.tsx:176-188` — die zwei Kind-Routen **innerhalb** von `<Route path="/admin"
+element={<AdminLayout />}>` ergänzen, neben dem bestehenden `<Route path="benutzer">`:
+
+```tsx
+{/* Detailrouten der Stammdaten. Sie liegen IM AdminLayout, behalten also die Sidebar —
+    eine Detailseite ohne den Verwaltungsrahmen waere eine Sackgasse ohne Rueckweg.
+    Die Sektions-Routen entstehen aus `adminGruppen` (Schleife darueber); diese zwei
+    stehen daneben, weil die Registry Sektionen fuehrt, keine Detailadressen. */}
+<Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
+<Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
+```
+
+Die Reihenfolge gegenüber der `adminGruppen`-Schleife ist gleichgültig — react-router 7
+rankt nach Spezifität, nicht nach Deklarationsreihenfolge. **Zu prüfen:** dass
+`/admin/stammdaten/fahrzeuge` (ohne id) weiterhin die Liste zeigt und nicht auf die
+Detailroute fällt.
 
 - [ ] **Step 6: Beide Modale auf Schnellerfassung kürzen**
 
@@ -834,8 +884,19 @@ statt einer Seite. **Gemessene Feldlisten** (25.08.2026):
 | `karten/OnlineQuelleFormModal` | 7 | Name · URL · Typ | Attribution · Zoom-Grenzen · Proxy-Schalter · Aktiv-Schalter |
 | `stammdaten/EtbBausteinFormModal` | 6 | Label · Typ · Inhalt | Meldeweg · Veranlassung · Sortierung |
 | `stammdaten/MaterialFormModal` | 6 | Bezeichnung · Kategorie · Bestandsnummer | Trägerorganisation · Standort · Bemerkung |
+| `stammdaten/StatusKatalogTab.tsx:206` | 5 | Label · Kategorie | Farbe · FMS-Anker · Sortierung |
+| `pages/BenutzerPage.tsx:179` | 5 | Anzeigename · Benutzername · Passwort | System-Rolle · Org-Rolle |
 
-`SprechgruppeFormModal` trägt 3 Felder und ist bereits konform — kein Task.
+`SprechgruppeFormModal` (3), `OfflineDownloadUrlModal` (3), `PersonalStatusTab` (4),
+`EinheitTypenTab` (3), `QualifikationenTab` (2) und `BenutzerPage.tsx:227` (3) sind bereits
+konform — kein Task.
+
+**Die zwei Fünf-Feld-Masken sind Grenzfälle mit einem gemeinsamen Muster:** was hinter den
+Collapse wandert, hat in beiden Fällen einen **sinnvollen Vorgabewert**
+(`initialValues={{ system_rolle: 'keiner', org_rolle: 'keine' }}` in `BenutzerPage.tsx:194`,
+Farbe/FMS/Sortierung sind optional). Ein Feld mit brauchbarem Default darf eingeklappt sein —
+eins ohne nicht, sonst legt jemand einen Datensatz an, dem etwas Nötiges fehlt, ohne es zu
+sehen. **Kein Pflichtfeld wandert** (LFH-343 · H49).
 
 **Pflichtfeld-Regel (LFH-343 · H49):** kein Feld, das eine Ablehnung auslösen kann, wandert
 hinter den Collapse. Bei allen drei Masken sind genau die Pflichtwerte die sichtbaren.
