@@ -57,7 +57,6 @@ export default function PersonalDetailPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = theme.useToken();
-  const [form] = Form.useForm<FormWerte>();
 
   const personalQuery = useQuery({
     queryKey: globalKeys.personalListe('alle'),
@@ -148,6 +147,19 @@ export default function PersonalDetailPage() {
           `initialValues` wird genau einmal gelesen, ohne den Schluessel truege das
           Formular die Werte des vorigen Satzes.
 
+          UND DESHALB STEHT HIER KEIN `Form.useForm()` (LFH-346, Review-Befund, gemessen).
+          Der Schluessel allein reicht NICHT: eine in der Seite gehaltene Instanz liegt
+          AUSSERHALB des gekeyten Teilbaums, ihr rc-field-form-Speicher ueberlebt den
+          Remount und gewinnt gegen die neuen `initialValues` (`preserve` ist per Vorgabe
+          an) — dieselbe Mechanik, die CLAUDE.md fuer `destroyOnHidden` beschreibt.
+          Ohne die Instanz legt `<Form>` seinen Speicher je `key` selbst an.
+
+          Wer hier `form.validateFields()` o. ae. braucht, holt sich mit `const [form]`
+          den Fehler zurueck — dann ist `key={id}` wieder wirkungslos, und ALLE Tests
+          bleiben gruen ausser „traegt nach dem Wechsel auf einen anderen Datensatz
+          DESSEN Werte". Der Absende-Knopf braucht die Instanz nicht: er liegt als
+          `htmlType="submit"` IM `<form>`.
+
           Ein Effekt, der bei jeder Query-Aenderung `setFieldsValue` ruft, stand hier
           zunaechst und ist WEG: die Query wird auch von FREMDEN Aenderungen invalidiert,
           und wer gerade schrieb, saehe seinen Text ohne Vorwarnung ersetzt (LFH-342 · C7,
@@ -156,7 +168,6 @@ export default function PersonalDetailPage() {
         */}
         <Form<FormWerte>
           key={id}
-          form={form}
           layout="vertical"
           disabled={!istAdmin}
           initialValues={zuFormWerten(person)}

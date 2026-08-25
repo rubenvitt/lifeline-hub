@@ -2,11 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import PersonalDetailPage from './PersonalDetailPage';
 import PersonalTab from './PersonalTab';
+import { personalDetailPfad } from './stammdatenDetail';
 
 /**
  * LFH-346 · A7 — die Personal-Detailroute. Gegenstück zu `FahrzeugDetailPage.test.tsx`;
@@ -24,6 +25,11 @@ const person = {
   telefon: '0170 1234567', staerke_position: 'fuehrer', benutzer_id: null, bemerkung: 'Springer',
   dienststatus: 'in_dienst', qualifikationen: [{ id: 1, label: 'Sanitäter' }],
   angelegt_at: '2026-05-26 09:00:00',
+};
+
+/** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
+const personZwei = {
+  ...person, id: 6, name: 'Anna Schmidt', telefon: '0160 7654321', bemerkung: 'Zweite',
 };
 
 function handler(benutzer = admin, personal: unknown[] = [person], onPatch: (b: unknown) => void = () => {}) {
@@ -47,6 +53,25 @@ function renderRoute(pfad: string) {
       <Route path="/admin/stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
     </Routes>,
     { route: pfad },
+  );
+}
+
+/** Detail→Detail-Sprung wie in `FahrzeugDetailPage.test.tsx` — dieselbe Begründung. */
+function NaechstePerson() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate(personalDetailPfad(6))}>Nächste Person</button>;
+}
+
+function renderMitWechsel() {
+  handler(admin, [person, personZwei]);
+  return renderMitProviders(
+    <>
+      <NaechstePerson />
+      <Routes>
+        <Route path="/admin/stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
+      </Routes>
+    </>,
+    { route: personalDetailPfad(5) },
   );
 }
 
@@ -131,5 +156,24 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     renderRoute('/admin/stammdaten/personal/0');
 
     expect(await screen.findByRole('button', { name: 'Person anlegen' })).toBeInTheDocument();
+  });
+  /**
+   * `key={id}` am `<Form>` — Gegenstück zu `FahrzeugDetailPage.test.tsx`, gleiche Begründung:
+   * `initialValues` wird genau EINMAL beim Mount gelesen, ohne den Schlüssel bearbeitete man
+   * Person 6 mit den Feldern von Person 5. Die Überschrift ist die Positivprobe für den
+   * Routenwechsel, das Feld die eigentliche Aussage.
+   */
+  it('trägt nach dem Wechsel auf einen anderen Datensatz DESSEN Werte', async () => {
+    const nutzer = userEvent.setup();
+    renderMitWechsel();
+
+    expect(await screen.findByRole('heading', { name: 'Thomas Müller' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Telefon')).toHaveValue('0170 1234567');
+
+    await nutzer.click(screen.getByRole('button', { name: 'Nächste Person' }));
+
+    expect(await screen.findByRole('heading', { name: 'Anna Schmidt' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Telefon')).toHaveValue('0160 7654321');
+    expect(screen.getByLabelText('Bemerkung')).toHaveValue('Zweite');
   });
 });

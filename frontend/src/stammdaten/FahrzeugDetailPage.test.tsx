@@ -2,12 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { globalKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import FahrzeugDetailPage from './FahrzeugDetailPage';
 import FahrzeugeTab from './FahrzeugeTab';
+import { fahrzeugDetailPfad } from './stammdatenDetail';
 
 /**
  * LFH-346 · A7 — die Fahrzeug-Detailroute.
@@ -29,6 +30,11 @@ const fahrzeug = {
   sondersignal: true, tragenkapazitaet: 2,
   staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
   bemerkung: 'Reserve', dienststatus: 'in_dienst', angelegt_at: '2026-05-26 10:00:00',
+};
+
+/** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
+const fahrzeugZwei = {
+  ...fahrzeug, id: 8, funkrufname: 'Florian 2', opta: 'FL MUS 08', bemerkung: 'Zweiter',
 };
 
 function handler(benutzer = admin, fahrzeuge: unknown[] = [fahrzeug], onPatch: (b: unknown) => void = () => {}) {
@@ -57,6 +63,29 @@ function renderRoute(pfad: string) {
       <Route path="/admin/stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
     </Routes>,
     { route: pfad },
+  );
+}
+
+/**
+ * Ein Detail→Detail-Sprung, wie ihn ein künftiger „nächstes Fahrzeug"-Link auslöste. Er steht
+ * NEBEN den `Routes`, damit der Klick die Route wechselt, ohne den Baum neu aufzubauen — genau
+ * der Fall, für den `key={id}` am `<Form>` steht.
+ */
+function NaechstesFahrzeug() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate(fahrzeugDetailPfad(8))}>Nächstes Fahrzeug</button>;
+}
+
+function renderMitWechsel() {
+  handler(admin, [fahrzeug, fahrzeugZwei]);
+  return renderMitProviders(
+    <>
+      <NaechstesFahrzeug />
+      <Routes>
+        <Route path="/admin/stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
+      </Routes>
+    </>,
+    { route: fahrzeugDetailPfad(7) },
   );
 }
 
@@ -204,5 +233,28 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     renderRoute('/admin/stammdaten/fahrzeuge/abc');
 
     expect(await screen.findByRole('button', { name: 'Fahrzeug anlegen' })).toBeInTheDocument();
+  });
+  /**
+   * `key={id}` am `<Form>` (Review-Befund LFH-346 · C11): antds `initialValues` wird genau
+   * EINMAL beim Mount gelesen. Hängt dieselbe Seite auf einen anderen Datensatz um, trüge das
+   * Formular ohne den Schlüssel die Werte des vorigen — der Nutzer bearbeitete Fahrzeug 8 mit
+   * den Feldern von Fahrzeug 7 und schriebe sie beim Speichern fest.
+   *
+   * Die Überschrift ist die Positivprobe: sie liest direkt aus der Query, ist also auch ohne
+   * Schlüssel richtig. Erst sie macht eine rote Feldzeile zur Aussage über das Seeding statt
+   * über eine ausgebliebene Navigation.
+   */
+  it('trägt nach dem Wechsel auf einen anderen Datensatz DESSEN Werte', async () => {
+    const nutzer = userEvent.setup();
+    renderMitWechsel();
+
+    expect(await screen.findByRole('heading', { name: 'Florian 1' })).toBeInTheDocument();
+    expect(screen.getByLabelText('OPTA')).toHaveValue('FL MUS 01');
+
+    await nutzer.click(screen.getByRole('button', { name: 'Nächstes Fahrzeug' }));
+
+    expect(await screen.findByRole('heading', { name: 'Florian 2' })).toBeInTheDocument();
+    expect(screen.getByLabelText('OPTA')).toHaveValue('FL MUS 08');
+    expect(screen.getByLabelText('Bemerkung')).toHaveValue('Zweiter');
   });
 });
