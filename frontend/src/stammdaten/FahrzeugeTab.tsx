@@ -1,4 +1,5 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -12,6 +13,7 @@ import type { Fahrzeug } from '../api/types';
 import FahrzeugFormModal from './FahrzeugFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { fahrzeugDetailPfad } from './stammdatenDetail';
 
 function staerkeText(f: Fahrzeug): string {
   if (!f.staerke) return '—';
@@ -54,6 +56,13 @@ export default function FahrzeugeTab() {
        * neuer Default.
        */
       sorter: (a, b) => a.funkrufname.localeCompare(b.funkrufname, 'de', { numeric: true }),
+      /**
+       * Die Leitspalte führt auf die Detailseite (LFH-346 · A7). Der Anker-Riegel aus
+       * LFH-340 ist hier NICHT nötig: `KatalogTabelle` kennt kein `onZeileKlick` — er
+       * betrifft ausschliesslich `Datensicht`, wo Zeilenklick und Link gleichzeitig feuern
+       * könnten.
+       */
+      render: (_, f) => <Link to={fahrzeugDetailPfad(f.id)}>{f.funkrufname}</Link>,
     },
     { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },

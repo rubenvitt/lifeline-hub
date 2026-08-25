@@ -7,6 +7,8 @@ import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
+import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
+import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import ChatPage from './pages/ChatPage';
@@ -185,6 +187,16 @@ export default function App() {
                 </Fragment>
               ))}
               <Route path="benutzer" element={<BenutzerPage />} />
+              {/* Detailrouten der Stammdaten (LFH-346 · A7). Sie liegen IM `AdminLayout`,
+                  behalten also die Sidebar — eine Detailseite ohne den Verwaltungsrahmen
+                  wäre eine Sackgasse ohne Rückweg. Sie stehen NEBEN der `adminGruppen`-
+                  Schleife, weil die Registry Sektionen führt, keine Detailadressen.
+                  Die Reihenfolge gegenüber der Schleife ist gleichgültig: react-router 7
+                  rankt nach Spezifität, `stammdaten/fahrzeuge` (statisch) schlägt
+                  `stammdaten/fahrzeuge/:fahrzeugId` nicht, sondern trifft eine andere
+                  Adresse — die Liste bleibt unter dem Pfad ohne id erreichbar. */}
+              <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
+              <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
             </Route>
           </Route>
           {/* Ebene 2 — Einsatz-Workspace */}

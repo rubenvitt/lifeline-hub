@@ -1,4 +1,5 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -12,6 +13,7 @@ import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { personalDetailPfad } from './stammdatenDetail';
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
@@ -45,6 +47,15 @@ export default function PersonalTab() {
        * Serverreihenfolge bleibt der Einstieg, die Sortierung ist ein Angebot.
        */
       sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
+      /**
+       * Die Leitspalte führt auf die Detailseite (LFH-346 · A7). Kein Anker-Riegel nötig —
+       * `KatalogTabelle` kennt kein `onZeileKlick` (Begründung in `FahrzeugeTab`).
+       *
+       * Der `dataIndex` bleibt stehen: die Freitextsuche des Primitivs liest die ROHWERTE
+       * der Spalten mit `dataIndex`, nicht das Gerenderte — ohne ihn fiele der Name aus dem
+       * Suchkorpus, den der Platzhalter als erstes verspricht.
+       */
+      render: (_, p) => <Link to={personalDetailPfad(p.id)}>{p.name}</Link>,
     },
     { title: 'Personalnr.', dataIndex: 'personalnummer', key: 'personalnummer', render: (t) => t ?? '—' },
     {
