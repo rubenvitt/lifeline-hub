@@ -1,7 +1,8 @@
 import {
-  App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType,
+  App, Button, Form, Input, InputNumber, Popconfirm, Space, type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import SchnellAnlegen from '../components/SchnellAnlegen';
@@ -50,7 +51,8 @@ export default function EinheitTypenTab() {
       };
       return aktualisiereTyp(id, daten);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }); setBearbeite(null); },
+    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
@@ -81,8 +83,9 @@ export default function EinheitTypenTab() {
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
-  // Vorbelegung beim Öffnen — kein Zurücksetzen: `destroyOnHidden` am Dialog wirft
-  // die Felder beim Schliessen ohnehin weg.
+  // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
+  // `ErfassungsModal` auf allen vier Auswegen selbst. Ein Reset hier wäre doppelt
+  // und verdeckte, ob die Hülle ihre Zusicherung überhaupt einlöst.
   useEffect(() => {
     if (bearbeite) {
       form.setFieldsValue({
@@ -185,30 +188,37 @@ export default function EinheitTypenTab() {
           suche={{ platzhalter: 'Label' }}
         />
       )}
-      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben. */}
-      <Modal
-        open={bearbeite !== null}
-        title="Typ bearbeiten"
-        okText="Speichern"
-        confirmLoading={speichern.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => setBearbeite(null)}
-        destroyOnHidden
+      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben.
+
+          Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
+          also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
+          war ein DOM-Geschwister ausserhalb. KEIN `serie`: hier wird bearbeitet,
+          nicht in Serie erfasst. Die Feldzahl bleibt unverändert. */}
+      <ErfassungsModal<FormWerte>
+        offen={bearbeite !== null}
+        titel="Typ bearbeiten"
+        form={form}
+        erfassenText="Speichern"
+        laeuft={speichern.isPending}
+        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
+        // sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam. Der
+        // Wurf im Leerfall ist derselbe Gedanke — ein stilles `return` läse sich
+        // für die Hülle als Erfolg und schlösse den Dialog ohne Request.
+        onErfassen={async (w) => {
+          if (!bearbeite) throw new Error('Kein Datensatz zum Bearbeiten');
+          await speichern.mutateAsync({ id: bearbeite.id, werte: w });
+        }}
+        onFertig={() => setBearbeite(null)}
+        onAbbrechen={() => setBearbeite(null)}
       >
-        <Form<FormWerte>
-          form={form}
-          layout="vertical"
-          onFinish={(w) => { if (bearbeite) speichern.mutate({ id: bearbeite.id, werte: w }); }}
-        >
-          <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
-            <Input placeholder="z. B. Zug" />
-          </Form.Item>
-          <Form.Item label="Soll-Stärke (vollständig oder leer lassen)" name="soll">
-            <StaerkeEingabe />
-          </Form.Item>
-          <Form.Item label="Sortierung" name="sortier"><InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} /></Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+          <Input placeholder="z. B. Zug" />
+        </Form.Item>
+        <Form.Item label="Soll-Stärke (vollständig oder leer lassen)" name="soll">
+          <StaerkeEingabe />
+        </Form.Item>
+        <Form.Item label="Sortierung" name="sortier"><InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} /></Form.Item>
+      </ErfassungsModal>
     </AdminPage>
   );
 }

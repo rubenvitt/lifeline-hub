@@ -362,4 +362,194 @@ describe('BenutzerPage', () => {
     expect(await screen.findByText('Einsatz-Liste')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Benutzer anlegen' })).not.toBeInTheDocument();
   });
+
+  /**
+   * Seit LFH-346 · A6 stehen BEIDE Dialoge unbedingt im Baum, und antd lässt den
+   * geschlossenen als `role="dialog"` stehen. Über den zugänglichen Namen sind sie
+   * NICHT zu trennen: `@rc-component/util`s `useId` liefert unter `NODE_ENV=test`
+   * die Konstante `'test-id'` (`hooks/useId.js:57`) — beide `aria-labelledby` zeigen
+   * damit auf dasselbe Element, und `getByRole('dialog', { name })` griffe stets den
+   * ersten. Unterschieden wird deshalb an der sichtbaren Überschrift.
+   */
+  function dialogMitTitel(titel: string): HTMLElement {
+    const treffer = screen.getAllByRole('dialog')
+      .filter((d) => d.querySelector('.ant-modal-title')?.textContent === titel);
+    if (treffer.length !== 1) {
+      throw new Error(`Erwartet genau EIN Modal „${titel}", gefunden ${treffer.length}`);
+    }
+    return treffer[0];
+  }
+
+  /**
+   * Zwei Benutzer, damit „Bearbeiten"-Zeilen unterscheidbar sind. Eigene Hülle, weil
+   * die Prüfungen unten den Anlegen- UND den Bearbeiten-Dialog brauchen.
+   */
+  function renderMitZwei() {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
+          benutzer({ id: 3, anzeigename: 'Ben', benutzername: 'ben', system_rolle: 'keiner' }),
+        ]),
+      ),
+    );
+    return renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+  }
+
+  /**
+   * LFH-346 · A6. DIE Zusicherung des Umbaus auf `ErfassungsModal`, für BEIDE Dialoge
+   * dieser Seite: Enter kommt aus der eingebauten Formularübermittlung des Browsers,
+   * und die greift nur, wenn der Knopf IM `<form>` liegt. Per Tastendruck ist das hier
+   * nicht belegbar — beide Masken tragen `Select`, und `@rc-component/select` ruft bei
+   * jedem Enter `preventDefault()`. Beide Hälften zusammen sind die Aussage: keine
+   * antd-Fusszeile (dort stünde der Knopf als DOM-Geschwister ausserhalb, Befund H69)
+   * UND der Knopf hat tatsächlich ein `form` als Vorfahr. Mutationsprobe: dreht man
+   * auf `<Modal onOk okText="…">` zurück, fallen beide Abfragen.
+   */
+  it('beide Dialoge tragen keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
+    renderMitZwei();
+    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
+    await screen.findByRole('dialog');
+    const anlegen = dialogMitTitel('Neuen Benutzer anlegen');
+    expect(anlegen.querySelector('.ant-modal-footer')).toBeNull();
+    expect(within(anlegen).getByRole('button', { name: 'Anlegen' }).closest('form')).not.toBeNull();
+    await userEvent.click(within(anlegen).getByRole('button', { name: 'Abbrechen' }));
+
+    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
+    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Bearbeiten' }));
+    const bearbeiten = dialogMitTitel('Benutzer bearbeiten');
+    expect(bearbeiten.querySelector('.ant-modal-footer')).toBeNull();
+    expect(within(bearbeiten).getByRole('button', { name: 'Speichern' }).closest('form'))
+      .not.toBeNull();
+  });
+
+  /**
+   * Die zweite Zusicherung der Hülle. Bis hierher trugen BEIDE Masken ein
+   * handgesetztes `autoFocus` am ersten Feld; das ist weg, den Fokus setzt die Hülle.
+   * Zwei Quellen für denselben Fokus wären eine zu viel.
+   *
+   * BEWUSST ZWEI Tests statt einem: beide Masken haben ein Feld `anzeigename`, und
+   * antds `Form.Item` leitet daraus die DOM-`id` ab. In jsdom räumt `destroyOnHidden`
+   * den geschlossenen Dialog nicht ab (die Schliessanimation läuft dort nie zu Ende) —
+   * beide Eingaben stünden gleichzeitig mit derselben `id` im Baum, und
+   * `getByLabelText` löste über `for` auf die des FALSCHEN Dialogs auf. Ein Test, der
+   * beide nacheinander öffnet, scheitert daran und nicht am Fokus.
+   */
+  it('setzt im Anlegen-Dialog den Fokus ins erste Feld', async () => {
+    renderMitZwei();
+    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
+    const anlegen = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(anlegen).getByLabelText('Anzeigename')).toHaveFocus());
+  });
+
+  it('setzt im Bearbeiten-Dialog den Fokus ins erste Feld', async () => {
+    renderMitZwei();
+    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
+    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Bearbeiten' }));
+    const bearbeiten = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(bearbeiten).getByLabelText('Anzeigename')).toHaveFocus());
+  });
+
+  /**
+   * Der Sonderfall des Umbaus. Bis LFH-346 · A6 hängte der Bearbeiten-Dialog über
+   * `key={zuBearbeiten.id}` am `<Form>` einen frischen Baum ein — die Hülle setzt
+   * stattdessen selbst auf allen vier Auswegen zurück, und die Vorbelegung läuft
+   * über einen Effekt. Diese Prüfung ist die Stelle, an der auffiele, wenn beim
+   * Wegfall des `key` die Vorbelegung mit verschwände: der zweite Benutzer trüge
+   * dann Namen und Rollen des ersten.
+   *
+   * Bewusst mit einem WERTUNTERSCHIED in allen drei Feldern — ein Vorrat, in dem
+   * sich nur der Name unterscheidet, liesse die beiden Rollen-Selects ungeprüft.
+   */
+  it('zeigt beim Wechsel von Benutzer A zu Benutzer B wirklich B', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer({
+            id: 2, anzeigename: 'Eva', benutzername: 'eva',
+            system_rolle: 'admin', org_rolle: 'fuehrungskraft',
+          }),
+          benutzer({
+            id: 3, anzeigename: 'Ben', benutzername: 'ben',
+            system_rolle: 'keiner', org_rolle: 'keine',
+          }),
+        ]),
+      ),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+
+    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
+    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('dialog');
+    const ersterDialog = dialogMitTitel('Benutzer bearbeiten');
+    expect(within(ersterDialog).getByLabelText('Anzeigename')).toHaveValue('Eva');
+    // Der gewählte Wert eines antd-`Select` steht im sichtbaren Auswahl-Element, nicht
+    // im `<input>` — der zugängliche Name der Combobox ist die Feldbeschriftung.
+    expect(within(ersterDialog).getByText('Admin')).toBeInTheDocument();
+    expect(within(ersterDialog).getByText(/Führungskraft/)).toBeInTheDocument();
+    await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Abbrechen' }));
+
+    const benZeile = (await screen.findByText('Ben')).closest('tr') as HTMLElement;
+    await userEvent.click(within(benZeile).getByRole('button', { name: 'Bearbeiten' }));
+    const zweiterDialog = dialogMitTitel('Benutzer bearbeiten');
+    await waitFor(() =>
+      expect(within(zweiterDialog).getByLabelText('Anzeigename')).toHaveValue('Ben'),
+    );
+    expect(within(zweiterDialog).getByText('Benutzer')).toBeInTheDocument();
+    expect(within(zweiterDialog).getByText('Keine')).toBeInTheDocument();
+    expect(within(zweiterDialog).queryByText('Admin')).toBeNull();
+    expect(within(zweiterDialog).queryByText(/Führungskraft/)).toBeNull();
+  });
+
+  /**
+   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den
+   * Erfolgszweig aus, während der Server ablehnt: Felder leer, Dialog zu, kein Konto.
+   * Geprüft wird das Ergebnis, nicht die Schreibweise.
+   */
+  it('lässt nach einer Ablehnung den Anlegen-Dialog samt Wortlaut stehen', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      http.post('/api/benutzer', () =>
+        HttpResponse.json({ error: 'Benutzername bereits vergeben' }, { status: 422 })),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
+    await userEvent.type(screen.getByLabelText('Anzeigename'), 'Eva');
+    await userEvent.type(screen.getByLabelText('Benutzername'), 'admin');
+    await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await screen.findByText('Benutzername bereits vergeben');
+    const dialog = dialogMitTitel('Neuen Benutzer anlegen');
+    expect(within(dialog).getByLabelText('Anzeigename')).toHaveValue('Eva');
+    expect(within(dialog).getByLabelText('Benutzername')).toHaveValue('admin');
+  });
 });

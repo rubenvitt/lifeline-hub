@@ -1,9 +1,10 @@
-import { App, Button, Form, Input, Modal, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Form, Input, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
@@ -51,11 +52,10 @@ export default function BenutzerPage() {
 
   const anlegen = useMutation({
     mutationFn: (b: NeuerBenutzer) => legeBenutzerAn(b),
-    onSuccess: () => {
-      setOffen(false);
-      form.resetFields();
-      qc.invalidateQueries({ queryKey: globalKeys.benutzer() });
-    },
+    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle
+    // (LFH-346 · A6). Ein `resetFields()` hier wäre der zweite Mechanismus für
+    // dieselbe Sache und verdeckte, ob die Hülle ihre Zusicherung einlöst.
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
 
@@ -67,12 +67,29 @@ export default function BenutzerPage() {
 
   const bearbeiten = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) => bearbeiteBenutzer(id, patch),
-    onSuccess: () => {
-      setZuBearbeiten(null);
-      qc.invalidateQueries({ queryKey: globalKeys.benutzer() });
-    },
+    // Diese Mutation trägt ZWEI Wege: den Bearbeiten-Dialog und „Reaktivieren" in der
+    // Zeile. Das Schliessen des Dialogs macht deshalb `onFertig` an der Hülle, nicht
+    // dieser Erfolgszweig — der lief bisher auch nach einem Reaktivieren mit.
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
+
+  /**
+   * VORBELEGUNG, kein `key` (LFH-346 · A6). Bis hierher hängte dieser Dialog über
+   * `key={zuBearbeiten.id}` am `<Form>` einen frischen Baum ein, damit der zweite
+   * Datensatz nicht die Werte des ersten erbt. Die Hülle löst dasselbe Problem
+   * selbst — sie setzt auf allen vier Auswegen zurück —, und zwei Mechanismen für
+   * eine Sache sind einer zu viel. Geblieben ist die Vorbelegung, dieselbe Bauform
+   * wie in `PersonalFormModal` und den vier Stammdaten-Tabs.
+   */
+  useEffect(() => {
+    if (!zuBearbeiten) return;
+    editForm.setFieldsValue({
+      anzeigename: zuBearbeiten.anzeigename,
+      system_rolle: zuBearbeiten.system_rolle,
+      org_rolle: zuBearbeiten.org_rolle,
+    });
+  }, [zuBearbeiten, editForm]);
 
   if (!authLaedt && angemeldeterBenutzer?.system_rolle !== 'admin') {
     return <Navigate to="/einsaetze" replace />;
@@ -182,89 +199,87 @@ export default function BenutzerPage() {
         />
       )}
 
-      <Modal
-        title="Neuen Benutzer anlegen"
-        open={offen}
-        onCancel={() => {
-          setOffen(false);
-          form.resetFields();
-        }}
-        onOk={() => form.submit()}
-        okText="Anlegen"
-        confirmLoading={anlegen.isPending}
+      {/* Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
+          also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
+          war ein DOM-Geschwister ausserhalb. KEIN `serie`: ein Benutzerkonto legt man
+          nicht im Minutentakt an. Das `autoFocus` am ersten Feld ist weg — den Fokus
+          setzt die Hülle, und zwei Quellen dafür sind eine zu viel. Die Feldzahl
+          bleibt unverändert (Kürzung ist A8). */}
+      <ErfassungsModal<NeuerBenutzer>
+        offen={offen}
+        titel="Neuen Benutzer anlegen"
+        form={form}
+        erfassenText="Anlegen"
+        laeuft={anlegen.isPending}
+        initialValues={{ system_rolle: 'keiner', org_rolle: 'keine' }}
+        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
+        // sonst leert die Hülle die Felder, obwohl das Konto nie angelegt wurde.
+        onErfassen={(w) => anlegen.mutateAsync(w)}
+        onFertig={() => setOffen(false)}
+        onAbbrechen={() => setOffen(false)}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{ system_rolle: 'keiner', org_rolle: 'keine' }}
-          onFinish={(w) => anlegen.mutate(w)}
+        <Form.Item
+          label="Anzeigename"
+          name="anzeigename"
+          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
         >
-          <Form.Item
-            label="Anzeigename"
-            name="anzeigename"
-            rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
-          >
-            <Input autoFocus />
-          </Form.Item>
-          <Form.Item
-            label="Benutzername"
-            name="benutzername"
-            rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
-          >
-            <Input autoComplete="off" />
-          </Form.Item>
-          <Form.Item
-            label="Passwort"
-            name="passwort"
-            rules={[{ required: true, min: 8, message: 'Mindestens 8 Zeichen' }]}
-          >
-            <Input.Password autoComplete="new-password" />
-          </Form.Item>
-          <Form.Item label="System-Rolle" name="system_rolle">
-            <Select options={SYSTEM_ROLLEN} />
-          </Form.Item>
-          <Form.Item label="Org-Rolle" name="org_rolle">
-            <Select options={ORG_ROLLEN} />
-          </Form.Item>
-        </Form>
-      </Modal>
+          <Input />
+        </Form.Item>
+        <Form.Item
+          label="Benutzername"
+          name="benutzername"
+          rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+        >
+          <Input autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          label="Passwort"
+          name="passwort"
+          rules={[{ required: true, min: 8, message: 'Mindestens 8 Zeichen' }]}
+        >
+          <Input.Password autoComplete="new-password" />
+        </Form.Item>
+        <Form.Item label="System-Rolle" name="system_rolle">
+          <Select options={SYSTEM_ROLLEN} />
+        </Form.Item>
+        <Form.Item label="Org-Rolle" name="org_rolle">
+          <Select options={ORG_ROLLEN} />
+        </Form.Item>
+      </ErfassungsModal>
 
-      {zuBearbeiten && (
-        <Modal
-          title="Benutzer bearbeiten"
-          open
-          onCancel={() => setZuBearbeiten(null)}
-          onOk={() => editForm.submit()}
-          okText="Speichern"
-          confirmLoading={bearbeiten.isPending && bearbeiten.variables?.id === zuBearbeiten.id}
+      {/* Der Dialog steht jetzt UNBEDINGT im Baum (`offen` statt `{zuBearbeiten && …}`):
+          `destroyOnHidden` an der Hülle hängt die Felder beim Schliessen ohnehin ab, und
+          während der Schliessanimation ist `zuBearbeiten` schon `null` — jeder Lesezugriff
+          hier optional. */}
+      <ErfassungsModal<BearbeitenWerte>
+        offen={zuBearbeiten !== null}
+        titel="Benutzer bearbeiten"
+        form={editForm}
+        erfassenText="Speichern"
+        laeuft={bearbeiten.isPending && bearbeiten.variables?.id === zuBearbeiten?.id}
+        // Der Wurf im Leerfall statt eines stillen `return`: ein aufgelöstes Versprechen
+        // läse die Hülle als Erfolg und schlösse den Dialog, ohne dass etwas gesendet wurde.
+        onErfassen={async (w) => {
+          if (!zuBearbeiten) throw new Error('Kein Benutzer zum Bearbeiten');
+          await bearbeiten.mutateAsync({ id: zuBearbeiten.id, patch: w });
+        }}
+        onFertig={() => setZuBearbeiten(null)}
+        onAbbrechen={() => setZuBearbeiten(null)}
+      >
+        <Form.Item
+          label="Anzeigename"
+          name="anzeigename"
+          rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
         >
-          <Form
-            key={zuBearbeiten.id}
-            form={editForm}
-            layout="vertical"
-            initialValues={{
-              anzeigename: zuBearbeiten.anzeigename,
-              system_rolle: zuBearbeiten.system_rolle,
-              org_rolle: zuBearbeiten.org_rolle,
-            }}
-            onFinish={(w) => bearbeiten.mutate({ id: zuBearbeiten.id, patch: w })}
-          >
-            <Form.Item
-              label="Anzeigename"
-              name="anzeigename"
-              rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
-            >
-              <Input autoFocus />
-            </Form.Item>
-            <Form.Item label="System-Rolle" name="system_rolle">
-              <Select options={SYSTEM_ROLLEN} />
-            </Form.Item>
-            <Form.Item label="Org-Rolle" name="org_rolle">
-              <Select options={ORG_ROLLEN} />
-            </Form.Item>
-          </Form>
-        </Modal>
-      )}
+          <Input />
+        </Form.Item>
+        <Form.Item label="System-Rolle" name="system_rolle">
+          <Select options={SYSTEM_ROLLEN} />
+        </Form.Item>
+        <Form.Item label="Org-Rolle" name="org_rolle">
+          <Select options={ORG_ROLLEN} />
+        </Form.Item>
+      </ErfassungsModal>
     </AdminPage>
   );
 }
