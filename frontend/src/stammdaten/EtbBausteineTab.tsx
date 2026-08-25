@@ -1,7 +1,7 @@
-import { App, Button, Popconfirm, Space, Tag, Typography, theme, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, Tag, Typography, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import KatalogTabelle from '../components/KatalogTabelle';
+import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -31,7 +31,7 @@ export default function EtbBausteineTab() {
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
-  const spalten: TableColumnsType<EtbBaustein> = [
+  const spalten: KatalogSpalte<EtbBaustein>[] = [
     {
       title: 'Baustein',
       dataIndex: 'label',
@@ -47,13 +47,13 @@ export default function EtbBausteineTab() {
        * Spalten nebeneinander zwangen sie den Blick zum Springen, und der ungekürzte Inhalt
        * trieb die Zeilenhöhe.
        *
-       * `dataIndex: 'label'` BLEIBT stehen, und das ist die tragende Zeile dieser Spalte:
-       * die Suche des Primitivs liest nur Spalten mit auflösbarem Datenbezug (Dateikopf
-       * `KatalogTabelle`); ohne ihn fiele die Leitspalte ganz aus dem Suchkorpus. Der
-       * Inhalt entsteht erst beim Rendern und trägt seither NICHT mehr bei — der
-       * Suchplatzhalter sagt deshalb „Label" statt „Label oder Inhalt". Der enge Korpus ist
-       * der bewusste Preis; ein Platzhalter, der mehr verspricht, als die Suche hält, wäre
-       * teurer.
+       * `dataIndex: 'label'` BLEIBT stehen — es trägt die Sortierung und den angezeigten
+       * Wert. Den SUCHKORPUS trägt es hier nicht mehr: die Zwei-Zeilen-Zelle schob den
+       * Inhaltstext in ein `render`, und was erst beim Rendern entsteht, liest die Suche des
+       * Primitivs nicht. Der Ausweg ist der `suchText`-Haken unten (LFH-346 · C11) — er
+       * gewinnt über den `dataIndex` und nimmt deshalb BEIDE Werte auf; ein Haken, der nur
+       * den Inhalt zurückgäbe, verlöre das Label. Der Suchplatzhalter darf damit wieder
+       * „Label oder Inhalt" sagen.
        *
        * Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im Browser gemessene
        * Begründung steht in `karten/OnlineQuellenVerwaltung.tsx`: unter `table-layout: auto`,
@@ -63,6 +63,9 @@ export default function EtbBausteineTab() {
        * einzeilig gewollt.
        */
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
+      // Beide Werte, durch Leerzeichen getrennt: ein Begriff, der über die Grenze hinweg
+      // ginge („unverändertLage"), wäre kein Wort, das jemand sucht.
+      suchText: (b: EtbBaustein) => `${b.label} ${b.inhalt}`,
       onCell: () => ({ style: { maxWidth: 320 } }),
       render: (label: string, b: EtbBaustein) => (
         <>
@@ -119,7 +122,7 @@ export default function EtbBausteineTab() {
               </Space>
             ),
           },
-        ] as TableColumnsType<EtbBaustein>)
+        ] as KatalogSpalte<EtbBaustein>[])
       : []),
   ];
 
@@ -157,12 +160,12 @@ export default function EtbBausteineTab() {
           dataSource={query.data ?? []}
           columns={spalten}
           /**
-           * NUR „Label" — seit der Zwei-Zeilen-Zelle (LFH-346 · A4) entsteht der Inhalt erst
-           * beim Rendern und liegt damit außerhalb des Suchkorpus des Primitivs, das die
-           * Rohwerte der Spalten mit Datenbezug liest. Der frühere Wortlaut „Label oder
-           * Inhalt" wäre jetzt ein Versprechen, das die Suche nicht hält.
+           * Wieder BEIDES — der `suchText`-Haken der Leitspalte holt den Inhalt zurück in den
+           * Korpus, den die Zwei-Zeilen-Zelle (LFH-346 · A4) ihm genommen hatte. Der
+           * Platzhalter ist an den Haken gebunden, nicht an die Spaltenzahl: wer ihn
+           * entfernt, nimmt hier „oder Inhalt" mit heraus.
            */
-          suche={{ platzhalter: 'Label' }}
+          suche={{ platzhalter: 'Label oder Inhalt' }}
           locale={{ emptyText: 'Keine Bausteine' }}
         />
       )}

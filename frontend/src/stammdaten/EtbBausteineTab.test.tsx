@@ -107,19 +107,19 @@ describe('EtbBausteineTab', () => {
     expect(labels(container)).toEqual(['Abschnitt gebildet', 'Lage unverändert']);
 
     // Gesucht wird über das LABEL — „gebildet" steht nur dort, nicht im zweiten Label.
-    const feld = screen.getByPlaceholderText('Label');
+    const feld = screen.getByPlaceholderText('Label oder Inhalt');
     await userEvent.type(feld, 'gebildet');
     expect(labels(container)).toEqual(['Abschnitt gebildet']);
     await userEvent.clear(feld);
     expect(labels(container)).toHaveLength(2);
 
-    // Die andere Hälfte derselben Zusicherung, und sie ist der Preis der Zwei-Zeilen-Zelle
-    // (LFH-346 · A4): der Inhalt entsteht erst beim Rendern und trägt deshalb NICHT mehr zum
-    // Suchkorpus bei — das Primitiv liest nur Spalten mit auflösbarem `dataIndex`.
+    // Die andere Hälfte derselben Zusicherung: seit LFH-346 · C11 trägt die Leitspalte einen
+    // `suchText`-Haken, der Label UND Inhalt in den Korpus hebt — die Zwei-Zeilen-Zelle
+    // (A4) hatte den Inhalt ins `render` geschoben und damit aus der Suche genommen.
     // „Einsatzabschnitt" steht ausschließlich im Inhalt der zweiten Zeile; „Abschnitt" allein
     // träfe deren Label mit und bewiese nichts.
     await userEvent.type(feld, 'Einsatzabschnitt');
-    expect(labels(container)).toHaveLength(0);
+    expect(labels(container)).toEqual(['Abschnitt gebildet']);
     await userEvent.clear(feld);
 
     // Gefiltert wird die ZEILENMENGE, nicht die Anwesenheit des Trichters: antd zeichnet ihn
@@ -199,9 +199,10 @@ describe('EtbBausteineTab — Zwei-Zeilen-Zelle (LFH-346 · A4)', () => {
   it('nennt im Suchplatzhalter nur, was die Suche wirklich liest', async () => {
     render(admin);
     await screen.findByText('Lage unverändert');
-    // Der Inhalt ist mit der Zwei-Zeilen-Zelle aus dem Korpus gefallen (Wirkung: siehe
-    // Ordnungs-Test oben). Ein Platzhalter, der ihn weiter verspräche, wäre eine Lüge.
-    expect(screen.getByPlaceholderText('Label')).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Label oder Inhalt')).not.toBeInTheDocument();
+    // Der Testname bleibt richtig, das Verdikt kehrt sich um: der `suchText`-Haken der
+    // Leitspalte (LFH-346 · C11) liest wieder beides, der Platzhalter darf es also wieder
+    // versprechen. Dass er es hält, misst der Ordnungs-Test oben mit „Einsatzabschnitt".
+    expect(screen.getByPlaceholderText('Label oder Inhalt')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Label')).toBeNull();
   });
 });
