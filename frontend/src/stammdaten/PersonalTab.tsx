@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +11,7 @@ import { ladePersonalVorschlaege, listePersonal, POSITION_LABELS, setzeDienststa
 import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
+import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
@@ -163,6 +165,7 @@ export default function PersonalTab() {
           Person anlegen
         </Button>
       }
+      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
           (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`

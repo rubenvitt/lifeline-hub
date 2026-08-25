@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, Typography, theme, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +12,7 @@ import type { EtbBaustein } from '../api/types';
 import { etbTyp } from '../theme/statusFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
+import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 export default function EtbBausteineTab() {
   const { benutzer } = useAuth();
@@ -135,6 +137,7 @@ export default function EtbBausteineTab() {
           Baustein anlegen
         </Button>
       }
+      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
           (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`

@@ -1,5 +1,6 @@
 import { App, Button, Input, Popconfirm, Space, Typography, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ import {
 } from '../api/stichwortVorschlaege';
 import type { StichwortVorschlag } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
+import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 export default function StichworteTab() {
   const { benutzer } = useAuth();
@@ -105,7 +107,10 @@ export default function StichworteTab() {
   ];
 
   return (
-    <AdminPage titel="Einsatz-Stichworte">
+    <AdminPage
+      titel="Einsatz-Stichworte"
+      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+    >
     {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         handgebaute Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für

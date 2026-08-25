@@ -2,6 +2,7 @@ import {
   App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -16,6 +17,7 @@ import type { EinheitTyp, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import { globalKeys } from '../api/queryKeys';
+import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 interface FormWerte {
   label: string;
@@ -135,7 +137,10 @@ export default function EinheitTypenTab() {
   ];
 
   return (
-    <AdminPage titel="Einheitstypen">
+    <AdminPage
+      titel="Einheitstypen"
+      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+    >
     {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für

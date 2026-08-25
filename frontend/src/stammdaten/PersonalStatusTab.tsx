@@ -1,5 +1,6 @@
 import { App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -13,6 +14,7 @@ import {
 } from '../api/personalStatus';
 import type { PersonalStatus, StatusKategorie } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
+import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { leerZuNull } from '../api/patchTriState';
 import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
@@ -147,7 +149,10 @@ export default function PersonalStatusTab() {
   ];
 
   return (
-    <AdminPage titel="Personal-Status">
+    <AdminPage
+      titel="Personal-Status"
+      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+    >
     {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
