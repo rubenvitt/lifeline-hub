@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -96,14 +96,45 @@ describe('PersonalTab', () => {
     expect(screen.getByRole('button', { name: 'Person anlegen' })).toBeInTheDocument();
   });
 
-  it('sperrt während des Dienststatuswechsels alle Zeilen und markiert nur das Ziel als ladend', async () => {
+  /**
+   * LFH-346 · A1: eine laufende Mutation gehört GENAU EINER Zeile. Vorher sperrte
+   * `dienststatusMutation.isPending` jede Zeile der Tabelle — bei 150 Zeilen eine
+   * Vollsperre wegen eines Klicks.
+   *
+   * Die zweite Hälfte („Zeile B feuert wirklich") ist die eigentliche Aussage: ein
+   * `toBeEnabled()` allein bliebe grün, wenn der Riegel im `onConfirm`
+   * (`if (!…isPending)`) stehen bliebe — der Knopf sähe bedienbar aus und schluckte
+   * den Klick. Muster aus `pages/BenutzerPage.test.tsx` („patchIds").
+   *
+   * Reihenfolge ist Absicht: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf.
+   * Nach dem Klick auf Zeile B wandert `variables` dorthin, Zeile A verliert ihre
+   * Ladeanzeige, obwohl ihre Anfrage noch läuft. Alle A-Zusicherungen stehen deshalb
+   * VOR dem zweiten Klick; „A und B laden gleichzeitig" wäre schlicht falsch.
+   *
+   * Zeile 2 steht bewusst auf `ausser_dienst`: ihre Aktion ist dann der schlichte
+   * Knopf „Wieder in Dienst" ohne Rückfrage — sonst stünde ein zweites „OK" neben dem
+   * noch offenen Portal der ersten.
+   */
+  it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
+    const gerufen: string[] = [];
     let freigeben: (() => void) | undefined;
     const gate = new Promise<void>((resolve) => { freigeben = resolve; });
-    server.use(http.post('/api/personal/1/ausser-dienst', async () => {
-      await gate;
-      return HttpResponse.json({ ...personal[0], dienststatus: 'ausser_dienst' });
-    }));
-    const { container } = render(admin, [personal[0], { ...personal[0], id: 2, name: 'Erika Muster' }]);
+    server.use(
+      http.post('/api/personal/:id/ausser-dienst', async ({ params }) => {
+        gerufen.push(`ausser-dienst/${params.id}`);
+        await gate;
+        return HttpResponse.json({ ...personal[0], dienststatus: 'ausser_dienst' });
+      }),
+      http.post('/api/personal/:id/in-dienst', async ({ params }) => {
+        gerufen.push(`in-dienst/${params.id}`);
+        await gate;
+        return HttpResponse.json({ ...personal[0], id: 2, dienststatus: 'in_dienst' });
+      }),
+    );
+    const { container } = render(admin, [
+      personal[0],
+      { ...personal[0], id: 2, name: 'Erika Muster', dienststatus: 'ausser_dienst' },
+    ]);
     await screen.findByText('Thomas Müller');
     const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
     const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
@@ -111,11 +142,17 @@ describe('PersonalTab', () => {
     await userEvent.click(within(erste).getByRole('button', { name: 'Außer Dienst' }));
     await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
 
+    // Die eigene Zeile ist gesperrt und zeigt den Lauf …
     expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
     expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass('ant-btn-loading');
-    expect(within(zweite).getByRole('button', { name: 'Außer Dienst' })).toBeDisabled();
-    expect(within(zweite).getByRole('button', { name: 'Außer Dienst' })).not.toHaveClass('ant-btn-loading');
-    expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+    expect(within(erste).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
+    // … die FREMDE Zeile bleibt bedienbar.
+    expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
+    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).toBeEnabled();
+    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass('ant-btn-loading');
+
+    await userEvent.click(within(zweite).getByRole('button', { name: 'Wieder in Dienst' }));
+    await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1', 'in-dienst/2']));
     await act(async () => { freigeben?.(); });
   });
 

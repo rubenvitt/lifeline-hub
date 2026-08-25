@@ -129,7 +129,13 @@ export default function BenutzerPage() {
               okButtonProps={{ danger: true }}
               onConfirm={() => deaktivieren.mutate(b.id)}
             >
-              <Button danger>Deaktivieren</Button>
+              {/* Zeilengescopte Ladeanzeige (LFH-346 · A1). Vorher trug „Deaktivieren"
+                  ÜBERHAUPT keine — anders als „Reaktivieren" daneben —, ein Klick blieb
+                  also ohne jede Rückmeldung und lud zum zweiten ein. `variables` ist hier
+                  die nackte id. */}
+              <Button danger loading={deaktivieren.isPending && deaktivieren.variables === b.id}>
+                Deaktivieren
+              </Button>
             </Popconfirm>
           ) : (
             <Button

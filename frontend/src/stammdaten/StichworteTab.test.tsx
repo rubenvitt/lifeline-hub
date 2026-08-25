@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -76,6 +76,34 @@ describe('StichworteTab', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
     await waitFor(() => expect(geloescht).toBe(1));
+  });
+
+  /**
+   * LFH-346 · A1: der Ladezustand gehört GENAU der gelöschten Zeile. Vorher hing
+   * `loading` an `loeschenMutation.isPending` und drehte damit in JEDER Zeile einen
+   * Spinner — ein Fortschritt, der etwas über einen fremden Datensatz behauptet.
+   *
+   * Die zweite Zeile ist die eigentliche Aussage: ohne den Zeilenvergleich ist sie
+   * ladend, obwohl an ihr nichts läuft. Die Rückfrage trägt hier `okText="Ja"`
+   * (anders als in Fahrzeuge/Material/Personal, wo antds Vorgabe „OK" steht).
+   */
+  it('zeigt den Ladezustand NUR an der gelöschten Zeile', async () => {
+    const { container } = renderTab(admin, [
+      { id: 1, text: 'H1' },
+      { id: 2, text: 'H2' },
+    ]);
+    server.use(http.delete('/api/stichwort-vorschlaege/:id', () => new Promise(() => {})));
+    await screen.findByText('H1');
+    const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
+
+    await userEvent.click(within(erste).getByRole('button', { name: 'Löschen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
+
+    await waitFor(() =>
+      expect(within(erste).getByRole('button', { name: /Löschen/ })).toHaveClass('ant-btn-loading'),
+    );
+    expect(within(zweite).getByRole('button', { name: 'Löschen' })).not.toHaveClass('ant-btn-loading');
   });
 
   it('die Leitspalte sortiert numerisch, ohne die Serverreihenfolge zu verdrängen', async () => {

@@ -90,7 +90,10 @@ export default function StichworteTab() {
                 okButtonProps={{ danger: true }}
                 onConfirm={() => loeschenMutation.mutate(v.id)}
               >
-                <Button danger loading={loeschenMutation.isPending}>
+                {/* Der Lauf gehört GENAU der gelöschten Zeile (LFH-346 · A1): am blanken
+                    `isPending` drehte der Spinner in JEDER Zeile und behauptete Fortschritt
+                    an fremden Datensätzen. `variables` ist hier die nackte id. */}
+                <Button danger loading={loeschenMutation.isPending && loeschenMutation.variables === v.id}>
                   Löschen
                 </Button>
               </Popconfirm>

@@ -88,30 +88,49 @@ export default function FahrzeugeTab() {
             title: 'Aktionen',
             key: 'aktionen',
             render: (_, f: Fahrzeug) => {
-              const gesperrt = dienststatusMutation.isPending;
-              const laeuft = gesperrt && dienststatusMutation.variables?.id === f.id;
+              /**
+               * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346 · A1). Vorher
+               * hing die Sperre am blanken `dienststatusMutation.isPending` — das sperrte
+               * JEDE Zeile der Tabelle, während eine einzige Mutation lief; bei 150
+               * Personalzeilen eine Vollsperre wegen eines Klicks.
+               *
+               * Der Riegel gegen ein zweites Absenden DERSELBEN Zeile ist unten im
+               * `onConfirm`/`onClick` mitgewandert: ein Klick auf eine ANDERE Zeile ist kein
+               * Doppelklick, sondern die nächste Aufgabe — bliebe der Riegel global, sähe
+               * der fremde Knopf bedienbar aus und schluckte den Klick.
+               *
+               * Er hält dabei WENIGER als der alte, und das ist der bewusst gezahlte Preis:
+               * EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf, die Marke WANDERT
+               * also beim Klick auf eine andere Zeile, statt sich zu sammeln (dieselbe
+               * Beobachtung wie in LFH-345). Nach A → B → A ist A wieder klickbar, obwohl
+               * seine erste Anfrage noch läuft. Unschädlich, weil der Endpunkt einen Status
+               * SETZT (idempotent), nicht umschaltet. Wer das enger will, braucht einen
+               * Zustand je Zeile — nicht diese eine Zeile Code.
+               */
+              const laeuft =
+                dienststatusMutation.isPending && dienststatusMutation.variables?.id === f.id;
               return (
                 <Space size="middle">
-                  <Button disabled={gesperrt} onClick={() => { setBearbeite(f); setModalOffen(true); }}>
+                  <Button disabled={laeuft} onClick={() => { setBearbeite(f); setModalOffen(true); }}>
                     Bearbeiten
                   </Button>
                   {f.dienststatus === 'in_dienst' ? (
                     <Popconfirm
                       title="Außer Dienst stellen?"
-                      disabled={gesperrt}
+                      disabled={laeuft}
                       okButtonProps={{ danger: true }}
                       onConfirm={() => {
-                        if (!dienststatusMutation.isPending) {
+                        if (!laeuft) {
                           dienststatusMutation.mutate({ id: f.id, inDienst: false });
                         }
                       }}
                     >
-                      <Button danger loading={laeuft} disabled={gesperrt}>Außer Dienst</Button>
+                      <Button danger loading={laeuft} disabled={laeuft}>Außer Dienst</Button>
                     </Popconfirm>
                   ) : (
-                    <Button loading={laeuft} disabled={gesperrt}
+                    <Button loading={laeuft} disabled={laeuft}
                       onClick={() => {
-                        if (!dienststatusMutation.isPending) {
+                        if (!laeuft) {
                           dienststatusMutation.mutate({ id: f.id, inDienst: true });
                         }
                       }}>

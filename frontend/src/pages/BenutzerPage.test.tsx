@@ -201,6 +201,51 @@ describe('BenutzerPage', () => {
     freigeben();
   });
 
+  /**
+   * LFH-346 · A1: „Deaktivieren" trug ÜBERHAUPT keine Ladeanzeige — anders als
+   * „Reaktivieren" daneben, das seit jeher zeilenweise scopt. Ein Klick auf eine
+   * unumkehrbar wirkende Aktion ohne jede Rückmeldung lädt zum zweiten Klick ein.
+   *
+   * Die zweite Zeile ist die schärfere Hälfte: ein ungescoptes
+   * `loading={deaktivieren.isPending}` erfüllte die erste Erwartung ebenfalls.
+   */
+  it('zeigt den Ladezustand beim Deaktivieren NUR an der geklickten Zeile', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer(),
+          benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
+          benutzer({ id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner' }),
+        ]),
+      ),
+      http.post('/api/benutzer/:id/deaktivieren', () => new Promise(() => {})),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/admin/benutzer' },
+    );
+
+    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
+    const maxZeile = (await screen.findByText('Max')).closest('tr') as HTMLElement;
+    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Deaktivieren' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
+
+    await waitFor(() =>
+      expect(within(evaZeile).getByRole('button', { name: /Deaktivieren/ })).toHaveClass(
+        'ant-btn-loading',
+      ),
+    );
+    expect(within(maxZeile).getByRole('button', { name: 'Deaktivieren' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
+  });
+
   // Ordnung statt bloßer Anwesenheit: geprüft wird, was Suche, Sortierung und Statusfilter mit
   // den Zeilen TUN. Die stehende Kopfzeile schiebt eine verborgene Messzeile als erste
   // Körperzeile ein, deshalb die Verengung auf `tr.ant-table-row`.
