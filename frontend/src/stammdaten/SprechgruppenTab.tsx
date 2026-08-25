@@ -59,6 +59,17 @@ export default function SprechgruppenTab() {
       title: 'Hinweis',
       dataIndex: 'hinweis',
       key: 'hinweis',
+      /**
+       * Die einzige Freitextspalte dieser Tabelle — sie trägt Belegungshinweise und trieb
+       * ungekürzt die Zeilenhöhe (Befund N13). `showTitle` hält den vollen Wert erreichbar,
+       * und der Bezug bleibt: der Hinweis steht namentlich im Suchplatzhalter.
+       * Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im Browser gemessene
+       * Begründung steht in `karten/OnlineQuellenVerwaltung.tsx`: unter `table-layout: auto`,
+       * das `KatalogTabelle` mit `scroll={{ x: 'max-content' }}` erzwingt, ist eine
+       * Spaltenbreite wirkungslos.
+       */
+      ellipsis: { showTitle: true },
+      onCell: () => ({ style: { maxWidth: 240 } }),
       render: (h: string | null) => h ?? '—',
     },
     {

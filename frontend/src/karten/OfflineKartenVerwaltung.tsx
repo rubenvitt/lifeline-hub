@@ -290,6 +290,16 @@ export default function OfflineKartenVerwaltung() {
       title: 'Attribution',
       dataIndex: 'lizenz',
       key: 'lizenz',
+      /**
+       * Lizenztexte sind Fließtext („© OpenStreetMap contributors (ODbL)" und länger) und
+       * trieben ungekürzt die Zeilenhöhe (Befund N13). `showTitle` hält den vollen Wert
+       * erreichbar. Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im
+       * Browser gemessene Begründung steht in `OnlineQuellenVerwaltung.tsx`: unter
+       * `table-layout: auto`, das `KatalogTabelle` mit `scroll={{ x: 'max-content' }}`
+       * erzwingt, ist eine Spaltenbreite wirkungslos.
+       */
+      ellipsis: { showTitle: true },
+      onCell: () => ({ style: { maxWidth: 200 } }),
       render: (l: string | null) => l ?? '—',
     },
     ...(istAdmin

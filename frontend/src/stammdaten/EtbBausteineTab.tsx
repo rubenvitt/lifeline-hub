@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, Tag, Typography, theme, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ export default function EtbBausteineTab() {
   const { message } = App.useApp();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<EtbBaustein | null>(null);
+  const { token } = theme.useToken();
 
   const query = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
@@ -30,16 +31,53 @@ export default function EtbBausteineTab() {
 
   const spalten: TableColumnsType<EtbBaustein> = [
     {
-      title: 'Label',
+      title: 'Baustein',
       dataIndex: 'label',
-      key: 'label',
+      key: 'baustein',
       /**
        * Leitspalte: an ihr sucht ein Mensch den Baustein. Kein `defaultSortOrder` — die
        * fachliche Reihenfolge ist `sortier` und kommt vom Server
        * (`src/etb_baustein/repo.rs:47` — `ORDER BY sortier, id`); sie bestimmt, in welcher
        * Folge die Bausteine im ETB angeboten werden, und bleibt deshalb der Einstieg.
+       *
+       * ZWEI ZEILEN, EINE ZELLE (LFH-346 · A4, Befund N13): Label und Inhalt gehören
+       * zusammen gelesen („was fügt dieser Baustein ein?"), nicht verglichen — als zwei
+       * Spalten nebeneinander zwangen sie den Blick zum Springen, und der ungekürzte Inhalt
+       * trieb die Zeilenhöhe.
+       *
+       * `dataIndex: 'label'` BLEIBT stehen, und das ist die tragende Zeile dieser Spalte:
+       * die Suche des Primitivs liest nur Spalten mit auflösbarem Datenbezug (Dateikopf
+       * `KatalogTabelle`); ohne ihn fiele die Leitspalte ganz aus dem Suchkorpus. Der
+       * Inhalt entsteht erst beim Rendern und trägt seither NICHT mehr bei — der
+       * Suchplatzhalter sagt deshalb „Label" statt „Label oder Inhalt". Der enge Korpus ist
+       * der bewusste Preis; ein Platzhalter, der mehr verspricht, als die Suche hält, wäre
+       * teurer.
+       *
+       * Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im Browser gemessene
+       * Begründung steht in `karten/OnlineQuellenVerwaltung.tsx`: unter `table-layout: auto`,
+       * das `KatalogTabelle` mit `scroll={{ x: 'max-content' }}` erzwingt, ist eine
+       * Spaltenbreite wirkungslos. Einzeilig gekürzt wird über `Typography.Text` —
+       * mehrzeilige Kürzung gibt es in antd 6 nur über `Paragraph` (LFH-369), und hier ist
+       * einzeilig gewollt.
        */
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
+      onCell: () => ({ style: { maxWidth: 320 } }),
+      render: (label: string, b: EtbBaustein) => (
+        <>
+          {/* Die Marke trägt die Testabfrage: der `textContent` der Zelle enthält seit der
+              Vereinigung Label UND Inhalt, ein `td:first-child`-Griff läse beides. */}
+          <div data-lfh="baustein-label" style={{ fontWeight: token.fontWeightStrong }}>
+            {label}
+          </div>
+          <Typography.Text
+            type="secondary"
+            ellipsis={{ tooltip: b.inhalt }}
+            style={{ display: 'block' }}
+          >
+            {b.inhalt}
+          </Typography.Text>
+        </>
+      ),
     },
     {
       title: 'Typ',
@@ -58,7 +96,6 @@ export default function EtbBausteineTab() {
       onFilter: (wert, b) => b.typ === wert,
       render: (t: EtbBaustein['typ']) => <Tag>{etbTyp[t].label}</Tag>,
     },
-    { title: 'Inhalt', dataIndex: 'inhalt', key: 'inhalt' },
     { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
     ...(istAdmin
       ? ([
@@ -109,11 +146,12 @@ export default function EtbBausteineTab() {
           dataSource={query.data ?? []}
           columns={spalten}
           /**
-           * Label UND Inhalt sind genannt, weil beide echten Fließtext tragen und die Suche des
-           * Primitivs die Rohwerte aller Spalten mit Datenbezug liest — den Baustein sucht man
-           * mal am Namen, mal an einer Wendung aus dem Text.
+           * NUR „Label" — seit der Zwei-Zeilen-Zelle (LFH-346 · A4) entsteht der Inhalt erst
+           * beim Rendern und liegt damit außerhalb des Suchkorpus des Primitivs, das die
+           * Rohwerte der Spalten mit Datenbezug liest. Der frühere Wortlaut „Label oder
+           * Inhalt" wäre jetzt ein Versprechen, das die Suche nicht hält.
            */
-          suche={{ platzhalter: 'Label oder Inhalt' }}
+          suche={{ platzhalter: 'Label' }}
           locale={{ emptyText: 'Keine Bausteine' }}
         />
       )}
