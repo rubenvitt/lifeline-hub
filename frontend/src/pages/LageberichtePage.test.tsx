@@ -447,40 +447,68 @@ describe('LageberichtePage', () => {
     expect(container.querySelector('.ant-empty')).toBeNull();
   });
 
-  it('macht die Fortschreibungskette als Kette lesbar (v-Nummer, Gruppen, Zähler)', async () => {
+  it('zeigt je Fortschreibungskette EINE Karte mit dem jüngsten Stand und den Vorgängern als Links (N23)', async () => {
     setup(KETTE);
     const sicht = await screen.findByRole('region', { name: 'Lageberichte' });
 
-    // Zwei Karten mit demselben Titel — unterscheidbar nur über die v-Nummer.
+    // EINE Karte für die Kette 11 → 13: der Kopf ist v2 (Entwurf), v1 steht als Vorgänger-Link.
     const links = await screen.findAllByRole('link', { name: 'Lage 10:00' });
-    expect(links.map((l) => l.getAttribute('href'))).toEqual([
-      '/einsaetze/7/lageberichte/13',
-      '/einsaetze/7/lageberichte/11',
-    ]);
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/einsaetze/7/lageberichte/13']);
     // Kein zweiter Anker im Titel-Link: der Link entsteht in `karte.titel.ziel`.
     links.forEach((l) => expect(l.querySelector('a')).toBeNull());
-
+    expect(screen.getByRole('link', { name: 'v1' })).toHaveAttribute('href', '/einsaetze/7/lageberichte/11');
     expect(sicht).toHaveTextContent('v2');
-    expect(sicht).toHaveTextContent('v1');
-    // Exakter Text in eigenem Knoten; zwei Treffer, weil die Vorlage ein Merkmal der
-    // KETTE ist und die Fortschreibung sie unverändert kopiert.
-    expect(screen.getAllByText('Freier Bericht')).toHaveLength(2);
+    expect(sicht).toHaveTextContent(/Vorgänger:\s*v1/);
+    // Die Vorlage steht je KETTE einmal, nicht je Fassung.
+    expect(screen.getAllByText('Freier Bericht')).toHaveLength(1);
 
-    // Gruppenköpfe mit Zähler, Entwürfe zuerst (`gruppen.reihenfolge`). Trennzeichen und
-    // Zählerform gehören dem Primitiv → `[·(]` plus `toHaveTextContent` auf der Region.
+    // Gruppenköpfe mit Zähler über KÖPFE, Entwürfe zuerst (`gruppen.reihenfolge`).
+    // Trennzeichen und Zählerform gehören dem Primitiv → `[·(]` auf der Region.
     expect(sicht).toHaveTextContent(/Entwürfe\s*[·(]\s*1/);
-    expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*2/);
+    expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*1/);
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
 
-    // Gruppenachse führend, INNERHALB der Gruppe absteigend nach Zeitstand
-    // (`standardSortierung`). Nur an der aufsteigenden Fixture beweiskräftig: 11 (10:00)
-    // muss vor 14 (09:00) stehen, obwohl 14 zuerst geliefert wird.
-    expect(within(sicht).getAllByRole('link').map((l) => l.getAttribute('href'))).toEqual([
+    // Gruppenachse führend; der freigegebene Kopf 14 steht in seiner Gruppe.
+    expect(
+      within(sicht).getAllByRole('link').map((l) => l.getAttribute('href')),
+    ).toEqual([
       '/einsaetze/7/lageberichte/13',
       '/einsaetze/7/lageberichte/11',
       '/einsaetze/7/lageberichte/14',
     ]);
+  });
+
+  it('öffnet das Anlege-Modal mit Fokus im Titel und vorbelegtem Titel aus der Uhrzeit (N23)', async () => {
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    const titel = await screen.findByLabelText('Titel');
+    await waitFor(() => expect(titel).toHaveFocus());
+    expect((titel as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/);
+    // Erfassungs-Norm B4: der Absende-Knopf liegt IM Formular — Enter sendet; und kein
+    // antd-Footer, in dem ein Knopf ausserhalb des `<form>` stünde.
+    const knopf = screen.getByRole('button', { name: 'Anlegen' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+    // Drittes, optionales Feld: der Zeitstand (Backend konnte es schon, die UI bot es nie an).
+    expect(screen.getByLabelText('Zeitstand')).toBeInTheDocument();
+  });
+
+  it('schickt Vorlage und Titel; ein leerer Zeitstand wird nicht mitgeschickt', async () => {
+    const posts: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', async ({ request }) => {
+        posts.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(bericht, { status: 201 });
+      }),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.clear(titel);
+    await userEvent.type(titel, 'Lage 1200{Enter}');
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({ vorlage: 'lagebericht', titel: 'Lage 1200' });
   });
 
   it('bleibt in jeder Breite eine Kartensicht (form="karte", kein Breakpoint-Rückfall)', async () => {
@@ -511,6 +539,6 @@ describe('LageberichtePage', () => {
   it('trägt Überschrift und Kennzahlenzeile', async () => {
     setup(KETTE);
     expect(await screen.findByRole('heading', { name: 'Lageberichte', level: 3 })).toBeInTheDocument();
-    expect(await screen.findByText(/3 Berichte · 1 im Entwurf/)).toBeInTheDocument();
+    expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
   });
 });
