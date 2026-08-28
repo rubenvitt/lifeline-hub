@@ -22,6 +22,7 @@ import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useViewport } from '../components/useViewport';
+import { nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 
 function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -43,25 +44,6 @@ function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
       children: baue(a.id),
     }));
   return baue(null);
-}
-
-function nachfahrenInkl(abschnitte: Einsatzabschnitt[], id: number): Set<number> {
-  const kinder = new Map<number, number[]>();
-  for (const a of abschnitte) {
-    if (a.ueber_abschnitt_id != null) {
-      if (!kinder.has(a.ueber_abschnitt_id)) kinder.set(a.ueber_abschnitt_id, []);
-      kinder.get(a.ueber_abschnitt_id)!.push(a.id);
-    }
-  }
-  const ergebnis = new Set<number>();
-  const stack = [id];
-  while (stack.length) {
-    const n = stack.pop()!;
-    if (ergebnis.has(n)) continue;
-    ergebnis.add(n);
-    for (const c of kinder.get(n) ?? []) stack.push(c);
-  }
-  return ergebnis;
 }
 
 interface AbschnittWerte {
