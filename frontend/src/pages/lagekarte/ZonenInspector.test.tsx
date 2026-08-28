@@ -308,6 +308,27 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     expect(onAendern).toHaveBeenCalledWith({ label: 'Charlie' });
   });
 
+  it('trägt eine nach dem Wechsel eintreffende Quittung von A nicht an B', async () => {
+    let freigeben: (() => void) | undefined;
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() =>
+      new Promise<void>((resolve) => { freigeben = resolve; }));
+    const { rerenderZone } = renderInspector({ zone: zoneA, onAendern });
+
+    const label = screen.getByRole('textbox', { name: 'Label' });
+    await userEvent.type(label, 'X');
+    fireEvent.blur(label);
+    expect(screen.getByText('speichert …')).toBeInTheDocument();
+
+    rerenderZone(zoneB);
+    expect(screen.queryByText('speichert …')).not.toBeInTheDocument();
+
+    // Der Lauf von A löst erst JETZT auf — ohne invalidierten Zähler stünde an Zone B
+    // „gespeichert" für einen Vorgang, der nie zu ihr gehörte.
+    await act(async () => { freigeben?.(); });
+    expect(screen.queryByText('gespeichert')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Label' })).toHaveValue('Bravo');
+  });
+
   it('zieht beim Wechsel auch den Typ nach (Farbfeld weg, Gebiets-Zuordnung da)', () => {
     const gefahrenZone: LageZone = {
       ...zoneB,
