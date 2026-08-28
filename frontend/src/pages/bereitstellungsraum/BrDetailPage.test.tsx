@@ -214,6 +214,28 @@ describe('BrDetailPage – Sidebar filtert auf aktueller_br_id == null (LFH-14)'
   });
 });
 
+describe('BrDetailPage — Sidebar-Suche (LFH-347 · M58b)', () => {
+  it('filtert die freien Kräfte über das Suchfeld', async () => {
+    const a = einheit({ id: 30, name: 'Zug Nord', aktueller_br_id: null });
+    const b = einheit({ id: 31, name: 'Trupp Süd', aktueller_br_id: null });
+    const br = brDetail({ einheiten: [], fahrzeuge: [] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([a, b])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    await screen.findByText('Zug Nord');
+    await userEvent.type(screen.getByLabelText('Kräfte suchen'), 'süd');
+    expect(screen.queryByText('Zug Nord')).not.toBeInTheDocument();
+    expect(screen.getByText('Trupp Süd')).toBeInTheDocument();
+  });
+});
+
 describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
   it('zeigt bei BR-Status geplant keine entfernen-/zuweisen-Buttons', async () => {
     // geplant → schreibgeschützt; bereitgestellte Einheit + freie Kraft in Sidebar.
