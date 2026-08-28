@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
 import { useEffect } from 'react';
@@ -22,6 +22,8 @@ import { brStatus } from '../../theme/statusFarben';
 import { abstand, flaeche } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
 import { merkeLetztenBr } from './brAuswahl';
+import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
+import { summiereStaerke } from '../../anzeige/staerke';
 
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
@@ -123,6 +125,14 @@ export default function BrDetailPage() {
     belegungMut.mutate({ objekt_typ: 'fahrzeug', objekt_id: fahrzeugId, art: 'austritt' });
   }
 
+  // Typ und Stärke aus der Einheiten-/Fahrzeugliste (LFH-347 · M58): `BrEinheitKurz` trägt nur
+  // id+name, die vollen Daten liegen in Queries, die die Sidebar ohnehin braucht.
+  const einheitVon = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e]));
+  const fahrzeugVon = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f]));
+  const bereitgestellt = br.einheiten.map((e) => einheitVon.get(e.id)).filter((e): e is Einheit => e != null);
+  const summe = summiereStaerke(bereitgestellt);
+  const fahrzeugZahl = br.fahrzeuge.length;
+
   return (
     <EinsatzSeite
       breite={flaeche.seiteBreit}
@@ -183,6 +193,9 @@ export default function BrDetailPage() {
       >
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
+          <Typography.Text strong data-testid="br-summe" style={{ display: 'block', marginBottom: abstand.md }}>
+            Bereitgestellt: <StaerkeAnzeige wert={summe} /> · {fahrzeugZahl} {fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
+          </Typography.Text>
           <SektionHeader titel="Bereitgestellte Einheiten" />
           <Liste
             style={{ marginBottom: abstand.lg }}
@@ -205,7 +218,11 @@ export default function BrDetailPage() {
                     : []
                 }
               >
-                {e.name}
+                <Space wrap>
+                  <span>{e.name}</span>
+                  {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
+                  <Tag color="blue"><StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} /></Tag>
+                </Space>
               </ListenEintrag>
             )}
           />
@@ -231,7 +248,10 @@ export default function BrDetailPage() {
                     : []
                 }
               >
-                {f.funkrufname}
+                <Space wrap>
+                  <span>{f.funkrufname}</span>
+                  {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
+                </Space>
               </ListenEintrag>
             )}
           />

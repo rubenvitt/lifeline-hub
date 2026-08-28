@@ -256,6 +256,31 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
   });
 });
 
+describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
+  it('zeigt je bereitgestellter Einheit Typ und Stärke sowie die Summenzeile', async () => {
+    const zug = einheit({ id: 10, name: 'Zug 1', typ_label: 'Zug', ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 } });
+    const trupp = einheit({ id: 11, name: 'Trupp 2', typ_label: 'Trupp', ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 } });
+    const br = brDetail({ einheiten: [{ id: 10, name: 'Zug 1' }, { id: 11, name: 'Trupp 2' }], fahrzeuge: [{ id: 5, funkrufname: 'Florian 1' }] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug, trupp])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([
+        fahrzeug({ id: 5, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', aktueller_br_id: 1 }),
+      ])),
+    );
+
+    renderBrDetail();
+
+    const summe = await screen.findByTestId('br-summe');
+    expect(summe).toHaveTextContent('Bereitgestellt: 1/4/20//25 · 1 Fahrzeug');
+    expect(screen.getByText('Zug')).toBeInTheDocument();
+    expect(screen.getByText('1/3/18//22')).toBeInTheDocument();
+    expect(screen.getByText('LF 20')).toBeInTheDocument();
+  });
+});
+
 // Task 4 (LFH-341 · H40): unter `md` nimmt die „Kräfte ohne BR"-Spalte die feste 240-px-Breite
 // und stellt sich mit dem Hauptbereich gestapelt statt gequetscht dar — dieselbe Form wie
 // Gefahrengebietsliste und Gliederungsbaum. Geprüft wird der Inline-Style der Karte selbst
