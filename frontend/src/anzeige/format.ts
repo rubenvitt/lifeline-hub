@@ -42,7 +42,7 @@ export const DEFAULT_KONVENTIONEN: AnzeigeKonventionen = {
  * JEDEM Zeit-Rendering den ganzen Einsatz-Subtree crashen. Defensiver Fallback
  * auf lokale Zeit (Review LFH-136).
  */
-function inZone(utcStr: string, konv: AnzeigeKonventionen) {
+export function inZone(utcStr: string, konv: AnzeigeKonventionen) {
   const d = dayjs.utc(utcStr);
   if (!konv.zeitzone) return d.local();
   try {

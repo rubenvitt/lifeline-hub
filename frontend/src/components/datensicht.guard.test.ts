@@ -197,7 +197,12 @@ const KARTEN_EIGENBAU: string[] = ['/src/etb/EtbTabelle.tsx'];
  * Dateien, die `form="karte"` tragen MÜSSEN — Module, die heute schon kartenbasiert gelesen
  * werden (Befehle, Lageberichte). Dort ist die Tabelle der Befund, nicht der Zielzustand.
  */
-const NUR_KARTE: string[] = ['/src/auftraege/BefehlListe.tsx', '/src/pages/LageberichtePage.tsx'];
+const NUR_KARTE: string[] = [
+  '/src/auftraege/BefehlListe.tsx',
+  '/src/pages/LageberichtePage.tsx',
+  // Zwölfte Konsumentin seit LFH-348 · C13: ein Lageobjekt wird gelesen, nicht verglichen.
+  '/src/pages/LagemeldungenPage.tsx',
+];
 
 /**
  * Dateien, die `form="tabelle"` tragen MÜSSEN — Vergleichsflächen, die Kriterium 14
@@ -271,6 +276,9 @@ const KONSUMENTEN = [
   '/src/pages/FahrzeugePage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
+  // Zwölfte seit LFH-348 · C13: die Lagemeldungen lagen auf einer nackten `Liste` ohne
+  // Zeit, Sortierung, Gruppen und Rückweg (Befund M85).
+  '/src/pages/LagemeldungenPage.tsx',
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
@@ -812,9 +820,10 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // Wer den zweiten einträgt, begründet ebenso — sonst wächst die Ausnahme über das
     // Band auf fünf und der Kartenplan wäre nur noch ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(1);
-    // Zwei Kartenmodule, eine Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am
-    // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
-    expect(NUR_KARTE).toHaveLength(2);
+    // Drei Kartenmodule (Befehle, Lageberichte, seit LFH-348 · C13 die Lagemeldungen), eine
+    // Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest oben
+    // auf; wer umbaut, ohne einzutragen, an der Formprüfung.
+    expect(NUR_KARTE).toHaveLength(3);
     expect(NUR_TABELLE).toHaveLength(1);
     // Die vierte ist keine Ausnahme, sondern eine PFLICHT — und sie ist ausdrücklich
     // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
