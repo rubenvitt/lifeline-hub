@@ -87,7 +87,9 @@ export default function BrDetailPage() {
 
   const belegungMut = useMutation({
     mutationFn: belegeBr.bind(null, einsatzId, brId),
-    onSuccess: () => { message.success('Erfolgreich'); invalidate(); },
+    // Fester Schlüssel (N8): ein serieller Zuweisen/Entfernen-Lauf ERSETZT den stehenden
+    // Toast statt ihn zu stapeln — dieselbe Bauform wie `kommunikation/rueckgaengig.tsx`.
+    onSuccess: () => { message.success({ content: 'Erfolgreich', key: 'br-belegung' }); invalidate(); },
     onError: fehler,
   });
 
@@ -130,7 +132,13 @@ export default function BrDetailPage() {
   const einheitVon = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e]));
   const fahrzeugVon = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f]));
   const bereitgestellt = br.einheiten.map((e) => einheitVon.get(e.id)).filter((e): e is Einheit => e != null);
-  const summe = summiereStaerke(bereitgestellt);
+  // Final-Review Befund A: `bereitgestellt` verwirft lautlos jede Einheit, die in
+  // `einheitenQuery.data` fehlt (Query lädt noch, ist gescheitert, oder der Cache ist
+  // nur teilweise gefüllt). Eine Summe über diese verkürzte Menge wäre eine zu kleine,
+  // aber vollständig aussehende Zahl neben Namen, die die Liste sehr wohl zeigt — die
+  // MENGE entscheidet, nicht `isSuccess`: auch ein Teilausfall ist unvollständig.
+  const unvollstaendig = bereitgestellt.length < br.einheiten.length;
+  const summe = unvollstaendig ? null : summiereStaerke(bereitgestellt);
   const fahrzeugZahl = br.fahrzeuge.length;
 
   return (
@@ -193,9 +201,19 @@ export default function BrDetailPage() {
       >
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
-          <Typography.Text strong data-testid="br-summe" style={{ display: 'block', marginBottom: abstand.md }}>
-            Bereitgestellt: <StaerkeAnzeige wert={summe} /> · {fahrzeugZahl} {fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
-          </Typography.Text>
+          <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
+            <Typography.Text strong>
+              Bereitgestellt: {unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />} · {fahrzeugZahl}{' '}
+              {fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
+            </Typography.Text>
+            {unvollstaendig && (
+              <div>
+                <Typography.Text type="warning">
+                  (Stärke unvollständig — Einheitenliste nicht geladen)
+                </Typography.Text>
+              </div>
+            )}
+          </div>
           <SektionHeader titel="Bereitgestellte Einheiten" />
           <Liste
             style={{ marginBottom: abstand.lg }}

@@ -303,6 +303,53 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
   });
 });
 
+describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Final-Review Befund A)', () => {
+  it('zeigt „—" statt einer zu kleinen Zahl, wenn eine bereitgestellte Einheit in der Einheitenliste fehlt', async () => {
+    // BR trägt zwei Einheiten, die Einheiten-Query liefert nur eine davon zurück
+    // (Teilausfall/Cache-Lücke) — die Summenzeile darf keine vollständig aussehende,
+    // in Wahrheit zu kleine Zahl zeigen.
+    const zug = einheit({ id: 10, name: 'Zug 1', ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 } });
+    const br = brDetail({
+      einheiten: [{ id: 10, name: 'Zug 1' }, { id: 11, name: 'Trupp 2' }],
+      fahrzeuge: [],
+    });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug])), // Trupp 2 fehlt
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    const summe = await screen.findByTestId('br-summe');
+    expect(summe).toHaveTextContent('Bereitgestellt: —');
+    expect(summe).not.toHaveTextContent('//');
+    expect(screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)')).toBeInTheDocument();
+    // Namen bleiben aus `br.einheiten` sichtbar, auch wenn die Detaildaten fehlen.
+    expect(screen.getByText('Trupp 2')).toBeInTheDocument();
+  });
+
+  it('zeigt denselben unvollständigen Zustand, wenn die Einheiten-Query scheitert', async () => {
+    const br = brDetail({ einheiten: [{ id: 10, name: 'Zug 1' }], fahrzeuge: [] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    expect(await screen.findByText('Zug 1')).toBeInTheDocument();
+    const summe = screen.getByTestId('br-summe');
+    expect(summe).toHaveTextContent('Bereitgestellt: —');
+    expect(screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)')).toBeInTheDocument();
+  });
+});
+
 // Task 4 (LFH-341 · H40): unter `md` nimmt die „Kräfte ohne BR"-Spalte die feste 240-px-Breite
 // und stellt sich mit dem Hauptbereich gestapelt statt gequetscht dar — dieselbe Form wie
 // Gefahrengebietsliste und Gliederungsbaum. Geprüft wird der Inline-Style der Karte selbst
