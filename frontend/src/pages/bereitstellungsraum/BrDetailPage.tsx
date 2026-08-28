@@ -1,11 +1,12 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
-import { parseRouteId, bereitstellungsraeumePfad } from '../../routing/deeplinks';
+import { parseRouteId, bereitstellungsraeumeListePfad } from '../../routing/deeplinks';
 import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -19,6 +20,10 @@ import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brStatus } from '../../theme/statusFarben';
 import { abstand, flaeche } from '../../theme/tokens';
+import BrSwitcher from './BrSwitcher';
+import { merkeLetztenBr } from './brAuswahl';
+import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
+import { summiereStaerke } from '../../anzeige/staerke';
 
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
@@ -26,7 +31,7 @@ export default function BrDetailPage() {
   const { benutzer } = useAuth();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
-  const listenPfad = bereitstellungsraeumePfad(einsatzId);
+  const listenPfad = bereitstellungsraeumeListePfad(einsatzId);
   const { abBreite } = useViewport();
   const breit = abBreite('md');
 
@@ -50,6 +55,12 @@ export default function BrDetailPage() {
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
+
+  // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet beim
+  // nächsten Mal wieder hier (Muster `UhsDetailPage.tsx`).
+  useEffect(() => {
+    if (detailQuery.isSuccess) merkeLetztenBr(einsatzId, brId);
+  }, [detailQuery.isSuccess, einsatzId, brId]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
@@ -76,7 +87,9 @@ export default function BrDetailPage() {
 
   const belegungMut = useMutation({
     mutationFn: belegeBr.bind(null, einsatzId, brId),
-    onSuccess: () => { message.success('Erfolgreich'); invalidate(); },
+    // Fester Schlüssel (N8): ein serieller Zuweisen/Entfernen-Lauf ERSETZT den stehenden
+    // Toast statt ihn zu stapeln — dieselbe Bauform wie `kommunikation/rueckgaengig.tsx`.
+    onSuccess: () => { message.success({ content: 'Erfolgreich', key: 'br-belegung' }); invalidate(); },
     onError: fehler,
   });
 
@@ -114,12 +127,26 @@ export default function BrDetailPage() {
     belegungMut.mutate({ objekt_typ: 'fahrzeug', objekt_id: fahrzeugId, art: 'austritt' });
   }
 
+  // Typ und Stärke aus der Einheiten-/Fahrzeugliste (LFH-347 · M58): `BrEinheitKurz` trägt nur
+  // id+name, die vollen Daten liegen in Queries, die die Sidebar ohnehin braucht.
+  const einheitVon = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e]));
+  const fahrzeugVon = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f]));
+  const bereitgestellt = br.einheiten.map((e) => einheitVon.get(e.id)).filter((e): e is Einheit => e != null);
+  // Final-Review Befund A: `bereitgestellt` verwirft lautlos jede Einheit, die in
+  // `einheitenQuery.data` fehlt (Query lädt noch, ist gescheitert, oder der Cache ist
+  // nur teilweise gefüllt). Eine Summe über diese verkürzte Menge wäre eine zu kleine,
+  // aber vollständig aussehende Zahl neben Namen, die die Liste sehr wohl zeigt — die
+  // MENGE entscheidet, nicht `isSuccess`: auch ein Teilausfall ist unvollständig.
+  const unvollstaendig = bereitgestellt.length < br.einheiten.length;
+  const summe = unvollstaendig ? null : summiereStaerke(bereitgestellt);
+  const fahrzeugZahl = br.fahrzeuge.length;
+
   return (
     <EinsatzSeite
       breite={flaeche.seiteBreit}
       titel={
         <Space>
-          {br.bezeichnung}
+          <BrSwitcher einsatzId={einsatzId} aktuellerBr={br} />
           <StatusTag darstellung={brStatus[br.status]} />
         </Space>
       }
@@ -174,6 +201,19 @@ export default function BrDetailPage() {
       >
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
+          <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
+            <Typography.Text strong>
+              Bereitgestellt: {unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />} · {fahrzeugZahl}{' '}
+              {fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
+            </Typography.Text>
+            {unvollstaendig && (
+              <div>
+                <Typography.Text type="warning">
+                  (Stärke unvollständig — Einheitenliste nicht geladen)
+                </Typography.Text>
+              </div>
+            )}
+          </div>
           <SektionHeader titel="Bereitgestellte Einheiten" />
           <Liste
             style={{ marginBottom: abstand.lg }}
@@ -196,7 +236,11 @@ export default function BrDetailPage() {
                     : []
                 }
               >
-                {e.name}
+                <Space wrap>
+                  <span>{e.name}</span>
+                  {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
+                  <Tag color="blue"><StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} /></Tag>
+                </Space>
               </ListenEintrag>
             )}
           />
@@ -222,7 +266,10 @@ export default function BrDetailPage() {
                     : []
                 }
               >
-                {f.funkrufname}
+                <Space wrap>
+                  <span>{f.funkrufname}</span>
+                  {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
+                </Space>
               </ListenEintrag>
             )}
           />

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -111,6 +111,31 @@ describe('EinsatzabschnittePage', () => {
     expect(screen.queryByLabelText(
       `Datenstand ${formatiereDatenstand(abschnittStand)}`,
     )).not.toBeInTheDocument();
+  });
+
+  /**
+   * AK1 (LFH-347 · H37). Zwei Zeilen, zwei Bedeutungen: die Bestandszeile „Stärke (F/UF/M//Σ)"
+   * zählt weiter NUR die direkt zugeordneten Einheiten — sie wechselt nicht still die
+   * Bedeutung —, die neue Zeile summiert über die Unterabschnitte. Beide Labels sind im DOM
+   * verschieden, und die Zahlen belegen die Trennung: Süd hängt unter Nord und trägt 0/1/1.
+   */
+  it('zeigt die eigene Stärke und die inkl. Unterabschnitte getrennt beschriftet', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [
+      { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 0 },
+      { id: 6, einsatz_id: 1, ueber_abschnitt_id: 5, name: 'Süd', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1 },
+    ]));
+    server.use(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([
+      { id: 1, einsatz_id: 1, name: 'Zug Nord', abschnitt_id: 5, ist: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }, ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }, sortier: 0, sprechgruppen: [], fahrzeug_mitglieder: [], personal_mitglieder: [], material_mitglieder: [] },
+      { id: 2, einsatz_id: 1, name: 'Trupp Süd', abschnitt_id: 6, ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 }, ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 }, sortier: 1, sprechgruppen: [], fahrzeug_mitglieder: [], personal_mitglieder: [], material_mitglieder: [] },
+    ])));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+
+    const eigene = screen.getByText('Stärke (F/UF/M//Σ)').closest('tr')!;
+    const inkl = screen.getByText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)').closest('tr')!;
+    expect(eigene).not.toBe(inkl);
+    expect(within(eigene).getByText('1/2/3//6')).toBeInTheDocument();
+    expect(within(inkl).getByText('1/3/4//8')).toBeInTheDocument();
   });
 
   it('selektiert per ?abschnitt=<id> den Abschnitt (LFH-25 Inspector-Deeplink)', async () => {
@@ -300,18 +325,8 @@ describe('EinsatzabschnittePage', () => {
    * Eindeutig wird der Griff über `within(...)` auf die Gliederungs-Karte, nicht über
    * einen abweichenden String.
    */
-  it('bietet im leeren Baum genau eine Primäraktion, und die legt einen Abschnitt an', async () => {
-    let angelegt = false;
-    server.use(
-      http.post('/api/einsaetze/1/abschnitte', () => {
-        angelegt = true;
-        return HttpResponse.json({
-          id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Neuer Abschnitt',
-          leiter_id: null, leiter_name: null, bemerkung: null, sortier: 0,
-        });
-      }),
-      ...handlers('einsatzleitung', 'aktiv', []),
-    );
+  it('bietet im leeren Baum genau eine Primäraktion, und die öffnet einen Entwurf', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', []));
     renderPage();
     const karte = (await screen.findByText('Noch keine Abschnitte')).closest('.ant-card');
     expect(karte, 'der Leerzustand muss in der Gliederungs-Karte stehen').not.toBeNull();
@@ -319,7 +334,84 @@ describe('EinsatzabschnittePage', () => {
     expect(knoepfe).toHaveLength(1);
 
     await userEvent.click(within(karte as HTMLElement).getByRole('button', { name: 'Abschnitt anlegen' }));
-    await waitFor(() => expect(angelegt).toBe(true));
+    expect(await within(karte as HTMLElement).findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+  });
+
+  /**
+   * M55 (LFH-347 · C12). Vorher schrieb der Klick sofort `POST …/abschnitte` mit dem Namen
+   * „Neuer Abschnitt" — samt ETB-Eintrag —, und Abbrechen ließ den Datensatz stehen.
+   * Jetzt entsteht er erst beim Speichern; Abbrechen hinterlässt nichts, auch keine
+   * Invalidierung des Tagebuchs.
+   */
+  it('legt beim Öffnen und Abbrechen des Entwurfs nichts an — 0 POST, 0 ETB-Invalidierung', async () => {
+    let posts = 0;
+    server.use(...handlers(), http.post('/api/einsaetze/1/abschnitte', () => { posts += 1; return HttpResponse.json({}); }));
+    const { client } = renderPage();
+    const invalidieren = vi.spyOn(client, 'invalidateQueries');
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+
+    expect(screen.getByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    expect(posts).toBe(0);
+    expect(invalidieren.mock.calls.some(([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(einsatzKeys.etb(1)))).toBe(false);
+  });
+
+  it('schreibt den Abschnitt erst beim Speichern und wählt ihn dann aus', async () => {
+    const bodies: unknown[] = [];
+    server.use(...handlers(), http.post('/api/einsaetze/1/abschnitte', async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({ id: 9, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Ost', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1, sprechgruppen: [] });
+    }));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Ost');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Ost' });
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+  });
+
+  it('verwirft den Entwurf, wenn im Baum ein bestehender Abschnitt gewählt wird', async () => {
+    server.use(...handlers());
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    await userEvent.click(screen.getByText('Nord'));
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    expect(screen.getByText('Abschnitt: Nord')).toBeInTheDocument();
+  });
+
+  /**
+   * Review-Fund (LFH-347 · Fix-Runde 1). Der Kopfknopf „Abschnitt anlegen" ist klickbar,
+   * bevor `abschnitteQuery` aufgelöst ist. Löst der Cross-Modul-Deeplink (`?abschnitt=<id>`)
+   * danach `setGewaehlt` aus, während der Entwurf noch offen steht, muss er ihn verwerfen —
+   * wie `Tree onSelect` es bereits tut. Ohne den Fix bleibt `entwurf=true` bei gesetztem
+   * `gewaehlt` stehen, und `speichern` nähme beim nächsten „Speichern" wegen `!entwurf ===
+   * false` fälschlich den POST-Zweig für einen längst bestehenden Abschnitt.
+   */
+  it('verwirft den Entwurf, wenn der Deeplink nach dem Öffnen einen Abschnitt selektiert', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', async () => {
+        await new Promise((r) => setTimeout(r, 50));
+        return HttpResponse.json([
+          { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: 'Leiter Nord', bemerkung: null, sortier: 0 },
+        ]);
+      }),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einsatzabschnitte?abschnitt=5' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
   });
 
   /**

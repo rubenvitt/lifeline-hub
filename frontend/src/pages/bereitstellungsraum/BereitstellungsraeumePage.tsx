@@ -1,46 +1,30 @@
 import {
-  App, Breadcrumb, Button, Drawer, Form, Input,
+  Breadcrumb, Button,
   type TableColumnsType,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
-import { listeBr, legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
-import { ApiError } from '../../api/client';
+import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet } from '../../components/SeitenZustand';
 import { brStatus } from '../../theme/statusFarben';
 import { flaeche } from '../../theme/tokens';
 import KatalogTabelle from '../../components/KatalogTabelle';
-import {
-  ErfassungsFormular,
-  type ErfassungsFormularSteuerung,
-} from '../../components/Erfassung';
-
-interface BrAnlegenAuftrag {
-  einsatzId: number;
-  daten: BrEingabe;
-}
-
-interface AngelegterBr {
-  einsatzId: number;
-  brId: number;
-}
+import BrAnlegenDrawer from './BrAnlegenDrawer';
 
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const navigate = useNavigate();
-  const qc = useQueryClient();
-  const { message } = App.useApp();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -52,41 +36,8 @@ export default function BereitstellungsraeumePage() {
   });
 
   const [anlegen, setAnlegen] = useState(false);
-  const [form] = Form.useForm<BrEingabe>();
-  const angelegterBr = useRef<AngelegterBr | null>(null);
-  const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
-  const abbruchGeneration = useRef(0);
-  const formularEinsatzId = useRef(einsatzId);
-
-  useEffect(() => {
-    if (formularEinsatzId.current === einsatzId) return;
-    formularEinsatzId.current = einsatzId;
-    form.resetFields();
-  }, [einsatzId, form]);
 
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
-
-  const anlegenMut = useMutation({
-    mutationFn: (auftrag: BrAnlegenAuftrag) => legeBrAn(auftrag.einsatzId, auftrag.daten),
-    onSuccess: (_br, auftrag) => {
-      message.success('Bereitstellungsraum angelegt');
-      qc.invalidateQueries({ queryKey: einsatzKeys.br(auftrag.einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.etb(auftrag.einsatzId) });
-    },
-    onError: (e: unknown) =>
-      message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
-  });
-
-  const anlegenAbbrechen = useCallback(() => {
-    abbruchGeneration.current += 1;
-    angelegterBr.current = null;
-    setAnlegen(false);
-  }, []);
-
-  const drawerSchliessen = () => {
-    if (formularSteuerung.current) formularSteuerung.current.abbrechen();
-    else anlegenAbbrechen();
-  };
 
   const spalten: TableColumnsType<Bereitstellungsraum> = [
     {
@@ -179,64 +130,39 @@ export default function BereitstellungsraeumePage() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void brQuery.refetch()} />}
-          <KatalogTabelle<Bereitstellungsraum>
-            rowKey="id"
-            loading={brQuery.isLoading}
-            dataSource={sichtbar}
-            columns={spalten}
-            size="middle"
-            pagination={false}
-            locale={{ emptyText: 'Noch keine Bereitstellungsräume erfasst' }}
-          />
+          {/* `!brQuery.isLoading` statt `brQuery.isSuccess`: eine vollständig stornierte Liste
+              bleibt auch dann ein Leerzustand, wenn eine NACHFOLGENDE Aktualisierung scheitert
+              (`standVeraltet`) — react-query setzt `status` dabei auf `'error'`, `isSuccess`
+              wird also false, obwohl die (leeren) Zeilen aus dem Zwischenspeicher weiter
+              gültig sind. Gemessen: der D3-Regressionstest „alles storniert + Fehler ergibt
+              Banner" erwartet den Leertext WEITER sichtbar, `isSuccess` verfehlte das. */}
+          {!brQuery.isLoading && sichtbar.length === 0 && (
+            <SeitenLeer
+              titel="Noch keine Bereitstellungsräume erfasst"
+              hinweis="Lege einen Bereitstellungsraum an, um Kräfte zu sammeln."
+              aktion={schreibgeschuetzt ? undefined : { label: 'Ersten BR anlegen', onClick: () => setAnlegen(true) }}
+            />
+          )}
+          {(sichtbar.length > 0 || brQuery.isLoading) && (
+            <KatalogTabelle<Bereitstellungsraum>
+              rowKey="id"
+              loading={brQuery.isLoading}
+              dataSource={sichtbar}
+              columns={spalten}
+              size="middle"
+              pagination={false}
+              locale={{ emptyText: 'Noch keine Bereitstellungsräume erfasst' }}
+            />
+          )}
         </>
       )}
 
-      <Drawer
-        title="Bereitstellungsraum anlegen"
+      <BrAnlegenDrawer
+        einsatzId={einsatzId}
         open={anlegen}
-        keyboard={false}
-        onClose={drawerSchliessen}
-        size={420}
-        destroyOnHidden
-      >
-        <ErfassungsFormular<BrEingabe>
-          form={form}
-          steuerungRef={formularSteuerung}
-          onErfassen={async (daten) => {
-            const auftrag: BrAnlegenAuftrag = { einsatzId, daten };
-            const generation = abbruchGeneration.current;
-            const br = await anlegenMut.mutateAsync(auftrag);
-            if (abbruchGeneration.current === generation) {
-              angelegterBr.current = { einsatzId: auftrag.einsatzId, brId: br.id };
-            }
-          }}
-          onFertig={() => {
-            const ergebnis = angelegterBr.current;
-            angelegterBr.current = null;
-            setAnlegen(false);
-            if (ergebnis) {
-              navigate(bereitstellungsraumDetailPfad(ergebnis.einsatzId, ergebnis.brId));
-            }
-          }}
-          onAbbrechen={anlegenAbbrechen}
-          laeuft={anlegenMut.isPending}
-          erfassenText="Anlegen"
-        >
-          <Form.Item
-            label="Bezeichnung"
-            name="bezeichnung"
-            rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}
-          >
-            <Input placeholder="z. B. BR Ost" />
-          </Form.Item>
-          <Form.Item label="Standort (optional)" name="standort">
-            <Input placeholder="Adresse / Hinweis" />
-          </Form.Item>
-          <Form.Item label="Notiz (optional)" name="notiz">
-            <Input.TextArea rows={3} />
-          </Form.Item>
-        </ErfassungsFormular>
-      </Drawer>
+        onClose={() => setAnlegen(false)}
+        onAngelegt={(br) => navigate(bereitstellungsraumDetailPfad(einsatzId, br.id))}
+      />
     </EinsatzSeite>
   );
 }

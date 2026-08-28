@@ -113,6 +113,12 @@ export function bereitstellungsraeumePfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'bereitstellungsraeume');
 }
 
+/** Tabellenansicht aller Bereitstellungsräume — der Modul-Index springt seit LFH-347 · M56
+ *  direkt in den zuletzt gewählten BR (wie `unfallhilfsstellen/liste`). */
+export function bereitstellungsraeumeListePfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'bereitstellungsraeume')}/liste`;
+}
+
 export function lageberichtePfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'lageberichte');
 }

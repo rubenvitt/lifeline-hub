@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Card, Form, Input, Space, Tag, Tree, Typography, type TreeDataNode } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Form, Input, Space, Tag, theme, Tree, Typography, type TreeDataNode } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import {
@@ -49,7 +49,7 @@ import { ErfassungsModal } from '../components/Erfassung';
  * `@ant-design/icons`-Knoten sonst sein eigenes ENGLISCHES `aria-label` („user") als
  * eigenes Vorleseziel in jede Zeile stellte.
  */
-function baueBaum(einheiten: Einheit[], einsatzId: number): TreeDataNode[] {
+function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: string): TreeDataNode[] {
   const kinder = new Map<number | null, Einheit[]>();
   for (const e of einheiten) {
     const key = e.ueber_einheit_id ?? null;
@@ -68,7 +68,7 @@ function baueBaum(einheiten: Einheit[], einsatzId: number): TreeDataNode[] {
             {e.soll ? <> / Soll <StaerkeAnzeige wert={e.soll} /></> : null}
           </Tag>
           {e.fuehrer_name && (
-            <span style={{ color: '#888' }}>
+            <span style={{ color: sekundaerFarbe }}>
               <span aria-hidden="true"><UserOutlined /></span> {e.fuehrer_name}
             </span>
           )}
@@ -94,6 +94,7 @@ export default function EinheitenPage() {
   const { message } = App.useApp();
   const [bildenOffen, setBildenOffen] = useState(false);
   const [bildenForm] = Form.useForm<BildenWerte>();
+  const { token } = theme.useToken();
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
@@ -153,7 +154,10 @@ export default function EinheitenPage() {
     onError: fehler,
   });
 
-  const baumDaten = useMemo(() => baueBaum(einheiten, einsatzId), [einheiten, einsatzId]);
+  const baumDaten = useMemo(
+    () => baueBaum(einheiten, einsatzId, token.colorTextSecondary),
+    [einheiten, einsatzId, token.colorTextSecondary],
+  );
 
   // Seitenzustand: NUR `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
   // `darfImEinsatzSchreiben` etwas. Alles andere wird an Ort und Stelle entschieden.

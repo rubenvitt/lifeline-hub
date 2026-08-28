@@ -36,16 +36,16 @@ function renderPage() {
   return renderMitProviders(
     <CommandPaletteProvider>
       <Routes>
-        <Route path="/einsaetze/:id/bereitstellungsraeume" element={<BereitstellungsraeumePage />} />
+        <Route path="/einsaetze/:id/bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
       </Routes>
     </CommandPaletteProvider>,
-    { route: '/einsaetze/1/bereitstellungsraeume' },
+    { route: '/einsaetze/1/bereitstellungsraeume/liste' },
   );
 }
 
 function EinsatzWechsel() {
   const navigate = useNavigate();
-  return <button onClick={() => navigate('/einsaetze/2/bereitstellungsraeume')}>Zu Einsatz B</button>;
+  return <button onClick={() => navigate('/einsaetze/2/bereitstellungsraeume/liste')}>Zu Einsatz B</button>;
 }
 
 function PfadProbe() {
@@ -58,11 +58,11 @@ function renderWechselPage() {
       <EinsatzWechsel />
       <PfadProbe />
       <Routes>
-        <Route path="/einsaetze/:id/bereitstellungsraeume" element={<BereitstellungsraeumePage />} />
+        <Route path="/einsaetze/:id/bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
         <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<div>BR-DETAIL</div>} />
       </Routes>
     </CommandPaletteProvider>,
-    { route: '/einsaetze/1/bereitstellungsraeume' },
+    { route: '/einsaetze/1/bereitstellungsraeume/liste' },
   );
 }
 
@@ -285,7 +285,7 @@ describe('BereitstellungsraeumePage', () => {
     await act(async () => { antwortFreigeben(); });
     await screen.findByText('Bereitstellungsraum angelegt');
 
-    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/bereitstellungsraeume');
+    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/bereitstellungsraeume/liste');
   });
 
   it('bindet einen laufenden Auftrag an dessen Einsatz-ID', async () => {

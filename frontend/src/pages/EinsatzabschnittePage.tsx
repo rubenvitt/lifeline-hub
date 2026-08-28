@@ -13,7 +13,7 @@ import {
   aktualisiereAbschnitt, legeAbschnittAn, listeAbschnitte, loeseAbschnittAuf, type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
 import { ApiError } from '../api/client';
-import type { Einsatzabschnitt, Staerke } from '../api/types';
+import type { Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
@@ -22,8 +22,10 @@ import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useViewport } from '../components/useViewport';
+import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
+import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
 
-function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
+function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
   for (const a of abschnitte) {
     const key = a.ueber_abschnitt_id ?? null;
@@ -34,34 +36,15 @@ function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
     (kinder.get(parent) ?? []).map((a) => ({
       key: a.id,
       title: (
-        <Space size={4}>
-          <span>{a.name}</span>
-          {a.leiter_name && <span style={{ color: '#888' }}>👤 {a.leiter_name}</span>}
-          {a.erreichbarkeit && <span style={{ color: '#888' }}>☎</span>}
-        </Space>
+        <AbschnittKnoten
+          abschnitt={a}
+          staerke={abschnittStaerken(abschnitte, einheiten, a.id).inklUnter}
+          anzahlEinheiten={einheiten.filter((e) => e.abschnitt_id === a.id).length}
+        />
       ),
       children: baue(a.id),
     }));
   return baue(null);
-}
-
-function nachfahrenInkl(abschnitte: Einsatzabschnitt[], id: number): Set<number> {
-  const kinder = new Map<number, number[]>();
-  for (const a of abschnitte) {
-    if (a.ueber_abschnitt_id != null) {
-      if (!kinder.has(a.ueber_abschnitt_id)) kinder.set(a.ueber_abschnitt_id, []);
-      kinder.get(a.ueber_abschnitt_id)!.push(a.id);
-    }
-  }
-  const ergebnis = new Set<number>();
-  const stack = [id];
-  while (stack.length) {
-    const n = stack.pop()!;
-    if (ergebnis.has(n)) continue;
-    ergebnis.add(n);
-    for (const c of kinder.get(n) ?? []) stack.push(c);
-  }
-  return ergebnis;
 }
 
 interface AbschnittWerte {
@@ -82,6 +65,7 @@ export default function EinsatzabschnittePage() {
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [bearbeiten, setBearbeiten] = useState(false);
+  const [entwurf, setEntwurf] = useState(false);
   const [form] = Form.useForm<AbschnittWerte>();
   const { abBreite } = useViewport();
   const breit = abBreite('md');
@@ -92,8 +76,12 @@ export default function EinsatzabschnittePage() {
   const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
 
   // Cross-Modul-Deeplink (LFH-25): ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
+  // Spiegelt `Tree onSelect`: der Kopfknopf ist klickbar, bevor `abschnitteQuery` aufgelöst
+  // ist, und ein danach feuernder Deeplink darf einen offenen Entwurf nicht überleben lassen
+  // (LFH-347 · Fix-Runde 1) — sonst nimmt `speichern` wegen `!entwurf === false` fälschlich
+  // den POST-Zweig für einen bereits ausgewählten Bestandsabschnitt.
   useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
-    if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) setGewaehlt(zid);
+    if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) { setEntwurf(false); setGewaehlt(zid); }
   });
 
   function invalidate() {
@@ -117,14 +105,9 @@ export default function EinsatzabschnittePage() {
         kommunikationsmittel: werte.kommunikationsmittel || null,
         erreichbarkeit: werte.erreichbarkeit?.trim() || null,
       };
-      return aktuell ? aktualisiereAbschnitt(einsatzId, aktuell.id, daten) : legeAbschnittAn(einsatzId, daten);
+      return aktuell && !entwurf ? aktualisiereAbschnitt(einsatzId, aktuell.id, daten) : legeAbschnittAn(einsatzId, daten);
     },
-    onSuccess: (a) => { invalidate(); setGewaehlt(a.id); setBearbeiten(false); message.success('Gespeichert'); },
-    onError: fehler,
-  });
-  const anlegen = useMutation({
-    mutationFn: () => legeAbschnittAn(einsatzId, { name: 'Neuer Abschnitt' }),
-    onSuccess: (a) => { invalidate(); setGewaehlt(a.id); setBearbeiten(true); },
+    onSuccess: (a) => { invalidate(); setEntwurf(false); setGewaehlt(a.id); setBearbeiten(false); message.success('Gespeichert'); },
     onError: fehler,
   });
   const aufloesen = useMutation({
@@ -138,7 +121,7 @@ export default function EinsatzabschnittePage() {
 
   // Formular mit den Werten des aktuellen Abschnitts vorbelegen, sobald der Edit-Modus öffnet.
   useEffect(() => {
-    if (aktuell && bearbeiten) {
+    if (aktuell && bearbeiten && !entwurf) {
       form.setFieldsValue({
         name: aktuell.name, ueber_abschnitt_id: aktuell.ueber_abschnitt_id ?? undefined,
         leiter_id: aktuell.leiter_id ?? undefined, bemerkung: aktuell.bemerkung ?? undefined,
@@ -147,25 +130,34 @@ export default function EinsatzabschnittePage() {
         erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
       });
     }
-  }, [aktuell, bearbeiten, form]);
+  }, [aktuell, bearbeiten, entwurf, form]);
 
-  const baumDaten = useMemo(() => baueBaum(abschnitte), [abschnitte]);
+  /** Lokaler Entwurf statt Server-Datensatz (LFH-347 · M55): der POST — und damit der
+   *  ETB-Eintrag — entsteht erst beim Speichern. Abbrechen hinterlässt nichts. */
+  function entwurfOeffnen() {
+    setGewaehlt(null);
+    setBearbeiten(false);
+    form.resetFields();
+    setEntwurf(true);
+  }
+
+  const baumDaten = useMemo(() => {
+    const knoten = baueBaum(abschnitte, einheitenQuery.data ?? []);
+    return entwurf
+      ? [...knoten, { key: 'entwurf', title: <i>Neuer Abschnitt (ungespeichert)</i>, selectable: false }]
+      : knoten;
+  }, [abschnitte, einheitenQuery.data, entwurf]);
   const verboten = aktuell ? nachfahrenInkl(abschnitte, aktuell.id) : new Set<number>();
   const parentOptionen = abschnitte.filter((a) => !verboten.has(a.id)).map((a) => ({ value: a.id, title: a.name }));
   const personalOptionen = (personalQuery.data ?? []).map((p) => ({ value: p.id, label: p.name }));
   const zugeordneteEinheiten = (einheitenQuery.data ?? []).filter((e) => e.abschnitt_id === aktuell?.id);
 
-  // Stärke des Abschnitts = Summe der kumulierten Ist-Stärke der direkt zugeordneten Einheiten.
-  const abschnittStaerke: Staerke | null = zugeordneteEinheiten.length === 0
-    ? null
-    : zugeordneteEinheiten.reduce<Staerke>(
-        (acc, e) => ({
-          fuehrer: acc.fuehrer + (e.ist_kumuliert?.fuehrer ?? 0),
-          unterfuehrer: acc.unterfuehrer + (e.ist_kumuliert?.unterfuehrer ?? 0),
-          mannschaft: acc.mannschaft + (e.ist_kumuliert?.mannschaft ?? 0),
-        }),
-        { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-      );
+  // ZWEI Werte, getrennt beschriftet (LFH-347 · H37): „eigene" ist die Bedeutung der
+  // Bestandszeile und bleibt es; „inkl. Unterabschnitte" ist das, was der Einsatzleiter
+  // im Fükw bisher im Kopf addieren musste.
+  const staerken = aktuell
+    ? abschnittStaerken(abschnitte, einheitenQuery.data ?? [], aktuell.id)
+    : { eigene: null, inklUnter: null };
 
   // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
   //
@@ -244,7 +236,7 @@ export default function EinsatzabschnittePage() {
             personalQuery.dataUpdatedAt,
           )} />
         </Space>
-        {darfSchreiben && <Button type="primary" onClick={() => anlegen.mutate()}>Abschnitt anlegen</Button>}
+        {darfSchreiben && <Button type="primary" onClick={entwurfOeffnen}>Abschnitt anlegen</Button>}
       </Space>
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
@@ -281,35 +273,36 @@ export default function EinsatzabschnittePage() {
               ursache={abschnitteQuery.error}
               onWiederholen={() => void abschnitteQuery.refetch()}
             />
-          ) : abschnitte.length === 0 ? (
+          ) : abschnitte.length === 0 && !entwurf ? (
             <SeitenLeer
               titel="Noch keine Abschnitte"
               hinweis="Gliedere die Lage in Abschnitte, um Einheiten und Führung zuzuordnen."
               /* Derselbe Wortlaut wie der Kopfknopf: eine zweite Schreibweise für dieselbe
                  Geste wäre der Befund, den B3 behebt. Ohne Schreibrecht keine Aktion — ein
                  Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
-              aktion={darfSchreiben ? { label: 'Abschnitt anlegen', onClick: () => anlegen.mutate() } : undefined}
+              aktion={darfSchreiben ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen } : undefined}
             />
           ) : (
             <>
               {standVeraltet && (
                 <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
               )}
-              <Tree treeData={baumDaten} selectedKeys={gewaehlt != null ? [gewaehlt] : []} defaultExpandAll
-                onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)} />
+              <Tree treeData={baumDaten} selectedKeys={entwurf ? ['entwurf'] : gewaehlt != null ? [gewaehlt] : []} defaultExpandAll
+                onSelect={(keys) => { setEntwurf(false); setGewaehlt(keys.length ? Number(keys[0]) : null); }} />
             </>
           )}
         </Card>
 
-        <Card style={{ flex: 1 }} size="small" title={aktuell ? `Abschnitt: ${aktuell.name}` : 'Kein Abschnitt gewählt'}>
+        <Card style={{ flex: 1 }} size="small"
+          title={entwurf ? 'Neuer Abschnitt' : aktuell ? `Abschnitt: ${aktuell.name}` : 'Kein Abschnitt gewählt'}>
           {/* KEIN Leerzustand, sondern eine Aufforderung bei fehlender Auswahl: die Menge
               kann voll sein, es fehlt nur die Wahl. Deshalb ausdrücklich ohne Aktion — es
               gibt nichts zu beheben, nur etwas anzuklicken. */}
-          {!aktuell ? (
+          {!aktuell && !entwurf ? (
             <SeitenLeer titel="Wähle einen Abschnitt im Baum" />
-          ) : bearbeiten ? (
+          ) : entwurf || bearbeiten ? (
             <Form<AbschnittWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
-              <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
+              <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input autoFocus /></Form.Item>
               <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
                 <TreeSelect allowClear placeholder="Übergeordneter Abschnitt" treeData={parentOptionen} />
               </Form.Item>
@@ -331,16 +324,18 @@ export default function EinsatzabschnittePage() {
               <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
               <Space size="middle">
                 <Button type="primary" htmlType="submit" loading={speichern.isPending}>Speichern</Button>
-                <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
-                <Popconfirm title="Abschnitt auflösen?"
-                  description={'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'}
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => aufloesen.mutate(aktuell.id)}>
-                  <Button danger>Auflösen</Button>
-                </Popconfirm>
+                <Button onClick={() => { setEntwurf(false); setBearbeiten(false); }}>Abbrechen</Button>
+                {!entwurf && aktuell && (
+                  <Popconfirm title="Abschnitt auflösen?"
+                    description={'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'}
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => aufloesen.mutate(aktuell.id)}>
+                    <Button danger>Auflösen</Button>
+                  </Popconfirm>
+                )}
               </Space>
             </Form>
-          ) : (
+          ) : aktuell ? (
             <>
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="Abschnittsleiter">{aktuell.leiter_name ?? '—'}</Descriptions.Item>
@@ -352,7 +347,8 @@ export default function EinsatzabschnittePage() {
                     leerText="keine Funk-Angaben"
                   />
                 </Descriptions.Item>
-                <Descriptions.Item label="Stärke (F/UF/M//Σ)"><StaerkeAnzeige wert={abschnittStaerke} /></Descriptions.Item>
+                <Descriptions.Item label="Stärke (F/UF/M//Σ)"><StaerkeAnzeige wert={staerken.eigene} /></Descriptions.Item>
+                <Descriptions.Item label="Stärke inkl. Unterabschnitte (F/UF/M//Σ)"><StaerkeAnzeige wert={staerken.inklUnter} /></Descriptions.Item>
                 {aktuell.bemerkung && <Descriptions.Item label="Bemerkung">{aktuell.bemerkung}</Descriptions.Item>}
               </Descriptions>
 
@@ -370,7 +366,7 @@ export default function EinsatzabschnittePage() {
 
               {einheitenListe}
             </>
-          )}
+          ) : null}
         </Card>
       </div>
     </div>

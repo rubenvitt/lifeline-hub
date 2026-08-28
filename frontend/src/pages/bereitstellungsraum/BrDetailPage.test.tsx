@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,6 +10,14 @@ import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
+
+// Kind-Komponente stubben (Präzedenz `UhsDetailPage.test.tsx:21`): `BrSwitcher` feuert eine
+// eigene `listeBr`-Query (`GET .../bereitstellungsraeume`, ohne Trailing-ID), für die diese
+// Datei keinen MSW-Handler registriert. `test/setup.ts` läuft mit `onUnhandledRequest: 'error'`
+// — ohne den Mock hing das Grün bislang am Abort-Timing der Query beim Unmount (`gcTime: 0`),
+// nicht an einem echten Handler. Diese Datei testet die Seiten-Komposition (Kräfte/Sidebar/
+// Schreibschutz), nicht den Switcher-Datenfluss.
+vi.mock('./BrSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 
 // -------- Fixture-Builder --------
 
@@ -90,7 +98,7 @@ function renderBrBei(route: string) {
         <AuthProvider>
           <MemoryRouter initialEntries={[route]}>
             <Routes>
-              <Route path="/einsaetze/:id/bereitstellungsraeume" element={<div>BR-LISTE</div>} />
+              <Route path="/einsaetze/:id/bereitstellungsraeume/liste" element={<div>BR-LISTE</div>} />
               <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
             </Routes>
           </MemoryRouter>
@@ -206,6 +214,28 @@ describe('BrDetailPage – Sidebar filtert auf aktueller_br_id == null (LFH-14)'
   });
 });
 
+describe('BrDetailPage — Sidebar-Suche (LFH-347 · M58b)', () => {
+  it('filtert die freien Kräfte über das Suchfeld', async () => {
+    const a = einheit({ id: 30, name: 'Zug Nord', aktueller_br_id: null });
+    const b = einheit({ id: 31, name: 'Trupp Süd', aktueller_br_id: null });
+    const br = brDetail({ einheiten: [], fahrzeuge: [] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([a, b])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    await screen.findByText('Zug Nord');
+    await userEvent.type(screen.getByLabelText('Kräfte suchen'), 'süd');
+    expect(screen.queryByText('Zug Nord')).not.toBeInTheDocument();
+    expect(screen.getByText('Trupp Süd')).toBeInTheDocument();
+  });
+});
+
 describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
   it('zeigt bei BR-Status geplant keine entfernen-/zuweisen-Buttons', async () => {
     // geplant → schreibgeschützt; bereitgestellte Einheit + freie Kraft in Sidebar.
@@ -245,6 +275,78 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'zuweisen' })).not.toBeInTheDocument();
+  });
+});
+
+describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
+  it('zeigt je bereitgestellter Einheit Typ und Stärke sowie die Summenzeile', async () => {
+    const zug = einheit({ id: 10, name: 'Zug 1', typ_label: 'Zug', ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 } });
+    const trupp = einheit({ id: 11, name: 'Trupp 2', typ_label: 'Trupp', ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 } });
+    const br = brDetail({ einheiten: [{ id: 10, name: 'Zug 1' }, { id: 11, name: 'Trupp 2' }], fahrzeuge: [{ id: 5, funkrufname: 'Florian 1' }] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug, trupp])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([
+        fahrzeug({ id: 5, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', aktueller_br_id: 1 }),
+      ])),
+    );
+
+    renderBrDetail();
+
+    const summe = await screen.findByTestId('br-summe');
+    expect(summe).toHaveTextContent('Bereitgestellt: 1/4/20//25 · 1 Fahrzeug');
+    expect(screen.getByText('Zug')).toBeInTheDocument();
+    expect(screen.getByText('1/3/18//22')).toBeInTheDocument();
+    expect(screen.getByText('LF 20')).toBeInTheDocument();
+  });
+});
+
+describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Final-Review Befund A)', () => {
+  it('zeigt „—" statt einer zu kleinen Zahl, wenn eine bereitgestellte Einheit in der Einheitenliste fehlt', async () => {
+    // BR trägt zwei Einheiten, die Einheiten-Query liefert nur eine davon zurück
+    // (Teilausfall/Cache-Lücke) — die Summenzeile darf keine vollständig aussehende,
+    // in Wahrheit zu kleine Zahl zeigen.
+    const zug = einheit({ id: 10, name: 'Zug 1', ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 } });
+    const br = brDetail({
+      einheiten: [{ id: 10, name: 'Zug 1' }, { id: 11, name: 'Trupp 2' }],
+      fahrzeuge: [],
+    });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug])), // Trupp 2 fehlt
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    const summe = await screen.findByTestId('br-summe');
+    expect(summe).toHaveTextContent('Bereitgestellt: —');
+    expect(summe).not.toHaveTextContent('//');
+    expect(screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)')).toBeInTheDocument();
+    // Namen bleiben aus `br.einheiten` sichtbar, auch wenn die Detaildaten fehlen.
+    expect(screen.getByText('Trupp 2')).toBeInTheDocument();
+  });
+
+  it('zeigt denselben unvollständigen Zustand, wenn die Einheiten-Query scheitert', async () => {
+    const br = brDetail({ einheiten: [{ id: 10, name: 'Zug 1' }], fahrzeuge: [] });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    expect(await screen.findByText('Zug 1')).toBeInTheDocument();
+    const summe = screen.getByTestId('br-summe');
+    expect(summe).toHaveTextContent('Bereitgestellt: —');
+    expect(screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)')).toBeInTheDocument();
   });
 });
 
