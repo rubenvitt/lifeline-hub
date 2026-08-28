@@ -236,3 +236,96 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     expect(zaehle(ohne)).toBe(zaehle(mit) - 1);
   });
 });
+
+describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
+  // Träger der Zusicherung ist der Reset-Effekt IN `ZonenInspector` (Vergleich gegen
+  // `entwurfZoneId`), NICHT ein `key` an der Aufrufstelle in `LagekartePage`. Ein `key`
+  // daneben wäre eine zweite Wahrheit; hier wird deshalb der Effekt gepinnt.
+  //
+  // Der historische Fehler (H43): Bezeichnung/Farbe/Notiz waren unkontrolliert
+  // (`defaultValue`), beim Wechsel A→B standen also weiter die Werte von A im Feld — und ein
+  // bloßer Fokuswechsel im Label-Feld schrieb `onAendern({ label: 'Alpha' })` auf Zone B.
+  // Behoben wurde das mit LFH-334 (kontrollierte Felder + Reset-Effekt); hier kommt der
+  // fehlende Regressionstest nach.
+  const zoneA: LageZone = {
+    ...basisZone,
+    id: 1,
+    typ: 'freie_skizze',
+    label: 'Alpha',
+    notiz: 'NotizA',
+    // jsdom sanitisiert `input[type=color]` auf `#` + sechs KLEINbuchstaben-Hexziffern —
+    // ein Großbuchstabe im Fixture käme als '#000000' zurück.
+    farbe: '#ff0000',
+    gefahrengebiet_id: null,
+  };
+  const zoneB: LageZone = {
+    ...zoneA,
+    id: 2,
+    label: 'Bravo',
+    notiz: 'NotizB',
+    farbe: '#00ff00',
+  };
+
+  /** Sichtbarer Wert eines antd-Select — das `combobox` selbst ist ohne Suche leer.
+   *  antd 6 rendert die gewählte Option als `.ant-select-content` (nicht mehr
+   *  `-selection-item`); Präzedenz `stammdaten/EtbBausteinFormModal.test.tsx:88`. */
+  const gewaehlt = (combobox: HTMLElement) =>
+    combobox.closest('.ant-select')?.querySelector('.ant-select-content')?.textContent;
+
+  it('zeigt nach dem Wechsel A→B die Werte von B und schreibt beim bloßen Blur nicht', async () => {
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>();
+    const { rerenderZone } = renderInspector({ zone: zoneA, gebiete: [], onAendern });
+
+    const label = screen.getByRole('textbox', { name: 'Label' });
+    const farbe = screen.getByLabelText('Farbe');
+    const notiz = screen.getByRole('textbox', { name: 'Notiz' });
+    expect(label).toHaveValue('Alpha');
+    expect(notiz).toHaveValue('NotizA');
+    expect(farbe).toHaveValue('#ff0000');
+
+    // `rerender` ist act-gewickelt: der Reset-Effekt ist danach durch.
+    rerenderZone(zoneB);
+
+    expect(label).toHaveValue('Bravo');
+    expect(notiz).toHaveValue('NotizB');
+    expect(farbe).toHaveValue('#00ff00');
+
+    // Reiner Fokuswechsel ohne Eingabe darf KEIN PATCH auslösen: der Entwurf trägt bereits
+    // die Werte von B, der onBlur-Vergleich gegen `zone.*` findet also keine Änderung.
+    await userEvent.click(label);
+    fireEvent.blur(label);
+    await userEvent.click(notiz);
+    fireEvent.blur(notiz);
+    await userEvent.click(farbe);
+    fireEvent.blur(farbe);
+    expect(onAendern).not.toHaveBeenCalled();
+
+    // Gegenaussage — ohne sie wäre „nicht aufgerufen" auch bei ersatzlos entferntem `onBlur`
+    // grün: eine echte Eingabe auf B muss weiterhin ankommen.
+    await userEvent.clear(label);
+    await userEvent.type(label, 'Charlie');
+    fireEvent.blur(label);
+    expect(onAendern).toHaveBeenCalledWith({ label: 'Charlie' });
+  });
+
+  it('zieht beim Wechsel auch den Typ nach (Farbfeld weg, Gebiets-Zuordnung da)', () => {
+    const gefahrenZone: LageZone = {
+      ...zoneB,
+      typ: 'gefahrengebiet',
+      farbe: null,
+      gefahrengebiet_id: 10,
+    };
+    const { rerenderZone } = renderInspector({ zone: zoneA, gebiete: [gebiet] });
+
+    expect(screen.getByLabelText('Farbe')).toBeInTheDocument();
+    expect(screen.queryByText('Gehört zu Gefahrengebiet')).not.toBeInTheDocument();
+
+    rerenderZone(gefahrenZone);
+
+    // Die beiden tragenden Aussagen hängen direkt an `entwurf.typ` und nicht an
+    // antd-Interna — der Text der Auswahlanzeige ist nur die Zusatzprobe.
+    expect(screen.queryByLabelText('Farbe')).not.toBeInTheDocument();
+    expect(screen.getByText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
+    expect(gewaehlt(screen.getByRole('combobox', { name: 'Zonen-Typ' }))).toBe('Gefahrengebiet');
+  });
+});
