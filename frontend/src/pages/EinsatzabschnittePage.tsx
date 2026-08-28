@@ -13,7 +13,7 @@ import {
   aktualisiereAbschnitt, legeAbschnittAn, listeAbschnitte, loeseAbschnittAuf, type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
 import { ApiError } from '../api/client';
-import type { Einsatzabschnitt, Staerke } from '../api/types';
+import type { Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
@@ -22,7 +22,7 @@ import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useViewport } from '../components/useViewport';
-import { nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
+import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 
 function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -137,17 +137,12 @@ export default function EinsatzabschnittePage() {
   const personalOptionen = (personalQuery.data ?? []).map((p) => ({ value: p.id, label: p.name }));
   const zugeordneteEinheiten = (einheitenQuery.data ?? []).filter((e) => e.abschnitt_id === aktuell?.id);
 
-  // Stärke des Abschnitts = Summe der kumulierten Ist-Stärke der direkt zugeordneten Einheiten.
-  const abschnittStaerke: Staerke | null = zugeordneteEinheiten.length === 0
-    ? null
-    : zugeordneteEinheiten.reduce<Staerke>(
-        (acc, e) => ({
-          fuehrer: acc.fuehrer + (e.ist_kumuliert?.fuehrer ?? 0),
-          unterfuehrer: acc.unterfuehrer + (e.ist_kumuliert?.unterfuehrer ?? 0),
-          mannschaft: acc.mannschaft + (e.ist_kumuliert?.mannschaft ?? 0),
-        }),
-        { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-      );
+  // ZWEI Werte, getrennt beschriftet (LFH-347 · H37): „eigene" ist die Bedeutung der
+  // Bestandszeile und bleibt es; „inkl. Unterabschnitte" ist das, was der Einsatzleiter
+  // im Fükw bisher im Kopf addieren musste.
+  const staerken = aktuell
+    ? abschnittStaerken(abschnitte, einheitenQuery.data ?? [], aktuell.id)
+    : { eigene: null, inklUnter: null };
 
   // ZWEI EBENEN, getrennt gehalten (LFH-331 · B3, D3):
   //
@@ -334,7 +329,8 @@ export default function EinsatzabschnittePage() {
                     leerText="keine Funk-Angaben"
                   />
                 </Descriptions.Item>
-                <Descriptions.Item label="Stärke (F/UF/M//Σ)"><StaerkeAnzeige wert={abschnittStaerke} /></Descriptions.Item>
+                <Descriptions.Item label="Stärke (F/UF/M//Σ)"><StaerkeAnzeige wert={staerken.eigene} /></Descriptions.Item>
+                <Descriptions.Item label="Stärke inkl. Unterabschnitte (F/UF/M//Σ)"><StaerkeAnzeige wert={staerken.inklUnter} /></Descriptions.Item>
                 {aktuell.bemerkung && <Descriptions.Item label="Bemerkung">{aktuell.bemerkung}</Descriptions.Item>}
               </Descriptions>
 

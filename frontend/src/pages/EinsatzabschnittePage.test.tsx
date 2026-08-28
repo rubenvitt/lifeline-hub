@@ -113,6 +113,31 @@ describe('EinsatzabschnittePage', () => {
     )).not.toBeInTheDocument();
   });
 
+  /**
+   * AK1 (LFH-347 · H37). Zwei Zeilen, zwei Bedeutungen: die Bestandszeile „Stärke (F/UF/M//Σ)"
+   * zählt weiter NUR die direkt zugeordneten Einheiten — sie wechselt nicht still die
+   * Bedeutung —, die neue Zeile summiert über die Unterabschnitte. Beide Labels sind im DOM
+   * verschieden, und die Zahlen belegen die Trennung: Süd hängt unter Nord und trägt 0/1/1.
+   */
+  it('zeigt die eigene Stärke und die inkl. Unterabschnitte getrennt beschriftet', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [
+      { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 0 },
+      { id: 6, einsatz_id: 1, ueber_abschnitt_id: 5, name: 'Süd', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1 },
+    ]));
+    server.use(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([
+      { id: 1, einsatz_id: 1, name: 'Zug Nord', abschnitt_id: 5, ist: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }, ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }, sortier: 0, sprechgruppen: [], fahrzeug_mitglieder: [], personal_mitglieder: [], material_mitglieder: [] },
+      { id: 2, einsatz_id: 1, name: 'Trupp Süd', abschnitt_id: 6, ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 }, ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 }, sortier: 1, sprechgruppen: [], fahrzeug_mitglieder: [], personal_mitglieder: [], material_mitglieder: [] },
+    ])));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+
+    const eigene = screen.getByText('Stärke (F/UF/M//Σ)').closest('tr')!;
+    const inkl = screen.getByText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)').closest('tr')!;
+    expect(eigene).not.toBe(inkl);
+    expect(within(eigene).getByText('1/2/3//6')).toBeInTheDocument();
+    expect(within(inkl).getByText('1/3/4//8')).toBeInTheDocument();
+  });
+
   it('selektiert per ?abschnitt=<id> den Abschnitt (LFH-25 Inspector-Deeplink)', async () => {
     server.use(...handlers());
     renderMitProviders(
