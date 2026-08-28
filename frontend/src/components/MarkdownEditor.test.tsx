@@ -90,6 +90,30 @@ describe('MarkdownEditor – toggle-Variante', () => {
     expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');
   });
 
+  /**
+   * Die Voraussetzung der Druckregeln aus `pages/lageberichtPrint.css` (LFH-350/M86),
+   * hier als DOM-Messung statt als Annahme: das `split`-Layout wickelt sein Textfeld in
+   * `.markdown-editor__eingabe`, das `toggle`-Layout NICHT. Eine Druckregel auf
+   * `.markdown-editor__eingabe` kann einen Toggle-Abschnitt deshalb nicht leer drucken —
+   * und eine Regel auf `textarea` müsste an `:has(.markdown-editor__vorschau)` hängen.
+   * Fällt diese Behauptung, ist die Begründung der Druckregeln hinfällig.
+   */
+  it('wickelt sein Textfeld NICHT in die Eingabespalte (anders als split)', () => {
+    const { container: zu } = renderMitProviders(
+      <MarkdownEditor layout="toggle" value="**fett**" onChange={() => {}} />,
+    );
+    expect(zu.querySelectorAll('.markdown-editor--toggle textarea')).toHaveLength(1);
+    expect(zu.querySelector('.markdown-editor__eingabe')).toBeNull();
+    // Und bei geschlossener Vorschau ist das Textfeld der einzige Träger des Textes.
+    expect(zu.querySelector('.markdown-editor__vorschau')).toBeNull();
+
+    const { container: gespalten } = renderMitProviders(
+      <MarkdownEditor layout="split" value="**fett**" onChange={() => {}} />,
+    );
+    expect(gespalten.querySelectorAll('.markdown-editor__eingabe textarea')).toHaveLength(1);
+    expect(gespalten.querySelector('.markdown-editor__vorschau')).not.toBeNull();
+  });
+
   it('reicht onKeyDown durch', async () => {
     const onKeyDown = vi.fn();
     renderMitProviders(
