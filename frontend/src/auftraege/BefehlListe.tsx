@@ -12,6 +12,7 @@ import { befehlDetailPfad } from '../routing/deeplinks';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import Datenstand from '../components/Datenstand';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 /**
  * Befehlsliste des Aufträge/Befehle-Tabs (LFH-330 · B2, Bündel III).
@@ -82,11 +83,16 @@ const befehlSpalten = spaltenFuer<BefehlAnzeige>()([
     title: 'Fassung',
     sortWert: (b) => b.zeitstand,
     // v-Nummer, Zeitstand und Ersteller in EINER Zeile — drei Slots sind das Maximum.
-    // `zeitstand` bleibt der rohe Wirestring: die beiden Detailseiten geben ihn ebenso
-    // rohe aus, und nur hier zu formatieren zeigte für dasselbe Feld zwei verschiedene
-    // Uhrzeiten (lokal vs. UTC). Die Umstellung aller vier Stellen auf die taktische DTG
-    // ist ein eigener Vorgang.
-    render: (_t, b) => `v${b.version} · ${b.zeitstand} · ${b.ersteller_name}`,
+    // `zeitstand` läuft seit LFH-350 (F2/H60) durch `ZeitAnzeige` (taktische DTG in der
+    // Anzeigezone), gleichlautend mit den beiden Detailseiten. `sortWert` oben bleibt der
+    // rohe UTC-Wirestring: der sortiert lexikografisch korrekt, die DTG (`DDHHmm…`) nicht.
+    render: (_t, b) => (
+      <>
+        {`v${b.version} · `}
+        <ZeitAnzeige wert={b.zeitstand} />
+        {` · ${b.ersteller_name}`}
+      </>
+    ),
   },
 ]);
 

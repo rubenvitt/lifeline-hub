@@ -18,6 +18,7 @@ import { vorlage } from '../befehle/vorlagen';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import './befehlPrint.css';
 
 export default function BefehlDetailPage() {
@@ -237,7 +238,11 @@ function BefehlDetail() {
         </Space>
       </Flex>
 
-      <Typography.Paragraph type="secondary">Zeitstand: {befehl.zeitstand}</Typography.Paragraph>
+      {/* Taktische DTG in der Anzeigezone (LFH-350 · H60): `zeitstand` ist ein UTC-Wirestring
+          ohne Zonenkennung und stand roh ausgegeben um den Zonenversatz falsch. */}
+      <Typography.Paragraph type="secondary">
+        Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
+      </Typography.Paragraph>
 
       {istEntwurf && darfSchreiben ? (
         <Form

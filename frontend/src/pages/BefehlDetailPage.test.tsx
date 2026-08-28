@@ -8,6 +8,8 @@ import BefehlDetailPage from './BefehlDetailPage';
 import { AuthProvider } from '../auth/AuthContext';
 import * as befehleApi from '../api/befehle';
 import * as einsaetzeApi from '../api/einsaetze';
+import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('../api/befehle');
 vi.mock('../api/einsaetze');
@@ -224,5 +226,57 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
     const ereignis = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(ereignis);
     expect(ereignis.defaultPrevented).toBe(false);
+  });
+});
+
+/**
+ * ── ZEITSTAND IN DER ANZEIGEZONE (LFH-350 · H60) ────────────────────────────────
+ *
+ * Gleiche Sache wie auf der Lagebericht-Detailseite: `zeitstand` ist ein UTC-Wirestring
+ * ohne Zonenkennung und stand roh ausgegeben um den Zonenversatz falsch.
+ *
+ * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
+ * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
+ * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
+ * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
+ * auflöst — `findByText` hat dann längst getroffen, und auf einem Berliner Rechner wäre der
+ * Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren: 4 von 5 Tests
+ * blieben es). `setQueryData` stellt die Zone vor dem ersten Render.
+ */
+function renderMitZone(bid: number) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(einsatzKeys.einstellungen(1), {
+    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+  });
+  return render(
+    <QueryClientProvider client={qc}>
+      <AntApp>
+        <AuthProvider>
+          <EinsatzAnzeigeProvider einsatzId={1}>
+            <MemoryRouter initialEntries={[`/einsaetze/1/auftraege/befehle/${bid}`]}>
+              <Routes>
+                <Route path="/einsaetze/:id/auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
+              </Routes>
+            </MemoryRouter>
+          </EinsatzAnzeigeProvider>
+        </AuthProvider>
+      </AntApp>
+    </QueryClientProvider>,
+  );
+}
+
+describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
+  it('zeigt die taktische DTG in der Anzeigezone, nicht den rohen UTC-Wirestring', async () => {
+    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue(
+      { einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } } as never,
+    );
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(
+      { ...befehl('freigegeben'), zeitstand: '2026-07-25 12:00:00' } as never,
+    );
+    renderMitZone(7);
+
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin.
+    expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
+    expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });
