@@ -1,11 +1,12 @@
 import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
-import { parseRouteId, bereitstellungsraeumePfad } from '../../routing/deeplinks';
+import { parseRouteId, bereitstellungsraeumeListePfad } from '../../routing/deeplinks';
 import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -19,6 +20,8 @@ import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brStatus } from '../../theme/statusFarben';
 import { abstand, flaeche } from '../../theme/tokens';
+import BrSwitcher from './BrSwitcher';
+import { merkeLetztenBr } from './brAuswahl';
 
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
@@ -26,7 +29,7 @@ export default function BrDetailPage() {
   const { benutzer } = useAuth();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
-  const listenPfad = bereitstellungsraeumePfad(einsatzId);
+  const listenPfad = bereitstellungsraeumeListePfad(einsatzId);
   const { abBreite } = useViewport();
   const breit = abBreite('md');
 
@@ -50,6 +53,12 @@ export default function BrDetailPage() {
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
+
+  // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet beim
+  // nächsten Mal wieder hier (Muster `UhsDetailPage.tsx`).
+  useEffect(() => {
+    if (detailQuery.isSuccess) merkeLetztenBr(einsatzId, brId);
+  }, [detailQuery.isSuccess, einsatzId, brId]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
@@ -119,7 +128,7 @@ export default function BrDetailPage() {
       breite={flaeche.seiteBreit}
       titel={
         <Space>
-          {br.bezeichnung}
+          <BrSwitcher einsatzId={einsatzId} aktuellerBr={br} />
           <StatusTag darstellung={brStatus[br.status]} />
         </Space>
       }

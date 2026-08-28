@@ -90,7 +90,7 @@ function renderBrBei(route: string) {
         <AuthProvider>
           <MemoryRouter initialEntries={[route]}>
             <Routes>
-              <Route path="/einsaetze/:id/bereitstellungsraeume" element={<div>BR-LISTE</div>} />
+              <Route path="/einsaetze/:id/bereitstellungsraeume/liste" element={<div>BR-LISTE</div>} />
               <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
             </Routes>
           </MemoryRouter>

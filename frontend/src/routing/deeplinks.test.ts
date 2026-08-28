@@ -7,6 +7,7 @@ import {
   unfallhilfsstellenListePfad,
   bereitstellungsraumDetailPfad,
   bereitstellungsraeumePfad,
+  bereitstellungsraeumeListePfad,
   lageberichtDetailPfad,
   lageberichtePfad,
   befehlDetailPfad,
@@ -93,6 +94,9 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   });
   it('bereitstellungsraeumePfad', () => {
     expect(bereitstellungsraeumePfad(E)).toBe('/einsaetze/5/bereitstellungsraeume');
+  });
+  it('bereitstellungsraeumeListePfad', () => {
+    expect(bereitstellungsraeumeListePfad(3)).toBe('/einsaetze/3/bereitstellungsraeume/liste');
   });
   it('lageberichtePfad', () => {
     expect(lageberichtePfad(E)).toBe('/einsaetze/5/lageberichte');

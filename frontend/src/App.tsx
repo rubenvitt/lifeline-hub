@@ -45,6 +45,7 @@ import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
 import BereitstellungsraeumePage from './pages/bereitstellungsraum/BereitstellungsraeumePage';
+import BereitstellungsraeumeDefault from './pages/bereitstellungsraum/BereitstellungsraeumeDefault';
 import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import AdminLayout from './admin/AdminLayout';
 import {
@@ -90,7 +91,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   einsatzabschnitte: <EinsatzabschnittePage />,
   personen: <PersonenPage />,
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
-  bereitstellungsraeume: <BereitstellungsraeumePage />,
+  bereitstellungsraeume: <BereitstellungsraeumeDefault />,
   tiere: <TierePage />,
   schaeden: <SchaedenPage />,
   lageberichte: <LageberichtePage />,
@@ -224,6 +225,7 @@ export default function App() {
             ))}
             <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
             <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+            <Route path="bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
             <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
             <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
             <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
