@@ -740,6 +740,35 @@ Alltag wichtigsten:
   `<form>`) blieben dabei **beide grün**. In antd 6 ist er gemessen ein
   `<div role="button">`, die Zusicherung hält; `MaterialFormModal.test.tsx` ist die Stelle,
   an der ein antd-Sprung das auffliegen liesse.
+- **Ein Direkteinstieg ist ein Baustein, kein UHS-Sonderfall** (LFH-347 · C12, M56).
+  `components/Direkteinstieg.tsx` + `components/EinstiegSwitcher.tsx` +
+  `components/direkteinstiegKern.ts` tragen „spring in den zuletzt gewählten Datensatz, sonst
+  in den ältesten aktiven, sonst den jüngsten; bei leerer Menge Leerzustand mit Anlage". UHS
+  und Bereitstellungsraum sind zwei dünne Belegungen; die Tabelle liegt jeweils unter
+  `…/liste`. Der `localStorage`-Schlüssel `<praefix>:letzteAuswahl:<einsatzId>` ist für `uhs`
+  byte-gleich zum Bestand — gespeicherte Auswahlen überleben den Umbau, und
+  `direkteinstiegKern.test.ts` pinnt ihn.
+  **Die Kerndatei heisst `direkteinstiegKern.ts`, nicht `direkteinstieg.ts`** — und das ist
+  gemessen, nicht Geschmack: der naheliegende Name kollidiert case-insensitiv mit
+  `Direkteinstieg.tsx` im selben Verzeichnis. Vites `resolve.extensions` prüft `.ts` **vor**
+  `.tsx`, auf macOS/Windows traf `import … from './Direkteinstieg'` deshalb still die
+  Kerndatei statt der Komponente, ohne Fehler — der Default-Export war schlicht `undefined`
+  (Memory `ts-tsx-basename-shadowing-typecheck`). Wer ein Modul aus Komponente plus reinem
+  Kern baut, gibt dem Kern ein Suffix.
+  **Eine Stärke wird EINMAL summiert** (`anzeige/staerke.ts:summiereStaerke`, `null` bei
+  leerer Menge — „keine Einheit" ist nicht „0/0/0"); Abschnitt eigene, Abschnitt inkl.
+  Unterabschnitte (`pages/einsatzabschnitte/abschnittStaerke.ts`) und BR-Summenzeile lesen alle
+  von dort. Die Bestandszeile `Stärke (F/UF/M//Σ)` behält ihre Bedeutung (direkt zugeordnet);
+  die kumulierte ist eine **zweite** Zeile, kein stiller Bedeutungswechsel.
+  **„Abschnitt anlegen" ist ein lokaler Entwurf** (M55): eigener `entwurf`-State, kein
+  Fake-Datensatz in der Query — ein Objekt mit `id: -1` liefe durch `nachfahrenInkl`, die
+  Stärke-Rechnung und den Deeplink-Abgleich. Der POST (und der ETB-Eintrag) entsteht beim
+  Speichern; Abbrechen hinterlässt nichts, und der Test zählt beides (0 POST, 0
+  ETB-Invalidierung).
+  **M51 bleibt bei einem Auslöser je Zelle** — das Ticket verlangte ein 5-Wege-Segmentcontrol
+  mit einem Tipp, LFH-368 hat gemessen, dass das Breitenbudget (~693 px) es nicht trägt. Der
+  e2e-Nachweis (`e2e/gefahren-matrix-zelle.spec.ts`) misst ≥ 44 px auf dem Tablet in Stufe
+  `komfortabel`; im Fükw sind 30 px die Staffel, kein Mangel.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
