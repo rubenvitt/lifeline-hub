@@ -163,10 +163,10 @@ anderes als die DB), und im Entwurfszweig steht der rohe UTC-Wirestring nicht me
 
 | # | Was | Wo |
 | --- | --- | --- |
-| **N4** | Hook-Nachzüge aus dem Review: `autosaveLaeuft` als `loading` am Speichern-Knopf nutzen oder streichen; expliziter Speichern-Klick blurrt zuerst (Autosave-PATCH) und sendet dann (zweiter PATCH) — gemeinsamer Riegel; 30-s-Frist und „kein Autosave am freigegebenen Stand" im Hook-Test; `Form.useWatch([], form)` rendert die Seite je Anschlag — messen, ggf. auf Abschnittspfade einschränken; `kettenKoepfe` bei vollständigem Zyklus: Restmenge als Einzelköpfe statt leere Liste | `entwurf/useEntwurfVerlustschutz.ts`, `LageberichtDetailPage.tsx`, `lageberichte/ketten.ts` |
-| **N1** | Berichts-/Befehlsstatus als `StatusTag` mit Vertragstyp statt antd-Preset (`Tag color="green"` im Kopf der Detailseiten) — Entscheidung für alle vier Kommunikationsmodule, ob die Phasenachse in den A2-Vertrag wandert | `LageberichtDetailPage.tsx:228`, `BefehlDetailPage.tsx` (gleiche Stelle), `kommunikation/phase.ts` |
-| **N2** | Speicher-/Anlegefehler als `SpeicherFehler` in der Seite bzw. im Dialog statt nur als Toast (Fortschreibung von C10/H14 auf die Entwurfsseiten) | beide Detailseiten, `LageberichtePage.tsx` |
-| **N3** | Fokus beim Einstieg in einen Entwurf — welches Feld? (erster leerer Abschnitt wäre der Kandidat) | `LageberichtDetailPage.tsx`, `BefehlDetailPage.tsx` |
+| **N4 → LFH-495** | Hook-Nachzüge aus dem Review: `autosaveLaeuft` als `loading` am Speichern-Knopf nutzen oder streichen; expliziter Speichern-Klick blurrt zuerst (Autosave-PATCH) und sendet dann (zweiter PATCH) — gemeinsamer Riegel; 30-s-Frist und „kein Autosave am freigegebenen Stand" im Hook-Test; `Form.useWatch([], form)` rendert die Seite je Anschlag — messen, ggf. auf Abschnittspfade einschränken; `kettenKoepfe` bei vollständigem Zyklus: Restmenge als Einzelköpfe statt leere Liste | `entwurf/useEntwurfVerlustschutz.ts`, `LageberichtDetailPage.tsx`, `lageberichte/ketten.ts` |
+| **N1 → LFH-493** | Berichts-/Befehlsstatus als `StatusTag` mit Vertragstyp statt antd-Preset (`Tag color="green"` im Kopf der Detailseiten) — Entscheidung für alle vier Kommunikationsmodule, ob die Phasenachse in den A2-Vertrag wandert | `LageberichtDetailPage.tsx:228`, `BefehlDetailPage.tsx` (gleiche Stelle), `kommunikation/phase.ts` |
+| **N2 → LFH-494** | Speicher-/Anlegefehler als `SpeicherFehler` in der Seite bzw. im Dialog statt nur als Toast (Fortschreibung von C10/H14 auf die Entwurfsseiten) | beide Detailseiten, `LageberichtePage.tsx` |
+| **N3 → LFH-495** | Fokus beim Einstieg in einen Entwurf — welches Feld? (erster leerer Abschnitt wäre der Kandidat) | `LageberichtDetailPage.tsx`, `BefehlDetailPage.tsx` |
 
 Die drei sind **je ein Ticket**; N1 und N2 betreffen beide Zwillingsseiten und gehören
 gemeinsam angefasst, sonst entsteht wieder die Divergenz, die C13 mit dem Hook geschlossen hat.
