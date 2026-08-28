@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { Route, Routes } from 'react-router';
-import { screen, within } from '@testing-library/react';
+import { Route, Routes, useNavigate } from 'react-router';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -10,6 +10,8 @@ import { AuthProvider } from '../auth/AuthContext';
 import LageberichtePage from './LageberichtePage';
 import LageberichtDetailPage from './LageberichtDetailPage';
 import type { EinsatzAnzeige, LageberichtAnzeige } from '../api/types';
+import { einsatzKeys } from '../api/queryKeys';
+import { alsOrtszeit } from '../etb/filterZeit';
 
 const admin = {
   id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
@@ -249,6 +251,143 @@ describe('LageberichtDetailPage', () => {
     // Kein Rohtext mit Markdown-Zeichen
     expect(screen.queryByText(/## Schwerpunkt/)).toBeNull();
     expect(screen.queryByText(/- Punkt A/)).toBeNull();
+  });
+});
+
+/**
+ * Verlustschutz am Lageberichtsentwurf (LFH-348 · C13, Befund H63).
+ *
+ * Der reale Fremdschreib-Pfad: dieser Bericht ändert sich serverseitig (zweiter Tab, anderes
+ * Stabsmitglied) → `LiveEvent::Lagebericht` → Invalidierung → neue Objektidentität → der
+ * Sync-Effekt schrieb den Serverstand kommentarlos über ungespeicherte Eingaben. Ein
+ * Refetch mit UNVERÄNDERTEM Stand tut das nicht (Structural Sharing) — deshalb schiebt jeder
+ * Test hier einen geänderten Stand nach, nicht bloß eine Invalidierung.
+ */
+describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)', () => {
+  /** Serverstand nachschiebbar: der Handler liest aus einer Variablen. */
+  function setupLebend(start: LageberichtAnzeige) {
+    let stand = start;
+    const patches: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(stand)),
+      http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, async ({ request }) => {
+        patches.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(stand);
+      }),
+    );
+    const r = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: `/einsaetze/7/lageberichte/${start.id}` },
+    );
+    return {
+      patches,
+      /** Fremde Änderung: neuer Serverstand + Invalidierung wie über den Live-Stream. */
+      fremdeAenderung: async (neu: LageberichtAnzeige) => {
+        stand = neu;
+        await act(async () => {
+          await r.client.invalidateQueries({ queryKey: einsatzKeys.lagebericht(7, start.id) });
+        });
+      },
+    };
+  }
+
+  it('überschreibt getippten Text NICHT, wenn der Bericht serverseitig geändert wurde', async () => {
+    const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
+    const auftrag = await screen.findByLabelText('Auftrag');
+    await userEvent.type(auftrag, 'Meine Fassung');
+    await fremdeAenderung({
+      ...lagebericht7Abschnitte, titel: 'Fremde Fassung', aktualisiert_at: '2026-06-02 12:00:00',
+    });
+    // ZUERST warten, bis der neue Stand nachweislich ANGEKOMMEN ist: die Überschrift kommt
+    // aus der Query, nicht aus dem Formular — der unabhängige Zeuge. Ohne ihn bestünde die
+    // Zusicherung darunter beim ersten Versuch auch ohne jeden Riegel (C7, gemessen).
+    await screen.findByRole('heading', { name: 'Fremde Fassung' });
+    expect(screen.getByLabelText('Auftrag')).toHaveValue('Meine Fassung');
+  });
+
+  it('übernimmt eine fremde Änderung in ein unberührtes Formular (Gegenaussage)', async () => {
+    const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
+    await screen.findByLabelText('Auftrag');
+    await fremdeAenderung({
+      ...lagebericht7Abschnitte, titel: 'Neu vom Server', aktualisiert_at: '2026-06-02 12:00:00',
+      abschnitte: [{ schluessel: 'auftrag', text: 'Fremder Text' }, ...lagebericht7Abschnitte.abschnitte.slice(1)],
+    });
+    await screen.findByRole('heading', { name: 'Neu vom Server' });
+    expect(screen.getByLabelText('Auftrag')).toHaveValue('Fremder Text');
+  });
+
+  it('lädt beim Wechsel der Bericht-ID neu, auch wenn im alten Bericht etwas offen war', async () => {
+    const zweiter: LageberichtAnzeige = {
+      ...lagebericht7Abschnitte, id: 13, titel: 'Zweiter Bericht',
+      abschnitte: [{ schluessel: 'auftrag', text: 'Text 13' }, ...lagebericht7Abschnitte.abschnitte.slice(1)],
+    };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(lagebericht7Abschnitte)),
+      http.get('/api/einsaetze/7/lageberichte/13', () => HttpResponse.json(zweiter)),
+      http.patch('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(lagebericht7Abschnitte)),
+    );
+    function Weiter() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>weiter</button>;
+    }
+    renderMitProviders(
+      <AuthProvider>
+        <Weiter />
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/lageberichte/12' },
+    );
+    await userEvent.type(await screen.findByLabelText('Auftrag'), 'offen');
+    await userEvent.click(screen.getByRole('button', { name: 'weiter' }));
+    await screen.findByRole('heading', { name: 'Zweiter Bericht' });
+    // Dieselbe Komponente, andere ID: ohne Remount hielte der Riegel des alten Berichts
+    // den neuen Serverstand fern, und das Feld zeigte „offen" statt „Text 13".
+    expect(await screen.findByLabelText('Auftrag')).toHaveValue('Text 13');
+  });
+
+  it('speichert beim Verlassen eines Feldes von selbst und zeigt den Zeitstempel', async () => {
+    const { patches } = setupLebend(lagebericht7Abschnitte);
+    await userEvent.type(await screen.findByLabelText('Auftrag'), 'x');
+    expect(patches).toHaveLength(0);
+    await userEvent.tab();
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0].abschnitte).toEqual(expect.arrayContaining([{ schluessel: 'auftrag', text: 'x' }]));
+    expect(await screen.findByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
+  });
+
+  it('warnt beim Reload, solange eine Fassung ungespeichert ist — und sonst nicht', async () => {
+    setupLebend(lagebericht7Abschnitte);
+    const auftrag = await screen.findByLabelText('Auftrag');
+    let ereignis = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(ereignis);
+    expect(ereignis.defaultPrevented).toBe(false);
+
+    await userEvent.type(auftrag, 'noch nicht gespeichert');
+    ereignis = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(ereignis);
+    expect(ereignis.defaultPrevented).toBe(true);
+  });
+
+  it('macht den Zeitstand im Entwurf editierbar und schickt ihn als UTC-Wirestring (N23)', async () => {
+    const { patches } = setupLebend(lagebericht7Abschnitte);
+    const feld = await screen.findByLabelText('Zeitstand');
+    // Der Wert kommt über den Sync-Effekt NACH dem ersten Render — deshalb `waitFor`.
+    await waitFor(() =>
+      expect(feld).toHaveValue(alsOrtszeit('2026-06-02 10:00:00')!.format('DD.MM.YYYY HH:mm')),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toMatchObject({ zeitstand: '2026-06-02 10:00:00' });
   });
 });
 

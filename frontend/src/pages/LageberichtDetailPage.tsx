@@ -1,5 +1,5 @@
-import { App, Breadcrumb, Button, Form, Input, Space, Spin, Tag, Typography } from 'antd';
-import { useEffect } from 'react';
+import { App, Breadcrumb, Button, DatePicker, Flex, Form, Input, Space, Spin, Tag, Typography } from 'antd';
+import type { Dayjs } from 'dayjs';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -18,9 +18,25 @@ import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
 import { vorlage } from '../lageberichte/vorlagen';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
+import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import './lageberichtPrint.css';
 
+/**
+ * Formularwerte des Entwurfs: Titel, Zeitstand (lokale Picker-Zeit, UTC erst beim Senden —
+ * `etb/filterZeit.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
+ */
+type FormWerte = { titel: string; zeitstand?: Dayjs } & Record<string, string | Dayjs | undefined>;
+
 export default function LageberichtDetailPage() {
+  const { lbId } = useParams();
+  // Remount je Bericht: der Verlustschutz-Merker gehört zu EINEM Datensatz. Ohne den Key
+  // trüge ein Routenwechsel auf dieselbe Komponente (Fortschreiben → neuer Entwurf) den
+  // Riegel des alten Berichts mit und hielte den neuen Serverstand fern (getestet).
+  return <LageberichtDetail key={lbId} />;
+}
+
+function LageberichtDetail() {
   const { id, lbId } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
@@ -29,8 +45,7 @@ export default function LageberichtDetailPage() {
   const { message, modal } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [form] = Form.useForm<Record<string, string>>();
-
+  const [form] = Form.useForm<FormWerte>();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -42,14 +57,6 @@ export default function LageberichtDetailPage() {
     enabled: idGueltig,
   });
 
-  useEffect(() => {
-    if (berichtQuery.data) {
-      const werte: Record<string, string> = { titel: berichtQuery.data.titel };
-      for (const a of berichtQuery.data.abschnitte) werte[a.schluessel] = a.text;
-      form.setFieldsValue(werte);
-    }
-  }, [berichtQuery.data, form]);
-
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
@@ -59,18 +66,45 @@ export default function LageberichtDetailPage() {
 
   // Persistiert die aktuellen Formularwerte als Entwurf (ohne Erfolgs-Toast) — von der
   // „Entwurf speichern"-Mutation und vom Freigabe-Flow gemeinsam genutzt.
-  const speichern = (werte: Record<string, string>) => {
+  const speichern = (werte: FormWerte) => {
     const v = vorlage(berichtQuery.data!.vorlage)!;
-    const abschnitte: LageberichtAbschnitt[] = v.abschnitte.map((a) => ({
-      schluessel: a.schluessel,
-      text: werte[a.schluessel] ?? '',
-    }));
-    return aktualisiereLagebericht(einsatzId, berichtId, { titel: werte.titel, abschnitte });
+    const abschnitte: LageberichtAbschnitt[] = v.abschnitte.map((a) => {
+      const text = werte[a.schluessel];
+      return { schluessel: a.schluessel, text: typeof text === 'string' ? text : '' };
+    });
+    return aktualisiereLagebericht(einsatzId, berichtId, {
+      titel: werte.titel,
+      // Leer gelassen → Feld nicht mitschicken; das Backend behält den Bestandswert.
+      ...(werte.zeitstand ? { zeitstand: alsBackendZeit(werte.zeitstand) } : {}),
+      abschnitte,
+    });
   };
+
+  /**
+   * Riegel gegen den Fremd-Refetch (Befund H63), Autosave (30 s + Blur) und Reload-Warner —
+   * derselbe Hook wie in `BefehlDetailPage`, Begründungen in
+   * `entwurf/useEntwurfVerlustschutz.ts`. Das Ticket verlangte einen Effekt an `bericht.id`
+   * mit `isFieldsTouched()`-Guard; gebaut ist der C7-Mechanismus, weil `isFieldsTouched` nach
+   * dem Speichern nie zurückfällt.
+   */
+  const schutz = useEntwurfVerlustschutz<LageberichtAnzeige, FormWerte>({
+    daten: berichtQuery.data,
+    istEntwurf: berichtQuery.data?.status === 'entwurf',
+    form,
+    werteAus: (b) => {
+      const werte: FormWerte = { titel: b.titel, zeitstand: alsOrtszeit(b.zeitstand) };
+      for (const a of b.abschnitte) werte[a.schluessel] = a.text;
+      return werte;
+    },
+    speichern,
+    onFehler: fehler,
+    onGespeichert: invalidate,
+  });
 
   const speichernMutation = useMutation({
     mutationFn: speichern,
     onSuccess: () => {
+      schutz.quittiereGespeichert();
       invalidate();
       message.success('Entwurf gespeichert');
     },
@@ -117,7 +151,7 @@ export default function LageberichtDetailPage() {
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder VOR dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
-    let werte: Record<string, string>;
+    let werte: FormWerte;
     try {
       werte = await form.validateFields();
     } catch {
@@ -156,16 +190,27 @@ export default function LageberichtDetailPage() {
           { title: bericht.titel },
         ]}
       />
-      <Space className="lagebericht-no-print" style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
+      {/* Umbruchfähige Kopfzeile nach dem Muster von `BefehlDetailPage` (C8/M73): ohne
+          `wrap` schob der Titel auf 390 px die Aktionen aus dem sichtbaren Bereich. */}
+      <Flex
+        className="lagebericht-no-print"
+        justify="space-between"
+        align="center"
+        gap={16}
+        wrap
+        style={{ marginBottom: 16 }}
+      >
+        <div>
           <Typography.Title level={3} style={{ margin: 0 }}>
             {bericht.titel}
           </Typography.Title>
-          <Tag color={istEntwurf ? 'default' : 'green'}>{istEntwurf ? 'Entwurf' : 'Freigegeben'}</Tag>
-          <Tag>{v?.label ?? bericht.vorlage}</Tag>
-          <Tag>v{bericht.version}</Tag>
-        </Space>
-        <Space>
+          <Space size={6} wrap style={{ marginTop: 4 }}>
+            <Tag color={istEntwurf ? 'default' : 'green'}>{istEntwurf ? 'Entwurf' : 'Freigegeben'}</Tag>
+            <Tag>{v?.label ?? bericht.vorlage}</Tag>
+            <Tag>v{bericht.version}</Tag>
+          </Space>
+        </div>
+        <Space wrap>
           <Button onClick={() => window.print()}>Drucken / als PDF</Button>
           {!istEntwurf && bericht.etb_eintrag_id != null && (
             <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
@@ -177,6 +222,13 @@ export default function LageberichtDetailPage() {
           )}
           {istEntwurf && darfSchreiben && (
             <>
+              {/* Der sichtbare Beleg des stillen Autosave. Ohne ihn wäre „gespeichert"
+                  von „nicht gespeichert" nicht zu unterscheiden. */}
+              <Typography.Text type="secondary">
+                {schutz.ungespeichert
+                  ? 'ungespeicherte Änderungen'
+                  : schutz.zuletztGespeichert && `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
+              </Typography.Text>
               <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
                 Entwurf speichern
               </Button>
@@ -186,7 +238,7 @@ export default function LageberichtDetailPage() {
             </>
           )}
         </Space>
-      </Space>
+      </Flex>
 
       <Typography.Paragraph type="secondary">Zeitstand: {bericht.zeitstand}</Typography.Paragraph>
 
@@ -194,10 +246,19 @@ export default function LageberichtDetailPage() {
         <Form
           form={form}
           layout="vertical"
-          onFinish={(werte) => speichernMutation.mutate(werte as Record<string, string>)}
+          onValuesChange={schutz.markiereGeaendert}
+          // Zweiter Auslöser neben der Frist: ein verlassenes Feld ist der Moment, in dem
+          // ein Abschnitt fertig gedacht ist. `onBlur` steigt aus den Feldern auf.
+          onBlur={schutz.autosaveJetzt}
+          onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
         >
           <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
             <Input />
+          </Form.Item>
+          {/* Das Backend nimmt den Zeitstand seit jeher (`routes/lagebericht.rs`), nur die
+              UI bot ihn nirgends an (N23). Picker in Ortszeit, Wire in UTC — `etb/filterZeit`. */}
+          <Form.Item label="Zeitstand" name="zeitstand">
+            <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
           </Form.Item>
           {v?.abschnitte.map((a) => (
             <Form.Item key={a.schluessel} label={a.label} name={a.schluessel}>
