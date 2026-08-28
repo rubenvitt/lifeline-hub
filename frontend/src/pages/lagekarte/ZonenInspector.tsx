@@ -48,6 +48,10 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
     // noch auf ihren Blur warten. Bei einer wirklich anderen Zone ist ein Vollreset richtig.
     if (entwurfZoneId.current === zone.id) return;
     entwurfZoneId.current = zone.id;
+    // Ein auf der ALTEN Zone gestarteter Speichervorgang darf nach dem Wechsel keine
+    // Quittung („gespeichert"/„nicht gespeichert") an der neuen Zone hinterlassen —
+    // der Zähler invalidiert den nachlaufenden Lauf wie der Reset den Entwurf (LFH-349).
+    speicherLauf.current++;
     setEntwurf({
       typ: zone.typ,
       label: zone.label ?? '',
