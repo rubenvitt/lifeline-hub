@@ -329,6 +329,28 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     expect(screen.getByRole('textbox', { name: 'Label' })).toHaveValue('Bravo');
   });
 
+  it('quittiert weiter, wenn während des Speicherns ein Same-ID-Refetch eintrifft', async () => {
+    // Gegenaussage zum Test darüber: das Invalidieren des Lauf-Zählers gehört HINTER den
+    // Same-ID-Riegel. Der eigene Speichervorgang ändert genau die Werte, an denen der
+    // Effekt hängt (label/notiz/farbe), und `zoneAendern` wartet die Invalidierung ab —
+    // ein Increment vor dem Riegel ließe „gespeichert" also nie mehr erscheinen.
+    let freigeben: (() => void) | undefined;
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() =>
+      new Promise<void>((resolve) => { freigeben = resolve; }));
+    const { rerenderZone } = renderInspector({ zone: zoneA, onAendern });
+
+    const label = screen.getByRole('textbox', { name: 'Label' });
+    await userEvent.type(label, 'X');
+    fireEvent.blur(label);
+    expect(screen.getByText('speichert …')).toBeInTheDocument();
+
+    // Gleiche id, geänderte Werte — genau das, was der eigene Refetch liefert.
+    rerenderZone({ ...zoneA, label: 'AlphaX' });
+
+    await act(async () => { freigeben?.(); });
+    expect(await screen.findByText('gespeichert')).toBeInTheDocument();
+  });
+
   it('zieht beim Wechsel auch den Typ nach (Farbfeld weg, Gebiets-Zuordnung da)', () => {
     const gefahrenZone: LageZone = {
       ...zoneB,
