@@ -134,7 +134,7 @@ export default function LagemeldungenPage() {
           standardSortierung={{ spalte: 'zeit', richtung: 'ab' }}
           gruppen={{
             schluessel: (l) => tagesSchluessel(l.erstellt_at, konventionen),
-            etikett: (s) => tagesEtikett(s),
+            etikett: (s) => tagesEtikett(s, konventionen),
             reihenfolge: tage,
           }}
           karte={{ art: 'plan', titel: { spalte: 'text' }, sekundaer: ['zeit', 'herkunft', 'ort'] }}

@@ -193,6 +193,10 @@ function LageberichtDetail() {
           fehler(e);
           throw e; // Dialog offen lassen, Freigabe nicht auslösen.
         }
+        // Sonst bliebe der Merker nach der endgültigen Freigabe stehen und der Browser
+        // fragte beim Neuladen nach Änderungen an einem Bericht, der nicht mehr editierbar
+        // ist (Review LFH-348).
+        schutz.quittiereGespeichert();
         await freigebenMutation.mutateAsync();
       },
     });
@@ -260,7 +264,12 @@ function LageberichtDetail() {
         </Space>
       </Flex>
 
-      <Typography.Paragraph type="secondary">Zeitstand: {bericht.zeitstand}</Typography.Paragraph>
+      {/* Im Entwurf trägt das Picker-Feld den Zeitstand — ein roher UTC-Wirestring direkt
+          über einem Feld in Ortszeit zeigte zwei Uhrzeiten für denselben Wert. Die
+          Formatierung des Lesezweigs liegt bei LFH-350 (F2). */}
+      {!(istEntwurf && darfSchreiben) && (
+        <Typography.Paragraph type="secondary">Zeitstand: {bericht.zeitstand}</Typography.Paragraph>
+      )}
 
       {istEntwurf && darfSchreiben ? (
         <Form
@@ -278,7 +287,9 @@ function LageberichtDetail() {
           {/* Das Backend nimmt den Zeitstand seit jeher (`routes/lagebericht.rs`), nur die
               UI bot ihn nirgends an (N23). Picker in Ortszeit, Wire in UTC — `etb/filterZeit`. */}
           <Form.Item label="Zeitstand" name="zeitstand">
-            <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+            {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
+                würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die DB. */}
+            <DatePicker showTime allowClear={false} format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
           </Form.Item>
           <Checkbox
             checked={vorschauNeben}

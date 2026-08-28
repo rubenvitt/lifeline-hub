@@ -2,7 +2,7 @@ import { App, Breadcrumb, Button, DatePicker, Flex, Form, Input, Spin, Typograph
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Select } from '../components/Select';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
@@ -140,13 +140,18 @@ export default function LageberichtePage() {
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [form] = Form.useForm<AnlegenWerte>();
   const spalten = useMemo(() => lageberichtSpalten(einsatzId), [einsatzId]);
-  // BEIM ÖFFNEN gebildet, nicht beim Mount: `initialValues` werden von der Hülle bei jedem
-  // Zurücksetzen erneut wirksam — ein zweites Öffnen trüge sonst die Uhrzeit des ersten.
-  const [startwerte, setStartwerte] = useState<AnlegenWerte>({ vorlage: 'lagebericht', titel: '' });
-  const anlegenOeffnen = () => {
-    setStartwerte({ vorlage: 'lagebericht', titel: titelVorschlag(dayjs()) });
-    setAnlegenOffen(true);
-  };
+  /**
+   * Der Titelvorschlag wird BEIM ÖFFNEN in den Formularspeicher geschrieben — nicht über
+   * `initialValues`. Gemessen (Review LFH-348): der Speicher von rc-field-form überlebt das
+   * Abhängen der Kinder (`destroyOnHidden`), und beim nächsten Einhängen gewinnt der alte
+   * Store gegen neue `initialValues` (`useForm.js`: `merge(initialValues, store)`). Ein
+   * zweites Öffnen um 14:15 zeigte sonst „Lageüberblick 1030" — in einer Kette, in der die
+   * Uhrzeit im Titel der Ordnungsschlüssel ist, eine falsche Angabe in einer Führungsunterlage.
+   * Dieselbe Falle beschreibt `components/Erfassung.tsx` am `ErfassungsModal`.
+   */
+  useEffect(() => {
+    if (anlegenOffen) form.setFieldsValue({ titel: titelVorschlag(dayjs()) });
+  }, [anlegenOffen, form]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -223,7 +228,7 @@ export default function LageberichtePage() {
             type="primary"
             icon={<PlusOutlined />}
             aria-label="Neuer Bericht"
-            onClick={anlegenOeffnen}
+            onClick={() => setAnlegenOffen(true)}
           >
             Neuer Bericht
           </Button>
@@ -265,7 +270,7 @@ export default function LageberichtePage() {
         form={form}
         erfassenText="Anlegen"
         laeuft={anlegenMutation.isPending}
-        initialValues={startwerte}
+        initialValues={{ vorlage: 'lagebericht' }}
         onErfassen={(w) => anlegenMutation.mutateAsync(w)}
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}

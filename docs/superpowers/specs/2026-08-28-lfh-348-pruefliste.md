@@ -131,10 +131,39 @@ gewesen, ohne dass die Seite kürzer ist.
 
 ---
 
+## Review-Runde (28.08.2026) — vier Befunde, alle behoben im selben Zug
+
+Der Reviewer fand **zwei nachweislich falsche Code-Zusicherungen** und **zwei Lücken im
+Verlustschutz**; alle vier sind gefixt und je mit einem Test belegt, der vorher fehlte:
+
+1. **Titelvorschlag veraltete beim zweiten Öffnen** — der Kommentar behauptete das Gegenteil.
+   Gemessen: der Speicher von rc-field-form überlebt `destroyOnHidden` und gewinnt beim
+   Remount gegen `initialValues` (`useForm.js`: `merge(initialValues, store)`). Der
+   Vorschlag wird jetzt beim Öffnen per `setFieldsValue` in den Store geschrieben; Test
+   „trägt beim zweiten Öffnen einen frischen Titelvorschlag".
+2. **`tagesEtikett` brach den Zonenvertrag seines eigenen Moduls** — der einzige Aufrufer
+   reichte kein `jetzt` durch, „Heute" fiel bei abweichender Anzeigezone auf den falschen
+   Tageskopf. Die Funktion nimmt jetzt die Konventionen selbst (`jetztInZone`), der Aufrufer
+   kann es nicht mehr falsch machen; Test mit `Pacific/Auckland`.
+3. **Verlustfenster im Verlustschutz**: blur startete den PATCH mit S1, weitergetippt zu S2,
+   die Quittung für S1 räumte den Merker — S2 lag ungesichert und unangemeldet im Formular.
+   Jetzt ein Änderungszähler: quittiert wird nur, wenn seit dem Start des Speicherns nichts
+   geändert wurde. Test mit manuell aufgelöstem Promise; dazu der Fehlerfall-Test (Autosave
+   scheitert → `onFehler`, Merker bleibt). Der Riegel gegen Doppel-Autosave ist eine Ref.
+4. **Nach der Freigabe blieb der Merker stehen** — der Browser fragte beim Neuladen nach
+   Änderungen an einem nicht mehr editierbaren Bericht. `quittiereGespeichert()` nach dem
+   Speichern im Freigabe-Dialog, in **beiden** Zwillingsseiten.
+
+Zwei Minor-Punkte ebenfalls mitgenommen: der Zeitstand-Picker ist nicht mehr löschbar
+(`zeitstand` ist serverseitig nicht nullbar, ein geleertes Feld zeigte dauerhaft etwas
+anderes als die DB), und im Entwurfszweig steht der rohe UTC-Wirestring nicht mehr direkt
+über dem Picker in Ortszeit.
+
 ## Nachzüge
 
 | # | Was | Wo |
 | --- | --- | --- |
+| **N4** | Hook-Nachzüge aus dem Review: `autosaveLaeuft` als `loading` am Speichern-Knopf nutzen oder streichen; expliziter Speichern-Klick blurrt zuerst (Autosave-PATCH) und sendet dann (zweiter PATCH) — gemeinsamer Riegel; 30-s-Frist und „kein Autosave am freigegebenen Stand" im Hook-Test; `Form.useWatch([], form)` rendert die Seite je Anschlag — messen, ggf. auf Abschnittspfade einschränken; `kettenKoepfe` bei vollständigem Zyklus: Restmenge als Einzelköpfe statt leere Liste | `entwurf/useEntwurfVerlustschutz.ts`, `LageberichtDetailPage.tsx`, `lageberichte/ketten.ts` |
 | **N1** | Berichts-/Befehlsstatus als `StatusTag` mit Vertragstyp statt antd-Preset (`Tag color="green"` im Kopf der Detailseiten) — Entscheidung für alle vier Kommunikationsmodule, ob die Phasenachse in den A2-Vertrag wandert | `LageberichtDetailPage.tsx:228`, `BefehlDetailPage.tsx` (gleiche Stelle), `kommunikation/phase.ts` |
 | **N2** | Speicher-/Anlegefehler als `SpeicherFehler` in der Seite bzw. im Dialog statt nur als Toast (Fortschreibung von C10/H14 auf die Entwurfsseiten) | beide Detailseiten, `LageberichtePage.tsx` |
 | **N3** | Fokus beim Einstieg in einen Entwurf — welches Feld? (erster leerer Abschnitt wäre der Kandidat) | `LageberichtDetailPage.tsx`, `BefehlDetailPage.tsx` |

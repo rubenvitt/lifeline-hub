@@ -157,6 +157,10 @@ function BefehlDetail() {
           fehler(e);
           throw e; // Dialog offen lassen, Freigabe nicht auslösen.
         }
+        // Sonst bliebe der Merker nach der endgültigen Freigabe stehen und der Browser
+        // fragte beim Neuladen nach Änderungen an einem Befehl, der nicht mehr editierbar
+        // ist (Review LFH-348).
+        schutz.quittiereGespeichert();
         await freigebenMutation.mutateAsync();
       },
     });

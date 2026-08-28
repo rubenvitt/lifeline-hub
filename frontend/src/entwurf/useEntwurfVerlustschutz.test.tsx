@@ -85,6 +85,45 @@ describe('useEntwurfVerlustschutz', () => {
     expect(screen.getByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
   });
 
+  it('lässt den Merker stehen, wenn während des laufenden Autosave weitergetippt wurde', async () => {
+    // Das Verlustfenster im Verlustschutz (Review LFH-348): der PATCH trägt S1, im Formular
+    // steht S2 — eine Quittung für S1 darf nicht „alles gespeichert" bedeuten.
+    let aufloesen: () => void = () => {};
+    const speichern = vi.fn(() => new Promise<void>((r) => { aufloesen = r; }));
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab(); // Autosave startet, Promise hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await userEvent.type(feld, 'b'); // S2 entsteht, während S1 unterwegs ist
+    await act(async () => { aufloesen(); });
+    expect(screen.getByText('offen')).toBeInTheDocument();
+    // Der Zeitstempel sagt trotzdem, dass ETWAS gesichert wurde.
+    expect(screen.getByText(/zuletzt gespeichert/)).toBeInTheDocument();
+  });
+
+  it('meldet einen gescheiterten Autosave und lässt den Merker stehen', async () => {
+    const onFehler = vi.fn();
+    const speichern = vi.fn().mockRejectedValue(new Error('503'));
+    function Kaputt() {
+      const [form] = Form.useForm<Daten>();
+      const schutz = useEntwurfVerlustschutz<Daten, Daten>({
+        daten: { titel: 'S' }, istEntwurf: true, form, werteAus: (d) => d, speichern, onFehler,
+      });
+      return (
+        <Form form={form} onValuesChange={schutz.markiereGeaendert} onBlur={schutz.autosaveJetzt}>
+          <Form.Item label="Titel" name="titel"><Input /></Form.Item>
+          <output>{schutz.ungespeichert ? 'offen' : 'sauber'}</output>
+        </Form>
+      );
+    }
+    render(<Kaputt />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    await waitFor(() => expect(onFehler).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('offen')).toBeInTheDocument();
+  });
+
   it('speichert nichts, wenn nichts berührt wurde — auch nicht beim Verlassen', async () => {
     const speichern = vi.fn().mockResolvedValue(undefined);
     render(<Huelle speichern={speichern} />);

@@ -98,19 +98,38 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     setZuletztGespeichert(dayjs().format('HH:mm'));
   }, []);
 
+  /**
+   * Änderungszähler — die Antwort auf das Verlustfenster IM Verlustschutz (Review LFH-348):
+   * blur startet den PATCH mit Schnappschuss S1, im nächsten Feld wird weitergetippt (S2),
+   * der PATCH kommt zurück und quittierte S1 als „gespeichert" — der Merker fiel, der
+   * Warner meldete sich ab, und S2 lag ungesichert im Formular, ohne dass die Seite es
+   * sagte. Quittiert wird deshalb nur, wenn seit dem Start des Speicherns nichts mehr
+   * geändert wurde; sonst bleibt der Merker stehen und die nächste Frist holt S2 nach.
+   */
+  const aenderungRef = useRef(0);
+  // Riegel gegen zwei gleichzeitige Autosaves als Ref, nicht als State: zwei Aufrufe im
+  // selben Tick sähen beide den alten State (React batcht).
+  const laeuftRef = useRef(false);
+
   // In einer Ref, damit der Intervall-Effekt nicht bei jedem Render neu aufgesetzt wird
   // (sonst liefe die Frist nie ab — dieselbe Falle wie bei instabilen Effekt-Deps).
   const autosaveRef = useRef<() => void>(() => {});
   autosaveRef.current = () => {
-    if (!ungespeichert || autosaveLaeuft) return;
+    if (!ungespeichert || laeuftRef.current) return;
+    laeuftRef.current = true;
     setAutosaveLaeuft(true);
+    const stand = aenderungRef.current;
     speichern(form.getFieldsValue())
       .then(() => {
-        quittiereGespeichert();
+        if (aenderungRef.current === stand) quittiereGespeichert();
+        else setZuletztGespeichert(dayjs().format('HH:mm'));
         onGespeichert?.();
       })
       .catch(onFehler)
-      .finally(() => setAutosaveLaeuft(false));
+      .finally(() => {
+        laeuftRef.current = false;
+        setAutosaveLaeuft(false);
+      });
   };
 
   useEffect(() => {
@@ -130,7 +149,10 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     return () => window.removeEventListener('beforeunload', warnen);
   }, [ungespeichert]);
 
-  const markiereGeaendert = useCallback(() => setUngespeichert(true), []);
+  const markiereGeaendert = useCallback(() => {
+    aenderungRef.current += 1;
+    setUngespeichert(true);
+  }, []);
   const autosaveJetzt = useCallback(() => autosaveRef.current(), []);
 
   return {

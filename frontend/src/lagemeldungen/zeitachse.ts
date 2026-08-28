@@ -25,12 +25,32 @@ export function tagesSchluessel(utc: string, konv: AnzeigeKonventionen = DEFAULT
   return inZone(utc, konv).format('YYYY-MM-DD');
 }
 
-/** Gruppenetikett: „Heute" / „Gestern" / `DD.MM.YYYY`. `jetzt` in derselben Zone wie der Schlüssel. */
-export function tagesEtikett(schluessel: string, jetzt: Dayjs = dayjs()): string {
-  const tag = dayjs(schluessel, 'YYYY-MM-DD');
-  if (tag.isSame(jetzt, 'day')) return 'Heute';
-  if (tag.isSame(jetzt.subtract(1, 'day'), 'day')) return 'Gestern';
-  return tag.format('DD.MM.YYYY');
+/** „Jetzt" in der Anzeigezone — dieselbe Zone, in der `tagesSchluessel` den Tag bestimmt. */
+export function jetztInZone(konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN, jetzt: Dayjs = dayjs()): Dayjs {
+  if (!konv.zeitzone) return jetzt;
+  try {
+    return jetzt.tz(konv.zeitzone);
+  } catch {
+    return jetzt;
+  }
+}
+
+/**
+ * Gruppenetikett: „Heute" / „Gestern" / `DD.MM.YYYY`. Nimmt die KONVENTIONEN, nicht ein
+ * `jetzt` — damit der Aufrufer die Zone nicht vergessen kann (Review LFH-348: der einzige
+ * Produktivaufrufer reichte kein `jetzt` durch, „Heute" fiel bei abweichender Anzeigezone
+ * auf den falschen Tageskopf). Der Schlüssel `YYYY-MM-DD` ist zonenlos; verglichen wird er
+ * mit dem heutigen Schlüssel derselben Zone, nicht mit einem Zeitpunkt.
+ */
+export function tagesEtikett(
+  schluessel: string,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  jetzt: Dayjs = dayjs(),
+): string {
+  const heute = jetztInZone(konv, jetzt);
+  if (schluessel === heute.format('YYYY-MM-DD')) return 'Heute';
+  if (schluessel === heute.subtract(1, 'day').format('YYYY-MM-DD')) return 'Gestern';
+  return dayjs(schluessel, 'YYYY-MM-DD').format('DD.MM.YYYY');
 }
 
 /** Trifft der Zeitpunkt in das Fenster? Grenzen einschließend (59 min drin, 61 min draußen). */
@@ -47,6 +67,6 @@ export function imZeitfenster(
     case 'vierStunden':
       return !d.isBefore(jetzt.subtract(4, 'hour'));
     case 'heute':
-      return d.isSame(konv.zeitzone ? jetzt.tz(konv.zeitzone) : jetzt, 'day');
+      return d.isSame(jetztInZone(konv, jetzt), 'day');
   }
 }

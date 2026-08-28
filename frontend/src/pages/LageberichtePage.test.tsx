@@ -494,6 +494,22 @@ describe('LageberichtePage', () => {
     expect(screen.getByLabelText('Zeitstand')).toBeInTheDocument();
   });
 
+  it('trägt beim zweiten Öffnen einen frischen Titelvorschlag, nicht den Speicher des ersten', async () => {
+    // Der Speicher von rc-field-form überlebt `destroyOnHidden` und gewinnt gegen
+    // `initialValues` (gemessen, Review LFH-348). Wer den Vorschlag über `initialValues`
+    // setzt, sieht beim zweiten Öffnen den Stand des ersten — hier durch einen eigenen
+    // Wortlaut sichtbar gemacht, weil zwei Uhrzeiten im selben Test gleich sein können.
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    const erstes = await screen.findByLabelText('Titel');
+    await userEvent.clear(erstes);
+    await userEvent.type(erstes, 'Handgeschrieben');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: /Neuer Bericht/i }));
+    const zweites = await screen.findByLabelText('Titel');
+    await waitFor(() => expect((zweites as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/));
+  });
+
   it('schickt Vorlage und Titel; ein leerer Zeitstand wird nicht mitgeschickt', async () => {
     const posts: Record<string, unknown>[] = [];
     server.use(

@@ -15,9 +15,22 @@ describe('zeitachse', () => {
 
   it('etikettiert Heute, Gestern und sonst das Datum', () => {
     const jetzt = dayjs('2026-06-13 10:00:00');
-    expect(tagesEtikett('2026-06-13', jetzt)).toBe('Heute');
-    expect(tagesEtikett('2026-06-12', jetzt)).toBe('Gestern');
-    expect(tagesEtikett('2026-06-01', jetzt)).toBe('01.06.2026');
+    expect(tagesEtikett('2026-06-13', undefined, jetzt)).toBe('Heute');
+    expect(tagesEtikett('2026-06-12', undefined, jetzt)).toBe('Gestern');
+    expect(tagesEtikett('2026-06-01', undefined, jetzt)).toBe('01.06.2026');
+  });
+
+  it('bestimmt „Heute" in der Anzeigezone, nicht in der Browserzone (Review LFH-348)', () => {
+    // 23:00 UTC am 12.: in Auckland (+12) ist es der 13. — der Schlüssel aus
+    // `tagesSchluessel` sagt 13., und das Etikett muss ihn als „Heute" erkennen.
+    const jetzt = dayjs.utc('2026-06-12 23:00:00');
+    const auckland = { zeitzone: 'Pacific/Auckland' };
+    expect(tagesSchluessel('2026-06-12 23:00:00', auckland)).toBe('2026-06-13');
+    expect(tagesEtikett('2026-06-13', auckland, jetzt)).toBe('Heute');
+    expect(tagesEtikett('2026-06-12', auckland, jetzt)).toBe('Gestern');
+    // Ohne Zone bleibt es die Tagesgrenze des übergebenen `jetzt` (im Betrieb: `dayjs()`, lokal).
+    const lokal = jetzt.local();
+    expect(tagesEtikett(lokal.format('YYYY-MM-DD'), undefined, lokal)).toBe('Heute');
   });
 
   it('Zeitfenster: Grenzen einschließend, in der Anzeigezone', () => {
