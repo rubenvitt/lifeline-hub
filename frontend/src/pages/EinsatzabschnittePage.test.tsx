@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -325,18 +325,8 @@ describe('EinsatzabschnittePage', () => {
    * Eindeutig wird der Griff über `within(...)` auf die Gliederungs-Karte, nicht über
    * einen abweichenden String.
    */
-  it('bietet im leeren Baum genau eine Primäraktion, und die legt einen Abschnitt an', async () => {
-    let angelegt = false;
-    server.use(
-      http.post('/api/einsaetze/1/abschnitte', () => {
-        angelegt = true;
-        return HttpResponse.json({
-          id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Neuer Abschnitt',
-          leiter_id: null, leiter_name: null, bemerkung: null, sortier: 0,
-        });
-      }),
-      ...handlers('einsatzleitung', 'aktiv', []),
-    );
+  it('bietet im leeren Baum genau eine Primäraktion, und die öffnet einen Entwurf', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', []));
     renderPage();
     const karte = (await screen.findByText('Noch keine Abschnitte')).closest('.ant-card');
     expect(karte, 'der Leerzustand muss in der Gliederungs-Karte stehen').not.toBeNull();
@@ -344,7 +334,54 @@ describe('EinsatzabschnittePage', () => {
     expect(knoepfe).toHaveLength(1);
 
     await userEvent.click(within(karte as HTMLElement).getByRole('button', { name: 'Abschnitt anlegen' }));
-    await waitFor(() => expect(angelegt).toBe(true));
+    expect(await within(karte as HTMLElement).findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+  });
+
+  /**
+   * M55 (LFH-347 · C12). Vorher schrieb der Klick sofort `POST …/abschnitte` mit dem Namen
+   * „Neuer Abschnitt" — samt ETB-Eintrag —, und Abbrechen ließ den Datensatz stehen.
+   * Jetzt entsteht er erst beim Speichern; Abbrechen hinterlässt nichts, auch keine
+   * Invalidierung des Tagebuchs.
+   */
+  it('legt beim Öffnen und Abbrechen des Entwurfs nichts an — 0 POST, 0 ETB-Invalidierung', async () => {
+    let posts = 0;
+    server.use(...handlers(), http.post('/api/einsaetze/1/abschnitte', () => { posts += 1; return HttpResponse.json({}); }));
+    const { client } = renderPage();
+    const invalidieren = vi.spyOn(client, 'invalidateQueries');
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+
+    expect(screen.getByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    expect(posts).toBe(0);
+    expect(invalidieren.mock.calls.some(([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(einsatzKeys.etb(1)))).toBe(false);
+  });
+
+  it('schreibt den Abschnitt erst beim Speichern und wählt ihn dann aus', async () => {
+    const bodies: unknown[] = [];
+    server.use(...handlers(), http.post('/api/einsaetze/1/abschnitte', async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({ id: 9, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Ost', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1, sprechgruppen: [] });
+    }));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Ost');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Ost' });
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+  });
+
+  it('verwirft den Entwurf, wenn im Baum ein bestehender Abschnitt gewählt wird', async () => {
+    server.use(...handlers());
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    await userEvent.click(screen.getByText('Nord'));
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+    expect(screen.getByText('Abschnitt: Nord')).toBeInTheDocument();
   });
 
   /**
