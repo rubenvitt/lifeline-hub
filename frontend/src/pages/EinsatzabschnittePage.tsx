@@ -76,8 +76,12 @@ export default function EinsatzabschnittePage() {
   const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
 
   // Cross-Modul-Deeplink (LFH-25): ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
+  // Spiegelt `Tree onSelect`: der Kopfknopf ist klickbar, bevor `abschnitteQuery` aufgelöst
+  // ist, und ein danach feuernder Deeplink darf einen offenen Entwurf nicht überleben lassen
+  // (LFH-347 · Fix-Runde 1) — sonst nimmt `speichern` wegen `!entwurf === false` fälschlich
+  // den POST-Zweig für einen bereits ausgewählten Bestandsabschnitt.
   useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
-    if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) setGewaehlt(zid);
+    if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) { setEntwurf(false); setGewaehlt(zid); }
   });
 
   function invalidate() {

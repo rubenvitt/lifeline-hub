@@ -385,6 +385,36 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
+   * Review-Fund (LFH-347 · Fix-Runde 1). Der Kopfknopf „Abschnitt anlegen" ist klickbar,
+   * bevor `abschnitteQuery` aufgelöst ist. Löst der Cross-Modul-Deeplink (`?abschnitt=<id>`)
+   * danach `setGewaehlt` aus, während der Entwurf noch offen steht, muss er ihn verwerfen —
+   * wie `Tree onSelect` es bereits tut. Ohne den Fix bleibt `entwurf=true` bei gesetztem
+   * `gewaehlt` stehen, und `speichern` nähme beim nächsten „Speichern" wegen `!entwurf ===
+   * false` fälschlich den POST-Zweig für einen längst bestehenden Abschnitt.
+   */
+  it('verwirft den Entwurf, wenn der Deeplink nach dem Öffnen einen Abschnitt selektiert', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', async () => {
+        await new Promise((r) => setTimeout(r, 50));
+        return HttpResponse.json([
+          { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: 'Leiter Nord', bemerkung: null, sortier: 0 },
+        ]);
+      }),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einsatzabschnitte?abschnitt=5' },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
+    expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
+  });
+
+  /**
    * Der zweite Leer-Knoten der Seite ist KEIN Leerzustand, sondern eine Aufforderung
    * bei fehlender Auswahl: die Menge ist gefüllt, es fehlt nur die Wahl. Deshalb
    * ausdrücklich ohne Primäraktion — ein Knopf hier führte aus einer Lage heraus, die
