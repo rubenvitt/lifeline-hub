@@ -764,7 +764,9 @@ Alltag wichtigsten:
   Fake-Datensatz in der Query — ein Objekt mit `id: -1` liefe durch `nachfahrenInkl`, die
   Stärke-Rechnung und den Deeplink-Abgleich. Der POST (und der ETB-Eintrag) entsteht beim
   Speichern; Abbrechen hinterlässt nichts, und der Test zählt beides (0 POST, 0
-  ETB-Invalidierung).
+  ETB-Invalidierung) — wobei der POST-Zähler die Aussage trägt und die ETB-Zeile die Absicht
+  dokumentiert: sie hängt kausal am POST (die Invalidierung läuft nur in dessen `onSuccess`)
+  und kann für sich allein nicht rot werden.
   **M51 bleibt bei einem Auslöser je Zelle** — das Ticket verlangte ein 5-Wege-Segmentcontrol
   mit einem Tipp, LFH-368 hat gemessen, dass das Breitenbudget (~693 px) es nicht trägt. Der
   e2e-Nachweis (`e2e/gefahren-matrix-zelle.spec.ts`) misst ≥ 44 px auf dem Tablet in Stufe

@@ -53,7 +53,13 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
         </span>
       )}
       {abschnitt.erreichbarkeit && (
-        <span aria-hidden="true" style={{ color: token.colorTextSecondary }}><PhoneOutlined /></span>
+        <span
+          aria-hidden="true"
+          title="Erreichbarkeit hinterlegt"
+          style={{ color: token.colorTextSecondary }}
+        >
+          <PhoneOutlined />
+        </span>
       )}
     </Space>
   );
