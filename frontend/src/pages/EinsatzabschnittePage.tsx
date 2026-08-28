@@ -13,7 +13,7 @@ import {
   aktualisiereAbschnitt, legeAbschnittAn, listeAbschnitte, loeseAbschnittAuf, type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
 import { ApiError } from '../api/client';
-import type { Einsatzabschnitt } from '../api/types';
+import type { Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
@@ -23,8 +23,9 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
+import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
 
-function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
+function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
   for (const a of abschnitte) {
     const key = a.ueber_abschnitt_id ?? null;
@@ -35,11 +36,11 @@ function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
     (kinder.get(parent) ?? []).map((a) => ({
       key: a.id,
       title: (
-        <Space size={4}>
-          <span>{a.name}</span>
-          {a.leiter_name && <span style={{ color: '#888' }}>👤 {a.leiter_name}</span>}
-          {a.erreichbarkeit && <span style={{ color: '#888' }}>☎</span>}
-        </Space>
+        <AbschnittKnoten
+          abschnitt={a}
+          staerke={abschnittStaerken(abschnitte, einheiten, a.id).inklUnter}
+          anzahlEinheiten={einheiten.filter((e) => e.abschnitt_id === a.id).length}
+        />
       ),
       children: baue(a.id),
     }));
@@ -131,7 +132,7 @@ export default function EinsatzabschnittePage() {
     }
   }, [aktuell, bearbeiten, form]);
 
-  const baumDaten = useMemo(() => baueBaum(abschnitte), [abschnitte]);
+  const baumDaten = useMemo(() => baueBaum(abschnitte, einheitenQuery.data ?? []), [abschnitte, einheitenQuery.data]);
   const verboten = aktuell ? nachfahrenInkl(abschnitte, aktuell.id) : new Set<number>();
   const parentOptionen = abschnitte.filter((a) => !verboten.has(a.id)).map((a) => ({ value: a.id, title: a.name }));
   const personalOptionen = (personalQuery.data ?? []).map((p) => ({ value: p.id, label: p.name }));
