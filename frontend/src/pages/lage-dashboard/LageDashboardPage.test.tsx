@@ -6,6 +6,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
+import { QueryClient } from '@tanstack/react-query';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -15,6 +16,7 @@ import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, Meldung } from '../../api/types';
 import { uhrzeit } from './lagebild';
 import { formatUhrzeitMitTag } from '../../anzeige/format';
+import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 
 class FakeEventSource {
   url: string;
@@ -910,5 +912,67 @@ describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
 
   it('nutzt den Modul-Builder', () => {
     expect(quelle).toContain('einsatzModulPfad');
+  });
+});
+
+/**
+ * ── STAND DER LAGEBERICHT-KACHEL (LFH-350 · H60) ────────────────────────────────
+ *
+ * `lagebild.bericht.stand` ist `bericht.zeitstand` — ein UTC-Wirestring ohne
+ * Zonenkennung. Die Kachel gab ihn roh aus, also um den Zonenversatz falsch.
+ *
+ * Formatiert wird in der SEITE, nicht in `lagebild.ts`: die Zone hängt am
+ * `EinsatzAnzeigeProvider`, und `baueLagebild` bleibt eine reine Funktion.
+ *
+ * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
+ * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
+ * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
+ * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
+ * auflöst — die Behauptung hat dann längst getroffen, und auf einem Berliner Rechner wäre
+ * der Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren). `setQueryData`
+ * stellt die Zone vor dem ersten Render; der MSW-Handler bedient nur den Refetch.
+ */
+function renderMitZone() {
+  server.use(
+    http.get('/api/einsaetze/1/einstellungen', () =>
+      HttpResponse.json({ einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
+    ),
+  );
+  // Bewusst NICHT `neuerQueryClient()`: dessen `gcTime: 0` räumt einen per `setQueryData`
+  // gesetzten, noch unbeobachteten Eintrag beim ersten `await` weg (CLAUDE.md,
+  // Query-Key-Registry). Hier hinge die Zone dann still wieder am MSW-Refetch.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(einsatzKeys.einstellungen(1), {
+    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+  });
+  return renderMitProviders(
+    <EinsatzAnzeigeProvider einsatzId={1}>
+      <Routes>
+        <Route path="/einsaetze/:id/lage-dashboard" element={<LageDashboardPage />} />
+      </Routes>
+    </EinsatzAnzeigeProvider>,
+    { route: '/einsaetze/1/lage-dashboard', client },
+  );
+}
+
+describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => {
+  it('zeigt den Stand als taktische DTG in der Anzeigezone, nicht roh', async () => {
+    mockEndpunkte({
+      personen: [person('sk3')],
+      lageberichte: [
+        {
+          id: 3, einsatz_id: 1, titel: 'Lage 14:00', status: 'freigegeben',
+          zeitstand: '2026-07-25 12:00:00', ersteller_id: 1, ersteller_name: 'Muster',
+          erstellt_at: '2026-07-25 12:00:00', aktualisiert_at: '2026-07-25 12:00:00',
+          version: 1, vorlage: 'lagebericht',
+          abschnitte: [{ schluessel: 'gefahren_schadenlage', text: 'Pegel steigend.' }],
+        },
+      ],
+    });
+    renderMitZone();
+    await kennzahlGeladen('Vermisst');
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin.
+    expect(await screen.findByText('251400JUL2026')).toBeInTheDocument();
+    expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });

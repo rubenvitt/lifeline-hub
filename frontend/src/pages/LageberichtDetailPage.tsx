@@ -22,6 +22,7 @@ import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import './lageberichtPrint.css';
 
 /**
@@ -264,11 +265,15 @@ function LageberichtDetail() {
         </Space>
       </Flex>
 
-      {/* Im Entwurf trägt das Picker-Feld den Zeitstand — ein roher UTC-Wirestring direkt
-          über einem Feld in Ortszeit zeigte zwei Uhrzeiten für denselben Wert. Die
-          Formatierung des Lesezweigs liegt bei LFH-350 (F2). */}
+      {/* Im Entwurf trägt das Picker-Feld den Zeitstand — eine zweite Anzeige daneben zeigte
+          zwei Uhrzeiten für denselben Wert. Der Lesezweig rendert seit LFH-350 (F2/H60) über
+          `ZeitAnzeige` in der taktischen DTG und in der Anzeigezone; der rohe Wirestring
+          (`YYYY-MM-DD HH:mm:ss`, UTC ohne Zonenkennung) stand hier um den Zonenversatz
+          falsch. */}
       {!(istEntwurf && darfSchreiben) && (
-        <Typography.Paragraph type="secondary">Zeitstand: {bericht.zeitstand}</Typography.Paragraph>
+        <Typography.Paragraph type="secondary">
+          Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
+        </Typography.Paragraph>
       )}
 
       {istEntwurf && darfSchreiben ? (

@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes, useNavigate } from 'react-router';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient } from '@tanstack/react-query';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -12,6 +13,7 @@ import LageberichtDetailPage from './LageberichtDetailPage';
 import type { EinsatzAnzeige, LageberichtAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { alsOrtszeit } from '../etb/filterZeit';
+import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 
 const admin = {
   id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
@@ -556,5 +558,57 @@ describe('LageberichtePage', () => {
     setup(KETTE);
     expect(await screen.findByRole('heading', { name: 'Lageberichte', level: 3 })).toBeInTheDocument();
     expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * ── ZEITSTAND DER FASSUNGSZEILE (LFH-350 · H60) ─────────────────────────────────
+ *
+ * Die Spalte „Fassung" gab `zeitstand` bis dahin roh aus — ein UTC-Wirestring ohne
+ * Zonenkennung, also um den Zonenversatz falsch. `sortWert` bleibt bewusst der Wirestring
+ * (lexikografisch korrekt sortierbar), nur die ANZEIGE läuft über `ZeitAnzeige`.
+ *
+ * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
+ * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
+ * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
+ * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
+ * auflöst — die Behauptung hat dann längst getroffen, und auf einem Berliner Rechner wäre
+ * der Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren). `setQueryData`
+ * stellt die Zone vor dem ersten Render; der MSW-Handler bedient nur den Refetch.
+ */
+function setupMitZone(berichte: LageberichtAnzeige[]) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json(berichte)),
+    http.get('/api/einsaetze/7/einstellungen', () =>
+      HttpResponse.json({ einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
+    ),
+  );
+  // Bewusst NICHT `neuerQueryClient()`: dessen `gcTime: 0` räumt einen per `setQueryData`
+  // gesetzten, noch unbeobachteten Eintrag beim ersten `await` weg (CLAUDE.md,
+  // Query-Key-Registry). Hier hinge die Zone dann still wieder am MSW-Refetch.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(einsatzKeys.einstellungen(7), {
+    einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+  });
+  return renderMitProviders(
+    <AuthProvider>
+      <EinsatzAnzeigeProvider einsatzId={7}>
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
+        </Routes>
+      </EinsatzAnzeigeProvider>
+    </AuthProvider>,
+    { route: '/einsaetze/7/lageberichte', client },
+  );
+}
+
+describe('LageberichtePage — Fassungszeile (LFH-350 · H60)', () => {
+  it('zeigt den Zeitstand als taktische DTG in der Anzeigezone, nicht roh', async () => {
+    setupMitZone([{ ...bericht, id: 21, version: 1, zeitstand: '2026-07-25 12:00:00' }]);
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin.
+    expect(await screen.findByText('v1 · 251400JUL2026 · A')).toBeInTheDocument();
+    expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });

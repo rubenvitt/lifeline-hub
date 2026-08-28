@@ -20,6 +20,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import Datenstand from '../components/Datenstand';
 import { alsBackendZeit } from '../etb/filterZeit';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 /**
  * Lageberichte als Kartensicht (LFH-330 · B2, Bündel III) — der Zwilling der Befehlsliste.
@@ -89,15 +90,17 @@ function lageberichtSpalten(einsatzId: number) {
       title: 'Fassung',
       sortWert: (k) => k.kopf.zeitstand,
       // v-Nummer, Zeitstand und Ersteller in EINER Zeile — drei Slots sind das Maximum.
-      // `zeitstand` bleibt der rohe Wirestring, wie auf der Detailseite: nur hier zu
-      // formatieren zeigte für dasselbe Feld zwei verschiedene Uhrzeiten (lokal vs. UTC);
-      // die Formatierung beider Stellen liegt bei LFH-350 (F2).
+      // `zeitstand` läuft seit LFH-350 (F2/H60) durch `ZeitAnzeige` (taktische DTG in der
+      // Anzeigezone), gleichlautend mit der Detailseite. `sortWert` bleibt der rohe
+      // UTC-Wirestring: der sortiert lexikografisch korrekt, die DTG (`DDHHmm…`) nicht.
       // Die Vorgänger als Deeplinks aus dem Spalten-`render` — erlaubt, weil NICHT die
       // Titelspalte (deren Anker setzt das Primitiv); der Klick-Riegel im Primitiv trennt
       // den Link-Klick vom Zeilenklick (LFH-340 · C5).
       render: (_t, k) => (
         <>
-          {`v${k.kopf.version} · ${k.kopf.zeitstand} · ${k.kopf.ersteller_name}`}
+          {`v${k.kopf.version} · `}
+          <ZeitAnzeige wert={k.kopf.zeitstand} />
+          {` · ${k.kopf.ersteller_name}`}
           {k.vorgaenger.length > 0 && (
             <span style={{ display: 'block' }}>
               {'Vorgänger: '}

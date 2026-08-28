@@ -19,6 +19,32 @@
     display: none !important;
   }
 
+  /* ---- Entwurfsansicht: jeder Abschnitt genau EINMAL (LFH-350, Befund M86) ----
+
+     Im Status `entwurf` steht statt `.befehl-druck` je Abschnitt ein `MarkdownEditor`
+     im Druckbereich; Eingabe und Vorschau liegen nebeneinander, der Abschnitt käme
+     sonst doppelt aufs Papier (Roh-Markdown neben gerendertem Text). Es weicht die
+     ganze EINGABESPALTE, nicht bloß ihr Textfeld: der Wrapper trägt `flex: 1 1 50%`
+     (MarkdownEditor.css), eine leer gedruckte Spalte ließe der Vorschau nur die halbe
+     Seitenbreite.
+
+     ANDERS ALS DER LAGEBERICHT braucht der Befehl KEINE Toggle-Regel und keine
+     Akkordeon-Regel: `BefehlDetailPage.tsx` verdrahtet `layout="split"` fest und reiht
+     die Abschnitte als schlichte `Form.Item`-Liste ohne `Collapse`. Eine Regel, die
+     nichts trifft, behauptete eine Deckung, die es nicht gibt — wer hier ein
+     Toggle-Layout einführt, holt die `:has`-Regel aus `lageberichtPrint.css` mit. Der
+     Test dieser Datei pinnt beide Voraussetzungen. */
+  .befehl-print-root .markdown-editor--split .markdown-editor__eingabe {
+    display: none !important;
+  }
+
+  /* Beschriftung und Vorschau-Umschalter des Editors sind Bedienung, kein Inhalt —
+     dieselbe Trennung wie bei `.befehl-no-print`. */
+  .befehl-print-root .markdown-editor__label,
+  .befehl-print-root .markdown-editor .ant-btn {
+    display: none !important;
+  }
+
   /* Markdown-Inhalte im Druckbereich */
   .befehl-druck .markdown h1,
   .befehl-druck .markdown h2,

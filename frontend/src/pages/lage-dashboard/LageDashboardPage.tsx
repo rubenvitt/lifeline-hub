@@ -39,6 +39,7 @@ import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { baueLagebild, dtgJetzt, type Datenzustand, type Dringlichkeit } from './lagebild';
+import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import '../../theme/sprache.css';
 
 /** Verdichtet mehrere Queries auf den Zustand, den ihre Kachel zeigen muss.
@@ -528,7 +529,11 @@ export default function LageDashboardPage() {
                 {lagebild?.bericht?.status}
               </Plakette>
               {' · Stand '}
-              <span className="lfh-zahl">{lagebild?.bericht?.stand}</span>
+              {/* `stand` ist `bericht.zeitstand`, ein UTC-Wirestring ohne Zonenkennung —
+                  roh ausgegeben stand er um den Zonenversatz falsch (LFH-350 · H60). Die
+                  Formatierung sitzt hier statt in `lagebild.ts`, weil die Zone am
+                  Provider hängt und `baueLagebild` rein bleibt. */}
+              <span className="lfh-zahl"><ZeitAnzeige wert={lagebild?.bericht?.stand} /></span>
             </p>
             <p className="lfh-fussnote">von {lagebild?.bericht?.von}</p>
             {lagebild?.bericht?.auszug && (

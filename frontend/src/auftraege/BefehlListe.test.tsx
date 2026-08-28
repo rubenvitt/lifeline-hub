@@ -7,6 +7,10 @@ import { App as AntApp } from 'antd';
 import BefehlListe from './BefehlListe';
 import * as befehleApi from '../api/befehle';
 import { setzeViewportBreite } from '../test/viewport';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
+import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('../api/befehle');
 
@@ -20,6 +24,14 @@ vi.mock('../api/befehle');
  * antds Default zurück, und `useAnzeigeKonventionen` wirft ohne Provider nicht. Die
  * BREITENachse hängt nicht am Provider, sondern an `useViewport`; sie wird über
  * `setzeViewportBreite` gestellt (siehe „in jeder Breite Karten").
+ *
+ * AUSNAHME seit LFH-350 (H60): die Fassungszeile formatiert `zeitstand` über `ZeitAnzeige`,
+ * und die Zone kommt aus dem `EinsatzAnzeigeProvider`. Der eine Test dazu (`renderMitZone`
+ * unten) hängt den Provider ein und braucht dafür genau EINEN MSW-Handler
+ * (`/api/einsaetze/1/einstellungen`) — ohne ihn liefe die Einstellungs-Abfrage in
+ * `onUnhandledRequest: 'error'`, die Konventionen fielen still auf die LOKALE Maschinenzone
+ * zurück und die Behauptung wäre nur auf einem Berliner Rechner richtig. Alle übrigen Tests
+ * der Datei bleiben netzfrei.
  */
 
 const BASIS = {
@@ -175,5 +187,56 @@ describe('BefehlListe', () => {
 
     expect(await screen.findByText('Noch keine Befehle')).toBeInTheDocument();
     expect(container.querySelector('.ant-empty')).toBeNull();
+  });
+});
+
+/**
+ * ── ZEITSTAND DER FASSUNGSZEILE (LFH-350 · H60) ─────────────────────────────────
+ *
+ * `zeitstand` ist ein UTC-Wirestring ohne Zonenkennung; roh ausgegeben stand die Zeile um
+ * den Zonenversatz falsch. `sortWert` bleibt der Wirestring (lexikografisch korrekt), nur
+ * die Anzeige läuft über `ZeitAnzeige`.
+ *
+ * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
+ * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
+ * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
+ * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
+ * auflöst — die Behauptung hat dann längst getroffen, und auf einem Berliner Rechner wäre
+ * der Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren). `setQueryData`
+ * stellt die Zone vor dem ersten Render; der MSW-Handler bedient nur den Refetch.
+ */
+function renderMitZone() {
+  server.use(
+    http.get('/api/einsaetze/1/einstellungen', () =>
+      HttpResponse.json({ einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
+    ),
+  );
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(einsatzKeys.einstellungen(1), {
+    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+  });
+  return render(
+    <QueryClientProvider client={qc}>
+      <AntApp>
+        <EinsatzAnzeigeProvider einsatzId={1}>
+          <MemoryRouter>
+            <BefehlListe einsatzId={1} darfSchreiben />
+          </MemoryRouter>
+        </EinsatzAnzeigeProvider>
+      </AntApp>
+    </QueryClientProvider>,
+  );
+}
+
+describe('BefehlListe — Fassungszeile (LFH-350 · H60)', () => {
+  it('zeigt den Zeitstand als taktische DTG in der Anzeigezone, nicht roh', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockResolvedValue(
+      [{ ...BASIS, id: 4, titel: 'Befehl A', vorlage: 'befehl_lad', version: 1,
+         status: 'freigegeben', zeitstand: '2026-07-25 12:00:00', vorgaenger_id: null }] as never,
+    );
+    renderMitZone();
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin.
+    expect(await screen.findByText('v1 · 251400JUL2026 · EL')).toBeInTheDocument();
+    expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });

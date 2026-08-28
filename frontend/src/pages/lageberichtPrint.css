@@ -19,6 +19,55 @@
     display: none !important;
   }
 
+  /* ---- Entwurfsansicht: jeder Abschnitt genau EINMAL (LFH-350, Befund M86) ----
+
+     Im Status `entwurf` steht statt `.lagebericht-druck` je Abschnitt ein
+     `MarkdownEditor` im Druckbereich. Die drei Regeln darunter sind die einzige
+     Stelle, an der das Papier vom Bildschirm abweicht. */
+
+  /* Zugeklappte Akkordeon-Abschnitte stehen dank `forceRender` im DOM
+     (`lageberichte/AbschnittsAkkordeon.tsx`), sind aber ausgeblendet — und zwar auf
+     ZWEI Wegen, beide am 28.08.2026 gemessen: ein NIE geöffneter Abschnitt bekommt von
+     rc-motion ein INLINE `display:none` (CSSMotion.js:115-119, weil `renderedRef` nie
+     wahr war), ein wieder zugeklappter die Klasse `ant-collapse-panel-hidden`. Beiden
+     gemeinsam ist `ant-collapse-panel-inactive`. `!important` ist hier Pflicht, nicht
+     Gewohnheit: ohne es gewinnt der Inline-Stil. Ohne die Regel druckt ein Entwurf
+     genau EINEN von acht Abschnitten — der Fehler wiegt schwerer als das doppelte
+     Drucken, gegen das M86 gemeldet wurde.
+     VERTRAG: der Selektor trifft JEDES Collapse im Druckbereich. Heute liegt dort genau
+     eines (`AbschnittsAkkordeon`); ein zweites klappte im Ausdruck stillschweigend
+     komplett auf — wer eines hinzufügt, engt diese Regel auf den Abschnittsbereich ein. */
+  .lagebericht-print-root .ant-collapse-panel-inactive {
+    display: block !important;
+  }
+
+  /* Split-Layout: Eingabe und Vorschau liegen nebeneinander, der Abschnitt käme sonst
+     doppelt aufs Papier (Roh-Markdown neben gerendertem Text). Es weicht die ganze
+     EINGABESPALTE, nicht bloß ihr Textfeld: der Wrapper trägt `flex: 1 1 50%`
+     (MarkdownEditor.css), eine leer gedruckte Spalte ließe der Vorschau nur die halbe
+     Seitenbreite. */
+  .lagebericht-print-root .markdown-editor--split .markdown-editor__eingabe {
+    display: none !important;
+  }
+
+  /* Toggle-Layout — die VORGABE der Seite (`vorschauNeben` startet auf `false`): dort
+     ist das Textfeld NICHT in `.markdown-editor__eingabe` gewickelt
+     (`MarkdownEditor.tsx:72`) und bei geschlossener Vorschau der einzige Träger des
+     Abschnittstextes. Es weicht deshalb nur, wenn tatsächlich eine gerenderte Vorschau
+     danebensteht (`:has`) — eine unbedingte Regel auf `textarea` druckte den Abschnitt
+     LEER, und das wäre schlimmer als doppelt. */
+  .lagebericht-print-root .markdown-editor--toggle:has(.markdown-editor__vorschau) textarea {
+    display: none !important;
+  }
+
+  /* Beschriftung und Vorschau-Umschalter des Editors sind Bedienung, kein Inhalt —
+     dieselbe Trennung wie bei `.lagebericht-no-print`. Der Editor rendert keinen
+     weiteren Knopf. */
+  .lagebericht-print-root .markdown-editor__label,
+  .lagebericht-print-root .markdown-editor .ant-btn {
+    display: none !important;
+  }
+
   /* Markdown-Inhalte im Druckbereich */
   .lagebericht-druck .markdown h1,
   .lagebericht-druck .markdown h2,

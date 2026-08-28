@@ -7,6 +7,8 @@ import LageberichtDetailPage from './LageberichtDetailPage';
 import { AuthProvider } from '../auth/AuthContext';
 import * as einsaetzeApi from '../api/einsaetze';
 import * as lageberichteApi from '../api/lageberichte';
+import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('../api/einsaetze');
 vi.mock('../api/lageberichte');
@@ -52,5 +54,62 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     renderBei('/einsaetze/1/lageberichte/9');
     const link = await screen.findByRole('link', { name: /ETB-Eintrag/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=5');
+  });
+});
+
+/**
+ * ── ZEITSTAND IN DER ANZEIGEZONE (LFH-350 · H60) ────────────────────────────────
+ *
+ * `zeitstand` ist ein UTC-Wirestring OHNE Zonenkennung (`YYYY-MM-DD HH:mm:ss`). Roh
+ * ausgegeben stand er um den Zonenversatz falsch — im Sommer zwei Stunden zu früh, und
+ * zwar ohne Fehlerbild: die Zahl sieht plausibel aus.
+ *
+ * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
+ * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
+ * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
+ * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
+ * auflöst — `findByText` hat dann längst getroffen, und auf einem Berliner Rechner wäre der
+ * Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren: 4 von 5 Tests
+ * blieben es). `setQueryData` stellt die Zone vor dem ersten Render.
+ */
+function renderMitZone(route: string) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(einsatzKeys.einstellungen(1), {
+    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+  });
+  return render(
+    <QueryClientProvider client={qc}>
+      <AntApp>
+        <AuthProvider>
+          <EinsatzAnzeigeProvider einsatzId={1}>
+            <MemoryRouter initialEntries={[route]}>
+              <Routes>
+                <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+              </Routes>
+            </MemoryRouter>
+          </EinsatzAnzeigeProvider>
+        </AuthProvider>
+      </AntApp>
+    </QueryClientProvider>,
+  );
+}
+
+describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
+  it('zeigt die taktische DTG in der Anzeigezone, nicht den rohen UTC-Wirestring', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(
+      { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung', bezeichnung: 'Übung' } as never,
+    );
+    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue(
+      { einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } } as never,
+    );
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ zeitstand: '2026-07-25 12:00:00' }) as never,
+    );
+    renderMitZone('/einsaetze/1/lageberichte/9');
+
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin → DDHHmm + Monatskürzel + Jahr.
+    expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
+    // Gegenaussage: der Wirestring darf nirgends mehr sichtbar sein.
+    expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });
