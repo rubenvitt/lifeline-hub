@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,6 +10,14 @@ import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
+
+// Kind-Komponente stubben (Präzedenz `UhsDetailPage.test.tsx:21`): `BrSwitcher` feuert eine
+// eigene `listeBr`-Query (`GET .../bereitstellungsraeume`, ohne Trailing-ID), für die diese
+// Datei keinen MSW-Handler registriert. `test/setup.ts` läuft mit `onUnhandledRequest: 'error'`
+// — ohne den Mock hing das Grün bislang am Abort-Timing der Query beim Unmount (`gcTime: 0`),
+// nicht an einem echten Handler. Diese Datei testet die Seiten-Komposition (Kräfte/Sidebar/
+// Schreibschutz), nicht den Switcher-Datenfluss.
+vi.mock('./BrSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 
 // -------- Fixture-Builder --------
 
