@@ -1,5 +1,6 @@
-import { App, Breadcrumb, Button, DatePicker, Flex, Form, Input, Space, Spin, Tag, Typography } from 'antd';
+import { App, Breadcrumb, Button, Checkbox, DatePicker, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
 import type { Dayjs } from 'dayjs';
+import { useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -16,6 +17,7 @@ import {
 } from '../api/lageberichte';
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
 import { vorlage } from '../lageberichte/vorlagen';
+import { AbschnittsAkkordeon, befuellteAbschnitte } from '../lageberichte/AbschnittsAkkordeon';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
@@ -46,6 +48,17 @@ function LageberichtDetail() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<FormWerte>();
+  const { token } = theme.useToken();
+  // Alle Werte beobachten: die Leer-Marke je Kopfzeile folgt dem Tippen, nicht dem Speichern.
+  const werte = Form.useWatch([], form) as Record<string, unknown> | undefined;
+  /**
+   * Genau EIN offener Abschnitt — und die Vorschau nur auf Wunsch NEBEN dem Text (H62).
+   * Bestand: acht Split-Editoren à acht Zeilen, 2108 px Scrollstrecke, keine Navigation.
+   * „Vorschau neben dem Text" ist eine EINSTELLUNG, keine Aktion, und steht deshalb in
+   * einer eigenen Zeile über den Abschnitten, nicht in der Knopfreihe — Vorgabe AUS.
+   */
+  const [offenerAbschnitt, setOffenerAbschnitt] = useState<string | null>(null);
+  const [vorschauNeben, setVorschauNeben] = useState(false);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -56,6 +69,13 @@ function LageberichtDetail() {
     queryFn: () => ladeLagebericht(einsatzId, berichtId),
     enabled: idGueltig,
   });
+  // Vor den frühen Rückgaben (Hook-Reihenfolge); `vorlage()` liefert je Schlüssel dasselbe
+  // Objekt aus `VORLAGEN`, die Abhängigkeit ist also stabil.
+  const vorlageDef = berichtQuery.data ? vorlage(berichtQuery.data.vorlage) : undefined;
+  const befuellt = useMemo(
+    () => befuellteAbschnitte(werte, vorlageDef?.abschnitte ?? []),
+    [werte, vorlageDef],
+  );
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
@@ -260,11 +280,32 @@ function LageberichtDetail() {
           <Form.Item label="Zeitstand" name="zeitstand">
             <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
           </Form.Item>
-          {v?.abschnitte.map((a) => (
-            <Form.Item key={a.schluessel} label={a.label} name={a.schluessel}>
-              <MarkdownEditor layout="split" variante="dokument" autoSize={{ minRows: 8 }} />
-            </Form.Item>
-          ))}
+          <Checkbox
+            checked={vorschauNeben}
+            onChange={(e) => setVorschauNeben(e.target.checked)}
+            style={{ marginBottom: token.margin }}
+          >
+            Vorschau neben dem Text
+          </Checkbox>
+          {v && (
+            <AbschnittsAkkordeon
+              abschnitte={v.abschnitte}
+              befuellt={befuellt}
+              offen={offenerAbschnitt ?? v.abschnitte[0].schluessel}
+              onOffen={setOffenerAbschnitt}
+              editor={(a) => (
+                // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für
+                // die Zugänglichkeit (Label-Verknüpfung), steht aber nicht ein zweites Mal da.
+                <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
+                  <MarkdownEditor
+                    layout={vorschauNeben ? 'split' : 'toggle'}
+                    variante="dokument"
+                    autoSize={{ minRows: 6 }}
+                  />
+                </Form.Item>
+              )}
+            />
+          )}
         </Form>
       ) : (
         <div className="lagebericht-druck">

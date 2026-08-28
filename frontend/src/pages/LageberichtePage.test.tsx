@@ -199,24 +199,15 @@ describe('LageberichtDetailPage', () => {
     expect(await screen.findByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
   });
 
-  it('Entwurf-Editor spiegelt Markdown live als Vorschau (layout=split)', async () => {
-    setupDetail({
-      ...lagebericht7Abschnitte,
-      abschnitte: [
-        { schluessel: 'auftrag', text: '' },
-        { schluessel: 'gefahren_schadenlage', text: '' },
-        { schluessel: 'eigene_lage', text: '' },
-        { schluessel: 'lageentwicklung', text: '' },
-        { schluessel: 'fuehrungsprobleme', text: '' },
-        { schluessel: 'antraege_vorschlaege', text: '' },
-        { schluessel: 'zusammenfassung', text: '' },
-      ],
-    });
-    // Warte auf das Formular
+  it('Entwurf-Editor zeigt die Vorschau auf Wunsch neben dem Text (Umschalter, Vorgabe AUS)', async () => {
+    setupDetail(lagebericht7Abschnitte);
     const auftragFeld = await screen.findByLabelText('Auftrag');
-    // Markdown-Text eintippen
     await userEvent.type(auftragFeld, '## Schwerpunkt\n- Punkt A');
-    // Live-Vorschau muss die formatierte Überschrift zeigen (nicht den Rohtext)
+    // Vorgabe: KEINE Vorschau neben dem Text (H62 — der Split kostete die halbe
+    // Schreibbreite und war für 2108 px Scrollstrecke mitverantwortlich).
+    expect(screen.queryByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeNull();
+    // Der Umschalter ist eine Einstellung in eigener Zeile, keine Aktion in der Knopfreihe.
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
     expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
@@ -225,6 +216,46 @@ describe('LageberichtDetailPage', () => {
     for (const el of rohTexte) {
       expect(el.tagName.toLowerCase()).toBe('textarea');
     }
+  });
+
+  it('Entwurf-Editor spiegelt Markdown im eingeklappten Modus über den Vorschau-Knopf des Abschnitts', async () => {
+    setupDetail(lagebericht7Abschnitte);
+    const auftragFeld = await screen.findByLabelText('Auftrag');
+    await userEvent.type(auftragFeld, '## Schwerpunkt');
+    const abschnitt = auftragFeld.closest('.ant-collapse-item') as HTMLElement;
+    await userEvent.click(within(abschnitt).getByRole('button', { name: /Vorschau/ }));
+    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+  });
+
+  it('Abschnittsnavigation listet alle acht Abschnitte, markiert leere und hält EINEN offen (H62)', async () => {
+    const acht: LageberichtAnzeige = {
+      ...lagebericht7Abschnitte, id: 15, vorlage: 'lagebeurteilung',
+      abschnitte: [
+        { schluessel: 'auftrag', text: 'Hochwasser' },
+        { schluessel: 'anlass', text: '' },
+        { schluessel: 'beurteilung_schadenlage', text: '' },
+        { schluessel: 'beurteilung_eigene_lage', text: '' },
+        { schluessel: 'gemeinsame_elemente', text: '' },
+        { schluessel: 'entschlussvorschlaege', text: '' },
+        { schluessel: 'abwaegen', text: '' },
+        { schluessel: 'vorschlag_beste', text: '' },
+      ],
+    };
+    setupDetail(acht);
+    await screen.findByLabelText('Auftrag');
+    const koepfe = await screen.findAllByRole('tab');
+    expect(koepfe).toHaveLength(8);
+    // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke.
+    expect(screen.getByRole('tab', { name: /^expanded Auftrag$|^collapsed Auftrag$/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ })).toBeInTheDocument();
+    expect(koepfe.filter((k) => k.getAttribute('aria-expanded') === 'true')).toHaveLength(1);
+    // Die Marke folgt dem Tippen: leeren Abschnitt befüllen → „(leer)" verschwindet.
+    await userEvent.click(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }));
+    await userEvent.type(screen.getByLabelText('Anlass des Lagevortrags'), 'Pegel steigt');
+    expect(screen.queryByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ })).toBeNull();
+    // Alle acht Editoren stehen im DOM — ein Speichern schickt keinen Abschnitt leer.
+    // `[id]`: rc-textarea hängt für `autoSize` ein neuntes, unbeschriftetes Messfeld ein.
+    expect(document.querySelectorAll('textarea[id]')).toHaveLength(8);
   });
 
   it('freigegebener Bericht rendert Markdown-Abschnittstext formatiert (Überschrift + Liste)', async () => {
