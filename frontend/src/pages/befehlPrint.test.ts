@@ -116,7 +116,9 @@ describe('befehlPrint.css — Entwurfsausdruck (M86)', () => {
     // Akkordeon-Regel aus `lageberichtPrint.css`.
     const seite = readFileSync(join(hier, 'BefehlDetailPage.tsx'), 'utf8');
     expect(seite).toContain('<MarkdownEditor layout="split"');
-    expect(seite).not.toContain('toggle');
-    expect(seite).not.toContain('Akkordeon');
+    // Als JSX-Prop bzw. Import gepinnt, nicht als Wort: ein Kommentar, der „toggle" oder
+    // „Akkordeon" erwähnt, ändert am Layout nichts und darf nicht rot färben.
+    expect(seite).not.toContain('layout="toggle"');
+    expect(seite).not.toMatch(/import .*AbschnittsAkkordeon/);
   });
 });

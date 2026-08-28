@@ -33,7 +33,10 @@
      gemeinsam ist `ant-collapse-panel-inactive`. `!important` ist hier Pflicht, nicht
      Gewohnheit: ohne es gewinnt der Inline-Stil. Ohne die Regel druckt ein Entwurf
      genau EINEN von acht Abschnitten — der Fehler wiegt schwerer als das doppelte
-     Drucken, gegen das M86 gemeldet wurde. */
+     Drucken, gegen das M86 gemeldet wurde.
+     VERTRAG: der Selektor trifft JEDES Collapse im Druckbereich. Heute liegt dort genau
+     eines (`AbschnittsAkkordeon`); ein zweites klappte im Ausdruck stillschweigend
+     komplett auf — wer eines hinzufügt, engt diese Regel auf den Abschnittsbereich ein. */
   .lagebericht-print-root .ant-collapse-panel-inactive {
     display: block !important;
   }
