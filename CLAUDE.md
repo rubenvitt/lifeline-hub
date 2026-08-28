@@ -771,6 +771,25 @@ Alltag wichtigsten:
   mit einem Tipp, LFH-368 hat gemessen, dass das Breitenbudget (~693 px) es nicht trägt. Der
   e2e-Nachweis (`e2e/gefahren-matrix-zelle.spec.ts`) misst ≥ 44 px auf dem Tablet in Stufe
   `komfortabel`; im Fükw sind 30 px die Staffel, kein Mangel.
+- **Der Verlustschutz eines Entwurfs ist ein Hook, keine Seitenlogik** (LFH-348 · C13, H63).
+  `entwurf/useEntwurfVerlustschutz.ts` trägt Riegel gegen den Fremd-Refetch, Autosave (30 s +
+  Blur), `beforeunload` und den Zeitstempel; `BefehlDetailPage` und `LageberichtDetailPage`
+  konsumieren ihn — und **beide rendern ihren Inhalt mit `key={<id>}`**, weil der Merker zu
+  EINEM Datensatz gehört: ein Routenwechsel auf dieselbe Komponente (Fortschreiben → neuer
+  Entwurf) trüge sonst den Riegel des alten mit und hielte den neuen Serverstand fern
+  (getestet). Das Ticket verlangte `form.isFieldsTouched()` und ein lokales `useEntwurf`
+  (IndexedDB); beides ist bewusst nicht gebaut — die C7-Begründung gilt, und ein lokaler
+  Entwurf neben dem Server-Autosave wäre eine zweite Wahrheit ohne Auflösungsregel.
+  **Die Abschnittsnavigation ist ein Akkordeon, kein `Anchor`** — gemessen: die Bestandsseite
+  war 2108 px hoch (`e2e/lagebericht-schmal.spec.ts`), die verlangte Halbierung ist mit acht
+  ausgeklappten Editoren in keiner Bauform erreichbar, und der Körper hat einen Boden von
+  `100vh`. Die Kopfzeilen (`lageberichte/AbschnittsAkkordeon.tsx`, `forceRender`, Leer-Marke
+  mit Wort „(leer)" als zweitem Kanal) SIND die Navigation. Wer eine Seitenhöhe misst, wartet
+  bis sie steht: `autoSize` misst nach dem Einhängen nach, ein Griff davor las 1324 statt 2108.
+  Die Lageberichte-Liste zeigt **Kettenköpfe** (`lageberichte/ketten.ts`, Kopf = ohne
+  Nachfolger, nicht `vorgaenger_id == null`), die Lagemeldungen sind die **zwölfte**
+  `Datensicht`-Konsumentin; ihre Tagesgrenze liegt in der Anzeigezone
+  (`lagemeldungen/zeitachse.ts`), nicht in UTC.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.

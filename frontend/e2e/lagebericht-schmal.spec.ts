@@ -25,10 +25,13 @@ const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 /**
- * Halbe Bestandshöhe. Gemessen am Stand VOR C13 (Commit f184da4c, 28.08.2026):
- * siehe Prüfliste. Bis zur Messung steht hier kein Deckel — der erste Lauf liefert die Zahl.
+ * Halbe Bestandshöhe. Gemessen am Stand VOR C13 (Commit f184da4c, 28.08.2026, zweimal
+ * identisch): `body.scrollHeight` = **2108 px**, Formular 1833 px, ein Textfeld 180 px.
+ * Das Ticket verlangt mindestens die Halbierung → 1054. Nach dem Umbau (Akkordeon, ein
+ * offener Editor): 938 px. Der Körper hat einen Boden von `100vh` = 768 px
+ * (`AppLayout`/`EinsatzLayout`, `minHeight`) — darunter kann keine Seite fallen.
  */
-const MAX_HOEHE = Number.POSITIVE_INFINITY;
+const MAX_HOEHE = 1054;
 
 async function anmelden(page: Page) {
   await page.goto('/login');
