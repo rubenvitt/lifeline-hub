@@ -200,6 +200,29 @@ describe('MeldungenPage', () => {
     await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
   });
 
+  it('hält beim Filterwechsel die vorherige Liste samt Zählern, bis die neue da ist (LFH-351)', async () => {
+    // Beim ERSTEN Wechsel auf einen Richtungsfilter ist der neue Key kalt; ohne
+    // `placeholderData` zeigte die Seite für die Dauer des Requests „Keine Meldungen" und
+    // „0 offen" — obwohl offene Meldungen existieren.
+    let antworte: (m: Meldung[]) => void = () => {};
+    listeMeldungen.mockImplementation((_id: number, f: { richtung?: string }) =>
+      f.richtung === 'extern'
+        ? new Promise<Meldung[]>((resolve) => { antworte = resolve; })
+        : Promise.resolve([meldung()]));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByText('Extern'));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
+    // Während der Request läuft: alte Liste und Zähler stehen, kein Leerzustand.
+    expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
+    expect(screen.getByText('1 offen · 0 abgeschlossen')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Meldungen')).not.toBeInTheDocument();
+    // Gegenaussage: sobald die Antwort da ist, gilt sie — das Platzhalten ist kein Einfrieren.
+    antworte([]);
+    expect(await screen.findByText('Keine Meldungen')).toBeInTheDocument();
+    expect(screen.queryByText('Florian Nord 1')).not.toBeInTheDocument();
+  });
+
   it('Beobachter sieht Posteingang, aber keine Erfassung', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValueOnce({
       id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',

@@ -586,6 +586,28 @@ describe('PersonenDetailPage — Stammdaten', () => {
     expect(koerper[1].basis_geaendert_at).toBeUndefined();
   });
 
+  it('ein zweiter 409 auf den Overwrite zeigt die Servermeldung statt erneut den Dialog (LFH-351)', async () => {
+    // Die Personen-Route kennt einen zweiten 409, der kein CAS-Konflikt ist: `fordere_aktiv`
+    // („Einsatz ist abgeschlossen und schreibgeschützt") greift VOR der CAS-Prüfung und lässt
+    // sich per `overwrite` nicht umgehen. Ohne den `!v.overwrite`-Zweig öffnete jeder
+    // Overwrite denselben Dialog erneut — die echte Servermeldung käme nie.
+    const koerper: Array<Record<string, unknown>> = [];
+    render(einsatzAktiv, detail, [
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ error: 'Einsatz ist abgeschlossen und schreibgeschützt' }, { status: 409 });
+      }),
+    ]);
+    await ausMenue(/Bearbeiten/);
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    // Die Servermeldung belegt den else-Zweig (`fehler`); ein zweiter Dialog wäre das Rennen
+    // aus H65, dessen einziger Ausweg „Neu laden" ist.
+    expect(await screen.findByText('Einsatz ist abgeschlossen und schreibgeschützt')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Überschreiben' })).toHaveLength(1);
+  });
+
   it('Beobachter sieht keinen Bearbeiten-Button', async () => {
     render(einsatzBeobachter, detail);
     await screen.findByRole('heading', { name: /Person R-001/ });
