@@ -69,6 +69,11 @@ export default function MeldungenPage() {
   const meldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungenListe(einsatzId, richtungFilter ?? 'alle'),
     queryFn: () => listeMeldungen(einsatzId, { richtung: richtungFilter }),
+    // LFH-351/H48: jeder Richtungsfilter ist ein eigener Query-Key. Beim ersten Wechsel ist
+    // der Key kalt, und ohne Platzhalter zeigte die Seite für die Dauer des Requests
+    // „Keine Meldungen" samt „0 offen" — unter Zeitdruck genau die Sekunde, in der man die
+    // Lage falsch abliest. Die vorherige Liste steht, bis die neue da ist.
+    placeholderData: (prev) => prev,
   });
 
   // Cross-Modul-Deeplink (LFH-153): ?meldung=<id> (z. B. Lagekarte-Inspector) hebt die Meldung

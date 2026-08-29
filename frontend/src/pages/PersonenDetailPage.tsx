@@ -215,7 +215,13 @@ export default function PersonenDetailPage() {
       aktualisierePerson(einsatzId, personId, v.daten, v.overwrite ? undefined : v.basis),
     onSuccess: () => { invalidateDetail(); setEditSitzung(null); },
     onError: (e, v) => {
-      if (istKonflikt(e)) {
+      // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Die Personen-Route kennt
+      // einen ZWEITEN 409, der kein CAS-Konflikt ist: `fordere_aktiv` („Einsatz ist
+      // abgeschlossen und schreibgeschützt") greift VOR der CAS-Prüfung, und `overwrite` kann
+      // ihn nicht umgehen. Ein 409 auf den Overwrite muss deshalb die echte Servermeldung
+      // zeigen, statt denselben Dialog erneut zu öffnen — sonst wäre „Überschreiben" ein
+      // toter Button (LFH-351/H65; dieselbe Weiche wie in SchaedenDetailPage/TiereDetailPage).
+      if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
           content:
