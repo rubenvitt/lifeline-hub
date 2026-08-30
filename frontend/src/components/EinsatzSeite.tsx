@@ -1,5 +1,6 @@
 import { Flex, Typography, theme } from 'antd';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { flaeche } from '../theme/tokens';
 // Der Akzentstrich lebt als Klasse in der Gestaltungssprache. Der Import ist
 // bewusst hier und nicht global: bis A2 hatte `sprache.css` genau einen
@@ -25,6 +26,19 @@ interface EinsatzSeiteProps {
    * `<Form form={form}>` in `children`.
    */
   aktionen?: ReactNode;
+  /**
+   * Anlegen-Aktion der Seite für die Kommandopalette („Neue Zeile", LFH-391 · B5).
+   *
+   * Bewusst ein CALLBACK und nicht aus `aktionen` abgeleitet: der Slot ist ein `ReactNode`,
+   * und aus einem ReactNode lässt sich kein Aufruf ziehen. Die Seite gibt hier **denselben**
+   * Callback hinein, den ihr Anlegen-Knopf trägt — **samt seinem Rechte-Riegel**
+   * (`darfSchreiben ? cb : undefined`). Das Vorhandensein der Prop ist kein Rechtebeleg
+   * (CLAUDE.md, LFH-372): die Palette ist ein zweiter Bedienweg auf dieselbe Aktion und darf
+   * keinen anderen Riegel haben als der erste.
+   *
+   * Fehlt sie, wird **gar keine** Ebene registriert (siehe `aktiv` unten).
+   */
+  neueZeile?: () => void;
   /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
   hinweis?: ReactNode;
   /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
@@ -68,6 +82,7 @@ export default function EinsatzSeite({
   beschreibung,
   breadcrumb,
   aktionen,
+  neueZeile,
   hinweis,
   dataUpdatedAt,
   breite = flaeche.seiteSchmal,
@@ -75,6 +90,29 @@ export default function EinsatzSeite({
 }: EinsatzSeiteProps) {
   const { token } = theme.useToken();
   const aktionenRef = useRef<HTMLDivElement>(null);
+  const seitenWurzel = useRef<HTMLDivElement>(null);
+
+  /*
+   * Die erste SEITENWEITE Tastatur-Ebene des Repos (LFH-391 · B5). Die vier bisherigen
+   * Registrierungen (Datensicht, Erfassung, EtbPage, KatalogTabelle) haben alle schmale
+   * Wurzeln — genau dafür ist die Ebenen-KETTE aus B1 gebaut: diese flache Ebene liegt
+   * ÜBER den tiefen Werkzeugleisten, statt sie zu verdrängen.
+   *
+   * `name` ist eine KONSTANTE und ausdrücklich nicht aus `titel` abgeleitet: er steht in den
+   * Effekt-Deps von `useTastaturEbene`, und `titel` ist ein `ReactNode` — eine neue Identität
+   * bei jedem Render meldete die Ebene bei jedem Titelwechsel ab und neu an.
+   *
+   * `aktiv` hängt an der Prop, nicht am Rendern: eine Detailseite ohne Anlegen-Aktion stellte
+   * sonst eine LEERE Ebene in Kette und Anzeige-Fallback — und weil der Fallback die
+   * FLACHSTE Ebene greift, verdrängte ausgerechnet die leere Seitenebene die nützliche
+   * Werkzeugleiste darunter.
+   */
+  useTastaturEbene({
+    name: 'Seitenaktionen',
+    wurzel: seitenWurzel,
+    aktionen: { 'neue-zeile': neueZeile },
+    aktiv: neueZeile != null,
+  });
 
   // „Genau eine Primäraktion, rechts" — als Dev-Warnung, nicht als Typsignatur.
   // Das ist die ehrlichere Variante: der Slot ist `ReactNode`, und TypeScript sieht
@@ -96,7 +134,7 @@ export default function EinsatzSeite({
   });
 
   return (
-    <div style={{ maxWidth: breite, margin: '0 auto' }}>
+    <div ref={seitenWurzel} style={{ maxWidth: breite, margin: '0 auto' }}>
       {breadcrumb && <div style={{ marginBottom: token.marginXS }}>{breadcrumb}</div>}
       {/**
         * `wrap` ist keine Kosmetik (LFH-339 · C4, gemessen). Ohne es steht der

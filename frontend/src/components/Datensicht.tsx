@@ -647,21 +647,54 @@ export function pruefeKartenplan<T extends object, K extends string>(
   return befunde;
 }
 
+/** Die abwählbaren Spalten: alles außer der Kennungsspalte und den `immerSichtbar`-Spalten. */
+function waehlbareSpalten<T, K extends string>(
+  spalten: readonly DatensichtSpalte<T, K>[],
+): readonly DatensichtSpalte<T, K>[] {
+  return spalten.filter((s, i) => i !== 0 && !s.immerSichtbar);
+}
+
+/**
+ * Gibt es überhaupt etwas zu schalten? EINE Wahrheit für zwei Leser (LFH-391 · B4).
+ *
+ * Der Schalter selbst rendert bei `false` gar nichts — und die Kommandopalette darf dann
+ * auch keinen Befehl „Spalten" anbieten, der auf einen nicht vorhandenen Schalter zeigt.
+ * Rechnete jede Seite das für sich, wäre das derselbe Fehlermodus wie beim Spaltenzähler:
+ * eine Angabe, die lügen kann, verfehlt genau das Kriterium, für das sie existiert.
+ */
+export function hatWaehlbareSpalten<T, K extends string>(
+  spalten: readonly DatensichtSpalte<T, K>[],
+): boolean {
+  return waehlbareSpalten(spalten).length > 0;
+}
+
 /** Der Schalter für Seiten, die ihn EINMAL über mehreren Sichten zeigen. */
 export function SpaltenSchalter<T, K extends string>(props: {
   bezeichnung: string;
   spalten: readonly DatensichtSpalte<T, K>[];
   aus: readonly K[];
   onAus: (schluessel: K[]) => void;
+  /**
+   * Optionale KONTROLLIERTE Offen-Achse. Ohne beide Props bleibt das Dropdown unkontrolliert
+   * wie bisher — der Export ist für Seiten gedacht, die den Schalter selbst platzieren, und
+   * ein Pflicht-Prop wäre eine Vertragsänderung ohne Gegenstand (gemessen: kein externer
+   * Aufrufer). Gebraucht wird sie, weil die Kommandopalette den Schalter von AUSSEN öffnet:
+   * `trigger={['click']}` allein hat keinen Weg hinein.
+   */
+  offen?: boolean;
+  onOffen?: (offen: boolean) => void;
 }): ReactNode {
-  const { bezeichnung, spalten, aus, onAus } = props;
+  const { bezeichnung, spalten, aus, onAus, offen, onOffen } = props;
   // Der Schalter stellt die Breitenfrage SELBST, statt den Zähler übergeben zu bekommen:
   // sonst gäbe es zwei Stellen, an denen „wie viele sind ausgeblendet" gerechnet wird, und
   // die Seiten-Variante (ein Schalter über mehreren Sichten) driftete von der internen weg.
   const { abBreite } = useViewport();
   const { anzahlVerborgen } = sichtbareSpalten({ spalten, verborgen: new Set(aus), abBreite });
-  const waehlbar = spalten.filter((s, i) => i !== 0 && !s.immerSichtbar);
-  if (waehlbar.length === 0) return null;
+  const waehlbar = waehlbareSpalten(spalten);
+  // Bewusst über {@link hatWaehlbareSpalten} statt über `waehlbar.length` — es ist genau die
+  // Funktion, die auch die Palette liest. Wer die Bedingung hier ändert, sieht die zweite
+  // Seite im selben Aufruf.
+  if (!hatWaehlbareSpalten(spalten)) return null;
 
   const umschalten = (schluessel: K) =>
     onAus(aus.includes(schluessel) ? aus.filter((k) => k !== schluessel) : [...aus, schluessel]);
@@ -681,6 +714,10 @@ export function SpaltenSchalter<T, K extends string>(props: {
   return (
     <Dropdown
       trigger={['click']}
+      // `undefined` lässt rc-trigger in seinem unkontrollierten Zweig — die Achse ist
+      // additiv, kein Bruch für Aufrufer ohne die Props.
+      open={offen}
+      onOpenChange={onOffen}
       /*
        * Der Fokus muss beim Öffnen IN das Menü wandern. Ohne `autoFocus` bleibt er am Knopf,
        * die Pfeiltasten heben keinen Eintrag hervor, und die Eingabetaste schließt das Menü
@@ -857,10 +894,40 @@ export default function Datensicht<T extends object, const K extends string>(
     nachBenutzeraktion();
   }, [nachBenutzeraktion]);
 
+  // ── Formwahl ──────────────────────────────────────────────────────────────────────
+  // Steht HIER und nicht erst bei der Werkzeugzeile, weil die Ebenen-Registrierung
+  // gleich darunter sie liest: der Spaltenschalter existiert nur im Tabellenzweig.
+  const alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite('md'));
+
+  const [spaltenOffen, setSpaltenOffen] = useState(false);
+
+  // Steht der Schalter überhaupt? EINE Wahrheit für drei Leser: die Palettenmeldung unten,
+  // der Rücksetzer daneben und der Schalter selbst (Kartenzweig → gar nicht gerendert;
+  // ohne wählbare Spalte → `null`).
+  const spaltenSchalterDa = alsTabelle && hatWaehlbareSpalten(spalten);
+
+  /*
+   * Verschwindet der Schalter, feuert antd KEIN `onOpenChange(false)` — der Zustand bliebe
+   * auf `true` stehen und das Overlay klappte beim Wiederauftauchen unaufgefordert über den
+   * Inhalt (gemessen: `form='auto'`, Fenster unter `md` und zurück). Vor der kontrollierten
+   * Offen-Achse aus LFH-391 · B4 starb der Zustand mit der Komponente; die Achse hat ihn
+   * überlebensfähig gemacht, also muss sie ihn auch beenden. Der Riegel hängt an BEIDEN
+   * Bedingungen, nicht nur an der Breite: ein Wechsel der Spaltengarnitur nimmt den Schalter
+   * genauso weg.
+   */
+  useEffect(() => {
+    if (!spaltenSchalterDa) setSpaltenOffen(false);
+  }, [spaltenSchalterDa]);
+
   useTastaturEbene({
     name: `Datensicht-Filter: ${bezeichnung}`,
     wurzel: werkzeugWurzel,
-    aktionen: { 'filter-zuruecksetzen': filterZuruecksetzen },
+    aktionen: {
+      // Nur melden, was die Zeile auch hält (LFH-391 · B4) — ein Befehl auf einen nicht
+      // vorhandenen Schalter wäre ein Befehl ohne Wirkung.
+      'filter-zuruecksetzen': filterZuruecksetzen,
+      ...(spaltenSchalterDa ? { spalten: () => setSpaltenOffen(true) } : {}),
+    },
   });
 
   // ── Spaltensichtbarkeit ───────────────────────────────────────────────────────────
@@ -1045,10 +1112,8 @@ export default function Datensicht<T extends object, const K extends string>(
     console.warn(`[Datensicht: ${bezeichnung}] ${befundSchluessel}`);
   }, [befundSchluessel, bezeichnung]);
 
-  // ── Formwahl ──────────────────────────────────────────────────────────────────────
-  const alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite('md'));
-
   // ── Werkzeugzeile ─────────────────────────────────────────────────────────────────
+  // (`alsTabelle` steht weiter oben — die Ebenen-Registrierung liest es mit.)
   const filterSpalten = gezeigteSpalten.filter((s) => s.filter != null);
   /**
    * Gruppiert wird über die EINGEFRORENE Achse, solange die Schleuse zu ist — sonst hängt ein
@@ -1150,6 +1215,8 @@ export default function Datensicht<T extends object, const K extends string>(
           spalten={spalten}
           aus={aktiveSpaltenAus}
           onAus={setzeSpaltenAus}
+          offen={spaltenOffen}
+          onOffen={setSpaltenOffen}
         />
       )}
       {gruppenZaehler.length > 0 && alsTabelle && (

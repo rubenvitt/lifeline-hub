@@ -1,6 +1,9 @@
 // frontend/src/command-palette/befehle.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { baueBefehle, kuerzelFuerTastaturAktion, tastaturAktionFuerEreignis } from './befehle';
+import {
+  baueBefehle, kuerzelFuerTastaturAktion, tastaturAktionFuerEreignis,
+  TASTATUR_AKTIONEN, TASTATUR_AKTION_REIHENFOLGE,
+} from './befehle';
 import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverride, Koordinatenformat } from '../api/types';
@@ -229,6 +232,10 @@ describe('Tastaturaktionen', () => {
       .toBe('Esc');
     expect(kuerzelFuerTastaturAktion('filter-zuruecksetzen', 'Mozilla/5.0 (Macintosh)'))
       .toBe('⌘ ⌫');
+    // Gegenaussage zu den drei gebundenen Ids (LFH-391 · B3): eine Aktion OHNE Tastenweg
+    // hat kein Kürzel. Bis hierher fiel jede unbekannte Id auf das Filter-Kürzel durch.
+    expect(kuerzelFuerTastaturAktion('neue-zeile', 'Mozilla/5.0 (X11; Linux x86_64)')).toBeNull();
+    expect(kuerzelFuerTastaturAktion('spalten', 'Mozilla/5.0 (Macintosh)')).toBeNull();
   });
 
   it('erzeugt nur für registrierte Callbacks sichtbare Aktionsbefehle', () => {
@@ -253,6 +260,52 @@ describe('Tastaturaktionen', () => {
     aktionsbefehle[1].ausfuehren();
     expect(speichern).toHaveBeenCalledTimes(1);
     expect(filterZuruecksetzen).toHaveBeenCalledTimes(1);
+  });
+
+  it('eine Aktion ohne Tastenbindung trägt KEIN Kürzel', () => {
+    const neueZeile = vi.fn();
+    const b = baueBefehle(kontext({
+      tastaturAktionen: { 'neue-zeile': neueZeile },
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+    }));
+
+    const befehl = b.find((x) => x.id === 'tastatur:neue-zeile');
+    expect(befehl).toBeDefined();
+    expect(befehl!.label).toBe('Neue Zeile');
+    /*
+     * Bewusst `in` statt `toBeUndefined()`: ein gesetztes `kuerzel: undefined` wäre von
+     * einem fehlenden Schlüssel nicht zu unterscheiden — dieselbe Presence-Falle, die
+     * CLAUDE.md für serde-Antworten beschreibt. Und die Aussage ist nicht kosmetisch:
+     * vorher schrieb `baueBefehle` das Kürzel unbedingt, jede ungebundene Aktion trug
+     * damit sichtbar „Strg + Rücktaste" — das Kürzel des Filter-Zurücksetzens.
+     */
+    expect('kuerzel' in befehl!).toBe(false);
+
+    befehl!.ausfuehren();
+    expect(neueZeile).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt das Kürzel weiter an, wo eine Tastenbindung existiert', () => {
+    // Positivhälfte zur Aussage darüber: der Zweig ist nicht pauschal abgeschaltet.
+    const b = baueBefehle(kontext({
+      tastaturAktionen: { speichern: vi.fn() },
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+    }));
+    const befehl = b.find((x) => x.id === 'tastatur:speichern');
+    expect('kuerzel' in befehl!).toBe(true);
+    expect(befehl!.kuerzel).toBe('Strg + S / Strg + ↵');
+  });
+
+  it('die Ordnungsliste deckt jede TastaturAktionId genau einmal', () => {
+    /*
+     * Das Record erzwingt die Vollständigkeit der DEFINITIONEN über den Typcheck (TS2741);
+     * die REIHENFOLGE kann es nicht erzwingen, weil ein Record keine vertragliche Ordnung
+     * hat. Genau diese Lücke schließt dieser Guard: eine Id ohne Eintrag in der
+     * Ordnungsliste erschiene sonst nie in der Palette — stumm, ohne Typfehler.
+     */
+    expect([...TASTATUR_AKTION_REIHENFOLGE].sort())
+      .toEqual(Object.keys(TASTATUR_AKTIONEN).sort());
+    expect(new Set(TASTATUR_AKTION_REIHENFOLGE).size).toBe(TASTATUR_AKTION_REIHENFOLGE.length);
   });
 });
 

@@ -4,7 +4,22 @@ import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides, Koordinatenformat
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 
-export type TastaturAktionId = 'speichern' | 'verwerfen' | 'filter-zuruecksetzen';
+/**
+ * Die Aktionen, die eine Maske oder Seite an die Palette meldet (LFH-391 · B3).
+ *
+ * NICHT jede hat einen Tastenweg: `tastaturAktionFuerEreignis` bindet weiterhin nur
+ * `speichern`/`verwerfen`/`filter-zuruecksetzen` — das sind die Mutations- und
+ * Abbruchwege, die man mitten im Tippen braucht. `neue-zeile` und `spalten` sind
+ * ausschliesslich über die Palette erreichbar; ein viertes globales Kürzel wäre eine
+ * neue Kollisionsfläche mit Browser- und antd-Bindungen.
+ *
+ * Wer die Union erweitert, trägt in `befehle.ts` BEIDES nach: den Eintrag im
+ * exhaustiven `TASTATUR_AKTIONEN` (das erzwingt der Typcheck, TS2741) und die Position
+ * in `TASTATUR_AKTION_REIHENFOLGE` (das erzwingt der Guard in `befehle.test.ts` — ein
+ * Record hat keine vertragliche Ordnung, die Palette-Gruppe aber schon).
+ */
+export type TastaturAktionId =
+  | 'speichern' | 'verwerfen' | 'filter-zuruecksetzen' | 'neue-zeile' | 'spalten';
 
 export type TastaturAktionen = Partial<Record<TastaturAktionId, () => void>>;
 

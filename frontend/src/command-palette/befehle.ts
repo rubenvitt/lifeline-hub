@@ -71,14 +71,62 @@ interface TastaturEreignis {
   altKey?: boolean;
 }
 
-const TASTATUR_AKTIONEN: {
-  id: TastaturAktionId;
+interface TastaturAktionDefinition {
   label: string;
   schlagworte: string[];
-}[] = [
-  { id: 'speichern', label: 'Speichern', schlagworte: ['sichern', 'formular', 'submit'] },
-  { id: 'verwerfen', label: 'Verwerfen', schlagworte: ['abbrechen', 'schließen', 'escape'] },
-  { id: 'filter-zuruecksetzen', label: 'Filter zurücksetzen', schlagworte: ['suche', 'leeren', 'reset'] },
+  /** Sichtbares Kürzel je Plattform — `null`, wo es keinen Tastenweg gibt. */
+  kuerzel: (mac: boolean) => string | null;
+}
+
+/**
+ * EIN exhaustives Verzeichnis je Aktion (LFH-391 · B3) statt des früheren Arrays.
+ *
+ * Der Wechsel schließt einen stillen Anzeigefehler: ein Array kann keine Vollständigkeit
+ * behaupten, eine neue `TastaturAktionId` ohne Zeile erschien schlicht NIE in der Palette
+ * — ohne Typfehler und ohne roten Test. Das Record bricht dafür den Typcheck (TS2741).
+ * Das Kürzel liegt am selben Eintrag, weil der zweite stille Fehler genau dort saß:
+ * `kuerzelFuerTastaturAktion` fiel für jede unbekannte Id auf „Strg + Rücktaste" durch und
+ * beschriftete damit eine ungebundene Aktion mit dem Kürzel des Filter-Zurücksetzens.
+ */
+export const TASTATUR_AKTIONEN: Record<TastaturAktionId, TastaturAktionDefinition> = {
+  speichern: {
+    label: 'Speichern',
+    schlagworte: ['sichern', 'formular', 'submit'],
+    kuerzel: (mac) => (mac ? '⌘ S / ⌘ ↵' : 'Strg + S / Strg + ↵'),
+  },
+  verwerfen: {
+    label: 'Verwerfen',
+    schlagworte: ['abbrechen', 'schließen', 'escape'],
+    kuerzel: () => 'Esc',
+  },
+  'filter-zuruecksetzen': {
+    label: 'Filter zurücksetzen',
+    schlagworte: ['suche', 'leeren', 'reset'],
+    kuerzel: (mac) => (mac ? '⌘ ⌫' : 'Strg + Rücktaste'),
+  },
+  'neue-zeile': {
+    label: 'Neue Zeile',
+    schlagworte: ['anlegen', 'erfassen', 'neu', 'hinzufügen'],
+    kuerzel: () => null,
+  },
+  spalten: {
+    label: 'Spalten',
+    schlagworte: ['spalten', 'ausblenden', 'einblenden', 'tabelle', 'ansicht'],
+    kuerzel: () => null,
+  },
+};
+
+/**
+ * Die Reihenfolge der Gruppe „Aktionen" in der Palette. Sie steht getrennt, weil ein
+ * Record keine vertragliche Ordnung hat — vorher trug sie die Einfügereihenfolge des
+ * Arrays. Dass sie jede Id genau einmal führt, prüft der Guard in `befehle.test.ts`; das
+ * ist die einzige Hälfte dieses Vertrags, die von Hand gepflegt wird.
+ *
+ * Die drei Aktionen mit Tastenweg bleiben vorn: sie sind die Antwort auf „was kann ich
+ * hier gerade tun", und ihre Reihenfolge ist von `befehle.test.ts` gepinnt.
+ */
+export const TASTATUR_AKTION_REIHENFOLGE: readonly TastaturAktionId[] = [
+  'speichern', 'verwerfen', 'filter-zuruecksetzen', 'neue-zeile', 'spalten',
 ];
 
 /** Reine Auflösung der globalen Mutationskürzel. Bereits behandelte und wiederholte
@@ -93,28 +141,34 @@ export function tastaturAktionFuerEreignis(e: TastaturEreignis): TastaturAktionI
   return null;
 }
 
-/** Sichtbarer Gegenpart zur Ereignisauflösung; der User-Agent ist absichtlich ein
- * Parameter, damit beide Plattformzweige ohne Manipulation globaler Browserwerte testbar sind. */
-export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: string): string {
+/**
+ * Sichtbarer Gegenpart zur Ereignisauflösung; der User-Agent ist absichtlich ein
+ * Parameter, damit beide Plattformzweige ohne Manipulation globaler Browserwerte testbar
+ * sind. `null` heißt „diese Aktion hat keinen Tastenweg" — der frühere Rest-Zweig, der
+ * jede unbekannte Id mit dem Filter-Kürzel beschriftete, ist ersatzlos entfallen.
+ */
+export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: string): string | null {
   const mac = /Mac|iPhone|iPad|iPod/.test(userAgent);
-  if (id === 'verwerfen') return 'Esc';
-  if (id === 'speichern') return mac ? '⌘ S / ⌘ ↵' : 'Strg + S / Strg + ↵';
-  return mac ? '⌘ ⌫' : 'Strg + Rücktaste';
+  return TASTATUR_AKTIONEN[id].kuerzel(mac);
 }
 
 export function baueBefehle(k: BefehlKontext): Befehl[] {
   const befehle: Befehl[] = [];
 
   // 1. Aktionen — die kontextabhängigen Tastatur-Aktionen der gerade aktiven Maske
-  for (const definition of TASTATUR_AKTIONEN) {
-    const ausfuehren = k.tastaturAktionen?.[definition.id];
+  for (const id of TASTATUR_AKTION_REIHENFOLGE) {
+    const ausfuehren = k.tastaturAktionen?.[id];
     if (!ausfuehren) continue;
+    const definition = TASTATUR_AKTIONEN[id];
+    const kuerzel = kuerzelFuerTastaturAktion(id, k.userAgent ?? '');
     befehle.push({
-      id: `tastatur:${definition.id}`,
+      id: `tastatur:${id}`,
       gruppe: 'aktionen',
       label: definition.label,
       schlagworte: definition.schlagworte,
-      kuerzel: kuerzelFuerTastaturAktion(definition.id, k.userAgent ?? ''),
+      // Der Schlüssel FEHLT bei Aktionen ohne Tastenweg, statt auf `undefined` zu stehen:
+      // `Befehl.kuerzel` ist optional, und die Palette rendert die Marke am truthy-Zweig.
+      ...(kuerzel ? { kuerzel } : {}),
       ausfuehren,
     });
   }

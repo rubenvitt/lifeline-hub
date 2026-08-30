@@ -143,6 +143,33 @@ export function sendeZeigerAenderung(grob: boolean): number {
 }
 
 /**
+ * Setzt die Breite UND feuert das Änderungsereignis an alle Breiten-Zuhörer — der Weg, auf
+ * dem ein Test einen Fensterwechsel ZUR LAUFZEIT nachstellt (Pendant zu
+ * {@link sendeZeigerAenderung}).
+ *
+ * {@link setzeViewportBreite} allein reicht dafür nicht: antds Beobachter
+ * (`_util/responsiveObserver.js`) liest `matches` nur beim Anmelden und danach ausschließlich
+ * im `change`-Zuhörer — eine nachträglich gesetzte Breite ohne Ereignis erreicht eine bereits
+ * gerenderte Komponente nie, und der Test bliebe trivial grün.
+ *
+ * Gibt die Anzahl der benachrichtigten Zuhörer zurück, aus demselben Grund wie oben: nur so
+ * ist belegbar, dass überhaupt jemand zugehört hat.
+ */
+export function sendeBreitenAenderung(breiteInPx: number): number {
+  breite = breiteInPx;
+  let benachrichtigt = 0;
+  for (const [abfrage, menge] of hoerer) {
+    if (!BREITEN_MUSTER.test(abfrage)) continue;
+    const ereignis = { matches: trifftZu(abfrage), media: abfrage } as MediaQueryListEvent;
+    for (const funktion of [...menge]) {
+      funktion(ereignis);
+      benachrichtigt += 1;
+    }
+  }
+  return benachrichtigt;
+}
+
+/**
  * Alle bisher abgefragten Medienabfragen, in Abfragereihenfolge.
  *
  * Die Liste ist INNERHALB eines Tests kumulativ (erst `setzeViewportZurueck` im globalen
