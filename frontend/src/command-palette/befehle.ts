@@ -1,7 +1,7 @@
 // frontend/src/command-palette/befehle.ts
 import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDesktop, TbWorld, TbArrowsMinimize, TbArrowsMaximize, TbHandStop } from 'react-icons/tb';
 import {
-  modulRegistry, istModulFreigegeben, istModulSichtbar, istModulGesperrt, modulZielRoute,
+  modulRegistry, istModulFreigegeben, modulZielRoute,
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
@@ -29,8 +29,20 @@ import type { Koordinatenformat } from '../api/types';
  * Schnellaktion lief damit ins Leere. Ein Routenstück nur für diese eine Zeile
  * auszunehmen hätte zwei Wahrheiten für dieselbe Sache stehen lassen; deshalb tragen
  * alle vier Zeilen den Builder.
+ *
+ * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT und bewusst NICHT die Registry-Reihenfolge
+ * (LFH-391 · A1). Die Registry ordnet nach Kategorie — das ist die NAVIGATIONS-Rangfolge,
+ * gelesen von `erstesFreigegebenesModul`/`moduleNachKategorie`, und sie stellte `etb` vor
+ * `personen`. Beide Ordnungen an dieselbe Liste zu binden machte aus einer Umsortierung der
+ * Navigation still eine Umsortierung der Palette. Wer hier „aufräumt", färbt den `toEqual`-Pin
+ * in `befehle.test.ts` rot, ohne dass fachlich etwas kaputt wäre — der Pin ist Absicht.
+ *
+ * EXPORTIERT für `schnellaktionen.guard.test.ts`: der prüft je Zeile Trägermodul, Ziel und
+ * die Deckung gegen die Seiten, die `?neu=1` wirklich lesen. Die Tabelle bleibt bewusst HIER
+ * und wandert nicht in die `modulRegistry` — die ist heute frei von Router-/Deeplink-Bezügen,
+ * ein `pfad`-Closure zöge `routing/deeplinks.ts` in jeden Test, der sie anfasst.
  */
-const SCHNELLAKTIONEN: { modulKey: string; pfad: (einsatzId: number) => string; label: string; schlagworte: string[] }[] = [
+export const SCHNELLAKTIONEN: { modulKey: string; pfad: (einsatzId: number) => string; label: string; schlagworte: string[] }[] = [
   { modulKey: 'personen', pfad: (id) => personenPfad(id, { neu: true }), label: 'Neue Person erfassen', schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'] },
   { modulKey: 'etb', pfad: (id) => etbPfad(id, { neu: true }), label: 'Neuer ETB-Eintrag', schlagworte: ['tagebuch', 'meldung', 'eintrag'] },
   { modulKey: 'unfallhilfsstellen', pfad: (id) => unfallhilfsstellenListePfad(id, { neu: true }), label: 'Neue Unfallhilfsstelle', schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'] },
@@ -203,10 +215,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     }
 
     // 4. Schnellaktionen — nur wenn der User schreiben darf (kein Beobachter, aktiver Einsatz)
+    //    Der Modulfilter ist die LESEACHSE `istModulFreigegeben` (LFH-391 · A1b), dieselbe
+    //    Funktion wie in 2. und 3. — vorher stand hier die zweiteilige Fassung ohne
+    //    `status === 'fertig'`, und eine Schnellaktion konnte auf ein unfertiges Modul zeigen,
+    //    dessen Navigationseintrag daneben gar nicht existiert.
     if (k.darfSchreibenImEinsatz) {
       for (const a of SCHNELLAKTIONEN) {
         const m = modulRegistry.find((x) => x.key === a.modulKey);
-        if (!m || !istModulSichtbar(m, k.overrides) || istModulGesperrt(m, k.benutzer, k.overrides)) continue;
+        if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
         const ziel = a.pfad(k.einsatzId);
         befehle.push({
           id: `aktion:${a.modulKey}`, gruppe: 'schnellaktionen', label: a.label,

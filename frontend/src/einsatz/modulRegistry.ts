@@ -149,6 +149,12 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * Rahmens und zweimal in `command-palette/befehle.ts`. Vier Kopien einer Bedingung driften
  * genau an der Stelle auseinander, die niemand testet.
  *
+ * SEIT LFH-391 · A1b sind es DREI Stellen in `command-palette/befehle.ts`: der
+ * Schnellaktions-Filter führte als einziger noch die ZWEITEILIGE Fassung ohne
+ * `status === 'fertig'` — genau die vorhergesagte Drift, nur in der anderen Richtung. Sie
+ * war im Bestand unbeobachtbar (alle vier Trägermodule sind `fertig`) und ist über einen
+ * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
+ *
  * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerLaden`) führt die
  * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle vier
  * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen) sind `fertig`,

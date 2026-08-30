@@ -23,9 +23,11 @@ export type TastaturAktionId =
 
 export type TastaturAktionen = Partial<Record<TastaturAktionId, () => void>>;
 
-export type BefehlGruppe =
-  | 'aktionen' | 'schnellaktionen' | 'zuletzt' | 'module'
-  | 'einsaetze' | 'einstellungen' | 'navigation';
+/**
+ * Die Gruppen der Palette — ABGELEITET aus `GRUPPEN_REIHENFOLGE` (LFH-391 · A2),
+ * nicht daneben deklariert. Siehe den Vertrag am Array weiter unten.
+ */
+export type BefehlGruppe = (typeof GRUPPEN_REIHENFOLGE)[number];
 
 export interface Befehl {
   id: string;
@@ -69,10 +71,25 @@ export interface BefehlKontext {
  * `aktionen` (die kontextabhängigen Tastatur-Aktionen aus `TASTATUR_AKTIONEN`) bleibt
  * unangetastet an der Spitze: sie erscheint nur dort, wo eine Maske sie registriert hat,
  * und ist dann die Antwort auf „was kann ich hier gerade tun".
+ *
+ * ZWEI VERTRÄGE an dieser Liste (LFH-391 · A2):
+ *
+ * 1. **Die Reihenfolge IST die Union.** `BefehlGruppe` wird aus diesem `as const`-Tupel
+ *    abgeleitet — eine Gruppe kann also nicht mehr existieren, ohne hier zu stehen.
+ *    Vorher waren es zwei unabhängige Deklarationen, und `GRUPPEN_LABEL` (ein Record
+ *    über die Union) brach den Typcheck bei einer fehlenden Gruppe, dieses Array NICHT:
+ *    eine Gruppe in Union und Label, aber nicht in der Reihenfolge, renderte gar nicht —
+ *    `CommandPalette.tsx` iteriert ausschliesslich über dieses Array. Kein Typfehler,
+ *    kein roter Test, kein Fehlerbild. Die Mutationsprobe ist ein gestrichener Eintrag:
+ *    dann bricht `tsc` — gemessen an 'zuletzt' TS2353 an `GRUPPEN_LABEL`, TS2322 am
+ *    `gruppe:`-Literal in `befehle.ts` und TS2345/TS2367 in `befehle.test.ts`.
+ * 2. **Kein Eintrag steht zweimal.** Das sieht der Typ NICHT — eine Dublette lässt die
+ *    Union unverändert, rendert die Gruppe aber doppelt und macht `aria-activedescendant`
+ *    über doppelte `cmd-<id>` mehrdeutig. Dafür `typen.test.ts`.
  */
-export const GRUPPEN_REIHENFOLGE: BefehlGruppe[] = [
+export const GRUPPEN_REIHENFOLGE = [
   'aktionen', 'schnellaktionen', 'zuletzt', 'module', 'einsaetze', 'einstellungen', 'navigation',
-];
+] as const;
 
 export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
   aktionen: 'Aktionen',
@@ -82,4 +99,53 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
   einsaetze: 'Einsatz wechseln',
   einstellungen: 'Einstellungen',
   navigation: 'Navigation',
+};
+
+/**
+ * Präfix-Modi der Sucheingabe (LFH-391 · A4). `alles` ist der Vorgabemodus ohne Präfix.
+ *
+ * `>` ist ein reiner TEILMENGEN-Filter: er zeigt `aktionen` + `schnellaktionen`, also genau
+ * die zwei Gruppen, die seit LFH-337 · M11 ohnehin an der Spitze der Startansicht stehen.
+ * Ohne das Zeichen wird damit nichts unerreichbar — das Präfix ist Abkürzung, kein Zugang.
+ * Deshalb bewusst KEIN Wortalias („aktionen"), obwohl `>` auf deutscher Tastatur Shift+`<`
+ * ist und die Palette laut CLAUDE.md auch der Berührungs-/Handschuhweg zu 42+ Befehlen
+ * ist: ein zweiter Syntaxweg für eine Bequemlichkeit wäre eine zweite Wahrheit, und wer
+ * „aktionen" tippt, will meistens danach SUCHEN. Für die Datensatz-Modi der Etappe C ist
+ * die Lage anders (dort sind die Ziele ohne Präfix nicht erreichbar) — die Frage wird dort
+ * neu gestellt.
+ */
+export type PaletteModus = 'alles' | 'aktionen';
+
+export interface ModusBeschreibung {
+  /** Zeichen am Anfang der Eingabe; `null` für den Vorgabemodus, der ohne Präfix gilt. */
+  praefix: string | null;
+  /** Gruppen, auf die eingeschränkt wird; `null` = keine Einschränkung. */
+  gruppen: readonly BefehlGruppe[] | null;
+  /** Wortlaut der Modusanzeige, solange der Modus aktiv ist. */
+  hinweis: string | null;
+  /** Wortlaut in der Legende bei leerem Feld, hinter der Präfix-Marke. */
+  legende: string | null;
+}
+
+/**
+ * EIN exhaustiver Record für alle drei Angaben eines Modus — Präfixzeichen, Gruppen und
+ * Wortlaut gehören zusammen. Drei getrennte Tabellen wären drei Orte, an denen ein neuer
+ * Modus vergessen werden kann; hier erzwingt der Typcheck (TS2741) alles auf einmal.
+ *
+ * ETAPPE C ERGÄNZT HIER '#' und '@' — und bricht dabei absichtlich den Typcheck, sobald
+ * `PaletteModus` die zwei Varianten bekommt (gemessen an einer dritten Variante: TS2741
+ * „Property 'etb' is missing … but required in type 'Record<PaletteModus,
+ * ModusBeschreibung>'"). Das ist die eingebaute Erinnerung, dass ein Modus ohne
+ * Präfixzeichen unerreichbar und einer ohne Wortlaut unsichtbar wäre.
+ * `gruppen` ist für die Datensatz-Modi dann `[]` (keine statischen Befehle), nicht `null` —
+ * `null` zeigte weiterhin alle Module.
+ */
+export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
+  alles: { praefix: null, gruppen: null, hinweis: null, legende: null },
+  aktionen: {
+    praefix: '>',
+    gruppen: ['aktionen', 'schnellaktionen'],
+    hinweis: 'Nur Aktionen',
+    legende: 'zeigt nur Aktionen',
+  },
 };
