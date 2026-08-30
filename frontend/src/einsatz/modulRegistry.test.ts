@@ -10,6 +10,8 @@ import {
   modulZielRoute,
   aufloeseStandardModul,
   erstesFreigegebenesModul,
+  modulZuRoute,
+  modulAusPfad,
   type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
@@ -257,5 +259,44 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
       { key: 'x', kategorie: 'lage', label: 'X', icon: () => null, route: 'x', status: 'geplant' },
     ];
     expect(erstesFreigegebenesModul('lage', admin, undefined, nurGeplant)).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Die Umkehrung Route → Eintrag stand vor LFH-391 · C4 ZWEIMAL wörtlich im Bestand
+ * (`EinsatzLayout` für die Hervorhebung, `ModulStub` für die Rückweg-Beschriftung); der
+ * Modulschlüssel der Kommandopalette wäre die dritte Kopie geworden.
+ */
+describe('modulZuRoute / modulAusPfad', () => {
+  it('findet den Eintrag zu einem Routen-Segment', () => {
+    expect(modulZuRoute('etb')?.key).toBe('etb');
+    // Schlüssel und Route fallen NICHT überall zusammen — 'gefahren' ist der einzige
+    // Bestandsfall und deshalb der aussagekräftige: gesucht wird über `route`.
+    expect(modulZuRoute('gefahren')?.key).toBe('gefahrenzonen');
+    expect(modulZuRoute('gefahrenzonen')).toBeNull();
+  });
+
+  it('liefert null für Unbekanntes und für nichts', () => {
+    expect(modulZuRoute('gibtsnicht')).toBeNull();
+    expect(modulZuRoute(undefined)).toBeNull();
+    expect(modulZuRoute('')).toBeNull();
+  });
+
+  it('liest das Modul-Segment aus dem Pfad, auch auf einer Sub-Route', () => {
+    expect(modulAusPfad('/einsaetze/7/etb')?.key).toBe('etb');
+    // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Detail- oder
+    // Listen-Unterseite ihr Modul (`EinsatzLayout` hängt seine Hervorhebung daran).
+    expect(modulAusPfad('/einsaetze/7/unfallhilfsstellen/liste')?.key).toBe('unfallhilfsstellen');
+    expect(modulAusPfad('/einsaetze/7/personen/12')?.key).toBe('personen');
+  });
+
+  it('liefert null ausserhalb eines Einsatz-Moduls', () => {
+    expect(modulAusPfad('/einsaetze/7')).toBeNull();
+    expect(modulAusPfad('/einsaetze')).toBeNull();
+    expect(modulAusPfad('/profil')).toBeNull();
+    // Kein Einsatz-Bereich: ein Pfad, dessen DRITTES Segment zufällig wie eine Modulroute
+    // heisst, ist keiner — sonst gälte `/admin/stammdaten/personal` als Modul „Personal".
+    expect(modulAusPfad('/admin/stammdaten/personal')).toBeNull();
   });
 });

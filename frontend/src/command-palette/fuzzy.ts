@@ -1,12 +1,49 @@
 // frontend/src/command-palette/fuzzy.ts
 import Fuse from 'fuse.js';
-import { GRUPPEN_REIHENFOLGE, PALETTE_MODI, type Befehl, type PaletteModus } from './typen';
+import { GRUPPEN_REIHENFOLGE, GRUPPE_NUR_ORDNUNG, PALETTE_MODI, type Befehl, type PaletteModus } from './typen';
 
 /** Ein Fuse-Treffer samt Bewertung. Kleiner ist besser (0 = perfekt). */
 export interface Treffer {
   befehl: Befehl;
   score: number;
+  /**
+   * Vorgegebene Präfixstufe für Treffer, die NICHT durch Fuse gelaufen sind
+   * (LFH-391 · C1). Fehlt sie, rechnet {@link ordneTreffer} sie aus dem Label.
+   *
+   * Sie ist der Grund, warum das zentrale Akzeptanzkriterium des Tickets hält: ein
+   * Datensatz-Label trägt seine Modulherkunft vorn („Personen · R-042 · Müller"), und
+   * {@link praefixStufe} läse daraus bei der Suche '42' Stufe 3 — dieselbe Stufe wie
+   * Fuse-Rauschen, während ein Einsatz namens „Einsatz 42" auf Stufe 2 stünde und den
+   * exakten Nummerntreffer verdrängte. Der Erzeuger des Treffers weiss, WORAUF er
+   * getroffen hat; das Label weiss es nicht.
+   */
+  stufe?: 0 | 1 | 2 | 3;
 }
+
+/**
+ * Der Score eines Treffers, den Fuse NIE bewertet hat (LFH-391 · C1, Review-Befund).
+ *
+ * Datensatz-Treffer trugen bisher `score: 0` — den bestmöglichen Wert für etwas, das gar
+ * nicht bewertet worden ist. Auf gleicher Stufe verdrängten sie damit jeden Befehl: wer auf
+ * einer Einsatzseite 'einheit' tippte, um zum MODUL Einheiten zu springen, fand den
+ * Modulbefehl hinter fünf Einheiten-Datensätzen, und Enter öffnete einen Datensatz.
+ *
+ * 1 ist STRIKT schlechter als jeder Fuse-Score und damit die ehrliche Setzung „unbewertet
+ * verliert gegen bewertet". Der Wert ist hergeleitet, nicht geraten: fuse.js deckelt den
+ * Bitap-Score eines angenommenen Treffers auf `threshold` (hier 0,4) und potenziert ihn in
+ * `computeScore` mit `weight * norm` — einem STRIKT positiven Exponenten. `0,4^x` bleibt für
+ * jedes x > 0 unter 1, ein Gleichstand ist also ausgeschlossen und die Gruppenachse darunter
+ * kommt gar nicht erst zum Zug.
+ *
+ * KEIN kleinerer Wert tut es: `norm` ist `1/sqrt(Tokenzahl)`, bei langem Feld geht der
+ * Exponent gegen 0 und der Score damit gegen 1 — gemessen 0,973 bei einem 400-Wort-Label
+ * (`fuzzy.test.ts`, „kommt bei langem Label nahe an 1 heran"). Ein Deckel bei 0,9 hätte den
+ * Datensatz dort wieder vor den Befehl gestellt.
+ *
+ * Die STUFE bleibt davon unberührt und ist die erste Achse: ein Nummerntreffer steht auf
+ * Stufe 0 und gewinnt weiterhin gegen jeden Fuzzy-Treffer, so schlecht sein Score auch ist.
+ */
+export const UNBEWERTET = 1;
 
 /**
  * Die Modi mit Präfixzeichen — die EINZIGE Quelle für Parser und Legende.
@@ -57,24 +94,31 @@ export function filtereNachModus(befehle: Befehl[], modus: PaletteModus): Befehl
 }
 
 /**
- * Bei AKTIVER Suche entfällt die Gruppe `zuletzt` (LFH-391 · A3, Review-Befund).
+ * Bei AKTIVER Suche entfallen die ORDNUNGSKOPIEN — `zuletzt` (LFH-391 · A3, Review-Befund)
+ * und seit Etappe D auch `ausgefuehrt`.
  *
- * Sie ist ein reines ORDNUNGSMITTEL für die leere Ansicht: `baueBefehle` filtert die
+ * Sie sind reine ORDNUNGSMITTEL für die leere Ansicht: `baueBefehle` filtert die
  * Zuletzt-Schleife und die Modul-Schleife über DIESELBE Funktion `istModulFreigegeben`,
  * jeder `zuletzt:`-Eintrag hat also zwingend einen `modul:`-Zwilling mit gleichem Label,
- * gleicher Ikone und gleichem Ziel. Im Gruppenzweig trennen die Überschriften „Zuletzt"
- * und „Module" die beiden — genau darauf beruht die im Bestand bewusst hingenommene
+ * gleicher Ikone und gleichem Ziel; ein `ausgefuehrt:`-Eintrag ist per Konstruktion eine
+ * Kopie seines Originals — er entsteht nur, wenn dieses Original in derselben Runde gebaut
+ * wurde. Im Gruppenzweig trennen die Überschriften „Zuletzt", „Zuletzt ausgeführt" und
+ * „Module" die Zwillinge — genau darauf beruht die im Bestand bewusst hingenommene
  * Dopplung (LFH-337 · H12).
  *
  * Flach gerendert fällt diese Trennung weg, und es blieben zwei bis auf die DOM-`id`
  * ununterscheidbare Zeilen: wer zuletzt die Lagekarte offen hatte und „lage" tippt, sah
  * „Lagekarte, Lagekarte, Lagemeldungen" — für Vorlesende zweimal derselbe Name ohne
- * Hinweis, warum. Die Rangfolge leistet bei aktiver Suche ohnehin, wofür die Gruppe da
- * war; sie hier wegzulassen nimmt der Liste nichts und ist deshalb der Dedup-Sonderregel
+ * Hinweis, warum. Die Rangfolge leistet bei aktiver Suche ohnehin, wofür die Gruppen da
+ * waren; sie hier wegzulassen nimmt der Liste nichts und ist deshalb der Dedup-Sonderregel
  * vorzuziehen.
+ *
+ * EINE Funktion für beide Gruppen, gesteuert über {@link GRUPPE_NUR_ORDNUNG}: eine zweite
+ * Filterfunktion daneben wäre eine zweite Stelle, an der eine dritte Kopien-Gruppe vergessen
+ * werden kann — und das Vergessen ist hier still (die Liste rendert, nur doppelt).
  */
 export function ohneOrdnungsdubletten(befehle: Befehl[]): Befehl[] {
-  return befehle.filter((b) => b.gruppe !== 'zuletzt');
+  return befehle.filter((b) => !GRUPPE_NUR_ORDNUNG[b.gruppe]);
 }
 
 /**
@@ -120,11 +164,32 @@ const WORTGRENZE = /[^\p{L}\p{N}]+/u;
 export function praefixStufe(b: Befehl, suche: string): 0 | 1 | 2 | 3 {
   const s = suche.trim().toLocaleLowerCase();
   if (!s) return 3;
-  const label = b.label.toLocaleLowerCase();
-  if (label === s) return 0;
-  if (label.startsWith(s)) return 1;
-  if (label.split(WORTGRENZE).some((w) => w.startsWith(s))) return 2;
+  const ausLabel = textStufe(b.label, s);
+  if (ausLabel < 3) return ausLabel;
   if (b.schlagworte?.some((w) => w.toLocaleLowerCase().startsWith(s))) return 2;
+  return 3;
+}
+
+/**
+ * Dieselbe Stufenrechnung über einen NACKTEN Text (LFH-391 · C1).
+ *
+ * Herausgezogen, weil ein zweiter Aufrufer sie über etwas anderes als ein Befehlslabel
+ * braucht: `datensaetze.ts` stuft einen Texttreffer über das BASISlabel ohne die
+ * Modulherkunft davor. Zwei Kopien dieser vier Zeilen wären zwei Definitionen von
+ * „beginnt damit" — genau die Sorte Drift, die niemandem auffällt, weil beide Seiten
+ * plausibel aussehen.
+ *
+ * Ein Schlagwort erreicht hier bewusst nur Stufe 2 (siehe {@link praefixStufe}) und ist
+ * deshalb NICHT Teil dieser Funktion: es ist Suchhilfe, nicht das, was man liest.
+ */
+export function textStufe(text: string, suche: string): 0 | 1 | 2 | 3 {
+  const s = suche.trim().toLocaleLowerCase();
+  // Ein leerer Begriff darf keine Stufe 1 erzeugen — `''.startsWith` ist immer wahr.
+  if (!s) return 3;
+  const t = text.toLocaleLowerCase();
+  if (t === s) return 0;
+  if (t.startsWith(s)) return 1;
+  if (t.split(WORTGRENZE).some((w) => w.startsWith(s))) return 2;
   return 3;
 }
 
@@ -145,10 +210,13 @@ export function praefixStufe(b: Befehl, suche: string): 0 | 1 | 2 | 3 {
  * Bei LEERER Suche ruft die Produktion diese Funktion NICHT — dort rendert der Gruppenzweig
  * (die Zusicherung dafür hängt am Rendertest in `CommandPalette.test.tsx`, nicht hier: ein
  * `ordneTreffer(t, '')` wäre ein toter Pfad).
+ *
+ * Ein `Treffer.stufe` GEWINNT gegen die Rechnung aus dem Label (LFH-391 · C1) — siehe die
+ * Begründung am Feld.
  */
 export function ordneTreffer(treffer: Treffer[], suche: string): Befehl[] {
   return treffer
-    .map((t, index) => ({ t, index, stufe: praefixStufe(t.befehl, suche) }))
+    .map((t, index) => ({ t, index, stufe: t.stufe ?? praefixStufe(t.befehl, suche) }))
     .sort(
       (a, b) =>
         a.stufe - b.stufe ||

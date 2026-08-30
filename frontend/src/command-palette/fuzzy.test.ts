@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   filtereBefehle, filtereNachModus, modiMitPraefix, ohneOrdnungsdubletten, ordneTreffer, parsePraefix,
-  praefixStufe, type Treffer,
+  praefixStufe, textStufe, UNBEWERTET, type Treffer,
 } from './fuzzy';
 import type { Befehl, PaletteModus } from './typen';
 
@@ -62,6 +62,32 @@ describe('filtereBefehle', () => {
     const score = new Map(treffer.map((t) => [t.befehl.id, t.score]));
     expect(score.get('modul:etb')!).toBeLessThan(score.get('aktion:personen')!);
   });
+
+  /**
+   * WARUM {@link UNBEWERTET} genau 1 ist und keine kleinere Zahl (Review-Befund zu C).
+   *
+   * Ein Datensatz-Treffer ist nie durch Fuse gelaufen und bekommt deshalb den schlechtesten
+   * denkbaren Score, damit er auf gleicher Stufe gegen jeden BEWERTETEN Befehl verliert. Das
+   * trägt nur, wenn kein Fuse-Score ihn erreicht — und der Abstand ist kleiner, als er
+   * aussieht: fuse.js deckelt den Bitap-Score zwar auf `threshold` (0,4), potenziert ihn in
+   * `computeScore` aber mit `weight * norm`, und `norm` ist `1/sqrt(Tokenzahl)`. Bei einem
+   * langen Feld geht der Exponent gegen 0, und `0,4^x` geht damit gegen 1.
+   *
+   * Gemessen an fuse.js 7.5.0: ein Tippfehler auf einem 400-Wort-Label liefert 0,973 — ein
+   * Deckel bei 0,9 hätte den Datensatz vor diesen Befehl gestellt. Strikt unter 1 bleibt es
+   * trotzdem in jedem Fall, weil der Exponent strikt positiv ist.
+   *
+   * Die zwei Hälften gehören zusammen: die untere Schranke widerlegt jeden kleineren Wert,
+   * die obere belegt, dass 1 als Deckel hält. (Mutationsprobe: `UNBEWERTET = 0.9` färbt die
+   * erste rot.)
+   */
+  it('kommt bei langem Label nahe an 1 heran, bleibt aber strikt darunter', () => {
+    const rauschen = Array.from({ length: 400 }, (_, i) => `wort${i}`).join(' ');
+    const treffer = filtereBefehle([b('lang', `${rauschen} etb`)], 'etp');
+    expect(treffer, 'Fuse findet das Label trotz Tippfehler — sonst prüft der Test nichts').toHaveLength(1);
+    expect(treffer[0].score).toBeGreaterThan(0.9);
+    expect(treffer[0].score).toBeLessThan(UNBEWERTET);
+  });
 });
 
 /**
@@ -93,6 +119,24 @@ describe('praefixStufe', () => {
     expect(praefixStufe(lagekarte, 'lagekarte')).toBe(0);
     expect(praefixStufe(lagekarte, 'LAGE')).toBe(1);
     expect(praefixStufe(b('a', 'Neuer ETB-Eintrag', ['Tagebuch']), 'tage')).toBe(2);
+  });
+});
+
+/**
+ * Die Stufenrechnung über einen NACKTEN Text (LFH-391 · C1). `praefixStufe` ist seither ihr
+ * Aufrufer für Label und Schlagworte; ein zweiter Aufrufer sind die Datensatz-Treffer, die
+ * ihre Stufe aus dem Basislabel OHNE Modulherkunft rechnen (siehe `datensaetze.ts`).
+ */
+describe('textStufe', () => {
+  it('unterscheidet dieselben vier Stufen wie praefixStufe', () => {
+    expect(textStufe('Lagekarte', 'lagekarte')).toBe(0);
+    expect(textStufe('Lagekarte', 'lage')).toBe(1);
+    expect(textStufe('R-042 · Müller', 'müller')).toBe(2);
+    expect(textStufe('Personen', 'persanen')).toBe(3);
+  });
+  /** Ein leerer Begriff darf keine Stufe 1 erzeugen — `''.startsWith` ist immer wahr. */
+  it('stuft einen leeren Begriff auf 3', () => {
+    expect(textStufe('Lagekarte', '   ')).toBe(3);
   });
 });
 
@@ -135,6 +179,27 @@ describe('ordneTreffer', () => {
       { befehl: b('zweit', 'ETB', undefined, 'module'), score: 0.1 },
     ];
     expect(ordneTreffer(treffer, 'zzz').map((x) => x.id)).toEqual(['erst', 'zweit']);
+  });
+
+  /**
+   * PAAR zur Regel darunter (LFH-391 · C1): ein Treffer, der NICHT durch Fuse gelaufen ist,
+   * bringt seine Stufe selbst mit — sonst rechnete `ordneTreffer` sie aus einem Label, das
+   * mit der Fundstelle nichts zu tun haben muss (Datensatz-Treffer, ETB-Volltext).
+   */
+  it('respektiert eine mitgelieferte Stufe, statt sie aus dem Label zu rechnen', () => {
+    const treffer: Treffer[] = [
+      { befehl: b('praefix', 'Lagekarte'), score: 0.4 },
+      { befehl: b('vorgabe', 'Völlig anderer Text'), score: 0.4, stufe: 0 },
+    ];
+    expect(ordneTreffer(treffer, 'lage').map((x) => x.id)).toEqual(['vorgabe', 'praefix']);
+  });
+
+  it('rechnet die Stufe weiterhin selbst, wenn keine mitgeliefert ist', () => {
+    const treffer: Treffer[] = [
+      { befehl: b('ohne', 'Völlig anderer Text'), score: 0.4 },
+      { befehl: b('praefix', 'Lagekarte'), score: 0.4 },
+    ];
+    expect(ordneTreffer(treffer, 'lage').map((x) => x.id)).toEqual(['praefix', 'ohne']);
   });
 });
 
@@ -218,6 +283,25 @@ describe('ohneOrdnungsdubletten', () => {
     expect(ohneOrdnungsdubletten(mitZuletzt).map((x) => x.id)).toEqual([
       'modul:lagekarte',
       'modul:lagemeldungen',
+    ]);
+  });
+
+  /**
+   * BEIDE Gedächtnisgruppen fallen bei aktiver Suche weg (LFH-391 · Etappe D), aus demselben
+   * Grund: `ausgefuehrt:nav:profil` ist eine Kopie von `nav:profil` mit gleichem Label,
+   * gleicher Ikone und gleichem Ziel — flach gerendert stünde „Profil, Profil" da, für
+   * Vorlesende zweimal derselbe Name ohne Hinweis, warum. Die Rangfolge leistet bei aktiver
+   * Suche ohnehin, wofür die Gruppe da ist.
+   */
+  it('entfernt auch die Gedächtnisgruppe „ausgefuehrt" samt ihrem Zwilling-Original', () => {
+    const mitGedaechtnis: Befehl[] = [
+      b('ausgefuehrt:nav:profil', 'Profil', undefined, 'ausgefuehrt'),
+      b('nav:profil', 'Profil', undefined, 'navigation'),
+      b('modul:lagekarte', 'Lagekarte', undefined, 'module'),
+    ];
+    expect(ohneOrdnungsdubletten(mitGedaechtnis).map((x) => x.id)).toEqual([
+      'nav:profil',
+      'modul:lagekarte',
     ]);
   });
 

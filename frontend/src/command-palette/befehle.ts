@@ -14,6 +14,7 @@ import {
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
 import type { IconType } from 'react-icons';
+import { GRUPPE_MERKBAR } from './typen';
 import type { Befehl, BefehlKontext, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
@@ -193,7 +194,13 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     //    der Abkürzung, statt in eine gesperrte Seite zu führen.
     //    Eigenes id-Präfix: derselbe Registry-Eintrag steht hier UND unter „Module", und
     //    zwei gleiche `id` machten `aria-activedescendant` mehrdeutig.
+    //    DAS AKTUELLE MODUL FÄLLT HERAUS (LFH-391 · C4): ein Sprung auf die Seite, auf der
+    //    man steht, verkürzt keinen Weg und kostet einen der drei Plätze — dieselbe Regel,
+    //    die `loeseZuletztModule` im Navigationsrahmen seit LFH-337 · H12 fährt. Der
+    //    Kategorie-Ausschluss von dort gilt hier NICHT: die Palette zeigt kein Panel, in dem
+    //    das Nachbarmodul ohnehin zwei Zeilen tiefer stünde.
     for (const key of k.zuletztModulKeys ?? []) {
+      if (key === k.aktuellerModulKey) continue;
       const m = modulRegistry.find((x) => x.key === key);
       if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
@@ -269,7 +276,68 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
   if (k.benutzer?.system_rolle === 'admin') {
     befehle.push({ id: 'nav:benutzer', gruppe: 'navigation', label: 'Benutzerverwaltung', icon: TbUser, ausfuehren: () => k.navigate('/benutzer') });
   }
-  befehle.push({ id: 'nav:abmelden', gruppe: 'navigation', label: 'Abmelden', icon: TbLogout, ausfuehren: () => k.logout() });
+  // `nichtMerkbar`: der einzige Befehl der Palette ohne Rückweg. Merkbar stünde er nach der
+  // ersten Benutzung dauerhaft als erste, VORAUSGEWÄHLTE Zeile der Startansicht — `Strg/⌘+K`
+  // + Enter beendete dann die Sitzung statt den erwarteten Kontextbefehl auszulösen
+  // (Review-Befund zu Etappe D). Die Gruppe `navigation` bleibt merkbar; die Ausnahme ist
+  // dieser Befehl, nicht seine Nachbarschaft.
+  befehle.push({ id: 'nav:abmelden', gruppe: 'navigation', label: 'Abmelden', icon: TbLogout, nichtMerkbar: true, ausfuehren: () => k.logout() });
 
-  return befehle;
+  // 8. Gedächtnis (LFH-391 · Etappe D) — ZULETZT, weil beide Hälften die FERTIGE Liste
+  //    brauchen: die Meldung hängt an jedem merkbaren Befehl, und die Auflösung greift auf
+  //    genau die Befehle zu, die es in dieser Runde wirklich gibt.
+  //    Die Position im ARRAY sagt nichts über die Position in der Palette: die
+  //    Startansicht rendert über `GRUPPEN_REIHENFOLGE`, und dort steht `ausgefuehrt` vorn.
+  return mitGedaechtnis(befehle, k);
+}
+
+/**
+ * Darf dieser Befehl ins Gedächtnis (LFH-391 · Etappe D)? KONJUNKTION aus dem exhaustiven
+ * Gruppenurteil und dem Einzel-Opt-out — beides gilt, keins ersetzt das andere.
+ *
+ * EINE Funktion für BEIDE Seiten, und das ist die Aussage: der Riegel gilt beim Schreiben
+ * (welcher Befehl meldet sich überhaupt) UND beim Lesen (der Serverstand kann von einem
+ * älteren Client stammen, der die Regel noch nicht kannte). Zwei getrennte Ausdrücke wären
+ * zwei Stellen, an denen ein künftiges `nichtMerkbar` vergessen werden kann — und die
+ * Leseseite ist genau die, die den Bestandsschaden aufräumt.
+ */
+function istMerkbar(b: Befehl): boolean {
+  return GRUPPE_MERKBAR[b.gruppe] && !b.nichtMerkbar;
+}
+
+/** Id-Präfix der Gedächtniszeilen. Eigenes Präfix aus demselben Grund wie bei `zuletzt:` —
+ *  dieselbe `id` zweimal im Baum macht `aria-activedescendant` mehrdeutig. */
+const AUSGEFUEHRT_PRAEFIX = 'ausgefuehrt:';
+
+/**
+ * Hängt das Gedächtnis an eine fertige Befehlsliste (LFH-391 · Etappe D). Rein: alles, was
+ * nach aussen wirkt, kommt über `k.merkeBefehl` bzw. `k.zuletztBefehlIds` herein.
+ *
+ * ERST wickeln, DANN klonen — die Reihenfolge ist tragend. Die Gedächtniszeile erbt damit
+ * die Meldung ihres Originals, und weil die Wicklung `b.id` des Originals eingeschlossen
+ * hat, meldet ein Griff ins Gedächtnis `nav:profil` und nicht `ausgefuehrt:nav:profil`.
+ * Andersherum wüchse bei jedem Griff ein weiteres Präfix an, das beim nächsten Aufbau gegen
+ * nichts mehr auflöst: das Gedächtnis vergässe genau die Befehle, die man am häufigsten
+ * benutzt.
+ */
+function mitGedaechtnis(befehle: Befehl[], k: BefehlKontext): Befehl[] {
+  // OHNE Callback bleibt die Liste unangetastet — kein Wrapper, keine neue Identität. Das
+  // ist kein Sonderfall ohne Fall: `useBefehle` wird auch ausserhalb der Palette gerendert,
+  // und die Prop ist wie `merkeModulBesuch` optional.
+  const merkend = k.merkeBefehl
+    ? befehle.map((b) => (istMerkbar(b)
+      ? { ...b, ausfuehren: () => { k.merkeBefehl?.(b.id); b.ausfuehren(); } }
+      : b))
+    : befehle;
+
+  const ausgefuehrt: Befehl[] = [];
+  for (const id of k.zuletztBefehlIds ?? []) {
+    const treffer = merkend.find((b) => b.id === id);
+    // DER RIEGEL GILT AUCH BEIM LESEN, nicht nur beim Schreiben: der Stand kommt vom
+    // Server und kann von einem älteren Client stammen, der `GRUPPE_MERKBAR` noch nicht
+    // kannte. Ohne diese Zeile stünde ein Modul zum DRITTEN Mal in der Liste.
+    if (!treffer || !istMerkbar(treffer)) continue;
+    ausgefuehrt.push({ ...treffer, id: `${AUSGEFUEHRT_PRAEFIX}${treffer.id}`, gruppe: 'ausgefuehrt' });
+  }
+  return ausgefuehrt.length > 0 ? [...merkend, ...ausgefuehrt] : merkend;
 }

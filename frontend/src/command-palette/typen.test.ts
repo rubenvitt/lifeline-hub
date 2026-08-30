@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GRUPPEN_REIHENFOLGE } from './typen';
+import { GRUPPEN_REIHENFOLGE, GRUPPE_MERKBAR, GRUPPE_NUR_ORDNUNG, type BefehlGruppe } from './typen';
 
 /**
  * Was der TYP nicht sehen kann (LFH-391 · A2).
@@ -42,5 +42,41 @@ describe('Palette-Gruppen', () => {
     // Jede doppelte Gruppe wird genau einmal gemeldet, auch bei drei Vorkommen.
     expect(dubletten(['a', 'b', 'a', 'a'])).toEqual(['a']);
     expect(dubletten(['a', 'b', 'c'])).toEqual([]);
+  });
+});
+
+/**
+ * Was die beiden exhaustiven Gruppen-Records nicht selbst behaupten können (LFH-391 · D).
+ *
+ * `tsc` erzwingt, dass JEDE Gruppe in beiden Records eine Zeile hat (TS2741) — nicht aber,
+ * dass die beiden Zeilen zueinander passen.
+ */
+describe('Gedächtnis-Gruppe „ausgefuehrt"', () => {
+  it('steht bei leerer Suche zuoberst', () => {
+    // Die Startansicht rendert AUSSCHLIESSLICH über dieses Tupel; „zuoberst" ist damit
+    // Index 0 und keine Meinung.
+    expect(GRUPPEN_REIHENFOLGE[0]).toBe('ausgefuehrt');
+  });
+
+  /**
+   * Eine Gruppe, die zugleich merkbar UND eine reine Ordnungskopie ist, merkte sich ihre
+   * eigenen Kopien: aus `ausgefuehrt:nav:profil` würde `ausgefuehrt:ausgefuehrt:nav:profil`,
+   * das beim nächsten Aufbau gegen nichts mehr auflöst. Das Gedächtnis vergässe genau die
+   * Befehle, die am häufigsten benutzt werden.
+   */
+  it('ist keine Gruppe zugleich merkbar und Ordnungskopie', () => {
+    const beides = (Object.keys(GRUPPE_MERKBAR) as BefehlGruppe[]).filter(
+      (g) => GRUPPE_MERKBAR[g] && GRUPPE_NUR_ORDNUNG[g],
+    );
+    expect(beides).toEqual([]);
+  });
+
+  /** Die zwei Kopien-Gruppen sind benannt, nicht abgeleitet — sonst wäre die Zeile darüber
+   *  trivial grün, weil beide Records dieselbe Aussage träfen. */
+  it('führt genau die beiden Gedächtnisgruppen als Ordnungskopie', () => {
+    const kopien = (Object.keys(GRUPPE_NUR_ORDNUNG) as BefehlGruppe[]).filter(
+      (g) => GRUPPE_NUR_ORDNUNG[g],
+    );
+    expect(kopien.sort()).toEqual(['ausgefuehrt', 'zuletzt']);
   });
 });

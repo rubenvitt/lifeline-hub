@@ -7,7 +7,7 @@ import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  erstesFreigegebenesModul, kategorien, modulRegistry,
+  erstesFreigegebenesModul, kategorien, modulAusPfad,
   moduleNachKategorie, modulZielRoute, type KategorieKey, type ModulEintrag,
 } from './modulRegistry';
 import EinsatzSwitcher from './EinsatzSwitcher';
@@ -95,9 +95,9 @@ export default function EinsatzLayout() {
 
   // Modul-Segment ist der Pfad-Teil direkt nach der Einsatz-ID
   // (…/einsaetze/:id/<route>/…) — nicht das letzte Segment, sonst verliert das
-  // Menü auf Sub-Routen (Detail, Liste) die Hervorhebung.
-  const aktuellesSegment = pathname.split('/').filter(Boolean)[2];
-  const aktuellesModul = modulRegistry.find((m) => m.route === aktuellesSegment);
+  // Menü auf Sub-Routen (Detail, Liste) die Hervorhebung. Die Zerlegung wohnt seit
+  // LFH-391 · C4 in der Registry: `ModulStub` und die Kommandopalette fragen dasselbe.
+  const aktuellesModul = modulAusPfad(pathname);
   const aktiveKategorie: KategorieKey | null = aktuellesModul?.kategorie ?? null;
 
   const { abBreite } = useViewport();

@@ -5,6 +5,7 @@ pub mod auftrag;
 pub mod auth;
 pub mod backup;
 pub mod befehl;
+pub mod benutzer_einstellungen;
 pub mod bereitstellungsraum;
 pub mod cache_db;
 pub mod chat;

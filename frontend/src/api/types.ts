@@ -26,6 +26,10 @@ export type Einsatzart = S['Einsatzart'];
 export type EinsatzAnzeige = S['EinsatzAnzeige'];
 export type MitgliedAnzeige = S['MitgliedAnzeige'];
 export type StichwortVorschlag = S['StichwortVorschlag'];
+/** Präferenzen des angemeldeten Benutzers (LFH-391 · Etappe D). `eintraege` ist SPARSE —
+ *  ein fehlender Schlüssel heisst „nie geschrieben"; der Wert ist ein opaker Text, dessen
+ *  Form nur der Besitzer des Schlüssels kennt. */
+export type BenutzerEinstellungen = S['BenutzerEinstellungenAnzeige'];
 
 // ============================== Karten-/Anzeige-Defaults ==============================
 export type BasemapModus = S['BasemapModus'];

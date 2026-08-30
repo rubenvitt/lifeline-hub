@@ -108,3 +108,20 @@ export function useAuth(): AuthWert {
   if (!wert) throw new Error('useAuth muss innerhalb von <AuthProvider> verwendet werden');
   return wert;
 }
+
+/**
+ * Wie {@link useAuth}, aber ohne Provider `null` statt einer Ausnahme (LFH-391 · Etappe D).
+ *
+ * Für querschnittliche Rahmen, die bewusst OHNE App-Provider gerendert werden dürfen —
+ * dieselbe Nachsicht, die `useTastaturEbene` gegenüber dem Paletten-Context übt. Der
+ * konkrete Anlass ist gemessen: `CommandPaletteProvider` fragt seit dem Befehls-Gedächtnis
+ * nach dem angemeldeten Benutzer, und mindestens eine Bestands-Testfläche
+ * (`pages/UnfallhilfsstellenPage.test.tsx`, Drawer-Escape) mountet ihn ohne `AuthProvider`.
+ *
+ * NICHT als bequemere Variante von `useAuth` gedacht: wer den Benutzer BRAUCHT, soll die
+ * Ausnahme bekommen. Diese hier ist für Stellen, an denen „kein Provider" eine zulässige
+ * Betriebsart ist und still zu „nicht angemeldet" führt.
+ */
+export function useAuthOptional(): AuthWert | null {
+  return useContext(AuthContext);
+}

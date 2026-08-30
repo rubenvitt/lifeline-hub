@@ -54,3 +54,41 @@ describe('CommandPalette · Bedienziel-Boden in beiden Zweigen', () => {
     });
   });
 });
+
+/**
+ * Die dritte Zeilensorte (LFH-391 · C3): ein Datensatz-Treffer.
+ *
+ * Er entsteht in `baueDatensatzTreffer` und kommt als `Treffer` herein statt als `Befehl` —
+ * genau die Stelle, an der ein eigener Renderzweig naheläge (zweizeilige Treffer, eigene
+ * Beschriftungsform). Er läuft deshalb ausdrücklich durch DIESELBE `role="option"`-Schleife;
+ * ein eigener Zweig verlöre den Bedienziel-Boden still, und `dichte.guard.test.ts` sieht ein
+ * Pixel-Padding strukturell nicht.
+ */
+describe('CommandPalette · Bedienziel-Boden der Datensatz-Zeile', () => {
+  it('nimmt denselben Zeilenstil für einen Datensatz-Treffer', async () => {
+    const u = userEvent.setup();
+    renderMitProviders(
+      <CommandPalette
+        befehle={[]}
+        datensatzTreffer={[{
+          befehl: {
+            id: 'datensatz:personen:7',
+            gruppe: 'datensaetze',
+            label: 'Personen · R-042 · Müller',
+            ausfuehren: () => {},
+          },
+          score: 0,
+          stufe: 0,
+        }]}
+        schliesse={() => {}}
+      />,
+    );
+
+    await u.type(screen.getByRole('combobox'), '42');
+
+    expect(screen.getByRole('option', { name: 'Personen · R-042 · Müller' })).toHaveStyle({
+      minHeight: '4242px',
+      padding: '1px 2px',
+    });
+  });
+});

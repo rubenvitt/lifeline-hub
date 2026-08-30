@@ -104,6 +104,14 @@ pub fn build_router(state: AppState) -> Router {
             "/api/benutzer/{id}/totp/reset",
             post(routes::benutzer::totp_reset),
         )
+        .route(
+            "/api/benutzer-einstellungen",
+            get(routes::benutzer_einstellungen::lesen),
+        )
+        .route(
+            "/api/benutzer-einstellungen/{schluessel}",
+            put(routes::benutzer_einstellungen::setzen),
+        )
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))

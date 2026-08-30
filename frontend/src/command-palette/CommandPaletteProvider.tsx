@@ -1,10 +1,15 @@
 // frontend/src/command-palette/CommandPaletteProvider.tsx
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { useBefehle } from './useBefehle';
+import { useDatensatzTreffer } from './useDatensaetze';
+import { useZuletztBefehle, type BefehlsGedaechtnis } from './useZuletztBefehle';
+import { einsatzIdAusPfad } from './einsatzPfad';
+import { modulAusPfad } from '../einsatz/modulRegistry';
 import { CommandPalette } from './CommandPalette';
 import { tastaturAktionFuerEreignis } from './befehle';
-import type { TastaturAktionen } from './typen';
+import type { PaletteModus, TastaturAktionen } from './typen';
 
 interface TastaturEbene {
   id: symbol;
@@ -117,6 +122,14 @@ function flachsteEbene(ebenen: Map<symbol, TastaturEbene>): TastaturEbene[] {
 
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [offen, setOffen] = useState(false);
+  /**
+   * Das Befehls-Gedächtnis hängt HIER und nicht in `PaletteHost` (LFH-391 · Etappe D) —
+   * beide Hälften brauchen einen Träger, der die Palette überlebt bzw. ihr vorausgeht.
+   * Die Herleitung steht an `useZuletztBefehle`; hier steht nur die Folge: der Provider
+   * ist app-weit montiert, also ist der Stand beim ersten `Strg/⌘+K` in aller Regel schon
+   * da, und der Schreib-Callback funktioniert noch, wenn die Palette längst abgehängt ist.
+   */
+  const gedaechtnis = useZuletztBefehle();
   const ebenenRef = useRef(new Map<symbol, TastaturEbene>());
   // Ketten statt einzelner Ebenen (LFH-391 · B): eine Werkzeugleiste kennt „Filter
   // zurücksetzen", die Seite darüber „Neue Zeile" — mit genau EINER aktiven Ebene
@@ -274,21 +287,98 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   return (
     <PaletteContext.Provider value={wert}>
       {children}
-      {offen && <PaletteHost schliesse={schliesse} tastaturAktionen={aktiveAktionen} />}
+      {offen && (
+        <PaletteHost
+          schliesse={schliesse}
+          tastaturAktionen={aktiveAktionen}
+          gedaechtnis={gedaechtnis}
+        />
+      )}
     </PaletteContext.Provider>
   );
 }
 
-/** Lädt die Befehle erst beim Öffnen (Query läuft nicht im Leerlauf). */
+/**
+ * Lädt die Befehle erst beim Öffnen (Query läuft nicht im Leerlauf) — und seit LFH-391 · C3
+ * auch die Datensätze.
+ *
+ * ZWEI HOOKS, nicht ein erweitertes `useBefehle`, und der Grund ist gemessen: `useBefehle`
+ * memoisiert über elf Dependencies; eine tastenabhängige Quelle dort baute die ganze
+ * Befehlsliste bei jedem Anschlag neu. Der Datensatz-Weg hängt dagegen ausschliesslich am
+ * ENTPRELLTEN Stand, den die Palette selbst meldet.
+ */
 function PaletteHost({
   schliesse,
   tastaturAktionen,
+  gedaechtnis,
 }: {
   schliesse: () => void;
   tastaturAktionen: TastaturAktionen;
+  gedaechtnis: BefehlsGedaechtnis;
 }) {
-  const befehle = useBefehle(tastaturAktionen);
-  return <CommandPalette befehle={befehle} schliesse={schliesse} />;
+  /**
+   * EIN STANDBILD beim Öffnen (LFH-391 · Etappe D). `useState` liest den Initialwert genau
+   * einmal — der Stand, den die Palette beim Öffnen vorfindet, gilt für ihre ganze Öffnung.
+   *
+   * Ohne das könnte die Antwort des Servers mitten in der offenen Palette eintreffen und die
+   * OBERSTE Gruppe entstehen lassen: jede Zeile darunter rückte nach unten, während der
+   * Finger schon unterwegs ist. Das ist derselbe Vertrag, aus dem die Auswahl an der
+   * Befehls-ID statt am Index hängt („Live-Updates springen nicht unter dem Cursor",
+   * WCAG 3.2.5) — und derselbe, aus dem die Startansicht kuratiert ist und keine
+   * nachrückende Datenhalde (LFH-337 · M11).
+   *
+   * `PaletteHost` wird beim Schliessen abgehängt (`{offen && …}`), das Standbild gilt also
+   * je Öffnung neu. Der SCHREIBweg ist bewusst NICHT eingefroren: er liest den Stand aus dem
+   * QueryClient, damit zwei Ausführungen hintereinander sich nicht gegenseitig überschreiben.
+   *
+   * DER PREIS IST GEMESSEN und angenommen: wer die Palette öffnet, BEVOR der erste Abruf
+   * zurück ist, sieht das Gedächtnis erst beim nächsten Öffnen — im Betrieb liegen zwischen
+   * App-Start und dem ersten `Strg/⌘+K` Sekunden, im Playwright-Lauf Millisekunden, weshalb
+   * `e2e/palette-gedaechtnis.spec.ts` ausdrücklich auf die Antwort wartet. Der Tausch ist
+   * die Vorgabe des Tickets („erst ab Antwort rendern"): eine Gruppe, die ZUOBERST
+   * nachklappt, verschiebt jede Zeile darunter, und das trifft jeden Griff, nicht nur den
+   * allerersten nach dem Laden.
+   */
+  const [zuletztBefehlIds] = useState(gedaechtnis.ids);
+  const gefroren = useMemo(
+    () => ({ ids: zuletztBefehlIds, merke: gedaechtnis.merke }),
+    [zuletztBefehlIds, gedaechtnis.merke],
+  );
+  const befehle = useBefehle(tastaturAktionen, gefroren);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const einsatzId = einsatzIdAusPfad(pathname);
+  const [stand, setStand] = useState<{ modus: PaletteModus; rest: string }>({ modus: 'alles', rest: '' });
+
+  // Identitätsstabil, weil beide in `useMemo`-Dependencies der Hooks darunter stehen: ein
+  // je Render frisch gebautes Paar machte deren Memoisierung wirkungslos.
+  const gehZu = useCallback((pfad: string) => { navigate(pfad); }, [navigate]);
+  const melde = useCallback((modus: PaletteModus, rest: string) => {
+    // Gleicher Stand → gleiches Objekt: die Frist läuft auch beim blossen Öffnen einmal ab
+    // und meldete sonst je Palettenöffnung ein neues, inhaltsgleiches Objekt.
+    setStand((v) => (v.modus === modus && v.rest === rest ? v : { modus, rest }));
+  }, []);
+
+  const datensatzTreffer = useDatensatzTreffer({
+    einsatzId,
+    modus: stand.modus,
+    suche: stand.rest,
+    // Die AKTUELLE ROUTE als Modulschlüssel (LFH-391 · C4, Arbeitspunkt 3): wer im
+    // Kräfte-Modul einen Funkrufnamen tippt, meint das Fahrzeug und nicht die gleichnamige
+    // Person. Die Zerlegung kommt aus der Registry, nicht von Hand — sie stand im Bestand
+    // schon zweimal (`EinsatzLayout`, `ModulStub`).
+    aktuellerModulKey: modulAusPfad(pathname)?.key ?? null,
+    navigate: gehZu,
+  });
+
+  return (
+    <CommandPalette
+      befehle={befehle}
+      datensatzTreffer={datensatzTreffer}
+      onSucheEntprellt={melde}
+      schliesse={schliesse}
+    />
+  );
 }
 
 export function useCommandPalette(): PaletteWert {
