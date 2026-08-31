@@ -342,6 +342,9 @@ export default function TierePage() {
           </Space>
         )
       }
+      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
+      // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber.
+      neueZeile={darfSchreiben ? () => setModus({ einsatzId, wert: 'schnell' }) : undefined}
       hinweis={
         !darfSchreiben && einsatz.status !== 'aktiv' && (
           <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />

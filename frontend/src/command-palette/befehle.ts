@@ -1,7 +1,7 @@
 // frontend/src/command-palette/befehle.ts
 import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDesktop, TbWorld, TbArrowsMinimize, TbArrowsMaximize, TbHandStop } from 'react-icons/tb';
 import {
-  modulRegistry, istModulFreigegeben, istModulSichtbar, istModulGesperrt, modulZielRoute,
+  modulRegistry, istModulFreigegeben, modulZielRoute,
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
@@ -14,6 +14,7 @@ import {
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
 import type { IconType } from 'react-icons';
+import { GRUPPE_MERKBAR } from './typen';
 import type { Befehl, BefehlKontext, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
@@ -29,8 +30,20 @@ import type { Koordinatenformat } from '../api/types';
  * Schnellaktion lief damit ins Leere. Ein Routenstück nur für diese eine Zeile
  * auszunehmen hätte zwei Wahrheiten für dieselbe Sache stehen lassen; deshalb tragen
  * alle vier Zeilen den Builder.
+ *
+ * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT und bewusst NICHT die Registry-Reihenfolge
+ * (LFH-391 · A1). Die Registry ordnet nach Kategorie — das ist die NAVIGATIONS-Rangfolge,
+ * gelesen von `erstesFreigegebenesModul`/`moduleNachKategorie`, und sie stellte `etb` vor
+ * `personen`. Beide Ordnungen an dieselbe Liste zu binden machte aus einer Umsortierung der
+ * Navigation still eine Umsortierung der Palette. Wer hier „aufräumt", färbt den `toEqual`-Pin
+ * in `befehle.test.ts` rot, ohne dass fachlich etwas kaputt wäre — der Pin ist Absicht.
+ *
+ * EXPORTIERT für `schnellaktionen.guard.test.ts`: der prüft je Zeile Trägermodul, Ziel und
+ * die Deckung gegen die Seiten, die `?neu=1` wirklich lesen. Die Tabelle bleibt bewusst HIER
+ * und wandert nicht in die `modulRegistry` — die ist heute frei von Router-/Deeplink-Bezügen,
+ * ein `pfad`-Closure zöge `routing/deeplinks.ts` in jeden Test, der sie anfasst.
  */
-const SCHNELLAKTIONEN: { modulKey: string; pfad: (einsatzId: number) => string; label: string; schlagworte: string[] }[] = [
+export const SCHNELLAKTIONEN: { modulKey: string; pfad: (einsatzId: number) => string; label: string; schlagworte: string[] }[] = [
   { modulKey: 'personen', pfad: (id) => personenPfad(id, { neu: true }), label: 'Neue Person erfassen', schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'] },
   { modulKey: 'etb', pfad: (id) => etbPfad(id, { neu: true }), label: 'Neuer ETB-Eintrag', schlagworte: ['tagebuch', 'meldung', 'eintrag'] },
   { modulKey: 'unfallhilfsstellen', pfad: (id) => unfallhilfsstellenListePfad(id, { neu: true }), label: 'Neue Unfallhilfsstelle', schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'] },
@@ -71,14 +84,62 @@ interface TastaturEreignis {
   altKey?: boolean;
 }
 
-const TASTATUR_AKTIONEN: {
-  id: TastaturAktionId;
+interface TastaturAktionDefinition {
   label: string;
   schlagworte: string[];
-}[] = [
-  { id: 'speichern', label: 'Speichern', schlagworte: ['sichern', 'formular', 'submit'] },
-  { id: 'verwerfen', label: 'Verwerfen', schlagworte: ['abbrechen', 'schließen', 'escape'] },
-  { id: 'filter-zuruecksetzen', label: 'Filter zurücksetzen', schlagworte: ['suche', 'leeren', 'reset'] },
+  /** Sichtbares Kürzel je Plattform — `null`, wo es keinen Tastenweg gibt. */
+  kuerzel: (mac: boolean) => string | null;
+}
+
+/**
+ * EIN exhaustives Verzeichnis je Aktion (LFH-391 · B3) statt des früheren Arrays.
+ *
+ * Der Wechsel schließt einen stillen Anzeigefehler: ein Array kann keine Vollständigkeit
+ * behaupten, eine neue `TastaturAktionId` ohne Zeile erschien schlicht NIE in der Palette
+ * — ohne Typfehler und ohne roten Test. Das Record bricht dafür den Typcheck (TS2741).
+ * Das Kürzel liegt am selben Eintrag, weil der zweite stille Fehler genau dort saß:
+ * `kuerzelFuerTastaturAktion` fiel für jede unbekannte Id auf „Strg + Rücktaste" durch und
+ * beschriftete damit eine ungebundene Aktion mit dem Kürzel des Filter-Zurücksetzens.
+ */
+export const TASTATUR_AKTIONEN: Record<TastaturAktionId, TastaturAktionDefinition> = {
+  speichern: {
+    label: 'Speichern',
+    schlagworte: ['sichern', 'formular', 'submit'],
+    kuerzel: (mac) => (mac ? '⌘ S / ⌘ ↵' : 'Strg + S / Strg + ↵'),
+  },
+  verwerfen: {
+    label: 'Verwerfen',
+    schlagworte: ['abbrechen', 'schließen', 'escape'],
+    kuerzel: () => 'Esc',
+  },
+  'filter-zuruecksetzen': {
+    label: 'Filter zurücksetzen',
+    schlagworte: ['suche', 'leeren', 'reset'],
+    kuerzel: (mac) => (mac ? '⌘ ⌫' : 'Strg + Rücktaste'),
+  },
+  'neue-zeile': {
+    label: 'Neue Zeile',
+    schlagworte: ['anlegen', 'erfassen', 'neu', 'hinzufügen'],
+    kuerzel: () => null,
+  },
+  spalten: {
+    label: 'Spalten',
+    schlagworte: ['spalten', 'ausblenden', 'einblenden', 'tabelle', 'ansicht'],
+    kuerzel: () => null,
+  },
+};
+
+/**
+ * Die Reihenfolge der Gruppe „Aktionen" in der Palette. Sie steht getrennt, weil ein
+ * Record keine vertragliche Ordnung hat — vorher trug sie die Einfügereihenfolge des
+ * Arrays. Dass sie jede Id genau einmal führt, prüft der Guard in `befehle.test.ts`; das
+ * ist die einzige Hälfte dieses Vertrags, die von Hand gepflegt wird.
+ *
+ * Die drei Aktionen mit Tastenweg bleiben vorn: sie sind die Antwort auf „was kann ich
+ * hier gerade tun", und ihre Reihenfolge ist von `befehle.test.ts` gepinnt.
+ */
+export const TASTATUR_AKTION_REIHENFOLGE: readonly TastaturAktionId[] = [
+  'speichern', 'verwerfen', 'filter-zuruecksetzen', 'neue-zeile', 'spalten',
 ];
 
 /** Reine Auflösung der globalen Mutationskürzel. Bereits behandelte und wiederholte
@@ -93,28 +154,34 @@ export function tastaturAktionFuerEreignis(e: TastaturEreignis): TastaturAktionI
   return null;
 }
 
-/** Sichtbarer Gegenpart zur Ereignisauflösung; der User-Agent ist absichtlich ein
- * Parameter, damit beide Plattformzweige ohne Manipulation globaler Browserwerte testbar sind. */
-export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: string): string {
+/**
+ * Sichtbarer Gegenpart zur Ereignisauflösung; der User-Agent ist absichtlich ein
+ * Parameter, damit beide Plattformzweige ohne Manipulation globaler Browserwerte testbar
+ * sind. `null` heißt „diese Aktion hat keinen Tastenweg" — der frühere Rest-Zweig, der
+ * jede unbekannte Id mit dem Filter-Kürzel beschriftete, ist ersatzlos entfallen.
+ */
+export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: string): string | null {
   const mac = /Mac|iPhone|iPad|iPod/.test(userAgent);
-  if (id === 'verwerfen') return 'Esc';
-  if (id === 'speichern') return mac ? '⌘ S / ⌘ ↵' : 'Strg + S / Strg + ↵';
-  return mac ? '⌘ ⌫' : 'Strg + Rücktaste';
+  return TASTATUR_AKTIONEN[id].kuerzel(mac);
 }
 
 export function baueBefehle(k: BefehlKontext): Befehl[] {
   const befehle: Befehl[] = [];
 
   // 1. Aktionen — die kontextabhängigen Tastatur-Aktionen der gerade aktiven Maske
-  for (const definition of TASTATUR_AKTIONEN) {
-    const ausfuehren = k.tastaturAktionen?.[definition.id];
+  for (const id of TASTATUR_AKTION_REIHENFOLGE) {
+    const ausfuehren = k.tastaturAktionen?.[id];
     if (!ausfuehren) continue;
+    const definition = TASTATUR_AKTIONEN[id];
+    const kuerzel = kuerzelFuerTastaturAktion(id, k.userAgent ?? '');
     befehle.push({
-      id: `tastatur:${definition.id}`,
+      id: `tastatur:${id}`,
       gruppe: 'aktionen',
       label: definition.label,
       schlagworte: definition.schlagworte,
-      kuerzel: kuerzelFuerTastaturAktion(definition.id, k.userAgent ?? ''),
+      // Der Schlüssel FEHLT bei Aktionen ohne Tastenweg, statt auf `undefined` zu stehen:
+      // `Befehl.kuerzel` ist optional, und die Palette rendert die Marke am truthy-Zweig.
+      ...(kuerzel ? { kuerzel } : {}),
       ausfuehren,
     });
   }
@@ -127,7 +194,13 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     //    der Abkürzung, statt in eine gesperrte Seite zu führen.
     //    Eigenes id-Präfix: derselbe Registry-Eintrag steht hier UND unter „Module", und
     //    zwei gleiche `id` machten `aria-activedescendant` mehrdeutig.
+    //    DAS AKTUELLE MODUL FÄLLT HERAUS (LFH-391 · C4): ein Sprung auf die Seite, auf der
+    //    man steht, verkürzt keinen Weg und kostet einen der drei Plätze — dieselbe Regel,
+    //    die `loeseZuletztModule` im Navigationsrahmen seit LFH-337 · H12 fährt. Der
+    //    Kategorie-Ausschluss von dort gilt hier NICHT: die Palette zeigt kein Panel, in dem
+    //    das Nachbarmodul ohnehin zwei Zeilen tiefer stünde.
     for (const key of k.zuletztModulKeys ?? []) {
+      if (key === k.aktuellerModulKey) continue;
       const m = modulRegistry.find((x) => x.key === key);
       if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
@@ -149,10 +222,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     }
 
     // 4. Schnellaktionen — nur wenn der User schreiben darf (kein Beobachter, aktiver Einsatz)
+    //    Der Modulfilter ist die LESEACHSE `istModulFreigegeben` (LFH-391 · A1b), dieselbe
+    //    Funktion wie in 2. und 3. — vorher stand hier die zweiteilige Fassung ohne
+    //    `status === 'fertig'`, und eine Schnellaktion konnte auf ein unfertiges Modul zeigen,
+    //    dessen Navigationseintrag daneben gar nicht existiert.
     if (k.darfSchreibenImEinsatz) {
       for (const a of SCHNELLAKTIONEN) {
         const m = modulRegistry.find((x) => x.key === a.modulKey);
-        if (!m || !istModulSichtbar(m, k.overrides) || istModulGesperrt(m, k.benutzer, k.overrides)) continue;
+        if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
         const ziel = a.pfad(k.einsatzId);
         befehle.push({
           id: `aktion:${a.modulKey}`, gruppe: 'schnellaktionen', label: a.label,
@@ -199,7 +276,68 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
   if (k.benutzer?.system_rolle === 'admin') {
     befehle.push({ id: 'nav:benutzer', gruppe: 'navigation', label: 'Benutzerverwaltung', icon: TbUser, ausfuehren: () => k.navigate('/benutzer') });
   }
-  befehle.push({ id: 'nav:abmelden', gruppe: 'navigation', label: 'Abmelden', icon: TbLogout, ausfuehren: () => k.logout() });
+  // `nichtMerkbar`: der einzige Befehl der Palette ohne Rückweg. Merkbar stünde er nach der
+  // ersten Benutzung dauerhaft als erste, VORAUSGEWÄHLTE Zeile der Startansicht — `Strg/⌘+K`
+  // + Enter beendete dann die Sitzung statt den erwarteten Kontextbefehl auszulösen
+  // (Review-Befund zu Etappe D). Die Gruppe `navigation` bleibt merkbar; die Ausnahme ist
+  // dieser Befehl, nicht seine Nachbarschaft.
+  befehle.push({ id: 'nav:abmelden', gruppe: 'navigation', label: 'Abmelden', icon: TbLogout, nichtMerkbar: true, ausfuehren: () => k.logout() });
 
-  return befehle;
+  // 8. Gedächtnis (LFH-391 · Etappe D) — ZULETZT, weil beide Hälften die FERTIGE Liste
+  //    brauchen: die Meldung hängt an jedem merkbaren Befehl, und die Auflösung greift auf
+  //    genau die Befehle zu, die es in dieser Runde wirklich gibt.
+  //    Die Position im ARRAY sagt nichts über die Position in der Palette: die
+  //    Startansicht rendert über `GRUPPEN_REIHENFOLGE`, und dort steht `ausgefuehrt` vorn.
+  return mitGedaechtnis(befehle, k);
+}
+
+/**
+ * Darf dieser Befehl ins Gedächtnis (LFH-391 · Etappe D)? KONJUNKTION aus dem exhaustiven
+ * Gruppenurteil und dem Einzel-Opt-out — beides gilt, keins ersetzt das andere.
+ *
+ * EINE Funktion für BEIDE Seiten, und das ist die Aussage: der Riegel gilt beim Schreiben
+ * (welcher Befehl meldet sich überhaupt) UND beim Lesen (der Serverstand kann von einem
+ * älteren Client stammen, der die Regel noch nicht kannte). Zwei getrennte Ausdrücke wären
+ * zwei Stellen, an denen ein künftiges `nichtMerkbar` vergessen werden kann — und die
+ * Leseseite ist genau die, die den Bestandsschaden aufräumt.
+ */
+function istMerkbar(b: Befehl): boolean {
+  return GRUPPE_MERKBAR[b.gruppe] && !b.nichtMerkbar;
+}
+
+/** Id-Präfix der Gedächtniszeilen. Eigenes Präfix aus demselben Grund wie bei `zuletzt:` —
+ *  dieselbe `id` zweimal im Baum macht `aria-activedescendant` mehrdeutig. */
+const AUSGEFUEHRT_PRAEFIX = 'ausgefuehrt:';
+
+/**
+ * Hängt das Gedächtnis an eine fertige Befehlsliste (LFH-391 · Etappe D). Rein: alles, was
+ * nach aussen wirkt, kommt über `k.merkeBefehl` bzw. `k.zuletztBefehlIds` herein.
+ *
+ * ERST wickeln, DANN klonen — die Reihenfolge ist tragend. Die Gedächtniszeile erbt damit
+ * die Meldung ihres Originals, und weil die Wicklung `b.id` des Originals eingeschlossen
+ * hat, meldet ein Griff ins Gedächtnis `nav:profil` und nicht `ausgefuehrt:nav:profil`.
+ * Andersherum wüchse bei jedem Griff ein weiteres Präfix an, das beim nächsten Aufbau gegen
+ * nichts mehr auflöst: das Gedächtnis vergässe genau die Befehle, die man am häufigsten
+ * benutzt.
+ */
+function mitGedaechtnis(befehle: Befehl[], k: BefehlKontext): Befehl[] {
+  // OHNE Callback bleibt die Liste unangetastet — kein Wrapper, keine neue Identität. Das
+  // ist kein Sonderfall ohne Fall: `useBefehle` wird auch ausserhalb der Palette gerendert,
+  // und die Prop ist wie `merkeModulBesuch` optional.
+  const merkend = k.merkeBefehl
+    ? befehle.map((b) => (istMerkbar(b)
+      ? { ...b, ausfuehren: () => { k.merkeBefehl?.(b.id); b.ausfuehren(); } }
+      : b))
+    : befehle;
+
+  const ausgefuehrt: Befehl[] = [];
+  for (const id of k.zuletztBefehlIds ?? []) {
+    const treffer = merkend.find((b) => b.id === id);
+    // DER RIEGEL GILT AUCH BEIM LESEN, nicht nur beim Schreiben: der Stand kommt vom
+    // Server und kann von einem älteren Client stammen, der `GRUPPE_MERKBAR` noch nicht
+    // kannte. Ohne diese Zeile stünde ein Modul zum DRITTEN Mal in der Liste.
+    if (!treffer || !istMerkbar(treffer)) continue;
+    ausgefuehrt.push({ ...treffer, id: `${AUSGEFUEHRT_PRAEFIX}${treffer.id}`, gruppe: 'ausgefuehrt' });
+  }
+  return ausgefuehrt.length > 0 ? [...merkend, ...ausgefuehrt] : merkend;
 }

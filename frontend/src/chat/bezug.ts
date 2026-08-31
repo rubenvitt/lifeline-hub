@@ -35,7 +35,12 @@ export const BEZUG_TYP_OPTIONEN: { value: BezugTyp; label: string }[] = (
   Object.keys(BEZUG_TYP_LABEL) as BezugTyp[]
 ).map((value) => ({ value, label: BEZUG_TYP_LABEL[value] }));
 
-function kuerze(s: string, max = 60): string {
+/**
+ * Kürzungsgrenze für Freitext in einer Zeile. EXPORTIERT für `command-palette/datensaetze.ts`
+ * (LFH-391 · C1): dessen ETB-Label kürzt denselben Sorte Freitext wie `auftragLabel`. Kopiert
+ * wären es zwei Zahlen, und die zweite zöge beim nächsten Anfassen nicht mit.
+ */
+export function kuerze(s: string, max = 60): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 

@@ -98,6 +98,51 @@ export function modulZielRoute(modul: ModulEintrag): string {
 }
 
 /**
+ * Die Umkehrung von {@link ModulEintrag.route} — Registry-Eintrag zu einem Routen-Segment
+ * (LFH-391 · C4).
+ *
+ * Sie stand vorher ZWEIMAL wörtlich im Bestand: `EinsatzLayout` leitet daraus die
+ * Hervorhebung in Rail und Panel ab, `ModulStub` die Beschriftung seines Rückwegs. Der
+ * Modulschlüssel der Kommandopalette (Rangvorteil des Moduls, in dem man steht) wäre die
+ * dritte Kopie geworden — gehoben, bevor sie entsteht.
+ *
+ * Gesucht wird über `route`, NICHT über `key`: die beiden fallen nicht überall zusammen
+ * ('gefahren' ist der Bestandsfall). Und nicht über {@link modulZielRoute} — ein
+ * `verweistAuf`-Eintrag zeigt auf die Route eines ANDEREN Moduls, ihn hier mitzumatchen
+ * lieferte zwei Einträge für dieselbe Adresse. Heute nutzt kein Eintrag das Feld; die
+ * Entscheidung fällt damit, bevor sie beobachtbar wird.
+ */
+export function modulZuRoute(
+  route: string | null | undefined,
+  register: ModulEintrag[] = modulRegistry,
+): ModulEintrag | null {
+  if (!route) return null;
+  return register.find((m) => m.route === route) ?? null;
+}
+
+/**
+ * Das Modul, in dem ein Pfad liegt — `/einsaetze/:id/<route>/…`, sonst `null`.
+ *
+ * Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre jede Sub-Route (Liste,
+ * Detail) ihr Modul, und die Navigation ihre Hervorhebung.
+ *
+ * Der Bezug zum Router ist eine Zeichenketten-Zerlegung, kein Import — die Registry bleibt
+ * damit frei von `routing/deeplinks.ts` (siehe die Begründung an `SCHNELLAKTIONEN` in
+ * `command-palette/befehle.ts`). Das Geschwister für die ID ist
+ * `command-palette/einsatzPfad.ts`; es bleibt dort, weil ausser der Palette niemand sie aus
+ * dem Pfad zieht — jede andere Stelle hat `useParams`.
+ */
+export function modulAusPfad(
+  pathname: string,
+  register: ModulEintrag[] = modulRegistry,
+): ModulEintrag | null {
+  const teile = pathname.split('/').filter(Boolean); // z. B. ['einsaetze','5','etb']
+  // Der Präfix wird mitgeprüft: sonst gälte `/admin/stammdaten/personal` als Modul „Personal".
+  if (teile[0] !== 'einsaetze') return null;
+  return modulZuRoute(teile[2], register);
+}
+
+/**
  * Module, die nicht ausgeblendet werden dürfen (Spiegel des Backends
  * `src/einsatz/modul.rs::NICHT_AUSBLENDBAR`): Stammdaten + Einstellungen selbst.
  */
@@ -148,6 +193,12 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * viermal wörtlich da: in `erstesFreigegebenesModul` hier, in der „Zuletzt"-Ableitung des
  * Rahmens und zweimal in `command-palette/befehle.ts`. Vier Kopien einer Bedingung driften
  * genau an der Stelle auseinander, die niemand testet.
+ *
+ * SEIT LFH-391 · A1b sind es DREI Stellen in `command-palette/befehle.ts`: der
+ * Schnellaktions-Filter führte als einziger noch die ZWEITEILIGE Fassung ohne
+ * `status === 'fertig'` — genau die vorhergesagte Drift, nur in der anderen Richtung. Sie
+ * war im Bestand unbeobachtbar (alle vier Trägermodule sind `fertig`) und ist über einen
+ * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
  *
  * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerLaden`) führt die
  * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle vier

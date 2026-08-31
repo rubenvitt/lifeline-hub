@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import Platzhalter, { type PlatzhalterRueckweg } from '../components/Platzhalter';
-import { aufloeseStandardModul, modulRegistry, type ModulEintrag } from './modulRegistry';
+import { aufloeseStandardModul, modulZuRoute, type ModulEintrag } from './modulRegistry';
 import { ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
@@ -10,7 +10,7 @@ import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
  *  nichtssagenden „Zurück". Fällt die Route aus der Registry heraus, bleibt der
  *  generische Text (der Pfad selbst ist von `aufloeseStandardModul` gedeckt). */
 function rueckwegLabel(zielRoute: string): string {
-  const ziel = modulRegistry.find((m) => m.route === zielRoute);
+  const ziel = modulZuRoute(zielRoute);
   return ziel ? `${ziel.label} öffnen` : 'Standardmodul öffnen';
 }
 

@@ -256,6 +256,18 @@ export interface components {
             totp_aktiviert: boolean;
         };
         /**
+         * @description Alle Präferenzen eines Benutzers. `eintraege` ist sparse — nur gesetzte Schlüssel
+         *     stehen darin, eine leere Map heißt „nichts gespeichert".
+         */
+        BenutzerEinstellungenAnzeige: {
+            /** @description Schlüssel → opaker Wert. */
+            eintraege: {
+                [key: string]: string;
+            };
+            /** @description Zeitpunkt der jüngsten Änderung; fehlt, solange nichts gespeichert ist. */
+            geaendert_at?: string | null;
+        };
+        /**
          * @description Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `betriebsart` (per-Variante, Großbuchstaben — `rename_all` trifft nicht).
          * @enum {string}

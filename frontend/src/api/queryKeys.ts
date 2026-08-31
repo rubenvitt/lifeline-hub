@@ -283,7 +283,7 @@ export const einsatzKeys = {
 /**
  * Query-Key-Prefixe für alles, was NICHT unter einer `einsatzId` hängt.
  *
- * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 22 Prefixe sind gar nicht
+ * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 23 Prefixe sind gar nicht
  * mandantenbezogen — `admin-karte` und `karte-config` sind instanzweit (eine Kartenkonfiguration
  * pro Installation), `fachebene` bezeichnet externe Fremdquellen (NINA/DWD/PEGELONLINE/KRITIS).
  * `ORG_KEYS` wäre dort ein Fehlname, und ein Fehlname in einer Registry, die genau deshalb
@@ -306,6 +306,8 @@ export const GLOBAL_KEYS = {
   orgEinstellungen: 'org-einstellungen',
   orgModulEinstellungen: 'org-modul-einstellungen',
   authProvider: 'auth-provider',
+  // Präferenzen des ANGEMELDETEN Benutzers (LFH-391 · Etappe D).
+  benutzerEinstellungen: 'benutzer-einstellungen',
 
   // Stammdaten-Kataloge
   personal: 'personal',
@@ -393,6 +395,34 @@ export const globalKeys = {
   // sprechgruppen kennt im Bestand nur den Filterwert 'alle' und KEIN bare-Invalidate —
   // deshalb bewusst nur dieser eine Accessor (siehe queryKeys.prefixmatch.test.ts).
   sprechgruppenAlle: () => [GLOBAL_KEYS.sprechgruppen, 'alle'] as const,
+
+  /**
+   * Präferenzen EINES Benutzers (LFH-391 · Etappe D, korrigiert im Review).
+   *
+   * DER SERVER-SLOT IST PRO BENUTZER, sein Cache-Fach muss es auch sein. Die frühere
+   * Begründung „der Endpunkt kennt nur das eigene Fach, also gibt es keinen zweiten
+   * adressierbaren Zustand" verwechselte die ADRESSIERUNG auf der Wire mit dem, was im
+   * Prozess nebeneinander liegen kann: `main.tsx` hält EINEN QueryClient für die Lebensdauer
+   * des Tabs, `LoginPage` navigiert nach der Anmeldung bloss. Am gemeinsamen Fükw-Rechner
+   * teilen sich zwei Schichten damit dasselbe Fach — die zweite sah das Gedächtnis der
+   * ersten und schrieb es beim ersten Griff in ihr eigenes Serverfach zurück.
+   *
+   * Das Muster ist NICHT erfunden: `offline/queue.ts` trennt seine benutzerabhängigen Daten
+   * seit jeher über `benutzer.id` („datenbankweit eindeutig; dadurch genügt diese eine
+   * Identität zur sicheren Trennung auch über Organisationsgrenzen hinweg"). Die Alternative
+   * — beim Abmelden räumen — scheidet aus, weil es dafür GAR KEINEN Mechanismus gibt
+   * (gemessen: kein `qc.clear`/`removeQueries`/`resetQueries` im Produktivcode, `logout()`
+   * setzt allein `benutzer` auf `null`); einen einzuführen wäre eine querschnittliche
+   * Entscheidung über alle 23 Prefixe und griffe ausserdem nicht, wenn die Sitzung ohne
+   * Abmeldung endet (401 → Sitzungswache → jemand anders meldet sich an).
+   *
+   * `null` steht für „niemand angemeldet" und ist ein zulässiges Key-Element wie die `bbox`
+   * bei {@link globalKeys.fachebeneKritis}; das Fach bleibt leer, weil die Abfrage dann
+   * abgeschaltet ist. KEIN barer Prefix-Accessor daneben — es gibt kein Invalidate über alle
+   * Benutzerfächer und wird keins geben, dieselbe Lage wie bei `sprechgruppenAlle`.
+   */
+  benutzerEinstellungenVon: (benutzerId: number | null) =>
+    [GLOBAL_KEYS.benutzerEinstellungen, benutzerId] as const,
 
   // Karte: barer Prefix (invalidiereKarte trifft per Prefix-Match alle sieben Bereiche)
   // + adressierter Bereich. Zwei Funktionen statt optionalem Argument.

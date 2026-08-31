@@ -19,6 +19,7 @@ use utoipa::OpenApi;
     crate::befehl::BefehlStatus,
     crate::befehl::BefehlVorlage,
     crate::befehl::repo::BefehlAnzeige,
+    crate::benutzer_einstellungen::BenutzerEinstellungenAnzeige,
     crate::bereitstellungsraum::BrAnzeige,
     crate::bereitstellungsraum::BrBelegungAnzeige,
     crate::bereitstellungsraum::BrBelegungsArt,

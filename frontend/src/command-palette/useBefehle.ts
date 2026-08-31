@@ -11,16 +11,43 @@ import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
 import { leseZuletztModule, merkeModulBesuch } from '../einsatz/zuletztModule';
+import { modulAusPfad } from '../einsatz/modulRegistry';
+import type { BefehlsGedaechtnis } from './useZuletztBefehle';
 import type { Befehl, TastaturAktionen } from './typen';
 
-/** Verdrahtet Auth/Theme/Router/Query mit der reinen baueBefehle-Funktion. */
-export function useBefehle(tastaturAktionen?: TastaturAktionen): Befehl[] {
+/** Kein Gedächtnis übergeben → keine Gruppe, keine Aufzeichnung. EIN Objekt statt eines
+ *  Vorgabewerts im Kopf: ein `{}` dort wäre je Render eine neue Identität und machte das
+ *  `useMemo` unten wirkungslos. */
+const OHNE_GEDAECHTNIS: BefehlsGedaechtnis = { ids: [], merke: () => {} };
+
+/**
+ * Verdrahtet Auth/Theme/Router/Query mit der reinen baueBefehle-Funktion.
+ *
+ * Das Befehls-Gedächtnis kommt als PARAMETER herein und wird hier NICHT selbst geholt
+ * (LFH-391 · Etappe D). Beides hat einen gemessenen Grund: der Schreibweg muss den Unmount
+ * der Palette überleben, und der Lesestand muss beim Öffnen schon dastehen — beides kann
+ * nur ein Träger oberhalb der Palette leisten. Die Herleitung steht an `useZuletztBefehle`.
+ * Optional, weil `useBefehle` auch ausserhalb des Paletten-Rahmens gerendert wird.
+ */
+export function useBefehle(
+  tastaturAktionen?: TastaturAktionen,
+  gedaechtnis: BefehlsGedaechtnis = OHNE_GEDAECHTNIS,
+): Befehl[] {
   const { benutzer, logout } = useAuth();
   const { setModus } = useThemeMode();
   const { setDichte } = useDichte();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
+  /**
+   * Die AKTUELLE ROUTE als Modulschlüssel (LFH-391 · C4, Arbeitspunkt 3). Der Pfad lag hier
+   * schon — es braucht keine neue Prop, nur die Zerlegung, und die kommt aus der Registry
+   * statt zum dritten Mal von Hand (`EinsatzLayout`, `ModulStub`).
+   *
+   * Ein PRIMITIV in der Dependency-Liste unten, kein Registry-Objekt: dessen Identität ist
+   * zwar stabil, aber `?.key` sagt genau das, worauf die Befehlsliste reagieren soll.
+   */
+  const aktuellerModulKey = modulAusPfad(pathname)?.key ?? null;
 
   const { data: einsaetze = [] } = useQuery({ queryKey: globalKeys.einsaetze(), queryFn: listeEinsaetze });
   const { data: overrides } = useQuery({
@@ -75,7 +102,10 @@ export function useBefehle(tastaturAktionen?: TastaturAktionen): Befehl[] {
     () => baueBefehle({
       einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
       zuletztModulKeys,
+      aktuellerModulKey,
       merkeModulBesuch: merkeBesuch,
+      zuletztBefehlIds: gedaechtnis.ids,
+      merkeBefehl: gedaechtnis.merke,
       navigate: (p) => navigate(p),
       setThemeModus: setModus,
       setDichte,
@@ -87,6 +117,9 @@ export function useBefehle(tastaturAktionen?: TastaturAktionen): Befehl[] {
     // `setDichte` gehört hier hinein und ist dafür identitätsstabil (useCallback im
     // Provider) — das aus `useDichte()` zurückgegebene Objekt dagegen NICHT: es ist
     // je Aufruf frisch und würde die Liste bei jedem Render neu bauen.
-    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen, zuletztModulKeys, merkeBesuch],
+    // `gedaechtnis` als GANZES in der Dependency-Liste: das Objekt ist beim Aufrufer
+    // memoisiert (`useZuletztBefehle`), seine beiden Felder einzeln zu listen brächte
+    // nichts ausser einer zweiten Stelle, an der eines vergessen werden kann.
+    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen, zuletztModulKeys, aktuellerModulKey, merkeBesuch, gedaechtnis],
   );
 }

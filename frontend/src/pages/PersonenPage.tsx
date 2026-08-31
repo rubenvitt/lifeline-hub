@@ -454,6 +454,9 @@ export default function PersonenPage() {
           </Space>
         )
       }
+      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
+      // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber.
+      neueZeile={darfSchreiben ? () => setModusFuer(einsatzId, 'schnell') : undefined}
       hinweis={
         !darfSchreiben && einsatz.status !== 'aktiv' && (
           <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />

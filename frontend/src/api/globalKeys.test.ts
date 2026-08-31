@@ -24,6 +24,18 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.orgEinstellungen()).toEqual(['org-einstellungen']);
     expect(globalKeys.orgModulEinstellungen()).toEqual(['org-modul-einstellungen']);
     expect(globalKeys.authProvider()).toEqual(['auth-provider']);
+    // LFH-391 · Etappe D: NEU, deshalb ohne Vorbestand — das Literal ist trotzdem
+    // handgeschrieben und nicht aus `GLOBAL_KEYS` gelesen. Der Pin schuetzt hier nicht vor
+    // einer Umbenennung des Bestands, sondern vor der stillen Umbenennung DIESES Fachs:
+    // der Stand liegt serverseitig unter einem festen Schluessel, ein anderer Query-Key
+    // traefe ein leeres Cache-Fach, und das Gedaechtnis waere nach dem Neuladen leer, ohne
+    // dass irgendetwas rot wird.
+    expect(globalKeys.benutzerEinstellungenVon(7)).toEqual(['benutzer-einstellungen', 7]);
+    // Ohne Sitzung ist das Fach adressierbar, aber leer — die Abfrage ist dann abgeschaltet.
+    expect(globalKeys.benutzerEinstellungenVon(null)).toEqual(['benutzer-einstellungen', null]);
+    // ZWEI Benutzer, ZWEI Fächer. Das ist der Befund, gegen den der Key parametrisiert wurde:
+    // ein prozessweiter QueryClient überlebt den Schichtwechsel ohne Neuladen.
+    expect(globalKeys.benutzerEinstellungenVon(1)).not.toEqual(globalKeys.benutzerEinstellungenVon(2));
   });
 
   it('Stammdaten-Kataloge ohne Filter', () => {
@@ -78,10 +90,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebeneKritis('1,2,3,4')).toEqual(['fachebene', 'kritis', '1,2,3,4']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 22 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 23 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(22);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(22);
+    expect(werte).toHaveLength(23);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(23);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

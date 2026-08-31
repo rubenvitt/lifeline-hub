@@ -722,6 +722,32 @@
           }
         }
       },
+      "BenutzerEinstellungenAnzeige": {
+        "type": "object",
+        "description": "Alle Präferenzen eines Benutzers. `eintraege` ist sparse — nur gesetzte Schlüssel\nstehen darin, eine leere Map heißt „nichts gespeichert\".",
+        "required": [
+          "eintraege"
+        ],
+        "properties": {
+          "eintraege": {
+            "type": "object",
+            "description": "Schlüssel → opaker Wert.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "geaendert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der jüngsten Änderung; fehlt, solange nichts gespeichert ist."
+          }
+        }
+      },
       "Betriebsart": {
         "type": "string",
         "description": "Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `betriebsart` (per-Variante, Großbuchstaben — `rename_all` trifft nicht).",

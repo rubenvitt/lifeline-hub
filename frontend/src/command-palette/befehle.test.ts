@@ -1,6 +1,9 @@
 // frontend/src/command-palette/befehle.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { baueBefehle, kuerzelFuerTastaturAktion, tastaturAktionFuerEreignis } from './befehle';
+import {
+  baueBefehle, kuerzelFuerTastaturAktion, tastaturAktionFuerEreignis,
+  TASTATUR_AKTIONEN, TASTATUR_AKTION_REIHENFOLGE,
+} from './befehle';
 import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverride, Koordinatenformat } from '../api/types';
@@ -229,6 +232,10 @@ describe('Tastaturaktionen', () => {
       .toBe('Esc');
     expect(kuerzelFuerTastaturAktion('filter-zuruecksetzen', 'Mozilla/5.0 (Macintosh)'))
       .toBe('⌘ ⌫');
+    // Gegenaussage zu den drei gebundenen Ids (LFH-391 · B3): eine Aktion OHNE Tastenweg
+    // hat kein Kürzel. Bis hierher fiel jede unbekannte Id auf das Filter-Kürzel durch.
+    expect(kuerzelFuerTastaturAktion('neue-zeile', 'Mozilla/5.0 (X11; Linux x86_64)')).toBeNull();
+    expect(kuerzelFuerTastaturAktion('spalten', 'Mozilla/5.0 (Macintosh)')).toBeNull();
   });
 
   it('erzeugt nur für registrierte Callbacks sichtbare Aktionsbefehle', () => {
@@ -253,6 +260,52 @@ describe('Tastaturaktionen', () => {
     aktionsbefehle[1].ausfuehren();
     expect(speichern).toHaveBeenCalledTimes(1);
     expect(filterZuruecksetzen).toHaveBeenCalledTimes(1);
+  });
+
+  it('eine Aktion ohne Tastenbindung trägt KEIN Kürzel', () => {
+    const neueZeile = vi.fn();
+    const b = baueBefehle(kontext({
+      tastaturAktionen: { 'neue-zeile': neueZeile },
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+    }));
+
+    const befehl = b.find((x) => x.id === 'tastatur:neue-zeile');
+    expect(befehl).toBeDefined();
+    expect(befehl!.label).toBe('Neue Zeile');
+    /*
+     * Bewusst `in` statt `toBeUndefined()`: ein gesetztes `kuerzel: undefined` wäre von
+     * einem fehlenden Schlüssel nicht zu unterscheiden — dieselbe Presence-Falle, die
+     * CLAUDE.md für serde-Antworten beschreibt. Und die Aussage ist nicht kosmetisch:
+     * vorher schrieb `baueBefehle` das Kürzel unbedingt, jede ungebundene Aktion trug
+     * damit sichtbar „Strg + Rücktaste" — das Kürzel des Filter-Zurücksetzens.
+     */
+    expect('kuerzel' in befehl!).toBe(false);
+
+    befehl!.ausfuehren();
+    expect(neueZeile).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt das Kürzel weiter an, wo eine Tastenbindung existiert', () => {
+    // Positivhälfte zur Aussage darüber: der Zweig ist nicht pauschal abgeschaltet.
+    const b = baueBefehle(kontext({
+      tastaturAktionen: { speichern: vi.fn() },
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+    }));
+    const befehl = b.find((x) => x.id === 'tastatur:speichern');
+    expect('kuerzel' in befehl!).toBe(true);
+    expect(befehl!.kuerzel).toBe('Strg + S / Strg + ↵');
+  });
+
+  it('die Ordnungsliste deckt jede TastaturAktionId genau einmal', () => {
+    /*
+     * Das Record erzwingt die Vollständigkeit der DEFINITIONEN über den Typcheck (TS2741);
+     * die REIHENFOLGE kann es nicht erzwingen, weil ein Record keine vertragliche Ordnung
+     * hat. Genau diese Lücke schließt dieser Guard: eine Id ohne Eintrag in der
+     * Ordnungsliste erschiene sonst nie in der Palette — stumm, ohne Typfehler.
+     */
+    expect([...TASTATUR_AKTION_REIHENFOLGE].sort())
+      .toEqual(Object.keys(TASTATUR_AKTIONEN).sort());
+    expect(new Set(TASTATUR_AKTION_REIHENFOLGE).size).toBe(TASTATUR_AKTION_REIHENFOLGE.length);
   });
 });
 
@@ -281,6 +334,28 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
     // modulRegistry führt 'etb' unter dem Kürzel-Label 'ETB' (nicht der Beschreibung
     // 'Einsatztagebuch.') — baueBefehle übernimmt `m.label` unverändert.
     expect(zuletzt[0].label).toBe('ETB');
+  });
+
+  /**
+   * PAAR mit der Zeile darüber: das Modul, auf dessen Seite die Palette geöffnet wurde,
+   * fällt aus der Abkürzung (LFH-391 · C4, Arbeitspunkt 3 — der zweite Konsument der
+   * aktuellen Route).
+   *
+   * Dieselbe Regel, die der Navigationsrahmen seit LFH-337 · H12 fährt
+   * (`loeseZuletztModule`, Ausschluss `key`): ein Sprung auf die Seite, auf der man steht,
+   * ist keine Abkürzung — und bei genau drei Plätzen kostet er den nützlichsten. Der Fall
+   * ist der NORMALFALL und nicht die Ausnahme: `merkeModulBesuch` schreibt bei jeder
+   * bewussten Modulwahl, der jüngste Eintrag ist also fast immer die aktuelle Seite.
+   *
+   * Die zweite Hälfte („ein ANDERES Modul bleibt") ist tragend: ein Riegel, der die ganze
+   * Gruppe leert, wäre sonst ebenso grün.
+   */
+  it('lässt das Modul, auf dem man steht, aus Zuletzt heraus', () => {
+    const befehle = baueBefehle({
+      ...kontext(), einsatzId: 1, zuletztModulKeys: ['etb', 'personen'], aktuellerModulKey: 'etb',
+    });
+    expect(befehle.filter((b) => b.gruppe === 'zuletzt').map((b) => b.id))
+      .toEqual(['zuletzt:personen']);
   });
 
   it('nimmt ein ausgeblendetes Modul NICHT in Zuletzt auf', () => {
@@ -359,5 +434,150 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
     const befehle = baueBefehle({ ...kontext(), einsatzId: 1, zuletztModulKeys: ['etb'] });
     const ids = befehle.map((b) => b.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+/**
+ * Das Gedächtnis zuletzt AUSGEFÜHRTER Befehle (LFH-391 · Etappe D).
+ *
+ * Zwei Hälften, die zusammen den Vertrag tragen: `merkeBefehl` an der SCHREIBseite (welche
+ * Gruppen dürfen überhaupt hinein) und die Auflösung an der LESEseite (gespeichert sind IDs,
+ * aufgelöst wird gegen die gerade gebaute Liste).
+ */
+describe('baueBefehle — Zuletzt ausgeführt', () => {
+  it('baut aus gemerkten IDs eine eigene Gruppe in der Reihenfolge der IDs', () => {
+    const b = baueBefehle({ ...kontext(), zuletztBefehlIds: ['koord:utm', 'nav:profil'] });
+    const gruppe = b.filter((x) => x.gruppe === 'ausgefuehrt');
+
+    expect(gruppe.map((x) => x.id)).toEqual(['ausgefuehrt:koord:utm', 'ausgefuehrt:nav:profil']);
+    expect(gruppe.map((x) => x.label)).toEqual(['Koordinaten: UTM', 'Profil']);
+  });
+
+  /**
+   * DER KERN der Entscheidung „IDs statt Beschriftungen": eine ID, die die aktuelle Liste
+   * nicht mehr enthält, erzeugt gar keine Zeile. Hier über das ENTZOGENE RECHT geprüft —
+   * `nav:admin` existiert nur für `darfVerwaltung`. Damit ist der Rechtefilter gratis, ohne
+   * eine zweite Wahrheit über Berechtigungen.
+   */
+  it('löst eine ID nicht auf, die es in der aktuellen Liste nicht mehr gibt', () => {
+    const mitRecht = baueBefehle({
+      ...kontext({ benutzer: admin }), zuletztBefehlIds: ['nav:admin'],
+    });
+    expect(mitRecht.some((x) => x.id === 'ausgefuehrt:nav:admin')).toBe(true);
+
+    const ohneRecht = baueBefehle({
+      ...kontext({ benutzer: sichter }), zuletztBefehlIds: ['nav:admin'],
+    });
+    expect(ohneRecht.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
+    // Gegenprobe zur Trivialität: die Gruppe ist leer, nicht die ganze Liste.
+    expect(ohneRecht.some((x) => x.id === 'nav:profil')).toBe(true);
+  });
+
+  it('erfindet keine Zeile für eine unbekannte ID', () => {
+    const b = baueBefehle({ ...kontext(), zuletztBefehlIds: ['gibt:es:nicht'] });
+    expect(b.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
+  });
+
+  /**
+   * DER DUBLETTENRIEGEL liegt an der SCHREIBseite (`GRUPPE_MERKBAR`) — und muss beim LESEN
+   * ein zweites Mal greifen: ein Serverstand kann von einem älteren Client stammen, der die
+   * Regel noch nicht kannte. Ohne diesen Riegel stünde dasselbe Modul zum DRITTEN Mal in der
+   * Liste (Module, Zuletzt, Zuletzt ausgeführt).
+   */
+  it('löst eine gemerkte Modul-ID NICHT auf, auch wenn sie im Serverstand steht', () => {
+    const b = baueBefehle({
+      ...kontext(), zuletztModulKeys: ['etb'], zuletztBefehlIds: ['modul:etb', 'zuletzt:etb'],
+    });
+    expect(b.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
+  });
+
+  it('vergibt Ausgeführt-Befehlen eigene ids, die mit nichts kollidieren', () => {
+    const ids = baueBefehle({
+      ...kontext(), zuletztModulKeys: ['etb'], zuletztBefehlIds: ['nav:profil', 'koord:utm'],
+    }).map((x) => x.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe('baueBefehle — was ins Gedächtnis kommt', () => {
+  it('meldet das Ausführen eines Navigations-, Einstellungs- und Schnellaktions-Befehls', () => {
+    for (const id of ['nav:profil', 'koord:utm', 'aktion:personen']) {
+      const merkeBefehl = vi.fn();
+      baueBefehle({ ...kontext(), merkeBefehl }).find((b) => b.id === id)!.ausfuehren();
+      expect(merkeBefehl, id).toHaveBeenCalledWith(id);
+    }
+  });
+
+  it('meldet das Ausführen NICHT für Module, Zuletzt und Tastatur-Aktionen', () => {
+    const merkeBefehl = vi.fn();
+    const b = baueBefehle({
+      ...kontext(), zuletztModulKeys: ['etb'], merkeBefehl,
+      tastaturAktionen: { speichern: vi.fn() },
+    });
+    for (const id of ['modul:etb', 'zuletzt:etb', 'tastatur:speichern']) {
+      b.find((x) => x.id === id)!.ausfuehren();
+    }
+    expect(merkeBefehl).not.toHaveBeenCalled();
+  });
+
+  it('führt den gemerkten Befehl weiterhin aus — merken ersetzt nichts', () => {
+    const navigate = vi.fn();
+    const reihenfolge: string[] = [];
+    const merkeBefehl = vi.fn(() => reihenfolge.push('merke'));
+    const b = baueBefehle({
+      ...kontext({ navigate: (p: string) => { reihenfolge.push('nav'); navigate(p); } }),
+      merkeBefehl,
+    });
+
+    b.find((x) => x.id === 'nav:profil')!.ausfuehren();
+
+    expect(navigate).toHaveBeenCalledWith('/profil');
+    expect(reihenfolge).toEqual(['merke', 'nav']);
+  });
+
+  /**
+   * Eine Zeile aus dem Gedächtnis meldet die ID des ORIGINALS, nicht ihre eigene. Sonst
+   * wüchse bei jedem Griff darauf ein `ausgefuehrt:ausgefuehrt:…`, das beim nächsten Aufbau
+   * gegen nichts mehr auflöst — das Gedächtnis vergässe genau die Befehle, die man am
+   * häufigsten benutzt.
+   */
+  /**
+   * ABMELDEN GEHÖRT NICHT INS GEDÄCHTNIS (Review-Befund zu Etappe D). Es liegt in
+   * `navigation` — zusammen mit Profil, Stammdaten und Administration, die zu Recht merkbar
+   * sind —, hat aber als einziger Befehl der Palette keinen Rückweg: das Gedächtnis stünde
+   * ZUOBERST und ist vorausgewählt, `Strg/⌘+K` gefolgt von Enter beendete also die Sitzung
+   * statt den erwarteten Kontextbefehl auszulösen. Ausgeführt wird er weiterhin — merkbar ist
+   * er nicht.
+   */
+  it('meldet das Ausführen von Abmelden NICHT, führt ihn aber aus', () => {
+    const merkeBefehl = vi.fn();
+    const logout = vi.fn();
+
+    baueBefehle({ ...kontext({ logout }), merkeBefehl })
+      .find((x) => x.id === 'nav:abmelden')!.ausfuehren();
+
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(merkeBefehl).not.toHaveBeenCalled();
+  });
+
+  /** Wie beim Gruppenriegel gilt der Ausschluss AUCH BEIM LESEN: ein Serverstand kann von
+   *  einem älteren Client stammen, der die Regel noch nicht kannte — und genau die Benutzer,
+   *  denen der Befund passiert ist, tragen ihn schon im Fach. */
+  it('löst ein gemerktes Abmelden nicht auf, auch wenn es im Serverstand steht', () => {
+    const b = baueBefehle({ ...kontext(), zuletztBefehlIds: ['nav:abmelden'] });
+
+    expect(b.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
+    // Gegenprobe zur Trivialität: der Befehl selbst steht weiter in der Navigation.
+    expect(b.some((x) => x.id === 'nav:abmelden')).toBe(true);
+  });
+
+  it('meldet beim Griff ins Gedächtnis die ID des Originals', () => {
+    const merkeBefehl = vi.fn();
+    const b = baueBefehle({ ...kontext(), zuletztBefehlIds: ['nav:profil'], merkeBefehl });
+
+    b.find((x) => x.id === 'ausgefuehrt:nav:profil')!.ausfuehren();
+
+    expect(merkeBefehl).toHaveBeenCalledWith('nav:profil');
+    expect(merkeBefehl).toHaveBeenCalledTimes(1);
   });
 });

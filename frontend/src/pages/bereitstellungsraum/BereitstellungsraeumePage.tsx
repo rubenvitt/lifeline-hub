@@ -115,6 +115,9 @@ export default function BereitstellungsraeumePage() {
           Neu
         </Button>
       }
+      // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
+      // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber (dort `disabled`).
+      neueZeile={schreibgeschuetzt ? undefined : () => setAnlegen(true)}
     >
       {/* Der Fehler TAUSCHT die Tabelle aus, statt durch sie hindurchgereicht zu werden
           (D3): `Datensicht` führt den Kartenzweig an `Liste`, und deren Vertrag kennt
