@@ -179,11 +179,13 @@ export function useThemeMode(): ThemeModeWert {
  *
  * Beide Achsen teilen einen Provider (ein Context, ein `useMemo`), aber sie
  * teilen keinen Namen: wer eine Trefffläche umschaltet, soll nicht `useThemeMode`
- * lesen müssen. Zweiter Bedienweg ist dieselbe Quelle — der Umschalter in der
- * Kopfzeile und die Kommandopalette hängen hier, und ein Eintrag im
- * Benutzermenü kann es ebenso (nötig, weil die Kopfzeile auf schmalem Schirm
- * ihre Umschalter ablegt und die Stufe sonst genau in den Kontexten unbedienbar
- * wäre, denen A1 `komfortabel` und `handschuh` zuweist).
+ * lesen müssen. Jeder Bedienweg ist dieselbe Quelle — seit LFH-392 sind das die
+ * Umschaltgruppe im Benutzermenü (auf jeder Breite, der einzige Weg, der die
+ * aktive Stufe auch ANZEIGT) und die Kommandopalette. Der frühere dritte, ein
+ * Segmented-Paar in der Kopfzeile, ist fort: sechs Ziele für zwei Einstellungen
+ * in einer Aktionsreihe, deren Wahl im Menü darunter schon vollständig lag.
+ * Unverzichtbar bleibt der Menüweg, weil A1 dem Führungs-Tablet und dem mobilen
+ * Kontext `komfortabel` und `handschuh` zuweist.
  *
  * Das zurückgegebene Objekt ist je Aufruf frisch — es gehört NICHT in ein
  * Dependency-Array. Stabil sind `dichte` (ein String) und `setDichte` (per
