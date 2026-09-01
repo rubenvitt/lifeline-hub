@@ -56,9 +56,11 @@ const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconT
   { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: TbMoon },
 ];
 
-/** Bediendichte über die Palette (LFH-329 · B1) — der zweite Bedienweg neben dem
- *  Kopfzeilen-Umschalter, und auf schmalem Schirm der einzige, weil die Kopfzeile
- *  dort ihre Umschalter ablegt. */
+/** Bediendichte über die Palette (LFH-329 · B1) — der zweite Bedienweg neben der
+ *  Umschaltgruppe im Benutzermenü. Seit LFH-392 ist der Kopfzeilen-Umschalter fort,
+ *  auf JEDER Breite; die Palette ist damit die schnelle Abkürzung, nicht der
+ *  Ersatz. Sie kann das auch nicht sein: ein `Befehl` (`typen.ts`) trägt kein
+ *  Zustandsfeld, die Palette zeigt also nicht an, welche Stufe gerade gilt. */
 const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: IconType }[] = [
   { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: TbArrowsMinimize },
   { id: 'dichte:komfortabel', label: 'Dichte: Komfortabel', stufe: 'komfortabel', icon: TbArrowsMaximize },

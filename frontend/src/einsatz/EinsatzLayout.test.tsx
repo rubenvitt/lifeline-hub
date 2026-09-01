@@ -6,6 +6,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
+import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout from './EinsatzLayout';
@@ -350,12 +351,71 @@ describe('EinsatzLayout', () => {
    * Gegenprobe zum Kopfzeilen-Block unter lg — mit DERSELBEN Abfrage. Eine
    * `queryBy…`-Null allein belegt nichts: sie wäre auch bei falsch
    * geschriebener Beschriftung grün.
+   *
+   * SEIT LFH-392 trägt diese Aussage der AK1-Zähler darunter (`radio: 0`) — ein
+   * eigener Test auf die zwei Etiketten stand hier und ist gefallen: „Farbschema
+   * wählen" kam mit `ThemeToggle.tsx` fort und existiert im Repo nicht mehr, die
+   * Null darauf war durch keine Änderung am Produktivcode rot zu bekommen.
    */
-  it('ab lg stehen beide Umschalter in der Kopfzeile', async () => {
+
+  /**
+   * AK 1 von LFH-392, kalibriert gegen den Bestand: vor dem Umbau zählte
+   * dieselbe Abfrage 11 (5 Knöpfe + 6 Segment-Radios), danach 5. Die
+   * Aufschlüsselung steht daneben, weil eine nackte Zahl beim Fehlschlag nicht
+   * sagt, welche Sorte Ziel dazugekommen ist. Herleitung: `test/kopfzeile.ts`.
+   */
+  it('AK1 — die Kopfzeile trägt nur noch 5 Bedienziele (vorher 11)', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(screen.getByRole('radiogroup', { name: 'Farbschema wählen' })).toBeInTheDocument();
-    expect(screen.getByRole('radiogroup', { name: 'Bediendichte wählen' })).toBeInTheDocument();
+    expect(bedienzieleNachRolle()).toEqual({ button: 5, radio: 0, link: 0 });
+    expect(zaehleBedienziele()).toBe(5);
+  });
+
+  /**
+   * AK 2 als PAAR: erreichbar statt bloß verschwunden. Wirkung prüft
+   * `BenutzerMenu.test.tsx` (dort steht der `ThemeModeProvider`), hier nur
+   * Erreichbarkeit — der Test-Wrapper montiert keinen Provider, die Hooks fallen
+   * auf `system`/`kompakt` zurück.
+   */
+  it('AK2 — beide Achsen sind ab lg im Benutzermenü erreichbar', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
+
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: /System ✓/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^Dunkel$/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^Handschuh$/ })).toBeInTheDocument();
+  });
+
+  /**
+   * Die Alarmzentrale ist von den Aktionen ABGESETZT (LFH-392).
+   *
+   * WAS HIER NICHT PRÜFBAR IST: dass die Trennung im Browser auch zu SEHEN ist.
+   * `vite.config.ts` fährt Vitest mit `css: false`, und jsdom rechnet kein
+   * Layout — ein Pixelabstand wäre hier eine erfundene Zahl. Belegbar ist die
+   * DOM-Semantik: es gibt genau einen Trenner, die Alarm-Knöpfe stehen davor,
+   * die Aktionen dahinter. Das Sichtbare belegen die Bilder am Ticket.
+   *
+   * `compareDocumentPosition` statt `children.indexOf`: antds `Space` wickelt
+   * JEDES Kind in ein eigenes `.ant-space-item`, die Knöpfe sind also Enkel und
+   * kein `indexOf` fände sie (gemessen).
+   */
+  it('setzt die Alarmzentrale mit einem Trenner von den Aktionen ab', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+
+    const kopf = screen.getByRole('banner');
+    const trenner = within(kopf).getAllByRole('separator');
+    expect(trenner).toHaveLength(1);
+
+    const ton = within(kopf).getByRole('button', { name: /Alarmton/ });
+    const suchen = within(kopf).getByRole('button', { name: 'Suchen' });
+    expect(trenner[0].compareDocumentPosition(ton) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(
+      trenner[0].compareDocumentPosition(suchen) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('rendert den sichtbaren Such-Trigger im Einsatz-Workspace', async () => {
@@ -477,16 +537,19 @@ describe('EinsatzLayout', () => {
     });
 
     it('legt beide Umschalter ab, behält Alarm-Zentrale und Benutzermenü', async () => {
-      // Die Alarm-Zentrale ist bereits reines Symbol und bleibt deshalb stehen —
-      // sie kostet auf 390 px so wenig Breite wie der Griff daneben.
+      // Die Alarm-Zentrale bleibt stehen, WEIL sie ihren Zustand ausspricht:
+      // beide Knöpfe tragen sichtbaren Text („Desktop blockiert" / „Ton bereit",
+      // AlarmZentrale.tsx) plus `aria-label`. Hier stand bis LFH-392 das
+      // Gegenteil — „bereits reines Symbol" — und das war am Bestand falsch;
+      // genau der Text ist der Grund, dass sie nicht ins Menü wandert.
+      //
+      // Die Null darunter ist seit LFH-392 KEINE Breitenaussage mehr: die
+      // Umschalter sind auf jeder Breite aus dem Kopf. Gezählt wird über die
+      // ROLLE, nicht über die zwei Etiketten — die existieren im Repo nicht mehr,
+      // eine Null darauf wäre nicht widerlegbar (siehe `test/kopfzeile.ts`).
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-      expect(
-        screen.queryByRole('radiogroup', { name: 'Farbschema wählen' }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole('radiogroup', { name: 'Bediendichte wählen' }),
-      ).not.toBeInTheDocument();
+      expect(radiosImKopf()).toBe(0);
       expect(screen.getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: 'Alarmton durch Klick entsperren' }),

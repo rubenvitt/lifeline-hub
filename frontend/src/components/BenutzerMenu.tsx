@@ -1,13 +1,12 @@
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
-import { FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
 import type { IconType } from 'react-icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { rollenFarbe } from '../theme/statusFarben';
 import { useDichte, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
-import { DICHTE_OPTIONEN } from './ThemeToggle';
+import { DARSTELLUNG_OPTIONEN, DICHTE_OPTIONEN } from '../theme/darstellungOptionen';
 import { useViewport } from './useViewport';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
@@ -17,22 +16,6 @@ function initialen(name: string): string {
   if (teile.length === 1) return teile[0].slice(0, 2).toUpperCase();
   return (teile[0][0] + teile[teile.length - 1][0]).toUpperCase();
 }
-
-/**
- * Die drei Farbschema-Stufen — eine KOPIE der Liste im `ThemeToggle`.
- *
- * ERZWUNGEN, NICHT GEWÄHLT: die Dichte-Achse daneben kommt über den Export
- * `DICHTE_OPTIONEN` aus derselben Quelle, genau damit eine umbenannte Stufe
- * nicht an zwei Orten verschieden dasteht. Für die Farbschema-Achse gibt es
- * heute keinen solchen Export, und die Datei gehört in diesem Zyklus einem
- * anderen Arbeitspaket. Der fehlende Export ist Nacharbeit — bis dahin ist ein
- * umbenanntes „Hell" hier von Hand nachzuziehen.
- */
-const DARSTELLUNG_OPTIONEN: { wert: ThemeModus; titel: string; Icon: IconType }[] = [
-  { wert: 'system', titel: 'System', Icon: FiMonitor },
-  { wert: 'light', titel: 'Hell', Icon: FiSun },
-  { wert: 'dark', titel: 'Dunkel', Icon: FiMoon },
-];
 
 /** Präfixe der beiden Umschalt-Gruppen. Sie tragen den Wert im Schlüssel,
  *  damit `onClick` ohne zweite Zuordnungstabelle auskommt. */
@@ -67,14 +50,17 @@ function umschaltEintrag(
  * Kopf, keine Gefahrenmeldung. Sie kommt über `rollenFarbe('marke', token)` und damit je
  * Modus aus `theme/tokens.ts`; vorher stand hier eine Kopie des Hex-Werts.
  *
- * ZWEI GESTALTEN, EINE SCHWELLE (LFH-329 · B1/M12). Unterhalb von antds `lg`
- * schrumpft der Trigger auf den Avatar (kein Name, kein Pfeil) und das Dropdown
- * nimmt dafür zwei Gruppen auf: Darstellung UND Bediendichte. Das zweite ist
- * kein Beiwerk — die Kopfzeile legt dort ihren Umschalter ab, und die
- * Kommandopalette trägt beide Achsen zwar, hat aber keinen sichtbaren Auslöser
- * (nur Cmd/Ctrl+K, auf einem Touchgerät also keinen). Ohne diese Gruppen wären
- * genau die Stufen unbedienbar, die A1 dem Führungs-Tablet und dem mobilen
- * Kontext zuweist: `komfortabel` und `handschuh`.
+ * ZWEI GESTALTEN, EINE SCHWELLE — die Schwelle gilt nur noch dem TRIGGER
+ * (LFH-329 · B1/M12, eingeschränkt in LFH-392). Unterhalb von antds `lg`
+ * schrumpft der Auslöser auf den Avatar (kein Name, kein Pfeil). Die zwei
+ * Umschaltgruppen im Dropdown hängen dagegen an KEINER Breite mehr: seit
+ * LFH-392 ist dies der einzige sichtbare Bedienweg für Darstellung und
+ * Bediendichte, auf jedem Schirm.
+ *
+ * Die Kommandopalette trägt beide Achsen zwar als sechs Befehle, ersetzt diese
+ * Gruppen aber nicht: sie zeigt keinen aktiven Wert an. Ohne sie wären genau die
+ * Stufen unbedienbar, die A1 dem Führungs-Tablet und dem mobilen Kontext
+ * zuweist: `komfortabel` und `handschuh`.
  *
  * Angebunden wird über `useThemeMode`/`useDichte`, NICHT über die
  * Kommandopalette: deren Hook wirft außerhalb seines Providers, und der
@@ -148,30 +134,34 @@ export default function BenutzerMenu() {
         </div>
       ),
     },
-    // Nur im schmalen Ast: ab `lg` stehen beide Achsen als Umschalter in der
-    // Kopfzeile, und zwei Bedienwege mit getrenntem Aussehen für dieselbe Wahl
-    // wären schlechter als einer.
-    ...(breit
-      ? []
-      : ([
-          { type: 'divider' },
-          {
-            key: 'darstellung',
-            type: 'group',
-            label: 'Darstellung',
-            children: DARSTELLUNG_OPTIONEN.map(({ wert, titel, Icon }) =>
-              umschaltEintrag(DARSTELLUNG_PRAEFIX, wert, titel, Icon, wert === modus),
-            ),
-          },
-          {
-            key: 'bediendichte',
-            type: 'group',
-            label: 'Bediendichte',
-            children: DICHTE_OPTIONEN.map(({ wert, titel, Icon }) =>
-              umschaltEintrag(DICHTE_PRAEFIX, wert, titel, Icon, wert === dichte),
-            ),
-          },
-        ] satisfies MenuProps['items'])),
+    // AUF JEDER BREITE (LFH-392). Bis dahin hing das an `breit ? [] : […]`, weil
+    // ab `lg` zwei Segmentleisten in der Kopfzeile dieselbe Wahl trugen — und
+    // zwei Bedienwege mit getrenntem Aussehen für eine Wahl sind schlechter als
+    // einer. Der Satz gilt weiter; aufgelöst ist er jetzt zugunsten DIESER
+    // Stelle: die Kopfzeile ist die Aktionsreihe, und eine Einstellung gehört da
+    // nicht hinein.
+    //
+    // WER DEN RIEGEL ZURÜCKDREHT, nimmt beiden Achsen ab 992 px ihren einzigen
+    // sichtbaren Bedienweg: die Kommandopalette trägt sie zwar als sechs Befehle,
+    // zeigt aber keinen aktiven Wert an (`command-palette/typen.ts` kennt kein
+    // Zustandsfeld) — der zweite Kanal nach WCAG 1.4.1 hinge dann an nichts.
+    { type: 'divider' },
+    {
+      key: 'darstellung',
+      type: 'group',
+      label: 'Darstellung',
+      children: DARSTELLUNG_OPTIONEN.map(({ wert, titel, Icon }) =>
+        umschaltEintrag(DARSTELLUNG_PRAEFIX, wert, titel, Icon, wert === modus),
+      ),
+    },
+    {
+      key: 'bediendichte',
+      type: 'group',
+      label: 'Bediendichte',
+      children: DICHTE_OPTIONEN.map(({ wert, titel, Icon }) =>
+        umschaltEintrag(DICHTE_PRAEFIX, wert, titel, Icon, wert === dichte),
+      ),
+    },
     { type: 'divider' },
     { key: 'profil', icon: <UserOutlined />, label: 'Profil' },
     { key: 'abmelden', icon: <LogoutOutlined />, label: 'Abmelden', danger: true },

@@ -1,19 +1,26 @@
 /**
- * Das Benutzermenü auf beiden Breiten (LFH-329 · B1/M12).
+ * Das Benutzermenü (LFH-329 · B1/M12, fortgeschrieben in LFH-392).
  *
- * ZWEI AUSSAGEN, DIE ZUSAMMENGEHÖREN. Die Kopfzeile legt unterhalb von antds
- * `lg` ihre Umschalter ab — den Anzeigenamen im Trigger und den
- * Kopfzeilen-Umschalter für Farbschema und Bediendichte. Das erste ist Fläche,
- * das zweite wäre ein Verlust: A1 weist dem Führungs-Tablet und dem mobilen
- * Kontext ausdrücklich `komfortabel` und `handschuh` zu, und die
- * Kommandopalette hat heute keinen sichtbaren Auslöser (0 Konsumenten von
- * `useCommandPalette`, nur Cmd/Ctrl+K). Ohne die Gruppen hier wären beide
- * Stufen auf 390 px unbedienbar.
+ * ZWEI SORTEN AUSSAGE IN DIESER DATEI, und sie dürfen nicht vermischt werden:
  *
- * JEDE SCHMAL-BEHAUPTUNG HAT IHRE POSITIVE GEGENPROBE mit derselben Abfrage im
- * breiten Ast. Eine reine `queryBy…`-Null ist auch dann grün, wenn die
- * Beschriftung falsch geschrieben oder die Rolle eine andere ist — sie belegt
- * für sich genommen nichts.
+ * 1. BREITENABHÄNGIG ist nur noch der TRIGGER — unterhalb von antds `lg`
+ *    schrumpft er auf die Initialen (kein Name, kein Chevron). Das ist Fläche,
+ *    und die zwei Blöcke „ab lg" / „unter lg" tragen genau diese Frage.
+ * 2. BREITENUNABHÄNGIG sind die zwei Umschaltgruppen im Dropdown. Bis LFH-392
+ *    hingen sie am Schmal-Ast, weil die Kopfzeile die Achsen ab `lg` selbst als
+ *    Segmentleisten trug; seit die dort fort sind, ist dies der EINZIGE sichtbare
+ *    Bedienweg für Farbschema und Bediendichte. Sie stehen deshalb in einem
+ *    eigenen, über beide Breiten parametrisierten Block ganz unten.
+ *
+ * WARUM DIE GRUPPEN NICHT VERZICHTBAR SIND: A1 weist dem Führungs-Tablet und dem
+ * mobilen Kontext ausdrücklich `komfortabel` und `handschuh` zu. Die
+ * Kommandopalette trägt beide Achsen zwar als Befehle und hat seit LFH-335 auch
+ * einen sichtbaren Auslöser — sie zeigt aber keinen AKTIVEN Wert an. Ohne diese
+ * Gruppen gäbe es die Stufenwahl nur noch blind.
+ *
+ * JEDE NULLAUSSAGE BRAUCHT IHRE POSITIVE GEGENPROBE mit derselben Abfrage. Eine
+ * reine `queryBy…`-Null ist auch dann grün, wenn die Beschriftung falsch
+ * geschrieben oder die Rolle eine andere ist — sie belegt für sich nichts.
  *
  * `setzeViewportBreite` läuft VOR dem Render: antds Beobachter ruft seinen
  * Zuhörer beim Abonnieren synchron auf und liest dabei nur `matches`.
@@ -71,21 +78,6 @@ describe('BenutzerMenu — ab lg', () => {
     expect((await trigger()).textContent).toContain(ANZEIGENAME);
   });
 
-  it('kein Darstellungs- und kein Dichte-Eintrag im Dropdown', async () => {
-    // Beide Achsen stehen ab lg als Umschalter in der Kopfzeile. Stünden sie
-    // zusätzlich hier, gäbe es zwei Bedienwege mit getrenntem Aussehen für
-    // dieselbe Wahl.
-    zeige();
-    await oeffne();
-    // Regex, nicht exakt: antds Symbol-Span trägt ein eigenes `aria-label`
-    // (`user`, `logout`) und geht damit in den zugänglichen Namen ein. Die
-    // Einträge der zwei neuen Gruppen nutzen react-icons ohne Beschriftung und
-    // heißen deshalb genau wie ihr Text — deren Prüfungen dürfen exakt sein.
-    expect(await screen.findByRole('menuitem', { name: /Profil/ })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /Hell/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /Handschuh/ })).not.toBeInTheDocument();
-  });
-
   it('zeigt die gebaute Frontend-Version sichtbar im Dropdown', async () => {
     zeige();
     await oeffne();
@@ -114,6 +106,39 @@ describe('BenutzerMenu — unter lg', () => {
     expect((await trigger()).style.height).toBe('40px');
   });
 
+  it('Profil und Abmelden bleiben erreichbar', async () => {
+    // Die neuen Gruppen kommen HINZU, sie ersetzen nichts.
+    zeige();
+    await oeffne();
+    // Regex, nicht exakt: antds Symbol-Span trägt ein eigenes `aria-label`
+    // (`user`, `logout`) und geht damit in den zugänglichen Namen ein. Die
+    // Einträge der zwei neuen Gruppen nutzen react-icons ohne Beschriftung und
+    // heißen deshalb genau wie ihr Text — deren Prüfungen dürfen exakt sein.
+    expect(await screen.findByRole('menuitem', { name: /Profil/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Abmelden/ })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Die zwei Umschaltgruppen hängen an KEINER Breite (LFH-392).
+ *
+ * WARUM ÜBER BEIDE BREITEN PARAMETRISIERT und nicht als zwei Blöcke: bis LFH-392
+ * stand hier ein Pin „ab lg KEIN Darstellungs- und kein Dichte-Eintrag" gegen die
+ * Positivaussage im Schmal-Block — die Kopfzeile trug die Achsen ab `lg` selbst.
+ * Seit die Umschalter dort ganz fort sind, ist die Breite für diese Gruppen
+ * bedeutungslos. Zwei gleichlautende Blöcke unter zwei Breitenüberschriften ließen
+ * den nächsten Leser eine Regel vermuten, die es nicht mehr gibt; die
+ * Parametrisierung schreibt die Abwesenheit der Regel hin.
+ *
+ * Die Breite steht als LITERAL da (1024 = Vitest-Vorgabe, also der `ab lg`-Ast;
+ * 390 = Handschirm). Aus `useViewport` zurückgelesen prüfte sie sich selbst.
+ */
+describe.each([
+  ['ab lg', 1024],
+  ['unter lg', 390],
+])('BenutzerMenu — Umschaltgruppen, %s', (_lage, breite) => {
+  beforeEach(() => setzeViewportBreite(breite));
+
   it('Darstellung liegt im Dropdown, der aktive Modus trägt ihn im Namen', async () => {
     zeige();
     await oeffne();
@@ -125,8 +150,8 @@ describe('BenutzerMenu — unter lg', () => {
   });
 
   it('die Bediendichte liegt daneben — alle drei Stufen', async () => {
-    // DER GRUND FÜR DIE GANZE GRUPPE: ohne sie wäre die Stufe auf 390 px nur
-    // noch über die Palette erreichbar, die keinen sichtbaren Auslöser hat.
+    // DER GRUND FÜR DIE GANZE GRUPPE: ohne sie wäre die Stufe nur noch über die
+    // Kommandopalette erreichbar, und die zeigt keinen aktiven Wert an.
     zeige();
     await oeffne();
     expect(await screen.findByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
@@ -138,6 +163,9 @@ describe('BenutzerMenu — unter lg', () => {
     // Gemessen wird am Wurzelelement, nicht am Zustand der Komponente: eine
     // Wahl, die den Eintrag markiert, aber das Merkmal nicht setzt, ließe das
     // handgeschriebene CSS auf der Ausgangsstufe stehen.
+    //
+    // DIESE HÄLFTE TRÄGT DIE AUSSAGE, nicht die Präsenz darüber: ein Eintrag,
+    // dessen `onClick`-Zweig fehlt, ließe beide Tests oben grün.
     zeige();
     await oeffne();
     await userEvent.click(screen.getByRole('menuitem', { name: /^Dunkel$/ }));
@@ -146,17 +174,12 @@ describe('BenutzerMenu — unter lg', () => {
     await oeffne();
     await userEvent.click(screen.getByRole('menuitem', { name: /^Handschuh$/ }));
     expect(document.documentElement.dataset.dichte).toBe('handschuh');
-  });
 
-  it('Profil und Abmelden bleiben erreichbar', async () => {
-    // Die neuen Gruppen kommen HINZU, sie ersetzen nichts.
-    zeige();
-    await oeffne();
-    // Regex, nicht exakt: antds Symbol-Span trägt ein eigenes `aria-label`
-    // (`user`, `logout`) und geht damit in den zugänglichen Namen ein. Die
-    // Einträge der zwei neuen Gruppen nutzen react-icons ohne Beschriftung und
-    // heißen deshalb genau wie ihr Text — deren Prüfungen dürfen exakt sein.
-    expect(await screen.findByRole('menuitem', { name: /Profil/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Abmelden/ })).toBeInTheDocument();
+    // DIE ACHSEN SIND UNABHÄNGIG — der Dichte-Klick hat das Farbschema nicht
+    // mitgesetzt. Diese Zusicherung trug bis LFH-392 `ThemeToggle.test.tsx`; sie
+    // betrifft aber nicht die gelöschte Komponente, sondern den weiterlebenden
+    // `ThemeModeProvider` (ein Context, ein `useMemo`, zwei Setter). Mit der
+    // Testdatei wäre sie ersatzlos gefallen.
+    expect(document.documentElement.dataset.theme).toBe('dark');
   });
 });

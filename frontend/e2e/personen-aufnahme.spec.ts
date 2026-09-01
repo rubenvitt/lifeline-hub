@@ -44,10 +44,16 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 /**
  * Die Sichtungs-Gruppe — über die Feld-Id, NICHT über `getByRole('radiogroup')`.
  *
- * GEMESSEN: die Kopfzeile trägt zwei weitere Radiogruppen („Farbschema wählen",
- * „Bediendichte wählen", beides `Segmented`), ein blankes `getByRole('radiogroup')` bricht
- * also im Strict-Modus. Die Id kommt aus `name="sichtung"` am `Form.Item` und ist damit an
- * denselben Vertrag gebunden wie der abgesendete Feldname.
+ * Bis LFH-392 stand hier als Grund, die Kopfzeile trage zwei WEITERE Radiogruppen
+ * („Farbschema wählen", „Bediendichte wählen", beides `Segmented`), ein blankes
+ * `getByRole('radiogroup')` breche also im Strict-Modus. Diese zwei Gruppen sind fort —
+ * der Grund ist damit hinfällig, die Wahl des Selektors aber NICHT.
+ *
+ * Er bleibt, weil er an den richtigen Vertrag bindet: die Id kommt aus `name="sichtung"`
+ * am `Form.Item`, also an denselben Namen, der abgesendet wird. Auf
+ * `getByRole('radiogroup')` umzustellen koppelte diesen Test wieder daran, wie viele
+ * Radiogruppen sonst noch auf der Seite stehen — genau die Zahl, die LFH-392 gerade
+ * beweglich gemacht hat.
  */
 function sichtung(page: Page) {
   return page.locator('#sichtung');

@@ -177,17 +177,24 @@ test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläch
 });
 
 test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', async ({ page }) => {
-  // DIE EIGENTLICHE ZUSICHERUNG DIESES PAKETS. Die Kopfzeile legt ihre
-  // Umschalter unter lg ab; A1 weist dem Führungs-Tablet und dem mobilen
-  // Kontext aber gerade `komfortabel` und `handschuh` zu. Die Kommandopalette
-  // trägt beide Achsen zwar, hat heute aber keinen sichtbaren Auslöser (nur
-  // Cmd/Ctrl+K — auf einem Touchgerät kein Bedienweg). Bliebe also nichts.
+  // DIE EIGENTLICHE ZUSICHERUNG DIESES PAKETS. A1 weist dem Führungs-Tablet und
+  // dem mobilen Kontext gerade `komfortabel` und `handschuh` zu. Die
+  // Kommandopalette trägt beide Achsen zwar und hat seit LFH-335 auch einen
+  // sichtbaren Auslöser — sie zeigt aber keinen AKTIVEN Wert an. Das Menü ist
+  // der Bedienweg, der die Stufe zeigt UND setzt.
+  //
+  // Unter lg ist dieser Test seit LFH-392 UNVERÄNDERT — was sich geändert hat,
+  // ist die Gegenprobe darunter: sie belegt nicht mehr, dass die BREITE die
+  // Umschalter entfernt, sondern dass sie in keiner Breite mehr im Kopf stehen.
   await anmelden(page);
   await page.setViewportSize(SCHMAL);
   await page.goto('/einsaetze');
 
-  await expect(page.getByLabel('Farbschema wählen')).toHaveCount(0);
-  await expect(page.getByLabel('Bediendichte wählen')).toHaveCount(0);
+  // Über die ROLLE gezählt, nicht über die zwei Etiketten: die kamen mit
+  // `ThemeToggle.tsx` fort und stehen im Repo nirgends mehr — eine Null darauf
+  // wäre durch keine Änderung am Produktivcode rot zu bekommen. Diese hier
+  // schlägt an, sobald irgendein Segmented in die Kopfzeile zurückkehrt.
+  await expect(page.locator('header').getByRole('radio')).toHaveCount(0);
 
   const trigger = page.getByRole('button', { name: 'Benutzermenü' });
   const kasten = (await trigger.boundingBox())!;
@@ -205,13 +212,66 @@ test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', asy
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
-test('ab lg stehen die Umschalter wieder in der Kopfzeile', async ({ page }) => {
-  // Gegenprobe. Ohne sie belegte der Test oben nur, dass irgendetwas fehlt —
-  // nicht, dass die BREITE es entfernt.
+test('auch ab lg stehen die Umschalter nicht im Kopf — bedienbar bleiben sie', async ({ page }) => {
+  /**
+   * UMGEDREHT IN LFH-392. Bis dahin hieß dieser Test „ab lg stehen die
+   * Umschalter wieder in der Kopfzeile" und war die Gegenprobe zur Null oben:
+   * ohne ihn belegte jene nur, dass irgendetwas fehlt, nicht dass die BREITE es
+   * entfernt.
+   *
+   * Diese Gegenprobe gibt es nicht mehr, weil es die Regel nicht mehr gibt — die
+   * Umschalter sind auf JEDER Breite aus dem Kopf. Die Null oben ersatzlos
+   * stehenzulassen hieße, eine nicht mehr widerlegbare Behauptung zu behalten.
+   * An ihre Stelle tritt deshalb die ANDERE Hälfte: nicht im Kopf, aber im Menü
+   * bedienbar — beides auf derselben Breite, in derselben Runde geprüft.
+   */
   await anmelden(page);
   await page.setViewportSize(BREIT);
   await page.goto('/einsaetze');
 
-  await expect(page.getByLabel('Farbschema wählen')).toBeVisible();
-  await expect(page.getByLabel('Bediendichte wählen')).toBeVisible();
+  // Über die ROLLE gezählt, nicht über die zwei Etiketten: die kamen mit
+  // `ThemeToggle.tsx` fort und stehen im Repo nirgends mehr — eine Null darauf
+  // wäre durch keine Änderung am Produktivcode rot zu bekommen. Diese hier
+  // schlägt an, sobald irgendein Segmented in die Kopfzeile zurückkehrt.
+  await expect(page.locator('header').getByRole('radio')).toHaveCount(0);
+
+  const trigger = page.getByRole('button', { name: 'Benutzermenü' });
+  await trigger.click();
+  await page.getByRole('menuitem', { name: /Komfortabel/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
+
+  await trigger.click();
+  await page.getByRole('menuitem', { name: /Dunkel/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
+test('die Alarmzentrale steht ab lg sichtbar abgesetzt von den Aktionen', async ({ page }) => {
+  /**
+   * DIE HÄLFTE, DIE VITEST NICHT KANN (LFH-392). `EinsatzLayout.test.tsx` belegt
+   * die DOM-Semantik — genau ein Trenner, Alarm davor, Aktionen dahinter. Ob
+   * daraus im Browser eine sichtbare Trennung wird, kann es nicht sagen:
+   * `vite.config.ts` fährt Vitest mit `css: false`, und jsdom rechnet kein Layout.
+   *
+   * Gemessen wird deshalb, dass der Trenner eine echte Ausdehnung hat und
+   * zwischen den zwei Gruppen LIEGT — nicht nur, dass er im Baum steht. Ein
+   * `display: none` oder eine Nullbreite fiele hier auf und in jsdom nicht.
+   */
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Absetzung ${Date.now()}`);
+  await page.setViewportSize(BREIT);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+
+  const trenner = page.locator('header [role="separator"]');
+  await expect(trenner).toHaveCount(1);
+  const trennerKasten = (await trenner.boundingBox())!;
+  expect(trennerKasten.height, 'Trenner hat sichtbare Höhe').toBeGreaterThan(0);
+
+  const ton = (await page.getByRole('button', { name: /Alarmton/ }).boundingBox())!;
+  const suchen = (await page.getByRole('button', { name: 'Suchen' }).boundingBox())!;
+  expect(ton.x + ton.width, 'Alarmzentrale endet links vom Trenner').toBeLessThanOrEqual(
+    trennerKasten.x + 1,
+  );
+  expect(suchen.x, 'Aktionen beginnen rechts vom Trenner').toBeGreaterThanOrEqual(
+    trennerKasten.x + trennerKasten.width - 1,
+  );
 });

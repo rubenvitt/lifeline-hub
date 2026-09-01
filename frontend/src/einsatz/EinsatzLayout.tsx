@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Drawer, Layout, Space, Spin } from 'antd';
+import { Alert, Button, Divider, Drawer, Layout, Space, Spin } from 'antd';
 import { TbMenu2 } from 'react-icons/tb';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -17,12 +17,11 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 import { loeseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
-import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
-import { navDrawerBreite } from '../theme/tokens';
+import { farbenDunkel, navDrawerBreite } from '../theme/tokens';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
@@ -295,13 +294,35 @@ export default function EinsatzLayout() {
           )}
         </div>
         <Space style={{ marginLeft: 'auto' }} size="middle">
-          {/* Die Alarm-Zentrale bleibt auch auf dem Handschirm stehen und nennt
+          {/* Die Alarm-Zentrale bleibt auf JEDER Breite stehen und nennt
               Desktop-/Tonstatus ausdrücklich; „blockiert“ oder „stumm“ darf im
-              Einsatz nicht nur über eine Ikone vermittelt werden. Farbschema
-              UND Bediendichte wandern unter `lg` dagegen ins Benutzermenü. */}
+              Einsatz nicht nur über eine Ikone vermittelt werden.
+              ABGESETZT SEIT LFH-392: sie ZEIGT einen Zustand, die drei Ziele
+              rechts vom Trenner FÜHREN eine Handlung aus. Bis dahin standen
+              beide Sorten im selben `middle`-Rhythmus und im selben Gewicht.
+              Der Trenner ist die ganze Absetzung — eine eigene Klammer braucht
+              es nicht: antds `Space` flacht nur Fragment-KINDER ab, und
+              `<AlarmZentrale/>` ist ein Komponenten-Element, ihre zwei Knöpfe
+              liegen also ohnehin schon in EINEM `.ant-space-item` ohne inneren
+              Abstand (gemessen).
+              Farbschema und Bediendichte sind hier ganz heraus und wohnen
+              breitenunabhängig im Benutzermenü — Einstellungen gehören nicht in
+              eine Aktionsreihe (CLAUDE.md, Nachtrag 30.07.2026). */}
           <AlarmZentrale />
+          {/* `vertical`, NICHT `type="vertical"`: antd 6 meldet `type` als
+              veraltet (`divider/index.js`) und schriebe bei jedem Render beider
+              Layout-Suiten eine Dev-Warnung ins Protokoll.
+              `farbenDunkel.linieStark` statt eines rgba-Literals, weil die
+              Kopfzeile in BEIDEN Modi denselben dunklen Grund trägt — dieselbe
+              Begründung wie am `GlobalLink` und an der `IconRail`; ein
+              erfundener Farbwert wäre ein Fehler, kein Vorschlag.
+              `margin: 0`, weil der `middle`-Abstand des `Space` beidseits schon
+              sitzt. */}
+          <Divider
+            vertical
+            style={{ borderInlineStartColor: farbenDunkel.linieStark, height: 20, margin: 0 }}
+          />
           <CommandPaletteTrigger />
-          {breit && <ThemeToggle />}
           <BenutzerMenu />
         </Space>
       </Header>

@@ -9,6 +9,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { farbenDunkel } from '../theme/tokens';
+import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import AppLayout from './AppLayout';
 
 const admin = {
@@ -73,15 +74,50 @@ describe('AppLayout (globale Topbar)', () => {
   });
 
   /**
-   * Die Gegenprobe zum Schmal-Block darunter — und zwar mit DERSELBEN Abfrage.
-   * Ohne sie wäre die Null unten auch dann grün, wenn die Beschriftung falsch
-   * geschrieben oder die Rolle eine andere wäre.
+   * AK 1 von LFH-392: die Zahl der Bedienziele ist BELEGT gesunken.
+   *
+   * KALIBRIERT GEGEN DEN BESTAND, nicht gegen eine Wunschzahl: vor dem Umbau
+   * zählte dieselbe Abfrage hier 10 (2 Links + 2 Knöpfe + 6 Segment-Radios),
+   * danach 4. Wer den Zähler auf `getAllByRole('button')` verkürzt, misst vorher
+   * wie nachher 2 und behauptet einen Fortschritt, den er nicht gemessen hat —
+   * die Herleitung steht in `test/kopfzeile.ts`.
+   *
+   * `radio: 0` IST DIE NULLAUSSAGE dieses Pakets, und zwar die einzige, die rot
+   * werden kann. Hier stand zuerst ein Paar `queryByRole('radiogroup', { name:
+   * 'Farbschema wählen' })` — nutzlos: das Etikett kam mit `ThemeToggle.tsx` fort
+   * und existiert im ganzen Repo nicht mehr, die Null war damit durch keine
+   * Änderung am Produktivcode widerlegbar. Diese hier schlägt an, sobald
+   * IRGENDEIN Segmented oder Radio in die Kopfzeile zurückkehrt — unabhängig
+   * davon, wie es beschriftet ist.
    */
-  it('ab lg stehen beide Umschalter in der Kopfzeile', async () => {
+  it('AK1 — die Kopfzeile trägt nur noch 4 Bedienziele (vorher 10)', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
-    expect(screen.getByRole('radiogroup', { name: 'Farbschema wählen' })).toBeInTheDocument();
-    expect(screen.getByRole('radiogroup', { name: 'Bediendichte wählen' })).toBeInTheDocument();
+    expect(bedienzieleNachRolle()).toEqual({ button: 2, radio: 0, link: 2 });
+    expect(zaehleBedienziele()).toBe(4);
+  });
+
+  /**
+   * AK 2 als PAAR zum Test darüber: was aus der Kopfzeile verschwindet, ist
+   * nachweislich woanders erreichbar. Ohne diese Hälfte belegte die 4 oben nur,
+   * dass etwas WEG ist — nicht, dass es noch bedienbar ist.
+   *
+   * Geprüft wird ERREICHBARKEIT, nicht Wirkung: `renderMitProviders` montiert
+   * keinen `ThemeModeProvider`, `useThemeMode` fällt deshalb auf `system` /
+   * `kompakt` zurück (ThemeModeProvider.tsx:165-175). Dass ein Klick bis ans
+   * `<html>` durchschlägt, prüft `BenutzerMenu.test.tsx` — dort steht der
+   * Provider.
+   */
+  it('AK2 — beide Achsen sind ab lg im Benutzermenü erreichbar', async () => {
+    setup(admin);
+    await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
+
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: /System ✓/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^Dunkel$/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^Handschuh$/ })).toBeInTheDocument();
   });
 
   it('rendert den sichtbaren Such-Trigger in der globalen Kopfzeile', async () => {
@@ -101,10 +137,10 @@ describe('AppLayout (globale Topbar)', () => {
       // Der Trigger trägt hier keinen Namen mehr, deshalb hängt das Warten am
       // `aria-label` statt am Anzeigenamen.
       expect(await screen.findByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
-      expect(screen.queryByRole('radiogroup', { name: 'Farbschema wählen' })).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole('radiogroup', { name: 'Bediendichte wählen' }),
-      ).not.toBeInTheDocument();
+      // Über die ROLLE gezählt, nicht über das Etikett: „Farbschema wählen"
+      // existiert seit LFH-392 nirgends mehr im Repo, eine Null darauf wäre
+      // durch keine Änderung widerlegbar. Siehe `test/kopfzeile.ts`.
+      expect(radiosImKopf()).toBe(0);
       // Der Anzeigename ist mit dem Trigger geschrumpft — die drei
       // Bestandsfälle oben laufen deshalb bewusst auf der Standardbreite.
       expect(screen.queryByText('Chef')).not.toBeInTheDocument();

@@ -117,8 +117,9 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
               und `label[for]` benennt in HTML nur *labelable elements*. Eine
               `Radio.Group` ist ein `div[role="radiogroup"]` und gehört nicht dazu — ohne
               den Namen stünden hier sechs Auswahlflächen in einer namenlosen Gruppe.
-              Dieselbe Lösung tragen die benannten Gruppen der Kopfzeile
-              („Farbschema wählen", „Bediendichte wählen"). */}
+              Dieselbe Lösung trugen bis LFH-392 die zwei `Segmented` der Kopfzeile
+              („Farbschema wählen", „Bediendichte wählen"); sie sind fort, die
+              Begründung darüber steht für sich. */}
           <Radio.Group
             name="sichtung"
             aria-label="Sichtungskategorie"

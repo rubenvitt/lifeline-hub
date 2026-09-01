@@ -3,7 +3,6 @@ import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel } from '../theme/tokens';
-import ThemeToggle from './ThemeToggle';
 import BenutzerMenu from './BenutzerMenu';
 import CommandPaletteTrigger from './CommandPaletteTrigger';
 import { useViewport } from './useViewport';
@@ -106,10 +105,12 @@ function GlobalLink({
 
 export default function AppLayout() {
   const { benutzer } = useAuth();
-  // Dieselbe Schwelle wie im Einsatz-Workspace: unter `lg` legt die Kopfzeile
-  // ihre Umschalter ab. Die Frage stellt ausschließlich `useViewport` — eine
-  // zweite, handgeschriebene Breitenabfrage driftet still von antds Schwellen
-  // weg (erzwungen von `useViewport.guard.test.ts`).
+  // Dieselbe Schwelle wie im Einsatz-Workspace. Sie trägt seit LFH-392 nur noch
+  // EINE Frage: ob der Sperrgrund am Verwaltungs-Link als Tag danebensteht — die
+  // Umschalter hingen früher ebenfalls hier und sind jetzt breitenunabhängig im
+  // Benutzermenü. Die Frage stellt ausschließlich `useViewport`; eine zweite,
+  // handgeschriebene Breitenabfrage driftet still von antds Schwellen weg
+  // (erzwungen von `useViewport.guard.test.ts`).
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
 
@@ -125,12 +126,15 @@ export default function AppLayout() {
           gesperrt={!darfVerwaltung(benutzer)}
           grundSichtbar={breit}
         />
+        {/* Farbschema UND Bediendichte wohnen seit LFH-392 auf JEDER Breite im
+            Benutzermenü, nicht mehr ab `lg` zusätzlich hier. Sie sind
+            Einstellungen, keine Aktionen — und ein Element, das keine Aktion ist,
+            gehört nicht in eine Aktionsreihe (CLAUDE.md, Nachtrag 30.07.2026 zur
+            Erfassungs-Knopfreihe). Zwei Dreier-Segmentleisten trugen die zwei
+            Einstellungen mit SECHS Zielen breit aus, während dieselbe Wahl im
+            Menü darunter schon vollständig lag. */}
         <Space style={{ marginLeft: 'auto' }} size="middle">
           <CommandPaletteTrigger />
-          {/* Unter `lg` wandern Farbschema UND Bediendichte ins Benutzermenü —
-              nicht ersatzlos weg. Der Umschalter belegt hier zwei Segmentleisten
-              nebeneinander; das ist auf 390 px die Hälfte der Zeile. */}
-          {breit && <ThemeToggle />}
           <BenutzerMenu />
         </Space>
       </Header>
