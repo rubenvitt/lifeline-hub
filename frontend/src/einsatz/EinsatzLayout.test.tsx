@@ -397,6 +397,8 @@ describe('EinsatzLayout', () => {
    * Layout — ein Pixelabstand wäre hier eine erfundene Zahl. Belegbar ist die
    * DOM-Semantik: es gibt genau einen Trenner, die Alarm-Knöpfe stehen davor,
    * die Aktionen dahinter. Das Sichtbare belegen die Bilder am Ticket.
+   * Der Test läuft auf der Vitest-Vorgabebreite (1024, also ab `lg`); die
+   * Null unter `lg` steht im Schmal-Block unten — beide zusammen sind das Paar.
    *
    * `compareDocumentPosition` statt `children.indexOf`: antds `Space` wickelt
    * JEDES Kind in ein eigenes `.ant-space-item`, die Knöpfe sind also Enkel und
@@ -554,6 +556,17 @@ describe('EinsatzLayout', () => {
       expect(
         screen.getByRole('button', { name: 'Alarmton durch Klick entsperren' }),
       ).toBeInTheDocument();
+    });
+
+    it('trägt unter lg KEINEN Trenner — das 390-px-Budget hält ihn nicht (gemessen)', async () => {
+      // Die Gegenprobe zum Trenner-Test ab lg. Er ist ein eigenes `Space`-Kind
+      // und kostet einen vollen `middle`-Abstand mit; auf 390 px lief der
+      // UHS-Grundriss damit um 20 px waagerecht über
+      // (`e2e/uhs-grundriss-touch.spec.ts`). Die Null ist widerlegbar: dieselbe
+      // Abfrage findet ab lg genau einen Trenner (Test oben).
+      setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(within(screen.getByRole('banner')).queryAllByRole('separator')).toHaveLength(0);
     });
 
     it('hält Hamburger und Schließen-Knopf auf der A1-Trefffläche', async () => {

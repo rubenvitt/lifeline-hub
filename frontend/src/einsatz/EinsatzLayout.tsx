@@ -309,7 +309,27 @@ export default function EinsatzLayout() {
               breitenunabhängig im Benutzermenü — Einstellungen gehören nicht in
               eine Aktionsreihe (CLAUDE.md, Nachtrag 30.07.2026). */}
           <AlarmZentrale />
-          {/* `vertical`, NICHT `type="vertical"`: antd 6 meldet `type` als
+          {/* DER TRENNER STEHT ERST AB `lg` — und das ist eine Messung, keine
+              Vorliebe. Er ist ein eigenes `Space`-Kind und kostet damit nicht
+              nur seine Strichbreite, sondern zusätzlich einen vollen
+              `middle`-Abstand: auf 390 px lief der UHS-Grundriss dadurch um
+              20 px waagerecht über (`e2e/uhs-grundriss-touch.spec.ts` — auf
+              `main` grün, mit dem breitenunabhängigen Trenner rot). Das
+              Kopfzeilenbudget auf 390 px ist eine bewirtschaftete Größe
+              (LFH-329 · B1); ein Trenner, der es sprengt, kauft Gliederung mit
+              Überlauf.
+              DIE HÜLLENVARIANTE IST GEMESSEN UND VERWORFEN: Alarmzentrale und
+              Trenner in ein gemeinsames `inline-flex` zu packen spart zwar den
+              Abstand, nimmt den zwei Alarm-Knöpfen aber die Umbruchmöglichkeit —
+              die Kopfzeile wuchs damit auf 486 px bei 390 px Schirm (135 px
+              Überlauf), also schlimmer als der Ausgangszustand.
+              KEIN WIDERSPRUCH ZUM ZWECK DES TASKS: unter `lg` steht rechts vom
+              Alarmblock ohnehin nur noch Suchen + Benutzermenü, und die zwei
+              Gruppen grenzen sich dort schon durch den Zeilenbruch der
+              Alarmtexte ab (der eigene Befund LFH-511). Zu trennen ist die
+              Reihe, die dicht ist — und dicht ist sie ab `lg`.
+
+              `vertical`, NICHT `type="vertical"`: antd 6 meldet `type` als
               veraltet (`divider/index.js`) und schriebe bei jedem Render beider
               Layout-Suiten eine Dev-Warnung ins Protokoll.
               `farbenDunkel.linieStark` statt eines rgba-Literals, weil die
@@ -318,10 +338,12 @@ export default function EinsatzLayout() {
               erfundener Farbwert wäre ein Fehler, kein Vorschlag.
               `margin: 0`, weil der `middle`-Abstand des `Space` beidseits schon
               sitzt. */}
-          <Divider
-            vertical
-            style={{ borderInlineStartColor: farbenDunkel.linieStark, height: 20, margin: 0 }}
-          />
+          {breit && (
+            <Divider
+              vertical
+              style={{ borderInlineStartColor: farbenDunkel.linieStark, height: 20, margin: 0 }}
+            />
+          )}
           <CommandPaletteTrigger />
           <BenutzerMenu />
         </Space>
