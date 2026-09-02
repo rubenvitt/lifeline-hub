@@ -34,7 +34,11 @@ import {
   type AnzeigeKonventionen,
 } from '../../anzeige/format';
 import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
-import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
+import {
+  warnstufeKennzahl,
+  type StatusDarstellung,
+  type Statusrolle,
+} from '../../theme/statusFarben';
 import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
@@ -64,6 +68,34 @@ export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
  * zeigen. Die Verengung ist damit das Ehrlichere, nicht das Bequemere.
  */
 export type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
+
+/**
+ * Der ZWEITE KANAL des Dringlichkeitsmarkers (LFH-395, WCAG 1.4.1).
+ *
+ * `form` ist dabei kein neu erfundenes Vokabular: {@link StatusDarstellung}
+ * führt den Slot seit LFH-328 als „optional zusätzlich" — er hatte nur nie
+ * einen Konsumenten. Dies ist der erste; wer einen zweiten braucht, nimmt
+ * dieselben drei Werte, statt eine vierte Form danebenzustellen.
+ *
+ * WARUM HIER UND NICHT IN `theme/statusFarben.ts`, obwohl der Vertragstyp von
+ * dort kommt: dessen Abdeckungsguard zählt die Maps gegen eine Literal-Liste
+ * **und** `toHaveLength(10)`. Ein elfter Eintrag wäre eine Änderung am Vertrag
+ * und an seinem Guard — eine eigene Entscheidung, kein Nebenprodukt dieses
+ * Fehlerfixes. Dieselbe Erwägung wie bei `einsatz/einsatzStatus.ts`
+ * (LFH-345 · M14), und `Dringlichkeit` ist ohnehin eine Verengung fürs
+ * Dashboard statt eines eigenen Vertrags.
+ *
+ * `label` benennt die STUFE, nicht ihren Anlass — und das ist erzwungen, nicht
+ * gewählt: derselbe `alarm` entsteht an der Auftrags- wie an der Meldungszeile
+ * aus `ist_ueberfaellig`, `achtung` aber nur an der Meldungszeile (Status
+ * `neu`) und an der Auftragszeile gar nicht. Ein Wort je Anlass bräuchte also
+ * eine Map je Liste; ein Wort je Stufe trägt beide.
+ */
+export const DRINGLICHKEIT_ZEICHEN: Record<Dringlichkeit, StatusDarstellung> = {
+  alarm: { rolle: 'alarm', label: 'dringend', form: 'dreieck' },
+  achtung: { rolle: 'achtung', label: 'erhöht', form: 'balken' },
+  normal: { rolle: 'normal', label: 'normal', form: 'kreis' },
+};
 
 /** Rolle → Dringlichkeit. `Record` über die VOLLE `Statusrolle`, damit eine siebte
  *  Rolle im Vertrag hier den Build bricht statt still auf `normal` zu fallen. Die drei

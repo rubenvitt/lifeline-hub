@@ -350,6 +350,61 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     expect(zeile).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=88');
   });
 
+  it('Kurzlisten-Zeilen verschiedener Dringlichkeit unterscheiden sich ohne Farbe (LFH-395)', async () => {
+    // WCAG 1.4.1: bis LFH-395 hing die Stufe ALLEIN an der Farbe des Markers —
+    // Form, Symbol und Text waren über alle drei Stufen gleich. Der zweite Kanal
+    // ist jetzt doppelt: die FORM des Markers (`form` aus `StatusDarstellung`,
+    // bis dahin ein deklarierter, aber konsumentenloser Slot) und das Stufenwort
+    // im zugänglichen Namen der Zeile. Beides wird geprüft — die Klasse allein
+    // wäre kein Beleg, sie ist der Träger der Farbe (AK1).
+    mockEndpunkte({
+      personen: [person('sk3')],
+      meldungen: [
+        meldung({ id: 1, lfd_nr: 1, inhalt: 'Deich bricht', ist_ueberfaellig: true }),
+        meldung({ id: 2, lfd_nr: 2, inhalt: 'Keller unter Wasser', status: 'neu' }),
+        meldung({ id: 3, lfd_nr: 3, inhalt: 'Sandsaecke geliefert', status: 'in_bearbeitung' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisst');
+
+    const dringend = await screen.findByRole('link', { name: /Deich bricht/ });
+    const erhoeht = screen.getByRole('link', { name: /Keller unter Wasser/ });
+    const normal = screen.getByRole('link', { name: /Sandsaecke geliefert/ });
+
+    // Kanal „Text": ohne das Stufenwort bliebe die Zeile für Vorlesende
+    // stufenlos, egal wie deutlich der Marker aussieht (AK3).
+    expect(dringend).toHaveAccessibleName(/dringend/);
+    expect(erhoeht).toHaveAccessibleName(/erhöht/);
+    expect(normal).toHaveAccessibleName(/normal/);
+
+    // Kanal „Form": drei Stufen, drei verschiedene Formen. Dass die Formachse
+    // ohne Farbe auskommt und die Farbachse ohne Geometrie, belegt die
+    // CSS-Prüfung in „Der Dringlichkeitsmarker (LFH-395)".
+    const form = (zeile: HTMLElement) =>
+      [...zeile.querySelector('.lfh-zeichen')!.classList].find((k) =>
+        /^lfh-zeichen--(dreieck|kreis|balken)$/.test(k),
+      );
+    const formen = [form(dringend), form(erhoeht), form(normal)];
+    expect(formen, 'jede Stufe braucht eine Form').not.toContain(undefined);
+    expect(new Set(formen).size, 'drei Stufen, drei Formen').toBe(3);
+  });
+
+  it('das Zeichen im Kachelkopf bleibt stumme Deko — es trägt keine Stufe', async () => {
+    // Gegenaussage zum Test darüber: der Marker im Kachelkopf ist Gestaltung,
+    // kein Status. Bekäme er im selben Zug eine Stimme, stünde in jeder Kachel
+    // ein bedeutungsloses Vorleseziel — derselbe Fehler, den CLAUDE.md an
+    // `AmpelZelle` beschreibt, nur andersherum.
+    mockEndpunkte({ personen: [person('sk3')] });
+    render();
+    await kennzahlGeladen('Vermisst');
+    const kopf = screen.getByRole('heading', { name: 'Meldungen (eingehend)' }).parentElement!;
+    const deko = kopf.querySelector('.lfh-zeichen')!;
+    expect(deko).toHaveAttribute('aria-hidden', 'true');
+    expect(deko).not.toHaveAttribute('aria-label');
+    expect(within(kopf).queryByRole('img')).toBeNull();
+  });
+
   // Die zweite Hälfte von AK2: ohne sie wäre „mindestens eine Zeile" auch dann
   // erfüllt, wenn der Leerzustand genauso aussieht.
   it('ohne Aufträge zeigt die Kachel den Leerzustand und KEINE Zeile', async () => {
@@ -895,6 +950,61 @@ describe('Die Kennzahlenleiste in sprache.css', () => {
       css,
       'ein unskopiertes .lfh-zeile:first-child träfe jede Zeile im <li>-Wrapper',
     ).not.toMatch(/^\.lfh-zeile:first-child/m);
+  });
+});
+
+describe('Der Dringlichkeitsmarker (LFH-395)', () => {
+  const hier = dirname(fileURLToPath(import.meta.url));
+  const css = readFileSync(join(hier, '..', '..', 'theme', 'sprache.css'), 'utf-8');
+  const quelle = readFileSync(join(hier, 'LageDashboardPage.tsx'), 'utf8');
+
+  /** Der Rumpf der ersten Regel für `wahl`. */
+  function regel(wahl: string): string {
+    const start = css.indexOf(wahl);
+    expect(start, `Selektor ${wahl} steht nicht in sprache.css`).toBeGreaterThanOrEqual(0);
+    const auf = css.indexOf('{', start);
+    return css.slice(auf + 1, css.indexOf('}', auf));
+  }
+
+  it('Form und Farbe liegen auf getrennten Achsen — die Form braucht die Farbe nicht', () => {
+    // Das ist die Bedingung, unter der die Form überhaupt ein ZWEITER Kanal ist:
+    // eine Formregel, die ihre Statusfarbe selbst mitbrächte, wäre nur eine
+    // zweite Schreibweise der ersten. Die Farbe erreicht die Form über
+    // `currentColor` — dieselbe Bauform wie in `Tastenkuerzel` (CLAUDE.md).
+    const formen = {
+      dreieck: regel('.lfh-zeichen--dreieck {'),
+      kreis: regel('.lfh-zeichen--kreis {'),
+      balken: regel('.lfh-zeichen--balken {'),
+    };
+    for (const [name, block] of Object.entries(formen)) {
+      expect(block, `${name}: eine Formregel trägt keine Statusfarbe`).not.toMatch(
+        /var\(--lfh-(alarm|achtung|normal)\)/,
+      );
+    }
+    // Drei Namen sind noch keine drei Formen.
+    const rumpf = Object.values(formen).map((b) => b.replace(/\s+/g, ' ').trim());
+    expect(new Set(rumpf).size, 'drei Formnamen, drei Geometrien').toBe(3);
+
+    for (const stufe of ['alarm', 'achtung', 'normal'] as const) {
+      const block = regel(`.lfh-zeichen--${stufe} {`);
+      expect(block, `${stufe}: die Farbe kommt aus der Rolle`).toMatch(
+        new RegExp(`color:\\s*var\\(--lfh-${stufe}\\)`),
+      );
+      expect(block, `${stufe}: Geometrie gehört nicht in eine Farbregel`).not.toMatch(
+        /width|height|border-radius|border-left|border-right|border-bottom/,
+      );
+    }
+  });
+
+  it('jeder Marker der Seite trägt eine Formklasse', () => {
+    // Seit LFH-395 trägt `.lfh-zeichen` selbst keine Geometrie mehr — die kommt
+    // aus der Formklasse. Ein Marker ohne sie wäre 0 × 0 px und damit spurlos
+    // weg: kein Fehler, kein roter Test, nur ein verschwundenes Zeichen.
+    const zeilen = quelle.split('\n').filter((z) => z.includes('lfh-zeichen'));
+    expect(zeilen.length, 'die Marker der Seite werden nicht mehr gefunden').toBeGreaterThan(0);
+    for (const z of zeilen) {
+      expect(z.trim(), 'Marker ohne Formklasse').toMatch(/lfh-zeichen--(dreieck|kreis|balken|\$\{)/);
+    }
   });
 });
 

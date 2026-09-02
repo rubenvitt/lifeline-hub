@@ -38,7 +38,13 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
-import { baueLagebild, dtgJetzt, type Datenzustand, type Dringlichkeit } from './lagebild';
+import {
+  baueLagebild,
+  DRINGLICHKEIT_ZEICHEN,
+  dtgJetzt,
+  type Datenzustand,
+  type Dringlichkeit,
+} from './lagebild';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import '../../theme/sprache.css';
 
@@ -107,6 +113,30 @@ function Plakette({ stufe, children }: { stufe: Dringlichkeit; children: React.R
   return <span className={`lfh-plakette lfh-plakette--${stufe}`}>{children}</span>;
 }
 
+/**
+ * Der Dringlichkeitsmarker einer Kurzlisten-Zeile — mit zweitem Kanal (LFH-395).
+ *
+ * Die Form kommt aus {@link DRINGLICHKEIT_ZEICHEN}, die Farbe aus der
+ * Stufenklasse; `sprache.css` hält beide Achsen getrennt.
+ *
+ * Er ist NICHT mehr `aria-hidden`: als einziger Träger der Dringlichkeit wäre
+ * die Zeile sonst für Vorlesende stufenlos. Ein eigenes Vorleseziel wird er
+ * dadurch nicht — er steht INNERHALB des Zeilen-Links, dessen Name sich aus
+ * seinem Inhalt bildet, das Stufenwort fliesst also in den Linknamen ein. Genau
+ * deshalb bleibt das Zeichen im Kachelkopf `aria-hidden`: dort ist es Deko und
+ * hätte nichts zu sagen.
+ */
+function Zeichen({ stufe }: { stufe: Dringlichkeit }) {
+  const { form, label } = DRINGLICHKEIT_ZEICHEN[stufe];
+  return (
+    <span
+      className={`lfh-zeichen lfh-zeichen--${form} lfh-zeichen--${stufe}`}
+      role="img"
+      aria-label={label}
+    />
+  );
+}
+
 function Kachel(props: {
   titel: string;
   mehr: string;
@@ -123,7 +153,9 @@ function Kachel(props: {
   return (
     <section className={`lfh-kachel${breit ? ' lfh-kachel--breit' : ''}`}>
       <header className="lfh-kachel__kopf">
-        <span className="lfh-zeichen" aria-hidden="true" />
+        {/* Deko, kein Status: stufenlos und stumm (LFH-395). Die Formklasse ist
+            trotzdem Pflicht — die Basis trägt seit LFH-395 keine Geometrie. */}
+        <span className="lfh-zeichen lfh-zeichen--dreieck" aria-hidden="true" />
         <h2 className="lfh-kachel__titel">{titel}</h2>
         <button type="button" className="lfh-kachel__mehr lfh-knopf-blank" onClick={aufMehr}>
           {mehr}
@@ -582,7 +614,7 @@ export default function LageDashboardPage() {
               {(lagebild?.auftragszeilen ?? []).map((z) => (
                 <li key={z.id}>
                   <Link className="lfh-zeile" to={auftraegePfad(einsatzId, { auftrag: z.id })}>
-                    <span className={`lfh-zeichen lfh-zeichen--${z.stufe}`} aria-hidden="true" />
+                    <Zeichen stufe={z.stufe} />
                     {z.lfdNr != null && <span className="lfh-zeile__nr">{z.lfdNr}</span>}
                     <span className="lfh-zeile__text">{z.text}</span>
                     {z.frist && <time className="lfh-zahl">{z.frist}</time>}
@@ -631,7 +663,7 @@ export default function LageDashboardPage() {
               {(lagebild?.meldungszeilen ?? []).map((z) => (
                 <li key={z.id}>
                   <Link className="lfh-zeile" to={meldungenPfad(einsatzId, { meldung: z.id })}>
-                    <span className={`lfh-zeichen lfh-zeichen--${z.stufe}`} aria-hidden="true" />
+                    <Zeichen stufe={z.stufe} />
                     <span className="lfh-zeile__nr">{z.lfdNr}</span>
                     <time className="lfh-zahl">{z.zeit}</time>
                     <span className="lfh-zeile__text">{z.text}</span>
