@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Divider, Drawer, Layout, Space, Spin } from 'antd';
+import { Alert, Button, Divider, Drawer, Layout, Space, Spin, theme } from 'antd';
 import { TbMenu2 } from 'react-icons/tb';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -67,6 +67,71 @@ const KOPF_STIL = {
  */
 const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
 
+/* ── Das Breitenbudget der Kopfzeile auf 390 px (LFH-511) ─────────────────────
+   Die Kopfzeile lief auf dem Handschirm über, sobald die Dichtestufe über
+   `kompakt` stieg — und der mobile Kontext IST `komfortabel` (Bedien-Leitlinie
+   A1, per `zeigerIstGrob` aus `(pointer: coarse)` vorbelegt). Gemessen:
+
+     Reihenkinder konstant   Alarmzentrale 169–171 · Suchen 48 · Benutzermenü 46
+     Reihen-Abstand ×2       kompakt 22 · komfortabel 36 · handschuh 52
+     Bedarf gesamt           389 · 403 · 421   gegen 390 px
+
+   ES WÄCHST NUR DER ABSTAND, nicht der Inhalt: die drei Ziele sind in jeder
+   Stufe gleich breit (icon-only bzw. textgebunden). Bei `kompakt` endete die
+   Reihe auf den Pixel genau am Innenrand — null Reserve, also kippt jede Stufe
+   darüber. Deshalb ein DECKEL auf den Abstand, kein neuer Sollwert: dieselbe
+   Bauform wie `aktionsabstand()` in `pages/uhs/Grundriss.tsx` (LFH-378), und
+   dieselbe Begründung — wo die Breite gebunden ist, ginge jede zusätzliche
+   Lücke direkt von der Trefffläche ab.
+
+   DIE ZIELE SELBST BLEIBEN UNANGETASTET. Die Alarmzentrale behält ihren Text
+   in jeder Stufe: „blockiert" oder „stumm" darf im Einsatz nicht nur über eine
+   Ikone vermittelt werden (LFH-392). Der Deckel kauft die 13 bzw. 31 px allein
+   aus Weißraum.
+
+   DER GEWINN GEHT AN DEN EINSATZNAMEN, nicht in Reserve: `REST_STIL` ist das
+   einzige elastische Kind, es stand auf allen drei Stufen bei 0 px. Was der
+   Deckel freigibt, bekommt der Name. */
+
+/** Kopf-Abstand am breiten Schirm. Der schmale nimmt `--lfh-kopf-polsterung`. */
+const KOPF_GAP = 16;
+const KOPF_GAP_SCHMAL = 12;
+/** Polsterung je Seite auf schmalem Schirm — Spiegel von `theme/rollen.css:73`. */
+const KOPF_POLSTERUNG_SCHMAL = 12;
+/** Deckel des Reihen-Abstands. Unter dem kompakten `abstand.md` (11), damit die
+ *  Rechnung auch in `handschuh` aufgeht, wo die Alarmzentrale 2 px breiter misst. */
+const REIHE_GAP_DECKEL = 10;
+/** Breiteste gemessene Belegung der Aktionsreihe (handschuh, „Desktop blockiert"). */
+export const KOPF_REIHE_KINDER = 265;
+/** Der Handschirm, für den das Budget gilt (Bedien-Leitlinie A1). */
+export const KOPF_BUDGET_BREITE = 390;
+
+/**
+ * Kopf- und Reihen-Abstand. Rein und exportiert aus demselben Grund wie
+ * `aktionsabstand`: nur so ist die Bilanz über alle Dichtestufen prüfbar, ohne
+ * zu rendern — jsdom rechnet kein Layout.
+ */
+export function kopfAbstaende(padding: number, schmal: boolean): { kopf: number; reihe: number } {
+  return schmal
+    ? { kopf: KOPF_GAP_SCHMAL, reihe: Math.min(padding, REIHE_GAP_DECKEL) }
+    : { kopf: KOPF_GAP, reihe: padding };
+}
+
+/**
+ * Was die Kopfzeile auf dem Handschirm mindestens braucht. Der Einsatzname ist
+ * NICHT enthalten — er ist das elastische Kind und darf auf 0 fallen; alles
+ * andere ist fest.
+ */
+export function kopfBedarf(abstaende: { kopf: number; reihe: number }): number {
+  return (
+    2 * KOPF_POLSTERUNG_SCHMAL +
+    TREFFLAECHE +
+    2 * abstaende.kopf +
+    KOPF_REIHE_KINDER +
+    2 * abstaende.reihe
+  );
+}
+
 /**
  * Ebene 2: Einsatz-Workspace mit Switcher-Header, Icon-Rail und Modul-Panel.
  *
@@ -101,6 +166,11 @@ export default function EinsatzLayout() {
 
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
+  // `token.padding` IST der Wert, den `Space size="middle"` sonst zöge
+  // (`abstand.md`, 11/18/26) — der Deckel deckelt also den echten Abstand und
+  // führt keine Parallelzahl ein.
+  const { token } = theme.useToken();
+  const abstaende = kopfAbstaende(token.padding, !breit);
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
@@ -259,7 +329,7 @@ export default function EinsatzLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={KOPF_STIL}>
+      <Header style={{ ...KOPF_STIL, gap: abstaende.kopf }}>
         {!breit && (
           <Button
             type="text"
@@ -293,7 +363,7 @@ export default function EinsatzLayout() {
             <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
           )}
         </div>
-        <Space style={{ marginLeft: 'auto' }} size="middle">
+        <Space style={{ marginLeft: 'auto' }} size={abstaende.reihe}>
           {/* Die Alarm-Zentrale bleibt auf JEDER Breite stehen und nennt
               Desktop-/Tonstatus ausdrücklich; „blockiert“ oder „stumm“ darf im
               Einsatz nicht nur über eine Ikone vermittelt werden.
