@@ -73,26 +73,76 @@ test('Kopf-Polsterung: 24 px am Fükw-Schirm, 12 px auf 390 px', async ({ page }
   }
 });
 
-test('Kopfzeile: auf 390 px läuft sie nicht über', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(
-    page,
-    // Absichtlich lang: genau daran zeigt sich, ob der Name kürzt oder schiebt.
-    `E2E Hochwasser Nord — Deichverteidigung Abschnitt West ${Date.now()}`,
+/**
+ * IN BEIDEN DICHTESTUFEN, und das ist eine Messung aus LFH-392: mit einem
+ * zusätzlichen `Space`-Kind in der Einsatz-Kopfzeile (dem Trenner vor den
+ * Aktionen) lief der Kopf auf 390 px um 20 px über — `scrollWidth` 410 gegen
+ * `clientWidth` 390 — aber NUR in `komfortabel`, wo der `middle`-Abstand 18 px
+ * statt 11 px trägt und jedes Ziel 48 statt 30 px breit ist. Dieser Test lief
+ * bis dahin ausschließlich mit feinem Zeiger, also in `kompakt`, und blieb grün;
+ * gefunden hat den Überlauf ein Touch-Test einer fremden Seite
+ * (`uhs-grundriss-touch.spec.ts`, `hasTouch: true`). Ein 390-px-Budget, das nur
+ * in der Fükw-Stufe geprüft wird, prüft den Kontext nicht, für den 390 px
+ * stehen: der mobile Kontext ist `komfortabel` (Bedien-Leitlinie A1).
+ *
+ * `hasTouch` statt einer gespeicherten Wahl, weil das der Weg ist, den das Gerät
+ * nimmt: `useViewport.zeigerIstGrob` belegt die Stufe ohne gespeicherte Wahl
+ * aus `(pointer: coarse)` vor (LFH-361). Die VORBEDINGUNG auf `data-dichte` ist
+ * tragend — fiele die Vorbelegung, liefe die Touch-Variante still in `kompakt`
+ * und wäre grün durch Nichtstun.
+ *
+ * DIE EINSATZ-KOPFZEILE IST IN `komfortabel` EIN BENANNTER RESTPOSTEN (LFH-511),
+ * kein toleriertes Pixel: auch OHNE den Trenner misst ihre `Space` dort 299 px
+ * (Alarmzentrale 169 + 2 × 18 Abstand + Suchen 48 + Benutzermenü 46) und steht
+ * mit Hamburger (48) und zwei Kopf-Abständen (16 + 16) bei 379 px gegen 366 px
+ * Innenbreite — 13 px in die Polsterung, 1 px über den Kopf (`scrollWidth` 391).
+ * Das ist Bestand (`main` trägt auf 390 px denselben Kopf-DOM) und gehört zur
+ * Alarmzentrale, nicht zu diesem Paket. Ein `≤ 1`-Spielraum wie in
+ * `uhs-grundriss-touch.spec.ts` verschluckte die 13 px in der Polsterung —
+ * deshalb `fixme` mit Ticket statt Toleranz; ein rot geborenes Gate würde
+ * abgeschaltet statt befolgt. Wer LFH-511 schließt, nimmt das `fixme` heraus.
+ */
+async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' | 'komfortabel') {
+  await page.goto(route);
+  const kopf = page.locator('header');
+  await expect(kopf, route).toBeVisible();
+  await expect(page.locator('html'), `${route}: Vorbedingung Dichtestufe`).toHaveAttribute(
+    'data-dichte',
+    stufe,
   );
+  const masse = await kopf.evaluate((el) => ({ scroll: el.scrollWidth, klient: el.clientWidth }));
+  expect(masse.scroll, `${route}: Kopfzeile läuft über`).toBeLessThanOrEqual(masse.klient);
+}
 
-  await page.setViewportSize(SCHMAL);
-  for (const route of ['/einsaetze', `/einsaetze/${einsatzId}/etb`]) {
-    await page.goto(route);
-    const kopf = page.locator('header');
-    await expect(kopf, route).toBeVisible();
-    const masse = await kopf.evaluate((el) => ({
-      scroll: el.scrollWidth,
-      klient: el.clientWidth,
-    }));
-    expect(masse.scroll, `${route}: Kopfzeile läuft über`).toBeLessThanOrEqual(masse.klient);
-  }
-});
+for (const [stufe, hasTouch] of [
+  ['kompakt', false],
+  ['komfortabel', true],
+] as const) {
+  test.describe(`Kopfzeile auf 390 px in Stufe ${stufe}`, () => {
+    test.use({ hasTouch });
+
+    test('die Ebene-1-Kopfzeile läuft nicht über', async ({ page }) => {
+      await anmelden(page);
+      await page.setViewportSize(SCHMAL);
+      await kopfLaeuftNichtUeber(page, '/einsaetze', stufe);
+    });
+
+    test('die Einsatz-Kopfzeile läuft nicht über', async ({ page }) => {
+      test.fixme(
+        stufe === 'komfortabel',
+        'LFH-511: die Alarmzentrale sprengt in komfortabel das 390-px-Budget (379 px gegen 366 px Innenbreite, gemessen) — Bestand, siehe Dateikommentar',
+      );
+      await anmelden(page);
+      const einsatzId = await einsatzAnlegen(
+        page,
+        // Absichtlich lang: genau daran zeigt sich, ob der Name kürzt oder schiebt.
+        `E2E Hochwasser Nord — Deichverteidigung Abschnitt West ${Date.now()}`,
+      );
+      await page.setViewportSize(SCHMAL);
+      await kopfLaeuftNichtUeber(page, `/einsaetze/${einsatzId}/etb`, stufe);
+    });
+  });
+}
 
 /**
  * DERSELBE Nachweis für den GESPERRTEN Zweig der Topbar (LFH-337 · Fix-Welle, Befund B1).

@@ -297,11 +297,11 @@ export default function EinsatzLayout() {
           {/* Die Alarm-Zentrale bleibt auf JEDER Breite stehen und nennt
               Desktop-/Tonstatus ausdrücklich; „blockiert“ oder „stumm“ darf im
               Einsatz nicht nur über eine Ikone vermittelt werden.
-              ABGESETZT SEIT LFH-392: sie ZEIGT einen Zustand, die drei Ziele
-              rechts vom Trenner FÜHREN eine Handlung aus. Bis dahin standen
-              beide Sorten im selben `middle`-Rhythmus und im selben Gewicht.
-              Der Trenner ist die ganze Absetzung — eine eigene Klammer braucht
-              es nicht: antds `Space` flacht nur Fragment-KINDER ab, und
+              ABGESETZT SEIT LFH-392 (ab `lg`, Begründung am Trenner unten): sie
+              ZEIGT einen Zustand, die zwei Ziele rechts vom Trenner FÜHREN eine
+              Handlung aus. Bis dahin standen beide Sorten im selben
+              `middle`-Rhythmus und im selben Gewicht. Der Trenner ist die ganze
+              Absetzung — eine eigene Klammer braucht es nicht: antds `Space` flacht nur Fragment-KINDER ab, und
               `<AlarmZentrale/>` ist ein Komponenten-Element, ihre zwei Knöpfe
               liegen also ohnehin schon in EINEM `.ant-space-item` ohne inneren
               Abstand (gemessen).
@@ -323,11 +323,16 @@ export default function EinsatzLayout() {
               Abstand, nimmt den zwei Alarm-Knöpfen aber die Umbruchmöglichkeit —
               die Kopfzeile wuchs damit auf 486 px bei 390 px Schirm (135 px
               Überlauf), also schlimmer als der Ausgangszustand.
-              KEIN WIDERSPRUCH ZUM ZWECK DES TASKS: unter `lg` steht rechts vom
-              Alarmblock ohnehin nur noch Suchen + Benutzermenü, und die zwei
-              Gruppen grenzen sich dort schon durch den Zeilenbruch der
-              Alarmtexte ab (der eigene Befund LFH-511). Zu trennen ist die
-              Reihe, die dicht ist — und dicht ist sie ab `lg`.
+              KEIN WIDERSPRUCH ZUM ZWECK DES TASKS, ABER EINE ABWEICHUNG VON DER
+              ENTSCHEIDUNG „eigene Gruppe + Trenner": unter `lg` ist die
+              Alarmzentrale UNABGESETZT — nicht anders abgesetzt. Rechts von ihr
+              stehen dieselben zwei Ziele wie ab `lg`, nur schmaler (Suchen ohne
+              Beschriftung, Benutzermenü als Initialen); zu trennen ist die
+              Reihe, die dicht ist, und dicht ist sie ab `lg`. Dass die
+              Alarmtexte auf 390 px heute umbrechen, ist der Befund LFH-511 und
+              KEIN Ersatz für die Trennung — die Entscheidung hier steht auf der
+              20-px-Messung allein und hält auch, wenn LFH-511 den Umbruch
+              beseitigt.
 
               `vertical`, NICHT `type="vertical"`: antd 6 meldet `type` als
               veraltet (`divider/index.js`) und schriebe bei jedem Render beider
@@ -337,7 +342,10 @@ export default function EinsatzLayout() {
               Begründung wie am `GlobalLink` und an der `IconRail`; ein
               erfundener Farbwert wäre ein Fehler, kein Vorschlag.
               `margin: 0`, weil der `middle`-Abstand des `Space` beidseits schon
-              sitzt. */}
+              sitzt. `height: 20` ist ein festes Maß und KEIN Bedienziel — die
+              Nachbarn wachsen mit der Dichte-Staffel, der Strich nicht;
+              dieselbe Trennung wie bei `Tastenkuerzel` (CLAUDE.md: „ein `<kbd>`
+              ist Satz, kein Ziel"). */}
           {breit && (
             <Divider
               vertical
