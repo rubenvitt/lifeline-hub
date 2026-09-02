@@ -91,16 +91,24 @@ test('Kopf-Polsterung: 24 px am Fükw-Schirm, 12 px auf 390 px', async ({ page }
  * tragend — fiele die Vorbelegung, liefe die Touch-Variante still in `kompakt`
  * und wäre grün durch Nichtstun.
  *
- * DIE EINSATZ-KOPFZEILE IST IN `komfortabel` EIN BENANNTER RESTPOSTEN (LFH-511),
- * kein toleriertes Pixel: auch OHNE den Trenner misst ihre `Space` dort 299 px
- * (Alarmzentrale 169 + 2 × 18 Abstand + Suchen 48 + Benutzermenü 46) und steht
- * mit Hamburger (48) und zwei Kopf-Abständen (16 + 16) bei 379 px gegen 366 px
- * Innenbreite — 13 px in die Polsterung, 1 px über den Kopf (`scrollWidth` 391).
- * Das ist Bestand (`main` trägt auf 390 px denselben Kopf-DOM) und gehört zur
- * Alarmzentrale, nicht zu diesem Paket. Ein `≤ 1`-Spielraum wie in
- * `uhs-grundriss-touch.spec.ts` verschluckte die 13 px in der Polsterung —
- * deshalb `fixme` mit Ticket statt Toleranz; ein rot geborenes Gate würde
- * abgeschaltet statt befolgt. Wer LFH-511 schließt, nimmt das `fixme` heraus.
+ * LFH-511 IST GESCHLOSSEN, das `fixme` ist damit heraus. Der Befund lautete:
+ * auch OHNE den Trenner mass die `Space` in `komfortabel` 299 px (Alarmzentrale
+ * 169 + 2 × 18 Abstand + Suchen 48 + Benutzermenü 46) und stand mit Hamburger
+ * (48) und zwei Kopf-Abständen (16 + 16) bei 379 px gegen 366 px Innenbreite —
+ * 13 px in die Polsterung, 1 px über den Kopf (`scrollWidth` 391).
+ *
+ * Behoben in `einsatz/EinsatzLayout.tsx` durch einen DECKEL auf den
+ * Kopf- und Reihen-Abstand am schmalen Schirm (Bauform `aktionsabstand()` aus
+ * LFH-378). Es wächst nur der Abstand, nicht der Inhalt: die drei Ziele sind in
+ * jeder Stufe gleich breit. Die Alarmzentrale behält deshalb ihren Text — die
+ * Forderung aus LFH-392, dass „blockiert"/„stumm" nicht nur über eine Ikone
+ * läuft, ist unangetastet. Die Bilanz je Dichtestufe prüft
+ * `EinsatzLayout.test.tsx` ohne Rendern; DASS sie im Browser aufgeht, prüft
+ * dieser Test.
+ *
+ * ZWEI WEITERE SPECS HINGEN AM SELBEN BEFUND, ohne ihn zu nennen:
+ * `einstellungen-schmal` und `kraefte-schmal` setzen ebenfalls `hasTouch` und
+ * messen `documentElement` — sie waren schlicht übersehen und liefen rot mit.
  */
 async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' | 'komfortabel') {
   await page.goto(route);
@@ -128,10 +136,6 @@ for (const [stufe, hasTouch] of [
     });
 
     test('die Einsatz-Kopfzeile läuft nicht über', async ({ page }) => {
-      test.fixme(
-        stufe === 'komfortabel',
-        'LFH-511: die Alarmzentrale sprengt in komfortabel das 390-px-Budget (379 px gegen 366 px Innenbreite, gemessen) — Bestand, siehe Dateikommentar',
-      );
       await anmelden(page);
       const einsatzId = await einsatzAnlegen(
         page,

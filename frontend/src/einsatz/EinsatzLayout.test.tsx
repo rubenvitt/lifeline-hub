@@ -9,8 +9,13 @@ import { setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import EinsatzLayout from './EinsatzLayout';
+import EinsatzLayout, {
+  KOPF_BUDGET_BREITE,
+  kopfAbstaende,
+  kopfBedarf,
+} from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
+import { dichten } from '../theme/tokens';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -592,6 +597,66 @@ describe('EinsatzLayout', () => {
       expect(schliessen.style.minWidth).toBe('48px');
       expect(schliessen.style.minHeight).toBe('48px');
     });
+  });
+});
+
+describe('EinsatzLayout · Breitenbudget der Kopfzeile (LFH-511)', () => {
+  // Die Stufen als HANDGESCHRIEBENE Zahlen daneben: `dichten` liefert sie zwar,
+  // aber die Behauptung „11/18/26" ist Teil des Befunds und soll brechen, wenn
+  // jemand die Staffel verschiebt, ohne diese Rechnung neu zu machen.
+  const STUFEN = [
+    ['kompakt', 11],
+    ['komfortabel', 18],
+    ['handschuh', 26],
+  ] as const;
+
+  it('die Staffel liefert genau die gemessenen Reihen-Abstände', () => {
+    for (const [stufe, erwartet] of STUFEN) {
+      expect(dichten[stufe].abstand.md, `${stufe}: abstand.md`).toBe(erwartet);
+    }
+  });
+
+  it('auf 390 px passt die Kopfzeile in JEDER Dichtestufe', () => {
+    for (const [stufe, padding] of STUFEN) {
+      const bedarf = kopfBedarf(kopfAbstaende(padding, true));
+      expect(bedarf, `${stufe}: Kopfzeile braucht ${bedarf} px`).toBeLessThanOrEqual(
+        KOPF_BUDGET_BREITE,
+      );
+    }
+  });
+
+  it('OHNE den Deckel läuft sie ab komfortabel über — das ist der Befund', () => {
+    // Die Gegenaussage. Ohne sie wäre der Test darüber auch von einem Deckel
+    // erfüllt, der nie greift, und der ganze Fix nicht belegt.
+    const ohneDeckel = (padding: number) => kopfBedarf({ kopf: 16, reihe: padding });
+
+    // `kompakt` hatte NULL RESERVE — im Browser gemessen endete die Reihe auf
+    // den Pixel genau am Innenrand (Space 286 bei [92…378], Innenbreite 366).
+    // Genau deshalb war der Überlauf ab der nächsten Stufe unausweichlich.
+    // Nicht „≤ Budget" behauptet, weil `KOPF_REIHE_KINDER` bewusst der
+    // Handschuh-Worst-Case ist (265 statt 263) und die Rechnung damit um 2 px
+    // nach oben irrt — in der richtigen Richtung für einen Deckel.
+    expect(Math.abs(ohneDeckel(11) - KOPF_BUDGET_BREITE), 'kompakt stand auf der Kante').toBeLessThanOrEqual(2);
+
+    expect(ohneDeckel(18), 'komfortabel MUSS ohne Deckel überlaufen').toBeGreaterThan(
+      KOPF_BUDGET_BREITE,
+    );
+    expect(ohneDeckel(26), 'handschuh MUSS ohne Deckel überlaufen').toBeGreaterThan(
+      KOPF_BUDGET_BREITE,
+    );
+    // Und der Deckel muss WIRKEN, nicht bloß existieren.
+    expect(kopfBedarf(kopfAbstaende(26, true)), 'mit Deckel bleibt Luft').toBeLessThan(
+      ohneDeckel(26),
+    );
+  });
+
+  it('am breiten Schirm bleibt der Abstand die Dichte-Staffel — der Deckel ist schmal-only', () => {
+    // Ein Deckel, der überall gilt, nähme der Dichteachse ihre Wirkung dort, wo
+    // sie nichts kostet. Geprüft wird die Ungleichheit über die Stufen.
+    const breit = STUFEN.map(([, p]) => kopfAbstaende(p, false).reihe);
+    expect(breit).toEqual([11, 18, 26]);
+    const schmal = STUFEN.map(([, p]) => kopfAbstaende(p, true).reihe);
+    expect(new Set(schmal).size, 'schmal ist der Abstand gedeckelt und damit konstant').toBe(1);
   });
 });
 
