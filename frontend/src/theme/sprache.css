@@ -73,29 +73,58 @@
   letter-spacing: 2px;
 }
 
-/* ── Signatur 2 · Das Dreieck als Sektionsmarke (DV 102) ───────────────────
-   Trägt Kachelköpfe und Zeilenmarker. Die drei Stufen unterscheiden sich
-   heute AUSSCHLIESSLICH über `border-bottom-color` — Breite und Höhe sind
-   identisch, ein zweiter (nicht-farblicher) Kanal fehlt. Die WCAG-1.4.1-Lücke
-   ist LFH-395 zugeordnet und dort in der Prüfliste verdiktiert; dieser
-   Kommentar behauptet den zweiten Kanal deshalb nicht mehr. */
+/* ── Signatur 2 · Die Sektionsmarke und der Zeilenmarker (DV 102) ──────────
+   ZWEI ACHSEN, GETRENNT GEHALTEN (LFH-395, WCAG 1.4.1). Bis dahin hing die
+   Stufe AUSSCHLIESSLICH an `border-bottom-color`; Breite, Höhe und Umriss
+   waren über alle drei Stufen gleich. Wer rot-grün-blind ist oder den
+   Fükw-Schirm im Sonnenlicht liest, bekam die Dringlichkeit nicht.
+
+   Seither trägt die FORMKLASSE (`--dreieck` / `--kreis` / `--balken`) die
+   Geometrie und die STUFENKLASSE (`--alarm` / `--achtung` / `--normal`) allein
+   die Farbe. Die Brücke ist `currentColor`, und sie ist nicht Bequemlichkeit:
+   das Dreieck färbt über `border-bottom-color`, Kreis und Balken über
+   `background` — ohne sie bräuchte jede Stufe DREI Regeln, je eine pro Form.
+   Dieselbe Bauform wie in `components/Tastenkuerzel.tsx`.
+
+   Die Basis trägt bewusst KEINE Geometrie: ein Marker ohne Formklasse soll
+   verschwinden statt als Dreieck durchzurutschen. Festgehalten in
+   `LageDashboardPage.test.tsx` („jeder Marker der Seite trägt eine
+   Formklasse") — sonst wäre der Ausfall spurlos, jsdom rechnet kein Layout. */
 .lfh-zeichen {
+  flex: 0 0 auto;
+  color: var(--lfh-bedien);
+}
+
+/* Warndreieck. Die höchste Stufe behält den Umriss, den die Marke seit je hat. */
+.lfh-zeichen--dreieck {
   width: 0;
   height: 0;
-  flex: 0 0 auto;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-bottom: 9px solid var(--lfh-bedien);
+  border-bottom: 9px solid currentColor;
+}
+/* Punkt — die ruhige Form, für den Normalfall. */
+.lfh-zeichen--kreis {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* Balken — dazwischen, und im Umriss von beiden anderen unterscheidbar. */
+.lfh-zeichen--balken {
+  width: 10px;
+  height: 3px;
+  background: currentColor;
 }
 
 .lfh-zeichen--alarm {
-  border-bottom-color: var(--lfh-alarm);
+  color: var(--lfh-alarm);
 }
 .lfh-zeichen--achtung {
-  border-bottom-color: var(--lfh-achtung);
+  color: var(--lfh-achtung);
 }
 .lfh-zeichen--normal {
-  border-bottom-color: var(--lfh-normal);
+  color: var(--lfh-normal);
 }
 
 /* ── Signatur 3 · Zahlen als Instrument ────────────────────────────────────
