@@ -142,7 +142,13 @@ async function stelleDichte(page: Page, dichte: string) {
     [DICHTE_SCHLUESSEL, dichte] as const,
   );
   await page.reload();
-  await page.waitForLoadState('networkidle');
+  // KEIN `networkidle` hier: die Zusicherung darunter IST die stärkere Bedingung und
+  // wiederholt von sich aus, bis sie greift. `networkidle` wartet dagegen auf ein
+  // Schweigen des Netzes, das der Live-Stream ohnehin nur widerwillig hergibt — es
+  // kostet je Aufruf mindestens eine halbe Sekunde und sagt nichts über den Zustand,
+  // den dieser Test messen will. Dieser Test navigiert zwölfmal (drei Dichtestufen ×
+  // vier Seiten); das summierte Warten hat ihn unter Volllast über sein 30-s-Budget
+  // gedrückt, während er einzeln grün war.
   // Gegenprobe, dass die Stufe wirklich angekommen ist: `ThemeModeProvider.tsx:99` schreibt
   // sie als Merkmal an das Wurzelelement. Ohne diese Zeile wäre ein verworfener
   // Speicherwert (unbekannte Stufe → Rückfall auf `kompakt`) nicht von einem
@@ -238,6 +244,12 @@ test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tab
 test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — Aktionsknopf, Spaltenschalter, Titel-Link', async ({
   page,
 }) => {
+  // Dieser Test leistet das Dreifache eines gewöhnlichen: drei Dichtestufen, je vier
+  // Seitenaufrufe samt Neuladen. Das Vorgabebudget von 30 s reicht dafür einzeln, unter
+  // Volllast der ganzen Suite aber nicht — der Fehlschlag war dann ein abgebrochenes
+  // `page.goto` („frame was detached"), also die Uhr und keine Aussage über die Staffel.
+  // Die redundanten `networkidle`-Wartezeiten sind zusätzlich heraus (siehe `stelleDichte`).
+  test.setTimeout(90_000);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Datensicht Dichte ${Date.now()}`);
   await seedeKraft(page, einsatzId);
@@ -258,7 +270,6 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — A
     // ── Aktionsknopf im Kartenzweig (390 px)
     await page.setViewportSize(HANDSCHIRM);
     await page.goto(`/einsaetze/${einsatzId}/personal`);
-    await page.waitForLoadState('networkidle');
     await stelleDichte(page, dichte);
     const karte = page.locator('[data-lfh="datensicht-karte"]');
     await expect(karte).toHaveCount(1);
@@ -270,7 +281,6 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — A
 
     // ── Titel-Link im Kartenzweig (390 px, Tierliste)
     await page.goto(`/einsaetze/${einsatzId}/tiere`);
-    await page.waitForLoadState('networkidle');
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
     const tierKarte = page.locator('[data-lfh="datensicht-karte"]');
     await expect(tierKarte).toHaveCount(1);
@@ -286,7 +296,6 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — A
     // ── Spaltenschalter im Tabellenzweig (1366 px)
     await page.setViewportSize(FUEKW);
     await page.goto(`/einsaetze/${einsatzId}/personal`);
-    await page.waitForLoadState('networkidle');
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
     // Sein `aria-label` ist `"<Beschriftung> — <Bezeichnung>"` (`Datensicht.tsx:648`), die
     // Beschriftung wechselt mit dem Zähler („Spalten" bzw. „Spalten · n ausgeblendet",

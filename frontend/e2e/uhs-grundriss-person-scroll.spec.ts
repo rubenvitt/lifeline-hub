@@ -58,6 +58,21 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   // Person aus „Noch nicht aufgenommen" auf „Bett 1" ziehen → belegt.
   await ziehe(page, page.getByText(personName).first(), page.getByText('Bett 1'));
   await expect(page.getByText('belegt')).toBeVisible();
+
+  // UND DANN WARTEN, BIS DER UMBAU DURCH IST — sonst zieht der Test in einen
+  // Wettlauf. Gemessen (Zeitverlauf nach dem Zug): das POST auf
+  // `…/uhs-belegung` kommt bei +403 ms als 201 zurück, „belegt" steht bei
+  // +400 ms — aber die zwei Invalidierungen (`/uhs`, `/personen`) landen erst
+  // bei +433 ms, und der Name steht bis +717 ms DOPPELT im Baum. Wer in diesem
+  // Fenster den zweiten Zug beginnt, greift ein Layout, das gleich umbricht:
+  // die Geste läuft, das Ziel verschiebt sich, der Drop verfehlt. Der Zug tat
+  // dann nichts, und beide Tests unten schlugen fehl, obwohl die Funktion
+  // arbeitet — mit 1 s Wartezeit davor waren sie gemessen grün.
+  //
+  // KEINE feste Wartezeit, sondern die Bedingung selbst: genau EIN Namens-Tag.
+  // Ein `waitForTimeout` wäre auf einer langsameren Maschine wieder zu kurz und
+  // hier meist zu lang.
+  await expect(page.locator('.ant-tag').filter({ hasText: personName })).toHaveCount(1);
   return personName;
 }
 

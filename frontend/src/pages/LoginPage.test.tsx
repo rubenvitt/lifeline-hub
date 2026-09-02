@@ -555,7 +555,17 @@ describe('LoginPage', () => {
       // `getByRole` statt eines bedingten Klicks: verschwaende der Knopf je, degenerierte der
       // Test stillschweigend zu „ein Aufruf" und belegte den Riegel nicht mehr. Dass der Klick
       // real durchgeht, zeigt die gemessene Ausgangslage ['login','totpFinish','totpFinish'].
-      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+      //
+      // DER NAME IST HIER EIN TEILSTRING, und das ist der Punkt des Tests: die
+      // sechste Ziffer sendet selbst ab, der Knopf steht also gerade auf
+      // `loading` — und antd haengt dem Ladeicon ein eigenes `aria-label`
+      // („loading") an, das in den zugaenglichen Namen einfliesst. Gemessen
+      // heisst der Knopf in diesem Moment „loading Anmelden". Ein exakter Name
+      // trifft ihn nur, solange der Ladezustand noch nicht gerendert ist — der
+      // Test gewann dieses Rennen mal und verlor es mal (wandernder Fehlschlag
+      // im Sammel-Gate, 346 ms, kein Timeout). Dieselbe antd-Falle, die
+      // CLAUDE.md fuer Menueeintraege beschreibt.
+      await userEvent.click(screen.getByRole('button', { name: /Anmelden/ }));
 
       await waitFor(() => expect(aufrufe).toBeGreaterThan(0));
       expect(aufrufe).toBe(1);
