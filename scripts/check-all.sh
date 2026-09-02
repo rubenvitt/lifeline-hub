@@ -34,7 +34,26 @@ cd "$ROOT"
 . "$ROOT/scripts/lib/dev-env.sh"
 
 FE="$ROOT/frontend"
-PNPM="mise exec pnpm@11.10.0 -- pnpm"
+# NODE IST GEPINNT WIE pnpm — und das ist eine Messung, keine Vorliebe (2026-09-03).
+# Vorher stand hier nur die pnpm-Version; Node kam aus der globalen mise-Konfiguration
+# des jeweiligen Rechners, das Gate war also je Maschine ein anderes. Beide Nachbarn
+# dieser Version fallen aus, jeder auf eigene Weise:
+#
+#   26.8.1  Der Vite-Dev-Server stirbt mitten in Schritt 7 an einem V8-Abbruch
+#           („Lazy deopt after a fast API call with return value is unsupported",
+#           Stack: Buffer.byteLength ← _http_outgoing.end beim Ausliefern einer
+#           ~7-MB-Antwort). Danach laufen ALLE Folgetests in ERR_CONNECTION_REFUSED
+#           — gemessen 72 von 93 in einem Lauf, 3 von 93 in einem anderen, je nachdem
+#           wann es ihn erwischt. Das sieht aus wie eine wandernde Flakiness und ist
+#           in Wahrheit ein toter Server.
+#   22.23.0 e2e läuft sauber durch, aber `src/api/kartenbilder.test.ts` bricht
+#           deterministisch mit „object.stream is not a function" (@mswjs/interceptors
+#           ruft .stream() auf einem Blob, den Node 22 nicht so liefert).
+#
+# 26.7.0 trägt beides: Vitest 3666/3666 und e2e 93/93, ohne Absturz. Wer die Zahl
+# ändert, prüft BEIDE Schritte (5 und 7) — eine Version, die nur einen davon grün
+# macht, ist keine.
+PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
 SCHRITTE=7
 
 geraeumt="$(dev_env_liste | tr '\n' ' ')"

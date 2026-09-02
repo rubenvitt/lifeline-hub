@@ -23,7 +23,28 @@ overrides:
   # Wieder `^3.1.5` statt `>=3.1.5` (siehe js-yaml oben): kein Major-Sprung in eine
   # Abhängigkeit, die wir nicht selbst rufen. Reines Build-Zeit-Tooling (PWA-Manifest),
   # kein Laufzeit-Code im Bundle; der Frontend-Produktionsbuild und check-all.sh prüfen es.
-  fast-uri@>=3.0.0 <3.1.5: ^3.1.5
+  #
+  # NACHGEZOGEN 2026-09-03: DASSELBE MUSTER WIE BEI nanoid UNTEN — das Advisory ist
+  # gewandert, der Override nicht. Aus einem Fund (GHSA-7p8r-x3mc-p8w7) sind VIER
+  # geworden (zusätzlich GHSA-jqff-g426-hqxp u. a., Host-Confusion über übersprungene
+  # IDN-Normalisierung sowie SSRF), und die Schwelle steht jetzt bei 3.1.6. Der Override
+  # hob weiterhin korrekt auf 3.1.5 — nur reichte das Ziel nicht mehr, und `pnpm audit`
+  # brach Schritt 6. BEIDE Grenzen sind nachgezogen: die Obergrenze des Bereichs UND die
+  # Zielversion. ^3.1.6 bleibt ein Same-Major-Patch.
+  fast-uri@>=3.0.0 <3.1.6: ^3.1.6
+
+  # GHSA-c83g-rgw3-j3cx (high): unbegrenztes Cache-Wachstum ohne Eviction (OOM), sowie
+  # ein zweiter Fund derselben Version (Crash/Prototype-Write über eine untrusted
+  # `browserslist-stats.json`). Beide gepatcht ab 4.28.7, der Lockfile stand auf 4.28.4.
+  # Ketten: eslint-plugin-react-hooks → @babel/core → @babel/helper-compilation-targets →
+  # browserslist, dazu vite-plugin-pwa → workbox-build → @babel/core bzw.
+  # @babel/preset-env (gemeldet über 100 Pfade, alle über @babel).
+  # Reines Build-Zeit-Tooling — browserslist beantwortet beim Bundeln die Zielbrowser-
+  # Frage und liegt nicht im ausgelieferten Bündel. Wir rufen es nirgends selbst; kein
+  # Direktabhängiger führt es, ein Bump ohne Override gibt es also nicht.
+  # ^4.28.7 bleibt ein Same-Major-Patch; verifiziert durch den Frontend-Produktionsbuild
+  # und check-all.sh.
+  browserslist@>=4.0.0 <4.28.7: ^4.28.7
 
   # GHSA-rgw5-rvv9-x895 (high): DoS durch unbeschränkte Zwischenarrays bei Brace-Mustern.
   # Ketten: openapi-typescript → @redocly/openapi-core → minimatch@5 sowie vite-plugin-pwa →
