@@ -1,4 +1,4 @@
-import { App, Badge, Button, Tooltip } from 'antd';
+import { App, Badge, Button, Dropdown, Tooltip } from 'antd';
 import { CheckCircleOutlined, DesktopOutlined, StopOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { TbBell, TbBellOff } from 'react-icons/tb';
@@ -14,6 +14,7 @@ import {
 } from '../alarm/alarmTon';
 import { desktopPermission, fordereDesktopPermission, zeigeDesktopAlarm } from '../alarm/desktopAlarm';
 import { auftraegePfad, erinnerungenPfad, meldungenPfad } from '../routing/deeplinks';
+import { useViewport } from '../components/useViewport';
 
 type ErinnerungDetail = {
   erinnerung_id?: number;
@@ -348,6 +349,12 @@ export default function AlarmZentrale() {
     setGemutet(true);
   };
 
+  // Die Breitenfrage stellt ausschliesslich `useViewport` (erzwungen von
+  // `useViewport.guard.test.ts`). `istSchmal` ist `< md` (768 px) — bei 768 px
+  // und darüber trägt die Kopfzeile beide Knöpfe mühelos, eng wird es erst auf
+  // dem Handschirm.
+  const { istSchmal } = useViewport();
+
   const desktopAktivieren = () => {
     fordereDesktopPermission((p) => setPermission(p));
   };
@@ -370,6 +377,87 @@ export default function AlarmZentrale() {
       ? 'Alarmton durch Klick entsperren'
       : 'Alarmton stummschalten';
 
+  // Einmal abgeleitet, von BEIDEN Bauformen benutzt: die schmale zeigt dieselbe
+  // Ikone wie der Knopf, den sie vertritt — sonst hiesse dasselbe Zeichen an
+  // zwei Orten Verschiedenes.
+  const desktopIkone =
+    desktop === 'erlaubt' ? (
+      <CheckCircleOutlined />
+    ) : desktop === 'browser-blockiert' ? (
+      <StopOutlined />
+    ) : (
+      <DesktopOutlined />
+    );
+  const tonIkone =
+    gemutet || tonStatus === 'blockiert' ? (
+      <TbBellOff aria-hidden />
+    ) : (
+      <Badge dot status="error">
+        <TbBell aria-hidden style={{ color: '#fff' }} />
+      </Badge>
+    );
+
+  if (istSchmal) {
+    // ── EIN Ziel statt zwei (LFH-511) ────────────────────────────────────────
+    // Auf 390 px bekommt die Aktionsreihe 180 px; zwei beschriftete Knöpfe
+    // brauchen 286. Bis hierher löste das der Browser selbst, indem er beide in
+    // ihrem gemeinsamen `.ant-space-item` UMBRACH — waagerecht unauffällig,
+    // senkrecht 144 px Inhalt in einem 96 px hohen Kopf, oben und unten
+    // angeschnitten (gemessen, `e2e/kopfzeile-schmal.spec.ts`).
+    //
+    // Die naheliegende Abhilfe ist gesperrt: „blockiert"/„stumm" darf im Einsatz
+    // nicht nur über eine Ikone laufen (CLAUDE.md, LFH-392). Ein blosses
+    // `nowrap` ebenso — LFH-392 hat es gemessen, die Kopfzeile wuchs auf 486 px.
+    // Bleibt die Bündelung: die Marke NENNT den Zustand, der genannt werden
+    // muss, beide Steuerungen liegen vollständig beschriftet im Menü.
+    //
+    // WELCHEN Zustand sie nennt, ist keine Geschmacksfrage: ein stummer Alarm
+    // ist im Einsatz schwerer zu bemerken als eine fehlende Desktop-Meldung —
+    // der hörbare Kanal geht vor. Sind beide unauffällig, nennt sie trotzdem
+    // einen Zustand („Ton bereit") statt eines erfundenen Sammelworts.
+    const tonAuffaellig = gemutet || tonStatus !== 'bereit';
+    const zeigtTon = tonAuffaellig || desktop === 'erlaubt';
+    const sammelText = zeigtTon ? tonText : desktopText;
+
+    return (
+      <Dropdown
+        trigger={['click']}
+        menu={{
+          autoFocus: true,
+          items: [
+            {
+              key: 'desktop',
+              icon: desktopIkone,
+              label: desktopText,
+              // Gleiche Regel wie am breiten Knopf: nur `aus` ist vom Browser
+              // aus überhaupt änderbar.
+              disabled: desktop !== 'aus',
+            },
+            { key: 'ton', icon: tonIkone, label: tonText },
+          ],
+          // Die Zuordnung hängt am MENÜ, nicht je Eintrag (CLAUDE.md) — ein Ort
+          // für einen etwaigen Riegel statt zweier.
+          onClick: ({ key }) => {
+            if (key === 'desktop') desktopAktivieren();
+            else void tonUmschalten();
+          },
+        }}
+      >
+        <Button
+          type="text"
+          // Der zugängliche Name trägt die Gruppe UND den Zustand: „Alarmzentrale"
+          // allein sagte nicht, was gerade los ist, der sichtbare Text allein
+          // nicht, wozu der Knopf gehört.
+          aria-label={`Alarmzentrale: ${sammelText}`}
+          icon={zeigtTon ? tonIkone : desktopIkone}
+          style={{ color: '#fff', flexShrink: 0 }}
+        >
+          {sammelText}
+        </Button>
+      </Dropdown>
+    );
+  }
+
   return (
     <>
       <Tooltip title={desktopHinweis}>
@@ -378,13 +466,7 @@ export default function AlarmZentrale() {
           aria-label={`Desktop-Benachrichtigungen: ${desktopText.replace('Desktop ', '')}`}
           aria-disabled={desktop !== 'aus'}
           onClick={desktop === 'aus' ? desktopAktivieren : undefined}
-          icon={
-            desktop === 'erlaubt'
-              ? <CheckCircleOutlined />
-              : desktop === 'browser-blockiert'
-                ? <StopOutlined />
-                : <DesktopOutlined />
-          }
+          icon={desktopIkone}
           style={{ color: '#fff' }}
         >
           {desktopText}
@@ -397,15 +479,7 @@ export default function AlarmZentrale() {
           aria-pressed={gemutet}
           onClick={() => void tonUmschalten()}
           style={{ color: '#fff' }}
-          icon={
-            gemutet || tonStatus === 'blockiert' ? (
-              <TbBellOff aria-hidden />
-            ) : (
-              <Badge dot status="error">
-                <TbBell aria-hidden style={{ color: '#fff' }} />
-              </Badge>
-            )
-          }
+          icon={tonIkone}
         >
           {tonText}
         </Button>
