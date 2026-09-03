@@ -91,24 +91,37 @@ test('Kopf-Polsterung: 24 px am Fükw-Schirm, 12 px auf 390 px', async ({ page }
  * tragend — fiele die Vorbelegung, liefe die Touch-Variante still in `kompakt`
  * und wäre grün durch Nichtstun.
  *
- * LFH-511 IST GESCHLOSSEN, das `fixme` ist damit heraus. Der Befund lautete:
- * auch OHNE den Trenner mass die `Space` in `komfortabel` 299 px (Alarmzentrale
- * 169 + 2 × 18 Abstand + Suchen 48 + Benutzermenü 46) und stand mit Hamburger
- * (48) und zwei Kopf-Abständen (16 + 16) bei 379 px gegen 366 px Innenbreite —
- * 13 px in die Polsterung, 1 px über den Kopf (`scrollWidth` 391).
+ * DIE WAAGERECHTE HÄLFTE VON LFH-511 IST BEHOBEN, das `fixme` deshalb heraus —
+ * DAS TICKET IST ES NICHT. Beides sauber auseinanderhalten:
  *
- * Behoben in `einsatz/EinsatzLayout.tsx` durch einen DECKEL auf den
- * Kopf- und Reihen-Abstand am schmalen Schirm (Bauform `aktionsabstand()` aus
- * LFH-378). Es wächst nur der Abstand, nicht der Inhalt: die drei Ziele sind in
- * jeder Stufe gleich breit. Die Alarmzentrale behält deshalb ihren Text — die
- * Forderung aus LFH-392, dass „blockiert"/„stumm" nicht nur über eine Ikone
+ * BEHOBEN (und das ist, was dieser Test misst): auch OHNE den Trenner mass die
+ * `Space` in `komfortabel` 299 px (Alarmzentrale 169 + 2 × 18 Abstand + Suchen
+ * 48 + Benutzermenü 46) und stand mit Hamburger (48) und zwei Kopf-Abständen
+ * (16 + 16) bei 379 px gegen 366 px Innenbreite — 13 px in die Polsterung, 1 px
+ * über den Kopf (`scrollWidth` 391). Ein DECKEL auf Kopf- und Reihen-Abstand am
+ * schmalen Schirm (`einsatz/EinsatzLayout.tsx`, Bauform `aktionsabstand()` aus
+ * LFH-378) räumt das: es wächst nur der Abstand, nicht der Inhalt, die drei
+ * Ziele sind in jeder Stufe gleich breit. Die Alarmzentrale behält ihren Text —
+ * die Forderung aus LFH-392, dass „blockiert"/„stumm" nicht nur über eine Ikone
  * läuft, ist unangetastet. Die Bilanz je Dichtestufe prüft
- * `EinsatzLayout.test.tsx` ohne Rendern; DASS sie im Browser aufgeht, prüft
- * dieser Test.
+ * `EinsatzLayout.test.tsx` ohne Rendern; DASS sie im Browser aufgeht, hier.
  *
- * ZWEI WEITERE SPECS HINGEN AM SELBEN BEFUND, ohne ihn zu nennen:
+ * OFFEN BLEIBT DER EIGENTLICHE BEFUND VON LFH-511 — der SENKRECHTE Überlauf,
+ * und dieser Test sieht ihn konstruktionsbedingt nicht (er misst nur
+ * `scrollWidth`). Gemessen am 03.09.2026 auf `/etb`, 390 px, `komfortabel`,
+ * NACH dem Deckel: `scrollHeight` 144 gegen `clientHeight` 96, also 48 px
+ * senkrechter Überlauf. Die zwei Knöpfe der Alarmzentrale liegen in EINEM
+ * `.ant-space-item`, brechen dort um und werden beide angeschnitten
+ * („Desktop blockiert" oben=−24, „Ton bereit" unten=119 bei 96 px Kopfhöhe).
+ * Ein `nowrap` allein löst es nicht: LFH-392 hat das gemessen und verworfen —
+ * ohne Umbruchmöglichkeit wuchs die Kopfzeile auf 486 px. Der Deckel gibt rund
+ * 20 px zurück, die Lücke ist knapp 100. Es braucht also die Entscheidung, die
+ * das Ticket nennt (Kurzwort, Kürzung oder Zusammenfassung beider Knöpfe) —
+ * eine Bedienentscheidung, kein Nebenprodukt eines Abstands-Deckels.
+ *
+ * ZWEI WEITERE SPECS HINGEN AN DER WAAGERECHTEN HÄLFTE, ohne sie zu nennen:
  * `einstellungen-schmal` und `kraefte-schmal` setzen ebenfalls `hasTouch` und
- * messen `documentElement` — sie waren schlicht übersehen und liefen rot mit.
+ * messen `documentElement` — sie waren übersehen und liefen rot mit.
  */
 async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' | 'komfortabel') {
   await page.goto(route);
