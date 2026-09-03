@@ -94,6 +94,29 @@ const baseURL = `http://127.0.0.1:${frontendPort}`;
 
 export default defineConfig({
   testDir: './e2e',
+  /**
+   * GEDECKELTE WORKER-ZAHL — gemessen, nicht vorsichtshalber (03.09.2026).
+   *
+   * Playwrights Vorgabe ist `cpus / 2`, hier also 6. Damit fielen in zwei
+   * Vollläufen hintereinander je zwei bis drei Tests aus — WANDERND (erst
+   * `kraefte-schmal`, dann `fokus-verdeckung` + `gate1-ueberlauf`) und
+   * ausnahmslos mit Infrastruktur-Signaturen: `page.goto`-Timeout nach 90 s,
+   * `ERR_CONNECTION_REFUSED`, ein fehlgeschlagenes Seeding („mindestens 8
+   * gesäte Zeilen" → 0). Nie eine Zusicherung über das geprüfte Verhalten.
+   *
+   * Der Grund ist Lastdruck, kein Testfehler: sechs Chromium-Instanzen plus
+   * Backend plus Vite kommen auf eine Maschine, die im Leerlauf schon rund 10
+   * ihrer 12 Kerne belegt hat. Mit drei Workern: 93/93, und der Preis sind
+   * 4,2 statt 3,4 Minuten.
+   *
+   * Das ist bewusst KEINE Toleranz an einer Zusicherung — die Tests bleiben
+   * scharf, es laufen nur weniger gleichzeitig. Ein Gate, das je Lauf andere
+   * Tests rot färbt, wird abgeschaltet statt befolgt; genau deshalb steht die
+   * Zahl hier und nicht in einem Kommentar.
+   *
+   * Übersteuerbar: `PW_WORKERS=6 pnpm e2e` auf einer ruhigen Maschine.
+   */
+  workers: Number(process.env.PW_WORKERS ?? 3),
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: { baseURL, trace: 'on-first-retry' },
