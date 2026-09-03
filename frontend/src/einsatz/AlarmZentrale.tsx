@@ -380,13 +380,19 @@ export default function AlarmZentrale() {
   // Einmal abgeleitet, von BEIDEN Bauformen benutzt: die schmale zeigt dieselbe
   // Ikone wie der Knopf, den sie vertritt — sonst hiesse dasselbe Zeichen an
   // zwei Orten Verschiedenes.
+  // `aria-hidden` ist hier Pflicht, nicht Kosmetik: ein `@ant-design/icons`-Knoten
+  // setzt unbedingt `role="img"` samt ENGLISCHEM `aria-label` aus seinem Namen
+  // (`AntdIcon.js`), und antds Menü hängt nirgends ein `aria-hidden` davor. Ohne
+  // das hiesse der Menüeintrag vorgelesen „stop Desktop blockiert" — derselbe
+  // Fall, den CLAUDE.md aus LFH-366 als „delete Bild entfernen" führt. Am breiten
+  // Knopf fiel es nicht auf, weil dort ein eigenes `aria-label` den Namen setzt.
   const desktopIkone =
     desktop === 'erlaubt' ? (
-      <CheckCircleOutlined />
+      <CheckCircleOutlined aria-hidden />
     ) : desktop === 'browser-blockiert' ? (
-      <StopOutlined />
+      <StopOutlined aria-hidden />
     ) : (
-      <DesktopOutlined />
+      <DesktopOutlined aria-hidden />
     );
   const tonIkone =
     gemutet || tonStatus === 'blockiert' ? (
@@ -415,6 +421,18 @@ export default function AlarmZentrale() {
     // ist im Einsatz schwerer zu bemerken als eine fehlende Desktop-Meldung —
     // der hörbare Kanal geht vor. Sind beide unauffällig, nennt sie trotzdem
     // einen Zustand („Ton bereit") statt eines erfundenen Sammelworts.
+    //
+    // EINE ZEILE TRÄGT EINEN ZUSTAND, NICHT ZWEI — das ist die bewusste Grenze
+    // dieser Bauform. Sind Ton UND Desktop auffällig, nennt die Marke nur den
+    // Ton; der Desktop-Zustand steht dann ausschliesslich im Menü (deshalb dort
+    // `desktopHinweis` als Etikett, das ihn ausspricht). Beide nebeneinander
+    // wären wieder 286 px — genau der Überlauf, den diese Bauform behebt.
+    //
+    // ZWEI EINTRÄGE SIND HIER KEIN VERSTOSS gegen „ab drei Aktionen bündeln"
+    // (CLAUDE.md/LFH-366). Diese Regel wehrt das Bündeln aus BEQUEMLICHKEIT ab —
+    // hier bündelt die Breite, nicht die Wahl: zwei beschriftete Ziele passen
+    // nachweislich nicht. Der Preis ist echt und benannt: Stummschalten kostet
+    // auf dem Handschirm zwei Tipper statt einem.
     const tonAuffaellig = gemutet || tonStatus !== 'bereit';
     const zeigtTon = tonAuffaellig || desktop === 'erlaubt';
     const sammelText = zeigtTon ? tonText : desktopText;
@@ -424,16 +442,25 @@ export default function AlarmZentrale() {
         trigger={['click']}
         menu={{
           autoFocus: true,
+          // DIE EINTRÄGE TRAGEN DIE HANDLUNG, NICHT DEN ZUSTAND — der Auslöser
+          // trägt den Zustand. Ein Eintrag „Ton bereit", der beim Antippen stumm
+          // schaltet, liest sich als das Gegenteil dessen, was er tut; „Desktop
+          // aus" fordert sogar die Berechtigung AN. Die breite Bauform hatte die
+          // Handlung im Tooltip und im `aria-label` — und ausgerechnet der
+          // Handschirm ist der einzige Kontext OHNE Hover, also ohne Tooltip.
+          // `desktopHinweis`/`tonHinweis` benennen Handlung UND Zustand in einem
+          // Satz; dadurch steht der Desktop-Zustand hier auch dann, wenn die
+          // Marke oben gerade den Ton nennt.
           items: [
             {
               key: 'desktop',
               icon: desktopIkone,
-              label: desktopText,
+              label: desktopHinweis,
               // Gleiche Regel wie am breiten Knopf: nur `aus` ist vom Browser
               // aus überhaupt änderbar.
               disabled: desktop !== 'aus',
             },
-            { key: 'ton', icon: tonIkone, label: tonText },
+            { key: 'ton', icon: tonIkone, label: tonHinweis },
           ],
           // Die Zuordnung hängt am MENÜ, nicht je Eintrag (CLAUDE.md) — ein Ort
           // für einen etwaigen Riegel statt zweier.

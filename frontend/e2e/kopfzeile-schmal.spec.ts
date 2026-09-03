@@ -148,6 +148,16 @@ async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' 
   expect(masse.scrollH, `${route}: Kopfzeile läuft SENKRECHT über`).toBeLessThanOrEqual(
     masse.klientH,
   );
+  // UND DIE KOPFHÖHE SELBST WIRD GEPINNT, sonst ist die Zeile darüber stumpf:
+  // `scrollH <= klientH` ist von ZWEI Zuständen erfüllt — „der Inhalt passt in
+  // einen festen Kopf" und „der Kopf ist auf seinen Inhalt gewachsen". Ohne
+  // diesen Pin bliebe der Test grün, wenn die Kopfzeile auf 144 px wüchse und
+  // ein Sechstel des Handschirms frässe. Die Zahlen sind die Dichte-Staffel
+  // (`--lfh-kopf-*`), handgeschrieben statt aus einem Token gelesen — sonst
+  // prüfte der Test den Token gegen sich selbst.
+  expect(masse.klientH, `${route}: Kopfhöhe der Stufe ${stufe}`).toBe(
+    stufe === 'kompakt' ? 60 : 96,
+  );
 }
 
 for (const [stufe, hasTouch] of [
