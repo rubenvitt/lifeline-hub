@@ -84,10 +84,17 @@ const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as c
    dieselbe Begründung — wo die Breite gebunden ist, ginge jede zusätzliche
    Lücke direkt von der Trefffläche ab.
 
-   DIE ZIELE SELBST BLEIBEN UNANGETASTET. Die Alarmzentrale behält ihren Text
-   in jeder Stufe: „blockiert" oder „stumm" darf im Einsatz nicht nur über eine
-   Ikone vermittelt werden (LFH-392). Der Deckel kauft die 13 bzw. 31 px allein
-   aus Weißraum.
+   DER DECKEL SELBST TASTET DIE ZIELE NICHT AN — er kauft die 13 bzw. 31 px
+   allein aus Weißraum. „blockiert" oder „stumm" bleibt in jeder Stufe als Text
+   benannt, nicht nur als Ikone (LFH-392).
+
+   NACHTRAG LFH-511: die Alarmzentrale ist unter `md` inzwischen EIN Ziel statt
+   zweier (sie bündelt selbst, `AlarmZentrale.tsx`) — sie brach vorher in ihrem
+   gemeinsamen `.ant-space-item` um und trieb den Kopf senkrecht über. Für die
+   Rechnung hier ändert das nichts: gemessen wurden die 169–171 px am bereits
+   umgebrochenen Layout, und ein einzelner Knopf „Desktop blockiert" ist genauso
+   breit. Der Deckel bleibt tragend — ohne ihn braucht die Reihe in
+   `komfortabel` 299 px bei 286 verfügbaren.
 
    DER GEWINN GEHT AN DEN EINSATZNAMEN, nicht in Reserve: `REST_STIL` ist das
    einzige elastische Kind, es stand auf allen drei Stufen bei 0 px. Was der

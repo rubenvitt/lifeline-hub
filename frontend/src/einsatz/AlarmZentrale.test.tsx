@@ -318,11 +318,57 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(
       screen.queryByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
     ).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Alarmton stummschalten' })).toBeNull();
+    // Der Ton-Knopf wird über ein MUSTER über alle drei Wortlaute gesucht, nicht
+    // über einen davon: `tonStatus` steht beim Rendern noch auf dem Initialwert
+    // und dreht erst einen Microtask später auf `bereit`. Ein Name-Literal träfe
+    // den Knopf in diesem Moment ohnehin nicht — die Zeile wäre auch dann grün,
+    // wenn es die Bündelung gar nicht gäbe, und belegte nichts.
+    expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
 
-    // Und an ihrer Stelle steht genau eines, das den Zustand BENENNT.
+    // Und an ihrer Stelle steht genau EINES, das den Zustand BENENNT. `waitFor`,
+    // weil das Muster auf beide Zustände passt und schon greift, bevor die
+    // Tonprüfung durch ist — ohne das schlüge der Test an einem korrekten Bau an.
     const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    expect(ziel).toHaveTextContent('Desktop blockiert');
+    await waitFor(() => expect(ziel).toHaveTextContent('Desktop blockiert'));
+    expect(screen.getAllByRole('button', { name: /^Alarmzentrale:/ })).toHaveLength(1);
+  });
+
+  it('bei erlaubtem Desktop und gutem Ton nennt die Marke den Ton', async () => {
+    // Deckt den Zweig `|| desktop === 'erlaubt'` ab. Ohne diesen Test liesse er
+    // sich streichen, ohne dass etwas rot wird — und er trägt die Festlegung,
+    // dass die Marke auch im unauffälligen Fall einen ZUSTAND nennt statt eines
+    // erfundenen Sammelworts.
+    stubAudioReady();
+    stubNotification('granted');
+    setzeViewportBreite(390);
+    renderAlarm();
+
+    const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
+    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+  });
+
+  it('ist der Desktop abschaltbar, ist sein Menüeintrag bedienbar und fordert die Berechtigung an', async () => {
+    // Der einzige im schmalen Zweig überhaupt handlungsfähige Desktop-Pfad —
+    // ohne diesen Test liefe er in keinem Lauf, und weder das `disabled` noch
+    // der `key === 'desktop'`-Zweig könnten rot werden.
+    stubAudioReady();
+    const NotificationMock = stubNotification('default');
+    setzeViewportBreite(390);
+    renderAlarm();
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Alarmzentrale:/ }));
+    const menue = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    expect(menue, 'das Menü muss offen sein').not.toBeNull();
+
+    const eintrag = within(menue).getByRole('menuitem', { name: /aktivieren/ });
+    // KEIN antd-Ikonenname im zugänglichen Namen: `@ant-design/icons` setzt
+    // unbedingt ein englisches `aria-label`, antds Menü hängt kein `aria-hidden`
+    // davor. Ohne die Hülle hiesse der Eintrag „desktop Desktop-…".
+    expect(eintrag.textContent).not.toMatch(/desktop-outlined|check-circle|^stop/i);
+    await userEvent.click(eintrag);
+    expect(NotificationMock.requestPermission).toHaveBeenCalledOnce();
   });
 
   it('das gebündelte Ziel trägt beide Steuerungen mit ihrem Wortlaut', async () => {
@@ -338,8 +384,18 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
     expect(menue, 'das Menü muss offen sein').not.toBeNull();
-    expect(menue).toHaveTextContent('Desktop blockiert');
-    expect(menue).toHaveTextContent('Ton bereit');
+    // ZWEI EINTRÄGE, einzeln gegriffen — ein Gesamttext-Vergleich wäre auch von
+    // einer Regression erfüllt, die beide Wortlaute in EINEN Eintrag legt.
+    const eintraege = within(menue).getAllByRole('menuitem');
+    expect(eintraege).toHaveLength(2);
+    // Der Desktop-Eintrag NENNT seinen Zustand: er ist der einzige Ort, an dem
+    // er steht, wenn die Marke oben gerade den Ton nennt.
+    expect(eintraege[0].textContent).toMatch(/im Browser blockiert/);
+    // Der Ton-Eintrag nennt die HANDLUNG, nicht den Zustand. „Ton bereit" als
+    // Etikett eines Eintrags, der stummschaltet, sagte das Gegenteil dessen,
+    // was er tut — und auf dem Handschirm gibt es keinen Tooltip, der das
+    // geraderückte.
+    expect(eintraege[1].textContent).toMatch(/stummschalten/);
   });
 
   it('die Sammelbeschriftung nennt den Ton, sobald er stumm ist — er ist der lautere Kanal', async () => {
@@ -352,7 +408,8 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     const menue = document.querySelector(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /Ton bereit/ }));
+    expect(menue, 'das Menü muss offen sein').not.toBeNull();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /stummschalten/ }));
 
     expect(istAlarmGemutet()).toBe(true);
     // Vorher nannte die Marke „Desktop blockiert", jetzt den Ton: bei zwei
