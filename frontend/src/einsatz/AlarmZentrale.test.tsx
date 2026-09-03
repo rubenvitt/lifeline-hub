@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App as AntApp } from 'antd';
@@ -12,6 +12,7 @@ import {
 } from 'react-router';
 import AlarmZentrale from './AlarmZentrale';
 import { istAlarmGemutet } from '../alarm/alarmTon';
+import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 
 function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
   const { notification } = AntApp.useApp();
@@ -279,5 +280,99 @@ describe('AlarmZentrale', () => {
     expect(screen.getByRole('button', { name: 'Zu Aufträgen' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Erinnerungen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
+  });
+});
+
+/**
+ * ── Die Kopfzeile auf dem Handschirm (LFH-511) ───────────────────────────────
+ *
+ * Zwei beschriftete Ziele passen auf 390 px nicht neben Menügriff, Suche und
+ * Benutzermenü: die Reihe bekommt dort 180 px, die zwei Knöpfe brauchen 286.
+ * Bis hierher löste das der Browser selbst — beide Knöpfe liegen in EINEM
+ * `.ant-space-item`, flossen inline und BRACHEN UM. Waagerecht sah das gut aus,
+ * senkrecht stand der Kopfinhalt auf 144 px in einem 96 px hohen Kopf und wurde
+ * oben wie unten angeschnitten (gemessen in `e2e/kopfzeile-schmal.spec.ts`).
+ *
+ * DIE BESCHRIFTUNG DARF NICHT ERSATZLOS ZUR IKONE WERDEN — CLAUDE.md verlangt,
+ * dass „blockiert"/„stumm" benannt bleibt. Deshalb die dritte der im Ticket
+ * genannten Möglichkeiten: EIN Ziel mit Sammelbeschriftung, die den Zustand
+ * nennt, der genannt werden muss; beide Steuerungen liegen vollständig
+ * beschriftet im Menü darunter.
+ *
+ * Die Breitenfrage stellt `useViewport` (`istSchmal`, also unter `md`) — bei
+ * 768 px und darüber ist Platz im Überfluss, dort bleiben es zwei Knöpfe.
+ * `test/viewport.ts` steht per Vorgabe auf 1024 px; alle Tests oben messen
+ * deshalb weiterhin die breite Bauform, ohne davon zu wissen.
+ */
+describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
+  afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
+
+  it('bündelt auf 390 px zu EINEM Ziel und nennt darin den auffälligen Zustand', async () => {
+    stubAudioReady();
+    stubNotification('denied');
+    setzeViewportBreite(390);
+    renderAlarm();
+
+    // Die zwei getrennten Ziele der breiten Bauform sind WEG — das ist die
+    // Hälfte der Aussage, ohne die ein zusätzlicher Knopf sie auch erfüllte.
+    expect(
+      screen.queryByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Alarmton stummschalten' })).toBeNull();
+
+    // Und an ihrer Stelle steht genau eines, das den Zustand BENENNT.
+    const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
+    expect(ziel).toHaveTextContent('Desktop blockiert');
+  });
+
+  it('das gebündelte Ziel trägt beide Steuerungen mit ihrem Wortlaut', async () => {
+    stubAudioReady();
+    stubNotification('denied');
+    setzeViewportBreite(390);
+    renderAlarm();
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Alarmzentrale:/ }));
+    // Über das GEÖFFNETE Menü greifen: antd lässt die Portale geschlossener
+    // Dropdowns im Baum stehen.
+    const menue = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    expect(menue, 'das Menü muss offen sein').not.toBeNull();
+    expect(menue).toHaveTextContent('Desktop blockiert');
+    expect(menue).toHaveTextContent('Ton bereit');
+  });
+
+  it('die Sammelbeschriftung nennt den Ton, sobald er stumm ist — er ist der lautere Kanal', async () => {
+    stubAudioReady();
+    stubNotification('denied');
+    setzeViewportBreite(390);
+    renderAlarm();
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Alarmzentrale:/ }));
+    const menue = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Ton bereit/ }));
+
+    expect(istAlarmGemutet()).toBe(true);
+    // Vorher nannte die Marke „Desktop blockiert", jetzt den Ton: bei zwei
+    // auffälligen Zuständen gewinnt der hörbare Kanal.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Alarmzentrale:/ })).toHaveTextContent(
+        'Ton stumm',
+      ),
+    );
+  });
+
+  it('ab md bleiben es zwei Ziele — der Umbau gilt nur dem Handschirm', () => {
+    stubAudioReady();
+    stubNotification('denied');
+    setzeViewportBreite(768);
+    renderAlarm();
+
+    expect(
+      screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
 });

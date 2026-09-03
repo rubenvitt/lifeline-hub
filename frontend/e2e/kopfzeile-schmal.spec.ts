@@ -131,8 +131,23 @@ async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' 
     'data-dichte',
     stufe,
   );
-  const masse = await kopf.evaluate((el) => ({ scroll: el.scrollWidth, klient: el.clientWidth }));
-  expect(masse.scroll, `${route}: Kopfzeile läuft über`).toBeLessThanOrEqual(masse.klient);
+  const masse = await kopf.evaluate((el) => ({
+    scrollB: el.scrollWidth,
+    klientB: el.clientWidth,
+    scrollH: el.scrollHeight,
+    klientH: el.clientHeight,
+  }));
+  expect(masse.scrollB, `${route}: Kopfzeile läuft WAAGERECHT über`).toBeLessThanOrEqual(
+    masse.klientB,
+  );
+  // BEIDE ACHSEN — und die senkrechte ist die schärfere (LFH-511 · AK1). Sie fehlte
+  // bis hierher, und ihr Fehlen war kein Zufall: waagerecht blieb die Kopfzeile
+  // ausgerechnet DESHALB grün, weil die Alarmzentrale umbrach. Der Umbruch ist die
+  // Ursache des Befunds, nicht sein Gegenteil — er kauft Breite mit Höhe, und ein
+  // Kopf, dessen Inhalt höher ist als er selbst, schneidet ihn oben und unten an.
+  expect(masse.scrollH, `${route}: Kopfzeile läuft SENKRECHT über`).toBeLessThanOrEqual(
+    masse.klientH,
+  );
 }
 
 for (const [stufe, hasTouch] of [

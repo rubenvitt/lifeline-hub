@@ -554,13 +554,26 @@ describe('EinsatzLayout', () => {
       // Umschalter sind auf jeder Breite aus dem Kopf. Gezählt wird über die
       // ROLLE, nicht über die zwei Etiketten — die existieren im Repo nicht mehr,
       // eine Null darauf wäre nicht widerlegbar (siehe `test/kopfzeile.ts`).
+      //
+      // SEIT LFH-511 IST SIE AUF 390 px EIN ZIEL STATT ZWEIER — die Begründung
+      // oben bleibt davon unberührt, sie ist sogar ihr Maßstab: das gebündelte
+      // Ziel spricht seinen Zustand weiterhin aus („Ton blockiert"), beide
+      // Steuerungen liegen vollständig beschriftet im Menü darunter. Zwei
+      // beschriftete Knöpfe passten hier nicht (180 px verfügbar, 286 nötig) und
+      // brachen um, was den Kopfinhalt auf 144 px in einem 96 px hohen Kopf
+      // trieb. Gezählt wird deshalb EIN Ziel, nicht keines: verschwände die
+      // Alarmzentrale ganz, wäre dieser Test ebenso rot.
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       expect(radiosImKopf()).toBe(0);
       expect(screen.getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
+      const alarm = screen.getByRole('button', { name: /^Alarmzentrale:/ });
+      expect(alarm).toHaveTextContent('Ton blockiert');
+      // Und die Einzelknöpfe der breiten Bauform stehen hier NICHT mehr — ohne
+      // diese Hälfte wäre „ein Ziel" auch von drei Zielen erfüllt.
       expect(
-        screen.getByRole('button', { name: 'Alarmton durch Klick entsperren' }),
-      ).toBeInTheDocument();
+        screen.queryByRole('button', { name: 'Alarmton durch Klick entsperren' }),
+      ).toBeNull();
     });
 
     it('trägt unter lg KEINEN Trenner — das 390-px-Budget hält ihn nicht (gemessen)', async () => {
