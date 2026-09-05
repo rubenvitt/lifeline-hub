@@ -9,7 +9,8 @@ import { renderMitProviders } from '../test/utils';
 import { formatZeitKurz } from '../anzeige/format';
 import type { EinsatzAnzeige } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
-import EinsaetzePage from './EinsaetzePage';
+import EinsaetzePage, { kartenTitelStil } from './EinsaetzePage';
+import { dichten } from '../theme/tokens';
 
 const admin = {
   id: 1,
@@ -573,5 +574,52 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     expect(karte).toHaveFocus();
     await nutzer.keyboard('{Enter}');
     expect(await screen.findByText('EINSATZ-DETAIL')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Der Titel-Link der Einsatzkarte ist ein handgebautes Bedienziel und folgt der
+ * Dichte-Staffel (LFH-396, Gate 3). GEMESSEN im Browser vor dem Fix: 17 px in jeder Stufe —
+ * ein nacktes Inline-`<a>` im Kartenkopf, unter dem 24-px-Boden schon in `kompakt`. Die
+ * Karte selbst ist 120 px hoch und klickbar, aber der Link ist das TASTATURziel (Test „die
+ * Tabulatortaste erreicht die Einsatzkarte" oben), und Gate 3 misst jedes fokussierbare
+ * Element.
+ *
+ * Rein und exportiert wie `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`): `test/utils.tsx`
+ * rendert ein nacktes `ConfigProvider` ohne unser Theme, ein gerenderter Wert belegte
+ * antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein Layout. Die Pixel misst
+ * `e2e/gate3-trefflaeche.spec.ts`; hier steht, dass die Höhe aus dem Token kommt und
+ * über die Stufen MITZIEHT.
+ */
+describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH-396)', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    paddingSM: dichten[stufe].abstand.sm,
+  });
+
+  // Die Böden als Literale, nicht aus dem Token zurückgelesen — sonst prüfte der Test den
+  // Token gegen sich selbst (LFH-365).
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(kartenTitelStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(kartenTitelStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(kartenTitelStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
+    const hoehen = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
+      (s) => kartenTitelStil(tokenFuer(s)).minHeight,
+    );
+    expect(hoehen[0]).toBeLessThan(hoehen[1]);
+    expect(hoehen[1]).toBeLessThan(hoehen[2]);
+  });
+
+  /**
+   * ZWEI Angaben, nicht eine (LFH-365). Die Polsterung liegt nur auf der SENKRECHTEN Achse:
+   * waagerecht polstert der Kartenkopf selbst, und ein Versatz des Titels gegenüber dem
+   * Kartenkörper wäre eine Sichtänderung, keine Trefflächenänderung.
+   */
+  it('trägt neben der Höhe eine mitziehende senkrechte Polsterung', () => {
+    expect(kartenTitelStil(tokenFuer('kompakt')).padding).toBe('7px 0');
+    expect(kartenTitelStil(tokenFuer('handschuh')).padding).toBe('16px 0');
   });
 });

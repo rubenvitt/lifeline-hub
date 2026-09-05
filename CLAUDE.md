@@ -183,7 +183,17 @@ Alltag wichtigsten:
   genau einen Konsumenten, und der ist eine Klasse ohne Verwender). Präzedenz:
   `components/Datensicht.tsx:1255`, `etb/SlashMenu.tsx`, `pages/lagekarte/Sidebar.tsx`
   (`bedienzielStil`, als **reine, exportierte** Funktion — nur so ist die Zusicherung über zwei
-  Dichtestufen prüfbar, ohne zu rendern). Der Boden ist die **Trefffläche, nicht der ganze
+  Dichtestufen prüfbar, ohne zu rendern), seit LFH-396 auch `pages/EinsaetzePage.tsx`
+  (`kartenTitelStil`). **Ein `<a>` erbt keine Steuerhöhe** (LFH-396, gemessen): der Titel-Link
+  der Einsatzkarte maß **17 px in jeder Stufe** — ein Inline-Anker im Kartenkopf ist so hoch
+  wie seine Zeile, und die Prüfliste von LFH-336 hatte „Card-Link erbt vom `ConfigProvider`"
+  als Annahme statt als Messung geführt. Wer einen `Link` als Tastaturziel in eine Karte oder
+  Zeile setzt, gibt ihm die zwei Angaben — mit `display: flex` statt `inline-flex`, damit der
+  Text als Flex-Item weiter per Ellipsis abschneidet. **Der Gate-3-Nachweis je Route liegt in
+  `e2e/gate3-trefflaeche.spec.ts`** (Lage-Dashboard, Einsatzauswahl); eine neue Route mit
+  handgebauten Bedienzielen bekommt dort ihren Test — Böden als Literale, Mengen über
+  `alleHaltenStufe` mit gesäter Mindestzahl, und die Mutationsprobe „Stufe festgenagelt →
+  rot", die das Ticket verlangt. Der Boden ist die **Trefffläche, nicht der ganze
   Zugang**: ein `ListenEintrag` mit `onClick` bleibt ein nacktes `<div>` ohne `role`/`tabIndex`,
   und die klickbare Zeile als Ganzes ist B7/LFH-335 zugeordnet. **Kein Guard sieht diese Fälle** — ein
   Pixel-Padding ist keine Größen-Prop —, die Zusicherung muss also von Hand kommen. Prüfbar ist der
