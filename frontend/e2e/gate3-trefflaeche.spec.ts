@@ -250,11 +250,15 @@ test('Lage-Dashboard: Kurzlisten-Zeile, Kennzahl-Knopf und Mehr-Knopf folgen der
 
     const zeile = await alleHaltenStufe(zeilen, soll, `Kurzlisten-Zeile (${dichte})`, 2);
     const kennzahl = await alleHaltenStufe(kennzahlen, soll, `Kennzahl-Knopf (${dichte})`, 6);
+    // Sechs, nicht „mindestens eine": das Dashboard rendert sechs `<Kachel>` UNBEDINGT
+    // (`LageDashboardPage.tsx`, keine steht hinter einem `&&`), und der Mehr-Knopf sitzt im
+    // Kachelkopf außerhalb der Zustandsweiche. Mit `1` bliebe der Test grün, wenn fünf
+    // Kacheln verschwänden (Review-Befund).
     const mehr = await alleHaltenStufe(
       page.locator('.lfh-kachel__mehr'),
       soll,
       `Mehr-Knopf der Kachel (${dichte})`,
-      1,
+      6,
     );
 
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Zeile ${zeile}, Kennzahl ${kennzahl}, Mehr ${mehr}`);
@@ -304,10 +308,17 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
       soll,
       `Suchfeld (${dichte})`,
     );
-    // Der Such-Knopf trägt in antd 6 keine eigene Klasse mehr (`ant-input-search-button` ist
-    // weg, gemessen) und keinen Namen — nur ein `role="img"`-Icon. Innerhalb des Suchfelds ist
-    // er der einzige Knopf; das Löschkreuz von `allowClear` erscheint erst mit Inhalt.
-    const knopf = await haeltStufe(suche.getByRole('button'), soll, `Such-Knopf (${dichte})`);
+    // Der Such-Knopf heißt in antd 6 `.ant-input-search-btn` (`input/Search.js`:
+    // `btnPrefixCls = \`${prefixCls}-btn\``) — NICHT mehr `-button`; der erste Anlauf dieses
+    // Specs hatte die alte Klasse und fand 0 Knoten. Bewusst die Klasse statt
+    // `getByRole('button')`: das Löschkreuz von `allowClear` trägt selbst `role="button"` und
+    // ist bei leerem Feld nur `visibility: hidden` — ein Rollen-Locator hinge still daran, dass
+    // vor der Messung niemand tippt (Review-Befund).
+    const knopf = await haeltStufe(
+      suche.locator('.ant-input-search-btn'),
+      soll,
+      `Such-Knopf (${dichte})`,
+    );
 
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Suchfeld ${feld}, Such-Knopf ${knopf}`,

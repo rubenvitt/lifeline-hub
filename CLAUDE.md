@@ -187,9 +187,14 @@ Alltag wichtigsten:
   (`kartenTitelStil`). **Ein `<a>` erbt keine Steuerhöhe** (LFH-396, gemessen): der Titel-Link
   der Einsatzkarte maß **17 px in jeder Stufe** — ein Inline-Anker im Kartenkopf ist so hoch
   wie seine Zeile, und die Prüfliste von LFH-336 hatte „Card-Link erbt vom `ConfigProvider`"
-  als Annahme statt als Messung geführt. Wer einen `Link` als Tastaturziel in eine Karte oder
-  Zeile setzt, gibt ihm die zwei Angaben — mit `display: flex` statt `inline-flex`, damit der
-  Text als Flex-Item weiter per Ellipsis abschneidet. **Der Gate-3-Nachweis je Route liegt in
+  als Annahme statt als Messung geführt. Wer einen `Link` als Tastaturziel in einen
+  **Kartenkopf** setzt (antds `Card title`, `white-space: nowrap`), gibt ihm die zwei Angaben —
+  dort mit `display: flex` statt `inline-flex`, damit der Text als Flex-Item weiter per Ellipsis
+  abschneidet. **Bekannter, davon abweichender Stand:** die zwei Titel-Links des
+  `Datensicht`-Primitivs (Tabellen- und Kartenzweig) tragen `inline-flex` mit nur `minHeight` und
+  sind so im Browser belegt (`e2e/datensicht-schmal.spec.ts`, 30 / 48 / 72) — das ist kein
+  Restposten, sondern der Beleg, dass in einer Zelle ohne `nowrap`-Kopf die eine Angabe trägt.
+  Die Regel zielt auf den Kartenkopf, nicht auf das Primitiv. **Der Gate-3-Nachweis je Route liegt in
   `e2e/gate3-trefflaeche.spec.ts`** (Lage-Dashboard, Einsatzauswahl); eine neue Route mit
   handgebauten Bedienzielen bekommt dort ihren Test — Böden als Literale, Mengen über
   `alleHaltenStufe` mit gesäter Mindestzahl, und die Mutationsprobe „Stufe festgenagelt →
