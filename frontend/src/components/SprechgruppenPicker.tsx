@@ -1,4 +1,4 @@
-import { App, Button, Input, Space } from 'antd';
+import { App, Button, Input, Space, theme } from 'antd';
 import { Select } from './Select';
 import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
@@ -26,6 +26,7 @@ interface SprechgruppenPickerProps {
  */
 export default function SprechgruppenPicker({ einsatzId, value = [], onChange }: SprechgruppenPickerProps) {
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [neuBezeichnung, setNeuBezeichnung] = useState('');
@@ -83,7 +84,7 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
         <Button
           type="link"
           icon={<PlusOutlined />}
-          style={{ padding: 0, marginTop: 4 }}
+          style={{ padding: 0, marginTop: token.marginSM }}
           onClick={() => setAnlegenOffen(true)}
         >
           neue Sprechgruppe anlegen
@@ -91,7 +92,7 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
       )}
 
       {anlegenOffen && (
-        <Space.Compact style={{ marginTop: 6, width: '100%' }}>
+        <Space size={token.marginSM} wrap style={{ marginTop: token.marginSM, width: '100%' }}>
           <Input
             aria-label="Neue Bezeichnung"
             placeholder="z. B. 412_F_DRK"
@@ -129,7 +130,7 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
           >
             Abbrechen
           </Button>
-        </Space.Compact>
+        </Space>
       )}
     </div>
   );

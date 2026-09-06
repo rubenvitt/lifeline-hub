@@ -14,15 +14,13 @@ interface StatusTagProps {
   /** Zusatzinformation als Tooltip-Attribut (z. B. Stand der Meldung). */
   title?: string;
   /**
-   * Mandantengepflegte Farbe, die die Rollenfarbe überschreibt — für Kataloge AUSSERHALB
+   * Mandantengepflegte Zusatzfarbe — für Kataloge AUSSERHALB
    * des A2-Vertrags (`fahrzeug_status.status_farbe`, `personal_status.status_farbe`;
    * das Backend trimmt sie nur, es validiert sie nicht).
    *
-   * Sie landet auf Rand und Text, NIE auf der Fläche (LFH-339 · C4, Zielform-Spec §4b):
-   * Kontrast (WCAG 1.4.11) ist bei ungeprüftem Freitext nicht zugesichert, und auf einem
-   * Rand trägt die Farbe keine Textlesbarkeit. Der Bestand rendert sie heute noch über
-   * antds `color`-Prop als Vollfläche mit erzwungen weißem Text — genau die Form, die
-   * dieser Baustein für die Rollenachse ausdrücklich verwirft.
+   * LFH-446: nur ein dekorativer Farbpunkt. Freitext wie `transparent` darf weder den
+   * Wortlaut noch den tragenden Rahmen ausblenden. Beides ist durch den Rollenvertrag
+   * bestimmt; der zusätzliche Punkt trägt keine eigene Information und ist aria-hidden.
    *
    * Leerer String und `null` zählen als „nicht gepflegt": das Backend trimmt, ein
    * getrimmtes Nichts ist keine Farbe.
@@ -37,11 +35,12 @@ interface StatusTagProps {
  * zweite Kanal (WCAG 1.4.1) nicht Disziplin, sondern Typ: einen Tag ohne Text kann
  * man hier gar nicht bauen.
  *
- * BEWUSST OHNE antds `color`-Prop: ein nicht-Preset-Wert würde dort als VOLLFLÄCHE mit
- * erzwungen weißem Text gerendert, und im Dunkelmodus sind die Rollenfarben aufgehellt
- * (`alarm` ist dort ein helles Rot) — weiß darauf ist unlesbar. Stattdessen die
- * Umrissform der A0-Formensprache: Rollenfarbe als Text- und Rahmenfarbe auf der
- * Tag-Grundfläche. Nebeneffekt, der Tests trägt: es entsteht keine mehrdeutige
+ * BEWUSST OHNE antds `color`-Prop: antd 6 berechnet für Nicht-Presets ein statisches
+ * Farbpaar aus der Zeichenkette (bei `filled` mit HSL-Helligkeit 0.95 am Grund),
+ * unabhängig vom aktiven Modus. Stattdessen die
+ * Umrissform der A0-Formensprache: Rollenfarbe an Rahmen/Formzeichen, lesbarer Wortlaut
+ * aus `colorText`. LFH-446 maß für farbigen Text im Hellmodus nur 4,88–6,94:1 statt 7:1.
+ * Nebeneffekt, der Tests trägt: es entsteht keine mehrdeutige
  * `.ant-tag-*`-Farbklasse, an der ein Test sich festhalten könnte.
  *
  * Keine Klein-Variante am Steuerelement (A1 Gate 4) — die Höhe kommt aus der
@@ -49,17 +48,30 @@ interface StatusTagProps {
  */
 export default function StatusTag({ darstellung, title, farbe: ueberschrieben }: StatusTagProps) {
   const { token } = theme.useToken();
-  const farbe = ueberschrieben?.trim() ? ueberschrieben.trim() : rollenFarbe(darstellung.rolle, token);
+  const farbe = rollenFarbe(darstellung.rolle, token);
+  const mandantenfarbe = ueberschrieben?.trim();
   return (
     <Tag
       title={title}
       data-rolle={darstellung.rolle}
-      style={{ color: farbe, borderColor: farbe, background: 'transparent' }}
+      style={{ color: token.colorText, borderColor: farbe, background: 'transparent' }}
     >
       {darstellung.form && (
-        <span aria-hidden="true" style={{ marginInlineEnd: token.marginXXS }}>
+        <span aria-hidden="true" style={{ color: farbe, marginInlineEnd: token.marginXXS }}>
           {FORM_ZEICHEN[darstellung.form]}
         </span>
+      )}
+      {mandantenfarbe && (
+        // Hintergrund statt Textfarbe: ungültiges CSS bleibt transparent, ohne eine
+        // scheinbare Mandantenfarbe aus dem Wortlaut zu erben.
+        <span
+          aria-hidden="true"
+          data-lfh="mandantenfarbe"
+          style={{
+            display: 'inline-block', width: '0.5em', height: '0.5em', borderRadius: '50%',
+            backgroundColor: mandantenfarbe, marginInlineEnd: token.marginXXS,
+          }}
+        />
       )}
       {darstellung.label}
     </Tag>

@@ -86,11 +86,11 @@ describe('StatusWahl', () => {
     expect(ausloeser.textContent).not.toMatch(/Florian 44\/1/);
   });
 
-  it('zeigt die Statusfarbe als Rand und Text, nie als Hintergrundfläche', async () => {
+  it('trennt die Statusfarbe am Rand vom lesbaren Wortlaut, ohne Hintergrundfläche', async () => {
     aufbauen();
     const etikett = screen.getByText('1 – Frei auf Funk').closest('.ant-tag') as HTMLElement;
     expect(etikett.style.background).toBe('transparent');
-    expect(etikett.style.borderColor).toBe(etikett.style.color);
+    expect(etikett.style.borderColor).not.toBe(etikett.style.color);
 
     // Auch im Menü: der Farbpunkt steht NEBEN dem Text, die Zeile bleibt ungefärbt.
     const menue = await oeffneMenue();

@@ -1,10 +1,12 @@
+import StatusTag from '../components/StatusTag';
+import SichtungsTag from '../components/SichtungsTag';
 import { Button, Descriptions, Drawer, Space, Spin, Tag, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { personDetailPfad } from '../routing/deeplinks';
 import { ladePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
-import { SK_META, STATUS_META, istPatient } from './personMeta';
+import { STATUS_META, istPatient } from './personMeta';
 import PersonVerlauf from './PersonVerlauf';
 import { SeitenFehler } from '../components/SeitenZustand';
 
@@ -51,10 +53,10 @@ export default function PersonDetailDrawer({
       {p && (
         <Space orientation="vertical" style={{ width: '100%' }} size="large">
           <Space wrap>
-            <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>
+            <StatusTag darstellung={STATUS_META[p.status]} />
             {istPatient(p) && <Tag color="geekblue">Patient</Tag>}
             {p.aktuelle_sichtung
-              ? <Tag color={SK_META[p.aktuelle_sichtung].color}>SK: {SK_META[p.aktuelle_sichtung].label}</Tag>
+              ? <SichtungsTag kategorie={p.aktuelle_sichtung} praefix="SK: " />
               : <Tag>ungesichtet</Tag>}
             {p.aktueller_verbleib && <Tag color="purple">{p.aktueller_verbleib}</Tag>}
             {p.storniert_at && <Tag color="default">storniert</Tag>}

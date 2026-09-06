@@ -1,3 +1,6 @@
+import { bezugsDarstellung } from '../theme/statusFarben';
+import StatusTag from '../components/StatusTag';
+import SichtungsTag from '../components/SichtungsTag';
 import { Alert, App, Breadcrumb, Button, Col, Collapse, Descriptions, Dropdown, Form, Input, InputNumber, Modal, Row, Space, Spin, Tag, Typography, theme, type MenuProps, type TableColumnsType } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
@@ -421,7 +424,7 @@ export default function PersonenDetailPage() {
         <Space wrap>
           {istPatient(person) && <Tag color="geekblue">Patient</Tag>}
           {person.aktuelle_sichtung
-            ? <Tag color={SK_META[person.aktuelle_sichtung].color}>SK: {SK_META[person.aktuelle_sichtung].label}</Tag>
+            ? <SichtungsTag kategorie={person.aktuelle_sichtung} praefix="SK: " />
             : <Tag>ungesichtet</Tag>}
           {person.aktueller_verbleib && <Tag color="purple">{person.aktueller_verbleib}</Tag>}
         </Space>
@@ -661,10 +664,10 @@ export default function PersonenDetailPage() {
                         // einem `danger`-Knopf und mindestens einer weiteren Aktion trägt
                         // mindestens `token.marginSM` Abstand — antds Vorgabe liegt darunter.
                         <Space wrap size="middle">
-                          <Tag color="blue">
-                            {uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
-                              ?? `UHS #${person.aktuelle_uhs_id}`}
-                          </Tag>
+                          <StatusTag darstellung={bezugsDarstellung(
+                            uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
+                              ?? `UHS #${person.aktuelle_uhs_id}`
+                          )} />
                           {darfSchreiben && !person.storniert_at && (
                             <>
                               <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
@@ -807,13 +810,8 @@ export default function PersonenDetailPage() {
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
-          {/* BEFUND: `STATUS_META`/`SK_META` (`personen/personMeta.ts`) bleiben antd-Farbnamen.
-              Spec §5 zieht die Grenze bewusst — `PersonStatus`/`Sichtungskategorie` sind keine
-              Vertrags-Enums (§1.3), und die Sichtungskategorien tragen mit SK I–IV eine eigene,
-              genormte Farbsprache, die keine Statusrolle abbilden kann. Der Kopf wandert, die
-              Tags bleiben. */}
-          <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>
-          {p.aktuelle_sichtung && <Tag color={SK_META[p.aktuelle_sichtung].color}>{SK_META[p.aktuelle_sichtung].label}</Tag>}
+          <StatusTag darstellung={STATUS_META[p.status]} />
+          {p.aktuelle_sichtung && <SichtungsTag kategorie={p.aktuelle_sichtung} />}
           {p.storniert_at && <Tag color="default">storniert</Tag>}
         </Space>
       }

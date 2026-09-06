@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { detailBereit, einheitMitZuordnungen, kopfFelder, zuordnungsKarte } from './einheit-fixture';
 
 /**
  * Prüflisten-Zeile Z13 der Bedien-Leitlinie — WCAG 2.4.11 „Focus Not Obscured (Minimum)":
@@ -64,6 +65,7 @@ interface Verdeckungsbefund {
   stoppsInTabelle: number;
   stoppsGesamt: number;
   fixierteKandidaten: number;
+  besuchteZiele: string[];
 }
 
 /**
@@ -94,17 +96,20 @@ async function pruefeFokusVerdeckung(page: Page, schritte: number): Promise<Verd
   let stoppsInTabelle = 0;
   let stoppsGesamt = 0;
   let fixierteKandidaten = 0;
+  const besuchteZiele = new Set<string>();
 
   for (let i = 0; i < schritte; i += 1) {
     await page.keyboard.press('Tab');
     const schritt = await page.evaluate(() => {
-      const ziel = document.activeElement;
-      if (ziel == null || ziel === document.body || ziel === document.documentElement) {
+      const fokus = document.activeElement;
+      if (fokus == null || fokus === document.body || fokus === document.documentElement) {
         return null;
       }
+      // Der innere Combobox-/Zahleneingabe-Input ist kleiner als das sichtbare Fokusziel.
+      const ziel = fokus.closest('.ant-select, .ant-input-number, .ant-input-affix-wrapper') ?? fokus;
       const zr = ziel.getBoundingClientRect();
       if (zr.width === 0 || zr.height === 0) {
-        return { beschreibung: null, inTabelle: false, kandidaten: 0 };
+        return { beschreibung: null, inTabelle: false, kandidaten: 0, kennung: null };
       }
 
       const kandidaten = Array.from(document.querySelectorAll('body *')).filter((el) => {
@@ -140,6 +145,7 @@ async function pruefeFokusVerdeckung(page: Page, schritte: number): Promise<Verd
         beschreibung,
         inTabelle: ziel.closest('.ant-table') != null,
         kandidaten: kandidaten.length,
+        kennung: fokus.getAttribute('data-e2e-fokus'),
       };
     });
 
@@ -148,9 +154,10 @@ async function pruefeFokusVerdeckung(page: Page, schritte: number): Promise<Verd
     if (schritt.inTabelle) stoppsInTabelle += 1;
     fixierteKandidaten = Math.max(fixierteKandidaten, schritt.kandidaten);
     if (schritt.beschreibung) verdeckt.push(schritt.beschreibung);
+    if (schritt.kennung) besuchteZiele.add(schritt.kennung);
   }
 
-  return { verdeckt, stoppsInTabelle, stoppsGesamt, fixierteKandidaten };
+  return { verdeckt, stoppsInTabelle, stoppsGesamt, fixierteKandidaten, besuchteZiele: [...besuchteZiele] };
 }
 
 test('Selbstbeweis: der Messkern meldet eine erfundene Verdeckung', async ({ page }) => {
@@ -401,4 +408,129 @@ test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async 
       `Einstellungen/verhalten 390×420: ${ergebnis.stoppsGesamt} Stopps, ` +
       `${ergebnis.fixierteKandidaten} fixierte Knoten, Reserve ${reserve}px`,
   });
+});
+
+/** LFH-446: Besuchsnachweise gehören zur Route, allgemeine Stopps zählen auch die Navigation. */
+async function einheitFokusBereit(page: Page, dichte: string) {
+  await anmelden(page);
+  const { pfad } = await einheitMitZuordnungen(page);
+  await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+  await page.goto(pfad);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+  await detailBereit(page);
+  const ziele = kopfFelder(page).map(({ name, fokus }) => ({ name, fokus }));
+  for (const name of ['Speichern', 'Auflösen']) {
+    ziele.push({ name, fokus: page.getByRole('main').getByRole('button', { name, exact: true }) });
+  }
+  ziele.push({ name: 'neue Sprechgruppe anlegen', fokus: page.getByRole('main').getByRole('button', { name: /neue Sprechgruppe anlegen$/ }) });
+  for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
+    const karte = zuordnungsKarte(page, titel);
+    ziele.push({ name: `${titel} entfernen`, fokus: karte.getByRole('button', { name: 'Entfernen', exact: true }) });
+    ziele.push({ name: `${titel} zuordnen`, fokus: karte.getByRole('combobox') });
+  }
+  ziele.push({ name: 'Als Einheitsführer', fokus: zuordnungsKarte(page, 'Personal').getByRole('button', { name: 'Als Einheitsführer' }) });
+  for (const { name, fokus } of ziele) {
+    await expect(fokus, name).toHaveCount(1);
+    await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
+  }
+  const leiste = page.getByRole('button', { name: 'Speichern', exact: true }).locator('xpath=ancestor::div[@style][contains(@style,"sticky")][1]');
+  await expect(leiste).toHaveCount(1);
+  await expect(leiste).toHaveCSS('position', 'sticky');
+  await leiste.evaluate((el) => el.classList.add('e2e-einheit-leiste'));
+  const reserve = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  expect(reserve).toBeGreaterThan((await leiste.boundingBox())!.height);
+  return { ziele: ziele.map(({ name }) => name), leiste };
+}
+
+for (const viewport of [{ width: 1366, height: 520 }, { width: 390, height: 420 }]) {
+  for (const dichte of ['kompakt', 'handschuh']) {
+    test(`Einheit: alle Formular- und Zuordnungsziele frei bei ${viewport.width}px, ${dichte}`, async ({ page }) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize(viewport);
+      const { ziele, leiste } = await einheitFokusBereit(page, dichte);
+      await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
+      // Die Leiste steht während der Formulareingabe tatsächlich im Viewport.
+      await page.getByLabel('Name', { exact: true }).focus();
+      await expect(leiste).toBeInViewport();
+      await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
+      const befund = await pruefeFokusVerdeckung(page, 60);
+      expect(befund.besuchteZiele.sort(), 'Jedes benannte Feld, jede Leisten- und Zuordnungsaktion muss per Tab besucht werden').toEqual(ziele.sort());
+      expect(befund.fixierteKandidaten).toBeGreaterThan(0);
+      expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+      test.info().annotations.push({ type: 'messwert', description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen` });
+    });
+  }
+}
+
+for (const { dichte, boden, abstand } of [
+  { dichte: 'komfortabel', boden: 48, abstand: 8 },
+  { dichte: 'handschuh', boden: 72, abstand: 16 },
+]) {
+  test(`Einheit: geöffnete Sprechgruppenfelder bei 390px, ${dichte}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 420 });
+    const { ziele } = await einheitFokusBereit(page, dichte);
+    await page.getByRole('button', { name: /neue Sprechgruppe anlegen$/ }).click();
+    const bezeichnung = page.getByRole('textbox', { name: 'Neue Bezeichnung', exact: true });
+    const betriebsart = page.getByRole('combobox', { name: 'Neue Betriebsart', exact: true });
+    await bezeichnung.fill('Messgruppe');
+    await betriebsart.click();
+    // AntD virtualisiert role=option in einen unsichtbaren ARIA-Hilfsknoten.
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^TMO$/ }).click();
+    const ergaenzt = [
+      { name: 'Neue Bezeichnung', fokus: bezeichnung, huelle: bezeichnung },
+      { name: 'Neue Betriebsart', fokus: betriebsart, huelle: page.locator('.ant-select').filter({ has: betriebsart }) },
+      ...['Anlegen', 'Abbrechen'].map((name) => ({ name, fokus: page.getByRole('button', { name, exact: true }), huelle: page.getByRole('button', { name, exact: true }) })),
+    ];
+    await expect(ergaenzt[2].fokus).toBeEnabled();
+    const kaesten = [];
+    for (const { name, fokus, huelle } of ergaenzt) {
+      await fokus.evaluate((el, wert) => el.setAttribute('data-e2e-fokus', wert), name);
+      const kasten = (await huelle.boundingBox())!;
+      expect(Math.min(kasten.width, kasten.height), `${name}, ${dichte}`).toBeGreaterThanOrEqual(boden - 0.5);
+      kaesten.push(kasten);
+    }
+    for (let i = 1; i < kaesten.length; i++) {
+      const a = kaesten[i - 1];
+      const b = kaesten[i];
+      expect(Math.max(b.x - a.x - a.width, b.y - a.y - a.height), `Feldabstand ${dichte}, Paar ${i}`).toBeGreaterThanOrEqual(abstand - 0.5);
+    }
+    const breite = await page.evaluate(() => ({ inhalt: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
+    expect(breite.inhalt, `Kein horizontaler Überlauf bei geöffneter Schnellerfassung ${dichte}`).toBeLessThanOrEqual(breite.viewport);
+    await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
+    const befund = await pruefeFokusVerdeckung(page, 60);
+    expect(befund.besuchteZiele.sort()).toEqual([...ziele.filter((name) => name !== 'neue Sprechgruppe anlegen'), ...ergaenzt.map(({ name }) => name)].sort());
+    expect(befund.fixierteKandidaten).toBeGreaterThan(0);
+    expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+    test.info().annotations.push({ type: 'messwert', description: `390px ${dichte}, Sprechgruppen offen: ${befund.besuchteZiele.length} Routenziele, ${befund.verdeckt.length} Verdeckungen, 4 Ziele ≥${boden}px, Abstände ≥${abstand}px, kein horizontaler Überlauf` });
+  });
+}
+
+test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste wird erkannt', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 520 });
+  const { leiste } = await einheitFokusBereit(page, 'handschuh');
+  await page.getByLabel('Name', { exact: true }).focus();
+  await expect(leiste).toBeInViewport();
+  await leiste.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const probe = document.createElement('button');
+    probe.id = 'e2e-leistenprobe';
+    probe.textContent = 'Leistenprobe';
+    probe.setAttribute('data-e2e-fokus', 'Leistenprobe');
+    Object.assign(probe.style, { position: 'fixed', left: `${r.left + 10}px`, top: `${r.top + 10}px`, width: '40px', height: '20px', zIndex: '0' });
+    // Geschwister, kein Kind der Leiste: Vorfahren des Fokusziels sind keine Verdecker.
+    el.before(probe);
+    const start = document.createElement('button');
+    start.id = 'e2e-probenstart';
+    start.style.position = 'fixed';
+    probe.before(start);
+    start.focus({ preventScroll: true });
+  });
+  const verdeckt = await pruefeFokusVerdeckung(page, 1);
+  expect(verdeckt.besuchteZiele).toEqual(['Leistenprobe']);
+  expect(verdeckt.verdeckt).toHaveLength(1);
+  expect(verdeckt.verdeckt[0]).toContain('e2e-einheit-leiste');
+  // Gegenprobe am selben Ziel: die Geometrie außerhalb der Leiste muss frei sein.
+  await page.locator('#e2e-leistenprobe').evaluate((el) => { el.style.top = '100px'; });
+  await page.locator('#e2e-probenstart').focus();
+  expect((await pruefeFokusVerdeckung(page, 1)).verdeckt).toEqual([]);
 });

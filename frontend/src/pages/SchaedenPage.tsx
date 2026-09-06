@@ -1,3 +1,4 @@
+import StatusTag from '../components/StatusTag';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -73,7 +74,7 @@ const schaedenSpalten = (einsatzId: number) =>
         werte: (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({ text: AUSMASS_META[a].label, value: a })),
         trifft: (s, wert) => s.ausmass === wert,
       },
-      render: (_, s) => <Tag color={AUSMASS_META[s.ausmass].color}>{AUSMASS_META[s.ausmass].label}</Tag>,
+      render: (_, s) => <StatusTag darstellung={AUSMASS_META[s.ausmass]} />,
     },
     {
       title: 'Ort',
@@ -90,10 +91,10 @@ const schaedenSpalten = (einsatzId: number) =>
       title: 'Status',
       key: 'status',
       render: (_, s) => (
-        <Tag color={STATUS_META[s.status].color}>
-          {STATUS_META[s.status].label}
-          {s.status === 'uebergeben' && s.uebergeben_an ? ` (${s.uebergeben_an})` : ''}
-        </Tag>
+        <StatusTag darstellung={{
+          ...STATUS_META[s.status],
+          label: STATUS_META[s.status].label + (s.status === 'uebergeben' && s.uebergeben_an ? ` (${s.uebergeben_an})` : ''),
+        }} />
       ),
     },
     {

@@ -97,6 +97,30 @@ pub async fn liste(
 
 // ---------- POST /schaeden (Anlegen) ----------
 
+/// Anlegen und PATCH prüfen denselben vollständigen Koordinatenzustand.
+fn pruefe_koordinaten(lat: Option<f64>, lon: Option<f64>) -> Result<(), AppError> {
+    if lat.is_some() != lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if let Some(lat) = lat {
+        if !(-90.0..=90.0).contains(&lat) {
+            return Err(AppError::UnprocessableEntity(
+                "lat muss zwischen -90 und 90 liegen".into(),
+            ));
+        }
+    }
+    if let Some(lon) = lon {
+        if !(-180.0..=180.0).contains(&lon) {
+            return Err(AppError::UnprocessableEntity(
+                "lon muss zwischen -180 und 180 liegen".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Deserialize)]
 pub struct AnlegenBody {
     pub status: Option<String>,
@@ -104,6 +128,8 @@ pub struct AnlegenBody {
     pub ausmass: Option<String>,
     pub ort: Option<String>,
     pub beschreibung: Option<String>,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
     pub geschaedigt_person_id: Option<i64>,
     pub geschaedigt_kontakt: Option<String>,
     pub geschaedigt_personal_id: Option<i64>,
@@ -160,6 +186,7 @@ pub async fn anlegen(
     let Some(ort) = trimme(Some(ort_roh)) else {
         return Err(AppError::Validation("Ort darf nicht leer sein".into()));
     };
+    pruefe_koordinaten(body.lat, body.lon)?;
     let kontakt = trimme(body.geschaedigt_kontakt.clone());
 
     // Eigene Organisation: id wird IMMER serverseitig aus einsatz.org_id abgeleitet,
@@ -209,6 +236,8 @@ pub async fn anlegen(
                 ausmass: ausmass.as_str(),
                 ort: &ort,
                 beschreibung: beschreibung.as_deref(),
+                lat: body.lat,
+                lon: body.lon,
                 geschaedigt_person_id: body.geschaedigt_person_id,
                 geschaedigt_kontakt: kontakt.as_deref(),
                 geschaedigt_personal_id: body.geschaedigt_personal_id,
@@ -344,25 +373,7 @@ pub async fn aktualisieren(
         Some(opt) => opt,
         None => vorher.lon,
     };
-    if eff_lat.is_some() != eff_lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if let Some(la) = eff_lat {
-        if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity(
-                "lat muss zwischen -90 und 90 liegen".into(),
-            ));
-        }
-    }
-    if let Some(lo) = eff_lon {
-        if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity(
-                "lon muss zwischen -180 und 180 liegen".into(),
-            ));
-        }
-    }
+    pruefe_koordinaten(eff_lat, eff_lon)?;
 
     // Enum-Prechecks: Feld isoliert unbrauchbar → 400 (LFH-305). Diese drei sind zugleich
     // der einzige Schutz vor einem stillen Durchfall auf die DB — schaden/repo.rs bindet

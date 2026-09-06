@@ -27,6 +27,8 @@ pub struct NeueDaten<'a> {
     pub ausmass: &'a str,
     pub ort: &'a str,
     pub beschreibung: Option<&'a str>,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
     pub geschaedigt_person_id: Option<i64>,
     pub geschaedigt_kontakt: Option<&'a str>,
     pub geschaedigt_personal_id: Option<i64>,
@@ -131,9 +133,9 @@ pub async fn anlegen_tx(
         "INSERT INTO einsatz_schaden \
             (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, \
              geschaedigt_person_id, geschaedigt_kontakt, geschaedigt_personal_id, \
-             geschaedigt_organisation_id, erfasst_von, geaendert_von) \
+             geschaedigt_organisation_id, erfasst_von, geaendert_von, lat, lon) \
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, 'offen', ?2, ?3, ?4, \
-                COALESCE(?5, ''), ?6, ?7, ?9, ?10, ?8, ?8 \
+                COALESCE(?5, ''), ?6, ?7, ?9, ?10, ?8, ?8, ?11, ?12 \
          FROM einsatz_schaden WHERE einsatz_id = ?1 \
          RETURNING id, registrier_nr",
     )
@@ -147,6 +149,8 @@ pub async fn anlegen_tx(
     .bind(erfasser_id)
     .bind(daten.geschaedigt_personal_id)
     .bind(daten.geschaedigt_organisation_id)
+    .bind(daten.lat)
+    .bind(daten.lon)
     .fetch_one(&mut *conn)
     .await?;
 
@@ -457,6 +461,8 @@ mod tests {
             ausmass: "gering",
             ort: "Hauptstr. 1",
             beschreibung: None,
+            lat: None,
+            lon: None,
             geschaedigt_person_id: None,
             geschaedigt_kontakt: None,
             geschaedigt_personal_id: None,

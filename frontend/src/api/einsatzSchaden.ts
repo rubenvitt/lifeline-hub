@@ -7,6 +7,8 @@ export interface SchadenEingabe {
   ausmass: Ausmass;
   ort: string;
   beschreibung?: string | null;
+  lat?: number | null;
+  lon?: number | null;
   geschaedigt_person_id?: number | null;
   geschaedigt_personal_id?: number | null;
   geschaedigt_organisation_id?: number | null;

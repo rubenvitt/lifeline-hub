@@ -1,5 +1,18 @@
 import type { ThemeConfig } from 'antd';
 
+/** LFH-455: fachliche Sichtungskennzeichnung, bewusst unabhängig von A0-Statusrollen.
+ * Die festen Farbfelder behalten auch nachts ihren Farbton (insbesondere schwarz).
+ * Ihre Umrandung und die separate Beschriftung lesen die Textfarbe des aktiven Modus.
+ * Nur TSX konsumiert diese Palette; sie hat keine zweite CSS-Quelle.
+ * Farbbedeutungen: BBK, Triage/Sichtung (SK I–IV, EX); unverletzt hat keine eigene Farbe. */
+export const sichtungsfarben = {
+  rot: '#f5222d',
+  gelb: '#fadb14',
+  gruen: '#52c41a',
+  blau: '#1677ff',
+  schwarz: '#000000',
+} as const;
+
 /**
  * Gestaltungssprache „E · Lagekarte nachts" (LFH-352 · A0).
  *
