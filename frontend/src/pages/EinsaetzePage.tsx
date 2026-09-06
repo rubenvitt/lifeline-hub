@@ -1,4 +1,16 @@
-import { App, AutoComplete, Button, Card, DatePicker, Form, Input, Space, Tag, Typography } from 'antd';
+import {
+  App,
+  AutoComplete,
+  Button,
+  Card,
+  DatePicker,
+  Form,
+  Input,
+  Space,
+  Tag,
+  Typography,
+  theme,
+} from 'antd';
 import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
@@ -54,6 +66,44 @@ const KACHEL_MIN_HOEHE = 120;
  */
 const SUCHE_AB = 8;
 
+/**
+ * Der Titel-Link der Einsatzkarte als Bedienziel auf der Dichte-Staffel (LFH-396, Gate 3).
+ *
+ * GEMESSEN im Browser (`e2e/gate3-trefflaeche.spec.ts`, Stand vor dem Fix): 17 px in jeder
+ * Stufe — ein nacktes Inline-`<a>` im Kartenkopf ist so hoch wie seine Zeile und
+ * unterschreitet damit schon in `kompakt` den 24-px-Boden. Die Karte selbst ist 120 px hoch
+ * und klickbar, der Link aber ist das TASTATURziel (Tab erreicht ihn, Enter navigiert), und
+ * Gate 3 misst jedes fokussierbare Element.
+ *
+ * ZWEI Angaben, nicht eine (LFH-365): `minHeight` aus `controlHeight` trägt den Boden
+ * (30 / 48 / 72), die Polsterung zieht mit. Sie liegt nur auf der SENKRECHTEN Achse —
+ * waagerecht polstert der Kartenkopf selbst, ein Versatz des Titels gegenüber dem
+ * Kartenkörper wäre eine Sichtänderung, keine Trefflächenänderung. `display: flex` statt
+ * `inline-flex`, damit der Text darin als eigenes Flex-Item weiterhin per Ellipsis
+ * abschneidet (der Kopf ist `white-space: nowrap`): ein atomarer Inline-Kasten würde vom
+ * Kopf hart geclippt, ohne „…".
+ *
+ * Rein und exportiert nach dem Muster von `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`):
+ * nur so ist die Zusicherung über zwei Dichtestufen ohne Rendern prüfbar — `test/utils.tsx`
+ * montiert ein nacktes `ConfigProvider` ohne unser Theme.
+ */
+export function kartenTitelStil(token: { controlHeight: number; paddingSM: number }) {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px 0`,
+  } as const;
+}
+
+/** Der Text im Titel-Link: schneidet als Flex-Item per Ellipsis ab (siehe {@link kartenTitelStil}). */
+const kartenTitelTextStil: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
 /** Ein Kartenraster; die Mindestbreite kommt aus `flaeche`, der Abstand aus `abstand`. */
 function rasterStil(minBreite: number, luft: number): CSSProperties {
   return {
@@ -86,6 +136,7 @@ function KachelSkelett() {
 
 export default function EinsaetzePage() {
   const navigate = useNavigate();
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -183,8 +234,12 @@ export default function EinsaetzePage() {
       key={e.id}
       hoverable
       title={
-        <Link to={einsatzPfad(e.id)} onClick={(event) => event.stopPropagation()}>
-          {e.bezeichnung}
+        <Link
+          to={einsatzPfad(e.id)}
+          onClick={(event) => event.stopPropagation()}
+          style={kartenTitelStil(token)}
+        >
+          <span style={kartenTitelTextStil}>{e.bezeichnung}</span>
         </Link>
       }
       style={klein ? { opacity: 0.65 } : { minHeight: KACHEL_MIN_HOEHE }}

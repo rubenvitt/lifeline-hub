@@ -2,7 +2,7 @@
 .superpowers/
 
 # Rust
-/target/
+/target
 
 # Node / Frontend
 node_modules/
