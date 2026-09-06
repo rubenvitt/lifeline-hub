@@ -1,11 +1,13 @@
-import { Tag, Typography } from 'antd';
+import StatusTag from '../components/StatusTag';
+import SichtungsTag from '../components/SichtungsTag';
+import { Typography } from 'antd';
 import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
-import { SK_META, STATUS_META } from './personMeta';
+import { STATUS_META } from './personMeta';
 
 /** Alter-Anzeige: Geburtsdatum > geschätztes Alter > „—". */
 function alterAnzeige(p: Person): string {
@@ -48,14 +50,12 @@ export function nameText(p: Person): string | null {
 /**
  * Sichtungskategorie als Etikett, „—" wenn ungesichtet.
  *
- * Aus dem anonymen `render` herausgezogen, damit die Regel adressierbar ist. `SK_META`
- * bleibt bei antd-Farbnamen und damit außerhalb des A2-Statusfarbvertrags — sie in eine
- * `StatusDarstellung` zu zwingen wäre der von A2 verbotene Bestands-Sweep. Folge: der
- * zweite Kanal ist hier das Etikett selbst („SK II"), nicht ein zusätzliches Symbol.
+ * LFH-455: SichtungsTag trägt die eigene fachliche Farbachse samt lesbarer Beschriftung.
+ * Sie bleibt unabhängig vom Personenstatus; „SK II" trägt den zweiten Kanal.
  */
 export function SkTag({ p }: { p: Person }) {
   return p.aktuelle_sichtung ? (
-    <Tag color={SK_META[p.aktuelle_sichtung].color}>{SK_META[p.aktuelle_sichtung].label}</Tag>
+    <SichtungsTag kategorie={p.aktuelle_sichtung} />
   ) : (
     <Typography.Text type="secondary">—</Typography.Text>
   );
@@ -91,7 +91,7 @@ export const personenSpalten = spaltenFuer<Person>()([
     title: 'Status',
     key: 'status',
     width: 130,
-    render: (_, p) => <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>,
+    render: (_, p) => <StatusTag darstellung={STATUS_META[p.status]} />,
   },
   { title: 'SK', key: 'sk', width: 90, render: (_, p) => <SkTag p={p} /> },
   {
@@ -140,14 +140,9 @@ export type PersonenSpaltenKey = (typeof personenSpalten)[number]['key'];
 /**
  * Kartenplan der Personenlisten.
  *
- * KEIN `status`-Slot, obwohl es eine Statusspalte gibt: `STATUS_META`/`SK_META` sind
- * antd-Farbnamen und stehen außerhalb des A2-Statusfarbvertrags. Sie in eine
- * `StatusDarstellung` zu zwingen wäre der von A2 ausdrücklich verbotene Bestands-Sweep.
- * SK steht deshalb als Sekundärfeld, Status als Spalte.
- *
- * Offener Prüflisten-Rest daraus (Kriterium 7, eine Farbe = eine Bedeutung): `red` bedeutet
- * in der Statusspalte „verstorben" und in der SK-Spalte „SK I". → Folgeticket „modul-lokale
- * Farbmaps in den A2-Vertrag".
+ * SK steht als Sekundärfeld, Status als Spalte. LFH-455 zentralisiert beide Farbachsen;
+ * der bisherige Kartenumfang bleibt dabei erhalten. Ein zusätzlicher Status-Slot
+ * wäre eine eigene Layoutentscheidung.
  *
  * Der Rückgabetyp ist der Plan-ZWEIG, nicht der ganze `Kartenplan`-Verbund. Gemessen: über
  * dem Verbund verliert ein `{ ...personenKarte(id), aktion: … }` die Unterscheidung nach

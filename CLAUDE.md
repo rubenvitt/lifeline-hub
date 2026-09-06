@@ -11,6 +11,34 @@ Skill `clickup-task-anlegen`.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
+**Farbachse der Betroffenen-Module (LFH-455):** Personenstatus, Schadensstatus und
+Schadensausmaß gehören zum A2-Vertrag in `theme/statusFarben.ts`. Ihre Darstellung folgt
+`StatusTag` aus LFH-446: die Rollenfarbe kennzeichnet den Rand, `token.colorText` trägt die
+Beschriftung. Dafür ist keine zusätzliche Darstellungsoption nötig. „Betroffen“ und
+„abgemeldet“ sagen nichts über medizinische Dringlichkeit; „verstorben“ ist kein roter
+Alarm wie SK I. Diese Personenstatus sind neutral, „vermisst“ ist `achtung`. Beim Schaden
+ist „offen“ `achtung`, „übergeben“ `bedien`, „abgeschlossen“ neutral. Beim Ausmaß ist
+„gering“ neutral, „mittel“/„groß“ `achtung`, „katastrophal“ `alarm`; die Labels unterscheiden
+die zusammengefassten Stufen.
+
+**Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
+`SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
+SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe
+([BBK: Triage/Sichtung](https://www.bbk.bund.de/DE/Themen/Gesundheitlicher-Bevoelkerungsschutz/Triage-Sichtung/triage-sichtung.html)).
+Die Umrandung macht Gelb auf hellem und Schwarz auf dunklem Grund sichtbar, die separate
+Beschriftung folgt dem Modus. `color="black"` an antds `Tag` ist ausdrücklich falsch:
+es ist kein Preset und erzeugt ein statisches Farbpaar ohne Nachtmodus. SK IV/blau ist die
+benannte fachliche Ausnahme zur blauen Bedien-/Beziehungsrolle. Übergabe, Geschädigt-Bezug
+und UHS-Verortung tragen `bedien` als aktive Beziehung, nicht als Zustand der referenzierten
+Entität. Personenstatus und Sichtung bleiben unabhängig, auch bei `SK=tot` mit anderem
+Personenstatus.
+
+`e2e/betroffene-kontrast.spec.ts` prüft die tatsächlich zusammengesetzten Text-/Hintergrundpaare
+auf Aufnahme-Route, im Modal, in Listen und Details: Tag ≥ 7:1, Nacht ≥ 5:1. Die Sichtungswahl
+wird ungewählt, gewählt und mit Hover geprüft; Alpha wird mitgerechnet, unbelegte
+Bild-/Opacity-Kompositionen werden abgelehnt. Kein zusätzlicher mobiler Status-Slot ist
+Teil dieser Farbentscheidung.
+
 Die UI-Form richtet sich nach Umfang/Interaktion des Inhalts (LFH-19):
 
 - **Vollseite / eigene Route** (`/einsaetze/:einsatzId/<modul>/:id`) → umfangreiche

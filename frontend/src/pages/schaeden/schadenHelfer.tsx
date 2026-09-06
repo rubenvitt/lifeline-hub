@@ -1,8 +1,9 @@
 import { Link } from 'react-router';
-import { Tag, Typography } from 'antd';
+import { Typography } from 'antd';
+import StatusTag from '../../components/StatusTag';
+import { bezugsDarstellung } from '../../theme/statusFarben';
 import { personDetailPfad, personalPfad } from '../../routing/deeplinks';
 import type {
-  Ausmass,
   Schaden,
   SchadenAbschlussGrund,
   SchadenStatus,
@@ -14,11 +15,7 @@ import type { GeschaedigtWert } from './GeschaedigtPicker';
 // -Detailseite (SchaedenDetailPage). Insbesondere die Geschädigt-XOR-Abbildung auf die
 // vier Backend-Felder liegt damit an EINER Stelle (sonst fehleranfällig dupliziert).
 
-export const STATUS_META: Record<SchadenStatus, { label: string; color: string }> = {
-  offen: { label: 'offen', color: 'gold' },
-  uebergeben: { label: 'übergeben', color: 'blue' },
-  abgeschlossen: { label: 'abgeschlossen', color: 'default' },
-};
+export { schadenStatus as STATUS_META, schadenAusmass as AUSMASS_META } from '../../theme/statusFarben';
 
 export const TYP_LABEL: Record<SchadenTyp, string> = {
   sachschaden: 'Sachschaden',
@@ -29,12 +26,6 @@ export const TYP_LABEL: Record<SchadenTyp, string> = {
   sonstige: 'Sonstige',
 };
 
-export const AUSMASS_META: Record<Ausmass, { label: string; color: string }> = {
-  gering: { label: 'gering', color: 'green' },
-  mittel: { label: 'mittel', color: 'gold' },
-  gross: { label: 'groß', color: 'orange' },
-  katastrophal: { label: 'katastrophal', color: 'red' },
-};
 
 export const ABSCHLUSS_LABEL: Record<SchadenAbschlussGrund, string> = {
   behoben: 'behoben',
@@ -74,21 +65,21 @@ export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNo
     }
     // Deeplink auf die Personen-Detailseite (LFH-25), falls die Person-id bekannt ist.
     return s.geschaedigt_person_id != null ? (
-      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}><Tag color="blue">{label}</Tag></Link>
+      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}><StatusTag darstellung={bezugsDarstellung(label)} /></Link>
     ) : (
-      <Tag color="blue">{label}</Tag>
+      <StatusTag darstellung={bezugsDarstellung(label)} />
     );
   }
   if (s.geschaedigt_personal_id != null) {
     // Einsatzkraft → Personal-Liste mit Zeilen-Selektion (?personal=, LFH-25).
     return (
       <Link to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
-        <Tag color="geekblue">{s.geschaedigt_personal_name ?? 'Einsatzkraft'}</Tag>
+        <StatusTag darstellung={bezugsDarstellung(s.geschaedigt_personal_name ?? 'Einsatzkraft')} />
       </Link>
     );
   }
   if (s.geschaedigt_organisation_id != null) {
-    return <Tag color="purple">{s.geschaedigt_organisation_name ?? 'Eigene Organisation'}</Tag>;
+    return <StatusTag darstellung={bezugsDarstellung(s.geschaedigt_organisation_name ?? 'Eigene Organisation')} />;
   }
   if (s.geschaedigt_kontakt) return <Typography.Text>{s.geschaedigt_kontakt}</Typography.Text>;
   return <Typography.Text type="secondary">—</Typography.Text>;

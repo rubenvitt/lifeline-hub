@@ -1,6 +1,7 @@
+import SichtungsTag from '../components/SichtungsTag';
 import { Space, Tag, Typography } from 'antd';
 import type { Person, Sichtungskategorie } from '../api/types';
-import { PATIENT_SK, SK_META } from './personMeta';
+import { PATIENT_SK } from './personMeta';
 
 /** Zählt je SK-Kategorie + Gruppe „ungesichtet" (Spec-Drei-Teilung). */
 function lagebildZaehlung(alle: Person[]): { sk: Record<Sichtungskategorie, number>; ungesichtet: number } {
@@ -21,7 +22,7 @@ export default function LagebildStreifen({ alle }: { alle: Person[] }) {
   const skTags = (Object.keys(z.sk) as Sichtungskategorie[])
     .filter((k) => z.sk[k] > 0)
     .map((k) => (
-      <Tag key={k} color={SK_META[k].color}>{SK_META[k].label}: {z.sk[k]}</Tag>
+      <SichtungsTag key={k} kategorie={k} anzahl={z.sk[k]} />
     ));
   return (
     <Space wrap style={{ marginBottom: 12 }}>

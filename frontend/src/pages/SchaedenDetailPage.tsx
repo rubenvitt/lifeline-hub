@@ -1,3 +1,4 @@
+import StatusTag from '../components/StatusTag';
 import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -157,7 +158,7 @@ export default function SchaedenDetailPage() {
       </Descriptions.Item>
       <Descriptions.Item label="Ausmaß">
         {zelle('ausmass', <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
-          <Tag color={AUSMASS_META[s.ausmass].color}>{AUSMASS_META[s.ausmass].label}</Tag>)}
+          <StatusTag darstellung={AUSMASS_META[s.ausmass]} />)}
       </Descriptions.Item>
       <Descriptions.Item label="Ort">
         {zelle('ort', <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />, s.ort,
@@ -222,7 +223,7 @@ export default function SchaedenDetailPage() {
           <Typography.Title level={3} style={{ margin: 0 }}>
             Schaden {schadenRegistrierAnzeige(s.registrier_nr)}
           </Typography.Title>
-          <Tag color={STATUS_META[s.status].color}>{STATUS_META[s.status].label}</Tag>
+          <StatusTag darstellung={STATUS_META[s.status]} />
           {s.storniert_at && <Tag color="default">storniert</Tag>}
         </Space>
         <Space>

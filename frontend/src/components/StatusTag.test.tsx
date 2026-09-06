@@ -1,9 +1,10 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, theme } from 'antd';
 import { renderMitProviders } from '../test/utils';
 import StatusTag from './StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
+import { antdToken, farbenHell, farbenDunkel } from '../theme/tokens';
 
 /** Der Vertrag verlangt den zweiten Kanal am Eintrag; die Tests bauen ihn hier von Hand,
  *  damit sie unabhängig von den konkreten Enum-Zuordnungen bleiben. */
@@ -17,6 +18,18 @@ function stilVon(element: HTMLElement) {
 }
 
 describe('StatusTag', () => {
+  it.each(['light', 'dark'] as const)('%s: Beschriftung bleibt unabhängig von der Statusfarbe lesbar', (modus) => {
+    const config = { algorithm: modus === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: antdToken(modus === 'dark' ? farbenDunkel : farbenHell) };
+    const token = theme.getDesignToken(config);
+    renderMitProviders(
+      <ConfigProvider theme={config}>
+        <StatusTag darstellung={{ rolle: 'achtung', label: 'vermisst' }} />
+      </ConfigProvider>,
+    );
+    const tag = screen.getByText('vermisst').closest('.ant-tag') as HTMLElement;
+    expect(tag).toHaveStyle({ color: token.colorText, borderColor: token.colorWarning });
+    expect(tag.style.background).toBe('transparent');
+  });
   it('rendert den Text IMMER — die Farbe allein ist kein Kanal (WCAG 1.4.1)', () => {
     renderMitProviders(<StatusTag darstellung={alarm} />);
     expect(screen.getByText('nicht verfügbar')).toBeInTheDocument();
