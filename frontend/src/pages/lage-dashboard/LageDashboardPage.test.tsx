@@ -14,8 +14,7 @@ import { warnstufeKennzahl } from '../../theme/statusFarben';
 import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, Meldung } from '../../api/types';
-import { uhrzeit } from './lagebild';
-import { formatUhrzeitMitTag } from '../../anzeige/format';
+import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 
 class FakeEventSource {
@@ -324,10 +323,10 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     await kennzahlGeladen('Vermisst');
     const zeile = await screen.findByRole('link', { name: /Strom ausgefallen/ });
     expect(zeile).toHaveTextContent('12');
-    // `uhrzeit()` rechnet den UTC-Wirestring in die Anzeigezone um (siehe
-    // `lagebild.ts`) — die Erwartung darf deshalb nicht von der Maschinen-TZ
+    // `formatUhrzeit()` rechnet den UTC-Wirestring in die Anzeigezone um (siehe
+    // `anzeige/format.ts`) — die Erwartung darf deshalb nicht von der Maschinen-TZ
     // abhängen und wird über dieselbe Funktion berechnet wie die Seite selbst.
-    expect(zeile).toHaveTextContent(uhrzeit('2026-06-11 14:05:00'));
+    expect(zeile).toHaveTextContent(formatUhrzeit('2026-06-11 14:05:00'));
     expect(zeile).toHaveTextContent('ELW 1');
     expect(zeile).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=77');
   });
