@@ -16,6 +16,8 @@ const OPTIONEN: { value: Koordinatenformat; label: string }[] = [
 ];
 
 interface Props {
+  /** Von Form.Item gesetzte ID verbindet dessen Label mit dem Texteingabefeld. */
+  id?: string;
   value?: LatLon | null;
   onChange?: (wert: LatLon | null) => void;
   status?: 'error' | 'warning';
@@ -26,7 +28,7 @@ interface Props {
 }
 
 
-export default function KoordinatenEingabe({ value, onChange, status, einsatzId, exclude }: Props) {
+export default function KoordinatenEingabe({ id, value, onChange, status, einsatzId, exclude }: Props) {
   const override = useKoordinatenSystemOverride();
   const { konventionen } = useAnzeigeKonventionen();
   const system: Koordinatenformat = override ?? konventionen.koordinatenformat ?? 'wgs84';
@@ -64,6 +66,7 @@ export default function KoordinatenEingabe({ value, onChange, status, einsatzId,
     <Space orientation="vertical" size={2} style={{ width: '100%' }}>
       <Space.Compact style={{ width: '100%' }}>
         <Input
+          id={id}
           value={text}
           onChange={(e) => bearbeiten(e.target.value)}
           onFocus={() => setFokus(true)}
@@ -72,6 +75,7 @@ export default function KoordinatenEingabe({ value, onChange, status, einsatzId,
           placeholder="Koordinate eingeben"
         />
         <Select<Koordinatenformat>
+          aria-label="Koordinatenformat"
           value={system}
           onChange={setzeOverride}
           options={OPTIONEN}

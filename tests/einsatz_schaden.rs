@@ -1337,6 +1337,116 @@ async fn patch_geschaedigt_organisation_erzwingt_eigene_org() {
 // ---------- Tests: Verortung (lat/lon) ----------
 
 #[tokio::test]
+async fn anlegen_koordinaten_speichert_paar_samt_grenzwerten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{e}/schaeden");
+
+    for (lat, lon) in [(52.1, 8.5), (0.0, 0.0), (-90.0, -180.0), (90.0, 180.0)] {
+        let mut body = gueltig();
+        body["lat"] = json!(lat);
+        body["lon"] = json!(lon);
+        let (status, schaden) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}: {schaden}");
+        assert_eq!(schaden["lat"].as_f64(), Some(lat));
+        assert_eq!(schaden["lon"].as_f64(), Some(lon));
+
+        let id = schaden["id"].as_i64().unwrap();
+        let (status, geladen) = anfrage(&app, "GET", &format!("{pfad}/{id}"), &admin, None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(geladen["lat"].as_f64(), Some(lat), "muss persistiert sein");
+        assert_eq!(geladen["lon"].as_f64(), Some(lon), "muss persistiert sein");
+    }
+}
+
+#[tokio::test]
+async fn anlegen_koordinaten_sind_optional_auch_bei_explizitem_null() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    for koordinaten in [json!({}), json!({"lat": null, "lon": null})] {
+        let mut body = gueltig();
+        body.as_object_mut()
+            .unwrap()
+            .extend(koordinaten.as_object().unwrap().clone());
+        let (status, schaden) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/schaeden"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{body}: {schaden}");
+        assert!(schaden["lat"].is_null());
+        assert!(schaden["lon"].is_null());
+    }
+}
+
+#[tokio::test]
+async fn anlegen_koordinaten_unvollstaendig_oder_ausserhalb_range_ist_422_ohne_write() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let etb_vorher: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    for koordinaten in [
+        json!({"lat": 52.1}),
+        json!({"lon": 8.5}),
+        json!({"lat": 52.1, "lon": null}),
+        json!({"lat": null, "lon": 8.5}),
+        json!({"lat": -90.1, "lon": 8.5}),
+        json!({"lat": 90.1, "lon": 8.5}),
+        json!({"lat": 52.1, "lon": -180.1}),
+        json!({"lat": 52.1, "lon": 180.1}),
+    ] {
+        let mut body = gueltig();
+        body.as_object_mut()
+            .unwrap()
+            .extend(koordinaten.as_object().unwrap().clone());
+        let (status, antwort) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/schaeden"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{body}: {antwort}"
+        );
+        assert!(antwort["error"].is_string());
+    }
+
+    let schaeden: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_schaden WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let etb_nachher: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        schaeden, 0,
+        "abgelehnte Koordinaten dürfen keinen Schaden anlegen"
+    );
+    assert_eq!(etb_nachher, etb_vorher, "kein ETB-Eintrag ohne Schaden");
+}
+
+#[tokio::test]
 async fn schaden_verorten_setzt_lat_lon() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

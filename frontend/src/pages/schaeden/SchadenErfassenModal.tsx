@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { App, Form, Input } from 'antd';
+import { App, Collapse, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
@@ -7,6 +7,8 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { legeSchadenAn, type SchadenEingabe } from '../../api/einsatzSchaden';
 import type { Ausmass, SchadenTyp } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
+import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
+import type { LatLon } from '../../anzeige/koordinaten';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
@@ -24,10 +26,14 @@ interface Props {
   orgName: string;
 }
 
+type SchadenFormular = Omit<SchadenEingabe, 'lat' | 'lon'> & {
+  koordinaten?: LatLon | null;
+};
+
 /** Schnellerfassungs-Modal für Schäden. Props-gesteuert: die Seite hält nur den `open`-State
  *  (Trigger-Button, ?neu=1), dieses Modal besitzt Formular, Geschädigt-Auswahl und die
- *  Anlege-Mutation. Feldreihenfolge (Typ, Ausmaß, Geschädigt) ist stabil — der Test wählt die
- *  Comboboxen per Index.
+ *  Anlege-Mutation. Vier Kernfelder bleiben sichtbar; Geschädigt und Koordinate liegen
+ *  optional unter „Weitere Angaben“.
  *
  *  SERIENMODUS (LFH-332 · B4): an einer Schadenslage werden Schäden am Stück erfasst, deshalb
  *  `serie` — „Speichern und nächste" lässt den Dialog stehen. Der Ort wiederholt sich dabei
@@ -37,15 +43,15 @@ interface Props {
  *  damit der ausgeschaltete B4-Schalter einen Serien-Reset leer lässt.
  *
  *  Zurückgesetzt wird NICHT mehr hier: die Hülle leert die Felder auf beiden Wegen (nach dem
- *  Erfassen und beim Abbrechen). Nur „Geschädigt" ist kein `Form.Item`, sondern lokaler State
+ *  Erfassen und beim Abbrechen). Nur „Geschädigt" liegt außerhalb des Formstores in lokalem State
  *  — den muss dieses Modul selbst leeren. */
 export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, orgName }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [form] = Form.useForm<SchadenEingabe>();
+  const [form] = Form.useForm<SchadenFormular>();
   const geladeneOeffnung = useRef<string | null>(null);
   const formularEinsatzId = useRef(einsatzId);
-  // Geschädigt ist ein strukturierter Wert → lokaler State (kein Form.Item).
+  // Geschädigt liegt außerhalb des Formstores; der Reset erfolgt daher separat.
   const [geschaedigt, setGeschaedigt] = useState<GeschaedigtWert>(null);
 
   useEffect(() => {
@@ -86,23 +92,25 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
    * aber das Formular — der lokale Geschädigt-Wert würde sonst stillschweigend auf den nächsten
    * Schaden mitwandern. Das wäre ein falscher Datensatz, keine Kosmetik.
    */
-  async function onErfassen(daten: SchadenEingabe) {
+  async function onErfassen(daten: SchadenFormular) {
     await anlegenMutation.mutateAsync({
       typ: daten.typ,
       ausmass: daten.ausmass,
       ort: daten.ort,
       beschreibung: daten.beschreibung ?? null,
+      lat: daten.koordinaten?.lat ?? null,
+      lon: daten.koordinaten?.lon ?? null,
       ...geschaedigtFelder(geschaedigt, orgId),
     });
   }
 
-  function onErfasst(daten: SchadenEingabe) {
+  function onErfasst(daten: SchadenFormular) {
     schreibeErfassungsSitzungswert(einsatzId, 'schaden', 'ort', daten.ort);
     setGeschaedigt(null);
   }
 
   return (
-    <ErfassungsModal<SchadenEingabe>
+    <ErfassungsModal<SchadenFormular>
       offen={open}
       titel="Schaden erfassen"
       form={form}
@@ -130,14 +138,25 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       <Form.Item label="Beschreibung" name="beschreibung">
         <Input.TextArea rows={2} />
       </Form.Item>
-      <Form.Item label="Geschädigt">
-        <GeschaedigtPicker
-          einsatzId={einsatzId}
-          orgName={orgName}
-          value={geschaedigt}
-          onChange={setGeschaedigt}
-        />
-      </Form.Item>
+      <Collapse
+        items={[{
+          key: 'weitere',
+          label: 'Weitere Angaben',
+          children: <>
+            <Form.Item label="Geschädigt">
+              <GeschaedigtPicker
+                einsatzId={einsatzId}
+                orgName={orgName}
+                value={geschaedigt}
+                onChange={setGeschaedigt}
+              />
+            </Form.Item>
+            <Form.Item label="Koordinate" name="koordinaten">
+              <KoordinatenEingabe />
+            </Form.Item>
+          </>,
+        }]}
+      />
     </ErfassungsModal>
   );
 }

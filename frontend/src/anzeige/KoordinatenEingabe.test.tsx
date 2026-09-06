@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useState } from 'react';
+import { Form } from 'antd';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -11,6 +12,18 @@ import type { LatLon } from './koordinaten';
 afterEach(() => localStorage.clear());
 
 describe('KoordinatenEingabe', () => {
+  it('verbindet das Form-Label mit dem Koordinatenfeld', () => {
+    renderMitProviders(
+      <Form>
+        <Form.Item name="koordinaten" label="Koordinate">
+          <KoordinatenEingabe />
+        </Form.Item>
+      </Form>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Koordinate' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Koordinatenformat' })).toBeInTheDocument();
+  });
+
   it('zeigt den value im aktuellen System (WGS84 default)', () => {
     render(<KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} />);
     expect(screen.getByRole('textbox')).toHaveValue('51.50000, 10.25000');
