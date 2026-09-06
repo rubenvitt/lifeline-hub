@@ -165,6 +165,17 @@ interface PlatzKarteProps {
   platz: UhsPlatz;
   belegtVon: Person | undefined;
   schreibgeschuetzt: boolean;
+  /**
+   * Eine Belegungs-Mutation läuft gerade (LFH-457). BEWUSST getrennt von
+   * `schreibgeschuetzt`: das ist ein DAUERHAFTER Rechtezustand und nimmt Bedienelemente
+   * aus dem Baum; dieser hier ist TRANSIENT und darf das nicht. Bis LFH-457 fuhr
+   * `belegMut.isPending` als `schreibgeschuetzt` hier herein — damit verschwanden während
+   * jeder Belegung ALLE Menü-Auslöser der Fläche (im Browser gemessen 26 bis 397 ms), und
+   * ein Portal-Overlay stirbt mit seinem Auslöser. Wer in diesem Fenster ein Platzmenü
+   * öffnete, verlor es wieder. Gesperrt werden deshalb nur die Wege, die eine ZWEITE
+   * Belegung anstoßen würden — nicht das Menü als Ganzes.
+   */
+  belegungLaeuft: boolean;
   bearbeitbar: boolean;
   onVerfuegbarkeit: (v: Verfuegbarkeit) => void;
   onAustritt: () => void;
@@ -176,7 +187,7 @@ interface PlatzKarteProps {
   onZurueckInWartebereich?: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen, onZuweisen, onZurueckInWartebereich }: PlatzKarteProps) {
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen, onZuweisen, onZurueckInWartebereich }: PlatzKarteProps) {
   // Platz-Karte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus —
   // Drag-Source (Layout verschieben). Mit @dnd-kit beides am selben Knoten.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
@@ -199,6 +210,17 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
   // (s. onDragEnd), und ein Ersatzweg, der strenger ist als die Geste, die er ersetzt,
   // ersetzt sie nicht.
   const zuweisbar = !schreibgeschuetzt && !bearbeitbar && !belegtVon;
+  // Der Schutz, den `belegMut.isPending` vor LFH-457 trug — er bleibt, aber er SPERRT
+  // statt zu entfernen: die beiden Menüeinträge, die eine zweite Bewegung derselben Person
+  // anstoßen würden („Patient zuweisen" und „Zurück in den Wartebereich"), stehen weiter da
+  // und sind deaktiviert. Ein Eintrag, der während einer laufenden Belegung aus dem offenen
+  // Menü verschwände (und beim Ende wieder auftauchte), verschöbe die Liste unter dem
+  // Cursor — bei `autoFocus: true` fiele der Tastaturfokus dabei auf `<body>`, also genau
+  // der „ich verliere meinen Platz"-Fall, gegen den dieses Ticket geschrieben ist. Und
+  // „still weggeschaltet" ist ohnehin nicht die Bauform dieses Repos (CLAUDE.md,
+  // C10/M16 · C11/M45). Der WURZELKLICK dagegen hat keinen Sperrzustand, den man sehen
+  // könnte; er ruht.
+  const zuweisenGesperrt = belegungLaeuft;
   const style: React.CSSProperties = {
     position: 'absolute',
     left: platz.pos_x ?? 10,
@@ -239,7 +261,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
   // Aktionszeile ist an SCHRITT_Y gedeckelt (Rechnung im Dateikopf).
   const menu = {
     items: [
-      ...(zuweisbar ? [{ key: 'zuweisen', label: 'Patient zuweisen', icon: <UserAddOutlined /> }, { type: 'divider' as const }] : []),
+      ...(zuweisbar ? [{ key: 'zuweisen', label: 'Patient zuweisen', icon: <UserAddOutlined />, disabled: zuweisenGesperrt }, { type: 'divider' as const }] : []),
       // Rückweg in den Wartebereich (LFH-341 · H40): der Drag auf `drop-inbox` ist unter
       // `lg` strukturell weg — das Droppable liegt in einem anderen Reiter, und die Tabs
       // tragen `destroyOnHidden` (Begründung am Reiter-Zweig unten; ohne die Prop bliebe
@@ -251,7 +273,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
       // ist im Menü-Item nicht vorgesehen; die Tests greifen deshalb per TEILSTRING, nie
       // per exaktem Namen — dieselbe Regel wie bei der Aktionsbündelung.
       ...(onZurueckInWartebereich
-        ? [{ key: 'wartebereich', label: 'Zurück in den Wartebereich', icon: <RollbackOutlined /> }]
+        ? [{ key: 'wartebereich', label: 'Zurück in den Wartebereich', icon: <RollbackOutlined />, disabled: zuweisenGesperrt }]
         : []),
       ...verfItems,
       ...(bearbeitbar ? [{ type: 'divider' as const }, { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }] : []),
@@ -284,7 +306,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
       data-testid="platz-karte"
       style={style}
       {...dragProps}
-      onClick={zuweisbar ? onZuweisen : undefined}
+      onClick={zuweisbar && !zuweisenGesperrt ? onZuweisen : undefined}
     >
       {/* Titel: max. 2 Zeilen, dann Ellipsis (voller Name im Tooltip). Feste maxHeight,
           damit ein Umbruch die Karte NICHT vergrößert. */}
@@ -312,7 +334,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
           mehr: Quelle (Platz) und Ziel (`drop-inbox`) liegen dann in verschiedenen
           Reitern, das Droppable ist nicht im Baum. */}
       <div style={{ height: 24, overflow: 'hidden' }}>
-        {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || bearbeitbar} kompakt onOeffnen={onOeffnen} />}
+        {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || belegungLaeuft || bearbeitbar} kompakt onOeffnen={onOeffnen} />}
       </div>
       {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons (kein Menü); feste Höhe.
           DER `click`-RIEGEL DER KARTE SITZT HIER — einmal am Container statt an jedem
@@ -325,6 +347,12 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
         style={{ display: 'flex', gap: aktionsabstand(token), height: 24, alignItems: 'center' }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* GESPERRT, nicht entfernt, solange eine Belegung läuft (LFH-457): das optimistische
+            Update setzt die Person sofort auf diese Karte, beide Knöpfe erschienen also
+            mitten in der laufenden Mutation — und beide gehen auf DIESELBE Person und
+            denselben Endpunkt. Vor der Prop-Trennung war das strukturell unmöglich, weil
+            `belegMut.isPending` die ganze Karte als `schreibgeschuetzt` führte; diese Sperre
+            ist der Rest jenes Schutzes, ohne sein Nebenwirkung (das Abhängen). */}
         {belegtVon && !schreibgeschuetzt && (
           <>
             <Tooltip title="Verbleib / Entlassung erfassen">
@@ -333,6 +361,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
                 size="small"
                 aria-label="Verbleib / Entlassung erfassen"
                 icon={<CarOutlined />}
+                disabled={belegungLaeuft}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={onTransport}
               />
@@ -343,6 +372,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
                 danger
                 aria-label="zurückweisen"
                 icon={<LogoutOutlined />}
+                disabled={belegungLaeuft}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={onAustritt}
               />
@@ -378,11 +408,13 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
 
 /** Schmale Personen-Liste als Spalten-Karte (links: Eingang/Wartebereich). */
 function PersonenSpalte({
-  titel, personen, schreibgeschuetzt, droppableId, leerText, onOeffnen, onVerbleib,
+  titel, personen, schreibgeschuetzt, belegungLaeuft, droppableId, leerText, onOeffnen, onVerbleib,
 }: {
   titel: string;
   personen: Person[];
   schreibgeschuetzt: boolean;
+  /** Belegung läuft (LFH-457) — sperrt den Drag, ohne Bedienelemente abzuhängen. */
+  belegungLaeuft: boolean;
   droppableId?: string;
   leerText: string;
   onOeffnen: (personId: number) => void;
@@ -399,9 +431,11 @@ function PersonenSpalte({
    * mit derselben Ursache verschieden zu behandeln wäre ein Unterschied ohne Bedeutung.
    *
    * NICHT gesetzt heisst „kein Schreibrecht" — der Auslöser wird dann GAR NICHT gerendert,
-   * nicht deaktiviert. Die Prop-Anwesenheit ist bewusst der Riegel und nicht das
-   * `schreibgeschuetzt` daneben: das trägt zusätzlich `belegMut.isPending`, der Auslöser
-   * flackerte damit während jeder Belegung weg.
+   * nicht deaktiviert. Die Prop-Anwesenheit blieb der Riegel, weil `schreibgeschuetzt`
+   * daneben bis LFH-457 zusätzlich `belegMut.isPending` trug und der Auslöser damit
+   * während jeder Belegung wegflackerte. Diese Vermischung ist aufgelöst (`belegungLaeuft`
+   * ist jetzt eine eigene Prop) — der Riegel bleibt trotzdem hier, weil ein Verbleib ohne
+   * Schreibrecht gar keine Aktion ist und ein gesperrter Knopf nur Platz kostete.
    */
   onVerbleib?: (person: Person) => void;
 }) {
@@ -418,7 +452,7 @@ function PersonenSpalte({
       <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
         {personen.map((p) => (
           <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <PersonenkarteDrag person={p} disabled={schreibgeschuetzt} onOeffnen={onOeffnen} />
+            <PersonenkarteDrag person={p} disabled={schreibgeschuetzt || belegungLaeuft} onOeffnen={onOeffnen} />
             {onVerbleib && (
               <Tooltip title="Verbleib / Entlassung erfassen">
                 {/* GESCHWISTERKNOTEN der Drag-Karte, nicht ihr Kind: so hängt der Auslöser
@@ -452,17 +486,24 @@ function PersonenSpalte({
 
 /** Rechte Spalte: aus DIESER UHS heraus auf Transport gebrachte Personen.
  *  Drop-Target: eine belegte Person hierher ziehen öffnet den Transport-Abschluss-Screen. */
-function TransportSpalte({ personen, schreibgeschuetzt, onOeffnen }: { personen: Person[]; schreibgeschuetzt: boolean; onOeffnen: (personId: number) => void }) {
-  const drop = useDroppable({ id: 'drop-transport', data: { kind: 'transport' }, disabled: schreibgeschuetzt });
+function TransportSpalte({ personen, schreibgeschuetzt, belegungLaeuft, onOeffnen }: { personen: Person[]; schreibgeschuetzt: boolean; belegungLaeuft: boolean; onOeffnen: (personId: number) => void }) {
+  // Das Drop-Target ruht während einer laufenden Belegung. NICHT, weil es dieselbe Mutation
+  // anstieße — `kind: 'transport'` führt in `onDragEnd` auf `setTransportPerson`, also auf
+  // `erfasseVerbleib` und einen anderen Endpunkt. Sondern weil es derselbe GESTENWEG ist:
+  // die Quelle (Personenkarte) ist während der Belegung ohnehin nicht ziehbar, und ein
+  // aufnahmebereites Ziel ohne mögliche Quelle wäre eine Einladung ins Leere.
+  // Bedienelemente hängt `belegungLaeuft` NICHT ab (LFH-457).
+  const gesperrt = schreibgeschuetzt || belegungLaeuft;
+  const drop = useDroppable({ id: 'drop-transport', data: { kind: 'transport' }, disabled: gesperrt });
   const { token } = theme.useToken();
   return (
     <Card
       title="Auf Transport gebracht"
       size="small"
       styles={{ body: { padding: 8 } }}
-      style={{ background: !schreibgeschuetzt && drop.isOver ? token.colorPrimaryBg : undefined }}
+      style={{ background: !gesperrt && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
-      <div ref={schreibgeschuetzt ? undefined : drop.setNodeRef} style={{ minHeight: 48 }}>
+      <div ref={gesperrt ? undefined : drop.setNodeRef} style={{ minHeight: 48 }}>
       {personen.map((p) => (
         <div key={p.id} style={{ marginBottom: 6 }}>
           <Tag color="orange" style={{ margin: 0, cursor: 'pointer' }} onClick={() => onOeffnen(p.id)}>{personLabel(p)}</Tag>
@@ -749,7 +790,8 @@ export default function Grundriss({
       <PersonenSpalte
         titel="Noch nicht aufgenommen"
         personen={nichtAufgenommen}
-        schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+        schreibgeschuetzt={schreibgeschuetzt}
+        belegungLaeuft={belegMut.isPending}
         leerText="keine"
         onOeffnen={setDetailPersonId}
         onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
@@ -757,7 +799,8 @@ export default function Grundriss({
       <PersonenSpalte
         titel="Wartebereich (Eingang)"
         personen={wartebereichPersonen}
-        schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+        schreibgeschuetzt={schreibgeschuetzt}
+        belegungLaeuft={belegMut.isPending}
         droppableId="drop-inbox"
         leerText="leer"
         onOeffnen={setDetailPersonId}
@@ -795,7 +838,8 @@ export default function Grundriss({
                 key={p.id}
                 platz={p}
                 belegtVon={belegt}
-                schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+                schreibgeschuetzt={schreibgeschuetzt}
+                belegungLaeuft={belegMut.isPending}
                 bearbeitbar={platzEditAktiv && !layoutMut.isPending}
                 onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                 onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
@@ -818,8 +862,12 @@ export default function Grundriss({
                   // `art` selbst — für eine Person, die bereits an dieser UHS liegt,
                   // ergibt das `'wechsel'`. Der Eintritt in den Wartebereich IST ein
                   // Wechsel, kein Austritt.
+                  // NICHT an `belegMut.isPending` hängen (LFH-457): die Abwesenheit des
+                  // Callbacks nimmt den Eintrag aus dem Menü, und das ist genau der
+                  // Mechanismus, den dieses Ticket abgestellt hat. Gesperrt wird er über
+                  // `belegungLaeuft` in der Karte — sichtbar, an seinem Platz.
                   (() => {
-                    if (!belegt || schreibgeschuetzt || belegMut.isPending) return undefined;
+                    if (!belegt || schreibgeschuetzt) return undefined;
                     return () => belegMut.mutate({ personId: belegt.id, platzId: null });
                   })()
                 }
@@ -846,7 +894,8 @@ export default function Grundriss({
     <div style={{ height: '100%', minHeight: 0, overflow: 'auto' }}>
       <TransportSpalte
         personen={transportiert}
-        schreibgeschuetzt={schreibgeschuetzt || belegMut.isPending}
+        schreibgeschuetzt={schreibgeschuetzt}
+        belegungLaeuft={belegMut.isPending}
         onOeffnen={setDetailPersonId}
       />
     </div>

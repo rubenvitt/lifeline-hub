@@ -724,3 +724,146 @@ describe('Grundriss – Aktionszeilen-Abstand der Platzkarte (LFH-378)', () => {
     expect(aktionsabstand({ marginSM: 3, controlHeightSM: 24 })).toBe(3);
   });
 });
+
+describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () => {
+  /** Zwei Plätze: „Bett 1" belegt (Ausgangspunkt der Belegungs-Mutation), „Bett 2" frei
+   *  (der Platz, an dem danach das Menü geöffnet wird — genau der gemeldete Bedienweg). */
+  function zweiPlaetze() {
+    return uhsDetail({
+      status: 'aktiv',
+      plaetze: [
+        platz({ id: 10, bezeichnung: 'Bett 1' }),
+        platz({ id: 11, bezeichnung: 'Bett 2', pos_x: 200 }),
+      ],
+    });
+  }
+
+  /** Belegungs-Route, deren Antwort erst auf Zuruf kommt — die Mutation bleibt so lange
+   *  `pending`, und genau dieses Fenster ist der Gegenstand des Befunds. */
+  function haengendeBelegung(personId: number) {
+    let freigeben: (() => void) | undefined;
+    const tor = new Promise<void>((aufloesen) => { freigeben = aufloesen; });
+    server.use(http.post(`/api/einsaetze/1/personen/${personId}/uhs-belegung`, async () => {
+      await tor;
+      return HttpResponse.json({
+        id: 1, einsatz_id: 1, person_id: personId, uhs_id: 1, platz_id: null,
+        art: 'wechsel', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+      });
+    }));
+    return () => freigeben?.();
+  }
+
+  /** Das ZULETZT geöffnete Menü. antd lässt die Portale geschlossener Dropdowns im Baum
+   *  stehen und markiert sie in jsdom nicht immer als `hidden` — ein `querySelector` traf
+   *  deshalb das Menü des zuerst geöffneten Platzes (gemessen: „Zurück in den
+   *  Wartebereich" statt der Verfügbarkeiten). */
+  function menue(): HTMLElement | null {
+    const offen = document.querySelectorAll('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    return (offen[offen.length - 1] as HTMLElement) ?? null;
+  }
+
+  /** Startet die Belegung über „Zurück in den Wartebereich" an Bett 1 und lässt sie laufen. */
+  async function starteBelegung() {
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    await userEvent.click(within(menue()!).getByText('Zurück in den Wartebereich'));
+  }
+
+  it('lässt das Platzmenü eines anderen Platzes erreichbar, während eine Belegung läuft', async () => {
+    // DER BEFUND, gemessen (LFH-457): `belegMut.isPending` fuhr als `schreibgeschuetzt` in
+    // die Platzkarte, und die rendert ihren Menü-Auslöser unter `{!schreibgeschuetzt && …}`.
+    // Damit verschwanden während JEDER Belegung ALLE Auslöser aus dem Baum — im Browser
+    // gemessen 26 bis 397 ms lang. Ein Portal-Overlay stirbt mit seinem Auslöser; wer in
+    // diesem Fenster klickt, greift ins Leere.
+    const belegend = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const freigeben = haengendeBelegung(7);
+    renderGrundriss(zweiPlaetze(), [belegend]);
+
+    await starteBelegung();
+
+    // Die Mutation läuft noch (die Route ist nicht freigegeben) — trotzdem ist das Menü
+    // des NACHBARPLATZES erreichbar und bleibt offen.
+    const ausloeser = screen.getByRole('button', { name: /Platzaktionen zu Bett 2/ });
+    await userEvent.click(ausloeser);
+    expect(within(menue()!).getByText('als in Aufbereitung markieren')).toBeInTheDocument();
+
+    freigeben();
+  });
+
+  it('startet während einer laufenden Belegung KEINE zweite über den Klickweg', async () => {
+    // Die Gegenaussage: `belegMut.isPending` hatte einen Zweck — es verhinderte, dass
+    // parallel eine zweite Belegung angestoßen wird. Der Schutz muss die Trennung
+    // überleben, sonst tauscht der Fix einen Bedienbefund gegen einen Datenbefund.
+    const belegend = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const wartend = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    const freigeben = haengendeBelegung(7);
+    renderGrundriss(zweiPlaetze(), [belegend, wartend]);
+
+    await starteBelegung();
+
+    // Wurzelklick auf den freien Nachbarplatz — kein Zuweisungsdialog.
+    await userEvent.click(screen.getAllByTestId('platz-karte')[1]);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // … und der Menüweg dorthin steht GESPERRT da, statt zu verschwinden: ein Eintrag,
+    // der aus dem offenen Menü fällt und später wiederkommt, verschöbe die Liste unter
+    // dem Cursor. Geprüft wird beides — dass er sichtbar ist UND nicht auslöst.
+    await userEvent.click(screen.getByRole('button', { name: /Platzaktionen zu Bett 2/ }));
+    const eintrag = within(menue()!).getByRole('menuitem', { name: /Patient zuweisen/ });
+    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(eintrag);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    freigeben();
+  });
+
+  it('sperrt „Zurück in den Wartebereich" an einer FREMDEN Karte, statt ihn zu entfernen', async () => {
+    // Derselbe Vertrag wie beim Eintrag darüber, und der unauffälligere Fall: der Rückweg
+    // hing an `belegMut.isPending` und fiel damit während JEDER Belegung aus dem Menü
+    // JEDER belegten Karte — auch an Karten, die mit der laufenden Bewegung nichts zu tun
+    // haben. Das ist genau der Mechanismus, den dieses Ticket abgestellt hat; bei
+    // `autoFocus: true` verliert eine Tastaturbedienung dabei ihren Platz.
+    const bewegt = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const fremd = person({ id: 9, registrier_nr: 9, aktuelle_uhs_id: 1, aktueller_platz_id: 11 });
+    const freigeben = haengendeBelegung(5);
+    renderGrundriss(zweiPlaetze(), [bewegt, fremd]);
+
+    // Belegung an Bett 1 anstoßen (über den Rückweg dieser Karte) …
+    await starteBelegung();
+
+    // … und an der FREMDEN, weiterhin belegten Karte steht der Eintrag gesperrt da.
+    await userEvent.click(screen.getByRole('button', { name: /Platzaktionen zu Bett 2/ }));
+    const eintrag = within(menue()!).getByRole('menuitem', { name: /Zurück in den Wartebereich/ });
+    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
+
+    freigeben();
+  });
+
+  it('sperrt die Patientenaktionen der Zielkarte, solange die Belegung läuft', async () => {
+    // Die zweite Hälfte desselben Schutzes, und die unauffälligere: das OPTIMISTISCHE
+    // Update setzt die Person sofort auf den Zielplatz, also erscheinen dort auch sofort
+    // „Verbleib / Entlassung erfassen" und „zurückweisen" — beide auf DIESELBE Person und
+    // denselben Endpunkt wie die noch laufende Belegung. Solange `belegMut.isPending` als
+    // `schreibgeschuetzt` durchfuhr, war das strukturell unmöglich; seit der Trennung muss
+    // es ausdrücklich gesperrt werden, sonst tauscht der Fix einen Bedienbefund gegen
+    // einen Datenbefund. Gesperrt, nicht entfernt — ein Verschwinden wäre genau der
+    // Mechanismus, gegen den dieses Ticket geschrieben ist.
+    const wartend = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: 1, aktueller_platz_id: null });
+    const freigeben = haengendeBelegung(5);
+    renderGrundriss(zweiPlaetze(), [wartend]);
+
+    // Zuweisen über den Klickweg an Bett 1 — die Person sitzt danach optimistisch dort.
+    await userEvent.click((await screen.findAllByTestId('platz-karte'))[0]);
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Patient' }));
+    const liste = await waitFor(() => {
+      const el = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+      if (!el) throw new Error('kein offenes Auswahlfeld');
+      return el as HTMLElement;
+    });
+    await userEvent.click(within(liste).getByText(/R-005/));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByRole('button', { name: 'zurückweisen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Verbleib / Entlassung erfassen' })).toBeDisabled();
+
+    freigeben();
+  });
+});
