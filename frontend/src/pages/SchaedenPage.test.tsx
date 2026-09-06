@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, isInaccessible, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
@@ -166,6 +166,14 @@ async function fuelleSchaden(dialog: HTMLElement, typ: string, ausmass: string, 
   await userEvent.type(within(dialog).getByLabelText('Ort'), ort);
 }
 
+async function oeffneWeitereAngaben(dialog: HTMLElement) {
+  const schalter = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
+  if (schalter.getAttribute('aria-expanded') === 'false') await userEvent.click(schalter);
+  // Wie im Material-Feldbudget: jsdom beendet die opacity-Animation nicht selbst.
+  // Die Rolle prüft, dass der Inhalt nicht mehr aus dem Zugänglichkeitsbaum verborgen ist.
+  await within(dialog).findByRole('textbox', { name: 'Koordinate' });
+}
+
 describe('SchaedenPage', () => {
   /**
    * LFH-340 · C5. Die Schadensseite war die einzige der drei Betroffenen-Listen, die den
@@ -225,6 +233,74 @@ describe('SchaedenPage', () => {
     expect(screen.getByRole('columnheader', { name: /Verortet/ })).toBeInTheDocument();
     expect(screen.getByLabelText('verortet')).toBeInTheDocument();
     expect(screen.getByLabelText('nicht verortet')).toBeInTheDocument();
+  });
+
+  it.each([true, false])('Erfassung mit Koordinate=%s aktualisiert den Verortungsstand der Liste', async (mitKoordinate) => {
+    const schaeden: object[] = [];
+    let gesendet: Record<string, unknown> = {};
+    server.use(http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+      gesendet = await request.json() as Record<string, unknown>;
+      // Nur das tatsächlich versandte Paar kommt beim nächsten Listen-GET zurück.
+      // Eine feste verortete Response würde einen vergessenen Request-Wert verdecken.
+      const angelegt = basisSchaden({
+        typ: gesendet.typ, ausmass: gesendet.ausmass, ort: gesendet.ort,
+        lat: gesendet.lat ?? null, lon: gesendet.lon ?? null,
+      });
+      schaeden.push(angelegt);
+      return HttpResponse.json(angelegt, { status: 201 });
+    }));
+    render(einsatzAktiv, schaeden);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
+    if (mitKoordinate) {
+      await oeffneWeitereAngaben(dialog);
+      await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
+    }
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await warteBisDialogWeg();
+
+    const zeile = await screen.findByRole('row', { name: /S-001/ });
+    expect(within(zeile).getByLabelText(mitKoordinate ? 'verortet' : 'nicht verortet')).toBeInTheDocument();
+    expect(within(zeile).queryByLabelText(mitKoordinate ? 'nicht verortet' : 'verortet')).not.toBeInTheDocument();
+    if (mitKoordinate) {
+      expect(gesendet).toMatchObject({ lat: 52.1, lon: 8.5 });
+    } else {
+      expect(gesendet.lat ?? null).toBeNull();
+      expect(gesendet.lon ?? null).toBeNull();
+    }
+    expect(gesendet).not.toHaveProperty('koordinaten');
+  });
+
+  it('Feldbudget: zeigt vier Kernfelder und zählt die optionalen Angaben nur aufgeklappt', async () => {
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    const sichtbareFelder = () => [...dialog.querySelectorAll<HTMLElement>('.ant-form-item')]
+      .filter((feld) => !isInaccessible(feld));
+    expect(sichtbareFelder()).toHaveLength(4);
+    expect(within(dialog).queryByPlaceholderText('Koordinate eingeben')).not.toBeInTheDocument();
+
+    const weitereAngaben = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
+    expect(weitereAngaben).toHaveAttribute('aria-expanded', 'false');
+    await oeffneWeitereAngaben(dialog);
+    expect(within(dialog).getByRole('textbox', { name: 'Koordinate' })).toBeInTheDocument();
+    expect(sichtbareFelder()).toHaveLength(6);
+    await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
+
+    const panel = within(dialog).getByRole('textbox', { name: 'Koordinate' })
+      .closest('.ant-collapse-panel')!;
+    await userEvent.click(weitereAngaben);
+    await vi.waitFor(() => {
+      // Wie beim Dialog-Ende: jsdom liefert keinen CSS-Übergang. Collapse akzeptiert
+      // nur das Ende der Höhenanimation; danach muss der Inhalt tatsächlich verborgen sein.
+      const ende = new window.Event('transitionend', { bubbles: true });
+      Object.defineProperty(ende, 'propertyName', { value: 'height' });
+      fireEvent(panel, ende);
+      expect(sichtbareFelder()).toHaveLength(4);
+    });
+    await oeffneWeitereAngaben(dialog);
+    expect(within(dialog).getByPlaceholderText('Koordinate eingeben')).toHaveValue('52.10000, 8.50000');
   });
 
   it('zeigt offene Schäden mit S-Nummer, Typ und Ausmaß', async () => {
@@ -323,7 +399,7 @@ describe('SchaedenPage', () => {
   });
 
   /**
-   * „Geschädigt" ist kein `Form.Item`, sondern lokaler State des Modals — die Hülle leert beim
+   * „Geschädigt" liegt außerhalb des Form-Stores im lokalen State — die Hülle leert beim
    * Serien-Speichern das Formular, diesen Wert kann sie nicht kennen. Läge der Reset nur an
    * `onFertig` (das beim Serien-Speichern NIE läuft), wanderte die Zuordnung des ersten
    * Schadens still auf den zweiten: ein falscher Datensatz, keine Kosmetik.
@@ -331,7 +407,7 @@ describe('SchaedenPage', () => {
    * Geprüft werden BEIDE Absendungen. Nur `koerper[1] === null` wäre auch grün, wenn die
    * Zuordnung nie angekommen wäre — erst die 42 in `koerper[0]` macht daraus „geleert".
    */
-  it('Serien-Speichern trägt den Geschädigten NICHT in den nächsten Schaden', async () => {
+  it('Serien-Speichern trägt Geschädigten und Koordinate NICHT in den nächsten Schaden', async () => {
     const koerper: Record<string, unknown>[] = [];
     server.use(
       http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
@@ -347,8 +423,10 @@ describe('SchaedenPage', () => {
     // Schalter fiele die erste Hälfte weg und die zweite bewiese nichts mehr.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
+    await oeffneWeitereAngaben(dialog);
     await userEvent.click(within(dialog).getAllByRole('combobox')[2]); // Geschädigt
     await waehleOption('R-007 · Anna Meier');
+    await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
     await vi.waitFor(() => expect(koerper).toHaveLength(1));
 
@@ -361,7 +439,10 @@ describe('SchaedenPage', () => {
 
     await vi.waitFor(() => expect(koerper).toHaveLength(2));
     expect(koerper[0].geschaedigt_person_id).toBe(42);
+    expect(koerper[0]).toMatchObject({ lat: 52.1, lon: 8.5 });
     expect(koerper[1].geschaedigt_person_id).toBeNull();
+    expect(koerper[1].lat).toBeNull();
+    expect(koerper[1].lon).toBeNull();
     expect(koerper[1].ort).toBe('Hauptstr. 17');
   });
 
@@ -392,17 +473,21 @@ describe('SchaedenPage', () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const ersterDialog = await modalDialog();
+    await oeffneWeitereAngaben(ersterDialog);
     expect(within(ersterDialog).getAllByRole('combobox')[2]).toHaveValue('');
     await fuelleSchaden(ersterDialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
+    await userEvent.type(within(ersterDialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Anlegen' }));
     await vi.waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
     const zweiterDialog = await modalDialog();
+    await oeffneWeitereAngaben(zweiterDialog);
     await vi.waitFor(() => expect(within(zweiterDialog).getByLabelText('Ort')).toHaveValue('Hauptstr. 17'));
     expect(within(zweiterDialog).getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
     expect(within(zweiterDialog).getAllByRole('combobox')[2]).toHaveValue('');
+    expect(within(zweiterDialog).getByPlaceholderText('Koordinate eingeben')).toHaveValue('');
   });
 
   it('merkt den Ort bei einem fehlgeschlagenen Schaden nicht und lässt den Wortlaut stehen', async () => {
@@ -488,8 +573,10 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialogA).getAllByRole('combobox')[1]);
     await waehleOption('gering');
     await userEvent.type(within(dialogA).getByLabelText('Beschreibung'), 'Nur Einsatz A');
+    await oeffneWeitereAngaben(dialogA);
     await userEvent.click(within(dialogA).getAllByRole('combobox')[2]);
     await waehleOption('R-007 · Anna Meier');
+    await userEvent.type(within(dialogA).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
 
     const dialogB = await modalDialog();
@@ -497,7 +584,9 @@ describe('SchaedenPage', () => {
     expect(within(dialogB).getAllByRole('combobox')[0]).toHaveValue('');
     expect(within(dialogB).getAllByRole('combobox')[1]).toHaveValue('');
     expect(within(dialogB).getByLabelText('Beschreibung')).toHaveValue('');
+    await oeffneWeitereAngaben(dialogB);
     expect(within(dialogB).getAllByRole('combobox')[2]).toHaveValue('');
+    expect(within(dialogB).getByPlaceholderText('Koordinate eingeben')).toHaveValue('');
   });
 
   it('Schnellerfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {
@@ -517,6 +606,7 @@ describe('SchaedenPage', () => {
     await waehleOption('gering');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
     // Geschädigt-Combobox (3.) öffnen und die betroffene Person wählen.
+    await oeffneWeitereAngaben(dialog);
     await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
     await waehleOption('R-007 · Anna Meier');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
@@ -542,6 +632,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getAllByRole('combobox')[1]);
     await waehleOption('gering');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
+    await oeffneWeitereAngaben(dialog);
     await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
     await waehleOption('Schulz · Sanitäter');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
@@ -568,6 +659,7 @@ describe('SchaedenPage', () => {
     await waehleOption('gering');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
     // In die Geschädigt-Combobox tippen → synthetische „extern"-Option erscheint.
+    await oeffneWeitereAngaben(dialog);
     const geschaedigt = within(dialog).getAllByRole('combobox')[2];
     await userEvent.click(geschaedigt);
     await userEvent.type(geschaedigt, 'Familie Krause');
