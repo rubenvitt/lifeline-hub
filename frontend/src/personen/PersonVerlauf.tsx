@@ -1,8 +1,9 @@
+import SichtungsTag from '../components/SichtungsTag';
 import { Tag, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import type { PersonDetail } from '../api/types';
-import { SK_META, kurzVerbleib } from './personMeta';
+import { kurzVerbleib } from './personMeta';
 
 const { useToken } = theme;
 
@@ -23,7 +24,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
   const eintraege: Array<{ key: string; at: string; node: ReactNode }> = [
     ...(person.sichtungen ?? []).map((s) => ({
       key: `s-${s.id}`, at: s.gesichtet_at,
-      node: <span><Tag color={SK_META[s.kategorie].color}>{SK_META[s.kategorie].label}</Tag>
+      node: <span><SichtungsTag kategorie={s.kategorie} />
         {s.notiz && <Typography.Text type="secondary"> — {s.notiz}</Typography.Text>}</span>,
     })),
     ...(person.notizen ?? []).map((n) => ({

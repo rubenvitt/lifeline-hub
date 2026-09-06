@@ -1,10 +1,14 @@
 import type { GlobalToken } from 'antd';
-import { farbenDunkel, farbenHell } from './tokens';
+import { farbenDunkel, farbenHell, type sichtungsfarben } from './tokens';
 import type {
   BelegungsArt,
+  Ausmass,
   BrStatus,
   EtbTyp,
   MaterialStatus,
+  PersonStatus,
+  SchadenStatus,
+  Sichtungskategorie,
   StatusKategorie,
   UhsStatus,
   UhsTyp,
@@ -42,11 +46,12 @@ import type {
  * eigener Befund mit eigenem Ticket, nicht Teil von A2.
  *
  * Ebenfalls bewusst draußen: die rund 20 Farb-/Label-Maps außerhalb der hier gelisteten
- * Enums (`personen/personMeta.ts`, `pages/schaeden/schadenHelfer.tsx`,
- * `kommunikation/phase.ts`, `TierePage`, `clusterDonut.ts`, `taktischesZeichen.ts` u. a.).
+ * Enums (`kommunikation/phase.ts`, `TierePage`, `clusterDonut.ts`, `taktischesZeichen.ts` u. a.).
  * Sie hineinzuziehen wäre der Bestands-Sweep, den A2 ausdrücklich verbietet.
  * Der Materialstatus (`pages/MaterialPage.tsx`) stand bis LFH-341/C6 in dieser Liste —
  * seither trägt er seine Karte HIER ({@link materialStatus}), nicht mehr draußen.
+ * LFH-455 nimmt Personenstatus, Schadensstatus und Schadensausmaß auf. Sichtung liegt
+ * hier als eigener Vertrag: eine fachliche Farbkennzeichnung, keine A0-Statusrolle.
  *
  * ── DIE DRITTE DARSTELLUNGSSORTE: FLÄCHE (aufgelöst mit LFH-368 · B5h) ──────────
  *
@@ -80,6 +85,52 @@ export interface StatusDarstellung {
   label: string;
   form?: 'dreieck' | 'kreis' | 'balken';
 }
+
+/** Registrierung/Fallbearbeitung, unabhängig von der medizinischen Sichtung.
+ * Abgemeldet ist keine medizinische Entwarnung; verstorben kein Alarm wie SK I. */
+export const personStatus: Record<PersonStatus, StatusDarstellung> = {
+  erfasst: { label: 'erfasst', rolle: 'neutral' },
+  vermisst: { label: 'vermisst', rolle: 'achtung' },
+  betroffen: { label: 'betroffen', rolle: 'neutral' },
+  verstorben: { label: 'verstorben', rolle: 'neutral' },
+  abgemeldet: { label: 'abgemeldet', rolle: 'neutral' },
+};
+
+/** Übergabe ist eine aktive Beziehung, wie Material im Einsatz oder UHS-Zuordnung. */
+export const schadenStatus: Record<SchadenStatus, StatusDarstellung> = {
+  offen: { label: 'offen', rolle: 'achtung' },
+  uebergeben: { label: 'übergeben', rolle: 'bedien' },
+  abgeschlossen: { label: 'abgeschlossen', rolle: 'neutral' },
+};
+
+export const schadenAusmass: Record<Ausmass, StatusDarstellung> = {
+  gering: { label: 'gering', rolle: 'neutral' },
+  mittel: { label: 'mittel', rolle: 'achtung' },
+  gross: { label: 'groß', rolle: 'achtung' },
+  katastrophal: { label: 'katastrophal', rolle: 'alarm' },
+};
+
+/** Ein Datensatzbezug, kein Betriebsstatus der referenzierten Entität. */
+export function bezugsDarstellung(label: string): StatusDarstellung {
+  return { label, rolle: 'bedien' };
+}
+
+export interface SichtungsDarstellung {
+  label: string;
+  farbe: keyof typeof sichtungsfarben | null;
+}
+
+/** Eigene fachliche Farbsprache: SK IV/blau ist eine ausdrücklich benannte Ausnahme
+ * zur blauen Bedien-/Beziehungsrolle. Schwarz kennzeichnet Tote; es färbt nie Text.
+ * Die Labels bleiben der unabhängige zweite Kanal. */
+export const sichtung: Record<Sichtungskategorie, SichtungsDarstellung> = {
+  sk1: { label: 'SK I', farbe: 'rot' },
+  sk2: { label: 'SK II', farbe: 'gelb' },
+  sk3: { label: 'SK III', farbe: 'gruen' },
+  sk4: { label: 'SK IV', farbe: 'blau' },
+  tot: { label: 'tot', farbe: 'schwarz' },
+  unverletzt: { label: 'unverletzt', farbe: null },
+};
 
 /**
  * Kräfte-Statuskategorie. Vereint fünf bisher getrennt gepflegte Maps:

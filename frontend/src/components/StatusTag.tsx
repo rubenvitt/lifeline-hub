@@ -35,9 +35,9 @@ interface StatusTagProps {
  * zweite Kanal (WCAG 1.4.1) nicht Disziplin, sondern Typ: einen Tag ohne Text kann
  * man hier gar nicht bauen.
  *
- * BEWUSST OHNE antds `color`-Prop: ein nicht-Preset-Wert würde dort als VOLLFLÄCHE mit
- * erzwungen weißem Text gerendert, und im Dunkelmodus sind die Rollenfarben aufgehellt
- * (`alarm` ist dort ein helles Rot) — weiß darauf ist unlesbar. Stattdessen die
+ * BEWUSST OHNE antds `color`-Prop: antd 6 berechnet für Nicht-Presets ein statisches
+ * Farbpaar aus der Zeichenkette (bei `filled` mit HSL-Helligkeit 0.95 am Grund),
+ * unabhängig vom aktiven Modus. Stattdessen die
  * Umrissform der A0-Formensprache: Rollenfarbe an Rahmen/Formzeichen, lesbarer Wortlaut
  * aus `colorText`. LFH-446 maß für farbigen Text im Hellmodus nur 4,88–6,94:1 statt 7:1.
  * Nebeneffekt, der Tests trägt: es entsteht keine mehrdeutige

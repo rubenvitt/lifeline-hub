@@ -18,7 +18,7 @@ const dunkelToken = tokenFuer(farbenDunkel, true);
 const ALLE_ROLLEN: sf.Statusrolle[] = ['alarm', 'achtung', 'normal', 'neutral', 'bedien', 'marke'];
 
 /** Bewusst AUS DEM MODUL abgeleitet statt handgepflegt: eine handgeschriebene Liste
- *  ließe eine elfte Map still am Kanal-Test vorbeilaufen. Die Zahl unten ist der
+ *  ließe eine zusätzliche Map still am Kanal-Test vorbeilaufen. Die Zahl unten ist der
  *  Wächter — kommt ein Enum dazu, wird sie laut, statt dass die Abdeckung schrumpft. */
 const ALLE_MAPS = Object.fromEntries(
   Object.entries(sf).filter(
@@ -30,12 +30,15 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle zehn Vertrags-Enums ab — eine elfte Map rutscht nicht still durch', () => {
+  it('deckt alle dreizehn Vertrags-Enums ab — eine weitere Map rutscht nicht still durch', () => {
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
       'belegungsArt',
       'brStatus',
       'etbTyp',
       'materialStatus',
+      'personStatus',
+      'schadenAusmass',
+      'schadenStatus',
       'statusKategorie',
       'uhsStatus',
       'uhsTyp',
@@ -142,12 +145,13 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(sf.flaechenFarbe('keine', dunkelToken)).toBe('transparent');
   });
 
-  it('bleibt aus der Etikett-Abdeckung heraus — die Zehn-Enum-Zusicherung gilt weiter', () => {
+  it('bleibt wie die Sichtung aus der Rollen-Abdeckung heraus', () => {
     // `warnstufeFlaeche`-Einträge tragen KEIN `rolle`-Feld und werden von `ALLE_MAPS`
     // deshalb nicht erfasst. Das ist Absicht: eine Fläche ist keine Statusrolle, und
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(10);
+    expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(13);
   });
 });
 
@@ -177,5 +181,25 @@ describe('materialStatus', () => {
     // Farbe der einzige Kanal, und genau das verbietet WCAG 1.4.1.
     expect(sf.materialStatus.defekt.label).not.toBe(sf.materialStatus.verbraucht.label);
     for (const d of Object.values(sf.materialStatus)) expect(d.label.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Betroffenen-Farbachsen (LFH-455)', () => {
+  it('bewahrt die fachliche Farbsprache als eigene Achse', () => {
+    expect(Object.fromEntries(Object.entries(sf.sichtung).map(([k, d]) => [k, d.farbe])))
+      .toEqual({ sk1: 'rot', sk2: 'gelb', sk3: 'gruen', sk4: 'blau', tot: 'schwarz', unverletzt: null });
+    expect(Object.values(sf.sichtung).every((d) => d.label.trim().length > 0)).toBe(true);
+  });
+  it('ordnet Schadensstatus und Schadensausmaß ihren Rollen zu', () => {
+    expect(sf.schadenStatus).toEqual({
+      offen: { label: 'offen', rolle: 'achtung' },
+      uebergeben: { label: 'übergeben', rolle: 'bedien' },
+      abgeschlossen: { label: 'abgeschlossen', rolle: 'neutral' },
+    });
+    expect(Object.fromEntries(Object.entries(sf.schadenAusmass).map(([k, d]) => [k, d.rolle])))
+      .toEqual({ gering: 'neutral', mittel: 'achtung', gross: 'achtung', katastrophal: 'alarm' });
+  });
+  it('kennzeichnet Bezüge als Beziehung mit expliziter Beschriftung', () => {
+    expect(sf.bezugsDarstellung('UHS Nord')).toEqual({ label: 'UHS Nord', rolle: 'bedien' });
   });
 });
