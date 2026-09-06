@@ -1,0 +1,5 @@
+/* LFH-446: nativer Fokus-Scroll berücksichtigt die sticky Aktionsleiste.
+   Die Variable folgt per ResizeObserver ihrer tatsächlichen Höhe. */
+.lfh-einheit-kopfdaten :where(input, textarea, button, [tabindex]) {
+  scroll-margin-block-end: var(--lfh-einheit-fokusabstand, 0px);
+}

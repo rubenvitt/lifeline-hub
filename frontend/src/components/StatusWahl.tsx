@@ -107,9 +107,8 @@ export interface StatusWahlProps<W> {
   /** Aktueller Stand als Etikett. `null` = kein Status gesetzt. */
   darstellung: StatusDarstellung | null;
   /**
-   * Mandantengepflegte Farbe des aktuellen Status — überschreibt die Rollenfarbe im
-   * Etikett. Siehe `components/StatusTag.tsx`: sie steht auf Rand und Text, nie auf der
-   * Fläche.
+   * Mandantengepflegte Zusatzfarbe des aktuellen Status. Siehe `StatusTag`: seit LFH-446
+   * ein dekorativer Punkt neben dem Wortlaut; Text und tragender Rahmen bleiben lesbar.
    */
   farbe?: string | null;
   /**
@@ -183,10 +182,11 @@ export default function StatusWahl<W extends string | number>({
           // bereits das Label, sonst läse er sie doppelt (Muster `StatusTag`).
           <span
             aria-hidden="true"
-            style={{ color: o.farbe?.trim() ? o.farbe.trim() : rollenFarbe(o.darstellung.rolle, token) }}
-          >
-            ●
-          </span>
+            style={{
+              display: 'inline-block', width: '0.5em', height: '0.5em', borderRadius: '50%',
+              backgroundColor: o.farbe?.trim() ? o.farbe.trim() : rollenFarbe(o.darstellung.rolle, token),
+            }}
+          />
         )}
         {o.label}
       </span>

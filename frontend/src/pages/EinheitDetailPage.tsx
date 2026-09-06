@@ -29,6 +29,25 @@ import { einheitenPfad, parseRouteId } from '../routing/deeplinks';
 import {
   nichtGefundenInhalt, SeitenFehler, SeitenLeer, SeitenSkeleton,
 } from '../components/SeitenZustand';
+import './EinheitDetailPage.css';
+
+/** Die echte Höhe zählt: Handschuh-Stufe und umgebrochene Aktionen verändern die Leiste.
+ * Der Scrollabstand muss schon VOR dem nativen Fokus-Scroll am Ziel stehen (LFH-446).
+ */
+function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
+  const formular = leiste?.closest('form');
+  if (!leiste || !formular) return;
+  const aktualisiere = () => formular.style.setProperty(
+    '--lfh-einheit-fokusabstand', `${leiste.getBoundingClientRect().height + abstand}px`,
+  );
+  aktualisiere();
+  const beobachter = new ResizeObserver(aktualisiere);
+  beobachter.observe(leiste);
+  return () => {
+    beobachter.disconnect();
+    formular.style.removeProperty('--lfh-einheit-fokusabstand');
+  };
+}
 
 /**
  * Vollseiten-Detail einer Einheit (LFH-339 · C4, Befund M26).
@@ -340,7 +359,7 @@ export default function EinheitDetailPage() {
       </Space>
 
       <Card size="small" style={{ marginBottom: token.margin }}>
-        <Form<KopfWerte> form={form} layout="vertical" disabled={!darfSchreiben} onFinish={(w) => speichern.mutate(w)}>
+        <Form<KopfWerte> className="lfh-einheit-kopfdaten" form={form} layout="vertical" disabled={!darfSchreiben} onFinish={(w) => speichern.mutate(w)}>
           <SektionHeader titel="Kopfdaten" />
           <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
           <Form.Item label="Typ" name="typ_id">
@@ -409,6 +428,7 @@ export default function EinheitDetailPage() {
              * zwischen „Speichern" und „Auflösen".
              */
             <div
+              ref={(el) => beobachteAktionsleiste(el, token.marginSM)}
               style={{
                 position: 'sticky', bottom: 0, zIndex: 1,
                 background: token.colorBgContainer,
@@ -459,7 +479,7 @@ export default function EinheitDetailPage() {
           ),
         )}
         {darfSchreiben && (
-          <Select style={{ width: '100%', marginTop: token.marginXS }} placeholder="Person zuordnen …" value={null}
+          <Select style={{ width: '100%', marginTop: token.marginSM }} placeholder="Person zuordnen …" value={null}
             notFoundContent={personalInhalt}
             options={freiesPersonal.map((p) => ({ value: p.id, label: p.name }))}
             onSelect={(epId) => personalZu.mutate(Number(epId))} />
@@ -476,7 +496,7 @@ export default function EinheitDetailPage() {
           ),
         )}
         {darfSchreiben && (
-          <Select style={{ width: '100%', marginTop: token.marginXS }} placeholder="Fahrzeug zuordnen …" value={null}
+          <Select style={{ width: '100%', marginTop: token.marginSM }} placeholder="Fahrzeug zuordnen …" value={null}
             notFoundContent={fahrzeugInhalt}
             options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
             onSelect={(efId) => fahrzeugZu.mutate(Number(efId))} />
@@ -493,7 +513,7 @@ export default function EinheitDetailPage() {
           ),
         )}
         {darfSchreiben && (
-          <Select style={{ width: '100%', marginTop: token.marginXS }} placeholder="Material zuordnen …" value={null}
+          <Select style={{ width: '100%', marginTop: token.marginSM }} placeholder="Material zuordnen …" value={null}
             notFoundContent={materialInhalt}
             options={freiesMaterial.map((m) => ({ value: m.id, label: `${m.bezeichnung} ×${m.menge}` }))}
             onSelect={(emId) => materialZu.mutate(Number(emId))} />
