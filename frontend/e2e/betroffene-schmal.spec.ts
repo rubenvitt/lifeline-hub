@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
  * Die Betroffenen-Module am Handschirm (LFH-340 · C5, AK 5).
@@ -17,6 +17,12 @@ import { expect, test, type Page } from '@playwright/test';
  * `datensicht-schmal.spec.ts`, das die Weiche am Primitiv misst; hier geht es um die drei
  * Modulrouten, die sie konsumieren.
  *
+ * LFH-454 ergänzt die gerenderten Treffflächen über zwei Dichtestufen: Titel-Links der
+ * Karten bei 390 px, Spaltenschalter bei 1366 px. Die Schwelle ist die Staffel 48 / 72,
+ * nicht 44 px — sonst bliebe eine Regression auf 44–47 px unbemerkt. Ein fester Wert
+ * von 48 px fällt erst im Handschuh-Durchgang durch. Die Sollwerte bleiben Literale,
+ * damit der Test nicht einen importierten Produktiv-Token gegen sich selbst prüft.
+ *
  * ── WAS HIER BEWUSST NICHT GEMESSEN WIRD ────────────────────────────────────────────────
  *
  * Kein `waitForLoadState('networkidle')`: auf Einsatzrouten bleibt ein SSE-Strom offen, die
@@ -33,6 +39,13 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 const HANDSCHIRM = { width: 390, height: 844 };
 const FUEKW = { width: 1366, height: 900 };
+
+const STAFFEL = [
+  { dichte: 'komfortabel', soll: 48 },
+  { dichte: 'handschuh', soll: 72 },
+] as const;
+
+const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 
 /** Subpixel-Spielraum: Chromium rechnet unter Last anders als im Einzellauf. */
 const SUBPIXEL = 0.5;
@@ -86,6 +99,35 @@ async function seedeAlles(page: Page, einsatzId: string) {
   );
 }
 
+/** Der Provider liest die gespeicherte Wahl beim Montieren, deshalb das Neuladen. */
+async function stelleDichte(page: Page, dichte: string) {
+  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+    DICHTE_SCHLUESSEL,
+    dichte,
+  ] as const);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+}
+
+/** Misst genau das Bedienziel, nachdem Inhalt und Dichtestufe angekommen sind. */
+async function haeltStufe(page: Page, ziel: Locator, dichte: string, soll: number, name: string) {
+  await expect(ziel, `${name}: genau ein Bedienziel`).toHaveCount(1);
+  await expect(ziel, `${name}: Bedienziel sichtbar`).toBeVisible();
+  // Vor JEDER Messung, auch nach einem Routenwechsel: „Stufe nicht angekommen" muss
+  // von „Ziel zu klein" unterscheidbar bleiben.
+  await expect(page.locator('html'), `${name}: aktive Dichtestufe`).toHaveAttribute(
+    'data-dichte',
+    dichte,
+  );
+  const kasten = await ziel.boundingBox();
+  expect(kasten, `${name}: kein Kasten messbar`).not.toBeNull();
+  expect(
+    kasten!.height,
+    `${name} (${dichte}): gemessen ${kasten!.height} px, Soll ≥ ${soll} px`,
+  ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+  return kasten!.height;
+}
+
 /** Waagerechter Überlauf des Dokuments — die eigentliche Aussage von AK 5. */
 async function keinQuerlauf(page: Page, pfad: string) {
   await expect
@@ -114,10 +156,15 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
     const pfad = `/einsaetze/${einsatzId}/${modul.route}`;
     await page.goto(pfad);
     // Der Anker steht VOR jeder Messung — sonst prüft der Test den Ladezustand.
-    await expect(page.getByText(modul.anker).first(), `${pfad}: Datensatz muss stehen`).toBeVisible();
+    await expect(
+      page.getByText(modul.anker).first(),
+      `${pfad}: Datensatz muss stehen`,
+    ).toBeVisible();
 
-    await expect(page.locator('[data-lfh="datensicht-karte"]').first(), `${pfad}: Kartenzweig`)
-      .toBeVisible();
+    await expect(
+      page.locator('[data-lfh="datensicht-karte"]').first(),
+      `${pfad}: Kartenzweig`,
+    ).toBeVisible();
     await expect(page.locator('.ant-table'), `${pfad}: keine Tabelle bei 390 px`).toHaveCount(0);
     await keinQuerlauf(page, pfad);
   }
@@ -135,7 +182,10 @@ test('bei 1366 px steht auf allen drei Listen die Tabelle statt der Karte', asyn
   for (const modul of MODULE) {
     const pfad = `/einsaetze/${einsatzId}/${modul.route}`;
     await page.goto(pfad);
-    await expect(page.getByText(modul.anker).first(), `${pfad}: Datensatz muss stehen`).toBeVisible();
+    await expect(
+      page.getByText(modul.anker).first(),
+      `${pfad}: Datensatz muss stehen`,
+    ).toBeVisible();
 
     await expect(page.locator('.ant-table').first(), `${pfad}: Tabellenzweig`).toBeVisible();
     await expect(
@@ -143,5 +193,62 @@ test('bei 1366 px steht auf allen drei Listen die Tabelle statt der Karte', asyn
       `${pfad}: keine Karten bei 1366 px`,
     ).toHaveCount(0);
     await keinQuerlauf(page, pfad);
+  }
+});
+
+test.describe('LFH-454: Treffflächen der Betroffenen-Routen', () => {
+  // Nur die Breite zu ändern erzeugt kein `pointer: coarse`. Der Touch-Kontext gilt
+  // für beide Breiten; die gespeicherte Wahl bestimmt darin die jeweilige Stufe.
+  test.use({ hasTouch: true });
+
+  for (const { dichte, soll } of STAFFEL) {
+    for (const { viewport, art, zielName } of [
+      { viewport: HANDSCHIRM, art: 'karte', zielName: 'Titel-Link' },
+      { viewport: FUEKW, art: 'tabelle', zielName: 'Spaltenschalter' },
+    ] as const) {
+      test(`${dichte}: ${zielName} hält auf allen drei Routen bei ${viewport.width} px die Stufe ${soll} px`, async ({
+        page,
+      }, testInfo) => {
+        await anmelden(page);
+        const einsatzId = await einsatzAnlegen(page, `E2E Betroffene ${dichte} ${Date.now()}`);
+        await seedeAlles(page, einsatzId);
+        await stelleDichte(page, dichte);
+        await page.setViewportSize(viewport);
+
+        const gemessen: string[] = [];
+        for (const modul of MODULE) {
+          const pfad = `/einsaetze/${einsatzId}/${modul.route}`;
+          await page.goto(pfad);
+          const bereich = page.locator(
+            art === 'karte' ? '[data-lfh="datensicht-karte"]' : 'tr.ant-table-row',
+          );
+          await expect(bereich, `${pfad}: genau ein gesäter Datensatz`).toHaveCount(1);
+          await expect(
+            bereich.getByText(modul.anker),
+            `${pfad}: Datensatz muss stehen`,
+          ).toBeVisible();
+
+          const ziel =
+            art === 'karte'
+              ? bereich.getByRole('link', { name: modul.anker })
+              : page
+                  .locator('[data-lfh="datensicht-werkzeuge"]')
+                  .getByRole('button', { name: /^Spalten/ });
+          if (art === 'karte') {
+            await expect(ziel).toHaveAttribute(
+              'href',
+              new RegExp(`/einsaetze/${einsatzId}/${modul.route}/\\d+$`),
+            );
+          }
+          const hoehe = await haeltStufe(page, ziel, dichte, soll, `${pfad}: ${zielName}`);
+          gemessen.push(`${modul.route}: ${zielName} ${hoehe} px (Soll ≥ ${soll} px)`);
+        }
+
+        await testInfo.attach('Treffflächen-Messwerte', {
+          body: gemessen.join('\n'),
+          contentType: 'text/plain',
+        });
+      });
+    }
   }
 });
