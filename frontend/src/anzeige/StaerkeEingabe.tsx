@@ -1,4 +1,4 @@
-import { InputNumber, Space, Typography } from 'antd';
+import { InputNumber, Space, Typography, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import type { Staerke } from '../api/types';
 
@@ -37,6 +37,7 @@ const SPALTE: React.CSSProperties = { display: 'inline-flex', flexDirection: 'co
  * auf 0 zieht — nur eine wirklich externe value-Änderung wird in die Felder gespiegelt.
  */
 export default function StaerkeEingabe({ value, onChange, disabled }: Props) {
+  const { token } = theme.useToken();
   const [f, setF] = useState<Feld>(value?.fuehrer ?? null);
   const [uf, setUf] = useState<Feld>(value?.unterfuehrer ?? null);
   const [m, setM] = useState<Feld>(value?.mannschaft ?? null);
@@ -60,7 +61,7 @@ export default function StaerkeEingabe({ value, onChange, disabled }: Props) {
   const gesamt = (f ?? 0) + (uf ?? 0) + (m ?? 0);
 
   return (
-    <Space align="end" wrap>
+    <Space align="end" size={token.marginSM} wrap>
       <span style={SPALTE}>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>Führer</Typography.Text>
         <InputNumber min={0} value={f} disabled={disabled} aria-label="Führer" placeholder="F"
