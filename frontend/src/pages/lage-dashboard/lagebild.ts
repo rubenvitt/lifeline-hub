@@ -111,13 +111,6 @@ const ROLLE_ALS_DRINGLICHKEIT: Record<Statusrolle, Dringlichkeit> = {
   marke: 'normal',
 };
 
-export interface Ereigniszeile {
-  zeit: string;
-  text: string;
-  von: string;
-  stufe: Dringlichkeit;
-}
-
 /** Eine Meldung als Kurzlisten-Zeile des Dashboards (LFH-336 · Befund H5). */
 export interface Meldungszeile {
   id: number;
@@ -156,7 +149,6 @@ export interface Lagebild {
   bezeichnung: string;
   stichwort: string | null;
   org: string | null;
-  seit: string;
   status: string;
   kennzahlen: Kennzahl[];
   sichtung: { etikett: string; wert: number; stufe: Dringlichkeit }[];
@@ -181,7 +173,6 @@ export interface Lagebild {
   meldungenOffen: number;
   meldungenNeu: number;
   meldungenUeberfaellig: number;
-  ereignisse: Ereigniszeile[];
 }
 
 /**
@@ -220,25 +211,11 @@ export function dtgJetzt(): string {
   return dtgKurz(new Date());
 }
 
-/** `2026-06-11 09:00:00` (UTC) → `11:00` in der Anzeigezone.
- *
- *  Bis LFH-336 schnitt diese Funktion die Ziffern per Regex aus dem Wirestring —
- *  also UTC, ohne Umrechnung. Solange nur `ereignisse` und `seit` daran hingen,
- *  fiel das niemandem auf; mit Meldungszeit und FRIST daran wäre es eine Uhr, die
- *  zwei Stunden falsch geht, an genau der Stelle, wo jemand danach handelt. */
-export function uhrzeit(
-  iso: string | null | undefined,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): string {
-  return formatUhrzeit(iso, konv);
-}
-
 /**
  * Die jüngsten OFFENEN Meldungen als Kurzliste.
  *
- * Sortiert nach EREIGNISZEIT, nicht nach Eingangszeit — dieselbe Begründung wie
- * bei `ereignisse`: im Meldebild zählt, wann es passiert ist, nicht wann es
- * jemand eingetippt hat.
+ * Sortiert nach EREIGNISZEIT, nicht nach Eingangszeit: im Meldebild zählt,
+ * wann es passiert ist, nicht wann es jemand eingetippt hat.
  *
  * Gefiltert auf `ist_offen`, weil die Kopfzahl der Kachel offene Meldungen zählt.
  * Eine Liste, die erledigte mitzeigt, widerspräche der Zahl über ihr.
@@ -254,7 +231,7 @@ export function meldungszeilen(
     .map((m) => ({
       id: m.id,
       lfdNr: m.lfd_nr,
-      zeit: uhrzeit(m.ereigniszeit, konv),
+      zeit: formatUhrzeit(m.ereigniszeit, konv),
       absender: m.absender,
       text: m.inhalt,
       stufe: m.ist_ueberfaellig ? 'alarm' : m.status === 'neu' ? 'achtung' : 'normal',
@@ -272,10 +249,10 @@ export function meldungszeilen(
  * Die Statusmenge ist dieselbe wie bei `auftraegeOffen` weiter unten: alles außer
  * `vollzogen` und `abgenommen`.
  *
- * `frist` nutzt `formatUhrzeitMitTag`, NICHT `uhrzeit`/`formatUhrzeit` — eine reine
+ * `frist` nutzt `formatUhrzeitMitTag`, NICHT `formatUhrzeit` — eine reine
  * `HH:mm` ist optisch nicht von „in 20 Minuten" zu „morgen früh" zu unterscheiden,
  * und eine Frist ist der Fall, nach dem jemand handelt (LFH-336, Fix-Runde 1 zu
- * Task 3). `meldungszeilen` oben bleibt bewusst bei `uhrzeit`: eine Meldung zeigt
+ * Task 3). `meldungszeilen` oben bleibt bewusst bei `formatUhrzeit`: eine Meldung zeigt
  * Vergangenes und steht als „die drei jüngsten" ohnehin im Jetzt, keine Deadline.
  */
 export function auftragszeilen(
@@ -375,24 +352,10 @@ export function baueLagebild(r: Rohdaten): Lagebild {
   const meldungenNeu = r.meldungen.filter((m) => m.status === 'neu').length;
   const meldungenUeberfaellig = r.meldungen.filter((m) => m.ist_ueberfaellig).length;
 
-  // Nach EREIGNISZEIT, nicht nach Eingangszeit: im Meldebild zählt, wann es
-  // passiert ist, nicht wann es jemand eingetippt hat (die Erfassung kann
-  // Stunden später erfolgen — beim Seed liegen alle Eingänge auf derselben Minute).
-  const ereignisse: Ereigniszeile[] = [...r.meldungen]
-    .sort((a, b) => (a.ereigniszeit < b.ereigniszeit ? 1 : -1))
-    .slice(0, 5)
-    .map((m) => ({
-      zeit: uhrzeit(m.ereigniszeit),
-      text: m.inhalt,
-      von: m.absender,
-      stufe: m.ist_ueberfaellig ? 'alarm' : m.status === 'neu' ? 'achtung' : 'normal',
-    }));
-
   return {
     bezeichnung: r.einsatz.bezeichnung,
     stichwort: r.einsatz.stichwort ?? null,
     org: r.einsatz.org_name ?? null,
-    seit: uhrzeit(r.einsatz.begonnen_at),
     status: r.einsatz.status,
     // SECHS Kennzahlen, feste Reihenfolge (LFH-329 · B1).
     //
@@ -484,7 +447,6 @@ export function baueLagebild(r: Rohdaten): Lagebild {
     meldungenOffen,
     meldungenNeu,
     meldungenUeberfaellig,
-    ereignisse,
   };
 }
 
@@ -521,6 +483,5 @@ export function leeresLagebild(basis: Lagebild): Lagebild {
     meldungenOffen: 0,
     meldungenNeu: 0,
     meldungenUeberfaellig: 0,
-    ereignisse: [],
   };
 }
