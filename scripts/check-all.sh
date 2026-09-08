@@ -83,7 +83,8 @@ echo "==> [6/$SCHRITTE] Abhängigkeiten auf bekannte Schwachstellen prüfen"
 echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)"
 # Cargo baut nicht zwingend nach ./target (globales build.target-dir, siehe
 # ~/.cargo/config.toml) — den Pfad deshalb von Cargo selbst erfragen.
-TARGET_DIR="$(cd "$ROOT" && cargo metadata --format-version 1 --no-deps | jq -r .target_directory)"
+# JSON mit dem ohnehin benötigten Node lesen; jq ist keine Projektvoraussetzung.
+TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
 BINAER="$TARGET_DIR/debug/lifeline-hub"
 if [ -x "$BINAER" ]; then
   # Die Suite startet Backend und Vite selbst auf freien Ports — ein parallel laufender

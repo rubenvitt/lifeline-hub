@@ -29,7 +29,8 @@ cargo build --release
 # Cargo baut nicht zwingend nach ./target — ein globales build.target-dir (z. B. ein
 # gemeinsames Verzeichnis über alle Worktrees, ~/.cargo/config.toml) verschiebt es.
 # Deshalb den Pfad von Cargo selbst erfragen statt ihn zu raten.
-TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)"
+# JSON mit dem ohnehin benötigten Node lesen; jq ist keine Projektvoraussetzung.
+TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
 BINARY="$TARGET_DIR/release/lifeline-hub"
 
 echo "==> SBOM erzeugen (LFH-253/G01)"
