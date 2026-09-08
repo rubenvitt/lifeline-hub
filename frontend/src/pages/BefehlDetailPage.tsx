@@ -1,6 +1,7 @@
 import { App, Breadcrumb, Button, Flex, Form, Input, Space, Spin, Tag, Typography } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -18,6 +19,7 @@ import { vorlage } from '../befehle/vorlagen';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import './befehlPrint.css';
 
@@ -39,6 +41,12 @@ function BefehlDetail() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();
+  const speicherfolge = useRef<Promise<unknown>>(Promise.resolve());
+  const aktiv = useRef(true);
+  useEffect(() => {
+    aktiv.current = true;
+    return () => { aktiv.current = false; };
+  }, []);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -54,8 +62,9 @@ function BefehlDetail() {
     qc.invalidateQueries({ queryKey: einsatzKeys.befehl(einsatzId, befehlId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   };
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) => {
+    if (aktiv.current) message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  };
 
   // Persistiert die aktuellen Formularwerte als Entwurf (ohne Erfolgs-Toast) — von der
   // „Entwurf speichern"-Mutation und vom Freigabe-Flow gemeinsam genutzt.
@@ -65,7 +74,18 @@ function BefehlDetail() {
       schluessel: a.schluessel,
       text: werte[a.schluessel] ?? '',
     }));
-    return aktualisiereBefehl(einsatzId, befehlId, { titel: werte.titel, abschnitte });
+    // Blur-Autosave und explizites Speichern können direkt aufeinander folgen.
+    // In Reihenfolge schreiben, damit eine späte S1-Antwort S2 nicht überschreibt.
+    const auftrag = speicherfolge.current
+      .catch(() => {}) // Ein Fehler darf den nächsten Speicherversuch nicht sperren.
+      .then(() => {
+        // „Verwerfen“/Unmount beendet noch nicht gestartete Aufträge dieses Editors.
+        // Ein späteres Öffnen derselben ID bekommt seine eigene Ref und Speicherfolge.
+        if (!aktiv.current) throw new DOMException('Editor verlassen', 'AbortError');
+        return aktualisiereBefehl(einsatzId, befehlId, { titel: werte.titel, abschnitte });
+      });
+    speicherfolge.current = auftrag;
+    return auftrag;
   };
 
   /**
@@ -87,9 +107,13 @@ function BefehlDetail() {
   });
 
   const speichernMutation = useMutation({
-    mutationFn: speichern,
-    onSuccess: () => {
-      schutz.quittiereGespeichert();
+    mutationFn: async (werte: Record<string, string>) => {
+      const quittieren = schutz.quittungVorbereiten();
+      await speichern(werte);
+      return quittieren;
+    },
+    onSuccess: (quittieren) => {
+      quittieren();
       invalidate();
       message.success('Entwurf gespeichert');
     },
@@ -152,6 +176,7 @@ function BefehlDetail() {
         // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
         // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
         // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
+        const quittieren = schutz.quittungVorbereiten();
         try {
           await speichern(werte);
         } catch (e) {
@@ -161,7 +186,7 @@ function BefehlDetail() {
         // Sonst bliebe der Merker nach der endgültigen Freigabe stehen und der Browser
         // fragte beim Neuladen nach Änderungen an einem Befehl, der nicht mehr editierbar
         // ist (Review LFH-348).
-        schutz.quittiereGespeichert();
+        quittieren();
         await freigebenMutation.mutateAsync();
       },
     });
@@ -169,6 +194,18 @@ function BefehlDetail() {
 
   return (
     <div className="befehl-print-root">
+      <EntwurfNavigationSchutz
+        ungespeichert={schutz.ungespeichert && istEntwurf && darfSchreiben}
+        speichert={schutz.autosaveLaeuft || speichernMutation.isPending}
+        speichern={async () => {
+          try {
+            await form.validateFields();
+          } catch {
+            return; // Feldfehler bleiben am Formular; der Wechsel bleibt angehalten.
+          }
+          schutz.autosaveJetzt();
+        }}
+      />
       <Breadcrumb
         className="befehl-no-print"
         style={{ marginBottom: 12 }}
