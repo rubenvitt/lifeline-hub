@@ -1,11 +1,15 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderMitProviders } from './test/utils';
-import { AuthProvider } from './auth/AuthContext';
-import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
-import App from './App';
+import { act, render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, RouterProvider } from 'react-router';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { App as AntApp, ConfigProvider } from 'antd';
+import { neuerQueryClient } from './test/utils';
+import { appRouten } from './App';
 import { http, HttpResponse } from 'msw';
 import { server } from './test/server';
+import { SITZUNG_ABGELAUFEN } from './auth/sitzungsEvent';
 
 const admin = {
   id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
@@ -20,17 +24,72 @@ const einsatz = {
 afterEach(() => vi.restoreAllMocks());
 
 function renderApp(route: string) {
-  return renderMitProviders(
-    <AuthProvider>
-      <CommandPaletteProvider>
-        <App />
-      </CommandPaletteProvider>
-    </AuthProvider>,
-    { route },
-  );
+  const client = neuerQueryClient();
+  const router = createMemoryRouter(appRouten, { initialEntries: [route] });
+  return { router, ...render(
+    <QueryClientProvider client={client}>
+      <ConfigProvider>
+        <AntApp><RouterProvider router={router} /></AntApp>
+      </ConfigProvider>
+    </QueryClientProvider>,
+  ) };
 }
 
 describe('App-Routing', () => {
+  it('kehrt nach Login zur vollständigen URL zurück und hält Auth beim Routenwechsel', async () => {
+    let pruefungen = 0;
+    server.use(
+      http.get('/api/auth/me', () => {
+        pruefungen += 1;
+        return HttpResponse.json({ error: 'x' }, { status: 401 });
+      }),
+      http.post('/api/auth/login', () => HttpResponse.json(admin)),
+      http.get('/api/dev/users', () => HttpResponse.json([])),
+      http.get('/api/auth/providers', () => HttpResponse.json([])),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    );
+    const ziel = '/einsaetze/7/stab?ansicht=detail#lage';
+    const { router } = renderApp(ziel);
+    await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+    await userEvent.type(screen.getByLabelText('Passwort'), 'test-passwort');
+    await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+    await screen.findByText(/🚧 Stab/);
+    expect(router.state.location).toMatchObject({
+      pathname: '/einsaetze/7/stab', search: '?ansicht=detail', hash: '#lage',
+    });
+    await act(async () => { await router.navigate('/einsaetze'); });
+    expect(await screen.findByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
+    expect(pruefungen).toBe(1);
+  });
+
+  it('die Sitzungswache kennt nach Navigation die aktuelle URL einschließlich Query und Hash', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    );
+    const { router } = renderApp('/einsaetze');
+    await screen.findByRole('button', { name: 'Neuer Einsatz' });
+    const ziel = '/einsaetze/7/stab?ansicht=detail#lage';
+    await act(async () => { await router.navigate(ziel); });
+    await screen.findByText(/🚧 Stab/);
+    act(() => window.dispatchEvent(new Event(SITZUNG_ABGELAUFEN)));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
+    expect(router.state.location.state).toMatchObject({ von: ziel });
+  });
+
+  it('lädt die per React.lazy eingebundene Kräfteübersicht im Data Router', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    );
+    renderApp('/einsaetze/7/kraefteuebersicht');
+    expect(await screen.findByRole('heading', { name: /Kräfteübersicht/ })).toBeInTheDocument();
+  });
+
   it('leitet ohne Anmeldung zu /login um', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
     server.use(http.get('/api/dev/users', () => HttpResponse.json([])));

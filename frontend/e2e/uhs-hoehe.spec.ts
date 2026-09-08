@@ -63,15 +63,20 @@ async function grundrissMessen(page: Page) {
   });
 }
 
-async function passtInsFenster(page: Page) {
+async function fuelltArbeitsflaeche(page: Page) {
   await expect(page.getByTestId('grundriss-rahmen')).toBeVisible();
   await expect.poll(async () => {
     const m = await grundrissMessen(page);
-    return Math.abs(m.unten - (m.fenster - m.polster));
-  }, { message: 'Grundriss füllt die verfügbare Höhe bis zur Seitenpolsterung' }).toBeLessThanOrEqual(1);
+    // LFH-462: Bei 390 × 844 und Handschuh-Dichte bleiben nach dem Kopf weniger
+    // als 380px. Der bestehende Mindestboden verlangt dann Dokument-Scroll.
+    const unterkante = Math.max(m.fenster - m.polster, m.oben + 380);
+    return Math.abs(m.unten - unterkante);
+  }, { message: 'Grundriss füllt die Resthöhe und wahrt mindestens 380px Arbeitsfläche' }).toBeLessThanOrEqual(1);
   const m = await grundrissMessen(page);
-  expect(m.hoehe).toBeGreaterThan(150);
-  expect(m.unten).toBeLessThanOrEqual(m.fenster);
+  expect(m.hoehe).toBeGreaterThanOrEqual(380);
+  if (m.fenster - m.polster - m.oben >= 380) {
+    expect(m.unten).toBeLessThanOrEqual(m.fenster);
+  }
   return m;
 }
 
@@ -93,7 +98,7 @@ for (const breite of [1366, 1024, 390]) {
       await page.goto(pfad);
       await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
       await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
-      messungen.push({ dichte, ...await passtInsFenster(page) });
+      messungen.push({ dichte, ...await fuelltArbeitsflaeche(page) });
     }
     expect(messungen[0].hoehe).toBeGreaterThan(messungen[2].hoehe);
     // Prüft auch die innere Tabs-Kette: eine passende Außenhöhe allein könnte
@@ -115,13 +120,17 @@ for (const breite of [1366, 1024, 390]) {
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     // Resize NACH Scroll: viewport-relatives top allein würde die Höhe aufblasen.
     await page.setViewportSize({ width: breite, height: 844 });
-    await passtInsFenster(page);
+    const verkleinert = await fuelltArbeitsflaeche(page);
+    if (breite === 390) {
+      expect(verkleinert.fenster - verkleinert.polster - verkleinert.oben).toBeLessThan(380);
+      expect(verkleinert.hoehe).toBeCloseTo(380, 0);
+    }
     // Live-Wechsel ohne Reload/resize: der äußere App-Kopf ändert seine Höhe.
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.getByRole('button', { name: /Benutzermenü/ }).click();
     await page.getByRole('menuitem', { name: /^Kompakt$/ }).click();
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
-    await passtInsFenster(page);
+    await fuelltArbeitsflaeche(page);
     expect(browserFehler).toEqual([]);
     await testInfo.attach('hoehen.json', { body: JSON.stringify(messungen, null, 2), contentType: 'application/json' });
   });
