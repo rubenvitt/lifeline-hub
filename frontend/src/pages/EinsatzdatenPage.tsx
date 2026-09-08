@@ -16,7 +16,7 @@ import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
-import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, darfEinsatzLeiten, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import type { Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
@@ -356,7 +356,13 @@ export default function EinsatzdatenPage() {
         </>
       )}
 
-      <MitgliederAbschnitt einsatzId={einsatzId} darfVerwalten={darfVerwaltenMitglieder} />
+      <MitgliederAbschnitt
+        key={einsatzId}
+        einsatzId={einsatzId}
+        darfVerwalten={darfVerwaltenMitglieder}
+        // mitglied_setzen fordert die Einsatzrolle, ohne System-Admin-Ausnahme.
+        darfFuehrungsstelleVerwalten={darfVerwaltenMitglieder && istEinsatzLeitung(einsatz)}
+      />
     </EinsatzSeite>
   );
 }

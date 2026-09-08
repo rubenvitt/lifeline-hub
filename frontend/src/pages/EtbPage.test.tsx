@@ -6,7 +6,8 @@ import { Route, Routes, useLocation } from 'react-router';
 import type { ReactElement } from 'react';
 import { server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders as renderMitBasisProviders } from '../test/utils';
+import { einsatzKeys } from '../api/queryKeys';
 import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueLeerenFuerTests } from '../offline/queue';
@@ -104,6 +105,38 @@ function setup(route = '/einsaetze/7/etb') {
 }
 
 describe('EtbPage', () => {
+  it.each([null, 'Alte Leitung'])('LFH-461 Review: erster Entwurf wartet auf laufenden Detail-Refetch (Cache: %s)', async (meine_fuehrungsstelle) => {
+    setupMSW();
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.einsatz(7), { ...einsatz, meine_fuehrungsstelle });
+    let freigeben!: () => void;
+    const antwort = new Promise<void>((resolve) => { freigeben = resolve; });
+    server.use(http.get('/api/einsaetze/7', async () => {
+      await antwort;
+      return HttpResponse.json({ ...einsatz, meine_fuehrungsstelle: 'Neue Leitung' });
+    }));
+    // Entspricht der nach dem Stellen-Speichern gestarteten Invalidierung.
+    await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/etb" element={<EtbPage />} /></Routes>,
+      { client, route: '/einsaetze/7/etb' },
+    );
+    try {
+      await screen.findByText('Erste Meldung');
+      expect.soft(screen.queryByPlaceholderText(/Inhalt/)).not.toBeInTheDocument();
+      expect.soft(screen.queryByRole('button', { name: /add|hinzu/i })).not.toBeInTheDocument();
+    } finally {
+      freigeben();
+    }
+    expect(await screen.findByText('An: Neue Leitung')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meine Eingabe');
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
+    await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Meine Eingabe');
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
   it('zeigt Einsatz-Bezeichnung und ETB-Einträge', async () => {
     setup();
     // Bezeichnung erscheint als Überschrift (zusätzlich in der Breadcrumb-Zeile) → gezielt die Überschrift prüfen.

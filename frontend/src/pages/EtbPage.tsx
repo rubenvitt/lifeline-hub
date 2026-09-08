@@ -370,6 +370,7 @@ export default function EtbPage() {
               erfassen={erfassenMitMeldung}
               bausteine={bausteineQuery.data ?? []}
               einsatz={einsatz}
+              kontextLaedt={einsatzQuery.isFetching}
               werteBehalten={werteBehalten}
               onWerteBehaltenChange={setWerteBehalten}
             />
