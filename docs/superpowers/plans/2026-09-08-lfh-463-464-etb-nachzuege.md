@@ -9,7 +9,11 @@ Freigegebener Umfang: gemeinsamer PR aus isoliertem Worktree auf frischem
 - [x] Design: expliziter optionaler Einsatztermin; Umbruch erst nach Browsermessung.
 - [x] Entwicklung und gezielte Verifikation.
 - [x] Unabhängiger Review und vollständiges lokales Gate.
-- [ ] Commit, Push, PR; Prüfbelege und PR-Link in beiden ClickUp-Tasks.
+- [x] Commit, Push und [PR #22](https://github.com/rubenvitt/lifeline-hub/pull/22)
+  mit Prüfbelegen veröffentlicht.
+
+Der abschließende Head-Commit und Boardstatus werden in beiden ClickUp-Tasks
+dokumentiert. Stand der Veröffentlichung: `testing`; kein Merge beauftragt.
 
 ## LFH-464 — Messung vor Umbruch
 
