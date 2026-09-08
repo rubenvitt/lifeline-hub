@@ -14,26 +14,29 @@ export function suchKuerzelFuerUserAgent(userAgent: string): string {
 /**
  * Einheitlicher Zugang zur Kommandopalette in beiden Kopfzeilen.
  *
- * Unterhalb von `lg` trägt der Knopf bewusst die A1-Trefffläche statt einer
- * Dichte-Prop: Er ist dann der alleinige sichtbare Suchzugang auf Touch-Geräten.
+ * Unterhalb von `lg` bleibt die A1-Trefffläche der Mindestwert. Die Handschuh-
+ * Stufe darf darüber wachsen (LFH-460), weil dies der sichtbare Suchzugang ist.
  */
 export default function CommandPaletteTrigger() {
   const { toggle } = useCommandPalette();
   const { token } = theme.useToken();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
+  const trefflaeche = Math.max(TREFFLAECHE, token.controlHeight);
   const kuerzel = suchKuerzelFuerUserAgent(
     typeof navigator === 'undefined' ? '' : navigator.userAgent,
   );
   const stil = {
     color: 'var(--lfh-kopf-vordergrund)',
     flexShrink: 0,
-    ...(breit ? {} : {
-      width: TREFFLAECHE,
-      height: TREFFLAECHE,
-      minWidth: TREFFLAECHE,
-      minHeight: TREFFLAECHE,
-    }),
+    ...(breit
+      ? {}
+      : {
+          width: trefflaeche,
+          height: trefflaeche,
+          minWidth: trefflaeche,
+          minHeight: trefflaeche,
+        }),
   } as const;
 
   return (

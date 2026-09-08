@@ -1,4 +1,4 @@
-import { Button, Dropdown, type MenuProps } from 'antd';
+import { Button, Dropdown, theme, type MenuProps } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import { einsatzPfad } from '../routing/deeplinks';
  */
 export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }) {
   const navigate = useNavigate();
+  const { token } = theme.useToken();
   const { data: einsaetze = [] } = useQuery({
     queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
@@ -50,6 +51,8 @@ export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }
           fontWeight: 600,
           fontSize: 16,
           maxWidth: '100%',
+          // Auch ein kurzer Name wie „A“ hält den Handschuh-Boden (LFH-460).
+          minWidth: token.controlHeight,
           display: 'inline-flex',
           alignItems: 'center',
           gap: 6,

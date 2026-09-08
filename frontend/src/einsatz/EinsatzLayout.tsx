@@ -7,8 +7,13 @@ import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  erstesFreigegebenesModul, kategorien, modulAusPfad,
-  moduleNachKategorie, modulZielRoute, type KategorieKey, type ModulEintrag,
+  erstesFreigegebenesModul,
+  kategorien,
+  modulAusPfad,
+  moduleNachKategorie,
+  modulZielRoute,
+  type KategorieKey,
+  type ModulEintrag,
 } from './modulRegistry';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -31,7 +36,7 @@ const { Header, Content } = Layout;
 
 /**
  * 48 px ist die Trefffläche aus A1 Festlegung 4 (Material 48 dp) — dieselbe Zahl,
- * die die Rail trägt. Sie gilt für den Hamburger und für den Schließen-Knopf, den
+ * die die Rail trägt. Sie ist der Boden für den Hamburger (Handschuh: 72 px) und den Schließen-Knopf, den
  * der Drawer selbst mitbringt: der ist von Haus aus kleiner, und ein Knopf, den
  * man auf dem Handschirm nicht trifft, ist keiner.
  */
@@ -50,8 +55,11 @@ const TREFFLAECHE = 48;
  */
 const KOPF_STIL = {
   display: 'flex',
+  flexWrap: 'wrap',
+  height: 'auto',
+  lineHeight: 'normal',
   alignItems: 'center',
-  gap: 16,
+  columnGap: 16,
   paddingInline: 'var(--lfh-kopf-polsterung)',
 } as const;
 
@@ -67,76 +75,11 @@ const KOPF_STIL = {
  */
 const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
 
-/* ── Das Breitenbudget der Kopfzeile auf 390 px (LFH-511) ─────────────────────
-   Die Kopfzeile lief auf dem Handschirm über, sobald die Dichtestufe über
-   `kompakt` stieg — und der mobile Kontext IST `komfortabel` (Bedien-Leitlinie
-   A1, per `zeigerIstGrob` aus `(pointer: coarse)` vorbelegt). Gemessen:
-
-     Reihenkinder konstant   Alarmzentrale 169–171 · Suchen 48 · Benutzermenü 46
-     Reihen-Abstand ×2       kompakt 22 · komfortabel 36 · handschuh 52
-     Bedarf gesamt           389 · 403 · 421   gegen 390 px
-
-   ES WÄCHST NUR DER ABSTAND, nicht der Inhalt: die drei Ziele sind in jeder
-   Stufe gleich breit (icon-only bzw. textgebunden). Bei `kompakt` endete die
-   Reihe auf den Pixel genau am Innenrand — null Reserve, also kippt jede Stufe
-   darüber. Deshalb ein DECKEL auf den Abstand, kein neuer Sollwert: dieselbe
-   Bauform wie `aktionsabstand()` in `pages/uhs/Grundriss.tsx` (LFH-378), und
-   dieselbe Begründung — wo die Breite gebunden ist, ginge jede zusätzliche
-   Lücke direkt von der Trefffläche ab.
-
-   DER DECKEL SELBST TASTET DIE ZIELE NICHT AN — er kauft die 13 bzw. 31 px
-   allein aus Weißraum. „blockiert" oder „stumm" bleibt in jeder Stufe als Text
-   benannt, nicht nur als Ikone (LFH-392).
-
-   NACHTRAG LFH-511: die Alarmzentrale ist unter `md` inzwischen EIN Ziel statt
-   zweier (sie bündelt selbst, `AlarmZentrale.tsx`) — sie brach vorher in ihrem
-   gemeinsamen `.ant-space-item` um und trieb den Kopf senkrecht über. Für die
-   Rechnung hier ändert das nichts: gemessen wurden die 169–171 px am bereits
-   umgebrochenen Layout, und ein einzelner Knopf „Desktop blockiert" ist genauso
-   breit. Der Deckel bleibt tragend — ohne ihn braucht die Reihe in
-   `komfortabel` 299 px bei 286 verfügbaren.
-
-   DER GEWINN GEHT AN DEN EINSATZNAMEN, nicht in Reserve: `REST_STIL` ist das
-   einzige elastische Kind, es stand auf allen drei Stufen bei 0 px. Was der
-   Deckel freigibt, bekommt der Name. */
-
-/** Kopf-Abstand am breiten Schirm. Der schmale nimmt `--lfh-kopf-polsterung`. */
-const KOPF_GAP = 16;
-const KOPF_GAP_SCHMAL = 12;
-/** Polsterung je Seite auf schmalem Schirm — Spiegel von `theme/rollen.css:73`. */
-const KOPF_POLSTERUNG_SCHMAL = 12;
-/** Deckel des Reihen-Abstands. Unter dem kompakten `abstand.md` (11), damit die
- *  Rechnung auch in `handschuh` aufgeht, wo die Alarmzentrale 2 px breiter misst. */
-const REIHE_GAP_DECKEL = 10;
-/** Breiteste gemessene Belegung der Aktionsreihe (handschuh, „Desktop blockiert"). */
-export const KOPF_REIHE_KINDER = 265;
-/** Der Handschirm, für den das Budget gilt (Bedien-Leitlinie A1). */
-export const KOPF_BUDGET_BREITE = 390;
-
-/**
- * Kopf- und Reihen-Abstand. Rein und exportiert aus demselben Grund wie
- * `aktionsabstand`: nur so ist die Bilanz über alle Dichtestufen prüfbar, ohne
- * zu rendern — jsdom rechnet kein Layout.
- */
+/** LFH-460: Die Aktionsreihe darf umbrechen; ihre Ziele wachsen mit der Dichte.
+ *  Unter lg bleibt der Abstand aus LFH-511 gedeckelt. Der Deckel spart Weissraum,
+ *  ist aber kein Breitenbeweis mehr: das prüft gate1-ueberlauf.spec.ts im Browser. */
 export function kopfAbstaende(padding: number, schmal: boolean): { kopf: number; reihe: number } {
-  return schmal
-    ? { kopf: KOPF_GAP_SCHMAL, reihe: Math.min(padding, REIHE_GAP_DECKEL) }
-    : { kopf: KOPF_GAP, reihe: padding };
-}
-
-/**
- * Was die Kopfzeile auf dem Handschirm mindestens braucht. Der Einsatzname ist
- * NICHT enthalten — er ist das elastische Kind und darf auf 0 fallen; alles
- * andere ist fest.
- */
-export function kopfBedarf(abstaende: { kopf: number; reihe: number }): number {
-  return (
-    2 * KOPF_POLSTERUNG_SCHMAL +
-    TREFFLAECHE +
-    2 * abstaende.kopf +
-    KOPF_REIHE_KINDER +
-    2 * abstaende.reihe
-  );
+  return schmal ? { kopf: 12, reihe: Math.min(padding, 10) } : { kopf: 16, reihe: padding };
 }
 
 /**
@@ -336,41 +279,61 @@ export default function EinsatzLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ ...KOPF_STIL, gap: abstaende.kopf }}>
-        {!breit && (
-          <Button
-            type="text"
-            aria-label="Navigation öffnen"
-            // `flexShrink: 0` ist nicht Kosmetik: der Header ist eine Flex-Zeile,
-            // und ohne die Sperre drückt der Inhalt daneben den Knopf auf dem
-            // Handschirm auf gut die halbe Trefffläche zusammen (gemessen: 26 px).
-            //
-            // `color` ebenso wenig: ein antd-Textknopf erbt `colorText`, und die
-            // Rolle folgt dem Farbschema — im Hellmodus also dunkel. Die
-            // Kopfzeile trägt aber in BEIDEN Modi denselben dunklen Grund
-            // (gemessen `rgb(0, 21, 41)`), sodass der Griff dort dunkel auf
-            // dunkel verschwand. Er folgt jetzt seinem Grund statt dem Modus —
-            // dieselbe Entscheidung, die Alarmzentrale und Benutzermenü
-            // nebenan schon treffen, hier nur als Rolle statt als wiederholter
-            // Festwert.
-            style={{
-              width: TREFFLAECHE,
-              height: TREFFLAECHE,
-              flexShrink: 0,
-              color: 'var(--lfh-kopf-vordergrund)',
-            }}
-            icon={<TbMenu2 size={24} />}
-            onClick={() => setNavOffen(true)}
-          />
-        )}
-        <div style={REST_STIL}>
-          {einsatzQuery.isLoading ? (
-            <Spin />
-          ) : (
-            <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
+      <Header
+        style={{
+          ...KOPF_STIL,
+          columnGap: abstaende.kopf,
+          rowGap: token.paddingXS,
+          paddingBlock: token.paddingXS,
+          minHeight: token.controlHeight * 2,
+        }}
+      >
+        {/* Navigation und Einsatzname bleiben zusammen. Bei Platzmangel wechselt
+            die Aktionsreihe darunter, statt den Wechsler auf null zu drücken. */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: abstaende.kopf,
+            flex: '1 1 240px',
+            minWidth: 0,
+          }}
+        >
+          {!breit && (
+            <Button
+              type="text"
+              aria-label="Navigation öffnen"
+              // `flexShrink: 0` ist nicht Kosmetik: der Header ist eine Flex-Zeile,
+              // und ohne die Sperre drückt der Inhalt daneben den Knopf auf dem
+              // Handschirm auf gut die halbe Trefffläche zusammen (gemessen: 26 px).
+              //
+              // `color` ebenso wenig: ein antd-Textknopf erbt `colorText`, und die
+              // Rolle folgt dem Farbschema — im Hellmodus also dunkel. Die
+              // Kopfzeile trägt aber in BEIDEN Modi denselben dunklen Grund
+              // (gemessen `rgb(0, 21, 41)`), sodass der Griff dort dunkel auf
+              // dunkel verschwand. Er folgt jetzt seinem Grund statt dem Modus —
+              // dieselbe Entscheidung, die Alarmzentrale und Benutzermenü
+              // nebenan schon treffen, hier nur als Rolle statt als wiederholter
+              // Festwert.
+              style={{
+                width: Math.max(TREFFLAECHE, token.controlHeight),
+                height: Math.max(TREFFLAECHE, token.controlHeight),
+                flexShrink: 0,
+                color: 'var(--lfh-kopf-vordergrund)',
+              }}
+              icon={<TbMenu2 size={24} />}
+              onClick={() => setNavOffen(true)}
+            />
           )}
+          <div style={REST_STIL}>
+            {einsatzQuery.isLoading ? (
+              <Spin />
+            ) : (
+              <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
+            )}
+          </div>
         </div>
-        <Space style={{ marginLeft: 'auto' }} size={abstaende.reihe}>
+        <Space wrap style={{ marginLeft: 'auto', maxWidth: '100%' }} size={abstaende.reihe}>
           {/* Die Alarm-Zentrale bleibt auf JEDER Breite stehen und nennt
               Desktop-/Tonstatus ausdrücklich; „blockiert“ oder „stumm“ darf im
               Einsatz nicht nur über eine Ikone vermittelt werden.

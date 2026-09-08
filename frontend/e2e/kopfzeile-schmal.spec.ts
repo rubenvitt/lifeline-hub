@@ -73,55 +73,9 @@ test('Kopf-Polsterung: 24 px am Fükw-Schirm, 12 px auf 390 px', async ({ page }
   }
 });
 
-/**
- * IN BEIDEN DICHTESTUFEN, und das ist eine Messung aus LFH-392: mit einem
- * zusätzlichen `Space`-Kind in der Einsatz-Kopfzeile (dem Trenner vor den
- * Aktionen) lief der Kopf auf 390 px um 20 px über — `scrollWidth` 410 gegen
- * `clientWidth` 390 — aber NUR in `komfortabel`, wo der `middle`-Abstand 18 px
- * statt 11 px trägt und jedes Ziel 48 statt 30 px breit ist. Dieser Test lief
- * bis dahin ausschließlich mit feinem Zeiger, also in `kompakt`, und blieb grün;
- * gefunden hat den Überlauf ein Touch-Test einer fremden Seite
- * (`uhs-grundriss-touch.spec.ts`, `hasTouch: true`). Ein 390-px-Budget, das nur
- * in der Fükw-Stufe geprüft wird, prüft den Kontext nicht, für den 390 px
- * stehen: der mobile Kontext ist `komfortabel` (Bedien-Leitlinie A1).
- *
- * `hasTouch` statt einer gespeicherten Wahl, weil das der Weg ist, den das Gerät
- * nimmt: `useViewport.zeigerIstGrob` belegt die Stufe ohne gespeicherte Wahl
- * aus `(pointer: coarse)` vor (LFH-361). Die VORBEDINGUNG auf `data-dichte` ist
- * tragend — fiele die Vorbelegung, liefe die Touch-Variante still in `kompakt`
- * und wäre grün durch Nichtstun.
- *
- * DIE WAAGERECHTE HÄLFTE VON LFH-511 IST BEHOBEN, das `fixme` deshalb heraus —
- * DAS TICKET IST ES NICHT. Beides sauber auseinanderhalten:
- *
- * BEHOBEN (und das ist, was dieser Test misst): auch OHNE den Trenner mass die
- * `Space` in `komfortabel` 299 px (Alarmzentrale 169 + 2 × 18 Abstand + Suchen
- * 48 + Benutzermenü 46) und stand mit Hamburger (48) und zwei Kopf-Abständen
- * (16 + 16) bei 379 px gegen 366 px Innenbreite — 13 px in die Polsterung, 1 px
- * über den Kopf (`scrollWidth` 391). Ein DECKEL auf Kopf- und Reihen-Abstand am
- * schmalen Schirm (`einsatz/EinsatzLayout.tsx`, Bauform `aktionsabstand()` aus
- * LFH-378) räumt das: es wächst nur der Abstand, nicht der Inhalt, die drei
- * Ziele sind in jeder Stufe gleich breit. Die Alarmzentrale behält ihren Text —
- * die Forderung aus LFH-392, dass „blockiert"/„stumm" nicht nur über eine Ikone
- * läuft, ist unangetastet. Die Bilanz je Dichtestufe prüft
- * `EinsatzLayout.test.tsx` ohne Rendern; DASS sie im Browser aufgeht, hier.
- *
- * OFFEN BLEIBT DER EIGENTLICHE BEFUND VON LFH-511 — der SENKRECHTE Überlauf,
- * und dieser Test sieht ihn konstruktionsbedingt nicht (er misst nur
- * `scrollWidth`). Gemessen am 03.09.2026 auf `/etb`, 390 px, `komfortabel`,
- * NACH dem Deckel: `scrollHeight` 144 gegen `clientHeight` 96, also 48 px
- * senkrechter Überlauf. Die zwei Knöpfe der Alarmzentrale liegen in EINEM
- * `.ant-space-item`, brechen dort um und werden beide angeschnitten
- * („Desktop blockiert" oben=−24, „Ton bereit" unten=119 bei 96 px Kopfhöhe).
- * Ein `nowrap` allein löst es nicht: LFH-392 hat das gemessen und verworfen —
- * ohne Umbruchmöglichkeit wuchs die Kopfzeile auf 486 px. Der Deckel gibt rund
- * 20 px zurück, die Lücke ist knapp 100. Es braucht also die Entscheidung, die
- * das Ticket nennt (Kurzwort, Kürzung oder Zusammenfassung beider Knöpfe) —
- * eine Bedienentscheidung, kein Nebenprodukt eines Abstands-Deckels.
- *
- * ZWEI WEITERE SPECS HINGEN AN DER WAAGERECHTEN HÄLFTE, ohne sie zu nennen:
- * `einstellungen-schmal` und `kraefte-schmal` setzen ebenfalls `hasTouch` und
- * messen `documentElement` — sie waren übersehen und liefen rot mit.
+/** Kompakte Vorgabe und Touch-Vorbelegung prüfen beide Layoutfamilien.
+ *  LFH-460 ergänzt die gespeicherte Wahl aller drei Stufen in gate1-ueberlauf.
+ *  Der Kopf darf jetzt kontrolliert umbrechen, seine Ziele aber nicht abschneiden.
  */
 async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' | 'komfortabel') {
   await page.goto(route);
@@ -148,16 +102,11 @@ async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' 
   expect(masse.scrollH, `${route}: Kopfzeile läuft SENKRECHT über`).toBeLessThanOrEqual(
     masse.klientH,
   );
-  // UND DIE KOPFHÖHE SELBST WIRD GEPINNT, sonst ist die Zeile darüber stumpf:
-  // `scrollH <= klientH` ist von ZWEI Zuständen erfüllt — „der Inhalt passt in
-  // einen festen Kopf" und „der Kopf ist auf seinen Inhalt gewachsen". Ohne
-  // diesen Pin bliebe der Test grün, wenn die Kopfzeile auf 144 px wüchse und
-  // ein Sechstel des Handschirms frässe. Die Zahlen sind die Dichte-Staffel
-  // (`--lfh-kopf-*`), handgeschrieben statt aus einem Token gelesen — sonst
-  // prüfte der Test den Token gegen sich selbst.
-  expect(masse.klientH, `${route}: Kopfhöhe der Stufe ${stufe}`).toBe(
-    stufe === 'kompakt' ? 60 : 96,
-  );
+  // LFH-460 erlaubt zwei Zeilen. Der Deckel verhindert ungebremstes Wachstum,
+  // während die Inhaltsprüfung oben weiterhin jedes Abschneiden aufdeckt.
+  const einzeilig = stufe === 'kompakt' ? 60 : 96;
+  expect(masse.klientH, `${route}: Kopfhöhe der Stufe ${stufe}`).toBeGreaterThanOrEqual(einzeilig);
+  expect(masse.klientH, `${route}: höchstens zwei Kopfzeilen`).toBeLessThanOrEqual(2 * einzeilig);
 }
 
 for (const [stufe, hasTouch] of [
@@ -254,7 +203,9 @@ test('Kopfzeile: auf 390 px läuft sie auch für einen Benutzer OHNE Verwaltungs
   expect(masse.scroll, 'Kopfzeile läuft über (gesperrter Zweig)').toBeLessThanOrEqual(masse.klient);
 });
 
-test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläche', async ({ page }) => {
+test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläche', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Suche ${Date.now()}`);
 
@@ -264,7 +215,10 @@ test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläch
     const trigger = page.getByRole('button', { name: 'Suchen' });
     await expect(trigger, route).toBeVisible();
     const kasten = (await trigger.boundingBox())!;
-    expect(Math.min(kasten.width, kasten.height), `${route}: Such-Trefffläche`).toBeGreaterThanOrEqual(48);
+    expect(
+      Math.min(kasten.width, kasten.height),
+      `${route}: Such-Trefffläche`,
+    ).toBeGreaterThanOrEqual(48);
   }
 });
 
