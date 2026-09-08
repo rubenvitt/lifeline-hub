@@ -949,6 +949,10 @@ export default function Grundriss({
             defaultActiveKey="flaeche"
             destroyOnHidden
             style={{ height: '100%' }}
+            // Der Tabs-Holder bekommt die Resthöhe nach der Reiterleiste. Body
+            // und Pane müssen sie weiterreichen, sonst wächst die Fläche nach
+            // ihrem Inhalt über den begrenzten Grundriss hinaus (LFH-459).
+            styles={{ body: { height: '100%' }, content: { height: '100%' } }}
             items={[
               { key: 'flaeche', label: 'Fläche', children: flaeche },
               { key: 'warte', label: 'Wartebereich', children: wartebereich },

@@ -8,6 +8,7 @@ import { flaeche } from '../theme/tokens';
 // gebunden (`.lfh-*`) — sie färbt also nichts ein, was sie nicht anfasst.
 import '../theme/sprache.css';
 import Datenstand from './Datenstand';
+import FensterRahmen from './FensterRahmen';
 
 interface EinsatzSeiteProps {
   titel: ReactNode;
@@ -45,6 +46,8 @@ interface EinsatzSeiteProps {
   dataUpdatedAt?: number;
   /** Container-Breite in px — `flaeche.seiteSchmal` (Default) oder `flaeche.seiteBreit`. */
   breite?: number;
+  /** Arbeitsfläche bis zum Fensterende; children folgen darunter im Dokumentfluss. */
+  fensterInhalt?: { inhalt: ReactNode; mindestHoehe?: number };
   children: ReactNode;
 }
 
@@ -86,6 +89,7 @@ export default function EinsatzSeite({
   hinweis,
   dataUpdatedAt,
   breite = flaeche.seiteSchmal,
+  fensterInhalt,
   children,
 }: EinsatzSeiteProps) {
   const { token } = theme.useToken();
@@ -133,8 +137,8 @@ export default function EinsatzSeite({
     }
   });
 
-  return (
-    <div ref={seitenWurzel} style={{ maxWidth: breite, margin: '0 auto' }}>
+  const kopf = (
+    <>
       {breadcrumb && <div style={{ marginBottom: token.marginXS }}>{breadcrumb}</div>}
       {/**
         * `wrap` ist keine Kosmetik (LFH-339 · C4, gemessen). Ohne es steht der
@@ -177,6 +181,14 @@ export default function EinsatzSeite({
         )}
       </Flex>
       {hinweis && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
+    </>
+  );
+
+  return (
+    <div ref={seitenWurzel} style={{ maxWidth: breite, margin: '0 auto' }}>
+      {fensterInhalt != null
+        ? <FensterRahmen kopf={kopf} mindestHoehe={fensterInhalt.mindestHoehe}>{fensterInhalt.inhalt}</FensterRahmen>
+        : kopf}
       {children}
     </div>
   );

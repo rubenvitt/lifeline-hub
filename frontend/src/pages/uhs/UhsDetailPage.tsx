@@ -158,13 +158,16 @@ export default function UhsDetailPage() {
           )}
         </Space>
       }
+      fensterInhalt={{
+        // Die bisherige Mindest-Arbeitsfläche bleibt: unter einem langen Kopf
+        // scrollt die Seite weiter, statt Grundriss und Reiter zu überlagern.
+        // 380px beschreibt die Fläche, nicht eine geschätzte Kopfhöhe.
+        mindestHoehe: 380,
+        inhalt: <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
+      }}
     >
-      {/* Grundriss bleibt Hauptinhalt mit bemessener Höhe (Grundriss-Root ist height:100%);
-          die Seite scrollt, die Material/Bewegungen-Tabs liegen darunter (LFH-149, kein Drawer). */}
-      <div style={{ height: 'calc(100vh - 300px)', minHeight: 380 }}>
-        <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
-      </div>
-
+      {/* Der Seitenkopf teilt die echte Resthöhe mit dem Grundriss (LFH-459).
+          Material/Bewegungen folgen weiterhin im Seitenfluss (LFH-149). */}
       <Tabs
         style={{ marginTop: 16 }}
         items={[
