@@ -88,6 +88,13 @@ export function useOfflineSync(benutzerId?: number): void {
             refetchType: 'none',
           });
           void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
+          // Der Anlege-Request kann zugleich den UHS-Eintritt enthalten (LFH-458).
+          // Auch ohne funktionierenden Live-Stream muss die gerade offene UHS nachladen.
+          const uhsId = element.wert.aktion.daten.uhs_id;
+          if (uhsId != null) {
+            void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(element.wert.einsatz_id) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(element.wert.einsatz_id, uhsId) });
+          }
           meldeOfflineSchreibaktionGesendet({
             art: 'person',
             benutzerId: aktuellerBenutzerId,

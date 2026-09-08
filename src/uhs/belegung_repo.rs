@@ -28,29 +28,52 @@ pub async fn eintritt(
     erfasst_von: i64,
 ) -> Result<BelegungAnzeige, AppError> {
     let id = crate::write_retry!(pool, |conn| {
-        pruefe_uhs_aktiv(&mut *conn, einsatz_id, uhs_id).await?;
-        pruefe_person_nicht_belegt(&mut *conn, einsatz_id, person_id).await?;
-        if let Some(pid) = platz_id {
-            pruefe_platz_belegbar(&mut *conn, uhs_id, pid, person_id).await?;
-        }
-        let id = insert_event(
-            &mut *conn,
+        eintritt_tx(
+            conn,
             einsatz_id,
             person_id,
             uhs_id,
             platz_id,
-            "eintritt",
             notiz,
             erfasst_von,
         )
-        .await?;
-        update_cache(&mut *conn, einsatz_id, person_id, Some(uhs_id), platz_id).await?;
-        if let Some(pid) = platz_id {
-            loese_eigene_reservierung_ein(&mut *conn, pid, person_id).await?;
-        }
-        Ok(id)
+        .await
     })?;
     laden(pool, einsatz_id, id).await
+}
+
+/// Eintritt auf der Transaktion des Aufrufers (LFH-458): bei der Aufnahme gehören
+/// Person, Sichtung, Belegung und Audit zusammen. Kein eigener Commit/Pool-Read.
+pub async fn eintritt_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    uhs_id: i64,
+    platz_id: Option<i64>,
+    notiz: Option<&str>,
+    erfasst_von: i64,
+) -> Result<i64, AppError> {
+    pruefe_uhs_aktiv(&mut *conn, einsatz_id, uhs_id).await?;
+    pruefe_person_nicht_belegt(&mut *conn, einsatz_id, person_id).await?;
+    if let Some(pid) = platz_id {
+        pruefe_platz_belegbar(&mut *conn, uhs_id, pid, person_id).await?;
+    }
+    let id = insert_event(
+        &mut *conn,
+        einsatz_id,
+        person_id,
+        uhs_id,
+        platz_id,
+        "eintritt",
+        notiz,
+        erfasst_von,
+    )
+    .await?;
+    update_cache(&mut *conn, einsatz_id, person_id, Some(uhs_id), platz_id).await?;
+    if let Some(pid) = platz_id {
+        loese_eigene_reservierung_ein(&mut *conn, pid, person_id).await?;
+    }
+    Ok(id)
 }
 
 /// UHS-/Platz-Wechsel einer Person. Erfordert aktive Belegung der Person.

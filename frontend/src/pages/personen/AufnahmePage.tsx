@@ -6,7 +6,6 @@ import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { registrierAnzeige } from '../../api/einsatzPerson';
-import { aenderePersonBelegung } from '../../api/einsatzUhs';
 import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ErfassungsFormular } from '../../components/Erfassung';
@@ -49,11 +48,9 @@ import { flaeche } from '../../theme/tokens';
  *
  * „Patient aufnehmen" in der UHS-Detailseite schickt hierher mit `?uhs=<id>` (der
  * `uhsAuftrag` unten). Wer über diesen Weg kommt, erfasst keine Person im Allgemeinen,
- * sondern einen Patienten dieser Unfallhilfsstelle: nach dem Anlegen bucht die Seite den
- * Eintritt in den Wartebereich (`aenderePersonBelegung`, `art: 'eintritt'`,
- * `platz_id: null`) und kehrt zur UHS zurück statt in die Personenliste. Offline gibt es
- * keine Person-ID und damit keine Belegung — die Quittung sagt das ehrlich, statt eine
- * Zuordnung zu versprechen, die kein Code nachträgt (Details an der Mutation unten).
+ * sondern einen Patienten dieser Unfallhilfsstelle. `uhs_id` geht mit dem Anlegen
+ * mit (LFH-458): der Server schreibt Person und Wartebereich-Eintritt atomar. Die
+ * Offline-Queue erhält denselben Auftrag samt client_id; die Seite kehrt zur UHS zurück.
  */
 export default function AufnahmePage() {
   const { id } = useParams();
@@ -68,7 +65,7 @@ export default function AufnahmePage() {
   const [searchParams] = useSearchParams();
   /**
    * DER UHS-AUFTRAG (LFH-341 · C6). Wer von der UHS-Kopfzeile kommt, erfasst einen
-   * PATIENTEN, keine Person im Allgemeinen: nach dem Anlegen wird der Eintritt in den
+   * PATIENTEN, keine Person im Allgemeinen: mit dem Anlegen wird der Eintritt in den
    * Wartebereich gebucht, und der Rückweg geht zur UHS statt in die Personenliste.
    *
    * Unbrauchbares wird GANZ verworfen, nicht halb übernommen — dieselbe Regel wie beim
@@ -106,56 +103,19 @@ export default function AufnahmePage() {
   const anlegenMutation = useMutation({
     mutationFn: async (daten: AufnahmeEingabe) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
-      return erfassePersonOfflineFaehig(benutzer.id, einsatzId, daten);
+      return erfassePersonOfflineFaehig(benutzer.id, einsatzId, {
+        ...daten,
+        ...(uhsAuftrag !== null ? { uhs_id: uhsAuftrag } : {}),
+      });
     },
-    onSuccess: async (ergebnis) => {
+    onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        const text = uhsAuftrag
-          // KEIN Versprechen, das kein Code einlöst: die Queue trägt die Person, aber
-          // niemand schiebt danach die Belegung nach (gemessen — `offline/schreiben.ts`
-          // hat keinen Drain-Hook für Folgeaktionen). Eine still ausgefallene Zuordnung
-          // wäre eine Person, die an der UHS niemand sucht; ein falsches „folgt" wäre
-          // schlimmer, weil dann auch niemand nachsieht. Zielticket: uhs_id am POST.
-          ? 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung, die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen.'
-          : 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.';
-        setQuittung(text);
-        // Auf dem PRIMÄR-Knopf navigiert `onFertig` sofort zur UHS (bzw. in die Liste) —
-        // die stehende Quittung hängt dabei aus, bevor sie ein Frame lang sichtbar war
-        // (gemessen: ein Test auf den Primär-Knopf lief rot, DOM zeigte bereits das
-        // Navigationsziel). Bei einem Auftrag steht in ihr aber keine Statusnotiz mehr,
-        // sondern eine HANDLUNGSANWEISUNG — genau der Fall, den der Brief mit „eine
-        // Person, die an der UHS niemand sucht" benennt. `message.warning` nutzt denselben
-        // Kanal wie der Fehlerzweig unten (der überlebt die Navigation, weil er am
-        // `App`-Kontext hängt, nicht am Baum dieser Seite).
-        if (uhsAuftrag) message.warning(text);
+        setQuittung('Offline vorgemerkt — Registriernummer folgt nach der Übertragung.');
       } else {
         const person = ergebnis.daten;
-        let zusatz = '';
+        const zusatz = uhsAuftrag && person.aktuelle_uhs_id === uhsAuftrag
+          && person.aktueller_platz_id === null ? ' · im Wartebereich' : '';
         if (uhsAuftrag) {
-          try {
-            await aenderePersonBelegung(einsatzId, person.id, {
-              art: 'eintritt',
-              uhs_id: uhsAuftrag,
-              platz_id: null,
-            });
-            zusatz = ' · im Wartebereich';
-          } catch (e) {
-            // Die Person IST angelegt — das darf die Quittung nicht verschweigen, nur
-            // weil der zweite Schritt gescheitert ist. Und der Toast muss es MITSAGEN,
-            // spiegelbildlich zum Offline-Zweig oben: auf dem PRIMÄR-Knopf löst
-            // `mutateAsync` erst nach diesem `onSuccess` auf, die Hülle ruft dann
-            // `onFertig()` und navigiert zur UHS — die stehende `<Alert>`-Quittung hängt
-            // dabei mit der Seite aus. Sichtbar bliebe allein `fehlerText(e)`, also
-            // „Aktion fehlgeschlagen" oder die Servermeldung, und BEIDE sagen nicht, dass
-            // die Person angelegt wurde. Der Bediener fände den Patienten nicht im
-            // Wartebereich, schlösse „nicht angelegt" und erfasste ihn erneut — zwei
-            // Registriernummern für einen Patienten an einer Unfallhilfsstelle.
-            message.error(
-              `Erfasst als ${registrierAnzeige(person.registrier_nr)} — die Zuordnung zur `
-              + `Unfallhilfsstelle ist fehlgeschlagen (${fehlerText(e)}). Bitte von Hand zuordnen.`,
-            );
-            zusatz = ' · Zuordnung zur Unfallhilfsstelle fehlgeschlagen';
-          }
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsAuftrag) });
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
         }

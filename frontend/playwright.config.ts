@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,13 @@ import { fileURLToPath } from 'node:url';
 // Step 5)" zu starten — ein Verweis auf einen Schritt, den es im Repo nie gab.
 
 const frontendVerzeichnis = fileURLToPath(new URL('.', import.meta.url));
-const binaer = resolve(frontendVerzeichnis, '..', 'target', 'debug', 'lifeline-hub');
+// Dieselbe Cargo-Wahrheit wie check-all.sh: build.target-dir bzw. CARGO_TARGET_DIR
+// kann das Binary außerhalb des Worktrees ablegen.
+const cargoMetadaten = JSON.parse(execFileSync(
+  'cargo', ['metadata', '--format-version', '1', '--no-deps'],
+  { cwd: resolve(frontendVerzeichnis, '..'), encoding: 'utf8' },
+)) as { target_directory: string };
+const binaer = join(cargoMetadaten.target_directory, 'debug', 'lifeline-hub');
 
 // Vorgebautes Binary voraussetzen statt bauen: `cargo build` im webServer-Command würde
 // jeden Lauf um Minuten verlängern und den Fehlerfall hinter einem Compile-Log verstecken.

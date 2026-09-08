@@ -233,13 +233,13 @@ Richtungen danebenliegt → **LFH-459**.
 | 8 · Helligkeits-/Kontrastregler | **offen** | Unverändert: es gibt keinen in der Anwendung, A0 hat ihn ausdrücklich weiterverwiesen → **Folge-Task aus A0**. C6 ändert daran nichts und behauptet es auch nicht |
 | 9 · Kritische Anzeigen im Blickfeld | **erfüllt — die alte Zeile 9 ist durch den Umbruch falsch geworden** | Sie sagte „Die Drei-Spalten-Ordnung bleibt". Unter `lg` bleibt sie **nicht**: es sind drei Reiter, und mit `destroyOnHidden` stehen die beiden anderen gar nicht im Baum — die Prop trägt die Aussage, nicht das Fehlen eines `forceRender` (im Abschluss-Review gemessen: antds Vorgabe lässt eine einmal besuchte Pane montiert). Genau deshalb ist die **Fläche der Default-Reiter** (`Grundriss.tsx`, `defaultActiveKey="flaeche"`) — die Arbeitsfläche des BHP ist die kritische Anzeige, die anderen beiden sind eine Berührung entfernt. Breit ist die Ordnung unverändert. Der Zuweisungsdialog trägt den Zielplatz weiterhin im Titel |
 | 10 · Alarmbudget | **nicht anwendbar** | Der Grundriss erzeugt keine Alarme |
-| 11 · Warnverhalten | **erfüllt** | Kein Blinken, kein Ton. Neu und bewusst: der Offline-Fall der Aufnahme meldet über `message.warning` statt stumm zu bleiben (`AufnahmePage.tsx:130`) — Text, keine Bewegung |
+| 11 · Warnverhalten | **erfüllt** | Kein Blinken, kein Ton. Seit LFH-458 ist die Offline-UHS-Zuordnung Teil der persistenten Vormerkung; die bisherige Handarbeitswarnung entfällt, die Offline-Quittung bleibt |
 | 12 · Kein Sprung unter dem Cursor | **erfüllt für den Umbau, offen im Bestand — und das Ziel ist nicht mehr B6** | Der Reiter-Wechsel verändert kein Layout unter dem Finger, die Karten behalten ihre feste Grösse, und der Rückweg-Eintrag erscheint nur am belegten Platz. **Offen bleibt:** Belegungsänderungen anderer Stellen fahren über den SSE-Fan-out direkt in die handgebauten Personenspalten des Grundrisses. B6/LFH-334 ist **shipped** und hat den Sammelbanner gebaut — aber ausdrücklich für **Listenseiten** („Stand hh:mm … je Listenseite", „N neue Einträge — anzeigen"), getragen vom `Datensicht`-Primitiv (`Datensicht.tsx:754`, `zufluss: 'sammelbanner'`). Die Spalten des Grundrisses sind **kein** `Datensicht`, standen in keinem Akzeptanzkriterium von B6 und haben den Banner nie bekommen. B6 hat den Grundriss dabei durchaus angefasst — die Refetch-Sperre nach optimistischer Belegung steht in seinem Umsetzungsstand —, die Stelle ist also gesehen und nicht gemacht worden, nicht übersehen. Die **Fläche** braucht ihn nicht — ihre Karten stehen absolut auf `pos_x`/`pos_y` und schieben einander nicht. → **noch nicht getickt**, und das steht hier so, statt auf ein erledigtes Ticket zu zeigen |
 | 13 · Fokus nie verdeckt | **teilweise erfüllt** | Unverändert gilt: der Dialog führt den Fokus, der Menü-Eintrag ist über Tastatur gedacht und in jsdom nicht belegbar. **Neu:** die drei Reiterköpfe sind reguläre antd-Tabs mit ihrer Tastaturbedienung; die Reihenfolge im Tab-Durchlauf ist Fläche → Wartebereich → Transport, also die der sichtbaren Köpfe. **Offen bleibt** die Frage, ob ein Fokusziel beim Durchtabben der absolut positionierten Platzkarten hinter dem Rand des Scrollcontainers landet. Die alte Fassung nannte das „wäre der erste Dichte-/Fokus-e2e-Nachweis des Repos" — **das stimmt nicht mehr**: `frontend/e2e/fokus-verdeckung.spec.ts` führt das Verfahren samt Selbstbeweis, für `KatalogTabelle` und den Tabellenzweig der `Datensicht`. Es fehlt nur die Anwendung auf den Grundriss → **noch nicht getickt** |
 | 14 · Tabellenseite vollständig | **dreigeteilt: nicht anwendbar / erfüllt / offen** | **Grundriss:** nicht anwendbar — hier wird verortet, nicht verglichen. **Bewegungen-Reiter:** **erfüllt**, und das ist die Korrektur an der alten Zeile: er ist seit B2 kein handgebautes `Table` mehr, sondern `Datensicht` mit Standardsortierung, Art-Filter und Suche (`BewegungenTab.tsx:148-169`). Ein Spaltenschalter fehlt dort **absichtlich** — alle fünf Spalten tragen `immerSichtbar`, weil es keine gibt, die man sinnvoll abwählt; ein Schalter samt Zähler wäre ein Bedienelement für eine Entscheidung, die niemand treffen muss. Das steht als Begründung im Code. **Material-Reiter:** **offen** — er nutzt weiterhin `KatalogTabelle` (Scrollcontainer und stehende Kopfzeile ✓, Spaltenschalter mit Zähler ✗) → **noch nicht getickt**, Bestand, weder von B5g noch von C6 verursacht |
 | 15a · Erfassungsmaske — Zuweisungsdialog | **erfüllt, unverändert** | `ErfassungsModal`, ein Feld, Zielplatz im Titel, kein Serienmodus mit Begründung. C6 fasst die Maske nicht an |
 | 15b · Erfassungsmaske — „Material zuordnen" | **erfüllt seit LFH-378** | Umgebaut auf `ErfassungsModal`. Die Enter-Zusicherung greift dort nicht, weil das einzige Feld ein `Select` ist — das ist eine Bibliothekseigenschaft, kein Umsetzungsfehler (Nachtrag 31.07.2026 oben). Geprüft wird die Struktur |
-| 15c · Erfassungsmaske — Patientenaufnahme (**neu mit C6**) | **erfüllt, mit einer benannten Lücke** | Die Aufnahme an der UHS baut **kein zweites Formular**: „Patient aufnehmen" navigiert auf die gemeinsame Route aus C5 (`personenAufnahmePfad(einsatzId, { uhs })` → `?uhs=<id>`), die `personen/AufnahmeFelder.tsx` und den Serienbetrieb der Erfassungshülle mitbringt. Breadcrumb und Seitenbeschreibung tragen den UHS-Auftrag, der Abschluss führt auf die UHS zurück. **Die Lücke ist offline und sie ist ehrlich benannt statt behauptet** — Vorbehalt B unten → **LFH-458** |
+| 15c · Erfassungsmaske — Patientenaufnahme (**neu mit C6**) | **erfüllt, Offline-Zuordnung seit LFH-458 enthalten** | Die Aufnahme an der UHS baut **kein zweites Formular**: „Patient aufnehmen" navigiert auf die gemeinsame Route aus C5 (`personenAufnahmePfad(einsatzId, { uhs })` → `?uhs=<id>`), die `personen/AufnahmeFelder.tsx` und den Serienbetrieb der Erfassungshülle mitbringt. Breadcrumb und Seitenbeschreibung tragen den UHS-Auftrag, der Abschluss führt auf die UHS zurück. **Seit LFH-458** trägt die Vormerkung `uhs_id`; Person und Wartebereich-Eintritt werden im selben idempotenten POST übertragen (Nachtrag C unten) |
 | **1a · Nachtrag: die Sensorik** | **GESCHLOSSEN — beide Hälften belegt, unter dem Vorbehalt synthetischer Pointer-Events** | Die zweite Hälfte („und der Drag kommt trotzdem an") ist das, was B5g offen liess und dieses Ticket als AK1 forderte. Belegt in `frontend/e2e/uhs-grundriss-touch.spec.ts`: der Touch-Drag bei 1024 px legt eine Person auf „Bett 1" (`:175`), eine abgelehnte Zuordnung rollt zurück (`:221`), und die Warteliste **scrollt bei angehaltenem Drag weiter** (`:278`) — das ist die Gegenprobe zu der Regression, die das ursprüngliche Eltern-AK mit `touchAction: 'none'` verlangt hätte. Die Entscheidung von B5g ist damit nicht nur begründet, sondern **gemessen richtig**. Bei 390 px trägt der Klickweg (`:374`). **Der Vorbehalt gehört in dieses Verdikt, nicht in eine Fussnote:** synthetische Pointer-Events sind untrusted — belegt ist, dass der Code-Pfad unter `pointerType: 'touch'` feuert, **nicht**, dass ein echter Finger den Drag zu Ende bringt (Vorbehalt A) |
 | **1b · Nachtrag: der Riegel gegen Fehlauslösung** | **erfüllt, unverändert** | Der `click`-Riegel an der Aktionszeile trägt weiter; C6 hat die Zeile nicht bewegt. Der neue Rückweg-Eintrag hängt im selben Teilbaum und ist damit mitgedeckt |
 
@@ -258,7 +258,7 @@ die Begründung von 2026 heute nicht mehr stimmt.
 | 12 | Sammelbanner für die handgebauten Personenspalten des Grundrisses | **noch nicht getickt** — B6/LFH-334 ist shipped und hat ihn im `Datensicht`-Primitiv gebaut, das der Grundriss nicht nutzt |
 | 13 | Fokus-Sichtbarkeit beim Durchtabben der absolut positionierten Platzkarten | **noch nicht getickt** — das Verfahren steht seit `fokus-verdeckung.spec.ts`, nur die Anwendung auf den Grundriss fehlt |
 | 14 | Spaltenschalter mit Zähler im Material-Reiter | **noch nicht getickt** — Bestand |
-| 15c | Offline-Zuordnung zur UHS bei der Aufnahme | **LFH-458** — neu angelegt |
+| 15c | Offline-Zuordnung zur UHS bei der Aufnahme | **LFH-458** — implementiert; Nachweis in `person_aufnahme_uhs.rs`, `AufnahmePage.test.tsx` und `useOfflineSync.test.tsx` |
 | (Suite) | `uhs-grundriss-person-scroll.spec.ts:82` reisst in 1 von 8 Sammelläufen, Ursache ungemessen | **LFH-398** — Ticket existiert und führt genau die Lastempfindlichkeit dieser Datei |
 
 Die drei „noch nicht getickt" zeigen weiterhin bewusst auf **keine** Nummer. Sie auf ein
@@ -307,7 +307,7 @@ genommen, statt eine zu geben. Das stand in keinem Akzeptanzkriterium und ist be
 gefunden worden, nicht beim Testen. Folge: `belegMut` hat **drei** Aufrufer; das AK „für beide
 Aufrufer" ist erfüllt und überschritten.
 
-**6 · Die Offline-Zuordnung ist ehrlich benannt, nicht gelöst.** Siehe Vorbehalt B → **LFH-458**.
+**6 · Die Offline-Zuordnung ist mit LFH-458 Teil der Aufnahme.** `uhs_id` geht mit dem Anlege-POST und der Offline-Vormerkung mit. Der Server schreibt Person, Sichtung und Wartebereich-Eintritt in derselben Transaktion unter `war_neu`; ein Replay erzeugt keine weitere Belegung. Ein erzwungener Belegungsfehler rollt auch Person, Sichtung und Audit zurück (`tests/person_aufnahme_uhs.rs`).
 
 **7 · Die UHS-Detailseite nutzt den gemeinsamen Modul-Seitenkopf.** Die Abhängigkeitszeile des
 Tickets verlangte es („C5 liefert ausserdem den gemeinsamen Modul-Seitenkopf, den die UHS-Seiten
@@ -336,14 +336,15 @@ eine Frage an das Gerät und nicht an die Spec. **Ein Blick auf echtem Gerät st
 die Grenze der Methode, nicht ihres Ergebnisses. Genau deshalb steht der Vorbehalt in Zeile 1a
 selbst und nicht nur hier.
 
-**C · Und eine offline gelassene Zuordnung.** `AufnahmePage` bucht den Wartebereich-Eintritt als
-**zweiten** Request. Offline geht er verloren: `erfassePersonOfflineFaehig` legt die Person mit
-`client_id`-Idempotenz in die Queue, aber kein Drain-Hook schiebt die Belegung nach (gemessen in
-`offline/useOfflineSync.ts` — die Queue-Aktion trägt keine `uhs_id`). Die Quittung sagt das
-deshalb: „die Zuordnung zur Unfallhilfsstelle muss danach von Hand erfolgen", zusätzlich als
-`message.warning`, weil der Wortlaut auf dem Primärweg die Navigation überleben muss. Der saubere
-Weg ist der, den LFH-340/C5 für die **Sichtung** gewählt hat und den `CLAUDE.md` als Regel führt:
-das Feld geht **mit** dem Anlegen mit, serverseitig in derselben Transaktion → **LFH-458**.
+**C · Offline-UHS-Aufnahme seit LFH-458.** Der zweite Belegungs-Request entfällt.
+`AufnahmePage` übergibt `uhs_id` an `erfassePersonOfflineFaehig`; die persistente Queue erhält
+UHS und `client_id` gemeinsam. Der Server validiert UHS-Zugriff und Einsatzzugehörigkeit,
+schreibt den Eintritt atomar mit der Person und lädt die Antwort danach. `vermisst` + UHS
+liefert 422, eine unbekannte oder fremde UHS 404. Bei Wiederholung derselben `client_id`
+entsteht keine zweite Belegung. Auch nach dem Queue-Drain werden UHS-Liste und Detail
+invalidiert. Die Quittung und der Primärweg enthalten deshalb keinen Handarbeitsvorbehalt
+mehr. Die Tests belegen Ein-Request-Aufnahme, beide Offline-Speicherwege, Übertragung der
+UHS-ID, Rollback und Replay; die ursprüngliche C6-Lücke ist damit implementiert geschlossen.
 
 ## Ein zweiter Befund, der aus dem Umfang fällt
 
