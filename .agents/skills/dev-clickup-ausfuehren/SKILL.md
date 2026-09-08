@@ -1,6 +1,6 @@
 ---
 name: dev-clickup-ausfuehren
-description: Per-single-(sub)task execution layer for the Lifeline-Hub ClickUp Entwicklungsboard. Use for one concrete standalone ClickUp task with no subtasks to load its context, keep its board status moving forward, choose an implementation approach, implement and verify it. Usually invoked by dev-clickup-orchestrieren. Not for capturing new work; use clickup-task-anlegen for that.
+description: Execute one concrete task from the Lifeline-Hub ClickUp Entwicklungsboard through implementation, verification, and a published pull request. Keep its board status current. Usually invoked by dev-clickup-orchestrieren. Not for capturing new work; use clickup-task-anlegen for that.
 ---
 
 # Einzelnen ClickUp-Task ausführen (Lifeline Hub)
@@ -11,6 +11,10 @@ Setze genau einen Task vom **Entwicklungsboard** (`901523554968`, Workspace
 `9015920204`) um. Dieser Skill besitzt die Statusspur, die Workspace-Prüfung und das
 Komplexitäts-Routing. Bei Parent-Tasks, Subtasks oder ausdrücklich gewünschter
 Mehragenten-Orchestrierung verwende `dev-clickup-orchestrieren` als Einstieg.
+
+**Ziel jeder Umsetzung ist ein veröffentlichter PR.** Commit, Push und PR-Erstellung gehören
+zum Auftrag und benötigen keine zusätzliche Nachfrage. Eine ausdrückliche Einschränkung des
+Users geht vor. Ein Merge gehört erst mit gesondertem Auftrag dazu.
 
 Neue, außerhalb des Scopes entdeckte Arbeit gehört zu `clickup-task-anlegen`.
 
@@ -92,10 +96,23 @@ Bevor du „fertig“ sagst:
    Projektkonventionen und Testlücken aus.
 
 Nach implementierter und selbst geprüfter Änderung darf der Task auf `in review`. Nutzt der
-Ablauf eine getrennte Abnahme, setze danach `testing`. Setze `shipped` erst nach nachweislich
-erfolgreicher Integration und `done` erst, wenn nichts mehr offen ist. Merge, Push, Commit oder
-PR nur, wenn der User dies beauftragt hat oder der laufende Auftrag es ausdrücklich umfasst.
-Referenziere dann die `custom_id` in Commit-/PR-Text.
+Ablauf eine getrennte Abnahme, setze danach `testing`.
+
+Führe die Umsetzung anschließend bis zum PR:
+
+1. Committe die Änderungen des Tasks mit seiner `custom_id` und pushe den Arbeitsbranch.
+2. Erstelle einen PR gegen den Zielbranch des Projekts oder aktualisiere den bestehenden PR
+   dieses Arbeitsbranches. Beschreibe Ergebnis, Prüfbelege und verbleibende Grenzen.
+3. Prüfe den veröffentlichten PR samt Head-Commit und verfügbarem Check-Status. Hinterlege
+   PR-Link, geprüften Commit, Gate-Ergebnisse und Review-Stand in ClickUp.
+4. Berichte den PR-Link und den tatsächlichen Prüf-/Boardstatus. Ein offener PR ist noch
+   nicht `shipped` oder `done`.
+
+Bei noch offenen Prüfungen oder Befunden veröffentliche den vorhandenen, reviewbaren Stand
+als Draft-PR und benenne die Blocker. Ist schon die Veröffentlichung technisch blockiert,
+melde den konkreten Blocker und den gesicherten lokalen Stand; behaupte keinen PR-Abschluss.
+Setze `shipped` erst nach nachweislich erfolgreicher Integration und `done` erst, wenn nichts
+mehr offen ist. Merge nur bei gesonderter Beauftragung.
 
 ## Grenzen
 
@@ -103,4 +120,6 @@ Referenziere dann die `custom_id` in Commit-/PR-Text.
 - Keine Statussprünge aufgrund bloßer Absicht.
 - Kein Rückwärtssetzen oder redundantes Status-Update.
 - Keine ungefragte Branch-/Worktree-Anlage.
+- Kein Abschluss nur mit lokalen Änderungen, einem Commit oder Push: Ziel bleibt der PR,
+  sofern der User den Auftrag nicht ausdrücklich einschränkt.
 - Keine „fertig“-Aussage allein aufgrund vorhandener Änderungen; aktuelle Prüfbelege nennen.

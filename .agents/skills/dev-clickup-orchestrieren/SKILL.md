@@ -1,6 +1,6 @@
 ---
 name: dev-clickup-orchestrieren
-description: Primary entry point whenever the user wants to implement, pick up, "umsetzen", or work through a task from the Lifeline-Hub ClickUp Entwicklungsboard, especially parent tasks with subtasks or requests using "mit subagents", "ultracode", "als Workflow", "automode", or "mach alle Subtasks". Orchestrates scope, design, development, review, and forward-only ClickUp status updates, invoking dev-clickup-ausfuehren for each concrete task. Not for capturing new tasks; use clickup-task-anlegen.
+description: Orchestrate Lifeline-Hub ClickUp development tasks through scope, implementation, review, and published pull requests, especially parent tasks with subtasks or requested subagents. Invoke dev-clickup-ausfuehren per concrete task and keep board status moving forward. Not for capturing new work; use clickup-task-anlegen.
 ---
 
 # ClickUp-Task orchestrieren (Lifeline Hub)
@@ -12,6 +12,11 @@ Dies ist der primäre Einstieg für die Umsetzung eines Tasks vom Entwicklungsbo
 besitzt Entscheidungen, User-Checkpoints, Workspace und Integration. Codex-Subagenten
 übernehmen klar begrenzte Lese-, Entwurfs- und Review-Aufträge. Die Ausführung eines einzelnen
 (Sub-)Tasks folgt `dev-clickup-ausfuehren`; Statusspur und Branchregeln werden nicht dupliziert.
+
+**Die Orchestrierung endet mit veröffentlichten PRs für den beauftragten Umfang.** Commit,
+Push und PR-Erstellung sind Teil der Umsetzung und werden ohne zusätzliche Nachfrage vom
+Main-Agent ausgeführt. Nur eine ausdrückliche Einschränkung des Users ändert dieses Ziel;
+ein Merge braucht weiterhin einen gesonderten Auftrag.
 
 Lies für konkrete Prompts und Koordination
 `references/codex-agent-bausteine.md`, sobald eine Fan-out-Phase beginnt.
@@ -33,7 +38,7 @@ Lies für konkrete Prompts und Koordination
 
 Lege zu Beginn mit dem Codex-Planwerkzeug diese Phasen an und halte sie aktuell:
 
-`Laden → Scope → Design → Entwicklung → Review → Abschluss`
+`Laden → Scope → Design → Entwicklung → Review → PR und Abschluss`
 
 Es darf höchstens eine Phase `in_progress` sein. Ein Plan ist Fortschrittsanzeige, kein Ersatz
 für Boardstatus oder Prüfbelege.
@@ -107,16 +112,25 @@ Bestätigte Findings gehen zurück in die Entwicklungsphase. Danach führt der M
 frischen Verifikationsbefehle aus und entscheidet anhand realer Ergebnisse über `in review`
 und gegebenenfalls `testing`.
 
-## Phase 5: Abschluss
+## Phase 5: PR und Abschluss
 
-- Integriere nur, wenn der User Merge/Commit/PR beauftragt hat oder dies ausdrücklich zum
-  laufenden Auftrag gehört.
+- Führe jeden beauftragten Teil nach dem PR-Abschluss aus `dev-clickup-ausfuehren` bis zu
+  einem veröffentlichten PR. Zusammengehörige Änderungen dürfen einen gemeinsamen PR
+  tragen; unabhängige Arbeitsbranches bekommen eigene PRs. Vorhandene PRs werden aktualisiert.
+- Der Main-Agent committet, pusht und erstellt die PRs. Ein Agenten-Handoff, lokale Änderungen
+  oder grüne Tests allein beenden die Orchestrierung nicht. Offene Befunde/Prüfungen gehören
+  mit konkreten Blockern in einen Draft-PR; technische Veröffentlichungsblocker werden klar
+  als unvollständiger Abschluss gemeldet.
+- Prüfe PR-Link, Head-Commit und verfügbaren Check-Status. Hinterlege die zugehörigen Links,
+  Gate-Ergebnisse und Review-Stände in den ClickUp-Tasks und gegebenenfalls im Parent.
+- Merge nur bei gesondertem Auftrag des Users.
 - Setze einzelne Subtasks erst nach erfolgreicher Integration auf `shipped` und anschließend
   auf `done`, wenn wirklich nichts offen ist.
 - Setze den Parent erst auf `shipped`/`done`, wenn alle erforderlichen Subtasks diesen Stand
   erreicht haben.
 - Referenziere die jeweilige `custom_id` in Commits und PRs.
-- Berichte geänderte Dateien, ausgeführte Prüfungen, verbleibende Risiken und Boardstatus.
+- Berichte PR-Links, geänderte Dateien, ausgeführte Prüfungen, verbleibende Risiken und
+  Boardstatus.
 
 ## Checkpoints
 
@@ -139,4 +153,6 @@ nicht nur einen Phasenstatus.
 - Keine schreibenden Parallelagenten im selben Checkout.
 - Kein Agenten-Fan-out für triviale Arbeit ohne unabhängige Teilaufgaben.
 - Kein neuer Task: dafür `clickup-task-anlegen`.
+- Kein Abschluss ohne veröffentlichte PRs für den beauftragten Umfang, außer bei einer
+  ausdrücklichen Einschränkung des Users oder einem benannten Veröffentlichungsblocker.
 - Kein `shipped`/`done` ohne erfolgreiche Integration und aktuelle Prüfbelege.
