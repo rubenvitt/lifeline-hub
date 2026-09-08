@@ -1,5 +1,5 @@
 // frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx
-import { Tabs } from 'antd';
+import { Spin, Tabs } from 'antd';
 import { useCallback, useState } from 'react';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
@@ -13,16 +13,18 @@ export interface EtbEntwurfsTabsProps {
   erfassen: (e: NeuerEintrag) => Promise<void>;
   bausteine: EtbBaustein[];
   einsatz: EinsatzAnzeige;
+  /** Eine laufende Detail-Abfrage muss vor der ersten Vorbelegung ankommen. */
+  kontextLaedt?: boolean;
   /** Zustand des Schalters „Werte behalten". Liegt beim Aufrufer — s. Kommentar unten. */
   werteBehalten: boolean;
   onWerteBehaltenChange: (b: boolean) => void;
 }
 
 export default function EtbEntwurfsTabs({
-  einsatzId, erfassen, bausteine, einsatz, werteBehalten, onWerteBehaltenChange,
+  einsatzId, erfassen, bausteine, einsatz, kontextLaedt = false, werteBehalten, onWerteBehaltenChange,
 }: EtbEntwurfsTabsProps) {
   const { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen } =
-    useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle);
+    useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle, kontextLaedt);
 
   /**
    * Wertübernahme über die Remount-Grenze (LFH-332/H61).
@@ -83,6 +85,10 @@ export default function EtbEntwurfsTabs({
         />
       ) : null,
   }));
+
+  // Auch „+“ wartet auf die Initialisierung, sonst überschriebe das Laden einen
+  // währenddessen angelegten und womöglich bereits bearbeiteten Tab.
+  if (entwuerfe.length === 0) return <Spin aria-label="ETB-Entwürfe werden geladen" />;
 
   return (
     <Tabs

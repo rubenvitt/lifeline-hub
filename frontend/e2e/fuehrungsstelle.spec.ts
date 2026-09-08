@@ -21,14 +21,40 @@ for (const breite of [1280, 390]) {
     await page.goto(einsatzdatenPfad(a));
     await page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` }).click();
     const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true })).toBeFocused();
+    expect(await dialog.getByRole('button', { name: 'Speichern', exact: true })
+      .evaluate((knopf) => knopf.closest('form') !== null)).toBe(true);
     await dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }).fill('Florian A');
     await page.screenshot({ path: testInfo.outputPath('fuehrungsstelle-pflegen.png'), animations: 'disabled' });
-    await dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }).press('Enter');
-    await expect(dialog).not.toBeVisible();
-    await expect(page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` })).toHaveText('Florian A');
+    // LFH-461 Review: der Detail-Refetch nach dem Speichern kommt erst an,
+    // nachdem über die SPA-Navigation das ETB mit seinem alten Cache geöffnet ist.
+    let freigeben!: () => void;
+    const antwort = new Promise<void>((resolve) => { freigeben = resolve; });
+    let angefragt!: () => void;
+    const anfrage = new Promise<void>((resolve) => { angefragt = resolve; });
+    const detailRoute = `**/api/einsaetze/${a}`;
+    await page.route(detailRoute, async (route) => {
+      angefragt();
+      await antwort;
+      await route.continue();
+    });
+    try {
+      await dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }).press('Enter');
+      await expect(dialog).not.toBeVisible();
+      await expect(page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` })).toHaveText('Florian A');
+      await anfrage;
+      if (breite < 992) await page.getByRole('button', { name: 'Navigation öffnen', exact: true }).click();
+      await page.getByRole('button', { name: 'Erfassung', exact: true }).click();
+      await page.getByRole('button', { name: 'ETB', exact: true }).click();
+      await expect(page).toHaveURL(etbPfad(a));
+      await expect(page.getByLabel('ETB-Entwürfe werden geladen')).toBeVisible();
+      await expect(page.getByPlaceholder('Inhalt …')).toHaveCount(0);
+    } finally {
+      freigeben();
+    }
 
-    await page.goto(etbPfad(a));
     await expect(page.getByText('An: Florian A', { exact: true })).toBeVisible();
+    await page.unroute(detailRoute);
     await page.getByPlaceholder('Inhalt …').fill('Entwurf ohne Empfänger');
     await page.getByRole('button', { name: 'Aktionen zu An', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Entfernen', exact: true }).click();

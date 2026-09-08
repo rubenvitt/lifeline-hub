@@ -1,4 +1,4 @@
-import { Alert, App, Button, Form, Input, Modal, Popconfirm, Space } from 'antd';
+import { Alert, App, Button, Form, Input, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { listeBenutzer } from '../api/benutzer';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import KatalogTabelle from '../components/KatalogTabelle';
 import SektionHeader from '../components/SektionHeader';
+import { ErfassungsModal } from '../components/Erfassung';
 
 const ROLLEN: { value: EinsatzRolle; label: string }[] = [
   { value: 'einsatzleitung', label: 'Einsatzleitung' },
@@ -20,6 +21,38 @@ const ROLLEN: { value: EinsatzRolle; label: string }[] = [
 interface Props {
   einsatzId: number;
   darfVerwalten: boolean;
+  darfFuehrungsstelleVerwalten: boolean;
+}
+
+type StellenZiel = MitgliedAnzeige & { einsatzId: number };
+type StellenWerte = { fuehrungsstelle: string };
+
+function FuehrungsstelleModal({ mitglied, speichern, schliessen, laeuft, fehler }: {
+  mitglied: StellenZiel;
+  speichern: (werte: StellenWerte) => Promise<unknown>;
+  schliessen: () => void;
+  laeuft: boolean;
+  fehler: Error | null;
+}) {
+  const [form] = Form.useForm<StellenWerte>();
+  return (
+    <ErfassungsModal
+      offen
+      titel={`Führungsstelle für ${mitglied.anzeigename}`}
+      form={form}
+      initialValues={{ fuehrungsstelle: mitglied.fuehrungsstelle ?? '' }}
+      onErfassen={speichern}
+      onFertig={schliessen}
+      onAbbrechen={schliessen}
+      erfassenText="Speichern"
+      laeuft={laeuft}
+    >
+      <Form.Item name="fuehrungsstelle" label="Führungsstelle" extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt. Leer lassen entfernt die Vorbelegung.">
+        <Input maxLength={200} disabled={laeuft} />
+      </Form.Item>
+      {fehler && <Alert type="error" title={fehler.message} showIcon />}
+    </ErfassungsModal>
+  );
 }
 
 /**
@@ -38,32 +71,27 @@ interface Props {
  * die ist unten zu einem `minWidth` geworden. Das ist die Anpassung, die der Befund
  * verlangt; die Kartenform wäre eine Formänderung ohne Not.
  */
-export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props) {
+export default function MitgliederAbschnitt({ einsatzId, darfVerwalten, darfFuehrungsstelleVerwalten }: Props) {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [neuerBenutzer, setNeuerBenutzer] = useState<number | undefined>();
   const [neueRolle, setNeueRolle] = useState<EinsatzRolle>('fuehrungspersonal');
-  const [stelleZiel, setStelleZiel] = useState<(MitgliedAnzeige & { einsatzId: number }) | null>(null);
-  const [stelleWert, setStelleWert] = useState('');
+  const [stelleZiel, setStelleZiel] = useState<StellenZiel | null>(null);
 
   const stelleSetzen = useMutation({
-    mutationFn: ({ mitglied, wert }: { mitglied: MitgliedAnzeige & { einsatzId: number }; wert: string | null }) =>
+    mutationFn: ({ mitglied, wert }: { mitglied: StellenZiel; wert: string | null }) =>
       setzeMitglied(mitglied.einsatzId, mitglied.benutzer_id, mitglied.einsatz_rolle, wert),
     onSuccess: (liste, { mitglied }) => {
       qc.setQueryData(einsatzKeys.mitglieder(mitglied.einsatzId), liste);
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(mitglied.einsatzId) });
-      setStelleZiel((aktuell) => aktuell?.einsatzId === mitglied.einsatzId ? null : aktuell);
     },
   });
 
-  const stelleSpeichern = () => {
-    if (!stelleZiel || stelleZiel.einsatzId !== einsatzId || !darfVerwalten || stelleSetzen.isPending) return;
-    const wert = stelleWert.trim() || null;
-    if (wert === (stelleZiel.fuehrungsstelle ?? null)) {
-      setStelleZiel(null);
-      return;
-    }
-    stelleSetzen.mutate({ mitglied: stelleZiel, wert });
+  const stelleSpeichern = async ({ fuehrungsstelle }: StellenWerte) => {
+    if (!stelleZiel || stelleZiel.einsatzId !== einsatzId || !darfFuehrungsstelleVerwalten || stelleSetzen.isPending) return;
+    const wert = fuehrungsstelle.trim() || null;
+    if (wert === (stelleZiel.fuehrungsstelle ?? null)) return;
+    await stelleSetzen.mutateAsync({ mitglied: stelleZiel, wert });
   };
 
   const mitgliederQuery = useQuery({
@@ -100,14 +128,13 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
     {
       title: 'Führungsstelle',
       key: 'fuehrungsstelle',
-      render: (_, m) => darfVerwalten ? (
+      render: (_, m) => darfFuehrungsstelleVerwalten ? (
         <Button
           type="link"
           disabled={stelleSetzen.isPending}
           aria-label={`Führungsstelle für ${m.anzeigename} bearbeiten`}
           onClick={() => {
             stelleSetzen.reset();
-            setStelleWert(m.fuehrungsstelle ?? '');
             setStelleZiel({ ...m, einsatzId });
           }}
         >
@@ -194,31 +221,16 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
         columns={spalten}
         dataSource={mitglieder}
       />
-      <Modal
-        title={`Führungsstelle für ${stelleZiel?.anzeigename ?? ''}`}
-        open={stelleZiel !== null && stelleZiel.einsatzId === einsatzId && darfVerwalten}
-        onCancel={() => { if (!stelleSetzen.isPending) setStelleZiel(null); }}
-        onOk={stelleSpeichern}
-        okText="Speichern"
-        cancelText="Abbrechen"
-        confirmLoading={stelleSetzen.isPending}
-        cancelButtonProps={{ disabled: stelleSetzen.isPending }}
-        destroyOnHidden
-      >
-        <Form layout="vertical" onFinish={stelleSpeichern}>
-          <Form.Item label="Führungsstelle" htmlFor="mitglied-fuehrungsstelle" extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt. Leer lassen entfernt die Vorbelegung.">
-            <Input
-              id="mitglied-fuehrungsstelle"
-              autoFocus
-              maxLength={200}
-              value={stelleWert}
-              disabled={stelleSetzen.isPending}
-              onChange={(e) => setStelleWert(e.target.value)}
-            />
-          </Form.Item>
-          {stelleSetzen.isError && <Alert type="error" title={stelleSetzen.error.message} showIcon />}
-        </Form>
-      </Modal>
+      {stelleZiel !== null && stelleZiel.einsatzId === einsatzId && darfFuehrungsstelleVerwalten && (
+        <FuehrungsstelleModal
+          key={`${stelleZiel.einsatzId}:${stelleZiel.benutzer_id}`}
+          mitglied={stelleZiel}
+          speichern={stelleSpeichern}
+          schliessen={() => setStelleZiel((aktuell) => aktuell === stelleZiel ? null : aktuell)}
+          laeuft={stelleSetzen.isPending}
+          fehler={stelleSetzen.error}
+        />
+      )}
     </section>
   );
 }
