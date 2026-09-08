@@ -200,7 +200,11 @@ impl Einsatz {
 
     /// API-Darstellung inkl. der Einsatz-Rolle des abfragenden Benutzers
     /// (`None`, wenn dieser kein Mitglied ist).
-    pub fn anzeige(&self, meine_rolle: Option<String>) -> EinsatzAnzeige {
+    pub fn anzeige(
+        &self,
+        meine_rolle: Option<String>,
+        meine_fuehrungsstelle: Option<String>,
+    ) -> EinsatzAnzeige {
         EinsatzAnzeige {
             id: self.id,
             org_id: self.org_id,
@@ -223,6 +227,7 @@ impl Einsatz {
             anzahl_betroffene_initial: self.anzahl_betroffene_initial,
             retention_bis: self.retention_bis.clone(),
             meine_rolle,
+            meine_fuehrungsstelle,
         }
     }
 }
@@ -254,6 +259,9 @@ pub struct EinsatzAnzeige {
     pub retention_bis: Option<String>,
     #[schema(value_type = Option<EinsatzRolle>)]
     pub meine_rolle: Option<String>,
+    /// Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meine_fuehrungsstelle: Option<String>,
 }
 
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).
@@ -265,6 +273,8 @@ pub struct MitgliedAnzeige {
     #[sqlx(try_from = "String")]
     pub einsatz_rolle: EinsatzRolle,
     pub zugewiesen_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fuehrungsstelle: Option<String>,
 }
 
 #[cfg(test)]

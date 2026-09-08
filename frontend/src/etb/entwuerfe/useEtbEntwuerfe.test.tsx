@@ -24,6 +24,27 @@ afterEach(() => {
 });
 
 describe('useEtbEntwuerfe', () => {
+  it('LFH-461: nur der erste neue Entwurf bekommt die Stelle; Rerender und Folgeentwürfe nicht', async () => {
+    const { result, rerender } = renderHook(
+      ({ stelle }) => useEtbEntwuerfe(7, stelle),
+      { initialProps: { stelle: 'Florian Leitung' } },
+    );
+    await waitFor(() => expect(result.current.entwuerfe[0]?.an).toBe('Florian Leitung'));
+    const id = result.current.aktiverId!;
+    act(() => result.current.entwurfAktualisieren(id, { inhalt: 'Text', typ: 'meldung', metadaten: {} }));
+    rerender({ stelle: 'Andere Leitung' });
+    expect(result.current.entwuerfe[0].an).toBeUndefined();
+    await act(async () => { await result.current.entwurfSchliessen(id); });
+    expect(result.current.entwuerfe[0].an).toBeUndefined();
+  });
+
+  it.each(['Eigener Empfänger', undefined])('LFH-461: geladener Entwurf bleibt maßgeblich (%s)', async (an) => {
+    await entwurfSpeichern(entwurf({ an }));
+    const { result } = renderHook(() => useEtbEntwuerfe(7, 'Florian Leitung'));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    expect(result.current.entwuerfe[0].an).toBe(an);
+  });
+
   it('garantiert nach dem Laden mindestens einen (leeren) Entwurf', async () => {
     const { result } = renderHook(() => useEtbEntwuerfe(7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));

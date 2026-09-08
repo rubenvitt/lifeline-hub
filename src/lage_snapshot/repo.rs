@@ -239,7 +239,7 @@ pub async fn erzeuge(
         version: 1,
         stand_at: stand_at.clone(),
         org_default,
-        einsatz: einsatz.anzeige(None),
+        einsatz: einsatz.anzeige(None, None),
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
         // inkl_storniert=false: der Stand spiegelt das sichtbare Lagebild, nicht stornierte Schäden.

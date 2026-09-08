@@ -73,6 +73,31 @@ describe('TextAreaRef – Caret-Pfad', () => {
 // ---------------------------------------------------------------------------
 
 describe('Schnellerfassung', () => {
+  it('LFH-461: belegt An einmalig vor und setzt einen entfernten Chip bei Refetch nicht zurück', async () => {
+    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' } });
+    const { rerender } = renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.getByText('An: Florian Leitung')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
+    rerender(<Schnellerfassung {...p} einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Neue Leitung' }} />);
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
+  it.each(['Eigener Empfänger', undefined])('LFH-461: vorhandener Entwurf gewinnt auch mit leerem An (%s)', (an) => {
+    renderMitProviders(<Schnellerfassung {...props({
+      einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
+      initialWerte: { inhalt: 'Entwurf', typ: 'meldung', metadaten: { an } },
+    })} />);
+    expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
+    if (an) expect(screen.getByText('An: Eigener Empfänger')).toBeInTheDocument();
+    else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
+  it.each([undefined, null, '   '])('LFH-461: ohne gesetzte Stelle kein An-Chip (%s)', (stelle) => {
+    renderMitProviders(<Schnellerfassung {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: stelle } })} />);
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
   it('Enter sendet typ=meldung mit Inhalt; Feld danach leer', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);

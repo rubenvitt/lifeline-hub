@@ -8,7 +8,7 @@ import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { entwuerfeLaden, entwuerfeLeerenFuerTests } from './entwurfStore';
+import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './entwurfStore';
 import EtbEntwurfsTabs from './EtbEntwurfsTabs';
 
 const einsatz = { id: 7, bezeichnung: 'Test', stichwort: null, leitstellen_nr: null, einsatzort: null } as unknown as EinsatzAnzeige;
@@ -45,6 +45,68 @@ function MitSchalter(p: React.ComponentProps<typeof EtbEntwurfsTabs>) {
 }
 
 describe('EtbEntwurfsTabs', () => {
+  it('LFH-461: Folgeentwurf ohne Werte behalten bleibt auch nach Remount ohne An', async () => {
+    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' }, werteBehalten: false });
+    const ersteAnsicht = renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe(''));
+    ersteAnsicht.unmount();
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('');
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
+  it('LFH-461: nur den Standard-Chip entfernen überlebt auch den vollständigen Remount', async () => {
+    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' } });
+    const ersteAnsicht = renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+    ersteAnsicht.unmount();
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('');
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
+  it('LFH-461: echte Tabs belegen nur anfangs vor; Entfernen überlebt Tabwechsel und Kontext-Refetch', async () => {
+    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' } });
+    const { rerender } = renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
+    const ersterTab = screen.getAllByRole('tab')[0];
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
+    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+    await userEvent.click(ersterTab);
+    rerender(<EtbEntwurfsTabs {...p} einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Andere Leitung' }} />);
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
+  it.each([true, false])('LFH-461: nach Absenden entscheidet Werte behalten (%s)', async (behalten) => {
+    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' }, werteBehalten: behalten });
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Erste Meldung{Enter}');
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    if (behalten) expect(screen.getByText('An: Florian Leitung')).toBeInTheDocument();
+    else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
+  it('LFH-461: Wertübernahme befüllt keinen bereits vorhandenen Entwurf mit bewusst leerem An', async () => {
+    const basis = { einsatz_id: 7, typ: 'meldung' as const, erstellt_at: '2026-06-22T10:00:00Z', geaendert_at: '2026-06-22T10:00:00Z' };
+    await entwurfSpeichern({ ...basis, id: 'a', inhalt: 'Erster', an: 'Florian Leitung' });
+    await entwurfSpeichern({ ...basis, id: 'b', inhalt: 'Zweiter' });
+    localStorage.setItem('etb-entwurf-aktiv-7', 'a');
+    renderMitProviders(<EtbEntwurfsTabs {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Standard' } })} />);
+    expect(await screen.findByDisplayValue('Erster')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByDisplayValue('Zweiter')).toBeInTheDocument();
+    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  });
+
   it('öffnet mit einem leeren Entwurf-Tab und Eingabefeld', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     expect(await screen.findByPlaceholderText(/Inhalt/)).toBeInTheDocument();

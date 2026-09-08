@@ -1641,6 +1641,13 @@
               "null"
             ]
           },
+          "meine_fuehrungsstelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung."
+          },
           "meine_rolle": {
             "oneOf": [
               {
@@ -4209,6 +4216,12 @@
           },
           "einsatz_rolle": {
             "$ref": "#/components/schemas/EinsatzRolle"
+          },
+          "fuehrungsstelle": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "zugewiesen_at": {
             "type": "string"

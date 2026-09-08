@@ -84,7 +84,7 @@ pub async fn anlegen(
     .await?;
     Ok((
         StatusCode::CREATED,
-        Json(einsatz.anzeige(Some(EINSATZ_ROLLE_LEITUNG.to_string()))),
+        Json(einsatz.anzeige(Some(EINSATZ_ROLLE_LEITUNG.to_string()), None)),
     ))
 }
 
@@ -107,7 +107,10 @@ pub async fn detail(
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    Ok(Json(einsatz.anzeige(rolle.map(|r| r.as_str().to_string()))))
+    Ok(Json(einsatz.anzeige(
+        rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+    )))
 }
 
 /// POST /api/einsaetze/{id}/abschliessen — Einsatz abschließen (read-only).
@@ -123,9 +126,10 @@ pub async fn abschliessen(
     fordere_aktiv(&einsatz)?;
 
     let aktualisiert = repo::abschliessen(&state.pool, id, benutzer.id).await?;
-    Ok(Json(
-        aktualisiert.anzeige(rolle.map(|r| r.as_str().to_string())),
-    ))
+    Ok(Json(aktualisiert.anzeige(
+        rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+    )))
 }
 
 #[derive(Debug, Deserialize)]
@@ -170,7 +174,10 @@ pub async fn aufbewahrungsfrist_setzen(
     let alt = einsatz.retention_bis.as_deref();
     // Unverändert → kein UPDATE, kein Audit-Eintrag (kein Rauschen im ETB).
     if alt == neue_frist.as_deref() {
-        return Ok(Json(einsatz.anzeige(rolle.map(|r| r.as_str().to_string()))));
+        return Ok(Json(einsatz.anzeige(
+            rolle.map(|r| r.as_str().to_string()),
+            repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+        )));
     }
     if ist_fristverkuerzung(alt, neue_frist.as_deref()) && !req.bestaetigt {
         return Err(AppError::Conflict(
@@ -186,9 +193,10 @@ pub async fn aufbewahrungsfrist_setzen(
 
     let aktualisiert =
         repo::frist_setzen(&state.pool, id, benutzer.id, neue_frist.as_deref(), &audit).await?;
-    Ok(Json(
-        aktualisiert.anzeige(rolle.map(|r| r.as_str().to_string())),
-    ))
+    Ok(Json(aktualisiert.anzeige(
+        rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+    )))
 }
 
 #[derive(Debug, Deserialize)]
@@ -533,6 +541,8 @@ pub async fn modul_override_setzen(
 pub struct MitgliedRolle {
     /// 'einsatzleitung' | 'fuehrungspersonal' | 'beobachter'.
     pub einsatz_rolle: String,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub fuehrungsstelle: Option<Option<String>>,
 }
 
 /// GET /api/einsaetze/{id}/mitglieder — Mitgliederliste; gemäß DSGVO-Lese-Policy.
@@ -563,6 +573,16 @@ pub async fn mitglied_setzen(
 
     let neue_rolle = EinsatzRolle::parse(&req.einsatz_rolle)
         .ok_or_else(|| AppError::Validation("Ungültige einsatz_rolle".into()))?;
+    let fuehrungsstelle = support::trimme_tri(req.fuehrungsstelle);
+    if fuehrungsstelle
+        .as_ref()
+        .and_then(|s| s.as_ref())
+        .is_some_and(|s| s.chars().count() > 200)
+    {
+        return Err(AppError::Validation(
+            "Führungsstelle darf höchstens 200 Zeichen haben".into(),
+        ));
+    }
 
     // Ziel-Benutzer muss existieren, zur Organisation DIESES Einsatzes gehören und aktiv
     // sein. Der Org-Bezug gehört schon hierher (F05/LFH-232): der eigentliche Guard sitzt
@@ -596,7 +616,14 @@ pub async fn mitglied_setzen(
         }
     }
 
-    repo::setze_rolle(&state.pool, id, ziel_id, neue_rolle).await?;
+    repo::setze_mitgliedschaft(
+        &state.pool,
+        id,
+        ziel_id,
+        neue_rolle,
+        fuehrungsstelle.as_ref().map(|s| s.as_deref()),
+    )
+    .await?;
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
@@ -739,7 +766,8 @@ pub async fn aktualisieren(
     )
     .await?;
 
-    Ok(Json(
-        aktualisiert.anzeige(rolle.map(|r| r.as_str().to_string())),
-    ))
+    Ok(Json(aktualisiert.anzeige(
+        rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+    )))
 }
