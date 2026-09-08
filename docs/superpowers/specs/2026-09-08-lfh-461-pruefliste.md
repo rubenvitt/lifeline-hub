@@ -25,7 +25,7 @@ sie im bestehenden Abschnitt „Zugriff“ über ein Formular mit einem Feld.
 - Freitext wird bei der Einsatz-Schwärzung gelöscht; andere Einsätze bleiben
   unverändert. Ohne gesetzte Stelle erscheint kein An-Chip.
 
-## Prüfbelege vom 08.09.2026
+## Prüfbelege der ursprünglichen Umsetzung vom 08.09.2026
 
 Alle nachfolgenden Prüfungen endeten mit Exit 0. Rust-Kommandos liefen über
 `scripts/lib/dev-env.sh` / `ohne_dev_env`; Frontend-Kommandos im Verzeichnis
@@ -69,8 +69,52 @@ Das gezielte Re-Review hat beide Korrekturen freigegeben und keine belegte neue
 Regression gefunden. Die unveränderten jsdom-/antd-Warnungen wurden nicht als
 bestandene Assertions gezählt.
 
+## Nacharbeit nach Merge von PR #19
+
+PR #19 wurde am 08.09.2026 um 18:38:50 UTC als `fd435f50` integriert. Das
+GitHub-Review traf um 18:42:15 UTC ein. Alle drei Befunde sind bestätigt:
+
+1. Ein gecachter Einsatz wurde beim ersten ETB-Mount als endgültige Vorbelegung
+   festgehalten, obwohl die Detail-Invalidierung nach dem Stellen-Speichern noch
+   lief. Jetzt wartet die Initialisierung auf den laufenden Abruf. Danach schützt
+   der Initialisierungsmerker die Entwürfe gegen Refetches. Auch eine verspätete
+   IndexedDB-Antwort darf keine aktuellere Initialisierung überschreiben.
+2. Der Stellen-Editor verwendete die allgemeine Admin-Ausnahme. Er verlangt jetzt
+   zusätzlich die tatsächliche Einsatzleitungsrolle, wie `mitglied_setzen` im
+   Backend. Die übrigen Verwaltungsaktionen sind nicht Gegenstand dieses Fixes.
+3. Der Editor verwendet jetzt `ErfassungsModal` mit eigener Formularinstanz und
+   `mutateAsync`. Der Absende-Knopf liegt im Formular; Fokus, Reset und Abbruch
+   folgen dem Primitiv. Ein Einsatz-Key trennt die Mitgliederverwaltung beim
+   Routenwechsel; verspätete Antworten aktualisieren nur ihren ursprünglichen
+   Cache und schließen keinen neuen Dialog.
+
+**RED:** `rtk proxy node node_modules/vitest/vitest.mjs run
+src/pages/MitgliederAbschnitt.test.tsx src/pages/EinsatzdatenPage.test.tsx
+src/pages/EtbPage.test.tsx -t 'LFH-461' --reporter=dot` (in `frontend`): Exit 1,
+6 rot / 4 grün / 46 ausgelassen. Nachweis: falsche bzw. fehlende Vorbelegung trotz
+Refetch, sichtbare Editor-Knöpfe für drei Nicht-Leitungsrollen eines System-Admins,
+Absende-Knopf außerhalb des Formulars.
+
+**GREEN:** folgende aktuelle Prüfungen endeten mit Exit 0:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Vitest: `src/etb/entwuerfe`, `Schnellerfassung.test.tsx`, `MitgliederAbschnitt.test.tsx`, `EinsatzdatenPage.test.tsx`, `EtbPage.test.tsx`, `Erfassung.test.tsx`, Schreibrecht-/Dichte-/Aktionsabstands-Guards | 199 Tests in 12 Dateien |
+| Playwright: `fuehrungsstelle.spec.ts`, `etb-entwurf-tabs.spec.ts` | 4 Fälle; verzögerter Detailabruf + echte SPA-Navigation bei 1280/390 px, Fokus und Enter, Entfernen und Reload |
+| `node node_modules/typescript/bin/tsc --noEmit` | grün |
+| `node node_modules/eslint/bin/eslint.js . --max-warnings 0` | grün |
+| `antd lint frontend/src/pages/MitgliederAbschnitt.tsx --format json` | keine Befunde |
+| `node node_modules/vite/bin/vite.js build` | grün |
+| `cargo build` via `ohne_dev_env` | grün; eigene Binary-Kopie für den Browserlauf |
+| `git diff --check` | grün |
+
+Das unabhängige, lesende Review der Nacharbeit gab den Diff ohne belegte Findings
+frei. Rust-Code, Migration und generierte API-Typen bleiben unverändert; die oben
+stehenden Rust-/Codegen-Testzahlen gehören zur ursprünglichen Umsetzung.
+
 ## Abschlussgrenze
 
 Gezielte Task-Verifikation; kein Lauf des gesamten `scripts/check-all.sh` und
-kein Dependency-Audit. Der PR bleibt bis zur Integration offen. Kein Merge im
-Rahmen dieses Auftrags.
+kein Dependency-Audit. PR #19 ist bereits integriert; der Folge-PR für die nach
+dem Merge eingegangenen Review-Befunde bleibt bis zu seiner Integration offen.
+Kein Merge des Folge-PRs im Rahmen dieses Auftrags.

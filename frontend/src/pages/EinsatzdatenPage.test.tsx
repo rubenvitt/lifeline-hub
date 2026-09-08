@@ -61,6 +61,20 @@ function setup(opts: SetupOpts = {}) {
   );
 }
 
+describe('Führungsstellen-Berechtigung', () => {
+  it.each([null, 'beobachter', 'fuehrungspersonal'] as const)('LFH-461 Review: System-Admin mit Einsatzrolle %s darf keine Führungsstelle bearbeiten', async (meine_rolle) => {
+    setup({ einsatz: { meine_rolle } });
+    await screen.findByText('Frank Führung');
+    expect(screen.queryAllByRole('button', { name: /Führungsstelle für/ })).toHaveLength(0);
+  });
+
+  it('LFH-461 Review: aktive Einsatzleitung darf die Führungsstelle bearbeiten', async () => {
+    setup({ benutzer: { ...admin, system_rolle: 'keiner' } });
+    expect(await screen.findByRole('button', { name: 'Führungsstelle für Frank Führung bearbeiten' })).toBeInTheDocument();
+  });
+
+});
+
 describe('Alarmzeit-Wandlung (Wire ↔ Picker)', () => {
   it('liest den Wirestring als UTC — geprüft am absoluten Instant, nicht an der Wanduhrzeit', () => {
     // Die Assertion prüft den INSTANT, nicht das Format: `Date.UTC(...)` ist in jeder

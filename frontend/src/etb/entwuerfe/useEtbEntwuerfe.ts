@@ -20,9 +20,10 @@ function leererEntwurf(einsatzId: number, metadaten: MetadatenWerte = {}, vorbel
 }
 
 /** Der Aufrufer montiert je Einsatz neu (key=einsatzId). */
-export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | null) {
-  // Refetches dürfen weder neu laden noch einen entfernten Chip wieder einsetzen.
-  const [anfangsEmpfaenger] = useState(() => fuehrungsstelle?.trim());
+export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | null, kontextLaedt = false) {
+  // Erst beim Initialisieren festhalten: beim Mount kann noch ein alter Einsatz aus
+  // dem Query-Cache vorliegen. Spätere Refetches dürfen den Entwurf nicht neu laden.
+  const anfangsEmpfaenger = useRef<string | undefined>(undefined);
   const [entwuerfe, setEntwuerfe] = useState<EtbEntwurf[]>([]);
   const [aktiverId, setAktiverId] = useState<string | null>(null);
   const initialisiert = useRef(false);
@@ -33,14 +34,15 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
   entwuerfeRef.current = entwuerfe;
 
   useEffect(() => {
+    if (initialisiert.current || kontextLaedt) return;
     let abgebrochen = false;
-    initialisiert.current = false;
     void (async () => {
       const geladen = await entwuerfeLaden(einsatzId);
       if (abgebrochen || initialisiert.current) return;
       initialisiert.current = true;
+      anfangsEmpfaenger.current = fuehrungsstelle?.trim();
       if (geladen.length === 0) {
-        const leer = leererEntwurf(einsatzId, anfangsEmpfaenger ? { an: anfangsEmpfaenger } : {}, !!anfangsEmpfaenger);
+        const leer = leererEntwurf(einsatzId, anfangsEmpfaenger.current ? { an: anfangsEmpfaenger.current } : {}, !!anfangsEmpfaenger.current);
         setEntwuerfe([leer]);
         setAktiverId(leer.id);
         return;
@@ -51,7 +53,7 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
       setAktiverId(gueltig ? gemerkt! : geladen[0].id);
     })();
     return () => { abgebrochen = true; };
-  }, [einsatzId, anfangsEmpfaenger]);
+  }, [einsatzId, fuehrungsstelle, kontextLaedt]);
 
   // Bewusst leere Zustände nach Entfernen/Absenden/+ bleiben erhalten. Unberührte
   // Anfangsdefaults haben An und werden weiterhin NICHT beim Mount gespeichert.
@@ -73,10 +75,10 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
   }, [einsatzId]);
 
   const neuerEntwurf = useCallback((metadaten: MetadatenWerte = {}) => {
-    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger);
+    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
     setEntwuerfe((prev) => [...prev, leer]);
     aktivenSetzen(leer.id);
-  }, [einsatzId, aktivenSetzen, anfangsEmpfaenger]);
+  }, [einsatzId, aktivenSetzen]);
 
   const entwurfAktualisieren = useCallback((id: string, werte: EntwurfWerte) => {
     const patch = werteZuPatch(werte);
@@ -106,7 +108,7 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
     // Zustandsänderungen während des vorausgehenden await (neuer Tab / paralleles
     // Schließen) und chainen korrekt — ein Closure-Snapshot überschriebe den aktuellen
     // State und ließe einen Zombie-Tab zurück.
-    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger);
+    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
     let naechsteListe: EtbEntwurf[] = [];
     setEntwuerfe((prev) => {
       const rest = prev.filter((e) => e.id !== id);
@@ -120,7 +122,7 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
       localStorage.setItem(aktivKey(einsatzId), naechster);
       return naechster;
     });
-  }, [einsatzId, anfangsEmpfaenger]);
+  }, [einsatzId]);
 
   return { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen };
 }

@@ -24,6 +24,22 @@ afterEach(() => {
 });
 
 describe('useEtbEntwuerfe', () => {
+  it('LFH-461 Review: Kontextwechsel während IndexedDB lädt verwendet die aktuelle Stelle', async () => {
+    let freigeben!: (werte: EtbEntwurf[]) => void;
+    const laden = vi.spyOn(entwurfStore, 'entwuerfeLaden')
+      .mockReturnValueOnce(new Promise<EtbEntwurf[]>((resolve) => { freigeben = resolve; }));
+    const { result, rerender } = renderHook(
+      ({ stelle }) => useEtbEntwuerfe(7, stelle),
+      { initialProps: { stelle: 'Alter Cache' } },
+    );
+    await waitFor(() => expect(laden).toHaveBeenCalledTimes(1));
+    rerender({ stelle: 'Neue Leitung' });
+    await waitFor(() => expect(result.current.entwuerfe[0]?.an).toBe('Neue Leitung'));
+    await act(async () => { freigeben([]); });
+    expect(result.current.entwuerfe).toHaveLength(1);
+    expect(result.current.entwuerfe[0].an).toBe('Neue Leitung');
+  });
+
   it('LFH-461: nur der erste neue Entwurf bekommt die Stelle; Rerender und Folgeentwürfe nicht', async () => {
     const { result, rerender } = renderHook(
       ({ stelle }) => useEtbEntwuerfe(7, stelle),
