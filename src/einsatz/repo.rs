@@ -132,6 +132,22 @@ pub async fn rolle_von(
     Ok(rolle.and_then(|s| EinsatzRolle::parse(&s)))
 }
 
+/// Eigene Führungsstelle, ausdrücklich auf Benutzer UND Einsatz begrenzt.
+pub async fn fuehrungsstelle_von(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    benutzer_id: i64,
+) -> Result<Option<String>, AppError> {
+    let stelle: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT fuehrungsstelle FROM einsatz_mitgliedschaft WHERE einsatz_id = ? AND benutzer_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(benutzer_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(stelle.flatten())
+}
+
 /// Alle für den Benutzer lesbaren Einsätze, annotiert mit dessen Rolle
 /// (`meine_rolle`). Die DSGVO-Lese-Policy (`darf_lesen`) filtert Einsätze,
 /// die der Benutzer nicht sehen darf, vor der Rückgabe heraus.
@@ -165,6 +181,7 @@ pub async fn liste_fuer(
         retention_bis: Option<String>,
         geloescht_at: Option<String>,
         meine_rolle: Option<String>,
+        meine_fuehrungsstelle: Option<String>,
     }
 
     let rows = sqlx::query_as::<_, Row>(
@@ -173,7 +190,7 @@ pub async fn liste_fuer(
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.geloescht_at, \
-                m.einsatz_rolle AS meine_rolle \
+                m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
@@ -221,6 +238,7 @@ pub async fn liste_fuer(
             anzahl_betroffene_initial: r.anzahl_betroffene_initial,
             retention_bis: r.retention_bis,
             meine_rolle: r.meine_rolle,
+            meine_fuehrungsstelle: r.meine_fuehrungsstelle,
         })
         .collect())
 }
@@ -677,7 +695,7 @@ pub async fn mitglieder(
     einsatz_id: i64,
 ) -> Result<Vec<MitgliedAnzeige>, AppError> {
     sqlx::query_as::<_, MitgliedAnzeige>(
-        "SELECT m.benutzer_id, b.anzeigename, b.benutzername, m.einsatz_rolle, m.zugewiesen_at \
+        "SELECT m.benutzer_id, b.anzeigename, b.benutzername, m.einsatz_rolle, m.zugewiesen_at, m.fuehrungsstelle \
          FROM einsatz_mitgliedschaft m \
          JOIN benutzer b ON b.id = m.benutzer_id \
          WHERE m.einsatz_id = ? \
@@ -696,21 +714,36 @@ pub async fn setze_rolle(
     benutzer_id: i64,
     rolle: EinsatzRolle,
 ) -> Result<(), AppError> {
+    setze_mitgliedschaft(pool, einsatz_id, benutzer_id, rolle, None).await
+}
+
+/// Rolle und optional die Führungsstelle in EINEM Statement aktualisieren.
+/// Fehlendes Feld erhält den Bestand; explizites null löscht die Stelle.
+pub async fn setze_mitgliedschaft(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    rolle: EinsatzRolle,
+    fuehrungsstelle: Option<Option<&str>>,
+) -> Result<(), AppError> {
     // Org-Guard IM SQL (F05/LFH-232), nicht im Handler: dies ist einer von nur zwei
     // produktiven INSERTs in `einsatz_mitgliedschaft` und damit ein Chokepoint der
     // Mandanten-Grenze. Eine org-fremde Mitgliedschaft würde die Isolation aus LFH-115
     // vollständig aushebeln — `darf_lesen` prüft bei vorhandener Rolle die Org nicht mehr.
     // Als `WHERE EXISTS` kann kein künftiger Aufrufer den Check vergessen.
     let betroffen = sqlx::query(
-        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
-         SELECT ?1, ?2, ?3 \
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle) \
+         SELECT ?1, ?2, ?3, ?4 \
          WHERE EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
                        WHERE b.id = ?2 AND b.org_id = e.org_id) \
-         ON CONFLICT(einsatz_id, benutzer_id) DO UPDATE SET einsatz_rolle = excluded.einsatz_rolle",
+         ON CONFLICT(einsatz_id, benutzer_id) DO UPDATE SET einsatz_rolle = excluded.einsatz_rolle, \
+         fuehrungsstelle = CASE WHEN ?5 THEN excluded.fuehrungsstelle ELSE einsatz_mitgliedschaft.fuehrungsstelle END",
     )
     .bind(einsatz_id)
     .bind(benutzer_id)
     .bind(rolle.as_str())
+    .bind(fuehrungsstelle.flatten())
+    .bind(fuehrungsstelle.is_some())
     .execute(pool)
     .await?
     .rows_affected();

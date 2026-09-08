@@ -564,6 +564,8 @@ export interface components {
             /** Format: int64 */
             id: number;
             leitstellen_nr?: string | null;
+            /** @description Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung. */
+            meine_fuehrungsstelle?: string | null;
             meine_rolle?: null | components["schemas"]["EinsatzRolle"];
             meldende_stelle?: string | null;
             /** Format: int64 */
@@ -1442,6 +1444,7 @@ export interface components {
             benutzer_id: number;
             benutzername: string;
             einsatz_rolle: components["schemas"]["EinsatzRolle"];
+            fuehrungsstelle?: string | null;
             zugewiesen_at: string;
         };
         /**

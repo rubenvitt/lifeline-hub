@@ -1,19 +1,28 @@
 // frontend/src/etb/entwuerfe/useEtbEntwuerfe.ts
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EntwurfWerte, EtbEntwurf } from './entwurfModell';
-import { istLeer, werteZuPatch } from './entwurfModell';
+import { istLeer, werteZuPatch, zuWerte } from './entwurfModell';
 import { entwuerfeLaden, entwurfEntfernen, entwurfSpeichern } from './entwurfStore';
+import type { MetadatenWerte } from '../schnellerfassungModell';
 
 function aktivKey(einsatzId: number): string {
   return `etb-entwurf-aktiv-${einsatzId}`;
 }
 
-function leererEntwurf(einsatzId: number): EtbEntwurf {
+function leererEntwurf(einsatzId: number, metadaten: MetadatenWerte = {}, vorbelegungGeprueft = false): EtbEntwurf {
   const jetzt = new Date().toISOString();
-  return { id: crypto.randomUUID(), einsatz_id: einsatzId, inhalt: '', typ: 'meldung', erstellt_at: jetzt, geaendert_at: jetzt };
+  return {
+    id: crypto.randomUUID(), einsatz_id: einsatzId,
+    ...werteZuPatch({ inhalt: '', typ: 'meldung', metadaten }),
+    ...(vorbelegungGeprueft ? { an_vorbelegung_geprueft: true as const } : {}),
+    erstellt_at: jetzt, geaendert_at: jetzt,
+  };
 }
 
-export function useEtbEntwuerfe(einsatzId: number) {
+/** Der Aufrufer montiert je Einsatz neu (key=einsatzId). */
+export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | null) {
+  // Refetches dürfen weder neu laden noch einen entfernten Chip wieder einsetzen.
+  const [anfangsEmpfaenger] = useState(() => fuehrungsstelle?.trim());
   const [entwuerfe, setEntwuerfe] = useState<EtbEntwurf[]>([]);
   const [aktiverId, setAktiverId] = useState<string | null>(null);
   const initialisiert = useRef(false);
@@ -31,7 +40,7 @@ export function useEtbEntwuerfe(einsatzId: number) {
       if (abgebrochen || initialisiert.current) return;
       initialisiert.current = true;
       if (geladen.length === 0) {
-        const leer = leererEntwurf(einsatzId);
+        const leer = leererEntwurf(einsatzId, anfangsEmpfaenger ? { an: anfangsEmpfaenger } : {}, !!anfangsEmpfaenger);
         setEntwuerfe([leer]);
         setAktiverId(leer.id);
         return;
@@ -42,18 +51,32 @@ export function useEtbEntwuerfe(einsatzId: number) {
       setAktiverId(gueltig ? gemerkt! : geladen[0].id);
     })();
     return () => { abgebrochen = true; };
-  }, [einsatzId]);
+  }, [einsatzId, anfangsEmpfaenger]);
+
+  // Bewusst leere Zustände nach Entfernen/Absenden/+ bleiben erhalten. Unberührte
+  // Anfangsdefaults haben An und werden weiterhin NICHT beim Mount gespeichert.
+  // Erst nach dem Commit sichern: ein beim Schließen verworfener Ersatzentwurf
+  // darf nicht als Zombie in IndexedDB landen (auch bei parallelem Schließen).
+  const leerGesichert = useRef(new WeakSet<EtbEntwurf>());
+  useEffect(() => {
+    for (const e of entwuerfe) {
+      if (e.an_vorbelegung_geprueft && istLeer(zuWerte(e)) && !leerGesichert.current.has(e)) {
+        leerGesichert.current.add(e);
+        void entwurfSpeichern(e);
+      }
+    }
+  }, [entwuerfe]);
 
   const aktivenSetzen = useCallback((id: string) => {
     setAktiverId(id);
     localStorage.setItem(aktivKey(einsatzId), id);
   }, [einsatzId]);
 
-  const neuerEntwurf = useCallback(() => {
-    const leer = leererEntwurf(einsatzId);
+  const neuerEntwurf = useCallback((metadaten: MetadatenWerte = {}) => {
+    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger);
     setEntwuerfe((prev) => [...prev, leer]);
     aktivenSetzen(leer.id);
-  }, [einsatzId, aktivenSetzen]);
+  }, [einsatzId, aktivenSetzen, anfangsEmpfaenger]);
 
   const entwurfAktualisieren = useCallback((id: string, werte: EntwurfWerte) => {
     const patch = werteZuPatch(werte);
@@ -67,13 +90,13 @@ export function useEtbEntwuerfe(einsatzId: number) {
     // statt doppelt (LFH-216).
     if (!bestand) return;
     if (istLeer(werte)) {
-      void entwurfEntfernen(id);
+      if (!bestand.an_vorbelegung_geprueft) void entwurfEntfernen(id);
     } else {
       void entwurfSpeichern({ ...bestand, ...patch, geaendert_at });
     }
   }, []);
 
-  const entwurfSchliessen = useCallback(async (id: string) => {
+  const entwurfSchliessen = useCallback(async (id: string, metadaten: MetadatenWerte = {}) => {
     await entwurfEntfernen(id);
     // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode
     // (Dev-Server / e2e) werden Updater doppelt invoked — eine IM Updater erzeugte
@@ -83,7 +106,7 @@ export function useEtbEntwuerfe(einsatzId: number) {
     // Zustandsänderungen während des vorausgehenden await (neuer Tab / paralleles
     // Schließen) und chainen korrekt — ein Closure-Snapshot überschriebe den aktuellen
     // State und ließe einen Zombie-Tab zurück.
-    const leer = leererEntwurf(einsatzId);
+    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger);
     let naechsteListe: EtbEntwurf[] = [];
     setEntwuerfe((prev) => {
       const rest = prev.filter((e) => e.id !== id);
@@ -97,7 +120,7 @@ export function useEtbEntwuerfe(einsatzId: number) {
       localStorage.setItem(aktivKey(einsatzId), naechster);
       return naechster;
     });
-  }, [einsatzId]);
+  }, [einsatzId, anfangsEmpfaenger]);
 
   return { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen };
 }

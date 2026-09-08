@@ -13,6 +13,9 @@ export interface EtbEntwurf {
   typ: EtbTyp;
   von?: string;
   an?: string;
+  /** LFH-461: An-Default wurde bereits berücksichtigt. Ein danach bewusst leerer
+   * Entwurf muss Remount/Reload überleben, sonst würde An erneut vorbelegt. */
+  an_vorbelegung_geprueft?: true;
   meldeweg?: MeldeWeg;
   veranlassung?: string;
   ereigniszeit?: string;

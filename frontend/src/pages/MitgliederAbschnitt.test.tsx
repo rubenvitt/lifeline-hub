@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { ConfigProvider } from 'antd';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
@@ -18,6 +19,68 @@ function mitglied(over: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('MitgliederAbschnitt', () => {
+  it('LFH-461: ein offener Dialog wird beim Einsatzwechsel geschlossen', async () => {
+    server.use(
+      http.get('/api/einsaetze/:id/mitglieder', () => HttpResponse.json([mitglied()])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+    );
+    const ansicht = (id: number) => <ConfigProvider theme={{ token: { motion: false } }}><MitgliederAbschnitt einsatzId={id} darfVerwalten /></ConfigProvider>;
+    const { rerender } = renderMitProviders(ansicht(7));
+    await userEvent.click(await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Führungsstelle' }), 'Stelle in Einsatz 7');
+    rerender(ansicht(8));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('LFH-461: Leitung pflegt und leert die Führungsstelle über die Mitglieder-API', async () => {
+    let stelle: string | null = null;
+    const gespeichert: unknown[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied({ fuehrungsstelle: stelle })])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/mitglieder/2', async ({ request }) => {
+        const body = await request.json() as { fuehrungsstelle: string | null };
+        gespeichert.push(body);
+        stelle = body.fuehrungsstelle;
+        return HttpResponse.json([mitglied({ fuehrungsstelle: stelle })]);
+      }),
+    );
+    // jsdom liefert kein animationend für den Modal-Abbau.
+    renderMitProviders(<ConfigProvider theme={{ token: { motion: false } }}><MitgliederAbschnitt einsatzId={7} darfVerwalten /></ConfigProvider>);
+    await userEvent.click(await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Führungsstelle' }), 'Florian Leitung');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(gespeichert).toEqual([{ einsatz_rolle: 'fuehrungspersonal', fuehrungsstelle: 'Florian Leitung' }]);
+    expect(screen.getByText('Florian Leitung')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }));
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Führungsstelle' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(gespeichert).toHaveLength(2));
+    expect(gespeichert[1]).toEqual({ einsatz_rolle: 'fuehrungspersonal', fuehrungsstelle: null });
+  });
+
+  it('LFH-461: ohne Verwaltungsrecht ist die Führungsstelle nur lesbar', async () => {
+    server.use(http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied({ fuehrungsstelle: 'Florian Leitung' })])));
+    renderMitProviders(<MitgliederAbschnitt einsatzId={7} darfVerwalten={false} />);
+    expect(await screen.findByText('Florian Leitung')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Führungsstelle/ })).not.toBeInTheDocument();
+  });
+
+  it('LFH-461: fehlgeschlagenes Speichern hält Eingabe und Fehler im Dialog', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/mitglieder/2', () => HttpResponse.json({ error: 'Einsatz abgeschlossen' }, { status: 409 })),
+    );
+    renderMitProviders(<MitgliederAbschnitt einsatzId={7} darfVerwalten />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Führungsstelle' }), 'Florian Leitung');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Einsatz abgeschlossen');
+    expect(screen.getByRole('textbox', { name: 'Führungsstelle' })).toHaveValue('Florian Leitung');
+  });
+
   it('zeigt vorhandene Mitglieder', async () => {
     server.use(
       http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),

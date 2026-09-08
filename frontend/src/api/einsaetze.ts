@@ -41,9 +41,11 @@ export function setzeMitglied(
   id: number,
   benutzerId: number,
   rolle: EinsatzRolle,
+  fuehrungsstelle?: string | null,
 ): Promise<MitgliedAnzeige[]> {
   return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder/${benutzerId}`, 'PUT', {
     einsatz_rolle: rolle,
+    ...(fuehrungsstelle !== undefined ? { fuehrungsstelle } : {}),
   });
 }
 

@@ -79,7 +79,15 @@ export default function Schnellerfassung({
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
-  const [metadaten, setMetadaten] = useState<MetadatenWerte>(initialWerte?.metadaten ?? {});
+  // Nur beim ersten Mount ohne Entwurf vorbelegen. Auch ein bewusst leeres
+  // Entwurfsfeld gewinnt; Berichtigungen übernehmen ausschließlich das Original.
+  const [metadaten, setMetadaten] = useState<MetadatenWerte>(() =>
+    initialWerte?.metadaten ?? (
+      !berichtigungZu && einsatz.meine_fuehrungsstelle?.trim()
+        ? { an: einsatz.meine_fuehrungsstelle.trim() }
+        : {}
+    ),
+  );
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
   const [sendet, setSendet] = useState(false);
 
