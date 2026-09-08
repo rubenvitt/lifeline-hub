@@ -156,6 +156,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             ),
             retain("status", G_ENUM),
             retain("begonnen_at", G_ZEIT),
+            retain("naechste_lagebesprechung_at", G_ZEIT),
             retain("abgeschlossen_at", G_ZEIT),
             retain("abgeschlossen_von", G_FK),
             retain("einsatzart", G_ENUM),

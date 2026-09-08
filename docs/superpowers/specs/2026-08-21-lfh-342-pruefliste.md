@@ -118,6 +118,12 @@ Vier Stellen, jede mit Messung — Entscheidungen, keine Auslassungen.
 
 ## Nicht gebaut, mit Begründung
 
+**Fortschreibung 08.09.2026:** Die Terminquelle und der konfigurierbare Umbruch sind in
+LFH-463/464 umgesetzt. Der Einsatz trägt einen optionalen UTC-Besprechungstermin;
+das ETB nutzt nach Browsermessung `xl` statt `md`. Die folgenden Einträge dokumentieren
+den damaligen C7-Stand. Aktuelle Entscheidung und Grenzen:
+[LFH-463/464-Prüfliste](2026-09-08-lfh-463-464-pruefliste.md).
+
 - **„Nächste Lagebesprechung" als Wiedervorlage-Schnellwahl.** Das Frontend kennt keine Quelle
   für den nächsten Besprechungstermin (`grep -rn "lagebesprechung" frontend/src` = 0 Treffer).
   Ein Chip, der raten müsste, wäre in einer beweissichernden Anwendung eine falsche

@@ -568,6 +568,8 @@ export interface components {
             meine_fuehrungsstelle?: string | null;
             meine_rolle?: null | components["schemas"]["EinsatzRolle"];
             meldende_stelle?: string | null;
+            /** @description Nächste Lagebesprechung als expliziter UTC-Termin; fehlt ohne gesetzten Termin. */
+            naechste_lagebesprechung_at?: string | null;
             /** Format: int64 */
             org_id: number;
             org_name: string;

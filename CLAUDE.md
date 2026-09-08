@@ -63,6 +63,15 @@ unter `md` (`form="auto"`) ist die begründungspflichtige Ausnahme, nicht der No
 Begründung steht im Dateikopf von `Datensicht.tsx`, die Regel in Abschnitt AK3b des
 Drawer-Specs. Keine der 13 Katalogtabellen wird zu Karten.
 
+**ETB-Nachzüge LFH-463/464:** `Datensicht` hat für die Auto-Form einen optionalen
+`tabelleAb`-Punkt; der Default bleibt `md`. Ausschließlich die ETB-Chronologie setzt
+nach Browsermessung `xl` (1200 px): darunter Ereigniskarten, darüber Tabelle.
+`lg` würde den gemessenen 1024-px-Engpass nicht beheben. Der optionale Einsatztermin
+`naechste_lagebesprechung_at` wird in den Einsatzdaten gepflegt und als absolute
+Wiedervorlage-Schnellwahl angeboten, wenn er bekannt und zukünftig ist. Kein
+berechneter Rhythmus. Prüfbelege und der getrennte Langtextbefund LFH-523 stehen in
+`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`.
+
 **Die erste eingelöste Karten-Ausnahme ist die ETB-Chronologie** (LFH-342/C7,
 `etb/EtbTabelle.tsx`). Sie zeigt, woran die Formfrage wirklich hängt, und korrigiert dabei ein
 früheres Verdikt: die B5e-Prüfliste hatte „die Chronologie wird verglichen, sie bleibt eine

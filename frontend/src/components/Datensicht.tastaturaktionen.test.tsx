@@ -72,6 +72,7 @@ type SpaltenKey = 'funkrufname' | 'typ';
 function rendere(
   spalten: readonly DatensichtSpalte<Fahrzeug, SpaltenKey>[],
   form: 'tabelle' | 'karte' | 'auto',
+  tabelleAb: 'md' | 'xl' = 'md',
 ): ReactElement {
   const karte: Kartenplan<Fahrzeug, SpaltenKey> = {
     art: 'plan',
@@ -86,6 +87,7 @@ function rendere(
         zeilenSchluessel="id"
         karte={karte}
         form={form}
+        tabelleAb={tabelleAb}
         suche={{ platzhalter: 'Funkrufname' }}
       />
     </CommandPaletteProvider>
@@ -195,10 +197,13 @@ describe('Datensicht · Spaltenmenü über einen Zweigwechsel', () => {
    * Beide Bedingungen des Schalters werden geprüft, nicht nur die Breite: er fällt genauso
    * weg, wenn `hatWaehlbareSpalten` falsch wird (Wechsel der Spaltengarnitur).
    */
-  it('bleibt zu, wenn der Schalter unter md verschwindet und die Breite zurückkommt', async () => {
+  it.each([
+    { tabelleAb: 'md', breit: 1024, schmal: 390 },
+    { tabelleAb: 'xl', breit: 1280, schmal: 1199 },
+  ] as const)('bleibt beim Wechsel über $tabelleAb geschlossen', async ({ tabelleAb, breit, schmal }) => {
     const u = userEvent.setup();
-    setzeViewportBreite(1024);
-    renderBasis(rendere(ZWEI_SPALTEN, 'auto'));
+    setzeViewportBreite(breit);
+    renderBasis(rendere(ZWEI_SPALTEN, 'auto', tabelleAb));
 
     await u.click(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' }));
     await waitFor(() => expect(offenesSpaltenMenue()).not.toBeNull());
@@ -206,12 +211,12 @@ describe('Datensicht · Spaltenmenü über einen Zweigwechsel', () => {
     // Fensterwechsel ZUR LAUFZEIT: der Stub feuert das `change`-Ereignis, das antds
     // Beobachter als einziges liest — eine bloß gesetzte Breite erreicht ihn nicht mehr.
     await act(async () => {
-      expect(sendeBreitenAenderung(390)).toBeGreaterThan(0);
+      expect(sendeBreitenAenderung(schmal)).toBeGreaterThan(0);
     });
     expect(screen.queryByRole('button', { name: /^Spalten/ })).toBeNull();
 
     await act(async () => {
-      sendeBreitenAenderung(1024);
+      sendeBreitenAenderung(breit);
     });
     expect(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' })).toBeInTheDocument();
     expect(offenesSpaltenMenue()).toBeNull();

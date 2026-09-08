@@ -9,9 +9,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * hoch die Berührungsziele wirklich sind. Dass die Weiche existiert, pinnt
  * `src/components/Datensicht.test.tsx`; hier geht es um die gemessene Wirkung.
  *
- * DIE BREITENWEICHE, gegen die gemessen wird: `Datensicht.tsx:852`
- * `alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite('md'))`. `md` ist antds
- * 768 px. 390 px liegt darunter (Kartenzweig), 1366 px darüber (Tabellenzweig).
+ * Der Default-Umbruch bleibt `md` (768 px). Seit LFH-464 kann eine vermessene Fläche
+ * `tabelleAb` setzen; das ETB nutzt `xl`. Hier wird am unveränderten Personal-Konsumenten
+ * zusätzlich 767/768 und 1199/1200 geprüft, damit die ETB-Ausnahme nicht global wird.
  *
  * AN- UND ABWESENHEIT, je mit Gegenprobe auf der anderen Breite. `.ant-table` allein trennt
  * die Zweige nicht: eine Seite, die aus einem beliebigen anderen Grund keine Tabelle rendert
@@ -186,6 +186,20 @@ async function seedeKraft(page: Page, einsatzId: string) {
     'Personal',
   );
 }
+
+test('LFH-464: Personal behält md auch im Bereich des neuen ETB-Umbruchs', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Default-Umbruch ${Date.now()}`);
+  await seedeKraft(page, einsatzId);
+  for (const breite of [767, 768, 991, 992, 1024, 1199, 1200, 1280]) {
+    await page.setViewportSize({ width: breite, height: 900 });
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    const sicht = page.getByRole('region', { name: 'Personal im Einsatz' });
+    await expect(sicht.getByText(KRAFT, { exact: true })).toHaveCount(1);
+    await expect(sicht.locator('.ant-table')).toHaveCount(breite >= 768 ? 1 : 0);
+    await expect(sicht.locator('[data-lfh="datensicht-karte"]')).toHaveCount(breite >= 768 ? 0 : 1);
+  }
+});
 
 test('Personalseite: bei 390 px Karten und kein Tabellenelement, bei 1366 px Tabelle — Gegenprobe in beide Richtungen', async ({
   page,

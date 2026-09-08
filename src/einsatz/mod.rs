@@ -169,6 +169,7 @@ pub struct Einsatz {
     #[sqlx(try_from = "String")]
     pub status: EinsatzStatus,
     pub begonnen_at: String,
+    pub naechste_lagebesprechung_at: Option<String>,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
     #[sqlx(try_from = "String")]
@@ -213,6 +214,7 @@ impl Einsatz {
             stichwort: self.stichwort.clone(),
             status: self.status.clone(),
             begonnen_at: self.begonnen_at.clone(),
+            naechste_lagebesprechung_at: self.naechste_lagebesprechung_at.clone(),
             abgeschlossen_at: self.abgeschlossen_at.clone(),
             abgeschlossen_von: self.abgeschlossen_von,
             einsatzart: self.einsatzart.clone(),
@@ -243,6 +245,9 @@ pub struct EinsatzAnzeige {
     pub stichwort: Option<String>,
     pub status: EinsatzStatus,
     pub begonnen_at: String,
+    /// Nächste Lagebesprechung als expliziter UTC-Termin; fehlt ohne gesetzten Termin.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub naechste_lagebesprechung_at: Option<String>,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
     pub einsatzart: Einsatzart,
@@ -321,6 +326,7 @@ mod tests {
             stichwort: None,
             status: EinsatzStatus::Aktiv,
             begonnen_at: "2026-05-23".into(),
+            naechste_lagebesprechung_at: None,
             abgeschlossen_at: None,
             abgeschlossen_von: None,
             einsatzart: Einsatzart::Realeinsatz,
