@@ -68,6 +68,8 @@ export interface KopfdatenUpdate {
   anzahl_betroffene_initial: number | null;
   /** Alarmzeit im SQLite-Format 'YYYY-MM-DD HH:mm:ss'. */
   begonnen_at: string;
+  /** Expliziter UTC-Termin; null löscht die optionale Angabe. */
+  naechste_lagebesprechung_at?: string | null;
 }
 
 export function aktualisiereEinsatz(id: number, felder: KopfdatenUpdate): Promise<EinsatzAnzeige> {

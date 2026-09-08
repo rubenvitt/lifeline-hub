@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -110,6 +110,40 @@ describe('Alarmzeit-Wandlung (Wire ↔ Picker)', () => {
 });
 
 describe('EinsatzdatenPage', () => {
+  it('LFH-463: zeigt den Besprechungstermin lokal und speichert denselben UTC-Instant', async () => {
+    let patchBody: Record<string, unknown> = {};
+    setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
+    server.use(http.patch('/api/einsaetze/7', async ({ request }) => {
+      patchBody = await request.json() as Record<string, unknown>;
+      return HttpResponse.json(basisEinsatz);
+    }));
+    expect(await screen.findByText('Nächste Lagebesprechung')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    expect(screen.getByLabelText('Nächste Lagebesprechung (optional)')).toHaveValue(
+      dayjs.utc('2026-09-09 13:17:43').local().format('YYYY-MM-DD HH:mm:ss'),
+    );
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody.naechste_lagebesprechung_at).toBe('2026-09-09 13:17:43'));
+  });
+
+  it('LFH-463: leeren des Besprechungstermins sendet explizit null', async () => {
+    let patchBody: Record<string, unknown> = {};
+    setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
+    server.use(http.patch('/api/einsaetze/7', async ({ request }) => {
+      patchBody = await request.json() as Record<string, unknown>;
+      return HttpResponse.json(basisEinsatz);
+    }));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = screen.getByLabelText('Nächste Lagebesprechung (optional)');
+    // jsdom aktiviert den CSS-Hoverzustand des Clear-Buttons nicht. Der Browserweg
+    // wird zusätzlich im ETB-E2E geprüft; hier zählt dessen tatsächlicher onClear-Pfad.
+    fireEvent.click(feld.closest('.ant-picker')!.querySelector<HTMLElement>('.ant-picker-clear')!);
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody.naechste_lagebesprechung_at).toBeNull());
+  });
+
   it('zeigt die Alarmzeit im Picker lokal und schickt sie unverändert als UTC zurück', async () => {
     let patchBody: Record<string, unknown> = {};
     setup();

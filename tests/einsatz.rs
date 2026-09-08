@@ -728,6 +728,153 @@ async fn patch_kopf(
 }
 
 #[tokio::test]
+async fn lagebesprechung_patch_erhaelt_den_instant_und_unterscheidet_absent_von_null() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, neu) = einsatz_anlegen(&app, &admin, "Besprechung").await;
+    let id = neu["id"].as_i64().unwrap();
+    assert!(!neu
+        .as_object()
+        .unwrap()
+        .contains_key("naechste_lagebesprechung_at"));
+    let (_, anderer) = einsatz_anlegen(&app, &admin, "Andere Lage").await;
+
+    let (status, gesetzt) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({
+            "naechste_lagebesprechung_at": "2026-09-09T15:17:43+02:00"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        gesetzt["naechste_lagebesprechung_at"],
+        "2026-09-09 13:17:43"
+    );
+    let (_, erhalten) = patch_kopf(&app, &admin, id, json!({"stichwort": "Besprechung"})).await;
+    assert_eq!(
+        erhalten["naechste_lagebesprechung_at"],
+        "2026-09-09 13:17:43"
+    );
+
+    // Der unabhängige Listenzweig muss denselben Wert liefern und andere Einsätze erhalten.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/einsaetze")
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let liste: Value =
+        serde_json::from_slice(&to_bytes(resp.into_body(), usize::MAX).await.unwrap()).unwrap();
+    let zeilen = liste.as_array().unwrap();
+    assert_eq!(
+        zeilen.iter().find(|e| e["id"] == id).unwrap()["naechste_lagebesprechung_at"],
+        "2026-09-09 13:17:43"
+    );
+    assert!(!zeilen
+        .iter()
+        .find(|e| e["id"] == anderer["id"])
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .contains_key("naechste_lagebesprechung_at"));
+
+    for leer in [Value::Null, json!("  ")] {
+        let (status, geloescht) = patch_kopf(
+            &app,
+            &admin,
+            id,
+            json!({"naechste_lagebesprechung_at": leer}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(!geloescht
+            .as_object()
+            .unwrap()
+            .contains_key("naechste_lagebesprechung_at"));
+        let (_, erneut) = patch_kopf(
+            &app,
+            &admin,
+            id,
+            json!({"naechste_lagebesprechung_at": "2026-09-09 13:17:43"}),
+        )
+        .await;
+        assert_eq!(erneut["naechste_lagebesprechung_at"], "2026-09-09 13:17:43");
+    }
+    let (status, _) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({"naechste_lagebesprechung_at": "morgen"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (_, nach_fehler) = patch_kopf(&app, &admin, id, json!({})).await;
+    assert_eq!(
+        nach_fehler["naechste_lagebesprechung_at"],
+        "2026-09-09 13:17:43"
+    );
+}
+
+#[tokio::test]
+async fn lagebesprechung_respektiert_einsatzrechte_und_abschluss() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, neu) = einsatz_anlegen(&app, &admin, "Besprechungsrechte").await;
+    let id = neu["id"].as_i64().unwrap();
+    let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let termin = json!({"naechste_lagebesprechung_at": "2026-09-09 13:17:43"});
+    assert_eq!(
+        patch_kopf(&app, &erika, id, termin.clone()).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        mitglied_setzen(&app, &admin, id, erika_id, "beobachter").await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        patch_kopf(&app, &erika, id, termin.clone()).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        mitglied_setzen(&app, &admin, id, erika_id, "fuehrungspersonal").await,
+        StatusCode::OK
+    );
+    let (status, gesetzt) = patch_kopf(&app, &erika, id, termin.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        gesetzt["naechste_lagebesprechung_at"],
+        "2026-09-09 13:17:43"
+    );
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{id}/abschliessen"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        patch_kopf(&app, &admin, id, termin).await.0,
+        StatusCode::CONFLICT
+    );
+}
+
+#[tokio::test]
 async fn einsatzleitung_patcht_kopfdaten() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

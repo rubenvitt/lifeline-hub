@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import dayjs from 'dayjs';
@@ -18,9 +18,10 @@ const EINTRAG = {
 /** Die Uhr steht, damit „+30 min" eine prüfbare Zahl ist und kein bewegliches Ziel. */
 const JETZT = new Date('2026-08-21T10:00:00Z');
 
-function zeige(onClose = vi.fn()) {
+function zeige(onClose = vi.fn(), naechsteLagebesprechungAt?: string | null) {
   return renderMitProviders(
-    <WiedervorlageModal einsatzId={7} eintrag={EINTRAG} onClose={onClose} />,
+    <WiedervorlageModal einsatzId={7} eintrag={EINTRAG} onClose={onClose}
+      naechsteLagebesprechungAt={naechsteLagebesprechungAt} />,
   );
 }
 
@@ -41,6 +42,49 @@ afterEach(() => {
 });
 
 describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
+  it('LFH-463: entfernt einen während des offenen Dialogs ablaufenden Termin', async () => {
+    zeige(vi.fn(), '2026-08-21 10:00:10');
+    expect(screen.getByRole('button', { name: 'Nächste Lagebesprechung' })).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(11_000));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument());
+  });
+
+  it('LFH-463: übernimmt nach einem Zeitsprung beim Anklicken keinen abgelaufenen Termin', async () => {
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    zeige(vi.fn(), '2026-08-21 10:00:10');
+    const vorher = faelligFeld().value;
+    const chip = screen.getByRole('button', { name: 'Nächste Lagebesprechung' });
+    // Ein Systemzeitsprung löst den schon geplanten Timer noch nicht aus.
+    vi.setSystemTime(new Date('2026-08-21T10:00:20Z'));
+    await nutzer.click(chip);
+    expect(faelligFeld()).toHaveValue(vorher);
+    expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+  });
+
+  it('LFH-463: übernimmt genau den bekannten UTC-Termin einschließlich Sekunden', async () => {
+    let gesendet: Record<string, unknown> | undefined;
+    server.use(http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+      gesendet = await request.json() as Record<string, unknown>;
+      return HttpResponse.json({ id: 1 });
+    }));
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    zeige(vi.fn(), '2026-08-21 13:17:43');
+    await nutzer.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung' }));
+    expect(faelligFeld()).toHaveValue(
+      dayjs.utc('2026-08-21 13:17:43').local().format('YYYY-MM-DD HH:mm'),
+    );
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
+  });
+
+  it.each([undefined, null, '', 'ungueltig', '2026-08-21 09:59:59', '2026-08-21 10:00:00'])(
+    'LFH-463: rendert ohne zukünftigen bekannten Termin keinen Chip (%s)', (termin) => {
+      zeige(vi.fn(), termin);
+      expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '+30 min' })).toBeEnabled();
+    },
+  );
+
   it('belegt die Fälligkeit mit +30 min vor, nicht mit „jetzt"', () => {
     zeige();
     // „jetzt" war der einzige nie gemeinte Wert: eine Wiedervorlage auf den aktuellen

@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import type { ComponentProps } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -10,6 +10,9 @@ import { baueZeilen, type EtbZeile } from './etbZeile';
 import EtbTabelle from './EtbTabelle';
 
 type TabellenProps = ComponentProps<typeof EtbTabelle>;
+
+// Bestandszusicherungen zur Tabelle laufen am Fükw; Kartentests setzen ihre Breite selbst.
+beforeEach(() => setzeViewportBreite(1366));
 
 /**
  * EtbTabelle ist seit den Backlink-Badges router-abhängig → in MemoryRouter rendern.
@@ -348,7 +351,7 @@ describe('EtbTabelle – Datenzustände (LFH-331 · B3)', () => {
  * die jsdom belegen KANN — die tatsächlichen Pixelbreiten misst erst Playwright.
  */
 describe('EtbTabelle – Chronologie auf dem Datensicht-Primitiv (LFH-342 · C7)', () => {
-  it('löst die Tabelle unter md in Ereigniszeilen auf', () => {
+  it('löst die Tabelle auf dem Handschirm in Ereigniszeilen auf', () => {
     setzeViewportBreite(390);
     renderTabelle({ eintraege: [eintrag()] });
     // GENAU EIN Zweig im Baum: eine verborgene Tabelle daneben machte jede
@@ -357,13 +360,20 @@ describe('EtbTabelle – Chronologie auf dem Datensicht-Primitiv (LFH-342 · C7)
     expect(screen.getAllByTestId('etb-ereigniszeile')).toHaveLength(1);
   });
 
-  it('bleibt ab md eine Tabelle', () => {
-    setzeViewportBreite(768);
+  it('LFH-464: bleibt ab xl eine Tabelle', () => {
+    setzeViewportBreite(1200);
     renderTabelle({ eintraege: [eintrag()] });
     // `getAllBy…`: antd rendert bei fixierter Kennungsspalte zwei `<table>` (Kopf und
     // Rumpf getrennt) — `getByRole` schlüge an der Mehrzahl fehl, nicht an der Sache.
     expect(screen.getAllByRole('table').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('etb-ereigniszeile')).not.toBeInTheDocument();
+  });
+
+  it.each([768, 991, 992, 1024, 1199])('LFH-464: zeigt bei %i px Ereigniskarten', (breite) => {
+    setzeViewportBreite(breite);
+    renderTabelle({ eintraege: [eintrag()] });
+    expect(screen.queryAllByRole('table')).toHaveLength(0);
+    expect(screen.getAllByTestId('etb-ereigniszeile')).toHaveLength(1);
   });
 
   /**

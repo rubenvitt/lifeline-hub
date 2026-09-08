@@ -693,6 +693,8 @@ pub struct KopfdatenPatch {
     pub anzahl_betroffene_initial: Option<Option<i64>>,
     /// Alarmzeit (ISO-8601/RFC3339 oder SQLite-Format).
     pub begonnen_at: Option<String>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub naechste_lagebesprechung_at: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id} — Kopf-/Stammdaten als echter Teil-Patch (LFH-306).
@@ -740,6 +742,9 @@ pub async fn aktualisieren(
     };
 
     let stichwort = support::trimme_tri(req.stichwort);
+    let naechste_lagebesprechung_at = support::trimme_tri(req.naechste_lagebesprechung_at)
+        .map(|zeit| zeit.map(|z| crate::etb::normalisiere_zeit(&z)).transpose())
+        .transpose()?;
     let einsatznummer_intern = support::trimme_tri(req.einsatznummer_intern);
     let leitstellen_nr = support::trimme_tri(req.leitstellen_nr);
     let einsatzort = support::trimme_tri(req.einsatzort);
@@ -762,6 +767,7 @@ pub async fn aktualisieren(
             sachverhalt: sachverhalt.as_ref().map(|v| v.as_deref()),
             anzahl_betroffene_initial: req.anzahl_betroffene_initial,
             begonnen_at: begonnen_at.as_deref(),
+            naechste_lagebesprechung_at: naechste_lagebesprechung_at.as_ref().map(|v| v.as_deref()),
         },
     )
     .await?;

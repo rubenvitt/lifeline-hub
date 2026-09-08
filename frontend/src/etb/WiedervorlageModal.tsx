@@ -1,5 +1,7 @@
 import { App, Button, DatePicker, Form, Input, Space, Typography } from 'antd';
+import { useEffect, useReducer } from 'react';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeErinnerungAn } from '../api/erinnerungen';
 import { ApiError } from '../api/client';
@@ -9,6 +11,7 @@ import { abstand } from '../theme/tokens';
 import type { EtbEintragAnzeige } from '../api/types';
 
 const { TextArea } = Input;
+dayjs.extend(utc);
 
 /** Kürzt den ETB-Eintragstext zu einem brauchbaren Erinnerungs-Titel. */
 function titelAusEintrag(inhalt: string): string {
@@ -38,10 +41,8 @@ const VORGABE_MINUTEN = 30;
  * `<span onClick>` schuldete stattdessen die zwei Angaben aus LFH-365 samt eigener
  * Dichte-Zusicherung — für etwas, das ein Knopf ohnehin mitbringt.
  *
- * „Nächste Lagebesprechung" aus dem Ticket fehlt mit Absicht: das Frontend kennt keine
- * Quelle für den nächsten Besprechungstermin. Ein Chip, der raten müsste, wäre in einer
- * beweissichernden Anwendung eine falsche Tatsachenbehauptung — der Punkt liegt als
- * eigener Nachzug auf dem Board.
+ * LFH-463 ergänzt unten den expliziten Einsatztermin, sofern er bekannt und zukünftig ist.
+ * Er ist ein absoluter Zeitpunkt; die vier relativen Vorbelegungen bleiben unverändert.
  */
 const SCHNELLWAHL = [
   { label: '+15 min', minuten: 15 },
@@ -61,14 +62,31 @@ const SCHNELLWAHL = [
  * Auswegen. Die Maske wurde für N22 ohnehin angefasst — und die Erfassungs-Norm gilt
  * genau dann (LFH-332 · B4).
  */
-export default function WiedervorlageModal({ einsatzId, eintrag, onClose }: {
+export default function WiedervorlageModal({ einsatzId, eintrag, onClose, naechsteLagebesprechungAt }: {
   einsatzId: number;
   eintrag: EtbEintragAnzeige | null;
   onClose: () => void;
+  naechsteLagebesprechungAt?: string | null;
 }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<FormWerte>();
+  const [zeitPruefung, pruefeZeit] = useReducer((wert: number) => wert + 1, 0);
+  // Der Wirestring ist UTC ohne Offset. Lokal parsen würde den Instant verschieben.
+  const lagebesprechung = naechsteLagebesprechungAt
+    ? dayjs.utc(naechsteLagebesprechungAt).local() : null;
+  const terminBekannt = lagebesprechung?.isValid() && lagebesprechung.isAfter(dayjs());
+  const offen = eintrag !== null;
+
+  useEffect(() => {
+    if (!offen || !naechsteLagebesprechungAt) return;
+    const rest = dayjs.utc(naechsteLagebesprechungAt).valueOf() - Date.now();
+    if (!(rest > 0)) return;
+    // Auch ein lange geöffneter Dialog verliert den Chip am Termin. Sehr ferne
+    // Termine brauchen mehrere Timer, weil Browser maximal 2^31-1 ms zulassen.
+    const timer = window.setTimeout(pruefeZeit, Math.min(rest, 2_147_483_647));
+    return () => window.clearTimeout(timer);
+  }, [offen, naechsteLagebesprechungAt, zeitPruefung]);
 
   const mutation = useMutation({
     mutationFn: (werte: FormWerte) =>
@@ -117,7 +135,7 @@ export default function WiedervorlageModal({ einsatzId, eintrag, onClose }: {
           (LFH-19). Der DatePicker darunter trägt weiter den freien Fall.
         */}
         <Space wrap style={{ marginBottom: abstand.sm }}>
-          <Typography.Text type="secondary">Fällig in</Typography.Text>
+          <Typography.Text type="secondary">Schnellwahl</Typography.Text>
           {SCHNELLWAHL.map((s) => (
             <Button
               key={s.label}
@@ -126,6 +144,18 @@ export default function WiedervorlageModal({ einsatzId, eintrag, onClose }: {
               {s.label}
             </Button>
           ))}
+          {terminBekannt && (
+            <Button onClick={() => {
+              // Ein Systemzeitsprung kann dem Timer zuvorkommen.
+              if (!lagebesprechung?.isAfter(dayjs())) {
+                pruefeZeit();
+                return;
+              }
+              form.setFieldValue('faellig', lagebesprechung);
+            }}>
+              Nächste Lagebesprechung
+            </Button>
+          )}
         </Space>
         <Form.Item name="faellig" noStyle rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}>
           <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />

@@ -303,6 +303,7 @@ mod tests {
             stichwort: None,
             status,
             begonnen_at: "2026-05-23".into(),
+            naechste_lagebesprechung_at: None,
             abgeschlossen_at: None,
             abgeschlossen_von: None,
             einsatzart: crate::einsatz::Einsatzart::Realeinsatz,

@@ -8,6 +8,7 @@ import { server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { neuerQueryClient, renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
+import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueLeerenFuerTests } from '../offline/queue';
@@ -105,6 +106,71 @@ function setup(route = '/einsaetze/7/etb') {
 }
 
 describe('EtbPage', () => {
+  it.each(['2099-09-09 15:17:43', null])(
+    'LFH-463: lädt beim Öffnen den inzwischen geänderten Termin frisch (%s)', async (termin) => {
+      setupMSW();
+      server.use(http.get('/api/einsaetze/7', () => HttpResponse.json({
+        ...einsatz, naechste_lagebesprechung_at: '2099-09-09 13:17:43',
+      })));
+      renderMitProviders(
+        <AuthProvider><Routes><Route path="/einsaetze/:id/etb" element={<EtbPage />} /></Routes></AuthProvider>,
+        { route: '/einsaetze/7/etb' },
+      );
+      await screen.findByText('Erste Meldung');
+      let freigeben!: () => void;
+      const antwort = new Promise<void>((resolve) => { freigeben = resolve; });
+      let abrufe = 0;
+      server.use(http.get('/api/einsaetze/7', async () => {
+        abrufe++;
+        await antwort;
+        return HttpResponse.json({ ...einsatz, naechste_lagebesprechung_at: termin });
+      }));
+      let gesendet: Record<string, unknown> | undefined;
+      server.use(http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        gesendet = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }));
+      const user = userEvent.setup();
+      try {
+        await waehleZeilenaktion(user, 'Wiedervorlage');
+        expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+        await waitFor(() => expect(abrufe).toBe(1));
+      } finally {
+        freigeben();
+      }
+      if (termin) {
+        await user.click(await screen.findByRole('button', { name: 'Nächste Lagebesprechung' }));
+        await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Anlegen' }));
+        await waitFor(() => expect(gesendet?.faellig_at).toBe(termin));
+      } else {
+        await waitFor(() => expect(screen.getByRole('button', { name: '+30 min' })).toBeEnabled());
+        expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+      }
+    },
+  );
+
+  it('LFH-463: reicht den Einsatztermin an die Wiedervorlage weiter', async () => {
+    setupMSW();
+    server.use(http.get('/api/einsaetze/7', () => HttpResponse.json({
+      ...einsatz, naechste_lagebesprechung_at: '2099-09-09 13:17:43',
+    })));
+    let gesendet: Record<string, unknown> | undefined;
+    server.use(http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+      gesendet = await request.json() as Record<string, unknown>;
+      return HttpResponse.json({ id: 1 });
+    }));
+    renderMitProviders(
+      <AuthProvider><Routes><Route path="/einsaetze/:id/etb" element={<EtbPage />} /></Routes></AuthProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+    const user = userEvent.setup();
+    await waehleZeilenaktion(user, 'Wiedervorlage');
+    await user.click(await screen.findByRole('button', { name: 'Nächste Lagebesprechung' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet?.faellig_at).toBe('2099-09-09 13:17:43'));
+  });
+
   it.each([null, 'Alte Leitung'])('LFH-461 Review: erster Entwurf wartet auf laufenden Detail-Refetch (Cache: %s)', async (meine_fuehrungsstelle) => {
     setupMSW();
     const client = neuerQueryClient();
@@ -155,19 +221,22 @@ describe('EtbPage', () => {
     expect(await screen.findByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
-  it('hebt per ?eintrag=<id> den geladenen Eintrag hervor und räumt den Param (LFH-25)', async () => {
+  it.each([1024, 1366])('hebt per ?eintrag=<id> bei %i px hervor und räumt den Param (LFH-25)', async (breite) => {
+    setzeViewportBreite(breite);
     const { container } = setup('/einsaetze/7/etb?eintrag=1');
     await screen.findByText('Erste Meldung');
     await waitFor(() =>
       // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix (`eintrag-<id>`) —
       // die Queue-`id` eines gepufferten Eintrags kollidierte sonst mit der DB-`id`.
-      expect(container.querySelector('[data-row-key="eintrag-1"]')).toHaveClass('zeile-hervorgehoben'),
+      expect(container.querySelector(breite < 1200
+        ? '[data-zeile="eintrag-1"]' : '[data-row-key="eintrag-1"]')).toHaveClass('zeile-hervorgehoben'),
     );
     // Adressier-Param wird nach dem Anwenden geräumt (apply-then-clean).
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
   });
 
   it('lädt ältere Seiten nach, bis der ?eintrag=<id> gefunden ist (laden-bis-gefunden)', async () => {
+    setzeViewportBreite(1366);
     const seite1 = Array.from({ length: 100 }, (_, i) => ({
       ...eintrag, id: 101 + i, lfd_nr: 200 - i, inhalt: `Eintrag ${101 + i}`,
     }));
@@ -495,7 +564,10 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       // Und die Leiste zeigt ihn. Beide Hälften: ein Filter, der nur im Query-Key
       // steht, ist von außen nicht als gesetzt erkennbar.
       expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
-      expect(screen.getByTitle('Meldung')).toBeInTheDocument();
+      // Die Schnellerfassung hat einen eigenen Typwähler. Nur die Filterleiste belegt
+      // den URL-Filter, unabhängig davon, wann der Entwurf fertig geladen ist.
+      const filterleiste = screen.getByPlaceholderText('Volltextsuche').closest('.ant-space')!;
+      expect(within(filterleiste as HTMLElement).getByTitle('Meldung')).toBeInTheDocument();
     });
 
     it('schreibt einen getippten Suchbegriff in die URL', async () => {
