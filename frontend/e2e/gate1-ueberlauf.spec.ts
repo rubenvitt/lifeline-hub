@@ -63,11 +63,15 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
           for (const route of routen) {
             await page.goto(route);
             await expect(page.locator('html')).toHaveAttribute('data-dichte', stufe);
-            await expect(
-              route === '/einsaetze'
-                ? page.locator('[data-testid="einsaetze-raster"]')
-                : page.getByPlaceholder('Inhalt …'),
-            ).toBeVisible();
+            if (route !== '/einsaetze') {
+              await expect(page.getByPlaceholder('Inhalt …')).toBeVisible();
+            } else if (mitVerwaltung) {
+              await expect(page.locator('[data-testid="einsaetze-raster"]')).toBeVisible();
+            } else {
+              // LFH-462: Der neue Benutzer hat keine Einsatzmitgliedschaft. Das
+              // Raster ist nur während seiner Lade-Skelette sichtbar, danach leer.
+              await expect(page.getByText('Keine Einsätze', { exact: true })).toBeVisible();
+            }
             // Konkrete Inhaltsanker statt networkidle: die Einsatzroute hält SSE offen.
             const kopf = page.locator('header');
             await expect(kopf).toHaveCount(1);

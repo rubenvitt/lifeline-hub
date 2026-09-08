@@ -31,6 +31,8 @@ export interface Verlustschutz {
   autosaveJetzt: () => void;
   /** Nach einem expliziten Speichern des Aufrufers: setzt Merker und Zeitstempel. */
   quittiereGespeichert: () => void;
+  /** VOR einem asynchronen Speichern aufrufen, zurückgegebene Quittung erst bei Erfolg. */
+  quittungVorbereiten: () => () => void;
   autosaveLaeuft: boolean;
 }
 
@@ -59,10 +61,10 @@ export interface Verlustschutz {
  * dem Speichern-Knopf — ein Autosave, den niemand sieht, ist von „nicht gespeichert" nicht
  * zu unterscheiden. Der FEHLERFALL meldet sich dagegen sehr wohl (`onFehler`).
  *
- * `useBlocker` steht nicht zur Verfügung — gemessen in C7: er verlangt einen Data Router,
- * die Anwendung hängt an `<BrowserRouter>` (`main.tsx`), der Aufruf wirft beim Rendern
- * (LFH-462). Den In-App-Wechsel trägt der Blur-Autosave (jeder Klick auf eine Brotkrume
- * verlässt zuerst das Feld), Reload und Tab-Schluss ein `beforeunload`.
+ * Seit LFH-462 nutzt der Befehlsentwurf zusätzlich `EntwurfNavigationSchutz` mit
+ * `useBlocker` im Data Router. Er liest denselben Merker und setzt eine angehaltene
+ * Navigation nach erfolgreichem Autosave fort. Der Lagebericht behält Blur-Autosave
+ * und `beforeunload`; dieser Hook selbst bleibt unabhängig vom Router.
  *
  * DER MERKER GEHÖRT ZU EINEM DATENSATZ. Wechselt die Route auf denselben Komponententyp mit
  * anderer ID (Fortschreiben → neuer Entwurf), bleibt der Hook-State stehen und der Riegel
@@ -107,6 +109,13 @@ export function useEntwurfVerlustschutz<D, W extends object>({
    * geändert wurde; sonst bleibt der Merker stehen und die nächste Frist holt S2 nach.
    */
   const aenderungRef = useRef(0);
+  const quittungVorbereiten = useCallback(() => {
+    const stand = aenderungRef.current;
+    return () => {
+      if (aenderungRef.current === stand) quittiereGespeichert();
+      else setZuletztGespeichert(dayjs().format('HH:mm'));
+    };
+  }, [quittiereGespeichert]);
   // Riegel gegen zwei gleichzeitige Autosaves als Ref, nicht als State: zwei Aufrufe im
   // selben Tick sähen beide den alten State (React batcht).
   const laeuftRef = useRef(false);
@@ -118,14 +127,17 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     if (!ungespeichert || laeuftRef.current) return;
     laeuftRef.current = true;
     setAutosaveLaeuft(true);
-    const stand = aenderungRef.current;
+    const quittieren = quittungVorbereiten();
     speichern(form.getFieldsValue())
       .then(() => {
-        if (aenderungRef.current === stand) quittiereGespeichert();
-        else setZuletztGespeichert(dayjs().format('HH:mm'));
+        quittieren();
         onGespeichert?.();
       })
-      .catch(onFehler)
+      .catch((e) => {
+        // antds message.error liefert ein Thenable bis zum Schließen des Toasts.
+        // Die Speicher-Sperre hängt am Request, nicht an dieser Rückmeldung.
+        onFehler(e);
+      })
       .finally(() => {
         laeuftRef.current = false;
         setAutosaveLaeuft(false);
@@ -161,6 +173,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     markiereGeaendert,
     autosaveJetzt,
     quittiereGespeichert,
+    quittungVorbereiten,
     autosaveLaeuft,
   };
 }

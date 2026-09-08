@@ -64,6 +64,11 @@ Checkout. Bestehende Änderungen gehören dem User und werden nicht überschrieb
 | `main`/`master`, generischer Branch oder erkennbar andere Aufgabe | Lage und vorgeschlagenen Branch nennen; vor Branch-/Worktree-Anlage fragen |
 
 Nach Zustimmung verwende den in der aktuellen Codex-Umgebung vorgesehenen Worktree-Weg.
+Neue Arbeitsbranches und Worktrees entstehen standardmäßig vom frisch geladenen
+`origin/main`: führe unmittelbar vorher `rtk git fetch origin main` aus und verwende nach
+erfolgreichem Fetch ausdrücklich `origin/main` als Startpunkt. Beim Git-Fallback lautet der
+Aufruf `rtk git worktree add <pfad> -b <branch> origin/main`. Scheitert der Fetch, kläre den
+Fehler, bevor du anlegst. Eine vom User ausdrücklich gewünschte andere Basis geht vor.
 Falls kein sicherer Worktree-Weg verfügbar ist, frage, ob im aktuellen Checkout fortgefahren
 werden soll. Lege nicht ungefragt einen Branch oder Worktree an und führe keine destruktiven
 Git-Befehle aus.

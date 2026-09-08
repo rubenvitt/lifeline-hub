@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route } from 'react-router';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import BefehlDetailPage from './BefehlDetailPage';
@@ -18,22 +18,23 @@ const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'e
 
 function renderAt(bid: number | string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const router = createMemoryRouter([
+    { path: '/einsaetze', element: <div>EINSATZ-LISTE</div> },
+    { path: '/einsaetze/:id/auftraege', element: <div>AUFTRAEGE-LISTE</div> },
+    { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
+  ], { initialEntries: ['/einsaetze/1/auftraege', `/einsaetze/1/auftraege/befehle/${bid}`] });
   const ergebnis = render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
-          <MemoryRouter initialEntries={[`/einsaetze/1/auftraege/befehle/${bid}`]}>
-            <Routes>
-              <Route path="/einsaetze/:id/auftraege" element={<div>AUFTRAEGE-LISTE</div>} />
-              <Route path="/einsaetze/:id/auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
-            </Routes>
-          </MemoryRouter>
+          <RouterProvider router={router} />
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );
   return {
     ...ergebnis,
+    router,
     /**
      * Stellt den Serverstand um und löst denselben Weg aus wie der SSE-Listener:
      * Invalidierung → Refetch → neues `befehlQuery.data`.
@@ -253,11 +254,9 @@ function renderMitZone(bid: number) {
       <AntApp>
         <AuthProvider>
           <EinsatzAnzeigeProvider einsatzId={1}>
-            <MemoryRouter initialEntries={[`/einsaetze/1/auftraege/befehle/${bid}`]}>
-              <Routes>
-                <Route path="/einsaetze/:id/auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
-              </Routes>
-            </MemoryRouter>
+            <RouterProvider router={createMemoryRouter([
+              { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
+            ], { initialEntries: [`/einsaetze/1/auftraege/befehle/${bid}`] })} />
           </EinsatzAnzeigeProvider>
         </AuthProvider>
       </AntApp>
@@ -278,5 +277,174 @@ describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
     expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
+  });
+});
+
+
+describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
+  beforeEach(() => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl).mockReset();
+    vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
+  });
+
+  function halteSpeichernAn() {
+    let resolve!: (wert: never) => void;
+    let reject!: (fehler: Error) => void;
+    vi.mocked(befehleApi.aktualisiereBefehl).mockImplementation(() =>
+      new Promise((ja, nein) => { resolve = ja; reject = nein; }));
+    return {
+      erfolg: () => act(async () => { resolve(befehl('entwurf') as never); }),
+      fehler: () => act(async () => { reject(new Error('Netz unterbrochen')); }),
+    };
+  }
+
+  async function oeffneBlocker() {
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, ' neu');
+    await userEvent.click(screen.getByRole('link', { name: 'Aufträge/Befehle' }));
+    return within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+  }
+
+  it('hält die Brotkrume an; Verwerfen setzt genau diesen Wechsel fort', async () => {
+    halteSpeichernAn();
+    renderAt(7);
+    const dialog = await oeffneBlocker();
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+    await userEvent.click(dialog.getByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1); // nur vorheriger Blur
+  });
+
+  it('Bleiben hält die Fassung und verwirft die Navigation auch nach Autosave-Erfolg', async () => {
+    const save = halteSpeichernAn();
+    const { router } = renderAt(7);
+    const dialog = await oeffneBlocker();
+    await userEvent.click(dialog.getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByLabelText('Titel')).toHaveValue('Befehl 1 neu');
+    await save.erfolg();
+    expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/7');
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+  });
+
+  it('holt den angehaltenen Wechsel nach, sobald Autosave die Fassung gesichert hat', async () => {
+    const save = halteSpeichernAn();
+    renderAt(7);
+    await oeffneBlocker();
+    await save.erfolg();
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+  });
+
+  it('bleibt bei einem Speicherfehler und speichert beim erneuten Auftrag vor dem Weitergehen', async () => {
+    const save = halteSpeichernAn();
+    renderAt(7);
+    const dialog = await oeffneBlocker();
+    await save.fehler();
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+    const erneut = halteSpeichernAn();
+    const weiter = dialog.getByRole('button', { name: /Speichern und weiter/ });
+    await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
+    await userEvent.click(weiter);
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(2));
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(1, 7,
+      expect.objectContaining({ titel: 'Befehl 1 neu' }));
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+    await erneut.erfolg();
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+  });
+
+  it('schützt auch Browser-Zurück und lässt eine neue Fassung nach älterem PATCH offen', async () => {
+    const save = halteSpeichernAn();
+    const { router } = renderAt(7);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, ' a');
+    await userEvent.tab();
+    await userEvent.type(titel, ' b');
+    await act(async () => { await router.navigate(-1); });
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await save.erfolg();
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+    expect(screen.getByLabelText('Titel')).toHaveValue('Befehl 1 a b');
+  });
+
+  it('gibt eine neue Eingabe nicht durch die Quittung eines älteren manuellen Speicherns frei', async () => {
+    const save = halteSpeichernAn();
+    const { router } = renderAt(7);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, ' a');
+    // Direkter Submit ohne Blur trennt den manuellen Weg vom Autosave.
+    fireEvent.submit(titel.closest('form')!);
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1));
+    await userEvent.type(titel, ' b');
+    await act(async () => { await router.navigate('/einsaetze/1/auftraege'); });
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await save.erfolg();
+    expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/7');
+    expect(screen.getByLabelText('Titel')).toHaveValue('Befehl 1 a b');
+  });
+
+  it('schreibt manuellen Stand und folgenden Autosave in Reihenfolge und wartet auf die neuere Fassung', async () => {
+    const save = halteSpeichernAn();
+    const { router } = renderAt(7);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, ' a');
+    fireEvent.submit(titel.closest('form')!);
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1));
+    await userEvent.type(titel, ' b');
+    await userEvent.click(screen.getByRole('link', { name: 'Aufträge/Befehle' }));
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1);
+    await save.erfolg();
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(2));
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(1, 7,
+      expect.objectContaining({ titel: 'Befehl 1 a b' }));
+    expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/7');
+    await save.erfolg();
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+  });
+
+  it('startet nach Verwerfen keinen vorgemerkten PATCH des verlassenen Editors', async () => {
+    const save = halteSpeichernAn();
+    renderAt(7);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, ' a');
+    fireEvent.submit(titel.closest('form')!);
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1));
+    await userEvent.type(titel, ' b');
+    await userEvent.click(screen.getByRole('link', { name: 'Aufträge/Befehle' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Verwerfen' }));
+    await screen.findByText('AUFTRAEGE-LISTE');
+    await save.erfolg();
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1);
+  });
+
+  it('lässt Query-/Hash-Wechsel im selben Editor ohne Dialog zu', async () => {
+    const { router } = renderAt(7);
+    await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
+    await act(async () => { await router.navigate('?ansicht=test#lage'); });
+    expect(screen.getByLabelText('Titel')).toHaveValue('Befehl 1 neu');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(router.state.location.hash).toBe('#lage');
+  });
+
+  it.each(['entwurf', 'freigegeben'] as const)('lässt die unveränderte Fassung %s direkt gehen', async (status) => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl(status) as never);
+    renderAt(7);
+    await userEvent.click(await screen.findByRole('link', { name: 'Aufträge/Befehle' }));
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('verlangt beim ausdrücklichen Speichern einen gültigen Titel', async () => {
+    halteSpeichernAn();
+    renderAt(7);
+    await userEvent.clear(await screen.findByLabelText('Titel'));
+    // Ohne Blur: prüft den expliziten Dialogweg unabhängig vom Autosave.
+    fireEvent.click(screen.getByRole('link', { name: 'Aufträge/Befehle' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Speichern und weiter' }));
+    await screen.findByText(/titel.*required/i);
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
   });
 });

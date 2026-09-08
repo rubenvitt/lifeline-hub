@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes } from 'react-router';
+import { createRoutesFromElements, Navigate, Outlet, Route } from 'react-router';
 import { Fragment, lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
@@ -62,7 +62,8 @@ import { modulRegistry } from './einsatz/modulRegistry';
 import { EINSTELLUNGEN_SEKTIONEN } from './routing/deeplinks';
 import LiveStatusBanner from './live/LiveStatusBanner';
 import { useOfflineSync } from './offline/useOfflineSync';
-import { useAuth } from './auth/AuthContext';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
 
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
@@ -157,14 +158,25 @@ function BetriebsLayout() {
   );
 }
 
+/** Persistenter Rahmen auch für Login, globale Verwaltung und Einsatz-Routen. */
 export default function App() {
-  // Zentrale 401-Behandlung (LFH-268/F24): hier und nicht tiefer, weil App die oberste
-  // Komponente innerhalb von AntApp, BrowserRouter und AuthProvider ist — damit greift der
-  // Re-Login-Pfad auch auf /admin, /profil, den Stammdaten und der Einsatzliste.
-  useSitzungsWache();
-
   return (
-    <Routes>
+    <AuthProvider>
+      <CommandPaletteProvider>
+        <SitzungsLayout />
+      </CommandPaletteProvider>
+    </AuthProvider>
+  );
+}
+
+function SitzungsLayout() {
+  useSitzungsWache();
+  return <Outlet />;
+}
+
+/** Eine Routenquelle für Browser und Integrationstests; keine nachgelagerten Routes. */
+export const appRouten = createRoutesFromElements(
+    <Route element={<App />}>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<BetriebsLayout />}>
@@ -241,6 +253,5 @@ export default function App() {
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/einsaetze" replace />} />
-    </Routes>
-  );
-}
+    </Route>,
+);

@@ -554,12 +554,14 @@ Alltag wichtigsten:
   **(3)** Autosave meldet sich **nicht** per Erfolgs-Toast (eine Meldung alle 30 s ist eine
   Alarmquelle nach EEMUA 191), sondern über „zuletzt gespeichert HH:MM" neben dem Knopf — der
   Fehlerfall dagegen sehr wohl.
-  **`useBlocker` steht nicht zur Verfügung** und das ist gemessen: er verlangt einen **Data
-  Router**, die Anwendung hängt an `<BrowserRouter>` (`main.tsx`), der Aufruf wirft dort beim
-  Rendern. Wer ihn will, stellt zuerst die ganze Routenlandschaft um. Bis dahin trägt den
-  In-App-Wechsel der **Blur-Autosave** (jeder Klick auf eine Brotkrume verlässt das Feld
-  zuerst) und Reload/Tab-Schluss ein `beforeunload` — mit Gegenaussage, dass er ohne offene
-  Fassung schweigt.
+  **Der Befehlsentwurf schützt seit LFH-462 auch interne Navigation.** Die gesamte
+  Routenlandschaft liegt im Data Router (`createBrowserRouter` + `RouterProvider`),
+  `entwurf/EntwurfNavigationSchutz.tsx` trägt `useBlocker` mit dem eigenen Merker und
+  dem Dialog „Speichern und weiter / Verwerfen / Bleiben“. Fällt der Merker nach
+  erfolgreichem Autosave, wird ein noch angehaltener Wechsel nachgeholt; nach „Bleiben“
+  ist dieser Versuch verworfen. Query-/Hash-Wechsel im selben Editor bleiben möglich.
+  Der gemeinsame Hook behält Autosave und `beforeunload` für beide Entwurfsseiten;
+  der Lagebericht erhält durch diese Router-Umstellung keinen eigenen Blocker.
 - **Erst die Umkehrbarkeit, dann der Rückgängig-Knopf** (LFH-343 · C8, Fortschreibung von
   LFH-378). Eine Rückfrage vor einer umkehrbaren Aktion ist Reibung; sie ersatzlos zu
   streichen macht die Aktion aber nur dann einklickbar, wenn es einen **serverseitigen**

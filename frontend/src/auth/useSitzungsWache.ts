@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 import { SITZUNG_ABGELAUFEN } from './sitzungsEvent';
 
-/** Einziger Empfänger von {@link SITZUNG_ABGELAUFEN} (LFH-268/F24). Gehört in `App`, weil das
- *  die oberste Komponente innerhalb von `AntApp`, `BrowserRouter` und `AuthProvider` ist — die
+/** Einziger Empfänger von {@link SITZUNG_ABGELAUFEN} (LFH-268/F24). Gehört ins persistente Root-Layout (`App`/`SitzungsLayout`) innerhalb von
+ *  `AntApp`, Data Router und `AuthProvider` — die
  *  Vorgänger-Brücke saß in `EinsatzLayout` und ließ damit `/admin`, `/profil`, die Stammdaten
  *  und die Einsatzliste ohne jede 401-Behandlung. */
 export function useSitzungsWache(): void {
