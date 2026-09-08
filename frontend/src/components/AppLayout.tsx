@@ -1,4 +1,5 @@
-import { Layout, Space, Tag, Typography } from 'antd';
+import { Layout, Space, Tag, Typography, theme } from 'antd';
+import type { CSSProperties } from 'react';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
@@ -21,8 +22,11 @@ const { Header, Content } = Layout;
  */
 const KOPF_STIL = {
   display: 'flex',
+  flexWrap: 'wrap',
+  height: 'auto',
+  lineHeight: 'normal',
   alignItems: 'center',
-  gap: 16,
+  columnGap: 16,
   paddingInline: 'var(--lfh-kopf-polsterung)',
 } as const;
 
@@ -39,11 +43,13 @@ function GlobalLink({
   label,
   gesperrt,
   grundSichtbar,
+  linkStil,
 }: {
   to: string;
   label: string;
   gesperrt: boolean;
   grundSichtbar: boolean;
+  linkStil: CSSProperties;
 }) {
   if (gesperrt) {
     return (
@@ -97,7 +103,7 @@ function GlobalLink({
     );
   }
   return (
-    <Link to={to} style={{ color: '#fff', flexShrink: 0 }}>
+    <Link to={to} style={linkStil}>
       {label}
     </Link>
   );
@@ -113,11 +119,29 @@ export default function AppLayout() {
   // (erzwungen von `useViewport.guard.test.ts`).
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
+  const { token } = theme.useToken();
+  const linkStil: CSSProperties = {
+    color: '#fff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    flexShrink: 0,
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px ${token.padding}px`,
+  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={KOPF_STIL}>
-        <Link to="/einsaetze" style={{ color: '#fff', fontWeight: 600, fontSize: 18 }}>
+      {/* LFH-460: Umbruch braucht eine mitwachsende Höhe UND normale Zeilenhöhe.
+          Sonst reserviert jedes Space-Kind antds gesamte Headerhöhe als Textzeile. */}
+      <Header
+        style={{
+          ...KOPF_STIL,
+          minHeight: token.controlHeight * 2,
+          rowGap: token.paddingXS,
+          paddingBlock: token.paddingXS,
+        }}
+      >
+        <Link to="/einsaetze" style={{ ...linkStil, fontWeight: 600, fontSize: 18 }}>
           lifeline-hub
         </Link>
         <GlobalLink
@@ -125,6 +149,7 @@ export default function AppLayout() {
           label="Verwaltung"
           gesperrt={!darfVerwaltung(benutzer)}
           grundSichtbar={breit}
+          linkStil={linkStil}
         />
         {/* Farbschema UND Bediendichte wohnen seit LFH-392 auf JEDER Breite im
             Benutzermenü, nicht mehr ab `lg` zusätzlich hier. Sie sind
@@ -133,7 +158,7 @@ export default function AppLayout() {
             Erfassungs-Knopfreihe). Zwei Dreier-Segmentleisten trugen die zwei
             Einstellungen mit SECHS Zielen breit aus, während dieselbe Wahl im
             Menü darunter schon vollständig lag. */}
-        <Space style={{ marginLeft: 'auto' }} size="middle">
+        <Space wrap style={{ marginLeft: 'auto', maxWidth: '100%' }} size="middle">
           <CommandPaletteTrigger />
           <BenutzerMenu />
         </Space>

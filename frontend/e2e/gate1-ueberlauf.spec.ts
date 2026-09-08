@@ -1,5 +1,162 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+// LFH-460: Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen.
+// Die gespeicherte Wahl muss auch bei Touch gelten; Pixel prüft nur der Browser.
+test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
+  test.use({ hasTouch: true });
+
+  test('kurzer Einsatzname hält den Handschuh-Boden', async ({ page }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, 'A');
+    await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+    for (const breite of [390, 1024]) {
+      await page.setViewportSize({ width: breite, height: 900 });
+      await page.goto(`/einsaetze/${einsatzId}/etb`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+      const wechsler = page.locator('header').getByRole('button', { name: /^A down$/ });
+      await expect(wechsler).toBeVisible();
+      expect
+        .soft((await wechsler.boundingBox())!.width, `${breite}px: kurzer Name`)
+        .toBeGreaterThanOrEqual(72);
+    }
+  });
+
+  for (const mitVerwaltung of [true, false]) {
+    for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      for (const breite of [390, 1024]) {
+        test(`${breite}px ${stufe} ${mitVerwaltung ? 'Admin' : 'ohne Verwaltungsrecht'}: kein Querlauf und erreichbare Kopfziele`, async ({
+          page,
+        }) => {
+          await anmelden(page);
+          const einsatzId = await einsatzAnlegen(
+            page,
+            `LFH-460 Hochwasser Abschnitt Nordwest ${Date.now()}`,
+          );
+          await page.addInitScript(
+            (dichte) => localStorage.setItem('lifeline-hub.dichte', dichte),
+            stufe,
+          );
+          await page.setViewportSize({ width: breite, height: 900 });
+
+          if (!mitVerwaltung) {
+            const benutzername = `lfh460-${Date.now()}`;
+            const passwort = 'lfh-460-test-passwort';
+            const antwort = await page.request.post('/api/benutzer', {
+              data: {
+                benutzername,
+                passwort,
+                anzeigename: 'Maximiliane Kirchgassner-Wohlfahrt',
+              },
+            });
+            expect(antwort.ok(), await antwort.text()).toBeTruthy();
+            const logout = await page.request.post('/api/auth/logout');
+            expect(logout.ok()).toBeTruthy();
+            await page.goto('/login');
+            await page.getByLabel('Benutzername').fill(benutzername);
+            await page.getByLabel('Passwort').fill(passwort);
+            await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+            await expect(page).toHaveURL(/\/einsaetze/);
+          }
+          const routen = mitVerwaltung
+            ? ['/einsaetze', `/einsaetze/${einsatzId}/etb`]
+            : ['/einsaetze'];
+          for (const route of routen) {
+            await page.goto(route);
+            await expect(page.locator('html')).toHaveAttribute('data-dichte', stufe);
+            await expect(
+              route === '/einsaetze'
+                ? page.locator('[data-testid="einsaetze-raster"]')
+                : page.getByPlaceholder('Inhalt …'),
+            ).toBeVisible();
+            // Konkrete Inhaltsanker statt networkidle: die Einsatzroute hält SSE offen.
+            const kopf = page.locator('header');
+            await expect(kopf).toHaveCount(1);
+            if (!mitVerwaltung) {
+              await expect(kopf.getByRole('link', { name: 'Verwaltung' })).toHaveCount(0);
+              await expect(kopf.getByText(/^Verwaltung/)).toBeVisible();
+              await expect(kopf.getByText('Keine Berechtigung')).toHaveCount(
+                breite === 1024 ? 1 : 0,
+              );
+            }
+            const messung = await kopf.evaluate((el) => {
+              const k = el.getBoundingClientRect();
+              const ziele = Array.from(el.querySelectorAll('button, a[href]')).map((ziel) => {
+                const r = ziel.getBoundingClientRect();
+                return {
+                  name: ziel.getAttribute('aria-label') ?? ziel.textContent,
+                  x: r.x,
+                  y: r.y,
+                  rechts: r.right,
+                  unten: r.bottom,
+                  breite: r.width,
+                  hoehe: r.height,
+                };
+              });
+              return {
+                dokument: document.documentElement.scrollWidth,
+                viewport: window.innerWidth,
+                kopfUnten: k.bottom,
+                kopfOben: k.top,
+                kopfBreite: el.clientWidth,
+                kopfInhalt: el.scrollWidth,
+                kopfHoehe: el.clientHeight,
+                kopfInhaltHoehe: el.scrollHeight,
+                ziele,
+              };
+            });
+            const kontext = `${route} ${breite}px ${stufe}`;
+            console.log(kontext, JSON.stringify(messung));
+            expect.soft(messung.dokument, kontext).toBeLessThanOrEqual(messung.viewport);
+            expect.soft(messung.kopfInhalt, kontext).toBeLessThanOrEqual(messung.kopfBreite);
+            expect.soft(messung.kopfInhaltHoehe, kontext).toBeLessThanOrEqual(messung.kopfHoehe);
+            expect(
+              messung.ziele.length,
+              `${kontext}: tatsächlich Bedienziele messen`,
+            ).toBeGreaterThanOrEqual(mitVerwaltung ? (route === '/einsaetze' ? 4 : 5) : 3);
+            for (const ziel of messung.ziele) {
+              const name = `${kontext}: ${ziel.name}`;
+              expect.soft(ziel.x, name).toBeGreaterThanOrEqual(0);
+              expect.soft(ziel.rechts, name).toBeLessThanOrEqual(breite);
+              expect.soft(ziel.y, name).toBeGreaterThanOrEqual(messung.kopfOben);
+              expect.soft(ziel.unten, name).toBeLessThanOrEqual(messung.kopfUnten);
+              const boden = stufe === 'handschuh' ? 72 : stufe === 'komfortabel' ? 48 : 24;
+              expect.soft(ziel.hoehe, name).toBeGreaterThanOrEqual(boden);
+              expect.soft(ziel.breite, name).toBeGreaterThanOrEqual(boden);
+              for (const nachbar of messung.ziele) {
+                if (nachbar === ziel) continue;
+                const ueberlappt =
+                  Math.min(ziel.rechts, nachbar.rechts) > Math.max(ziel.x, nachbar.x) &&
+                  Math.min(ziel.unten, nachbar.unten) > Math.max(ziel.y, nachbar.y);
+                expect.soft(ueberlappt, `${name}: überdeckt ${nachbar.name}`).toBe(false);
+              }
+            }
+            expect(messung.kopfHoehe, `${kontext}: höchstens zwei Zeilen`).toBeLessThanOrEqual(
+              stufe === 'handschuh' ? 288 : stufe === 'komfortabel' ? 192 : 120,
+            );
+            if (stufe === 'handschuh') {
+              await test.info().attach(`${route} Kopfzeile`, {
+                body: await page.screenshot(),
+                contentType: 'image/png',
+              });
+            }
+            const inhalt = await page.locator('.ant-layout-content').first().boundingBox();
+            expect(
+              inhalt!.y,
+              `${kontext}: Kopf verdeckt keinen Seiteninhalt`,
+            ).toBeGreaterThanOrEqual(messung.kopfUnten);
+            await kopf.getByRole('button', { name: 'Suchen', exact: true }).click();
+            await expect(page.getByRole('combobox', { name: /Suchen: Module/ })).toBeFocused();
+            await page.keyboard.press('Escape');
+            await kopf.getByRole('button', { name: 'Benutzermenü' }).click();
+            await expect(page.getByRole('menuitem', { name: /Profil/ })).toBeVisible();
+            await page.keyboard.press('Escape');
+          }
+        });
+      }
+    }
+  }
+});
+
 /**
  * Gate 1 der Bedien-Leitlinie: kein waagerechter Überlauf auf den drei
  * Arbeitsbreiten (LFH-329 · B1, Abschlussschritt).
@@ -444,9 +601,7 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
 
       // Freistellung greift über das MODUL-SEGMENT des Pfades, nicht über den ganzen
       // Pfad: der enthält die laufende Einsatz-ID und wäre nicht schreibbar.
-      const frei = BESTAND_OFFEN.find(
-        (b) => pfad.endsWith(`/${b.modul}`) && b.breite === breite,
-      );
+      const frei = BESTAND_OFFEN.find((b) => pfad.endsWith(`/${b.modul}`) && b.breite === breite);
       if (frei) {
         genutzteFreistellungen.add(`${frei.modul}@${frei.breite}`);
         if (ueber <= 1) {

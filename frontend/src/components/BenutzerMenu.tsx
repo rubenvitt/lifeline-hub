@@ -185,7 +185,8 @@ export default function BenutzerMenu() {
         type="text"
         aria-label="Benutzermenü"
         style={{
-          height: 40,
+          height: Math.max(40, token.controlHeight),
+          minWidth: token.controlHeight,
           padding: '0 8px',
           color: '#fff',
           display: 'inline-flex',
@@ -202,8 +203,8 @@ export default function BenutzerMenu() {
         {/* Unter `lg` bleibt der Avatar allein stehen: Name und Pfeil kosten
             dort bis zu 190 px der Kopfzeile, und der Name steht ohnehin in der
             Kopfgruppe des Dropdowns. Das `aria-label` am Knopf bleibt, damit
-            der Trigger auch als reines Symbol benannt ist — die Höhe (40 px)
-            hält dabei A1 Gate 3 (≥ 24 px) mit Reserve. */}
+            der Trigger auch als reines Symbol benannt ist. Höhe und Mindestbreite
+            folgen der Dichte; 40 px bleiben nur der kompakte Höhenboden (LFH-460). */}
         {breit && (
           <>
             <span
