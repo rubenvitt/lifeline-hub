@@ -34,6 +34,9 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
    * `status: 'vermisst'` ein 422 — eine vermisste Person ist nicht angetroffen.
    */
   sichtung?: Sichtungskategorie;
+  /** Wartebereich-Eintritt in derselben Transaktion wie die Anlage (LFH-458).
+   * Bleibt beim Offline-Replay an der client_id; `vermisst` + UHS ist 422. */
+  uhs_id?: number | null;
 }
 
 export function listePersonen(einsatzId: number, status?: PersonStatus): Promise<Person[]> {

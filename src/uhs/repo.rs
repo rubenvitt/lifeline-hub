@@ -54,12 +54,21 @@ pub async fn liste(
 /// Lädt eine UHS (auch stornierte) eines Einsatzes; `NotFound`, falls sie nicht
 /// zum Einsatz gehört (Org-Isolation via `einsatz_id`-Prädikat).
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<UhsAnzeige, AppError> {
+    laden_tx(&mut *pool.acquire().await?, einsatz_id, id).await
+}
+
+/// Wie `laden`, innerhalb einer offenen Transaktion, etwa für die Aufnahme-Auditspur.
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<UhsAnzeige, AppError> {
     sqlx::query_as::<_, UhsAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
     )))
     .bind(id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)
 }

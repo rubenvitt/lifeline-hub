@@ -140,6 +140,9 @@ pub struct AnlegenBody {
     /// Offline-Queue mit `client_id`-Idempotenz (siehe unten), ein nachgeschobener
     /// Sichtungs-Call hätte keine — ein Replay legte die Sichtung ein zweites Mal an.
     pub sichtung: Option<String>,
+    /// Optionaler Eintritt in den UHS-Wartebereich in derselben Transaktion wie die
+    /// Person-Anlage (LFH-458). Ein client_id-Replay erzeugt keine zweite Belegung.
+    pub uhs_id: Option<i64>,
     /// Stabiler, client-generierter Idempotenzschlüssel für Offline-Queue und
     /// Timeout-Replay. Leer/fehlend behält das Verhalten älterer Clients.
     pub client_id: Option<String>,
@@ -165,6 +168,16 @@ pub async fn anlegen(
         &benutzer,
     )
     .await?;
+    if body.uhs_id.is_some() {
+        fordere_modul_zugriff_laden(
+            &state.pool,
+            einsatz_id,
+            einsatz.org_id,
+            "unfallhilfsstellen",
+            &benutzer,
+        )
+        .await?;
+    }
     crate::routes::support::fordere_offline_queue_benutzer(&headers, benutzer.id)?;
 
     // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-Gates, aber vor dem
@@ -204,6 +217,12 @@ pub async fn anlegen(
         ));
     }
 
+    if body.uhs_id.is_some() && matches!(status_enum, PersonStatus::Vermisst) {
+        return Err(AppError::UnprocessableEntity(
+            "Eine vermisste Person kann keinen UHS-Wartebereich betreten".into(),
+        ));
+    }
+
     // Erst-Sichtung: das Feld für sich → 400, die Kombination mit dem Status → 422
     // (LFH-267/F22). Eine vermisste Person ist nicht angetroffen und damit nicht sichtbar;
     // dieselbe Linie zieht der dedizierte Sichtungs-Endpunkt über `person.status`.
@@ -237,7 +256,7 @@ pub async fn anlegen(
     let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
         .await?
         .etb_startwert();
-    let (person, war_neu) = crate::write_retry!(&state.pool, |conn| {
+    let (person, war_neu, uhs_etb_id) = crate::write_retry!(&state.pool, |conn| {
         let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
             conn,
             einsatz_id,
@@ -257,6 +276,7 @@ pub async fn anlegen(
             },
         )
         .await?;
+        let mut uhs_etb_id = None;
         if war_neu {
             // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
             // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
@@ -300,15 +320,47 @@ pub async fn anlegen(
                 crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
                     .await?;
             }
+            if let Some(uhs_id) = body.uhs_id {
+                crate::uhs::belegung_repo::eintritt_tx(
+                    conn,
+                    einsatz_id,
+                    id,
+                    uhs_id,
+                    None,
+                    None,
+                    benutzer.id,
+                )
+                .await?;
+                let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
+                let text = format!(
+                    "Person {}: Aufnahme in {} (Inbox)",
+                    registrier_anzeige(reg),
+                    uhs.bezeichnung,
+                );
+                uhs_etb_id = Some(
+                    crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
+                        .await?,
+                );
+            }
         }
-        // NACH der Sichtung geladen: sonst trüge die Antwort den Vorzustand — Status
+        // NACH Sichtung und UHS-Eintritt geladen: sonst trüge die Antwort den Vorzustand — Status
         // `erfasst`, `aktuelle_sichtung` leer —, und der Client zeigte die Quittung zu
         // einem Datensatz, den es so nie gab.
         let person = repo::laden_tx(conn, einsatz_id, id).await?;
-        Ok((person, war_neu))
+        Ok((person, war_neu, uhs_etb_id))
     })?;
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
+        if let Some(uhs_id) = body.uhs_id {
+            state.live.publiziere_event(
+                einsatz_id,
+                LiveEvent::Uhs,
+                serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": uhs_id }).to_string(),
+            );
+        }
+        if let Some(etb_id) = uhs_etb_id {
+            state.live.publiziere(einsatz_id, etb_id);
+        }
     }
     Ok((StatusCode::CREATED, Json(person)))
 }

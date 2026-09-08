@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 ## ClickUp
 
@@ -10,34 +10,6 @@ Tasks werden selbstständig über den ClickUp-MCP angelegt — wie und wann besc
 Skill `clickup-task-anlegen`.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
-
-**Farbachse der Betroffenen-Module (LFH-455):** Personenstatus, Schadensstatus und
-Schadensausmaß gehören zum A2-Vertrag in `theme/statusFarben.ts`. Ihre Darstellung folgt
-`StatusTag` aus LFH-446: die Rollenfarbe kennzeichnet den Rand, `token.colorText` trägt die
-Beschriftung. Dafür ist keine zusätzliche Darstellungsoption nötig. „Betroffen“ und
-„abgemeldet“ sagen nichts über medizinische Dringlichkeit; „verstorben“ ist kein roter
-Alarm wie SK I. Diese Personenstatus sind neutral, „vermisst“ ist `achtung`. Beim Schaden
-ist „offen“ `achtung`, „übergeben“ `bedien`, „abgeschlossen“ neutral. Beim Ausmaß ist
-„gering“ neutral, „mittel“/„groß“ `achtung`, „katastrophal“ `alarm`; die Labels unterscheiden
-die zusammengefassten Stufen.
-
-**Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
-`SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
-SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe
-([BBK: Triage/Sichtung](https://www.bbk.bund.de/DE/Themen/Gesundheitlicher-Bevoelkerungsschutz/Triage-Sichtung/triage-sichtung.html)).
-Die Umrandung macht Gelb auf hellem und Schwarz auf dunklem Grund sichtbar, die separate
-Beschriftung folgt dem Modus. `color="black"` an antds `Tag` ist ausdrücklich falsch:
-es ist kein Preset und erzeugt ein statisches Farbpaar ohne Nachtmodus. SK IV/blau ist die
-benannte fachliche Ausnahme zur blauen Bedien-/Beziehungsrolle. Übergabe, Geschädigt-Bezug
-und UHS-Verortung tragen `bedien` als aktive Beziehung, nicht als Zustand der referenzierten
-Entität. Personenstatus und Sichtung bleiben unabhängig, auch bei `SK=tot` mit anderem
-Personenstatus.
-
-`e2e/betroffene-kontrast.spec.ts` prüft die tatsächlich zusammengesetzten Text-/Hintergrundpaare
-auf Aufnahme-Route, im Modal, in Listen und Details: Tag ≥ 7:1, Nacht ≥ 5:1. Die Sichtungswahl
-wird ungewählt, gewählt und mit Hover geprüft; Alpha wird mitgerechnet, unbelegte
-Bild-/Opacity-Kompositionen werden abgelehnt. Kein zusätzlicher mobiler Status-Slot ist
-Teil dieser Farbentscheidung.
 
 Die UI-Form richtet sich nach Umfang/Interaktion des Inhalts (LFH-19):
 
@@ -525,7 +497,7 @@ Alltag wichtigsten:
   Jedes `Popconfirm` an einer destruktiven Aktion trägt `okButtonProps={{ danger: true }}` —
   sonst bestätigt man das Löschen mit einem blauen Knopf.
   **Die erste Anwendung auf den Bestand steht** (LFH-378/B5l): das „Lösen" im UHS-Materialreiter
-  (`pages/uhs/MaterialTab.tsx`) hat seine Rückfrage **verloren**, weil CLAUDE.md „eine gelöste
+  (`pages/uhs/MaterialTab.tsx`) hat seine Rückfrage **verloren**, weil AGENTS.md „eine gelöste
   Zuordnung" wörtlich als umkehrbar führt und die Umkehrung („Material zuordnen") als Knopf
   darüber steht. LFH-367/B5g hatte dasselbe `Popconfirm` noch **gehärtet statt entfernt** —
   bewusst, weil das Entfernen einer bestehenden Rückfrage eine Bedienentscheidung ist und nicht
@@ -577,7 +549,7 @@ Alltag wichtigsten:
   Schlüssel**, damit eine zweite Aktion den stehenden Toast ersetzt statt zu stapeln — wer in
   Serie sichtet, erzeugt sie im Sekundentakt, und zwei sichtbare Rückwege sagen nicht, welcher
   zu welchem Datensatz gehört.
-  **Ein handlungsfähiger Toast ist keine Alarmmeldung.** Das EEMUA-191-Budget, das CLAUDE.md
+  **Ein handlungsfähiger Toast ist keine Alarmmeldung.** Das EEMUA-191-Budget, das AGENTS.md
   gegen den Autosave-Erfolgstoast zitiert, zielt auf **ungefragte Zustandsmeldungen**. Der
   Rückgängig-Toast erscheint ausschließlich nach einer Nutzeraktion, nie nach einem
   Live-Ereignis, und er ersetzt eine Rückfrage, die vorher **zwei** Interaktionen kostete —
@@ -1413,10 +1385,10 @@ rtk wget <url>          # Compact download output (65%)
 ```bash
 rtk gain                # View token savings statistics
 rtk gain --history      # View command history with savings
-rtk discover            # Analyze Claude Code sessions for missed RTK usage
+rtk discover            # Analyze Codex sessions for missed RTK usage
 rtk proxy <cmd>         # Run command without filtering (for debugging)
-rtk init                # Add RTK instructions to CLAUDE.md
-rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
+rtk init                # Add RTK instructions to AGENTS.md
+rtk init --global       # Add RTK to ~/.Codex/AGENTS.md
 ```
 
 ## Token Savings Overview

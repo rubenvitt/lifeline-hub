@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { einsatzKeys } from '../../api/queryKeys';
 import { AuthProvider } from '../../auth/AuthContext';
-import { aenderePersonBelegung } from '../../api/einsatzUhs';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import AufnahmePage from './AufnahmePage';
 
 /**
@@ -17,29 +18,31 @@ import AufnahmePage from './AufnahmePage';
  * gilt: die Route existiert, sie erfasst in Serie ohne den Ort zu verlassen, und die
  * Quittung bleibt stehen.
  *
- * **Der UHS-Auftrag (LFH-341 · C6)** hängt am Query-Param `?uhs=<id>` und bucht nach dem
- * Anlegen den Eintritt in den Wartebereich. Die Person-Anlage selbst bleibt über MSW real
- * (wie im restlichen File) — nur `aenderePersonBelegung` wird zum Mock, sonst bräuchte jeder
- * Bestandstest hier einen Belegungs-Endpunkt, den H38 gar nicht anfasst. Gleiche Bauform wie
- * `GrundrissTabs.test.tsx`.
+ * LFH-458: Der UHS-Auftrag geht im Anlege-Request mit. Alle Schreibrequests
+ * werden über MSW gezählt, einschließlich versehentlicher Folge-Requests.
  */
-vi.mock('../../api/einsatzUhs', async (importOriginal) => {
-  const echt = await importOriginal<typeof import('../../api/einsatzUhs')>();
-  return { ...echt, aenderePersonBelegung: vi.fn() };
-});
+const schreibrequests: string[] = [];
+function merkeRequest({ request }: { request: Request }) {
+  if (request.method === 'POST') schreibrequests.push(new URL(request.url).pathname);
+}
 
 class FakeEventSource {
   url: string; closed = false;
   constructor(url: string) { this.url = url; }
   addEventListener() {} removeEventListener() {} close() { this.closed = true; }
 }
-beforeEach(() => {
+beforeEach(async () => {
   vi.stubGlobal('EventSource', FakeEventSource);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   sessionStorage.clear();
-  vi.mocked(aenderePersonBelegung).mockReset();
+  schreibrequests.length = 0;
+  server.events.on('request:start', merkeRequest);
+  await queueLeerenFuerTests();
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  server.events.removeListener('request:start', merkeRequest);
+});
 
 const nutzer = {
   id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
@@ -221,114 +224,80 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     expect(screen.queryByRole('link', { name: 'Personen' })).not.toBeInTheDocument();
   });
 
-  it('bucht nach dem Anlegen den Eintritt in den Wartebereich der beauftragten UHS', async () => {
-    const patient = { ...angelegt, id: 42, registrier_nr: 3 };
-    render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(patient, { status: 201 })),
+  it('erfasst Person und UHS-Eintritt mit genau einem Schreibrequest', async () => {
+    let daten: Record<string, unknown> = {};
+    const { client } = render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        daten = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...angelegt, aktuelle_uhs_id: 7, aktueller_platz_id: null }, { status: 201 });
+      }),
     ], '/einsaetze/1/personen/aufnahme?uhs=7');
+    // Der Test-Provider entsorgt unbeobachtete Queries sonst sofort (gcTime: 0).
+    client.setQueryDefaults(einsatzKeys.uhs(1), { gcTime: Infinity });
+    client.setQueryDefaults(einsatzKeys.uhsDetail(1, 7), { gcTime: Infinity });
+    client.setQueryData(einsatzKeys.uhs(1), []);
+    client.setQueryData(einsatzKeys.uhsDetail(1, 7), {});
     await screen.findByRole('radiogroup');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-
-    await waitFor(() => expect(aenderePersonBelegung).toHaveBeenCalledWith(1, 42, {
-      art: 'eintritt', uhs_id: 7, platz_id: null,
-    }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    expect(await screen.findByText('Erfasst als R-047 · SK II · im Wartebereich')).toBeInTheDocument();
+    expect(client.getQueryState(einsatzKeys.uhs(1))?.isInvalidated).toBe(true);
+    expect(client.getQueryState(einsatzKeys.uhsDetail(1, 7))?.isInvalidated).toBe(true);
+    expect(daten).toMatchObject({ uhs_id: 7, client_id: expect.any(String) });
+    expect(schreibrequests).toEqual(['/api/einsaetze/1/personen']);
   });
 
-  it('bucht ohne UHS-Auftrag gar keine Belegung', async () => {
+  it.each(['', '?uhs=kaputt'])('sendet ohne gültigen UHS-Auftrag kein uhs_id (%s)', async (query) => {
+    let daten: Record<string, unknown> = {};
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 })),
-    ]);
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        daten = await request.json() as Record<string, unknown>;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    ], `/einsaetze/1/personen/aufnahme${query}`);
     await screen.findByRole('radiogroup');
-
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-
-    // Der Primär-Knopf navigiert nach dem Speichern zurück in die Liste — die Quittung
-    // selbst ist danach nicht mehr im Baum (Muster aus dem Bestandstest oben, „geht nach
-    // dem Primär-Knopf zurück in die Liste"). Der belastbare Beleg ist der Mock.
     await screen.findByText('PERSONENLISTE');
-    expect(aenderePersonBelegung).not.toHaveBeenCalled();
+    expect(daten).not.toHaveProperty('uhs_id');
+    expect(schreibrequests).toEqual(['/api/einsaetze/1/personen']);
   });
 
-  it('sagt es, wenn die Zuordnung offline nicht gebucht werden konnte', async () => {
-    // Ohne Person-ID gibt es keine Belegung. Eine still ausgefallene Zuordnung
-    // waere eine Person, die an der UHS niemand sucht.
-    //
-    // ÜBER DEN PRIMÄR-KNOPF, nicht „Speichern und nächste": genau hier lag ein gemessener
-    // Defekt. `onFertig` navigiert nach dem Primär-Knopf sofort zur UHS — die stehende
-    // `<Alert>`-Quittung hängt dabei aus dem Baum, bevor sie ein Frame lang sichtbar war
-    // (roter Lauf vor dem Fix: `findByText(/von Hand erfolgen/)` fand nichts, das DOM
-    // zeigte bereits das Navigationsziel). Der Fix ist ein zweiter Kanal (`message.warning`,
-    // überlebt die Navigation, weil er am `App`-Kontext hängt statt am Baum dieser Seite) —
-    // dieser Test bleibt deshalb auf dem Primär-Knopf, sonst prüft er den Fix nicht.
+  it.each(['Erfassen', 'Speichern und nächste'])('merkt die UHS offline ohne Handarbeitsvorbehalt vor: %s', async (aktion) => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     render(einsatzAktiv, [], '/einsaetze/1/personen/aufnahme?uhs=7');
     await screen.findByRole('radiogroup');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-
-    // „muss von Hand erfolgen", NICHT „folgt": die Queue schiebt keine Belegung nach.
-    // Ein Test auf /folgt/ waere auch mit dem falschen Versprechen gruen.
-    expect(await screen.findByText(/von Hand erfolgen/)).toBeInTheDocument();
-    expect(aenderePersonBelegung).not.toHaveBeenCalled();
-    // Beleg, dass die Meldung wirklich die Navigation überlebt hat und nicht bloß VOR ihr
-    // gefasst wurde: die Seite ist tatsächlich weitergezogen.
-    await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7'));
+    await userEvent.click(screen.getByRole('button', { name: aktion }));
+    if (aktion === 'Erfassen') {
+      await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7'));
+    } else {
+      expect(await screen.findByText('Offline vorgemerkt — Registriernummer folgt nach der Übertragung.')).toBeInTheDocument();
+    }
+    const queue = await schreibaktionenLaden(1, 1);
+    expect(queue).toHaveLength(1);
+    expect(queue[0].aktion).toMatchObject({ art: 'person', daten: { uhs_id: 7, client_id: expect.any(String) } });
+    expect(screen.queryByText(/von Hand|Zuordnung.*fehlgeschlagen/)).not.toBeInTheDocument();
+    expect(schreibrequests).toEqual([]);
   });
 
-  it('sagt es, wenn die Zuordnung zur Unfallhilfsstelle fehlschlägt', async () => {
-    // Die Person IST angelegt — nur der zweite Schritt (Belegung) scheitert. Das darf die
-    // Quittung nicht verschweigen (Auftrag Auflösung 7).
-    const patient = { ...angelegt, id: 42, registrier_nr: 3 };
-    vi.mocked(aenderePersonBelegung).mockRejectedValueOnce(new Error('Netzwerkfehler'));
+  it('bleibt bei einem abgelehnten UHS-Eintritt ohne Erfolgsquittung im Formular', async () => {
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(patient, { status: 201 })),
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json({ error: 'UHS ist nicht aktiv' }, { status: 422 })),
     ], '/einsaetze/1/personen/aufnahme?uhs=7');
     await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('UHS ist nicht aktiv')).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/personen/aufnahme?uhs=7');
+    expect(screen.queryByText(/Erfasst als/)).not.toBeInTheDocument();
+    expect(await schreibaktionenLaden(1, 1)).toHaveLength(0);
+    expect(schreibrequests).toEqual(['/api/einsaetze/1/personen']);
+  });
 
-    // „Speichern und nächste" hält die Seite offen — die Aussage dieses Tests ist der
-    // Quittungszusatz, nicht der Rückweg (den prüfen die beiden Tests daneben).
+  it('liest den Wartebereich aus der Antwort, auch beim Replay nach einem Austritt', async () => {
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json({ ...angelegt, aktuelle_uhs_id: null, aktueller_platz_id: null }, { status: 201 })),
+    ], '/einsaetze/1/personen/aufnahme?uhs=7');
+    await screen.findByRole('radiogroup');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
-
-    expect(
-      await screen.findByText(/R-003.*Zuordnung zur Unfallhilfsstelle fehlgeschlagen/),
-    ).toBeInTheDocument();
-    // Der Fehler wird zusätzlich gemeldet — und zwar MIT der Registriernummer. Bis zum
-    // Abschluss-Review stand hier nur `fehlerText(e)`, also „Aktion fehlgeschlagen"; auf
-    // dem Primär-Knopf ist das der einzige überlebende Text (Test darunter), und er sagt
-    // nicht, dass die Person angelegt wurde.
-    expect(await screen.findByText(
-      'Erfasst als R-003 — die Zuordnung zur Unfallhilfsstelle ist fehlgeschlagen '
-      + '(Aktion fehlgeschlagen). Bitte von Hand zuordnen.',
-    )).toBeInTheDocument();
-  });
-
-  it('sagt auch über den Primär-Knopf hinweg, dass die Person trotz Fehler angelegt ist', async () => {
-    // DER GEFÄHRLICHERE ZWEIG, und bis zum Abschluss-Review der ungeprüfte. Der Test
-    // darüber nimmt „Speichern und nächste", weil dort die Seite hält — auf dem
-    // PRIMÄR-Knopf löst `mutateAsync` erst nach dem `async onSuccess` auf, die Hülle ruft
-    // `onFertig()` und navigiert zur UHS. Die stehende `<Alert>`-Quittung hängt dabei mit
-    // der Seite aus; sichtbar bliebe allein der Toast. Trüge der nur `fehlerText(e)`, läse
-    // der Bediener „Aktion fehlgeschlagen", fände den Patienten nicht im Wartebereich und
-    // erfasste ihn erneut — zwei Registriernummern für einen Patienten.
-    const patient = { ...angelegt, id: 42, registrier_nr: 3 };
-    vi.mocked(aenderePersonBelegung).mockRejectedValueOnce(new Error('Netzwerkfehler'));
-    render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(patient, { status: 201 })),
-    ], '/einsaetze/1/personen/aufnahme?uhs=7');
-    await screen.findByRole('radiogroup');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-
-    // Erst der Beleg, dass die Seite WIRKLICH weitergezogen ist — sonst prüfte die Zeile
-    // darunter womöglich noch die Quittung auf der alten Seite (Bauform aus dem
-    // Offline-Test daneben).
-    await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7'));
-    // Die Registriernummer überlebt die Navigation, weil `message` am `App`-Kontext hängt.
-    expect(await screen.findByText(/Erfasst als R-003 —/)).toBeInTheDocument();
-    // Und die Quittung, die es NICHT tut, ist wirklich weg — sonst wäre der zweite Kanal
-    // gar nicht nötig gewesen und dieser Test bewiese nichts.
-    expect(screen.queryByText(/R-003.*Zuordnung zur Unfallhilfsstelle fehlgeschlagen/)).not.toBeInTheDocument();
+    expect(await screen.findByText('Erfasst als R-047 · SK II')).toBeInTheDocument();
   });
 
   it('kehrt mit „Erfassen" zur beauftragenden UHS zurück, nicht in die Personenliste', async () => {

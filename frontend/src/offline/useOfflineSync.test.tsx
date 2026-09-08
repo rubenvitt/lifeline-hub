@@ -280,6 +280,23 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
     window.removeEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, listener);
   });
 
+  it('überträgt die vorgemerkte UHS und invalidiert ihre Ansichten nach dem Replay', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    client.setQueryData(einsatzKeys.uhs(7), []);
+    client.setQueryData(einsatzKeys.uhsDetail(7, 9), {});
+    vi.mocked(legePersonAn).mockResolvedValue({ id: 42, aktuelle_uhs_id: 9 } as Person);
+    await schreibaktionEinreihen(BENUTZER_A, 7, {
+      art: 'person', daten: { client_id: 'uhs-replay', uhs_id: 9 },
+    });
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+    await waitFor(() => expect(client.getQueryState(einsatzKeys.uhsDetail(7, 9))?.isInvalidated).toBe(true));
+    expect(client.getQueryState(einsatzKeys.uhs(7))?.isInvalidated).toBe(true);
+    expect(legePersonAn).toHaveBeenCalledExactlyOnceWith(
+      7, { client_id: 'uhs-replay', uhs_id: 9 }, { offlineQueueBenutzerId: BENUTZER_A },
+    );
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0 });
+  });
+
   it('erzeugt ohne bestehenden Personen-Cache keine unvollständige Singleton-Liste', async () => {
     const { client, Wrapper } = wrapperFuer();
     vi.mocked(legePersonAn).mockResolvedValue({ id: 42 } as Person);

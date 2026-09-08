@@ -26,14 +26,18 @@ echo "==> 3/3 Backend im Release-Modus bauen (bettet frontend/dist ein)"
 touch src/static_files.rs
 cargo build --release
 
-BINARY="target/release/lifeline-hub"
+# Cargo baut nicht zwingend nach ./target — ein globales build.target-dir (z. B. ein
+# gemeinsames Verzeichnis über alle Worktrees, ~/.cargo/config.toml) verschiebt es.
+# Deshalb den Pfad von Cargo selbst erfragen statt ihn zu raten.
+TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)"
+BINARY="$TARGET_DIR/release/lifeline-hub"
 
 echo "==> SBOM erzeugen (LFH-253/G01)"
 # Wozu: ohne Inventar des ausgelieferten Artefakts lässt sich im Advisory-Fall nicht
 # beantworten, ob und wo man betroffen ist. Deterministisch und offline — deshalb darf
 # das hier am Release hängen, anders als der netzabhängige Advisory-Scan
 # (scripts/check-deps.sh), der bewusst NICHT im Release-Pfad steht.
-SBOM_DIR="target/release/sbom"
+SBOM_DIR="$TARGET_DIR/release/sbom"
 mkdir -p "$SBOM_DIR"
 sbom_fehlend=()
 
@@ -47,7 +51,7 @@ fi
 
 if mise exec pnpm@11.10.0 -- pnpm -C frontend exec cyclonedx-npm --version >/dev/null 2>&1; then
   mise exec pnpm@11.10.0 -- pnpm -C frontend exec cyclonedx-npm \
-    --output-file "../$SBOM_DIR/bom-frontend.json"
+    --output-file "$SBOM_DIR/bom-frontend.json"
 else
   sbom_fehlend+=("@cyclonedx/cyclonedx-npm  →  pnpm -C frontend add -D @cyclonedx/cyclonedx-npm")
 fi
