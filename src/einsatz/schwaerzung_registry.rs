@@ -723,6 +723,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("benutzer_id", G_FK),
             retain("einsatz_rolle", G_ENUM),
+            scrub("fuehrungsstelle", Strategie::NullSetzen),
             retain("zugewiesen_at", G_ZEIT),
         ],
     },

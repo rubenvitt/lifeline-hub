@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Space } from 'antd';
+import { Alert, App, Button, Form, Input, Modal, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -43,6 +43,28 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
   const { message } = App.useApp();
   const [neuerBenutzer, setNeuerBenutzer] = useState<number | undefined>();
   const [neueRolle, setNeueRolle] = useState<EinsatzRolle>('fuehrungspersonal');
+  const [stelleZiel, setStelleZiel] = useState<(MitgliedAnzeige & { einsatzId: number }) | null>(null);
+  const [stelleWert, setStelleWert] = useState('');
+
+  const stelleSetzen = useMutation({
+    mutationFn: ({ mitglied, wert }: { mitglied: MitgliedAnzeige & { einsatzId: number }; wert: string | null }) =>
+      setzeMitglied(mitglied.einsatzId, mitglied.benutzer_id, mitglied.einsatz_rolle, wert),
+    onSuccess: (liste, { mitglied }) => {
+      qc.setQueryData(einsatzKeys.mitglieder(mitglied.einsatzId), liste);
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(mitglied.einsatzId) });
+      setStelleZiel((aktuell) => aktuell?.einsatzId === mitglied.einsatzId ? null : aktuell);
+    },
+  });
+
+  const stelleSpeichern = () => {
+    if (!stelleZiel || stelleZiel.einsatzId !== einsatzId || !darfVerwalten || stelleSetzen.isPending) return;
+    const wert = stelleWert.trim() || null;
+    if (wert === (stelleZiel.fuehrungsstelle ?? null)) {
+      setStelleZiel(null);
+      return;
+    }
+    stelleSetzen.mutate({ mitglied: stelleZiel, wert });
+  };
 
   const mitgliederQuery = useQuery({
     queryKey: einsatzKeys.mitglieder(einsatzId),
@@ -75,6 +97,24 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
 
   const spalten: ColumnsType<MitgliedAnzeige> = [
     { title: 'Name', dataIndex: 'anzeigename' },
+    {
+      title: 'Führungsstelle',
+      key: 'fuehrungsstelle',
+      render: (_, m) => darfVerwalten ? (
+        <Button
+          type="link"
+          disabled={stelleSetzen.isPending}
+          aria-label={`Führungsstelle für ${m.anzeigename} bearbeiten`}
+          onClick={() => {
+            stelleSetzen.reset();
+            setStelleWert(m.fuehrungsstelle ?? '');
+            setStelleZiel({ ...m, einsatzId });
+          }}
+        >
+          {m.fuehrungsstelle || 'Führungsstelle festlegen'}
+        </Button>
+      ) : (m.fuehrungsstelle || '—'),
+    },
     {
       title: 'Rolle',
       key: 'rolle',
@@ -154,6 +194,31 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
         columns={spalten}
         dataSource={mitglieder}
       />
+      <Modal
+        title={`Führungsstelle für ${stelleZiel?.anzeigename ?? ''}`}
+        open={stelleZiel !== null && stelleZiel.einsatzId === einsatzId && darfVerwalten}
+        onCancel={() => { if (!stelleSetzen.isPending) setStelleZiel(null); }}
+        onOk={stelleSpeichern}
+        okText="Speichern"
+        cancelText="Abbrechen"
+        confirmLoading={stelleSetzen.isPending}
+        cancelButtonProps={{ disabled: stelleSetzen.isPending }}
+        destroyOnHidden
+      >
+        <Form layout="vertical" onFinish={stelleSpeichern}>
+          <Form.Item label="Führungsstelle" htmlFor="mitglied-fuehrungsstelle" extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt. Leer lassen entfernt die Vorbelegung.">
+            <Input
+              id="mitglied-fuehrungsstelle"
+              autoFocus
+              maxLength={200}
+              value={stelleWert}
+              disabled={stelleSetzen.isPending}
+              onChange={(e) => setStelleWert(e.target.value)}
+            />
+          </Form.Item>
+          {stelleSetzen.isError && <Alert type="error" title={stelleSetzen.error.message} showIcon />}
+        </Form>
+      </Modal>
     </section>
   );
 }

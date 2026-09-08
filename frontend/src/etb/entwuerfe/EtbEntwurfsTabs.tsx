@@ -5,7 +5,7 @@ import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
 import Schnellerfassung, { nurUebernahme } from '../Schnellerfassung';
 import type { MetadatenWerte } from '../schnellerfassungModell';
-import { entwurfLabel, zuWerte, type EntwurfWerte } from './entwurfModell';
+import { entwurfLabel, zuWerte } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 
 export interface EtbEntwurfsTabsProps {
@@ -18,27 +18,11 @@ export interface EtbEntwurfsTabsProps {
   onWerteBehaltenChange: (b: boolean) => void;
 }
 
-/**
- * Setzt die übernommenen Wiederholfelder in einen Entwurf ein. Eigene Werte des Entwurfs
- * haben Vorrang — die Übernahme füllt nur Lücken, sie überschreibt nichts Erfasstes.
- */
-function mitUebernahme(w: EntwurfWerte, u: MetadatenWerte): EntwurfWerte {
-  return {
-    ...w,
-    metadaten: {
-      ...w.metadaten,
-      von: w.metadaten.von ?? u.von,
-      an: w.metadaten.an ?? u.an,
-      meldeweg: w.metadaten.meldeweg ?? u.meldeweg,
-    },
-  };
-}
-
 export default function EtbEntwurfsTabs({
   einsatzId, erfassen, bausteine, einsatz, werteBehalten, onWerteBehaltenChange,
 }: EtbEntwurfsTabsProps) {
   const { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen } =
-    useEtbEntwuerfe(einsatzId);
+    useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle);
 
   /**
    * Wertübernahme über die Remount-Grenze (LFH-332/H61).
@@ -62,10 +46,10 @@ export default function EtbEntwurfsTabs({
 
   const onEdit = useCallback(
     (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
-      if (action === 'add') neuerEntwurf();
+      if (action === 'add') neuerEntwurf(werteBehalten ? uebernahme : {});
       else if (typeof targetKey === 'string') void entwurfSchliessen(targetKey);
     },
-    [neuerEntwurf, entwurfSchliessen],
+    [neuerEntwurf, entwurfSchliessen, werteBehalten, uebernahme],
   );
 
   const items = entwuerfe.map((e) => ({
@@ -82,14 +66,17 @@ export default function EtbEntwurfsTabs({
             // Schnellerfassung neu, und `initialWerte` wird nur beim Mount gelesen.
             // Bei ausgeschaltetem Schalter wird geleert statt nur nicht angewandt —
             // sonst tauchten alte Werte beim Wiedereinschalten wieder auf.
-            setUebernahme(werteBehalten ? nurUebernahme(eintrag) : {});
-            await entwurfSchliessen(e.id); // genau diesen Tab schließen, nicht den aktiven
+            const naechsteMetadaten = werteBehalten ? nurUebernahme(eintrag) : {};
+            setUebernahme(naechsteMetadaten);
+            // Nur ein NEUER Folgeentwurf erhält die Übernahme. Ein bestehender Entwurf
+            // bleibt auch mit bewusst leerem An maßgeblich (LFH-461).
+            await entwurfSchliessen(e.id, naechsteMetadaten);
           }}
           berichtigungZu={null}
           onBerichtigungAbbrechen={() => {}}
           bausteine={bausteine}
           einsatz={einsatz}
-          initialWerte={mitUebernahme(zuWerte(e), uebernahme)}
+          initialWerte={zuWerte(e)}
           onWerteChange={(w) => entwurfAktualisieren(e.id, w)}
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={onWerteBehaltenChange}

@@ -365,6 +365,7 @@ export default function EtbPage() {
             />
           ) : (
             <EtbEntwurfsTabs
+              key={einsatzId}
               einsatzId={einsatzId}
               erfassen={erfassenMitMeldung}
               bausteine={bausteineQuery.data ?? []}
