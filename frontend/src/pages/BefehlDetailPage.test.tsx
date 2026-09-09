@@ -10,6 +10,7 @@ import * as befehleApi from '../api/befehle';
 import * as einsaetzeApi from '../api/einsaetze';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
+import { setzeViewportBreite } from '../test/viewport';
 
 vi.mock('../api/befehle');
 vi.mock('../api/einsaetze');
@@ -464,5 +465,73 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     await userEvent.click(dialog.getByRole('button', { name: 'Speichern und weiter' }));
     await screen.findByText(/titel.*required/i);
     expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+  });
+});
+
+/**
+ * Verankerte Aktionsleiste unterhalb des Tablet-Breakpoints (LFH-465, Nachzug aus
+ * LFH-343 · C8, Prüflisten-Zeile 13).
+ *
+ * WAS HIER FÄLLT UND WAS NICHT: die STRUKTUR — ein Aktionsblock, zwei Orte, der
+ * Autosave-Beleg geht mit. Die GEOMETRIE (klebt die Leiste wirklich unten, verdeckt sie
+ * ein Fokusziel) kann jsdom nicht beantworten, es rechnet kein Layout; die trägt
+ * `e2e/befehl-aktionsleiste.spec.ts`.
+ *
+ * DIE UNGLEICHHEIT IST DIE AUSSAGE. Ein Bau, der die Leiste in jeder Breite verankert,
+ * erfüllte „bei 390 px verankert" ebenfalls und wäre trotzdem falsch — oberhalb der
+ * Schwelle gehören dieselben Aktionen in den Kopf. Beide Zweige stehen deshalb als Paar.
+ */
+describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
+  beforeEach(() => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
+  });
+
+  const aktionsblock = () => document.querySelector<HTMLElement>('[data-lfh="befehl-aktionen"]');
+
+  it('verankert die Aktionen unterhalb von `lg` am unteren Rand', async () => {
+    setzeViewportBreite(390);
+    renderAt(7);
+    const freigeben = await screen.findByRole('button', { name: 'Freigeben' });
+    const block = aktionsblock();
+    expect(block).not.toBeNull();
+    expect(block).toContainElement(freigeben);
+    expect(block).toHaveStyle({ position: 'sticky', bottom: '0px' });
+  });
+
+  it('lässt die Aktionen ab `lg` im Kopf stehen — dort ist nichts verankert', async () => {
+    setzeViewportBreite(1024);
+    renderAt(7);
+    const freigeben = await screen.findByRole('button', { name: 'Freigeben' });
+    const block = aktionsblock();
+    expect(block).toContainElement(freigeben);
+    expect(block!.style.position).toBe('');
+  });
+
+  /**
+   * Genau EINE Kopie, in beiden Breiten. Der naheliegende Fehlbau — beide Orte rendern,
+   * einer per CSS versteckt — liefert zwei gleichnamige Knöpfe im Baum: die
+   * Vorlesereihenfolge bekäme „Freigeben" doppelt, und der Tabulaturdurchlauf des
+   * Verdeckungsnachweises liefe auf ein unsichtbares Ziel.
+   */
+  it.each([390, 1024])('rendert die Aktionen bei %ipx genau einmal', async (breite) => {
+    setzeViewportBreite(breite);
+    renderAt(7);
+    expect(await screen.findAllByRole('button', { name: 'Freigeben' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Entwurf speichern' })).toHaveLength(1);
+    expect(document.querySelectorAll('[data-lfh="befehl-aktionen"]')).toHaveLength(1);
+  });
+
+  /**
+   * Der Autosave-Beleg (LFH-342 · C7) muss sichtbar bleiben, WO IMMER die Knöpfe landen —
+   * das ist der zweite Aufzählungspunkt des Tickets. Ein Beleg, der oben im Kopf
+   * stehenbliebe, während die Knöpfe unten kleben, wäre auf 390 px aus dem Bild gescrollt,
+   * genau während man tippt.
+   */
+  it.each([390, 1024])('trägt den Autosave-Beleg bei %ipx im selben Block wie die Knöpfe', async (breite) => {
+    setzeViewportBreite(breite);
+    renderAt(7);
+    await userEvent.type(await screen.findByLabelText('Titel'), ' x');
+    expect(within(aktionsblock()!).getByText('ungespeicherte Änderungen')).toBeInTheDocument();
   });
 });
