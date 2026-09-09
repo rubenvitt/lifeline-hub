@@ -223,10 +223,20 @@ jobs:
       # „Test timed out in 10000ms", die im Gate-Job (uninstrumentiert) grün sind. Das ist
       # keine Regression, sondern die bekannte Flakiness unter Last; die Antwort ist mehr Zeit
       # und weniger Parallelität, nicht ein abgeschalteter Test.
+      # `pnpm run test:coverage -- <flags>` hat die Flags NICHT durchgereicht — gemessen: die
+      # Fehlermeldungen nannten weiter „timed out in 10000ms", also den Config-Wert. Deshalb
+      # `exec vitest` direkt; damit landen die Flags nachweislich an Vitest.
+      #
+      # `--retry=1` ist hier großzügiger als im Gate-Job und darf es sein: dieser Job MISST,
+      # er urteilt nicht (continue-on-error), und unter der Instrumentierung kippen auf zwei
+      # vCPU auch Tests, die sonst grün sind — gemessen waren es fünf, darunter zwei
+      # Race-Conditions statt reiner Timeouts. Bleibt der Job trotzdem rot, ist die richtige
+      # Antwort, die Frontend-Coverage ganz herauszunehmen und nur Rust zu messen, statt die
+      # Schrauben weiter zu lockern.
       - name: Frontend-Coverage
         run: >-
-          mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend run test:coverage --
-          --coverage.reporter=lcov --testTimeout=30000 --no-file-parallelism
+          mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec vitest run --coverage
+          --coverage.reporter=lcov --testTimeout=30000 --no-file-parallelism --retry=1
 
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:

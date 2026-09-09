@@ -124,8 +124,29 @@ export default defineConfig({
    * Übersteuerbar: `PW_WORKERS=6 pnpm e2e` auf einer ruhigen Maschine.
    */
   workers: Number(process.env.PW_WORKERS ?? 3),
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
+  /*
+   * FRISTEN NACH HARDWARE, NICHT NACH WUNSCH (LFH-522, gemessen im ersten CI-Lauf).
+   *
+   * Auf einem GitHub-Runner (2 vCPU) fielen 10 von 151 Tests aus — ausnahmslos an der Uhr:
+   * `page.goto`/`locator.click` überschritten den 30-s-Testtimeout, während 141 grün
+   * durchliefen. Das ist keine Regression, sondern die Hardware: die Suite fährt gegen den
+   * Vite-DEV-Server, der jedes Modul beim ersten Aufruf übersetzt, und zwei Worker teilen
+   * sich dabei zwei Kerne mit dem Backend.
+   *
+   * Deshalb längere Fristen NUR unter `CI` — lokal bleiben 30 s, damit ein echt hängender
+   * Test hier schnell auffällt und nicht eine halbe Minute pro Lauf kostet.
+   */
+  timeout: process.env.CI ? 90_000 : 30_000,
+  expect: { timeout: process.env.CI ? 25_000 : 10_000 },
+  /*
+   * EIN Wiederholungsversuch, und nur unter CI. Das ist bewusst die schwächste Zusicherung
+   * in dieser Datei, deshalb die Grenze: ein Test, der ZWEIMAL scheitert, bleibt rot — ein
+   * deterministisch kaputter Test wird also nicht grün gewaschen. Was `retries` auffängt,
+   * ist der Fall, den `trace: 'on-first-retry'` unten ohnehin schon voraussetzt: ein Ausfall,
+   * der beim zweiten Anlauf nicht wiederkehrt. Wer hier auf 2 erhöht, verschiebt die Grenze
+   * zwischen „flaky" und „kaputt" — und sollte vorher wissen, warum.
+   */
+  retries: process.env.CI ? 1 : 0,
   use: { baseURL, trace: 'on-first-retry' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
