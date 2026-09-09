@@ -295,6 +295,17 @@ Die verbleibenden zwei `moderate`-Funde brechen das Gate per Konvention nicht
   Variablen-Debuginfo heraus. **Wer einen dritten Job ergänzt, übernimmt beides.** Der
   Aufräumschritt steht bewusst doppelt in der Datei statt in einer eigenen Composite-Action —
   zwei Vorkommen rechtfertigen den Umweg nicht, drei vielleicht.
+- **Ein kalter Lauf dauert über eine Stunde** (gemessen: der zweite Anlauf lief exakt in die
+  ursprüngliche 60-Minuten-Grenze, der Schritt „Alle Gates" allein 53 Minuten). Zwei vCPU,
+  442 Crates inklusive OpenSSL aus Quelle, dann Rust-Suite, 3768 Vitest- und 143
+  Playwright-Tests. Die Grenzen stehen jetzt bei 120 (Gate) und 90 (Coverage) Minuten und
+  sind als **Reißleine gedacht, nicht als erwartetes Maß** — mit warmem Cargo-Cache liegt
+  der Lauf deutlich darunter.
+  **Der Cache selbst war dabei der eigentliche Fallstrick:** `Swatinem/rust-cache` speichert
+  per Vorgabe nur nach einem grünen Job. Ein Lauf, der ins Timeout rennt, hinterlässt also
+  keinen Cache, der nächste startet wieder kalt und rennt wieder ins Timeout — ein Kreis, der
+  sich ohne `cache-on-failure: true` nicht von selbst öffnet. Wer die Timeouts wieder senken
+  will, senkt sie erst, wenn ein warmer Lauf gemessen ist.
 - **Die Playwright-Flakiness unter Last** (Memory: Vitest/Playwright unter Last flaky) bleibt
   auf 2-vCPU-Runnern zu beobachten. `PW_WORKERS: 2` ist die Vorsorge; falls e2e dort trotzdem
   flakt, ist die Antwort ein `retries: 1` **nur unter `CI=true`**, nicht ein abgeschalteter

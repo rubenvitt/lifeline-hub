@@ -49,7 +49,13 @@ jobs:
   gate:
     name: check-all.sh
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 120 statt 60 — gemessen, nicht großzügig geschätzt: ein KALTER Lauf braucht auf zwei
+    # vCPU über eine Stunde allein für „Alle Gates" (Rust-Build über 442 Crates inklusive
+    # OpenSSL aus Quelle, dann Rust-Suite, 3768 Vitest-Tests und 143 Playwright-Tests). Der
+    # erste Anlauf lief exakt in die 60-Minuten-Grenze. Mit warmem Cargo-Cache liegt der Lauf
+    # deutlich darunter; die Grenze ist die Reißleine für einen hängenden Lauf, nicht das
+    # erwartete Maß.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -81,6 +87,12 @@ jobs:
           # Der Cache-Schlüssel muss das eingebackene OpenSSL kennen: ohne diesen Zusatz
           # teilte ein Lauf VOR und NACH einem openssl-src-Bump denselben Eintrag.
           key: openssl-vendored
+          # Ohne das hier gibt es einen Teufelskreis, und er ist im ersten Anlauf eingetreten:
+          # die Action speichert per Vorgabe nur nach einem GRÜNEN Job. Ein Lauf, der ins
+          # Timeout rennt, hinterlässt also keinen Cache — der nächste startet wieder kalt und
+          # rennt wieder ins Timeout. Ein Cache aus einem abgebrochenen Lauf ist nicht falsch,
+          # nur unvollständig; die Crates darin sind dieselben.
+          cache-on-failure: true
 
       # mise, weil check-all.sh seine Node-/pnpm-Versionen selbst pinnt
       # (`mise exec node@26.7.0 pnpm@11.10.0`) — beide Nachbarversionen sind gemessen kaputt,
@@ -140,7 +152,9 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 90 statt 45: `cargo llvm-cov` baut den gesamten Workspace ein ZWEITES Mal, instrumentiert
+    # und in einem eigenen Target-Verzeichnis — es teilt sich nichts mit dem Gate-Job.
+    timeout-minutes: 90
     # Bewusst KEIN Required Check und bewusst ein eigener Job: `cargo llvm-cov` ersetzt
     # `cargo test` durch einen instrumentierten Lauf, im Gate-Job wäre das ein zweiter
     # kompletter Durchlauf. Und ein Coverage-Werkzeug darf das Gate nie rot färben —
@@ -175,6 +189,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: coverage-openssl-vendored
+          cache-on-failure: true
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: llvmcov-cache
