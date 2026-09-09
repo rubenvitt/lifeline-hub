@@ -38,21 +38,40 @@ const KOEPFE = [
   ['pages/BefehlDetailPage.tsx', 'BEFEHL_STATUS[befehl.status]'],
 ] as const;
 
+/**
+ * Die Etikettengruppe des Kopfes — und NUR sie.
+ *
+ * Ein Guard über die ganze Datei behauptete „der Kopf ist die einzige Stelle mit einem
+ * `<Tag>`", statt es zu prüfen: ein späteres Prioritäts- oder Vorlagen-Etikett weiter
+ * unten im Rumpf färbte ihn rot, ohne dass am Statusetikett etwas falsch wäre — ein
+ * Gate, das aus dem falschen Grund rot geht, kostet die Zeit dessen, der es debuggt.
+ * Der Schnitt trägt die Begründung deshalb selbst und WIRFT, wenn er den Anker nicht
+ * findet: eine stillschweigend leere Menge machte jede Abwesenheits-Aussage trivial wahr.
+ */
+function etikettengruppe(inhalt: string, datei: string): string {
+  const auf = inhalt.indexOf('<Space size={6} wrap');
+  if (auf === -1) throw new Error(`${datei}: keine Etikettengruppe im Kopf gefunden`);
+  const zu = inhalt.indexOf('</Space>', auf);
+  if (zu === -1) throw new Error(`${datei}: Etikettengruppe nicht geschlossen`);
+  return inhalt.slice(auf, zu);
+}
+
 describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
   it.each(KOEPFE)('%s trägt kein Preset-`color` mehr am Etikett', (datei) => {
-    const inhalt = lies(datei);
-    // Der Kopf ist die einzige Stelle beider Dateien mit einem `<Tag>` — ein `color`
-    // daran kann deshalb nur das Statusetikett sein.
-    expect(inhalt, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(/<Tag\s+color=/);
+    const gruppe = etikettengruppe(lies(datei), datei);
+    expect(gruppe, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(/<Tag\s+color=/);
+    // Der Schnitt hat wirklich die Gruppe erwischt — sonst prüfte die Zeile darüber
+    // eine leere Zeichenkette gegen eine Abwesenheit und wäre immer grün.
+    expect(gruppe, `${datei}: der Schnitt enthält die Etiketten`).toContain('<Tag>');
   });
 
   it.each(KOEPFE)('%s schreibt den Wortlaut nicht ab, sondern liest ihn', (datei, zugriff) => {
-    const inhalt = lies(datei);
-    // „Freigegeben" stand NUR am Statusetikett (gemessen); „Entwurf" trägt daneben die
-    // Knopfbeschriftung „Entwurf speichern" und taugt deshalb nicht als Gegenprobe.
-    expect(inhalt, `${datei}: Statuslabel nicht abgeschrieben`).not.toContain("'Freigegeben'");
-    expect(inhalt, `${datei}: liest die Achse`).toContain(zugriff);
-    const badges = inhalt.match(/<StatusBadge/g) ?? [];
+    const gruppe = etikettengruppe(lies(datei), datei);
+    // „Freigegeben" als Literal ist die belastbare Gegenprobe; „Entwurf" trägt daneben
+    // die Knopfbeschriftung „Entwurf speichern" und taugt dafür nicht.
+    expect(gruppe, `${datei}: Statuslabel nicht abgeschrieben`).not.toContain("'Freigegeben'");
+    expect(gruppe, `${datei}: liest die Achse`).toContain(zugriff);
+    const badges = gruppe.match(/<StatusBadge/g) ?? [];
     expect(badges, `${datei}: genau ein Statusetikett im Kopf`).toHaveLength(1);
   });
 
@@ -60,8 +79,8 @@ describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
     // Gegenprobe: den Guard könnte man sonst erfüllen, indem man die Tag-Gruppe ganz
     // entfernt. Vorlage und Fassungsnummer stehen weiter daneben — sie tragen keine
     // Statusaussage und deshalb bewusst kein `color`.
-    const inhalt = lies(datei);
-    const schlicht = inhalt.match(/<Tag>/g) ?? [];
+    const gruppe = etikettengruppe(lies(datei), datei);
+    const schlicht = gruppe.match(/<Tag>/g) ?? [];
     expect(schlicht, `${datei}: Vorlage und Version bleiben stehen`).toHaveLength(2);
   });
 });
