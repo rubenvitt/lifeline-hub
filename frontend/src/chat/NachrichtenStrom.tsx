@@ -49,11 +49,14 @@ interface Props {
   /** Liefert die Kurzinfo für das Bezug-Popover; `null`, wenn das Objekt nicht
    *  (mehr) geladen/verfügbar ist. Ohne diesen Callback bleibt der Tag statisch. */
   bezugInfo?: (typ: BezugTyp, id: number) => BezugKurzinfo | null;
+  /** Zähler der EIGENEN Absendungen (LFH-466). Jede Erhöhung holt die Sicht ans Ende
+   *  zurück, auch wenn gerade weiter oben gelesen wurde — siehe Effekt unten. */
+  eigeneSendungen?: number;
 }
 
 export default function NachrichtenStrom({
   nachrichten, eigeneBenutzerId, darfSchreiben, onBearbeiten, onLoeschen, onHeraufstufen, onHeraufstufenAuftrag,
-  onBezugSetzen, onBezugLoeschen, bezugLabel, bezugInfo,
+  onBezugSetzen, onBezugLoeschen, bezugLabel, bezugInfo, eigeneSendungen = 0,
 }: Props) {
   const behaelter = useRef<HTMLDivElement>(null);
   const { token } = theme.useToken();
@@ -107,6 +110,26 @@ export default function NachrichtenStrom({
   }
 
   /**
+   * Die eigene Absendung holt die Sicht zurück (LFH-466).
+   *
+   * Wer weiter oben liest, kann trotzdem tippen: die Eingabe liegt als Geschwister
+   * AUSSERHALB dieses Scroll-Containers. Ohne diesen Effekt bekäme man für den
+   * eigenen Satz eine Pille — in jedem gängigen Chatprogramm springt die Sicht dabei
+   * ans Ende. Unterschieden wird die eigene ABSENDUNG, nicht der Autor: ein Riegel am
+   * Autor führte bei jeder fremden Nachricht desselben Kontos zum Sprung und machte
+   * die Pille in einer Ein-Benutzer-Prüfung unbelegbar.
+   *
+   * Der Effekt steht VOR dem Sprung-Effekt: laufen beide in derselben Commit-Runde
+   * (die Absendung invalidiert, die neue Nachricht trifft mit ein), entscheidet die
+   * Reihenfolge der Deklaration — der Merker muss stehen, bevor der Sprung ihn liest.
+   */
+  useEffect(() => {
+    if (eigeneSendungen === 0) return;
+    amBodenRef.current = true;
+    setMarkeId(null);
+  }, [eigeneSendungen]);
+
+  /**
    * „Stick to bottom" — aber nur nach unten (LFH-343 · C8, Befund H51).
    *
    * Der Strom wächst an ZWEI Enden: hinten durch neue Nachrichten und den
@@ -124,8 +147,19 @@ export default function NachrichtenStrom({
    */
   useEffect(() => {
     if (juengsteId === null) return;
-    if (!amBodenRef.current) return;
     const el = behaelter.current;
+    // Ohne Überlauf gibt es keine Lesestelle zu bewahren — und dann kann auch kein
+    // Scroll-Ereignis mehr feuern, das den Merker zurückstellt: `scrollTop` steht
+    // bereits auf 0 und bleibt es. Ohne diese Rückstellung bliebe eine Pille stehen,
+    // nachdem das Fenster breiter wurde und alles sichtbar ist. Der Einwand gegen
+    // Messen IM Effekt (`scrollHeight` ist hier schon gewachsen) greift für diese
+    // eine Frage nicht: sie ist eine Ja/Nein-Frage nach Überlauf, keine nach der
+    // Entfernung zum Boden.
+    if (el && el.scrollHeight <= el.clientHeight) {
+      amBodenRef.current = true;
+      setMarkeId(null);
+    }
+    if (!amBodenRef.current) return;
     el?.scrollTo?.({ top: el.scrollHeight });
   }, [juengsteId]);
 

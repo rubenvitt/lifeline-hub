@@ -230,8 +230,10 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     return {
       strom,
       scrollTo,
-      zeige: (neue: ChatNachricht[]) =>
-        rerender(<NachrichtenStrom nachrichten={neue} {...gemeinsam} />),
+      zeige: (neue: ChatNachricht[], eigeneSendungen = 0) =>
+        rerender(
+          <NachrichtenStrom nachrichten={neue} eigeneSendungen={eigeneSendungen} {...gemeinsam} />,
+        ),
     };
   }
 
@@ -286,8 +288,8 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
   });
 
-  it('zurück an den unteren Rand gescrollt räumt die Pille', async () => {
-    const { strom, zeige } = aufbau([A]);
+  it('zurück an den unteren Rand gescrollt räumt Pille UND Merker', async () => {
+    const { strom, scrollTo, zeige } = aufbau([A]);
     setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
     fireEvent.scroll(strom);
     zeige([A, B]);
@@ -296,6 +298,45 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     setzeMetriken(strom, { scrollTop: 1600, clientHeight: 400, scrollHeight: 2000 });
     fireEvent.scroll(strom);
     expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+
+    // Die zweite Hälfte, und die schärfere: der MERKER muss mit zurück. Ohne
+    // `amBodenRef.current = unten` im Scroll-Handler bliebe der Zähler geräumt (also
+    // keine Pille, obiger Satz grün), aber der Strom spränge für den Rest der Sitzung
+    // nie wieder mit.
+    zeige([A, B, C]);
+    expect(scrollTo).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+
+  it('die eigene Absendung holt die Sicht zurück — Pille weg, Sprung da', async () => {
+    const { strom, scrollTo, zeige } = aufbau([A]);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+    zeige([A, B]);
+    expect(await screen.findByRole('button', { name: '1 neue Nachricht' })).toBeInTheDocument();
+    scrollTo.mockClear();
+
+    // Absendung UND neue Nachricht in einer Runde — so trifft es im Betrieb ein.
+    zeige([A, B, C], 1);
+    expect(scrollTo).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+
+  it('ohne Überlauf gibt es keine Lesestelle: Merker und Zähler werden zurückgestellt', async () => {
+    const { strom, scrollTo, zeige } = aufbau([A]);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+    zeige([A, B]);
+    expect(await screen.findByRole('button', { name: '1 neue Nachricht' })).toBeInTheDocument();
+
+    // Das Fenster wird breiter, der Inhalt passt wieder — `scrollTop` steht schon auf
+    // 0 und bleibt es, es feuert also KEIN Scroll-Ereignis mehr. Ohne die Rückstellung
+    // im Effekt bliebe die Pille für immer stehen.
+    scrollTo.mockClear();
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 2000, scrollHeight: 2000 });
+    zeige([A, B, C]);
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+    expect(scrollTo).toHaveBeenCalled();
   });
 
   it('„Ältere laden" löst weder Sprung noch Pille aus (Gegenaussage aus C8)', () => {
