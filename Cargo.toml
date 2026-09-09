@@ -89,6 +89,23 @@ openidconnect = { version = "4", default-features = false }
 # `danger-allow-state-serialisation` nötig: der Ceremony-State liegt rein in-memory
 # (`auth::webauthn::state`), wird nie (de)serialisiert.
 webauthn-rs = { version = "0.5", features = ["conditional-ui"] }
+# LFH-522: OpenSSL wird STATISCH eingebacken (`vendored`) statt dynamisch gegen die
+# System-libssl/libcrypto zu binden. Der Pull selbst ist unvermeidbar (siehe den
+# webauthn-rs-Block darüber: `webauthn-rs-core`/`webauthn-attestation-ca` deklarieren
+# `openssl-sys` unconditional). Dieser Eintrag ist deshalb KEINE neue Abhängigkeit, sondern
+# der Schalter dafür — Cargos Feature-Unifikation aktiviert `vendored` quer durch den Graphen.
+#
+# Warum: (1) Windows-Cross-Build (x86_64-pc-windows-gnu) hat keine System-OpenSSL, gegen die
+# er linken könnte — ohne `vendored` bricht `openssl-sys` im Build-Script ab. (2) Damit ist
+# die in docs/betrieb/packaging.md offen gelassene „Option (b)" eingelöst: das Single-Binary-
+# Versprechen gilt wieder ohne Sternchen, der Zielrechner (ELW/Mini-PC) braucht keine
+# kompatible OpenSSL-Runtime mehr, und das Docker-Image kommt ohne libssl aus (distroless).
+#
+# Preis: Build-Voraussetzung ist jetzt Perl + C-Compiler (statt pkg-config + libssl-dev), und
+# ein KALTER Build kompiliert OpenSSL mit (~2 min, danach gecacht). Betriebsfolge wie beim
+# eingebetteten SQLite: ein OpenSSL-CVE ist NUR per Crate-Bump + Rebuild + Redeploy zu
+# schließen, kein `apt upgrade` erreicht diese Kopie — steht in packaging.md.
+openssl = { version = "0.10", features = ["vendored"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 # LFH-43: TOTP-Zweitfaktor (Increment 5, MFA). "otpauth" für die otpauth://-URL-Erzeugung
 # (QR-Code-Enrollment), "gen_secret" für kryptografisch zufällige Secret-Erzeugung.

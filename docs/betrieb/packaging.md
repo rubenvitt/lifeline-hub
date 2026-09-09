@@ -1,15 +1,16 @@
 # Betrieb: Bauen & Betreiben der Binary
 
 lifeline-hub wird als **eine** ausführbare Datei ausgeliefert. Sie enthält API,
-eingebettetes Frontend und (statisch gebündeltes) SQLite — kein separater
-Webserver. **Ausnahme (LFH-275, siehe unten):** WebAuthn/Passkeys bringt eine
-System-OpenSSL-Abhängigkeit mit, die sowohl beim Bauen als auch zur Laufzeit
-gebraucht wird.
+eingebettetes Frontend, SQLite und OpenSSL — alles statisch gebündelt, kein
+separater Webserver, keine Laufzeit-Bibliotheken vom Zielsystem. Die frühere
+Ausnahme (System-OpenSSL über WebAuthn/Passkeys, LFH-275) ist seit **LFH-522**
+geschlossen; der nächste Abschnitt erklärt wie und was das kostet.
 
 ## Bauen
 
-Voraussetzungen: Rust-Toolchain (stable), Node.js (für den Frontend-Build)
-**und System-OpenSSL** (pkg-config + Dev-Header, siehe nächster Abschnitt).
+Voraussetzungen: Rust-Toolchain (stable), Node.js (für den Frontend-Build),
+**Perl und ein C-Compiler** (für das mitkompilierte OpenSSL) sowie `nasm`
+(für die TLS-Krypto `aws-lc-sys`).
 
 ```bash
 ./scripts/build-release.sh
@@ -30,48 +31,51 @@ Release-Binary, die `frontend/dist` zur Compile-Zeit einbettet. Ergebnis:
 > Ein direkter `cargo build --release` **ohne** das Skript hat diese Garantien
 > nicht.
 
-## System-OpenSSL-Abhängigkeit (WebAuthn/Passkeys, LFH-275)
+## Eingebackenes OpenSSL (WebAuthn/Passkeys, LFH-275 → LFH-522)
 
-Das Projekt ist sonst durchgehend pure-Rust + rustls (kein System-OpenSSL) —
-`webauthn-rs` (Passkey-Login) durchbricht das. Das ist **kein reiner
-Build-Zeit-Umstand**, sondern qualifiziert das Single-Binary/
-"keine-Laufzeit-Abhängigkeiten"-Versprechen oben:
+Das Projekt ist sonst durchgehend pure-Rust + rustls (kein OpenSSL) —
+`webauthn-rs` (Passkey-Login) durchbricht das und zieht `openssl-sys`
+**unvermeidbar** in den Graphen: `webauthn-rs-core`/`webauthn-attestation-ca`
+deklarieren es als unconditional, nicht-optionale Abhängigkeit, kein
+`default-features = false` entfernt es (verifiziert per `cargo tree -i
+openssl-sys`).
 
-- **Laufzeit (wichtiger Teil):** `openssl-sys` bindet standardmäßig
-  **dynamisch** gegen die System-`libssl`/`libcrypto` (kein `vendored`-Feature
-  aktiv) — verifiziert per `otool -L target/debug/lifeline-hub` (macOS): die
-  Binary linkt gegen `libssl.3.dylib`/`libcrypto.3.dylib` aus dem lokalen
-  OpenSSL-Install. Auf Linux entsprechend gegen `libssl.so`/`libcrypto.so` in
-  passender Version. **Folge für den ELW/Mini-PC-Betrieb** (Abschnitt oben):
-  "bauen, Datei kopieren, starten" reicht nicht mehr ohne Weiteres — der
-  Ziel-Rechner braucht eine kompatible OpenSSL-Runtime, sonst startet die
-  Binary nicht (fehlende/inkompatible `.so`/`.dylib`). Das reißt außerdem die
-  C-OpenSSL-Angriffsfläche wieder rein, die das Projekt mit rustls bewusst
-  vermieden hatte.
-- **Build-Zeit:** pkg-config + OpenSSL-Dev-Header müssen auf dem Build-Rechner
-  vorhanden sein (z.B. Debian/Ubuntu `libssl-dev`, Fedora/RHEL
-  `openssl-devel`, macOS `brew install openssl@3`), sonst schlägt
-  `cargo build`/`build-release.sh` beim Kompilieren von `openssl-sys` fehl.
+**Was LFH-522 geändert hat:** nicht der Pull, sondern die Bindung.
+`Cargo.toml` führt `openssl` mit dem Feature `vendored` als direkte
+Abhängigkeit; Cargos Feature-Unifikation aktiviert es quer durch den Graphen.
+OpenSSL wird damit **aus Quelle mitkompiliert und statisch eingelinkt** statt
+dynamisch gegen die System-`libssl`/`libcrypto` zu binden.
 
-**Warum nicht einfach abschalten:** `webauthn-rs`s Default-Feature
-`attestation` (Zertifikatsketten-Prüfung für Sicherheitsschlüssel-Attestation,
-für passwortloses Passkey-Login selbst nicht gebraucht) wurde geprüft und
-**absichtlich beibehalten** — `default-features = false` entfernt
-`openssl-sys` NICHT. `webauthn-rs-core`/`webauthn-attestation-ca` (Pflicht-
-Abhängigkeiten von `webauthn-rs`, unabhängig von dessen Features) deklarieren
-`openssl`/`openssl-sys` selbst als unconditional, nicht-optionale Dependency —
-verifiziert per `cargo tree -i openssl-sys` mit `default-features = false`
-(Ergebnis unverändert). Der openssl-Pull ist damit inhärent zu jeder Nutzung
-dieser Library-Version, nicht durch Feature-Wahl vermeidbar.
+Folgen, beide relevant:
 
-**Für spätere musl/cross/Docker-Builds zu evaluieren:** entweder (a)
-OpenSSL-Dev-Header + kompatible Runtime-Lib im Zielimage/Zielsystem
-sicherstellen, oder (b) `openssl = { version = "*", features = ["vendored"] }`
-als eigene direkte Dependency ergänzen — Cargo-Feature-Unification aktiviert
-`vendored` dann quer über den gesamten Abhängigkeitsgraphen (kompiliert
-OpenSSL aus Quelle mit ein, macht die Binary wieder autark), braucht dafür
-aber C-Compiler + Perl am Build-Rechner. Nicht getestet, nur als Option
-notiert — keins von beidem ist in diesem Repo umgesetzt.
+- **Betrieb (der eigentliche Gewinn):** „bauen, Datei kopieren, starten" gilt
+  wieder ohne Sternchen. Der ELW-/Mini-PC-Rechner braucht **keine** kompatible
+  OpenSSL-Runtime mehr; es gibt keine `.so`/`.dylib`, die fehlen oder in der
+  falschen Version dastehen kann. Nachprüfbar am gebauten Binary — dort taucht
+  weder `libssl` noch `libcrypto` auf:
+
+  ```bash
+  otool -L target/release/lifeline-hub          # macOS
+  ldd    target/release/lifeline-hub            # Linux
+  x86_64-w64-mingw32-objdump -p …/lifeline-hub.exe | grep 'DLL Name'   # Windows
+  ```
+
+- **Cross-Build:** ohne `vendored` bricht `openssl-sys` beim Bauen für
+  `x86_64-pc-windows-gnu` ab („Could not find directory of OpenSSL
+  installation") — es gibt auf dem Linux-Build-Rechner schlicht keine
+  Windows-OpenSSL, gegen die er linken könnte. Das Windows-Artefakt existiert
+  nur wegen dieser Umstellung.
+
+- **Build-Zeit (der Preis):** Perl und ein C-Compiler müssen auf dem
+  Build-Rechner vorhanden sein (statt pkg-config + Dev-Headern), und ein
+  **kalter** Build kompiliert OpenSSL mit (~2 Minuten; danach im
+  Cargo-Cache).
+
+- **Patch-Pfad (wie beim SQLite unten):** eine OpenSSL-CVE ist **nur** per
+  Crate-Bump (`cargo update -p openssl-src`) + Rebuild + Redeploy zu
+  schließen. Kein `apt upgrade` auf dem Zielrechner erreicht diese Kopie. Das
+  ist die Kehrseite der Autarkie und muss im Advisory-Fall bekannt sein — die
+  eingebaute Version steht im SBOM neben dem Binary.
 
 ## Eingebettetes SQLite (LFH-233/G02)
 
@@ -108,12 +112,12 @@ dass dieser Abschnitt nachgezogen wird.
 (`target/release/sbom/eingebettete-sqlite-version.txt`), damit im Advisory-Fall ohne
 laufendes System beantwortbar ist, welche Version ausgeliefert wurde.
 
-> Anmerkung zur Autarkie: Das Argument „bundled hält die Binary unabhängig vom
-> Zielsystem" ist durch die dynamische OpenSSL-Bindung (Abschnitt oben) ohnehin
-> eingeschränkt — der Zielrechner muss bereits System-Bibliotheken pflegen. Ob für
-> gehärtete Deployments eine per OS gepflegte `libsqlite` sinnvoller wäre (CVE schließt
-> dann per Paketmanager statt per Rebuild), ist eine offene Abwägung und hier bewusst
-> nicht entschieden.
+> Anmerkung zur Autarkie: Seit LFH-522 ist das Binary auch bei OpenSSL autark
+> (Abschnitt oben), das Argument „bundled hält die Binary unabhängig vom Zielsystem"
+> trägt also durchgehend — mit der Folge, dass **beide** eingebackenen Bibliotheken
+> nur per Rebuild patchbar sind. Ob für gehärtete Deployments eine per OS gepflegte
+> `libsqlite` sinnvoller wäre (CVE schließt dann per Paketmanager statt per Rebuild),
+> ist eine offene Abwägung und hier bewusst nicht entschieden.
 
 ## Starten
 
