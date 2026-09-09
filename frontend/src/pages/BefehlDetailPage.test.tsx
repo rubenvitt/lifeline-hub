@@ -102,6 +102,24 @@ describe('BefehlDetailPage', () => {
     const link = await screen.findByRole('link', { name: /ETB-Eintrag/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=5');
   });
+
+  /**
+   * Der Kopf trägt die Phasenfarbe der gemeinsamen Achse, nicht das Preset-Grün
+   * (LFH-493). Die Farbe ist hier die einzige im DOM sichtbare Hälfte der
+   * Umstellung: der Wortlaut ist vorher wie nachher „Freigegeben" — dass er
+   * GELESEN statt abgeschrieben wird, pinnt `kommunikation/kopfStatus.guard.test.ts`.
+   *
+   * Der Entwurfs-Zustand ist bewusst NICHT die Probe: `PHASE_META.offen.color` ist
+   * `'default'` und damit byte-gleich zum abgelösten Preset — ein Test darauf bliebe
+   * auch ohne den Fix grün.
+   */
+  it('malt den freigegebenen Status in der Phasenfarbe, nicht im Preset-Grün', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    const etikett = (await screen.findByText('Freigegeben')).closest('.ant-tag');
+    expect(etikett).toHaveClass('ant-tag-success');
+    expect(etikett).not.toHaveClass('ant-tag-green');
+  });
 });
 
 /**

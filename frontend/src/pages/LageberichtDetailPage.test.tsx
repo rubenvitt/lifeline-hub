@@ -55,6 +55,23 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     const link = await screen.findByRole('link', { name: /ETB-Eintrag/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=5');
   });
+
+  /**
+   * Der Kopf trägt die Phasenfarbe der gemeinsamen Achse, nicht das Preset-Grün
+   * (LFH-493) — der Zwilling der Probe in `BefehlDetailPage.test.tsx`. Beide Module
+   * liegen auf derselben Achse (`phase.ts`: „bewusst dieselbe … und nicht deren
+   * Alias"); wer nur eines umstellt, hat die Divergenz bloß verschoben.
+   */
+  it('malt den freigegebenen Status in der Phasenfarbe, nicht im Preset-Grün', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(
+      { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung', bezeichnung: 'Übung' } as never,
+    );
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+    renderBei('/einsaetze/1/lageberichte/9');
+    const etikett = (await screen.findByText('Freigegeben')).closest('.ant-tag');
+    expect(etikett).toHaveClass('ant-tag-success');
+    expect(etikett).not.toHaveClass('ant-tag-green');
+  });
 });
 
 /**
