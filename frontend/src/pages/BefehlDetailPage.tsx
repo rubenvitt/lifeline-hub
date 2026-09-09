@@ -21,6 +21,7 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import './befehlPrint.css';
 
 export default function BefehlDetailPage() {
@@ -240,7 +241,13 @@ function BefehlDetail() {
             {befehl.titel}
           </Typography.Title>
           <Space size={6} wrap style={{ marginTop: 4 }}>
-            <Tag color={istEntwurf ? 'default' : 'green'}>{istEntwurf ? 'Entwurf' : 'Freigegeben'}</Tag>
+            {/* Derselbe Träger wie in der Liste (LFH-493): Fachlabel und Phasenfarbe
+                kommen aus der geteilten Achse, nicht aus zwei handgeschriebenen
+                Ternären. `istEntwurf` bleibt — es steuert die Knöpfe, nicht das Etikett. */}
+            <StatusBadge
+              phase={BEFEHL_STATUS[befehl.status].phase}
+              label={BEFEHL_STATUS[befehl.status].label}
+            />
             <Tag>{v?.label ?? befehl.vorlage}</Tag>
             <Tag>v{befehl.version}</Tag>
           </Space>

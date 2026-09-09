@@ -23,6 +23,7 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import './lageberichtPrint.css';
 
 /**
@@ -230,7 +231,13 @@ function LageberichtDetail() {
             {bericht.titel}
           </Typography.Title>
           <Space size={6} wrap style={{ marginTop: 4 }}>
-            <Tag color={istEntwurf ? 'default' : 'green'}>{istEntwurf ? 'Entwurf' : 'Freigegeben'}</Tag>
+            {/* Derselbe Träger wie in der Liste (LFH-493): Fachlabel und Phasenfarbe
+                kommen aus der geteilten Achse, nicht aus zwei handgeschriebenen
+                Ternären. `istEntwurf` bleibt — es steuert die Knöpfe, nicht das Etikett. */}
+            <StatusBadge
+              phase={LAGEBERICHT_STATUS[bericht.status].phase}
+              label={LAGEBERICHT_STATUS[bericht.status].label}
+            />
             <Tag>{v?.label ?? bericht.vorlage}</Tag>
             <Tag>v{bericht.version}</Tag>
           </Space>
