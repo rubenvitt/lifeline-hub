@@ -116,3 +116,45 @@ test('Chat: unten am Strom springt die Sicht weiter mit — ohne Pille', async (
     .poll(() => strom.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
     .toBeLessThanOrEqual(24);
 });
+
+test('Chat: der Kanalwechsel räumt Merker und Zähler', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Kanalwechsel ${Date.now()}`);
+  await page.setViewportSize(SCHMAL);
+  await page.goto(`/einsaetze/${einsatzId}/chat`);
+  await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();
+
+  // Zweiter Kanal per API — der Anlege-Weg der Oberfläche gehört zu KanalListe und
+  // ist hier nicht die Aussage.
+  await page.request.post(`/api/einsaetze/${einsatzId}/chat/kanaele`, { data: { name: 'Zweiter' } });
+  await page.reload();
+  const leiste = page.getByTestId('kanal-leiste');
+  await expect(leiste.getByText('Zweiter')).toBeVisible();
+
+  // Reihenfolge ist tragend: „Allgemein" ZUERST füllen, damit die Nachrichten des
+  // zweiten Kanals die HÖHEREN ids tragen. Sonst zählte eine mitgeschleppte Marke
+  // aus „Allgemein" im zweiten Kanal null Treffer, und die Aussage wäre auch ohne
+  // den Remount-Schlüssel grün.
+  await stromFuellen(page, 12);
+
+  await leiste.getByText('Zweiter').click();
+  await expect(page.getByText('Probe 1 —', { exact: false })).toHaveCount(0);
+  await stromFuellen(page, 12);
+
+  await leiste.getByText('Allgemein').click();
+  await expect(page.getByText('Probe 12 —', { exact: false }).first()).toBeVisible();
+
+  const strom = page.getByTestId('nachrichten-strom');
+  await strom.evaluate((el) => el.scrollTo({ top: 0 }));
+  await expect.poll(() => strom.evaluate((el) => el.scrollTop)).toBe(0);
+
+  // Der Merker gehört zu EINEM Kanal: nach dem Wechsel steht die Sicht unten und es
+  // gibt keine Pille — ohne `key={kanalId}` an `<NachrichtenStrom>` (`ChatPage`)
+  // nähme der zweite Kanal Merker und Marke des ersten mit.
+  await leiste.getByText('Zweiter').click();
+  await expect(page.getByRole('button', { name: /neue Nachricht/ })).toHaveCount(0);
+  await expect
+    .poll(() => page.getByTestId('nachrichten-strom')
+      .evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
+    .toBeLessThanOrEqual(24);
+});
