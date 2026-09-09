@@ -1,0 +1,20 @@
+/* LFH-465 — der native Fokus-Scroll berücksichtigt die verankerte Aktionsleiste.
+
+   `scroll-padding-block-end` am SCROLLPORT, nicht `scroll-margin-block-end` an den
+   Feldern — und das ist gemessen, nicht gewählt: Chromium scrollt beim Tabulatorwechsel
+   mit „nearest" und lässt ein Ziel, das schon teilweise im Bild steht, unangetastet. Ein
+   164 px hohes Abschnittsfeld stand damit auf `top: 764` in einem 844-px-Fenster, während
+   die Leiste bei 766 begann: zwei Pixel frei. `scroll-margin` an den Feldern blieb dabei
+   wirkungslos, weil es nur zählt, wenn überhaupt gescrollt wird — die Variante wurde
+   gebaut, gemessen und wieder verworfen. `scroll-padding` verkleinert dagegen den
+   Scrollport selbst: das Ziel gilt dann als NICHT sichtbar, der Browser scrollt, und der
+   Abzug ist eingerechnet.
+
+   Die Variable folgt per ResizeObserver der tatsächlichen Leistenhöhe
+   (`beobachteAktionsleiste` in `BefehlDetailPage.tsx`) — Dichtestufe (30/48/72 px) und
+   umgebrochene Knopfreihe verändern sie um ein Vielfaches. Ohne verankerte Leiste — ab
+   `lg` und auf jeder anderen Seite — ist sie nicht gesetzt, der Fallback `0px` macht die
+   Regel wirkungslos; nur deshalb darf sie am Wurzelelement stehen. */
+:root {
+  scroll-padding-block-end: var(--lfh-befehl-fokusabstand, 0px);
+}

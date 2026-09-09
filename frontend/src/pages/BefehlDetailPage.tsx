@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Flex, Form, Input, Space, Spin, Tag, Typography } from 'antd';
+import { App, Breadcrumb, Button, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
@@ -21,7 +21,42 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { useViewport } from '../components/useViewport';
+import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
 import './befehlPrint.css';
+import './befehlAktionsleiste.css';
+
+/**
+ * Hält `--lfh-befehl-fokusabstand` an der GEMESSENEN Höhe der verankerten Aktionsleiste
+ * (LFH-465; Bauform aus `EinheitDetailPage.tsx:37`, LFH-446).
+ *
+ * Warum gemessen und nicht als Festwert: Dichtestufe (30/48/72 px) und umgebrochene
+ * Knopfreihe verändern die Höhe um ein Vielfaches — ein Festwert wäre im Handschuh-Betrieb
+ * daneben, und die Felder darüber parkten beim nativen Fokus-Scroll wieder hinter der
+ * Leiste.
+ *
+ * Träger ist das WURZELELEMENT, nicht das `<form>` wie bei der Einheit und auch nicht die
+ * Seitenwurzel: die Regel dazu ist `scroll-padding-block-end` am Scrollport, und der
+ * Scrollport ist hier das Dokument. Ein `closest('form')` fände ohnehin nichts — die Leiste
+ * liegt ausserhalb des Formulars, weil sie mit „Drucken"/„Fortschreiben" auch Aktionen des
+ * freigegebenen Zweigs trägt, in dem es gar kein `<Form>` gibt; der Beobachter wäre dann ein
+ * stilles No-op. Die Aufräumfunktion nimmt die Eigenschaft beim Verlassen wieder weg, sonst
+ * trüge jede folgende Route den Abzug einer Leiste, die es dort nicht gibt.
+ */
+function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
+  if (!leiste) return;
+  const wurzel = document.documentElement;
+  const aktualisiere = () => wurzel.style.setProperty(
+    '--lfh-befehl-fokusabstand', `${leiste.getBoundingClientRect().height + abstand}px`,
+  );
+  aktualisiere();
+  const beobachter = new ResizeObserver(aktualisiere);
+  beobachter.observe(leiste);
+  return () => {
+    beobachter.disconnect();
+    wurzel.style.removeProperty('--lfh-befehl-fokusabstand');
+  };
+}
 
 export default function BefehlDetailPage() {
   const { befehlId } = useParams();
@@ -38,6 +73,8 @@ function BefehlDetail() {
   const befehlId = Number(befehlIdParam);
   const idGueltig = parseRouteId(befehlIdParam) != null;
   const { message, modal } = App.useApp();
+  const { token } = theme.useToken();
+  const { abBreite } = useViewport();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();
@@ -157,6 +194,9 @@ function BefehlDetail() {
   const v = vorlage(befehl.vorlage);
   const istEntwurf = befehl.status === 'entwurf';
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  // Unterhalb des Führungs-Tablets kleben die Aktionen am unteren Rand statt im Kopf
+  // (LFH-465). Begründung der Schwelle: `befehle/aktionsleiste.ts`.
+  const verankert = !abBreite(AKTIONSLEISTE_AB);
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder VOR dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
@@ -191,6 +231,62 @@ function BefehlDetail() {
       },
     });
   };
+
+  /**
+   * EIN Aktionsblock, zwei Orte (LFH-465). Ab `lg` steht er im Kopf-`Flex` neben dem
+   * Titel, darunter am unteren Rand verankert.
+   *
+   * KEINE ZWEITE KOPIE, die per CSS versteckt wird: das lieferte zwei gleichnamige Knöpfe
+   * im Baum — die Vorlesereihenfolge bekäme „Freigeben" doppelt, und der Tabulaturdurchlauf
+   * von `e2e/befehl-aktionsleiste.spec.ts` liefe auf ein unsichtbares Ziel.
+   *
+   * `htmlType="submit"` wäre hier FALSCH, anders als bei `speicherLeisteStil` (LFH-345 ·
+   * C10) und `EinheitDetailPage` (LFH-446): der Block trägt mit „Drucken" und
+   * „Fortschreiben" auch Aktionen des freigegebenen Zweigs, in dem es gar kein `<Form>`
+   * gibt — er liegt deshalb ausserhalb des Formulars, und „Entwurf speichern" ruft
+   * `form.submit()` weiter von Hand (unverändert gegenüber dem Kopf-Bestand). Wer das
+   * gegen LFH-346/C11 „harmonisiert", bricht entweder die Leiste oder die Kopf-Regel.
+   *
+   * Der Autosave-Beleg (LFH-342 · C7) geht mit den Knöpfen mit: oben stehengeblieben wäre
+   * er auf 390 px aus dem Bild gescrollt, genau während man tippt.
+   */
+  const aktionen = (
+    <div
+      className="befehl-no-print"
+      data-lfh="befehl-aktionen"
+      ref={verankert ? (el) => beobachteAktionsleiste(el, token.marginSM) : undefined}
+      style={aktionsleisteStil(verankert, token)}
+    >
+      <Space wrap>
+        <Button onClick={() => window.print()}>Drucken / als PDF</Button>
+        {!istEntwurf && befehl.etb_eintrag_id != null && (
+          <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
+        )}
+        {!istEntwurf && darfSchreiben && (
+          <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>
+            Fortschreiben
+          </Button>
+        )}
+        {istEntwurf && darfSchreiben && (
+          <>
+            {/* Der sichtbare Beleg des stillen Autosave. Ohne ihn wäre „gespeichert"
+                von „nicht gespeichert" nicht zu unterscheiden. */}
+            <Typography.Text type="secondary">
+              {schutz.ungespeichert
+                ? 'ungespeicherte Änderungen'
+                : schutz.zuletztGespeichert && `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
+            </Typography.Text>
+            <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
+              Entwurf speichern
+            </Button>
+            <Button type="primary" onClick={freigabeBestaetigen} loading={freigebenMutation.isPending}>
+              Freigeben
+            </Button>
+          </>
+        )}
+      </Space>
+    </div>
+  );
 
   return (
     <div className="befehl-print-root">
@@ -245,34 +341,7 @@ function BefehlDetail() {
             <Tag>v{befehl.version}</Tag>
           </Space>
         </div>
-        <Space wrap>
-          <Button onClick={() => window.print()}>Drucken / als PDF</Button>
-          {!istEntwurf && befehl.etb_eintrag_id != null && (
-            <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
-          )}
-          {!istEntwurf && darfSchreiben && (
-            <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>
-              Fortschreiben
-            </Button>
-          )}
-          {istEntwurf && darfSchreiben && (
-            <>
-              {/* Der sichtbare Beleg des stillen Autosave. Ohne ihn wäre „gespeichert"
-                  von „nicht gespeichert" nicht zu unterscheiden. */}
-              <Typography.Text type="secondary">
-                {schutz.ungespeichert
-                  ? 'ungespeicherte Änderungen'
-                  : schutz.zuletztGespeichert && `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
-              </Typography.Text>
-              <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
-                Entwurf speichern
-              </Button>
-              <Button type="primary" onClick={freigabeBestaetigen} loading={freigebenMutation.isPending}>
-                Freigeben
-              </Button>
-            </>
-          )}
-        </Space>
+        {!verankert && aktionen}
       </Flex>
 
       {/* Taktische DTG in der Anzeigezone (LFH-350 · H60): `zeitstand` ist ein UTC-Wirestring
@@ -316,6 +385,11 @@ function BefehlDetail() {
           })}
         </div>
       )}
+
+      {/* Die verankerte Leiste steht NACH dem Inhalt: `position: sticky; bottom: 0` klebt
+          nur, solange der umgebende Block noch scrollt — und die Tabulaturreihenfolge
+          führt so vom letzten Abschnittsfeld direkt auf „Freigeben". */}
+      {verankert && aktionen}
     </div>
   );
 }
