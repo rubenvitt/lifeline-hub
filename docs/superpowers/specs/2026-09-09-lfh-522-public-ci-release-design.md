@@ -283,10 +283,22 @@ Die verbleibenden zwei `moderate`-Funde brechen das Gate per Konvention nicht
 
 ## 10. Risiken und offene Punkte
 
-- **Erster CI-Lauf ist eine Messung.** Die Node-Pinnung in `check-all.sh` (26.7.0) und die
-  Playwright-Flakiness unter Last (Memory: Vitest/Playwright unter Last flaky) sind auf
-  GitHub-Runnern (2 vCPU) nicht gemessen. Falls e2e dort flakt, ist die Antwort ein
-  Playwright-`retries: 1` **nur unter `CI=true`**, nicht ein abgeschalteter Schritt.
+- **Der Engpass ist der Plattenplatz, nicht die Rechenzeit** — gemessen im ersten CI-Lauf
+  (09.09.2026, PR #26), nicht vermutet. Beide Jobs starben mitten im Rust-Build an
+  `No space left on device`; zuletzt konnte der Runner nicht einmal mehr sein eigenes Log
+  schreiben, weshalb der Job ohne fehlgeschlagenen Schritt als `failure` dastand. Ein
+  `ubuntu-latest`-Runner hat rund 14 GB frei, und der Debug-Build des Workspace samt
+  Integrationstests, OpenSSL aus Quelle, `aws-lc-sys`, gebündeltem SQLite, `node_modules`
+  und Chromium passt dort nicht hinein. Zwei Hebel, beide in `ci.yml`: die ungenutzten
+  vorinstallierten Toolchains werden vor dem Build entfernt (das Android-SDK allein trägt
+  zweistellige GB), und `CARGO_PROFILE_DEV_DEBUG=line-tables-only` nimmt die
+  Variablen-Debuginfo heraus. **Wer einen dritten Job ergänzt, übernimmt beides.** Der
+  Aufräumschritt steht bewusst doppelt in der Datei statt in einer eigenen Composite-Action —
+  zwei Vorkommen rechtfertigen den Umweg nicht, drei vielleicht.
+- **Die Playwright-Flakiness unter Last** (Memory: Vitest/Playwright unter Last flaky) bleibt
+  auf 2-vCPU-Runnern zu beobachten. `PW_WORKERS: 2` ist die Vorsorge; falls e2e dort trotzdem
+  flakt, ist die Antwort ein `retries: 1` **nur unter `CI=true`**, nicht ein abgeschalteter
+  Schritt.
 - **`ubuntu-24.04-arm`** ist nur für öffentliche Repos kostenlos. Deshalb steht der erste
   Release-Test hinter dem Umschalten (siehe Reihenfolge oben) — im privaten Zustand fiele
   nicht nur das arm64-Binary aus, sondern die gesamte Artefaktkette.
