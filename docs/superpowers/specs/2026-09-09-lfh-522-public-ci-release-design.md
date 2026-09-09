@@ -44,8 +44,15 @@ Per `gh api`, in Subtask 4:
   damit die Kanäle beim Anlegen geschützt sind: PR-Pflicht, Required Check
   `gate`, keine Force-Pushes. Der Release-Bot committet den Version-Bump auf die geschützten
   Branches — deshalb bekommt er eine **Bypass-Regel** (GitHub App oder PAT, s. Abschnitt 4).
-- Dependabot-Alerts und Security-Updates an; Actions-Berechtigung „GitHub-eigene und
-  verifizierte Actions“; Workflow-Token standardmäßig read-only, Rechte je Job explizit.
+- Dependabot-Alerts und Security-Updates an; Workflow-Token standardmäßig read-only, Rechte
+  je Job explizit.
+- **Actions-Berechtigung: „GitHub-eigene + verifizierte + Allowlist“**, nicht „nur
+  verifizierte“ (Korrektur am ersten Entwurf dieser Spec, gemessen beim Schreiben der
+  Workflows): `dtolnay/rust-toolchain`, `Swatinem/rust-cache` und `jdx/mise-action` sind
+  nicht verifiziert, die strikte Einstellung hätte das eigene Gate blockiert. Die
+  wirksame Absicherung ist ohnehin eine andere und ist umgesetzt: **jede** Action ist per
+  Commit-SHA gepinnt (Tag nur im Kommentar), Dependabot hält die Pins aktuell. Ein
+  verschobener Tag erreicht die Workflows damit nicht.
 - Secret Scanning + Push Protection an (kostenlos für public).
 
 ## 4. Gate-Workflow `.github/workflows/ci.yml`
@@ -74,6 +81,11 @@ und `CODECOV_TOKEN` aus den Repo-Secrets. Bewusst vom Gate getrennt: Coverage-To
 das Gate nie rot färben, und `cargo llvm-cov` ersetzt `cargo test` durch einen
 instrumentierten Lauf — ein zweiter Lauf im selben Job verdoppelte die Zeit.
 
+**Playwright-Parallelität:** der Gate-Job setzt `PW_WORKERS: 2`. Die Config sieht diese
+Schraube vor (`Number(process.env.PW_WORKERS ?? 3)`); drei Worker überzeichnen einen
+2-vCPU-Runner, und Überlast ist die bekannte Flake-Quelle dieser Suite. Das ist eine
+Env-Belegung im Workflow, **keine** Änderung an der Config — lokal bleiben es drei.
+
 **Nicht enthalten:** e2e-Retries, Matrix über Betriebssysteme (das Gate läuft nur auf
 Linux; die Cross-Plattform-Frage beantworten die Artefakt-Builds pro Release).
 
@@ -97,7 +109,8 @@ Vier Änderungen, jede mit Begründung:
    kalter Build +~2 min, gecacht. `otool -L`/`ldd`/`objdump -p` zeigen danach kein
    `libssl`/`libcrypto` mehr — das wird in Subtask 2 gemessen und in `packaging.md`
    festgehalten.
-2. **`cfg(unix)`-Gate am clamd-Unix-Socket** (`src/anhang/mod.rs`, `clamd_scan`):
+2. **`cfg(unix)`-Gate am clamd-Unix-Socket** (`src/anhang/mod.rs`, ausgelagert in zwei
+   cfg-Varianten von `clamd_verbinden`, damit `clamd_scan` selbst plattformfrei bleibt):
    `clamav_client::tokio::Socket` existiert nur unter `#[cfg(unix)]`. Unter Windows bleibt
    der TCP-Zweig; eine `unix:`-Adresse führt dort zu `ScannerNichtErreichbar` mit
    `tracing::warn!` — dieselbe fail-closed-Politik wie bei jedem anderen Verbindungsfehler,
@@ -122,7 +135,13 @@ Vier Änderungen, jede mit Begründung:
 ## 6. Release-Flow `.github/workflows/release.yml`
 
 **Werkzeug:** `semantic-release` (Node, über pnpm im Repo-Root als Dev-Dependency, keine
-globale Installation). Conventional Commits sind im Repo Bestand (`feat(etb): …`,
+globale Installation). Dafür entsteht eine **Root-`package.json`** — reines Werkzeug, `private`,
+Version dauerhaft `0.0.0`, mit eigenem Lockfile. Sie ist ausdrücklich **nicht** die
+Versionsquelle: die Anwendung versioniert in `Cargo.toml` und `frontend/package.json`.
+Deshalb fehlt `@semantic-release/npm` in der Plugin-Liste — es würde die Werkzeugdatei bumpen
+und einen npm-Publish versuchen. Die Konfiguration liegt in **`release.config.mjs`**, nicht
+in `.releaserc.json`: die drei nicht offensichtlichen Entscheidungen (0.x-Regel, vorbereitete
+Kanäle, zwei Versionsdateien) brauchen ihre Begründung am Ort, und JSON trägt keine Kommentare. Conventional Commits sind im Repo Bestand (`feat(etb): …`,
 `fix(LFH-462): …`).
 
 **Das Projekt ist in früher Alpha: es gibt noch nichts, was ein stabiler Kanal schützen
@@ -154,9 +173,14 @@ im selben Workflow — Entscheidung: **eigener Workflow mit `workflow_run` auf `
 damit `ci.yml` für PRs schlank bleibt):
 
 1. `@semantic-release/commit-analyzer` → Version.
-2. `@semantic-release/exec` (`prepareCmd`): `cargo set-version ${nextRelease.version}`
-   (cargo-edit) — bumpt `Cargo.toml` **und** `Cargo.lock`; `pnpm -C frontend version
-   ${nextRelease.version} --no-git-tag-version` für `frontend/package.json`.
+2. `@semantic-release/exec` (`prepareCmd`): `cargo set-version -p lifeline-hub
+   ${nextRelease.version}` (cargo-edit) — bumpt `Cargo.toml` **und** `Cargo.lock`; `-p`,
+   weil `karten-katalog`/`karten-service` eigene Versionen führen. Fürs Frontend
+   **`pnpm -C frontend pkg set version=…`**, nicht `pnpm version`: letzteres bricht mit
+   `ERR_PNPM_UNCLEAN_WORKING_TREE`, sobald der Baum Änderungen trägt — und das ist hier
+   immer der Fall, weil `@semantic-release/changelog` in derselben `prepare`-Phase vorher
+   läuft und CHANGELOG.md schon geschrieben hat. Gemessen beim Umsetzen; der naheliegende
+   Befehl hätte jeden Release zerrissen, und zwar nach Analyse und Changelog mitten im Lauf.
 3. `@semantic-release/changelog` → `CHANGELOG.md`.
 4. `@semantic-release/git` committet `Cargo.toml`, `Cargo.lock`, `frontend/package.json`,
    `CHANGELOG.md` mit `chore(release): vX.Y.Z [skip ci]` und taggt.
@@ -220,12 +244,42 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
    Dockerfile, `packaging.md`-Umschreibung, Messung „kein libssl mehr gelinkt“.
    Abnahme: `./scripts/build-release.sh --target x86_64-pc-windows-gnu` lokal grün,
    `cargo test --workspace` grün.
-3. **Release-Flow + Artefakte** — `.releaserc.json`, `release.yml`, `artefakte.yml`,
-   GitHub App + Secrets, Tag `v0.1.0`, 0.x-Regel. Abnahme: ein `fix:`-Commit auf
-   `main` erzeugt `v0.1.1` mit allen sechs Assets und dem Image.
-4. **Public + Integrationen** — Umschalten (mit Go), Rulesets, Dependabot, Codecov,
-   PR-Template. Abnahme: Repo öffentlich, Rulesets greifen (Test-Push auf `main` ohne PR
-   wird abgelehnt), erster Dependabot-Lauf sichtbar.
+3. **Public + Integrationen** (LFH-528) — Umschalten (mit Go), Rulesets, Dependabot,
+   Codecov-Token, GitHub App. Abnahme: Repo öffentlich, Rulesets greifen (Test-Push auf
+   `main` ohne PR wird abgelehnt), erster Dependabot-Lauf sichtbar.
+4. **Erster Release** (LFH-527) — Tag `v0.1.0` setzen, dann einen `fix:`-Commit auf `main`.
+   Abnahme: `v0.1.1` mit allen sechs Assets und dem Container-Abbild.
+
+**Die Reihenfolge 3 vor 4 ist eine Korrektur** (Review, 09.09.2026). Der erste Entwurf hatte
+den Release-Test vor dem Umschalten — und begründete den dann fehlschlagenden arm64-Job als
+„erwartbar". Erwartbar wäre er, folgenlos nicht: `veroeffentlichen` und `docker` hängen per
+`needs` am Matrix-Job, `fail-fast: false` schützt nur die Geschwister. Ein fehlgeschlagener
+arm64-Build liefert damit **null** Artefakte und kein Abbild, nicht „alles außer arm64". Der
+erste Release-Test hätte also einen Durchlauf beurteilt, der strukturell ein anderer ist als
+der echte. Deshalb: erst public (die arm64-Runner sind nur dort kostenlos), dann releasen.
+
+## 9b. Mitgenommen: zwei Advisory-Nachzüge
+
+Der erste vollständige Gate-Lauf war **rot** — nicht wegen dieser Arbeit, sondern weil
+`pnpm audit` zwei Bestandsbefunde im Frontend-Lockfile meldet, das dieser Vorgang gar nicht
+anfasst. Beide sind hier trotzdem behoben, und der Grund ist derselbe, aus dem CLAUDE.md
+`cargo clippy` aus dem Gate hält: **eine CI, die von Tag eins rot ist, wird abgeschaltet
+statt befolgt.** Ein Ticket dafür anzulegen und die CI rot zu starten, hätte das Ziel dieses
+Vorgangs verfehlt.
+
+- **js-yaml** (GHSA-2883-xcg3-v3hh, high): der Override in `frontend/pnpm-workspace.yaml`
+  stand auf `<4.3.1: ^4.3.1`, das Advisory ist auf 4.3.2 gewandert. Das ist zum **dritten
+  Mal** dasselbe Muster (nach `nanoid` und `fast-uri`, beide dort dokumentiert): der
+  Override pinnt eine Zahl, das Advisory bewegt sich darunter weg. Beide Grenzen nachgezogen.
+- **maplibre-gl** (GHSA-jrc7-96c5-q579, critical, XSS-Sanitizer-Bypass): direkte
+  Abhängigkeit, `^6.0.0` im Lockfile auf 6.0.0 festgehalten, gepatcht ab 6.4.1. Auf `^6.4.1`
+  gehoben, pnpm löst 6.8.0 auf. Ein Override wäre hier das falsche Werkzeug — die Datei
+  trägt ausdrücklich *transitive* Fixes, und dies ist eine direkte Laufzeitabhängigkeit.
+  Der Sprung über acht Minor-Versionen in der Kartenbibliothek ist durch die Playwright-Suite
+  gegangen (143 Tests, Lagekarte inbegriffen).
+
+Die verbleibenden zwei `moderate`-Funde brechen das Gate per Konvention nicht
+(`--audit-level=high`) und bleiben liegen.
 
 ## 10. Risiken und offene Punkte
 
@@ -233,9 +287,9 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
   Playwright-Flakiness unter Last (Memory: Vitest/Playwright unter Last flaky) sind auf
   GitHub-Runnern (2 vCPU) nicht gemessen. Falls e2e dort flakt, ist die Antwort ein
   Playwright-`retries: 1` **nur unter `CI=true`**, nicht ein abgeschalteter Schritt.
-- **`ubuntu-24.04-arm`** ist für public Repos kostenlos; für die private Phase von Subtask 1
-  wird er nicht gebraucht. Der erste Release-Test in Subtask 3 läuft ggf. noch privat, dann
-  schlägt der arm64-Job erwartbar fehl; das ist im Subtask vermerkt.
+- **`ubuntu-24.04-arm`** ist nur für öffentliche Repos kostenlos. Deshalb steht der erste
+  Release-Test hinter dem Umschalten (siehe Reihenfolge oben) — im privaten Zustand fiele
+  nicht nur das arm64-Binary aus, sondern die gesamte Artefaktkette.
 - **semantic-release + `[skip ci]`** überspringt das Gate für den Release-Commit. Der
   Commit ändert nur Versionsfelder und Changelog; das ist akzeptiert.
 - **Signierung** (Windows SmartScreen, macOS Gatekeeper) ist nicht Teil dieses Tickets.
