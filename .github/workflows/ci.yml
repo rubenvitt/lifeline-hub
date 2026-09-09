@@ -23,8 +23,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: gate-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  # NUR Pull-Request-Läufe abbrechen. Auf einem Kanal-Branch hängt am selben Lauf der
+  # Release-Job — ein Abbruch träfe ihn möglicherweise ZWISCHEN dem Push des Versions-Commits
+  # und dem Anlegen des GitHub-Releases. Das Ergebnis wäre ein Tag ohne Release, und weil die
+  # Artefakte an `release: published` hängen, entstünden sie nie: kein roter Lauf, nur ein
+  # fehlendes Release. Ein zweiter Push auf main wartet deshalb, statt den ersten zu killen.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
