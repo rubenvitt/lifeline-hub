@@ -51,6 +51,99 @@ const SUBPIXEL = 0.5;
 
 const MELDUNG = 'Keller Musterweg 3 unter Wasser';
 
+test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
+  test.use({ timezoneId: 'Europe/Berlin' });
+  test('übernimmt den gepflegten Termin sekundengenau und blendet die Schnellwahl nach Löschen aus', async ({ page }) => {
+    await page.setViewportSize(FUEKW);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Lagebesprechung ${Date.now()}`);
+    await seedeEintrag(page, einsatzId);
+    await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
+    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+    const termin = page.getByLabel('Nächste Lagebesprechung (optional)');
+    await termin.fill('2099-09-09 15:17:43');
+    // Enter übernimmt den Pickerwert und sendet das umgebende Formular ab.
+    await termin.press('Enter');
+    await expect(page.getByRole('button', { name: 'Bearbeiten', exact: true })).toBeVisible();
+    let einsatz = await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json() as Record<string, unknown>;
+    expect(einsatz.naechste_lagebesprechung_at).toBe('2099-09-09 13:17:43');
+
+    async function oeffneWiedervorlage() {
+      await page.goto(`/einsaetze/${einsatzId}/etb`);
+      const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
+      await expect(sicht.getByText(MELDUNG, { exact: true })).toBeVisible();
+      await sicht.getByRole('button', { name: 'Aktionen zu Eintrag 1', exact: true }).click();
+      await page.locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+        .getByRole('menuitem', { name: /Wiedervorlage/ }).click();
+      return page.getByRole('dialog');
+    }
+    let dialog = await oeffneWiedervorlage();
+    await dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true }).click();
+    const gespeichert = page.waitForResponse((antwort) =>
+      antwort.url().endsWith(`/api/einsaetze/${einsatzId}/erinnerungen`) && antwort.request().method() === 'POST');
+    await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
+    const antwort = await gespeichert;
+    expect(antwort.ok()).toBeTruthy();
+    expect(antwort.request().postDataJSON().faellig_at).toBe('2099-09-09 13:17:43');
+
+    await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
+    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+    const picker = page.locator('.ant-picker').filter({ has: page.getByLabel('Nächste Lagebesprechung (optional)') });
+    await picker.hover();
+    await picker.locator('.ant-picker-clear').click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Bearbeiten', exact: true })).toBeVisible();
+    einsatz = await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json() as Record<string, unknown>;
+    expect(einsatz).not.toHaveProperty('naechste_lagebesprechung_at');
+    dialog = await oeffneWiedervorlage();
+    await expect(dialog.getByRole('button', { name: '+30 min', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true })).toHaveCount(0);
+  });
+});
+
+test.describe('LFH-464: ETB-Umbruch bei xl', () => {
+  test.use({ hasTouch: true });
+  for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
+    test(`misst beide Seiten der Schwelle und die Tabletbreiten (${dichte})`, async ({ page }, testInfo) => {
+      await page.setViewportSize(FUEKW);
+      await anmelden(page);
+      const einsatzId = await einsatzAnlegen(page, `E2E ETB xl ${dichte} ${Date.now()}`);
+      await seedeEintrag(page, einsatzId);
+      await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+      const messungen = [];
+      for (const breite of [767, 768, 991, 992, 1024, 1199, 1200, 1280, 1366]) {
+        await page.setViewportSize({ width: breite, height: 900 });
+        await page.goto(`/einsaetze/${einsatzId}/etb`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
+        await expect(sicht.getByText(MELDUNG, { exact: true })).toHaveCount(1);
+        await expect(sicht.locator('.ant-table')).toHaveCount(breite >= 1200 ? 1 : 0);
+        await expect(sicht.getByTestId('etb-ereigniszeile')).toHaveCount(breite >= 1200 ? 0 : 1);
+        const mass = await sicht.evaluate((element) => {
+          const text = element.querySelector<HTMLElement>('.markdown')!;
+          const container = [...element.querySelectorAll<HTMLElement>('*')].filter((knoten) =>
+            ['auto', 'scroll'].includes(getComputedStyle(knoten).overflowX));
+          return {
+            sicht: element.getBoundingClientRect().width,
+            text: text.getBoundingClientRect().width,
+            bodyUeberlauf: document.body.scrollWidth - window.innerWidth,
+            innererUeberlauf: Math.max(0, ...container.map((knoten) => knoten.scrollWidth - knoten.clientWidth)),
+          };
+        });
+        expect(mass.bodyUeberlauf, `Seitenrumpf bei ${breite}/${dichte}`).toBeLessThanOrEqual(SUBPIXEL);
+        if (breite < 1200) {
+          expect(mass.innererUeberlauf).toBeLessThanOrEqual(SUBPIXEL);
+          expect(mass.text / mass.sicht).toBeGreaterThan(0.85);
+        }
+        messungen.push({ breite, dichte, ...mass });
+      }
+      await testInfo.attach('layoutmessung.json', {
+        body: JSON.stringify(messungen, null, 2), contentType: 'application/json',
+      });
+    });
+  }
+});
+
 // Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes
 // e2e-Hilfsmodul (gleichlautend in fünf Bestands-Specs vermerkt).
 async function anmelden(page: Page) {

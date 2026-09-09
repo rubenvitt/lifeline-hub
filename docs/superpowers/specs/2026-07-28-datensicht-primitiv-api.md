@@ -2,6 +2,12 @@
 
 ## 1. Die Entscheidung
 
+**Nachzug LFH-464 (08.09.2026):** `DatensichtProps` ergänzt `tabelleAb?: AbBreitePunkt`.
+Die Auto-Form nutzt diesen Punkt mit unverändertem Default `md`; feste Formen behalten
+Vorrang. Ausschließlich das ETB setzt nach Browsermessung `xl` (1200 px). Die folgenden
+`md`-Beispiele beschreiben weiterhin den Default. Messung und Begründung:
+[LFH-463/464-Prüfliste](2026-09-08-lfh-463-464-pruefliste.md).
+
 Grundlage ist **Entwurf 2 („Kartenplan über Spaltenregister")**: EIN Spaltenregister je Modul mit `key` als Pflichtfeld und einem daneben stehenden, über `const K` typgeprüften Kartenplan, dessen Slots Spaltenschlüssel tragen und deren Inhalt aus dem `render` derselben Spalte kommt (`zelle()`); der Tabellenzweig delegiert an `KatalogTabelle`, der Kartenzweig an `Liste`/`ListenEintrag`, genau ein Zweig steht im Baum.
 
 **Nicht** Entwurf 3 (15 Punkte gegen 14) — nicht weil sein Namensraumfehler unreparierbar wäre, sondern weil **die einzige Reparatur seine eigene These tötet**: die Projektion adressiert über `keyof T`, die Spalten dieses Repos über `key`, und die Räume fallen gemessen auseinander (`key:'typ'`/`dataIndex:'fahrzeugtyp'`, `key:'traeger'`/`dataIndex:'traegerorganisation'`, `FahrzeugePage.tsx:268/270`), während render-only-Spalten ohne jedes `dataIndex` die Mehrheit sind — **7 von 9** in `PersonalPage`, **5 von 7** in `personenSpalten`, **5 von 7** in `TierePage`, **4 von 6** in `MaterialPage`, **5 von 8** in `FahrzeugePage`. Der Join ginge nur über `bezugsSchluessel` (liest ausschließlich `dataIndex`, `KatalogTabelle.tsx:40-45`) und liefert für all diese Spalten `undefined`; die belastbare Reparatur — `{etikett, wert}` für **jede** Kartenrolle zu verlangen — entfernt `FeldSchluessel` und damit genau die Tippfehlersicherheit, die Entwurf 3 als Kern führt. Entwurf 2 braucht keine Reparatur.

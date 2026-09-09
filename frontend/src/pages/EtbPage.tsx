@@ -145,13 +145,29 @@ export default function EtbPage() {
    * verlassen wird.
    */
   const [werteBehalten, setWerteBehalten] = useState(false);
-  const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
+  const [wiedervorlageZu, setWiedervorlageZu] = useState<{
+    eintrag: EtbEintragAnzeige;
+    termin?: string | null;
+  } | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
     einsatzId,
     benutzer?.id,
   );
+
+  function oeffneWiedervorlage(eintrag: EtbEintragAnzeige) {
+    const kontext = { eintrag };
+    setWiedervorlageZu(kontext);
+    // Einsatz-Kopfdaten sind nicht live. Nur ein frischer Abruf darf die absolute
+    // Schnellwahl anbieten; bei Fehler bleiben die relativen Vorgaben bedienbar.
+    // Die Identität schützt vor Antworten nach Schließen oder erneutem Öffnen.
+    void ladeEinsatz(einsatzId).then(
+      (frisch) => setWiedervorlageZu((aktuell) => aktuell === kontext
+        ? { ...kontext, termin: frisch.naechste_lagebesprechung_at } : aktuell),
+      () => {},
+    );
+  }
 
   /**
    * Ein abgelehnter Eintrag geht auf demselben Weg zurück, den er gekommen ist —
@@ -443,7 +459,7 @@ export default function EtbPage() {
         fehler={etbQuery.isError}
         leerText={leerInhalt}
         onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
-        onWiedervorlage={darfSchreiben ? (e) => setWiedervorlageZu(e) : undefined}
+        onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
         onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
         onErneutSenden={(p) => void abgelehntErneutSenden(p)}
         onVerwerfen={(p) => { if (p.id != null) void abgelehntVerwerfen(p.id); }}
@@ -460,7 +476,8 @@ export default function EtbPage() {
       {darfSchreiben && (
         <WiedervorlageModal
           einsatzId={einsatzId}
-          eintrag={wiedervorlageZu}
+          eintrag={wiedervorlageZu?.eintrag ?? null}
+          naechsteLagebesprechungAt={wiedervorlageZu?.termin}
           onClose={() => setWiedervorlageZu(null)}
         />
       )}

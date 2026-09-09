@@ -60,6 +60,7 @@ interface FormWerte {
   sachverhalt?: string;
   anzahl_betroffene_initial?: number;
   begonnen_at: Dayjs;
+  naechste_lagebesprechung_at?: Dayjs | null;
 }
 
 /**
@@ -179,6 +180,8 @@ export default function EinsatzdatenPage() {
       sachverhalt: einsatz.sachverhalt ?? undefined,
       anzahl_betroffene_initial: einsatz.anzahl_betroffene_initial ?? undefined,
       begonnen_at: wireZuPicker(einsatz.begonnen_at),
+      naechste_lagebesprechung_at: einsatz.naechste_lagebesprechung_at
+        ? wireZuPicker(einsatz.naechste_lagebesprechung_at) : null,
     });
     setBearbeiten(true);
   }
@@ -197,6 +200,8 @@ export default function EinsatzdatenPage() {
       sachverhalt: leerZuNull(werte.sachverhalt),
       anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
       begonnen_at: pickerZuWire(werte.begonnen_at),
+      naechste_lagebesprechung_at: werte.naechste_lagebesprechung_at
+        ? pickerZuWire(werte.naechste_lagebesprechung_at) : null,
     };
     speichernMutation.mutate(felder);
   }
@@ -259,6 +264,9 @@ export default function EinsatzdatenPage() {
           <Form.Item label="Einsatzort (Adresse)" name="einsatzort">
             <Input />
           </Form.Item>
+          <Form.Item label="Nächste Lagebesprechung (optional)" name="naechste_lagebesprechung_at">
+            <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
+          </Form.Item>
           <Form.Item label="Koordinate" name="einsatzort_koord">
             <KoordinatenEingabe einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
           </Form.Item>
@@ -307,6 +315,11 @@ export default function EinsatzdatenPage() {
           <Descriptions bordered column={1} size="middle">
             <Descriptions.Item label="Einsatzart">
               {EINSATZART_LABELS[einsatz.einsatzart]}
+            </Descriptions.Item>
+            <Descriptions.Item label="Nächste Lagebesprechung">
+              {einsatz.naechste_lagebesprechung_at
+                ? <ZeitAnzeige wert={einsatz.naechste_lagebesprechung_at} format="dtgVoll" />
+                : '—'}
             </Descriptions.Item>
             <Descriptions.Item label="Koordinate">
               {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null

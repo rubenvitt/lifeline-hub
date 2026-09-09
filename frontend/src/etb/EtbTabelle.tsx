@@ -425,6 +425,8 @@ export default function EtbTabelle({
   return (
     <Datensicht<EtbZeile, EtbSpalte>
       bezeichnung="Einsatztagebuch"
+      // LFH-464: Karten unter 1200 px; lg ließe den gemessenen 1024-px-Engpass bestehen.
+      tabelleAb="xl"
       spalten={spalten}
       daten={zeilen}
       zeilenSchluessel={(z) => z.schluessel}

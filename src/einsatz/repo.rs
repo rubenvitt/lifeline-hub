@@ -103,7 +103,7 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, e.geloescht_at, \
+                e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 o.name AS org_name \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
@@ -165,6 +165,7 @@ pub async fn liste_fuer(
         #[sqlx(try_from = "String")]
         status: EinsatzStatus,
         begonnen_at: String,
+        naechste_lagebesprechung_at: Option<String>,
         abgeschlossen_at: Option<String>,
         abgeschlossen_von: Option<i64>,
         #[sqlx(try_from = "String")]
@@ -189,7 +190,7 @@ pub async fn liste_fuer(
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, e.geloescht_at, \
+                e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
@@ -224,6 +225,7 @@ pub async fn liste_fuer(
             stichwort: r.stichwort,
             status: r.status,
             begonnen_at: r.begonnen_at,
+            naechste_lagebesprechung_at: r.naechste_lagebesprechung_at,
             abgeschlossen_at: r.abgeschlossen_at,
             abgeschlossen_von: r.abgeschlossen_von,
             einsatzart: r.einsatzart,
@@ -615,6 +617,8 @@ pub struct KopfPatch<'a> {
     pub anzahl_betroffene_initial: Option<Option<i64>>,
     /// Bereits ins DB-Format normalisierte Alarmzeit.
     pub begonnen_at: Option<&'a str>,
+    /// Expliziter UTC-Termin; absent erhält, innere None löscht.
+    pub naechste_lagebesprechung_at: Option<Option<&'a str>>,
 }
 
 /// Teil-Patch der editierbaren Kopf-Spalten. Nicht-editierbare Spalten (status,
@@ -622,7 +626,7 @@ pub struct KopfPatch<'a> {
 /// Einsatznummer-Unique-Index ergibt `Conflict` (409).
 ///
 /// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`).
-/// Bei ZWÖLF gleichtypigen Paaren ist die Nummerierung die eigentliche Absicherung: eine um
+/// Bei dreizehn gleichtypigen Paaren ist die Nummerierung die eigentliche Absicherung: eine um
 /// eine Position verschobene Bind-Kette vertauschte Nachbarspalten
 /// (`meldende_stelle`↔`sachverhalt`, `einsatzort_lat`↔`einsatzort_lon`) STILL — ohne
 /// Compile- und ohne Laufzeitfehler. Abgesichert von
@@ -646,8 +650,10 @@ pub async fn patche_kopf(
             sachverhalt = CASE WHEN ?19 IS NULL THEN sachverhalt ELSE ?20 END, \
             anzahl_betroffene_initial = \
                 CASE WHEN ?21 IS NULL THEN anzahl_betroffene_initial ELSE ?22 END, \
-            begonnen_at = CASE WHEN ?23 IS NULL THEN begonnen_at ELSE ?24 END \
-         WHERE id = ?25",
+            begonnen_at = CASE WHEN ?23 IS NULL THEN begonnen_at ELSE ?24 END, \
+            naechste_lagebesprechung_at = \
+                CASE WHEN ?25 IS NULL THEN naechste_lagebesprechung_at ELSE ?26 END \
+         WHERE id = ?27",
     )
     .bind(patch.bezeichnung.map(|_| 1_i64))
     .bind(patch.bezeichnung)
@@ -673,6 +679,8 @@ pub async fn patche_kopf(
     .bind(patch.anzahl_betroffene_initial.and_then(|v| v))
     .bind(patch.begonnen_at.map(|_| 1_i64))
     .bind(patch.begonnen_at)
+    .bind(patch.naechste_lagebesprechung_at.map(|_| 1_i64))
+    .bind(patch.naechste_lagebesprechung_at.flatten())
     .bind(einsatz_id)
     .execute(pool)
     .await;
@@ -1410,6 +1418,7 @@ mod tests {
                 sachverhalt: Some(Some("Mehrzeiliges\nMeldebild")),
                 anzahl_betroffene_initial: Some(Some(3)),
                 begonnen_at: Some("2026-05-25 08:00:00"),
+                naechste_lagebesprechung_at: Some(Some("2026-05-25 10:17:43")),
             },
         )
         .await
@@ -1429,6 +1438,10 @@ mod tests {
         assert_eq!(aktualisiert.leitstellen_nr, None, "Some(None) leert");
         assert_eq!(aktualisiert.meldende_stelle, None, "Some(None) leert");
         assert_eq!(aktualisiert.begonnen_at, "2026-05-25 08:00:00");
+        assert_eq!(
+            aktualisiert.naechste_lagebesprechung_at.as_deref(),
+            Some("2026-05-25 10:17:43")
+        );
         // angelegt_at bleibt unverändert (Audit-Spur).
         assert_eq!(aktualisiert.angelegt_at, einsatz.angelegt_at);
     }

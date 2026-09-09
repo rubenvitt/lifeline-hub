@@ -804,6 +804,12 @@ const AUSNAHMEN = {
 };
 
 describe('Datensicht-Guard (LFH-330 · B2)', () => {
+  it('LFH-464: ausschließlich das vermessene ETB setzt einen eigenen Umbruch', () => {
+    const mitUmbruch = KONSUMENTEN.filter((pfad) => /\btabelleAb\s*=/.test(ohneKommentare(dateien[pfad])));
+    expect(mitUmbruch).toEqual(['/src/etb/EtbTabelle.tsx']);
+    expect(ohneKommentare(dateien['/src/etb/EtbTabelle.tsx'])).toContain('tabelleAb="xl"');
+  });
+
   it('das Primitiv und alle abgeleiteten Konsumenten halten den Vertrag', () => {
     expect(
       befunde(dateien, AUSNAHMEN),

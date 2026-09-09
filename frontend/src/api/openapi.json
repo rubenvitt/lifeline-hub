@@ -1664,6 +1664,13 @@
               "null"
             ]
           },
+          "naechste_lagebesprechung_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nächste Lagebesprechung als expliziter UTC-Termin; fehlt ohne gesetzten Termin."
+          },
           "org_id": {
             "type": "integer",
             "format": "int64"
