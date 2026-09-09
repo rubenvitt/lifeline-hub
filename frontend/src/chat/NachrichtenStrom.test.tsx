@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import NachrichtenStrom from './NachrichtenStrom';
@@ -189,5 +189,123 @@ describe('NachrichtenStrom', () => {
     const link = screen.getByRole('link', { name: /lage\.pdf/ });
     expect(link).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/42');
     expect(screen.getByText('(2 KB)')).toBeInTheDocument();
+  });
+});
+
+/**
+ * „n neue Nachrichten"-Pille statt bedingungslosem Sprung (LFH-466, Nachzug LFH-343 · C8).
+ *
+ * WARUM DIE METRIKEN GESTELLT WERDEN: jsdom rechnet kein Layout und liefert für
+ * `scrollTop`/`clientHeight`/`scrollHeight` konstant 0. Damit wäre
+ * `0 + 0 >= 0 - TOLERANZ` immer wahr — die Komponente hielte sich in JEDEM
+ * Vitest-Lauf für „am Boden", spränge und zeigte nie eine Pille. Ein Test „am
+ * Boden erscheint keine Pille" wäre so trivial grün und könnte nicht rot werden.
+ * Deshalb werden die drei Werte per `defineProperty` gesetzt; die e2e-Zusicherung
+ * im Browser (`e2e/chat-neue-nachrichten.spec.ts`) bleibt die tragende.
+ */
+describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
+  /** Setzt die drei Scroll-Metriken, die jsdom nicht rechnet. */
+  function setzeMetriken(
+    el: HTMLElement,
+    werte: { scrollTop: number; clientHeight: number; scrollHeight: number },
+  ) {
+    for (const [name, wert] of Object.entries(werte)) {
+      Object.defineProperty(el, name, { value: wert, configurable: true, writable: true });
+    }
+  }
+
+  /** Rendert den Strom und liefert Container, Scroll-Spion und `rerender`. */
+  function aufbau(nachrichten: ChatNachricht[]) {
+    const gemeinsam = {
+      eigeneBenutzerId: 1, darfSchreiben: true,
+      onBearbeiten: vi.fn(), onLoeschen: vi.fn(),
+      onHeraufstufen: vi.fn(), onHeraufstufenAuftrag: vi.fn(),
+    };
+    const { rerender } = renderMitProviders(<NachrichtenStrom nachrichten={nachrichten} {...gemeinsam} />);
+    const strom = screen.getByTestId('nachrichten-strom');
+    const scrollTo = vi.fn();
+    // jsdom kennt `scrollTo` auf Elementen nicht — der Spion IST hier zugleich
+    // das Polyfill, deshalb wird die Sprung-Aussage über ihn geführt.
+    (strom as unknown as { scrollTo: unknown }).scrollTo = scrollTo;
+    return {
+      strom,
+      scrollTo,
+      zeige: (neue: ChatNachricht[]) =>
+        rerender(<NachrichtenStrom nachrichten={neue} {...gemeinsam} />),
+    };
+  }
+
+  const A = nachricht({ id: 10, inhalt: 'A' });
+  const B = nachricht({ id: 11, inhalt: 'B' });
+  const C = nachricht({ id: 12, inhalt: 'C' });
+
+  it('steht der Lesende oben, erscheint die Pille und die Sicht bleibt stehen', async () => {
+    const { strom, scrollTo, zeige } = aufbau([A]);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    zeige([A, B]);
+    expect(await screen.findByRole('button', { name: '1 neue Nachricht' })).toBeInTheDocument();
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    // Der Zähler wächst mit jeder weiteren Nachricht, die seit dem Verlassen des
+    // unteren Randes dazugekommen ist.
+    zeige([A, B, C]);
+    expect(await screen.findByRole('button', { name: '2 neue Nachrichten' })).toBeInTheDocument();
+  });
+
+  it('steht der Lesende unten, springt der Strom mit — ohne Pille', () => {
+    const { strom, scrollTo, zeige } = aufbau([A]);
+    setzeMetriken(strom, { scrollTop: 1600, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    zeige([A, B]);
+    expect(scrollTo).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+
+  it('knapp über dem Boden gilt noch als unten (Toleranz)', () => {
+    const { strom, scrollTo, zeige } = aufbau([A]);
+    // 10 px Restweg — weniger als eine Nachrichtenzeile, also innerhalb der Toleranz.
+    setzeMetriken(strom, { scrollTop: 1590, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    zeige([A, B]);
+    expect(scrollTo).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+
+  it('Klick auf die Pille springt ans Ende und räumt den Zähler', async () => {
+    const { strom, scrollTo, zeige } = aufbau([A]);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+    zeige([A, B]);
+
+    await userEvent.click(await screen.findByRole('button', { name: '1 neue Nachricht' }));
+    expect(scrollTo).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+
+  it('zurück an den unteren Rand gescrollt räumt die Pille', async () => {
+    const { strom, zeige } = aufbau([A]);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+    zeige([A, B]);
+    expect(await screen.findByRole('button', { name: '1 neue Nachricht' })).toBeInTheDocument();
+
+    setzeMetriken(strom, { scrollTop: 1600, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+
+  it('„Ältere laden" löst weder Sprung noch Pille aus (Gegenaussage aus C8)', () => {
+    const { strom, scrollTo, zeige } = aufbau([B, C]);
+    setzeMetriken(strom, { scrollTop: 0, clientHeight: 400, scrollHeight: 2000 });
+    fireEvent.scroll(strom);
+
+    // Anbau VORNE: die Länge steigt, die jüngste id bleibt dieselbe.
+    zeige([A, B, C]);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
   });
 });

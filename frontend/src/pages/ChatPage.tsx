@@ -430,6 +430,12 @@ export default function ChatPage() {
             </div>
           )}
           <NachrichtenStrom
+            /* Remount je Kanal (Repo-Muster aus LFH-348 · C13). Der Strom merkt sich
+               seit LFH-466, ob der Lesende unten steht und ab welcher id gezählt wird
+               — beides gehört zu EINEM Kanal. Ohne den Schlüssel nähme ein Wechsel den
+               Merker aus dem alten Kanal mit: die Sicht spränge nicht ans Ende, und die
+               Pille zeigte eine Zahl aus fremden ids. */
+            key={kanalId ?? 'kein-kanal'}
             nachrichten={nachrichten}
             eigeneBenutzerId={benutzer?.id ?? null}
             darfSchreiben={darfSchreiben}

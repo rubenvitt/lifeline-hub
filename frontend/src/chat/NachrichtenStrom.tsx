@@ -1,11 +1,29 @@
 import { MoreOutlined, PaperClipOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
+import { Button, Dropdown, Popconfirm, Popover, Space, Tag, Tooltip, Typography, theme } from 'antd';
 import type { MenuProps } from 'antd';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../kommunikation';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import type { BezugKurzinfo } from './bezug';
+
+/**
+ * Restweg zum unteren Rand, der noch als „der Lesende steht unten" gilt (LFH-466).
+ *
+ * Die tragende Schranke ist „deutlich KLEINER als eine Nachrichtenzeile": eine
+ * Zeile aus Autor, Zeit und Text misst in der kompaktesten Dichtestufe grob 50 px.
+ * Wäre die Toleranz größer, bekäme jemand, der genau eine Nachricht zurückgeblättert
+ * hat, wieder den bedingungslosen Sprung — also exakt den Fehler, den dieses Ticket
+ * behebt. Nach unten braucht es trotzdem Luft: Subpixel-Rundung (Zoomstufe,
+ * `devicePixelRatio`) macht aus einem tatsächlich erreichten Boden sonst einen
+ * Restweg von einem Bruchteil eines Pixels.
+ */
+const TOLERANZ_UNTEN = 24;
+
+/** Steht die Sicht (innerhalb der Toleranz) am unteren Rand des Stroms? */
+function istAmBoden(el: HTMLElement): boolean {
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - TOLERANZ_UNTEN;
+}
 
 /** Menschlich lesbare Dateigröße. */
 function formatGroesse(bytes: number): string {
@@ -38,9 +56,55 @@ export default function NachrichtenStrom({
   onBezugSetzen, onBezugLoeschen, bezugLabel, bezugInfo,
 }: Props) {
   const behaelter = useRef<HTMLDivElement>(null);
+  const { token } = theme.useToken();
   // Die id der JÜNGSTEN Nachricht — sie unterscheidet die beiden Wachstumsrichtungen
   // (Begründung am Effekt unten). `nachrichten` ist aufsteigend sortiert.
   const juengsteId = nachrichten.length > 0 ? nachrichten[nachrichten.length - 1].id : null;
+
+  /**
+   * „Steht der Lesende unten?" — als REF, gepflegt vom Scroll-Handler (LFH-466).
+   *
+   * Die Messung darf NICHT im Effekt an der jüngsten id stattfinden: der läuft nach
+   * dem Commit, `scrollHeight` ist dann bereits um die Höhe der neuen Nachricht
+   * gewachsen. Wer exakt unten stand, wäre in dem Moment eine Zeilenhöhe vom Boden
+   * entfernt — die Pille erschiene also genau in dem Fall, in dem der Strom
+   * mitspringen soll. Scroll-Ereignisse feuern dagegen nur beim Bewegen der Sicht,
+   * nicht beim Wachsen des Inhalts, und tragen damit die Aussage über den Zustand
+   * VOR dem Zuwachs.
+   *
+   * Ein Ref und kein State: der Wert wird synchron im Effekt gelesen und soll pro
+   * Scroll-Ereignis kein Rendern auslösen. Startwert `true`, damit der erste Aufbau
+   * und der Kanalwechsel weiter ans Ende springen (Zusicherung aus LFH-343 · C8).
+   */
+  const amBodenRef = useRef(true);
+
+  /**
+   * Die id, ab der gezählt wird — gesetzt an der Flanke „unten → nicht unten".
+   *
+   * Über die ID und nicht über einen Zähler, den man hochzählt: „Ältere laden" hängt
+   * vorne an, und jeder Refetch ersetzt das ganze Array. Ein `n.id > markeId` ist
+   * gegen beides immun, ein Inkrement wäre es nicht.
+   */
+  const [markeId, setMarkeId] = useState<number | null>(null);
+  const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
+
+  /** Flankenwechsel am unteren Rand: Marke setzen bzw. räumen. */
+  function beiScroll() {
+    const el = behaelter.current;
+    if (!el) return;
+    const unten = istAmBoden(el);
+    if (unten === amBodenRef.current) return;
+    amBodenRef.current = unten;
+    setMarkeId(unten ? null : juengsteId);
+  }
+
+  /** Klick auf die Pille: ans Ende springen und den Zähler räumen. */
+  function zumEnde() {
+    const el = behaelter.current;
+    el?.scrollTo?.({ top: el.scrollHeight });
+    amBodenRef.current = true;
+    setMarkeId(null);
+  }
 
   /**
    * „Stick to bottom" — aber nur nach unten (LFH-343 · C8, Befund H51).
@@ -51,11 +115,16 @@ export default function NachrichtenStrom({
    * liest. Die jüngste id wächst nur im ersten Fall — beim Anbau vorne bleibt sie
    * gleich, obwohl die Länge steigt.
    *
+   * Der Sprung greift aber nur, wenn der Lesende gerade unten steht (LFH-466).
+   * Wer weiter oben im Verlauf liest, behält seine Stelle und bekommt stattdessen
+   * die Pille unten im Container.
+   *
    * `scrollTo` wird optional gerufen: jsdom kennt die Methode auf Elementen nicht
    * (dieselbe Vorsichtsmaßnahme wie bei `scrollIntoView` in `MeldungenPage`).
    */
   useEffect(() => {
     if (juengsteId === null) return;
+    if (!amBodenRef.current) return;
     const el = behaelter.current;
     el?.scrollTo?.({ top: el.scrollHeight });
   }, [juengsteId]);
@@ -63,6 +132,7 @@ export default function NachrichtenStrom({
   return (
     <div
       ref={behaelter}
+      onScroll={beiScroll}
       data-testid="nachrichten-strom"
       // Der eigene Scroll-Container ist der Kern von H51: ohne ihn wächst der
       // Strom die Seite lang, und die Eingabe darunter wandert aus dem Bild.
@@ -205,6 +275,33 @@ export default function NachrichtenStrom({
         );
       }}
     />
+      {/* Die Pille klebt am unteren Rand des Scroll-Containers, solange der Lesende
+          weiter oben steht. `position: sticky` statt `fixed`: sie gehört in den
+          Strom, nicht auf die Seite — unter ihr liegt die Eingabe als Geschwister.
+          Der Wrapper ist reine Positionierschale und deshalb KEIN Bedienziel; er
+          lässt Zeiger durch, damit die schmale Leiste links und rechts der Pille
+          keine Klicks auf den Text darunter abfängt.
+
+          Die Pille selbst ist ein echter antd-`Button` und kein `<div onClick>` —
+          damit kommen Trefflächenboden (`controlHeight`, 30 / 48 / 72), Fokusring
+          und Tastaturweg vom `ConfigProvider`, und sie schuldet nicht die zwei
+          Angaben, die LFH-365 einem HANDGEBAUTEN Ziel auferlegt. Dieselbe
+          Entscheidung wie beim Platzhalter in `components/BemerkungZelle.tsx`. */}
+      {neueAnzahl > 0 && (
+        <div
+          style={{
+            position: 'sticky',
+            bottom: token.paddingSM,
+            display: 'flex',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <Button type="primary" shape="round" style={{ pointerEvents: 'auto' }} onClick={zumEnde}>
+            {neueAnzahl === 1 ? '1 neue Nachricht' : `${neueAnzahl} neue Nachrichten`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
