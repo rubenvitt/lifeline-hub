@@ -15,6 +15,23 @@
  * `kommunikation/phase.ts` namentlich verbietet — und träfe acht Konsumenten in vier
  * Modulen samt `unbearbeitet`-Zweikanal (C8/H47). Das bleibt ein eigenes Ticket.
  *
+ * Die Linie ist nicht neu: `einsatz/einsatzStatus.ts` trägt den Vertragstyp
+ * `StatusDarstellung` und liegt trotzdem bewusst außerhalb von `statusFarben.ts` — mit
+ * derselben Begründung (dessen Abdeckungsguard zählt gegen ein `toHaveLength`, ein
+ * Eintrag mehr ist eine Vertragsänderung, kein Nebenprodukt). Dies ist die zweite
+ * Anwendung, nicht eine Ausrede für diesen einen Fall.
+ *
+ * WAS DIE UMSTELLUNG FARBLICH BEWIRKT — gemessen, nicht per Analogie behauptet: `PHASE_META`
+ * führt antds STATUS-Farben (`default`/`processing`/`success`/`error`), keine Presets.
+ * `antd/lib/tag/style/statusCmp.js` löst `ant-tag-success` über
+ * `colorSuccess`/`colorSuccessBg`/`colorSuccessBorder` auf, und `theme/tokens.ts`
+ * (`antdToken`) setzt `colorSuccess: farben.normal`. Der Kopf ist damit VON antds eigener
+ * Green-Palette (`presetCmp.js`, in `tokens.ts` nirgends vertreten) AUF die Rollenpalette
+ * gewandert. `PHASE_META.offen = 'default'` bekommt zwar die Klasse, aber keine Regel in
+ * `statusCmp` und fällt auf die Basis-Gestaltung des Tags zurück — ebenfalls Projekt-Tokens.
+ * Nicht behauptet wird, das repariere den Nachtmodus: beide Paletten folgen dem Algorithmus,
+ * geändert hat sich WELCHE.
+ *
  * WARUM QUELLTEXT-PIN: die eine Hälfte der Zusicherung ist eine ABWESENHEIT — „kein
  * handgeschriebenes Preset, kein abgeschriebener Wortlaut". Im DOM ist sie nicht
  * belegbar: der Entwurfs-Zustand rendert vorher wie nachher `color="default"`, die
@@ -47,6 +64,13 @@ const KOEPFE = [
  * Gate, das aus dem falschen Grund rot geht, kostet die Zeit dessen, der es debuggt.
  * Der Schnitt trägt die Begründung deshalb selbst und WIRFT, wenn er den Anker nicht
  * findet: eine stillschweigend leere Menge machte jede Abwesenheits-Aussage trivial wahr.
+ *
+ * SEIN BLINDFLECK, und der gehört zum Vertrag wie bei `queryKeyScan.ts`: ein
+ * VERSCHACHTELTES `<Space>` innerhalb der Gruppe schließt den Schnitt zu früh. Steht es
+ * VOR den Etiketten, fällt das laut auf (der `<Tag>`-Nachweis unten wird rot); steht es
+ * DAHINTER, bliebe ein `<Tag color=…>` im abgeschnittenen Rest unsichtbar. Ein
+ * Klammerzähler wäre die Antwort darauf — heute ist der Fall hypothetisch, der Kopf
+ * trägt genau drei Etiketten und kein zweites `Space`.
  */
 function etikettengruppe(inhalt: string, datei: string): string {
   const auf = inhalt.indexOf('<Space size={6} wrap');
@@ -59,9 +83,13 @@ function etikettengruppe(inhalt: string, datei: string): string {
 describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
   it.each(KOEPFE)('%s trägt kein Preset-`color` mehr am Etikett', (datei) => {
     const gruppe = etikettengruppe(lies(datei), datei);
-    expect(gruppe, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(/<Tag\s+color=/);
+    // `[^>]*` statt `\s+`: `<Tag style={{…}} color="green">` matchte sonst nicht, und
+    // Prettier sortiert JSX-Attribute nicht um. Beide Reihenfolgen kommen im Bestand vor
+    // (`meldungen/MeldungKarte.tsx` color-first, `erinnerung/ErinnerungKarte.tsx` style-first).
+    expect(gruppe, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(/<Tag(?=[\s>])[^>]*\scolor=/);
     // Der Schnitt hat wirklich die Gruppe erwischt — sonst prüfte die Zeile darüber
-    // eine leere Zeichenkette gegen eine Abwesenheit und wäre immer grün.
+    // eine leere Zeichenkette gegen eine Abwesenheit und wäre immer grün. Zugleich die
+    // Gegenprobe gegen das bloße Entfernen der Etikettengruppe.
     expect(gruppe, `${datei}: der Schnitt enthält die Etiketten`).toContain('<Tag>');
   });
 
@@ -69,18 +97,10 @@ describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
     const gruppe = etikettengruppe(lies(datei), datei);
     // „Freigegeben" als Literal ist die belastbare Gegenprobe; „Entwurf" trägt daneben
     // die Knopfbeschriftung „Entwurf speichern" und taugt dafür nicht.
-    expect(gruppe, `${datei}: Statuslabel nicht abgeschrieben`).not.toContain("'Freigegeben'");
+    // Alle drei Quote-Stile: `toContain("'…'")` liefe an `"Freigegeben"` vorbei.
+    expect(gruppe, `${datei}: Statuslabel nicht abgeschrieben`).not.toMatch(/['"`]Freigegeben['"`]/);
     expect(gruppe, `${datei}: liest die Achse`).toContain(zugriff);
     const badges = gruppe.match(/<StatusBadge/g) ?? [];
     expect(badges, `${datei}: genau ein Statusetikett im Kopf`).toHaveLength(1);
-  });
-
-  it.each(KOEPFE)('%s behält die zwei farblosen Geschwister-Etiketten', (datei) => {
-    // Gegenprobe: den Guard könnte man sonst erfüllen, indem man die Tag-Gruppe ganz
-    // entfernt. Vorlage und Fassungsnummer stehen weiter daneben — sie tragen keine
-    // Statusaussage und deshalb bewusst kein `color`.
-    const gruppe = etikettengruppe(lies(datei), datei);
-    const schlicht = gruppe.match(/<Tag>/g) ?? [];
-    expect(schlicht, `${datei}: Vorlage und Version bleiben stehen`).toHaveLength(2);
   });
 });
