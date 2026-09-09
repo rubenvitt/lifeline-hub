@@ -1,20 +1,37 @@
 /* LFH-465 — der native Fokus-Scroll berücksichtigt die verankerte Aktionsleiste.
 
-   `scroll-padding-block-end` am SCROLLPORT, nicht `scroll-margin-block-end` an den
-   Feldern — und das ist gemessen, nicht gewählt: Chromium scrollt beim Tabulatorwechsel
-   mit „nearest" und lässt ein Ziel, das schon teilweise im Bild steht, unangetastet. Ein
-   164 px hohes Abschnittsfeld stand damit auf `top: 764` in einem 844-px-Fenster, während
-   die Leiste bei 766 begann: zwei Pixel frei. `scroll-margin` an den Feldern blieb dabei
-   wirkungslos, weil es nur zählt, wenn überhaupt gescrollt wird — die Variante wurde
-   gebaut, gemessen und wieder verworfen. `scroll-padding` verkleinert dagegen den
-   Scrollport selbst: das Ziel gilt dann als NICHT sichtbar, der Browser scrollt, und der
-   Abzug ist eingerechnet.
+   GEMESSEN, nicht gewählt: ohne diese Regel landete `einsatzunterstuetzung` beim
+   Tabulatorwechsel auf `top: 764` in einem 844-px-Fenster, während die Leiste bei 766
+   begann — der obere Rand des Feldes lag also einen Pixel UNTER der Leistenoberkante. Mit
+   der Regel bleiben 42 px frei (Dichte `kompakt`, Leiste 78 px) bzw. 133 px
+   (`handschuh`, Leiste 184 px). `e2e/befehl-aktionsleiste.spec.ts` misst genau diesen
+   Streifen und wird ohne die Regel rot.
+
+   `scroll-padding-block-end` am SCROLLPORT, nicht `scroll-margin-block-end` an den Feldern:
+   die Feld-Variante war zuerst gebaut und blieb im Browser gemessen wirkungslos — der
+   Freiraum änderte sich nicht. Die Ursache ist NICHT abschließend geklärt und wird hier
+   deshalb auch nicht behauptet; nach CSSOM-View geht `scroll-margin` in die Zielbox ein und
+   sollte mitentscheiden, ob überhaupt gescrollt wird. Was zählt: die Wirkung ist gemessen,
+   und `scroll-padding` verkleinert den Scrollport nachweislich so, dass der Browser scrollt
+   und den Abzug einrechnet.
+   `pages/EinheitDetailPage.css` löst dieselbe Frage seit LFH-446 mit `scroll-margin` und
+   bleibt bewusst unberührt: dort ist sie NICHT nachgemessen worden, weder von LFH-446 noch
+   von hier. Das ist keine Aussage über ihre Wirksamkeit — wer sie anfasst, misst zuerst.
 
    Die Variable folgt per ResizeObserver der tatsächlichen Leistenhöhe
-   (`beobachteAktionsleiste` in `BefehlDetailPage.tsx`) — Dichtestufe (30/48/72 px) und
-   umgebrochene Knopfreihe verändern sie um ein Vielfaches. Ohne verankerte Leiste — ab
-   `lg` und auf jeder anderen Seite — ist sie nicht gesetzt, der Fallback `0px` macht die
-   Regel wirkungslos; nur deshalb darf sie am Wurzelelement stehen. */
+   (`beobachteAktionsleiste` in `BefehlDetailPage.tsx`) — die Dichte-Staffel (30/48/72 px)
+   und die umgebrochene Knopfreihe verändern sie um mehr als das Doppelte (78 → 184 px
+   gemessen), ein Festwert wäre in einer der Stufen daneben.
+
+   ── WARUM EIN `:root`-BLOCK AUS EINER SEITENLOKALEN DATEI ───────────────────────────────
+   Eine benannte Ausnahme, kein Präzedenzfall zum Nachmachen. `scroll-padding` wirkt nur am
+   Scrollport, und der ist hier das Dokument — ein auf `.befehl-` gescopter Selektor wäre
+   wirkungslos (die Regel, die `befehlPrint.test.ts:66-73` für die Schwesterdatei erzwingt,
+   ist deshalb hier nicht erfüllbar). Unschädlich ist der Block nur, weil die Variable ohne
+   verankerte Leiste gar nicht gesetzt wird und der Fallback `0px` verhaltensgleich zum
+   Vorgabewert `auto` ist; die Aufräumfunktion nimmt sie beim Verlassen der Route wieder weg
+   (e2e-geprüft). Wer hier einen zweiten `:root`-Block einträgt, begründet ebenso — und
+   prüft, dass er sich mit diesem nicht überschreibt. */
 :root {
   scroll-padding-block-end: var(--lfh-befehl-fokusabstand, 0px);
 }

@@ -1,7 +1,7 @@
 import { App, Breadcrumb, Button, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -31,17 +31,25 @@ import './befehlAktionsleiste.css';
  * (LFH-465; Bauform aus `EinheitDetailPage.tsx:37`, LFH-446).
  *
  * Warum gemessen und nicht als Festwert: Dichtestufe (30/48/72 px) und umgebrochene
- * Knopfreihe verändern die Höhe um ein Vielfaches — ein Festwert wäre im Handschuh-Betrieb
- * daneben, und die Felder darüber parkten beim nativen Fokus-Scroll wieder hinter der
- * Leiste.
+ * Knopfreihe verändern die Höhe um mehr als das Doppelte (gemessen 78 px in `kompakt`,
+ * 184 px in `handschuh`) — ein Festwert wäre in einer der Stufen daneben, und die Felder
+ * darüber parkten beim nativen Fokus-Scroll wieder hinter der Leiste.
  *
  * Träger ist das WURZELELEMENT, nicht das `<form>` wie bei der Einheit und auch nicht die
  * Seitenwurzel: die Regel dazu ist `scroll-padding-block-end` am Scrollport, und der
  * Scrollport ist hier das Dokument. Ein `closest('form')` fände ohnehin nichts — die Leiste
  * liegt ausserhalb des Formulars, weil sie mit „Drucken"/„Fortschreiben" auch Aktionen des
  * freigegebenen Zweigs trägt, in dem es gar kein `<Form>` gibt; der Beobachter wäre dann ein
- * stilles No-op. Die Aufräumfunktion nimmt die Eigenschaft beim Verlassen wieder weg, sonst
- * trüge jede folgende Route den Abzug einer Leiste, die es dort nicht gibt.
+ * stilles No-op.
+ *
+ * Die Aufräumfunktion nimmt die Eigenschaft beim Verlassen wieder weg — und DIESE Zusicherung
+ * ist geprüft statt geerbt: anders als bei LFH-446, wo der Träger das mit-unmountende `<form>`
+ * war, überlebt das Wurzelelement die Route. Bliebe der Abzug stehen, verschöbe er den
+ * Fokus-Scroll auf jeder folgenden schmalen Route um eine Leistenhöhe, die es dort nicht gibt:
+ * kein sichtbarer Fehler, keine Meldung. `e2e/befehl-aktionsleiste.spec.ts` misst es am
+ * abgehängten Baum, nicht an der gewechselten URL — React räumt eine Runde SPÄTER auf als der
+ * Router navigiert, und ein Blick direkt nach dem URL-Wechsel liest noch den alten Wert
+ * (gemessen: 85 px).
  */
 function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
   if (!leiste) return;
@@ -75,6 +83,19 @@ function BefehlDetail() {
   const { message, modal } = App.useApp();
   const { token } = theme.useToken();
   const { abBreite } = useViewport();
+  // Unterhalb des Führungs-Tablets kleben die Aktionen am unteren Rand statt im Kopf
+  // (LFH-465). Begründung der Schwelle: `befehle/aktionsleiste.ts`.
+  const verankert = !abBreite(AKTIONSLEISTE_AB);
+  /**
+   * `useCallback`, nicht inline: der Editor rendert über `onValuesChange` bei JEDEM
+   * Tastenanschlag neu, und ein Inline-Ref bekäme jedes Mal eine neue Identität — React
+   * risse die Aufräumfunktion durch und baute den ResizeObserver samt CSS-Eigenschaft
+   * pro Zeichen neu auf. Kein Leck und kein Flackern, aber Arbeit für nichts.
+   */
+  const leisteRef = useCallback(
+    (el: HTMLDivElement | null) => beobachteAktionsleiste(el, token.marginSM),
+    [token.marginSM],
+  );
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();
@@ -194,9 +215,6 @@ function BefehlDetail() {
   const v = vorlage(befehl.vorlage);
   const istEntwurf = befehl.status === 'entwurf';
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  // Unterhalb des Führungs-Tablets kleben die Aktionen am unteren Rand statt im Kopf
-  // (LFH-465). Begründung der Schwelle: `befehle/aktionsleiste.ts`.
-  const verankert = !abBreite(AKTIONSLEISTE_AB);
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder VOR dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
@@ -254,7 +272,7 @@ function BefehlDetail() {
     <div
       className="befehl-no-print"
       data-lfh="befehl-aktionen"
-      ref={verankert ? (el) => beobachteAktionsleiste(el, token.marginSM) : undefined}
+      ref={verankert ? leisteRef : undefined}
       style={aktionsleisteStil(verankert, token)}
     >
       <Space wrap>
