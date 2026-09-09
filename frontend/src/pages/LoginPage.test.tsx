@@ -535,7 +535,14 @@ describe('LoginPage', () => {
           aufrufe += 1;
           // Verzoegert, damit der Klick den LAUFENDEN Absendevorgang trifft — ein sofort
           // aufloesender Handler liesse den Riegel schon wieder gefallen sein.
-          await new Promise((r) => setTimeout(r, 50));
+          //
+          // 50 ms reichten dafuer NICHT auf fremder Hardware (gemessen, LFH-522): unter der
+          // Coverage-Instrumentierung auf zwei CI-Kernen braucht `userEvent.click` laenger
+          // als die Frist, der erste Vorgang war dann fertig, der Klick loeste einen zweiten
+          // Aufruf aus — `expected 2 to be 1`, ohne dass sich Code geaendert haette. Die
+          // Frist ist deshalb grosszuegig; sie kostet nichts, weil der Test ohnehin auf den
+          // Absendevorgang wartet.
+          await new Promise((r) => setTimeout(r, 2000));
           return HttpResponse.json(adminBody);
         }),
       );
