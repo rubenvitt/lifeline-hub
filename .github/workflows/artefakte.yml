@@ -1,0 +1,270 @@
+# Release-Artefakte (LFH-522/LFH-527) — vier Binaries, ein Container-Abbild.
+#
+# Hängt am fertigen Release, nicht am Release-Lauf: so lassen sich die Artefakte für ein
+# bestehendes Release jederzeit per workflow_dispatch nachbauen, ohne die Version neu zu
+# ermitteln.
+#
+# Die Windows-Binary entsteht als CROSS-BUILD auf dem Linux-Runner (MinGW-w64) und nicht
+# nativ auf windows-latest. Der Weg ist gemessen (Spike 2026-09-09): die .exe linkt nur
+# gegen Windows-System-DLLs, keine MinGW-Laufzeit daneben. Der Windows-Runner trägt
+# stattdessen den Smoke-Test — er belegt mehr als ein Build es könnte, nämlich dass die
+# Datei auf der Zielplattform auch startet.
+name: Artefakte
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release-Tag, dessen Artefakte (neu) gebaut werden sollen, z. B. v0.2.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artefakte-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  # Ein eigener Job nur fürs Prüfen und Zerlegen des Tags. Grund: der Tag fließt weiter unten
+  # in `actions/checkout`s `ref` und in Dateinamen. Bei workflow_dispatch ist er freie
+  # Nutzereingabe, und ein `ref`, das ein Angreifer bestimmt, ist der klassische Weg, fremden
+  # Code mit den Rechten dieses Workflows laufen zu lassen. Deshalb: erst gegen ein festes
+  # Muster prüfen, dann verwenden — und nie roh in ein `run:` interpolieren.
+  vorbereiten:
+    name: Tag prüfen
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pruefen.outputs.tag }}
+      version: ${{ steps.pruefen.outputs.version }}
+    steps:
+      - id: pruefen
+        env:
+          ROH_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$ROH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "FEHLER: '$ROH_TAG' ist kein zulässiger Release-Tag (erwartet: vX.Y.Z[-vorab])." >&2
+            exit 1
+          fi
+          echo "tag=$ROH_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${ROH_TAG#v}" >> "$GITHUB_OUTPUT"
+
+  bauen:
+    name: ${{ matrix.name }}
+    needs: vorbereiten
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runs-on: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            sbom: true
+          - name: linux-arm64
+            runs-on: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: macos-arm64
+            runs-on: macos-latest
+            target: aarch64-apple-darwin
+          - name: windows-x86_64
+            runs-on: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            mingw: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+
+      - name: System-Werkzeuge (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+
+      - name: MinGW-Toolchain für den Windows-Cross-Build
+        if: matrix.mingw
+        run: sudo apt-get install --no-install-recommends -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+
+      - name: System-Werkzeuge (macOS)
+        if: runner.os == 'macOS'
+        run: brew install nasm
+
+      - name: Rust-Toolchain (stable, Ziel ${{ matrix.target }})
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: artefakt-${{ matrix.target }}
+
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+
+      # Nur einmal: das SBOM soll das ausgelieferte Artefakt inventarisieren, und der
+      # Cargo-Graph ist über alle Targets derselbe. Vier Kopien wären vier gleiche Dateien.
+      - name: cargo-cyclonedx
+        if: matrix.sbom
+        run: cargo install cargo-cyclonedx --locked --version 0.5.7
+
+      - name: Bauen
+        env:
+          # Nur für den Cross-Build gesetzt; auf den nativen Runnern sind die Variablen leer
+          # und Cargo nimmt seine Vorgaben. Siehe den Kopfkommentar von build-release.sh:
+          # eine committete .cargo/config.toml wäre hier bequem und lokal schädlich.
+          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: ${{ matrix.mingw && 'x86_64-w64-mingw32-gcc' || '' }}
+          CC_x86_64_pc_windows_gnu: ${{ matrix.mingw && 'x86_64-w64-mingw32-gcc' || '' }}
+          CXX_x86_64_pc_windows_gnu: ${{ matrix.mingw && 'x86_64-w64-mingw32-g++' || '' }}
+          AR_x86_64_pc_windows_gnu: ${{ matrix.mingw && 'x86_64-w64-mingw32-ar' || '' }}
+        run: ./scripts/build-release.sh --target ${{ matrix.target }}
+
+      - name: Artefakt einsammeln
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+          ZIEL: ${{ matrix.target }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+          ausgabe="$target_dir/$ZIEL/release"
+          mkdir -p versand
+          case "$ZIEL" in
+            *windows*) cp "$ausgabe/lifeline-hub.exe" "versand/lifeline-hub-$VERSION-$ZIEL.exe" ;;
+            *)         cp "$ausgabe/lifeline-hub"     "versand/lifeline-hub-$VERSION-$ZIEL" ;;
+          esac
+          if [ -d "$ausgabe/sbom" ]; then
+            ( cd "$ausgabe" && zip -r - sbom ) > "versand/lifeline-hub-$VERSION-sbom.zip"
+          fi
+          ( cd versand && for f in *; do shasum -a 256 "$f" > "$f.sha256"; done )
+          ls -lh versand
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: versand-${{ matrix.name }}
+          path: versand/
+          retention-days: 7
+
+  # Der Beleg, dass die cross-gebaute Datei auf der Zielplattform wirklich läuft. `--help`
+  # prüft nur den Start; `sqlite-version` lädt zusätzlich das eingebackene SQLite und
+  # liefert genau die Zahl, die build-release.sh im Cross-Build nicht ermitteln konnte.
+  windows-smoke:
+    name: Windows-Smoke-Test
+    needs: [vorbereiten, bauen]
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: versand-windows-x86_64
+          path: versand
+
+      - name: Starten und Version lesen
+        shell: bash
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: |
+          set -euo pipefail
+          exe="versand/lifeline-hub-$VERSION-x86_64-pc-windows-gnu.exe"
+          "$exe" --help > /dev/null
+          version="$("$exe" sqlite-version)"
+          echo "eingebettetes SQLite: $version"
+          # Leere Ausgabe hieße: gestartet, aber die statisch gelinkte Bibliothek antwortet
+          # nicht — genau der stille Fehlschlag, den ein reiner Exit-Code-Test durchließe.
+          [ -n "$version" ] || { echo "FEHLER: sqlite-version lieferte nichts." >&2; exit 1; }
+
+  veroeffentlichen:
+    name: Ans Release hängen
+    needs: [vorbereiten, bauen, windows-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: versand-*
+          merge-multiple: true
+          path: versand
+
+      - name: Hochladen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.vorbereiten.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ls -lh versand
+          gh release upload "$TAG" versand/* --clobber
+
+  docker:
+    name: Container-Abbild
+    needs: [vorbereiten, bauen]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: versand-linux-*
+          merge-multiple: true
+          path: versand
+
+      # Das Dockerfile erwartet dist/linux-<TARGETARCH>/lifeline-hub — TARGETARCH ist Dockers
+      # Schreibweise (amd64/arm64), nicht die Rust-Triple-Schreibweise.
+      - name: Kontext für das Abbild bauen
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/linux-amd64 dist/linux-arm64
+          cp "versand/lifeline-hub-$VERSION-x86_64-unknown-linux-gnu" dist/linux-amd64/lifeline-hub
+          cp "versand/lifeline-hub-$VERSION-aarch64-unknown-linux-gnu" dist/linux-arm64/lifeline-hub
+          chmod +x dist/linux-*/lifeline-hub
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `latest` nur für stabile Releases: ein Prerelease darf den Tag nicht übernehmen, den
+      # ein `docker pull` ohne Angabe zieht. Die Kanal-Tags (beta/alpha) entstehen erst, wenn
+      # es die Branches gibt — bis dahin ist der Ausdruck schlicht leer.
+      - name: Abbild-Tags bestimmen
+        id: tags
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+          IST_VORAB: ${{ github.event.release.prerelease || false }}
+        run: |
+          set -euo pipefail
+          bild="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tags="$bild:$VERSION"
+          if [ "$IST_VORAB" != "true" ]; then
+            tags="$tags,$bild:latest"
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          provenance: true
+          sbom: true

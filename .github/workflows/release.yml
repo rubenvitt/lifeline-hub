@@ -1,0 +1,112 @@
+# Release (LFH-522/LFH-527) — ermittelt die Version, bumpt, taggt, legt das Release an.
+#
+# WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: `ci.yml` ruft diesen Workflow nach grünem Gate
+# und nur bei einem Push auf. Der Umweg über `workflow_call` statt `workflow_run` ist kein
+# Stilfrage, sondern behebt einen Fehler, der erst spät aufgefallen wäre:
+#
+#   semantic-release ermittelt den aktuellen Branch über env-ci aus `GITHUB_REF` — NICHT aus
+#   dem, was `actions/checkout` auscheckt. Ein `workflow_run`-Lauf läuft im Kontext des
+#   Default-Branches, `GITHUB_REF` zeigt dort also auf `main`, egal welcher Branch das Gate
+#   ausgelöst hat. Solange `main` der einzige Kanal ist, fällt das nicht auf. In dem Moment,
+#   in dem `beta` angelegt wird, released ein Push auf `beta` still als stabile Version —
+#   also genau dann, wenn die vorbereiteten Kanäle scharf werden sollen.
+#
+# `workflow_call` erbt den auslösenden Ereigniskontext, damit stimmt `GITHUB_REF` von selbst
+# und es braucht keinen nachgebauten Branch-Wechsel.
+name: Release
+
+on:
+  workflow_call:
+    secrets:
+      # Bewusst NICHT `required: true`: dann bräche der Aufruf, solange die App noch nicht
+      # eingerichtet ist (LFH-527), und der allererste Merge auf main käme mit einem roten
+      # Lauf heraus — für einen Schritt, der planmäßig noch nicht laufen kann. Stattdessen
+      # prüft der Job unten selbst und überspringt mit klarer Ansage.
+      RELEASE_APP_ID:
+        required: false
+      RELEASE_APP_PRIVATE_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Solange die App fehlt, ist „nichts tun" das richtige Verhalten — nicht „scheitern".
+      # Ein rot geborener Workflow wird abgeschaltet statt eingerichtet.
+      - name: Ist die Release-App eingerichtet?
+        id: bereit
+        env:
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_ID:-}" ]; then
+            echo "bereit=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release übersprungen — das Secret RELEASE_APP_ID ist nicht gesetzt."
+            echo "::notice::Einrichtung siehe ClickUp LFH-527 (GitHub App anlegen, Secrets hinterlegen)."
+          else
+            echo "bereit=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Der Token kommt aus einer GitHub App, nicht aus GITHUB_TOKEN und nicht aus einem
+      # persönlichen Zugriffstoken. Zwei Gründe: (1) mit GITHUB_TOKEN erzeugte Pushes lösen
+      # bewusst KEINE weiteren Workflows aus — das `release: published`-Ereignis käme nie
+      # an und die Artefakte würden nie gebaut. (2) Ein PAT läuft ab und hängt an einer
+      # Person; die App bleibt, auch wenn sich Zuständigkeiten ändern.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        if: steps.bereit.outputs.bereit == 'true'
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.bereit.outputs.bereit == 'true'
+        with:
+          # Die komplette Historie: semantic-release liest alle Commits seit dem letzten Tag,
+          # ein flacher Klon liefert eine falsche (meist zu kleine) Versionsanhebung.
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Rust-Toolchain (stable)
+        if: steps.bereit.outputs.bereit == 'true'
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+
+      # cargo-set-version aus cargo-edit bumpt Cargo.toml UND Cargo.lock (siehe prepareCmd
+      # in release.config.mjs). Ohne Lock-Bump bräche der nächste --frozen-lockfile-Lauf.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: edit-cache
+        if: steps.bereit.outputs.bereit == 'true'
+        with:
+          path: ~/.cargo/bin/cargo-set-version
+          key: cargo-edit-0.13.7-${{ runner.os }}
+      - name: cargo-edit
+        if: steps.bereit.outputs.bereit == 'true' && steps.edit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-edit --locked --version 0.13.7 --no-default-features --features set-version
+
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        if: steps.bereit.outputs.bereit == 'true'
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+
+      - name: Release-Werkzeug installieren
+        if: steps.bereit.outputs.bereit == 'true'
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm install --frozen-lockfile
+
+      - name: semantic-release
+        if: steps.bereit.outputs.bereit == 'true'
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GIT_AUTHOR_NAME: lifeline-hub-release
+          GIT_AUTHOR_EMAIL: noreply@github.com
+          GIT_COMMITTER_NAME: lifeline-hub-release
+          GIT_COMMITTER_EMAIL: noreply@github.com
+        # Der ganze Schritt läuft unter `mise exec`, weil der prepareCmd `pnpm` auf dem PATH
+        # braucht (er bumpt frontend/package.json) — nicht nur semantic-release selbst.
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm exec semantic-release
