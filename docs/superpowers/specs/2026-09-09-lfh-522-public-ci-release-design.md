@@ -5,7 +5,7 @@ Stand: 2026-09-09 · Status: Design freigegeben · Umsetzung in vier Subtasks (A
 ## 1. Ziel und Entscheidung
 
 Das Repo `rubenvitt/lifeline-hub` wird auf GitHub **öffentlich**, bekommt ein CI-Gate,
-einen automatisierten Release-Flow mit Kanälen (`main`/`beta`/`alpha`) und Release-Artefakte
+einen automatisierten Release-Flow (0.x auf `main`, Kanäle `beta`/`alpha` vorbereitet) und Release-Artefakte
 für Linux (x86_64, arm64), macOS (arm64), Windows (x86_64, `.exe`) sowie ein Multi-Arch-
 Docker-Image. Bis heute gibt es **kein CI**; das Gate ist `scripts/check-all.sh` lokal.
 
@@ -40,8 +40,8 @@ Keine Signierung/Notarisierung der Binaries (eigenes Ticket, wenn gebraucht).
 
 Per `gh api`, in Subtask 4:
 
-- Default-Branch auf `alpha` umstellen (Begründung in Abschnitt 6).
-- Branch-Protection (Rulesets) auf `main`, `beta`, `alpha`: PR-Pflicht, Required Check
+- Branch-Protection (Ruleset) auf `main` — und per Namensmuster gleich auf `beta`/`alpha`,
+  damit die Kanäle beim Anlegen geschützt sind: PR-Pflicht, Required Check
   `gate`, keine Force-Pushes. Der Release-Bot committet den Version-Bump auf die geschützten
   Branches — deshalb bekommt er eine **Bypass-Regel** (GitHub App oder PAT, s. Abschnitt 4).
 - Dependabot-Alerts und Security-Updates an; Actions-Berechtigung „GitHub-eigene und
@@ -50,7 +50,8 @@ Per `gh api`, in Subtask 4:
 
 ## 4. Gate-Workflow `.github/workflows/ci.yml`
 
-**Auslöser:** `pull_request` (alle Ziele) und `push` auf `main`, `beta`, `alpha`.
+**Auslöser:** `pull_request` (alle Ziele) und `push` auf `main`, `beta`, `alpha` (die
+beiden letzten greifen erst, wenn die Branches existieren).
 
 **Job `gate`** (ubuntu-latest) fährt **`scripts/check-all.sh` unverändert**. Grund: CI und
 lokales Gate dürfen nie auseinanderlaufen; das Skript ist die eine Durchsetzungsinstanz
@@ -124,18 +125,25 @@ Vier Änderungen, jede mit Begründung:
 globale Installation). Conventional Commits sind im Repo Bestand (`feat(etb): …`,
 `fix(LFH-462): …`).
 
-**Kanäle** (`.releaserc.json`): `main` → stabile Releases; `beta` → `X.Y.Z-beta.N`;
-`alpha` → `X.Y.Z-alpha.N`. Alle drei Branches werden angelegt (`beta`/`alpha` zunächst auf
-dem Stand von `main`). Feature-Branches gehen per PR auf den Kanal, in dem sie landen sollen;
-Kanal-Aufstieg ist ein Merge `alpha → beta → main`.
+**Das Projekt ist in früher Alpha: es gibt noch nichts, was ein stabiler Kanal schützen
+müsste.** Deshalb ein Branch und ein Kanal: `main` released **0.x**-Versionen ohne
+Prerelease-Suffix — SemVer definiert 0.x als „alles darf sich ändern“, das ist der
+Alpha-Stand, und er braucht kein `-alpha.N` obendrauf. Default-Branch bleibt `main`;
+Dependabot, ClickUp und `gh pr create` zielen damit ohne weitere Einstellung richtig.
 
-**Default-Branch wird `alpha`** (Subtask 4, `gh repo edit --default-branch alpha`). Der
-Default-Branch entscheidet, wohin Dependabot seine PRs öffnet, wovon ClickUp neue Branches
-abzweigt und worauf `gh pr create` zielt — das muss der Kanal sein, in den neue Arbeit
-fließt, nicht der stabile Release-Stand. `main` bleibt der stabile Kanal und trägt weiter
-den Namen, weil `semantic-release` und alle Bestandsverweise (CLAUDE.md, Skripte,
-`mise.toml`-Worktree-Cleanup) ihn kennen. Besucher des öffentlichen Repos sehen damit den
-Alpha-Stand zuerst; das README sagt in einer Zeile, welcher Branch stabil ist.
+**Kanäle vorbereitet, nicht angelegt** (`.releaserc.json`): `main` → Release-Branch;
+`beta` → `X.Y.Z-beta.N`; `alpha` → `X.Y.Z-alpha.N`. semantic-release ignoriert
+konfigurierte Branches, die im Repo nicht existieren („If `name` doesn't match to any branch
+existing in the repository, the definition will be ignored“, Workflow-Konfiguration), und
+verlangt mindestens einen Release-Branch — beides erfüllt. Die Kanäle werden aktiv, sobald
+der Auftraggeber die Branches anlegt, typischerweise mit der Entscheidung für 1.0. Dann
+kommt der Fluss `alpha → beta → main` und die Frage nach dem Default-Branch (der Kanal, in
+den neue Arbeit fließt) — heute nicht.
+
+**0.x-Regel:** `@semantic-release/commit-analyzer` bekommt `releaseRules` mit
+`{ "breaking": true, "release": "minor" }`, damit ein `BREAKING CHANGE` in der Alpha
+0.x → 0.(x+1) zählt statt auf 1.0.0 zu springen. Die Zeile wird mit der bewussten
+1.0-Freigabe entfernt; ein Kommentar in `.releaserc.json` sagt das.
 
 **Erstversion:** vor dem ersten Lauf wird `v0.1.0` auf den aktuellen `main`-Stand getaggt
 (passend zu `Cargo.toml`). semantic-release zählt dann ab `0.2.0`; ein Breaking Change springt
@@ -193,10 +201,8 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
 ## 8. Integrationen
 
 - **Dependabot** (`.github/dependabot.yml`): `cargo` (Root), `npm` (`/frontend`),
-  `github-actions`; wöchentlich; `target-branch: alpha` ausdrücklich (entspricht dem
-  Default, steht aber hin, damit ein späterer Default-Wechsel Dependabot nicht still auf
-  `main` umlenkt); Gruppen `minor-und-patch` je Ökosystem, damit nicht 30 Einzel-PRs
-  entstehen. Major-Updates einzeln. Ergänzt `check-deps.sh` (Advisories),
+  `github-actions`; wöchentlich; kein `target-branch` (Default `main`); Gruppen
+  `minor-und-patch` je Ökosystem, damit nicht 30 Einzel-PRs entstehen. Major-Updates einzeln. Ergänzt `check-deps.sh` (Advisories),
   ersetzt es nicht.
 - **Codecov**: Token als Repo-Secret `CODECOV_TOKEN` (legt der Auftraggeber an);
   `codecov.yml` mit `informational: true` für den Status — Coverage meldet, blockiert nicht.
@@ -215,8 +221,8 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
    Abnahme: `./scripts/build-release.sh --target x86_64-pc-windows-gnu` lokal grün,
    `cargo test --workspace` grün.
 3. **Release-Flow + Artefakte** — `.releaserc.json`, `release.yml`, `artefakte.yml`,
-   GitHub App + Secrets, Branches `beta`/`alpha`, Tag `v0.1.0`. Abnahme: ein
-   `fix:`-Commit auf `beta` erzeugt `v0.2.0-beta.1` mit allen sechs Assets und dem Image.
+   GitHub App + Secrets, Tag `v0.1.0`, 0.x-Regel. Abnahme: ein `fix:`-Commit auf
+   `main` erzeugt `v0.1.1` mit allen sechs Assets und dem Image.
 4. **Public + Integrationen** — Umschalten (mit Go), Rulesets, Dependabot, Codecov,
    PR-Template. Abnahme: Repo öffentlich, Rulesets greifen (Test-Push auf `main` ohne PR
    wird abgelehnt), erster Dependabot-Lauf sichtbar.
@@ -228,9 +234,8 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
   GitHub-Runnern (2 vCPU) nicht gemessen. Falls e2e dort flakt, ist die Antwort ein
   Playwright-`retries: 1` **nur unter `CI=true`**, nicht ein abgeschalteter Schritt.
 - **`ubuntu-24.04-arm`** ist für public Repos kostenlos; für die private Phase von Subtask 1
-  wird er nicht gebraucht (nur Subtask 3, das nach dem Umschalten oder direkt davor läuft —
-  Reihenfolge 3 vor 4 heißt: der erste Beta-Release-Test läuft ggf. noch privat und der
-  arm64-Job schlägt dann fehl; das ist erwartet und im Subtask vermerkt).
+  wird er nicht gebraucht. Der erste Release-Test in Subtask 3 läuft ggf. noch privat, dann
+  schlägt der arm64-Job erwartbar fehl; das ist im Subtask vermerkt.
 - **semantic-release + `[skip ci]`** überspringt das Gate für den Release-Commit. Der
   Commit ändert nur Versionsfelder und Changelog; das ist akzeptiert.
 - **Signierung** (Windows SmartScreen, macOS Gatekeeper) ist nicht Teil dieses Tickets.
