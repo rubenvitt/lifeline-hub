@@ -63,6 +63,8 @@ export default function ChatPage() {
     einsatzId: number;
     nachricht: ChatNachricht;
   } | null>(null);
+  /** Zählt die eigenen Absendungen; jede Erhöhung holt die Sicht ans Ende zurück. */
+  const [eigeneSendungen, setEigeneSendungen] = useState(0);
   const [dokumentSichtbar, setDokumentSichtbar] = useState(
     () => document.visibilityState === 'visible',
   );
@@ -252,7 +254,16 @@ export default function ChatPage() {
       const anhaenge = dateien.length > 0 ? await ladeAnhaengeHoch(einsatzId, dateien) : [];
       return sendeNachricht(einsatzId, kanalId as number, text, anhaenge.map((a) => a.id));
     },
-    onSuccess: invalidiereNachrichten,
+    onSuccess: () => {
+      invalidiereNachrichten();
+      // Wer selbst absendet, will seinen Satz sehen — auch wenn er gerade weiter oben
+      // im Verlauf las (LFH-466). Der Zähler unterscheidet die eigene ABSENDUNG vom
+      // Live-Ereignis; er hängt bewusst NICHT am Autor der Nachricht, sonst führte
+      // jede fremde Nachricht desselben Kontos zum Sprung — und die Pille wäre in
+      // einer Ein-Benutzer-Prüfung nicht mehr belegbar. Dieselbe Trennung, mit der
+      // LFH-343 · C8 den Rückgängig-Toast von den Alarmmeldungen abgrenzt.
+      setEigeneSendungen((n) => n + 1);
+    },
     onError: fehler,
   });
   const bearbeitenMutation = useMutation({
@@ -430,7 +441,14 @@ export default function ChatPage() {
             </div>
           )}
           <NachrichtenStrom
+            /* Remount je Kanal (Repo-Muster aus LFH-348 · C13). Der Strom merkt sich
+               seit LFH-466, ob der Lesende unten steht und ab welcher id gezählt wird
+               — beides gehört zu EINEM Kanal. Ohne den Schlüssel nähme ein Wechsel den
+               Merker aus dem alten Kanal mit: die Sicht spränge nicht ans Ende, und die
+               Pille zeigte eine Zahl aus fremden ids. */
+            key={kanalId ?? 'kein-kanal'}
             nachrichten={nachrichten}
+            eigeneSendungen={eigeneSendungen}
             eigeneBenutzerId={benutzer?.id ?? null}
             darfSchreiben={darfSchreiben}
             onBearbeiten={(n) => setBearbeitenAuswahl({ einsatzId, nachricht: n })}
