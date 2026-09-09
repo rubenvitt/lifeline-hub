@@ -56,6 +56,23 @@ FE="$ROOT/frontend"
 PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
 SCHRITTE=7
 
+# ZEITZONE FESTNAGELN (LFH-522, gemessen im ersten CI-Lauf).
+# Ohne diese Zeile hängt das Ergebnis der Suite an der Zone des Rechners: `EtbFilterleiste`
+# prüft, dass ein UTC-Wire-String als ORTSZEIT im Feld steht, und schreibt dafür einen festen
+# Wert hin (08:00 zu 06:00Z). Auf einem UTC-Runner ist die Umrechnung die Identität, der Test
+# wird rot — und zwar ohne dass sich eine Zeile Code geändert hätte. Dasselbe träfe jede
+# Entwicklerin außerhalb von Mitteleuropa.
+#
+# Europe/Berlin ist dabei keine willkürliche Wahl, sondern die Zielumgebung: das System läuft
+# auf einem Rechner im deutschen Einsatzdienst, und die Anzeigezone IST Ortszeit
+# (etb/filterZeit.ts). Der harte Wert im Test bleibt damit eine echte Aussage, statt aus der
+# Funktion zurückgelesen zu werden, die er prüft.
+#
+# Bekannte Lücke: ein alleinstehendes `pnpm test` oder `pnpm e2e` läuft nicht durch diesen
+# Wrapper. Wer dort eine Zeitverschiebung sieht, sucht sie zuerst hier.
+export TZ="${TZ_ERZWUNGEN:-Europe/Berlin}"
+echo "==> Zeitzone für den Lauf: $TZ"
+
 geraeumt="$(dev_env_liste | tr '\n' ' ')"
 if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"

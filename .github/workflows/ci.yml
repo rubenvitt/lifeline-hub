@@ -44,6 +44,10 @@ env:
   # lokal bleibt die Vorgabe unangetastet. Für den Coverage-Job ist es zusätzlich Pflicht:
   # llvm-cov braucht Zeileninfo, mehr nicht.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  # Der Runner läuft in UTC, die Zielumgebung dieses Systems nicht. scripts/check-all.sh setzt
+  # die Zone selbst (Begründung dort); der Coverage-Job fährt das Skript aber nicht und braucht
+  # sie deshalb hier. Ohne sie wird jeder Test rot, der eine Ortszeit-Umrechnung festschreibt.
+  TZ: Europe/Berlin
 
 jobs:
   gate:
@@ -214,8 +218,15 @@ jobs:
       - name: Rust-Coverage
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 
+      # Die Instrumentierung macht die Suite spürbar langsamer, und auf zwei vCPU reicht der
+      # Vorgabe-Testtimeout von 10 s dann nicht mehr — gemessen: mehrere Tests liefen in
+      # „Test timed out in 10000ms", die im Gate-Job (uninstrumentiert) grün sind. Das ist
+      # keine Regression, sondern die bekannte Flakiness unter Last; die Antwort ist mehr Zeit
+      # und weniger Parallelität, nicht ein abgeschalteter Test.
       - name: Frontend-Coverage
-        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend run test:coverage -- --coverage.reporter=lcov
+        run: >-
+          mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend run test:coverage --
+          --coverage.reporter=lcov --testTimeout=30000 --no-file-parallelism
 
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
