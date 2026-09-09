@@ -40,6 +40,7 @@ Keine Signierung/Notarisierung der Binaries (eigenes Ticket, wenn gebraucht).
 
 Per `gh api`, in Subtask 4:
 
+- Default-Branch auf `alpha` umstellen (Begründung in Abschnitt 6).
 - Branch-Protection (Rulesets) auf `main`, `beta`, `alpha`: PR-Pflicht, Required Check
   `gate`, keine Force-Pushes. Der Release-Bot committet den Version-Bump auf die geschützten
   Branches — deshalb bekommt er eine **Bypass-Regel** (GitHub App oder PAT, s. Abschnitt 4).
@@ -128,6 +129,14 @@ globale Installation). Conventional Commits sind im Repo Bestand (`feat(etb): �
 dem Stand von `main`). Feature-Branches gehen per PR auf den Kanal, in dem sie landen sollen;
 Kanal-Aufstieg ist ein Merge `alpha → beta → main`.
 
+**Default-Branch wird `alpha`** (Subtask 4, `gh repo edit --default-branch alpha`). Der
+Default-Branch entscheidet, wohin Dependabot seine PRs öffnet, wovon ClickUp neue Branches
+abzweigt und worauf `gh pr create` zielt — das muss der Kanal sein, in den neue Arbeit
+fließt, nicht der stabile Release-Stand. `main` bleibt der stabile Kanal und trägt weiter
+den Namen, weil `semantic-release` und alle Bestandsverweise (CLAUDE.md, Skripte,
+`mise.toml`-Worktree-Cleanup) ihn kennen. Besucher des öffentlichen Repos sehen damit den
+Alpha-Stand zuerst; das README sagt in einer Zeile, welcher Branch stabil ist.
+
 **Erstversion:** vor dem ersten Lauf wird `v0.1.0` auf den aktuellen `main`-Stand getaggt
 (passend zu `Cargo.toml`). semantic-release zählt dann ab `0.2.0`; ein Breaking Change springt
 regelkonform auf `1.0.0`.
@@ -184,8 +193,10 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
 ## 8. Integrationen
 
 - **Dependabot** (`.github/dependabot.yml`): `cargo` (Root), `npm` (`/frontend`),
-  `github-actions`; wöchentlich; Gruppen `minor-und-patch` je Ökosystem, damit nicht 30
-  Einzel-PRs entstehen. Major-Updates einzeln. Ergänzt `check-deps.sh` (Advisories),
+  `github-actions`; wöchentlich; `target-branch: alpha` ausdrücklich (entspricht dem
+  Default, steht aber hin, damit ein späterer Default-Wechsel Dependabot nicht still auf
+  `main` umlenkt); Gruppen `minor-und-patch` je Ökosystem, damit nicht 30 Einzel-PRs
+  entstehen. Major-Updates einzeln. Ergänzt `check-deps.sh` (Advisories),
   ersetzt es nicht.
 - **Codecov**: Token als Repo-Secret `CODECOV_TOKEN` (legt der Auftraggeber an);
   `codecov.yml` mit `informational: true` für den Status — Coverage meldet, blockiert nicht.
