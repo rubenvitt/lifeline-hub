@@ -5,7 +5,7 @@
 # `cargo fmt --check` bricht (mit Diff auf stdout), sobald Rust-Code vom rustfmt-Default-Stil
 # abweicht — so driftet die Formatierung nicht erneut auseinander.
 #
-# Es gibt (noch) kein CI — dieser Gate wird lokal/vor dem Merge gefahren.
+# Läuft lokal über scripts/check-all.sh und seit LFH-522 mit demselben Skript in der CI.
 # Bei Fehlschlag: `cargo fmt` laufen lassen und die Formatierung mitcommitten.
 set -euo pipefail
 

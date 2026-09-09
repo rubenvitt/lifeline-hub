@@ -1,0 +1,189 @@
+# CI (LFH-522/LFH-525) — Gate, Coverage und der angehängte Release-Aufruf.
+#
+# Der Job fährt `scripts/check-all.sh` UNVERÄNDERT. Das ist die tragende Entscheidung dieser
+# Datei: das Sammel-Gate (LFH-235/F17) ist die eine Wahrheit darüber, was geprüft wird, und
+# eine CI, die ihre Schritte selbst zusammenstellt, driftet unweigerlich vom lokalen Lauf ab.
+# Wer hier einen Schritt vermisst, ändert das Skript — nicht diesen Workflow.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar). Ein Tag ist verschiebbar; ein
+# kompromittierter Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot
+# (.github/dependabot.yml) hält die Pins aktuell.
+name: CI
+
+on:
+  pull_request:
+  push:
+    # beta/alpha existieren heute nicht (frühe Alpha, ein Kanal). Die Einträge stehen hier,
+    # damit die Kanäle beim Anlegen sofort geprüft werden.
+    branches: [main, beta, alpha]
+
+# Least privilege: der Gate-Job liest nur. Schreibrechte hat ausschließlich der
+# Release-Workflow, und der bezieht sie aus einer GitHub App, nicht aus GITHUB_TOKEN.
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Der Runner hat 2 vCPU; die lokale Vorgabe von 3 Playwright-Workern überzeichnet ihn und
+  # ist die wahrscheinlichste Flake-Quelle (Memory: Suite unter Last flaky). Die Config sieht
+  # diese Schraube ausdrücklich vor (`PW_WORKERS`), deshalb hier statt einer Config-Änderung.
+  PW_WORKERS: 2
+
+jobs:
+  gate:
+    name: check-all.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # nasm baut aws-lc-sys (rustls), perl+cc bauen das seit LFH-522 eingebackene OpenSSL.
+      # cmake und perl bringt ubuntu-latest mit; nasm nicht.
+      - name: System-Werkzeuge für die nativen Crates
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+
+      - name: Rust-Toolchain (stable)
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          # Der Cache-Schlüssel muss das eingebackene OpenSSL kennen: ohne diesen Zusatz
+          # teilte ein Lauf VOR und NACH einem openssl-src-Bump denselben Eintrag.
+          key: openssl-vendored
+
+      # mise, weil check-all.sh seine Node-/pnpm-Versionen selbst pinnt
+      # (`mise exec node@26.7.0 pnpm@11.10.0`) — beide Nachbarversionen sind gemessen kaputt,
+      # siehe den Kommentar im Skript. actions/setup-node stünde daneben und würde ignoriert.
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+
+      - name: pnpm-Store-Pfad ermitteln
+        id: pnpm
+        run: echo "store=$(mise exec node@26.7.0 pnpm@11.10.0 -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Frontend-Abhängigkeiten
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend install --frozen-lockfile
+
+      # Der Browser-Cache hängt an der Playwright-Version aus dem Lockfile: ein Bump ohne
+      # neuen Browser-Download endet sonst in „Executable doesn't exist".
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+
+      - name: Playwright-Chromium
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec playwright install --with-deps chromium
+
+      # Ohne cargo-audit WARNT check-deps.sh nur und exitet 0 — im CI soll es prüfen.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: audit-cache
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-0.22.2-${{ runner.os }}
+      - name: cargo-audit
+        if: steps.audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked --version 0.22.2
+
+      - name: Alle Gates
+        run: ./scripts/check-all.sh
+
+      # Nur im Fehlerfall: der Playwright-Report ist das einzige Mittel, eine e2e-Flake auf
+      # fremder Hardware zu beurteilen (jsdom rechnet kein Layout, das Log allein reicht nicht).
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Bewusst KEIN Required Check und bewusst ein eigener Job: `cargo llvm-cov` ersetzt
+    # `cargo test` durch einen instrumentierten Lauf, im Gate-Job wäre das ein zweiter
+    # kompletter Durchlauf. Und ein Coverage-Werkzeug darf das Gate nie rot färben —
+    # es misst, es urteilt nicht.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: System-Werkzeuge für die nativen Crates
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+
+      - name: Rust-Toolchain (stable + llvm-tools)
+        run: |
+          rustup toolchain install stable --profile minimal --component llvm-tools-preview --no-self-update
+          rustup default stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: coverage-openssl-vendored
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: llvmcov-cache
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: cargo-llvm-cov-0.6.22-${{ runner.os }}
+      - name: cargo-llvm-cov
+        if: steps.llvmcov-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-llvm-cov --locked --version 0.6.22
+
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+
+      - name: Frontend-Abhängigkeiten
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend install --frozen-lockfile
+
+      # Dieselbe Env-Hygiene wie im Sammel-Gate: der Runner setzt zwar keine
+      # LIFELINE_*-Variablen, aber der Aufruf soll dem lokalen gleichen.
+      - name: Rust-Coverage
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      - name: Frontend-Coverage
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend run test:coverage -- --coverage.reporter=lcov
+
+      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info,frontend/coverage/lcov.info
+          # Fehlt das Token (Fork-PR, Secret noch nicht gesetzt), soll der Job nicht rot
+          # werden — der Upload ist Zusatznutzen, keine Zusicherung.
+          fail_ci_if_error: false
+
+  # Der Release hängt hier drin und nicht in einem eigenen, per `workflow_run` ausgelösten
+  # Workflow. Grund steht im Kopf von release.yml: semantic-release liest den Branch aus
+  # GITHUB_REF, und ein workflow_run-Lauf trägt dort immer den Default-Branch — ein Push auf
+  # `beta` würde als stabiles Release herauskommen, sobald der Kanal existiert.
+  #
+  # `needs: gate` heißt: kein Release aus einem ungeprüften Stand. Auf `coverage` wird
+  # bewusst NICHT gewartet — die Zahl ist informativ und soll nichts aufhalten.
+  release:
+    name: Release
+    needs: gate
+    # Nur bei einem Push auf einen Kanal-Branch. Ohne diese Bedingung löste jeder grüne
+    # Pull-Request-Lauf einen Release-Versuch aus.
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: read
+    secrets:
+      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

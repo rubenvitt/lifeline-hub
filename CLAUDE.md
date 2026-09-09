@@ -1101,7 +1101,12 @@ Errors (LFH-168). Sie werden **behoben, nicht ignoriert** — und zwar an der Wu
 
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 
-Es gibt weiterhin **kein CI**. Die Durchsetzungsinstanz ist lokal:
+**Seit LFH-522 läuft das Gate auch in der CI** (`.github/workflows/ci.yml`) — und zwar,
+indem der Workflow `scripts/check-all.sh` **unverändert** aufruft. Die Reihenfolge bleibt
+damit: das Skript ist die Wahrheit, die CI ist nur ein zweiter Ort, an dem es läuft. Wer
+einen Schritt ergänzt, ergänzt ihn im Skript; ein Workflow, der seine Schritte selbst
+zusammenstellt, driftet vom lokalen Lauf ab, und dann prüft niemand mehr dasselbe.
+Lokal bleibt es der Weg vor dem Merge:
 
 ```bash
 ./scripts/check-all.sh     # alle Gates, vor dem Merge
@@ -1151,7 +1156,7 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
 
 - **Nach einer Backend-Typänderung** (Struct-/Enum-/Feld-Änderung an einem Response-DTO):
   `scripts/check-typ-codegen.sh` laufen lassen und die regenerierten `openapi.json` +
-  `types.generated.ts` **mitcommitten**. Das Skript ist das Drift-Gate (kein CI): es emittiert
+  `types.generated.ts` **mitcommitten**. Das Skript ist das Drift-Gate: es emittiert
   die Spec, regeneriert die TS, bricht per `git diff --exit-code`, wenn etwas nicht committet
   ist, und fährt `tsc`. Ein Feld-Rename bricht damit Build/Test statt still zur Laufzeit.
 - **Enum-Werte:** Domänen-Enums tragen wire-korrektes `#[serde(rename…)]`; `String`-Felder,
@@ -1197,7 +1202,15 @@ Adresse + clamd weg/Timeout → **fail-closed 503** (Default) bzw. `--clamav-fai
 still). Der reine No-op-/Fehlkonfig-Stub (`#[cfg(not(feature = "clamav"))]`) läuft nur unter
 **`cargo test --no-default-features`** — wer `src/anhang/mod.rs`/`clamd_scan` anfasst, sollte
 beide fahren. Der Scan-Wiring-Test (`tests/karte_hintergrundbild_scan.rs`) übt gegen
-`127.0.0.1:1` (ECONNREFUSED) in BEIDEN Builds den fail-closed-503-Pfad. Es gibt kein CI.
+`127.0.0.1:1` (ECONNREFUSED) in BEIDEN Builds den fail-closed-503-Pfad. Die CI fährt nur
+den Default-Build; `--no-default-features` bleibt Handarbeit an dieser Datei.
+
+**Der `unix:`-Zweig ist plattformgetrennt** (LFH-522): `clamav_client::tokio::Socket` ist in
+der Crate mit `#[cfg(unix)]` gated, weshalb `clamd_verbinden` in zwei cfg-Varianten vorliegt.
+Ohne diese Trennung ist das gesamte Crate für `x86_64-pc-windows-gnu` nicht übersetzbar
+(E0422) — gemessen, nicht vermutet. Unter Windows bleibt TCP; eine dort konfigurierte
+`unix:`-Adresse endet als `ScannerNichtErreichbar` mit lauter Warnung, also in derselben
+fail-open/closed-Entscheidung wie jeder andere Ausfall.
 
 ## Backend — Statuscode-Konvention (LFH-267/F22)
 
