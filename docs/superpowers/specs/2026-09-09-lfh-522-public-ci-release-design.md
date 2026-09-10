@@ -191,7 +191,14 @@ damit `ci.yml` für PRs schlank bleibt):
 4. `@semantic-release/git` committet `Cargo.toml`, `Cargo.lock`, `frontend/package.json`,
    `CHANGELOG.md` mit `chore(release): vX.Y.Z [skip ci]` und taggt.
 5. `@semantic-release/github` legt das GitHub-Release an (Prerelease-Flag für
-   beta/alpha) — **ohne** Assets; die kommen aus Abschnitt 7.
+   beta/alpha) — **ohne** Assets; die kommen aus Abschnitt 7. Der **Release-Text ist
+   gekappt** (`releaseBodyTemplate`, 120 000 Zeichen): GitHub nimmt höchstens 125 000 und
+   antwortet sonst mit 422 `body is too long`. Gemessen im Lauf 34499645278 — die Notizen
+   des ersten Releases umfassten die ganze Historie und waren 232 804 Zeichen lang, der
+   Abbruch kam nach Changelog, Commit und Tag und hinterließ ein Tag ohne Release (und
+   damit ohne Artefakte, siehe Abschnitt 7). Betrifft nicht nur den ersten Lauf: der erste
+   Merge von `alpha` nach `main` stellt dieselbe Liste erneut. `CHANGELOG.md` bleibt
+   vollständig — gekappt wird allein der Text des Releases, mit Verweis auf die Datei.
 
 **Identität des Bots:** Ein Push auf den geschützten Kanal-Branch braucht Bypass. Träger ist
 eine **GitHub App** des Auftraggebers (App-ID + Private Key als Secrets,
