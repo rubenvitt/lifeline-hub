@@ -58,6 +58,19 @@ export default {
          */
       },
     ],
+    /*
+     * `conventionalcommits` als Preset — und die Version des Presets ist gepinnt, nicht frei.
+     *
+     * Gemessen im ersten echten Release-Versuch: mit
+     * `conventional-changelog-conventionalcommits@10` bricht der Lauf im Schritt
+     * `generateNotes` ab — „Missing helper: … requires conventional-changelog-writer@9 or
+     * newer". Version 10 des Presets setzt den neuen Writer voraus, semantic-release 25 bringt
+     * aber `conventional-changelog-writer@8` mit. Der Fehler kommt NICHT beim Installieren,
+     * sondern mitten im Release, nach Analyse und Changelog — also an der teuersten Stelle.
+     *
+     * Deshalb steht in package.json `^9.3.1`, und .github/dependabot.yml sperrt den
+     * Major-Bump. Beides fällt erst, wenn semantic-release seinen Writer auf 9 hebt.
+     */
     ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],
     ['@semantic-release/changelog', { changelogFile: 'CHANGELOG.md' }],
     [
