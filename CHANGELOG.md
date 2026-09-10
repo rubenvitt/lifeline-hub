@@ -1,3 +1,10 @@
+## [1.0.0-alpha.2](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.1...v1.0.0-alpha.2) (2026-09-10)
+
+### Bug Fixes
+
+* **ci:** openapi.json vom Versions-Bump des Releases entkoppeln ([4e966bf](https://github.com/rubenvitt/lifeline-hub/commit/4e966bf954cb8086a80d2853055955f708b01c29)), closes [#LFH-527](https://github.com/rubenvitt/lifeline-hub/issues/LFH-527)
+* **ci:** Release-Text auf GitHubs Zeichengrenze kappen ([ee3fa22](https://github.com/rubenvitt/lifeline-hub/commit/ee3fa22ed939c4a38bd7359faf83bee2952cb885)), closes [#LFH-527](https://github.com/rubenvitt/lifeline-hub/issues/LFH-527)
+
 ## 1.0.0-alpha.1 (2026-09-10)
 
 ### ⚠ BREAKING CHANGES
