@@ -12,6 +12,60 @@
  * bumpen und (schlimmer) einen npm-Publish versuchen.
  */
 
+/*
+ * DER TEXT DES GITHUB-RELEASES WIRD GEKAPPT — 125 000 Zeichen sind GitHubs harte Grenze.
+ *
+ * Gemessen im Lauf 34499645278: `POST /repos/…/releases` antwortete mit 422 und
+ * `body is too long (maximum is 125000 characters)`; die Notizen waren 233 746 Zeichen lang.
+ * Das ist kein Einmalfall des ersten Releases, auch wenn er ihn zuerst getroffen hat: die
+ * Notizen umfassen alle Commits seit dem letzten Release DESSELBEN Kanals — der erste Merge
+ * von `alpha` nach `main` stellt dieselbe Liste über die ganze Historie noch einmal.
+ *
+ * Der Abbruch kommt an der teuersten Stelle: Changelog, Versions-Commit und Tag sind dann
+ * bereits gepusht. Zurück bleibt ein Tag ohne Release — und weil `artefakte.yml` an
+ * `release: published` hängt, entstehen für dieses Tag nie Binaries. Genau die Lage, die der
+ * Nebenläufigkeits-Kommentar in ci.yml beschreibt, nur aus einer anderen Ursache.
+ *
+ * Gekappt wird NUR dieser eine Text, nicht `nextRelease.notes`: CHANGELOG.md wird vorher
+ * geschrieben und bleibt vollständig. Nichts geht verloren, es steht eine Datei weiter —
+ * darauf zeigt der angehängte Hinweis.
+ *
+ * Warum eine Vorlage und kein eigenes Plugin: dauerhaft ändern ließe sich `nextRelease.notes`
+ * nur in `generateNotes`. Eine Kürzung im prepare-Schritt wäre bis zum publish wieder weg —
+ * semantic-release ERZEUGT die Notizen neu, sobald ein prepare-Plugin den gitHead bewegt hat,
+ * und der Versions-Commit tut genau das. In `generateNotes` zu kappen träfe aber die
+ * CHANGELOG.md mit. `releaseBodyTemplate` ist die dokumentierte Schraube für genau diesen Text.
+ */
+/*
+ * 120 000 statt der vollen 125 000: die Fehlermeldung spricht von „characters", gezählt wird
+ * hier aber in UTF-16-Einheiten, und die Notizen tragen Umlaute und Emoji. Zwischen beiden
+ * Zählweisen liegen bei diesem Text rund 0,4 % (232 804 Zeichen zu 233 746 Bytes) — der
+ * Abstand kostet nichts und nimmt die Frage aus dem Spiel, welche Zählung GitHub meint.
+ */
+const RELEASE_BODY_GRENZE = 120000;
+
+/*
+ * Lodash-Vorlage; `@semantic-release/github` kompiliert sie mit den Vorgabe-Trennzeichen.
+ * Drei Dinge, die beim Anfassen brechen:
+ *  - `%>` und `<%=` stehen ohne Zeilenumbruch nebeneinander. Jedes Zeichen dazwischen wäre
+ *    Ausgabe und stünde bei kurzen Notizen als Leerzeile über dem Release-Text.
+ *  - `\n` muss als Escape in die Vorlage (hier doppelter Backslash). Ein echter Umbruch
+ *    innerhalb der Zeichenkette bräche die kompilierte Funktion.
+ *  - `${` ist gesperrt: bei Vorgabe-Trennzeichen interpoliert lodash auch die ES-Form.
+ * Geschnitten wird an einer Zeilengrenze, sonst endet der Text mitten in einem Markdown-Link.
+ */
+const RELEASE_BODY_TEMPLATE = [
+  '<%',
+  `  const grenze = ${RELEASE_BODY_GRENZE};`,
+  '  const voll = nextRelease.notes || "";',
+  '  const hinweis = "\\n\\n---\\n\\n**Gekürzt.** GitHub nimmt für einen Release-Text höchstens "',
+  '    + "125 000 Zeichen; diese Liste ist länger. Vollständig steht sie in der CHANGELOG.md "',
+  '    + "zum Tag " + nextRelease.gitTag + ".";',
+  '  const platz = grenze - hinweis.length;',
+  '  const bruch = voll.lastIndexOf("\\n", platz);',
+  '%><%= voll.length <= grenze ? voll : voll.slice(0, bruch > 0 ? bruch : platz) + hinweis %>',
+].join('\n');
+
 /** @type {import('semantic-release').GlobalConfig} */
 export default {
   /*
@@ -124,6 +178,11 @@ export default {
          */
         successComment: false,
         failComment: false,
+        /*
+         * Kappt den Release-Text auf GitHubs 125 000 Zeichen — Begründung und Fallen stehen
+         * oben bei RELEASE_BODY_TEMPLATE. Kurze Notizen gehen unverändert durch.
+         */
+        releaseBodyTemplate: RELEASE_BODY_TEMPLATE,
       },
     ],
   ],
