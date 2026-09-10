@@ -28,6 +28,30 @@
 # andere: verkürzte Läufe, umgebaute Reihenfolge, Aufruf einzelner Schritte von Hand.
 set -euo pipefail
 
+# Bündel-Auswahl für die parallele CI (LFH-529). OHNE Argument läuft alles wie bisher —
+# das ist der Weg vor dem Merge und die Vorgabe, an der sich nichts geändert hat.
+#   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories   (Sekunden bis ~1:20)
+#   --nur rust       cargo test --workspace                  (~17 min)
+#   --nur frontend   Vitest                                  (~16 min, shardbar)
+#   --nur e2e        Playwright                              (~18 min, shardbar)
+# Geteilt wird über die Umgebung, nicht über weitere Flags:
+#   VITEST_SHARD=1/3   PW_SHARD=2/4
+NUR="alle"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --nur)
+      NUR="${2:-}"
+      [ -n "$NUR" ] || { echo "FEHLER: --nur braucht ein Bündel." >&2; exit 2; }
+      shift 2
+      ;;
+    --nur=*) NUR="${1#--nur=}"; shift ;;
+    -h|--help) sed -n '31,40p' "$0"; exit 0 ;;
+    *) echo "FEHLER: unbekanntes Argument '$1'." >&2; exit 2 ;;
+  esac
+done
+VITEST_SHARD="${VITEST_SHARD:-}"
+PW_SHARD="${PW_SHARD:-}"
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 # shellcheck source=lib/dev-env.sh
@@ -78,47 +102,144 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-echo "==> [1/$SCHRITTE] rustfmt-Baseline"
-"$ROOT/scripts/check-fmt.sh"
+# ── Die sieben Schritte, je als Funktion ────────────────────────────────────────────
+# Warum Funktionen statt einer geraden Abfolge: die CI fährt sie seit LFH-529 auf MEHREREN
+# Runnern parallel und muss sie deshalb einzeln ansprechen können. Der Aufruf ohne Argument
+# ist davon unberührt — er fährt weiterhin alle sieben der Reihe nach, und das bleibt der
+# Weg vor dem Merge.
+#
+# Die Nummer in der Ausgabe ist die Position im GESAMTgate, nicht im gerade laufenden
+# Teilstück: wer im CI-Log „[4/7]" liest, weiß sofort, welcher Schritt das ist.
 
-echo "==> [2/$SCHRITTE] Frontend-Lint (--max-warnings 0)"
-$PNPM -C "$FE" lint
+schritt_1() {
+  echo "==> [1/$SCHRITTE] rustfmt-Baseline"
+  "$ROOT/scripts/check-fmt.sh"
+}
 
-echo "==> [3/$SCHRITTE] Typ-Drift Backend↔Frontend (enthält den Frontend-Typecheck)"
-"$ROOT/scripts/check-typ-codegen.sh"
+schritt_2() {
+  echo "==> [2/$SCHRITTE] Frontend-Lint (--max-warnings 0)"
+  $PNPM -C "$FE" lint
+}
 
-echo "==> [4/$SCHRITTE] Rust-Suite (Workspace)"
-ohne_dev_env cargo test --workspace
+schritt_3() {
+  echo "==> [3/$SCHRITTE] Typ-Drift Backend↔Frontend (enthält den Frontend-Typecheck)"
+  "$ROOT/scripts/check-typ-codegen.sh"
+}
 
-echo "==> [5/$SCHRITTE] Frontend-Suite"
-# --no-file-parallelism: die volle Vitest-Suite ist unter Last sonst flaky.
-$PNPM -C "$FE" exec vitest run --no-file-parallelism
+schritt_4() {
+  echo "==> [4/$SCHRITTE] Rust-Suite (Workspace)"
+  ohne_dev_env cargo test --workspace
+}
 
-echo "==> [6/$SCHRITTE] Abhängigkeiten auf bekannte Schwachstellen prüfen"
-"$ROOT/scripts/check-deps.sh"
+schritt_5() {
+  echo "==> [5/$SCHRITTE] Frontend-Suite${VITEST_SHARD:+ (Anteil $VITEST_SHARD)}"
+  # --no-file-parallelism: die volle Vitest-Suite ist unter Last sonst flaky.
+  # VITEST_SHARD teilt die Dateien auf mehrere Runner auf (leer = alles auf einem).
+  $PNPM -C "$FE" exec vitest run --no-file-parallelism ${VITEST_SHARD:+--shard="$VITEST_SHARD"}
+}
 
-echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)"
-# Cargo baut nicht zwingend nach ./target (globales build.target-dir, siehe
-# ~/.cargo/config.toml) — den Pfad deshalb von Cargo selbst erfragen.
-# JSON mit dem ohnehin benötigten Node lesen; jq ist keine Projektvoraussetzung.
-TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
-BINAER="$TARGET_DIR/debug/lifeline-hub"
-if [ -x "$BINAER" ]; then
-  # Die Suite startet Backend und Vite selbst auf freien Ports — ein parallel laufender
-  # Dev-Stack auf 8080/5173 stört sie nicht und wird nicht gekapert.
-  # Env-Hygiene macht hier die Playwright-Config selbst (gleiche Präfixe wie
-  # lib/dev-env.sh): Playwright merged webServer.env mit process.env, das e2e-Backend
-  # erbte sonst die Dev-Umgebung. Bewusst dort statt hier, weil `pnpm e2e` laut LFH-309
-  # auch alleinstehend sauber laufen muss — ohne diesen Wrapper.
-  $PNPM -C "$FE" exec playwright test
-else
-  echo "    ÜBERSPRUNGEN: $BINAER fehlt." >&2
-  echo "    Die e2e-Suite startet das Backend selbst und setzt einen Debug-Build voraus." >&2
-  echo "    Einmal 'cargo build' laufen lassen, dann deckt dieses Gate auch die Fehler-" >&2
-  echo "    klassen ab, die nur der echte Browser sieht (Layout, WebGL, StrictMode)." >&2
-  echo "    (Bewusst kein harter Fehler: auf einem frischen Checkout wäre das Gate sonst" >&2
-  echo "     von Tag eins rot — und ein rotes Gate wird abgeschaltet statt befolgt.)" >&2
+schritt_6() {
+  echo "==> [6/$SCHRITTE] Abhängigkeiten auf bekannte Schwachstellen prüfen"
+  "$ROOT/scripts/check-deps.sh"
+}
+
+schritt_7() {
+  echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)${PW_SHARD:+ (Anteil $PW_SHARD)}"
+  # Cargo baut nicht zwingend nach ./target (globales build.target-dir, siehe
+  # ~/.cargo/config.toml) — den Pfad deshalb von Cargo selbst erfragen.
+  # JSON mit dem ohnehin benötigten Node lesen; jq ist keine Projektvoraussetzung.
+  local target_dir binaer
+  # PW_BINAER übersteuert die Cargo-Abfrage (LFH-529) — dieselbe Variable, die auch
+  # playwright.config.ts liest. In der geteilten CI lädt ein e2e-Shard das Binary als Artefakt
+  # und hat gar kein Cargo-Target-Verzeichnis; ohne die Übersteuerung müsste er die
+  # Rust-Toolchain nur für diese eine Abfrage mitschleppen.
+  #
+  # DER NAME IST NICHT BELIEBIG, und der erste Anlauf hieß falsch: `PW_BINAER`
+  # fiel unter `DEV_ENV_PRAEFIXE` in lib/dev-env.sh (^(LIFELINE|KS|AWS)_) und wurde als
+  # Dev-Variable GERÄUMT — der eigene Testlauf meldete sie brav in der Räumliste. Das hätte
+  # in der CI genau dann zugeschlagen, wenn ein Schritt durch `ohne_dev_env` läuft. `PW_`
+  # gehört zur Playwright-Familie (PW_WORKERS, PW_SHARD) und wird nicht angefasst.
+  if [ -n "${PW_BINAER:-}" ]; then
+    binaer="$PW_BINAER"
+  else
+    target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+    binaer="$target_dir/debug/lifeline-hub"
+  fi
+  if [ -x "$binaer" ]; then
+    # Die Suite startet Backend und Vite selbst auf freien Ports — ein parallel laufender
+    # Dev-Stack auf 8080/5173 stört sie nicht und wird nicht gekapert. Das gilt auch je
+    # Shard: jeder bringt seinen eigenen Stack auf eigenen Ports mit.
+    # Env-Hygiene macht hier die Playwright-Config selbst (gleiche Präfixe wie
+    # lib/dev-env.sh): Playwright merged webServer.env mit process.env, das e2e-Backend
+    # erbte sonst die Dev-Umgebung. Bewusst dort statt hier, weil `pnpm e2e` laut LFH-309
+    # auch alleinstehend sauber laufen muss — ohne diesen Wrapper.
+    $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"}
+  elif [ -n "${PW_BINAER:-}" ]; then
+    # Wer den Pfad ausdrücklich setzt, erwartet dort ein lauffähiges Binary. Hier still zu
+    # überspringen hieße: die CI meldet einen grünen e2e-Schritt, der nie gelaufen ist —
+    # und genau das passiert, wenn actions/upload-artifact das Ausführbar-Bit verliert
+    # (es zippt ohne Dateirechte, alles kommt als 644 zurück).
+    echo "FEHLER: '$binaer' ist nicht ausführbar (PW_BINAER ist gesetzt)." >&2
+    if [ -e "$binaer" ]; then
+      echo "        Die Datei existiert, hat aber kein Ausführbar-Bit — nach einem" >&2
+      echo "        Artefakt-Download fehlt es immer. Abhilfe: chmod +x." >&2
+    else
+      echo "        Die Datei existiert nicht. Pfad prüfen." >&2
+    fi
+    exit 1
+  else
+    echo "    ÜBERSPRUNGEN: $binaer fehlt." >&2
+    echo "    Die e2e-Suite startet das Backend selbst und setzt einen Debug-Build voraus." >&2
+    echo "    Einmal 'cargo build' laufen lassen, dann deckt dieses Gate auch die Fehler-" >&2
+    echo "    klassen ab, die nur der echte Browser sieht (Layout, WebGL, StrictMode)." >&2
+    echo "    (Bewusst kein harter Fehler: auf einem frischen Checkout wäre das Gate sonst" >&2
+    echo "     von Tag eins rot — und ein rotes Gate wird abgeschaltet statt befolgt.)" >&2
+  fi
+}
+
+# ── Bündel für die parallele CI ─────────────────────────────────────────────────────
+# `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
+# deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
+BUENDEL_schnell="1 2 3 6"
+BUENDEL_rust="4"
+BUENDEL_frontend="5"
+BUENDEL_e2e="7"
+BUENDEL_alle="1 2 3 4 5 6 7"
+
+# SELBSTPRÜFUNG: die vier Bündel müssen ZUSAMMEN genau die sieben Schritte ergeben — jeden
+# genau einmal. Ohne diese Zeile fiele beim Umsortieren still ein Schritt aus der CI heraus,
+# und niemand sähe es: die Jobs blieben grün, nur geprüft würde weniger. Das ist teurer als
+# ein roter Lauf.
+_summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
+_soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
+if [ "$_summe" != "$_soll" ]; then
+  echo "FEHLER: die Bündel decken nicht genau die $SCHRITTE Schritte ab." >&2
+  echo "        gebündelt: $_summe" >&2
+  echo "        erwartet:  $_soll" >&2
+  exit 2
 fi
 
+case "$NUR" in
+  alle)     lauf="$BUENDEL_alle" ;;
+  schnell)  lauf="$BUENDEL_schnell" ;;
+  rust)     lauf="$BUENDEL_rust" ;;
+  frontend) lauf="$BUENDEL_frontend" ;;
+  e2e)      lauf="$BUENDEL_e2e" ;;
+  *)
+    echo "FEHLER: unbekanntes Bündel '$NUR'." >&2
+    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e" >&2
+    exit 2
+    ;;
+esac
+
+for n in $lauf; do
+  "schritt_$n"
+done
+
 echo
-echo "==> OK: alle Gates grün."
+if [ "$NUR" = alle ]; then
+  echo "==> OK: alle Gates grün."
+else
+  echo "==> OK: Bündel '$NUR' grün (Schritte: $lauf von $SCHRITTE)."
+  echo "    Das ist ein TEILSTÜCK. Vor dem Merge gilt der volle Lauf ohne --nur."
+fi
