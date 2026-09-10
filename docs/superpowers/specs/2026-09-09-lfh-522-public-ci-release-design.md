@@ -5,7 +5,7 @@ Stand: 2026-09-09 · Status: Design freigegeben · Umsetzung in vier Subtasks (A
 ## 1. Ziel und Entscheidung
 
 Das Repo `rubenvitt/lifeline-hub` wird auf GitHub **öffentlich**, bekommt ein CI-Gate,
-einen automatisierten Release-Flow (0.x auf `main`, Kanäle `beta`/`alpha` vorbereitet) und Release-Artefakte
+einen automatisierten Release-Flow (`alpha` als Vorabkanal und Default-Branch, `main` als Freigabe) und Release-Artefakte
 für Linux (x86_64, arm64), macOS (arm64), Windows (x86_64, `.exe`) sowie ein Multi-Arch-
 Docker-Image. Bis heute gibt es **kein CI**; das Gate ist `scripts/check-all.sh` lokal.
 
@@ -140,33 +140,39 @@ Version dauerhaft `0.0.0`, mit eigenem Lockfile. Sie ist ausdrücklich **nicht**
 Versionsquelle: die Anwendung versioniert in `Cargo.toml` und `frontend/package.json`.
 Deshalb fehlt `@semantic-release/npm` in der Plugin-Liste — es würde die Werkzeugdatei bumpen
 und einen npm-Publish versuchen. Die Konfiguration liegt in **`release.config.mjs`**, nicht
-in `.releaserc.json`: die drei nicht offensichtlichen Entscheidungen (0.x-Regel, vorbereitete
-Kanäle, zwei Versionsdateien) brauchen ihre Begründung am Ort, und JSON trägt keine Kommentare. Conventional Commits sind im Repo Bestand (`feat(etb): …`,
+in `.releaserc.json`: die drei nicht offensichtlichen Entscheidungen (Kanal-Zuschnitt,
+fehlendes Bootstrap-Tag, zwei Versionsdateien) brauchen ihre Begründung am Ort, und JSON trägt
+keine Kommentare. Conventional Commits sind im Repo Bestand (`feat(etb): …`,
 `fix(LFH-462): …`).
 
-**Das Projekt ist in früher Alpha: es gibt noch nichts, was ein stabiler Kanal schützen
-müsste.** Deshalb ein Branch und ein Kanal: `main` released **0.x**-Versionen ohne
-Prerelease-Suffix — SemVer definiert 0.x als „alles darf sich ändern“, das ist der
-Alpha-Stand, und er braucht kein `-alpha.N` obendrauf. Default-Branch bleibt `main`;
-Dependabot, ClickUp und `gh pr create` zielen damit ohne weitere Einstellung richtig.
+**Die Arbeit läuft auf `alpha`, `main` ist die Freigabe** (Entscheidung 10.09.2026, sie
+ersetzt den ersten Entwurf „ein Branch `main` mit 0.x"). `alpha` ist der **Default-Branch**:
+dorthin gehen Pull Requests, dort öffnet Dependabot, davon zweigt neue Arbeit ab. Jeder Merge
+erzeugt dort einen **Vorab**-Release (`X.Y.Z-alpha.N`). Ein **stabiles** Release entsteht
+ausschließlich durch einen bewussten Merge `alpha → main` — solange den niemand macht, gibt es
+keins. Für ein Projekt, das noch nie ausgeliefert hat, ist genau das der Punkt: der stabile
+Kanal wird nicht dadurch belegt, dass jemand etwas mergt.
 
-**Kanäle vorbereitet, nicht angelegt** (`.releaserc.json`): `main` → Release-Branch;
-`beta` → `X.Y.Z-beta.N`; `alpha` → `X.Y.Z-alpha.N`. semantic-release ignoriert
-konfigurierte Branches, die im Repo nicht existieren („If `name` doesn't match to any branch
-existing in the repository, the definition will be ignored“, Workflow-Konfiguration), und
-verlangt mindestens einen Release-Branch — beides erfüllt. Die Kanäle werden aktiv, sobald
-der Auftraggeber die Branches anlegt, typischerweise mit der Entscheidung für 1.0. Dann
-kommt der Fluss `alpha → beta → main` und die Frage nach dem Default-Branch (der Kanal, in
-den neue Arbeit fließt) — heute nicht.
+`beta` steht als Zwischenstufe konfiguriert bereit und **existiert nicht**. Es wird allein
+durch `git push origin alpha:beta` scharf.
 
-**0.x-Regel:** `@semantic-release/commit-analyzer` bekommt `releaseRules` mit
-`{ "breaking": true, "release": "minor" }`, damit ein `BREAKING CHANGE` in der Alpha
-0.x → 0.(x+1) zählt statt auf 1.0.0 zu springen. Die Zeile wird mit der bewussten
-1.0-Freigabe entfernt; ein Kommentar in `.releaserc.json` sagt das.
+**Gemessen beim Einrichten:** semantic-release liest die konfigurierten Branches vom **Remote**,
+nicht aus der lokalen Kopie. Ein nur lokal angelegter Branch wird ignoriert — ein Trockenlauf
+gegen einen lokalen `alpha` meldete weiter „only publish from main". Wer einen Kanal testen
+will, muss ihn pushen.
 
-**Erstversion:** vor dem ersten Lauf wird `v0.1.0` auf den aktuellen `main`-Stand getaggt
-(passend zu `Cargo.toml`). semantic-release zählt dann ab `0.2.0`; ein Breaking Change springt
-regelkonform auf `1.0.0`.
+**Keine Erstversion von Hand, kein Bootstrap-Tag.** Ohne vorhandenes Tag setzt semantic-release
+die erste Version selbst; auf einem Vorabkanal ist das `1.0.0-alpha.1`. Das ist bewusst so
+gewählt: ein von Hand gesetztes Start-Tag wäre ein manueller Schritt in einem Flow, dessen
+ganzer Zweck es ist, keine zu haben. Der frühere Plan (`v0.1.0` vorab taggen, dann 0.x zählen)
+ist damit hinfällig.
+
+**Und deshalb entfällt die 0.x-Sonderregel.** Ein früherer Entwurf gab dem `commit-analyzer`
+`releaseRules: [{ breaking: true, release: 'minor' }]`, um in 0.x zu bleiben. Mit dem Start bei
+`1.0.0-alpha.1` sind wir gar nicht in 0.x, die Regel wäre also nicht bloß überflüssig, sondern
+falsch — sie hielte einen echten Bruch nach dem stabilen `1.0.0` auf einer Minor-Anhebung fest.
+Innerhalb eines Vorabkanals zählt ohnehin nur der Suffix hoch (alpha.1 → alpha.2), unabhängig
+von der Commit-Art.
 
 **Ablauf des Jobs `release`** (nach grünem `gate` über `workflow_run` oder als `needs`
 im selben Workflow — Entscheidung: **eigener Workflow mit `workflow_run` auf `ci.yml`**,
@@ -247,8 +253,9 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
 3. **Public + Integrationen** (LFH-528) — Umschalten (mit Go), Rulesets, Dependabot,
    Codecov-Token, GitHub App. Abnahme: Repo öffentlich, Rulesets greifen (Test-Push auf
    `main` ohne PR wird abgelehnt), erster Dependabot-Lauf sichtbar.
-4. **Erster Release** (LFH-527) — Tag `v0.1.0` setzen, dann einen `fix:`-Commit auf `main`.
-   Abnahme: `v0.1.1` mit allen sechs Assets und dem Container-Abbild.
+4. **Erster Release** (LFH-527) — GitHub App und Secrets einrichten, dann einen Commit auf
+   `alpha`. Abnahme: `v1.0.0-alpha.1` entsteht ohne Handgriff, mit allen sechs Assets und dem
+   Container-Abbild. **Kein Tag von Hand.**
 
 **Die Reihenfolge 3 vor 4 ist eine Korrektur** (Review, 09.09.2026). Der erste Entwurf hatte
 den Release-Test vor dem Umschalten — und begründete den dann fehlschlagenden arm64-Job als

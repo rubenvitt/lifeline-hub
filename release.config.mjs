@@ -15,18 +15,25 @@
 /** @type {import('semantic-release').GlobalConfig} */
 export default {
   /*
-   * DREI KANÄLE KONFIGURIERT, EINER EXISTIERT.
+   * ARBEIT LÄUFT AUF `alpha`, `main` IST DIE FREIGABE.
    *
-   * Das Projekt ist in früher Alpha: es gibt noch kein Release, also auch nichts, was ein
-   * stabiler Kanal gegen einen Vorabkanal abschirmen müsste. `main` released deshalb
-   * 0.x-Versionen OHNE Prerelease-Suffix — SemVer sagt für 0.x ohnehin „alles darf sich
-   * ändern", ein zusätzliches `-alpha.N` wäre doppelt gemoppelt.
+   * `alpha` ist der Default-Branch: dorthin gehen Pull Requests, dort öffnet Dependabot,
+   * davon zweigt neue Arbeit ab. Jeder Merge erzeugt dort einen VORAB-Release
+   * (`X.Y.Z-alpha.N`). Ein stabiles Release entsteht ausschließlich, wenn `alpha` bewusst
+   * nach `main` gemergt wird — solange das niemand tut, gibt es schlicht keins. Genau das
+   * ist für ein Projekt gewollt, das noch nie ausgeliefert hat.
    *
-   * `beta`/`alpha` stehen hier trotzdem: semantic-release ignoriert konfigurierte Branches,
-   * die im Repository nicht existieren („If `name` doesn't match to any branch existing in
-   * the repository, the definition will be ignored", Workflow-Konfiguration). Die Kanäle
-   * werden also allein durch das Anlegen des Branches scharf — typischerweise mit der
-   * Entscheidung für 1.0. Erst dann stellt sich die Frage nach dem Default-Branch.
+   * `beta` steht als Zwischenstufe bereit, existiert aber nicht. semantic-release ignoriert
+   * konfigurierte Branches, die es im Repository nicht gibt („If `name` doesn't match to any
+   * branch existing in the repository, the definition will be ignored", Workflow-
+   * Konfiguration) — und „Repository" heißt dabei das REMOTE, nicht die lokale Kopie:
+   * ein nur lokal angelegter Branch wird nicht erkannt (gemessen beim Einrichten). Der Kanal
+   * wird also allein durch `git push origin alpha:beta` scharf.
+   *
+   * KEIN BOOTSTRAP-TAG. Ohne vorhandenen Tag setzt semantic-release die erste Version selbst;
+   * auf einem Vorabkanal ist das `1.0.0-alpha.1`. Das ist bewusst so gewählt: ein von Hand
+   * gesetztes Start-Tag wäre ein manueller Schritt in einem Flow, dessen ganzer Zweck es ist,
+   * keine zu haben.
    */
   branches: [
     'main',
@@ -40,18 +47,15 @@ export default {
       {
         preset: 'conventionalcommits',
         /*
-         * 0.x-REGEL — MIT DER 1.0-FREIGABE ERSATZLOS STREICHEN.
+         * KEINE `releaseRules`-Sonderregel — normale SemVer.
          *
-         * Ohne diese Zeile hebt der erste `BREAKING CHANGE` die Version von 0.x auf 1.0.0.
-         * In der Alpha ist das eine Aussage über Reife, die niemand treffen wollte: hier
-         * brechen Schnittstellen laufend, und jeder Bruch dürfte genau einmal passieren,
-         * bevor die Versionsnummer 1.0 behauptet. Solange 0.x gilt, zählt ein Bruch als
-         * Minor (0.x → 0.(x+1).0).
-         *
-         * Wer 1.0 ausruft: diesen `releaseRules`-Eintrag entfernen, damit ein Bruch wieder
-         * Major wird. Das ist die eine Stelle, an der diese Entscheidung hängt.
+         * Ein früherer Entwurf hob hier „breaking → minor" heraus, um in 0.x zu bleiben. Das
+         * ist mit dem Wechsel auf den Vorabkanal hinfällig und wäre sogar falsch: die Zählung
+         * startet bei `1.0.0-alpha.1`, wir sind also gar nicht in 0.x. Innerhalb des Kanals
+         * zählt ohnehin nur der Vorab-Zähler hoch (alpha.1 → alpha.2), unabhängig davon, ob
+         * ein Commit `feat` oder `BREAKING CHANGE` trägt. Erst nach dem ersten stabilen
+         * `1.0.0` bewegt ein Bruch die Hauptversion — und dann soll er das auch.
          */
-        releaseRules: [{ breaking: true, release: 'minor' }],
       },
     ],
     ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],

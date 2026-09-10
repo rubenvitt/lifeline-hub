@@ -13,8 +13,9 @@ name: CI
 on:
   pull_request:
   push:
-    # beta/alpha existieren heute nicht (frühe Alpha, ein Kanal). Die Einträge stehen hier,
-    # damit die Kanäle beim Anlegen sofort geprüft werden.
+    # `alpha` ist der Default-Branch und trägt die tägliche Arbeit, `main` die Freigabe.
+    # `beta` existiert noch nicht und steht als Zwischenstufe bereit — der Eintrag sorgt
+    # dafür, dass der Kanal beim Anlegen sofort geprüft wird.
     branches: [main, beta, alpha]
 
 # Least privilege: der Gate-Job liest nur. Schreibrechte hat ausschließlich der
