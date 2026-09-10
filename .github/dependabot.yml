@@ -56,6 +56,16 @@ updates:
         patterns: ['*']
     commit-message:
       prefix: 'chore(deps)'
+    ignore:
+      # DIESER PIN IST EIN FIX, KEIN ZUFALL — er darf nicht automatisch steigen.
+      # Version 10 des Presets verlangt `conventional-changelog-writer@9`; semantic-release 25
+      # bringt aber Version 8 mit. Die Folge war kein Installationsfehler, sondern ein Abbruch
+      # MITTEN im Release-Lauf: „Missing helper: … requires conventional-changelog-writer@9 or
+      # newer", nach Analyse und Changelog, im Schritt `generateNotes` (gemessen im ersten
+      # echten Release-Versuch). Ein automatischer Major-Bump führte genau dorthin zurück.
+      # Der Pin fällt, wenn semantic-release seinen Writer auf 9 hebt — dann von Hand.
+      - dependency-name: conventional-changelog-conventionalcommits
+        update-types: [version-update:semver-major]
 
   # Die Actions sind per Commit-SHA gepinnt (siehe Kopf von ci.yml). Genau deshalb braucht es
   # diesen Eintrag: einen SHA hebt niemand von Hand an, und ohne Dependabot fröre die
