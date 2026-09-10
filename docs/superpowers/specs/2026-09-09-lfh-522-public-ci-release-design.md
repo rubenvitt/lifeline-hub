@@ -236,10 +236,19 @@ das Binary nativ ausführen kann). Upload per `gh release upload`.
   ersetzt es nicht.
 - **Codecov**: Token als Repo-Secret `CODECOV_TOKEN` (legt der Auftraggeber an);
   `codecov.yml` mit `informational: true` für den Status — Coverage meldet, blockiert nicht.
-- **ClickUp-GitHub**: Einrichtung in ClickUp durch den Auftraggeber. Repo-seitig:
-  `.github/pull_request_template.md` mit Zeile „ClickUp: LFH-NNN“ und der dokumentierten
-  Branch-Konvention `<typ>/lfh-<nnn>-<slug>` (schon Skill-Standard), über die ClickUp
-  Branches/PRs dem Task zuordnet.
+- **ClickUp-GitHub**: Einrichtung in ClickUp durch den Auftraggeber. Repo-seitig trägt
+  `.github/pull_request_template.md` die Zeile **`ClickUp: #LFH-NNN`** — mit Raute.
+  **Recherchiert, nicht angenommen** (10.09.2026): die Integration sucht eine Task-Kennung in
+  PR-Titel, PR-Beschreibung, Branch-Namen und Commit-Nachrichten, und sie braucht dafür das
+  `#`-Präfix. Der erste Entwurf schrieb `ClickUp: LFH-NNN` ohne Raute — das wäre bloß Text
+  gewesen, und der Task hätte auf „in development" gestanden, während der PR längst gemergt
+  ist.
+  **Die Branch-Konvention trägt die Verknüpfung NICHT**: Custom-IDs stehen in ClickUp immer in
+  Großbuchstaben, `chore/lfh-522-…` ist kleingeschrieben wie in Git üblich und wird nicht
+  gefunden. Der zweite tragende Weg sind die **Commit-Nachrichten**, die die Kennung in diesem
+  Projekt ohnehin groß im Body führen (`LFH-527`). Optional lässt sich ein Zielstatus anhängen
+  (`#LFH-527[in review]`), was den Task beim Erkennen direkt dorthin setzt — bewusst nicht in
+  die Vorlage aufgenommen, weil der Board-Status hier über den Skill mitgeführt wird.
 
 ## 9. Zerlegung in Subtasks (Reihenfolge ist Abhängigkeit)
 

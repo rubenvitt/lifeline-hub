@@ -1,10 +1,21 @@
-ClickUp: LFH-
+ClickUp: #LFH-
 
 <!--
-Die Zeile oben verknüpft den Pull Request mit dem Task auf dem Entwicklungsboard. Sie ist
-kein Schmuck: die ClickUp-Integration liest sie (und den Branch-Namen im Format
-`<typ>/lfh-<nnn>-<slug>`) und hängt PR und Status an den Task. Ohne Nummer bleibt der Task
-auf „in development" stehen, während der PR längst gemergt ist.
+DIE RAUTE GEHÖRT DAZU, UND DIE KENNUNG WIRD GROSS GESCHRIEBEN.
+
+Die ClickUp-Integration sucht eine Task-Kennung in PR-Titel, PR-Beschreibung, Branch-Namen
+und Commit-Nachrichten. Ohne die Raute erkennt sie nichts — die Zeile ist dann bloß Text, und
+der Task bleibt auf „in development" stehen, während der PR längst gemergt ist. Custom-IDs
+tragen in ClickUp immer Großbuchstaben (`LFH-527`), ein kleingeschriebenes `lfh-527` wird
+nicht gefunden.
+
+Das ist auch der Grund, warum die Verknüpfung hier steht und nicht am Branch-Namen hängt: die
+Branch-Konvention `<typ>/lfh-<nnn>-<slug>` ist kleingeschrieben, wie in Git üblich. Die
+Commit-Nachrichten dieses Projekts tragen die Kennung ohnehin groß im Body — das ist der
+zweite Weg, auf dem ClickUp den Task findet.
+
+Optional lässt sich ein Zielstatus anhängen: `#LFH-527[in review]` setzt den Task beim
+Erkennen direkt dorthin.
 -->
 
 ## Was ändert sich
