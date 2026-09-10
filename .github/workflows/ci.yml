@@ -1,9 +1,26 @@
-# CI (LFH-522/LFH-525) — Gate, Coverage und der angehängte Release-Aufruf.
+# CI (LFH-522/LFH-525, parallelisiert in LFH-534) — Gate, Coverage, Release-Aufruf.
 #
-# Der Job fährt `scripts/check-all.sh` UNVERÄNDERT. Das ist die tragende Entscheidung dieser
-# Datei: das Sammel-Gate (LFH-235/F17) ist die eine Wahrheit darüber, was geprüft wird, und
-# eine CI, die ihre Schritte selbst zusammenstellt, driftet unweigerlich vom lokalen Lauf ab.
-# Wer hier einen Schritt vermisst, ändert das Skript — nicht diesen Workflow.
+# JEDER Job ruft `scripts/check-all.sh` auf, keiner stellt sich seine Schritte selbst zusammen.
+# Das Sammel-Gate (LFH-235/F17) bleibt damit die eine Wahrheit darüber, WAS geprüft wird; die
+# Jobs hier entscheiden nur, WO es läuft. Wer einen Schritt vermisst, ändert das Skript.
+#
+# Warum überhaupt geteilt: der frühere Ein-Job-Aufbau fuhr drei schwere Suiten seriell —
+# Rust 17:00, Vitest 16:30, Playwright 17:54 — und brauchte 58 Minuten. Die drei hängen
+# nicht voneinander ab. Gemessen am grünen Lauf 34409143961.
+#
+# DIE ZAHLEN, DIE DIE AUFTEILUNG BESTIMMT HABEN (alle gemessen, nicht geschätzt):
+#   - Compile ist nur 2:29 der 17 Rust-Minuten (14,6 %). Die Rust-Suite auf mehrere Runner
+#     zu partitionieren bringt deshalb weit weniger als sie zu PARALLELISIEREN — jeder Shard
+#     zahlt den Compile erneut. Sie bleibt darum EIN Job.
+#   - Playwright verteilt nach Testzahl in Dateireihenfolge. Bei 143 Tests in 38 Dateien
+#     liegt das Ungleichgewicht bei 4 Shards auf 1,06×, bei 6 auf 1,38× — sechs wären
+#     langsamer als vier.
+#   - Vitest verteilt nach Dateien (SHA-1 des Pfads, sortiert, zusammenhängender Slice):
+#     323 Dateien teilen sich auf 4 Shards als 81/81/81/80.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar). Ein Tag ist verschiebbar; ein
+# kompromittierter Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot
+# (.github/dependabot.yml) hält die Pins aktuell.
 #
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar). Ein Tag ist verschiebbar; ein
 # kompromittierter Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot
@@ -51,88 +68,48 @@ env:
   TZ: Europe/Berlin
 
 jobs:
-  gate:
-    name: check-all.sh
+  # ── Die billigen Prüfungen, in einem Job und zuerst ──────────────────────────────────
+  # rustfmt, Lint, Typ-Drift und Advisories brauchen zusammen 1:37. Sie stehen vorn, damit
+  # ein Formatierungsfehler nicht erst nach einer Viertelstunde Testlauf auffällt.
+  schnell:
+    name: Schnellprüfungen
     runs-on: ubuntu-latest
-    # 120 statt 60 — gemessen, nicht großzügig geschätzt: ein KALTER Lauf braucht auf zwei
-    # vCPU über eine Stunde allein für „Alle Gates" (Rust-Build über 442 Crates inklusive
-    # OpenSSL aus Quelle, dann Rust-Suite, 3768 Vitest-Tests und 143 Playwright-Tests). Der
-    # erste Anlauf lief exakt in die 60-Minuten-Grenze. Mit warmem Cargo-Cache liegt der Lauf
-    # deutlich darunter; die Grenze ist die Reißleine für einen hängenden Lauf, nicht das
-    # erwartete Maß.
-    timeout-minutes: 120
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # PLATTENPLATZ — GEMESSEN NÖTIG, NICHT VORSORGLICH (erster CI-Lauf, PR #26).
-      # Beide Jobs starben mitten im Build an „No space left on device"; der Runner konnte
-      # zuletzt nicht einmal mehr sein eigenes Log schreiben. Ein ubuntu-latest-Runner hat
-      # rund 14 GB frei, und dieses Projekt braucht mehr: Debug-Build des ganzen Workspace
-      # samt Integrationstests, dazu OpenSSL aus Quelle (seit LFH-522), aws-lc-sys,
-      # gebündeltes SQLite, node_modules und ein Chromium.
-      # Die drei Verzeichnisse unten sind vorinstallierte Toolchains, die dieses Projekt
-      # nirgends anfasst; allein das Android-SDK trägt zweistellige GB. `df` steht davor und
-      # danach, damit beim nächsten Engpass nicht wieder geraten werden muss.
       - name: Plattenplatz schaffen
         run: |
           df -h /
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
-
-      # nasm baut aws-lc-sys (rustls), perl+cc bauen das seit LFH-522 eingebackene OpenSSL.
-      # cmake und perl bringt ubuntu-latest mit; nasm nicht.
       - name: System-Werkzeuge für die nativen Crates
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
-
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
-
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          # Der Cache-Schlüssel muss das eingebackene OpenSSL kennen: ohne diesen Zusatz
-          # teilte ein Lauf VOR und NACH einem openssl-src-Bump denselben Eintrag.
-          key: openssl-vendored
-          # Ohne das hier gibt es einen Teufelskreis, und er ist im ersten Anlauf eingetreten:
-          # die Action speichert per Vorgabe nur nach einem GRÜNEN Job. Ein Lauf, der ins
-          # Timeout rennt, hinterlässt also keinen Cache — der nächste startet wieder kalt und
-          # rennt wieder ins Timeout. Ein Cache aus einem abgebrochenen Lauf ist nicht falsch,
-          # nur unvollständig; die Crates darin sind dieselben.
+          # shared-key statt key: rust-cache hängt per Vorgabe die Job-ID an den Schlüssel,
+          # jeder Job hätte sonst seinen eigenen mehrere GB großen Eintrag — und GitHub
+          # deckelt bei 10 GB je Repository. `save-if: false` überall außer im Rust-Job:
+          # EINER pflegt den Eintrag, die anderen lesen ihn.
+          shared-key: rust-openssl-vendored
+          save-if: false
           cache-on-failure: true
-
-      # mise, weil check-all.sh seine Node-/pnpm-Versionen selbst pinnt
-      # (`mise exec node@26.7.0 pnpm@11.10.0`) — beide Nachbarversionen sind gemessen kaputt,
-      # siehe den Kommentar im Skript. actions/setup-node stünde daneben und würde ignoriert.
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.9.1
           install_args: node@26.7.0 pnpm@11.10.0
           cache: true
-
       - name: pnpm-Store-Pfad ermitteln
         id: pnpm
         run: echo "store=$(mise exec node@26.7.0 pnpm@11.10.0 -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm.outputs.store }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
-
       - name: Frontend-Abhängigkeiten
         run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend install --frozen-lockfile
-
-      # Der Browser-Cache hängt an der Playwright-Version aus dem Lockfile: ein Bump ohne
-      # neuen Browser-Download endet sonst in „Executable doesn't exist".
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
-
-      - name: Playwright-Chromium
-        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec playwright install --with-deps chromium
-
-      # Ohne cargo-audit WARNT check-deps.sh nur und exitet 0 — im CI soll es prüfen.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: audit-cache
         with:
@@ -141,21 +118,240 @@ jobs:
       - name: cargo-audit
         if: steps.audit-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-audit --locked --version 0.22.2
+      - name: Schnellprüfungen
+        run: ./scripts/check-all.sh --nur schnell
 
-      - name: Alle Gates
-        run: ./scripts/check-all.sh
-
-      # Nur im Fehlerfall: der Playwright-Report ist das einzige Mittel, eine e2e-Flake auf
-      # fremder Hardware zu beurteilen (jsdom rechnet kein Layout, das Log allein reicht nicht).
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure()
+  # ── Rust-Suite ──────────────────────────────────────────────────────────────────────
+  # Bewusst NICHT partitioniert: nur 14,6 % der Laufzeit sind Compile, den jeder Shard
+  # erneut zahlen würde. Dieser Job pflegt zugleich den geteilten Cargo-Cache für alle
+  # anderen (als einziger mit save-if: true, der Vorgabe).
+  rust:
+    name: Rust-Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Plattenplatz schaffen
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
+          df -h /
+      - name: System-Werkzeuge für die nativen Crates
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+      - name: Rust-Toolchain (stable)
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          name: playwright-report
-          path: frontend/playwright-report/
+          shared-key: rust-openssl-vendored
+          cache-on-failure: true
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+      - name: Rust-Suite
+        run: ./scripts/check-all.sh --nur rust
+
+  # ── Backend-Binary für die e2e-Shards ───────────────────────────────────────────────
+  # Eigener Job statt „e2e wartet auf die Rust-Suite": so starten die Shards nach dem Build
+  # (~5 min warm) statt nach Build PLUS 17 Minuten Tests, mit denen sie nichts zu tun haben.
+  binaer:
+    name: e2e-Binary
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Plattenplatz schaffen
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
+          df -h /
+      - name: System-Werkzeuge für die nativen Crates
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+      - name: Rust-Toolchain (stable)
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: rust-openssl-vendored
+          save-if: false
+          cache-on-failure: true
+      - name: Debug-Binary bauen
+        run: cargo build --bin lifeline-hub
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lifeline-hub-debug
+          path: target/debug/lifeline-hub
+          retention-days: 1
+
+  # ── Frontend-Suite, auf vier Runner geteilt ─────────────────────────────────────────
+  frontend:
+    name: Frontend-Suite ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      # Ohne fail-fast: ein roter Shard darf den anderen drei nicht die Diagnose nehmen.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Kein Rust, kein Chromium, kein Plattenplatz-Schritt — dieser Job braucht nur Node.
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+      - name: pnpm-Store-Pfad ermitteln
+        id: pnpm
+        run: echo "store=$(mise exec node@26.7.0 pnpm@11.10.0 -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - name: Frontend-Abhängigkeiten
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend install --frozen-lockfile
+      - name: Frontend-Suite (Anteil ${{ matrix.shard }}/4)
+        env:
+          VITEST_SHARD: ${{ matrix.shard }}/4
+        run: ./scripts/check-all.sh --nur frontend
+      # Vitest 4 legt die Blobs unter frontend/.vitest-reports/ ab — die aktuelle Doku zeigt
+      # bereits Vitest 5 mit einem anderen Pfad. include-hidden-files ist Pflicht, weil das
+      # Verzeichnis mit einem Punkt beginnt; ohne die Zeile lädt der Schritt nichts hoch.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: frontend/.vitest-reports/*
+          include-hidden-files: true
+          retention-days: 1
+
+  # ── e2e-Suite, auf vier Runner geteilt ──────────────────────────────────────────────
+  e2e:
+    name: e2e ${{ matrix.shard }}/4
+    needs: binaer
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+      - name: pnpm-Store-Pfad ermitteln
+        id: pnpm
+        run: echo "store=$(mise exec node@26.7.0 pnpm@11.10.0 -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - name: Frontend-Abhängigkeiten
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend install --frozen-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+      - name: Playwright-Chromium
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lifeline-hub-debug
+          path: bin
+      # PFLICHT, kein Schmuck: upload-artifact zippt ohne Dateirechte, alles kommt als 644
+      # zurück. Ohne diese Zeile ist das Binary da, aber nicht startbar — check-all.sh
+      # bricht dann mit einer klaren Meldung ab (es prüft das Bit ausdrücklich), statt die
+      # Suite still zu überspringen.
+      - name: Ausführbar machen
+        run: chmod +x bin/lifeline-hub
+      - name: e2e-Suite (Anteil ${{ matrix.shard }}/4)
+        env:
+          PW_SHARD: ${{ matrix.shard }}/4
+          # Erspart diesem Job die komplette Rust-Toolchain: ohne die Variable fragte die
+          # Playwright-Config `cargo metadata` nach dem Target-Verzeichnis.
+          PW_BINAER: ${{ github.workspace }}/bin/lifeline-hub
+        run: ./scripts/check-all.sh --nur e2e
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-blob-${{ matrix.shard }}
+          path: frontend/blob-report
+          retention-days: 1
+
+  # ── Ein Bericht aus den Teilläufen ──────────────────────────────────────────────────
+  # BEIDE Berichte sind ausdrücklich KEINE Required Checks — das sind die Shard-Jobs selbst.
+  # Grund: die Merge-Werkzeuge scheitern nur bei NULL Blobs. Ein an Speichermangel
+  # gestorbener Shard käme hier sonst als grüner Bericht über drei Viertel der Suite heraus.
+  # Sie laufen mit `!cancelled()`, weil man den Bericht gerade dann braucht, wenn es rot war.
+  berichte:
+    name: Testberichte zusammenführen
+    needs: [frontend, e2e]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          install_args: node@26.7.0 pnpm@11.10.0
+          cache: true
+      - name: Frontend-Abhängigkeiten
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend install --frozen-lockfile
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: frontend/.vitest-reports
+          pattern: vitest-blob-*
+          merge-multiple: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: frontend/all-blob-reports
+          pattern: playwright-blob-*
+          merge-multiple: true
+
+      # Der Riegel gegen den stillen Teilbericht: fehlt ein Blob, wäre die Zusammenfassung
+      # eine Aussage über weniger Tests, als jemand beim Lesen annimmt.
+      - name: Vollzähligkeit der Teilberichte
+        run: |
+          set -euo pipefail
+          v="$(find frontend/.vitest-reports -name 'blob-*.json' 2>/dev/null | wc -l | tr -d ' ')"
+          p="$(find frontend/all-blob-reports -name '*.zip' 2>/dev/null | wc -l | tr -d ' ')"
+          echo "Vitest-Blobs: $v von 4 | Playwright-Blobs: $p von 4"
+          [ "$v" -eq 4 ] && [ "$p" -eq 4 ] || {
+            echo "WARNUNG: nicht alle Shards haben einen Bericht hinterlassen." >&2
+            echo "         Der zusammengeführte Bericht deckt dann WENIGER ab als die Suite." >&2
+          }
+
+      - name: Frontend-Bericht
+        if: ${{ !cancelled() }}
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec vitest run --merge-reports --reporter=default
+        continue-on-error: true
+      - name: e2e-Bericht
+        if: ${{ !cancelled() }}
+        run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec playwright merge-reports --reporter html ./all-blob-reports
+        continue-on-error: true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-versuch-${{ github.run_attempt }}
+          path: frontend/playwright-report
           retention-days: 7
 
   coverage:
     name: Coverage
+    # NUR AUF PUSH, nicht auf jedem Pull Request. Mit ~66 Minuten ist das der längste Job
+    # des ganzen Workflows — länger als das gesamte übrige Gate nach der Aufteilung. Er
+    # blockiert zwar nichts (continue-on-error), prägt aber die Dauer, die man im PR sieht,
+    # und belegt vier Viertelstunden Runner für eine Zahl, die sich zwischen zwei Commits
+    # kaum bewegt. Auf dem Kanal-Branch läuft er weiter und hält den Verlauf bei Codecov
+    # lückenlos.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     # 90 statt 45: `cargo llvm-cov` baut den gesamten Workspace ein ZWEITES Mal, instrumentiert
     # und in einem eigenen Target-Verzeichnis — es teilt sich nichts mit dem Gate-Job.
@@ -193,6 +389,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
+          # Eigener Schlüssel, KEIN shared-key: `cargo llvm-cov` baut instrumentiert in ein
+          # eigenes Target-Verzeichnis. Diese Artefakte in den geteilten Eintrag zu mischen
+          # machte ihn für alle anderen Jobs unbrauchbar.
           key: coverage-openssl-vendored
           cache-on-failure: true
 
@@ -252,11 +451,19 @@ jobs:
   # GITHUB_REF, und ein workflow_run-Lauf trägt dort immer den Default-Branch — ein Push auf
   # `beta` würde als stabiles Release herauskommen, sobald der Kanal existiert.
   #
-  # `needs: gate` heißt: kein Release aus einem ungeprüften Stand. Auf `coverage` wird
-  # bewusst NICHT gewartet — die Zahl ist informativ und soll nichts aufhalten.
+  # `needs` MUSS ALLE VIER PRÜFJOBS NENNEN, und das ist die Stelle, an der die Aufteilung
+  # gefährlich werden kann: solange alles in einem Job lief, hieß „gate grün" auch „e2e grün".
+  # Seit die Suiten getrennt sind, stimmt das nicht mehr — stünde hier weiter nur ein Job,
+  # entstünde ein Release über einer roten e2e-Suite, ohne dass irgendetwas rot aussieht.
+  # Bei einer Matrix verlangt `needs` alle Instanzen; ein einzelner roter Shard hält den
+  # Release also auf.
+  #
+  # Auf `berichte` wird bewusst NICHT gewartet: der Job läuft mit `!cancelled()` und wäre
+  # auch dann grün, wenn alle Shards rot waren. Auf `coverage` ebenso wenig — die Zahl ist
+  # informativ und soll nichts aufhalten.
   release:
     name: Release
-    needs: gate
+    needs: [schnell, rust, frontend, e2e]
     # Nur bei einem Push auf einen Kanal-Branch. Ohne diese Bedingung löste jeder grüne
     # Pull-Request-Lauf einen Release-Versuch aus.
     if: github.event_name == 'push'

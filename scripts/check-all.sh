@@ -28,7 +28,7 @@
 # andere: verkürzte Läufe, umgebaute Reihenfolge, Aufruf einzelner Schritte von Hand.
 set -euo pipefail
 
-# Bündel-Auswahl für die parallele CI (LFH-529). OHNE Argument läuft alles wie bisher —
+# Bündel-Auswahl für die parallele CI (LFH-534). OHNE Argument läuft alles wie bisher —
 # das ist der Weg vor dem Merge und die Vorgabe, an der sich nichts geändert hat.
 #   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories   (Sekunden bis ~1:20)
 #   --nur rust       cargo test --workspace                  (~17 min)
@@ -103,7 +103,7 @@ if [ -n "${geraeumt// /}" ]; then
 fi
 
 # ── Die sieben Schritte, je als Funktion ────────────────────────────────────────────
-# Warum Funktionen statt einer geraden Abfolge: die CI fährt sie seit LFH-529 auf MEHREREN
+# Warum Funktionen statt einer geraden Abfolge: die CI fährt sie seit LFH-534 auf MEHREREN
 # Runnern parallel und muss sie deshalb einzeln ansprechen können. Der Aufruf ohne Argument
 # ist davon unberührt — er fährt weiterhin alle sieben der Reihe nach, und das bleibt der
 # Weg vor dem Merge.
@@ -133,9 +133,22 @@ schritt_4() {
 
 schritt_5() {
   echo "==> [5/$SCHRITTE] Frontend-Suite${VITEST_SHARD:+ (Anteil $VITEST_SHARD)}"
-  # --no-file-parallelism: die volle Vitest-Suite ist unter Last sonst flaky.
-  # VITEST_SHARD teilt die Dateien auf mehrere Runner auf (leer = alles auf einem).
-  $PNPM -C "$FE" exec vitest run --no-file-parallelism ${VITEST_SHARD:+--shard="$VITEST_SHARD"}
+  # --no-file-parallelism BLEIBT auch im Shard-Betrieb, und das ist kein Versehen: Sharding
+  # verteilt DATEIEN über Maschinen, das Flag steuert die Nebenläufigkeit INNERHALB eines
+  # Prozesses. Ohne das Flag startete jeder Shard wieder so viele Worker, wie der Runner
+  # Kerne meldet — also genau die Kontention, die hier als Flakiness gemessen wurde. Die Zeit
+  # kommt aus mehr Maschinen, nicht aus mehr Last je Maschine.
+  local bericht=()
+  if [ -n "${VITEST_SHARD:-}" ]; then
+    # Im Shard-Betrieb zusätzlich ein Blob-Bericht: nur daraus lassen sich die Teilläufe
+    # hinterher zu EINEM Ergebnis zusammenführen (`vitest run --merge-reports`). Ohne ihn
+    # hätte man vier getrennte Ausgaben und keine Gesamtaussage.
+    # ACHTUNG BEIM NACHSCHLAGEN: Vitest 4 legt die Blobs in `frontend/.vitest-reports/` ab.
+    # Die aktuelle Doku auf vitest.dev zeigt bereits Vitest 5 mit `.vitest/blob/` — wer das
+    # abschreibt, lädt in der CI ein leeres Verzeichnis hoch.
+    bericht=(--reporter=default --reporter=blob)
+  fi
+  $PNPM -C "$FE" exec vitest run --no-file-parallelism "${bericht[@]}" ${VITEST_SHARD:+--shard="$VITEST_SHARD"}
 }
 
 schritt_6() {
@@ -149,7 +162,7 @@ schritt_7() {
   # ~/.cargo/config.toml) — den Pfad deshalb von Cargo selbst erfragen.
   # JSON mit dem ohnehin benötigten Node lesen; jq ist keine Projektvoraussetzung.
   local target_dir binaer
-  # PW_BINAER übersteuert die Cargo-Abfrage (LFH-529) — dieselbe Variable, die auch
+  # PW_BINAER übersteuert die Cargo-Abfrage (LFH-534) — dieselbe Variable, die auch
   # playwright.config.ts liest. In der geteilten CI lädt ein e2e-Shard das Binary als Artefakt
   # und hat gar kein Cargo-Target-Verzeichnis; ohne die Übersteuerung müsste er die
   # Rust-Toolchain nur für diese eine Abfrage mitschleppen.

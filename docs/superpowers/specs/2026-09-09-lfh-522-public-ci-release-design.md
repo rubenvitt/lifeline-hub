@@ -297,6 +297,66 @@ Vorgangs verfehlt.
 Die verbleibenden zwei `moderate`-Funde brechen das Gate per Konvention nicht
 (`--audit-level=high`) und bleiben liegen.
 
+## 9c. Die CI läuft parallel (LFH-534)
+
+Der erste Aufbau fuhr alles in EINEM Job und brauchte **58 Minuten**. Gemessen am grünen Lauf
+34409143961 (warme Caches) liegt die Zeit fast vollständig in drei Suiten, die nichts
+voneinander wissen und trotzdem nacheinander liefen: Rust 17:00, Vitest 16:30, Playwright
+17:54. Die übrigen vier Schritte zusammen: 1:37.
+
+**Das Skript bleibt die Wahrheit, nur der Ort wird verteilt.** `scripts/check-all.sh` kennt
+seit LFH-534 vier Bündel (`--nur schnell|rust|frontend|e2e`) und die Schalter `VITEST_SHARD` /
+`PW_SHARD`. Jeder CI-Job ruft das Skript; keiner stellt sich seine Schritte selbst zusammen.
+Eine **Selbstprüfung im Skript** erzwingt, dass die vier Bündel zusammen genau die sieben
+Schritte ergeben, jeden genau einmal — ohne sie fiele beim Umsortieren still einer aus der CI
+heraus, die Jobs blieben grün, und geprüft würde weniger. Per Mutationsprobe belegt.
+
+**Vier Entscheidungen, alle gemessen statt geschätzt:**
+
+- **Die Rust-Suite wird NICHT partitioniert.** Die naheliegende Annahme war, dass der
+  Compile den Großteil der 17 Minuten ausmacht und sich auf mehrere Runner verteilen ließe.
+  Gemessen sind es **2:29 von 17:00 (14,6 %)**; 84,6 % ist Ausführung. Jeder Shard zahlte den
+  Compile erneut, und der Gewinn wäre klein gegen den Preis. Der große Hebel war ohnehin die
+  Parallelität der drei Suiten, nicht die Aufteilung einer einzelnen.
+- **Vier e2e-Shards, nicht mehr.** Playwright verteilt nach Testzahl in Dateireihenfolge; bei
+  143 Tests in 38 Dateien liegt das Ungleichgewicht bei 4 Shards auf 1,06×, bei **6 dagegen
+  auf 1,38 ×** — sechs Shards wären langsamer als vier. `fullyParallel` bleibt aus, obwohl die
+  Sharding-Doku es empfiehlt: `e2e/lage-dashboard-schmal.spec.ts` verlässt sich darauf, dass
+  die Tests einer Datei nacheinander in einem Worker laufen.
+- **Vier Vitest-Shards.** Vitest verteilt Dateien über den SHA-1 des Pfads, sortiert, als
+  zusammenhängenden Slice; 323 Dateien teilen sich als 81/81/81/80. `--no-file-parallelism`
+  bleibt je Shard gesetzt: Sharding verteilt Dateien über Maschinen, das Flag steuert die
+  Nebenläufigkeit innerhalb eines Prozesses. Die Zeit kommt aus mehr Maschinen, nicht aus
+  mehr Last je Maschine — die bekannte Flake-Schraube wird nicht angefasst.
+- **Der Coverage-Job läuft nur noch auf Push.** Mit ~66 Minuten war er der längste Job des
+  Workflows, länger als das gesamte übrige Gate nach der Aufteilung. Er blockiert nichts
+  (`continue-on-error`), prägte aber die Dauer, die man im Pull Request sieht.
+
+**Drei Fallen, die beim Aufteilen entstehen und geschlossen sind:**
+
+1. **`release` muss auf alle vier Prüfjobs zeigen.** Solange alles in einem Job lief, hieß
+   „gate grün" auch „e2e grün". Seit der Trennung stimmt das nicht mehr — stünde dort weiter
+   ein Job, entstünde ein Release über einer roten e2e-Suite, ohne dass etwas rot aussieht.
+2. **Schritt 4 erzeugte das Binary für Schritt 7.** Zieht man die Rust-Suite in einen eigenen
+   Job, findet die e2e-Suite nichts mehr und überspringt sich — mit **Exit 0**. Achtzehn
+   Minuten Prüfung verschwänden, der Lauf bliebe grün. Deshalb baut ein eigener Job das Binary
+   und gibt es als Artefakt weiter, und `PW_BINAER` macht bei gesetzter Übersteuerung aus dem
+   stillen Überspringen einen **harten Fehler**.
+3. **`upload-artifact` zippt ohne Dateirechte**, alles kommt als 644 zurück. Das Binary ist
+   dann da, aber nicht startbar. Der Workflow setzt das Bit nach dem Download; die Prüfung in
+   `check-all.sh` und in `playwright.config.ts` ist das Netz darunter.
+
+**Nebenbei zwei Bestandsfehler gefunden:** Es war gar kein Playwright-Reporter gesetzt, unter
+CI ist die Vorgabe `dot` — es entstand nie ein `playwright-report/`, und der `if: failure()`-
+Upload lud seit jeher ein Verzeichnis hoch, das es nicht gab. Und die Blob-Verzeichnisse
+fehlten in `.gitignore`. Beides ist behoben.
+
+**Nicht gemacht, bewusst:** die Fixkosten je Rust-Test. Rund 1500 Testläufe spielen je 101
+Migrationen auf einer frischen In-Memory-Datenbank ein, dazu grob 1700 Argon2id-Hashes mit
+Vorgabeparametern — überschlägig 10 bis 20 % der Ausführungszeit allein für die Hashes. Das
+ist der größte verbliebene Hebel, trifft auch lokale Läufe und braucht keinen CI-Umbau.
+Eigenes Ticket.
+
 ## 10. Risiken und offene Punkte
 
 - **Der Engpass ist der Plattenplatz, nicht die Rechenzeit** — gemessen im ersten CI-Lauf

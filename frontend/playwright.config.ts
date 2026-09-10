@@ -16,7 +16,7 @@ const frontendVerzeichnis = fileURLToPath(new URL('.', import.meta.url));
  * `build.target-dir` bzw. `CARGO_TARGET_DIR` es außerhalb des Worktrees ablegen kann.
  * Das ist dieselbe Cargo-Wahrheit, die auch check-all.sh befragt.
  *
- * `PW_BINAER` übersteuert das (LFH-529). Der Name trägt bewusst das `PW_`-Präfix wie
+ * `PW_BINAER` übersteuert das (LFH-534). Der Name trägt bewusst das `PW_`-Präfix wie
  * `PW_WORKERS`/`PW_SHARD`: ein `LIFELINE_`-Name fiele unter die Env-Hygiene in
  * scripts/lib/dev-env.sh und würde vor dem Testlauf geräumt. Der Grund ist die geteilte CI: dort lädt
  * ein e2e-Shard das fertig gebaute Binary als Artefakt herunter und braucht sonst nichts von
