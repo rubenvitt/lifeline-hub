@@ -7,7 +7,7 @@
 #  2. Ein generierter Feldname wurde umbenannt/entfernt, den ein FE-Konsument nutzt
 #     → `tsc` bricht.
 #
-# Es gibt (noch) kein CI — dieser Gate wird lokal/vor dem Merge gefahren.
+# Läuft lokal über scripts/check-all.sh und seit LFH-522 mit demselben Skript in der CI.
 # Nach einer Backend-Typänderung: dieses Skript laufen lassen, die regenerierten
 # Dateien committen.
 set -euo pipefail

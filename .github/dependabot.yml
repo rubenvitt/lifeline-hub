@@ -1,0 +1,73 @@
+# Dependabot (LFH-522/LFH-528).
+#
+# Ergänzt `scripts/check-deps.sh`, ersetzt es nicht: der Skript-Gate meldet Advisories zu den
+# eingefrorenen Lockfile-Versionen (RUSTSEC/GHSA), Dependabot hebt die Versionen an. Ohne das
+# zweite Stück bliebe jeder Fund Handarbeit.
+#
+# Gruppiert wird bewusst grob: drei Ökosysteme × wöchentlich × einzeln wären an einem Montag
+# leicht 30 Pull Requests, und ein Stapel, den niemand durchsieht, ist so gut wie kein Stapel.
+# Major-Updates bleiben einzeln — die will man einzeln lesen.
+version: 2
+updates:
+  # Rust: EIN Eintrag deckt den ganzen Workspace ab (`.`, `crates/karten-katalog`,
+  # `karten-service` teilen sich ein Cargo.lock).
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      rust-minor-und-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'chore(deps)'
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-und-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'chore(deps)'
+    ignore:
+      # Node und pnpm sind in scripts/check-all.sh gepinnt, weil beide Nachbarversionen
+      # gemessen kaputt sind (Kommentar dort). Ein automatischer Bump von pnpm hier würde
+      # das Lockfile gegen einen Stand heben, den das Gate nicht fährt.
+      - dependency-name: pnpm
+      # Der Playwright-Browser-Cache im Gate hängt am Lockfile-Hash; ein Bump ohne neuen
+      # Browser-Download endet in „Executable doesn't exist". Bewusst von Hand.
+      - dependency-name: '@playwright/test'
+
+  # Das Werkzeug-Paket im Repo-Root (semantic-release). Getrennt von /frontend, weil es eine
+  # eigene package.json und ein eigenes Lockfile hat.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      release-werkzeug:
+        patterns: ['*']
+    commit-message:
+      prefix: 'chore(deps)'
+
+  # Die Actions sind per Commit-SHA gepinnt (siehe Kopf von ci.yml). Genau deshalb braucht es
+  # diesen Eintrag: einen SHA hebt niemand von Hand an, und ohne Dependabot fröre die
+  # Werkzeugkette auf dem Stand des Tages ein, an dem sie geschrieben wurde.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'chore(deps)'

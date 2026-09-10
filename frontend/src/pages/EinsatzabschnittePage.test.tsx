@@ -393,9 +393,19 @@ describe('EinsatzabschnittePage', () => {
    * false` fälschlich den POST-Zweig für einen längst bestehenden Abschnitt.
    */
   it('verwirft den Entwurf, wenn der Deeplink nach dem Öffnen einen Abschnitt selektiert', async () => {
+    // Die Reihenfolge IST hier die Zusicherung: erst der Klick auf „Abschnitt anlegen",
+    // danach die aufgelöste Query. Ein `setTimeout(50)` hat das früher nur WAHRSCHEINLICH
+    // gemacht und hing damit an der Geschwindigkeit des Rechners — auf einem CI-Runner mit
+    // zwei Kernen brauchen `findByRole` und `userEvent.click` länger als die Frist, die
+    // Query war dann vor dem Klick da und der Test wurde rot (gemessen, LFH-522). Ein von
+    // Hand freigegebenes Promise macht dieselbe Aussage unabhängig von der Wanduhr.
+    let queryFreigeben!: () => void;
+    const queryGesperrt = new Promise<void>((aufloesen) => {
+      queryFreigeben = aufloesen;
+    });
     server.use(
       http.get('/api/einsaetze/1/abschnitte', async () => {
-        await new Promise((r) => setTimeout(r, 50));
+        await queryGesperrt;
         return HttpResponse.json([
           { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: 'Leiter Nord', bemerkung: null, sortier: 0 },
         ]);
@@ -410,6 +420,9 @@ describe('EinsatzabschnittePage', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    // Erst JETZT antwortet die Abschnitts-Query — der Entwurf steht also nachweislich schon,
+    // wenn der Deeplink `?abschnitt=5` greift. Genau diese Lage prüft der Test.
+    queryFreigeben();
     expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
     expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
   });

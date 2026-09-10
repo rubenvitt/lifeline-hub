@@ -1,0 +1,27 @@
+# Codecov (LFH-522/LFH-528).
+#
+# `informational: true` an beiden Zielen ist die tragende Einstellung: Coverage MELDET, sie
+# blockiert nicht. Ein Prozentwert, der einen Merge verhindert, erzeugt Tests, die die Zahl
+# heben und nichts prüfen — und dieses Projekt misst seine Testgüte ohnehin an Mutationsproben
+# (siehe CLAUDE.md), nicht an Abdeckung. Der Nutzen hier ist der Verlauf und die Sicht auf
+# ungetestete neue Zeilen im Pull Request.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: 'condensed_header, diff, files'
+  require_changes: true
+
+ignore:
+  - 'frontend/src/**/*.test.ts'
+  - 'frontend/src/**/*.test.tsx'
+  - 'frontend/e2e/**'
+  # Generiert aus dem Rust-Backend (LFH-120) — Abdeckung wäre eine Aussage über den
+  # Codegenerator, nicht über dieses Repo.
+  - 'frontend/src/api/types.generated.ts'

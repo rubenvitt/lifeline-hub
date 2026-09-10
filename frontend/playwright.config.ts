@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdtempSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -11,13 +11,34 @@ import { fileURLToPath } from 'node:url';
 // Step 5)" zu starten — ein Verweis auf einen Schritt, den es im Repo nie gab.
 
 const frontendVerzeichnis = fileURLToPath(new URL('.', import.meta.url));
-// Dieselbe Cargo-Wahrheit wie check-all.sh: build.target-dir bzw. CARGO_TARGET_DIR
-// kann das Binary außerhalb des Worktrees ablegen.
-const cargoMetadaten = JSON.parse(execFileSync(
-  'cargo', ['metadata', '--format-version', '1', '--no-deps'],
-  { cwd: resolve(frontendVerzeichnis, '..'), encoding: 'utf8' },
-)) as { target_directory: string };
-const binaer = join(cargoMetadaten.target_directory, 'debug', 'lifeline-hub');
+/*
+ * Der Pfad zum Backend-Binary — normalerweise über `cargo metadata`, weil
+ * `build.target-dir` bzw. `CARGO_TARGET_DIR` es außerhalb des Worktrees ablegen kann.
+ * Das ist dieselbe Cargo-Wahrheit, die auch check-all.sh befragt.
+ *
+ * `PW_BINAER` übersteuert das (LFH-534). Der Name trägt bewusst das `PW_`-Präfix wie
+ * `PW_WORKERS`/`PW_SHARD`: ein `LIFELINE_`-Name fiele unter die Env-Hygiene in
+ * scripts/lib/dev-env.sh und würde vor dem Testlauf geräumt. Der Grund ist die geteilte CI: dort lädt
+ * ein e2e-Shard das fertig gebaute Binary als Artefakt herunter und braucht sonst nichts von
+ * Rust. Ohne diese Übersteuerung müsste er trotzdem die komplette Toolchain installieren —
+ * nur damit `cargo metadata` ein Verzeichnis nennen kann, in dem gar nichts liegt.
+ * Lokal bleibt alles wie es war: ohne die Variable wird Cargo gefragt.
+ */
+const binaerUeberschrieben = process.env.PW_BINAER;
+const binaer = binaerUeberschrieben
+  ? resolve(binaerUeberschrieben)
+  : join(
+      (
+        JSON.parse(
+          execFileSync('cargo', ['metadata', '--format-version', '1', '--no-deps'], {
+            cwd: resolve(frontendVerzeichnis, '..'),
+            encoding: 'utf8',
+          }),
+        ) as { target_directory: string }
+      ).target_directory,
+      'debug',
+      'lifeline-hub',
+    );
 
 // Vorgebautes Binary voraussetzen statt bauen: `cargo build` im webServer-Command würde
 // jeden Lauf um Minuten verlängern und den Fehlerfall hinter einem Compile-Log verstecken.
@@ -26,6 +47,24 @@ if (!existsSync(binaer)) {
     `Backend-Binary fehlt: ${binaer}\n` +
       'Die e2e-Suite startet das Backend selbst und setzt dafür einen Debug-Build voraus.\n' +
       'Vorher einmal `cargo build` im Repo-Wurzelverzeichnis laufen lassen.',
+  );
+}
+
+/*
+ * AUSFÜHRBAR MUSS ES AUCH SEIN — und das ist in der CI keine Selbstverständlichkeit:
+ * `actions/upload-artifact` zippt ohne Dateirechte und stellt beim Auspacken alles auf 644.
+ * Das heruntergeladene Binary ist dann da, aber nicht startbar. Ein `existsSync` allein
+ * ginge darüber hinweg, und der Lauf stürbe erst Minuten später im webServer-Start mit
+ * EACCES — an einer Stelle, die nach einem Anwendungsfehler aussieht. Der Workflow setzt das
+ * Bit nach dem Download; diese Prüfung ist das Netz darunter.
+ */
+try {
+  accessSync(binaer, constants.X_OK);
+} catch {
+  throw new Error(
+    `Backend-Binary ist nicht ausführbar: ${binaer}\n` +
+      'In der CI verliert actions/upload-artifact die Dateirechte (alles wird 644).\n' +
+      'Nach dem Download `chmod +x` auf die Datei anwenden.',
   );
 }
 
@@ -124,8 +163,43 @@ export default defineConfig({
    * Übersteuerbar: `PW_WORKERS=6 pnpm e2e` auf einer ruhigen Maschine.
    */
   workers: Number(process.env.PW_WORKERS ?? 3),
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
+  /*
+   * FRISTEN NACH HARDWARE, NICHT NACH WUNSCH (LFH-522, gemessen im ersten CI-Lauf).
+   *
+   * Auf einem GitHub-Runner (2 vCPU) fielen 10 von 151 Tests aus — ausnahmslos an der Uhr:
+   * `page.goto`/`locator.click` überschritten den 30-s-Testtimeout, während 141 grün
+   * durchliefen. Das ist keine Regression, sondern die Hardware: die Suite fährt gegen den
+   * Vite-DEV-Server, der jedes Modul beim ersten Aufruf übersetzt, und zwei Worker teilen
+   * sich dabei zwei Kerne mit dem Backend.
+   *
+   * Deshalb längere Fristen NUR unter `CI` — lokal bleiben 30 s, damit ein echt hängender
+   * Test hier schnell auffällt und nicht eine halbe Minute pro Lauf kostet.
+   */
+  timeout: process.env.CI ? 90_000 : 30_000,
+  expect: { timeout: process.env.CI ? 25_000 : 10_000 },
+  /*
+   * EIN Wiederholungsversuch, und nur unter CI. Das ist bewusst die schwächste Zusicherung
+   * in dieser Datei, deshalb die Grenze: ein Test, der ZWEIMAL scheitert, bleibt rot — ein
+   * deterministisch kaputter Test wird also nicht grün gewaschen. Was `retries` auffängt,
+   * ist der Fall, den `trace: 'on-first-retry'` unten ohnehin schon voraussetzt: ein Ausfall,
+   * der beim zweiten Anlauf nicht wiederkehrt. Wer hier auf 2 erhöht, verschiebt die Grenze
+   * zwischen „flaky" und „kaputt" — und sollte vorher wissen, warum.
+   */
+  retries: process.env.CI ? 1 : 0,
+  /*
+   * BERICHTERSTATTUNG — ohne diese Zeile war der Report-Upload in ci.yml wirkungslos.
+   * Playwright nimmt unter CI von sich aus den `dot`-Reporter; ein `playwright-report/`
+   * entsteht dabei NIE. Der `if: failure()`-Upload im Workflow lud also seit jeher ein
+   * Verzeichnis hoch, das es nicht gab — stillschweigend, weil ein fehlender Pfad dort
+   * nur eine Warnung ist.
+   *
+   * `blob` statt `html`, weil die Suite auf mehrere Runner geteilt wird: Blob-Berichte
+   * lassen sich hinterher mit `playwright merge-reports` zu EINEM HTML-Bericht
+   * zusammenführen (seit Playwright 1.37; wir fahren 1.62). `github` daneben schreibt
+   * Fehler als Annotationen direkt an die betroffene Zeile im Pull Request.
+   * Lokal bleibt `list` — das ist das gewohnte Bild und ändert sich nicht.
+   */
+  reporter: process.env.CI ? [['blob'], ['github']] : 'list',
   use: { baseURL, trace: 'on-first-retry' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [

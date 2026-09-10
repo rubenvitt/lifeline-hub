@@ -8,12 +8,19 @@ allowBuilds:
 overrides:
   # GHSA-5p4m-2wfm-xmqj (high): quadratische CPU bei !!omap-Auflösung.
   # @redocly/openapi-core pinnt js-yaml exakt auf 4.2.0, openapi-typescript ist bereits
-  # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.1 ist
+  # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.1 war
   # ein Same-Major-Update (Minor+Patch); verifiziert durch check-typ-codegen.sh, das
   # diese Toolchain fährt (openapi.json → types.generated.ts).
-  # Bewusst `^4.3.1` und nicht `>=4.3.1`: letzteres zog js-yaml 5.2.1 herein — einen
+  # Bewusst `^4.3.2` und nicht `>=4.3.2`: letzteres zog js-yaml 5.2.1 herein — einen
   # Major-Sprung mit Breaking Changes in eine Abhängigkeit, die wir gar nicht selbst rufen.
-  js-yaml@>=4.0.0 <4.3.1: ^4.3.1
+  #
+  # NACHGEZOGEN 2026-09-09 (LFH-522-Gate-Lauf): DRITTES MAL DASSELBE MUSTER (siehe nanoid
+  # und fast-uri unten) — das Advisory ist gewandert, der Override nicht. Aus
+  # GHSA-5p4m-2wfm-xmqj ist zusätzlich GHSA-2883-xcg3-v3hh geworden (maxTotalMergeKeys
+  # begrenzt die CPU bei LEEREN Merge-Quellen nicht), die Schwelle steht jetzt bei 4.3.2.
+  # Der Override hob weiterhin korrekt auf 4.3.1 — nur reichte das Ziel nicht mehr, und
+  # `pnpm audit` brach Schritt 6. BEIDE Grenzen sind nachgezogen: Obergrenze UND Zielversion.
+  js-yaml@>=4.0.0 <4.3.2: ^4.3.2
 
   # GHSA-7p8r-x3mc-p8w7 (high): Host-Confusion über einen Backslash als Authority-Trenner.
   # Kette: vite-plugin-pwa → workbox-build → ajv (bzw.
