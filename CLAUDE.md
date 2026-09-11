@@ -897,8 +897,22 @@ Alltag wichtigsten:
   Anschlag (Kopfzeile, Etiketten — billig), die acht Editoren mit ihrer `autoSize`-Nachmessung
   nicht mehr: **p90 43–48 ms**. Die Sperre trägt nur, solange ALLE vier Props
   identitätsstabil sind — eine inline `editor`-Prop genügt, um sie aufzuheben, und sie macht
-  sonst nichts kaputt; deshalb ist der p90-Deckel von 60 ms das tragende Gate (per
-  Mutationsprobe: inline → 81 ms, rot). **Offen und benannt:** der schlechteste Anschlag liegt
+  sonst nichts kaputt.
+  **Das Gate dafür ist deterministisch und steht NICHT in der e2e-Suite** (gemessen im ersten
+  CI-Lauf dieses Tests): ein p90-Deckel von 60 ms war auf dem GitHub-Runner (2 vCPU, zwei
+  Playwright-Worker auf zwei Kernen) mit **83,4 ms** und im Wiederholversuch **62,5 ms** rot,
+  obwohl die Memoisierung drin ist. Auch das Verhältnis zur Kontrolle trennt nicht: 2,56 und
+  1,74 gegen 2,35 im unmemoisierten Zustand — die Bereiche überlappen. Ein absoluter
+  Millisekunden-Deckel für Eingabelatenz ist auf geteilten zwei Kernen ein Würfel, und ein rot
+  geborenes Gate wird abgeschaltet statt befolgt. Die Zusicherung zählt deshalb in Vitest die
+  Aufrufe der `editor`-Render-Prop (`AbschnittsAkkordeon.test.tsx`): bei unveränderten Props
+  rendert der Teilbaum nicht neu, ohne Uhr und hardwareunabhängig. **Beim Schreiben dieses
+  Tests ist die Falle, `rerender` DASSELBE Element-Objekt zu geben** — React überspringt den
+  Teilbaum dann von sich aus (Bailout auf die Element-Referenz), und der Test ist auch ohne
+  `memo` grün (per Mutationsprobe gemessen); es braucht je Render ein neues Element mit
+  gleichen Prop-*Identitäten*. Der e2e-Spec bleibt die **Messung** samt
+  Struktur-Vorbedingungen und schreibt die Zahlen in Log und Annotation; die RAIL-Deckel dort
+  gelten nur mit `PW_LATENZ=1` auf ruhiger Hardware. **Offen und benannt:** der schlechteste Anschlag liegt
   unverändert bei 120–130 ms und damit über der RAIL-Grenze von 100 ms — die Memoisierung hat
   ihn nicht bewegt, er hängt also nicht an `useWatch` (Verdacht: `autoSize`-Neumessung beim
   Zeilenumbruch, die auch die Kontrolle auf 58–77 ms hebt). Eigene Untersuchung, kein
