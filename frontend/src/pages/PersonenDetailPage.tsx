@@ -21,6 +21,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
+import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { flaeche } from '../theme/tokens';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -82,11 +83,8 @@ export default function PersonenDetailPage() {
 
   const qc = useQueryClient();
   const { message, modal } = App.useApp();
-  const [editSitzung, setEditSitzung] = useState<{
-    basis: string;
-    werte: PersonEingabe;
-  } | null>(null);
   const [editForm] = Form.useForm<PersonEingabe>();
+  const editSitzung = useEditSitzung<PersonEingabe>(editForm);
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
@@ -211,12 +209,16 @@ export default function PersonenDetailPage() {
       });
     },
   });
-  // Optimistisches Lock (LFH-241/F10): `basis` trägt den beim Laden gelesenen geaendert_at-Stand;
-  // ein 409 öffnet den Konfliktdialog (neu laden vs. überschreiben), statt still zu überschreiben.
+  // Optimistisches Lock (LFH-241/F10): `basis` trägt den beim ÖFFNEN der Maske eingefrorenen
+  // geaendert_at-Stand (LFH-303 — aus den Live-Query-Daten gelesen hebelte ein
+  // Hintergrund-Refetch das Lock aus); ein 409 öffnet den Konfliktdialog (neu laden vs.
+  // überschreiben), statt still zu überschreiben.
   const editMutation = useMutation({
-    mutationFn: (v: { daten: PersonEingabe; basis?: string; overwrite?: boolean }) =>
+    // `basis` ist eine `CasBasis` und damit nur aus `useEditSitzung` zu bekommen: ein
+    // blanker `p.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
+    mutationFn: (v: { daten: PersonEingabe; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisierePerson(einsatzId, personId, v.daten, v.overwrite ? undefined : v.basis),
-    onSuccess: () => { invalidateDetail(); setEditSitzung(null); },
+    onSuccess: () => { invalidateDetail(); editSitzung.beende(); },
     onError: (e, v) => {
       // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Die Personen-Route kennt
       // einen ZWEITEN 409, der kein CAS-Konflikt ist: `fordere_aktiv` („Einsatz ist
@@ -233,7 +235,7 @@ export default function PersonenDetailPage() {
           okButtonProps: { danger: true },
           cancelText: 'Neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
-          onCancel: () => { detailQuery.refetch(); setEditSitzung(null); },
+          onCancel: () => { detailQuery.refetch(); editSitzung.beende(); },
         });
       } else {
         fehler(e);
@@ -518,11 +520,16 @@ export default function PersonenDetailPage() {
   }
 
   function stammdatenSpalte(person: PersonDetail) {
+    // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
+    // verengt: `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der
+    // unmögliche Fall still ein Schreiben OHNE Lock — also genau der blinde Overwrite,
+    // gegen den F10 gebaut ist.
+    const sitzung = editSitzung.sitzung;
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
-        {editSitzung ? (
-          <Form form={editForm} layout="vertical" initialValues={editSitzung.werte}
-            onFinish={(daten) => editMutation.mutate({ daten, basis: editSitzung.basis })}>
+        {sitzung ? (
+          <Form form={editForm} layout="vertical" initialValues={sitzung.werte}
+            onFinish={(daten) => editMutation.mutate({ daten, basis: sitzung.basis })}>
             <Form.Item label="Name" name="name"><Input /></Form.Item>
             <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
             <Form.Item label="Geschlecht" name="geschlecht">
@@ -539,7 +546,7 @@ export default function PersonenDetailPage() {
             <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
-              <Button onClick={() => setEditSitzung(null)}>Abbrechen</Button>
+              <Button onClick={editSitzung.beende}>Abbrechen</Button>
             </Space>
           </Form>
         ) : (
@@ -727,8 +734,7 @@ export default function PersonenDetailPage() {
       notiz: p.notiz,
     };
     // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
-    setEditSitzung({ basis: p.geaendert_at, werte });
-    editForm.setFieldsValue(werte);
+    editSitzung.starte(p, werte);
   }
 
   function fuehreKopfaktionAus(aktion: Kopfaktion) {
@@ -765,7 +771,7 @@ export default function PersonenDetailPage() {
    *    korrigierbar bleiben muss — „Bearbeiten" steht in beiden Fällen im Menü.
    */
   const aktionenPlan = ((): { primaer: Kopfaktion; weitere: Kopfaktion[] } | null => {
-    if (!darfSchreiben || p.storniert_at || editSitzung) return null;
+    if (!darfSchreiben || p.storniert_at || editSitzung.sitzung) return null;
     const sichten: Kopfaktion = {
       art: 'sichten',
       key: 'sichten',
