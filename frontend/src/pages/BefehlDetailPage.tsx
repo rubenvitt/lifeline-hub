@@ -21,6 +21,7 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
+import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useViewport } from '../components/useViewport';
 import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
@@ -428,6 +429,15 @@ function BefehlDetail() {
               <MarkdownEditor layout="split" variante="dokument" autoSize={{ minRows: 8 }} />
             </Form.Item>
           ))}
+          {/* Einstiegsfokus in den ersten leeren Abschnitt (LFH-495). Als LETZTES Kind, damit
+              beim Mount-Effekt alle Felder im DOM stehen; Begründungen in `Einstiegsfokus`. */}
+          <Einstiegsfokus
+            form={form}
+            feld={einstiegsAbschnitt(
+              (v?.abschnitte ?? []).map((a) => a.schluessel),
+              (schluessel) => befehl.abschnitte.find((x) => x.schluessel === schluessel)?.text,
+            )}
+          />
         </Form>
       ) : (
         <div className="befehl-druck">

@@ -21,6 +21,7 @@ import { AbschnittsAkkordeon, befuellteAbschnitte } from '../lageberichte/Abschn
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -62,6 +63,24 @@ function LageberichtDetail() {
    */
   const [offenerAbschnitt, setOffenerAbschnitt] = useState<string | null>(null);
   const [vorschauNeben, setVorschauNeben] = useState(false);
+  /**
+   * Der Einstiegs-Abschnitt (LFH-495): offen UND fokussiert ist der erste leere. EINMAL je
+   * Bericht bestimmt — der Remount über `key={lbId}` ist der Reset. Eine lebende Ableitung
+   * wäre ein Fehler: sobald jemand diesen Abschnitt befüllt, zeigte `einstiegsAbschnitt` auf
+   * den nächsten leeren, und das Akkordeon klappte beim ersten Autosave unter dem Cursor
+   * weiter.
+   *
+   * WÄHREND DES RENDERNS abgeleitet, nicht im Effekt — und beides ist gemessen. Der
+   * `useState`-Initialwert geht nicht: `berichtQuery.data` ist beim ersten Render noch nicht
+   * da (die Seite zeigt einen `<Spin>`). Ein Effekt dagegen kommt zu SPÄT: `Einstiegsfokus`
+   * friert sein Ziel beim Mount ein und hing dann eine Runde zu früh am `undefined` —
+   * der Fokus landete gemessen auf `<body>`. Zusätzlich klappte das Akkordeon für einen
+   * Bildaufbau auf den ersten Abschnitt und danach weiter. React rendert nach einem
+   * `setState` im Renderlauf sofort neu, BEVOR es zeichnet; der Riegel gegen die Schleife
+   * ist das Objekt — `feld` darf `null` sein („Vorlage ohne Abschnitte"), ein nackter
+   * `null`-Vergleich liefe deshalb endlos.
+   */
+  const [einstieg, setEinstieg] = useState<{ feld: string | null } | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -79,6 +98,16 @@ function LageberichtDetail() {
     () => befuellteAbschnitte(werte, vorlageDef?.abschnitte ?? []),
     [werte, vorlageDef],
   );
+
+  if (einstieg === null && berichtQuery.data && vorlageDef) {
+    const geladen = berichtQuery.data;
+    setEinstieg({
+      feld: einstiegsAbschnitt(
+        vorlageDef.abschnitte.map((a) => a.schluessel),
+        (schluessel) => geladen.abschnitte.find((x) => x.schluessel === schluessel)?.text,
+      ) ?? null,
+    });
+  }
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
@@ -345,7 +374,8 @@ function LageberichtDetail() {
             <AbschnittsAkkordeon
               abschnitte={v.abschnitte}
               befuellt={befuellt}
-              offen={offenerAbschnitt ?? v.abschnitte[0].schluessel}
+              // Vorgabe ist der Einstiegs-Abschnitt, nicht stur der erste (LFH-495).
+              offen={offenerAbschnitt ?? einstieg?.feld ?? v.abschnitte[0].schluessel}
               onOffen={setOffenerAbschnitt}
               editor={(a) => (
                 // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für
@@ -360,6 +390,9 @@ function LageberichtDetail() {
               )}
             />
           )}
+          {/* Einstiegsfokus in den offenen Abschnitt (LFH-495). Als LETZTES Kind, damit beim
+              Mount-Effekt alle Felder im DOM stehen; Begründungen in `Einstiegsfokus`. */}
+          <Einstiegsfokus form={form} feld={einstieg?.feld ?? undefined} />
         </Form>
       ) : (
         <div className="lagebericht-druck">

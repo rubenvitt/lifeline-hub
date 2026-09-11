@@ -78,6 +78,47 @@ function befehl(status: 'entwurf' | 'freigegeben') {
   };
 }
 
+/**
+ * ── EINSTIEGSFOKUS (LFH-495, Nachzug C13/N3) ───────────────────────────────────
+ *
+ * Die Bedienentscheidung ist der ERSTE LEERE Abschnitt; Mechanik und Begründungen stehen in
+ * `entwurf/Einstiegsfokus.tsx` samt eigenem Test. Hier steht, dass die SEITE das Ziel aus dem
+ * SERVERSTAND ableitet und nicht aus den Formularwerten — die sind beim Mount noch leer, der
+ * Sync-Effekt füllt sie erst danach. Eine Ableitung aus dem Formular träfe deshalb immer den
+ * ersten Abschnitt und wäre von der richtigen Wahl nicht zu unterscheiden.
+ *
+ * Anders als im Lagebericht gibt es hier kein Akkordeon: alle fünf Editoren stehen gestapelt,
+ * der Fokus scrollt die Seite bis zu seinem Ziel (die verankerte Aktionsleiste hält es über
+ * `scroll-padding-block-end` frei, LFH-465).
+ */
+describe('BefehlDetailPage — Einstiegsfokus (LFH-495)', () => {
+  it('fokussiert den ersten LEEREN Abschnitt des Serverstands', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('entwurf'),
+      abschnitte: [
+        { schluessel: 'lage', text: 'Allgemeine Lage steht' },
+        { schluessel: 'auftrag', text: 'Auftrag steht' },
+        { schluessel: 'durchfuehrung', text: '' },
+      ],
+    } as never);
+    renderAt(7);
+    expect(await screen.findByLabelText('Durchführung')).toHaveFocus();
+  });
+
+  it('fokussiert am leeren Befehl den ersten Abschnitt (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    expect(await screen.findByLabelText('Lage')).toHaveFocus();
+  });
+
+  it('fokussiert im FREIGEGEBENEN Befehl nichts — es gibt kein Formular', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    await screen.findByRole('heading', { name: 'Befehl 1' });
+    expect(document.body).toHaveFocus();
+  });
+});
+
 describe('BefehlDetailPage', () => {
   it('zeigt im Entwurf editierbare Felder mit Hilfetext', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
