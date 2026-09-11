@@ -17,8 +17,19 @@
 //! Teil** — `spawn_blocking` allein würde den DoS nur von CPU auf Speicher verschieben, weil
 //! der Blocking-Pool bis auf 512 Threads wächst (× ~19 MiB je laufendem Hash).
 //!
-//! Das Gate umschließt bewusst **beide** Arme des Matches, den Wegwerf-Hash eingeschlossen —
-//! andernfalls bliebe genau der Vektor aus Punkt 2 offen.
+//! Das Gate umschließt bewusst **alle** Arme des Matches, die beiden Wegwerf-Hashes
+//! eingeschlossen — andernfalls bliebe genau der Vektor aus Punkt 2 offen.
+//!
+//! ## Drei Arme, ein Argon2-Lauf (LFH-310)
+//!
+//! Die Angleichung der Antwortzeit greift nur, wenn sie **jeden** Weg trifft. Sie tat das
+//! lange nur für zwei: der Treffer-Arm verifiziert, der `None`-Arm brennt einen Wegwerf-Hash
+//! — ein SSO-only-Konto aber (Sentinel-`passwort_hash` aus LFH-41, bewusst kein PHC-String)
+//! scheiterte schon am Parsen und antwortete in ~0 ms statt nach ~50–100 ms. Damit waren
+//! genau die per SSO angebundenen Konten per Timing aufzählbar. Den Ausgleich trägt seither
+//! [`password::wegwerf_lauf`], gerufen aus dem Parse-Fehler-Zweig von
+//! [`password::verifizieren`] — also **innerhalb** der Closure und damit unter demselben
+//! KDF-Platz wie die beiden anderen Arme, ohne zusätzlichen Lauf je Anmeldeversuch.
 //!
 //! ## Warum der KDF-Platz IN der Blocking-Closure liegt
 //!
@@ -110,7 +121,8 @@ impl Schranken {
 
 /// Prüft Anmeldedaten und liefert den aktiven Benutzer. `AppError::Unauthorized`
 /// bei unbekanntem Benutzer ODER falschem Passwort. Gleicht die Antwortzeit an
-/// (Wegwerf-Hash), damit sich existierende Benutzer nicht per Timing enumerieren lassen.
+/// (Wegwerf-Hash), damit sich existierende Benutzer nicht per Timing enumerieren lassen —
+/// auch SSO-only-Konten, deren Sentinel-Hash gar nicht erst parsbar ist (LFH-310).
 ///
 /// Bei dauerhaft ausgeschöpftem KDF-Gate: `AppError::ServiceUnavailable` (503), nachdem
 /// [`WARTEFRIST`] erfolglos verstrichen ist.
@@ -162,7 +174,8 @@ pub(crate) async fn anmelden_mit_schranken(
 
     // Argon2id ist rechen- und speicherintensiv und blockiert den aufrufenden Thread für die
     // volle Dauer. Auf dem async-Executor ausgeführt hieße das: ein Worker steht still. Der
-    // gesamte Match — Verifikation UND Wegwerf-Hash — wandert deshalb auf den Blocking-Pool.
+    // gesamte Match — Verifikation UND beide Wegwerf-Hashes — wandert deshalb auf den
+    // Blocking-Pool.
     //
     // `platz` wandert MIT in die Closure: ein `spawn_blocking`-Task überlebt das Fallen seines
     // JoinHandle. Läge der Platz draußen, gäbe ein Client-Abbruch ihn frei, während der Hash
@@ -174,7 +187,7 @@ pub(crate) async fn anmelden_mit_schranken(
             Some(b) if password::verifizieren(&passwort, &b.passwort_hash) => Ok(b),
             Some(_) => Err(AppError::Unauthorized),
             None => {
-                let _ = password::hash(&passwort);
+                password::wegwerf_lauf(&passwort);
                 Err(AppError::Unauthorized)
             }
         }
@@ -219,6 +232,38 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
+    }
+
+    /// Ein per OIDC JIT-provisioniertes Konto: existiert, hat aber kein lokales Passwort,
+    /// sondern den Sentinel aus LFH-41.
+    async fn sso_only_benutzer(pool: &SqlitePool) {
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, aktiv) \
+             VALUES (1, 'Sina SSO', 'sina', ?, 1)",
+        )
+        .bind(crate::auth::PASSWORT_HASH_SSO_ONLY)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Der schnellste von drei Anmeldeversuchen — das Minimum kommt der reinen Rechenzeit am
+    /// nächsten, weil eine Störung einen Lauf nur verlangsamen kann.
+    async fn schnellster_versuch(
+        pool: &SqlitePool,
+        name: &str,
+        schranken: &Schranken,
+    ) -> std::time::Duration {
+        let mut bestzeit = std::time::Duration::MAX;
+        for _ in 0..3 {
+            let start = std::time::Instant::now();
+            let err = anmelden_mit_schranken(pool, name, "egal", schranken)
+                .await
+                .unwrap_err();
+            assert!(matches!(err, AppError::Unauthorized), "war: {err:?}");
+            bestzeit = bestzeit.min(start.elapsed());
+        }
+        bestzeit
     }
 
     #[tokio::test]
@@ -279,6 +324,56 @@ mod tests {
         assert!(
             matches!(err, AppError::ServiceUnavailable(_)),
             "der Wegwerf-Hash-Pfad muss ebenfalls gedrosselt sein, war: {err:?}"
+        );
+    }
+
+    /// LFH-310: der Sentinel-Zweig brennt seit diesem Ticket einen Wegwerf-Hash — und dieser
+    /// Lauf muss ebenso unter dem Gate stehen wie die beiden anderen Arme. Läge er darunter
+    /// hinweg, hätte LFH-270 ein Loch genau in der Größe der SSO-only-Konten.
+    ///
+    /// Der Test war auch VOR dem Fix grün, und das ist kein Mangel: das Gate liegt vor dem
+    /// Match, umschließt also jeden Arm von selbst. Er hält genau diese Lage fest — wer das
+    /// Gate je in die Arme hinein verschiebt, lässt ihn rot werden.
+    #[tokio::test]
+    async fn auch_das_sso_only_konto_laeuft_durch_das_gate() {
+        let pool = crate::db::test_pool().await;
+        benutzer_mit_pw(&pool, "geheim123").await;
+        sso_only_benutzer(&pool).await;
+        let s = schranken(0, TEST_FRIST);
+
+        let err = anmelden_mit_schranken(&pool, "sina", "egal", &s)
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(err, AppError::ServiceUnavailable(_)),
+            "der Wegwerf-Hash des Sentinel-Zweigs muss ebenfalls gedrosselt sein, war: {err:?}"
+        );
+    }
+
+    /// Das Akzeptanzkriterium von LFH-310, am tatsächlichen Angriffsweg gemessen: der
+    /// Anmeldeversuch gegen ein SSO-only-Konto darf nicht schneller antworten als einer gegen
+    /// einen erfundenen Benutzernamen — sonst sind genau die SSO-Konten aufzählbar.
+    ///
+    /// Verglichen wird der **schnellste** von drei Läufen je Seite (Störungen verlangsamen
+    /// nur) und als **Verhältnis**, nicht gegen ein Millisekunden-Literal: die Lücke, die der
+    /// Test fängt, ist drei Größenordnungen breit (gemessen im Debug-Build vor dem Fix:
+    /// 505 ms unbekannter Name gegen 280 µs SSO-only-Konto).
+    #[tokio::test]
+    async fn sso_only_konto_antwortet_nicht_schneller_als_ein_unbekannter_name() {
+        let pool = crate::db::test_pool().await;
+        benutzer_mit_pw(&pool, "geheim123").await;
+        sso_only_benutzer(&pool).await;
+        let s = schranken(1, std::time::Duration::from_secs(60));
+
+        let unbekannt = schnellster_versuch(&pool, "gibtesnicht", &s).await;
+        let sso_only = schnellster_versuch(&pool, "sina", &s).await;
+
+        assert!(
+            sso_only * 4 >= unbekannt,
+            "SSO-only-Konto antwortete in {sso_only:?}, unbekannter Name in {unbekannt:?} — \
+             dieser Abstand ist ein Timing-Orakel, das die SSO-Konten aufzählbar macht \
+             (LFH-310)"
         );
     }
 

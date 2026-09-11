@@ -26,6 +26,11 @@ pub const ORG_ROLLE_KEINE: &str = "keine";
 /// dagegen sicher `false` liefert (kein lokaler Passwort-Login für SSO-Konten möglich).
 /// „Sentinel statt Migration": KEINE `passwort_hash`-nullable-Spalte, KEIN `benutzer`-
 /// Tabellen-Rebuild (40 FK-Abhängige) — der bestehende NOT-NULL-Text-Spaltentyp bleibt.
+///
+/// Weil der Wert nicht parsbar ist, kehrte `verifizieren` früher ohne jeden Argon2-Lauf
+/// zurück — und die Antwortzeit verriet damit, welche Konten SSO-only sind. Der Zweig brennt
+/// seit LFH-310 einen Wegwerf-Hash; wer hier etwas ändert, liest die Begründung an
+/// [`password::verifizieren`] mit.
 pub const PASSWORT_HASH_SSO_ONLY: &str = "!sso-kein-lokales-passwort";
 
 /// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
