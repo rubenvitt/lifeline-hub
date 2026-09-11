@@ -196,3 +196,146 @@ for (const modus of ['light', 'dark']) {
     await test.info().attach('kontrastwerte.json', { body: JSON.stringify(messwerte, null, 2), contentType: 'application/json' });
   });
 }
+
+// ── Kräfteübersicht und Verdichtungszeile (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 5) ──
+//
+// WAS DIE PRÜFLISTE OFFEN LIESS: sie belegte, dass alle Farben aus dem Vertrag kommen
+// (`rollenFarbe`/`statusKategorie`, 0 Farbliterale per Grep) — nicht, welchen Kontrast diese
+// Rollen auf ihrem tatsächlichen Grund erreichen. „Kommt aus dem Vertrag" ist keine Messung:
+// eine Rolle kann auf Kartengrund bestehen und auf Seitengrund durchfallen, und im
+// Nachtmodus gilt ein anderes Farbpaar. jsdom rechnet keine Farbmischung, deshalb hier.
+//
+// DERSELBE MESSKERN wie oben ({@link kontrastVon}) — komponierte Grundfläche über alle
+// Elternlagen, Alpha eingerechnet, Ablehnung statt Scheinpräzision bei Verläufen und
+// Gruppen-Opacity. Sein Selbstbeweis steht im ersten Test dieser Datei und gilt damit für
+// beide Flächenpaare. Eine zweite Kopie in einer eigenen Datei wäre ein Messkern, der an
+// zwei Orten verschieden rechnet — und machte beide Nachweise wertlos.
+//
+// ZWEI GRÜNDE, NICHT EINER — und genau darin liegt der Nachweis: die Kopf-Statuszahlen der
+// Kräfteübersicht stehen auf KARTENGRUND (`Card`), die drei derselben Rollen in der
+// Verdichtungszeile auf SEITENGRUND (`Space` ohne Karte). Beide zu messen ist der Punkt;
+// eine Messung auf nur einer Fläche behauptete die andere mit.
+//
+// KEIN RANDKONTRAST hier, anders als beim Etikett oben: diese Zahlen sind nackter Text in
+// einer Zeile, kein umrandetes Feld. `randKontrast` gegen einen nicht vorhandenen Rahmen
+// wäre eine Zahl ohne Gegenstand.
+//
+// ── GEMESSEN (11.09.2026, erster Lauf) ──────────────────────────────────────────────
+//
+//   Textfarben: normal rgb(28,102,64) · achtung rgb(122,82,0) · alarm rgb(176,35,24)
+//
+//   hell,   Kopf auf rgb(255,255,255)   frei 6,94 · gebunden 6,92 · n. einsatzbereit 6,78
+//   hell,   Zeile auf rgb(231,235,240)  frei 5,80 · gebunden 5,78 · n. verf.         5,66
+//   dunkel, Kopf auf rgb(22,28,37)      frei 6,02 · gebunden 7,22 · n. einsatzbereit 5,20
+//   dunkel, Zeile auf rgb(11,14,19)     frei 6,80 · gebunden 8,16 · n. verf.         5,87
+//
+// DER BEFUND, und er ist der Grund, warum dieser Nachweis gefehlt hat: der **Nachtmodus
+// hält** seine Grenze (5 : 1) in allen sechs Werten, der **Hellmodus verfehlt** seine
+// (7 : 1) in allen sechs — auf reinem Kartenweiß im besten Fall mit 6,94, auf Seitengrund
+// mit 5,66. „Tag" in Kriterium 5 meint den TAG, nicht das antd-`Tag`: die Schwellen sind
+// hell ≥ 7 : 1 / Nacht ≥ 5 : 1 (so auch `betroffene-kontrast.spec.ts:86`).
+//
+// Der Fehlbetrag ist eine Eigenschaft der **Rollen-Tokens als Textfarbe**, nicht dieser
+// beiden Seiten — auf reinem Weiß bleiben alle drei Rollen unter 7. Genau deshalb legt
+// `StatusTag` (LFH-446) die Rolle auf den RAND und die Beschriftung in `token.colorText`:
+// dort wird die Grenze erreicht. Die Kopfzahlen und die Verdichtungszeile sind die beiden
+// Flächen, die die Rolle direkt auf den Text legen.
+//
+// HIER NICHT BEHOBEN, und das ist eine Entscheidung: jede Lösung hat Breitenwirkung —
+// entweder die Rollen-Tokens im Hellmodus abdunkeln (das trifft JEDEN `rollenFarbe`-
+// Konsumenten, auch Ränder und Punkte, wo 3 : 1 genügt) oder die zwei Flächen auf die
+// `StatusTag`-Bauform umstellen. Beides ist eine Gestaltungsentscheidung mit eigenem
+// Ticket (**LFH-538**), kein Nebenprodukt eines Messungs-Nachzugs — dieselbe Trennung, die
+// LFH-378/B5g für eine Bedienentscheidung im Härtungs-Ticket gezogen hat. Die Schranke
+// unten steht deshalb auf der absoluten Untergrenze und NENNT den verfehlten Zielwert in
+// jeder Meldung, statt ihn wegzulassen.
+//
+// WARUM NICHT EINFACH `expect.soft` AUF 7 DANEBEN: eine Zusicherung, die bei jedem Lauf
+// rot meldet, wird nach zwei Wochen überlesen — und `pnpm e2e` bräche ab Tag eins (AK:
+// „der Spec läuft in `pnpm e2e` mit und ist grün"). Der Befund gehört an eine Stelle, die
+// jemand liest: in dieses Ticket, in die Meldung jeder Messung und in die Prüfliste.
+//
+// MUTATIONSPROBE (Akzeptanzkriterium), am 11.09.2026 mit zwei temporären Kopien gefahren,
+// beide Male danach zurückgedreht und byte-gleich verglichen. Weil die zwei Modi auf
+// VERSCHIEDENEN Schranken stehen, braucht jeder seine eigene Probe — eine einzige hätte nur
+// einen der beiden Zweige belegt:
+//  - Textfarbe vor der Messung auf `rgb(200,200,200)` gesetzt: der HELL-Test rot in allen
+//    sechs Werten (1,67 auf Kartengrund, 1,40 auf Seitengrund), der Nacht-Test blieb
+//    zu Recht grün — auf dunklem Grund ist dieses Grau kontrastreich.
+//  - Textfarbe auf `rgb(60,66,75)` gesetzt: der NACHT-Test rot in allen sechs Werten
+//    (1,69 bzw. 1,91 : 1, „Ziel ≥ 5"), der Hell-Test zu Recht grün.
+//    Damit ist auch die harte Nachtschranke als wirksam belegt und nicht nur behauptet.
+
+/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), als Literal. */
+const BODEN = 4.5;
+/**
+ * Zielwert je Modus aus Kriterium 5 (hell ≥ 7 : 1, Nacht ≥ 5 : 1), als Literale.
+ * `dark` wird HART zugesichert (der Bestand hält ihn), `light` steht heute nur in der
+ * Meldung — siehe LFH-538 im Block darüber.
+ */
+const ZIEL = { light: 7, dark: 5 } as const;
+
+/** Die drei Statusrollen, wie sie in Kopf und Zeile ausgeschrieben stehen. */
+const KOPF_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. einsatzbereit$/];
+const ZEILEN_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. verf\.$/];
+
+for (const modus of ['light', 'dark'] as const) {
+  test(`Kräfteübersicht: Kopf-Statuszahlen und Verdichtungszeile im Modus ${modus}`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await anmelden(page);
+    const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E 515 Kontrast ${Date.now()}` });
+    const basis = `/api/einsaetze/${einsatzId}`;
+    // Ohne Daten rendert die Verdichtungszeile `null` (Datenriegel) — die Messung liefe auf
+    // einem Leerzustand. Die Fahrzeugachse des Kopfes steht dagegen auch bei lauter Nullen.
+    await post(page, `${basis}/personal`, { adhoc: { name: 'Messkraft 515' } });
+    await post(page, `${basis}/fahrzeuge`, { adhoc: { funkrufname: 'Florian Musterstadt 3/44-1' } });
+
+    await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
+
+    const messwerte: Record<string, unknown>[] = [];
+
+    /** Misst die benannten Zeilenstücke und prüft Boden und Zielwert. */
+    async function misst(flaeche: string, muster: RegExp[]) {
+      for (const m of muster) {
+        const ziel = page.getByRole('main').getByText(m);
+        // Genau ein Knoten: `getByText` trifft den kleinsten Container, und eine Menge
+        // stumm zu mitteln verschwiege den schlechtesten Wert.
+        await expect(ziel, `${flaeche} ${m}: genau ein Knoten`).toHaveCount(1);
+        // Kein Hovergrund aus einer vorangegangenen Bewegung in die Messung mischen.
+        await page.mouse.move(0, 0);
+        const werte = await kontrastVon(ziel);
+        const kontext = `${modus}, ${flaeche}, ${m}: Text ${werte.text} auf rgb(${werte.grund}) = ${werte.textKontrast.toFixed(2)} : 1 (Ziel ≥ ${ZIEL[modus]}, absolute Untergrenze ${BODEN})`;
+        messwerte.push({ modus, flaeche, muster: String(m), ...werte });
+        // Im NACHTMODUS wird der Zielwert hart zugesichert — der Bestand hält ihn, und
+        // eine Schranke unterhalb des Erreichten ließe eine Verschlechterung durch.
+        // Im HELLMODUS steht heute die absolute Untergrenze, weil der Zielwert
+        // bestandsseitig verfehlt wird (LFH-538, Messwerte im Block oben); der Zielwert
+        // steht trotzdem in jeder Meldung. `soft`, damit ein Lauf ALLE sechs Werte meldet
+        // statt am ersten abzubrechen — bei einer Palettenänderung will man die ganze
+        // Tabelle sehen, nicht eine Zeile davon.
+        expect.soft(werte.textKontrast, kontext).toBeGreaterThanOrEqual(
+          modus === 'dark' ? ZIEL.dark : BODEN,
+        );
+      }
+    }
+
+    // (1) KARTENGRUND — der Statuskopf der Kräfteübersicht.
+    await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+    await misst('Kopf (Kartengrund)', KOPF_ZAHLEN);
+
+    // (2) SEITENGRUND — dieselben drei Rollen in der Verdichtungszeile.
+    await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    await expect(page.getByRole('link', { name: 'Kräfteübersicht', exact: true })).toHaveCount(1);
+    await misst('Verdichtungszeile (Seitengrund)', ZEILEN_ZAHLEN);
+
+    // Die Gründe müssen sich unterscheiden — sonst hat (2) nur (1) wiederholt und der
+    // ganze Zweitnachweis wäre eine Abschrift.
+    const gruende = new Set(messwerte.map((w) => String(w.grund)));
+    expect(gruende.size, `Karten- und Seitengrund sind zwei Flächen: ${[...gruende]}`).toBeGreaterThan(1);
+
+    await test.info().attach('kontrastwerte.json', { body: JSON.stringify(messwerte, null, 2), contentType: 'application/json' });
+  });
+}
