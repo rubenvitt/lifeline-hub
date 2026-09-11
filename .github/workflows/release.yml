@@ -56,6 +56,16 @@ jobs:
       # bewusst KEINE weiteren Workflows aus — das `release: published`-Ereignis käme nie
       # an und die Artefakte würden nie gebaut. (2) Ein PAT läuft ab und hängt an einer
       # Person; die App bleibt, auch wenn sich Zuständigkeiten ändern.
+      #
+      # Die App braucht drei Berechtigungen: `Contents: Read & Write` (Versions-Commit und
+      # Tag), `Issues: Read & Write` (der Kommentar an den enthaltenen Pull Requests läuft
+      # über die Issue-Route) und `Pull requests: Read`. Das `permissions:` oben im Workflow
+      # regelt sie NICHT — es gilt für `GITHUB_TOKEN`, gearbeitet wird mit dem App-Token.
+      #
+      # Bewusst nicht per `permission-*` an dieser Stelle eingeengt: fehlt der App eine hier
+      # angeforderte Berechtigung, bricht schon dieser Schritt — und damit der ganze Release.
+      # Ohne Einengung fehlt im schlechtesten Fall nur der Kommentar, und zwar still; der
+      # Fehlermodus steht bei SUCCESS_COMMENT_TEMPLATE in release.config.mjs.
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         if: steps.bereit.outputs.bereit == 'true'

@@ -66,6 +66,56 @@ const RELEASE_BODY_TEMPLATE = [
   '%><%= voll.length <= grenze ? voll : voll.slice(0, bruch > 0 ? bruch : platz) + hinweis %>',
 ].join('\n');
 
+/*
+ * JEDER RELEASE KOMMENTIERT SEINE ENTHALTENEN PULL REQUESTS.
+ *
+ * Das ist die Rückrichtung des Changelogs: die Notizen sagen, was in einer Version steckt —
+ * am Pull Request selbst stand bisher nichts. Wer Wochen später eine Änderung sucht, landet
+ * über die Suche IMMER zuerst beim PR, nie beim Release. `successComment: false` hat genau
+ * diese eine Spur gekappt.
+ *
+ * Kommentiert wird, was `@semantic-release/github` dem Release zurechnet: die PRs, deren
+ * Merge-Commit in der Spanne seit dem letzten Release DESSELBEN Kanals liegt, plus die
+ * Issues, die deren Beschreibung oder Commits per Schlüsselwort schließen.
+ *
+ * ZWEI KOMMENTARE JE PULL REQUEST SIND DER NORMALFALL, kein Fehler: `alpha` released jeden
+ * Merge als Vorabversion, der bewusste Merge `alpha → main` stellt dieselben Commits noch
+ * einmal als stabiles Release. Genau deshalb nennt der Text den Kanal — ohne ihn stünden
+ * zwei fast gleiche Sätze untereinander, und der Unterschied wäre allein die Versionsnummer.
+ *
+ * DIE BERECHTIGUNG HÄNGT AN DER GITHUB APP, nicht am Workflow: `permissions:` in
+ * `release.yml` gilt für `GITHUB_TOKEN`, kommentiert wird aber mit dem App-Token. Die App
+ * braucht **Issues: Read & Write** (PR-Kommentare laufen über die Issue-Route) und
+ * **Pull requests: Read**. Fehlt das, ist der Fehlermodus STILL: der Plugin-Code behandelt
+ * 403 und 404 als Protokollzeile und nicht als Fehler (`success.js`), der Lauf bleibt grün
+ * und die Kommentare fehlen einfach. Wer sie vermisst, sucht also im Job-Protokoll nach
+ * „Not allowed to add a comment", nicht nach einem roten Schritt.
+ *
+ * Die Vorlage folgt denselben Lodash-Regeln wie RELEASE_BODY_TEMPLATE oben (`%>` und `<%=`
+ * ohne Zeichen dazwischen, `\n` als Escape, kein `${`). Sie ist die einzige Stelle des
+ * Plugins, deren Auswertung NICHT im try/catch liegt — eine kaputte Vorlage bricht den
+ * `success`-Schritt, also nach dem Veröffentlichen: Release und Tag stünden, der Lauf wäre
+ * rot. Deshalb ist sie gegen `lodash.template` mit den Vorgabe-Trennzeichen durchgerechnet
+ * worden (PR, Vorab; PR, stabil; Issue; Release ohne URL), nicht bloß hingeschrieben.
+ */
+const SUCCESS_COMMENT_TEMPLATE = [
+  '<%',
+  '  const ghRelease = releases.find((r) => r.name === "GitHub release" && r.url);',
+  '  const ziel = ghRelease',
+  '    ? "[" + nextRelease.gitTag + "](" + ghRelease.url + ")"',
+  '    : "`" + nextRelease.gitTag + "`";',
+  '  const kanal = nextRelease.channel;',
+  '  const wo = kanal ? "der Vorabversion " + ziel : "Version " + ziel;',
+  '  const ende = kanal ? " (Kanal `" + kanal + "`)." : ".";',
+  '  const satz = issue.pull_request',
+  '    ? "Dieser Pull Request ist in " + wo + " enthalten" + ende',
+  '    : "Dieses Issue ist mit " + wo + " erledigt" + ende;',
+  '  const nachsatz = kanal',
+  '    ? "\\n\\nEine stabile Version entsteht erst, wenn dieser Stand nach `main` gemergt wird."',
+  '    : "";',
+  '%>🚀 <%= satz %><%= nachsatz %>',
+].join('\n');
+
 /** @type {import('semantic-release').GlobalConfig} */
 export default {
   /*
@@ -176,8 +226,28 @@ export default {
          * fertige Release reagiert. Die Binaries hier anzuhängen hieße, sechs Builds auf
          * vier Runnertypen in diesen einen Job zu ziehen und sie zu serialisieren.
          */
-        successComment: false,
-        failComment: false,
+        /*
+         * Der Kommentar an den enthaltenen PRs — Begründung, Berechtigung und Fallen stehen
+         * oben bei SUCCESS_COMMENT_TEMPLATE.
+         */
+        successComment: SUCCESS_COMMENT_TEMPLATE,
+        /*
+         * KEINE Etiketten dazu. Der Vorgabewert setzte je Release ein `released on @<kanal>`
+         * an jeden PR — bei zwei Releases je PR (alpha, dann stabil) also zwei Etiketten, die
+         * das Repository nebenbei selbst anlegt. Die Aussage steht bereits im Kommentar, und
+         * verlangt war eine Spur am PR, keine zweite Taxonomie. Wer sie doch will, streicht
+         * diese eine Zeile — der Vorgabewert ist an.
+         */
+        releasedLabels: false,
+        /*
+         * Bei einem GESCHEITERTEN Release wird weiterhin kein Issue angelegt — bewusst: die
+         * Aufgabenverwaltung dieses Projekts ist ClickUp, und ein roter Lauf meldet sich
+         * ohnehin. `failCommentCondition: false` statt des früheren `failComment: false`:
+         * verhaltensgleich (`fail.js` und `success.js` prüfen beide Zweige), aber ohne die
+         * DEPRECATION-Warnung, die das Plugin für die alte Schreibweise in jeden Lauf
+         * schreibt. Dieselbe Warnung galt `successComment: false` und fällt mit ihm weg.
+         */
+        failCommentCondition: false,
         /*
          * Kappt den Release-Text auf GitHubs 125 000 Zeichen — Begründung und Fallen stehen
          * oben bei RELEASE_BODY_TEMPLATE. Kurze Notizen gehen unverändert durch.
