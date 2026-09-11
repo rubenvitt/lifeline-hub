@@ -199,11 +199,31 @@ damit `ci.yml` für PRs schlank bleibt):
    damit ohne Artefakte, siehe Abschnitt 7). Betrifft nicht nur den ersten Lauf: der erste
    Merge von `alpha` nach `main` stellt dieselbe Liste erneut. `CHANGELOG.md` bleibt
    vollständig — gekappt wird allein der Text des Releases, mit Verweis auf die Datei.
+6. **Jeder Release kommentiert seine enthaltenen Pull Requests** (`successComment`,
+   Nachtrag 11.09.2026). Das ist die Rückrichtung des Changelogs: die Notizen sagen, was in
+   einer Version steckt, am Pull Request selbst stand bisher nichts — und gesucht wird über
+   die Suche immer zuerst der PR. Der Text ist deutsch und nennt den **Kanal**, weil zwei
+   Kommentare je PR der Normalfall sind: einer für die Vorabversion aus `alpha`, einer für
+   das stabile Release nach dem Merge auf `main`. **Ohne Etiketten** (`releasedLabels:
+   false`) — der Vorgabewert legte je Kanal ein `released on @…` an und damit zwei Etiketten
+   je PR, für eine Aussage, die schon im Kommentar steht. Bei einem **gescheiterten** Release
+   entsteht weiterhin kein Issue (`failCommentCondition: false`, verhaltensgleich zum
+   früheren `failComment: false`, aber ohne dessen DEPRECATION-Warnung): die
+   Aufgabenverwaltung ist ClickUp.
 
 **Identität des Bots:** Ein Push auf den geschützten Kanal-Branch braucht Bypass. Träger ist
 eine **GitHub App** des Auftraggebers (App-ID + Private Key als Secrets,
 `actions/create-github-app-token`) — kein persönlicher PAT, weil der abläuft und an der
 Person hängt. Die Bypass-Regel im Ruleset zeigt auf die App.
+
+**Die App braucht drei Berechtigungen:** `Contents: Read & Write` (Versions-Commit und Tag),
+`Issues: Read & Write` (der PR-Kommentar aus Punkt 6 läuft über die Issue-Route) und
+`Pull requests: Read`. Das `permissions:` im Workflow regelt sie nicht — es gilt für
+`GITHUB_TOKEN`. Fehlt die Issue-Berechtigung, ist der Fehlermodus **still**: das Plugin
+protokolliert 403/404 und lässt den Lauf grün; im Job-Protokoll steht dann „Not allowed to
+add a comment". Angefordert wird im Workflow trotzdem nichts per `permission-*` — eine dort
+verlangte, aber nicht erteilte Berechtigung bräche den Token-Schritt und damit den ganzen
+Release, für einen Kommentar.
 
 **`[skip ci]`** im Release-Commit verhindert die Schleife `release → push → ci → release`.
 Der Artefakt-Workflow hängt am Release-Event, nicht am Push, und läuft trotzdem.
