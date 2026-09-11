@@ -5,7 +5,11 @@ import type { TableColumnsType, TableProps } from 'antd';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
-import KatalogTabelle, { BLAETTER_SCHWELLE, type KatalogSpalte } from './KatalogTabelle';
+import KatalogTabelle, {
+  BLAETTER_SCHWELLE,
+  fliessBreite,
+  type KatalogSpalte,
+} from './KatalogTabelle';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -740,5 +744,198 @@ describe('KatalogTabelle · durchgereichte Sortierung und Filter', () => {
     expect(ohne.container.querySelector('.ant-table-filter-trigger')).not.toBeNull();
     await klickeFilter(ohne.container);
     expect(ohne.container.querySelectorAll('tr.ant-table-row')).toHaveLength(2);
+  });
+});
+
+/**
+ * Die Fließspalte (LFH-523).
+ *
+ * DER BEFUND: `scroll={{ x: 'max-content' }}` macht die Tabellenbreite INHALTSGETRIEBEN.
+ * Eine Spalte ohne `width` trägt damit ihre volle `max-content`-Breite bei — ein
+ * 209-Zeichen-Meldungstext bleibt einzeilig und bläst die Tabelle auf (gemessen im
+ * Handschuhmodus: 1484 px Text gegen 936 px Sicht, 1122 px innerer Überlauf). Der
+ * Kartenzweig derselben Daten bricht denselben Text um; die Tabelle hat nur keinen
+ * Deckel, gegen den sie umbrechen könnte.
+ *
+ * DIE DECKELUNG: trägt genau EINE Spalte {@link KatalogSpalte.mindestBreite}, rechnet das
+ * Primitiv `Σ(width der übrigen) + mindestBreite` aus und setzt DIESE Zahl als `scroll.x`.
+ * Antd behält daneben sein `min-width: 100%` — die Tabelle füllt also weiter den Container
+ * und scrollt erst darunter in sich.
+ *
+ * WARUM DAS DIE C7-ZUSICHERUNG NICHT ANFASST: liegt die gerechnete Zahl UNTER der
+ * Containerbreite, ist die benutzte Breite in beiden Fassungen dieselbe (`min-width: 100%`
+ * gewinnt), und die Spaltenverteilung der `auto`-Layoutrechnung ist damit Zeichen für
+ * Zeichen die alte. Verschieden verhalten sich die beiden erst, wenn `max-content` den
+ * Container ÜBERSTEIGT — also genau im Befund.
+ *
+ * DIE GEMESSENE FALLE, wegen der `tableLayout` mitgesetzt wird:
+ * `@rc-component/table/es/Table.js` wählt das Layout selbst —
+ * `if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'`. Dieses
+ * Primitiv fixiert Spalte 0 IMMER, `fixColumn` ist also gesetzt; eine Zahl statt
+ * `'max-content'` kippte das Layout still auf `fixed`. Unter `fixed` ist eine
+ * Spaltenbreite bindend statt bevorzugt — die 96 px der ETB-Aktionsspalte schnitten den
+ * 72-px-Knopf der Handschuhstufe an. `auto` respektiert die Mindestinhaltsbreite und ist
+ * zugleich das Layout, das der Bestand schon hat (vier Bestandstests pinnen es).
+ */
+describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
+  interface Lang {
+    id: number;
+    nr: string;
+    inhalt: string;
+  }
+
+  const LANG: Lang[] = [{ id: 1, nr: '#1', inhalt: 'Keller unter Wasser' }];
+
+  /** Nr. + Aktionen tragen feste Breiten, `inhalt` fließt. */
+  const FLIESS: KatalogSpalte<Lang>[] = [
+    { title: 'Nr.', dataIndex: 'nr', key: 'nr', width: 88 },
+    { title: 'Inhalt', dataIndex: 'inhalt', key: 'inhalt', mindestBreite: 320 },
+    { title: '', key: 'aktion', width: 96, render: () => 'x' },
+  ];
+
+  function koerperTabelle(container: HTMLElement): HTMLTableElement {
+    const tabelle = container.querySelector<HTMLTableElement>('.ant-table-body table');
+    expect(tabelle).not.toBeNull();
+    return tabelle!;
+  }
+
+  it('deckelt die Tabellenbreite auf Summe der festen Breiten plus Mindestmaß', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Lang> rowKey="id" columns={FLIESS} dataSource={LANG} pagination={false} />,
+    );
+    const tabelle = koerperTabelle(container);
+
+    // 88 + 320 + 96. Die Zahl steht als Literal da: aus der Spaltenliste zurückgerechnet
+    // prüfte sie die Rechnung gegen sich selbst.
+    expect(tabelle.style.width).toBe('504px');
+    // Der Container bleibt die UNTERGRENZE — sonst stünde eine schmale Tabelle in einer
+    // breiten Fläche, und die C7-Zusicherung fiele mit ihr.
+    expect(tabelle.style.minWidth).toBe('100%');
+  });
+
+  it('bleibt bei `auto`-Layout, obwohl rc-table auf eine Zahl hin `fixed` wählen würde', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Lang> rowKey="id" columns={FLIESS} dataSource={LANG} pagination={false} />,
+    );
+    // Die Mutationsprobe zu dieser Zeile ist das Weglassen des `tableLayout`-Props im
+    // Primitiv: dann steht hier `fixed`, und die Aktionsspalte schnitte in der
+    // Handschuhstufe ihren Knopf an.
+    expect(koerperTabelle(container).style.tableLayout).toBe('auto');
+  });
+
+  it('rechnet über die ÜBERGEBENEN Spalten, nicht über eine gemerkte Garnitur', () => {
+    // `Datensicht` filtert `abBreite`-Spalten HERAUS, bevor sie hier ankommen. Rechnete das
+    // Primitiv über eine Vollmenge, wäre der Deckel bei ausgeblendeten Nebenspalten zu
+    // breit und der Überlauf bliebe genau dort, wo der Befund gemessen wurde.
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Lang>
+        rowKey="id"
+        columns={[FLIESS[0], FLIESS[1]]}
+        dataSource={LANG}
+        pagination={false}
+      />,
+    );
+    expect(koerperTabelle(container).style.width).toBe('408px');
+  });
+
+  it('fällt ohne Fließspalte auf das inhaltsgetriebene Verhalten zurück', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile> rowKey="id" columns={SPALTEN} dataSource={ZEILEN} pagination={false} />,
+    );
+    const tabelle = koerperTabelle(container);
+    expect(tabelle.style.width).toBe('max-content');
+    // Und das Layout bleibt unangetastet — der Opt-in ändert nichts an den 18 Katalogen.
+    expect(tabelle.style.tableLayout).toBe('auto');
+  });
+
+  it('hebt die Deckelung auf und warnt, wenn eine Nachbarspalte keine Zahlbreite hat', () => {
+    const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Lang>
+        rowKey="id"
+        // `aktion` ohne `width`: die Summe wäre geraten. Ein geratener Deckel ist
+        // schlechter als keiner — er behauptete eine Breite, die die Spalte nicht hält.
+        columns={[FLIESS[0], FLIESS[1], { title: '', key: 'aktion', render: () => 'x' }]}
+        dataSource={LANG}
+        pagination={false}
+      />,
+    );
+    expect(koerperTabelle(container).style.width).toBe('max-content');
+    expect(warnung).toHaveBeenCalledWith(expect.stringContaining('aktion'));
+    warnung.mockRestore();
+  });
+
+  it('hebt die Deckelung auf und warnt bei zwei Fließspalten', () => {
+    const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Lang>
+        rowKey="id"
+        columns={[FLIESS[0], FLIESS[1], { ...FLIESS[2], mindestBreite: 200 }]}
+        dataSource={LANG}
+        pagination={false}
+      />,
+    );
+    // Zwei fließende Spalten sind kein Deckel, sondern zwei Reste — welche der beiden den
+    // Überschuss bekommt, entschiede die Layoutrechnung und nicht der Entwurf.
+    expect(koerperTabelle(container).style.width).toBe('max-content');
+    expect(warnung).toHaveBeenCalledWith(expect.stringContaining('Fließspalte'));
+    warnung.mockRestore();
+  });
+});
+
+/**
+ * Die Breitenrechnung für sich (LFH-523) — rein und ohne Rendern, wie `bedienzielStil` und
+ * `aktionsabstand`. Die Rendertests darüber belegen die VERDRAHTUNG; hier stehen die Zweige,
+ * die über ein gerendertes antd nur umständlich erreichbar wären.
+ */
+describe('fliessBreite', () => {
+  interface X {
+    a: string;
+  }
+
+  it('gibt ohne Fließspalte das inhaltsgetriebene Maß und keinen Grund zurück', () => {
+    const mass = fliessBreite<X>([{ key: 'a', width: 80 }, { key: 'b' }]);
+    expect(mass).toEqual({ x: 'max-content' });
+  });
+
+  it('summiert Zahlbreiten und das Mindestmaß', () => {
+    expect(
+      fliessBreite<X>([{ key: 'a', width: 80 }, { key: 'b', mindestBreite: 320 }, { key: 'c', width: 96 }]),
+    ).toEqual({ x: 496 });
+  });
+
+  it('verweigert die Rechnung bei einer Breite in Zeichenkettenform', () => {
+    // `width: '20%'` ist relativ zur Tabelle, die wir gerade erst ausrechnen — die Summe
+    // wäre zirkulär. Antds Typ lässt die Form zu, also muss die Rechnung sie abfangen.
+    const mass = fliessBreite<X>([{ key: 'a', width: '20%' }, { key: 'b', mindestBreite: 320 }]);
+    expect(mass.x).toBe('max-content');
+    expect(mass.warnung).toContain('a');
+  });
+
+  it('verweigert die Rechnung bei einer Spaltengruppe', () => {
+    // Eine Gruppe hat keine eigene Blattbreite; ihre Kinder tragen sie. Sie mitzuzählen
+    // hieße, eine Zahl zu erfinden.
+    const mass = fliessBreite<X>([
+      { key: 'g', children: [{ key: 'a', width: 80 }] } as unknown as KatalogSpalte<X>,
+      { key: 'b', mindestBreite: 320 },
+    ]);
+    expect(mass.x).toBe('max-content');
+    expect(mass.warnung).toContain('g');
+  });
+
+  it('nennt bei zwei Fließspalten BEIDE Schlüssel', () => {
+    // Ein Grund, der nur eine der beiden nennt, schickte den Leser auf die falsche Zeile.
+    const mass = fliessBreite<X>([
+      { key: 'a', mindestBreite: 100 },
+      { key: 'b', mindestBreite: 200 },
+    ]);
+    expect(mass.x).toBe('max-content');
+    expect(mass.warnung).toContain('a');
+    expect(mass.warnung).toContain('b');
+  });
+
+  it('kommt mit fehlender Spaltenliste zurecht', () => {
+    // `columns` ist an antd optional, und `KatalogTabelle` reicht es ungeprüft weiter.
+    expect(fliessBreite<X>(undefined)).toEqual({ x: 'max-content' });
   });
 });

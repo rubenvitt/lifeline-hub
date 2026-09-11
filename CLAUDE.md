@@ -69,8 +69,36 @@ nach Browsermessung `xl` (1200 px): darunter Ereigniskarten, darüber Tabelle.
 `lg` würde den gemessenen 1024-px-Engpass nicht beheben. Der optionale Einsatztermin
 `naechste_lagebesprechung_at` wird in den Einsatzdaten gepflegt und als absolute
 Wiedervorlage-Schnellwahl angeboten, wenn er bekannt und zukünftig ist. Kein
-berechneter Rhythmus. Prüfbelege und der getrennte Langtextbefund LFH-523 stehen in
+berechneter Rhythmus. Prüfbelege stehen in
 `docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`.
+
+**Eine Spalte darf fließen, und nur dann rechnet die Tabelle nicht mehr mit dem längsten
+Text** (LFH-523). `KatalogTabelle` rendert mit `scroll={{ x: 'max-content' }}` — die
+Tabellenbreite ist damit **inhaltsgetrieben**, und eine Spalte ohne `width` trägt ihre volle
+`max-content`-Breite bei. Ein normal umbrechbarer Meldungstext mit 209 Zeichen blieb deshalb
+einzeilig und verbreiterte die Tabelle, während der Kartenzweig derselben Daten ihn umbrach.
+Der **Rumpf scrollt dabei nicht** — der Überlauf steckt im Scrollcontainer der Tabelle, und
+ein Test auf `document.body.scrollWidth` allein ist gegen diesen Befund blind (er war auf
+altem Stand grün, während der Text 1122 px weit aus der Sicht ragte). Die Abhilfe ist ein
+**Opt-in**: trägt genau EINE Spalte `mindestBreite` und haben alle übrigen eine Zahlbreite,
+setzt das Primitiv `Σ(width) + mindestBreite` als `scroll.x`; `min-width: 100%` bleibt daneben
+stehen. Ohne den Haken ändert sich an den achtzehn Katalogtabellen nichts.
+**Die ≥50-%-Zusicherung aus C7 ist davon nicht berührt, und das folgt aus der Rechnung statt
+aus einer Messung:** liegt die Zahl unter der Containerbreite, ist die *benutzte* Breite in
+beiden Fassungen dieselbe und die `auto`-Layoutrechnung verteilt identisch — auseinander gehen
+sie erst, wenn `max-content` den Container übersteigt.
+**Die Zahl wird gegen die SCHMALSTE Fläche gewählt**, auf der die Tabelle überhaupt steht
+(ETB: 320 px, weil bei 1200 px Viewport rund 856 px Contentbreite bleiben und die vier festen
+Spalten 494 px belegen). Eine größere Zahl holte den Überlauf zurück.
+**Die gemessene Falle ist das Tabellenlayout:** `@rc-component/table` entscheidet
+`if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'` — dieses Primitiv
+fixiert Spalte 0 immer, eine Zahl kippt das Layout also still auf `fixed`, wo eine
+Spaltenbreite **bindend statt bevorzugt** ist und die 96 px der Aktionsspalte den 72-px-Knopf
+der Handschuhstufe anschnitten. `tableLayout="auto"` wird deshalb **nur im Zahlfall**
+mitgesetzt. Wer den Haken an eine zweite Spalte hängt oder einer Nachbarspalte die Zahlbreite
+nimmt, bekommt das Bestandsverhalten plus DEV-Warnung zurück — ein Opt-in, das still nichts
+tut, wäre von einem kaputten nicht zu unterscheiden. Herleitung und Prüfspur:
+`docs/superpowers/specs/2026-09-11-lfh-523-etb-langtext-umbruch.md`.
 
 **Die erste eingelöste Karten-Ausnahme ist die ETB-Chronologie** (LFH-342/C7,
 `etb/EtbTabelle.tsx`). Sie zeigt, woran die Formfrage wirklich hängt, und korrigiert dabei ein
