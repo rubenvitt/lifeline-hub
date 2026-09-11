@@ -1,3 +1,9 @@
+## [1.0.0-alpha.5](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.4...v1.0.0-alpha.5) (2026-09-11)
+
+### Bug Fixes
+
+* **entwurf:** Gescheiterte Freigabe meldet im Dialog statt im Toast (LFH-535) ([41714bc](https://github.com/rubenvitt/lifeline-hub/commit/41714bcf655abaf772b7fa1a57905c80c9b3318a))
+
 ## [1.0.0-alpha.4](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.3...v1.0.0-alpha.4) (2026-09-11)
 
 ### Features
