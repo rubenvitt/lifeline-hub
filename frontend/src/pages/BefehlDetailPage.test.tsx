@@ -11,6 +11,7 @@ import * as einsaetzeApi from '../api/einsaetze';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
+import { ApiError } from '../api/client';
 
 vi.mock('../api/befehle');
 vi.mock('../api/einsaetze');
@@ -315,6 +316,8 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     return {
       erfolg: () => act(async () => { resolve(befehl('entwurf') as never); }),
       fehler: () => act(async () => { reject(new Error('Netz unterbrochen')); }),
+      /** Wie `fehler`, aber mit einem bestimmten Grund — der Wortlaut trägt die Aussage. */
+      ablehnen: (e: Error) => act(async () => { reject(e); }),
     };
   }
 
@@ -370,6 +373,48 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
     await erneut.erfolg();
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+  });
+
+  /**
+   * Der Grund muss IM Dialog stehen, nicht auf der Seite dahinter (LFH-494, Review-Befund).
+   *
+   * Der Blocker-Dialog trägt `mask={{ closable: false }}`: alles hinter ihm ist abgedunkelt
+   * und unbedienbar. Solange der Fehler über `message.error` lief, war genau das der Kanal,
+   * der über einem offenen Modal funktioniert — beim Umbau auf den Seiten-Alert wäre diese
+   * eine Stelle sonst ohne jede Rückmeldung geblieben: `loading` fällt, der Dialog steht
+   * unverändert da. Das ist die H14-Diagnose, die dieses Ticket schliesst, an einem Pfad
+   * wieder aufgemacht. Anders als im Freigabe-Flow kann die Seite hier nicht „beides"
+   * melden — `autosaveJetzt()` liefert `void`, es gibt nichts zum Awaiten.
+   */
+  it('zeigt den Grund eines gescheiterten „Speichern und weiter" IM Dialog', async () => {
+    const save = halteSpeichernAn();
+    renderAt(7);
+    const dialog = await oeffneBlocker();
+    await save.fehler();
+    const erneut = halteSpeichernAn();
+    const weiter = dialog.getByRole('button', { name: /Speichern und weiter/ });
+    await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
+    await userEvent.click(weiter);
+    await erneut.ablehnen(new ApiError(503, 'Speichern vorübergehend nicht möglich'));
+
+    expect(await dialog.findByText('Speichern vorübergehend nicht möglich')).toBeInTheDocument();
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+  });
+
+  it('räumt den Grund im Dialog, sobald das Speichern gelingt, und geht weiter (Gegenaussage)', async () => {
+    const save = halteSpeichernAn();
+    renderAt(7);
+    const dialog = await oeffneBlocker();
+    await save.ablehnen(new ApiError(503, 'Speichern vorübergehend nicht möglich'));
+    expect(await dialog.findByText('Speichern vorübergehend nicht möglich')).toBeInTheDocument();
+
+    const erneut = halteSpeichernAn();
+    const weiter = dialog.getByRole('button', { name: /Speichern und weiter/ });
+    await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
+    await userEvent.click(weiter);
+    await erneut.erfolg();
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+    expect(screen.queryByText('Speichern vorübergehend nicht möglich')).toBeNull();
   });
 
   it('schützt auch Browser-Zurück und lässt eine neue Fassung nach älterem PATCH offen', async () => {
@@ -533,5 +578,60 @@ describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
     renderAt(7);
     await userEvent.type(await screen.findByLabelText('Titel'), ' x');
     expect(within(aktionsblock()!).getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+  });
+});
+
+/**
+ * ── SPEICHERFEHLER IN DER SEITE (LFH-494, Nachzug C13/N2) ──────────────────────
+ *
+ * Der Zwilling der Probe in `LageberichtePage.test.tsx`. Beide Entwurfsseiten teilen sich
+ * den Verlustschutz-Hook — wer nur eine umstellt, öffnet die Divergenz wieder, die C13 mit
+ * dem gemeinsamen Hook geschlossen hat.
+ *
+ * Die `.ant-message`-Abgrenzung trägt die Aussage: antds Toast rendert INNERHALB des
+ * RTL-Containers, ein blosses `findByText` bliebe mit zurückgedrehtem Umbau grün.
+ */
+describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
+  it('lässt den Grund eines gescheiterten Autosave in der Seite stehen, nicht nur im Toast', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl)
+      .mockRejectedValue(new ApiError(503, 'Dienst nicht erreichbar'));
+    renderAt(7);
+    await userEvent.type(await screen.findByLabelText('Titel'), 'x');
+    await userEvent.tab();
+
+    const treffer = await screen.findByText('Dienst nicht erreichbar');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(screen.getByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(screen.getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+  });
+
+  it('räumt den Grund beim nächsten gelungenen Speichern (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl)
+      .mockRejectedValueOnce(new ApiError(503, 'Dienst nicht erreichbar'))
+      .mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    await userEvent.type(await screen.findByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    expect(await screen.findByText('Dienst nicht erreichbar')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Dienst nicht erreichbar')).not.toBeInTheDocument());
+  });
+
+  it('behandelt das Verlassen des Editors nicht als Speicherfehler', async () => {
+    // `speichern` bricht noch nicht gestartete Aufträge mit einem `AbortError` ab. Ein
+    // Alert dafür behauptete einen Verlust, den es nicht gab — und stünde auf der Seite,
+    // die man gerade verlassen hat.
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl)
+      .mockRejectedValue(new DOMException('Editor verlassen', 'AbortError'));
+    renderAt(7);
+    await userEvent.type(await screen.findByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    await act(async () => {});
+    expect(screen.queryByText('Nicht gespeichert')).not.toBeInTheDocument();
   });
 });

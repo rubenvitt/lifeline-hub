@@ -21,6 +21,7 @@ import { AbschnittsAkkordeon, befuellteAbschnitte } from '../lageberichte/Abschn
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
@@ -119,7 +120,6 @@ function LageberichtDetail() {
       return werte;
     },
     speichern,
-    onFehler: fehler,
     onGespeichert: invalidate,
   });
 
@@ -130,7 +130,10 @@ function LageberichtDetail() {
       invalidate();
       message.success('Entwurf gespeichert');
     },
-    onError: fehler,
+    // KEIN Toast am Speicherpfad (LFH-494, Fortschreibung von C10/H14): der Grund gehört
+    // in denselben Zustand wie der des Autosave, sonst zeigte die Seite zwei Wahrheiten —
+    // einen stehenden Alert und einen Toast, der nach drei Sekunden geht.
+    onError: schutz.meldeSpeicherfehler,
   });
 
   const freigebenMutation = useMutation({
@@ -192,6 +195,10 @@ function LageberichtDetail() {
         try {
           await speichern(werte);
         } catch (e) {
+          // Hier BEIDES (LFH-494): der Alert liegt auf der Seite HINTER dem offenen Dialog
+          // (`throw e` lässt ihn stehen) — ohne den Toast bliebe der Grund unsichtbar, bis
+          // jemand abbricht. Der Alert ist der, der die drei Sekunden überlebt.
+          schutz.meldeSpeicherfehler(e);
           fehler(e);
           throw e; // Dialog offen lassen, Freigabe nicht auslösen.
         }
@@ -271,6 +278,17 @@ function LageberichtDetail() {
           )}
         </Space>
       </Flex>
+
+      {/*
+        Der Grund eines gescheiterten Speicherns (LFH-494) — der Zwilling in
+        `BefehlDetailPage`. `lagebericht-no-print`, weil ein „Nicht gespeichert"-Banner im
+        ausgedruckten Bericht eine Aussage mit Aussenwirkung wäre, die den Druck nicht betrifft.
+      */}
+      {schutz.speicherFehler != null && (
+        <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
+          <SpeicherFehler fehler={schutz.speicherFehler} />
+        </div>
+      )}
 
       {/* Im Entwurf trägt das Picker-Feld den Zeitstand — eine zweite Anzeige daneben zeigte
           zwei Uhrzeiten für denselben Wert. Der Lesezweig rendert seit LFH-350 (F2/H60) über
