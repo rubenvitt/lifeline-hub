@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { Routes, Route } from 'react-router';
 import { renderMitProviders } from '../test/utils';
-import Verdichtungszeile from './Verdichtungszeile';
+import Verdichtungszeile, { verdichtungsLinkStil } from './Verdichtungszeile';
+import { dichten } from '../theme/tokens';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -116,5 +117,56 @@ describe('Verdichtungszeile', () => {
     // verschöbe die Tabelle darunter bei jedem Laden (Prüflisten-Kriterium 12, CLS).
     const { container } = setup();
     expect(container.textContent).toBe('');
+  });
+});
+
+/**
+ * Der Link als Bedienziel auf der Dichte-Staffel (LFH-515, Nachzug zu LFH-338 · C3,
+ * Kriterium 2).
+ *
+ * WARUM HIER NUR DER INLINE-STIL UND KEIN PIXEL: `test/utils.tsx` rendert ein NACKTES
+ * `ConfigProvider` ohne unser Theme, und jsdom rechnet ohnehin kein Layout — eine
+ * Höhenbehauptung hier maß antd-Vorgaben und belegte nichts. Die Pixel misst
+ * `e2e/gate3-trefflaeche.spec.ts` (15 / 16 / 16 px vor dem Fix, gemessen im Browser);
+ * hier steht, dass die Höhe aus dem Token kommt und über die Stufen MITZIEHT.
+ */
+describe('Kräfteübersicht-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    paddingSM: dichten[stufe].abstand.sm,
+  });
+
+  // Die Böden als Literale, nicht aus dem Token zurückgelesen — sonst prüfte der Test den
+  // Token gegen sich selbst (LFH-365).
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(verdichtungsLinkStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(verdichtungsLinkStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(verdichtungsLinkStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {
+    const hoehen = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
+      (s) => verdichtungsLinkStil(tokenFuer(s)).minHeight,
+    );
+    expect(hoehen[0]).toBeLessThan(hoehen[1]);
+    expect(hoehen[1]).toBeLessThan(hoehen[2]);
+  });
+
+  /**
+   * ZWEI Angaben, nicht eine (LFH-365) — und die Polsterung zieht mit. Anders als am
+   * Kartentitel (`kartenTitelStil`) liegt sie auf BEIDEN Achsen: dort polstert der
+   * Kartenkopf waagerecht, hier polstert niemand sonst.
+   */
+  it('trägt neben der Höhe eine mitziehende Polsterung auf beiden Achsen', () => {
+    expect(verdichtungsLinkStil(tokenFuer('kompakt')).padding).toBe('7px');
+    expect(verdichtungsLinkStil(tokenFuer('handschuh')).padding).toBe('16px');
+  });
+
+  /**
+   * `inline-flex`, nicht `flex`: der Link ist ein Glied einer waagerechten `Space`-Zeile.
+   * Ein `flex` risse ihn auf die volle Zeilenbreite und schöbe die Zahlen davor um.
+   */
+  it('bleibt ein Inline-Glied der Zeile', () => {
+    expect(verdichtungsLinkStil(tokenFuer('kompakt')).display).toBe('inline-flex');
   });
 });
