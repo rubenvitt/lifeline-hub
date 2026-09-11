@@ -1,3 +1,17 @@
+## [1.0.0-alpha.4](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.3...v1.0.0-alpha.4) (2026-09-11)
+
+### Features
+
+* **entwurf:** Einstiegsfokus in den ersten leeren Abschnitt (LFH-495) ([8e13b95](https://github.com/rubenvitt/lifeline-hub/commit/8e13b95ced2d51dc3b0bd537a95b6744c35eaaa5))
+
+### Bug Fixes
+
+* **entwurf:** ein Klick auf „Entwurf speichern" ist ein PATCH (LFH-495) ([7c0cb9e](https://github.com/rubenvitt/lifeline-hub/commit/7c0cb9e0d7979a1543e3ff06fa944d24227683e4))
+
+### Performance Improvements
+
+* **lagebericht:** Tippkaskade des Entwurfs unterbinden, gemessen (LFH-495) ([f8c30da](https://github.com/rubenvitt/lifeline-hub/commit/f8c30dad287f858b6dc4ad788ea5d5548c47223d))
+
 ## [1.0.0-alpha.3](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.2...v1.0.0-alpha.3) (2026-09-11)
 
 ### Features
