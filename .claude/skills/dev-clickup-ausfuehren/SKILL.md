@@ -53,6 +53,14 @@ Task unklar oder mehrdeutig → kurz beim User rückfragen, nicht raten.
 
 ## Schritt 2: Workspace prüfen (Branch / Worktree)
 
+**Integrationsbasis ist `alpha`, nicht `main`.** Ein Feature-Branch wird von
+`origin/alpha` abgezweigt, dorthin gemergt und dorthin rebased, wenn der Branch
+zurückfällt. `main` ist die Release-Linie und wird von diesem Skill nie als Basis
+genommen — auch dann nicht, wenn `origin/HEAD` weiter auf `main` zeigt und ein
+Worktree-Helfer deshalb von dort abzweigt. Nach einem `EnterWorktree` deshalb
+**prüfen**, worauf der Branch zeigt (`git rev-list --left-right --count HEAD...origin/alpha`),
+und bei Bedarf auf `origin/alpha` umsetzen, bevor die erste Zeile Code entsteht.
+
 Branch-Name bilden: **`<typ>/<custom_id>-<slug>`**, custom_id klein, Slug aus dem
 Task-Namen (ASCII, kebab-case, Umlaute auflösen, 3–5 Wörter).
 Beispiel: `feat/lh-42-personal-status`.
@@ -61,12 +69,12 @@ Beispiel: `feat/lh-42-personal-status`.
 
 | Aktueller Branch | Gilt als passend? | Aktion |
 |---|---|---|
-| `main` / `master` | Nein | **User fragen**, dann Worktree |
+| `alpha` / `main` / `master` | Nein | **User fragen**, dann Worktree |
 | Generisch (`dev`, `wip`, `test`) oder erkennbar zu **anderer** Task | Nein | **User fragen**, dann Worktree |
-| Gehört erkennbar zu **dieser** Task (ID oder Thema passt) | Ja | Hier weiterarbeiten |
+| Gehört erkennbar zu **dieser** Task (ID oder Thema passt) | Ja | Hier weiterarbeiten (Basis gegen `origin/alpha` prüfen, s. o.) |
 
 **Wenn nicht passend:** dem User die Lage und den vorgeschlagenen Branch nennen und
-explizit fragen, z.B.: *„Wir sind auf `main`. Für LH-42 schlage ich
+explizit fragen, z.B.: *„Wir sind auf `alpha`. Für LH-42 schlage ich
 `feat/lh-42-personal-status` in einem isolierten Worktree vor — anlegen?"*
 Bei Zustimmung → **REQUIRED SUB-SKILL:** `superpowers:using-git-worktrees` (mit diesem
 Branch-Namen). Der Skill erledigt Detection, natives `EnterWorktree`, Setup und Baseline.
@@ -91,8 +99,9 @@ Start in den jeweiligen **Board-Status** wechseln (raus aus `backlog`):
 - **`superpowers:requesting-code-review`** vor dem Mergen → **Status: `in review`** (läuft
   danach noch eine Abnahme-/Testrunde → `testing`)
 - Commits/PR auf die `custom_id` referenzieren (z.B. `LH-42` im Body)
-- Integration → **`superpowers:finishing-a-development-branch`** → nach erfolgreichem Merge
-  **Status: `shipped`**; ist damit nichts mehr offen → `done`
+- Integration → **`superpowers:finishing-a-development-branch`**, **Ziel `alpha`** (PR-Base
+  `alpha`, nicht `main`) → nach erfolgreichem Merge **Status: `shipped`**; ist damit nichts
+  mehr offen → `done`
 - Wird der Task verworfen statt umgesetzt → **Status: `cancelled`**
 - Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
   Board-Status.

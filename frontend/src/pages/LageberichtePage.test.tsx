@@ -88,10 +88,29 @@ const lagebericht7Abschnitte: LageberichtAnzeige = {
 };
 
 function setupDetail(lb: LageberichtAnzeige) {
+  let stand = lb;
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get(`/api/einsaetze/7/lageberichte/${lb.id}`, () => HttpResponse.json(lb)),
+    http.get(`/api/einsaetze/7/lageberichte/${lb.id}`, () => HttpResponse.json(stand)),
+    /*
+     * Erfolgreicher PATCH als Grundrauschen: mehrere dieser Tests tippen und verlassen ein
+     * Feld, was den Blur-Autosave auslöst. Ohne Handler scheitert der Request, und seit
+     * LFH-494 steht der Grund dann als sichtbares „Nicht gespeichert" in der Seite statt in
+     * einem Toast — Rauschen, das eine spätere Fehlersuche kostet. Wer einen FEHLSCHLAG
+     * braucht, nimmt `setupLebend` bzw. einen eigenen Handler.
+     *
+     * Der Handler SPIEGELT den Body und gibt nicht `lb` zurück — das ist gemessen nötig:
+     * nach erfolgreichem Autosave fällt der Merker, und der auf die Invalidierung folgende
+     * Refetch schreibt den Serverstand zurück ins Formular. Ein Handler, der den alten
+     * Stand liefert, modellierte einen Server, der nichts speichert, und löschte das eben
+     * Getippte wieder aus dem Feld (zwei Bestandstests dieser Datei wurden davon rot).
+     */
+    http.patch(`/api/einsaetze/7/lageberichte/${lb.id}`, async ({ request }) => {
+      const body = (await request.json()) as Partial<LageberichtAnzeige>;
+      stand = { ...stand, ...body };
+      return HttpResponse.json(stand);
+    }),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -424,7 +443,145 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
   });
 });
 
+/**
+ * ── SPEICHERFEHLER IN DER SEITE (LFH-494, Nachzug C13/N2) ──────────────────────
+ *
+ * Fortschreibung von C10/H14 auf die Entwurfsseiten. Der Grund eines gescheiterten
+ * Autosave stand ausschliesslich in einem `message.error` und war nach rund drei Sekunden
+ * weg; sichtbar blieb „ungespeicherte Änderungen" — das WAS ohne das WARUM.
+ *
+ * Beide Aussagen gehören als Paar hierher, und die zweite ist die schärfere: ein Alert, der
+ * NIE geht, ist so falsch wie einer, der zu früh geht. `.ant-message`-Abgrenzung wie in den
+ * C10-Tests — antds Toast rendert INNERHALB des RTL-Containers, ein blosses `findByText`
+ * bliebe mit zurückgedrehtem Umbau grün.
+ *
+ * Ausgelöst wird über `onBlur`, nicht über die 30-s-Frist: die Frist steht im Hook-Test
+ * (`entwurf/useEntwurfVerlustschutz.test.tsx`), und Fake-Timer vertragen sich nicht mit
+ * `userEvent.type`.
+ */
+describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
+  function setupMitPatch(start: LageberichtAnzeige) {
+    const zustand = { scheitert: true };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(start)),
+      http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, () =>
+        (zustand.scheitert
+          ? HttpResponse.json({ error: 'Zeitstand liegt in der Zukunft' }, { status: 422 })
+          : HttpResponse.json(start))),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: `/einsaetze/7/lageberichte/${start.id}` },
+    );
+    return zustand;
+  }
+
+  it('lässt den Grund eines gescheiterten Autosave in der Seite stehen, nicht nur im Toast', async () => {
+    setupMitPatch(lagebericht7Abschnitte);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, 'x');
+    await userEvent.tab();
+
+    const treffer = await screen.findByText('Zeitstand liegt in der Zukunft');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(screen.getByText('Nicht gespeichert')).toBeInTheDocument();
+    // Der Merker bleibt — der Grund ergänzt ihn, er ersetzt ihn nicht.
+    expect(screen.getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+  });
+
+  it('räumt den Grund beim nächsten gelungenen Speichern (Gegenaussage)', async () => {
+    const zustand = setupMitPatch(lagebericht7Abschnitte);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, 'x');
+    await userEvent.tab();
+    expect(await screen.findByText('Zeitstand liegt in der Zukunft')).toBeInTheDocument();
+
+    zustand.scheitert = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Zeitstand liegt in der Zukunft')).not.toBeInTheDocument());
+  });
+});
+
 describe('LageberichtePage', () => {
+  it('zeigt den Grund eines gescheiterten Anlegens im Dialog, nicht nur im Toast (LFH-494)', async () => {
+    // Die Erfassungs-Hülle lässt die Werte bei Ablehnung stehen (B4/LFH-332) — bis dahin
+    // aber ohne Grund: der Dialog sah nach dem Verschwinden des Toasts unverändert aus.
+    // Dieser Pfad läuft weiter über `mutation.error` und räumt beim nächsten Absenden;
+    // anders als beim Autosave drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 })),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    const treffer = await screen.findByText('Titel bereits vergeben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    // Der Dialog steht weiter offen und hat die Werte behalten.
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
+    expect((screen.getByLabelText('Titel') as HTMLInputElement).value)
+      .toMatch(/^Lageüberblick \d{4}$/);
+  });
+
+  it('ersetzt den Grund beim nächsten Absenden, statt ihn zu stapeln (Gegenaussage)', async () => {
+    /*
+     * Die zutreffende Hälfte des AK für DIESEN Pfad: hier räumt react-query beim Übergang
+     * nach `pending`, weil ein Mensch den Knopf drückt. Der Autosave der Entwurfsseiten
+     * räumt dagegen erst bei Erfolg — dort wiederholt eine Frist von selbst.
+     *
+     * Gemessen wird mit einem ZWEITEN Fehlschlag und anderem Wortlaut, nicht mit einem
+     * Erfolg: antds Modal räumt sein DOM erst nach der Schliess-Transition (`afterClose`),
+     * und die läuft in jsdom nie — der alte Knoten stünde nach dem Schliessen weiterhin im
+     * Dokument, und die Abwesenheits-Zusicherung wäre unfälschbar rot. Mit offenem Dialog
+     * misst der Fall genau das, was er behauptet: der Grund wird ERSETZT.
+     */
+    let zweiter = false;
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', () => HttpResponse.json(
+        { error: zweiter ? 'Vorlage unbekannt' : 'Titel bereits vergeben' },
+        { status: 409 },
+      )),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Titel bereits vergeben')).toBeInTheDocument();
+
+    zweiter = true;
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Vorlage unbekannt')).toBeInTheDocument();
+    expect(screen.queryByText('Titel bereits vergeben')).not.toBeInTheDocument();
+  });
+
+  it('trägt beim erneuten Öffnen keinen Grund aus dem vorigen Versuch', async () => {
+    // Derselbe Store-überlebt-das-Schliessen-Fall wie beim Titelvorschlag: ohne `reset()`
+    // stünde der Fehler des letzten Anlegeversuchs über einem frischen, leeren Formular.
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 })),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Titel bereits vergeben')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    expect(screen.queryByText('Titel bereits vergeben')).not.toBeInTheDocument();
+  });
+
   it('zeigt die Berichte des Einsatzes', async () => {
     setup();
     expect(await screen.findByText('Lage 10:00')).toBeInTheDocument();

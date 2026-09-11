@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, DatePicker, Flex, Form, Input, Spin, Typography } from 'antd';
+import { Breadcrumb, Button, DatePicker, Flex, Form, Input, Spin, Typography, theme } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Select } from '../components/Select';
@@ -9,7 +9,6 @@ import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte } from '../api/lageberichte';
 import type { LageberichtVorlageKey } from '../api/types';
@@ -17,6 +16,7 @@ import { VORLAGEN } from '../lageberichte/vorlagen';
 import { kettenKoepfe, type KettenKopf } from '../lageberichte/ketten';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import Datenstand from '../components/Datenstand';
 import { alsBackendZeit } from '../etb/filterZeit';
@@ -138,23 +138,11 @@ export default function LageberichtePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
-  const { message } = App.useApp();
   const qc = useQueryClient();
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [form] = Form.useForm<AnlegenWerte>();
+  const { token } = theme.useToken();
   const spalten = useMemo(() => lageberichtSpalten(einsatzId), [einsatzId]);
-  /**
-   * Der Titelvorschlag wird BEIM ÖFFNEN in den Formularspeicher geschrieben — nicht über
-   * `initialValues`. Gemessen (Review LFH-348): der Speicher von rc-field-form überlebt das
-   * Abhängen der Kinder (`destroyOnHidden`), und beim nächsten Einhängen gewinnt der alte
-   * Store gegen neue `initialValues` (`useForm.js`: `merge(initialValues, store)`). Ein
-   * zweites Öffnen um 14:15 zeigte sonst „Lageüberblick 1030" — in einer Kette, in der die
-   * Uhrzeit im Titel der Ordnungsschlüssel ist, eine falsche Angabe in einer Führungsunterlage.
-   * Dieselbe Falle beschreibt `components/Erfassung.tsx` am `ErfassungsModal`.
-   */
-  useEffect(() => {
-    if (anlegenOffen) form.setFieldsValue({ titel: titelVorschlag(dayjs()) });
-  }, [anlegenOffen, form]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -166,8 +154,6 @@ export default function LageberichtePage() {
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const anlegenMutation = useMutation({
     mutationFn: (w: AnlegenWerte) =>
@@ -178,8 +164,30 @@ export default function LageberichtePage() {
         ...(w.zeitstand ? { zeitstand: alsBackendZeit(w.zeitstand) } : {}),
       }),
     onSuccess: invalidate,
-    onError: fehler,
+    // KEIN Toast (LFH-494): der Grund steht im Dialog. Die Erfassungs-Hülle lässt die Werte
+    // bei Ablehnung stehen (B4/LFH-332) — bis dahin aber ohne Grund, der Dialog sah nach dem
+    // Verschwinden des Toasts unverändert aus. Hier bleibt es bei `mutation.error` mit
+    // react-querys Räumen beim Absenden: anders als beim Autosave der Entwurfsseiten
+    // (`useEntwurfVerlustschutz`) drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
   });
+
+  /**
+   * Der Titelvorschlag wird BEIM ÖFFNEN in den Formularspeicher geschrieben — nicht über
+   * `initialValues`. Gemessen (Review LFH-348): der Speicher von rc-field-form überlebt das
+   * Abhängen der Kinder (`destroyOnHidden`), und beim nächsten Einhängen gewinnt der alte
+   * Store gegen neue `initialValues` (`useForm.js`: `merge(initialValues, store)`). Ein
+   * zweites Öffnen um 14:15 zeigte sonst „Lageüberblick 1030" — in einer Kette, in der die
+   * Uhrzeit im Titel der Ordnungsschlüssel ist, eine falsche Angabe in einer Führungsunterlage.
+   * Dieselbe Falle beschreibt `components/Erfassung.tsx` am `ErfassungsModal`.
+   *
+   * Der Vorschlag braucht den EFFEKT (der Formularspeicher steht erst nach dem Einhängen);
+   * das Räumen des letzten Fehlers braucht ihn NICHT und liegt deshalb im Öffnen-Handler
+   * (LFH-494). Ein Effekt läuft nach dem Paint — der abgelehnte Versuch von vorhin stünde
+   * sonst ein Bild lang über einem frisch vorbelegten Formular.
+   */
+  useEffect(() => {
+    if (anlegenOffen) form.setFieldsValue({ titel: titelVorschlag(dayjs()) });
+  }, [anlegenOffen, form]);
 
   if (einsatzQuery.isLoading) {
     return (
@@ -231,7 +239,7 @@ export default function LageberichtePage() {
             type="primary"
             icon={<PlusOutlined />}
             aria-label="Neuer Bericht"
-            onClick={() => setAnlegenOffen(true)}
+            onClick={() => { anlegenMutation.reset(); setAnlegenOffen(true); }}
           >
             Neuer Bericht
           </Button>
@@ -278,6 +286,14 @@ export default function LageberichtePage() {
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
+        {/* Der Grund der Ablehnung steht ÜBER den Feldern, deren Werte stehen geblieben
+            sind — sonst ist der unveränderte Dialog von „nichts passiert" nicht zu
+            unterscheiden (LFH-494). */}
+        {anlegenMutation.error != null && (
+          <div style={{ marginBottom: token.marginSM }}>
+            <SpeicherFehler fehler={anlegenMutation.error} titel="Nicht angelegt" />
+          </div>
+        )}
         <Form.Item label="Titel" name="titel" rules={[{ required: true, message: 'Titel erforderlich' }]}>
           <Input placeholder="z. B. Lageüberblick 1030" />
         </Form.Item>

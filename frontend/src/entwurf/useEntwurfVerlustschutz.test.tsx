@@ -18,7 +18,6 @@ function Traeger({ daten, speichern }: { daten: Daten; speichern: (w: Daten) => 
     form,
     werteAus: (d) => ({ titel: d.titel }),
     speichern,
-    onFehler: () => {},
   });
   return (
     <Form form={form} onValuesChange={schutz.markiereGeaendert} onBlur={schutz.autosaveJetzt}>
@@ -27,6 +26,7 @@ function Traeger({ daten, speichern }: { daten: Daten; speichern: (w: Daten) => 
       </Form.Item>
       <output>{schutz.ungespeichert ? 'offen' : 'sauber'}</output>
       {schutz.zuletztGespeichert && <p>zuletzt gespeichert {schutz.zuletztGespeichert}</p>}
+      {schutz.speicherFehler != null && <p>Grund: {(schutz.speicherFehler as Error).message}</p>}
     </Form>
   );
 }
@@ -102,26 +102,122 @@ describe('useEntwurfVerlustschutz', () => {
     expect(screen.getByText(/zuletzt gespeichert/)).toBeInTheDocument();
   });
 
-  it('meldet einen gescheiterten Autosave und lässt den Merker stehen', async () => {
-    const onFehler = vi.fn();
-    const speichern = vi.fn().mockRejectedValue(new Error('503'));
-    function Kaputt() {
+  it('hält den Grund eines gescheiterten Autosave als Zustand und lässt den Merker stehen', async () => {
+    // LFH-494: der Grund war bis dahin ein `message.error`-Toast und nach ~3 s weg —
+    // sichtbar blieb nur „ungespeicherte Änderungen", also das WAS ohne das WARUM.
+    const speichern = vi.fn().mockRejectedValue(new Error('503 Dienst nicht erreichbar'));
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    expect(await screen.findByText('Grund: 503 Dienst nicht erreichbar')).toBeInTheDocument();
+    expect(screen.getByText('offen')).toBeInTheDocument();
+  });
+
+  it('räumt den Speicherfehler beim nächsten GELUNGENEN Speichern (Gegenaussage)', async () => {
+    // Ein Fehlerzustand, der nie fällt, wäre so falsch wie einer, der zu früh geht.
+    const speichern = vi.fn()
+      .mockRejectedValueOnce(new Error('503'))
+      .mockResolvedValue(undefined);
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    expect(await screen.findByText('Grund: 503')).toBeInTheDocument();
+
+    await userEvent.click(feld);
+    await userEvent.type(feld, 'b');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument());
+  });
+
+  it('lässt den Grund während des nächsten Versuchs stehen, statt ihn blinken zu lassen', async () => {
+    // Die scharfe Abgrenzung zu react-querys `pending`-Semantik (C10): dort räumt der
+    // Übergang nach `pending`. Hier wiederholt eine 30-s-Frist von selbst — beim Start zu
+    // räumen liesse den Alert bei stehendem 503 im Takt verschwinden und wiederkommen
+    // („Kein Blinken auf lesbarem Text", CLAUDE.md).
+    let haengenAufloesen: () => void = () => {};
+    const speichern = vi.fn()
+      .mockRejectedValueOnce(new Error('503'))
+      .mockImplementationOnce(() => new Promise<void>((r) => { haengenAufloesen = r; }));
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    expect(await screen.findByText('Grund: 503')).toBeInTheDocument();
+
+    await userEvent.click(feld);
+    await userEvent.type(feld, 'b');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    // Der zweite Versuch ist unterwegs und noch nicht gelungen.
+    expect(screen.getByText('Grund: 503')).toBeInTheDocument();
+    await act(async () => { haengenAufloesen(); });
+    await waitFor(() => expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument());
+  });
+
+  it('räumt den Grund auch, wenn während des gelungenen Speicherns weitergetippt wurde', async () => {
+    // Die Quittungs-Closure hat ZWEI Zweige: nur der unveränderte quittiert vollständig.
+    // Der Server hat aber in BEIDEN erfolgreich gespeichert — räumte nur der eine, bliebe
+    // nach einem von einem Tastenanschlag überholten Speichern ein veralteter Grund stehen.
+    let haengenAufloesen: () => void = () => {};
+    const speichern = vi.fn()
+      .mockRejectedValueOnce(new Error('503'))
+      .mockImplementationOnce(() => new Promise<void>((r) => { haengenAufloesen = r; }));
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    expect(await screen.findByText('Grund: 503')).toBeInTheDocument();
+
+    await userEvent.click(feld);
+    await userEvent.type(feld, 'b');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    await userEvent.type(feld, 'c'); // S2 entsteht, während S1 unterwegs ist
+    await act(async () => { haengenAufloesen(); });
+    await waitFor(() => expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument());
+    // Der Merker bleibt trotzdem stehen — das Verlustfenster ist unverändert zugehalten.
+    expect(screen.getByText('offen')).toBeInTheDocument();
+  });
+
+  it('behandelt einen abgebrochenen Auftrag NICHT als Speicherfehler', async () => {
+    // `BefehlDetailPage` bricht die Speicherfolge beim Verlassen des Editors mit einem
+    // `AbortError` ab (`aktiv.current`). Das ist kein Zustand, den jemand lesen soll.
+    const speichern = vi.fn().mockRejectedValue(new DOMException('Editor verlassen', 'AbortError'));
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument();
+  });
+
+  it('nimmt einen Speicherfehler von aussen an und räumt ihn beim Quittieren', async () => {
+    // Der explizite „Entwurf speichern"-Knopf und der Freigabe-Flow laufen NICHT durch den
+    // Autosave-Zweig — sie melden über `meldeSpeicherfehler` in denselben Zustand, damit
+    // die Seite nicht zwei Fehlerquellen nebeneinander zeigt.
+    function Aussen() {
       const [form] = Form.useForm<Daten>();
       const schutz = useEntwurfVerlustschutz<Daten, Daten>({
-        daten: { titel: 'S' }, istEntwurf: true, form, werteAus: (d) => d, speichern, onFehler,
+        daten: { titel: 'S' }, istEntwurf: true, form, werteAus: (d) => d,
+        speichern: () => Promise.resolve(),
       });
       return (
-        <Form form={form} onValuesChange={schutz.markiereGeaendert} onBlur={schutz.autosaveJetzt}>
-          <Form.Item label="Titel" name="titel"><Input /></Form.Item>
-          <output>{schutz.ungespeichert ? 'offen' : 'sauber'}</output>
+        <Form form={form}>
+          <button type="button" onClick={() => schutz.meldeSpeicherfehler(new Error('422 Titel fehlt'))}>
+            melden
+          </button>
+          <button type="button" onClick={schutz.quittiereGespeichert}>quittieren</button>
+          {schutz.speicherFehler != null && <p>Grund: {(schutz.speicherFehler as Error).message}</p>}
         </Form>
       );
     }
-    render(<Kaputt />);
-    await userEvent.type(screen.getByLabelText('Titel'), 'x');
-    await userEvent.tab();
-    await waitFor(() => expect(onFehler).toHaveBeenCalledTimes(1));
-    expect(screen.getByText('offen')).toBeInTheDocument();
+    render(<Aussen />);
+    await userEvent.click(screen.getByText('melden'));
+    expect(await screen.findByText('Grund: 422 Titel fehlt')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('quittieren'));
+    await waitFor(() => expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument());
   });
 
   it('speichert nichts, wenn nichts berührt wurde — auch nicht beim Verlassen', async () => {

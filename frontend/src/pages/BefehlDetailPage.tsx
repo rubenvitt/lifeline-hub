@@ -19,6 +19,7 @@ import { vorlage } from '../befehle/vorlagen';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useViewport } from '../components/useViewport';
@@ -161,7 +162,6 @@ function BefehlDetail() {
       return werte;
     },
     speichern,
-    onFehler: fehler,
     onGespeichert: invalidate,
   });
 
@@ -176,7 +176,10 @@ function BefehlDetail() {
       invalidate();
       message.success('Entwurf gespeichert');
     },
-    onError: fehler,
+    // KEIN Toast am Speicherpfad (LFH-494, Fortschreibung von C10/H14): der Grund gehört
+    // in denselben Zustand wie der des Autosave, sonst zeigte die Seite zwei Wahrheiten —
+    // einen stehenden Alert und einen Toast, der nach drei Sekunden geht.
+    onError: schutz.meldeSpeicherfehler,
   });
 
   const freigebenMutation = useMutation({
@@ -239,6 +242,10 @@ function BefehlDetail() {
         try {
           await speichern(werte);
         } catch (e) {
+          // Hier BEIDES (LFH-494): der Alert liegt auf der Seite HINTER dem offenen Dialog
+          // (`throw e` lässt ihn stehen) — ohne den Toast bliebe der Grund unsichtbar, bis
+          // jemand abbricht. Der Alert ist der, der die drei Sekunden überlebt.
+          schutz.meldeSpeicherfehler(e);
           fehler(e);
           throw e; // Dialog offen lassen, Freigabe nicht auslösen.
         }
@@ -312,6 +319,9 @@ function BefehlDetail() {
       <EntwurfNavigationSchutz
         ungespeichert={schutz.ungespeichert && istEntwurf && darfSchreiben}
         speichert={schutz.autosaveLaeuft || speichernMutation.isPending}
+        // Der Grund gehört IN den Dialog: hinter seiner Maske ist die Seite unbedienbar,
+        // der Alert bei `data-lfh`-Kopf wäre dort unsichtbar (LFH-494, Review-Befund).
+        speicherFehler={schutz.speicherFehler}
         speichern={async () => {
           try {
             await form.validateFields();
@@ -368,6 +378,19 @@ function BefehlDetail() {
         </div>
         {!verankert && aktionen}
       </Flex>
+
+      {/*
+        Der Grund eines gescheiterten Speicherns — nicht im `aktionen`-Block (LFH-494):
+        der wandert je Breite zwischen Kopf und verankerter Leiste, der Alert soll aber in
+        jeder Breite an derselben Stelle über dem Inhalt stehen. `befehl-no-print`, weil ein
+        „Nicht gespeichert"-Banner im ausgedruckten Befehl eine Aussage mit Aussenwirkung
+        wäre, die den Druck nicht betrifft.
+      */}
+      {schutz.speicherFehler != null && (
+        <div className="befehl-no-print" style={{ marginBottom: token.marginSM }}>
+          <SpeicherFehler fehler={schutz.speicherFehler} />
+        </div>
+      )}
 
       {/* Taktische DTG in der Anzeigezone (LFH-350 · H60): `zeitstand` ist ein UTC-Wirestring
           ohne Zonenkennung und stand roh ausgegeben um den Zonenversatz falsch. */}

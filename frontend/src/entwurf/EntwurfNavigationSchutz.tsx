@@ -1,15 +1,33 @@
 import { Button, Flex, Modal, theme } from 'antd';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 
 interface Props {
   ungespeichert: boolean;
   speichert: boolean;
   speichern: () => Promise<void>;
+  /** Grund eines gescheiterten „Speichern und weiter" — `schutz.speicherFehler` (LFH-494). */
+  speicherFehler?: unknown;
 }
 
-/** LFH-462: Navigation und Autosave teilen denselben Verlustschutz-Merker. */
-export default function EntwurfNavigationSchutz({ ungespeichert, speichert, speichern }: Props) {
+/**
+ * LFH-462: Navigation und Autosave teilen denselben Verlustschutz-Merker.
+ *
+ * **DER GRUND STEHT IM DIALOG, NICHT DAHINTER (LFH-494).** Der Modal trägt
+ * `mask={{ closable: false }}` — alles hinter ihm ist abgedunkelt und unbedienbar. Solange
+ * der Speicherfehler über `message.error` lief, war das der einzige Kanal, der über einem
+ * offenen Modal funktioniert; beim Umbau auf den Seiten-Alert wäre genau diese Stelle ohne
+ * jede Rückmeldung geblieben: `loading` fällt, der Dialog steht unverändert da. Das ist die
+ * H14-Diagnose, die LFH-494 schliesst, an einem Pfad wieder aufgemacht.
+ *
+ * Anders als der Freigabe-Flow der Seite kann diese Stelle nicht „beides" melden:
+ * `autosaveJetzt()` liefert `void`, es gibt nichts zum Awaiten — der Zustand ist der
+ * einzige Weg, und er muss deshalb hier hereingereicht werden.
+ */
+export default function EntwurfNavigationSchutz({
+  ungespeichert, speichert, speichern, speicherFehler,
+}: Props) {
   const { token } = theme.useToken();
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
     ungespeichert && currentLocation.pathname !== nextLocation.pathname,
@@ -47,7 +65,10 @@ export default function EntwurfNavigationSchutz({ ungespeichert, speichert, spei
         </Flex>
       }
     >
-      Noch nicht gespeicherte Änderungen gehen beim Verlassen verloren.
+      <Flex vertical gap={token.marginSM}>
+        <span>Noch nicht gespeicherte Änderungen gehen beim Verlassen verloren.</span>
+        <SpeicherFehler fehler={speicherFehler} />
+      </Flex>
     </Modal>
   );
 }
