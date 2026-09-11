@@ -191,6 +191,14 @@ jobs:
     strategy:
       # Ohne fail-fast: ein roter Shard darf den anderen drei nicht die Diagnose nehmen.
       fail-fast: false
+      # ACHTUNG, DIE SHARD-ZAHL IST EIN PIN (LFH-528): der gerenderte Jobname
+      # ("{name} 1/4" … "4/4") steht als Required Status Check im Ruleset
+      # "Kanal-Branches (alpha/beta/main)". Wer die Zahl hier ändert, ändert die
+      # Check-NAMEN — die alten reporten dann nie mehr, und jeder Pull Request hängt
+      # still auf "Expected". Kein roter Lauf, keine Meldung, nur ein PR, der nicht
+      # mergebar wird. Die Zahl ändert man deshalb NUR zusammen mit der Checkliste in
+      # `gh api repos/:owner/:repo/rulesets/17017911`. Der oben diskutierte Vergleich
+      # 4 gegen 6 Shards ist damit nicht erledigt, aber er kostet zwei Schritte.
       matrix:
         shard: [1, 2, 3, 4]
     steps:
@@ -234,6 +242,14 @@ jobs:
     timeout-minutes: 40
     strategy:
       fail-fast: false
+      # ACHTUNG, DIE SHARD-ZAHL IST EIN PIN (LFH-528): der gerenderte Jobname
+      # ("{name} 1/4" … "4/4") steht als Required Status Check im Ruleset
+      # "Kanal-Branches (alpha/beta/main)". Wer die Zahl hier ändert, ändert die
+      # Check-NAMEN — die alten reporten dann nie mehr, und jeder Pull Request hängt
+      # still auf "Expected". Kein roter Lauf, keine Meldung, nur ein PR, der nicht
+      # mergebar wird. Die Zahl ändert man deshalb NUR zusammen mit der Checkliste in
+      # `gh api repos/:owner/:repo/rulesets/17017911`. Der oben diskutierte Vergleich
+      # 4 gegen 6 Shards ist damit nicht erledigt, aber er kostet zwei Schritte.
       matrix:
         shard: [1, 2, 3, 4]
     steps:
