@@ -85,24 +85,77 @@ echo "==> SBOM erzeugen (LFH-253/G01)"
 # Neben dem Binary, nicht neben dem Host-Build: mit --target liegt die Ausgabe eine Ebene
 # tiefer. Stünde hier weiter $TARGET_DIR/release, schriebe der Cross-Build sein SBOM an eine
 # Stelle, an der es niemand sucht — und der Einsammelschritt in .github/workflows/artefakte.yml
-# überspränge es STILL (er prüft mit `if [ -d … ]`), das Release käme ohne Stückliste heraus.
+# fände nichts vor. Der prüft seit LFH-527 auf INHALT statt auf das bloße Vorhandensein des
+# Verzeichnisses; die frühere `[ -d … ]`-Zeile ließ ein leeres SBOM still durchgehen.
+# BEIDE WERKZEUGAUFRUFE UNTEN SIND TOLERANT, BEWERTET WIRD AM GUARD.
+# Das sieht aus wie das `|| true`, das der Cargo-Zweig gerade LOSGEWORDEN ist, ist aber das
+# Gegenteil: dort verschluckte es einen Fehlschlag, ohne dass irgendwer danach nachsah. Hier
+# folgt unmittelbar eine Prüfung auf die erzeugte Datei, und sie ist die einzige Instanz, die
+# über vollständig/unvollständig entscheidet.
+# Ohne die Toleranz räumt `set -e` den ganzen Build ab, sobald ein Werkzeug zwar im PATH liegt,
+# aber nicht läuft (gemessen mit einem mise-Shim ohne gesetzte Version). Genau der Fall, den
+# der else-Zweig auffangen soll — nur dass `command -v` ihn nicht sieht, weil die Datei ja da
+# ist. Ein lokaler Build sähe dann statt einer Warnung einen Abbruch.
+# Die Fehlerausgabe der Werkzeuge bleibt sichtbar (nur stdout geht nach /dev/null): der Guard
+# nennt WAS fehlt, die Werkzeugmeldung darüber WARUM.
 SBOM_DIR="$AUSGABE_DIR/sbom"
+# ERST LEEREN, DANN FÜLLEN — wie beim Embed-Inhalt oben, und aus demselben Grund.
+# Gemessen bei der Mutationsprobe zu LFH-527: mit bloßem `mkdir -p` überleben die Dateien
+# des vorigen Laufs. Der Inhalts-Guard unten sieht sie, wird grün — und das Zip trägt eine
+# Stückliste, die zu einem ANDEREN Stand gehört als das ausgelieferte Binary. Genau die
+# Aussage, für die ein SBOM im Advisory-Fall existiert, wäre dann falsch. Auf einem frischen
+# CI-Runner fällt das nie auf; lokal ist es der Normalfall.
+rm -rf "$SBOM_DIR"
 mkdir -p "$SBOM_DIR"
 sbom_fehlend=()
 
 if command -v cargo-cyclonedx >/dev/null 2>&1; then
-  cargo cyclonedx --format json --all >/dev/null
+  cargo cyclonedx --format json --all >/dev/null || true
   # cargo-cyclonedx legt die Dateien neben den Manifesten ab — einsammeln.
-  find . -name 'bom.json' -not -path './target/*' -exec mv {} "$SBOM_DIR"/ \; 2>/dev/null || true
+  #
+  # DAS MUSTER IST `*.cdx.json`, NICHT `bom.json`. Gemessen an 0.5.7 (der Version, die
+  # artefakte.yml pinnt): das Werkzeug benennt seine Ausgabe nach dem Crate und legt bei
+  # `--all` je Workspace-Member eine Datei an — `lifeline-hub.cdx.json`,
+  # `karten-katalog.cdx.json`, `karten-service.cdx.json`. Der frühere `find` auf `bom.json`
+  # fand deshalb NICHTS, und zwar ohne Fehler und ohne roten Build: `cargo cyclonedx` endet
+  # mit 0, `find` ohne Treffer ebenso, und `|| true` hätte auch einen echten Fehlschlag
+  # verschluckt. Im Release v1.0.0-alpha.2 lag statt der Stückliste nur die SQLite-Version
+  # im Zip (Lauf 34513044748).
+  #
+  # Kein `2>/dev/null || true` mehr: ein fehlschlagendes `mv` soll auffallen. Und
+  # `node_modules` ist ausgeschlossen — ein Paket, das seine eigene Stammliste mitliefert,
+  # hätte sonst eine fremde Datei in unsere Stückliste geschoben.
+  find . -name '*.cdx.json' \
+    -not -path './target/*' \
+    -not -path './frontend/node_modules/*' \
+    -exec mv {} "$SBOM_DIR"/ \;
+  # Das Werkzeug lief — lieferte es auch? Begründung beim Guard unten.
+  [ -n "$(find "$SBOM_DIR" -name '*.cdx.json' -print -quit)" ] \
+    || sbom_fehlend+=("Cargo-Stückliste: cargo-cyclonedx lief, legte aber keine *.cdx.json ab")
 else
   sbom_fehlend+=("cargo-cyclonedx  →  cargo install cargo-cyclonedx")
 fi
 
-if mise exec pnpm@11.10.0 -- pnpm -C frontend exec cyclonedx-npm --version >/dev/null 2>&1; then
-  mise exec pnpm@11.10.0 -- pnpm -C frontend exec cyclonedx-npm \
-    --output-file "$SBOM_DIR/bom-frontend.json"
+# cdxgen, NICHT @cyclonedx/cyclonedx-npm — gemessen, nicht Geschmack (LFH-527).
+# Der frühere Zweig hier verlangte `cyclonedx-npm`, und dessen Remediation-Zeile schickte
+# jeden Leser in eine Sackgasse: das Werkzeug ermittelt den Abhängigkeitsbaum über `npm ls`
+# und bricht in einem pnpm-Baum mit „missing: …, required by …" ab, ohne eine Datei zu
+# schreiben. Es war also nie bloß nicht installiert — es hätte hier auch installiert nichts
+# geliefert. cdxgen liest `pnpm-lock.yaml` und kennt den Paketmanager (`-t pnpm`).
+#
+# MIT PFADARGUMENT, OHNE `cd`: der Kopf dieses Skripts setzt mit `cd "$(dirname "$0")/.."`
+# den Bezugspunkt, an dem jeder Pfad darunter hängt (`frontend/dist`, das `find .` oben).
+# Ein `cd frontend` hier verschöbe ihn für alles Folgende.
+#
+# `--no-recurse`: gefragt ist die Stückliste DIESES Pakets samt seiner transitiven
+# Abhängigkeiten (gemessen 848 Komponenten, CycloneDX 1.6) — nicht ein Streifzug durch
+# verschachtelte Projekte unterhalb von frontend/, der die Ausgabe mit Fremdbäumen füllte.
+if command -v cdxgen >/dev/null 2>&1; then
+  cdxgen -t pnpm --no-recurse -o "$SBOM_DIR/bom-frontend.json" frontend >/dev/null || true
+  [ -s "$SBOM_DIR/bom-frontend.json" ] \
+    || sbom_fehlend+=("Frontend-Stückliste: cdxgen lief, schrieb aber keine bom-frontend.json")
 else
-  sbom_fehlend+=("@cyclonedx/cyclonedx-npm  →  pnpm -C frontend add -D @cyclonedx/cyclonedx-npm")
+  sbom_fehlend+=("@cyclonedx/cdxgen  →  npm install -g @cyclonedx/cdxgen")
 fi
 
 # Die eingebackene SQLite-Version (LFH-233/G02): sie steckt als C-Amalgamation im Binary
@@ -119,11 +172,30 @@ else
   echo "    .github/workflows/artefakte.yml, Job 'windows-smoke'."
 fi
 
+# ZUSICHERUNG AUF INHALT, NICHT AUF EXISTENZ (LFH-527).
+#
+# Der frühere Aufbau konnte nicht rot werden: die fehlende Frontend-Stückliste war eine
+# bloße Warnung, der verfehlte Cargo-`find` wurde gar nicht bemerkt, und der Einsammelschritt
+# in .github/workflows/artefakte.yml prüfte danach nur `[ -d … ]` — das Verzeichnis legt
+# `mkdir -p` oben ja selbst an. Drei Prüfungen hintereinander, von denen keine den
+# tatsächlichen Mangel sehen konnte; genau so ist ein hohles SBOM-Zip ins Release gegangen.
+#
+# Hart bricht es nur mit SBOM_PFLICHT=1. Den setzt artefakte.yml für den EINEN Matrix-Eintrag,
+# der die Stückliste ausliefert. Auf den anderen drei Runnern ist cargo-cyclonedx nicht
+# installiert — dort zu brechen nähme dem Release seine Binaries für ein Artefakt, das jener
+# Lauf gar nicht beisteuert. Lokale Builds bleiben aus demselben Grund bei der Warnung: wer
+# eine Testbinary baut, soll nicht an einer fehlenden Stückliste scheitern.
 if [ ${#sbom_fehlend[@]} -gt 0 ]; then
-  echo "    WARNUNG: SBOM unvollständig, folgende Werkzeuge fehlen:" >&2
+  if [ -n "${SBOM_PFLICHT:-}" ]; then
+    echo "    FEHLER: SBOM unvollständig — dieser Lauf liefert die Stückliste aus:" >&2
+  else
+    echo "    WARNUNG: SBOM unvollständig, folgendes fehlt:" >&2
+  fi
   for w in "${sbom_fehlend[@]}"; do echo "      - $w" >&2; done
+  [ -z "${SBOM_PFLICHT:-}" ] || exit 1
 else
   echo "    SBOM: $SBOM_DIR"
+  ls -1 "$SBOM_DIR"
 fi
 
 echo "==> Fertig: $BINARY"
