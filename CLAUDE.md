@@ -663,6 +663,52 @@ Alltag wichtigsten:
   grün, während „die Meldung steht außerhalb von `.ant-message`" und „sie geht beim nächsten
   Absenden" rot wurden. Ein Test, der nicht rot werden kann, behauptet eine Deckung, die er
   nicht hat — die beiden tragenden Aussagen stehen deshalb an seiner Stelle.
+- **Ein gescheiterter Zustandsübergang meldet sich dort, wo die Person steht** (LFH-535,
+  Nachzug N5 aus LFH-348 · C13). Dieselbe H14-Diagnose wie beim Speichern, nur am
+  Übergang: schlägt `POST …/freigeben` fehl, hält antd das Bestätigungs-Modal **offen** —
+  und solange der Grund nur im Toast stand, war er nach rund drei Sekunden weg und der
+  unveränderte Dialog von „nichts passiert" nicht zu unterscheiden. Der Seiten-Alert taugt
+  hier **nicht**: der Dialog trägt `mask={{ closable: false }}`, alles dahinter ist
+  abgedunkelt. Der Grund steht deshalb **IM Dialog**, Bauform `EntwurfNavigationSchutz`
+  (LFH-494).
+  **Träger ist `entwurf/FreigabeDialog.tsx`, eine geteilte Komponente — nicht zwei
+  Copy-Paste-Dialoge**: die Entscheidung gilt für beide Zwillingsseiten gemeinsam, sonst
+  entsteht wieder die Divergenz, die C13 mit dem geteilten Verlustschutz-Hook geschlossen
+  hat. Damit fällt `modal.confirm` an beiden Seiten weg, und zwar aus einem gemessenen
+  Grund: dessen `content` wird beim **Aufruf** eingefroren, ein
+  `<SpeicherFehler fehler={mutation.error}>` darin rendert nicht nach und müsste per
+  `instanz.update({ content })` von Hand nachgeschoben werden — ein zweiter
+  Anzeigemechanismus neben dem, den LFH-494 schon gebaut hat.
+  **Der Flow hat ZWEI Fehlerquellen und zwei Überschriften**: der Speicher-Vorlauf
+  („Nicht gespeichert") und der Übergang selbst („Freigabe fehlgeschlagen") sagen der
+  Person Verschiedenes darüber, was ihr Entwurf jetzt **ist**. Die Wahl liegt als reine,
+  exportierte `freigabeGrund`-Funktion daneben; **Vorrang hat der Speicherfehler**, und
+  das ist die Reihenfolge, nicht Geschmack: scheitert der Vorlauf, läuft die Freigabe gar
+  nicht erst, ein dann noch stehender Freigabe-Grund stammt aus einem **früheren** Versuch.
+  Umgekehrt kann der Speicherfehler nicht veralten — er fällt bei jedem gelungenen
+  Speichern. Aus demselben Grund ruft das Öffnen `freigebenMutation.reset()`: react-query
+  hält `error` bis zum nächsten `mutate()`, ein Abbrechen-und-neu-Öffnen trüge den alten
+  Grund sonst in einen frischen Dialog.
+  **Die Toasts sind BEIDE weg, auch der im Speicher-Vorlauf.** Bis LFH-494 war er der
+  einzige Kanal über der Maske; mit dem Grund im Dialog wäre er die zweite Wahrheit, die
+  drei Sekunden später geht. Der Seiten-Alert bleibt daneben stehen — er überlebt das
+  Schliessen. Der **Erfolg** bleibt beim Toast: er quittiert eine abgeschlossene Handlung,
+  und der Dialog, in dem er stünde, ist dann zu. `fortschreibenMutation` ist **nicht**
+  betroffen: sie läuft ohne Dialog, dort ist der Toast die richtige Form.
+  **Zwei gemessene Testfallen dabei:** (1) `within(dialog).findByText(…)` allein belegt die
+  Zusicherung **nicht** — käme der Toast zurück, stünde der Wortlaut an zwei Stellen und
+  die Abfrage im Dialog fände ihren Alert weiter; gezählt wird deshalb die Message-Queue
+  selbst (`.ant-message`). Ein `getAllByText`-Zähler taugt ebenfalls nicht überall: beim
+  gescheiterten Vorlauf steht der Grund zu Recht doppelt (Dialog **und** Seiten-Alert).
+  (2) `toBeVisible()`/`queryByRole('dialog')` sind für „offen/zu" blind — antds Modal räumt
+  seinen Knoten erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`;
+  geprüft wird `ant-zoom-leave` (Konvention aus `MaterialPage.test.tsx`).
+  **Kein eigener `sendetRef`-Riegel am OK-Knopf**, anders als in `Erfassung.tsx`: antds
+  `Button` sperrt seinen Klick selbst, solange `loading` steht (gemessen,
+  `antd/es/button/Button.js`), und der Knopf ist hier der **einzige** Weg in die
+  Absende-Funktion — dort greift der Riegel, weil ein Tastenkürzel den Knopf umgeht. Ein
+  zweiter Riegel daneben liesse sich in jsdom von antds eigenem nicht unterscheiden, wäre
+  also eine Zusicherung, die kein Test rot machen kann.
 - **Fehlende Berechtigung wird erklärt, nicht stumm weggeschaltet** (LFH-345 · C10, M16). Ein
   `RechteHinweis` (`Alert type="info"`) über dem Block nennt den Grund, und **der
   Speichern-Knopf verschwindet nicht mehr** — er steht gesperrt da. „Ausgegraut" allein ist

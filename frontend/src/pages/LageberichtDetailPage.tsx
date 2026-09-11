@@ -26,6 +26,7 @@ import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
+import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -52,7 +53,7 @@ function LageberichtDetail() {
   const { benutzer } = useAuth();
   const berichtId = Number(lbId);
   const idGueltig = parseRouteId(lbId) != null;
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<FormWerte>();
@@ -203,13 +204,26 @@ function LageberichtDetail() {
     onSuccess: () => message.success('Entwurf gespeichert'),
   });
 
+  /**
+   * Die validierten Werte des Freigabe-Versuchs — und zugleich der Auf-Zu-Zustand des
+   * Dialogs (`!== null` heisst offen). Ein zweites `offen`-Flag daneben könnte von ihnen
+   * abweichen; so kann der Dialog nicht ohne die Werte stehen, mit denen er gespeichert
+   * werden soll.
+   */
+  const [freigabeWerte, setFreigabeWerte] = useState<FormWerte | null>(null);
+
+  /**
+   * KEIN `onError` (LFH-535, dieselbe Begründung wie an `speichernMutation`): der Grund
+   * steht als `freigebenMutation.error` im Bestätigungsdialog, der bei Ablehnung offen
+   * bleibt. Ein Toast daneben zeigte zwei Wahrheiten — einen stehenden Alert und eine
+   * Meldung, die nach drei Sekunden geht.
+   */
   const freigebenMutation = useMutation({
     mutationFn: () => gibLageberichtFrei(einsatzId, berichtId),
     onSuccess: () => {
       invalidate();
       message.success('Bericht freigegeben');
     },
-    onError: fehler,
   });
 
   const fortschreibenMutation = useMutation({
@@ -249,38 +263,66 @@ function LageberichtDetail() {
     } catch {
       return; // Validierungsfehler werden am Formular angezeigt.
     }
-    modal.confirm({
-      title: 'Lagebericht freigeben?',
-      content:
-        'Die Freigabe ist endgültig und unveränderlich: Der Bericht wird als ETB-Eintrag gesnapshottet. Korrekturen sind danach nur per Fortschreibung möglich.',
-      okText: 'Freigeben',
-      cancelText: 'Abbrechen',
-      onOk: async () => {
-        // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
-        // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
-        // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
-        // Über denselben Weg wie der Knopf (LFH-495): läuft der Blur-Autosave noch, wird
-        // er abgewartet statt gedoppelt. Der Hook quittiert bei Erfolg selbst — sonst
-        // bliebe der Merker nach der endgültigen Freigabe stehen und der Browser fragte
-        // beim Neuladen nach Änderungen an einem Bericht, der nicht mehr editierbar ist
-        // (Review LFH-348).
-        try {
-          await schutz.speichereJetzt(werte);
-        } catch (e) {
-          // Hier BEIDES (LFH-494): der Alert liegt auf der Seite HINTER dem offenen Dialog
-          // (`throw e` lässt ihn stehen) — ohne den Toast bliebe der Grund unsichtbar, bis
-          // jemand abbricht. Der Alert ist der, der die drei Sekunden überlebt; den legt
-          // `speichereJetzt` selbst ab.
-          fehler(e);
-          throw e; // Dialog offen lassen, Freigabe nicht auslösen.
-        }
-        await freigebenMutation.mutateAsync();
-      },
-    });
+    // Ein frisch geöffneter Dialog zeigt keinen alten Grund: react-query hält `error` bis
+    // zum nächsten `mutate()`, ein Abbrechen-und-neu-Öffnen trüge ihn sonst herein.
+    freigebenMutation.reset();
+    setFreigabeWerte(werte);
+  };
+
+  /**
+   * KEIN eigener `sendetRef`-Riegel wie in `Erfassung.tsx`/`OtpEingabe.tsx` — und das ist
+   * gemessen, nicht angenommen: antds `Button` sperrt seinen Klick selbst, solange
+   * `loading` steht (`antd/es/button/Button.js:190`, `if (innerLoading || mergedDisabled)
+   * { e.preventDefault(); return; }`). Dort greift der Riegel, weil ein Tastenkürzel am
+   * Wurzel-Element den Knopf UMGEHT; hier ist der Knopf der einzige Weg hierher, und
+   * `laeuft` hängt an ihm. Ein zweiter Riegel daneben liesse sich in jsdom von antds
+   * eigenem nicht unterscheiden — also eine Zusicherung, die kein Test rot machen kann.
+   */
+  const freigabeAusfuehren = async () => {
+    if (freigabeWerte === null) return;
+    // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
+    // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
+    // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
+    // Über denselben Weg wie der Knopf (LFH-495): läuft der Blur-Autosave noch, wird
+    // er abgewartet statt gedoppelt. Der Hook quittiert bei Erfolg selbst — sonst
+    // bliebe der Merker nach der endgültigen Freigabe stehen und der Browser fragte
+    // beim Neuladen nach Änderungen an einem Bericht, der nicht mehr editierbar ist
+    // (Review LFH-348).
+    try {
+      await schutz.speichereJetzt(freigabeWerte);
+    } catch {
+      // KEIN Toast mehr (LFH-535): der Grund steht als `schutz.speicherFehler` IM Dialog,
+      // der offen bleibt. Bis LFH-494 war der Toast der einzige Kanal über der Maske —
+      // mit dem Grund im Dialog wäre er die zweite Wahrheit, die drei Sekunden später geht.
+      // Der Seiten-Alert bleibt daneben stehen: er überlebt das Schliessen des Dialogs.
+      return;
+    }
+    try {
+      await freigebenMutation.mutateAsync();
+    } catch {
+      return; // Grund steht als `freigebenMutation.error` im Dialog; er bleibt offen.
+    }
+    setFreigabeWerte(null);
   };
 
   return (
     <div className="lagebericht-print-root">
+      <FreigabeDialog
+        offen={freigabeWerte !== null}
+        titel="Lagebericht freigeben?"
+        warnung="Die Freigabe ist endgültig und unveränderlich: Der Bericht wird als ETB-Eintrag gesnapshottet. Korrekturen sind danach nur per Fortschreibung möglich."
+        speicherFehler={schutz.speicherFehler}
+        freigabeFehler={freigebenMutation.error}
+        // `speichertGerade` deckt den Vorlauf ab — auch dann, wenn der Klick sich an einen
+        // noch laufenden Blur-Autosave anhängt (LFH-495). Das ist hier RICHTIG und nicht
+        // die Falle von `speichernMutation`: die benennt der Ladezustand um („loading
+        // Entwurf speichern"), dieser Knopf existiert dagegen nur, solange der Dialog
+        // offen steht — ein Hintergrund-Autosave ohne Bezug zu diesem Klick kann es
+        // hier nicht geben, der Vorlauf IST der Vorgang, auf den der Dialog wartet.
+        laeuft={schutz.speichertGerade || freigebenMutation.isPending}
+        onAbbrechen={() => setFreigabeWerte(null)}
+        onFreigeben={() => void freigabeAusfuehren()}
+      />
       <Breadcrumb
         className="lagebericht-no-print"
         style={{ marginBottom: 12 }}
