@@ -42,19 +42,31 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  *
  * ── WAS HIER BEWUSST NICHT GEMESSEN WIRD ────────────────────────────────────────────
  *
- * Kein routenweiter Scan aller fokussierbaren Elemente. Er bliebe an den bewusst FESTEN
- * 48ern hängen: Hamburger und Drawer-Schliesser (`EinsatzLayout.tsx`) sowie die
- * Drawer-Trefffläche in `ModulAkkordeon.tsx:44`. Beide sind an ihrer Fundstelle
- * ausdrücklich als Trefffläche und NICHT als Dichte-Angabe festgeschrieben — ein
- * Handschuh-Durchgang darüber wäre per Konstruktion rot. AK2 misst nur, was der Dichteachse
- * folgt.
+ * Kein routenweiter Scan aller fokussierbaren Elemente. Zwei Flächen des
+ * Navigationsrahmens tragen ein bewusst FESTES `minHeight: 48`: der Drawer-Schliesser
+ * (`EinsatzLayout.tsx:462`) und der Akkordeon-Kopf (`ModulAkkordeon.tsx:78`). Auf DIESER
+ * Route sind sie nicht im Baum — der Drawer steht erst unter `lg`, `drawerIstNichtImBaum`
+ * unten belegt es —, ein solcher Scan auf einem schmalen Schirm liefe aber per
+ * Konstruktion rot. AK2 misst nur, was der Dichteachse folgt.
  *
- * DIE ICONRAIL STAND BIS LFH-337 IN DIESER LISTE UND GEHÖRT NICHT MEHR HINEIN. Seit dem
- * sichtbaren Etikett trägt `railZielStil` (`IconRail.tsx:41-47`) `Math.max(48,
- * controlHeight)` — also 48 / 48 / 72 und damit exakt die {@link STAFFEL} dieser Datei;
- * die 48 ist dort BODEN unter der Staffel, nicht Ersatz für sie. Ein falscher
- * Ausschlussgrund lädt den nächsten Bearbeiter ein, ihn zu übernehmen, deshalb wird die
- * Rail seither mitgemessen (Abschnitt (b) unten) statt bloß umgeschrieben.
+ * DIESE LISTE IST SCHON EINMAL VERROTTET, UND EIN ZWEITES MAL. Beide Male stand hier ein
+ * Ausschlussgrund, den der Code nicht mehr hergab:
+ *
+ *  - DIE ICONRAIL stand bis LFH-337 darin. Seit dem sichtbaren Etikett trägt `railZielStil`
+ *    (`IconRail.tsx:41-47`) `Math.max(48, controlHeight)` — also 48 / 48 / 72 und damit
+ *    exakt die {@link STAFFEL} dieser Datei; die 48 ist dort BODEN unter der Staffel, nicht
+ *    Ersatz für sie. Sie wird seither mitgemessen (Abschnitt (b) unten) statt bloß
+ *    umgeschrieben.
+ *  - DER HAMBURGER stand bis LFH-516 darin, und das war im Browser widerlegbar:
+ *    `EinsatzLayout.tsx:319-320` rechnet ebenfalls `Math.max(48, controlHeight)` und misst
+ *    auf 390 px gemessene 48 / 48 / 72 (`gate3-trefflaeche.spec.ts`, Test „Navigations-Drawer
+ *    auf 390 px"). Dasselbe gilt für die MODULZEILEN im Drawer — die frühere Fassung nannte
+ *    pauschal „die Drawer-Trefffläche in `ModulAkkordeon.tsx:44`", aber die Datei übergibt
+ *    dort nur `mindestTrefflaeche={48}`, und `modulZeilenStil` verrechnet das per `Math.max`
+ *    mit der Stufe. Fest sind allein die zwei oben genannten Stellen; sie liegen als LFH-537.
+ *
+ * Ein falscher Ausschlussgrund lädt den nächsten Bearbeiter ein, ihn zu übernehmen —
+ * deshalb steht hier je Stelle, WAS sie rechnet, und nicht bloß, dass sie ausgenommen sei.
  *
  * Und keine BREITEN-Zusicherung an beschrifteten Knöpfen: `paddingInlineSM` ist in antds
  * `button/style/token.js:50` das Literal `8 - lineWidth` = 7 und hängt an keinem

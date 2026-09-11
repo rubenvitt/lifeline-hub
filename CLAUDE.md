@@ -232,10 +232,18 @@ Alltag wichtigsten:
   sind so im Browser belegt (`e2e/datensicht-schmal.spec.ts`, 30 / 48 / 72) — das ist kein
   Restposten, sondern der Beleg, dass in einer Zelle ohne `nowrap`-Kopf die eine Angabe trägt.
   Die Regel zielt auf den Kartenkopf, nicht auf das Primitiv. **Der Gate-3-Nachweis je Route liegt in
-  `e2e/gate3-trefflaeche.spec.ts`** (Lage-Dashboard, Einsatzauswahl); eine neue Route mit
+  `e2e/gate3-trefflaeche.spec.ts`** (Lage-Dashboard, Einsatzauswahl, Einheiten-Detailroute
+  und seit LFH-516 der **Einsatz-Navigationsrahmen**: Rail, Modul-Panel, beide Kopfzeilen,
+  Kommandopalette und der Drawer-Zweig auf 390 px); eine neue Route mit
   handgebauten Bedienzielen bekommt dort ihren Test — Böden als Literale, Mengen über
   `alleHaltenStufe` mit gesäter Mindestzahl, und die Mutationsprobe „Stufe festgenagelt →
-  rot", die das Ticket verlangt. Der Boden ist die **Trefffläche, nicht der ganze
+  rot", die das Ticket verlangt. **Ein Boden ist nicht immer die Staffel**: der Rahmen trägt
+  vier Verträge nebeneinander (30/48/72 · `Math.max(48, controlHeight)` an Rail, Hamburger,
+  schmalem Suchzugang und den Drawer-Modulzeilen · `Math.max(40, …)` am Benutzermenü · zwei
+  feste 48er im Drawer, gemessen in LFH-516 und als LFH-537 benannt). Wer eine Fläche
+  aufnimmt, schreibt ihren Boden als eigenes Literal hin, statt sie unter die Staffel zu
+  zwingen — `kompakt` prüfte sonst 30, wo der Code 48 garantiert, und die Zusicherung wäre
+  schwächer als der Bestand. Der Boden ist die **Trefffläche, nicht der ganze
   Zugang**: ein `ListenEintrag` mit `onClick` bleibt ein nacktes `<div>` ohne `role`/`tabIndex`,
   und die klickbare Zeile als Ganzes ist B7/LFH-335 zugeordnet. **Kein Guard sieht diese Fälle** — ein
   Pixel-Padding ist keine Größen-Prop —, die Zusicherung muss also von Hand kommen. Prüfbar ist der
