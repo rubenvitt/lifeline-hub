@@ -406,4 +406,99 @@ mod tests {
             "alle Plätze müssen nach dem Verbindungsende zurückgefallen sein"
         );
     }
+
+    /// Der Wirkungsnachweis der Grenze selbst (LFH-311).
+    ///
+    /// Die Bestandstests belegen, dass Verbindungen *bedient* werden und dass der Platz danach
+    /// *zurückfällt*. Beides bliebe grün, wenn [`PermitStream`] sein Permit gar nicht über die
+    /// Verbindungsdauer hielte oder wenn der Akzeptor aus dem Serve-Pfad verschwände — der
+    /// Deckel wäre in Produktion wirkungslos, ohne dass ein Test rot würde. Kein Bestandstest
+    /// reizt die Grenze je aus.
+    ///
+    /// Hier tut er es: mit genau EINEM Platz hält die erste Verbindung ihn besetzt, die zweite
+    /// wird erst bedient, nachdem die erste geschlossen ist.
+    ///
+    /// Was die Zusicherung „Platz belegt" rot macht — beide Male gemessen, nicht behauptet:
+    /// ein `PermitStream` ohne festgehaltenes Permit (der Platz fiele schon beim Accept zurück)
+    /// und ein Serve-Pfad ohne `.acceptor(..)` (es gäbe überhaupt keine Grenze). Für die BEIDEN
+    /// Serve-Pfade in `src/main.rs` deckt Letzteres der Montage-Guard in
+    /// `tests/zulassung_guard.rs` ab; hier ist es der Serve-Pfad des Testservers.
+    #[tokio::test]
+    async fn die_grenze_laesst_die_zweite_verbindung_warten() {
+        let (addr, akzeptor) = server_starten(Fristen::default(), 1).await;
+        assert_eq!(
+            akzeptor.freie_plaetze(),
+            1,
+            "genau ein Platz, und der ist frei"
+        );
+
+        // Erste Verbindung: vollständige Anfrage OHNE `Connection: close`, sie bleibt also offen
+        // und hält den einzigen Platz. Die Rundenzeit ist zugleich der Maßstab für das
+        // Wartefenster weiter unten.
+        let begonnen = std::time::Instant::now();
+        let mut erste = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        erste
+            .write_all(b"GET /ping HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .expect("senden");
+        let mut puffer = [0u8; 1024];
+        let gelesen = tokio::time::timeout(Duration::from_secs(5), erste.read(&mut puffer))
+            .await
+            .expect("Antwort binnen 5 s")
+            .expect("lesen");
+        let erste_antwort = String::from_utf8_lossy(&puffer[..gelesen]).into_owned();
+        assert!(
+            erste_antwort.starts_with("HTTP/1.1 200"),
+            "die erste Verbindung muss bedient werden, Antwort war: {erste_antwort}"
+        );
+        let rundenzeit = begonnen.elapsed();
+
+        // DIE Zusicherung: die offene Verbindung hält ihren Platz. Fiele das Permit beim Accept
+        // zurück, stünde hier wieder 1 — ohne dass irgendetwas anderes auffiele.
+        assert_eq!(
+            akzeptor.freie_plaetze(),
+            0,
+            "die offene Verbindung muss ihren Platz über die ganze Verbindungsdauer halten"
+        );
+
+        // Zweite Verbindung: verbindet und sendet vollständig — bedient werden darf sie nicht.
+        let mut zweite = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        zweite
+            .write_all(b"GET /ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .expect("senden");
+
+        // Eine NEGATIVE Aussage („wird nicht bedient") braucht zwangsläufig ein Zeitfenster —
+        // ein beobachtbarer Zustand, der sie trägt, existiert nicht. Damit es keine feste Zahl
+        // wird, leitet es sich aus der eben gemessenen Rundenzeit derselben Anfrage auf
+        // derselben Maschine ab: ein Server ohne wirksame Grenze antwortet in genau dieser
+        // Größenordnung, das Fenster liegt um den Faktor 20 darüber. Die Untergrenze fängt
+        // Messrauschen bei Mikrosekunden-Rundenzeiten ab, die Obergrenze hält den Test auf
+        // langsamer Hardware kurz.
+        let fenster = (rundenzeit * 20).clamp(Duration::from_millis(300), Duration::from_secs(3));
+        let mut muell = [0u8; 64];
+        let vorzeitig = tokio::time::timeout(fenster, zweite.read(&mut muell)).await;
+        assert!(
+            vorzeitig.is_err(),
+            "die zweite Verbindung wurde binnen {fenster:?} bedient, obwohl der einzige Platz \
+             belegt ist — die Obergrenze greift nicht"
+        );
+        assert_eq!(
+            akzeptor.freie_plaetze(),
+            0,
+            "der Platz ist weiterhin von der ersten Verbindung belegt"
+        );
+
+        // Platz freigeben — jetzt, und erst jetzt, muss die zweite drankommen.
+        drop(erste);
+
+        let mut antwort = Vec::new();
+        tokio::time::timeout(Duration::from_secs(5), zweite.read_to_end(&mut antwort))
+            .await
+            .expect("die zweite Verbindung muss nach dem Freiwerden binnen 5 s bedient werden")
+            .expect("lesen");
+        let text = String::from_utf8_lossy(&antwort);
+        assert!(text.starts_with("HTTP/1.1 200"), "Antwort war: {text}");
+        assert!(text.contains("pong"), "Antwort war: {text}");
+    }
 }
