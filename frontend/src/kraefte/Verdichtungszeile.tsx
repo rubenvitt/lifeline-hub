@@ -8,6 +8,40 @@ import { rollenFarbe, statusKategorie } from '../theme/statusFarben';
 import { staerkeText, verdichte } from './kraeftebild';
 
 /**
+ * Der Kräfteübersicht-Link als Bedienziel auf der Dichte-Staffel (LFH-515, Gate 3).
+ *
+ * GEMESSEN im Browser (`e2e/gate3-trefflaeche.spec.ts`, Stand vor dem Fix): **15 / 16 / 16 px**
+ * über die drei Stufen — der Link ist das EINZIGE Bedienelement dieser Zeile und blieb in der
+ * Handschuh-Stufe bei 16 px stehen, also bei nicht einmal einem Viertel des 72-px-Bodens. Es
+ * ist derselbe Befund, den LFH-396 am Titel-Link der Einsatzkarte gemessen hat, und
+ * CLAUDE.md führt ihn seither als Regel: **ein `<a>` erbt keine Steuerhöhe.** Die Prüfliste
+ * von LFH-338 hatte für Kriterium 1 „alle neuen Bedienelemente sind echte antd-Steuerelemente
+ * und erben damit die Dichte-Staffel vom `ConfigProvider`" geschrieben — für `Segmented` und
+ * `Button type="link"` stimmt das (30 / 48 / 72 gemessen), für `Link` nicht. Eine Annahme,
+ * keine Messung; genau die Sorte, für deren Aufdeckung dieser Nachzug existiert.
+ *
+ * ZWEI Angaben, nicht eine (LFH-365): `minHeight` aus `controlHeight` trägt den Boden,
+ * die Polsterung zieht mit — die Polsterung allein käme im Handschuh-Betrieb auf grob 54 px.
+ * `inline-flex` statt `flex` wie bei `kartenTitelStil` (`pages/EinsaetzePage.tsx`): der Link ist ein Glied einer
+ * waagerechten `Space`-Zeile und kein Kartenkopf mit `nowrap`; ein `flex` risse ihn auf die
+ * volle Zeilenbreite. Die Polsterung liegt auf BEIDEN Achsen (anders als am Kartentitel, wo
+ * der Kopf selbst waagerecht polstert): hier polstert niemand sonst, und `Space` setzt
+ * Abstände ZWISCHEN den Gliedern, nicht innerhalb.
+ *
+ * Rein und exportiert nach dem Muster von `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`):
+ * nur so ist die Zusicherung über zwei Dichtestufen ohne Rendern prüfbar — `test/utils.tsx`
+ * montiert ein nacktes `ConfigProvider` ohne unser Theme.
+ */
+export function verdichtungsLinkStil(token: { controlHeight: number; paddingSM: number }) {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px`,
+  } as const;
+}
+
+/**
  * Die Führungsantwort im Kopf einer Kräfte-Modulseite (LFH-338 · C3, Befund H21).
  *
  * Σ-Stärke und Fahrzeugverfügbarkeit über der Tabelle, verlinkt auf das volle Meldebild:
@@ -50,6 +84,7 @@ import { staerkeText, verdichte } from './kraeftebild';
  * Tickets, und es gibt trotzdem nur EINEN Link je Seite; ein zweiter Kopf-Link daneben
  * hätte den Grep ebenfalls befriedigt und die Bedienung verschlechtert.
  */
+
 export default function Verdichtungszeile({
   einsatzId,
   pfad,
@@ -95,7 +130,9 @@ export default function Verdichtungszeile({
       <span style={{ color: rollenFarbe(statusKategorie.nicht_verfuegbar.rolle, token) }}>
         {v.fahrzeugStatus.nicht_verfuegbar} n. verf.
       </span>
-      <Link to={pfad}>Kräfteübersicht</Link>
+      <Link to={pfad} style={verdichtungsLinkStil(token)}>
+        Kräfteübersicht
+      </Link>
     </Space>
   );
 }

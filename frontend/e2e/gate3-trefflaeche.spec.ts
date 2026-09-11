@@ -4,10 +4,11 @@ import { detailBereit, einheitMitZuordnungen, kopfFelder, zuordnungsKarte } from
 /**
  * Gate 3 der Bedien-Leitlinie: Lage-Dashboard und Einsatzauswahl (LFH-396, Nachzug zur
  * Prüfliste von LFH-336 · C1, Kriterium 2), die Einheiten-Detailroute (LFH-446,
- * Nachzug zu LFH-339 · Kriterium 2) sowie der Einsatz-NAVIGATIONSRAHMEN (LFH-516,
- * Nachzug zu LFH-337 · C2, Kriterium 2).
+ * Nachzug zu LFH-339 · Kriterium 2), der Einsatz-NAVIGATIONSRAHMEN (LFH-516,
+ * Nachzug zu LFH-337 · C2, Kriterium 2) sowie Kräfteübersicht und Verdichtungszeile
+ * (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 2).
  *
- * DIE DATEI TRÄGT DREI ROUTEN, DEN NAVIGATIONSRAHMEN UND EINEN SATZ HELFER. Das ist die
+ * DIE DATEI TRÄGT VIER ROUTEN, DEN NAVIGATIONSRAHMEN UND EINEN SATZ HELFER. Das ist die
  * Gestalt, die der LFH-446-Plan ausdrücklich vorsah („vorhandene STAFFEL, stelleDichte,
  * haeltStufe und alleHaltenStufe aus gate3-trefflaeche.spec.ts verwenden") — die
  * Einheiten-Tests entstanden nur deshalb mit eigenen Kopien dieser Helfer, weil ihr Branch
@@ -16,7 +17,10 @@ import { detailBereit, einheitMitZuordnungen, kopfFelder, zuordnungsKarte } from
  * ist je eine Fassung. Der Navigationsrahmen (LFH-516, 11.09.2026) ist der erste Zugang,
  * der KEINE Route ist — er steht auf jeder Einsatzroute — und hat die Einladung
  * „wer hier etwas anhängt, nimmt dieselben Helfer" eingelöst, statt eine vierte Kopie
- * von `anmelden`/`stelleDichte`/`haeltStufe` anzulegen.
+ * von `anmelden`/`stelleDichte`/`haeltStufe` anzulegen; Kräfteübersicht und
+ * Verdichtungszeile (LFH-515, 11.09.2026) sind derselben Einladung gefolgt. Die beiden
+ * Nachzüge entstanden am selben Tag auf getrennten Branches und trafen sich hier im
+ * Rebase — jeder trägt seinen eigenen Block am Dateiende, die Helfer sind geteilt.
  *
  * WARUM HIER UND NICHT IN VITEST: `vite.config.ts` fährt Vitest mit `css: false`, und
  * jsdom rechnet kein Layout. Belegt war für beide Routen bisher nur, dass die Ziele ihre
@@ -834,6 +838,201 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
         + `Akkordeon-Kopf ${kopfHoehe}, Schließer ${schliesser} `
         + `(feste 48 — LFH-537, Soll ≥ ${BODEN.fest48[dichte]})`,
     );
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+
+// ── Kräfteübersicht und Verdichtungszeile (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 2) ──
+//
+// DIE VIERTE ROUTE dieser Datei, mit denselben Helfern — genau die Gestalt, die der
+// Kopfkommentar oben vorsieht („wer hier etwas anhängt, nimmt dieselben Helfer").
+//
+// WARUM EIN EIGENER NACHZUG UND NICHT LFH-396: jenes Ticket ist namentlich auf Lage-Dashboard
+// und Einsatzauswahl mit fünf benannten Zielen gescopt und deckt keine Fläche der
+// Kräfteübersicht. Die Prüfliste von LFH-338 verwies zwischenzeitlich dorthin; mit dem
+// Schließen von LFH-396 (05.09.2026) wären die Verweise tot gewesen — dieselbe Lage, die
+// LFH-446 und LFH-516 mit eigenen Nachzügen gelöst haben.
+//
+// ── WAS DER ERSTE LAUF GEMESSEN HAT (vor jedem Fix, Fükw 1366 px) ───────────────────
+//
+//   Umschalter (Hülle)      30,00 / 48,00 / 72,00   ✓ hält
+//   Umschalter (Wahlfeld)   26,00 / 44,00 / 68,00   — 4 px unter dem Boden, siehe unten
+//   „Filter zurücksetzen"   30,00 / 48,00 / 72,00   ✓ hält
+//   Suchfeld des Filters    30,09 / 48,00 / 72,00   ✓ hält
+//   Filter-Marke            22,00 / 22,00 / 22,00   — dichteblind, benannte Ausnahme
+//   Schließkreuz der Marke  10×10 in JEDER Stufe    — dichteblind, benannte Ausnahme
+//   Kräfteübersicht-Link    15,00 / 16,00 / 16,00   ✗ BEFUND, behoben (s. u.)
+//
+// DER BEFUND: der Link der Verdichtungszeile ist das EINZIGE Bedienelement dieser Zeile und
+// blieb im Handschuh-Betrieb bei 16 px — nicht einmal ein Viertel des Bodens, und schon in
+// `kompakt` unter 24 px. Es ist wörtlich derselbe Befund, den LFH-396 am Titel-Link der
+// Einsatzkarte gemessen hat (17 px in jeder Stufe): CLAUDE.md führt ihn seither als Regel
+// „ein `<a>` erbt keine Steuerhöhe". Die Prüfliste von LFH-338 hatte für Kriterium 1
+// geschrieben, alle neuen Bedienelemente seien echte antd-Steuerelemente und erbten die
+// Staffel vom `ConfigProvider` — für `Segmented`, `Button type="link"` und `Input.Search`
+// stimmt das (Messwerte oben), für `Link` nicht. Eine Annahme, keine Messung. Behoben über
+// `verdichtungsLinkStil` (zwei Angaben nach LFH-365); danach gemessen **35,50 / 48,00 / 72,00**.
+// Der Kompaktwert liegt über dem Boden, weil die Polsterung auf beiden Achsen liegt und die
+// Zeilenhöhe des Textes dazukommt — Untergrenze, keine Gleichheit (siehe Kopfkommentar).
+//
+// DER UMSCHALTER: die Hülle trägt die Staffel punktgenau, das einzelne Wahlfeld liegt
+// konstant 4 px darunter — das sind die 2 px Innenpolsterung, die antd der Hülle je Seite
+// gibt (`segmentedContainerPadding`). Das ist KEIN Mangel und wird deshalb auch nicht
+// „behoben": die beiden Wahlfelder kacheln die Hülle lückenlos, es gibt keine tote Zone
+// zwischen ihnen, und ein Wahlfeld auf 72 px zu zwingen machte die Hülle 76 px hoch und
+// damit die Staffel selbst falsch. Zugesichert wird deshalb (a) die Hülle gegen den Boden
+// und (b) die lückenlose Kachelung — nicht eine Zahl, die man nur durch Brechen der Staffel
+// erreichte. Die 4 px stehen als Literal, damit ein Wachsen der Innenpolsterung auffliegt.
+//
+// MUTATIONSPROBE (Akzeptanzkriterium), am 11.09.2026 nach dem Muster oben mit zwei
+// temporären Kopien gefahren — beide Male danach zurückgedreht und byte-gleich verglichen:
+//  - `localStorage` in `stelleDichte` auf `'kompakt'` festgenagelt, `STAFFEL` nur
+//    `handschuh`: beide Tests rot an der `data-dichte`-Wache („Expected handschuh,
+//    Received kompakt"), noch VOR jeder Höhenmessung.
+//  - dieselbe Mutation, zusätzlich die Wache entfernt: rot an der ERSTEN Höhenmessung —
+//    „Umschalter-Hülle (handschuh) (gemessen 30px hoch, Soll ≥ 72)" und
+//    „Kräfteübersicht-Link (handschuh) (gemessen 35.5px hoch, Soll ≥ 72)".
+//    Beide Tests messen also die Staffel, nicht sich selbst.
+//
+// DIE FILTER-MARKE ist die benannte Ausnahme aus Kriterium 1 der Prüfliste, und dieser Spec
+// macht sie von einer Behauptung zu einer MESSUNG: `Tag closable` hängt nicht am
+// `ConfigProvider` — weder die Marke (22 px) noch ihr Schließkreuz (10×10 px) bewegen sich
+// über die Stufen. Getragen wird die Ausnahme allein davon, dass „Filter zurücksetzen" als
+// vollwertiger Knopf danebensteht und dieselbe Wirkung für ALLE Filter auf einmal hat. Genau
+// das ist hier die Zusicherung (und die kann rot werden): steht mindestens eine Marke, MUSS
+// der Zweitweg dastehen und den Boden halten. Die Maße der Marke werden protokolliert, nicht
+// gepinnt — sie sind antd-Bestand, kein C3-Erzeugnis, und ein Pin auf 22 bräche bei einem
+// antd-Sprung, ohne dass jemand etwas falsch gemacht hätte. Eine dichteabhängige Projekt-Hülle
+// um `Tag closable` ist Nachzug 1 der Prüfliste und eine Komponentenentscheidung mit eigenem
+// Ticket, nicht ein Nebenprodukt dieses Nachweises.
+
+/** Die Innenpolsterung, die antd der Segmented-Hülle je Seite gibt (`segmentedContainerPadding`).
+ *  Literal wie die Böden: aus dem Token zurückgelesen prüfte es den Token gegen sich selbst. */
+const SEGMENTED_POLSTER = 2;
+
+test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Meldebild`);
+
+  // Ohne Kräfte hat das Meldebild keinen Baum — der Umschalter stünde über einer leeren
+  // Tabelle, und der Suchfilter unten hätte nichts zu treffen. Ein Fahrzeug dazu, damit die
+  // Fahrzeugachse des Kopfes nicht nur Nullen trägt.
+  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Gate3' } }, 'Personal');
+  await anlegen(
+    page,
+    einsatzId,
+    'fahrzeuge',
+    { adhoc: { funkrufname: 'Florian Musterstadt 1/44-1' } },
+    'Fahrzeug',
+  );
+
+  const gemessen: string[] = [];
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+    await stelleDichte(page, dichte);
+
+    // Anker: die Seite ist fertig geladen. Ohne ihn misst der Rest einen Ladezustand.
+    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+
+    // (1) DER UMSCHALTER. Gemessen wird die Hülle gegen den Boden — sie trägt die
+    //     Steuerhöhe — und zusätzlich, dass die beiden Wahlfelder sie lückenlos kacheln.
+    const huelle = page.locator('.ant-segmented');
+    const umschalter = await haeltStufe(huelle, soll, `Umschalter-Hülle (${dichte})`);
+    const wahlfelder = page.locator('.ant-segmented-item');
+    const wahlfeld = await alleHaltenStufe(
+      wahlfelder,
+      soll - 2 * SEGMENTED_POLSTER,
+      `Umschalter-Wahlfeld (${dichte})`,
+      2,
+    );
+    // Lückenlos: das Wahlfeld füllt die Hülle abzüglich ihrer Innenpolsterung GENAU aus.
+    // Ohne diese Hälfte wäre die Nachsicht oben ein Freibrief — ein Wahlfeld, das nur halb
+    // so hoch wie seine Hülle ist, käme durch dieselbe gelockerte Schranke.
+    expect(
+      umschalter - wahlfeld,
+      `Umschalter (${dichte}): Wahlfeld kachelt die Hülle (Hülle ${umschalter}, Wahlfeld ${wahlfeld})`,
+    ).toBeLessThanOrEqual(2 * SEGMENTED_POLSTER + SUBPIXEL);
+
+    // (2) DAS SUCHFELD DER FILTERLEISTE. Gemessen wird die sichtbare Feldhülle
+    //     (`.ant-input-affix-wrapper`, sie trägt Rahmen und Polsterung), nicht das nackte
+    //     `<input>` darin — das ist so hoch wie seine Zeile (Begründung wie bei der
+    //     Einsatzauswahl oben).
+    const suchfeld = page.locator('.ant-input-affix-wrapper');
+    const feld = await haeltStufe(suchfeld, soll, `Filter-Suchfeld (${dichte})`);
+
+    // (3) FILTER SETZEN. Der Suchfilter ist der einzige, der ohne Stammdaten auskommt:
+    //     Abschnitt, Träger und Status ziehen ihre Optionen aus gepflegten Katalogen.
+    //     Gegriffen über den Platzhalter und NICHT über `getByRole('textbox')`: antds
+    //     `Input.Search` rendert `type="search"`, und das ist die Rolle `searchbox` — ein
+    //     Rollen-Locator lief hier gemessen in den Zeitablauf statt in eine Aussage.
+    await page.getByPlaceholder('Suche...').fill('Messkraft');
+    const marke = page.locator('.ant-tag').filter({ hasText: 'Suche:' });
+    await expect(marke).toHaveCount(1);
+
+    // (4) DER ZWEITWEG, an dem die Ausnahme der Marke hängt — und er ist zuerst DA und
+    //     dann groß genug. Beide Hälften zählen: ein Knopf, der bei gesetztem Filter
+    //     fehlte, machte die Marke zum einzigen Weg, und dann wären ihre 22 px ein Mangel
+    //     statt einer Ausnahme.
+    const zuruecksetzen = page.getByRole('button', { name: 'Filter zurücksetzen', exact: true });
+    const knopf = await haeltStufe(zuruecksetzen, soll, `„Filter zurücksetzen" (${dichte})`);
+
+    // (5) …und die Marke selbst, protokolliert statt gepinnt (Begründung im Block oben).
+    const markenKasten = (await marke.boundingBox())!;
+    const kreuz = (await marke.locator('.ant-tag-close-icon').boundingBox())!;
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Umschalter-Hülle ${umschalter}, Wahlfeld ${wahlfeld}, ` +
+        `Suchfeld ${feld}, Zurücksetzen ${knopf} | dichteblind: Marke ${markenKasten.height}, ` +
+        `Schließkreuz ${kreuz.height}×${kreuz.width}`,
+    );
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Verdichtungszeile: der Kräfteübersicht-Link folgt der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Verdichtung`);
+
+  // Die Zeile rendert `null`, solange NICHT BEIDE Listen da sind (`Verdichtungszeile.tsx`,
+  // Datenriegel). Leere Listen zählen als Daten — gesät wird trotzdem, sonst misst der Test
+  // eine Zeile aus lauter Nullen und die Fahrzeugachse hätte nichts zu zeigen.
+  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Verdichtung' } }, 'Personal');
+  await anlegen(
+    page,
+    einsatzId,
+    'fahrzeuge',
+    { adhoc: { funkrufname: 'Florian Musterstadt 2/44-1' } },
+    'Fahrzeug',
+  );
+
+  const gemessen: string[] = [];
+
+  for (const { dichte, soll } of STAFFEL) {
+    // Die Fahrzeugseite als einer der vier Einbauorte. Die Zeile ist dort dieselbe
+    // Komponente wie auf Personal, Material und Einheiten — vier Messungen derselben
+    // Komponente wären vier Abschriften desselben Satzes.
+    await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+    await stelleDichte(page, dichte);
+
+    const link = page.getByRole('link', { name: 'Kräfteübersicht', exact: true });
+    const hoehe = await haeltStufe(link, soll, `Kräfteübersicht-Link (${dichte})`);
+    // Er muss auch dorthin zeigen: ein Bedienziel der richtigen Größe am falschen Ziel
+    // bestünde diese Messung ebenso.
+    await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);
+
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Link ${hoehe}`);
   }
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
