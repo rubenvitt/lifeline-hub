@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -9,6 +10,7 @@ import * as einsaetzeApi from '../api/einsaetze';
 import * as lageberichteApi from '../api/lageberichte';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
+import { ApiError } from '../api/client';
 
 vi.mock('../api/einsaetze');
 vi.mock('../api/lageberichte');
@@ -128,5 +130,95 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
     expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
     // Gegenaussage: der Wirestring darf nirgends mehr sichtbar sein.
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
+  });
+});
+
+/**
+ * ── GESCHEITERTE FREIGABE (LFH-535, Nachzug N5 aus LFH-348 · C13) ──────────────
+ *
+ * Der Zwilling zu `BefehlDetailPage.test.tsx`. Die Bedienentscheidung gilt ausdrücklich
+ * für BEIDE Seiten gemeinsam — sonst entsteht wieder die Divergenz, die LFH-348 · C13 mit
+ * dem geteilten Verlustschutz-Hook geschlossen hat; Träger ist hier die geteilte
+ * Komponente `entwurf/FreigabeDialog.tsx`.
+ *
+ * Die Zusicherung hat zwei Hälften: der Grund steht IM Dialog UND nicht in der
+ * Message-Queue. Ohne die zweite bliebe der Test grün, wenn der Toast zurückkäme.
+ */
+describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(
+      { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung', bezeichnung: 'Übung' } as never,
+    );
+    vi.mocked(lageberichteApi.ladeLagebericht)
+      .mockResolvedValue(bericht({ status: 'entwurf' }) as never);
+    vi.mocked(lageberichteApi.aktualisiereLagebericht)
+      .mockResolvedValue(bericht({ status: 'entwurf' }) as never);
+    // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests dieser
+    // Datei weiter, und „nicht aufgerufen" wäre nach dem ersten Test nie wieder grün.
+    vi.mocked(lageberichteApi.gibLageberichtFrei).mockClear();
+  });
+
+  async function oeffneFreigabe() {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Freigeben' }));
+    return screen.findByRole('dialog', { name: 'Lagebericht freigeben?' });
+  }
+
+  /** Siehe `BefehlDetailPage.test.tsx` — dort steht die Begründung dieser Abfrage. */
+  function toastsMit(wortlaut: string) {
+    return [...document.querySelectorAll('.ant-message')]
+      .filter((n) => n.textContent?.includes(wortlaut));
+  }
+
+  it('zeigt den Grund IM Dialog statt im Toast und lässt ihn offen', async () => {
+    vi.mocked(lageberichteApi.gibLageberichtFrei)
+      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    const treffer = await within(dialog).findByText('Abschnitt „Auftrag" ist leer');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(toastsMit('Abschnitt „Auftrag" ist leer')).toHaveLength(0);
+    expect(within(dialog).getByText('Freigabe fehlgeschlagen')).toBeInTheDocument();
+    // „Offen" heisst in jsdom „nicht in der Verlassen-Bewegung": antds Modal räumt seinen
+    // Knoten erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`.
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+  });
+
+  it('schliesst den Dialog bei gelungener Freigabe und quittiert per Toast (Gegenaussage)', async () => {
+    vi.mocked(lageberichteApi.gibLageberichtFrei).mockResolvedValue(bericht() as never);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    expect(await screen.findByText('Bericht freigegeben')).toBeInTheDocument();
+  });
+
+  it('hält die Freigabe zurück, wenn schon der Speicher-Vorlauf scheitert', async () => {
+    vi.mocked(lageberichteApi.aktualisiereLagebericht)
+      .mockRejectedValue(new ApiError(503, 'Dienst nicht erreichbar'));
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    const treffer = await within(dialog).findByText('Dienst nicht erreichbar');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(toastsMit('Dienst nicht erreichbar')).toHaveLength(0);
+    expect(within(dialog).getByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(lageberichteApi.gibLageberichtFrei).not.toHaveBeenCalled();
+  });
+
+  it('öffnet nach Abbrechen ohne den Grund des vorigen Versuchs', async () => {
+    vi.mocked(lageberichteApi.gibLageberichtFrei)
+      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+    await within(dialog).findByText('Abschnitt „Auftrag" ist leer');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    await userEvent.click(screen.getByRole('button', { name: 'Freigeben' }));
+
+    await waitFor(() => expect(dialog).not.toHaveClass('ant-zoom-leave'));
+    expect(within(dialog).queryByText('Abschnitt „Auftrag" ist leer')).toBeNull();
   });
 });
