@@ -307,6 +307,45 @@ describe('LageberichtDetailPage', () => {
 });
 
 /**
+ * Detailseite mit nachschiebbarem Serverstand: der Handler liest aus einer Variablen.
+ *
+ * Auf MODULEBENE, weil drei Describe-Blöcke davon leben (Verlustschutz H63, Speicherfehler
+ * LFH-494, Einstiegsfokus LFH-495) — eine Kopie je Block wäre drei Fixtures für denselben
+ * Aufbau, und die erste Abweichung fiele niemandem auf.
+ */
+function setupLebend(start: LageberichtAnzeige) {
+  let stand = start;
+  const patches: Record<string, unknown>[] = [];
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(stand)),
+    http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, async ({ request }) => {
+      patches.push((await request.json()) as Record<string, unknown>);
+      return HttpResponse.json(stand);
+    }),
+  );
+  const r = renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route: `/einsaetze/7/lageberichte/${start.id}` },
+  );
+  return {
+    patches,
+    /** Fremde Änderung: neuer Serverstand + Invalidierung wie über den Live-Stream. */
+    fremdeAenderung: async (neu: LageberichtAnzeige) => {
+      stand = neu;
+      await act(async () => {
+        await r.client.invalidateQueries({ queryKey: einsatzKeys.lagebericht(7, start.id) });
+      });
+    },
+  };
+}
+
+/**
  * Verlustschutz am Lageberichtsentwurf (LFH-348 · C13, Befund H63).
  *
  * Der reale Fremdschreib-Pfad: dieser Bericht ändert sich serverseitig (zweiter Tab, anderes
@@ -316,38 +355,6 @@ describe('LageberichtDetailPage', () => {
  * Test hier einen geänderten Stand nach, nicht bloß eine Invalidierung.
  */
 describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)', () => {
-  /** Serverstand nachschiebbar: der Handler liest aus einer Variablen. */
-  function setupLebend(start: LageberichtAnzeige) {
-    let stand = start;
-    const patches: Record<string, unknown>[] = [];
-    server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(stand)),
-      http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, async ({ request }) => {
-        patches.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json(stand);
-      }),
-    );
-    const r = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
-        </Routes>
-      </AuthProvider>,
-      { route: `/einsaetze/7/lageberichte/${start.id}` },
-    );
-    return {
-      patches,
-      /** Fremde Änderung: neuer Serverstand + Invalidierung wie über den Live-Stream. */
-      fremdeAenderung: async (neu: LageberichtAnzeige) => {
-        stand = neu;
-        await act(async () => {
-          await r.client.invalidateQueries({ queryKey: einsatzKeys.lagebericht(7, start.id) });
-        });
-      },
-    };
-  }
 
   it('überschreibt getippten Text NICHT, wenn der Bericht serverseitig geändert wurde', async () => {
     const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
@@ -459,6 +466,101 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
  * (`entwurf/useEntwurfVerlustschutz.test.tsx`), und Fake-Timer vertragen sich nicht mit
  * `userEvent.type`.
  */
+/**
+ * ── EINSTIEGSFOKUS (LFH-495, Nachzug C13/N3) ───────────────────────────────────
+ *
+ * Beide Entwurfsseiten hatten keinen; die Bedienentscheidung ist der ERSTE LEERE Abschnitt
+ * (Begründung in `entwurf/Einstiegsfokus.tsx`). Die Mechanik des Fokussierens steht in
+ * `entwurf/Einstiegsfokus.test.tsx`; hier steht, was die SEITE daraus macht — der offene
+ * Abschnitt des Akkordeons folgt derselben Wahl, sonst stünde der Cursor in einem
+ * zugeklappten Editor.
+ */
+describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
+  /** Die ersten zwei Abschnitte befüllt: der Einstieg ist damit der DRITTE. */
+  const teilweiseBefuellt: LageberichtAnzeige = {
+    ...lagebericht7Abschnitte,
+    abschnitte: lagebericht7Abschnitte.abschnitte.map((a, i) => ({
+      ...a, text: i < 2 ? `Stand ${i}` : '',
+    })),
+  };
+
+  const offeneKopfzeile = () =>
+    screen.getAllByRole('tab').filter((b) => b.getAttribute('aria-expanded') === 'true');
+
+  it('klappt den ersten LEEREN Abschnitt auf und setzt den Fokus hinein', async () => {
+    setupLebend(teilweiseBefuellt);
+    // Der fortgeschriebene Bericht trägt „Auftrag" und „Gefahren-/Schadenlage" schon —
+    // weitergearbeitet wird an „Eigene Lage".
+    await waitFor(() => expect(offeneKopfzeile()).toHaveLength(1));
+    expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage (leer)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Eigene Lage')).toHaveFocus();
+  });
+
+  it('nimmt am LEEREN Bericht den ersten Abschnitt (Gegenaussage)', async () => {
+    // Ohne diese Hälfte wäre „öffnet immer den dritten" vom richtigen nicht zu unterscheiden.
+    setupLebend(lagebericht7Abschnitte);
+    await waitFor(() => expect(offeneKopfzeile()).toHaveLength(1));
+    expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Auftrag')).toHaveFocus();
+  });
+
+  it('lässt den offenen Abschnitt beim Befüllen NICHT weiterwandern', async () => {
+    // Die scharfe Aussage: der Einstieg wird EINMAL je Bericht bestimmt. Wäre er eine
+    // lebende Ableitung, klappte das Akkordeon beim ersten Autosave auf „Lageentwicklung"
+    // weiter — unter dem Cursor der Person, die gerade schreibt.
+    const { fremdeAenderung, patches } = setupLebend(teilweiseBefuellt);
+    const feld = await screen.findByLabelText('Eigene Lage');
+    await userEvent.type(feld, 'jetzt befüllt');
+    await userEvent.tab();
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await fremdeAenderung({
+      ...teilweiseBefuellt,
+      abschnitte: teilweiseBefuellt.abschnitte.map((a) =>
+        a.schluessel === 'eigene_lage' ? { ...a, text: 'jetzt befüllt' } : a),
+    });
+    expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage')).toBeInTheDocument();
+  });
+
+  it('setzt offenen Abschnitt und Vorschau-Schalter beim Wechsel auf einen anderen Bericht zurück', async () => {
+    // Die dritte Hook-Zusicherung aus dem Ticket: `key={lbId}` ist der Reset. Beide
+    // Zustände gehören zu EINEM Bericht — ein mitgeschleppter offener Abschnitt zeigte am
+    // nächsten Bericht einen Abschnitt, den niemand gewählt hat.
+    const zweiter: LageberichtAnzeige = { ...lagebericht7Abschnitte, id: 13, titel: 'Zweiter Bericht' };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(teilweiseBefuellt)),
+      http.get('/api/einsaetze/7/lageberichte/13', () => HttpResponse.json(zweiter)),
+    );
+    function Weiter() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>weiter</button>;
+    }
+    renderMitProviders(
+      <AuthProvider>
+        <Weiter />
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/lageberichte/12' },
+    );
+    // Von Hand einen ANDEREN Abschnitt wählen und die Vorschau einschalten.
+    await userEvent.click(await screen.findByText('Zusammenfassung (leer)'));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
+    await waitFor(() =>
+      expect(within(offeneKopfzeile()[0]).getByText('Zusammenfassung (leer)')).toBeInTheDocument());
+    expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).toBeChecked();
+
+    await userEvent.click(screen.getByRole('button', { name: 'weiter' }));
+    await screen.findByRole('heading', { name: 'Zweiter Bericht' });
+    // Der zweite Bericht ist ganz leer → Einstieg ist „Auftrag", nicht die alte Wahl.
+    await waitFor(() =>
+      expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument());
+    expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
+  });
+});
+
 describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
   function setupMitPatch(start: LageberichtAnzeige) {
     const zustand = { scheitert: true };

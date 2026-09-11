@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Button, Checkbox, DatePicker, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -16,11 +16,16 @@ import {
   schreibeLageberichtFort,
 } from '../api/lageberichte';
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
-import { vorlage } from '../lageberichte/vorlagen';
-import { AbschnittsAkkordeon, befuellteAbschnitte } from '../lageberichte/AbschnittsAkkordeon';
+import { vorlage, type AbschnittDef } from '../lageberichte/vorlagen';
+import {
+  AbschnittsAkkordeon,
+  befuellungsKette,
+  mengeAusKette,
+} from '../lageberichte/AbschnittsAkkordeon';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -62,6 +67,24 @@ function LageberichtDetail() {
    */
   const [offenerAbschnitt, setOffenerAbschnitt] = useState<string | null>(null);
   const [vorschauNeben, setVorschauNeben] = useState(false);
+  /**
+   * Der Einstiegs-Abschnitt (LFH-495): offen UND fokussiert ist der erste leere. EINMAL je
+   * Bericht bestimmt — der Remount über `key={lbId}` ist der Reset. Eine lebende Ableitung
+   * wäre ein Fehler: sobald jemand diesen Abschnitt befüllt, zeigte `einstiegsAbschnitt` auf
+   * den nächsten leeren, und das Akkordeon klappte beim ersten Autosave unter dem Cursor
+   * weiter.
+   *
+   * WÄHREND DES RENDERNS abgeleitet, nicht im Effekt — und beides ist gemessen. Der
+   * `useState`-Initialwert geht nicht: `berichtQuery.data` ist beim ersten Render noch nicht
+   * da (die Seite zeigt einen `<Spin>`). Ein Effekt dagegen kommt zu SPÄT: `Einstiegsfokus`
+   * friert sein Ziel beim Mount ein und hing dann eine Runde zu früh am `undefined` —
+   * der Fokus landete gemessen auf `<body>`. Zusätzlich klappte das Akkordeon für einen
+   * Bildaufbau auf den ersten Abschnitt und danach weiter. React rendert nach einem
+   * `setState` im Renderlauf sofort neu, BEVOR es zeichnet; der Riegel gegen die Schleife
+   * ist das Objekt — `feld` darf `null` sein („Vorlage ohne Abschnitte"), ein nackter
+   * `null`-Vergleich liefe deshalb endlos.
+   */
+  const [einstieg, setEinstieg] = useState<{ feld: string | null } | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -75,9 +98,50 @@ function LageberichtDetail() {
   // Vor den frühen Rückgaben (Hook-Reihenfolge); `vorlage()` liefert je Schlüssel dasselbe
   // Objekt aus `VORLAGEN`, die Abhängigkeit ist also stabil.
   const vorlageDef = berichtQuery.data ? vorlage(berichtQuery.data.vorlage) : undefined;
+  /**
+   * Die Leer-Marke je Kopfzeile — über ein PRIMITIV memoisiert (LFH-495, Nachzug N4).
+   *
+   * `befuellteAbschnitte(werte, …)` liefert je Tastenanschlag ein neues `Set` mit gleichem
+   * Inhalt. Als Prop am memoisierten Akkordeon reicht diese Identitätsänderung, um die
+   * Sperre wertlos zu machen — alle acht Editoren rendern samt `autoSize`-Nachmessung neu.
+   * Die Kette ist ein String und ändert sich nur beim echten Kippen leer↔befüllt; gemessen
+   * fällt die Verzögerung Anschlag-bis-Bild damit von 36/73/138 ms auf die Werte in
+   * `e2e/lagebericht-tippen.spec.ts`.
+   */
+  const befuelltKette = befuellungsKette(werte, vorlageDef?.abschnitte ?? []);
   const befuellt = useMemo(
-    () => befuellteAbschnitte(werte, vorlageDef?.abschnitte ?? []),
-    [werte, vorlageDef],
+    () => mengeAusKette(befuelltKette, vorlageDef?.abschnitte ?? []),
+    [befuelltKette, vorlageDef],
+  );
+
+  if (einstieg === null && berichtQuery.data && vorlageDef) {
+    const geladen = berichtQuery.data;
+    setEinstieg({
+      feld: einstiegsAbschnitt(
+        vorlageDef.abschnitte.map((a) => a.schluessel),
+        (schluessel) => geladen.abschnitte.find((x) => x.schluessel === schluessel)?.text,
+      ) ?? null,
+    });
+  }
+
+  /**
+   * `useCallback`, nicht inline (LFH-495): eine neue Funktionsidentität je Anschlag hebt die
+   * `memo`-Sperre des Akkordeons auf — ohne Fehlerbild, es wird nur wieder langsam.
+   * Abhängig allein von `vorschauNeben`, der einzigen Größe, die den Editor umstellt.
+   */
+  const abschnittsEditor = useCallback(
+    (a: AbschnittDef) => (
+      // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
+      // Zugänglichkeit (Label-Verknüpfung), steht aber nicht ein zweites Mal da.
+      <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
+        <MarkdownEditor
+          layout={vorschauNeben ? 'split' : 'toggle'}
+          variante="dokument"
+          autoSize={{ minRows: 6 }}
+        />
+      </Form.Item>
+    ),
+    [vorschauNeben],
   );
 
   const invalidate = () => {
@@ -123,17 +187,20 @@ function LageberichtDetail() {
     onGespeichert: invalidate,
   });
 
+  /**
+   * Ein Klick, ein PATCH (LFH-495). Der Klick blurrt zuerst das Feld, der Blur-Autosave ist
+   * also schon unterwegs — `speichereJetzt` hängt sich an ihn an, statt einen zweiten PATCH
+   * mit identischem Inhalt zu schicken. Quittung, Zeitstempel und `invalidate` liegen im
+   * Hook und laufen genau einmal je PATCH; hier bleibt nur der Erfolgs-Toast.
+   *
+   * KEIN `onError` (LFH-494, Fortschreibung von C10/H14): `speichereJetzt` legt den Grund
+   * selbst in `speicherFehler` ab, der Alert steht oben auf der Seite. Ein Toast daneben
+   * zeigte zwei Wahrheiten — einen stehenden Alert und eine Meldung, die nach drei
+   * Sekunden geht.
+   */
   const speichernMutation = useMutation({
-    mutationFn: speichern,
-    onSuccess: () => {
-      schutz.quittiereGespeichert();
-      invalidate();
-      message.success('Entwurf gespeichert');
-    },
-    // KEIN Toast am Speicherpfad (LFH-494, Fortschreibung von C10/H14): der Grund gehört
-    // in denselben Zustand wie der des Autosave, sonst zeigte die Seite zwei Wahrheiten —
-    // einen stehenden Alert und einen Toast, der nach drei Sekunden geht.
-    onError: schutz.meldeSpeicherfehler,
+    mutationFn: (werte: FormWerte) => schutz.speichereJetzt(werte),
+    onSuccess: () => message.success('Entwurf gespeichert'),
   });
 
   const freigebenMutation = useMutation({
@@ -192,20 +259,21 @@ function LageberichtDetail() {
         // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
         // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
         // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
+        // Über denselben Weg wie der Knopf (LFH-495): läuft der Blur-Autosave noch, wird
+        // er abgewartet statt gedoppelt. Der Hook quittiert bei Erfolg selbst — sonst
+        // bliebe der Merker nach der endgültigen Freigabe stehen und der Browser fragte
+        // beim Neuladen nach Änderungen an einem Bericht, der nicht mehr editierbar ist
+        // (Review LFH-348).
         try {
-          await speichern(werte);
+          await schutz.speichereJetzt(werte);
         } catch (e) {
           // Hier BEIDES (LFH-494): der Alert liegt auf der Seite HINTER dem offenen Dialog
           // (`throw e` lässt ihn stehen) — ohne den Toast bliebe der Grund unsichtbar, bis
-          // jemand abbricht. Der Alert ist der, der die drei Sekunden überlebt.
-          schutz.meldeSpeicherfehler(e);
+          // jemand abbricht. Der Alert ist der, der die drei Sekunden überlebt; den legt
+          // `speichereJetzt` selbst ab.
           fehler(e);
           throw e; // Dialog offen lassen, Freigabe nicht auslösen.
         }
-        // Sonst bliebe der Merker nach der endgültigen Freigabe stehen und der Browser
-        // fragte beim Neuladen nach Änderungen an einem Bericht, der nicht mehr editierbar
-        // ist (Review LFH-348).
-        schutz.quittiereGespeichert();
         await freigebenMutation.mutateAsync();
       },
     });
@@ -268,6 +336,15 @@ function LageberichtDetail() {
                   ? 'ungespeicherte Änderungen'
                   : schutz.zuletztGespeichert && `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
               </Typography.Text>
+              {/* `loading` NUR am expliziten Pfad, NICHT an `speichertGerade` (LFH-495,
+                  gemessen): antds Ladezustand hängt ein `<span role="img" aria-label="loading">`
+                  in den Knopf, der zugängliche Name wird dadurch zu „loading Entwurf
+                  speichern" — bei `speichertGerade` also bei JEDEM stillen Autosave, alle
+                  30 Sekunden und bei jedem verlassenen Feld. Ein Hintergrundvorgang, der den
+                  Namen eines Bedienelements umbenennt, ist genau die Alarmquelle, die der
+                  Autosave nicht sein soll (und `BefehlDetailPage.test.tsx` fand es sofort:
+                  „Unable to find … name 'Entwurf speichern'"). Der Riegel gegen den
+                  Doppel-PATCH liegt im Hook, nicht an diesem `loading`. */}
               <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
                 Entwurf speichern
               </Button>
@@ -332,21 +409,15 @@ function LageberichtDetail() {
             <AbschnittsAkkordeon
               abschnitte={v.abschnitte}
               befuellt={befuellt}
-              offen={offenerAbschnitt ?? v.abschnitte[0].schluessel}
+              // Vorgabe ist der Einstiegs-Abschnitt, nicht stur der erste (LFH-495).
+              offen={offenerAbschnitt ?? einstieg?.feld ?? v.abschnitte[0].schluessel}
               onOffen={setOffenerAbschnitt}
-              editor={(a) => (
-                // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für
-                // die Zugänglichkeit (Label-Verknüpfung), steht aber nicht ein zweites Mal da.
-                <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
-                  <MarkdownEditor
-                    layout={vorschauNeben ? 'split' : 'toggle'}
-                    variante="dokument"
-                    autoSize={{ minRows: 6 }}
-                  />
-                </Form.Item>
-              )}
+              editor={abschnittsEditor}
             />
           )}
+          {/* Einstiegsfokus in den offenen Abschnitt (LFH-495). Als LETZTES Kind, damit beim
+              Mount-Effekt alle Felder im DOM stehen; Begründungen in `Einstiegsfokus`. */}
+          <Einstiegsfokus form={form} feld={einstieg?.feld ?? undefined} />
         </Form>
       ) : (
         <div className="lagebericht-druck">

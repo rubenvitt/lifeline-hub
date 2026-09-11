@@ -1,6 +1,6 @@
 import { Collapse, Typography, theme } from 'antd';
 import { CheckCircleOutlined, MinusCircleOutlined } from '@ant-design/icons';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import type { AbschnittDef } from './vorlagen';
 
 /**
@@ -16,6 +16,40 @@ export function befuellteAbschnitte(
     const t = werte?.[a.schluessel];
     if (typeof t === 'string' && t.trim()) voll.add(a.schluessel);
   }
+  return voll;
+}
+
+/**
+ * Dieselbe Aussage als ZEICHENKETTE, ein Zeichen je Abschnitt („1" befüllt, „0" leer).
+ *
+ * Der Zweck ist eine Memo-Abhängigkeit, die ein PRIMITIV ist (CLAUDE.md, Lint-Disziplin:
+ * „Primitive statt Objekt in die Deps"). `befuellteAbschnitte` liefert bei jedem
+ * Tastenanschlag ein NEUES `Set` mit identischem Inhalt — als Prop reicht das, um jede
+ * Memoisierung des Akkordeons wertlos zu machen. Die Kette ändert sich dagegen nur, wenn ein
+ * Abschnitt tatsächlich von leer auf befüllt kippt, also ein- oder zweimal je Abschnitt und
+ * Sitzung statt vierzig Mal je Satz.
+ *
+ * Abgeleitet AUS `befuellteAbschnitte`, nicht daneben gebaut: die Frage „was ist befüllt"
+ * hat eine Definition, und eine zweite mit eigener Leerraum-Regel wäre die Sorte Abweichung,
+ * die niemandem auffällt.
+ */
+export function befuellungsKette(
+  werte: Record<string, unknown> | undefined,
+  abschnitte: readonly AbschnittDef[],
+): string {
+  const voll = befuellteAbschnitte(werte, abschnitte);
+  return abschnitte.map((a) => (voll.has(a.schluessel) ? '1' : '0')).join('');
+}
+
+/** Die Umkehrung — aus der Kette zurück zur Menge, ohne die Werte erneut zu lesen. */
+export function mengeAusKette(
+  kette: string,
+  abschnitte: readonly AbschnittDef[],
+): ReadonlySet<string> {
+  const voll = new Set<string>();
+  abschnitte.forEach((a, i) => {
+    if (kette[i] === '1') voll.add(a.schluessel);
+  });
   return voll;
 }
 
@@ -55,8 +89,25 @@ export interface AbschnittsAkkordeonProps {
  *  · Die Leer-Marke trägt ZWEI Kanäle (WCAG 1.4.1): Ikone in `aria-hidden`-Hülle und das
  *    Wort „(leer)" im Kopfzeilentext. Ein antd-Icon bringt sonst `role="img"` mit
  *    englischem Namen mit und stünde in jeder Zeile als eigenes Vorleseziel.
+ *
+ * `memo` IST HIER EINE MESSUNG, KEIN REFLEX (LFH-495, Nachzug N4). Die Detailseite hält mit
+ * `Form.useWatch([], form)` die Leer-Marke am Tippen statt am Speichern und rendert dafür je
+ * Anschlag neu — mit ihr acht Editoren, die alle `forceRender` tragen und ihre Höhe per
+ * `autoSize` nachmessen. Gemessen bei 1366 × 768 (`e2e/lagebericht-tippen.spec.ts`,
+ * Anschlag bis Bild): Median 36 ms, p90 73 ms, schlechtester 138 ms — gegen 17 / 30 / 72 ms
+ * am Befehlsentwurf, der dieselben Editoren ohne `useWatch` trägt. Der schlechteste Anschlag
+ * lag damit über der RAIL-Grenze von 100 ms.
+ *
+ * Die Sperre trägt nur, solange ALLE vier Props identitätsstabil bleiben: `abschnitte` kommt
+ * aus `VORLAGEN` (dasselbe Objekt je Schlüssel), `onOffen` ist ein Setter, `offen` ist eine
+ * Zeichenkette — und `befuellt` muss über `befuellungsKette`/`mengeAusKette` laufen, sonst
+ * ist es je Anschlag ein neues `Set` und die Memoisierung ein No-op. Wer `editor` inline
+ * übergibt statt per `useCallback`, hebt sie ebenso auf; beides fällt nicht auf, weil es
+ * nichts kaputt macht — es wird nur wieder langsam.
  */
-export function AbschnittsAkkordeon({ abschnitte, befuellt, offen, onOffen, editor }: AbschnittsAkkordeonProps) {
+export const AbschnittsAkkordeon = memo(function AbschnittsAkkordeon({
+  abschnitte, befuellt, offen, onOffen, editor,
+}: AbschnittsAkkordeonProps) {
   const { token } = theme.useToken();
   return (
     <Collapse
@@ -90,4 +141,4 @@ export function AbschnittsAkkordeon({ abschnitte, befuellt, offen, onOffen, edit
       })}
     />
   );
-}
+});
