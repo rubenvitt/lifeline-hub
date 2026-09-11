@@ -111,9 +111,26 @@ jobs:
 
       # Nur einmal: das SBOM soll das ausgelieferte Artefakt inventarisieren, und der
       # Cargo-Graph ist über alle Targets derselbe. Vier Kopien wären vier gleiche Dateien.
-      - name: cargo-cyclonedx
+      - name: SBOM-Werkzeuge
         if: matrix.sbom
-        run: cargo install cargo-cyclonedx --locked --version 0.5.7
+        # Beide Versionen exakt gepinnt, nicht als Bereich. Dieselbe Lehre, die
+        # release.config.mjs für das Changelog-Preset festhält: ein Werkzeug, das sich unter
+        # einem `^`-Bereich bewegt, bricht den Lauf irgendwann an der teuersten Stelle.
+        #
+        # cdxgen statt @cyclonedx/cyclonedx-npm für das Frontend — Begründung am Aufrufort in
+        # scripts/build-release.sh: cyclonedx-npm ermittelt seinen Baum über `npm ls` und
+        # liefert in einem pnpm-Projekt nichts.
+        run: |
+          cargo install cargo-cyclonedx --locked --version 0.5.7
+          mise exec node@26.7.0 -- npm install -g @cyclonedx/cdxgen@11.11.0
+          # Der PATH-Eintrag ist Teil der Installation, nicht Beiwerk: `npm -g` legt die
+          # Binary unter mises Node-Verzeichnis ab, und build-release.sh findet sie über
+          # `command -v cdxgen`. Ohne diese Zeile sähe der nächste Step sie nicht — das
+          # Skript nähme den else-Zweig, und der Lauf bräche erst am SBOM_PFLICHT-Gate ab,
+          # mit „Werkzeug fehlt" statt mit der wahren Ursache. Genau darum läuft auch der
+          # Aufruf oben über `mise exec`: ein nacktes `npm` ist hier nicht zugesichert,
+          # weshalb der Einsammelschritt unten `node` ebenso aufruft.
+          echo "$(mise exec node@26.7.0 -- npm prefix -g)/bin" >> "$GITHUB_PATH"
 
       - name: Bauen
         env:
@@ -124,6 +141,12 @@ jobs:
           CC_x86_64_pc_windows_gnu: ${{ matrix.mingw && 'x86_64-w64-mingw32-gcc' || '' }}
           CXX_x86_64_pc_windows_gnu: ${{ matrix.mingw && 'x86_64-w64-mingw32-g++' || '' }}
           AR_x86_64_pc_windows_gnu: ${{ matrix.mingw && 'x86_64-w64-mingw32-ar' || '' }}
+          # Nur der Matrix-Eintrag, der die Stückliste ausliefert, lässt sie sein Gate sein:
+          # build-release.sh bricht dann bei unvollständigem SBOM ab, statt zu warnen. Auf den
+          # anderen drei Runnern sind die SBOM-Werkzeuge gar nicht installiert — dort zu
+          # brechen nähme dem Release seine Binaries für ein Artefakt, das jener Lauf nicht
+          # beisteuert.
+          SBOM_PFLICHT: ${{ matrix.sbom && '1' || '' }}
         run: ./scripts/build-release.sh --target ${{ matrix.target }}
 
       - name: Artefakt einsammeln
@@ -131,6 +154,7 @@ jobs:
           VERSION: ${{ needs.vorbereiten.outputs.version }}
           ZIEL: ${{ matrix.target }}
           NAME: ${{ matrix.name }}
+          SBOM: ${{ matrix.sbom && '1' || '' }}
         run: |
           set -euo pipefail
           target_dir="$(cargo metadata --format-version 1 --no-deps | mise exec node@26.7.0 -- node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
@@ -140,7 +164,19 @@ jobs:
             *windows*) cp "$ausgabe/lifeline-hub.exe" "versand/lifeline-hub-$VERSION-$ZIEL.exe" ;;
             *)         cp "$ausgabe/lifeline-hub"     "versand/lifeline-hub-$VERSION-$ZIEL" ;;
           esac
-          if [ -d "$ausgabe/sbom" ]; then
+          # NUR der SBOM-Eintrag der Matrix packt ein Zip, und nur mit geprüftem INHALT.
+          #
+          # Zwei Fehler in einer Zeile, beide an v1.0.0-alpha.2 gemessen (Lauf 34513044748):
+          # `[ -d … ]` konnte nicht rot werden, weil build-release.sh das Verzeichnis mit
+          # `mkdir -p` selbst anlegt — das Release trug ein `sbom.zip` mit nur der
+          # SQLite-Version darin. Und die Bedingung galt für ALLE VIER Runner: jeder packte
+          # ein gleichnamiges Zip, die Cross-Builds sogar ein leeres, und welches am Release
+          # landete, entschied die Reihenfolge des Uploads.
+          if [ -n "$SBOM" ]; then
+            [ -n "$(find "$ausgabe/sbom" -name '*.cdx.json' -print -quit)" ] \
+              || { echo "FEHLER: keine Cargo-Stückliste (*.cdx.json) im SBOM." >&2; exit 1; }
+            [ -s "$ausgabe/sbom/bom-frontend.json" ] \
+              || { echo "FEHLER: keine Frontend-Stückliste (bom-frontend.json) im SBOM." >&2; exit 1; }
             ( cd "$ausgabe" && zip -r - sbom ) > "versand/lifeline-hub-$VERSION-sbom.zip"
           fi
           ( cd versand && for f in *; do shasum -a 256 "$f" > "$f.sha256"; done )
