@@ -8,6 +8,13 @@
 # Rust 17:00, Vitest 16:30, Playwright 17:54 — und brauchte 58 Minuten. Die drei hängen
 # nicht voneinander ab. Gemessen am grünen Lauf 34409143961.
 #
+# NACHHER, gemessen am grünen Pull-Request-Lauf 34636145213 (warme Caches): 14:12 Wall Clock
+# statt 58:00. Der kritische Pfad ist jetzt die Rust-Suite ALLEIN (13:13) — sie ist der Grund,
+# warum weiteres Sharden der beiden anderen Suiten nichts mehr brächte: Vitest-Shards liefen
+# 3:28 bis 5:50, die e2e-Shards 2:49 bis 4:45 (davor 5:00 für das Binary), Schnellprüfungen
+# 3:20. Wer die 14 Minuten weiter drücken will, muss an die Rust-Suite; die dafür nötige
+# Abwägung (nur 14,6 % Compile) steht unten am Job.
+#
 # DIE ZAHLEN, DIE DIE AUFTEILUNG BESTIMMT HABEN (alle gemessen, nicht geschätzt):
 #   - Compile ist nur 2:29 der 17 Rust-Minuten (14,6 %). Die Rust-Suite auf mehrere Runner
 #     zu partitionieren bringt deshalb weit weniger als sie zu PARALLELISIEREN — jeder Shard
@@ -17,10 +24,6 @@
 #     langsamer als vier.
 #   - Vitest verteilt nach Dateien (SHA-1 des Pfads, sortiert, zusammenhängender Slice):
 #     323 Dateien teilen sich auf 4 Shards als 81/81/81/80.
-#
-# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar). Ein Tag ist verschiebbar; ein
-# kompromittierter Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot
-# (.github/dependabot.yml) hält die Pins aktuell.
 #
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar). Ein Tag ist verschiebbar; ein
 # kompromittierter Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot
