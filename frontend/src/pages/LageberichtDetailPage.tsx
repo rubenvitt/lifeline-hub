@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Button, Checkbox, DatePicker, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -16,8 +16,12 @@ import {
   schreibeLageberichtFort,
 } from '../api/lageberichte';
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
-import { vorlage } from '../lageberichte/vorlagen';
-import { AbschnittsAkkordeon, befuellteAbschnitte } from '../lageberichte/AbschnittsAkkordeon';
+import { vorlage, type AbschnittDef } from '../lageberichte/vorlagen';
+import {
+  AbschnittsAkkordeon,
+  befuellungsKette,
+  mengeAusKette,
+} from '../lageberichte/AbschnittsAkkordeon';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
@@ -94,9 +98,20 @@ function LageberichtDetail() {
   // Vor den frühen Rückgaben (Hook-Reihenfolge); `vorlage()` liefert je Schlüssel dasselbe
   // Objekt aus `VORLAGEN`, die Abhängigkeit ist also stabil.
   const vorlageDef = berichtQuery.data ? vorlage(berichtQuery.data.vorlage) : undefined;
+  /**
+   * Die Leer-Marke je Kopfzeile — über ein PRIMITIV memoisiert (LFH-495, Nachzug N4).
+   *
+   * `befuellteAbschnitte(werte, …)` liefert je Tastenanschlag ein neues `Set` mit gleichem
+   * Inhalt. Als Prop am memoisierten Akkordeon reicht diese Identitätsänderung, um die
+   * Sperre wertlos zu machen — alle acht Editoren rendern samt `autoSize`-Nachmessung neu.
+   * Die Kette ist ein String und ändert sich nur beim echten Kippen leer↔befüllt; gemessen
+   * fällt die Verzögerung Anschlag-bis-Bild damit von 36/73/138 ms auf die Werte in
+   * `e2e/lagebericht-tippen.spec.ts`.
+   */
+  const befuelltKette = befuellungsKette(werte, vorlageDef?.abschnitte ?? []);
   const befuellt = useMemo(
-    () => befuellteAbschnitte(werte, vorlageDef?.abschnitte ?? []),
-    [werte, vorlageDef],
+    () => mengeAusKette(befuelltKette, vorlageDef?.abschnitte ?? []),
+    [befuelltKette, vorlageDef],
   );
 
   if (einstieg === null && berichtQuery.data && vorlageDef) {
@@ -108,6 +123,26 @@ function LageberichtDetail() {
       ) ?? null,
     });
   }
+
+  /**
+   * `useCallback`, nicht inline (LFH-495): eine neue Funktionsidentität je Anschlag hebt die
+   * `memo`-Sperre des Akkordeons auf — ohne Fehlerbild, es wird nur wieder langsam.
+   * Abhängig allein von `vorschauNeben`, der einzigen Größe, die den Editor umstellt.
+   */
+  const abschnittsEditor = useCallback(
+    (a: AbschnittDef) => (
+      // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
+      // Zugänglichkeit (Label-Verknüpfung), steht aber nicht ein zweites Mal da.
+      <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
+        <MarkdownEditor
+          layout={vorschauNeben ? 'split' : 'toggle'}
+          variante="dokument"
+          autoSize={{ minRows: 6 }}
+        />
+      </Form.Item>
+    ),
+    [vorschauNeben],
+  );
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
@@ -377,17 +412,7 @@ function LageberichtDetail() {
               // Vorgabe ist der Einstiegs-Abschnitt, nicht stur der erste (LFH-495).
               offen={offenerAbschnitt ?? einstieg?.feld ?? v.abschnitte[0].schluessel}
               onOffen={setOffenerAbschnitt}
-              editor={(a) => (
-                // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für
-                // die Zugänglichkeit (Label-Verknüpfung), steht aber nicht ein zweites Mal da.
-                <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
-                  <MarkdownEditor
-                    layout={vorschauNeben ? 'split' : 'toggle'}
-                    variante="dokument"
-                    autoSize={{ minRows: 6 }}
-                  />
-                </Form.Item>
-              )}
+              editor={abschnittsEditor}
             />
           )}
           {/* Einstiegsfokus in den offenen Abschnitt (LFH-495). Als LETZTES Kind, damit beim

@@ -844,6 +844,73 @@ Alltag wichtigsten:
   Nachfolger, nicht `vorgaenger_id == null`), die Lagemeldungen sind die **zwölfte**
   `Datensicht`-Konsumentin; ihre Tagesgrenze liegt in der Anzeigezone
   (`lagemeldungen/zeitachse.ts`), nicht in UTC.
+- **Ein Klick auf „Entwurf speichern" ist EIN PATCH** (LFH-495, Nachzug zu C13/N3+N4). Der
+  Klick ist zwei Ereignisse: er nimmt dem Feld zuerst den Fokus — `onBlur` startet den
+  Autosave —, und erst danach kommt `click` mit `form.submit()`. Bis dahin sperrte `laeuftRef`
+  nur Autosave gegen Autosave; der explizite Pfad lief daneben und schickte denselben Inhalt
+  ein zweites Mal, samt zweitem SSE-Ereignis und zweiter Invalidierung. **`speichereJetzt` ist
+  jetzt die EINZIGE Pforte** für ein Speichern ausserhalb der Uhr; `quittungVorbereiten`,
+  `quittiereGespeichert` und `meldeSpeicherfehler` sind **entfernt und nicht bloss ungenutzt**
+  — aus ihnen war der zweite Pfad zusammengesetzt, und die Begründung ist dieselbe wie bei
+  `onFehler` in LFH-494.
+  **„Anhängen" allein ist ein Rennen, nicht der Riegel** (gemessen): zwischen `mousedown` und
+  `click` liegen Millisekunden, ein schneller PATCH ist da längst zurück und die Dublette ging
+  doch raus. Vor dem Anhängen steht deshalb die Frage, ob dieser Stand **schon gesichert** ist
+  (`gesichertRef`). Dessen Start auf `-1` ist Teil des Vertrags: „nichts geändert" und „nichts
+  gesendet" sind zwei Zustände, und mit `0` verlöre ein unberührter Entwurf den PATCH des
+  Freigabe-Vorlaufs — `/freigeben` prüft den **persistierten** Stand, nicht den Editor-Inhalt.
+  **Der Riegel sperrt die Dublette, nicht den Fortschritt:** ein Blur mit NEUEREM Stand
+  bekommt weiter seinen eigenen PATCH. Die strengere Fassung („es läuft etwas, also nichts
+  senden") verschluckte den Fall „erst manuell speichern, dann weitertippen, dann die Seite
+  verlassen" und färbte den Reihenfolge-Test des Befehls sofort rot.
+  **`speichertGerade` (vormals `autosaveLaeuft`) deckt beide Pfade ab** und ist damit die
+  einzige Quelle am Navigations-Blocker. **Nicht** als `loading` am Speichern-Knopf, obwohl
+  das Ticket es vorschlug: antds Ladezustand hängt ein `role="img" aria-label="loading"` in
+  den Knopf und benennt ihn bei JEDEM stillen Autosave zu „loading Entwurf speichern" um —
+  ein Hintergrundvorgang, der ein Bedienelement umbenennt. Der Riegel liegt im Hook, nicht an
+  einem `loading`.
+- **Der Einstiegsfokus eines Entwurfs sitzt im ersten LEEREN Abschnitt** (LFH-495; das Ticket
+  liess die Bedienentscheidung offen), sonst im ersten. Ein fortgeschriebener Bericht trägt
+  die Abschnitte des Vorgängers befüllt — der erste leere ist die Stelle, an der die Arbeit
+  weitergeht; der Titel ist beim Anlegen UND beim Fortschreiben schon gesetzt und wäre der
+  falsche Kandidat. Der Lagebericht klappt denselben Abschnitt auf, sonst stünde der Cursor
+  in einem zugeklappten Editor. Träger ist `entwurf/Einstiegsfokus.tsx` (reine, exportierte
+  Wahlfunktion). Vier Festlegungen, alle gemessen: es ist eine **Komponente im
+  Formularzweig**, kein Effekt in der Seite (beide Seiten zeigen erst einen `<Spin>`, ein
+  `useEffect(…, [])` oben liefe, während es das Feld noch nicht gibt, und käme nie wieder);
+  ein **Effekt**, kein `requestAnimationFrame` (Lektion aus `Erfassung.tsx`); das Ziel wird
+  **am Mount eingefroren** und im Lagebericht **während des Renderns** abgeleitet — per Effekt
+  kam es eine Runde zu spät und der Fokus landete auf `<body>`, der Riegel gegen die
+  Renderschleife ist das Objekt, weil `feld` `null` sein darf; und es wird **kein Fokus
+  gestohlen**, der schon woanders liegt. Das Ziel kommt aus dem **Serverstand**, nicht aus den
+  Formularwerten — die sind beim Mount noch leer.
+- **`Form.useWatch([], form)` kostet die Kaskade, nicht die Marke** (LFH-495 · N4, dreimal
+  gemessen bei 1366 × 768, `e2e/lagebericht-tippen.spec.ts`, Anschlag bis Bild): Median 36 ms,
+  **p90 73 ms**, schlechtester 138 ms — gegen 17/30/72 ms am Befehlsentwurf, der dieselben
+  Editoren **ohne** `useWatch` trägt. Beide im Ticket vorgeschlagenen Eingriffe wären
+  wirkungslos gewesen: **„auf die Abschnittspfade einschränken"** geht nicht (der Hook nimmt
+  EINEN Pfad, die Abschnittszahl steht erst zur Laufzeit fest) und würde nichts sparen — die
+  Abschnittspfade sind genau das, was sich beim Tippen ändert; **„die Leer-Marke entprellen"**
+  trifft das Ergebnis, während den Render der **Hook** auslöst. Wirksam ist, die Kaskade zu
+  unterbinden: `AbschnittsAkkordeon` ist `memo`, `befuellt` läuft über ein **Primitiv**
+  (`befuellungsKette`) und der `editor` über `useCallback`. Der Elternteil rendert weiter je
+  Anschlag (Kopfzeile, Etiketten — billig), die acht Editoren mit ihrer `autoSize`-Nachmessung
+  nicht mehr: **p90 43–48 ms**. Die Sperre trägt nur, solange ALLE vier Props
+  identitätsstabil sind — eine inline `editor`-Prop genügt, um sie aufzuheben, und sie macht
+  sonst nichts kaputt; deshalb ist der p90-Deckel von 60 ms das tragende Gate (per
+  Mutationsprobe: inline → 81 ms, rot). **Offen und benannt:** der schlechteste Anschlag liegt
+  unverändert bei 120–130 ms und damit über der RAIL-Grenze von 100 ms — die Memoisierung hat
+  ihn nicht bewegt, er hängt also nicht an `useWatch` (Verdacht: `autoSize`-Neumessung beim
+  Zeilenumbruch, die auch die Kontrolle auf 58–77 ms hebt). Eigene Untersuchung, kein
+  Nebenprodukt dieses Nachzugs.
+- **`kettenKoepfe` lässt keinen Bericht fallen** (LFH-495). Bei einem VOLLSTÄNDIGEN Zyklus
+  (`11 → 13 → 11`, ein Datenfehler) hat jedes Glied einen Nachfolger, es gibt also keinen
+  Kopf — die Funktion lieferte dafür eine leere Liste, und die Berichte verschwanden lautlos
+  aus der Übersicht (`ketten.test.ts` pinnte das). Was nach dem ersten Durchgang in keiner
+  Kette liegt, wird **hinten** angehängt, mit gefolgter Kette statt als nackte Einzelköpfe:
+  der Zyklus bricht ohnehin ab, und so bleibt die Verwandtschaft sichtbar statt als n
+  gleichnamige Karten nebeneinander — das Bild, gegen das N23 gebaut wurde. Die
+  Listenreihenfolge der echten Köpfe bleibt; ein Datenfehler sortiert die Sicht nicht um.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
