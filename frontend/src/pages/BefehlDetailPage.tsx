@@ -165,21 +165,20 @@ function BefehlDetail() {
     onGespeichert: invalidate,
   });
 
+  /**
+   * Ein Klick, ein PATCH (LFH-495). Der Klick blurrt zuerst das Feld, der Blur-Autosave ist
+   * also schon unterwegs — `speichereJetzt` hängt sich an ihn an, statt einen zweiten PATCH
+   * mit identischem Inhalt zu schicken. Quittung, Zeitstempel und `invalidate` liegen im
+   * Hook und laufen genau einmal je PATCH; hier bleibt nur der Erfolgs-Toast.
+   *
+   * KEIN `onError` (LFH-494, Fortschreibung von C10/H14): `speichereJetzt` legt den Grund
+   * selbst in `speicherFehler` ab, der Alert steht unten auf der Seite. Ein Toast daneben
+   * zeigte zwei Wahrheiten — einen stehenden Alert und eine Meldung, die nach drei
+   * Sekunden geht.
+   */
   const speichernMutation = useMutation({
-    mutationFn: async (werte: Record<string, string>) => {
-      const quittieren = schutz.quittungVorbereiten();
-      await speichern(werte);
-      return quittieren;
-    },
-    onSuccess: (quittieren) => {
-      quittieren();
-      invalidate();
-      message.success('Entwurf gespeichert');
-    },
-    // KEIN Toast am Speicherpfad (LFH-494, Fortschreibung von C10/H14): der Grund gehört
-    // in denselben Zustand wie der des Autosave, sonst zeigte die Seite zwei Wahrheiten —
-    // einen stehenden Alert und einen Toast, der nach drei Sekunden geht.
-    onError: schutz.meldeSpeicherfehler,
+    mutationFn: (werte: Record<string, string>) => schutz.speichereJetzt(werte),
+    onSuccess: () => message.success('Entwurf gespeichert'),
   });
 
   const freigebenMutation = useMutation({
@@ -238,21 +237,21 @@ function BefehlDetail() {
         // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
         // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
         // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
-        const quittieren = schutz.quittungVorbereiten();
+        // Über denselben Weg wie der Knopf (LFH-495): läuft der Blur-Autosave noch, wird
+        // er abgewartet statt gedoppelt. Der Hook quittiert bei Erfolg selbst — sonst
+        // bliebe der Merker nach der endgültigen Freigabe stehen und der Browser fragte
+        // beim Neuladen nach Änderungen an einem Befehl, der nicht mehr editierbar ist
+        // (Review LFH-348).
         try {
-          await speichern(werte);
+          await schutz.speichereJetzt(werte);
         } catch (e) {
           // Hier BEIDES (LFH-494): der Alert liegt auf der Seite HINTER dem offenen Dialog
           // (`throw e` lässt ihn stehen) — ohne den Toast bliebe der Grund unsichtbar, bis
-          // jemand abbricht. Der Alert ist der, der die drei Sekunden überlebt.
-          schutz.meldeSpeicherfehler(e);
+          // jemand abbricht. Der Alert ist der, der die drei Sekunden überlebt; den legt
+          // `speichereJetzt` selbst ab.
           fehler(e);
           throw e; // Dialog offen lassen, Freigabe nicht auslösen.
         }
-        // Sonst bliebe der Merker nach der endgültigen Freigabe stehen und der Browser
-        // fragte beim Neuladen nach Änderungen an einem Befehl, der nicht mehr editierbar
-        // ist (Review LFH-348).
-        quittieren();
         await freigebenMutation.mutateAsync();
       },
     });
@@ -302,6 +301,15 @@ function BefehlDetail() {
                 ? 'ungespeicherte Änderungen'
                 : schutz.zuletztGespeichert && `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
             </Typography.Text>
+            {/* `loading` NUR am expliziten Pfad, NICHT an `speichertGerade` (LFH-495,
+                gemessen): antds Ladezustand hängt ein `<span role="img" aria-label="loading">`
+                in den Knopf, der zugängliche Name wird dadurch zu „loading Entwurf
+                speichern" — bei `speichertGerade` also bei JEDEM stillen Autosave, alle
+                30 Sekunden und bei jedem verlassenen Feld. Ein Hintergrundvorgang, der den
+                Namen eines Bedienelements umbenennt, ist genau die Alarmquelle, die der
+                Autosave nicht sein soll (und `BefehlDetailPage.test.tsx` fand es sofort:
+                „Unable to find … name 'Entwurf speichern'"). Der Riegel gegen den
+                Doppel-PATCH liegt im Hook, nicht an diesem `loading`. */}
             <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
               Entwurf speichern
             </Button>
@@ -318,7 +326,10 @@ function BefehlDetail() {
     <div className="befehl-print-root">
       <EntwurfNavigationSchutz
         ungespeichert={schutz.ungespeichert && istEntwurf && darfSchreiben}
-        speichert={schutz.autosaveLaeuft || speichernMutation.isPending}
+        // EINE Quelle (LFH-495): `speichertGerade` deckt Autosave UND Knopf ab, seit beide
+        // durch denselben Riegel laufen. `speichernMutation.isPending` daneben wäre eine
+        // zweite Wahrheit über denselben Vorgang.
+        speichert={schutz.speichertGerade}
         // Der Grund gehört IN den Dialog: hinter seiner Maske ist die Seite unbedienbar,
         // der Alert bei `data-lfh`-Kopf wäre dort unsichtbar (LFH-494, Review-Befund).
         speicherFehler={schutz.speicherFehler}

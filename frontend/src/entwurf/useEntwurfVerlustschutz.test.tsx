@@ -3,45 +3,89 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { Form, Input } from 'antd';
 import { useState } from 'react';
-import { useEntwurfVerlustschutz } from './useEntwurfVerlustschutz';
+import { AUTOSAVE_MS, useEntwurfVerlustschutz } from './useEntwurfVerlustschutz';
 
 interface Daten {
   titel: string;
 }
 
-/** Minimaler Träger: ein Feld, ein Serverstand, den der Test von aussen nachschiebt. */
-function Traeger({ daten, speichern }: { daten: Daten; speichern: (w: Daten) => Promise<unknown> }) {
+interface TraegerProps {
+  daten: Daten;
+  speichern: (w: Daten) => Promise<unknown>;
+  istEntwurf?: boolean;
+}
+
+/**
+ * Minimaler Träger: ein Feld, ein Serverstand, den der Test von aussen nachschiebt.
+ *
+ * Der Knopf liegt AUSSERHALB des `<Form>` und ruft `form.submit()` — genau wie in beiden
+ * echten Seiten, wo er im Kopf-`Space` bzw. in der verankerten Aktionsleiste steht und
+ * deshalb kein Übermittlungsknopf sein KANN (LFH-465, LFH-346 · C11). Ihn hier ins Formular
+ * zu setzen wäre bequemer und würde die Lage verfälschen: sein eigener Fokusverlust löste
+ * dann den Blur-Autosave des Formulars mit aus, den es in der Seite nicht gibt.
+ *
+ * Daraus entstand der Doppel-PATCH aus LFH-495: der Klick nimmt dem FELD zuerst den Fokus,
+ * `onBlur` startet den Autosave, und erst danach kommt `click` mit `form.submit()`. Die
+ * Zähler stehen im Bild, damit „der Aufrufer hat GENAU EINE Quittung bekommen" ohne
+ * Mock-Zugriff prüfbar ist.
+ */
+function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
   const [form] = Form.useForm<Daten>();
+  const [quittungen, setQuittungen] = useState(0);
+  const [ablehnungen, setAblehnungen] = useState(0);
   const schutz = useEntwurfVerlustschutz<Daten, Daten>({
     daten,
-    istEntwurf: true,
+    istEntwurf,
     form,
     werteAus: (d) => ({ titel: d.titel }),
     speichern,
   });
   return (
-    <Form form={form} onValuesChange={schutz.markiereGeaendert} onBlur={schutz.autosaveJetzt}>
-      <Form.Item label="Titel" name="titel">
-        <Input />
-      </Form.Item>
+    <>
+      <Form
+        form={form}
+        onValuesChange={schutz.markiereGeaendert}
+        onBlur={schutz.autosaveJetzt}
+        onFinish={(w) => {
+          void schutz.speichereJetzt(w).then(
+            () => setQuittungen((n) => n + 1),
+            () => setAblehnungen((n) => n + 1),
+          );
+        }}
+      >
+        <Form.Item label="Titel" name="titel">
+          <Input />
+        </Form.Item>
+      </Form>
+      <button type="button" onClick={() => form.submit()}>
+        Entwurf speichern
+      </button>
       <output>{schutz.ungespeichert ? 'offen' : 'sauber'}</output>
+      <p>quittungen {quittungen}</p>
+      <p>ablehnungen {ablehnungen}</p>
+      {schutz.speichertGerade && <p>speichert</p>}
       {schutz.zuletztGespeichert && <p>zuletzt gespeichert {schutz.zuletztGespeichert}</p>}
       {schutz.speicherFehler != null && <p>Grund: {(schutz.speicherFehler as Error).message}</p>}
-    </Form>
+    </>
   );
 }
 
-function Huelle({ speichern = () => Promise.resolve() }: { speichern?: (w: Daten) => Promise<unknown> }) {
+function Huelle({
+  speichern = () => Promise.resolve(),
+  istEntwurf,
+}: { speichern?: (w: Daten) => Promise<unknown>; istEntwurf?: boolean }) {
   const [daten, setDaten] = useState<Daten>({ titel: 'Server 1' });
   return (
     <>
-      <Traeger daten={daten} speichern={speichern} />
+      <Traeger daten={daten} speichern={speichern} istEntwurf={istEntwurf} />
       <button type="button" onClick={() => setDaten({ titel: 'Server 2' })}>
         fremd
       </button>
     </>
   );
 }
+
+const speichernKnopf = () => screen.getByRole('button', { name: 'Entwurf speichern' });
 
 /**
  * Die Seitentests (`BefehlDetailPage.test.tsx`, `LageberichtePage.test.tsx`) prüfen den
@@ -193,31 +237,144 @@ describe('useEntwurfVerlustschutz', () => {
     expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument();
   });
 
-  it('nimmt einen Speicherfehler von aussen an und räumt ihn beim Quittieren', async () => {
-    // Der explizite „Entwurf speichern"-Knopf und der Freigabe-Flow laufen NICHT durch den
-    // Autosave-Zweig — sie melden über `meldeSpeicherfehler` in denselben Zustand, damit
-    // die Seite nicht zwei Fehlerquellen nebeneinander zeigt.
-    function Aussen() {
-      const [form] = Form.useForm<Daten>();
-      const schutz = useEntwurfVerlustschutz<Daten, Daten>({
-        daten: { titel: 'S' }, istEntwurf: true, form, werteAus: (d) => d,
-        speichern: () => Promise.resolve(),
-      });
-      return (
-        <Form form={form}>
-          <button type="button" onClick={() => schutz.meldeSpeicherfehler(new Error('422 Titel fehlt'))}>
-            melden
-          </button>
-          <button type="button" onClick={schutz.quittiereGespeichert}>quittieren</button>
-          {schutz.speicherFehler != null && <p>Grund: {(schutz.speicherFehler as Error).message}</p>}
-        </Form>
-      );
-    }
-    render(<Aussen />);
-    await userEvent.click(screen.getByText('melden'));
+  it('legt den Grund eines gescheiterten EXPLIZITEN Speicherns in denselben Zustand', async () => {
+    // Der Knopf und der Freigabe-Vorlauf laufen seit LFH-495 durch `speichereJetzt` und
+    // melden damit in DENSELBEN Zustand wie der Autosave — die Seite zeigt nicht zwei
+    // Fehlerquellen nebeneinander. Bis dahin setzten die Seiten den Grund über ein
+    // öffentliches `meldeSpeicherfehler` selbst; genau diese zweite Pforte ist weg.
+    const speichern = vi.fn().mockRejectedValue(new Error('422 Titel fehlt'));
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.click(speichernKnopf());
     expect(await screen.findByText('Grund: 422 Titel fehlt')).toBeInTheDocument();
-    await userEvent.click(screen.getByText('quittieren'));
-    await waitFor(() => expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument());
+    // Die Ablehnung geht ZUSÄTZLICH an den Aufrufer — er lässt den Freigabe-Dialog offen.
+    expect(screen.getByText('ablehnungen 1')).toBeInTheDocument();
+    expect(screen.getByText('quittungen 0')).toBeInTheDocument();
+    expect(screen.getByText('offen')).toBeInTheDocument();
+  });
+
+  it('schickt beim Klick auf „Entwurf speichern" EINEN PATCH, nicht zwei (LFH-495)', async () => {
+    // Der Klick ist zwei Ereignisse: Blur (Autosave) und danach Submit. Beide trugen
+    // denselben Inhalt — zwei PATCH, zwei SSE-Ereignisse, zwei Invalidierungen.
+    const speichern = vi.fn().mockResolvedValue(undefined);
+    render(<Huelle speichern={speichern} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'x');
+    await userEvent.click(speichernKnopf());
+    expect(await screen.findByText('quittungen 1')).toBeInTheDocument();
+    expect(speichern).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+  });
+
+  it('hängt das explizite Speichern an einen LAUFENDEN Autosave an, statt zu doppeln', async () => {
+    // Die scharfe Fassung der Aussage darüber, unabhängig davon, wie jsdom Blur und Klick
+    // eines Knopfdrucks anordnet: der Autosave hängt nachweislich noch, wenn der explizite
+    // Pfad losgeht — er darf dann keinen zweiten PATCH schicken, aber trotzdem quittieren.
+    let aufloesen: () => void = () => {};
+    const speichern = vi.fn(() => new Promise<void>((r) => { aufloesen = r; }));
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab(); // Blur-Autosave startet, das Promise hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('speichert')).toBeInTheDocument();
+
+    await userEvent.click(speichernKnopf());
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('quittungen 0')).toBeInTheDocument(); // noch nicht zurück
+
+    await act(async () => { aufloesen(); });
+    expect(screen.getByText('quittungen 1')).toBeInTheDocument();
+    expect(screen.getByText('sauber')).toBeInTheDocument();
+    expect(screen.queryByText('speichert')).not.toBeInTheDocument();
+  });
+
+  it('schickt einen EIGENEN PATCH, wenn seit dem laufenden Speichern getippt wurde (Gegenaussage)', async () => {
+    // Ein Anhängen bei UNGLEICHEM Stand wäre eine Quittung über S1, während im Formular S2
+    // steht — genau das Verlustfenster, das der Änderungszähler zuhält. Ohne diese Hälfte
+    // wäre ein Riegel, der immer anhängt, vom richtigen nicht zu unterscheiden.
+    let aufloesen: () => void = () => {};
+    const speichern = vi.fn(() => new Promise<void>((r) => { aufloesen = r; }));
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+    await userEvent.type(feld, 'a');
+    await userEvent.tab();
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+
+    await userEvent.type(feld, 'b'); // S2 entsteht, während S1 unterwegs ist
+    await userEvent.click(speichernKnopf());
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+    expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1ab' });
+    await act(async () => { aufloesen(); });
+  });
+
+  it('gibt den Riegel nur an den Auftrag zurück, der ihn HÄLT', async () => {
+    // Bei ungleichem Stand laufen zwei Speicherungen gleichzeitig (Zweig (c)). Kommt die
+    // ERSTE zurück, während die zweite noch unterwegs ist, darf sie den Riegel nicht
+    // öffnen — sonst schickte der nächste Blur einen dritten PATCH neben die laufende
+    // zweite, und die Reihenfolge der Schnappschüsse auf dem Server wäre offen.
+    const aufloeser: Array<() => void> = [];
+    const speichern = vi.fn(() => new Promise<void>((r) => { aufloeser.push(r); }));
+    render(<Huelle speichern={speichern} />);
+    const feld = screen.getByLabelText('Titel');
+
+    await userEvent.type(feld, 'a');
+    await userEvent.tab(); // Auftrag 1 (Stand 1) hängt
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+
+    await userEvent.type(feld, 'b'); // Stand 2 — der Klick bekommt einen eigenen PATCH
+    await userEvent.click(speichernKnopf());
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
+
+    // Auftrag 1 kommt zurück, Auftrag 2 hält den Riegel noch.
+    await act(async () => { aufloeser[0](); });
+    expect(screen.getByText('speichert')).toBeInTheDocument();
+
+    // Ein weiterer Blur mit UNVERÄNDERTEM Stand: Auftrag 2 trägt diesen Inhalt schon, es
+    // gibt also nichts zu schicken — es sei denn, Auftrag 1 hätte den Riegel geöffnet.
+    await userEvent.click(feld);
+    await userEvent.tab();
+    await act(async () => {});
+    expect(speichern).toHaveBeenCalledTimes(2);
+
+    await act(async () => { aufloeser[1](); });
+  });
+
+  it('speichert nach Ablauf der 30-s-Frist, auch ohne das Feld zu verlassen', async () => {
+    // Die Frist war bis LFH-495 ungetestet — ein `setInterval`, das nie abläuft (instabile
+    // Effekt-Deps, s. Hook-Kommentar), wäre von einem laufenden nicht zu unterscheiden.
+    vi.useFakeTimers();
+    try {
+      const speichern = vi.fn().mockResolvedValue(undefined);
+      render(<Huelle speichern={speichern} />);
+      // `userEvent.type` kommt unter Fake-Timern nicht voran (CLAUDE.md, ETB-Filter):
+      // getippt wird über `fireEvent.change`, gewartet über `advanceTimersByTime`.
+      fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'S1' } });
+      expect(speichern).not.toHaveBeenCalled();
+      // Die FRIST ist die Aussage, nicht „irgendwann": eine Millisekunde davor noch nichts.
+      act(() => { vi.advanceTimersByTime(AUTOSAVE_MS - 1); });
+      expect(speichern).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(speichern).toHaveBeenCalledTimes(1);
+      expect(speichern).toHaveBeenCalledWith({ titel: 'S1' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lässt die Uhr am FREIGEGEBENEN Stand stehen (Gegenaussage zur Frist)', async () => {
+    // `istEntwurf: false` — ein freigegebener Bericht ist unveränderlich, ein PATCH im
+    // 30-s-Takt darauf wäre ein Schreibversuch auf eine abgeschlossene Unterlage.
+    vi.useFakeTimers();
+    try {
+      const speichern = vi.fn().mockResolvedValue(undefined);
+      render(<Huelle speichern={speichern} istEntwurf={false} />);
+      fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'S1' } });
+      act(() => { vi.advanceTimersByTime(AUTOSAVE_MS * 3); });
+      expect(speichern).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('speichert nichts, wenn nichts berührt wurde — auch nicht beim Verlassen', async () => {
