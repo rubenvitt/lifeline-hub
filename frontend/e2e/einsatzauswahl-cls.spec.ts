@@ -77,6 +77,22 @@ import type { EinsatzAnzeige } from '../src/api/types';
  *    Ladewechsel mit Suchfeld, Test 3 einen Refetch ohne Ladezustand). Das ist die
  *    Arbeitsteilung, kein Mangel.
  *
+ * ── ZWEITE PROBE: TEST 3 OHNE SEINEN AUSLÖSER ────────────────────────────────────────
+ *
+ * Test 3 hat keinen Produktivcode, den man sinnvoll mutieren könnte — seine Fixture
+ * liefert zweimal dieselben Bytes, der Sollwert ist null. Falsifiziert wird er deshalb an
+ * sich selbst: das `dispatchEvent` durch einen Kommentar ersetzt. Ergebnis (11.09.2026):
+ * rot an „zwischen Reset und Messung darf das Dokument nicht neu geladen haben", zwei
+ * verschiedene Lauf-Kennungen 58,7 s auseinander.
+ *
+ * DAS IST ZUGLEICH DER BEFUND, der den lange ungeklärten zweiten Listen-Abruf erklärt:
+ * bleibt die Seite lange genug offen, lädt sie irgendwann von sich aus neu (in einer
+ * früheren Fassung ohne Riegel bei 27,8 s beobachtet, hier bei 58,7 s) — vermutlich der
+ * Full-Reload des Vite-Dev-Servers, gegen den die Suite fährt. Eine Messung über einen
+ * Dokumentwechsel hinweg misst die LADEPHASE des neuen Dokuments: dieselbe `startTime`,
+ * dieselbe Summe wie beim ersten Aufbau, und ohne den Riegel sähe das aus wie ein
+ * Refetch-Shift von 0.0204. Der Riegel macht daraus eine benannte Fehlermeldung.
+ *
  * ── GEMESSENE WERTE (11.09.2026, lokal, Chromium, Fükw 1366 × 768) ───────────────────
  *
  *  - Test 1: Summe 0.0022 aus einem Shift am Rasterknoten. Quelle ist NICHT die
@@ -118,12 +134,16 @@ const CLS_GUT = 0.1;
 const LADEWECHSEL_DECKEL = CLS_GUT / 2;
 
 /**
- * Obergrenze für Wechsel, die strukturell GAR NICHTS verschieben sollen (Test 1 und 3).
+ * Obergrenze für Wechsel, die den Seitenaufbau NICHT ändern (Test 1 und 3).
  *
  * Der Anspruch ist nicht „knapp unter dem web.dev-Limit", sondern „kein Sprung". Ein Wert,
- * der auf 0,09 klettert, wäre unter `CLS_GUT` grün und trotzdem eine Regression. Die
- * Grenze ist die gemessene Ruhelage (0.0022 bzw. 0.0000) plus Luft für Subpixel-Rundung;
- * wer sie anhebt, hebt eine Zusicherung an, keine Toleranz.
+ * der auf 0,09 klettert, wäre unter `CLS_GUT` grün und trotzdem eine Regression.
+ *
+ * Die Zahl ist eine SETZUNG, keine Rundungstoleranz: gemessen sind 0.0022 (Test 1, der
+ * `Datenstand`-Einschub im Kopf — ein Wechsel, der die Seite eben doch minimal ändert) und
+ * 0.0000 (Test 3). 0,01 lässt davon Faktor 4,5 Luft, liegt aber eine Größenordnung unter
+ * dem web.dev-Budget und eine halbe unter dem gemessenen Ladewechsel aus Test 2 (0.0204).
+ * Wer sie anhebt, hebt eine Zusicherung an, keine Toleranz.
  */
 const HAUS_GRENZE = 0.01;
 
@@ -190,6 +210,8 @@ interface ShiftEintrag {
 interface Messung {
   summe: number;
   eintraege: ShiftEintrag[];
+  /** Kennung des Dokuments, in dem gemessen wurde — siehe {@link beobachteShifts}. */
+  lauf: string;
 }
 
 // Login-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes
@@ -220,8 +242,18 @@ async function beobachteShifts(page: Page) {
     interface Zustand {
       summe: number;
       eintraege: { wert: number; zeit: number; quellen: string[] }[];
+      lauf: string;
     }
-    const zustand: Zustand = { summe: 0, eintraege: [] };
+    // Die Kennung entsteht EINMAL je Dokument. Lädt die Seite unbemerkt neu, läuft dieses
+    // Script erneut und vergibt eine neue — daran erkennt Test 3 eine Messung, die über
+    // einen Dokumentwechsel hinweg lief und damit nichts belegt (gemessen: bei einem
+    // solchen Reload stand die Ladephase mit ihrer eigenen `startTime` wieder im frisch
+    // angelegten Akkumulator, und die Summe sah aus wie ein Refetch-Shift).
+    const zustand: Zustand = {
+      summe: 0,
+      eintraege: [],
+      lauf: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    };
     (window as unknown as { __lfhShift: Zustand }).__lfhShift = zustand;
 
     // Knotenbeschreibung statt Knoten: ein roter Test soll sagen, WAS sich bewegt hat.
@@ -266,7 +298,8 @@ async function beobachteShifts(page: Page) {
 async function leseShifts(page: Page): Promise<Messung> {
   return page.evaluate(() => {
     const z = (window as unknown as { __lfhShift?: Messung }).__lfhShift;
-    return z ? { summe: z.summe, eintraege: z.eintraege } : { summe: 0, eintraege: [] };
+    if (!z) throw new Error('Shift-Beobachter fehlt — addInitScript hat nicht gegriffen');
+    return { summe: z.summe, eintraege: z.eintraege, lauf: z.lauf };
   });
 }
 
@@ -289,24 +322,45 @@ async function setzeShiftsZurueck(page: Page) {
   });
 }
 
+/** Wie viele gleiche Lesungen in Folge als Ruhe gelten — siehe {@link ruheShifts}. */
+const STILLE_RUNDEN = 4;
+/** Abstand zwischen zwei Lesungen. `STILLE_RUNDEN` × dieser Wert ist das Ruhefenster. */
+const LESE_ABSTAND = 150;
+
 /**
- * Wartet, bis der Akkumulator zur Ruhe kommt — zwei gleiche Lesungen in Folge.
+ * Wartet, bis der Akkumulator zur Ruhe kommt — `STILLE_RUNDEN` gleiche Lesungen in Folge.
  *
  * KEIN fester Timeout: ein `waitForTimeout(1000)` wäre lokal großzügig und unter Volllast
  * der Suite (drei Worker, Vite übersetzt nebenher) zu knapp — der Test würde dann eine
  * Ruhelage messen, die noch gar nicht eingetreten ist, und wäre grün durch zu frühes
- * Hinsehen. Umgekehrt kostet die Schleife im Normalfall zwei Runden.
+ * Hinsehen.
+ *
+ * VIER Lesungen, nicht zwei (Review-Befund): mit zwei genügte EIN stilles Fenster von
+ * 100 ms, um „Ruhe" zu melden. Ein Nachzügler bei +300 ms — nachgeladene Schrift,
+ * verspätete Style-Injektion, Reflow unter Last — wäre nie gesehen worden, die Summe zu
+ * klein und JEDE Summen-Zusicherung dieser Datei grün durch zu frühes Hinsehen. Genau das,
+ * wogegen die Schleife gebaut ist. Vier Runden à 150 ms sind 450 ms Stille.
+ *
+ * Und die Schleife WIRFT, wenn sie das Fenster nie erreicht: „kommt nicht zur Ruhe" ist von
+ * „ist ruhig" sonst nicht zu unterscheiden, und ein Zwischenwert kann zufällig unter der
+ * Grenze liegen — ein stiller Falsch-Grün.
  */
-async function ruheShifts(page: Page, runden = 50, abstandMs = 100): Promise<Messung> {
+async function ruheShifts(page: Page, runden = 60): Promise<Messung> {
   let vorher = Number.NaN;
-  let letzte: Messung = { summe: 0, eintraege: [] };
+  let gleich = 0;
+  let letzte: Messung = { summe: 0, eintraege: [], lauf: '' };
   for (let i = 0; i < runden; i += 1) {
     letzte = await leseShifts(page);
-    if (letzte.summe === vorher) return letzte;
+    gleich = letzte.summe === vorher ? gleich + 1 : 0;
+    if (gleich >= STILLE_RUNDEN - 1) return letzte;
     vorher = letzte.summe;
-    await page.waitForTimeout(abstandMs);
+    await page.waitForTimeout(LESE_ABSTAND);
   }
-  return letzte;
+  throw new Error(
+    `Die Layout-Shifts kamen in ${runden} Runden à ${LESE_ABSTAND} ms nicht zur Ruhe — ` +
+      `zuletzt ${bericht(letzte)}. Ein Zwischenwert unter der Grenze wäre ein stiller ` +
+      'Falsch-Grün, deshalb ist das ein Fehler und keine Messung.',
+  );
 }
 
 /** Menschenlesbare Anmerkung für den Testbericht — Summe plus jede bewegte Quelle. */
@@ -377,10 +431,13 @@ function baueListe(
 /**
  * Interzipiert `GET /api/einsaetze` mit einer festen Antwort und zählt die Abrufe.
  *
- * Der Methoden-Riegel ist nicht Kosmetik: `POST /api/einsaetze` trifft dieselbe URL, und
- * ein Handler ohne ihn verschluckte das Seeding der Vorlage. Der Zähler ist der Beleg für
- * Test 3 — ohne ihn wäre „ein Refetch erzeugt keinen Shift" auch dann grün, wenn gar kein
- * Refetch stattfand.
+ * Der Methoden-Riegel ist Vorsorge, kein Bestandsfix: `POST /api/einsaetze` trifft dieselbe
+ * URL. Heute läuft `vorlageHolen()` in allen drei Tests VOR `stelleListe()`, der Riegel
+ * kann auf dem Seeding-Pfad also gar nicht feuern — wer die Reihenfolge umstellt oder einen
+ * zweiten Einsatz nach der Registrierung anlegt, wäre ohne ihn sofort betroffen.
+ *
+ * Der Zähler ist der Beleg für Test 3 — ohne ihn wäre „ein Refetch erzeugt keinen Shift"
+ * auch dann grün, wenn gar kein Refetch stattfand.
  */
 async function stelleListe(
   page: Page,
@@ -394,13 +451,16 @@ async function stelleListe(
       await route.continue();
       return;
     }
-    zaehler.abrufe += 1;
-    zaehler.zeiten.push(Date.now() - start);
-    // Nur der ERSTE Abruf wartet: ein Refetch (Test 3) soll nicht an einem längst
-    // geöffneten Tor hängen — ein aufgelöstes Promise gibt ohnehin sofort frei, die
-    // Bedingung ist also nur Dokumentation der Absicht.
+    // Das Tor hält die Antwort zurück, solange der Test misst. Nach `oeffne()` löst das
+    // Promise sofort auf, jeder weitere Abruf läuft also ungebremst durch.
     if (tor) await tor;
     await route.fulfill({ json: liste });
+    // GEZÄHLT WIRD NACH DEM AUSLIEFERN (Review-Befund). Am Eintritt gezählt, meldete der
+    // Zähler bereits das Abfangen der Anfrage — Test 3 hätte dann seine Messung starten
+    // können, bevor react-query die Antwort überhaupt verarbeitet hat, und die
+    // Null-Zusicherung wäre still grün geworden, ohne etwas gesehen zu haben.
+    zaehler.abrufe += 1;
+    zaehler.zeiten.push(Date.now() - start);
   });
   return zaehler;
 }
@@ -420,22 +480,25 @@ async function kartenStehen(page: Page, ersterName: string) {
 /**
  * Misst jede Kachel einer Menge gegen den Kachelboden (Untergrenze, nie Gleichheit).
  *
- * `mindestens` ist die Zahl, die die Fixture garantiert: ein Locator, der weniger trifft,
- * misst einen Zwischenzustand — und das ist ein Fehler, keine grüne Zeile (Muster aus
- * `gate3-trefflaeche.spec.ts`, `alleHaltenStufe`).
+ * `sollZahl` ist die Zahl, die die Fixture garantiert — und sie wird auf GLEICHHEIT
+ * geprüft, nicht als Untergrenze: die Fixture stellt die Liste selbst (`page.route`), die
+ * Kachelzahl ist also bekannt und nicht geschätzt. Ein Locator, der weniger trifft, misst
+ * einen Zwischenzustand; einer, der mehr trifft, misst etwas anderes als gedacht — beides
+ * ist ein Fehler, keine grüne Zeile. (`gate3-trefflaeche.spec.ts` nutzt an dieser Stelle
+ * eine Untergrenze, weil es dort gegen echte, parallel gesäte Daten misst.) Der
+ * `toHaveCount` wiederholt sich von selbst und ist damit zugleich der Anker auf den
+ * fertigen Zustand.
  */
 async function kachelnHaltenBoden(
   page: Page,
   auswahl: string,
   name: string,
-  mindestens: number,
+  sollZahl: number,
 ): Promise<number> {
   const kacheln = page.getByTestId('einsaetze-raster').locator(auswahl);
-  await expect(kacheln, `${name}: mindestens ${mindestens} Kacheln erwartet`).toHaveCount(
-    mindestens,
-  );
+  await expect(kacheln, `${name}: genau ${sollZahl} Kacheln erwartet`).toHaveCount(sollZahl);
   let kleinstes = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < mindestens; i += 1) {
+  for (let i = 0; i < sollZahl; i += 1) {
     const kasten = await kacheln.nth(i).boundingBox();
     expect(kasten, `${name} #${i + 1}: kein Kasten messbar`).not.toBeNull();
     expect(
@@ -561,15 +624,6 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
   await page.goto('/einsaetze');
   await kartenStehen(page, liste[0].bezeichnung);
   const ladephase = await ruheShifts(page);
-  // RELATIV gezählt, nicht absolut. Die frühere Fassung verlangte „genau ein Abruf" und
-  // fiel im Lauf mit drei Workern am 11.09.2026 mit zwei Abrufen aus; im Einzellauf und in
-  // einem eigens gefahrenen Mitschnitt der Request-Spur war es stets genau einer, die
-  // Ursache des zweiten ist also nicht geklärt. Sie muss es auch nicht sein: die Aussage
-  // dieses Tests ist „der Fokus löst EINEN ZUSÄTZLICHEN Abruf aus", und die trägt relativ
-  // genauso scharf — ein ausbleibender Refetch fällt weiterhin auf. Die Abrufzeiten unten
-  // stehen in der Anmerkung, damit ein künftiger Ausfall selbst sagt, wann es passierte.
-  const abrufeVorher = zaehler.abrufe;
-  expect(abrufeVorher, 'vor dem Refetch mindestens der Erstabruf').toBeGreaterThanOrEqual(1);
 
   // Die Query muss erst altern (siehe `STALE_TIME`), sonst ignoriert react-query das
   // Fokus-Ereignis und der Test belegte nichts.
@@ -579,21 +633,62 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
   // gemeldet wird, gehört zum Refetch.
   await setzeShiftsZurueck(page);
 
+  // Der Stand des `Datenstand`-Titels VOR dem Refetch. Er trägt Sekunden
+  // (`components/Datenstand.tsx`, `DD.MM.YYYY HH:mm:ss`), während sichtbar nur `HH:mm`
+  // steht — nach den 10,5 s oben ist er also garantiert ein anderer, sobald react-query
+  // die Antwort verarbeitet UND gerendert hat. Genau das ist der Anker, der dem Zähler
+  // fehlt: der zählt das Ausliefern, nicht das Ankommen im DOM. Und weil nur das
+  // `title`-Attribut sich sicher ändert, verschiebt dieser Anker selbst nichts.
+  const datenstand = page.locator('[aria-label^="Datenstand "]');
+  await expect(datenstand).toHaveCount(1);
+  const standVorher = await datenstand.getAttribute('title');
+  expect(standVorher, 'der Datenstand muss vor dem Refetch einen Titel tragen').not.toBeNull();
+
+  // RELATIV gezählt, und der Stand wird ERST HIER genommen (Review-Befund). In einer
+  // früheren Fassung stand diese Zeile vor den 10,5 s Wartezeit: ein Abruf in diesem
+  // Fenster hätte den Zähler schon auf den Zielwert gehoben, und die Zusicherung unten wäre
+  // grün gewesen, ohne dass der Fokus irgendetwas ausgelöst hat. Absolut gezählt („genau
+  // ein Abruf") war die Fassung davor, und die fiel im Lauf mit drei Workern mit zwei
+  // Abrufen aus — die Aussage dieses Tests ist ohnehin relativ.
+  const abrufeVorher = zaehler.abrufe;
+  expect(abrufeVorher, 'vor dem Refetch mindestens der Erstabruf').toBeGreaterThanOrEqual(1);
+  const laufVorher = (await leseShifts(page)).lauf;
+
+  // Das Warten auf die Antwort wird VOR dem Auslöser aufgesetzt, sonst ginge sie zwischen
+  // beiden Zeilen verloren. Bleibt der Refetch aus, stirbt der Test hier — und das ist der
+  // scharfe Beleg, den der Zähler allein nicht liefert.
+  const antwort = page.waitForResponse(
+    (r) => /\/api\/einsaetze(\?|$)/.test(r.url()) && r.request().method() === 'GET',
+  );
+
   // react-querys `focusManager` hängt am `visibilitychange`-Ereignis des Fensters
   // (`@tanstack/query-core`, `focusManager.setEventListener`). Es von Hand zu feuern ist
-  // die deterministische Fassung dessen, was der Browser beim Fensterwechsel tut — der
-  // BELEG, dass daraus wirklich ein Refetch wurde, ist der Abruf-Zähler unten, nicht das
-  // Ereignis selbst. Ein zweites Tab per `bringToFront` wäre der nativere Auslöser, in
-  // headless Chromium aber nicht zuverlässig.
+  // die deterministische Fassung dessen, was der Browser beim Fensterwechsel tut. Ein
+  // zweites Tab per `bringToFront` wäre der nativere Auslöser, in headless Chromium aber
+  // nicht zuverlässig.
   await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+  await antwort;
 
   await expect
     .poll(() => zaehler.abrufe, {
-      message: 'der Fensterfokus muss genau einen zusätzlichen Abruf auslösen',
+      message: 'der Fensterfokus muss einen zusätzlichen Abruf auslösen',
     })
-    .toBe(abrufeVorher + 1);
+    .toBeGreaterThanOrEqual(abrufeVorher + 1);
+  // Erst mit dem neuen Titel ist die Antwort im DOM angekommen. Ohne diesen Anker könnte
+  // die Ruhemessung unten enden, bevor das Re-Render überhaupt lief — bei einem Sollwert
+  // von 0 ein stiller Falsch-Grün.
+  await expect(datenstand).not.toHaveAttribute('title', standVorher!);
 
   const nachRefetch = await ruheShifts(page);
+  // Ein Refetch tauscht Daten, kein Dokument. Lud die Seite dazwischen neu, misst der
+  // frische Akkumulator die LADEPHASE und nicht den Refetch — die Summe sähe nach einem
+  // Refetch-Shift aus, wäre aber der Seitenaufbau (im Selbstbeweis unten so beobachtet).
+  // Das ist ein Fehler der Messung, kein Befund über die Seite, und muss sich als solcher
+  // melden statt als Zahl.
+  expect(
+    nachRefetch.lauf,
+    'zwischen Reset und Messung darf das Dokument nicht neu geladen haben',
+  ).toBe(laufVorher);
   test.info().annotations.push({
     type: 'messwert',
     description:
