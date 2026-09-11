@@ -676,3 +676,114 @@ describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
     expect(screen.queryByText('Nicht gespeichert')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ── GESCHEITERTE FREIGABE (LFH-535, Nachzug N5 aus LFH-348 · C13) ──────────────
+ *
+ * Dieselbe H14-Diagnose wie beim Speichern, nur am Zustandsübergang: schlägt
+ * `POST …/freigeben` fehl, bleibt der Bestätigungsdialog stehen — und solange der Grund
+ * nur im Toast stand, war er nach rund drei Sekunden weg und der unveränderte Dialog von
+ * „nichts passiert" nicht zu unterscheiden. Der Dialog trägt `mask={{ closable: false }}`,
+ * ein Seiten-Alert dahinter wäre unsichtbar.
+ *
+ * Die Zusicherung hat zwei Hälften, und die zweite trägt sie: der Grund steht IM Dialog
+ * UND nicht in der Message-Queue. Ohne `closest('.ant-message')` bliebe der Test grün,
+ * wenn der Toast zurückkäme.
+ */
+describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
+  beforeEach(() => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
+    // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests dieser
+    // Datei weiter, und „nicht aufgerufen" wäre nach dem ersten Test nie wieder grün
+    // (gemessen: 2 Aufrufe aus den Tests darüber).
+    vi.mocked(befehleApi.gibBefehlFrei).mockClear();
+  });
+
+  async function oeffneFreigabe() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Freigeben' }));
+    return screen.findByRole('dialog', { name: 'Befehl freigeben?' });
+  }
+
+  /**
+   * Die Message-Queue nach diesem Wortlaut absuchen — die Hälfte der Zusicherung, die den
+   * Umbau trägt.
+   *
+   * `within(dialog).findByText(...)` allein belegt sie NICHT: käme der Toast zurück,
+   * stünde der Wortlaut an ZWEI Stellen, und die Abfrage im Dialog fände ihren Alert
+   * weiter. Ein `getAllByText(...)`-Zähler taugt ebenfalls nicht überall — beim
+   * gescheiterten Speicher-Vorlauf steht der Grund zu Recht doppelt (Dialog UND
+   * Seiten-Alert, der das Schliessen überlebt). Gezählt wird deshalb genau die Queue.
+   */
+  function toastsMit(wortlaut: string) {
+    return [...document.querySelectorAll('.ant-message')]
+      .filter((n) => n.textContent?.includes(wortlaut));
+  }
+
+  it('zeigt den Grund IM Dialog statt im Toast und lässt ihn offen', async () => {
+    vi.mocked(befehleApi.gibBefehlFrei)
+      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    const treffer = await within(dialog).findByText('Abschnitt „Auftrag" ist leer');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(toastsMit('Abschnitt „Auftrag" ist leer')).toHaveLength(0);
+    expect(within(dialog).getByText('Freigabe fehlgeschlagen')).toBeInTheDocument();
+    // „Offen" heisst in jsdom „nicht in der Verlassen-Bewegung": antds Modal räumt seinen
+    // Knoten erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`
+    // (gemessen, `MaterialPage.test.tsx:556`). `queryByRole('dialog')` wäre hier blind.
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+  });
+
+  it('schliesst den Dialog bei gelungener Freigabe und quittiert per Toast (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.gibBefehlFrei).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    expect(await screen.findByText('Befehl freigegeben')).toBeInTheDocument();
+  });
+
+  /**
+   * Der Speicher-Vorlauf ist die ERSTE Fehlerquelle des Flows: `/freigeben` prüft den
+   * persistierten Stand. Scheitert er, darf die Freigabe gar nicht erst laufen — und der
+   * Grund trägt eine andere Überschrift, weil er der Person etwas anderes sagt.
+   */
+  it('hält die Freigabe zurück, wenn schon der Speicher-Vorlauf scheitert', async () => {
+    vi.mocked(befehleApi.aktualisiereBefehl)
+      .mockRejectedValue(new ApiError(503, 'Dienst nicht erreichbar'));
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    const treffer = await within(dialog).findByText('Dienst nicht erreichbar');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(toastsMit('Dienst nicht erreichbar')).toHaveLength(0);
+    expect(within(dialog).getByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(befehleApi.gibBefehlFrei).not.toHaveBeenCalled();
+  });
+
+  /**
+   * react-query hält `error` bis zum nächsten `mutate()`. Ohne `reset()` beim Öffnen trüge
+   * ein abgebrochener Versuch seinen Grund in den nächsten, frisch geöffneten Dialog —
+   * eine Meldung über etwas, das gerade gar nicht passiert ist.
+   */
+  it('öffnet nach Abbrechen ohne den Grund des vorigen Versuchs', async () => {
+    vi.mocked(befehleApi.gibBefehlFrei)
+      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+    await within(dialog).findByText('Abschnitt „Auftrag" ist leer');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    await userEvent.click(screen.getByRole('button', { name: 'Freigeben' }));
+
+    await waitFor(() => expect(dialog).not.toHaveClass('ant-zoom-leave'));
+    expect(within(dialog).queryByText('Abschnitt „Auftrag" ist leer')).toBeNull();
+  });
+});
