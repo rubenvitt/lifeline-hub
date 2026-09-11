@@ -1,3 +1,13 @@
+## [1.0.0-alpha.3](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.2...v1.0.0-alpha.3) (2026-09-11)
+
+### Features
+
+* **entwurf:** Speicher-/Anlegefehler in der Seite statt nur als Toast (LFH-494) ([082e457](https://github.com/rubenvitt/lifeline-hub/commit/082e457d417c063b5b6e11b2c6c38f958163ad72))
+
+### Bug Fixes
+
+* **ci:** SBOM im Release tatsächlich füllen statt nur benennen ([1dc0c45](https://github.com/rubenvitt/lifeline-hub/commit/1dc0c45d583c8e6c8db6f5457d0e334cca5b2c72))
+
 ## [1.0.0-alpha.2](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.1...v1.0.0-alpha.2) (2026-09-10)
 
 ### Bug Fixes
