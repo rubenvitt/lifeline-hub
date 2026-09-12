@@ -2,6 +2,43 @@ allowBuilds:
   esbuild: true
   msw: true
 
+# ═══════════════════════════════════════════════════════════════════════════════════
+# DIES IST DAS FRONTEND-GEGENSTÜCK ZU .cargo/audit.toml (LFH-354).
+#
+# Die Frage, die LFH-354 offen vorfand: die Rust-Seite hat mit .cargo/audit.toml einen
+# benannten Ort für bewertete Advisories — die Frontend-Seite hatte keinen, und damit war
+# nicht aufgeschrieben, was mit einem GHSA passiert, für den es keinen Upgrade-Pfad gibt.
+# Entschieden ist: DER BLOCK `overrides` UNTEN IST DIESER ORT, und die Regel lautet —
+#
+#   1. JEDER `high`-FUND BRICHT DAS GATE. Es gibt keine Ignorier-Liste, mit der man ein
+#      Advisory stumm stellt. Ein Fund wird BEHOBEN: entweder hebt der Direktabhängige die
+#      Version, oder — wenn die Kette keinen Weg hergibt — steht hier ein Override mit der
+#      erzwungenen sicheren Mindestversion UND seiner Begründung. Der Unterschied zur
+#      Rust-Seite ist keine Nachlässigkeit, sondern die Lage: bei npm kann man eine
+#      transitive Version erzwingen, bei Cargo nicht, und genau deshalb braucht die Rust-
+#      Seite ein Ignorier-Werkzeug und diese hier keines.
+#
+#   2. `moderate`/`low` MELDEN, BRECHEN ABER NICHT (`--audit-level=high` in
+#      scripts/check-deps.sh). Das ist die bewusste Schwelle, nicht ein Versehen: das
+#      Frontend-Werkzeug erzeugt genug Dauerrauschen, um ein Gate unbenutzbar zu machen,
+#      und ein Gate, das dauerrot ist, wird abgeschaltet statt befolgt.
+#
+#   3. KEIN LEERER `auditConfig.ignoreGhsas`-BLOCK „für später". pnpm brächte ihn mit,
+#      aber eine Ausnahmeliste ohne Eintrag ist eine Zusicherung, die nichts zusichert —
+#      dieselbe Linie, aus der CLAUDE.md „ein Eintrag ohne Verstoß gilt selbst als Verstoß"
+#      zieht. Wer den ersten echten Fall hat — ein `high`-Advisory, das WEDER über einen
+#      Override noch über ein Upgrade erreichbar ist —, führt den Block dann ein, mit dem
+#      Eintrag, der ihn nötig macht, und nach dem Muster von .cargo/audit.toml: warum kein
+#      Upgrade möglich ist, warum das Risiko in DIESEM Code nicht trägt, und woran man
+#      merkt, dass sich das ändert.
+#
+# Was ein Override hier braucht (jeder unten hält es vor): die GHSA-Nummer, die Kette, über
+# die das Paket hereinkommt, warum kein Direktabhängiger es heben kann, und ob es Bau- oder
+# Laufzeit ist. Und BEIDE Grenzen werden gepflegt — der Bereich UND die Zielversion; dass
+# ein Advisory sich unter einem festgenagelten Ziel wegbewegt, ist unten dreimal passiert
+# (nanoid, fast-uri, js-yaml).
+# ═══════════════════════════════════════════════════════════════════════════════════
+
 # Transitive Advisory-Fixes mit erzwungenen sicheren Mindestversionen.
 # Ab pnpm 10 werden Overrides hier gelesen, NICHT mehr aus package.json ("pnpm"-Feld
 # wird ignoriert — pnpm warnt darüber nur, es bricht nicht).
