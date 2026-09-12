@@ -1,3 +1,9 @@
+## [1.0.0-alpha.8](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.7...v1.0.0-alpha.8) (2026-09-12)
+
+### Bug Fixes
+
+* **auth:** SSO-only-Konten sind nicht mehr per Timing aufzählbar (LFH-310) ([1dee12b](https://github.com/rubenvitt/lifeline-hub/commit/1dee12b0ca4ddad8daa7502e587d2f7b0ed57ebf))
+
 ## [1.0.0-alpha.7](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.6...v1.0.0-alpha.7) (2026-09-12)
 
 ### Bug Fixes
