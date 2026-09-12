@@ -23,6 +23,7 @@ import { lagekartePfad, parseRouteId, schaedenPfad } from '../routing/deeplinks'
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import type { Ausmass, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
+import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import {
   ABSCHLUSS_GRUENDE,
   ABSCHLUSS_LABEL,
@@ -49,8 +50,14 @@ export default function SchaedenDetailPage() {
 
   const qc = useQueryClient();
   const { message, modal } = App.useApp();
-  const [bearbeiten, setBearbeiten] = useState(false);
   const [editForm] = Form.useForm<EditWerte>();
+  const editSitzung = useEditSitzung<EditWerte>(editForm);
+  // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
+  // verengt: `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der
+  // unmögliche Fall still ein Schreiben OHNE Lock — also genau der blinde Overwrite,
+  // gegen den F10 gebaut ist.
+  const sitzung = editSitzung.sitzung;
+  const bearbeiten = sitzung != null;
   const [uebergebenOffen, setUebergebenOffen] = useState(false);
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
@@ -74,12 +81,16 @@ export default function SchaedenDetailPage() {
     enabled: idGueltig,
   });
 
-  // Optimistisches Lock (LFH-300/F10): `basis` trägt den beim Laden gelesenen geaendert_at-Stand;
-  // ein 409 öffnet den Konfliktdialog (neu laden vs. überschreiben), statt still zu überschreiben.
+  // Optimistisches Lock (LFH-300/F10): `basis` trägt den beim ÖFFNEN der Maske eingefrorenen
+  // geaendert_at-Stand (LFH-303 — aus den Live-Query-Daten gelesen hebelte ein
+  // Hintergrund-Refetch das Lock aus); ein 409 öffnet den Konfliktdialog (neu laden vs.
+  // überschreiben), statt still zu überschreiben.
   const editMutation = useMutation({
-    mutationFn: (v: { daten: SchadenPatch; basis?: string; overwrite?: boolean }) =>
+    // `basis` ist eine `CasBasis` und damit nur aus `useEditSitzung` zu bekommen: ein
+    // blanker `s.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
+    mutationFn: (v: { daten: SchadenPatch; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisiereSchaden(einsatzId, schadenId, v.daten, v.overwrite ? undefined : v.basis),
-    onSuccess: () => { invalidateDetail(); setBearbeiten(false); },
+    onSuccess: () => { invalidateDetail(); editSitzung.beende(); },
     onError: (e, v) => {
       // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Anders als beim
       // Person-PATCH (Referenz LFH-241) kennt die Schaden-Route einen ZWEITEN 409: den
@@ -95,7 +106,7 @@ export default function SchaedenDetailPage() {
           okButtonProps: { danger: true },
           cancelText: 'Neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
-          onCancel: () => { detailQuery.refetch(); setBearbeiten(false); },
+          onCancel: () => { detailQuery.refetch(); editSitzung.beende(); },
         });
       } else {
         fehler(e);
@@ -236,8 +247,7 @@ export default function SchaedenDetailPage() {
                 Abschließen
               </Button>
               <Button onClick={() => {
-                setBearbeiten(true);
-                editForm.setFieldsValue({
+                editSitzung.starte(s, {
                   typ: s.typ, ausmass: s.ausmass, ort: s.ort, beschreibung: s.beschreibung,
                   geschaedigt: geschaedigtAusSchaden(s),
                 });
@@ -251,7 +261,7 @@ export default function SchaedenDetailPage() {
         </Space>
       </Space>
 
-      {bearbeiten ? (
+      {sitzung ? (
         <Form form={editForm}
           onFinish={(daten) => {
             const patch: SchadenPatch = {
@@ -259,12 +269,12 @@ export default function SchaedenDetailPage() {
               // Geschädigt XOR: immer alle vier Felder explizit senden (das nicht gewählte ist null).
               ...geschaedigtFelder(daten.geschaedigt ?? null, orgId),
             };
-            editMutation.mutate({ daten: patch, basis: s.geaendert_at });
+            editMutation.mutate({ daten: patch, basis: sitzung.basis });
           }}>
           {detailAnsicht}
           <Space style={{ marginTop: 16 }}>
             <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
-            <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
+            <Button onClick={editSitzung.beende}>Abbrechen</Button>
           </Space>
         </Form>
       ) : detailAnsicht}

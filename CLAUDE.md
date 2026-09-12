@@ -1276,7 +1276,8 @@ Lokal bleibt es der Weg vor dem Merge:
 ```
 
 Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-codegen.sh`
-(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e`.
+(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
+`release-ruhefenster.test.sh`.
 
 - **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
   `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
@@ -1304,6 +1305,22 @@ Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-co
   von Hand aufgerufene Schritte.
 - **Kein `| tail` um Gate-Kommandos** — das maskiert den Exit-Code, und eine rote Suite
   sieht dann grün aus.
+- **Ein Release entsteht nicht mehr je Merge, sondern je Arbeitsschub.** Der Release-Job
+  hängt weiter am grünen Push-Gate, tritt davor aber selbst zurück, wenn auf dem Kanal
+  schon ein neuerer Commit liegt — dessen Lauf macht das eine Sammel-Release, und die
+  Notizen enthalten die übersprungenen Commits mit. Dazu ein Ruhefenster von 15 Minuten
+  auf den jüngsten Commit für den Fall, dass das Gate schneller ist als der Abstand
+  zwischen zwei Merges. Träger ist `scripts/release-ruhefenster.sh` (Aufruf in
+  `release.yml`, Begründung im Dateikopf), Schritt 8 des Gates ist sein Selbsttest.
+  **Ein übersprungener Release-Job ist der Normalfall, kein Fehlerbild.**
+  **`chore(release):`-Commits zählen dabei nicht als „neuer Commit"** — sie sind der
+  Versions-Commit von semantic-release und danach HEAD des Kanals; ein naiver Vergleich
+  „HEAD == mein Commit?" liesse ab dem ersten Release JEDEN Lauf zurücktreten, und es
+  entstünde nie wieder eine Version. Dasselbe gilt für den Zeitstempel, an dem das
+  Ruhefenster rechnet: zwei Stellen, zwei Tests (Fall 3 und 6 im Selbsttest).
+  Wer das Fenster vergrössert, hebt den Job-Timeout in `release.yml` mit und bedenkt, dass
+  Push-Läufe desselben Kanals in EINER Nebenläufigkeitsgruppe stehen — ein wartender
+  Release hält den nächsten Gate-Lauf auf.
 
 `scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
 `cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories
@@ -1419,6 +1436,37 @@ Die Unterscheidung ist im Frontend heute nur **Heuristik**, kein Vertrag: `istKo
 409 in einer Route mit CAS-Dialog einführt, muss diesen Zweig mitziehen** — sonst läuft die
 Seite wieder in „Überschreiben?"-Schleifen. Ein maschinenlesbarer Fehler-Code im `{error}`-Body
 wäre die saubere Lösung und ist bewusst vertagt.
+
+**Die Baseline wird beim ÖFFNEN der Maske eingefroren, nicht beim Absenden gelesen**
+(LFH-303). Träger ist `components/useEditSitzung.ts`; `PersonenDetailPage`,
+`TiereDetailPage` und `SchaedenDetailPage` — die drei Seiten mit CAS-Dialog — konsumieren
+es. Gelesen aus den Live-Query-Daten hebelte `basis: t.geaendert_at` das Lock aus, das es
+setzen sollte: der QueryClient fährt `staleTime: 10_000` und lässt TanStacks Vorgaben
+`refetchOnWindowFocus`/`refetchOnReconnect` (beide `true`) stehen. Wer während offener
+Maske das Fenster wechselt und nach mehr als zehn Sekunden zurückkommt, hat den **fremden,
+neueren** Stand im Cache; der ging als Baseline raus, der Server verglich ihn mit sich
+selbst, die Prüfung passte — und die fremde Änderung war still überschrieben. Also genau
+der Lost-Update, gegen den F10 gebaut wurde, nur mit Fensterwechsel als Auslöser.
+**`refetchOnWindowFocus` abzuschalten wäre die kleinere Lösung gewesen**: der
+Fensterwechsel ist nur einer der Auslöser ohne Nutzeranlass — ein Netzwechsel
+(`refetchOnReconnect`) und jede `invalidateQueries` auf den Detail-Key tun dasselbe. Ein
+Flag schlösse einen Auslöser, der eingefrorene Stand schließt die Klasse.
+**Der Riegel gegen erneutes Driften ist ein Typ, kein Scanner**: `basis` ist eine
+`CasBasis` (gebrandeter `string`), und die entsteht ausschließlich in `useEditSitzung`. Ein
+`basis: t.geaendert_at` bricht damit den **Typcheck** — per Mutationsprobe belegt
+(`TS2322: Type 'string' is not assignable to type 'CasBasis'`). Ein Regex-Guard hätte die
+Schreibweise `const b = t.geaendert_at` nicht gesehen. Nach `string` bleibt `CasBasis`
+zuweisbar, die API-Funktionen und `patchBody` ändern sich also nicht.
+**Zwei gemessene Fallen daran:** `starte` nimmt den **Datensatz**, nicht den Zeitstempel —
+so ist eine fremde Zeichenkette als Basis nicht bloß verboten, sondern nicht formulierbar;
+und es befüllt das Formular gleich mit, weil nur ein gemeinsamer Aufruf belegt, dass Werte
+und Basis aus einem Snapshot stammen. Ein Test dafür braucht ein **gemountetes**
+`<Form form={form}>`: eine `Form.useForm()`-Instanz ohne angehängtes Formularelement
+verwirft `setFieldsValue` still (rc-field-form warnt nur auf der Konsole), die Zusicherung
+„das Formular ist befüllt" wäre dort nicht widerlegbar, weil sie immer scheiterte.
+**`UhsDetailPage` ist nicht betroffen** — sie hat gar keine Bearbeiten-Maske; der einzige
+UHS-PATCH ist das lat/lon-Setzen der Lagekarte und schreibt bewusst ohne Lock. Bekommt die
+UHS eine Maske, nimmt sie dasselbe Primitiv.
 
 **Die Konvention gilt in jeder Schicht**, nicht nur in `src/routes/`. Die ~89
 `AppError::Validation`-Stellen in `repo`/`parse`/`config` wurden bewusst **nicht** auditiert
