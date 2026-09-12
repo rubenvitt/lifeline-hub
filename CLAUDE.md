@@ -1300,6 +1300,16 @@ Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `p
   Lauf unformatiert zurück — das Typ-Gate wäre dauerhaft rot, während das Formatier-Gate das
   Gegenteil verlangte. Zwei Gates, die einander brechen. Wer eine Datei ergänzt, begründet
   sie dort; ein Einzelfall-Fix an der Datei selbst ist der falsche Ort.
+  **Eine `.git-blame-ignore-revs` braucht so ein Sweep NICHT — und das ist gemessen, nicht
+  angenommen.** Die naheliegende Sorge („564 Dateien Formatierung entwerten `git blame`
+  fürs ganze Frontend") trifft nicht zu: über 80 Dateien mit zusammen 14 100 Zeilen
+  beansprucht der Sweep-Commit im Blame genau **18 Zeilen**, und `blame.ignoreRevsFile`
+  ändert daran **nichts** — es sind die Zeilen, die Prettier durch einen Umbruch neu
+  erzeugt hat und die deshalb gar keinen Vorgänger haben, auf den git sie umhängen könnte.
+  Den Rest ordnet gits eigene Verschiebungserkennung von selbst dem Ursprungs-Commit zu.
+  Eine Ignore-Datei wäre hier also ein Artefakt ohne Wirkung, das eine Zusicherung behauptet,
+  die es nicht einlöst. Wer den nächsten Sweep fährt, misst nach, statt die Datei vorsorglich
+  anzulegen.
 
 - **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
   `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
