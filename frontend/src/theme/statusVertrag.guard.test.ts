@@ -681,8 +681,16 @@ const VERTRAGS_NAMEN: readonly string[] = [
 ];
 
 /**
- * Die Vertragsnamen, wie SIE IN DIESER DATEI HEISSEN — inklusive Umbenennung beim
- * Import (`import { rollenFarbe as farbe }`).
+ * Die Vertragsnamen, wie SIE IN DIESER DATEI HEISSEN — und NUR die, die sie wirklich
+ * importiert, inklusive Umbenennung (`import { rollenFarbe as farbe }`).
+ *
+ * „Nur die importierten" ist eine Korrektur (im Codex-Review gefunden): die erste Fassung
+ * legte jeder Datei ALLE Vertragsnamen in den Topf. Eine Seite mit einer eigenen lokalen
+ * `sichtung`- oder `dringlichkeit`-Variablen und `<Tag color={dringlichkeit}>` wäre damit
+ * gemeldet worden, obwohl sie `statusFarben.ts` nie importiert — ein Fehlalarm aus reiner
+ * Namensgleichheit, dieselbe Falle wie bei `STATUS_META` eine Ebene tiefer. Die
+ * Zusicherung verliert dadurch nichts: wer einen Vertragsexport LIEST, muss ihn
+ * importieren; der zweistufige Re-Export bleibt der benannte Blindfleck, der er war.
  *
  * Im Codex-Review gefunden, und es ist kein konstruierter Fall: `pages/uhs/Grundriss.tsx`
  * importiert heute `verfuegbarkeit as verfuegbarkeitVertrag`. Ohne Auflösung trägt ein
@@ -701,7 +709,12 @@ const VERTRAGS_NAMEN: readonly string[] = [
  * über `<Tag color=` — alle nutzen `StatusTag` oder nur `.label`.
  */
 function vertragsNamenIn(inhalt: string): readonly string[] {
-  const namen = new Set(VERTRAGS_NAMEN);
+  const namen = new Set<string>();
+  // Namensraum-Import: dann sind alle Vertragsnamen als `x.name` erreichbar, und die
+  // Wortgrenze im Vergleich unten trifft sie auch qualifiziert.
+  if (/import\s+\*\s+as\s+[A-Za-z_$][\w$]*\s+from\s*['"][^'"]*statusFarben['"]/.test(inhalt)) {
+    for (const name of VERTRAGS_NAMEN) namen.add(name);
+  }
   // `[^'"]*statusFarben`, NICHT `theme/statusFarben`: ein Geschwistermodul schreibt
   // `from './statusFarben'` — ohne Verzeichnis im Pfad. Dass die Geschwister im Schnitt
   // liegen, ist die Zusicherung von Guard 1; sie hier wieder auszuschliessen wäre
@@ -709,8 +722,10 @@ function vertragsNamenIn(inhalt: string): readonly string[] {
   const importe = inhalt.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*statusFarben['"]/g);
   for (const [, liste] of importe) {
     for (const teil of liste.split(',')) {
-      const teile = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)\s*$/.exec(teil);
-      if (teile && VERTRAGS_NAMEN.includes(teile[1])) namen.add(teile[2]);
+      const teile = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(
+        teil,
+      );
+      if (teile && VERTRAGS_NAMEN.includes(teile[1])) namen.add(teile[2] ?? teile[1]);
     }
   }
   return [...namen];
@@ -807,7 +822,10 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(wire[0]).toContain('vergleicht Wire-Wert `aktiv`');
 
     const gelesen = tagBefunde({
-      '/src/pages/Attrappe2.tsx': '<Tag color={rollenFarbe(warnstufeKarte[g.stufe].rolle, token)}>',
+      '/src/pages/Attrappe2.tsx': [
+        "import { rollenFarbe, warnstufeKarte } from '../theme/statusFarben';",
+        '<Tag color={rollenFarbe(warnstufeKarte[g.stufe].rolle, token)}>',
+      ].join('\n'),
     });
     expect(gelesen).toHaveLength(1);
     // Welchen der beiden Namen die Meldung nennt, hängt an der Exportreihenfolge des
@@ -832,8 +850,10 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     // (a) Falsch-negativ: ein verschachteltes Preset verdeckte das verbotene äußere
     //     `color` vollständig, weil nur der erste Treffer angesehen wurde.
     const verdeckt = tagBefunde({
-      '/src/pages/Verschachtelt.tsx':
+      '/src/pages/Verschachtelt.tsx': [
+        "import { rollenFarbe, warnstufeKarte } from '../theme/statusFarben';",
         '<Tag icon={<Icon color="blue" />} color={rollenFarbe(warnstufeKarte[s].rolle, t)}>',
+      ].join('\n'),
     });
     expect(verdeckt).toHaveLength(1);
 
@@ -841,7 +861,10 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     //     Element als `<Tag>` ist dokumentierter Blindfleck, kein Befund dieses Guards.
     expect(
       tagBefunde({
-        '/src/pages/Innen.tsx': '<Tag icon={<Icon color={warnstufeKarte[s].rolle} />}>{x}</Tag>',
+        '/src/pages/Innen.tsx': [
+          "import { warnstufeKarte } from '../theme/statusFarben';",
+          '<Tag icon={<Icon color={warnstufeKarte[s].rolle} />}>{x}</Tag>',
+        ].join('\n'),
       }),
     ).toEqual([]);
 
@@ -854,8 +877,10 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     // (a) Das `//` einer URL schnitt die Zeile ab, das verbotene `color` dahinter verschwand.
     expect(
       tagBefunde({
-        '/src/pages/Url.tsx':
+        '/src/pages/Url.tsx': [
+          "import { rollenFarbe, warnstufeKarte } from '../theme/statusFarben';",
           '<Tag title="https://example.org" color={rollenFarbe(warnstufeKarte[s].rolle, t)}>',
+        ].join('\n'),
       }),
     ).toHaveLength(1);
 
@@ -922,6 +947,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     const umbenannt = tagBefunde({
       '/src/pages/TagAlias.tsx': [
         "import { Tag as StatusLabel } from 'antd';",
+        "import { rollenFarbe, warnstufeKarte } from '../theme/statusFarben';",
         '<StatusLabel color={rollenFarbe(warnstufeKarte[s].rolle, token)}>x</StatusLabel>',
       ].join('\n'),
     });
@@ -935,6 +961,42 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
           '<StatusLabel color={rollenFarbe(warnstufeKarte[s].rolle, token)}>x</StatusLabel>',
       }),
     ).toEqual([]);
+  });
+
+  it('meldet einen gleichnamigen LOKALEN Wert nicht — Namensgleichheit ist kein Import', () => {
+    // Im Codex-Review gefunden: der Topf wurde jeder Datei mit ALLEN Vertragsnamen
+    // vorbelegt. Eine Seite mit einer eigenen `dringlichkeit` wäre damit gemeldet worden,
+    // ohne `statusFarben.ts` je zu importieren — derselbe Fehlalarm aus Namensgleichheit
+    // wie bei `STATUS_META`, nur eine Ebene höher.
+    expect(
+      tagBefunde({
+        '/src/pages/Eigen.tsx': [
+          'const dringlichkeit = eigeneAchse(x);',
+          '<Tag color={dringlichkeit}>{x}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+
+    // Die Gegenprobe, ohne die der Topf genauso gut leer bleiben könnte: MIT Import wird
+    // derselbe Ausdruck gemeldet.
+    expect(
+      tagBefunde({
+        '/src/pages/Gelesen.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          '<Tag color={dringlichkeit}>{x}</Tag>',
+        ].join('\n'),
+      }),
+    ).toHaveLength(1);
+
+    // Und der Namensraum-Import bleibt erfasst: `sf.rollenFarbe` ist derselbe Zugriff.
+    expect(
+      tagBefunde({
+        '/src/pages/Raum.tsx': [
+          "import * as sf from '../theme/statusFarben';",
+          '<Tag color={sf.rollenFarbe(sf.warnstufeKarte[s].rolle, t)}>x</Tag>',
+        ].join('\n'),
+      }),
+    ).toHaveLength(1);
   });
 
   it('lässt die legitimen Nachbarn in Ruhe', () => {
