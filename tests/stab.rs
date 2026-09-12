@@ -1389,3 +1389,93 @@ async fn wertgleicher_put_schreibt_die_zeile_trotzdem() {
     assert_eq!(stab_events, 1, "das Zustandsereignis feuert weiter");
     assert_eq!(etb_events, 0, "es gibt keinen ETB-Eintrag zu melden");
 }
+
+/// **Der Lebenszyklus-Riegel gilt auch für die Besetzung** (Codex-Review zu `39131a4`).
+///
+/// `fordere_aktiv` läuft im Extractor und liest einen Stand von VOR der Transaktion;
+/// `write_retry!` wartet bei BUSY am `BEGIN IMMEDIATE`, der Retry-Pfad verbreitert das
+/// Fenster also. Gerufen wird das Repo direkt, weil das Rennen über die Route nicht
+/// verlässlich herzustellen ist.
+///
+/// Beide Richtungen als Paar — und der DELETE ausdrücklich auch auf einer LEEREN Zeile:
+/// dort wäre ein 204 „schon nicht vergeben" die irreführendste Antwort, weil sie Erfolg
+/// meldet, wo gar nicht geschrieben werden darf.
+#[tokio::test]
+async fn besetzung_schreiben_auf_abgeschlossenem_einsatz_ist_409() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Eine belegte und eine leere Zeile vorbereiten, dann abschliessen.
+    anfrage(
+        &app,
+        "PUT",
+        &besetzung_pfad(einsatz, "s2"),
+        &admin,
+        Some(r#"{"besetzung_art":"einsatzleitung"}"#),
+    )
+    .await;
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    let etb_vorher = etb_treffer(&app, &admin, einsatz, "Besetzung").await;
+
+    let setzen = lifeline_hub::stab::repo::setzen(
+        &pool,
+        einsatz,
+        lifeline_hub::stab::Sachgebiet::S3,
+        1,
+        &lifeline_hub::stab::repo::BesetzungEingabe {
+            besetzung_art: lifeline_hub::stab::BesetzungArt::Einsatzleitung,
+            personal_id: None,
+            bezeichnung: None,
+        },
+    )
+    .await;
+    assert_eq!(
+        setzen.expect_err("setzen muss scheitern").status(),
+        StatusCode::CONFLICT
+    );
+
+    // Belegte Zeile: kein Entfernen auf einem abgeschlossenen Einsatz.
+    let entfernen_belegt =
+        lifeline_hub::stab::repo::entfernen(&pool, einsatz, lifeline_hub::stab::Sachgebiet::S2, 1)
+            .await;
+    assert_eq!(
+        entfernen_belegt
+            .expect_err("entfernen muss scheitern")
+            .status(),
+        StatusCode::CONFLICT
+    );
+
+    // LEERE Zeile: auch hier 409 statt eines „erfolgreichen" No-ops.
+    let entfernen_leer =
+        lifeline_hub::stab::repo::entfernen(&pool, einsatz, lifeline_hub::stab::Sachgebiet::S5, 1)
+            .await;
+    assert_eq!(
+        entfernen_leer
+            .expect_err("auch der No-op darf keinen Erfolg melden")
+            .status(),
+        StatusCode::CONFLICT
+    );
+
+    // Und nichts davon hat geschrieben.
+    assert_eq!(
+        etb_treffer(&app, &admin, einsatz, "Besetzung").await,
+        etb_vorher
+    );
+    let zeilen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_stabsfunktion WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        zeilen, 1,
+        "die S2-Zeile steht unverändert, S3 kam nicht dazu"
+    );
+}

@@ -91,28 +91,39 @@ const SELECT_BESPRECHUNGEN: &str =
 ///
 /// Der Termin kommt aus `einsatz` — eine Spalte, kein eigenes Cache-Fach (Entscheidung 11).
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<StabAnzeige, AppError> {
+    // ALLE vier Abfragen in EINER Lesetransaktion. Einzeln gegen den Pool gefahren könnten sie
+    // einen sich selbst widersprechenden Stand liefern: schliesst nebenher jemand eine
+    // Lagebesprechung ab, stünde `letzte_lagebesprechung` noch bei Nr. 1, während
+    // `anzahl_lagebesprechungen` schon 2 zeigt und der Termin aus Nr. 2 stammt. Dieselbe
+    // Antwort ist auch die QUITTUNG der beiden Schreibrouten — und die darf keinen Zustand
+    // tragen, den es nie gab (LFH-340/C5). SQLite hält unter WAL ab dem ersten Lesen einen
+    // konsistenten Snapshot bis zum Commit.
+    let mut tx = pool.begin().await?;
+
     let zeilen = sqlx::query_as::<_, Zeile>(SELECT_ZEILEN)
         .bind(einsatz_id)
-        .fetch_all(pool)
+        .fetch_all(&mut *tx)
         .await?;
 
     let letzte = sqlx::query_as::<_, LagebesprechungAnzeige>(SELECT_LETZTE_BESPRECHUNG)
         .bind(einsatz_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *tx)
         .await?;
 
     let anzahl: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_lagebesprechung WHERE einsatz_id = ?")
             .bind(einsatz_id)
-            .fetch_one(pool)
+            .fetch_one(&mut *tx)
             .await?;
 
     let termin: Option<String> =
         sqlx::query_scalar("SELECT naechste_lagebesprechung_at FROM einsatz WHERE id = ?")
             .bind(einsatz_id)
-            .fetch_optional(pool)
+            .fetch_optional(&mut *tx)
             .await?
             .flatten();
+
+    tx.commit().await?;
 
     Ok(StabAnzeige {
         besetzung: zeilen.into_iter().map(Zeile::zu_anzeige).collect(),
@@ -262,20 +273,7 @@ pub async fn lagebesprechung_abschliessen(
         // `write_retry!` mit `BEGIN IMMEDIATE` den Schreib-Lock schon am BEGIN hält: ein
         // konkurrierender Abschluss committet entweder vor unserem BEGIN (dann sieht dieses
         // SELECT ihn) oder erst nach unserem COMMIT.
-        let noch_aktiv: Option<i64> =
-            sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
-                .bind(einsatz_id)
-                .fetch_optional(&mut *conn)
-                .await?;
-        if noch_aktiv.is_none() {
-            // 409, NICHT 422: das ist der Lebenszyklus des Einsatzes, und dieselbe Tatsache
-            // beantwortet `fordere_aktiv` am Route-Gate mit `Conflict`
-            // (`einsatz/berechtigung.rs`). Zwei Codes für denselben Sachverhalt, unterschieden
-            // nur durch Timing, wären für einen Client nicht auseinanderzuhalten.
-            return Err(AppError::Conflict(
-                "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-            ));
-        }
+        fordere_aktiv_in_tx(conn, einsatz_id).await?;
 
         // 6. Der Einsatztermin — nur bei gesetztem Schlüssel (Tri-State). Ohne
         //    `status`-Prädikat: Schritt 5 hat es in derselben Transaktion bereits belegt, ein
@@ -331,6 +329,30 @@ fn zustand_text(art: Option<BesetzungArt>, name: Option<&str>) -> String {
 }
 
 /// Der Vorherstand einer Zeile, als Text für den ETB-Eintrag.
+/// Riegel gegen den Lebenszyklus INNERHALB einer Schreibtransaktion.
+///
+/// `fordere_aktiv` läuft im Extractor und liest einen Stand von VOR der Transaktion.
+/// `write_retry!` wartet bei BUSY am `BEGIN IMMEDIATE` mit Backoff — hält ein
+/// konkurrierendes „Einsatz abschliessen" gerade den Schreib-Lock, wartet der Aufruf also
+/// absichtlich, bis jenes committet hat, und schriebe danach in einen geschlossenen Einsatz.
+/// Der Retry-Pfad VERBREITERT das Fenster, statt es zu schliessen.
+///
+/// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, CLAUDE.md) — zwei Codes für dieselbe
+/// Tatsache, unterschieden nur durch Timing, könnte ein Client nicht auseinanderhalten.
+async fn fordere_aktiv_in_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<(), AppError> {
+    let aktiv: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    if aktiv.is_none() {
+        return Err(AppError::Conflict(
+            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Der fachliche Stand einer Zeile: `None` = nicht vergeben.
 type Stand = Option<(BesetzungArt, Option<i64>, Option<String>)>;
 
@@ -388,6 +410,12 @@ pub async fn setzen(
         .etb_startwert();
 
     let etb_id = write_retry!(pool, |conn| {
+        // 0. Lebenszyklus-Riegel. Anders als bei der Lagebesprechung steht er hier GANZ VORN:
+        //    dort trägt er zusätzlich die Atomaritäts-Zusicherung und muss deshalb hinter den
+        //    Inserts stehen; hier gibt es keinen solchen Grund, und in einen abgeschlossenen
+        //    Einsatz soll gar nichts erst geschrieben werden.
+        fordere_aktiv_in_tx(conn, einsatz_id).await?;
+
         // 1. Vorherstand lesen — er geht in den ETB-Text ein, entscheidet über den
         //    Gleichheitsfall und ist nach dem Upsert weg.
         let vorher_stand = vorher_stand(conn, einsatz_id, sachgebiet).await?;
@@ -506,6 +534,9 @@ pub async fn entfernen(
         .etb_startwert();
 
     write_retry!(pool, |conn| {
+        // Vor dem DELETE, damit auch der No-op-Pfad 409 antwortet statt eines irreführenden
+        // 204 „schon nicht vergeben" auf einem abgeschlossenen Einsatz.
+        fordere_aktiv_in_tx(conn, einsatz_id).await?;
         let vorher = stand_text(&vorher_stand(conn, einsatz_id, sachgebiet).await?);
         let betroffen = sqlx::query(
             "DELETE FROM einsatz_stabsfunktion WHERE einsatz_id = ? AND sachgebiet = ?",
