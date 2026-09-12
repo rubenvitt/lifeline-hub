@@ -50,9 +50,15 @@
  *     begründet das über 20 Zeilen). Wer eine ganze Achse als lauter Einzel-Konstanten
  *     danebenbaut, umgeht den Guard — das ist Aufwand, keine Nachlässigkeit.
  *   • **Ein Alias als Wert-Typ**: `type Karte = StatusDarstellung` und dann
- *     `Record<X, Karte>`. Der Parser vergleicht den letzten Typparameter dem NAMEN nach
- *     (seine Vereinigungsglieder einzeln, `| null` fällt also auf); er löst keine Aliase
- *     auf — das wäre ein Typchecker, kein Guard. Im Bestand gibt es keinen solchen Alias.
+ *     `Record<X, Karte>`. Der Parser vergleicht den letzten Typparameter dem NAMEN nach —
+ *     seine Vereinigungsglieder einzeln (`| null` fällt also auf) und jeweils den letzten
+ *     Punkt-Abschnitt (ein Namensraum-Import `sf.StatusDarstellung` fällt ebenfalls auf).
+ *     Aliase löst er nicht auf; das wäre ein Typchecker, kein Guard. Im Bestand gibt es
+ *     keinen solchen Alias.
+ *   • **Ein mehrzeiliges Template-Literal mit einem Kommentarzeichen darin.** Der
+ *     Kommentar-Stripper erkennt eine Zeichenkette nur, wenn sie auf ihrer Zeile schließt —
+ *     die Beschränkung verhindert, dass ein Apostroph in JSX-Text den halben Rest
+ *     verschluckt (siehe {@link stringEnde}). Im Bestand ohne Fundstelle.
  *   • **Eine FUNKTION, die eine `StatusDarstellung` baut**: `pages/MaterialPage.tsx:74`,
  *     `pages/FahrzeugePage.tsx:103`, `pages/PersonalPage.tsx:79`. Alle drei liegen auf
  *     der DB-Achse (`status_farbe`, mandantengepflegter Freitext), die der Kopf von
@@ -104,36 +110,73 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
   return treffer;
 }
 
-/** Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen. Kopie aus
- *  `components/dichte.guard.test.ts` — ohne sie zählte dieser Dateikopf seine eigenen
- *  Beispiele als Verstoß. Zeilenzahl bleibt erhalten (Index = Zeile − 1). */
+/**
+ * Schließendes Anführungszeichen zu `auf` — aber NUR auf derselben Zeile; sonst `-1`.
+ *
+ * Die Beschränkung ist der ganze Trick (Codex-Review zu diesem PR). Ein Stripper, der
+ * Zeichenketten gar nicht kennt, hält das `//` in `title="https://…"` für einen Kommentar
+ * und schneidet den Rest der Zeile ab — das verbotene `color` dahinter verschwindet. Einer,
+ * der jedes Anführungszeichen verfolgt, verschluckt am Apostroph in JSX-TEXT alles bis zum
+ * nächsten und reißt damit ein größeres Loch, als er schließt. Beides sind
+ * Falsch-Negative, und genau die sieht niemand.
+ *
+ * Ein Literal, das auf seiner Zeile schließt, ist eine Zeichenkette; ein einzelnes
+ * Apostroph in Prosa ist keine. Mehrzeilige Template-Literale bleiben damit
+ * unberücksichtigt — dokumentierter Blindfleck, im Bestand ohne Fundstelle.
+ */
+function stringEnde(zeile: string, auf: number): number {
+  const zeichen = zeile[auf];
+  for (let i = auf + 1; i < zeile.length; i++) {
+    if (zeile[i] === '\\') {
+      i++;
+      continue;
+    }
+    if (zeile[i] === zeichen) return i;
+  }
+  return -1;
+}
+
+/**
+ * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen; die Zeilenzahl
+ * bleibt erhalten (Index = Zeile - 1).
+ *
+ * Anders als die Kopien in `components/dichte.guard.test.ts` und
+ * `theme/gate5.guard.test.ts` überspringt dieser Stripper Zeichenketten
+ * ({@link stringEnde}). Dort ist der Blindfleck als Falsch-Negativ hingeschrieben und für
+ * einen Hex-Scan folgenlos; hier hätte ein `/*`-Literal in einer Zeichenkette den Rest der
+ * Datei stummgeschaltet, und ein stummer Guard ist von einem grünen nicht zu unterscheiden.
+ */
 function ohneKommentare(inhalt: string): string[] {
   const zeilen: string[] = [];
   let imBlock = false;
   for (const roh of inhalt.split('\n')) {
-    let rest = roh;
     let sichtbar = '';
-    while (rest.length > 0) {
+    let i = 0;
+    while (i < roh.length) {
       if (imBlock) {
-        const ende = rest.indexOf('*/');
-        if (ende === -1) break;
+        const ende = roh.indexOf('*/', i);
+        if (ende === -1) break; // Rest der Zeile liegt im Block
         imBlock = false;
-        rest = rest.slice(ende + 2);
+        i = ende + 2;
         continue;
       }
-      const block = rest.indexOf('/*');
-      const einzeilig = rest.indexOf('//');
-      if (block === -1 && einzeilig === -1) {
-        sichtbar += rest;
-        break;
+      const z = roh[i];
+      if (z === '"' || z === "'" || z === '`') {
+        const schluss = stringEnde(roh, i);
+        if (schluss !== -1) {
+          sichtbar += roh.slice(i, schluss + 1);
+          i = schluss + 1;
+          continue;
+        }
       }
-      if (einzeilig !== -1 && (block === -1 || einzeilig < block)) {
-        sichtbar += rest.slice(0, einzeilig);
-        break;
+      if (z === '/' && roh[i + 1] === '/') break;
+      if (z === '/' && roh[i + 1] === '*') {
+        imBlock = true;
+        i += 2;
+        continue;
       }
-      sichtbar += rest.slice(0, block);
-      rest = rest.slice(block + 2);
-      imBlock = true;
+      sichtbar += z;
+      i++;
     }
     zeilen.push(sichtbar);
   }
@@ -231,7 +274,14 @@ export function kartenStellen(text: string): number[] {
   for (let i = text.indexOf('Record<'); i !== -1; i = text.indexOf('Record<', i + 7)) {
     const args = typargumente(text, i + 'Record'.length);
     if (!args || args.length < 2) continue;
-    if (vereinigungsglieder(args[args.length - 1]).includes('StatusDarstellung')) {
+    // Der letzte Punkt-Abschnitt, damit ein Namensraum-Import (`Record<X,
+    // sf.StatusDarstellung>`, gültiges TypeScript) nicht am Vergleich vorbeiläuft —
+    // im Codex-Review gefunden. Aliase löst der Guard weiterhin nicht auf, das wäre ein
+    // Typchecker; ein QUALIFIZIERTER Name ist aber derselbe Typ, nur anders geschrieben.
+    const glieder = vereinigungsglieder(args[args.length - 1]).map(
+      (g) => g.split('.').pop()?.trim() ?? g,
+    );
+    if (glieder.includes('StatusDarstellung')) {
       treffer.push(i);
     }
   }
@@ -345,6 +395,14 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
         ].join('\n'),
       }),
     ).toEqual([]);
+  });
+
+  it('erkennt den Vertragstyp auch qualifiziert — `sf.StatusDarstellung`', () => {
+    // Im Codex-Review gefunden: ein Namensraum-Import ist gültiges TypeScript und derselbe
+    // Typ, nur anders geschrieben. Der Vergleich gegen den nackten Namen lief daran vorbei.
+    expect(
+      kartenBefunde({ '/src/pages/Ns.ts': 'const k: Record<X, sf.StatusDarstellung> = {};' }),
+    ).toHaveLength(1);
   });
 
   it('zählt Kommentar-Beispiele nicht mit — auch nicht die aus diesem Dateikopf', () => {
@@ -602,6 +660,36 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
 
     // `style={{ color: … }}` ist keine `color`-Prop — dieselbe Trennung, anderer Anlass.
     expect(farbAusdruck("<Tag style={{ color: 'aktiv' }}>")).toBeNull();
+  });
+
+  it('hält ein Kommentarzeichen IN einer Zeichenkette nicht für einen Kommentar', () => {
+    // Im Codex-Review gefunden, beide Male als Falsch-NEGATIV — der gefährlichen Richtung.
+    // (a) Das `//` einer URL schnitt die Zeile ab, das verbotene `color` dahinter verschwand.
+    expect(
+      tagBefunde({
+        '/src/pages/Url.tsx':
+          '<Tag title="https://example.org" color={rollenFarbe(warnstufeKarte[s].rolle, t)}>',
+      }),
+    ).toHaveLength(1);
+
+    // (b) Ein `/*` im Literal schaltete den GANZEN Rest der Datei stumm.
+    expect(
+      tagBefunde({
+        '/src/pages/Block.tsx': [
+          "const muster = '/*';",
+          "<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>",
+        ].join('\n'),
+      }),
+    ).toHaveLength(1);
+
+    // Und die Gegenprobe, ohne die der Stripper genauso gut fehlen könnte: ein ECHTER
+    // Kommentar mit demselben Wortlaut bleibt unsichtbar.
+    expect(
+      tagBefunde({
+        '/src/pages/Echt.tsx':
+          "// <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}> wäre falsch\nconst a = 1;",
+      }),
+    ).toEqual([]);
   });
 
   it('lässt die legitimen Nachbarn in Ruhe', () => {
