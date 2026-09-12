@@ -31,7 +31,7 @@ set -euo pipefail
 # Bündel-Auswahl für die parallele CI (LFH-534). OHNE Argument läuft alles wie bisher —
 # das ist der Weg vor dem Merge und die Vorgabe, an der sich nichts geändert hat.
 #   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
-#                    Ruhefenster-Selbsttest                  (Sekunden bis ~1:20)
+#                    Selbsttests der Gate-Skripte            (Sekunden bis ~1:20)
 #   --nur rust       cargo test --workspace                  (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
@@ -79,7 +79,7 @@ FE="$ROOT/frontend"
 # ändert, prüft BEIDE Schritte (5 und 7) — eine Version, die nur einen davon grün
 # macht, ist keine.
 PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
-SCHRITTE=8
+SCHRITTE=9
 
 # ZEITZONE FESTNAGELN (LFH-522, gemessen im ersten CI-Lauf).
 # Ohne diese Zeile hängt das Ergebnis der Suite an der Zone des Rechners: `EtbFilterleiste`
@@ -103,10 +103,10 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die sieben Schritte, je als Funktion ────────────────────────────────────────────
+# ── Die neun Schritte, je als Funktion ──────────────────────────────────────────────
 # Warum Funktionen statt einer geraden Abfolge: die CI fährt sie seit LFH-534 auf MEHREREN
 # Runnern parallel und muss sie deshalb einzeln ansprechen können. Der Aufruf ohne Argument
-# ist davon unberührt — er fährt weiterhin alle sieben der Reihe nach, und das bleibt der
+# ist davon unberührt — er fährt weiterhin alle neun der Reihe nach, und das bleibt der
 # Weg vor dem Merge.
 #
 # Die Nummer in der Ausgabe ist die Position im GESAMTgate, nicht im gerade laufenden
@@ -220,16 +220,26 @@ schritt_8() {
   "$ROOT/scripts/release-ruhefenster.test.sh"
 }
 
+schritt_9() {
+  echo "==> [9/$SCHRITTE] Advisory-Gate liest das Lockfile (Selbsttest, LFH-316)"
+  # Neben Schritt 6, nicht in ihm: Schritt 6 fragt die Advisory-Datenbank und ist damit
+  # netzabhängig und über die Zeit veränderlich. Dieser hier fragt, WORAUF Schritt 6
+  # schaut — ohne Netz, in rund einer Sekunde. Er gehört ins `schnell`-Bündel, weil sein
+  # Fehlerbild still ist: ein Gate, das eine Teilmenge prüft, meldet „OK" wie eines, das
+  # alles geprüft hat.
+  "$ROOT/scripts/check-deps.test.sh"
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
-BUENDEL_schnell="1 2 3 6 8"
+BUENDEL_schnell="1 2 3 6 8 9"
 BUENDEL_rust="4"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9"
 
-# SELBSTPRÜFUNG: die vier Bündel müssen ZUSAMMEN genau die sieben Schritte ergeben — jeden
+# SELBSTPRÜFUNG: die vier Bündel müssen ZUSAMMEN genau die neun Schritte ergeben — jeden
 # genau einmal. Ohne diese Zeile fiele beim Umsortieren still ein Schritt aus der CI heraus,
 # und niemand sähe es: die Jobs blieben grün, nur geprüft würde weniger. Das ist teurer als
 # ein roter Lauf.
