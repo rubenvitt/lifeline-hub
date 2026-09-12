@@ -77,6 +77,50 @@ if (!workerUrl)
   throw new Error('maplibre-Worker-URL ist leer — `?worker&url` hat nichts geliefert');
 maplibregl.setWorkerUrl(workerUrl);
 
+/** Ein Aufruf von `transformRequest`: was MapLibre wollte (`ein`) und was es bekam (`aus`). */
+interface KartenAnfrage {
+  ein: string;
+  aus: string;
+}
+/** Obergrenze des DEV-Mitschnitts. Eine offene Karte holt Kacheln im Sekundentakt; ohne Deckel
+ *  wüchse die Liste über eine Dev-Sitzung unbegrenzt. 40 reicht für jede Zusicherung — die
+ *  ersten Einträge sind Style/Glyphs/Kacheln des ersten Laufs, und genau die werden geprüft. */
+const ANFRAGEN_DECKEL = 40;
+
+/**
+ * `transformRequest` der Karte — plus DEV-Mitschnitt unter `window.__lfhKartenAnfragen`.
+ *
+ * WARUM DER MITSCHNITT SEIN MUSS (LFH-356, gemessen): die Absolutierung ist vom Netz aus
+ * NICHT beobachtbar. Der Versuch, sie über die tatsächlich abgesetzte Kachel-URL zu belegen,
+ * scheitert — mit ENTFERNTEM `transformRequest` lud der Kachel-Fixture-Lauf unverändert
+ * durch: 4 Kachel-Anfragen, alle absolut, `map.loaded()` true. Grund: maplibre 6 fetcht im
+ * Worker über `new Request(url)`, und der löst eine root-relative URL gegen
+ * `self.location` des WORKER-SKRIPTS auf — das liegt bei uns same-origin
+ * (`setWorkerUrl` oben), also kommt dasselbe heraus. Ein Test auf die Netz-Wirkung wäre
+ * grün, ohne dass diese Zeile je liefe: er könnte nicht rot werden.
+ *
+ * Die Absolutierung bleibt trotzdem tragend, und zwar nicht hypothetisch: ist die
+ * Worker-URL cross-origin, baut maplibre den Worker aus einem **Blob**
+ * (`maplibre-gl.mjs`: `if (!istCrossOrigin(url)) return new Worker(url)`, sonst
+ * `createObjectURL`). In einem `blob:`-Worker hat `self.location` einen opaken Pfad, gegen
+ * den sich `/api/karte/proxy/…` nicht auflösen lässt — genau das „Failed to parse URL" aus
+ * LFH-182. Wer Assets je auf ein CDN legt, fällt ohne diese Zeile sofort hinein.
+ *
+ * Der Mitschnitt ist damit die einzige Stelle, an der „läuft der Seam?" widerlegbar ist —
+ * dieselbe Begründung wie beim Karten-Handle `__lfhKarte` weiter unten, und wie dort ist
+ * die Zeile im Prod-Build weg (`import.meta.env.DEV` ist dann die Konstante `false`, der
+ * Zweig fällt beim Bündeln heraus).
+ */
+function transformiereKartenAnfrage(url: string): { url: string } {
+  const ergebnis = absolutiereProxyAnfrage(url);
+  if (import.meta.env.DEV) {
+    const w = window as unknown as { __lfhKartenAnfragen?: KartenAnfrage[] };
+    const liste = (w.__lfhKartenAnfragen ??= []);
+    if (liste.length < ANFRAGEN_DECKEL) liste.push({ ein: url, aus: ergebnis.url });
+  }
+  return ergebnis;
+}
+
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
 export type { ZoneFeature };
 
@@ -274,6 +318,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Karte einmalig erzeugen.
   useEffect(() => {
     if (!containerRef.current) return;
+    // Mitschnitt VOR dem Konstruktor leeren, nicht danach: `transformRequest` feuert bereits
+    // für Style und Glyphs, während `new maplibregl.Map` läuft. Und leeren überhaupt, weil ein
+    // Test sonst Einträge einer längst entfernten Karte läse — dieselbe Falle wie beim
+    // Karten-Handle unten, nur ohne die Rettung, dass ein `delete` sie sichtbar macht.
+    if (import.meta.env.DEV)
+      (window as unknown as { __lfhKartenAnfragen?: KartenAnfrage[] }).__lfhKartenAnfragen = [];
     const map = new maplibregl.Map({
       container: containerRef.current,
       style,
@@ -291,9 +341,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // `number | undefined`). Bewusste Entscheidung, kein Versehen: wer Overscaling will, setzt
       // hier eine Zahl und prüft die Basemap-Beschriftung auf einem echten Gerät nach.
       zoomLevelsToOverscale: undefined,
-      // Server-Proxy-URLs (/api/karte/proxy/…, LFH-182) sind root-relativ; im Tile-Worker ohne
-      // Dokument-Base scheitern sie sonst. Hier gegen die Origin absolutieren.
-      transformRequest: absolutiereProxyAnfrage,
+      // Server-Proxy-URLs (/api/karte/proxy/…, LFH-182) sind root-relativ; in einem
+      // Blob-Tile-Worker ohne auflösbare Base scheitern sie. Hier gegen die Origin
+      // absolutieren — Begründung und DEV-Mitschnitt oben an `transformiereKartenAnfrage`.
+      transformRequest: transformiereKartenAnfrage,
     });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     // Fenster für die Basemap-Abstufung schließen, sobald der STYLE steht — NICHT erst bei
@@ -367,7 +418,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // je eine Karte lief — genau die Sorte stiller Fehlbeleg, gegen die der Haken existiert.
       // (Unter StrictMode ist die Reihenfolge Effekt A → Cleanup A → Effekt B, der Haken zeigt
       // danach also korrekt auf die zweite, lebende Instanz.)
-      if (import.meta.env.DEV) delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
+      if (import.meta.env.DEV) {
+        delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
+        // Mitschnitt mit abräumen, aus demselben Grund: eine stehengebliebene Liste stammte
+        // von der entfernten Karte, und ein Test darauf wäre grün, ohne dass eine Karte lief.
+        delete (window as unknown as { __lfhKartenAnfragen?: unknown }).__lfhKartenAnfragen;
+      }
       // Ref nullen: sonst sieht der Attribution-Effekt nach StrictMode-Remount eine
       // stale Control der entfernten Map und ruft removeControl auf bereits Zerstörtem.
       attribControlRef.current = null;
