@@ -313,12 +313,22 @@ export function attributEbene(tag: string): string {
     const z = tag[i];
     if (anfuehrung) {
       raus += z;
-      if (z === '\\') { raus += tag[++i] ?? ''; continue; }
+      if (z === '\\') {
+        raus += tag[++i] ?? '';
+        continue;
+      }
       if (z === anfuehrung) anfuehrung = null;
       continue;
     }
-    if (z === '"' || z === "'" || z === '`') { anfuehrung = z; raus += z; continue; }
-    if (z !== '{') { raus += z; continue; }
+    if (z === '"' || z === "'" || z === '`') {
+      anfuehrung = z;
+      raus += z;
+      continue;
+    }
+    if (z !== '{') {
+      raus += z;
+      continue;
+    }
     // Balancierten Ausdruck greifen und entscheiden, ob er wörtlich genug ist.
     // Die Bilanz MUSS Zeichenketten überspringen — genau wie `tagEnde` und
     // `generikEnde`. Sonst verschiebt eine Klammer INNERHALB eines Strings die Tiefe,
@@ -470,7 +480,8 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
   });
 
   it('meldet das äußere Element dennoch, wenn es SELBST eine Angabe trägt', () => {
-    const quelle = '<Collapse size="small" items={[{ children: <Descriptions size="small" /> }]} />';
+    const quelle =
+      '<Collapse size="small" items={[{ children: <Descriptions size="small" /> }]} />';
     expect(stellenIn('/src/x.tsx', quelle)).toHaveLength(1);
   });
 
@@ -488,9 +499,10 @@ describe('Dichte-Guard (LFH-362 · B5b)', () => {
   });
 
   it('lässt Flächen ohne Bedienfunktion und die Projekt-Primitive in Ruhe', () => {
-    const quelle = ['<Card size="small" />', ...EIGENE_SEMANTIK.map((e) => `<${e} size="small" />`)].join(
-      '\n',
-    );
+    const quelle = [
+      '<Card size="small" />',
+      ...EIGENE_SEMANTIK.map((e) => `<${e} size="small" />`),
+    ].join('\n');
     expect(stellenIn('/src/x.tsx', quelle)).toEqual([]);
   });
 

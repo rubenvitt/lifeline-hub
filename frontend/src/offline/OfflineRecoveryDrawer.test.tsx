@@ -24,11 +24,7 @@ describe('OfflineRecoveryDrawer: nicht attribuierbare Legacy-Daten', () => {
 
     render(
       <App>
-        <OfflineRecoveryDrawer
-          open
-          onClose={vi.fn()}
-          benutzerId={11}
-        />
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
       </App>,
     );
 
@@ -39,14 +35,16 @@ describe('OfflineRecoveryDrawer: nicht attribuierbare Legacy-Daten', () => {
     expect(screen.queryByRole('button', { name: /Mir zuordnen/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Alle Alt-Daten verwerfen' }));
-    expect(await screen.findByText(
-      'Alle nicht attribuierbaren Alt-Daten endgültig verwerfen?',
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText('Alle nicht attribuierbaren Alt-Daten endgültig verwerfen?'),
+    ).toBeInTheDocument();
     expect(await queueNichtZugeordnetZaehlen()).toBe(1);
 
-    await user.click(screen.getByRole('button', {
-      name: 'Alle Alt-Daten endgültig verwerfen',
-    }));
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Alle Alt-Daten endgültig verwerfen',
+      }),
+    );
 
     await waitFor(async () => expect(await queueNichtZugeordnetZaehlen()).toBe(0));
   });

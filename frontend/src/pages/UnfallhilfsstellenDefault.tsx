@@ -11,7 +11,10 @@ import { liesLetzteUhs, waehleDefaultUhs } from './uhs/uhsAuswahl';
 export default function UnfallhilfsstellenDefault() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
+  const uhsQuery = useQuery({
+    queryKey: einsatzKeys.uhs(einsatzId),
+    queryFn: () => listeUhs(einsatzId),
+  });
   return (
     <Direkteinstieg
       query={uhsQuery}

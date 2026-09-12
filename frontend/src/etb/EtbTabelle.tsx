@@ -122,8 +122,17 @@ const GRUPPEN: Gruppierung<EtbZeile> = {
  * · `onZeileKlick` — es gibt keine Detailroute je Eintrag; der Klick hätte kein Ziel.
  */
 export default function EtbTabelle({
-  zeilen, einsatzId, highlightId, onBerichtigen, onWiedervorlage, onAuftragErteilen,
-  onErneutSenden, onVerwerfen, ladend, fehler, leerText,
+  zeilen,
+  einsatzId,
+  highlightId,
+  onBerichtigen,
+  onWiedervorlage,
+  onAuftragErteilen,
+  onErneutSenden,
+  onVerwerfen,
+  ladend,
+  fehler,
+  leerText,
 }: Props) {
   const { token } = theme.useToken();
 
@@ -154,7 +163,9 @@ export default function EtbTabelle({
       return (
         <Space size="middle">
           <Button onClick={() => onErneutSenden?.(z.puffer)}>Erneut senden</Button>
-          <Button danger onClick={() => onVerwerfen?.(z.puffer)}>Verwerfen</Button>
+          <Button danger onClick={() => onVerwerfen?.(z.puffer)}>
+            Verwerfen
+          </Button>
         </Space>
       );
     }
@@ -172,7 +183,8 @@ export default function EtbTabelle({
      */
     const items = [
       ...(onBerichtigen && e.typ !== 'berichtigung'
-        ? [{ key: 'berichtigen', label: 'Berichtigen' }] : []),
+        ? [{ key: 'berichtigen', label: 'Berichtigen' }]
+        : []),
       ...(onWiedervorlage ? [{ key: 'wiedervorlage', label: 'Wiedervorlage' }] : []),
       ...(onAuftragErteilen ? [{ key: 'auftrag', label: 'Auftrag erteilen' }] : []),
     ];
@@ -227,9 +239,11 @@ export default function EtbTabelle({
      * `label` ist am `StatusTag` Pflichtfeld und damit der zweite Kanal (WCAG 1.4.1) —
      * die Farbe allein trüge die Aussage nicht.
      */
-    return z.art === 'ausstehend'
-      ? <StatusTag darstellung={{ rolle: 'achtung', label: 'wird gesendet …' }} />
-      : <StatusTag darstellung={{ rolle: 'alarm', label: 'abgelehnt' }} />;
+    return z.art === 'ausstehend' ? (
+      <StatusTag darstellung={{ rolle: 'achtung', label: 'wird gesendet …' }} />
+    ) : (
+      <StatusTag darstellung={{ rolle: 'alarm', label: 'abgelehnt' }} />
+    );
   }
 
   function zeitpunkt(z: EtbZeile): ReactNode {
@@ -240,7 +254,9 @@ export default function EtbTabelle({
     const e = z.eintrag;
     return (
       <Space size={abstand.xs}>
-        <span><ZeitAnzeige wert={e.ereigniszeit} format="kurz" /></span>
+        <span>
+          <ZeitAnzeige wert={e.ereigniszeit} format="kurz" />
+        </span>
         {/*
           Ein Wort, kein Zeichen (LFH-365 · B5e): das ⧖ hier war nur mit Tooltip oder
           Vorwissen deutbar, und die Aussage „nachgetragen" ist beweisrelevant.
@@ -315,23 +331,34 @@ export default function EtbTabelle({
    * `EtbPage` übergibt dort alle Rückrufe als `undefined`. Deshalb ist `K` hier
    * ausgeschrieben statt inferiert: eine bedingte Liste verlöre die Schlüsselliterale.
    */
-  const zeigtAktionen = onBerichtigen != null || onWiedervorlage != null
-    || onAuftragErteilen != null || onErneutSenden != null || onVerwerfen != null;
+  const zeigtAktionen =
+    onBerichtigen != null ||
+    onWiedervorlage != null ||
+    onAuftragErteilen != null ||
+    onErneutSenden != null ||
+    onVerwerfen != null;
 
   const spalten = spaltenFuer<EtbZeile>()<EtbSpalte>([
     // Index 0 ist die fixierte, menschenlesbare Kennung — nie die DB-`id`.
     { key: 'nr', title: 'Nr.', etikett: 'Nr.', width: 88, render: (_, z) => kennung(z) },
     {
-      key: 'zeit', title: 'Ereigniszeit', etikett: 'Zeit', width: 180,
+      key: 'zeit',
+      title: 'Ereigniszeit',
+      etikett: 'Zeit',
+      width: 180,
       render: (_, z) => zeitpunkt(z),
     },
     {
-      key: 'typ', title: 'Typ', etikett: 'Typ', width: 130,
-      render: (_, z) => (
-        z.art === 'eintrag'
-          ? <StatusTag darstellung={etbTyp[z.eintrag.typ]} />
-          : <StatusTag darstellung={etbTyp[z.puffer.eintrag.typ]} />
-      ),
+      key: 'typ',
+      title: 'Typ',
+      etikett: 'Typ',
+      width: 130,
+      render: (_, z) =>
+        z.art === 'eintrag' ? (
+          <StatusTag darstellung={etbTyp[z.eintrag.typ]} />
+        ) : (
+          <StatusTag darstellung={etbTyp[z.puffer.eintrag.typ]} />
+        ),
     },
     /*
      * `abBreite: 'xxl'` an Von→An und Erfasser ist die ≥50-%-Zusicherung des Tickets in
@@ -341,7 +368,11 @@ export default function EtbTabelle({
      * weil `abBreite` und Handauswahl durch DIESELBE Funktion laufen.
      */
     {
-      key: 'vonan', title: 'Von → An', etikett: 'Von → An', width: 160, abBreite: 'xxl',
+      key: 'vonan',
+      title: 'Von → An',
+      etikett: 'Von → An',
+      width: 160,
+      abBreite: 'xxl',
       render: (_, z) => vonAn(z),
     },
     /*
@@ -359,24 +390,37 @@ export default function EtbTabelle({
      * holte den Überlauf zurück, den dieses Ticket entfernt.
      */
     {
-      key: 'inhalt', title: 'Inhalt', etikett: 'Inhalt', mindestBreite: 320,
+      key: 'inhalt',
+      title: 'Inhalt',
+      etikett: 'Inhalt',
+      mindestBreite: 320,
       render: (_, z) => inhaltsBlock(z),
     },
     {
-      key: 'erfasser', title: 'Erfasser', etikett: 'Erfasser', width: 120, abBreite: 'xxl',
+      key: 'erfasser',
+      title: 'Erfasser',
+      etikett: 'Erfasser',
+      width: 120,
+      abBreite: 'xxl',
       render: (_, z) => (z.art === 'eintrag' ? z.eintrag.erfasser_name : '—'),
     },
-    ...(zeigtAktionen ? [{
-      key: 'aktion' as const, title: '', etikett: 'Aktionen',
-      /*
-       * Von 230 px auf die Breite eines Auslösers. Die Zahl ist bewusst großzügig: der
-       * Knopf ist quadratisch und erbt seine Kante aus `controlHeight`, im
-       * Handschuh-Betrieb also 72 px. Eine feste Spaltenbreite kann der Staffel nicht
-       * folgen — sie ist hier nur ein Hinweis, weil die Tabelle mit `max-content` rechnet.
-       */
-      width: 96,
-      render: (_: unknown, z: EtbZeile) => zeilenAktionen(z),
-    }] : []),
+    ...(zeigtAktionen
+      ? [
+          {
+            key: 'aktion' as const,
+            title: '',
+            etikett: 'Aktionen',
+            /*
+             * Von 230 px auf die Breite eines Auslösers. Die Zahl ist bewusst großzügig: der
+             * Knopf ist quadratisch und erbt seine Kante aus `controlHeight`, im
+             * Handschuh-Betrieb also 72 px. Eine feste Spaltenbreite kann der Staffel nicht
+             * folgen — sie ist hier nur ein Hinweis, weil die Tabelle mit `max-content` rechnet.
+             */
+            width: 96,
+            render: (_: unknown, z: EtbZeile) => zeilenAktionen(z),
+          },
+        ]
+      : []),
   ]);
 
   /**
@@ -403,11 +447,15 @@ export default function EtbTabelle({
           borderBlockEnd: `1px solid ${token.colorSplit}`,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: token.marginXS }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: token.marginXS }}
+        >
           <Typography.Text strong>{kennung(zeile)}</Typography.Text>
           <Typography.Text type="secondary">{zeitpunkt(zeile)}</Typography.Text>
           <StatusTag
-            darstellung={etbTyp[zeile.art === 'eintrag' ? zeile.eintrag.typ : zeile.puffer.eintrag.typ]}
+            darstellung={
+              etbTyp[zeile.art === 'eintrag' ? zeile.eintrag.typ : zeile.puffer.eintrag.typ]
+            }
           />
           <Typography.Text type="secondary">{vonAn(zeile)}</Typography.Text>
           {zeile.art === 'eintrag' && (

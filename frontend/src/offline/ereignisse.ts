@@ -4,8 +4,7 @@ import type { PersonErfassungsSicht } from './queue';
 /** Korrelation zwischen einer lokal vorgemerkten Aktion und ihrer späteren
  * Server-Antwort. Das Ereignis ist bewusst nur ein UI-Signal; die Wahrheit
  * bleibt der Query-Cache beziehungsweise der nächste API-Abruf. */
-export const OFFLINE_SCHREIBAKTION_GESENDET_EVENT =
-  'lfh:offline-schreibaktion-gesendet';
+export const OFFLINE_SCHREIBAKTION_GESENDET_EVENT = 'lfh:offline-schreibaktion-gesendet';
 
 const OFFLINE_QUITTUNG_CHANNEL = 'lfh:offline-quittungen';
 const OFFLINE_QUITTUNG_STORAGE_KEY = 'lfh:offline-quittung-signal';
@@ -39,15 +38,14 @@ function holeQuittungKanal(): BroadcastChannel | null {
 function istPersonQuittungSignal(wert: unknown): wert is OfflinePersonQuittungSignal {
   if (!wert || typeof wert !== 'object') return false;
   const signal = wert as Partial<OfflinePersonQuittungSignal>;
-  return signal.typ === 'person-erfassungsquittung' &&
+  return (
+    signal.typ === 'person-erfassungsquittung' &&
     Number.isSafeInteger(signal.benutzerId) &&
-    Number.isSafeInteger(signal.einsatzId);
+    Number.isSafeInteger(signal.einsatzId)
+  );
 }
 
-function meldePersonQuittungTabUebergreifend(
-  benutzerId: number,
-  einsatzId: number,
-): void {
+function meldePersonQuittungTabUebergreifend(benutzerId: number, einsatzId: number): void {
   const signal: OfflinePersonQuittungSignal = {
     typ: 'person-erfassungsquittung',
     benutzerId,
@@ -61,7 +59,11 @@ function meldePersonQuittungTabUebergreifend(
     } catch {
       // Auch postMessage kann bei einem inzwischen geschlossenen/gesperrten Kanal
       // werfen. Danach einmal datenarm über den Storage-Seam signalisieren.
-      try { kanal.close(); } catch { /* bereits geschlossen */ }
+      try {
+        kanal.close();
+      } catch {
+        /* bereits geschlossen */
+      }
       quittungKanal = null;
     }
   }
@@ -128,15 +130,10 @@ export type OfflineSchreibaktionGesendet =
       daten: Meldung;
     };
 
-export function meldeOfflineSchreibaktionGesendet(
-  detail: OfflineSchreibaktionGesendet,
-): void {
+export function meldeOfflineSchreibaktionGesendet(detail: OfflineSchreibaktionGesendet): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(
-    new CustomEvent<OfflineSchreibaktionGesendet>(
-      OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
-      { detail },
-    ),
+    new CustomEvent<OfflineSchreibaktionGesendet>(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, { detail }),
   );
   if (detail.art === 'person') {
     meldePersonQuittungTabUebergreifend(detail.benutzerId, detail.einsatzId);

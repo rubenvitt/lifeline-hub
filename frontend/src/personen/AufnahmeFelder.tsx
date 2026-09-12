@@ -67,14 +67,20 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
 
   const weitereAngaben = (
     <>
-      <Form.Item label="Name" name="name"><Input /></Form.Item>
-      <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
+      <Form.Item label="Name" name="name">
+        <Input />
+      </Form.Item>
+      <Form.Item label="Vorname" name="vorname">
+        <Input />
+      </Form.Item>
       {modus === 'vermisst' && (
         <Form.Item label="Melder / Kontakt" name="melder_kontakt">
           <Input placeholder="Angehöriger, Kontaktdaten" />
         </Form.Item>
       )}
-      <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+      <Form.Item label="Notiz" name="notiz">
+        <Input.TextArea rows={2} />
+      </Form.Item>
     </>
   );
 

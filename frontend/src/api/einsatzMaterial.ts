@@ -12,7 +12,11 @@ export function listeEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial
   return apiGet<EinsatzMaterial[]>(`/api/einsaetze/${einsatzId}/material`);
 }
 
-export function disponiereMaterial(einsatzId: number, materialId: number, menge: number): Promise<EinsatzMaterial> {
+export function disponiereMaterial(
+  einsatzId: number,
+  materialId: number,
+  menge: number,
+): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', {
     material_id: materialId,
     menge,
@@ -20,7 +24,11 @@ export function disponiereMaterial(einsatzId: number, materialId: number, menge:
 }
 
 // menge wird separat übergeben, da es keine Stamm-Eigenschaft des Ad-hoc-Materials ist.
-export function disponiereAdhoc(einsatzId: number, adhoc: MaterialAdhocEingabe, menge: number): Promise<EinsatzMaterial> {
+export function disponiereAdhoc(
+  einsatzId: number,
+  adhoc: MaterialAdhocEingabe,
+  menge: number,
+): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', { adhoc, menge });
 }
 

@@ -1,5 +1,13 @@
 import {
-  App, Button, Collapse, Form, Input, InputNumber, Popconfirm, Space, type TableColumnsType,
+  App,
+  Button,
+  Collapse,
+  Form,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Space,
+  type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -13,7 +21,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import {
-  aktualisiereStatus, deaktiviereStatus, legeStatusAn, listeFahrzeugStatus, type StatusEingabe,
+  aktualisiereStatus,
+  deaktiviereStatus,
+  legeStatusAn,
+  listeFahrzeugStatus,
+  type StatusEingabe,
 } from '../api/fahrzeugStatus';
 import type { FahrzeugStatus, StatusKategorie } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
@@ -21,7 +33,6 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { leerZuNull } from '../api/patchTriState';
 import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
-
 
 interface FormWerte {
   label: string;
@@ -43,7 +54,10 @@ export default function StatusKatalogTab() {
   // hier abweichen.
   const [bearbeite, setBearbeite] = useState<FahrzeugStatus | null>(null);
 
-  const statusQuery = useQuery({ queryKey: globalKeys.fahrzeugStatus(), queryFn: listeFahrzeugStatus });
+  const statusQuery = useQuery({
+    queryKey: globalKeys.fahrzeugStatus(),
+    queryFn: listeFahrzeugStatus,
+  });
 
   const speichern = useMutation({
     mutationFn: ({ id, werte }: { id: number; werte: FormWerte }) => {
@@ -82,7 +96,8 @@ export default function StatusKatalogTab() {
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereStatus(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.fahrzeugStatus() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
   // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
@@ -148,9 +163,7 @@ export default function StatusKatalogTab() {
             key: 'aktionen',
             render: (_, s: FahrzeugStatus) => (
               <Space size="middle">
-                <Button onClick={() => setBearbeite(s)}>
-                  Bearbeiten
-                </Button>
+                <Button onClick={() => setBearbeite(s)}>Bearbeiten</Button>
                 <Popconfirm
                   title="Status deaktivieren?"
                   okButtonProps={{ danger: true }}
@@ -170,7 +183,7 @@ export default function StatusKatalogTab() {
       titel="Fahrzeug-Status"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
         einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
@@ -284,23 +297,25 @@ export default function StatusKatalogTab() {
         <Collapse
           ghost
           style={{ marginInline: -8 }}
-          items={[{
-            key: 'weitere',
-            label: 'Weitere Angaben',
-            children: (
-              <>
-                <Form.Item label="Farbe (Hex, optional)" name="farbe">
-                  <Input placeholder="#22aa55" />
-                </Form.Item>
-                <Form.Item label="FMS-Anker (0–9, optional)" name="fms_anker">
-                  <InputNumber min={0} max={9} style={{ width: '100%', maxWidth: 120 }} />
-                </Form.Item>
-                <Form.Item label="Sortierung" name="sortier">
-                  <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-                </Form.Item>
-              </>
-            ),
-          }]}
+          items={[
+            {
+              key: 'weitere',
+              label: 'Weitere Angaben',
+              children: (
+                <>
+                  <Form.Item label="Farbe (Hex, optional)" name="farbe">
+                    <Input placeholder="#22aa55" />
+                  </Form.Item>
+                  <Form.Item label="FMS-Anker (0–9, optional)" name="fms_anker">
+                    <InputNumber min={0} max={9} style={{ width: '100%', maxWidth: 120 }} />
+                  </Form.Item>
+                  <Form.Item label="Sortierung" name="sortier">
+                    <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
+                  </Form.Item>
+                </>
+              ),
+            },
+          ]}
         />
       </ErfassungsModal>
     </AdminPage>

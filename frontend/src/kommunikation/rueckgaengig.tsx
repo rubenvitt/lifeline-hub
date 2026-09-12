@@ -40,11 +40,7 @@ const DAUER_S = 6;
  */
 const SCHLUESSEL = 'lfh-rueckgaengig';
 
-export function zeigeRueckgaengig(
-  api: MessageInstance,
-  text: string,
-  aufRueckgaengig: () => void,
-) {
+export function zeigeRueckgaengig(api: MessageInstance, text: string, aufRueckgaengig: () => void) {
   // Lokal statt State: der Toast lebt außerhalb des React-Baums des Auslösers und
   // wird nach dem Klick ohnehin zerstört.
   let verbraucht = false;

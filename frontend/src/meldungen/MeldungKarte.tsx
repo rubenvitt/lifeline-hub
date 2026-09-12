@@ -1,4 +1,15 @@
-import { Button, Card, Dropdown, Flex, Modal, Popconfirm, Space, Tag, Typography, theme } from 'antd';
+import {
+  Button,
+  Card,
+  Dropdown,
+  Flex,
+  Modal,
+  Popconfirm,
+  Space,
+  Tag,
+  Typography,
+  theme,
+} from 'antd';
 import type { MenuProps } from 'antd';
 import { Select } from '../components/Select';
 import { ClockCircleOutlined, MoreOutlined } from '@ant-design/icons';
@@ -6,7 +17,13 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
-import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge, formatZeit } from '../kommunikation';
+import {
+  MELDUNG_STATUS,
+  PrioBadge,
+  QuittungIndikator,
+  StatusBadge,
+  formatZeit,
+} from '../kommunikation';
 
 const { Text } = Typography;
 
@@ -17,11 +34,18 @@ export interface BearbeiterOption {
 
 // Modul-spezifische Labels (kein gemeinsames Primitiv) — bleiben lokal.
 const ART_LABEL: Record<string, string> = {
-  lagemeldung: 'Lagemeldung', sofortmeldung: 'Sofortmeldung', rueckmeldung: 'Rückmeldung',
-  vollzugsmeldung: 'Vollzugsmeldung', anfrage: 'Anfrage', sonstige: 'Sonstige',
+  lagemeldung: 'Lagemeldung',
+  sofortmeldung: 'Sofortmeldung',
+  rueckmeldung: 'Rückmeldung',
+  vollzugsmeldung: 'Vollzugsmeldung',
+  anfrage: 'Anfrage',
+  sonstige: 'Sonstige',
 };
 const WEG_LABEL: Record<string, string> = {
-  funk: 'Funk', telefon: 'Telefon', persoenlich: 'Persönlich', sonstige: 'Sonstige',
+  funk: 'Funk',
+  telefon: 'Telefon',
+  persoenlich: 'Persönlich',
+  sonstige: 'Sonstige',
 };
 
 export interface MeldungKarteProps {
@@ -53,9 +77,17 @@ function bestaetigungsAchse(m: Meldung): ReactNode {
     return <QuittungIndikator quittiert von={m.bestaetigt_von_name} am={m.bestaetigt_at} />;
   }
   if (m.ist_ueberfaellig || m.eskaliert) {
-    return <Tag color="red" style={{ margin: 0 }}>Bestätigung überfällig{m.eskaliert ? ' (eskaliert)' : ''}</Tag>;
+    return (
+      <Tag color="red" style={{ margin: 0 }}>
+        Bestätigung überfällig{m.eskaliert ? ' (eskaliert)' : ''}
+      </Tag>
+    );
   }
-  return <Tag color="orange" style={{ margin: 0 }}>Bestätigung offen bis {formatZeit(m.bestaetigung_frist_at)}</Tag>;
+  return (
+    <Tag color="orange" style={{ margin: 0 }}>
+      Bestätigung offen bis {formatZeit(m.bestaetigung_frist_at)}
+    </Tag>
+  );
 }
 
 /**
@@ -65,13 +97,26 @@ function bestaetigungsAchse(m: Meldung): ReactNode {
  * orthogonal zum Triage-Status (LFH-97).
  */
 export default function MeldungKarte({
-  meldung: m, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder, hervorgehoben,
-  onStatus, onZuweisen, onLagerelevant, onBestaetigen, onAuftragErteilen,
+  meldung: m,
+  ansicht = 'offen',
+  einsatzId,
+  darfSchreiben,
+  mitglieder,
+  hervorgehoben,
+  onStatus,
+  onZuweisen,
+  onLagerelevant,
+  onBestaetigen,
+  onAuftragErteilen,
 }: MeldungKarteProps) {
   const { token } = theme.useToken();
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
   // Unübersehbare Hervorhebung (AK1/AK3): unbestätigte überfällige/eskalierte Sofortmeldung.
-  const alarmiert = !!(m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert));
+  const alarmiert = !!(
+    m.bestaetigung_pflicht &&
+    !m.ist_bestaetigt &&
+    (m.ist_ueberfaellig || m.eskaliert)
+  );
   // Eingangszustand (LFH-343 · C8, Befund H47): eine neue Meldung sah exakt aus wie
   // eine bereits gesichtete — beide `phase: 'offen'`, zwei graue Tags, drei
   // Buchstaben Unterschied. Der Akzent liegt auf DEMSELBEN linken Rand wie der
@@ -100,16 +145,24 @@ export default function MeldungKarte({
   //  • „Bestätigen" behält seinen `Popconfirm` — sichtbarer Knopf, keine Menü-Falle.
   const [erledigtOffen, setErledigtOffen] = useState(false);
 
-  const kannBestaetigen = !!(darfSchreiben && m.bestaetigung_pflicht && !m.ist_bestaetigt && onBestaetigen);
+  const kannBestaetigen = !!(
+    darfSchreiben &&
+    m.bestaetigung_pflicht &&
+    !m.ist_bestaetigt &&
+    onBestaetigen
+  );
   // Je Status genau eine Vorwärtsbewegung. `erledigt` hat keine.
   // Der `darfSchreiben`-Riegel steht HIER und nicht erst am Rendern: `MeldungenPage`
   // übergibt `onStatus` auch einem Beobachter, dessen Vorhandensein ist also kein
   // Rechtebeleg (gemessen — ohne den Riegel sah der Beobachter „Sichten").
   const naechster: { ziel: MeldungStatus; label: string } | null = !(darfSchreiben && onStatus)
     ? null
-    : m.status === 'neu' ? { ziel: 'gesichtet', label: 'Sichten' }
-      : m.status === 'gesichtet' ? { ziel: 'in_bearbeitung', label: 'In Bearbeitung' }
-        : m.status === 'in_bearbeitung' ? { ziel: 'erledigt', label: 'Erledigt' }
+    : m.status === 'neu'
+      ? { ziel: 'gesichtet', label: 'Sichten' }
+      : m.status === 'gesichtet'
+        ? { ziel: 'in_bearbeitung', label: 'In Bearbeitung' }
+        : m.status === 'in_bearbeitung'
+          ? { ziel: 'erledigt', label: 'Erledigt' }
           : null;
 
   const weitere: { key: string; label: string; onClick: () => void }[] = darfSchreiben
@@ -118,7 +171,13 @@ export default function MeldungKarte({
         // sonst verlöre eine neue Meldung den Direktsprung auf „Erledigt", den der
         // Bestand hatte (`m.status !== 'erledigt'`).
         ...(m.status === 'neu' && onStatus
-          ? [{ key: 'ib', label: 'In Bearbeitung', onClick: () => onStatus(m.id, 'in_bearbeitung') }]
+          ? [
+              {
+                key: 'ib',
+                label: 'In Bearbeitung',
+                onClick: () => onStatus(m.id, 'in_bearbeitung'),
+              },
+            ]
           : []),
         ...(m.status !== 'erledigt' && m.status !== 'in_bearbeitung' && onStatus
           ? [{ key: 'er', label: 'Erledigt', onClick: () => setErledigtOffen(true) }]
@@ -162,11 +221,25 @@ export default function MeldungKarte({
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
-          <Text type="secondary" style={{ fontSize: 12 }}>#{m.lfd_nr}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            #{m.lfd_nr}
+          </Text>
           <PrioBadge prio={m.prioritaet} />
-          <StatusBadge phase={status.phase} label={status.label} unbearbeitet={!!status.unbearbeitet} />
-          {m.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
-          {m.lagerelevant && <Tag color="gold" style={{ margin: 0 }}>Lagerelevant ✓</Tag>}
+          <StatusBadge
+            phase={status.phase}
+            label={status.label}
+            unbearbeitet={!!status.unbearbeitet}
+          />
+          {m.richtung === 'extern' && (
+            <Tag color="purple" style={{ margin: 0 }}>
+              Extern
+            </Tag>
+          )}
+          {m.lagerelevant && (
+            <Tag color="gold" style={{ margin: 0 }}>
+              Lagerelevant ✓
+            </Tag>
+          )}
           {m.auftrag_id != null && (
             <Link to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>↗ Auftrag</Link>
           )}
@@ -185,16 +258,25 @@ export default function MeldungKarte({
           sie fallen auf Metazeilen-Größe zurück. Vorher trug der Absender mit
           15 px strong den größten Schriftgrad der Karte. */}
       <Space size={6} wrap style={{ marginBottom: 6 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>{m.absender}</Text>
-        {m.empfaenger && <Text type="secondary" style={{ fontSize: 12 }}>→ {m.empfaenger}</Text>}
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {m.absender}
+        </Text>
+        {m.empfaenger && (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            → {m.empfaenger}
+          </Text>
+        )}
       </Space>
 
       <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {WEG_LABEL[m.meldeweg]} · {ART_LABEL[m.meldungsart]} · Ereignis: {formatZeit(m.ereigniszeit)}
+          {WEG_LABEL[m.meldeweg]} · {ART_LABEL[m.meldungsart]} · Ereignis:{' '}
+          {formatZeit(m.ereigniszeit)}
         </Text>
         {ansicht === 'abgeschlossen' && m.erledigt_at && (
-          <Text type="secondary" style={{ fontSize: 12 }}>Erledigt: {formatZeit(m.erledigt_at)}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Erledigt: {formatZeit(m.erledigt_at)}
+          </Text>
         )}
         {darfSchreiben && onZuweisen ? (
           <Select<number | null>
@@ -203,7 +285,10 @@ export default function MeldungKarte({
             placeholder="Bearbeiter zuweisen"
             value={m.bearbeiter_id ?? undefined}
             onChange={(v) => onZuweisen(m.id, v ?? null)}
-            options={(mitglieder ?? []).map((mi) => ({ value: mi.benutzer_id, label: mi.anzeigename }))}
+            options={(mitglieder ?? []).map((mi) => ({
+              value: mi.benutzer_id,
+              label: mi.anzeigename,
+            }))}
             aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
           />
         ) : (
@@ -222,7 +307,11 @@ export default function MeldungKarte({
           `abstand.xs` = 3/5/7 px je Dichtestufe und damit im Handschuh-Betrieb keine
           Trennung. Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
       {gesamt > 0 && (
-        <Space size="middle" wrap style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}>
+        <Space
+          size="middle"
+          wrap
+          style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}
+        >
           {kannBestaetigen && (
             <Popconfirm
               title="Sofortmeldung bestätigen (Kenntnis genommen)?"
@@ -233,20 +322,30 @@ export default function MeldungKarte({
               <Button danger>Bestätigen</Button>
             </Popconfirm>
           )}
-          {naechster && onStatus && (
-            naechster.ziel === 'erledigt'
-              ? <Button type="primary" ghost onClick={() => setErledigtOffen(true)}>{naechster.label}</Button>
-              : <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
-          )}
-          {buendeln ? (
-            menuItems.length > 0 && (
-              <Dropdown trigger={['click']} menu={{ items: menuItems }}>
-                <Button type="text" aria-label={`Aktionen zu Meldung ${m.lfd_nr}`} icon={<MoreOutlined />} />
-              </Dropdown>
-            )
-          ) : (
-            weitere.map((w) => <Button key={w.key} onClick={w.onClick}>{w.label}</Button>)
-          )}
+          {naechster &&
+            onStatus &&
+            (naechster.ziel === 'erledigt' ? (
+              <Button type="primary" ghost onClick={() => setErledigtOffen(true)}>
+                {naechster.label}
+              </Button>
+            ) : (
+              <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
+            ))}
+          {buendeln
+            ? menuItems.length > 0 && (
+                <Dropdown trigger={['click']} menu={{ items: menuItems }}>
+                  <Button
+                    type="text"
+                    aria-label={`Aktionen zu Meldung ${m.lfd_nr}`}
+                    icon={<MoreOutlined />}
+                  />
+                </Dropdown>
+              )
+            : weitere.map((w) => (
+                <Button key={w.key} onClick={w.onClick}>
+                  {w.label}
+                </Button>
+              ))}
         </Space>
       )}
       <Modal
@@ -254,7 +353,10 @@ export default function MeldungKarte({
         title="Meldung auf „Erledigt“ setzen?"
         okText="Bestätigen"
         cancelText="Abbrechen"
-        onOk={() => { setErledigtOffen(false); onStatus?.(m.id, 'erledigt'); }}
+        onOk={() => {
+          setErledigtOffen(false);
+          onStatus?.(m.id, 'erledigt');
+        }}
         onCancel={() => setErledigtOffen(false)}
       />
     </Card>

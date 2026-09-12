@@ -3,9 +3,22 @@ import { kettenKoepfe } from './ketten';
 import type { LageberichtAnzeige } from '../api/types';
 
 const b = (id: number, vorgaenger_id: number | null, version: number): LageberichtAnzeige => ({
-  id, vorgaenger_id, version, einsatz_id: 7, vorlage: 'freitext', titel: 'L', zeitstand: '',
-  status: 'entwurf', abschnitte: [], ersteller_id: 1, ersteller_name: 'A', erstellt_at: '',
-  aktualisiert_at: '', freigegeben_von_id: null, freigegeben_von_name: null, freigegeben_at: null,
+  id,
+  vorgaenger_id,
+  version,
+  einsatz_id: 7,
+  vorlage: 'freitext',
+  titel: 'L',
+  zeitstand: '',
+  status: 'entwurf',
+  abschnitte: [],
+  ersteller_id: 1,
+  ersteller_name: 'A',
+  erstellt_at: '',
+  aktualisiert_at: '',
+  freigegeben_von_id: null,
+  freigegeben_von_name: null,
+  freigegeben_at: null,
   etb_eintrag_id: null,
 });
 

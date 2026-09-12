@@ -5,7 +5,12 @@ import { PHASE_META, type KommPhase } from './phase';
  * Status-Badge: Fachlabel des Moduls in der Farbe der gemeinsamen Ober-Phase.
  * `title` (optional) zeigt eine Tooltip-Erklärung.
  */
-export default function StatusBadge({ phase, label, title, unbearbeitet }: {
+export default function StatusBadge({
+  phase,
+  label,
+  title,
+  unbearbeitet,
+}: {
   phase: KommPhase;
   label: string;
   title?: string;

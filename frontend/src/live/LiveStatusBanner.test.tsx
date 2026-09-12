@@ -10,12 +10,7 @@ import {
   setzeAppAktualisierer,
   verwerfeAppAktualisierung,
 } from '../pwa/appAktualisierung';
-import {
-  queueAblehnen,
-  queueEinreihen,
-  queueLaden,
-  queueLeerenFuerTests,
-} from '../offline/queue';
+import { queueAblehnen, queueEinreihen, queueLaden, queueLeerenFuerTests } from '../offline/queue';
 
 function melde(status: string) {
   act(() => {
@@ -102,7 +97,9 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
 
   it('hält Aktionen anderer Einsätze im globalen Badge und in der Recovery sichtbar', async () => {
     await queueEinreihen(11, 7, {
-      typ: 'meldung', inhalt: 'Aus Einsatz A', client_id: 'etb-einsatz-a',
+      typ: 'meldung',
+      inhalt: 'Aus Einsatz A',
+      client_id: 'etb-einsatz-a',
     });
     const [pending] = await queueLaden(11, 7);
     await queueAblehnen(11, pending, 'Unter Einsatz B weiterhin sichtbar');
@@ -116,7 +113,9 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
 
   it('öffnet vom globalen Badge die Recovery mit Inhalt, Grund und Wiederholen', async () => {
     await queueEinreihen(11, 7, {
-      typ: 'meldung', inhalt: 'Vollständiger Offline-Wortlaut', client_id: 'etb-recovery',
+      typ: 'meldung',
+      inhalt: 'Vollständiger Offline-Wortlaut',
+      client_id: 'etb-recovery',
     });
     const [pending] = await queueLaden(11, 7);
     await queueAblehnen(11, pending, 'Keine Berechtigung');

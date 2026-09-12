@@ -32,50 +32,103 @@ vi.mock('../api/lageberichte', () => ({
 vi.mock('react-router', async (orig) => ({ ...(await orig()), useNavigate: () => vi.fn() }));
 
 // Nur die im Page genutzten Felder; Rest via Cast (Test-Fixture, kein echter Server-DTO).
-const EINSATZ = { id: 1, bezeichnung: 'Testeinsatz', status: 'aktiv', meine_rolle: 'einsatzleitung' } as EinsatzAnzeige;
+const EINSATZ = {
+  id: 1,
+  bezeichnung: 'Testeinsatz',
+  status: 'aktiv',
+  meine_rolle: 'einsatzleitung',
+} as EinsatzAnzeige;
 
 const PERSON_P1 = {
-  id: 1, einsatz_id: 1, personal_id: null, einheit_id: null, fahrzeug_id: null, ist_adhoc: false,
-  name: 'P1', funktion: null, traegerorganisation: null,
-  staerke_position: 'mannschaft' as const, status_id: null,
-  status_label: null, status_kategorie: 'gebunden' as const,
-  status_farbe: null, bemerkung: null,
-  disponiert_at: '2024-01-01T00:00:00', disponiert_von: null,
+  id: 1,
+  einsatz_id: 1,
+  personal_id: null,
+  einheit_id: null,
+  fahrzeug_id: null,
+  ist_adhoc: false,
+  name: 'P1',
+  funktion: null,
+  traegerorganisation: null,
+  staerke_position: 'mannschaft' as const,
+  status_id: null,
+  status_label: null,
+  status_kategorie: 'gebunden' as const,
+  status_farbe: null,
+  bemerkung: null,
+  disponiert_at: '2024-01-01T00:00:00',
+  disponiert_von: null,
 };
 
 const ABSCHNITT_A1 = {
-  id: 10, einsatz_id: 1, ueber_abschnitt_id: null,
+  id: 10,
+  einsatz_id: 1,
+  ueber_abschnitt_id: null,
   name: 'Abschnitt Nord',
-  leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1,
-  flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
-  sprechgruppe_tmo: null, sprechgruppe_dmo: null, kommunikationsmittel: null, erreichbarkeit: null,
+  leiter_id: null,
+  leiter_name: null,
+  bemerkung: null,
+  sortier: 1,
+  flaeche_geojson: null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+  sprechgruppe_tmo: null,
+  sprechgruppe_dmo: null,
+  kommunikationsmittel: null,
+  erreichbarkeit: null,
   sprechgruppen: [],
 };
 
 const EINHEIT_E10 = {
-  id: 20, einsatz_id: 1, abschnitt_id: 10, abschnitt_name: 'Abschnitt Nord',
-  ueber_einheit_id: null, typ_id: null, typ_label: null,
-  name: '1. Zug', fuehrer_id: null, fuehrer_name: null,
-  bemerkung: null, sortier: 1,
+  id: 20,
+  einsatz_id: 1,
+  abschnitt_id: 10,
+  abschnitt_name: 'Abschnitt Nord',
+  ueber_einheit_id: null,
+  typ_id: null,
+  typ_label: null,
+  name: '1. Zug',
+  fuehrer_id: null,
+  fuehrer_name: null,
+  bemerkung: null,
+  sortier: 1,
   soll: null,
   ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
   ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-  personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
-  lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
+  personal_mitglieder: [],
+  fahrzeug_mitglieder: [],
+  material_mitglieder: [],
+  lat: null,
+  lon: null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
   aktueller_br_id: null,
   sprechgruppen: [],
 };
 
 const FAHRZEUG_F1 = {
-  id: 30, einsatz_id: 1, fahrzeug_id: null, einheit_id: 20,
-  ist_adhoc: false, funkrufname: 'FW 1/44-1', kennzeichen: null,
-  fahrzeugtyp: 'HLF 20', opta: null, traegerorganisation: null,
-  status_id: null, status_label: null,
+  id: 30,
+  einsatz_id: 1,
+  fahrzeug_id: null,
+  einheit_id: 20,
+  ist_adhoc: false,
+  funkrufname: 'FW 1/44-1',
+  kennzeichen: null,
+  fahrzeugtyp: 'HLF 20',
+  opta: null,
+  traegerorganisation: null,
+  status_id: null,
+  status_label: null,
   status_kategorie: 'verfuegbar' as const,
-  status_farbe: null, bemerkung: null,
-  disponiert_at: '2024-01-01T00:00:00', disponiert_von: null,
-  lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
-  aktueller_br_id: null, soll_besatzung: null,
+  status_farbe: null,
+  bemerkung: null,
+  disponiert_at: '2024-01-01T00:00:00',
+  disponiert_von: null,
+  lat: null,
+  lon: null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+  aktueller_br_id: null,
+  soll_besatzung: null,
 };
 
 let drucke: ReturnType<typeof vi.fn>;
@@ -172,11 +225,16 @@ describe('KraefteuebersichtPage', () => {
   it('zeigt "In Lagebericht übernehmen" nur für Führungspersonal im aktiven Einsatz', async () => {
     // EINSATZ hat status:'aktiv' und meine_rolle:'einsatzleitung' → Button sichtbar
     setup();
-    expect(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }),
+    ).toBeInTheDocument();
   });
 
   it('versteckt "In Lagebericht übernehmen" für Beobachter', async () => {
-    vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' } as EinsatzAnzeige);
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      ...EINSATZ,
+      meine_rolle: 'beobachter',
+    } as EinsatzAnzeige);
     setup();
     // Wait for page to render past Spin
     await screen.findByRole('button', { name: /Drucken/i });
@@ -198,9 +256,7 @@ describe('KraefteuebersichtPage', () => {
         1,
         99,
         expect.objectContaining({
-          abschnitte: expect.arrayContaining([
-            expect.objectContaining({ schluessel: 'text' }),
-          ]),
+          abschnitte: expect.arrayContaining([expect.objectContaining({ schluessel: 'text' })]),
         }),
       ),
     );
@@ -481,7 +537,12 @@ describe('aktiveFilterChips', () => {
       'Status: verfügbar',
       'Suche: „HLF"',
     ]);
-    expect(chips.map((c) => c.schluessel)).toEqual(['abschnittId', 'traeger', 'kategorie', 'suche']);
+    expect(chips.map((c) => c.schluessel)).toEqual([
+      'abschnittId',
+      'traeger',
+      'kategorie',
+      'suche',
+    ]);
   });
 
   it('wertet eine Suche aus lauter Leerzeichen NICHT als gesetzten Filter', () => {
@@ -661,10 +722,12 @@ describe('KraefteuebersichtPage — Aufklappen', () => {
  * Test die TIEFSTE Zeile.
  */
 it('klappt auch auf, wenn die Abschnitte VOR den übrigen Listen da sind', async () => {
-  const spaet = <T,>(wert: T) =>
-    () => new Promise<T>((aufloesen) => setTimeout(() => aufloesen(wert), 30));
+  const spaet =
+    <T,>(wert: T) =>
+    () =>
+      new Promise<T>((aufloesen) => setTimeout(() => aufloesen(wert), 30));
 
-  vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);       // sofort (im Cache)
+  vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]); // sofort (im Cache)
   vi.mocked(listeEinheiten).mockImplementation(spaet([EINHEIT_E10])); // trifft später ein
   vi.mocked(listeEinsatzFahrzeuge).mockImplementation(spaet([FAHRZEUG_F1]));
   setup();

@@ -8,13 +8,26 @@ import { AuthProvider } from '../auth/AuthContext';
 import EtbBausteineTab from './EtbBausteineTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-02 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-06-02 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 const bausteine = [
-  { id: 1, label: 'Lage unverändert', typ: 'lage', inhalt: 'Lage unverändert.', meldeweg: null, veranlassung: null, sortier: 10 },
+  {
+    id: 1,
+    label: 'Lage unverändert',
+    typ: 'lage',
+    inhalt: 'Lage unverändert.',
+    meldeweg: null,
+    veranlassung: null,
+    sortier: 10,
+  },
 ];
 
 /**
@@ -26,8 +39,13 @@ const bausteine = [
 const zweiBausteine = [
   bausteine[0],
   {
-    id: 2, label: 'Abschnitt gebildet', typ: 'entscheidung',
-    inhalt: 'Einsatzabschnitt gebildet.', meldeweg: null, veranlassung: null, sortier: 20,
+    id: 2,
+    label: 'Abschnitt gebildet',
+    typ: 'entscheidung',
+    inhalt: 'Einsatzabschnitt gebildet.',
+    meldeweg: null,
+    veranlassung: null,
+    sortier: 20,
   },
 ];
 
@@ -39,9 +57,7 @@ const zweiBausteine = [
  * Marke sitzt am Label-Knoten und hält die Aussage scharf, statt sie zu lockern.
  */
 const labels = (c: HTMLElement) =>
-  [...c.querySelectorAll('tr.ant-table-row [data-lfh="baustein-label"]')].map(
-    (z) => z.textContent,
-  );
+  [...c.querySelectorAll('tr.ant-table-row [data-lfh="baustein-label"]')].map((z) => z.textContent);
 
 /**
  * Der Eintrag IM Filtermenü. Das Typ-Label steht zweimal im Dokument — in der Zelle als `Tag`

@@ -20,7 +20,12 @@ function initialText(e: EtbEintragAnzeige | null): string {
  *  vorbelegt — gespiegelt von AuftragErteilenModal (Meldung→Auftrag). `destroyOnHidden`
  *  remountet das Formular bei jedem Öffnen, sodass `initialText` frisch greift. */
 export default function AuftragAusEtbModal({
-  eintrag, abschnitte, einheiten, senden, onAbbrechen, onAnlegen,
+  eintrag,
+  abschnitte,
+  einheiten,
+  senden,
+  onAbbrechen,
+  onAnlegen,
 }: Props) {
   return (
     <Modal
@@ -37,14 +42,16 @@ export default function AuftragAusEtbModal({
         abschnitte={abschnitte}
         einheiten={einheiten}
         initialText={initialText(eintrag)}
-        zitat={eintrag && (
-          // Read-only Wortlaut des Quell-Eintrags (LFH-343 · C8) — dieselbe
-          // Begründung wie bei Meldung→Auftrag: der vorbelegte Auftragstext wird
-          // beim Formulieren überschrieben, das ETB ist beweissichernd.
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-            {eintrag.inhalt}
-          </Typography.Paragraph>
-        )}
+        zitat={
+          eintrag && (
+            // Read-only Wortlaut des Quell-Eintrags (LFH-343 · C8) — dieselbe
+            // Begründung wie bei Meldung→Auftrag: der vorbelegte Auftragstext wird
+            // beim Formulieren überschrieben, das ETB ist beweissichernd.
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+              {eintrag.inhalt}
+            </Typography.Paragraph>
+          )
+        }
         onAnlegen={onAnlegen}
       />
     </Modal>

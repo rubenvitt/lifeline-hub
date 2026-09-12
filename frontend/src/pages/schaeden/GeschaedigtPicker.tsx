@@ -29,7 +29,11 @@ interface GeschaedigtGroup {
 }
 
 /** Label einer betroffenen Person: R-nnn + ggf. Name. */
-function personLabel(registrierNr: number, name: string | null | undefined, vorname: string | null | undefined): string {
+function personLabel(
+  registrierNr: number,
+  name: string | null | undefined,
+  vorname: string | null | undefined,
+): string {
   const reg = registrierAnzeige(registrierNr);
   const voll = [vorname, name].filter(Boolean).join(' ').trim();
   return voll ? `${reg} · ${voll}` : reg;
@@ -71,11 +75,7 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
             ? 'org'
             : 'extern';
   const aktuellesLabel =
-    value == null
-      ? undefined
-      : value.typ === 'extern'
-        ? value.kontakt
-        : value.label;
+    value == null ? undefined : value.typ === 'extern' ? value.kontakt : value.label;
 
   const optionen = useMemo<DefaultOptionType[]>(() => {
     const term = suche.trim();
@@ -125,7 +125,8 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
       });
     }
 
-    if (personOptions.length) gruppen.push({ label: 'Betroffene Personen', options: personOptions });
+    if (personOptions.length)
+      gruppen.push({ label: 'Betroffene Personen', options: personOptions });
     if (personalOptions.length) gruppen.push({ label: 'Einsatzkräfte', options: personalOptions });
     if (orgOptions.length) gruppen.push({ label: 'Eigene Organisation', options: orgOptions });
 
@@ -140,7 +141,8 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
           value: aktuellerKey,
           label: aktuellesLabel,
           typ: value?.typ,
-          refId: value && (value.typ === 'person' || value.typ === 'personal') ? value.refId : undefined,
+          refId:
+            value && (value.typ === 'person' || value.typ === 'personal') ? value.refId : undefined,
         });
       }
     }

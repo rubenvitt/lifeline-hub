@@ -11,21 +11,43 @@ import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
 
 const tmoSprechgruppe = {
-  id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
-  betriebsart: 'TMO' as const, hinweis: null, aktiv: true, sortier: 0,
+  id: 7,
+  einsatz_id: 1,
+  einsatz_lokal: false,
+  bezeichnung: '412_F_DRK',
+  betriebsart: 'TMO' as const,
+  hinweis: null,
+  aktiv: true,
+  sortier: 0,
 };
 const dmoSprechgruppe = {
-  id: 8, einsatz_id: 1, einsatz_lokal: false, bezeichnung: 'DMO 31',
-  betriebsart: 'DMO' as const, hinweis: null, aktiv: true, sortier: 1,
+  id: 8,
+  einsatz_id: 1,
+  einsatz_lokal: false,
+  bezeichnung: 'DMO 31',
+  betriebsart: 'DMO' as const,
+  hinweis: null,
+  aktiv: true,
+  sortier: 1,
 };
 
 /** Abschnitt mit gefüllten Funk-Feldern für Vorbelegungs-/Anzeige-Tests. */
 const funkAbschnitt = {
-  id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord',
-  leiter_id: null, leiter_name: null, bemerkung: null,
-  flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
-  sprechgruppe_tmo: '412_F_DRK', sprechgruppe_dmo: null,
-  kommunikationsmittel: 'digitalfunk', erreichbarkeit: '0151 23456', sortier: 0,
+  id: 5,
+  einsatz_id: 1,
+  ueber_abschnitt_id: null,
+  name: 'Nord',
+  leiter_id: null,
+  leiter_name: null,
+  bemerkung: null,
+  flaeche_geojson: null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+  sprechgruppe_tmo: '412_F_DRK',
+  sprechgruppe_dmo: null,
+  kommunikationsmittel: 'digitalfunk',
+  erreichbarkeit: '0151 23456',
+  sortier: 0,
   sprechgruppen: [tmoSprechgruppe],
 };
 
@@ -39,22 +61,47 @@ function renderPage() {
 }
 
 const einsatz = {
-  id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv', begonnen_at: '', abgeschlossen_at: null,
-  abgeschlossen_von: null, einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null, meldende_stelle: null,
-  sachverhalt: null, anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung',
+  id: 1,
+  bezeichnung: 'Lage',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
 };
 
 function handlers(
   rolle = 'einsatzleitung',
   status = 'aktiv',
   abschnitte: unknown[] = [
-    { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: 'Leiter Nord', bemerkung: null, sortier: 0 },
+    {
+      id: 5,
+      einsatz_id: 1,
+      ueber_abschnitt_id: null,
+      name: 'Nord',
+      leiter_id: null,
+      leiter_name: 'Leiter Nord',
+      bemerkung: null,
+      sortier: 0,
+    },
   ],
   sprechgruppen: unknown[] = [tmoSprechgruppe, dmoSprechgruppe],
 ) {
   return [
-    http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, meine_rolle: rolle, status })),
+    http.get('/api/einsaetze/1', () =>
+      HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
+    ),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(abschnitte)),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
@@ -86,15 +133,22 @@ describe('EinsatzabschnittePage', () => {
       einsatzKeys.abschnitte(1),
       einsatzKeys.einheiten(1),
       einsatzKeys.personal(1),
-    ]) client.setQueryDefaults(key, { staleTime: Infinity });
+    ])
+      client.setQueryDefaults(key, { staleTime: Infinity });
     client.setQueryData(einsatzKeys.abschnitte(1), [funkAbschnitt], { updatedAt: abschnittStand });
-    client.setQueryData(einsatzKeys.einheiten(1), [{
-      id: 10,
-      abschnitt_id: 5,
-      name: '1. Zug',
-      typ_label: 'Zug',
-      ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
-    }], { updatedAt: einheitenStand });
+    client.setQueryData(
+      einsatzKeys.einheiten(1),
+      [
+        {
+          id: 10,
+          abschnitt_id: 5,
+          name: '1. Zug',
+          typ_label: 'Zug',
+          ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+        },
+      ],
+      { updatedAt: einheitenStand },
+    );
     client.setQueryData(einsatzKeys.personal(1), [], { updatedAt: personalStand });
 
     renderMitProviders(
@@ -105,12 +159,12 @@ describe('EinsatzabschnittePage', () => {
     );
 
     expect(await screen.findByText('1. Zug')).toBeInTheDocument();
-    expect(screen.getByLabelText(
-      `Datenstand ${formatiereDatenstand(personalStand)}`,
-    )).toBeInTheDocument();
-    expect(screen.queryByLabelText(
-      `Datenstand ${formatiereDatenstand(abschnittStand)}`,
-    )).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText(`Datenstand ${formatiereDatenstand(personalStand)}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(`Datenstand ${formatiereDatenstand(abschnittStand)}`),
+    ).not.toBeInTheDocument();
   });
 
   /**
@@ -120,14 +174,62 @@ describe('EinsatzabschnittePage', () => {
    * verschieden, und die Zahlen belegen die Trennung: Süd hängt unter Nord und trägt 0/1/1.
    */
   it('zeigt die eigene Stärke und die inkl. Unterabschnitte getrennt beschriftet', async () => {
-    server.use(...handlers('einsatzleitung', 'aktiv', [
-      { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 0 },
-      { id: 6, einsatz_id: 1, ueber_abschnitt_id: 5, name: 'Süd', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1 },
-    ]));
-    server.use(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([
-      { id: 1, einsatz_id: 1, name: 'Zug Nord', abschnitt_id: 5, ist: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }, ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }, sortier: 0, sprechgruppen: [], fahrzeug_mitglieder: [], personal_mitglieder: [], material_mitglieder: [] },
-      { id: 2, einsatz_id: 1, name: 'Trupp Süd', abschnitt_id: 6, ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 }, ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 }, sortier: 1, sprechgruppen: [], fahrzeug_mitglieder: [], personal_mitglieder: [], material_mitglieder: [] },
-    ])));
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        {
+          id: 5,
+          einsatz_id: 1,
+          ueber_abschnitt_id: null,
+          name: 'Nord',
+          leiter_id: null,
+          leiter_name: null,
+          bemerkung: null,
+          sortier: 0,
+        },
+        {
+          id: 6,
+          einsatz_id: 1,
+          ueber_abschnitt_id: 5,
+          name: 'Süd',
+          leiter_id: null,
+          leiter_name: null,
+          bemerkung: null,
+          sortier: 1,
+        },
+      ]),
+    );
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            einsatz_id: 1,
+            name: 'Zug Nord',
+            abschnitt_id: 5,
+            ist: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 },
+            ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 },
+            sortier: 0,
+            sprechgruppen: [],
+            fahrzeug_mitglieder: [],
+            personal_mitglieder: [],
+            material_mitglieder: [],
+          },
+          {
+            id: 2,
+            einsatz_id: 1,
+            name: 'Trupp Süd',
+            abschnitt_id: 6,
+            ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+            ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+            sortier: 1,
+            sprechgruppen: [],
+            fahrzeug_mitglieder: [],
+            personal_mitglieder: [],
+            material_mitglieder: [],
+          },
+        ]),
+      ),
+    );
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
 
@@ -191,7 +293,9 @@ describe('EinsatzabschnittePage', () => {
   });
 
   it('zeigt eine Funk-Erreichbarkeits-Zusammenfassung im Detail', async () => {
-    server.use(...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, erreichbarkeit: null }]));
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, erreichbarkeit: null }]),
+    );
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
     const zusammenfassung = await screen.findByTestId('funk-erreichbarkeit');
@@ -202,7 +306,9 @@ describe('EinsatzabschnittePage', () => {
   it('sendet sprechgruppe_ids beim Speichern, nicht mehr tmo/dmo-Freitextfelder', async () => {
     let patchBody: Record<string, unknown> | null = null;
     server.use(
-      ...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, kommunikationsmittel: null, erreichbarkeit: null }]),
+      ...handlers('einsatzleitung', 'aktiv', [
+        { ...funkAbschnitt, kommunikationsmittel: null, erreichbarkeit: null },
+      ]),
       http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
         patchBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...funkAbschnitt, ...patchBody });
@@ -225,7 +331,7 @@ describe('EinsatzabschnittePage', () => {
     expect(patchBody).not.toHaveProperty('sprechgruppe_dmo');
     // sprechgruppe_ids wird gesendet (vorbelegt mit tmoSprechgruppe.id=7)
     expect(patchBody).toHaveProperty('sprechgruppe_ids');
-    expect((patchBody!['sprechgruppe_ids'] as number[])).toContain(7);
+    expect(patchBody!['sprechgruppe_ids'] as number[]).toContain(7);
     // Kommunikationsmittel und getrimmte Erreichbarkeit bleiben
     expect(patchBody).toMatchObject({
       kommunikationsmittel: 'mobil',
@@ -333,8 +439,12 @@ describe('EinsatzabschnittePage', () => {
     const knoepfe = within(karte as HTMLElement).getAllByRole('button');
     expect(knoepfe).toHaveLength(1);
 
-    await userEvent.click(within(karte as HTMLElement).getByRole('button', { name: 'Abschnitt anlegen' }));
-    expect(await within(karte as HTMLElement).findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    await userEvent.click(
+      within(karte as HTMLElement).getByRole('button', { name: 'Abschnitt anlegen' }),
+    );
+    expect(
+      await within(karte as HTMLElement).findByText('Neuer Abschnitt (ungespeichert)'),
+    ).toBeInTheDocument();
   });
 
   /**
@@ -345,7 +455,13 @@ describe('EinsatzabschnittePage', () => {
    */
   it('legt beim Öffnen und Abbrechen des Entwurfs nichts an — 0 POST, 0 ETB-Invalidierung', async () => {
     let posts = 0;
-    server.use(...handlers(), http.post('/api/einsaetze/1/abschnitte', () => { posts += 1; return HttpResponse.json({}); }));
+    server.use(
+      ...handlers(),
+      http.post('/api/einsaetze/1/abschnitte', () => {
+        posts += 1;
+        return HttpResponse.json({});
+      }),
+    );
     const { client } = renderPage();
     const invalidieren = vi.spyOn(client, 'invalidateQueries');
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
@@ -356,15 +472,32 @@ describe('EinsatzabschnittePage', () => {
 
     expect(screen.queryByText('Neuer Abschnitt (ungespeichert)')).not.toBeInTheDocument();
     expect(posts).toBe(0);
-    expect(invalidieren.mock.calls.some(([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(einsatzKeys.etb(1)))).toBe(false);
+    expect(
+      invalidieren.mock.calls.some(
+        ([arg]) => JSON.stringify(arg?.queryKey) === JSON.stringify(einsatzKeys.etb(1)),
+      ),
+    ).toBe(false);
   });
 
   it('schreibt den Abschnitt erst beim Speichern und wählt ihn dann aus', async () => {
     const bodies: unknown[] = [];
-    server.use(...handlers(), http.post('/api/einsaetze/1/abschnitte', async ({ request }) => {
-      bodies.push(await request.json());
-      return HttpResponse.json({ id: 9, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Ost', leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1, sprechgruppen: [] });
-    }));
+    server.use(
+      ...handlers(),
+      http.post('/api/einsaetze/1/abschnitte', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          id: 9,
+          einsatz_id: 1,
+          ueber_abschnitt_id: null,
+          name: 'Ost',
+          leiter_id: null,
+          leiter_name: null,
+          bemerkung: null,
+          sortier: 1,
+          sprechgruppen: [],
+        });
+      }),
+    );
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
     await userEvent.type(screen.getByLabelText('Name'), 'Ost');
@@ -407,7 +540,16 @@ describe('EinsatzabschnittePage', () => {
       http.get('/api/einsaetze/1/abschnitte', async () => {
         await queryGesperrt;
         return HttpResponse.json([
-          { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: 'Leiter Nord', bemerkung: null, sortier: 0 },
+          {
+            id: 5,
+            einsatz_id: 1,
+            ueber_abschnitt_id: null,
+            name: 'Nord',
+            leiter_id: null,
+            leiter_name: 'Leiter Nord',
+            bemerkung: null,
+            sortier: 0,
+          },
         ]);
       }),
       ...handlers(),

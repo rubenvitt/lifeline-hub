@@ -5,7 +5,13 @@ import { Alert, App, Button, Space, Spin, Tag, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
-import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
+import {
+  benenneGefahrengebiet,
+  gefahrengebietName,
+  ladeGefahrengebiete,
+  ladeMatrix,
+  setzeBewertung,
+} from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -46,7 +52,11 @@ import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
  * noch `tabIndex` noch `onKeyDown`; die klickbare Zeile als Ganzes ist B7 (LFH-335) zugeordnet.
  * Der Boden hier ist die Trefffläche, nicht der ganze Zugang.
  */
-export function gebietszeileStil(token: { controlHeight: number; paddingSM: number; padding: number }) {
+export function gebietszeileStil(token: {
+  controlHeight: number;
+  paddingSM: number;
+  padding: number;
+}) {
   return {
     cursor: 'pointer',
     minHeight: token.controlHeight,
@@ -66,8 +76,14 @@ export default function GefahrenPage() {
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
+  const gebieteQuery = useQuery({
+    queryKey: einsatzKeys.gefahrengebiete(einsatzId),
+    queryFn: () => ladeGefahrengebiete(einsatzId),
+  });
 
   // Stabile Referenz → der Auswahl-Effekt läuft nicht bei jedem Render neu.
   const gebiete = useMemo(() => gebieteQuery.data ?? [], [gebieteQuery.data]);
@@ -78,7 +94,10 @@ export default function GefahrenPage() {
   // korrigieren, wenn das gewählte verschwindet.
   useEffect(() => {
     if (!gebieteQuery.isSuccess) return;
-    if (gebiete.length === 0) { setGewaehlt(null); return; }
+    if (gebiete.length === 0) {
+      setGewaehlt(null);
+      return;
+    }
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
     if (ziel != null && gebiete.some((g) => g.id === ziel)) {
       setGewaehlt(ziel);
@@ -98,7 +117,8 @@ export default function GefahrenPage() {
     enabled: gewaehlt != null,
   });
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const setzen = useMutation({
     mutationFn: (d: BewertungEingabe) => setzeBewertung(einsatzId, gewaehlt as number, d),
     onSuccess: () => {
@@ -113,14 +133,26 @@ export default function GefahrenPage() {
     onError: fehler,
   });
 
-  if (einsatzQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+  if (einsatzQuery.isLoading)
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
+  if (einsatzQuery.isError || !einsatzQuery.data)
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  if (gebieteQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  if (gebieteQuery.isError) return <Alert type="error" title="Gefahrengebiete konnten nicht geladen werden" showIcon />;
+  if (gebieteQuery.isLoading)
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
+  if (gebieteQuery.isError)
+    return <Alert type="error" title="Gefahrengebiete konnten nicht geladen werden" showIcon />;
 
   if (gebiete.length === 0) {
     /**
@@ -171,15 +203,17 @@ export default function GefahrenPage() {
         style={breit ? { width: 240, flexShrink: 0 } : { width: '100%' }}
         size="small"
         bordered
-        header={(
+        header={
           <Space style={{ width: '100%', justifyContent: 'space-between' }}>
             <Typography.Text strong>Gefahrengebiete</Typography.Text>
-            <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
-              gebieteQuery.dataUpdatedAt,
-              matrixQuery.dataUpdatedAt,
-            )} />
+            <Datenstand
+              dataUpdatedAt={gemeinsamerDatenstand(
+                gebieteQuery.dataUpdatedAt,
+                matrixQuery.dataUpdatedAt,
+              )}
+            />
           </Space>
-        )}
+        }
         dataSource={gebiete}
         renderItem={(g) => (
           <ListenEintrag
@@ -213,11 +247,27 @@ export default function GefahrenPage() {
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         {aktuell && (
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
             <Typography.Title
               level={5}
               style={{ marginTop: 0 }}
-              editable={darfSchreiben ? { onChange: (v) => { const t = v.trim(); if (t !== (aktuell.label ?? '')) umbenennen.mutate(t); } } : false}
+              editable={
+                darfSchreiben
+                  ? {
+                      onChange: (v) => {
+                        const t = v.trim();
+                        if (t !== (aktuell.label ?? '')) umbenennen.mutate(t);
+                      },
+                    }
+                  : false
+              }
             >
               {gefahrengebietName(aktuell.label, aktuell.id)}
             </Typography.Title>
@@ -231,7 +281,12 @@ export default function GefahrenPage() {
           </div>
         )}
         {!darfSchreiben && (
-          <Alert type="info" showIcon title="Nur Lesezugriff – Bewertungen können nicht geändert werden." style={{ marginBottom: 12 }} />
+          <Alert
+            type="info"
+            showIcon
+            title="Nur Lesezugriff – Bewertungen können nicht geändert werden."
+            style={{ marginBottom: 12 }}
+          />
         )}
         {matrixQuery.isError ? (
           <Alert type="error" title="Matrix konnte nicht geladen werden" showIcon />

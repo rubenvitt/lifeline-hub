@@ -16,8 +16,20 @@ import { useAuth } from '../auth/AuthContext';
 
 function setzeRolle(system_rolle: string, org_rolle = 'keine') {
   vi.mocked(useAuth).mockReturnValue({
-    benutzer: { id: 1, system_rolle, org_rolle, anzeigename: 'X', benutzername: 'x', aktiv: true, erstellt_at: '', totp_aktiviert: false },
-    laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+    benutzer: {
+      id: 1,
+      system_rolle,
+      org_rolle,
+      anzeigename: 'X',
+      benutzername: 'x',
+      aktiv: true,
+      erstellt_at: '',
+      totp_aktiviert: false,
+    },
+    laedt: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    aktualisiere: vi.fn(),
   } as never);
 }
 

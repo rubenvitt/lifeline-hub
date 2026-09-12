@@ -7,11 +7,16 @@ const { Text } = Typography;
 
 /** Adressat-Kategorie → Anzeigelabel (modul-spezifisch, bleibt lokal). */
 const ADRESSAT_LABEL: Record<string, string> = {
-  leitstelle: 'Leitstelle', nachbar_ea: 'Nachbar-EA', uebergeordnet: 'Übergeordnete Führung', andere_bos: 'Andere BOS',
+  leitstelle: 'Leitstelle',
+  nachbar_ea: 'Nachbar-EA',
+  uebergeordnet: 'Übergeordnete Führung',
+  andere_bos: 'Andere BOS',
 };
 /** Nächster linearer Status (für die Weiterschalten-Aktion). */
 const NAECHSTER: Partial<Record<NachforderungStatus, NachforderungStatus>> = {
-  angefordert: 'zugesagt', zugesagt: 'unterwegs', unterwegs: 'eingetroffen',
+  angefordert: 'zugesagt',
+  zugesagt: 'unterwegs',
+  unterwegs: 'eingetroffen',
 };
 
 export interface NachforderungKarteProps {
@@ -30,7 +35,11 @@ export interface NachforderungKarteProps {
  * akzentuiert statt mit hartkodiertem Rot.
  */
 export default function NachforderungKarte({
-  nachforderung: n, ansicht = 'offen', darfSchreiben, onStatus, onAblehnen,
+  nachforderung: n,
+  ansicht = 'offen',
+  darfSchreiben,
+  onStatus,
+  onAblehnen,
 }: NachforderungKarteProps) {
   const { token } = theme.useToken();
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
@@ -40,21 +49,27 @@ export default function NachforderungKarte({
   const menge = n.anzahl != null ? `${n.anzahl}× ` : '';
   const adressat = `${ADRESSAT_LABEL[n.adressat_kategorie] ?? n.adressat_kategorie}${n.adressat_bezeichnung ? ` (${n.adressat_bezeichnung})` : ''}`;
 
-  const aktionen: ReactNode[] = darfSchreiben && n.ist_offen
-    ? [
-        // Fortschaltung mit EINEM Klick (LFH-343 · C8, Befund H50). Der
-        // Rückfrage-Dialog, der hier stand, kostete jeden Schritt der Kette zwei
-        // Klicks; der Rückweg steht stattdessen im Rückgängig-Toast der Seite,
-        // und `uebergang_erlaubt` nimmt seit derselben Änderung die Rücknahme um
-        // genau eine Stufe an.
-        next && onStatus
-          ? <Button key="next" onClick={() => onStatus(n.id, next)}>→ {NACHFORDERUNG_STATUS[next].label}</Button>
-          : null,
-        // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → keine Rückfrage.
-        onAblehnen
-          ? <Button key="ab" danger onClick={() => onAblehnen(n.id)}>Ablehnen</Button> : null,
-      ].filter(Boolean)
-    : [];
+  const aktionen: ReactNode[] =
+    darfSchreiben && n.ist_offen
+      ? [
+          // Fortschaltung mit EINEM Klick (LFH-343 · C8, Befund H50). Der
+          // Rückfrage-Dialog, der hier stand, kostete jeden Schritt der Kette zwei
+          // Klicks; der Rückweg steht stattdessen im Rückgängig-Toast der Seite,
+          // und `uebergang_erlaubt` nimmt seit derselben Änderung die Rücknahme um
+          // genau eine Stufe an.
+          next && onStatus ? (
+            <Button key="next" onClick={() => onStatus(n.id, next)}>
+              → {NACHFORDERUNG_STATUS[next].label}
+            </Button>
+          ) : null,
+          // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → keine Rückfrage.
+          onAblehnen ? (
+            <Button key="ab" danger onClick={() => onAblehnen(n.id)}>
+              Ablehnen
+            </Button>
+          ) : null,
+        ].filter(Boolean)
+      : [];
 
   return (
     <Card
@@ -74,7 +89,11 @@ export default function NachforderungKarte({
       </Flex>
 
       <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: 4 }}>
-        {menge}{n.art} <Text type="secondary" style={{ fontWeight: 400 }}>→ {adressat}</Text>
+        {menge}
+        {n.art}{' '}
+        <Text type="secondary" style={{ fontWeight: 400 }}>
+          → {adressat}
+        </Text>
       </Text>
 
       <Space orientation="vertical" size={2} style={{ width: '100%', marginBottom: 8 }}>
@@ -88,9 +107,21 @@ export default function NachforderungKarte({
             in der Offen-Ansicht ab „unterwegs" (Zwischenstände sichtbar machen). */}
         {(istAbg || n.status === 'unterwegs') && (
           <Space orientation="vertical" size={0}>
-            {n.zugesagt_at && <Text type="secondary" style={{ fontSize: 13 }}>Zugesagt: {formatZeit(n.zugesagt_at)}</Text>}
-            {n.unterwegs_at && <Text type="secondary" style={{ fontSize: 13 }}>Unterwegs: {formatZeit(n.unterwegs_at)}</Text>}
-            {n.eingetroffen_at && <Text type="secondary" style={{ fontSize: 13 }}>Eingetroffen: {formatZeit(n.eingetroffen_at)}</Text>}
+            {n.zugesagt_at && (
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Zugesagt: {formatZeit(n.zugesagt_at)}
+              </Text>
+            )}
+            {n.unterwegs_at && (
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Unterwegs: {formatZeit(n.unterwegs_at)}
+              </Text>
+            )}
+            {n.eingetroffen_at && (
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Eingetroffen: {formatZeit(n.eingetroffen_at)}
+              </Text>
+            )}
           </Space>
         )}
         {abgelehnt && (
@@ -109,7 +140,11 @@ export default function NachforderungKarte({
           deshalb nach der Norm „verbindlich für ohnehin Angefasstes" nach.
           Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
       {aktionen.length > 0 && (
-        <Space size="middle" wrap style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}>
+        <Space
+          size="middle"
+          wrap
+          style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}
+        >
           {aktionen}
         </Space>
       )}

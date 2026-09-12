@@ -565,12 +565,12 @@ export default function LageDashboardPage() {
                   roh ausgegeben stand er um den Zonenversatz falsch (LFH-350 · H60). Die
                   Formatierung sitzt hier statt in `lagebild.ts`, weil die Zone am
                   Provider hängt und `baueLagebild` rein bleibt. */}
-              <span className="lfh-zahl"><ZeitAnzeige wert={lagebild?.bericht?.stand} /></span>
+              <span className="lfh-zahl">
+                <ZeitAnzeige wert={lagebild?.bericht?.stand} />
+              </span>
             </p>
             <p className="lfh-fussnote">von {lagebild?.bericht?.von}</p>
-            {lagebild?.bericht?.auszug && (
-              <p className="lfh-auszug">{lagebild.bericht.auszug}</p>
-            )}
+            {lagebild?.bericht?.auszug && <p className="lfh-auszug">{lagebild.bericht.auszug}</p>}
           </Kachel>
 
           <Kachel

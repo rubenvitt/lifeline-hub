@@ -10,7 +10,10 @@ export function legeSprechgruppeAn(eingabe: SprechgruppeEingabe): Promise<Sprech
   return apiSend<Sprechgruppe>('/api/sprechgruppen', 'POST', eingabe);
 }
 
-export function aktualisiereSprechgruppe(id: number, eingabe: SprechgruppeEingabe): Promise<Sprechgruppe> {
+export function aktualisiereSprechgruppe(
+  id: number,
+  eingabe: SprechgruppeEingabe,
+): Promise<Sprechgruppe> {
   return apiSend<Sprechgruppe>(`/api/sprechgruppen/${id}`, 'PATCH', eingabe);
 }
 

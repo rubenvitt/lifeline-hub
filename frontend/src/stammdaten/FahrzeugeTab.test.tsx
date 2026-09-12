@@ -8,16 +8,31 @@ import { AuthProvider } from '../auth/AuthContext';
 import FahrzeugeTab from './FahrzeugeTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 const fahrzeug = {
-  id: 1, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', traegerorganisation: null,
-  kennzeichen: 'XX-AB 1', opta: null, standort: null, fms_issi: null, sondersignal: false,
-  tragenkapazitaet: null, staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
-  bemerkung: null, dienststatus: 'in_dienst', angelegt_at: '2026-05-26 10:00:00',
+  id: 1,
+  funkrufname: 'Florian 1',
+  fahrzeugtyp: 'LF 20',
+  traegerorganisation: null,
+  kennzeichen: 'XX-AB 1',
+  opta: null,
+  standort: null,
+  fms_issi: null,
+  sondersignal: false,
+  tragenkapazitaet: null,
+  staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+  bemerkung: null,
+  dienststatus: 'in_dienst',
+  angelegt_at: '2026-05-26 10:00:00',
 };
 
 // Voreinstellung bleibt EIN Fahrzeug: die Bestandsprüfungen unten greifen „Bearbeiten"
@@ -74,7 +89,9 @@ describe('FahrzeugeTab', () => {
   it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
     const gerufen: string[] = [];
     let freigeben: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
     server.use(
       http.post('/api/fahrzeuge/:id/ausser-dienst', async ({ params }) => {
         gerufen.push(`ausser-dienst/${params.id}`);
@@ -100,16 +117,22 @@ describe('FahrzeugeTab', () => {
 
     // Die eigene Zeile ist gesperrt und zeigt den Lauf …
     expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
-    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass('ant-btn-loading');
+    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass(
+      'ant-btn-loading',
+    );
     expect(within(erste).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
     // … die FREMDE Zeile bleibt bedienbar.
     expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
     expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).toBeEnabled();
-    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
 
     await userEvent.click(within(zweite).getByRole('button', { name: 'Wieder in Dienst' }));
     await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1', 'in-dienst/2']));
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
   });
 
   /**

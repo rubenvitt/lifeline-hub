@@ -39,14 +39,23 @@ function Harness({ bestand, onClose }: { bestand?: Material | null; onClose?: ()
   const [aktuell, setAktuell] = useState<Material | null>(bestand ?? null);
   return (
     <>
-      <button type="button" onClick={() => { setAktuell(null); setOffen(true); }}>
+      <button
+        type="button"
+        onClick={() => {
+          setAktuell(null);
+          setOffen(true);
+        }}
+      >
         Wieder öffnen
       </button>
       <MaterialFormModal
         offen={offen}
         material={aktuell}
         kategorien={['Betreuung']}
-        onClose={() => { setOffen(false); onClose?.(); }}
+        onClose={() => {
+          setOffen(false);
+          onClose?.();
+        }}
       />
     </>
   );

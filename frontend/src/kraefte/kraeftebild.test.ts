@@ -1,30 +1,121 @@
 import { it, expect } from 'vitest';
-import { baueKraeftebild, filtereKraefte, rendereMeldebildMarkdown, verdichte, OHNE_ABSCHNITT_KEY } from './kraeftebild';
-import type { Einheit, EinsatzPersonal, EinsatzFahrzeug, EinsatzMaterial, Einsatzabschnitt } from '../api/types';
+import {
+  baueKraeftebild,
+  filtereKraefte,
+  rendereMeldebildMarkdown,
+  verdichte,
+  OHNE_ABSCHNITT_KEY,
+} from './kraeftebild';
+import type {
+  Einheit,
+  EinsatzPersonal,
+  EinsatzFahrzeug,
+  EinsatzMaterial,
+  Einsatzabschnitt,
+} from '../api/types';
 
-const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzabschnitt =>
-  ({ id, einsatz_id: 1, ueber_abschnitt_id: ueber, name, leiter_id: null, leiter_name: null,
-     bemerkung: null, sortier: id, flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
-     sprechgruppe_tmo: null, sprechgruppe_dmo: null, kommunikationsmittel: null, erreichbarkeit: null, sprechgruppen: [] });
-const eh = (id: number, abschnitt_id: number | null, ueber_einheit_id: number | null = null): Einheit =>
-  ({ id, einsatz_id: 1, abschnitt_id, abschnitt_name: null, ueber_einheit_id, typ_id: null,
-     typ_label: 'Gruppe', name: `E${id}`, fuehrer_id: null, fuehrer_name: null, bemerkung: null,
-     sortier: id, soll: null, ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-     ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-     personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
-     lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null, aktueller_br_id: null, sprechgruppen: [] });
-const p = (id: number, einheit_id: number | null, pos: EinsatzPersonal['staerke_position'],
-           kat: EinsatzPersonal['status_kategorie'] = 'gebunden'): EinsatzPersonal =>
-  ({ id, einsatz_id: 1, personal_id: null, einheit_id, fahrzeug_id: null, ist_adhoc: false, name: `P${id}`,
-     funktion: null, traegerorganisation: null, staerke_position: pos, status_id: null,
-     status_label: null, status_kategorie: kat, status_farbe: null, disponiert_at: '', disponiert_von: null, bemerkung: null });
-const fz = (id: number, einheit_id: number | null, kat: EinsatzFahrzeug['status_kategorie'] = 'verfuegbar',
-            fms: number | null = 2): EinsatzFahrzeug =>
-  ({ id, einsatz_id: 1, fahrzeug_id: null, einheit_id, ist_adhoc: false, funkrufname: `F${id}`,
-     kennzeichen: null, fahrzeugtyp: 'LF', opta: null, traegerorganisation: null, status_id: null,
-     status_label: `${fms}`, status_kategorie: kat, status_farbe: null, bemerkung: null,
-     disponiert_at: '', disponiert_von: null, lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
-     aktueller_br_id: null, soll_besatzung: null });
+const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzabschnitt => ({
+  id,
+  einsatz_id: 1,
+  ueber_abschnitt_id: ueber,
+  name,
+  leiter_id: null,
+  leiter_name: null,
+  bemerkung: null,
+  sortier: id,
+  flaeche_geojson: null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+  sprechgruppe_tmo: null,
+  sprechgruppe_dmo: null,
+  kommunikationsmittel: null,
+  erreichbarkeit: null,
+  sprechgruppen: [],
+});
+const eh = (
+  id: number,
+  abschnitt_id: number | null,
+  ueber_einheit_id: number | null = null,
+): Einheit => ({
+  id,
+  einsatz_id: 1,
+  abschnitt_id,
+  abschnitt_name: null,
+  ueber_einheit_id,
+  typ_id: null,
+  typ_label: 'Gruppe',
+  name: `E${id}`,
+  fuehrer_id: null,
+  fuehrer_name: null,
+  bemerkung: null,
+  sortier: id,
+  soll: null,
+  ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+  ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+  personal_mitglieder: [],
+  fahrzeug_mitglieder: [],
+  material_mitglieder: [],
+  lat: null,
+  lon: null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+  aktueller_br_id: null,
+  sprechgruppen: [],
+});
+const p = (
+  id: number,
+  einheit_id: number | null,
+  pos: EinsatzPersonal['staerke_position'],
+  kat: EinsatzPersonal['status_kategorie'] = 'gebunden',
+): EinsatzPersonal => ({
+  id,
+  einsatz_id: 1,
+  personal_id: null,
+  einheit_id,
+  fahrzeug_id: null,
+  ist_adhoc: false,
+  name: `P${id}`,
+  funktion: null,
+  traegerorganisation: null,
+  staerke_position: pos,
+  status_id: null,
+  status_label: null,
+  status_kategorie: kat,
+  status_farbe: null,
+  disponiert_at: '',
+  disponiert_von: null,
+  bemerkung: null,
+});
+const fz = (
+  id: number,
+  einheit_id: number | null,
+  kat: EinsatzFahrzeug['status_kategorie'] = 'verfuegbar',
+  fms: number | null = 2,
+): EinsatzFahrzeug => ({
+  id,
+  einsatz_id: 1,
+  fahrzeug_id: null,
+  einheit_id,
+  ist_adhoc: false,
+  funkrufname: `F${id}`,
+  kennzeichen: null,
+  fahrzeugtyp: 'LF',
+  opta: null,
+  traegerorganisation: null,
+  status_id: null,
+  status_label: `${fms}`,
+  status_kategorie: kat,
+  status_farbe: null,
+  bemerkung: null,
+  disponiert_at: '',
+  disponiert_von: null,
+  lat: null,
+  lon: null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+  aktueller_br_id: null,
+  soll_besatzung: null,
+});
 
 it('Invariante: Kopf zählt jede Kraft genau einmal', () => {
   const personal = [p(1, 10, 'fuehrer'), p(2, 10, 'mannschaft'), p(3, null, 'mannschaft')];
@@ -58,7 +149,13 @@ it('verschachtelte Abschnitte rollen hoch', () => {
 });
 
 it('Catch-all: Kräfte ohne Zuordnung erscheinen und zählen', () => {
-  const bild = baueKraeftebild([ab(1)], [eh(10, null)], [p(1, null, 'mannschaft')], [fz(9, null)], []);
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, null)],
+    [p(1, null, 'mannschaft')],
+    [fz(9, null)],
+    [],
+  );
   expect(bild.verdichtung.anzahlPersonal).toBe(1);
   expect(bild.verdichtung.anzahlFahrzeuge).toBe(1);
   const ohne = bild.baum.find((z) => z.key === OHNE_ABSCHNITT_KEY);
@@ -73,7 +170,11 @@ it('leerer Einsatz: alles 0, kein Crash', () => {
 });
 
 it('verdichtet Fahrzeug-Status getrennt', () => {
-  const fahrzeuge = [fz(1, null, 'verfuegbar'), fz(2, null, 'gebunden'), fz(3, null, 'nicht_verfuegbar')];
+  const fahrzeuge = [
+    fz(1, null, 'verfuegbar'),
+    fz(2, null, 'gebunden'),
+    fz(3, null, 'nicht_verfuegbar'),
+  ];
   const bild = baueKraeftebild([], [], [], fahrzeuge, []);
   expect(bild.verdichtung.fahrzeugStatus.verfuegbar).toBe(1);
   expect(bild.verdichtung.fahrzeugStatus.gebunden).toBe(1);
@@ -90,13 +191,37 @@ it('Waisen-Abschnitt (Eltern nicht in Eingabe) wird zur Wurzel promotet', () => 
   expect(a2!.staerke.gesamt).toBe(1);
 });
 
-const mat = (id: number, einheit_id: number | null, status: EinsatzMaterial['status'], menge = 1): EinsatzMaterial =>
-  ({ id, einsatz_id: 1, material_id: null, einheit_id, uhs_id: null, ist_adhoc: false, bezeichnung: `M${id}`,
-     kategorie: null, bestandsnummer: null, traegerorganisation: null, menge, status, bemerkung: null,
-     disponiert_at: '', disponiert_von: null });
+const mat = (
+  id: number,
+  einheit_id: number | null,
+  status: EinsatzMaterial['status'],
+  menge = 1,
+): EinsatzMaterial => ({
+  id,
+  einsatz_id: 1,
+  material_id: null,
+  einheit_id,
+  uhs_id: null,
+  ist_adhoc: false,
+  bezeichnung: `M${id}`,
+  kategorie: null,
+  bestandsnummer: null,
+  traegerorganisation: null,
+  menge,
+  status,
+  bemerkung: null,
+  disponiert_at: '',
+  disponiert_von: null,
+});
 
 it('verdichtet Material nach Status', () => {
-  const bild = baueKraeftebild([], [], [], [], [mat(1, null, 'einsatzbereit'), mat(2, null, 'defekt'), mat(3, null, 'einsatzbereit')]);
+  const bild = baueKraeftebild(
+    [],
+    [],
+    [],
+    [],
+    [mat(1, null, 'einsatzbereit'), mat(2, null, 'defekt'), mat(3, null, 'einsatzbereit')],
+  );
   expect(bild.verdichtung.materialStatus.einsatzbereit).toBe(2);
   expect(bild.verdichtung.materialStatus.defekt).toBe(1);
   expect(bild.verdichtung.anzahlMaterialPositionen).toBe(3);
@@ -107,8 +232,10 @@ it('filtert Personal nach Trägerorganisation und Summe zieht mit', () => {
     { ...p(1, null, 'mannschaft'), traegerorganisation: 'THW' },
     { ...p(2, null, 'mannschaft'), traegerorganisation: 'FW' },
   ];
-  const ge = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge: [], material: [] },
-    { traeger: 'THW', abschnittId: null, kategorie: null, suche: '' });
+  const ge = filtereKraefte(
+    { abschnitte: [], einheiten: [], personal, fahrzeuge: [], material: [] },
+    { traeger: 'THW', abschnittId: null, kategorie: null, suche: '' },
+  );
   const bild = baueKraeftebild(ge.abschnitte, ge.einheiten, ge.personal, ge.fahrzeuge, ge.material);
   expect(bild.verdichtung.anzahlPersonal).toBe(1);
 });
@@ -116,8 +243,10 @@ it('filtert Personal nach Trägerorganisation und Summe zieht mit', () => {
 it('Status-Filter lässt Material unverändert (eigene Achse)', () => {
   const personal = [p(1, null, 'mannschaft', 'verfuegbar'), p(2, null, 'mannschaft', 'gebunden')];
   const material = [mat(1, null, 'einsatzbereit'), mat(2, null, 'defekt')];
-  const ge = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge: [], material },
-    { traeger: null, abschnittId: null, kategorie: 'verfuegbar', suche: '' });
+  const ge = filtereKraefte(
+    { abschnitte: [], einheiten: [], personal, fahrzeuge: [], material },
+    { traeger: null, abschnittId: null, kategorie: 'verfuegbar', suche: '' },
+  );
   // Personal wird nach Kategorie gefiltert …
   expect(ge.personal).toHaveLength(1);
   // … Material bleibt vollständig erhalten (keine status_kategorie).
@@ -128,8 +257,10 @@ it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschni
   const abschnitte = [ab(1), ab(2)];
   const einheiten = [eh(10, 1), eh(20, 2)];
   const personal = [p(1, 10, 'mannschaft'), p(2, 20, 'mannschaft')];
-  const ge = filtereKraefte({ abschnitte, einheiten, personal, fahrzeuge: [], material: [] },
-    { traeger: null, abschnittId: 1, kategorie: null, suche: '' });
+  const ge = filtereKraefte(
+    { abschnitte, einheiten, personal, fahrzeuge: [], material: [] },
+    { traeger: null, abschnittId: 1, kategorie: null, suche: '' },
+  );
   expect(ge.abschnitte.map((a) => a.id)).toEqual([1]);
   expect(ge.einheiten.map((e) => e.id)).toEqual([10]);
   expect(ge.personal.map((x) => x.id)).toEqual([1]);
@@ -141,7 +272,13 @@ it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
   // Die Fixture trägt ALLE DREI Mittelarten. Mit nur einer Person wäre die
   // „keine Bildzeichen"-Behauptung unten für zwei der drei Zweige gar nicht belegt —
   // sie liefe über Text, den der Renderer nie erzeugt hat.
-  const bild = baueKraeftebild([ab(1)], [eh(10, 1)], [p(1, 10, 'fuehrer')], [fz(1, 10)], [mat(1, 10, 'einsatzbereit')]);
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1)],
+    [p(1, 10, 'fuehrer')],
+    [fz(1, 10)],
+    [mat(1, 10, 'einsatzbereit')],
+  );
   const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
   expect(md).toContain('# Kräftemeldebild');
   expect(md).toContain('Stand 12:00');
@@ -163,12 +300,16 @@ it('Suche matcht über Name und Funkrufname', () => {
     { ...p(2, null, 'mannschaft'), name: 'Schmidt' },
   ];
   const fahrzeuge = [fz(1, null), fz(2, null)]; // funkrufname F1 / F2
-  const nachName = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge, material: [] },
-    { traeger: null, abschnittId: null, kategorie: null, suche: 'müll' });
+  const nachName = filtereKraefte(
+    { abschnitte: [], einheiten: [], personal, fahrzeuge, material: [] },
+    { traeger: null, abschnittId: null, kategorie: null, suche: 'müll' },
+  );
   expect(nachName.personal.map((x) => x.name)).toEqual(['Müller']);
   expect(nachName.fahrzeuge).toHaveLength(0);
-  const nachFunk = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge, material: [] },
-    { traeger: null, abschnittId: null, kategorie: null, suche: 'f2' });
+  const nachFunk = filtereKraefte(
+    { abschnitte: [], einheiten: [], personal, fahrzeuge, material: [] },
+    { traeger: null, abschnittId: null, kategorie: null, suche: 'f2' },
+  );
   expect(nachFunk.fahrzeuge.map((x) => x.funkrufname)).toEqual(['F2']);
   expect(nachFunk.personal).toHaveLength(0);
 });
@@ -200,7 +341,13 @@ it('Brücke: die Wurzelzeilen summieren sich auf die Verdichtung — beide Achse
     fz(4, 30, 'verfuegbar'),
   ];
   // Abschnitt 1 mit Einheit 10 und darunter 20; Einheit 30 hängt an KEINEM Abschnitt.
-  const bild = baueKraeftebild([ab(1)], [eh(10, 1), eh(20, 1, 10), eh(30, null)], personal, fahrzeuge, []);
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1), eh(20, 1, 10), eh(30, null)],
+    personal,
+    fahrzeuge,
+    [],
+  );
 
   const summe = (feld: 'personalVerteilung' | 'fahrzeugVerteilung') =>
     bild.baum.reduce(
@@ -221,10 +368,16 @@ it('Brücke: die Wurzelzeilen summieren sich auf die Verdichtung — beide Achse
   expect(summe('fahrzeugVerteilung')).toEqual(bild.verdichtung.fahrzeugStatus);
   // Und die Verdichtung selbst ist nicht leer — sonst wäre 0 == 0 die ganze Aussage.
   expect(bild.verdichtung.personalStatus).toEqual({
-    verfuegbar: 1, gebunden: 1, nicht_verfuegbar: 1, ohne: 1,
+    verfuegbar: 1,
+    gebunden: 1,
+    nicht_verfuegbar: 1,
+    ohne: 1,
   });
   expect(bild.verdichtung.fahrzeugStatus).toEqual({
-    verfuegbar: 2, gebunden: 1, nicht_verfuegbar: 0, ohne: 1,
+    verfuegbar: 2,
+    gebunden: 1,
+    nicht_verfuegbar: 0,
+    ohne: 1,
   });
 });
 

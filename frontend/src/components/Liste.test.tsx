@@ -90,10 +90,7 @@ describe('Liste', () => {
 
   it('rendert Einträge als list/listitem (Screenreader-Semantik wie antds List)', () => {
     renderMitProviders(
-      <Liste
-        dataSource={['A', 'B']}
-        renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
-      />,
+      <Liste dataSource={['A', 'B']} renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>} />,
     );
     expect(screen.getByRole('list')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);

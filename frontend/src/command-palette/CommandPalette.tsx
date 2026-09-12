@@ -5,10 +5,23 @@ import { Modal, Input, theme, type InputRef } from 'antd';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { form } from '../theme/tokens';
 import { sichtbareDatensaetze } from './datensaetze';
-import { filtereBefehle, filtereNachModus, modiMitPraefix, ohneOrdnungsdubletten, ordneTreffer, parsePraefix, type Treffer } from './fuzzy';
 import {
-  DATENSATZ_MINDESTZEICHEN, GRUPPEN_LABEL, GRUPPEN_REIHENFOLGE, PALETTE_MODI,
-  modusZeigtDatensaetze, type Befehl, type PaletteModus,
+  filtereBefehle,
+  filtereNachModus,
+  modiMitPraefix,
+  ohneOrdnungsdubletten,
+  ordneTreffer,
+  parsePraefix,
+  type Treffer,
+} from './fuzzy';
+import {
+  DATENSATZ_MINDESTZEICHEN,
+  GRUPPEN_LABEL,
+  GRUPPEN_REIHENFOLGE,
+  PALETTE_MODI,
+  modusZeigtDatensaetze,
+  type Befehl,
+  type PaletteModus,
 } from './typen';
 import { palettenZeilenStil } from './zeilenStil';
 
@@ -67,7 +80,9 @@ export function CommandPalette({
   const inputRef = useRef<InputRef>(null);
 
   // Fokus sicherstellen: antd Modal kann den Fokus nach Mount verschieben.
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   /**
    * Präfixmodus (LFH-391 · A4): das Zeichen am Anfang schränkt auf Befehlsgruppen ein, der
@@ -132,11 +147,13 @@ export function CommandPalette({
   const sucheAktiv = rest !== '';
 
   const gruppen = useMemo(
-    () => (sucheAktiv
-      ? []
-      : GRUPPEN_REIHENFOLGE
-        .map((g) => ({ gruppe: g, items: treffer.map((t) => t.befehl).filter((b) => b.gruppe === g) }))
-        .filter((x) => x.items.length > 0)),
+    () =>
+      sucheAktiv
+        ? []
+        : GRUPPEN_REIHENFOLGE.map((g) => ({
+            gruppe: g,
+            items: treffer.map((t) => t.befehl).filter((b) => b.gruppe === g),
+          })).filter((x) => x.items.length > 0),
     [treffer, sucheAktiv],
   );
   // EINZIGE Indexquelle für beide Zweige: `indexVon`, `aria-activedescendant`,
@@ -151,7 +168,9 @@ export function CommandPalette({
   const gefunden = aktivId === null ? -1 : flach.findIndex((b) => b.id === aktivId);
   const aktiv = gefunden >= 0 ? gefunden : 0;
 
-  useEffect(() => { setAktivId(null); }, [suche]);
+  useEffect(() => {
+    setAktivId(null);
+  }, [suche]);
 
   /**
    * Die Meldung nach aussen wartet, die sichtbare Liste nicht (LFH-391 · C3).
@@ -191,9 +210,13 @@ export function CommandPalette({
 
   function aufTaste(e: KeyboardEvent<HTMLInputElement>) {
     if (e.nativeEvent.isComposing) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); if (flach.length) setAktivId(flach[(aktiv + 1) % flach.length].id); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); if (flach.length) setAktivId(flach[(aktiv - 1 + flach.length) % flach.length].id); }
-    else if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (flach.length) setAktivId(flach[(aktiv + 1) % flach.length].id);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (flach.length) setAktivId(flach[(aktiv - 1 + flach.length) % flach.length].id);
+    } else if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
       e.preventDefault();
       fuehreAus(flach[aktiv]);
     }
@@ -209,18 +232,20 @@ export function CommandPalette({
   // noch gar nicht gestellt hat. Im präfixlosen Vorgabemodus bleibt die leere Eingabe
   // dagegen die kuratierte Startansicht und keine zu kurze Suche; dort ist „Keine Treffer"
   // die richtige Auskunft.
-  const zuKurzFuerDatensaetze = rest.length < DATENSATZ_MINDESTZEICHEN
-    && modusZeigtDatensaetze(modus)
-    && (rest.length > 0 || PALETTE_MODI[modus].praefix !== null);
+  const zuKurzFuerDatensaetze =
+    rest.length < DATENSATZ_MINDESTZEICHEN &&
+    modusZeigtDatensaetze(modus) &&
+    (rest.length > 0 || PALETTE_MODI[modus].praefix !== null);
   /**
    * Der Wortlaut des Leerzustands — als WERT, nicht als Zweig im JSX: die Region darunter
    * steht dauerhaft, nur ihr Inhalt wechselt (siehe dort).
    */
-  const leerText = flach.length > 0
-    ? ''
-    : zuKurzFuerDatensaetze
-      ? `Mindestens ${DATENSATZ_MINDESTZEICHEN} Zeichen für die Datensatzsuche`
-      : 'Keine Treffer';
+  const leerText =
+    flach.length > 0
+      ? ''
+      : zuKurzFuerDatensaetze
+        ? `Mindestens ${DATENSATZ_MINDESTZEICHEN} Zeichen für die Datensatzsuche`
+        : 'Keine Treffer';
 
   /**
    * EINE Zeile für BEIDE Zweige (LFH-391 · A3). Zwei Kopien wären zwei Orte, an denen der
@@ -281,21 +306,21 @@ export function CommandPalette({
           style={{ padding: '12px 16px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}
         />
         {/*
-          * Die Modusanzeige (LFH-391 · A4) — sichtbarer Gegenpart zu einem Filter, der die
-          * Liste um zwei Drittel kürzt. Sie beantwortet zwei Fragen: WIE komme ich hinein
-          * (Legende, solange nichts getippt ist) und BIN ich drin (Wortlaut, solange der
-          * Modus steht). Ohne die zweite Hälfte wäre der aktive Modus von einem kaputten
-          * Filter nicht zu unterscheiden — auf dem Berührungsweg sieht niemand die getippte
-          * Zeile als Syntax.
-          *
-          * BEDINGT, nicht dauerhaft: bei gewöhnlicher Suche kostet sie sonst eine der rund
-          * sieben Zeilen, die der Fükw-Schirm zeigt. Der Tastaturvertrag steht damit in der
-          * Steuerzeile und NICHT im Platzhalter (CLAUDE.md, Nacharbeit zu LFH-335) — der
-          * Platzhaltertext bleibt byte-gleich, womit auch die fünf e2e-Locator halten.
-          *
-          * Rollen statt Werte (LFH-352): Sekundärfarbe, kleine Schrift, Abstandsrollen.
-          * KEIN Bedienziel — Satz, kein Ziel, also kein `controlHeight`-Boden.
-          */}
+         * Die Modusanzeige (LFH-391 · A4) — sichtbarer Gegenpart zu einem Filter, der die
+         * Liste um zwei Drittel kürzt. Sie beantwortet zwei Fragen: WIE komme ich hinein
+         * (Legende, solange nichts getippt ist) und BIN ich drin (Wortlaut, solange der
+         * Modus steht). Ohne die zweite Hälfte wäre der aktive Modus von einem kaputten
+         * Filter nicht zu unterscheiden — auf dem Berührungsweg sieht niemand die getippte
+         * Zeile als Syntax.
+         *
+         * BEDINGT, nicht dauerhaft: bei gewöhnlicher Suche kostet sie sonst eine der rund
+         * sieben Zeilen, die der Fükw-Schirm zeigt. Der Tastaturvertrag steht damit in der
+         * Steuerzeile und NICHT im Platzhalter (CLAUDE.md, Nacharbeit zu LFH-335) — der
+         * Platzhaltertext bleibt byte-gleich, womit auch die fünf e2e-Locator halten.
+         *
+         * Rollen statt Werte (LFH-352): Sekundärfarbe, kleine Schrift, Abstandsrollen.
+         * KEIN Bedienziel — Satz, kein Ziel, also kein `controlHeight`-Boden.
+         */}
         {(modus !== 'alles' || rest === '') && (
           <div
             data-lfh="palette-modus"
@@ -310,18 +335,18 @@ export function CommandPalette({
           >
             {modus === 'alles'
               ? modiMitPraefix().map((m) => (
-                // Das Präfixzeichen als Marke, nicht als Satzzeichen im Fliesstext: ein
-                // nacktes '>' hat weder Rahmen noch Abstand zum Nachbarn — JSX verschluckt
-                // den Umbruch zwischen zwei Elementen ersatzlos, deshalb die Flex-Zeile
-                // mit `gap` statt eines Leerzeichens.
-                <span
-                  key={m.modus}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}
-                >
-                  <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
-                  {m.legende}
-                </span>
-              ))
+                  // Das Präfixzeichen als Marke, nicht als Satzzeichen im Fliesstext: ein
+                  // nacktes '>' hat weder Rahmen noch Abstand zum Nachbarn — JSX verschluckt
+                  // den Umbruch zwischen zwei Elementen ersatzlos, deshalb die Flex-Zeile
+                  // mit `gap` statt eines Leerzeichens.
+                  <span
+                    key={m.modus}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}
+                  >
+                    <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
+                    {m.legende}
+                  </span>
+                ))
               : PALETTE_MODI[modus].hinweis}
           </div>
         )}
@@ -357,26 +382,26 @@ export function CommandPalette({
           ))}
         </div>
         {/*
-          * Zwei Leerzustände, nicht einer (LFH-391 · C3): wer '@a' tippt, sieht per
-          * Konstruktion nichts — die statischen Befehle sind vom Modus ausgefiltert, die
-          * Datensatz-Abrufe laufen erst ab zwei Zeichen. Ein stummes „Keine Treffer" wäre
-          * dort von „kaputt" nicht zu unterscheiden, und auf dem Berührungsweg sieht niemand
-          * die getippte Zeile als Syntax.
-          *
-          * DIE REGION STEHT IMMER, auch wenn sie schweigt (Review-Befund 7, Bauform
-          * `components/Erfassung.tsx:352`): eine `aria-live`-Region meldet nur Änderungen an
-          * bereits vorhandenem Inhalt. Zusammen mit ihrem Text eingehängt sagte sie nichts an
-          * — hörbar blieb allein der Wechsel der Combobox auf `aria-expanded=false`, und der
-          * trennt „zu kurz" nicht von „nichts gefunden". Genau diese Ununterscheidbarkeit ist
-          * der Grund, aus dem die Zeile existiert.
-          *
-          * AUSSERHALB der Listbox: deren Kinder sind Optionen und Gruppen, ein Satz gehört
-          * dort nicht hinein. Sichtbar ändert das nichts — die Liste ist leer, wenn die
-          * Region spricht.
-          *
-          * KEIN Bedienziel: Satz, kein Ziel, also kein `controlHeight`-Boden. Die Polsterung
-          * hängt am Inhalt, sonst stünde im Trefferfall ein leerer Streifen unter der Liste.
-          */}
+         * Zwei Leerzustände, nicht einer (LFH-391 · C3): wer '@a' tippt, sieht per
+         * Konstruktion nichts — die statischen Befehle sind vom Modus ausgefiltert, die
+         * Datensatz-Abrufe laufen erst ab zwei Zeichen. Ein stummes „Keine Treffer" wäre
+         * dort von „kaputt" nicht zu unterscheiden, und auf dem Berührungsweg sieht niemand
+         * die getippte Zeile als Syntax.
+         *
+         * DIE REGION STEHT IMMER, auch wenn sie schweigt (Review-Befund 7, Bauform
+         * `components/Erfassung.tsx:352`): eine `aria-live`-Region meldet nur Änderungen an
+         * bereits vorhandenem Inhalt. Zusammen mit ihrem Text eingehängt sagte sie nichts an
+         * — hörbar blieb allein der Wechsel der Combobox auf `aria-expanded=false`, und der
+         * trennt „zu kurz" nicht von „nichts gefunden". Genau diese Ununterscheidbarkeit ist
+         * der Grund, aus dem die Zeile existiert.
+         *
+         * AUSSERHALB der Listbox: deren Kinder sind Optionen und Gruppen, ein Satz gehört
+         * dort nicht hinein. Sichtbar ändert das nichts — die Liste ist leer, wenn die
+         * Region spricht.
+         *
+         * KEIN Bedienziel: Satz, kein Ziel, also kein `controlHeight`-Boden. Die Polsterung
+         * hängt am Inhalt, sonst stünde im Trefferfall ein leerer Streifen unter der Liste.
+         */}
         <div
           data-lfh="palette-leerzustand"
           aria-live="polite"

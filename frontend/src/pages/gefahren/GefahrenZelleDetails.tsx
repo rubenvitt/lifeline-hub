@@ -38,7 +38,13 @@ export interface GefahrenZelleDetailsProps {
  * jedem Weg hinaus, auch über Escape und den Klick auf die Maske.
  */
 export default function GefahrenZelleDetails({
-  offen, kennung, zelle, titel, laeuft, onSpeichern, onSchliessen,
+  offen,
+  kennung,
+  zelle,
+  titel,
+  laeuft,
+  onSpeichern,
+  onSchliessen,
 }: GefahrenZelleDetailsProps) {
   const [form] = Form.useForm<Werte>();
 

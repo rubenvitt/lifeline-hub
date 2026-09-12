@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { keepPreviousData, useQueries } from '@tanstack/react-query';
 import {
-  ladeFachebene, type FachebeneQuelle, type FachebeneStatus, type FeatureCollection,
+  ladeFachebene,
+  type FachebeneQuelle,
+  type FachebeneStatus,
+  type FeatureCollection,
 } from '../../api/fachebenen';
 import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, mergeFeatures } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
@@ -36,7 +39,10 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   // KRITIS akkumulieren: einmal geladene Objekte bleiben sichtbar (auch beim Rauszoomen oder
   // Wechsel des Gebiets), statt bei jedem Fetch ersetzt zu werden. Dedup über die Koordinate.
   const kritisSammlungRef = useRef<Map<string, FeatureCollection['features'][number]>>(new Map());
-  const [kritisAkku, setKritisAkku] = useState<FeatureCollection>({ type: 'FeatureCollection', features: [] });
+  const [kritisAkku, setKritisAkku] = useState<FeatureCollection>({
+    type: 'FeatureCollection',
+    features: [],
+  });
 
   // Vier Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys()
   // (nina, dwd, pegelonline, kritis). KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
@@ -44,19 +50,26 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   const kombiniert = useQueries({
     queries: [
       {
-        queryKey: globalKeys.fachebene('nina'), queryFn: () => ladeFachebene('nina'),
-        enabled: fachebenenSichtbar.nina, refetchInterval: FACHEBENEN.nina.pollMs,
+        queryKey: globalKeys.fachebene('nina'),
+        queryFn: () => ladeFachebene('nina'),
+        enabled: fachebenenSichtbar.nina,
+        refetchInterval: FACHEBENEN.nina.pollMs,
       },
       {
-        queryKey: globalKeys.fachebene('dwd'), queryFn: () => ladeFachebene('dwd'),
-        enabled: fachebenenSichtbar.dwd, refetchInterval: FACHEBENEN.dwd.pollMs,
+        queryKey: globalKeys.fachebene('dwd'),
+        queryFn: () => ladeFachebene('dwd'),
+        enabled: fachebenenSichtbar.dwd,
+        refetchInterval: FACHEBENEN.dwd.pollMs,
       },
       {
-        queryKey: globalKeys.fachebene('pegelonline'), queryFn: () => ladeFachebene('pegelonline'),
-        enabled: fachebenenSichtbar.pegelonline, refetchInterval: FACHEBENEN.pegelonline.pollMs,
+        queryKey: globalKeys.fachebene('pegelonline'),
+        queryFn: () => ladeFachebene('pegelonline'),
+        enabled: fachebenenSichtbar.pegelonline,
+        refetchInterval: FACHEBENEN.pegelonline.pollMs,
       },
       {
-        queryKey: globalKeys.fachebeneKritis(kritisBbox), queryFn: () => ladeFachebene('kritis', kritisBbox!),
+        queryKey: globalKeys.fachebeneKritis(kritisBbox),
+        queryFn: () => ladeFachebene('kritis', kritisBbox!),
         enabled: fachebenenSichtbar.kritis && !!kritisBbox,
         // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
         // Leer-Blinken). KRITIS ist quasi statisch → lange als frisch behandeln (6 h);
@@ -69,7 +82,10 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     // combine wird von react-query memoisiert + strukturell geteilt → stabile Ableitungen.
     combine: (ergebnisse) => {
       const byKey = {
-        nina: ergebnisse[0], dwd: ergebnisse[1], pegelonline: ergebnisse[2], kritis: ergebnisse[3],
+        nina: ergebnisse[0],
+        dwd: ergebnisse[1],
+        pegelonline: ergebnisse[2],
+        kritis: ergebnisse[3],
       } as const;
       const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
@@ -90,7 +106,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       }
 
       const fachebenenAttribution = fachebeneKeys()
-        .filter((k) => fachebenenSichtbar[k] && byKey[k].data && byKey[k].data!.status !== 'offline')
+        .filter(
+          (k) => fachebenenSichtbar[k] && byKey[k].data && byKey[k].data!.status !== 'offline',
+        )
         .map((k) => byKey[k].data!.attribution)
         .filter(Boolean);
 
@@ -109,7 +127,10 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     const fc = kombiniert.kritisRoh?.features;
     if (!fc) return;
     if (mergeFeatures(kritisSammlungRef.current, fc.features, KRITIS_MAX)) {
-      setKritisAkku({ type: 'FeatureCollection', features: [...kritisSammlungRef.current.values()] });
+      setKritisAkku({
+        type: 'FeatureCollection',
+        features: [...kritisSammlungRef.current.values()],
+      });
     }
   }, [kombiniert.kritisRoh]);
 

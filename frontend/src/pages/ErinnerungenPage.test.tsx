@@ -9,25 +9,64 @@ import { erledigeErinnerung, oeffneErinnerung, quittiereErinnerung } from '../ap
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
 vi.mock('../api/einsaetze', () => ({
-  ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
+  ladeEinsatz: vi.fn().mockResolvedValue({
+    id: 1,
+    bezeichnung: 'Hochwasser',
+    status: 'aktiv',
+    meine_rolle: 'einsatzleitung',
+  }),
 }));
 vi.mock('../api/erinnerungen', () => {
   const basis = {
-    einsatz_id: 1, beschreibung: null, intervall_minuten: 30, empfaenger_funktion: null,
-    bezug_typ: null, bezug_id: null, quelle: 'manuell', erstellt_von_id: 1,
-    erstellt_at: '2026-06-11 09:00:00', quittiert_at: null, quittiert_von_id: null,
-    vollzug_status: 'offen', vollzogen_at: null, vollzogen_von_id: null,
+    einsatz_id: 1,
+    beschreibung: null,
+    intervall_minuten: 30,
+    empfaenger_funktion: null,
+    bezug_typ: null,
+    bezug_id: null,
+    quelle: 'manuell',
+    erstellt_von_id: 1,
+    erstellt_at: '2026-06-11 09:00:00',
+    quittiert_at: null,
+    quittiert_von_id: null,
+    vollzug_status: 'offen',
+    vollzogen_at: null,
+    vollzogen_von_id: null,
   };
   return {
     listeErinnerungen: vi.fn().mockResolvedValue([
-      { ...basis, id: 7, titel: 'Lagemeldung', faellig_at: '2026-06-11 10:00:00',
-        status: 'offen', erledigt_at: null, ist_faellig: true },
-      { ...basis, id: 8, titel: 'Ablöse erledigt', faellig_at: '2026-06-10 10:00:00',
-        status: 'erledigt', erledigt_at: '2026-06-10 11:00:00', ist_faellig: false },
-      { ...basis, id: 9, titel: 'Zur Kenntnis', faellig_at: '2026-06-10 12:00:00',
-        status: 'quittiert', erledigt_at: null, quittiert_at: '2026-06-10 12:30:00', ist_faellig: false },
+      {
+        ...basis,
+        id: 7,
+        titel: 'Lagemeldung',
+        faellig_at: '2026-06-11 10:00:00',
+        status: 'offen',
+        erledigt_at: null,
+        ist_faellig: true,
+      },
+      {
+        ...basis,
+        id: 8,
+        titel: 'Ablöse erledigt',
+        faellig_at: '2026-06-10 10:00:00',
+        status: 'erledigt',
+        erledigt_at: '2026-06-10 11:00:00',
+        ist_faellig: false,
+      },
+      {
+        ...basis,
+        id: 9,
+        titel: 'Zur Kenntnis',
+        faellig_at: '2026-06-10 12:00:00',
+        status: 'quittiert',
+        erledigt_at: null,
+        quittiert_at: '2026-06-10 12:30:00',
+        ist_faellig: false,
+      },
     ]),
-    legeErinnerungAn: vi.fn(), erledigeErinnerung: vi.fn(), quittiereErinnerung: vi.fn(),
+    legeErinnerungAn: vi.fn(),
+    erledigeErinnerung: vi.fn(),
+    quittiereErinnerung: vi.fn(),
     // Rückweg der beiden Abschluss-Aktionen (LFH-343 · C8). Fehlte der Eintrag,
     // wäre der Import zur Laufzeit `undefined` — und der Bruch fiele erst auf,
     // wenn jemand tatsächlich auf „Rückgängig" klickt.
@@ -41,7 +80,9 @@ function renderPage() {
     <QueryClientProvider client={qc}>
       <AntApp>
         <MemoryRouter initialEntries={['/einsaetze/1/erinnerungen']}>
-          <Routes><Route path="/einsaetze/:id/erinnerungen" element={<ErinnerungenPage />} /></Routes>
+          <Routes>
+            <Route path="/einsaetze/:id/erinnerungen" element={<ErinnerungenPage />} />
+          </Routes>
         </MemoryRouter>
       </AntApp>
     </QueryClientProvider>,
@@ -75,7 +116,9 @@ describe('ErinnerungenPage', () => {
    * kannte das Backend keine Rücknahme.
    */
   it('erledigt mit einem Klick und nimmt es über den Rückgängig-Knopf zurück', async () => {
-    vi.mocked(erledigeErinnerung).mockResolvedValue({} as Awaited<ReturnType<typeof erledigeErinnerung>>);
+    vi.mocked(erledigeErinnerung).mockResolvedValue(
+      {} as Awaited<ReturnType<typeof erledigeErinnerung>>,
+    );
     renderPage();
     await waitFor(() => expect(screen.getByText('Lagemeldung')).toBeInTheDocument());
 
@@ -87,7 +130,9 @@ describe('ErinnerungenPage', () => {
   });
 
   it('quittiert mit einem Klick und bietet denselben Rückweg an', async () => {
-    vi.mocked(quittiereErinnerung).mockResolvedValue({} as Awaited<ReturnType<typeof quittiereErinnerung>>);
+    vi.mocked(quittiereErinnerung).mockResolvedValue(
+      {} as Awaited<ReturnType<typeof quittiereErinnerung>>,
+    );
     renderPage();
     await waitFor(() => expect(screen.getByText('Lagemeldung')).toBeInTheDocument());
 

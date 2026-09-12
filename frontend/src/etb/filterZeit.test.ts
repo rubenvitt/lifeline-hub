@@ -39,8 +39,9 @@ describe('filterZeit', () => {
   it('liest einen Wire-String als UTC, nicht als Ortszeit', () => {
     // Der Wire-String trägt KEINE Zonenkennung. `dayjs(s)` läse ihn als Ortszeit und
     // verschöbe den Zeitpunkt um den Versatz — in Berlin im Sommer um zwei Stunden.
-    expect(alsOrtszeit('2026-08-21 06:00:00')!.valueOf())
-      .toBe(dayjs('2026-08-21T06:00:00Z').valueOf());
+    expect(alsOrtszeit('2026-08-21 06:00:00')!.valueOf()).toBe(
+      dayjs('2026-08-21T06:00:00Z').valueOf(),
+    );
   });
 
   it('leere und unbrauchbare Eingaben ergeben undefined, nicht Invalid Date', () => {

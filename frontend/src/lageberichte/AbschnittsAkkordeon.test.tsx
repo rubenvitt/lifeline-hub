@@ -37,16 +37,21 @@ describe('AbschnittsAkkordeon', () => {
     // mit `aria-label="expanded"`/`"collapsed"` und steht am Anfang des Namens (gemessen:
     // „expanded Auftrag"). Das ist antds eigene Zustandsansage, nicht unsere Marke.
     expect(screen.getByRole('tab', { name: /Auftrag$/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
+    ).toBeInTheDocument();
     // UNSERE Ikonen sind dekorativ — kein eigenes Vorleseziel je Zeile. Der einzige `img`
     // je Kopfzeile ist antds Pfeil.
     expect(screen.queryByRole('img', { name: /check-circle|minus-circle/ })).toBeNull();
-    for (const tab of screen.getAllByRole('tab')) expect(within(tab).getAllByRole('img')).toHaveLength(1);
+    for (const tab of screen.getAllByRole('tab'))
+      expect(within(tab).getAllByRole('img')).toHaveLength(1);
   });
 
   it('hält genau EINEN Abschnitt offen, rendert aber alle Editoren (forceRender)', () => {
     renderAkkordeon(new Set());
-    const offen = screen.getAllByRole('tab').filter((b) => b.getAttribute('aria-expanded') === 'true');
+    const offen = screen
+      .getAllByRole('tab')
+      .filter((b) => b.getAttribute('aria-expanded') === 'true');
     expect(offen).toHaveLength(1);
     expect(within(offen[0]).getByText('Auftrag (leer)')).toBeInTheDocument();
     // Alle acht Textfelder stehen im DOM — sonst fehlten `Form` die Werte der
@@ -67,7 +72,9 @@ describe('AbschnittsAkkordeon', () => {
 
 describe('befuellteAbschnitte', () => {
   it('zählt nur Text mit Inhalt', () => {
-    expect(befuellteAbschnitte({ auftrag: '  ', anlass: 'x', titel: 'T' }, acht)).toEqual(new Set(['anlass']));
+    expect(befuellteAbschnitte({ auftrag: '  ', anlass: 'x', titel: 'T' }, acht)).toEqual(
+      new Set(['anlass']),
+    );
     expect(befuellteAbschnitte(undefined, acht)).toEqual(new Set());
   });
 });
@@ -131,13 +138,21 @@ describe('AbschnittsAkkordeon — Memoisierung (LFH-495 · N4)', () => {
     const onOffen = vi.fn();
     const { rerender } = render(
       <AbschnittsAkkordeon
-        abschnitte={acht} befuellt={new Set()} offen="auftrag" onOffen={onOffen} editor={editor}
+        abschnitte={acht}
+        befuellt={new Set()}
+        offen="auftrag"
+        onOffen={onOffen}
+        editor={editor}
       />,
     );
     expect(aufrufe.n).toBe(8);
     rerender(
       <AbschnittsAkkordeon
-        abschnitte={acht} befuellt={new Set()} offen="auftrag" onOffen={onOffen} editor={editor}
+        abschnitte={acht}
+        befuellt={new Set()}
+        offen="auftrag"
+        onOffen={onOffen}
+        editor={editor}
       />,
     );
     expect(aufrufe.n).toBe(16);

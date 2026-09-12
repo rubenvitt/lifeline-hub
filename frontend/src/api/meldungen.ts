@@ -46,7 +46,11 @@ export function weiseBearbeiterZu(
 
 /** Sofortmeldung aktiv bestätigen (Quittung mit Zeitstempel + Person) (LFH-97). */
 export function bestaetigeMeldung(einsatzId: number, meldungId: number): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/bestaetigen`, 'POST', {});
+  return apiSend<Meldung>(
+    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/bestaetigen`,
+    'POST',
+    {},
+  );
 }
 
 /** Als lagerelevant an die Lage übergeben (LFH-95).
@@ -58,7 +62,11 @@ export function markiereLagerelevant(
   meldungId: number,
   daten: { text?: string; lat?: number; lon?: number } = {},
 ): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lagerelevant`, 'POST', daten);
+  return apiSend<Meldung>(
+    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lagerelevant`,
+    'POST',
+    daten,
+  );
 }
 
 /** Aus einer eingegangenen Meldung direkt einen Auftrag erteilen (Meldung→Auftrag, LFH-113).
@@ -68,7 +76,11 @@ export function erteileAuftragAusMeldung(
   meldungId: number,
   daten: NeuerAuftrag,
 ): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/auftrag`, 'POST', daten);
+  return apiSend<Meldung>(
+    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/auftrag`,
+    'POST',
+    daten,
+  );
 }
 
 /** Lageobjekte (aus lagerelevanten Meldungen) listen (LFH-95, Lage-Kategorie). */

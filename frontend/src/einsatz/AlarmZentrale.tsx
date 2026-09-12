@@ -12,7 +12,11 @@ import {
   setzeAlarmMute,
   type AlarmTonStatus,
 } from '../alarm/alarmTon';
-import { desktopPermission, fordereDesktopPermission, zeigeDesktopAlarm } from '../alarm/desktopAlarm';
+import {
+  desktopPermission,
+  fordereDesktopPermission,
+  zeigeDesktopAlarm,
+} from '../alarm/desktopAlarm';
 import { auftraegePfad, erinnerungenPfad, meldungenPfad } from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
 
@@ -48,9 +52,7 @@ type AlarmScope = {
 
 type DesktopZustand = 'aus' | 'erlaubt' | 'browser-blockiert';
 
-export function desktopZustand(
-  permission: NotificationPermission | 'unsupported',
-): DesktopZustand {
+export function desktopZustand(permission: NotificationPermission | 'unsupported'): DesktopZustand {
   if (permission === 'granted') return 'erlaubt';
   if (permission === 'default') return 'aus';
   return 'browser-blockiert';
@@ -100,11 +102,14 @@ export default function AlarmZentrale() {
     alarmScope.gebuendelteToastZiele.clear();
   }, [alarmScope, notification]);
 
-  const zielPfad = useCallback((ziel: AlarmZiel) => {
-    if (ziel === 'auftraege') return auftraegePfad(einsatzId);
-    if (ziel === 'erinnerungen') return erinnerungenPfad(einsatzId);
-    return meldungenPfad(einsatzId);
-  }, [einsatzId]);
+  const zielPfad = useCallback(
+    (ziel: AlarmZiel) => {
+      if (ziel === 'auftraege') return auftraegePfad(einsatzId);
+      if (ziel === 'erinnerungen') return erinnerungenPfad(einsatzId);
+      return meldungenPfad(einsatzId);
+    },
+    [einsatzId],
+  );
 
   const zeigeZusammenfassung = useCallback(() => {
     if (!alarmScope.aktiv) return;
@@ -114,7 +119,8 @@ export default function AlarmZentrale() {
     const nurAuftraege = ziele.size === 1 && ziele.has('auftraege');
     const nurErinnerungen = ziele.size === 1 && ziele.has('erinnerungen');
     let titel = `${anzahl} weitere Alarme`;
-    let beschreibung = 'Weitere Ereignisse sind eingegangen. Bitte in den betroffenen Modulen sichten.';
+    let beschreibung =
+      'Weitere Ereignisse sind eingegangen. Bitte in den betroffenen Modulen sichten.';
     if (nurSofortmeldungen) {
       titel = `${anzahl} weitere Sofortmeldungen`;
       beschreibung = 'Weitere Ereignisse sind eingegangen. Bitte die Meldungen gesammelt sichten.';
@@ -169,15 +175,47 @@ export default function AlarmZentrale() {
    * der neueste bleibt einzeln sichtbar. Danach wandert bei jedem neuen Ereignis der
    * bisher neueste Einzeltoast ebenfalls in die Zusammenfassung.
    */
-  const zeigeAlarmToast = useCallback((toast: AlarmToast) => {
-    if (!alarmScope.aktiv) return;
-    const toastEntfernen = () => {
-      alarmScope.eigeneToastKeys.delete(toast.key);
-      alarmScope.einzelneToastZiele.delete(toast.key);
-      alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys
-        .filter((key) => key !== toast.key);
-    };
-    if (alarmScope.einzelneToastKeys.includes(toast.key)) {
+  const zeigeAlarmToast = useCallback(
+    (toast: AlarmToast) => {
+      if (!alarmScope.aktiv) return;
+      const toastEntfernen = () => {
+        alarmScope.eigeneToastKeys.delete(toast.key);
+        alarmScope.einzelneToastZiele.delete(toast.key);
+        alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys.filter(
+          (key) => key !== toast.key,
+        );
+      };
+      if (alarmScope.einzelneToastKeys.includes(toast.key)) {
+        alarmScope.eigeneToastKeys.add(toast.key);
+        notification[toast.art]({
+          key: toast.key,
+          title: toast.titel,
+          description: toast.beschreibung,
+          duration: 0,
+          actions: toast.aktion,
+          onClose: toastEntfernen,
+        });
+        return;
+      }
+      if (alarmScope.gebuendelteToastZiele.has(toast.key)) return;
+
+      if (
+        alarmScope.gebuendelteToastZiele.size > 0 ||
+        alarmScope.einzelneToastKeys.length >= MAX_SICHTBARE_TOASTS
+      ) {
+        for (const verdraengt of alarmScope.einzelneToastKeys) {
+          const ziel = alarmScope.einzelneToastZiele.get(verdraengt);
+          if (ziel) alarmScope.gebuendelteToastZiele.set(verdraengt, ziel);
+          notification.destroy(verdraengt);
+          alarmScope.eigeneToastKeys.delete(verdraengt);
+        }
+        alarmScope.einzelneToastKeys = [];
+        alarmScope.einzelneToastZiele.clear();
+        zeigeZusammenfassung();
+      }
+
+      alarmScope.einzelneToastKeys.push(toast.key);
+      alarmScope.einzelneToastZiele.set(toast.key, toast.ziel);
       alarmScope.eigeneToastKeys.add(toast.key);
       notification[toast.art]({
         key: toast.key,
@@ -187,37 +225,9 @@ export default function AlarmZentrale() {
         actions: toast.aktion,
         onClose: toastEntfernen,
       });
-      return;
-    }
-    if (alarmScope.gebuendelteToastZiele.has(toast.key)) return;
-
-    if (
-      alarmScope.gebuendelteToastZiele.size > 0
-      || alarmScope.einzelneToastKeys.length >= MAX_SICHTBARE_TOASTS
-    ) {
-      for (const verdraengt of alarmScope.einzelneToastKeys) {
-        const ziel = alarmScope.einzelneToastZiele.get(verdraengt);
-        if (ziel) alarmScope.gebuendelteToastZiele.set(verdraengt, ziel);
-        notification.destroy(verdraengt);
-        alarmScope.eigeneToastKeys.delete(verdraengt);
-      }
-      alarmScope.einzelneToastKeys = [];
-      alarmScope.einzelneToastZiele.clear();
-      zeigeZusammenfassung();
-    }
-
-    alarmScope.einzelneToastKeys.push(toast.key);
-    alarmScope.einzelneToastZiele.set(toast.key, toast.ziel);
-    alarmScope.eigeneToastKeys.add(toast.key);
-    notification[toast.art]({
-      key: toast.key,
-      title: toast.titel,
-      description: toast.beschreibung,
-      duration: 0,
-      actions: toast.aktion,
-      onClose: toastEntfernen,
-    });
-  }, [alarmScope, notification, zeigeZusammenfassung]);
+    },
+    [alarmScope, notification, zeigeZusammenfassung],
+  );
 
   // duration: 0-Notices überleben sonst ihre Komponente. Bei Logout/Unmount und vor
   // dem nächsten Einsatz werden deshalb ausschließlich die Keys dieses Scopes zerstört.
@@ -264,9 +274,10 @@ export default function AlarmZentrale() {
   useEffect(() => {
     const onSofort = (ev: Event) => {
       const detail = (ev as CustomEvent<{ meldung_id?: number }>).detail ?? {};
-      const fachKey = detail.meldung_id != null
-        ? `sofort-${detail.meldung_id}`
-        : `sofort-${++alarmScope.zaehler}`;
+      const fachKey =
+        detail.meldung_id != null
+          ? `sofort-${detail.meldung_id}`
+          : `sofort-${++alarmScope.zaehler}`;
       const key = `${alarmScope.keyPrefix}-${fachKey}`;
       const oeffnen = () => {
         if (!alarmScope.aktiv) return;
@@ -278,7 +289,11 @@ export default function AlarmZentrale() {
         art: 'warning',
         titel: 'Sofortmeldung eingegangen',
         beschreibung: 'Eine Sofortmeldung erfordert Aufmerksamkeit — bitte sichten und bestätigen.',
-        aktion: (<Button type="primary" onClick={oeffnen}>Öffnen</Button>),
+        aktion: (
+          <Button type="primary" onClick={oeffnen}>
+            Öffnen
+          </Button>
+        ),
         ziel: 'meldungen',
       });
       zeigeDesktopAlarm('Sofortmeldung eingegangen', {
@@ -298,7 +313,9 @@ export default function AlarmZentrale() {
       const detail = (ev as CustomEvent<ErinnerungDetail>).detail ?? {};
       const istAuftrag = detail.bezug_typ === 'auftrag';
       const fachKey = istAuftrag
-        ? detail.bezug_id != null ? `auftrag-${detail.bezug_id}` : `auftrag-${++alarmScope.zaehler}`
+        ? detail.bezug_id != null
+          ? `auftrag-${detail.bezug_id}`
+          : `auftrag-${++alarmScope.zaehler}`
         : detail.erinnerung_id != null
           ? `erinnerung-${detail.erinnerung_id}`
           : `erinnerung-${++alarmScope.zaehler}`;
@@ -307,9 +324,10 @@ export default function AlarmZentrale() {
       const beschreibung = istAuftrag
         ? 'Ein Auftrag ist über seine Quittierfrist — bitte prüfen und quittieren.'
         : 'Eine Erinnerung ist fällig — bitte sichten.';
-      const ziel = istAuftrag && detail.bezug_id != null
-        ? auftraegePfad(einsatzId, { auftrag: detail.bezug_id })
-        : erinnerungenPfad(einsatzId);
+      const ziel =
+        istAuftrag && detail.bezug_id != null
+          ? auftraegePfad(einsatzId, { auftrag: detail.bezug_id })
+          : erinnerungenPfad(einsatzId);
       const oeffnen = () => {
         if (!alarmScope.aktiv) return;
         navigate(ziel);
@@ -320,7 +338,11 @@ export default function AlarmZentrale() {
         art: istAuftrag ? 'warning' : 'info',
         titel,
         beschreibung,
-        aktion: (<Button type="primary" onClick={oeffnen}>Öffnen</Button>),
+        aktion: (
+          <Button type="primary" onClick={oeffnen}>
+            Öffnen
+          </Button>
+        ),
         ziel: istAuftrag ? 'auftraege' : 'erinnerungen',
       });
       zeigeDesktopAlarm(titel, {
@@ -360,16 +382,18 @@ export default function AlarmZentrale() {
   };
 
   const desktop = desktopZustand(permission);
-  const desktopText = desktop === 'erlaubt'
-    ? 'Desktop erlaubt'
-    : desktop === 'aus'
-      ? 'Desktop aus'
-      : 'Desktop blockiert';
-  const desktopHinweis = desktop === 'aus'
-    ? 'Desktop-Benachrichtigungen aktivieren'
-    : desktop === 'erlaubt'
-      ? 'Desktop-Benachrichtigungen sind erlaubt'
-      : 'Desktop-Benachrichtigungen sind im Browser blockiert';
+  const desktopText =
+    desktop === 'erlaubt'
+      ? 'Desktop erlaubt'
+      : desktop === 'aus'
+        ? 'Desktop aus'
+        : 'Desktop blockiert';
+  const desktopHinweis =
+    desktop === 'aus'
+      ? 'Desktop-Benachrichtigungen aktivieren'
+      : desktop === 'erlaubt'
+        ? 'Desktop-Benachrichtigungen sind erlaubt'
+        : 'Desktop-Benachrichtigungen sind im Browser blockiert';
   const tonText = gemutet ? 'Ton stumm' : tonStatus === 'bereit' ? 'Ton bereit' : 'Ton blockiert';
   const tonHinweis = gemutet
     ? 'Alarmton einschalten'

@@ -22,8 +22,14 @@ import { SCHLUESSEL_ZULETZT_BEFEHLE } from './zuletztBefehle';
  */
 
 const nutzer = {
-  id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'EL',
+  benutzername: 'el',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+  aktiv: true,
+  erstellt_at: '',
+  totp_aktiviert: false,
 };
 
 let puts: { schluessel: string; wert: string }[];
@@ -54,16 +60,20 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
   it('merkt einen ausgeführten Befehl über das Schliessen der Palette hinweg', async () => {
     server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
     const u = userEvent.setup();
-    renderMitProviders(<CommandPaletteProvider><div /></CommandPaletteProvider>);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div />
+      </CommandPaletteProvider>,
+    );
 
     await oeffne(u);
     await u.click(await screen.findByRole('option', { name: 'Profil' }));
 
     // Die Palette hat sich beim Ausführen selbst geschlossen.
     await waitFor(() => expect(screen.queryByRole('combobox')).toBeNull());
-    await waitFor(() => expect(puts).toEqual([
-      { schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:profil"]' },
-    ]));
+    await waitFor(() =>
+      expect(puts).toEqual([{ schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:profil"]' }]),
+    );
 
     await oeffne(u);
 
@@ -79,7 +89,11 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
   it('zeigt ohne gemerkten Befehl gar keine Gedächtnisgruppe', async () => {
     server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
     const u = userEvent.setup();
-    renderMitProviders(<CommandPaletteProvider><div /></CommandPaletteProvider>);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div />
+      </CommandPaletteProvider>,
+    );
 
     await oeffne(u);
 
@@ -100,7 +114,9 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
    */
   it('lässt eine nachträglich eintreffende Antwort nicht in die offene Palette springen', async () => {
     let loese: () => void = () => {};
-    const antwortFrei = new Promise<void>((r) => { loese = r; });
+    const antwortFrei = new Promise<void>((r) => {
+      loese = r;
+    });
     server.use(
       http.get('/api/benutzer-einstellungen', async () => {
         await antwortFrei;
@@ -110,7 +126,11 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
       }),
     );
     const u = userEvent.setup();
-    const { client } = renderMitProviders(<CommandPaletteProvider><div /></CommandPaletteProvider>);
+    const { client } = renderMitProviders(
+      <CommandPaletteProvider>
+        <div />
+      </CommandPaletteProvider>,
+    );
 
     await oeffne(u);
     await screen.findByRole('option', { name: 'Profil' });
@@ -118,7 +138,8 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
 
     loese();
     await waitFor(() =>
-      expect(client.getQueryData(globalKeys.benutzerEinstellungenVon(nutzer.id))).toBeDefined());
+      expect(client.getQueryData(globalKeys.benutzerEinstellungenVon(nutzer.id))).toBeDefined(),
+    );
 
     // Der Stand IST da — und die offene Palette hat sich trotzdem nicht umsortiert.
     expect(gedaechtnisGruppe()).toBeNull();
@@ -136,11 +157,19 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
    * der flachen Trefferliste, mit gleichem Label und gleichem Ziel.
    */
   it('zeigt den gemerkten Befehl bei aktiver Suche genau einmal', async () => {
-    server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({
-      eintraege: { [SCHLUESSEL_ZULETZT_BEFEHLE]: '["nav:profil"]' },
-    })));
+    server.use(
+      http.get('/api/benutzer-einstellungen', () =>
+        HttpResponse.json({
+          eintraege: { [SCHLUESSEL_ZULETZT_BEFEHLE]: '["nav:profil"]' },
+        }),
+      ),
+    );
     const u = userEvent.setup();
-    renderMitProviders(<CommandPaletteProvider><div /></CommandPaletteProvider>);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div />
+      </CommandPaletteProvider>,
+    );
 
     await oeffne(u);
     await screen.findByRole('group', { name: 'Zuletzt ausgeführt' });

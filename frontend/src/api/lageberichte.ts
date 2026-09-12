@@ -15,7 +15,10 @@ export interface NeuerLagebericht {
   zeitstand?: string;
 }
 
-export function legeLageberichtAn(einsatzId: number, daten: NeuerLagebericht): Promise<LageberichtAnzeige> {
+export function legeLageberichtAn(
+  einsatzId: number,
+  daten: NeuerLagebericht,
+): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/lageberichte`, 'POST', daten);
 }
 
@@ -30,11 +33,18 @@ export function aktualisiereLagebericht(
   id: number,
   patch: LageberichtPatch,
 ): Promise<LageberichtAnzeige> {
-  return apiSend<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/lageberichte/${id}`, 'PATCH', patch);
+  return apiSend<LageberichtAnzeige>(
+    `/api/einsaetze/${einsatzId}/lageberichte/${id}`,
+    'PATCH',
+    patch,
+  );
 }
 
 export function gibLageberichtFrei(einsatzId: number, id: number): Promise<LageberichtAnzeige> {
-  return apiSend<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/lageberichte/${id}/freigeben`, 'POST');
+  return apiSend<LageberichtAnzeige>(
+    `/api/einsaetze/${einsatzId}/lageberichte/${id}/freigeben`,
+    'POST',
+  );
 }
 
 export function schreibeLageberichtFort(

@@ -14,7 +14,11 @@ export interface ErinnerungListeProps {
 /** Kartenboard der Erinnerungen (LFH-112). Reicht alle Props an die einzelne
  *  ErinnerungKarte durch; Darstellung/Logik liegen vollständig in der Karte. */
 export default function ErinnerungListe({
-  erinnerungen, ansicht = 'offen', darfSchreiben, onErledigen, onQuittieren,
+  erinnerungen,
+  ansicht = 'offen',
+  darfSchreiben,
+  onErledigen,
+  onQuittieren,
 }: ErinnerungListeProps) {
   if (erinnerungen.length === 0) return <SeitenLeer titel="Keine Erinnerungen" />;
   return (

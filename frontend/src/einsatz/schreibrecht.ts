@@ -26,7 +26,8 @@ import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 
 /** Nur die zwei Einsatz-Felder, die die Regel braucht — `Pick` + nullable, damit
  *  Partial-Fixtures und `einsatzQuery.data?.`-Aufrufstellen ohne Cast durchlaufen. */
-export type EinsatzSchreibkontext = Pick<EinsatzAnzeige, 'status' | 'meine_rolle'> | null | undefined;
+export type EinsatzSchreibkontext =
+  Pick<EinsatzAnzeige, 'status' | 'meine_rolle'> | null | undefined;
 
 /** Nur die System-Rolle des Benutzers (für den Admin-Zweig). */
 export type BenutzerSchreibkontext = Pick<BenutzerAnzeige, 'system_rolle'> | null | undefined;
@@ -87,9 +88,7 @@ export function darfImEinsatzSchreiben(
 /** Nur die zwei Benutzer-Felder der Org-Achse — bewusst getrennt von `BenutzerSchreibkontext`
  *  (das nur `system_rolle` kennt), damit die Achsen nicht über einen gemeinsamen Typ verschmelzen. */
 export type BenutzerVerwaltungskontext =
-  | Pick<BenutzerAnzeige, 'system_rolle' | 'org_rolle'>
-  | null
-  | undefined;
+  Pick<BenutzerAnzeige, 'system_rolle' | 'org_rolle'> | null | undefined;
 
 /** Zugang zum Verwaltungsbereich (`/admin` samt Stammdaten): System-Admin ODER Führungskraft
  *  der Organisation. Die EINE Quelle für dieses Gate — Topbar, Admin-Route und Kommandopalette

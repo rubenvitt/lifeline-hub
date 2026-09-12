@@ -83,7 +83,12 @@ export default function EinsatzAufbewahrung() {
           tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
           extra={orgHinweisWert(daten.einstellungen.org_defaults?.retention_dauer_tage, 'Tage')}
         >
-          <InputNumber min={1} max={3650} style={{ width: '100%', maxWidth: 200 }} placeholder="keine" />
+          <InputNumber
+            min={1}
+            max={3650}
+            style={{ width: '100%', maxWidth: 200 }}
+            placeholder="keine"
+          />
         </Form.Item>
 
         <div style={speicherLeisteStil(token)}>

@@ -15,12 +15,19 @@ import { listeEinheiten } from '../api/einheiten';
 import { listeEtb } from '../api/etb';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
 import {
-  baueDatensatzTreffer, etbVolltextMoeglich, zahlAusSuche, type DatensatzQuellen,
+  baueDatensatzTreffer,
+  etbVolltextMoeglich,
+  zahlAusSuche,
+  type DatensatzQuellen,
 } from './datensaetze';
 import type { Treffer } from './fuzzy';
 import {
-  DATENSATZ_MINDESTZEICHEN, PALETTE_MODI, QUELLE_MODUL, modusZeigtDatensaetze,
-  type DatensatzQuelle, type PaletteModus,
+  DATENSATZ_MINDESTZEICHEN,
+  PALETTE_MODI,
+  QUELLE_MODUL,
+  modusZeigtDatensaetze,
+  type DatensatzQuelle,
+  type PaletteModus,
 } from './typen';
 
 /**
@@ -97,9 +104,11 @@ export interface DatensatzAbruf {
  * Liste folgt — ein Request für eine Ansicht ohne Datensatzzeile.
  */
 export function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf): boolean {
-  return einsatzId != null
-    && suche.trim().length >= DATENSATZ_MINDESTZEICHEN
-    && modusZeigtDatensaetze(modus);
+  return (
+    einsatzId != null &&
+    suche.trim().length >= DATENSATZ_MINDESTZEICHEN &&
+    modusZeigtDatensaetze(modus)
+  );
 }
 
 /**
@@ -286,22 +295,32 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
    * geht in ein `useMemo` des Aufrufers, und ein je Render neues Objekt machte das dort
    * wirkungslos.
    */
-  return useMemo<DatensatzQuellen>(() => ({
-    personen: personenQuery.data,
-    schaeden: schaedenQuery.data,
-    uhs: uhsQuery.data,
-    meldungen: meldungenQuery.data,
-    auftraege: auftraegeQuery.data,
-    fahrzeuge: fahrzeugeQuery.data,
-    personal: personalQuery.data,
-    einheiten: einheitenQuery.data,
-    etbNummer: etbNummerQuery.data,
-    etbText: etbTextQuery.data,
-  }), [
-    personenQuery.data, schaedenQuery.data, uhsQuery.data, meldungenQuery.data,
-    auftraegeQuery.data, fahrzeugeQuery.data, personalQuery.data, einheitenQuery.data,
-    etbNummerQuery.data, etbTextQuery.data,
-  ]);
+  return useMemo<DatensatzQuellen>(
+    () => ({
+      personen: personenQuery.data,
+      schaeden: schaedenQuery.data,
+      uhs: uhsQuery.data,
+      meldungen: meldungenQuery.data,
+      auftraege: auftraegeQuery.data,
+      fahrzeuge: fahrzeugeQuery.data,
+      personal: personalQuery.data,
+      einheiten: einheitenQuery.data,
+      etbNummer: etbNummerQuery.data,
+      etbText: etbTextQuery.data,
+    }),
+    [
+      personenQuery.data,
+      schaedenQuery.data,
+      uhsQuery.data,
+      meldungenQuery.data,
+      auftraegeQuery.data,
+      fahrzeugeQuery.data,
+      personalQuery.data,
+      einheitenQuery.data,
+      etbNummerQuery.data,
+      etbTextQuery.data,
+    ],
+  );
 }
 
 /**
@@ -318,10 +337,16 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
  * Der zweite Beobachter auf `modulOverrides` kostet keinen zweiten Request: gleicher
  * Schlüssel, gleiches `enabled`, TanStack führt sie zusammen.
  */
-export function useDatensatzTreffer(
-  { einsatzId, modus, suche, aktuellerModulKey, navigate }:
-  DatensatzAbruf & { aktuellerModulKey: string | null; navigate: (pfad: string) => void },
-): Treffer[] {
+export function useDatensatzTreffer({
+  einsatzId,
+  modus,
+  suche,
+  aktuellerModulKey,
+  navigate,
+}: DatensatzAbruf & {
+  aktuellerModulKey: string | null;
+  navigate: (pfad: string) => void;
+}): Treffer[] {
   const { benutzer } = useAuth();
   const quellen = useDatensaetze({ einsatzId, modus, suche });
   const { data: overrides } = useQuery({
@@ -335,11 +360,19 @@ export function useDatensatzTreffer(
   // Abruf, nur über die Rangfolge (LFH-391 · C4). Stünde er dort, hinge das `enabled` der
   // zehn Listen an ihm, und ein Modulwechsel bei offener Palette startete sie neu.
   return useMemo(
-    () => (einsatzId == null
-      ? LEER
-      : baueDatensatzTreffer({
-        einsatzId, modus, suche, benutzer, overrides, aktuellerModulKey, navigate, quellen,
-      })),
+    () =>
+      einsatzId == null
+        ? LEER
+        : baueDatensatzTreffer({
+            einsatzId,
+            modus,
+            suche,
+            benutzer,
+            overrides,
+            aktuellerModulKey,
+            navigate,
+            quellen,
+          }),
     [einsatzId, modus, suche, benutzer, overrides, aktuellerModulKey, navigate, quellen],
   );
 }

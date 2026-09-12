@@ -71,7 +71,9 @@ export default function OnlineQuellenVerwaltung() {
        * Gegenstück ist „Aktiv" weiter unten: dort steht ein Wahrheitswert, den keine
        * Suche erreicht — deshalb trägt jene Spalte den Filter und diese nicht.
        */
-      render: (t: OnlineQuelle['typ']) => <Tag color={t === 'vektor' ? 'blue' : 'geekblue'}>{t}</Tag>,
+      render: (t: OnlineQuelle['typ']) => (
+        <Tag color={t === 'vektor' ? 'blue' : 'geekblue'}>{t}</Tag>
+      ),
     },
     {
       title: 'URL',
@@ -156,7 +158,12 @@ export default function OnlineQuellenVerwaltung() {
               // `abstand.xs` = 3/5/7 px und damit im Handschuh-Betrieb keine Trennung.
               // Erzwungen von `components/aktionsabstand.guard.test.ts`.
               <Space size="middle">
-                <Button onClick={() => { setBearbeite(q); setFormOffen(true); }}>
+                <Button
+                  onClick={() => {
+                    setBearbeite(q);
+                    setFormOffen(true);
+                  }}
+                >
                   Bearbeiten
                 </Button>
                 <Popconfirm
@@ -178,7 +185,13 @@ export default function OnlineQuellenVerwaltung() {
     <>
       {istAdmin && (
         <Space style={{ marginBottom: 12 }}>
-          <Button type="primary" onClick={() => { setBearbeite(null); setFormOffen(true); }}>
+          <Button
+            type="primary"
+            onClick={() => {
+              setBearbeite(null);
+              setFormOffen(true);
+            }}
+          >
             Quelle hinzufügen
           </Button>
           <Button onClick={() => setKatalogOffen(true)}>Aus Katalog hinzufügen</Button>

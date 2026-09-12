@@ -1,4 +1,18 @@
-import { App, AutoComplete, Breadcrumb, Button, Collapse, DatePicker, Descriptions, Form, Input, InputNumber, Space, Typography, theme } from 'antd';
+import {
+  App,
+  AutoComplete,
+  Breadcrumb,
+  Button,
+  Collapse,
+  DatePicker,
+  Descriptions,
+  Form,
+  Input,
+  InputNumber,
+  Space,
+  Typography,
+  theme,
+} from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -11,12 +25,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { aktualisiereEinsatz, ladeEinsatz, ladeMitglieder, type KopfdatenUpdate } from '../api/einsaetze';
+import {
+  aktualisiereEinsatz,
+  ladeEinsatz,
+  ladeMitglieder,
+  type KopfdatenUpdate,
+} from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
-import { darfImEinsatzSchreiben, darfEinsatzLeiten, istEinsatzLeitung } from '../einsatz/schreibrecht';
+import {
+  darfImEinsatzSchreiben,
+  darfEinsatzLeiten,
+  istEinsatzLeitung,
+} from '../einsatz/schreibrecht';
 import type { Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
@@ -181,7 +204,8 @@ export default function EinsatzdatenPage() {
       anzahl_betroffene_initial: einsatz.anzahl_betroffene_initial ?? undefined,
       begonnen_at: wireZuPicker(einsatz.begonnen_at),
       naechste_lagebesprechung_at: einsatz.naechste_lagebesprechung_at
-        ? wireZuPicker(einsatz.naechste_lagebesprechung_at) : null,
+        ? wireZuPicker(einsatz.naechste_lagebesprechung_at)
+        : null,
     });
     setBearbeiten(true);
   }
@@ -201,7 +225,8 @@ export default function EinsatzdatenPage() {
       anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
       begonnen_at: pickerZuWire(werte.begonnen_at),
       naechste_lagebesprechung_at: werte.naechste_lagebesprechung_at
-        ? pickerZuWire(werte.naechste_lagebesprechung_at) : null,
+        ? pickerZuWire(werte.naechste_lagebesprechung_at)
+        : null,
     };
     speichernMutation.mutate(felder);
   }
@@ -237,7 +262,9 @@ export default function EinsatzdatenPage() {
           <Form.Item
             label="Bezeichnung"
             name="bezeichnung"
-            rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+            rules={[
+              { required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' },
+            ]}
           >
             {/* Der Knopf, der hierher geführt hat, verschwindet im selben Rendern — ohne
                 `autoFocus` fiele der Fokus auf `<body>` und die Tastaturbedienung finge
@@ -317,14 +344,23 @@ export default function EinsatzdatenPage() {
               {EINSATZART_LABELS[einsatz.einsatzart]}
             </Descriptions.Item>
             <Descriptions.Item label="Nächste Lagebesprechung">
-              {einsatz.naechste_lagebesprechung_at
-                ? <ZeitAnzeige wert={einsatz.naechste_lagebesprechung_at} format="dtgVoll" />
-                : '—'}
+              {einsatz.naechste_lagebesprechung_at ? (
+                <ZeitAnzeige wert={einsatz.naechste_lagebesprechung_at} format="dtgVoll" />
+              ) : (
+                '—'
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Koordinate">
-              {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
-                ? <KoordinatenAnzeige lat={einsatz.einsatzort_lat} lon={einsatz.einsatzort_lon} einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
-                : '—'}
+              {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null ? (
+                <KoordinatenAnzeige
+                  lat={einsatz.einsatzort_lat}
+                  lon={einsatz.einsatzort_lon}
+                  einsatzId={einsatzId}
+                  exclude={`einsatzort:${einsatzId}`}
+                />
+              ) : (
+                '—'
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="Meldende Stelle">
               {einsatz.meldende_stelle ?? '—'}

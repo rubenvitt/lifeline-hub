@@ -9,10 +9,20 @@ import type { EtbEintragAnzeige } from '../api/types';
 import WiedervorlageModal from './WiedervorlageModal';
 
 const EINTRAG = {
-  id: 4, lfd_nr: 12, typ: 'meldung', inhalt: 'Keller unter Wasser', von: null, an: null,
-  meldeweg: null, veranlassung: null, erfasser_id: 1, erfasser_name: 'Admin',
-  ereigniszeit: '2026-08-21 10:00:00', received_at: '2026-08-21 10:00:01',
-  erfasst_lokal_at: null, berichtigt_eintrag_id: null,
+  id: 4,
+  lfd_nr: 12,
+  typ: 'meldung',
+  inhalt: 'Keller unter Wasser',
+  von: null,
+  an: null,
+  meldeweg: null,
+  veranlassung: null,
+  erfasser_id: 1,
+  erfasser_name: 'Admin',
+  ereigniszeit: '2026-08-21 10:00:00',
+  received_at: '2026-08-21 10:00:01',
+  erfasst_lokal_at: null,
+  berichtigt_eintrag_id: null,
 } as unknown as EtbEintragAnzeige;
 
 /** Die Uhr steht, damit „+30 min" eine prüfbare Zahl ist und kein bewegliches Ziel. */
@@ -20,8 +30,12 @@ const JETZT = new Date('2026-08-21T10:00:00Z');
 
 function zeige(onClose = vi.fn(), naechsteLagebesprechungAt?: string | null) {
   return renderMitProviders(
-    <WiedervorlageModal einsatzId={7} eintrag={EINTRAG} onClose={onClose}
-      naechsteLagebesprechungAt={naechsteLagebesprechungAt} />,
+    <WiedervorlageModal
+      einsatzId={7}
+      eintrag={EINTRAG}
+      onClose={onClose}
+      naechsteLagebesprechungAt={naechsteLagebesprechungAt}
+    />,
   );
 }
 
@@ -46,7 +60,11 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     zeige(vi.fn(), '2026-08-21 10:00:10');
     expect(screen.getByRole('button', { name: 'Nächste Lagebesprechung' })).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(11_000));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Nächste Lagebesprechung' }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it('LFH-463: übernimmt nach einem Zeitsprung beim Anklicken keinen abgelaufenen Termin', async () => {
@@ -58,15 +76,19 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     vi.setSystemTime(new Date('2026-08-21T10:00:20Z'));
     await nutzer.click(chip);
     expect(faelligFeld()).toHaveValue(vorher);
-    expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Nächste Lagebesprechung' }),
+    ).not.toBeInTheDocument();
   });
 
   it('LFH-463: übernimmt genau den bekannten UTC-Termin einschließlich Sekunden', async () => {
     let gesendet: Record<string, unknown> | undefined;
-    server.use(http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
-      gesendet = await request.json() as Record<string, unknown>;
-      return HttpResponse.json({ id: 1 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     zeige(vi.fn(), '2026-08-21 13:17:43');
     await nutzer.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung' }));
@@ -78,9 +100,12 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
   });
 
   it.each([undefined, null, '', 'ungueltig', '2026-08-21 09:59:59', '2026-08-21 10:00:00'])(
-    'LFH-463: rendert ohne zukünftigen bekannten Termin keinen Chip (%s)', (termin) => {
+    'LFH-463: rendert ohne zukünftigen bekannten Termin keinen Chip (%s)',
+    (termin) => {
       zeige(vi.fn(), termin);
-      expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Nächste Lagebesprechung' }),
+      ).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '+30 min' })).toBeEnabled();
     },
   );
@@ -106,8 +131,9 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     zeige();
     expect(screen.getByLabelText('Titel')).toBeInTheDocument();
     expect(screen.getByLabelText('Beschreibung (optional)')).toBeInTheDocument();
-    expect(document.querySelectorAll('.ant-form-item-control-input-content').length)
-      .toBeLessThanOrEqual(4);
+    expect(
+      document.querySelectorAll('.ant-form-item-control-input-content').length,
+    ).toBeLessThanOrEqual(4);
   });
 
   it('sendet mit Enter ab — der Absende-Knopf liegt im Formular', async () => {

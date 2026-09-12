@@ -26,11 +26,15 @@ interface Props {
  * einzige Weg, und er muss deshalb hier hereingereicht werden.
  */
 export default function EntwurfNavigationSchutz({
-  ungespeichert, speichert, speichern, speicherFehler,
+  ungespeichert,
+  speichert,
+  speichern,
+  speicherFehler,
 }: Props) {
   const { token } = theme.useToken();
-  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    ungespeichert && currentLocation.pathname !== nextLocation.pathname,
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      ungespeichert && currentLocation.pathname !== nextLocation.pathname,
   );
 
   useEffect(() => {
@@ -51,9 +55,12 @@ export default function EntwurfNavigationSchutz({
       mask={{ closable: false }}
       footer={
         <Flex gap={token.margin} wrap justify="space-between">
-          <Button danger onClick={() => {
-            if (blocker.state === 'blocked') blocker.proceed();
-          }}>
+          <Button
+            danger
+            onClick={() => {
+              if (blocker.state === 'blocked') blocker.proceed();
+            }}
+          >
             Verwerfen
           </Button>
           <Flex gap={token.marginSM} wrap>

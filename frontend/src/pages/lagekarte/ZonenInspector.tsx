@@ -21,14 +21,30 @@ export interface ZonenInspectorProps {
   darfSchreiben: boolean;
   onSchliessen: () => void;
   /** Partielles PATCH (nur geänderte Felder). */
-  onAendern: (patch: { typ?: ZoneTyp; label?: string | null; farbe?: string | null; notiz?: string | null; gefahrengebiet_id?: number | null; ansicht_id?: number | null }) => Promise<void>;
+  onAendern: (patch: {
+    typ?: ZoneTyp;
+    label?: string | null;
+    farbe?: string | null;
+    notiz?: string | null;
+    gefahrengebiet_id?: number | null;
+    ansicht_id?: number | null;
+  }) => Promise<void>;
   onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
   /** Ansichts-Zuordnung (B/LFH-320). */
   ansichten: KartenAnsicht[];
 }
 
-export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchliessen, onAendern, onMatrixOeffnen, onLoeschen, ansichten }: ZonenInspectorProps) {
+export default function ZonenInspector({
+  zone,
+  gebiete,
+  darfSchreiben,
+  onSchliessen,
+  onAendern,
+  onMatrixOeffnen,
+  onLoeschen,
+  ansichten,
+}: ZonenInspectorProps) {
   const gebietId = useId();
   const [entwurf, setEntwurf] = useState(() => ({
     typ: zone.typ,
@@ -38,7 +54,9 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
     gefahrengebiet_id: zone.gefahrengebiet_id,
     ansicht_id: zone.ansicht_id,
   }));
-  const [speicherStatus, setSpeicherStatus] = useState<'idle' | 'speichert' | 'gespeichert' | 'fehler'>('idle');
+  const [speicherStatus, setSpeicherStatus] = useState<
+    'idle' | 'speichert' | 'gespeichert' | 'fehler'
+  >('idle');
   const speicherLauf = useRef(0);
   const entwurfZoneId = useRef(zone.id);
 
@@ -61,7 +79,15 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
       ansicht_id: zone.ansicht_id,
     });
     setSpeicherStatus('idle');
-  }, [zone.id, zone.typ, zone.label, zone.farbe, zone.notiz, zone.gefahrengebiet_id, zone.ansicht_id]);
+  }, [
+    zone.id,
+    zone.typ,
+    zone.label,
+    zone.farbe,
+    zone.notiz,
+    zone.gefahrengebiet_id,
+    zone.ansicht_id,
+  ]);
 
   async function speichern(patch: Parameters<ZonenInspectorProps['onAendern']>[0]) {
     const lauf = ++speicherLauf.current;
@@ -76,7 +102,9 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
 
   const gesperrt = !darfSchreiben || speicherStatus === 'speichert';
   const istFreieSkizze = entwurf.typ === 'freie_skizze';
-  const erlaubteTypen = ZONE_TYPEN.filter((t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ);
+  const erlaubteTypen = ZONE_TYPEN.filter(
+    (t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ,
+  );
   const aktuellesGebiet = gebiete.find((g) => g.id === entwurf.gefahrengebiet_id) ?? null;
   const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
   // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie (LFH-146).
@@ -114,13 +142,17 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
     >
       <Space orientation="vertical" style={{ width: '100%' }}>
         {darfSchreiben ? (
-          <Select<ZoneTyp> aria-label="Zonen-Typ" value={entwurf.typ} style={{ width: '100%' }}
+          <Select<ZoneTyp>
+            aria-label="Zonen-Typ"
+            value={entwurf.typ}
+            style={{ width: '100%' }}
             disabled={gesperrt}
             options={erlaubteTypen.map((t) => ({ value: t.typ, label: t.label }))}
             onChange={(typ) => {
               setEntwurf((alt) => ({ ...alt, typ }));
               void speichern({ typ });
-            }} />
+            }}
+          />
         ) : (
           <Typography.Text>{zoneTypLabel(zone.typ)}</Typography.Text>
         )}
@@ -137,20 +169,31 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
           <GeoKennzahlen kennzahlen={kennzahlen} zusatz={zusatzZeilen} />
         )}
 
-        <Input aria-label="Label" placeholder="Bezeichnung" value={entwurf.label} disabled={gesperrt}
+        <Input
+          aria-label="Label"
+          placeholder="Bezeichnung"
+          value={entwurf.label}
+          disabled={gesperrt}
           onChange={(e) => setEntwurf((alt) => ({ ...alt, label: e.target.value }))}
           onBlur={() => {
             const label = entwurf.label.trim();
             setEntwurf((alt) => ({ ...alt, label }));
             if (label !== (zone.label ?? '')) void speichern({ label: label || null });
-          }} />
+          }}
+        />
 
         {istFreieSkizze && (
-          <Input aria-label="Farbe" type="color" value={entwurf.farbe} disabled={gesperrt}
+          <Input
+            aria-label="Farbe"
+            type="color"
+            value={entwurf.farbe}
+            disabled={gesperrt}
             onChange={(e) => setEntwurf((alt) => ({ ...alt, farbe: e.target.value }))}
             onBlur={() => {
-              if (entwurf.farbe !== (zone.farbe ?? '#1677ff')) void speichern({ farbe: entwurf.farbe });
-            }} />
+              if (entwurf.farbe !== (zone.farbe ?? '#1677ff'))
+                void speichern({ farbe: entwurf.farbe });
+            }}
+          />
         )}
 
         {entwurf.typ === 'gefahrengebiet' && (
@@ -163,7 +206,10 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
                 value={entwurf.gefahrengebiet_id ?? undefined}
                 disabled={gesperrt}
                 options={[
-                  ...gebiete.map((g) => ({ value: g.id, label: gefahrengebietName(g.label, g.id) })),
+                  ...gebiete.map((g) => ({
+                    value: g.id,
+                    label: gefahrengebietName(g.label, g.id),
+                  })),
                   { value: NEU, label: '+ Neues Gefahrengebiet' },
                 ]}
                 onChange={(v) => umhaengen(v)}
@@ -177,13 +223,19 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
           </>
         )}
 
-        <Input.TextArea aria-label="Notiz" placeholder="Notiz" value={entwurf.notiz} disabled={gesperrt} rows={2}
+        <Input.TextArea
+          aria-label="Notiz"
+          placeholder="Notiz"
+          value={entwurf.notiz}
+          disabled={gesperrt}
+          rows={2}
           onChange={(e) => setEntwurf((alt) => ({ ...alt, notiz: e.target.value }))}
           onBlur={() => {
             const notiz = entwurf.notiz.trim();
             setEntwurf((alt) => ({ ...alt, notiz }));
             if (notiz !== (zone.notiz ?? '')) void speichern({ notiz: notiz || null });
-          }} />
+          }}
+        />
 
         <AnsichtZuordnung
           ansichten={ansichten}
@@ -196,22 +248,34 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
         />
 
         {speicherStatus !== 'idle' && (
-          <Typography.Text type={speicherStatus === 'fehler' ? 'danger' : 'secondary'} aria-live="polite">
+          <Typography.Text
+            type={speicherStatus === 'fehler' ? 'danger' : 'secondary'}
+            aria-live="polite"
+          >
             {speicherStatus === 'speichert'
               ? 'speichert …'
-              : speicherStatus === 'gespeichert' ? 'gespeichert' : 'nicht gespeichert'}
+              : speicherStatus === 'gespeichert'
+                ? 'gespeichert'
+                : 'nicht gespeichert'}
           </Typography.Text>
         )}
 
-        {darfSchreiben && (
-          aktuellHatWarnstufen ? (
-            <Popconfirm title="Zone aufheben?" description="Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren." okText="Aufheben" cancelText="Abbrechen" onConfirm={onLoeschen}>
+        {darfSchreiben &&
+          (aktuellHatWarnstufen ? (
+            <Popconfirm
+              title="Zone aufheben?"
+              description="Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren."
+              okText="Aufheben"
+              cancelText="Abbrechen"
+              onConfirm={onLoeschen}
+            >
               <Button danger>Zone aufheben</Button>
             </Popconfirm>
           ) : (
-            <Button danger onClick={onLoeschen}>Zone aufheben</Button>
-          )
-        )}
+            <Button danger onClick={onLoeschen}>
+              Zone aufheben
+            </Button>
+          ))}
       </Space>
     </KartenDetailCard>
   );

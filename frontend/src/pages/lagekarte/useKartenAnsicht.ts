@@ -16,13 +16,29 @@ import type { LayerSichtbar } from './Sidebar';
 
 const FACHEBENE_KEYS = ['nina', 'dwd', 'pegelonline', 'kritis'] as const;
 const LAYER_KEYS: (keyof LayerSichtbar)[] = [
-  'einsatzort', 'uhs', 'schaden', 'einheit', 'fahrzeug',
-  'fuehrung', 'abschnitt', 'zone', 'lagemeldung', 'freies_zeichen',
+  'einsatzort',
+  'uhs',
+  'schaden',
+  'einheit',
+  'fahrzeug',
+  'fuehrung',
+  'abschnitt',
+  'zone',
+  'lagemeldung',
+  'freies_zeichen',
 ];
 /** Layer-Default beim Seed/ohne gespeicherten Wert: alle Ebenen an (heutiges Verhalten). */
 const LAYER_DEFAULT: LayerSichtbar = {
-  einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true,
-  fuehrung: true, abschnitt: true, zone: true, lagemeldung: true, freies_zeichen: true,
+  einsatzort: true,
+  uhs: true,
+  schaden: true,
+  einheit: true,
+  fahrzeug: true,
+  fuehrung: true,
+  abschnitt: true,
+  zone: true,
+  lagemeldung: true,
+  freies_zeichen: true,
 };
 
 /** Kanonischer Konfigurations-Stand einer Kartenansicht (View-Config, ohne Kamera). */
@@ -38,8 +54,10 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
   if (!roh || typeof roh !== 'object') return defaultFachebenenSichtbar();
   const o = roh as Record<string, unknown>;
   return {
-    nina: o.nina === true, dwd: o.dwd === true,
-    pegelonline: o.pegelonline === true, kritis: o.kritis === true,
+    nina: o.nina === true,
+    dwd: o.dwd === true,
+    pegelonline: o.pegelonline === true,
+    kritis: o.kritis === true,
   };
 }
 
@@ -120,9 +138,8 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
   const [basemap, setBasemap] = useState<BasemapModus>('blind');
   const [onlineStilName, setOnlineStilName] = useState<string | null>(null);
   const [kartenTheme, setKartenTheme] = useState<KartenThemeWahl>('auto');
-  const [fachebenenSichtbar, setFachebenenSichtbar] = useState<FachebenenSichtbar>(
-    defaultFachebenenSichtbar,
-  );
+  const [fachebenenSichtbar, setFachebenenSichtbar] =
+    useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
   const [layer, setLayer] = useState<LayerSichtbar>(() => ({ ...LAYER_DEFAULT }));
   // Anzeige-Fallback bei Style-Ladefehler (online→offline→blind). Getrennt von der
   // gewählten `basemap`, damit ein Fallback NICHT als schmutzig gilt (Advisor-Falle).
@@ -181,8 +198,7 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
   // „Als neue Ansicht speichern" (B/LFH-320): friert den aktuellen Karten-Zustand unter einem
   // neuen Namen ein. Liefert die neue Ansicht zurück (die Seite schaltet per ?ansicht= um).
   const neueMut = useMutation({
-    mutationFn: (name: string) =>
-      erstelleKartenAnsicht(einsatzId, { name, ...konfigPayload() }),
+    mutationFn: (name: string) => erstelleKartenAnsicht(einsatzId, { name, ...konfigPayload() }),
     onSuccess: invalidiereAnsichten,
   });
 

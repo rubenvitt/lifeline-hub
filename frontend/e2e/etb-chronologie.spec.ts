@@ -63,7 +63,9 @@ const MELDUNG = 'Keller Musterweg 3 unter Wasser';
 
 test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
   test.use({ timezoneId: 'Europe/Berlin' });
-  test('übernimmt den gepflegten Termin sekundengenau und blendet die Schnellwahl nach Löschen aus', async ({ page }) => {
+  test('übernimmt den gepflegten Termin sekundengenau und blendet die Schnellwahl nach Löschen aus', async ({
+    page,
+  }) => {
     await page.setViewportSize(FUEKW);
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E Lagebesprechung ${Date.now()}`);
@@ -75,7 +77,10 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     // Enter übernimmt den Pickerwert und sendet das umgebende Formular ab.
     await termin.press('Enter');
     await expect(page.getByRole('button', { name: 'Bearbeiten', exact: true })).toBeVisible();
-    let einsatz = await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json() as Record<string, unknown>;
+    let einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
+      string,
+      unknown
+    >;
     expect(einsatz.naechste_lagebesprechung_at).toBe('2099-09-09 13:17:43');
 
     async function oeffneWiedervorlage() {
@@ -83,14 +88,19 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
       const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
       await expect(sicht.getByText(MELDUNG, { exact: true })).toBeVisible();
       await sicht.getByRole('button', { name: 'Aktionen zu Eintrag 1', exact: true }).click();
-      await page.locator('.ant-dropdown:not(.ant-dropdown-hidden)')
-        .getByRole('menuitem', { name: /Wiedervorlage/ }).click();
+      await page
+        .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+        .getByRole('menuitem', { name: /Wiedervorlage/ })
+        .click();
       return page.getByRole('dialog');
     }
     let dialog = await oeffneWiedervorlage();
     await dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true }).click();
-    const gespeichert = page.waitForResponse((antwort) =>
-      antwort.url().endsWith(`/api/einsaetze/${einsatzId}/erinnerungen`) && antwort.request().method() === 'POST');
+    const gespeichert = page.waitForResponse(
+      (antwort) =>
+        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/erinnerungen`) &&
+        antwort.request().method() === 'POST',
+    );
     await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
     const antwort = await gespeichert;
     expect(antwort.ok()).toBeTruthy();
@@ -98,23 +108,32 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
 
     await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
     await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
-    const picker = page.locator('.ant-picker').filter({ has: page.getByLabel('Nächste Lagebesprechung (optional)') });
+    const picker = page
+      .locator('.ant-picker')
+      .filter({ has: page.getByLabel('Nächste Lagebesprechung (optional)') });
     await picker.hover();
     await picker.locator('.ant-picker-clear').click();
     await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Bearbeiten', exact: true })).toBeVisible();
-    einsatz = await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json() as Record<string, unknown>;
+    einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
+      string,
+      unknown
+    >;
     expect(einsatz).not.toHaveProperty('naechste_lagebesprechung_at');
     dialog = await oeffneWiedervorlage();
     await expect(dialog.getByRole('button', { name: '+30 min', exact: true })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true })).toHaveCount(0);
+    await expect(
+      dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true }),
+    ).toHaveCount(0);
   });
 });
 
 test.describe('LFH-464: ETB-Umbruch bei xl', () => {
   test.use({ hasTouch: true });
   for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
-    test(`misst beide Seiten der Schwelle und die Tabletbreiten (${dichte})`, async ({ page }, testInfo) => {
+    test(`misst beide Seiten der Schwelle und die Tabletbreiten (${dichte})`, async ({
+      page,
+    }, testInfo) => {
       await page.setViewportSize(FUEKW);
       await anmelden(page);
       const einsatzId = await einsatzAnlegen(page, `E2E ETB xl ${dichte} ${Date.now()}`);
@@ -132,15 +151,21 @@ test.describe('LFH-464: ETB-Umbruch bei xl', () => {
         const mass = await sicht.evaluate((element) => {
           const text = element.querySelector<HTMLElement>('.markdown')!;
           const container = [...element.querySelectorAll<HTMLElement>('*')].filter((knoten) =>
-            ['auto', 'scroll'].includes(getComputedStyle(knoten).overflowX));
+            ['auto', 'scroll'].includes(getComputedStyle(knoten).overflowX),
+          );
           return {
             sicht: element.getBoundingClientRect().width,
             text: text.getBoundingClientRect().width,
             bodyUeberlauf: document.body.scrollWidth - window.innerWidth,
-            innererUeberlauf: Math.max(0, ...container.map((knoten) => knoten.scrollWidth - knoten.clientWidth)),
+            innererUeberlauf: Math.max(
+              0,
+              ...container.map((knoten) => knoten.scrollWidth - knoten.clientWidth),
+            ),
           };
         });
-        expect(mass.bodyUeberlauf, `Seitenrumpf bei ${breite}/${dichte}`).toBeLessThanOrEqual(SUBPIXEL);
+        expect(mass.bodyUeberlauf, `Seitenrumpf bei ${breite}/${dichte}`).toBeLessThanOrEqual(
+          SUBPIXEL,
+        );
         if (breite < 1200) {
           expect(mass.innererUeberlauf).toBeLessThanOrEqual(SUBPIXEL);
           expect(mass.text / mass.sicht).toBeGreaterThan(0.85);
@@ -148,7 +173,8 @@ test.describe('LFH-464: ETB-Umbruch bei xl', () => {
         messungen.push({ breite, dichte, ...mass });
       }
       await testInfo.attach('layoutmessung.json', {
-        body: JSON.stringify(messungen, null, 2), contentType: 'application/json',
+        body: JSON.stringify(messungen, null, 2),
+        contentType: 'application/json',
       });
     });
   }
@@ -183,9 +209,9 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
 
   /** 209 Zeichen, ausschließlich normale Wortgrenzen — kein unteilbares Wort, keine URL. */
   const LANG =
-    'Im Kellergeschoss des Anwesens Musterweg 3 steht das Wasser rund achtzig Zentimeter '
-    + 'hoch. Die Heizungsanlage ist betroffen, der Hausanschlusskasten ist noch trocken. '
-    + 'Eigentuemer vor Ort, Zugang ueber die Hofseite.';
+    'Im Kellergeschoss des Anwesens Musterweg 3 steht das Wasser rund achtzig Zentimeter ' +
+    'hoch. Die Heizungsanlage ist betroffen, der Hausanschlusskasten ist noch trocken. ' +
+    'Eigentuemer vor Ort, Zugang ueber die Hofseite.';
 
   for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
     test(`bricht um statt zu ueberlaufen (${dichte})`, async ({ page }, testInfo) => {
@@ -218,7 +244,8 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
           // stecken. Ein auf eine Klasse verengter Griff ginge bei einem antd-Bump still
           // ins Leere und der Test waere danach eine Attrappe.
           const container = [...element.querySelectorAll<HTMLElement>('*')].filter((knoten) =>
-            ['auto', 'scroll'].includes(getComputedStyle(knoten).overflowX));
+            ['auto', 'scroll'].includes(getComputedStyle(knoten).overflowX),
+          );
           const zeilenhoehe = parseFloat(getComputedStyle(lang).lineHeight) || 0;
           return {
             sicht: element.getBoundingClientRect().width,
@@ -245,19 +272,23 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
         // (c) Und der innere Ueberlauf, der ihn fing. Auf altem Stand gemessen: 974 px
         // (kompakt) / 1134 px (komfortabel) / 1178 px (handschuh) bei 1200 px, und
         // 1122 px bei 1280/handschuh im Ticket. DAS ist die Zeile, die den Befund traegt.
-        expect(mass.innererUeberlauf, `Innerer Tabellenueberlauf bei ${wo}`)
-          .toBeLessThanOrEqual(SUBPIXEL);
+        expect(mass.innererUeberlauf, `Innerer Tabellenueberlauf bei ${wo}`).toBeLessThanOrEqual(
+          SUBPIXEL,
+        );
 
         // (d) Der Text steht INNERHALB der Sicht — die positive Form derselben Aussage.
-        expect(mass.langBreite, `Textbreite gegen Sicht bei ${wo}`)
-          .toBeLessThanOrEqual(mass.sicht + SUBPIXEL);
+        expect(mass.langBreite, `Textbreite gegen Sicht bei ${wo}`).toBeLessThanOrEqual(
+          mass.sicht + SUBPIXEL,
+        );
 
         // (e) Er ist MEHRZEILIG. Das ist die eigentliche Aussage des Tickets: lesbar ohne
         // waagerechtes Abfahren EINER langen Zeile. Ohne sie waere ein auf null Breite
         // zusammengefallener Text ebenfalls „ohne Ueberlauf".
         expect(mass.zeilenhoehe, `Zeilenhoehe bei ${wo}`).toBeGreaterThan(0);
-        expect(mass.langHoehe, `Texthoehe bei ${wo} (einzeilig waere <= ${mass.zeilenhoehe})`)
-          .toBeGreaterThan(mass.zeilenhoehe * 1.5);
+        expect(
+          mass.langHoehe,
+          `Texthoehe bei ${wo} (einzeilig waere <= ${mass.zeilenhoehe})`,
+        ).toBeGreaterThan(mass.zeilenhoehe * 1.5);
 
         // (f) Gegenprobe: der KURZE Text ist vom Deckel unberuehrt. Er teilt sich die Spalte
         // mit dem langen, bekommt also dieselbe Breite — zusammengezogen haette der Deckel
@@ -267,7 +298,8 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
         messungen.push({ breite, dichte, ...mass });
       }
       await testInfo.attach('langtext-messung.json', {
-        body: JSON.stringify(messungen, null, 2), contentType: 'application/json',
+        body: JSON.stringify(messungen, null, 2),
+        contentType: 'application/json',
       });
     });
   }
@@ -306,8 +338,8 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
     const anteil = spalte!.width / flaeche!.width;
     expect(
       anteil,
-      `Meldungstext bekommt ${Math.round(anteil * 100)} % der Contentbreite `
-        + `(${Math.round(spalte!.width)}px von ${Math.round(flaeche!.width)}px), Soll >= 50 %`,
+      `Meldungstext bekommt ${Math.round(anteil * 100)} % der Contentbreite ` +
+        `(${Math.round(spalte!.width)}px von ${Math.round(flaeche!.width)}px), Soll >= 50 %`,
     ).toBeGreaterThanOrEqual(MINDESTANTEIL);
 
     // Die fixierte Kennung bleibt die erste Spalte und bleibt fixiert (Gate 2).
@@ -410,7 +442,7 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Contentbreite', 
   const anteil = spalte!.width / flaeche!.width;
   expect(
     anteil,
-    `Meldungstext bekommt ${Math.round(anteil * 100)} % der Contentbreite `
-      + `(${Math.round(spalte!.width)}px von ${Math.round(flaeche!.width)}px), Soll ≥ 50 %`,
+    `Meldungstext bekommt ${Math.round(anteil * 100)} % der Contentbreite ` +
+      `(${Math.round(spalte!.width)}px von ${Math.round(flaeche!.width)}px), Soll ≥ 50 %`,
   ).toBeGreaterThanOrEqual(MINDESTANTEIL);
 });

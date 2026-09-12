@@ -78,9 +78,14 @@ export function EinsatzAnzeigeProvider({
     };
     return bindeFormatter(konventionen);
   }, [
-    data?.zeitzone, data?.zeitformat, data?.einheiten, data?.koordinatenformat,
-    data?.org_defaults?.zeitzone, data?.org_defaults?.zeitformat,
-    data?.org_defaults?.einheiten, data?.org_defaults?.koordinatenformat,
+    data?.zeitzone,
+    data?.zeitformat,
+    data?.einheiten,
+    data?.koordinatenformat,
+    data?.org_defaults?.zeitzone,
+    data?.org_defaults?.zeitformat,
+    data?.org_defaults?.einheiten,
+    data?.org_defaults?.koordinatenformat,
     override,
   ]);
 

@@ -18,18 +18,24 @@ function stilVon(element: HTMLElement) {
 }
 
 describe('StatusTag', () => {
-  it.each(['light', 'dark'] as const)('%s: Beschriftung bleibt unabhängig von der Statusfarbe lesbar', (modus) => {
-    const config = { algorithm: modus === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, token: antdToken(modus === 'dark' ? farbenDunkel : farbenHell) };
-    const token = theme.getDesignToken(config);
-    renderMitProviders(
-      <ConfigProvider theme={config}>
-        <StatusTag darstellung={{ rolle: 'achtung', label: 'vermisst' }} />
-      </ConfigProvider>,
-    );
-    const tag = screen.getByText('vermisst').closest('.ant-tag') as HTMLElement;
-    expect(tag).toHaveStyle({ color: token.colorText, borderColor: token.colorWarning });
-    expect(tag.style.background).toBe('transparent');
-  });
+  it.each(['light', 'dark'] as const)(
+    '%s: Beschriftung bleibt unabhängig von der Statusfarbe lesbar',
+    (modus) => {
+      const config = {
+        algorithm: modus === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: antdToken(modus === 'dark' ? farbenDunkel : farbenHell),
+      };
+      const token = theme.getDesignToken(config);
+      renderMitProviders(
+        <ConfigProvider theme={config}>
+          <StatusTag darstellung={{ rolle: 'achtung', label: 'vermisst' }} />
+        </ConfigProvider>,
+      );
+      const tag = screen.getByText('vermisst').closest('.ant-tag') as HTMLElement;
+      expect(tag).toHaveStyle({ color: token.colorText, borderColor: token.colorWarning });
+      expect(tag.style.background).toBe('transparent');
+    },
+  );
   it('rendert den Text IMMER — die Farbe allein ist kein Kanal (WCAG 1.4.1)', () => {
     renderMitProviders(<StatusTag darstellung={alarm} />);
     expect(screen.getByText('nicht verfügbar')).toBeInTheDocument();
@@ -63,7 +69,9 @@ describe('StatusTag', () => {
     expect(tag.className).not.toMatch(/ant-tag-(red|green|gold|orange|blue|cyan|purple)\b/);
     expect(stilVon(tag).color).toBe('rgb(18, 52, 86)');
     expect(stilVon(tag).borderColor).toBe('rgb(101, 67, 33)');
-    expect(tag.querySelector<HTMLElement>('[aria-hidden="true"]')?.style.color).toBe('rgb(101, 67, 33)');
+    expect(tag.querySelector<HTMLElement>('[aria-hidden="true"]')?.style.color).toBe(
+      'rgb(101, 67, 33)',
+    );
   });
 
   it('rendert das optionale Formzeichen zusätzlich zum Text, ohne ihn zu verdrängen', () => {
@@ -83,16 +91,20 @@ describe('StatusTag', () => {
   });
 
   it('eine transparente Mandantenfarbe lässt Wortlaut und tragenden Rahmen unverändert lesbar', () => {
-    renderMitProviders(<>
-      <StatusTag darstellung={{ ...normal, label: 'Rollenfarbe' }} />
-      <StatusTag darstellung={{ ...normal, label: 'Mandantenfarbe' }} farbe="transparent" />
-    </>);
+    renderMitProviders(
+      <>
+        <StatusTag darstellung={{ ...normal, label: 'Rollenfarbe' }} />
+        <StatusTag darstellung={{ ...normal, label: 'Mandantenfarbe' }} farbe="transparent" />
+      </>,
+    );
     const rolle = screen.getByText('Rollenfarbe').closest('.ant-tag') as HTMLElement;
     const mandant = screen.getByText('Mandantenfarbe').closest('.ant-tag') as HTMLElement;
     expect(stilVon(rolle).color).toBeTruthy();
     expect(stilVon(rolle).borderColor).toBeTruthy();
     expect(stilVon(mandant)).toEqual(stilVon(rolle));
-    expect(mandant.querySelector<HTMLElement>('[aria-hidden="true"]')?.style.backgroundColor).toBe('transparent');
+    expect(mandant.querySelector<HTMLElement>('[aria-hidden="true"]')?.style.backgroundColor).toBe(
+      'transparent',
+    );
   });
 
   it('setzt keine Klein-Variante (Gate 4) — die Höhe kommt aus der Dichte-Staffel', () => {

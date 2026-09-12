@@ -20,9 +20,16 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 import type { KarteMarker } from './marker';
 import {
-  baueMarkerFc, baueEinsatzortFc, reAnlegenMarker, pinneMarkerLayerNachOben,
-  MARKER_CLUSTER_QUELLE, MARKER_KLICK_LAYER, SPIDER_KLICK_LAYER, setzeSpiderDaten,
-  type MarkerFeatureCollection, type MarkerProps,
+  baueMarkerFc,
+  baueEinsatzortFc,
+  reAnlegenMarker,
+  pinneMarkerLayerNachOben,
+  MARKER_CLUSTER_QUELLE,
+  MARKER_KLICK_LAYER,
+  SPIDER_KLICK_LAYER,
+  setzeSpiderDaten,
+  type MarkerFeatureCollection,
+  type MarkerProps,
 } from './markerLayer';
 import { baueSpiderFc, SPIDER_CAP, type SpiderProjektor } from './spiderfy';
 import { tzIconKey } from './markerIcons';
@@ -66,7 +73,8 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 // unter Dev löst er auf eine echte, von Vite ausgelieferte Datei auf und alles bleibt grün — im
 // Prod-Build zeigt er auf `/assets/maplibre-gl-worker.mjs`, das es dort nicht gibt, und die Karte
 // lädt keine einzige Kachel. Dev grün, Prod tot, ohne eine Fehlermeldung. Lieber hier laut brechen.
-if (!workerUrl) throw new Error('maplibre-Worker-URL ist leer — `?worker&url` hat nichts geliefert');
+if (!workerUrl)
+  throw new Error('maplibre-Worker-URL ist leer — `?worker&url` hat nichts geliefert');
 maplibregl.setWorkerUrl(workerUrl);
 
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
@@ -141,19 +149,46 @@ export interface KartenHandle {
   abschnittAbschliessen(): boolean;
 }
 
-const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche({
-  style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
-  flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
-  zonen, zoneZeichnen, zoneZeichnenNonce, onZoneGezeichnet, onZoneKlick,
-  onZeichnenBereitAenderung,
-  fachebenen, onBboxAenderung, onZoomAenderung, onFachebeneKlick,
-  bilder, platzierBild, onPlatzierGeometrie,
-}, ref) {
+const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche(
+  {
+    style,
+    markers,
+    onKarteKlick,
+    onMarkerKlick,
+    flyToZiel,
+    onStyleFehler,
+    attribution,
+    flaechen,
+    zeichnen,
+    onFlaecheGezeichnet,
+    onFlaecheKlick,
+    zonen,
+    zoneZeichnen,
+    zoneZeichnenNonce,
+    onZoneGezeichnet,
+    onZoneKlick,
+    onZeichnenBereitAenderung,
+    fachebenen,
+    onBboxAenderung,
+    onZoomAenderung,
+    onFachebeneKlick,
+    bilder,
+    platzierBild,
+    onPlatzierGeometrie,
+  },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   // Aktuelle Marker-Daten als FeatureCollections; nach setStyle re-angelegt (analog flaechenDatenRef).
-  const markerDatenRef = useRef<MarkerFeatureCollection>({ type: 'FeatureCollection', features: [] });
-  const einsatzortDatenRef = useRef<MarkerFeatureCollection>({ type: 'FeatureCollection', features: [] });
+  const markerDatenRef = useRef<MarkerFeatureCollection>({
+    type: 'FeatureCollection',
+    features: [],
+  });
+  const einsatzortDatenRef = useRef<MarkerFeatureCollection>({
+    type: 'FeatureCollection',
+    features: [],
+  });
   // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
   const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
   // Cluster-DOM-Donut-Marker (cluster_id → Marker). clusterDomRef = alle bekannten,
@@ -166,7 +201,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const spiderTokenRef = useRef(0);
   // Controller-Funktionen als Refs, damit der DOM-Donut-Klickhandler + die Daten-/Style-Effekte sie
   // aufrufen können, ohne als Dependency neu zu binden.
-  const oeffneSpiderRef = useRef<(clusterId: string, center: [number, number], anzahl: number) => void>(() => {});
+  const oeffneSpiderRef = useRef<
+    (clusterId: string, center: [number, number], anzahl: number) => void
+  >(() => {});
   const schliesseSpiderRef = useRef<() => void>(() => {});
   // Entscheidet, welches error-Event die Basemap abstuft (LFH-325): Kachel-Fehler nie,
   // höchstens eine Abstufung je angewandtem Style, nach dem Laden gar keine mehr.
@@ -202,33 +239,37 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 
   // Imperative API für die Page: Upload-Platzierung (Viewport-Mitte, Bild-Seitenverhältnis)
   // und Auf-Bild-Zentrieren. Pixel-Raum via project/unproject → exakt, ohne cos(lat)-Verzerrung.
-  useImperativeHandle(ref, () => ({
-    initialeEckenFuerBild(ar) {
-      const map = mapRef.current;
-      if (!map) return null;
-      const el = map.getContainer();
-      const mittePx: Punkt = [el.clientWidth / 2, el.clientHeight / 2];
-      const breitePx = Math.min(el.clientWidth, el.clientHeight) * 0.5;
-      const px = eckenInitialPixel(mittePx, breitePx, ar > 0 ? ar : 1);
-      return px.map((p) => {
-        const ll = map.unproject(p);
-        return [ll.lng, ll.lat];
-      }) as Ecken;
-    },
-    zentriereAufEcken(ecken) {
-      const map = mapRef.current;
-      if (!map) return;
-      const b = new maplibregl.LngLatBounds();
-      for (const e of ecken) b.extend(e as [number, number]);
-      map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 });
-    },
-    zoneAbschliessen() {
-      return zoneDrawRef.current?.abschliessen() ?? false;
-    },
-    abschnittAbschliessen() {
-      return drawRef.current?.abschliessen() ?? false;
-    },
-  }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      initialeEckenFuerBild(ar) {
+        const map = mapRef.current;
+        if (!map) return null;
+        const el = map.getContainer();
+        const mittePx: Punkt = [el.clientWidth / 2, el.clientHeight / 2];
+        const breitePx = Math.min(el.clientWidth, el.clientHeight) * 0.5;
+        const px = eckenInitialPixel(mittePx, breitePx, ar > 0 ? ar : 1);
+        return px.map((p) => {
+          const ll = map.unproject(p);
+          return [ll.lng, ll.lat];
+        }) as Ecken;
+      },
+      zentriereAufEcken(ecken) {
+        const map = mapRef.current;
+        if (!map) return;
+        const b = new maplibregl.LngLatBounds();
+        for (const e of ecken) b.extend(e as [number, number]);
+        map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 });
+      },
+      zoneAbschliessen() {
+        return zoneDrawRef.current?.abschliessen() ?? false;
+      },
+      abschnittAbschliessen() {
+        return drawRef.current?.abschliessen() ?? false;
+      },
+    }),
+    [],
+  );
 
   // Karte einmalig erzeugen.
   useEffect(() => {
@@ -278,7 +319,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const ladendeIcons = new Set<string>();
     map.on('styleimagemissing', (e) => {
       const id = e.id;
-      if (!id.startsWith('tz|')) return;             // fremde IDs ignorieren
+      if (!id.startsWith('tz|')) return; // fremde IDs ignorieren
       if (map.hasImage(id) || ladendeIcons.has(id)) return;
       const tz = tzRegistryRef.current.get(id);
       if (!tz) return;
@@ -304,7 +345,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio });
         ladendeIcons.delete(id);
       };
-      img.onerror = () => { ladendeIcons.delete(id); };
+      img.onerror = () => {
+        ladendeIcons.delete(id);
+      };
       img.src = dataUrl;
     });
     mapRef.current = map;
@@ -386,7 +429,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const handler = (e: maplibregl.MapMouseEvent) => onKarteKlick?.({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+    const handler = (e: maplibregl.MapMouseEvent) =>
+      onKarteKlick?.({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     map.on('click', handler);
     // Nur der INITIALE Style-Ladefehler stuft die Basemap ab. MapLibre feuert 'error' auch
     // für einzelne fehlende Tiles — und zwar ZWANGSLÄUFIG vor 'load', weil 'load' selbst auf
@@ -408,7 +452,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // fly-to bei Auswahl.
   useEffect(() => {
     const map = mapRef.current;
-    if (map && flyToZiel) map.flyTo({ center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: 15 });
+    if (map && flyToZiel)
+      map.flyTo({ center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: 15 });
   }, [flyToZiel]);
 
   // Abschnittsflächen-Daten in die Source spielen (und für setStyle-Re-Anlage merken).
@@ -436,7 +481,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (id != null) onFlaecheKlick?.(Number(id));
     };
     map.on('click', 'abschnitte-fill', handler);
-    return () => { map.off('click', 'abschnitte-fill', handler); };
+    return () => {
+      map.off('click', 'abschnitte-fill', handler);
+    };
   }, [onFlaecheKlick]);
 
   // Zonendaten in die Source spielen (und für setStyle-Re-Anlage merken).
@@ -532,7 +579,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (mk.tz) registry.set(tzIconKey(mk.tz), mk.tz);
     }
     tzRegistryRef.current = registry;
-    wendeKartenDatenAn(map, () => reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current));
+    wendeKartenDatenAn(map, () =>
+      reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current),
+    );
     // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; der render-Sync baut
     // sie mit frischen Typ-Counts neu auf (ein wiederverwendeter cluster_id zeigte sonst stale Segmente).
     for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
@@ -552,8 +601,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       const schluessel = e.features?.[0]?.properties?.schluessel;
       if (typeof schluessel === 'string') onMarkerKlick?.(schluessel);
     };
-    const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
-    const leave = () => { map.getCanvas().style.cursor = ''; };
+    const enter = () => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
+    const leave = () => {
+      map.getCanvas().style.cursor = '';
+    };
     // Aufgefächerte Spider-Leaves verhalten sich wie Einzelmarker (Klick → onMarkerKlick, Cursor).
     const klickLayer = [...MARKER_KLICK_LAYER, ...SPIDER_KLICK_LAYER];
     for (const id of klickLayer) {
@@ -603,7 +656,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         if (!clusterDomOnScreenRef.current[id]) marker.addTo(map);
       }
       for (const id in clusterDomOnScreenRef.current) {
-        if (!neu[id]) { clusterDomOnScreenRef.current[id].remove(); delete clusterDomRef.current[id]; }
+        if (!neu[id]) {
+          clusterDomOnScreenRef.current[id].remove();
+          delete clusterDomRef.current[id];
+        }
       }
       clusterDomOnScreenRef.current = neu;
     };
@@ -627,7 +683,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const leer = { type: 'FeatureCollection' as const, features: [] };
 
     const schliesse = () => {
-      spiderTokenRef.current++;            // in-flight getClusterLeaves entwerten (load-bearing)
+      spiderTokenRef.current++; // in-flight getClusterLeaves entwerten (load-bearing)
       if (spiderOffenRef.current === null) return;
       spiderOffenRef.current = null;
       // mapRef wird im Map-Cleanup ZUERST genullt (Effekt-Reihenfolge) → beim Unmount mit offenem
@@ -637,19 +693,26 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
 
     const oeffne = (clusterId: string, center: [number, number], anzahl: number) => {
-      if (spiderOffenRef.current === clusterId) { schliesse(); return; } // Toggle / erneuter Klick
-      schliesse();                                                        // A→B: A einklappen
+      if (spiderOffenRef.current === clusterId) {
+        schliesse();
+        return;
+      } // Toggle / erneuter Klick
+      schliesse(); // A→B: A einklappen
       const src = map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined;
       if (!src) return;
       // Großcluster → Fallback: reinzoomen (verkleinert Cluster, dann erneut auffächerbar).
       if (anzahl > SPIDER_CAP) {
-        src.getClusterExpansionZoom(Number(clusterId))
+        src
+          .getClusterExpansionZoom(Number(clusterId))
           .then((zoom) => map.easeTo({ center, zoom }))
-          .catch(() => { /* Cluster nach Daten-Update weg → ignorieren */ });
+          .catch(() => {
+            /* Cluster nach Daten-Update weg → ignorieren */
+          });
         return;
       }
       const token = ++spiderTokenRef.current;
-      src.getClusterLeaves(Number(clusterId), SPIDER_CAP, 0)
+      src
+        .getClusterLeaves(Number(clusterId), SPIDER_CAP, 0)
         .then((leaves) => {
           if (token !== spiderTokenRef.current) return; // stale (anderer Cluster geklickt / eingeklappt)
           const projektor: SpiderProjektor = {
@@ -661,15 +724,19 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           setzeSpiderDaten(map, leafFc, legs);
           spiderOffenRef.current = clusterId;
         })
-        .catch(() => { /* Cluster nach Daten-Update weg → ignorieren */ });
+        .catch(() => {
+          /* Cluster nach Daten-Update weg → ignorieren */
+        });
     };
 
     oeffneSpiderRef.current = oeffne;
     schliesseSpiderRef.current = schliesse;
 
-    const aufKey = (e: KeyboardEvent) => { if (e.key === 'Escape') schliesse(); };
-    map.on('movestart', schliesse);  // jede Karten-Bewegung/Zoom klappt ein
-    map.on('click', schliesse);      // leerer Klick (und nach Leaf-Routing) klappt ein
+    const aufKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') schliesse();
+    };
+    map.on('movestart', schliesse); // jede Karten-Bewegung/Zoom klappt ein
+    map.on('click', schliesse); // leerer Klick (und nach Leaf-Routing) klappt ein
     window.addEventListener('keydown', aufKey);
     return () => {
       map.off('movestart', schliesse);
@@ -726,8 +793,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         const geometrie = findeGeometrieAn({ lng: e.lngLat.lng, lat: e.lngLat.lat }, fe.daten);
         onFachebeneKlick?.(props, quelle, geometrie);
       };
-      const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
-      const leave = () => { map.getCanvas().style.cursor = ''; };
+      const enter = () => {
+        map.getCanvas().style.cursor = 'pointer';
+      };
+      const leave = () => {
+        map.getCanvas().style.cursor = '';
+      };
       map.on('click', id, klick);
       map.on('mouseenter', id, enter);
       map.on('mouseleave', id, leave);
@@ -783,12 +854,15 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   }, [zoneZeichnen, zoneZeichnenNonce]);
 
   // Controller bei Unmount sauber zerstören.
-  useEffect(() => () => {
-    drawRef.current?.zerstoeren();
-    drawRef.current = null;
-    zoneDrawRef.current?.zerstoeren();
-    zoneDrawRef.current = null;
-  }, []);
+  useEffect(
+    () => () => {
+      drawRef.current?.zerstoeren();
+      drawRef.current = null;
+      zoneDrawRef.current?.zerstoeren();
+      zoneDrawRef.current = null;
+    },
+    [],
+  );
 
   // Stabile Ref für onPlatzierGeometrie (Callback-Identität soll den Effekt nicht neu auslösen).
   const onPlatzierGeometrieRef = useRef(onPlatzierGeometrie);
@@ -826,7 +900,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.ecken]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />;
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />
+  );
 });
 
 export default Kartenflaeche;

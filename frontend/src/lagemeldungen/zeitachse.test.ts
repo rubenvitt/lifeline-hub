@@ -9,7 +9,9 @@ describe('zeitachse', () => {
   it('bildet den Tagesschlüssel in der Anzeigezone, nicht in UTC', () => {
     // 23:30 UTC ist in Berlin (Sommer, +2) schon der 13. — ein `dayjs(s)`-Leser käme auf
     // den 12. und hängte den Eintrag unter den falschen Tageskopf.
-    expect(tagesSchluessel('2026-06-12 23:30:00', { zeitzone: 'Europe/Berlin' })).toBe('2026-06-13');
+    expect(tagesSchluessel('2026-06-12 23:30:00', { zeitzone: 'Europe/Berlin' })).toBe(
+      '2026-06-13',
+    );
     expect(tagesSchluessel('2026-06-12 23:30:00', { zeitzone: 'UTC' })).toBe('2026-06-12');
   });
 

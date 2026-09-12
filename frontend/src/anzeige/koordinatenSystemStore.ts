@@ -22,7 +22,9 @@ function lies(): Koordinatenformat | null {
 }
 function subscribe(cb: () => void): () => void {
   listeners.add(cb);
-  return () => { listeners.delete(cb); };
+  return () => {
+    listeners.delete(cb);
+  };
 }
 export function setzeOverride(system: Koordinatenformat | null): void {
   if (system == null) localStorage.removeItem(KEY);

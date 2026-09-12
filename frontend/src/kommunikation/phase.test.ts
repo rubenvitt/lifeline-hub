@@ -66,7 +66,10 @@ describe('Status-Deskriptoren', () => {
     expect(NACHFORDERUNG_STATUS.angefordert).toEqual({ label: 'Angefordert', phase: 'offen' });
     expect(NACHFORDERUNG_STATUS.zugesagt).toEqual({ label: 'Zugesagt', phase: 'in_arbeit' });
     expect(NACHFORDERUNG_STATUS.unterwegs).toEqual({ label: 'Unterwegs', phase: 'in_arbeit' });
-    expect(NACHFORDERUNG_STATUS.eingetroffen).toEqual({ label: 'Eingetroffen', phase: 'abgeschlossen' });
+    expect(NACHFORDERUNG_STATUS.eingetroffen).toEqual({
+      label: 'Eingetroffen',
+      phase: 'abgeschlossen',
+    });
     expect(NACHFORDERUNG_STATUS.abgelehnt).toEqual({ label: 'Abgelehnt', phase: 'ausnahme' });
   });
 

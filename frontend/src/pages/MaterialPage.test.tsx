@@ -11,27 +11,54 @@ import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-27 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-27 10:00:00',
 };
 
 const einsatzAktiv = {
-  id: 1, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+  id: 1,
+  bezeichnung: 'Hochwasser',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-27 08:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-05-27 08:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
   meine_rolle: 'einsatzleitung',
 };
 
 const em = {
-  id: 10, einsatz_id: 1, material_id: 5, einheit_id: null, ist_adhoc: false,
-  bezeichnung: 'Wolldecke', kategorie: 'Betreuung', bestandsnummer: null, traegerorganisation: null,
-  menge: 50, status: 'einsatzbereit', bemerkung: null,
-  disponiert_at: '2026-05-27 09:00:00', disponiert_von: 1,
+  id: 10,
+  einsatz_id: 1,
+  material_id: 5,
+  einheit_id: null,
+  ist_adhoc: false,
+  bezeichnung: 'Wolldecke',
+  kategorie: 'Betreuung',
+  bestandsnummer: null,
+  traegerorganisation: null,
+  menge: 50,
+  status: 'einsatzbereit',
+  bemerkung: null,
+  disponiert_at: '2026-05-27 09:00:00',
+  disponiert_von: 1,
 };
 
-function render(einsatzObj: typeof einsatzAktiv, materialListe: typeof em[]) {
+function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
@@ -60,7 +87,9 @@ function render(einsatzObj: typeof einsatzAktiv, materialListe: typeof em[]) {
  * jsdom nie `hidden` — deshalb zusätzlich über `pointerEvents` filtern.
  */
 async function oeffneStatusmenue(wurzel: HTMLElement, bezeichnung: string): Promise<HTMLElement> {
-  await userEvent.click(within(wurzel).getByRole('button', { name: `Status von ${bezeichnung} ändern` }));
+  await userEvent.click(
+    within(wurzel).getByRole('button', { name: `Status von ${bezeichnung} ändern` }),
+  );
   const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
     (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
   );
@@ -84,7 +113,13 @@ describe('MaterialPage', () => {
     expect(within(zeile).queryByRole('combobox')).toBeNull();
     const menue = await oeffneStatusmenue(zeile, 'Wolldecke');
     // Alle fünf Zustände senkrecht im Menü (Zielform-Spec §3).
-    for (const label of ['einsatzbereit', 'im Einsatz', 'defekt', 'verbraucht', 'Desinfektion nötig']) {
+    for (const label of [
+      'einsatzbereit',
+      'im Einsatz',
+      'defekt',
+      'verbraucht',
+      'Desinfektion nötig',
+    ]) {
       expect(within(menue).getByRole('menuitem', { name: new RegExp(label) })).toBeInTheDocument();
     }
   });
@@ -121,11 +156,15 @@ describe('MaterialPage', () => {
 
   it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
     let freigeben: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
-    server.use(http.patch('/api/einsaetze/1/material/10', async () => {
-      await gate;
-      return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
-    }));
+    const gate = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', async () => {
+        await gate;
+        return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
+      }),
+    );
     const zweitesMaterial = { ...em, id: 11, bezeichnung: 'Zeltbahn' };
     const { container, client } = render(einsatzAktiv, [em, zweitesMaterial]);
     await screen.findByText('Wolldecke');
@@ -135,34 +174,48 @@ describe('MaterialPage', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: /defekt/ }));
 
     await waitFor(() => {
-      expect(client.getQueryData<(typeof em)[]>(einsatzKeys.material(1))?.[0].status).toBe('defekt');
+      expect(client.getQueryData<(typeof em)[]>(einsatzKeys.material(1))?.[0].status).toBe(
+        'defekt',
+      );
     });
     // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im Cache.
     expect(zeile.textContent).toContain('defekt');
     expect(within(zeile).getByRole('button', { name: /Status von Wolldecke/ })).toBeDisabled();
     expect(
-      within(container.querySelector('[data-row-key="11"]') as HTMLElement)
-        .getByRole('button', { name: /Status von Zeltbahn/ }),
+      within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('button', {
+        name: /Status von Zeltbahn/,
+      }),
     ).toBeDisabled();
 
     let refetchFreigeben: (() => void) | undefined;
-    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
-    server.use(http.get('/api/einsaetze/1/material', async () => {
-      await refetchGate;
-      return HttpResponse.json([{ ...em, bezeichnung: 'Extern geändert' }, zweitesMaterial]);
-    }));
+    const refetchGate = new Promise<void>((resolve) => {
+      refetchFreigeben = resolve;
+    });
+    server.use(
+      http.get('/api/einsaetze/1/material', async () => {
+        await refetchGate;
+        return HttpResponse.json([{ ...em, bezeichnung: 'Extern geändert' }, zweitesMaterial]);
+      }),
+    );
     act(() => {
       client.setQueryData<(typeof em)[]>(einsatzKeys.material(1), (aktuell) =>
-        aktuell?.map((eintrag) => eintrag.id === 10 ? { ...eintrag, bezeichnung: 'Extern geändert' } : eintrag));
+        aktuell?.map((eintrag) =>
+          eintrag.id === 10 ? { ...eintrag, bezeichnung: 'Extern geändert' } : eintrag,
+        ),
+      );
     });
 
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     await waitFor(() => {
       const stand = client.getQueryData<(typeof em)[]>(einsatzKeys.material(1));
       expect(stand?.find((eintrag) => eintrag.id === 10)?.status).toBe('einsatzbereit');
       expect(stand?.find((eintrag) => eintrag.id === 10)?.bezeichnung).toBe('Extern geändert');
     });
-    await act(async () => { refetchFreigeben?.(); });
+    await act(async () => {
+      refetchFreigeben?.();
+    });
   });
 
   it('Einsatzleitung sieht Disponier- und Ad-hoc-Aktionen', async () => {
@@ -196,7 +249,13 @@ describe('MaterialPage', () => {
    * deshalb auf seiner EIGENEN Fünf-Werte-Achse, nicht auf verfügbar/gebunden/nicht
    * verfügbar. Erfunden wird hier kein Feld.
    */
-  const emDefekt = { ...em, id: 11, bezeichnung: 'Aluleiter', kategorie: 'Technik', status: 'defekt' };
+  const emDefekt = {
+    ...em,
+    id: 11,
+    bezeichnung: 'Aluleiter',
+    kategorie: 'Technik',
+    status: 'defekt',
+  };
 
   it('gruppiert nach dem eigenen Materialstatus, mit Zähler im Etikett', async () => {
     // Serverordnung [11, 10]; Namensordnung ebenfalls [11 Aluleiter, 10 Wolldecke];
@@ -207,7 +266,9 @@ describe('MaterialPage', () => {
     expect(screen.getByText('einsatzbereit · 1')).toBeInTheDocument();
     expect(screen.getByText('defekt · 1')).toBeInTheDocument();
     expect(
-      [...container.querySelectorAll('tr.ant-table-row')].map((r) => r.getAttribute('data-row-key')),
+      [...container.querySelectorAll('tr.ant-table-row')].map((r) =>
+        r.getAttribute('data-row-key'),
+      ),
     ).toEqual(['10', '11']);
   });
 
@@ -244,9 +305,13 @@ describe('MaterialPage', () => {
      * Beide Hälften geprüft: das Feld ist WEG und der Auslöser ist DA. Nur die zweite wäre
      * auch grün, wenn der Status doppelt stünde.
      */
-    const felder = [...karte.querySelectorAll('[data-lfh="datensicht-feld"]')].map((f) => f.textContent);
+    const felder = [...karte.querySelectorAll('[data-lfh="datensicht-feld"]')].map(
+      (f) => f.textContent,
+    );
     expect(felder.some((t) => t?.startsWith('Status'))).toBe(false);
-    expect(within(karte).getByRole('button', { name: 'Status von Wolldecke ändern' })).toBeInTheDocument();
+    expect(
+      within(karte).getByRole('button', { name: 'Status von Wolldecke ändern' }),
+    ).toBeInTheDocument();
     expect(karte.textContent).toContain('einsatzbereit');
   });
 
@@ -274,7 +339,9 @@ describe('MaterialPage', () => {
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(within(zeile).getByRole('button', { name: 'Bemerkung zu Wolldecke hinzufügen' })).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('button', { name: 'Bemerkung zu Wolldecke hinzufügen' }),
+    ).toBeInTheDocument();
   });
 
   it('keine Klein-Variante mehr am Status-Auswahlfeld und am Entfernen-Knopf', async () => {
@@ -371,7 +438,9 @@ describe('MaterialPage · Datenzustände', () => {
     const { client } = zeige(http.get('/api/einsaetze/1/material', () => HttpResponse.json([em])));
     await screen.findByText('Wolldecke');
 
-    server.use(http.get('/api/einsaetze/1/material', () => new HttpResponse(null, { status: 500 })));
+    server.use(
+      http.get('/api/einsaetze/1/material', () => new HttpResponse(null, { status: 500 })),
+    );
     await client.refetchQueries({ queryKey: einsatzKeys.material(1) });
 
     expect(
@@ -379,14 +448,20 @@ describe('MaterialPage · Datenzustände', () => {
     ).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
     expect(screen.getByText('Wolldecke')).toBeInTheDocument();
-    expect(screen.queryByText('Disponiertes Material konnte nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Disponiertes Material konnte nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Kein Material im Dienst"', async () => {
-    const { container } = zeige(http.get('/api/material', () => new HttpResponse(null, { status: 500 })));
+    const { container } = zeige(
+      http.get('/api/material', () => new HttpResponse(null, { status: 500 })),
+    );
     await screen.findByText('Noch kein Material disponiert');
     await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
-    expect(await screen.findByText('Materialliste konnte nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Materialliste konnte nicht geladen werden'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Kein Material im Dienst')).not.toBeInTheDocument();
   });
 
@@ -462,8 +537,10 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
 
     await waitFor(() => expect(sichtbareFelder(dialog)).toBe(vorher + 1));
-    expect(within(dialog).getByRole('button', { name: /Weitere Angaben/ }))
-      .toHaveAttribute('aria-expanded', 'true');
+    expect(within(dialog).getByRole('button', { name: /Weitere Angaben/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     /**
      * KEIN `toBeVisible()` auf dem aufgeklappten Feld — gemessen, nicht vergessen: die
      * Aufklapp-Animation beginnt mit `opacity: 0` und endet in jsdom nie (kein
@@ -569,8 +646,9 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
  * Platzhalter selbst: dessen Knoten trägt `pointer-events: none` (gemessen).
  */
 async function oeffneMaterialAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
-    .find((s) => s.textContent?.includes(platzhalter));
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
+    s.textContent?.includes(platzhalter),
+  );
   expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
   await userEvent.click(within(feld!).getByRole('combobox'));
 }

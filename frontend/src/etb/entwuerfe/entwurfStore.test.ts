@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { EtbEntwurf } from './entwurfModell';
-import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfEntfernen, entwurfSpeichern } from './entwurfStore';
+import {
+  entwuerfeLaden,
+  entwuerfeLeerenFuerTests,
+  entwurfEntfernen,
+  entwurfSpeichern,
+} from './entwurfStore';
 
 function entwurf(over: Partial<EtbEntwurf> = {}): EtbEntwurf {
   return {
-    id: 'a', einsatz_id: 7, inhalt: 'X', typ: 'meldung',
-    erstellt_at: '2026-06-22T10:00:00.000Z', geaendert_at: '2026-06-22T10:00:00.000Z', ...over,
+    id: 'a',
+    einsatz_id: 7,
+    inhalt: 'X',
+    typ: 'meldung',
+    erstellt_at: '2026-06-22T10:00:00.000Z',
+    geaendert_at: '2026-06-22T10:00:00.000Z',
+    ...over,
   };
 }
 

@@ -1,6 +1,12 @@
 // frontend/src/command-palette/fuzzy.ts
 import Fuse from 'fuse.js';
-import { GRUPPEN_REIHENFOLGE, GRUPPE_NUR_ORDNUNG, PALETTE_MODI, type Befehl, type PaletteModus } from './typen';
+import {
+  GRUPPEN_REIHENFOLGE,
+  GRUPPE_NUR_ORDNUNG,
+  PALETTE_MODI,
+  type Befehl,
+  type PaletteModus,
+} from './typen';
 
 /** Ein Fuse-Treffer samt Bewertung. Kleiner ist besser (0 = perfekt). */
 export interface Treffer {
@@ -53,7 +59,11 @@ export const UNBEWERTET = 1;
  * Reihenfolge-Konstante hätte genau die Lücke, die `GRUPPEN_REIHENFOLGE` einmal hatte —
  * ein Eintrag fehlt, nichts bricht, der Modus ist still unerreichbar.
  */
-export function modiMitPraefix(): { modus: PaletteModus; praefix: string; legende: string | null }[] {
+export function modiMitPraefix(): {
+  modus: PaletteModus;
+  praefix: string;
+  legende: string | null;
+}[] {
   const mit: { modus: PaletteModus; praefix: string; legende: string | null }[] = [];
   for (const modus of Object.keys(PALETTE_MODI) as PaletteModus[]) {
     const { praefix, legende } = PALETTE_MODI[modus];
@@ -221,7 +231,8 @@ export function ordneTreffer(treffer: Treffer[], suche: string): Befehl[] {
       (a, b) =>
         a.stufe - b.stufe ||
         a.t.score - b.t.score ||
-        GRUPPEN_REIHENFOLGE.indexOf(a.t.befehl.gruppe) - GRUPPEN_REIHENFOLGE.indexOf(b.t.befehl.gruppe) ||
+        GRUPPEN_REIHENFOLGE.indexOf(a.t.befehl.gruppe) -
+          GRUPPEN_REIHENFOLGE.indexOf(b.t.befehl.gruppe) ||
         a.index - b.index,
     )
     .map((x) => x.t.befehl);

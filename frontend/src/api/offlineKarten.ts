@@ -82,7 +82,10 @@ export function aktiviereOfflineKarte(id: number): Promise<OfflineKarteZeile> {
 }
 
 /** In-Place-Hot-Swap (B3): Update der aktiven Karte in dieselbe Zeile — downtime-frei. */
-export function neuLadeOfflineKarte(id: number, body: OfflineNeuLadenBody): Promise<OfflineKarteZeile> {
+export function neuLadeOfflineKarte(
+  id: number,
+  body: OfflineNeuLadenBody,
+): Promise<OfflineKarteZeile> {
   return apiSend<OfflineKarteZeile>(`/api/karte/offline-karten/${id}/neu-laden`, 'POST', body);
 }
 

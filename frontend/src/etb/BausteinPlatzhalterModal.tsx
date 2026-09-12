@@ -14,7 +14,12 @@ interface Props {
   onAbbrechenAll: () => void;
 }
 
-export default function BausteinPlatzhalterModal({ baustein, einsatz, onEinsetzen, onAbbrechenAll }: Props) {
+export default function BausteinPlatzhalterModal({
+  baustein,
+  einsatz,
+  onEinsetzen,
+  onAbbrechenAll,
+}: Props) {
   const [form] = Form.useForm<Record<string, string>>();
   const offenePlatzhalter = baustein ? ermittlePlatzhalter(baustein, einsatz) : [];
 
@@ -41,7 +46,13 @@ export default function BausteinPlatzhalterModal({ baustein, einsatz, onEinsetze
   const dialogOffen = baustein !== null && offenePlatzhalter.length > 0;
 
   return (
-    <Modal open={dialogOffen} title="Baustein einsetzen" footer={null} onCancel={abbrechen} destroyOnHidden>
+    <Modal
+      open={dialogOffen}
+      title="Baustein einsetzen"
+      footer={null}
+      onCancel={abbrechen}
+      destroyOnHidden
+    >
       <Form<Record<string, string>> form={form} layout="vertical" onFinish={anwenden}>
         <Space orientation="vertical" style={{ width: '100%' }}>
           {offenePlatzhalter.map((name, index) => (
@@ -49,7 +60,9 @@ export default function BausteinPlatzhalterModal({ baustein, einsatz, onEinsetze
               <Input aria-label={name} autoFocus={index === 0} />
             </Form.Item>
           ))}
-          <Button type="primary" htmlType="submit">Einsetzen</Button>
+          <Button type="primary" htmlType="submit">
+            Einsetzen
+          </Button>
         </Space>
       </Form>
     </Modal>

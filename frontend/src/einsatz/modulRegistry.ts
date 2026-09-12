@@ -1,17 +1,36 @@
 import type { IconType } from 'react-icons';
 import {
-  TbHierarchy, TbFileDescription, TbSitemap, TbUsers, TbBuildingCommunity,
-  TbUsersGroup, TbUser, TbTruck, TbPackages,
-  TbClipboardText, TbFirstAidKit, TbPaw, TbHome,
-  TbMap2, TbLayoutDashboard, TbReport, TbListDetails, TbAlertTriangle,
-  TbMessage, TbMessageCircle, TbBell, TbClipboardList, TbInbox,
-  TbSettings, TbBuildingWarehouse,
+  TbHierarchy,
+  TbFileDescription,
+  TbSitemap,
+  TbUsers,
+  TbBuildingCommunity,
+  TbUsersGroup,
+  TbUser,
+  TbTruck,
+  TbPackages,
+  TbClipboardText,
+  TbFirstAidKit,
+  TbPaw,
+  TbHome,
+  TbMap2,
+  TbLayoutDashboard,
+  TbReport,
+  TbListDetails,
+  TbAlertTriangle,
+  TbMessage,
+  TbMessageCircle,
+  TbBell,
+  TbClipboardList,
+  TbInbox,
+  TbSettings,
+  TbBuildingWarehouse,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
-  | 'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
+  'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
 export type ModulZaehlerQuelle = 'meldungen' | 'auftraege' | 'erinnerungen' | 'chat';
 
@@ -56,36 +75,245 @@ export const kategorien: Kategorie[] = [
 
 export const modulRegistry: ModulEintrag[] = [
   // Führung
-  { key: 'einsatzdaten', kategorie: 'fuehrung', label: 'Einsatzdaten', icon: TbFileDescription, route: 'einsatzdaten', status: 'fertig', beschreibung: 'Stammdaten des Einsatzes: Bezeichnung, Stichwort, Zeiten, Leitung.' },
-  { key: 'einsatzabschnitte', kategorie: 'fuehrung', label: 'Einsatzabschnitte', icon: TbSitemap, route: 'einsatzabschnitte', status: 'fertig', beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.' },
-  { key: 'stab', kategorie: 'fuehrung', label: 'Stab', icon: TbBuildingCommunity, route: 'stab', status: 'wip', beschreibung: 'Stabsarbeit (S1–S6). Wird später ausgearbeitet.' },
+  {
+    key: 'einsatzdaten',
+    kategorie: 'fuehrung',
+    label: 'Einsatzdaten',
+    icon: TbFileDescription,
+    route: 'einsatzdaten',
+    status: 'fertig',
+    beschreibung: 'Stammdaten des Einsatzes: Bezeichnung, Stichwort, Zeiten, Leitung.',
+  },
+  {
+    key: 'einsatzabschnitte',
+    kategorie: 'fuehrung',
+    label: 'Einsatzabschnitte',
+    icon: TbSitemap,
+    route: 'einsatzabschnitte',
+    status: 'fertig',
+    beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.',
+  },
+  {
+    key: 'stab',
+    kategorie: 'fuehrung',
+    label: 'Stab',
+    icon: TbBuildingCommunity,
+    route: 'stab',
+    status: 'wip',
+    beschreibung: 'Stabsarbeit (S1–S6). Wird später ausgearbeitet.',
+  },
   // Kräfte & Mittel
-  { key: 'einheiten', kategorie: 'kraefte', label: 'Einheiten', icon: TbUsersGroup, route: 'einheiten', status: 'fertig', beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.' },
-  { key: 'personal', kategorie: 'kraefte', label: 'Personal', icon: TbUser, route: 'personal', status: 'fertig', beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.' },
-  { key: 'fahrzeuge', kategorie: 'kraefte', label: 'Fahrzeuge', icon: TbTruck, route: 'fahrzeuge', status: 'fertig', beschreibung: 'Disponierte Fahrzeuge des Einsatzes.' },
-  { key: 'material', kategorie: 'kraefte', label: 'Material', icon: TbPackages, route: 'material', status: 'fertig', beschreibung: 'Material und Verbrauchsgüter im Einsatz.' },
-  { key: 'bereitstellungsraeume', kategorie: 'kraefte', label: 'Bereitstellungsräume', icon: TbBuildingWarehouse, route: 'bereitstellungsraeume', status: 'fertig', beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.' },
+  {
+    key: 'einheiten',
+    kategorie: 'kraefte',
+    label: 'Einheiten',
+    icon: TbUsersGroup,
+    route: 'einheiten',
+    status: 'fertig',
+    beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.',
+  },
+  {
+    key: 'personal',
+    kategorie: 'kraefte',
+    label: 'Personal',
+    icon: TbUser,
+    route: 'personal',
+    status: 'fertig',
+    beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.',
+  },
+  {
+    key: 'fahrzeuge',
+    kategorie: 'kraefte',
+    label: 'Fahrzeuge',
+    icon: TbTruck,
+    route: 'fahrzeuge',
+    status: 'fertig',
+    beschreibung: 'Disponierte Fahrzeuge des Einsatzes.',
+  },
+  {
+    key: 'material',
+    kategorie: 'kraefte',
+    label: 'Material',
+    icon: TbPackages,
+    route: 'material',
+    status: 'fertig',
+    beschreibung: 'Material und Verbrauchsgüter im Einsatz.',
+  },
+  {
+    key: 'bereitstellungsraeume',
+    kategorie: 'kraefte',
+    label: 'Bereitstellungsräume',
+    icon: TbBuildingWarehouse,
+    route: 'bereitstellungsraeume',
+    status: 'fertig',
+    beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.',
+  },
   // Erfassung
-  { key: 'etb', kategorie: 'erfassung', label: 'ETB', icon: TbClipboardText, route: 'etb', status: 'fertig', beschreibung: 'Einsatztagebuch.' },
-  { key: 'personen', kategorie: 'erfassung', label: 'Personen', icon: TbUsers, route: 'personen', status: 'fertig', beschreibung: 'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).' },
-  { key: 'unfallhilfsstellen', kategorie: 'erfassung', label: 'Unfallhilfsstellen', icon: TbFirstAidKit, route: 'unfallhilfsstellen', status: 'fertig', beschreibung: 'Behandlungs-/Sammelstellen als Örtlichkeiten mit Plätzen, Belegung und Material.' },
-  { key: 'tiere', kategorie: 'erfassung', label: 'Tiere', icon: TbPaw, route: 'tiere', status: 'fertig', beschreibung: 'Betroffene Tiere, getrennt vom Personenstamm.' },
-  { key: 'schaeden', kategorie: 'erfassung', label: 'Schäden', icon: TbHome, route: 'schaeden', status: 'fertig', beschreibung: 'Sach-/Infrastruktur-/Umweltschäden mit Bearbeitungs-Workflow.' },
+  {
+    key: 'etb',
+    kategorie: 'erfassung',
+    label: 'ETB',
+    icon: TbClipboardText,
+    route: 'etb',
+    status: 'fertig',
+    beschreibung: 'Einsatztagebuch.',
+  },
+  {
+    key: 'personen',
+    kategorie: 'erfassung',
+    label: 'Personen',
+    icon: TbUsers,
+    route: 'personen',
+    status: 'fertig',
+    beschreibung:
+      'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).',
+  },
+  {
+    key: 'unfallhilfsstellen',
+    kategorie: 'erfassung',
+    label: 'Unfallhilfsstellen',
+    icon: TbFirstAidKit,
+    route: 'unfallhilfsstellen',
+    status: 'fertig',
+    beschreibung:
+      'Behandlungs-/Sammelstellen als Örtlichkeiten mit Plätzen, Belegung und Material.',
+  },
+  {
+    key: 'tiere',
+    kategorie: 'erfassung',
+    label: 'Tiere',
+    icon: TbPaw,
+    route: 'tiere',
+    status: 'fertig',
+    beschreibung: 'Betroffene Tiere, getrennt vom Personenstamm.',
+  },
+  {
+    key: 'schaeden',
+    kategorie: 'erfassung',
+    label: 'Schäden',
+    icon: TbHome,
+    route: 'schaeden',
+    status: 'fertig',
+    beschreibung: 'Sach-/Infrastruktur-/Umweltschäden mit Bearbeitungs-Workflow.',
+  },
   // Lage
-  { key: 'lage-dashboard', kategorie: 'lage', label: 'Dashboard', icon: TbLayoutDashboard, route: 'lage-dashboard', status: 'fertig', beschreibung: 'Verdichtete Lageübersicht des Einsatzes.' },
-  { key: 'lagekarte', kategorie: 'lage', label: 'Lagekarte', icon: TbMap2, route: 'lagekarte', status: 'fertig', beschreibung: 'Karte der verortbaren Objekte: Einsatzort, Unfallhilfsstellen, Schäden — verorten per Klick.' },
-  { key: 'lageberichte', kategorie: 'lage', label: 'Lageberichte', icon: TbReport, route: 'lageberichte', status: 'fertig', beschreibung: 'Strukturierte Lageberichte.' },
-  { key: 'kraefteuebersicht', kategorie: 'lage', label: 'Kräfteübersicht', icon: TbListDetails, route: 'kraefteuebersicht', status: 'fertig', beschreibung: 'Meldebild der eingesetzten Kräfte.' },
-  { key: 'gefahrenzonen', kategorie: 'lage', label: 'Gefahren', icon: TbAlertTriangle, route: 'gefahren', status: 'fertig', beschreibung: 'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.' },
-  { key: 'lagemeldungen', kategorie: 'lage', label: 'Lagemeldungen', icon: TbInbox, route: 'lagemeldungen', status: 'fertig', beschreibung: 'Lagerelevante Meldungen, die an die Lage übergeben wurden.' },
+  {
+    key: 'lage-dashboard',
+    kategorie: 'lage',
+    label: 'Dashboard',
+    icon: TbLayoutDashboard,
+    route: 'lage-dashboard',
+    status: 'fertig',
+    beschreibung: 'Verdichtete Lageübersicht des Einsatzes.',
+  },
+  {
+    key: 'lagekarte',
+    kategorie: 'lage',
+    label: 'Lagekarte',
+    icon: TbMap2,
+    route: 'lagekarte',
+    status: 'fertig',
+    beschreibung:
+      'Karte der verortbaren Objekte: Einsatzort, Unfallhilfsstellen, Schäden — verorten per Klick.',
+  },
+  {
+    key: 'lageberichte',
+    kategorie: 'lage',
+    label: 'Lageberichte',
+    icon: TbReport,
+    route: 'lageberichte',
+    status: 'fertig',
+    beschreibung: 'Strukturierte Lageberichte.',
+  },
+  {
+    key: 'kraefteuebersicht',
+    kategorie: 'lage',
+    label: 'Kräfteübersicht',
+    icon: TbListDetails,
+    route: 'kraefteuebersicht',
+    status: 'fertig',
+    beschreibung: 'Meldebild der eingesetzten Kräfte.',
+  },
+  {
+    key: 'gefahrenzonen',
+    kategorie: 'lage',
+    label: 'Gefahren',
+    icon: TbAlertTriangle,
+    route: 'gefahren',
+    status: 'fertig',
+    beschreibung:
+      'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.',
+  },
+  {
+    key: 'lagemeldungen',
+    kategorie: 'lage',
+    label: 'Lagemeldungen',
+    icon: TbInbox,
+    route: 'lagemeldungen',
+    status: 'fertig',
+    beschreibung: 'Lagerelevante Meldungen, die an die Lage übergeben wurden.',
+  },
   // Kommunikation
-  { key: 'chat', kategorie: 'kommunikation', label: 'Chat', icon: TbMessageCircle, route: 'chat', status: 'fertig', beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).', zaehlerQuelle: 'chat' },
-  { key: 'erinnerungen', kategorie: 'kommunikation', label: 'Erinnerungen', icon: TbBell, route: 'erinnerungen', status: 'fertig', beschreibung: 'Terminierte Erinnerungen.', zaehlerQuelle: 'erinnerungen' },
-  { key: 'auftraege', kategorie: 'kommunikation', label: 'Aufträge/Befehle', icon: TbClipboardList, route: 'auftraege', status: 'fertig', beschreibung: 'Aufträge und Befehle mit Quittierung.', zaehlerQuelle: 'auftraege' },
-  { key: 'meldungen', kategorie: 'kommunikation', label: 'Meldungen (eingehend)', icon: TbInbox, route: 'meldungen', status: 'fertig', beschreibung: 'Eingehende Meldungen zur Bearbeitung.', zaehlerQuelle: 'meldungen' },
-  { key: 'nachforderungen', kategorie: 'kommunikation', label: 'Nachforderung', icon: TbPackages, route: 'nachforderungen', status: 'fertig', beschreibung: 'Nachforderung von Kräften/Mitteln bei Leitstelle/Nachbar-EA/übergeordneter Führung mit Status-Workflow.' },
+  {
+    key: 'chat',
+    kategorie: 'kommunikation',
+    label: 'Chat',
+    icon: TbMessageCircle,
+    route: 'chat',
+    status: 'fertig',
+    beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).',
+    zaehlerQuelle: 'chat',
+  },
+  {
+    key: 'erinnerungen',
+    kategorie: 'kommunikation',
+    label: 'Erinnerungen',
+    icon: TbBell,
+    route: 'erinnerungen',
+    status: 'fertig',
+    beschreibung: 'Terminierte Erinnerungen.',
+    zaehlerQuelle: 'erinnerungen',
+  },
+  {
+    key: 'auftraege',
+    kategorie: 'kommunikation',
+    label: 'Aufträge/Befehle',
+    icon: TbClipboardList,
+    route: 'auftraege',
+    status: 'fertig',
+    beschreibung: 'Aufträge und Befehle mit Quittierung.',
+    zaehlerQuelle: 'auftraege',
+  },
+  {
+    key: 'meldungen',
+    kategorie: 'kommunikation',
+    label: 'Meldungen (eingehend)',
+    icon: TbInbox,
+    route: 'meldungen',
+    status: 'fertig',
+    beschreibung: 'Eingehende Meldungen zur Bearbeitung.',
+    zaehlerQuelle: 'meldungen',
+  },
+  {
+    key: 'nachforderungen',
+    kategorie: 'kommunikation',
+    label: 'Nachforderung',
+    icon: TbPackages,
+    route: 'nachforderungen',
+    status: 'fertig',
+    beschreibung:
+      'Nachforderung von Kräften/Mitteln bei Leitstelle/Nachbar-EA/übergeordneter Führung mit Status-Workflow.',
+  },
   // Einstellungen
-  { key: 'einsatz-einstellungen', kategorie: 'einstellungen', label: 'Einstellungen', icon: TbSettings, route: 'einstellungen', status: 'fertig', beschreibung: 'Einsatzbezogene Einstellungen.' },
+  {
+    key: 'einsatz-einstellungen',
+    kategorie: 'einstellungen',
+    label: 'Einstellungen',
+    icon: TbSettings,
+    route: 'einstellungen',
+    status: 'fertig',
+    beschreibung: 'Einsatzbezogene Einstellungen.',
+  },
 ];
 
 export function moduleNachKategorie(kategorie: KategorieKey): ModulEintrag[] {
@@ -212,9 +440,11 @@ export function istModulFreigegeben(
   benutzer: BenutzerAnzeige | null,
   overrides?: ModulOverrides,
 ): boolean {
-  return modul.status === 'fertig'
-    && istModulSichtbar(modul, overrides)
-    && !istModulGesperrt(modul, benutzer, overrides);
+  return (
+    modul.status === 'fertig' &&
+    istModulSichtbar(modul, overrides) &&
+    !istModulGesperrt(modul, benutzer, overrides)
+  );
 }
 
 /** Ziel der Default-Route /einsaetze/:id: Lage-Dashboard sobald fertig, sonst ETB-Fallback. */
@@ -257,7 +487,9 @@ export function erstesFreigegebenesModul(
   overrides?: ModulOverrides,
   register: ModulEintrag[] = modulRegistry,
 ): ModulEintrag | null {
-  return register.find(
-    (m) => m.kategorie === kategorie && istModulFreigegeben(m, benutzer, overrides),
-  ) ?? null;
+  return (
+    register.find(
+      (m) => m.kategorie === kategorie && istModulFreigegeben(m, benutzer, overrides),
+    ) ?? null
+  );
 }

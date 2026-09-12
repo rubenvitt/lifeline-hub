@@ -48,12 +48,7 @@ export function erfasseEtb(
   eintrag: NeuerEintrag,
   optionen?: ApiSendOptionen,
 ): Promise<EtbEintragAnzeige> {
-  return apiSend<EtbEintragAnzeige>(
-    `/api/einsaetze/${einsatzId}/etb`,
-    'POST',
-    eintrag,
-    optionen,
-  );
+  return apiSend<EtbEintragAnzeige>(`/api/einsaetze/${einsatzId}/etb`, 'POST', eintrag, optionen);
 }
 
 /** Aus einem ETB-Eintrag direkt einen Auftrag erteilen (ETB→Auftrag, LFH-112).

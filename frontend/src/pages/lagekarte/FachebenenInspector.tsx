@@ -95,18 +95,27 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       {headline && (
-        <Typography.Paragraph strong style={{ marginBottom: 8 }}>{headline}</Typography.Paragraph>
+        <Typography.Paragraph strong style={{ marginBottom: 8 }}>
+          {headline}
+        </Typography.Paragraph>
       )}
       {sev ? (
-        <Tag color={sev.color} style={{ marginBottom: 8 }}>{sev.label}</Tag>
+        <Tag color={sev.color} style={{ marginBottom: 8 }}>
+          {sev.label}
+        </Tag>
       ) : schwere ? (
         <Tag style={{ marginBottom: 8 }}>{schwere}</Tag>
       ) : null}
       <Descriptions column={1}>
-        {dring && <Descriptions.Item label="Dringlichkeit">{DRINGLICHKEIT[dring] ?? dring}</Descriptions.Item>}
+        {dring && (
+          <Descriptions.Item label="Dringlichkeit">
+            {DRINGLICHKEIT[dring] ?? dring}
+          </Descriptions.Item>
+        )}
         {(von || bis) && (
           <Descriptions.Item label="Gültig">
-            {von ?? '?'}{bis ? ` – ${bis}` : ''}
+            {von ?? '?'}
+            {bis ? ` – ${bis}` : ''}
           </Descriptions.Item>
         )}
         <Descriptions.Item label="Quelle">{quelle}</Descriptions.Item>
@@ -118,7 +127,9 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
       )}
       {hinweis && (
         <>
-          <Typography.Text strong style={{ fontSize: 12 }}>Handlungsempfehlung</Typography.Text>
+          <Typography.Text strong style={{ fontSize: 12 }}>
+            Handlungsempfehlung
+          </Typography.Text>
           <Typography.Paragraph style={{ marginTop: 2, marginBottom: 0, fontSize: 13 }}>
             {hinweis}
           </Typography.Paragraph>
@@ -146,10 +157,14 @@ function PegelInhalt({ p }: { p: Record<string, unknown> }) {
         // Kennzahlen-Stimme mit `fontSizeHeading3` aus dem Theme statt einer eigenen Zahl.
         <Typography.Text
           strong
-          style={{ display: 'block', fontSize: token.fontSizeHeading3, marginBottom: token.marginXS }}
+          style={{
+            display: 'block',
+            fontSize: token.fontSizeHeading3,
+            marginBottom: token.marginXS,
+          }}
         >
-          {wert}{einheit ? ` ${einheit}` : ''}{' '}
-          {zust ? <Tag color={zust.color}>{zust.label}</Tag> : null}
+          {wert}
+          {einheit ? ` ${einheit}` : ''} {zust ? <Tag color={zust.color}>{zust.label}</Tag> : null}
         </Typography.Text>
       ) : (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
@@ -176,10 +191,16 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   const notaufnahme = s(p.notaufnahme);
   return (
     <>
-      {kategorie && <Tag color="purple" style={{ marginBottom: 8 }}>{kategorieLabel(kategorie)}</Tag>}
+      {kategorie && (
+        <Tag color="purple" style={{ marginBottom: 8 }}>
+          {kategorieLabel(kategorie)}
+        </Tag>
+      )}
       <Descriptions column={1}>
         {s(p.adresse) && <Descriptions.Item label="Adresse">{s(p.adresse)}</Descriptions.Item>}
-        {s(p.betreiber) && <Descriptions.Item label="Betreiber">{s(p.betreiber)}</Descriptions.Item>}
+        {s(p.betreiber) && (
+          <Descriptions.Item label="Betreiber">{s(p.betreiber)}</Descriptions.Item>
+        )}
         {telefon && (
           <Descriptions.Item label="Telefon">
             <a href={`tel:${telefon.replace(/\s/g, '')}`}>{telefon}</a>
@@ -188,7 +209,9 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
         {websiteRoh && (
           <Descriptions.Item label="Web">
             {website ? (
-              <a href={website} target="_blank" rel="noreferrer noopener">{website}</a>
+              <a href={website} target="_blank" rel="noreferrer noopener">
+                {website}
+              </a>
             ) : (
               websiteRoh
             )}
@@ -201,7 +224,12 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 /** Detailpanel für ein angeklicktes Fachebenen-Objekt (read-only externe Daten). */
-export default function FachebenenInspector({ quelle, properties, geometrie, onSchliessen }: FachebenenInspectorProps) {
+export default function FachebenenInspector({
+  quelle,
+  properties,
+  geometrie,
+  onSchliessen,
+}: FachebenenInspectorProps) {
   const { token } = theme.useToken();
   const p = properties;
   const istWarnung = quelle === 'nina' || quelle === 'dwd';
@@ -221,7 +249,11 @@ export default function FachebenenInspector({ quelle, properties, geometrie, onS
   }
 
   return (
-    <KartenDetailCard titel={titel} akzentFarbe={FACHEBENEN[quelle].farbe} onSchliessen={onSchliessen}>
+    <KartenDetailCard
+      titel={titel}
+      akzentFarbe={FACHEBENEN[quelle].farbe}
+      onSchliessen={onSchliessen}
+    >
       {istWarnung ? (
         <WarnungInhalt p={p} />
       ) : quelle === 'pegelonline' ? (

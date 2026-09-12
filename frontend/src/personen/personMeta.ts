@@ -16,10 +16,14 @@ export function kurzVerbleib(v: Verbleib): string {
   const ziel = v.ziel ? ` → ${v.ziel}` : '';
   const tm = v.transportmittel ? ` (${v.transportmittel})` : '';
   switch (v.art) {
-    case 'transport': return `Transport${ziel}${tm}`;
-    case 'entlassung': return 'entlassen';
-    case 'vor_ort': return 'verbleibt vor Ort';
-    case 'verstorben': return 'Verbleib des Leichnams';
+    case 'transport':
+      return `Transport${ziel}${tm}`;
+    case 'entlassung':
+      return 'entlassen';
+    case 'vor_ort':
+      return 'verbleibt vor Ort';
+    case 'verstorben':
+      return 'Verbleib des Leichnams';
   }
 }
 

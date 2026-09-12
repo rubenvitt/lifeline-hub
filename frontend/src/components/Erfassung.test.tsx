@@ -28,7 +28,11 @@ function renderMitProviders(
   };
 }
 
-interface Werte { ort: string; melder: string; notiz: string }
+interface Werte {
+  ort: string;
+  melder: string;
+  notiz: string;
+}
 
 /**
  * Zwei Textfelder plus eine Textarea — die Textarea steht am Ende, weil genau
@@ -56,9 +60,15 @@ function Harness(props: {
       steuerungRef={props.steuerungRef}
       onErfasst={props.onErfasst}
     >
-      <Form.Item label="Ort" name="ort"><Input /></Form.Item>
-      <Form.Item label="Melder" name="melder"><Input /></Form.Item>
-      <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+      <Form.Item label="Ort" name="ort">
+        <Input />
+      </Form.Item>
+      <Form.Item label="Melder" name="melder">
+        <Input />
+      </Form.Item>
+      <Form.Item label="Notiz" name="notiz">
+        <Input.TextArea rows={2} />
+      </Form.Item>
     </ErfassungsFormular>
   );
 }
@@ -160,9 +170,7 @@ describe('ErfassungsFormular — Serienmodus', () => {
     // Datensatz doppelt an; genau diese Folge prüft der letzte Aufruf mit.
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onFertig = vi.fn();
-    renderMitProviders(
-      <PflichtHarness onErfassen={onErfassen} onFertig={onFertig} />,
-    );
+    renderMitProviders(<PflichtHarness onErfassen={onErfassen} onFertig={onFertig} />);
     const nutzer = userEvent.setup();
 
     // Leeres Pflichtfeld: die Prüfung scheitert, gespeichert wird nichts.
@@ -234,7 +242,10 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     await waitFor(() => expect(document.activeElement).toBe(ort));
     await userEvent.type(ort, 'Sammelstelle');
     const ereignis = new KeyboardEvent('keydown', {
-      key: 's', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 's',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(ort, ereignis);
 
@@ -268,7 +279,10 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     await waitFor(() => expect(document.activeElement).toBe(ort));
     await userEvent.type(ort, 'Sammelstelle');
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Enter',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(ort, ereignis);
 
@@ -286,7 +300,11 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     await waitFor(() => expect(document.activeElement).toBe(ort));
     await userEvent.type(ort, 'Sammelstelle');
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Enter', ctrlKey: true, repeat: true, bubbles: true, cancelable: true,
+      key: 'Enter',
+      ctrlKey: true,
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(ort, ereignis);
 
@@ -302,7 +320,11 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     await waitFor(() => expect(document.activeElement).toBe(ort));
     await userEvent.type(ort, 'Sammelstelle');
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true, cancelable: true,
+      key: 'Enter',
+      ctrlKey: true,
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
     });
 
     fireEvent(ort, ereignis);
@@ -319,10 +341,18 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     await waitFor(() => expect(document.activeElement).toBe(ort));
     await userEvent.type(ort, 'Sammelstelle');
     const shiftEnter = new KeyboardEvent('keydown', {
-      key: 'Enter', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true,
+      key: 'Enter',
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     const altEnter = new KeyboardEvent('keydown', {
-      key: 'Enter', metaKey: true, altKey: true, bubbles: true, cancelable: true,
+      key: 'Enter',
+      metaKey: true,
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
     });
 
     fireEvent(ort, shiftEnter);
@@ -350,7 +380,12 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     // dem eine Tastenwiederholung ein zweites Mal absenden würde. Der Knopf ist
     // in diesem Fenster `loading` und damit klicktaub; die Tastatur ist es nicht.
     let einloesen: () => void = () => {};
-    const onErfassen = vi.fn(() => new Promise<void>((res) => { einloesen = res; }));
+    const onErfassen = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          einloesen = res;
+        }),
+    );
     renderMitProviders(<Harness onErfassen={onErfassen} serie />);
     const nutzer = userEvent.setup();
 
@@ -406,18 +441,22 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     });
     renderMitProviders(
       <Harness
-        onErfassen={vi.fn(async () => { reihenfolge.push('gespeichert'); })}
+        onErfassen={vi.fn(async () => {
+          reihenfolge.push('gespeichert');
+        })}
         onErfasst={onErfasst}
-        onFertig={() => { reihenfolge.push('fertig'); }}
+        onFertig={() => {
+          reihenfolge.push('fertig');
+        }}
       />,
     );
 
     await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
-    await waitFor(() => expect(reihenfolge).toEqual([
-      'gespeichert', 'akzeptiert:Brücke', 'fertig',
-    ]));
+    await waitFor(() =>
+      expect(reihenfolge).toEqual(['gespeichert', 'akzeptiert:Brücke', 'fertig']),
+    );
   });
 
   it('meldet akzeptierte Werte auch im erfolgreichen Serienlauf', async () => {
@@ -435,9 +474,9 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     await userEvent.type(screen.getByLabelText('Ort'), 'Sammelstelle');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
-    await waitFor(() => expect(onErfasst).toHaveBeenCalledWith(
-      expect.objectContaining({ ort: 'Sammelstelle' }),
-    ));
+    await waitFor(() =>
+      expect(onErfasst).toHaveBeenCalledWith(expect.objectContaining({ ort: 'Sammelstelle' })),
+    );
     expect(onFertig).not.toHaveBeenCalled();
   });
 
@@ -447,7 +486,9 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     renderMitProviders(
       <Harness
         onErfassen={onErfassen}
-        onErfasst={() => { throw new Error('lokaler Hook gescheitert'); }}
+        onErfasst={() => {
+          throw new Error('lokaler Hook gescheitert');
+        }}
         onFertig={onFertig}
       />,
     );
@@ -462,7 +503,9 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
 
   it('wartet einen ablehnenden Akzeptanz-Hook ab und schließt danach genau einmal', async () => {
     let hookAblehnen!: (grund: Error) => void;
-    const hookAntwort = new Promise<void>((_resolve, reject) => { hookAblehnen = reject; });
+    const hookAntwort = new Promise<void>((_resolve, reject) => {
+      hookAblehnen = reject;
+    });
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onErfasst = vi.fn(() => hookAntwort);
     const onFertig = vi.fn();
@@ -487,7 +530,9 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
 
   it('blockiert einen zweiten Submit, solange der Akzeptanz-Hook läuft', async () => {
     let hookFreigeben!: () => void;
-    const hookAntwort = new Promise<void>((resolve) => { hookFreigeben = resolve; });
+    const hookAntwort = new Promise<void>((resolve) => {
+      hookFreigeben = resolve;
+    });
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onErfasst = vi.fn(() => hookAntwort);
     const onFertig = vi.fn();
@@ -501,7 +546,10 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(onErfassen).toHaveBeenCalledTimes(1);
-    await act(async () => { hookFreigeben(); await hookAntwort; });
+    await act(async () => {
+      hookFreigeben();
+      await hookAntwort;
+    });
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
     expect(onErfassen).toHaveBeenCalledTimes(1);
   });
@@ -512,7 +560,9 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     renderMitProviders(
       <Harness
         onErfassen={onErfassen}
-        onErfasst={() => { throw new Error('Serien-Hook gescheitert'); }}
+        onErfasst={() => {
+          throw new Error('Serien-Hook gescheitert');
+        }}
         onFertig={onFertig}
         serie
       />,
@@ -529,7 +579,9 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
 
   it('führt nach Abbruch während des Akzeptanz-Hooks keinen späten Abschluss aus', async () => {
     let hookFreigeben!: () => void;
-    const hookAntwort = new Promise<void>((resolve) => { hookFreigeben = resolve; });
+    const hookAntwort = new Promise<void>((resolve) => {
+      hookFreigeben = resolve;
+    });
     const steuerung = createRef<ErfassungsFormularSteuerung>();
     const onAbbrechen = vi.fn();
     const onFertig = vi.fn();
@@ -548,8 +600,13 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(onErfasst).toHaveBeenCalledTimes(1));
     expect(onFertig).not.toHaveBeenCalled();
-    await act(async () => { steuerung.current?.abbrechen(); });
-    await act(async () => { hookFreigeben(); await hookAntwort; });
+    await act(async () => {
+      steuerung.current?.abbrechen();
+    });
+    await act(async () => {
+      hookFreigeben();
+      await hookAntwort;
+    });
 
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(onFertig).not.toHaveBeenCalled();
@@ -598,7 +655,9 @@ describe('ErfassungsFormular — Ablehnung und Abbruch', () => {
     );
 
     await userEvent.type(screen.getByLabelText('Ort'), 'Brücke');
-    await act(async () => { steuerung.current?.abbrechen(); });
+    await act(async () => {
+      steuerung.current?.abbrechen();
+    });
 
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Ort')).toHaveValue('');
@@ -624,7 +683,9 @@ describe('ErfassungsModal', () => {
         onAbbrechen={props.onAbbrechen ?? (() => {})}
         onErfasst={props.onErfasst}
       >
-        <Form.Item label="Ort" name="ort"><Input /></Form.Item>
+        <Form.Item label="Ort" name="ort">
+          <Input />
+        </Form.Item>
       </ErfassungsModal>
     );
   }
@@ -675,7 +736,9 @@ describe('ErfassungsModal', () => {
     await waitFor(() => expect(document.activeElement).toBe(ort));
     await userEvent.type(ort, 'Brücke');
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Escape', bubbles: true, cancelable: true,
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(ort, ereignis);
 
@@ -687,7 +750,9 @@ describe('ErfassungsModal', () => {
   it('verwirft einen laufenden Abschluss über Kreuz und Maskenklick', async () => {
     for (const weg of ['kreuz', 'maske'] as const) {
       let antwortFreigeben!: () => void;
-      const antwort = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+      const antwort = new Promise<void>((resolve) => {
+        antwortFreigeben = resolve;
+      });
       const onAbbrechen = vi.fn();
       const onFertig = vi.fn();
       const onErfasst = vi.fn();
@@ -712,7 +777,10 @@ describe('ErfassungsModal', () => {
         expect(maske).not.toBeNull();
         await userEvent.click(maske!);
       }
-      await act(async () => { antwortFreigeben(); await antwort; });
+      await act(async () => {
+        antwortFreigeben();
+        await antwort;
+      });
 
       expect(onAbbrechen).toHaveBeenCalledTimes(1);
       expect(onErfasst).not.toHaveBeenCalled();

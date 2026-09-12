@@ -347,7 +347,9 @@ describe('LoginPage', () => {
 
     it('lässt während der Passkey-Ceremony nur den Passkey-Button laden, nicht „Anmelden"', async () => {
       setzeSecureContext(true);
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(
         http.get('/api/auth/providers', () =>
@@ -385,7 +387,9 @@ describe('LoginPage', () => {
 
     it('zeigt KEINEN Passkey-Button ohne Secure Context, auch bei aktivem webauthn-Provider', async () => {
       setzeSecureContext(false);
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json(webauthnProvider)));
 
@@ -403,7 +407,9 @@ describe('LoginPage', () => {
 
     it('zeigt KEINEN Passkey-Button ohne aktiven webauthn-Provider (aber Secure Context)', async () => {
       setzeSecureContext(true);
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(
         http.get('/api/auth/providers', () =>
@@ -579,10 +585,14 @@ describe('LoginPage', () => {
     });
 
     it('richtet die Code-Eingabe auf Ziffern aus (inputMode, one-time-code, maxLength)', async () => {
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-      server.use(http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })));
+      server.use(
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+      );
 
       renderMitProviders(
         <AuthProvider>
@@ -636,10 +646,14 @@ describe('LoginPage', () => {
     });
 
     it('führt aus der Recovery-Eingabe zurück zur Code-Eingabe', async () => {
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-      server.use(http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })));
+      server.use(
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+      );
 
       renderMitProviders(
         <AuthProvider>
@@ -664,7 +678,9 @@ describe('LoginPage', () => {
     });
 
     it('meldet einen normalen (Nicht-MFA) Login unverändert direkt an — keine Code-Eingabe', async () => {
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
       server.use(http.post('/api/auth/login', () => HttpResponse.json(adminBody)));

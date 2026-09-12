@@ -84,9 +84,15 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
     <nav
       aria-label="Kategorien"
       style={{
-        display: 'flex', flexDirection: 'column', gap: abstand.xs, padding: abstand.sm,
-        background: farbenDunkel.grund, minHeight: '100%',
-        width: RAIL_BREITE, flexShrink: 0, boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: abstand.xs,
+        padding: abstand.sm,
+        background: farbenDunkel.grund,
+        minHeight: '100%',
+        width: RAIL_BREITE,
+        flexShrink: 0,
+        boxSizing: 'border-box',
       }}
     >
       {kategorien.map((k) => {

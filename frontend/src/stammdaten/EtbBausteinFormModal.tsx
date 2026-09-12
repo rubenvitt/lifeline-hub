@@ -129,23 +129,25 @@ export default function EtbBausteinFormModal({
       <Collapse
         ghost
         style={{ marginInline: -8 }}
-        items={[{
-          key: 'weitere',
-          label: 'Weitere Angaben',
-          children: (
-            <>
-              <Form.Item label="Meldeweg (optional)" name="meldeweg">
-                <Select allowClear options={MELDEWEG_OPTIONEN} />
-              </Form.Item>
-              <Form.Item label="Veranlassung (optional)" name="veranlassung">
-                <Input />
-              </Form.Item>
-              <Form.Item label="Sortierung" name="sortier">
-                <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-              </Form.Item>
-            </>
-          ),
-        }]}
+        items={[
+          {
+            key: 'weitere',
+            label: 'Weitere Angaben',
+            children: (
+              <>
+                <Form.Item label="Meldeweg (optional)" name="meldeweg">
+                  <Select allowClear options={MELDEWEG_OPTIONEN} />
+                </Form.Item>
+                <Form.Item label="Veranlassung (optional)" name="veranlassung">
+                  <Input />
+                </Form.Item>
+                <Form.Item label="Sortierung" name="sortier">
+                  <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
+                </Form.Item>
+              </>
+            ),
+          },
+        ]}
       />
     </ErfassungsModal>
   );

@@ -10,25 +10,52 @@ import { antdToken, farbenHell, type Dichte } from '../theme/tokens';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 
 const bausteine: EtbBaustein[] = [
-  { id: 1, label: 'Lagemeldung', typ: 'meldung', inhalt: '', meldeweg: null, veranlassung: null, sortier: 0 },
+  {
+    id: 1,
+    label: 'Lagemeldung',
+    typ: 'meldung',
+    inhalt: '',
+    meldeweg: null,
+    veranlassung: null,
+    sortier: 0,
+  },
 ];
 
 describe('SlashMenu', () => {
   it('zeigt Felder- und Bausteine-Sektion und wählt per Klick', async () => {
     const onWahl = vi.fn();
     renderMitProviders(
-      <SlashMenu offen filter="" bausteine={bausteine} gesetzteFelder={[]} onWahl={onWahl} onSchliessen={vi.fn()} />,
+      <SlashMenu
+        offen
+        filter=""
+        bausteine={bausteine}
+        gesetzteFelder={[]}
+        onWahl={onWahl}
+        onSchliessen={vi.fn()}
+      />,
     );
     expect(screen.getByText('Felder')).toBeInTheDocument();
     expect(screen.getByText('Bausteine')).toBeInTheDocument();
     await userEvent.click(screen.getByText('Ereigniszeit'));
-    expect(onWahl).toHaveBeenCalledWith({ art: 'feld', key: 'ereigniszeit', label: 'Ereigniszeit', gesetzt: false });
+    expect(onWahl).toHaveBeenCalledWith({
+      art: 'feld',
+      key: 'ereigniszeit',
+      label: 'Ereigniszeit',
+      gesetzt: false,
+    });
   });
 
   it('filtert und wählt den ersten Treffer per Enter (über externes keydown)', async () => {
     const onWahl = vi.fn();
     renderMitProviders(
-      <SlashMenu offen filter="lage" bausteine={bausteine} gesetzteFelder={[]} onWahl={onWahl} onSchliessen={vi.fn()} />,
+      <SlashMenu
+        offen
+        filter="lage"
+        bausteine={bausteine}
+        gesetzteFelder={[]}
+        onWahl={onWahl}
+        onSchliessen={vi.fn()}
+      />,
     );
     expect(screen.queryByText('Ereigniszeit')).toBeNull();
     expect(screen.getByText('Lagemeldung')).toBeInTheDocument();
@@ -39,19 +66,40 @@ describe('SlashMenu', () => {
     const onSchliessen = vi.fn();
     const ref = createRef<SlashMenuHandle>();
     renderMitProviders(
-      <SlashMenu ref={ref} offen filter="" bausteine={bausteine} gesetzteFelder={[]} onWahl={onWahl} onSchliessen={onSchliessen} />,
+      <SlashMenu
+        ref={ref}
+        offen
+        filter=""
+        bausteine={bausteine}
+        gesetzteFelder={[]}
+        onWahl={onWahl}
+        onSchliessen={onSchliessen}
+      />,
     );
     // flach = [ereigniszeit, von, an, meldeweg, veranlassung, ...bausteine]
-    act(() => { ref.current!.handleKey('ArrowDown'); });
-    act(() => { ref.current!.handleKey('Enter'); });
+    act(() => {
+      ref.current!.handleKey('ArrowDown');
+    });
+    act(() => {
+      ref.current!.handleKey('Enter');
+    });
     expect(onWahl).toHaveBeenCalledWith(expect.objectContaining({ art: 'feld', key: 'von' }));
-    act(() => { expect(ref.current!.handleKey('Escape')).toBe(true); });
+    act(() => {
+      expect(ref.current!.handleKey('Escape')).toBe(true);
+    });
     expect(onSchliessen).toHaveBeenCalled();
   });
 
   it('rendert nichts, wenn geschlossen', () => {
     const { container } = renderMitProviders(
-      <SlashMenu offen={false} filter="" bausteine={bausteine} gesetzteFelder={[]} onWahl={vi.fn()} onSchliessen={vi.fn()} />,
+      <SlashMenu
+        offen={false}
+        filter=""
+        bausteine={bausteine}
+        gesetzteFelder={[]}
+        onWahl={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
     );
     expect(container.querySelector('[data-testid="slash-menu"]')).toBeNull();
   });
@@ -74,7 +122,14 @@ describe('SlashMenu', () => {
 function masse(dichte: Dichte) {
   const { container, unmount } = render(
     <ConfigProvider theme={{ token: antdToken(farbenHell, dichte) }}>
-      <SlashMenu offen filter="" bausteine={bausteine} gesetzteFelder={[]} onWahl={vi.fn()} onSchliessen={vi.fn()} />
+      <SlashMenu
+        offen
+        filter=""
+        bausteine={bausteine}
+        gesetzteFelder={[]}
+        onWahl={vi.fn()}
+        onSchliessen={vi.fn()}
+      />
     </ConfigProvider>,
   );
   const option = container.querySelector<HTMLElement>('[role="option"]')!;

@@ -34,9 +34,13 @@ describe('MeldungFormular', () => {
     await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
-      meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true,
-    }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        meldungsart: 'sofortmeldung',
+        prioritaet: 'sofort',
+        bestaetigung_pflicht: true,
+      }),
+    );
   });
 
   it('reicht das Frist-Override in Minuten durch', async () => {
@@ -46,9 +50,12 @@ describe('MeldungFormular', () => {
     await userEvent.type(screen.getByLabelText('Bestätigungsfrist in Minuten'), '30');
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
-      bestaetigung_pflicht: true, bestaetigung_frist_min: 30,
-    }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bestaetigung_pflicht: true,
+        bestaetigung_frist_min: 30,
+      }),
+    );
   });
 
   it('Lagemeldung-Fast-Path belegt meldungsart + richtung extern vor', async () => {
@@ -56,18 +63,24 @@ describe('MeldungFormular', () => {
     await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
     await fuellePflichtfelder('S3', 'Lage: ...');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
-      meldungsart: 'lagemeldung', richtung: 'extern',
-    }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        meldungsart: 'lagemeldung',
+        richtung: 'extern',
+      }),
+    );
   });
 
   it('sendet ohne Pflicht keine Frist', async () => {
     const onAnlegen = renderFormular();
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
-      bestaetigung_pflicht: false, bestaetigung_frist_min: undefined,
-    }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bestaetigung_pflicht: false,
+        bestaetigung_frist_min: undefined,
+      }),
+    );
   });
 
   // --- LFH-332/B4: Serienerfassung, Wertübernahme, Fehlschlag ---
@@ -103,7 +116,10 @@ describe('MeldungFormular', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(2));
     expect(onAnlegen.mock.calls[1][0]).toMatchObject({
-      absender: 'RTW 2', empfaenger: 'ELW 1', meldeweg: 'telefon', inhalt: 'Zweite Meldung',
+      absender: 'RTW 2',
+      empfaenger: 'ELW 1',
+      meldeweg: 'telefon',
+      inhalt: 'Zweite Meldung',
     });
   });
 

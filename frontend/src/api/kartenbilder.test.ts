@@ -7,14 +7,19 @@ import {
 } from './kartenbilder';
 
 describe('kartenbilder API', () => {
-  beforeEach(() => { vi.restoreAllMocks(); });
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('liste ruft den richtigen Pfad', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', { status: 200 }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('[]', { status: 200 }));
     await listeHintergrundbilder(7);
-    expect(fetchMock).toHaveBeenCalledWith('/api/einsaetze/7/karte/hintergrundbilder', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/einsaetze/7/karte/hintergrundbilder',
+      expect.anything(),
+    );
   });
 
   it('download-pfad ist stabil', () => {
@@ -24,9 +29,9 @@ describe('kartenbilder API', () => {
   it('begrenzt auch den direkten Bilddownload auf 15 Sekunden', async () => {
     const signal = new AbortController().signal;
     const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(new Blob(['bild']), { status: 200 }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(new Blob(['bild']), { status: 200 }));
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
 
     await expect(ladeBildBlobUrl(7, 3)).resolves.toBe('blob:test');
@@ -38,11 +43,16 @@ describe('kartenbilder API', () => {
   });
 
   it('upload hängt datei + ecken als FormData an', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('{"id":1}', { status: 201 }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"id":1}', { status: 201 }));
     const datei = new File([new Uint8Array([0x89])], 'plan.png', { type: 'image/png' });
-    await ladeHintergrundbildHoch(7, datei, [[9,50],[9.1,50],[9.1,49.9],[9,49.9]]);
+    await ladeHintergrundbildHoch(7, datei, [
+      [9, 50],
+      [9.1, 50],
+      [9.1, 49.9],
+      [9, 49.9],
+    ]);
     const [, init] = fetchMock.mock.calls[0];
     expect(init?.body).toBeInstanceOf(FormData);
     const fd = init!.body as FormData;

@@ -29,10 +29,16 @@ interface FormWerte {
  * Bezeichnung wechseln und werden geleert.
  */
 const UEBERNAHME: (keyof FormWerte & string)[] = [
-  'adressatKategorie', 'adressatBezeichnung', 'prioritaet',
+  'adressatKategorie',
+  'adressatBezeichnung',
+  'prioritaet',
 ];
 
-export default function NachforderungFormular({ senden, onAnlegen, card = true }: {
+export default function NachforderungFormular({
+  senden,
+  onAnlegen,
+  card = true,
+}: {
   senden: boolean;
   /**
    * Absetzen. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
@@ -63,8 +69,13 @@ export default function NachforderungFormular({ senden, onAnlegen, card = true }
     <ErfassungsFormular<FormWerte>
       form={form}
       initialValues={{
-        art: '', anzahl: null, bezeichnung: '', adressatKategorie: 'leitstelle',
-        adressatBezeichnung: '', prioritaet: 'normal', begruendung: '',
+        art: '',
+        anzahl: null,
+        bezeichnung: '',
+        adressatKategorie: 'leitstelle',
+        adressatBezeichnung: '',
+        prioritaet: 'normal',
+        begruendung: '',
       }}
       onErfassen={absenden}
       // Das Inline-Formular schliesst sich nach dem Absetzen NICHT — Zuklappen ist
@@ -113,11 +124,13 @@ export default function NachforderungFormular({ senden, onAnlegen, card = true }
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="prioritaet" label="Priorität">
-            <Select<NachforderungPrioritaet> options={[
-              { value: 'sofort', label: 'Sofort' },
-              { value: 'dringend', label: 'Dringend' },
-              { value: 'normal', label: 'Normal' },
-            ]} />
+            <Select<NachforderungPrioritaet>
+              options={[
+                { value: 'sofort', label: 'Sofort' },
+                { value: 'dringend', label: 'Dringend' },
+                { value: 'normal', label: 'Normal' },
+              ]}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
@@ -130,5 +143,9 @@ export default function NachforderungFormular({ senden, onAnlegen, card = true }
   );
 
   if (!card) return formular;
-  return <Card size="small" title="Nachforderung absetzen">{formular}</Card>;
+  return (
+    <Card size="small" title="Nachforderung absetzen">
+      {formular}
+    </Card>
+  );
 }

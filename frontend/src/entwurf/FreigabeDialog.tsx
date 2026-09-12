@@ -71,7 +71,14 @@ export function freigabeGrund(
 }
 
 export default function FreigabeDialog({
-  offen, titel, warnung, speicherFehler, freigabeFehler, laeuft, onAbbrechen, onFreigeben,
+  offen,
+  titel,
+  warnung,
+  speicherFehler,
+  freigabeFehler,
+  laeuft,
+  onAbbrechen,
+  onFreigeben,
 }: Props) {
   const { token } = theme.useToken();
   const grund = freigabeGrund(speicherFehler, freigabeFehler);

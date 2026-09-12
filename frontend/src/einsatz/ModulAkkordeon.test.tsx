@@ -7,8 +7,14 @@ import { kategorien } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 const ohne: BenutzerAnzeige = {
-  id: 1, anzeigename: 'E', benutzername: 'e', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'E',
+  benutzername: 'e',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
+  totp_aktiviert: false,
 };
 
 const ueberschreibung = (
@@ -17,8 +23,12 @@ const ueberschreibung = (
   benoetigteRolle: 'admin' | 'fuehrungskraft' | null = null,
 ): ModulOverrides => ({
   [modulKey]: {
-    einsatz_id: 7, modul_key: modulKey, sichtbar,
-    benoetigte_rolle: benoetigteRolle, geaendert_at: null, geaendert_von: null,
+    einsatz_id: 7,
+    modul_key: modulKey,
+    sichtbar,
+    benoetigte_rolle: benoetigteRolle,
+    geaendert_at: null,
+    geaendert_von: null,
   },
 });
 
@@ -42,8 +52,9 @@ describe('ModulAkkordeon', () => {
       offeneKategorie: 'kommunikation',
       zaehler: { chat: { wert: 3, beschreibung: '3 ungelesene Chat-Nachrichten' } },
     });
-    expect(screen.getByRole('button', { name: 'Chat, 3 ungelesene Chat-Nachrichten' }))
-      .toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Chat, 3 ungelesene Chat-Nachrichten' }),
+    ).toBeInTheDocument();
   });
 
   it('listet Kategorie-Kopfzeilen mit aria-expanded und nur unter der offenen die Module', () => {

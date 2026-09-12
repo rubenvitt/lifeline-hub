@@ -326,7 +326,8 @@ function istDunklerModus(token: GlobalToken): boolean {
   const wert = Number.parseInt(hex.slice(0, 6), 16);
   if (Number.isNaN(wert)) return false;
   // Relative Helligkeit nach ITU-R BT.709 — dieselbe Gewichtung, die WCAG 1.4.3 nutzt.
-  const helligkeit = 0.2126 * ((wert >> 16) & 255) + 0.7152 * ((wert >> 8) & 255) + 0.0722 * (wert & 255);
+  const helligkeit =
+    0.2126 * ((wert >> 16) & 255) + 0.7152 * ((wert >> 8) & 255) + 0.0722 * (wert & 255);
   return helligkeit < 128;
 }
 

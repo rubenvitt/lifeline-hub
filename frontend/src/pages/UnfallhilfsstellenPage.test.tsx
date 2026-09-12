@@ -16,47 +16,88 @@ import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 
 class FakeEventSource {
-  url: string; closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {} removeEventListener() {} close() { this.closed = true; }
+  url: string;
+  closed = false;
+  constructor(url: string) {
+    this.url = url;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+  close() {
+    this.closed = true;
+  }
 }
-beforeEach(() => { vi.stubGlobal('EventSource', FakeEventSource); localStorage.clear(); });
+beforeEach(() => {
+  vi.stubGlobal('EventSource', FakeEventSource);
+  localStorage.clear();
+});
 afterEach(() => vi.unstubAllGlobals());
 
 function einsatzAntwort(rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung') {
   return {
-    id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv',
-    begonnen_at: '2026-05-28', abgeschlossen_at: null, abgeschlossen_von: null,
-    einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-05-28',
-    leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-    meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+    id: 1,
+    bezeichnung: 'Lage',
+    stichwort: null,
+    status: 'aktiv',
+    begonnen_at: '2026-05-28',
+    abgeschlossen_at: null,
+    abgeschlossen_von: null,
+    einsatzart: 'realeinsatz',
+    einsatznummer_intern: null,
+    angelegt_at: '2026-05-28',
+    leitstellen_nr: null,
+    einsatzort: null,
+    einsatzort_lat: null,
+    einsatzort_lon: null,
+    meldende_stelle: null,
+    sachverhalt: null,
+    anzahl_betroffene_initial: null,
     meine_rolle: rolle,
   };
 }
 
 /** Eine UHS-Zeile — die Kennung `BHP 50` ist in mehreren Tests der Beleg „Zeile steht". */
 const bhp50 = {
-  id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-  bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-  erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+  id: 7,
+  einsatz_id: 1,
+  abschnitt_id: null,
+  typ: 'behandlungsplatz',
+  bezeichnung: 'BHP 50',
+  standort: null,
+  notiz: null,
+  status: 'aktiv',
+  erfasst_at: 'x',
+  erfasst_von: 1,
+  geaendert_at: 'x',
+  geaendert_von: 1,
+  storniert_at: null,
 };
 
 function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return { qc, ...render(
-    <QueryClientProvider client={qc}>
-      <AntApp>
-        <AuthProvider>
-          <MemoryRouter initialEntries={[route]}>
-            <Routes>
-              <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
-              <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-            </Routes>
-          </MemoryRouter>
-        </AuthProvider>
-      </AntApp>
-    </QueryClientProvider>
-  ) };
+  return {
+    qc,
+    ...render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <AuthProvider>
+            <MemoryRouter initialEntries={[route]}>
+              <Routes>
+                <Route
+                  path="/einsaetze/:id/unfallhilfsstellen/liste"
+                  element={<UnfallhilfsstellenPage />}
+                />
+                <Route
+                  path="/einsaetze/:id/unfallhilfsstellen/:uhsId"
+                  element={<UhsDetailPage />}
+                />
+              </Routes>
+            </MemoryRouter>
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 function UhsDrawerHarness(props: { onClose: () => void; onAngelegt: () => void }) {
@@ -65,7 +106,10 @@ function UhsDrawerHarness(props: { onClose: () => void; onAngelegt: () => void }
     <UhsAnlegenDrawer
       einsatzId={1}
       open={open}
-      onClose={() => { props.onClose(); setOpen(false); }}
+      onClose={() => {
+        props.onClose();
+        setOpen(false);
+      }}
       onAngelegt={props.onAngelegt}
     />
   );
@@ -75,7 +119,9 @@ function UhsEinsatzWechselHarness() {
   const [einsatzId, setEinsatzId] = useState(1);
   return (
     <>
-      <button type="button" onClick={() => setEinsatzId(2)}>Zu Einsatz B</button>
+      <button type="button" onClick={() => setEinsatzId(2)}>
+        Zu Einsatz B
+      </button>
       <UhsAnlegenDrawer einsatzId={einsatzId} open onClose={() => {}} />
     </>
   );
@@ -109,7 +155,9 @@ describe('UnfallhilfsstellenPage', () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
-        <AntApp><UhsEinsatzWechselHarness /></AntApp>
+        <AntApp>
+          <UhsEinsatzWechselHarness />
+        </AntApp>
       </QueryClientProvider>,
     );
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'UHS Einsatz A');
@@ -136,11 +184,25 @@ describe('UnfallhilfsstellenPage', () => {
   it('rendert die UHS-Liste mit Status-Badge', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-        { id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-          bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null },
-      ])),
+      http.get('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json([
+          {
+            id: 7,
+            einsatz_id: 1,
+            abschnitt_id: null,
+            typ: 'behandlungsplatz',
+            bezeichnung: 'BHP 50',
+            standort: null,
+            notiz: null,
+            status: 'aktiv',
+            erfasst_at: 'x',
+            erfasst_von: 1,
+            geaendert_at: 'x',
+            geaendert_von: 1,
+            storniert_at: null,
+          },
+        ]),
+      ),
     );
     renderPage();
     await waitFor(() => expect(screen.getByText('BHP 50')).toBeInTheDocument());
@@ -195,9 +257,7 @@ describe('UnfallhilfsstellenPage', () => {
     const { qc } = renderPage();
     await screen.findByText('BHP 50');
 
-    server.use(
-      http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })),
-    );
+    server.use(http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })));
     await qc.refetchQueries({ queryKey: einsatzKeys.uhs(1) });
 
     expect(
@@ -205,7 +265,9 @@ describe('UnfallhilfsstellenPage', () => {
     ).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
     expect(screen.getByText('BHP 50')).toBeInTheDocument();
-    expect(screen.queryByText('Unfallhilfsstellen konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Unfallhilfsstellen konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   it('zeigt bei leerer Liste den Leertext und KEINEN Fehler', async () => {
@@ -225,11 +287,24 @@ describe('UnfallhilfsstellenPage', () => {
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
       http.post('/api/einsaetze/1/uhs', async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({
-          id: 1, einsatz_id: 1, abschnitt_id: null, typ: 'patientenablage',
-          bezeichnung: 'PA 1', standort: null, notiz: null, status: 'geplant',
-          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
-        }, { status: 201 });
+        return HttpResponse.json(
+          {
+            id: 1,
+            einsatz_id: 1,
+            abschnitt_id: null,
+            typ: 'patientenablage',
+            bezeichnung: 'PA 1',
+            standort: null,
+            notiz: null,
+            status: 'geplant',
+            erfasst_at: 'x',
+            erfasst_von: 1,
+            geaendert_at: 'x',
+            geaendert_von: 1,
+            storniert_at: null,
+          },
+          { status: 201 },
+        );
       }),
     );
     renderPage();
@@ -245,7 +320,8 @@ describe('UnfallhilfsstellenPage', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
       http.post('/api/einsaetze/1/uhs', () =>
-        HttpResponse.json({ error: 'UHS abgelehnt' }, { status: 500 })),
+        HttpResponse.json({ error: 'UHS abgelehnt' }, { status: 500 }),
+      ),
     );
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
@@ -261,21 +337,29 @@ describe('UnfallhilfsstellenPage', () => {
   it('meldet nach Schließen während des Anlegens keinen verspäteten Abschluss', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
-    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
-    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const postStart = new Promise<void>((resolve) => {
+      postGestartet = resolve;
+    });
+    const antwortGate = new Promise<void>((resolve) => {
+      antwortFreigeben = resolve;
+    });
     const onClose = vi.fn();
     const onAngelegt = vi.fn();
-    server.use(http.post('/api/einsaetze/1/uhs', async () => {
-      postGestartet();
-      await antwortGate;
-      return HttpResponse.json(bhp50, { status: 201 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/uhs', async () => {
+        postGestartet();
+        await antwortGate;
+        return HttpResponse.json(bhp50, { status: 201 });
+      }),
+    );
     renderUhsDrawer(onClose, onAngelegt);
 
     await userEvent.type(screen.getByPlaceholderText('z. B. BHP 50'), 'PA 1{Enter}');
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-    await act(async () => { antwortFreigeben(); });
+    await act(async () => {
+      antwortFreigeben();
+    });
     await screen.findByText('UHS angelegt');
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -287,20 +371,57 @@ describe('Grundriss DnD', () => {
   it('öffnet Detail und zeigt den Grundriss mit Plätzen', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-        { id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-          bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null },
-      ])),
-      http.get('/api/einsaetze/1/uhs/7', () => HttpResponse.json({
-        id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-        bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-        erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
-        plaetze: [{ id: 1, uhs_id: 7, typ: 'bett', bezeichnung: 'Bett 3',
-                    pos_x: 100, pos_y: 50, verfuegbarkeit: 'frei',
-                    reserviert_fuer_person_id: null, storniert_at: null }],
-        belegungen: [], material: [],
-      })),
+      http.get('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json([
+          {
+            id: 7,
+            einsatz_id: 1,
+            abschnitt_id: null,
+            typ: 'behandlungsplatz',
+            bezeichnung: 'BHP 50',
+            standort: null,
+            notiz: null,
+            status: 'aktiv',
+            erfasst_at: 'x',
+            erfasst_von: 1,
+            geaendert_at: 'x',
+            geaendert_von: 1,
+            storniert_at: null,
+          },
+        ]),
+      ),
+      http.get('/api/einsaetze/1/uhs/7', () =>
+        HttpResponse.json({
+          id: 7,
+          einsatz_id: 1,
+          abschnitt_id: null,
+          typ: 'behandlungsplatz',
+          bezeichnung: 'BHP 50',
+          standort: null,
+          notiz: null,
+          status: 'aktiv',
+          erfasst_at: 'x',
+          erfasst_von: 1,
+          geaendert_at: 'x',
+          geaendert_von: 1,
+          storniert_at: null,
+          plaetze: [
+            {
+              id: 1,
+              uhs_id: 7,
+              typ: 'bett',
+              bezeichnung: 'Bett 3',
+              pos_x: 100,
+              pos_y: 50,
+              verfuegbarkeit: 'frei',
+              reserviert_fuer_person_id: null,
+              storniert_at: null,
+            },
+          ],
+          belegungen: [],
+          material: [],
+        }),
+      ),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     );
     renderPage();
@@ -316,17 +437,45 @@ describe('UhsDetailPage', () => {
   it('merkt die geöffnete UHS als zuletzt ausgewählt', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-        { id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-          bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null },
-      ])),
-      http.get('/api/einsaetze/1/uhs/7', () => HttpResponse.json({
-        id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-        bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-        erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
-        plaetze: [], belegungen: [], material: [],
-      })),
+      http.get('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json([
+          {
+            id: 7,
+            einsatz_id: 1,
+            abschnitt_id: null,
+            typ: 'behandlungsplatz',
+            bezeichnung: 'BHP 50',
+            standort: null,
+            notiz: null,
+            status: 'aktiv',
+            erfasst_at: 'x',
+            erfasst_von: 1,
+            geaendert_at: 'x',
+            geaendert_von: 1,
+            storniert_at: null,
+          },
+        ]),
+      ),
+      http.get('/api/einsaetze/1/uhs/7', () =>
+        HttpResponse.json({
+          id: 7,
+          einsatz_id: 1,
+          abschnitt_id: null,
+          typ: 'behandlungsplatz',
+          bezeichnung: 'BHP 50',
+          standort: null,
+          notiz: null,
+          status: 'aktiv',
+          erfasst_at: 'x',
+          erfasst_von: 1,
+          geaendert_at: 'x',
+          geaendert_von: 1,
+          storniert_at: null,
+          plaetze: [],
+          belegungen: [],
+          material: [],
+        }),
+      ),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     );
     renderPage('/einsaetze/1/unfallhilfsstellen/7');

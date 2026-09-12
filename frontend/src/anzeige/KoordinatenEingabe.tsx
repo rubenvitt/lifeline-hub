@@ -27,8 +27,14 @@ interface Props {
   exclude?: string;
 }
 
-
-export default function KoordinatenEingabe({ id, value, onChange, status, einsatzId, exclude }: Props) {
+export default function KoordinatenEingabe({
+  id,
+  value,
+  onChange,
+  status,
+  einsatzId,
+  exclude,
+}: Props) {
   const override = useKoordinatenSystemOverride();
   const { konventionen } = useAnzeigeKonventionen();
   const system: Koordinatenformat = override ?? konventionen.koordinatenformat ?? 'wgs84';
@@ -71,7 +77,7 @@ export default function KoordinatenEingabe({ id, value, onChange, status, einsat
           onChange={(e) => bearbeiten(e.target.value)}
           onFocus={() => setFokus(true)}
           onBlur={() => setFokus(false)}
-          status={fehler ? 'error' : status ?? undefined}
+          status={fehler ? 'error' : (status ?? undefined)}
           placeholder="Koordinate eingeben"
         />
         <Select<Koordinatenformat>

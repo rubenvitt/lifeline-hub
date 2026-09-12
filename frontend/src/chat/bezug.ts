@@ -1,5 +1,11 @@
 import type {
-  Auftrag, BezugTyp, LageberichtAnzeige, Meldung, Person, Schaden, Uhs,
+  Auftrag,
+  BezugTyp,
+  LageberichtAnzeige,
+  Meldung,
+  Person,
+  Schaden,
+  Uhs,
 } from '../api/types';
 import { schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import { registrierAnzeige } from '../api/einsatzPerson';
@@ -72,7 +78,10 @@ export function auftragLabel(a: Auftrag): string {
 
 // Kurzinfo-Builder je Typ — speisen das Bezug-Popover aus den Listen-Objekten.
 export function schadenInfo(s: Schaden): BezugKurzinfo {
-  return { titel: schadenLabel(s), zeilen: [`Typ: ${s.typ}`, `Ausmaß: ${s.ausmass}`, `Ort: ${s.ort}`] };
+  return {
+    titel: schadenLabel(s),
+    zeilen: [`Typ: ${s.typ}`, `Ausmaß: ${s.ausmass}`, `Ort: ${s.ort}`],
+  };
 }
 export function uhsInfo(u: Uhs): BezugKurzinfo {
   return { titel: uhsLabel(u), zeilen: [`Typ: ${u.typ}`] };

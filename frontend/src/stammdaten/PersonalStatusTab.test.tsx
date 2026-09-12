@@ -8,8 +8,13 @@ import { AuthProvider } from '../auth/AuthContext';
 import PersonalStatusTab from './PersonalStatusTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
@@ -150,7 +155,11 @@ describe('PersonalStatusTab', () => {
       http.post('/api/personal-status', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json({
-          id: 9, label: 'im Anmarsch', kategorie: 'gebunden', farbe: null, sortier: 0,
+          id: 9,
+          label: 'im Anmarsch',
+          kategorie: 'gebunden',
+          farbe: null,
+          sortier: 0,
         });
       }),
     );
@@ -199,7 +208,9 @@ describe('PersonalStatusTab', () => {
     const dialog = await screen.findByRole('dialog');
 
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
-    expect(within(dialog).getByRole('button', { name: 'Speichern' }).closest('form')).not.toBeNull();
+    expect(
+      within(dialog).getByRole('button', { name: 'Speichern' }).closest('form'),
+    ).not.toBeNull();
   });
 
   /**
@@ -224,7 +235,8 @@ describe('PersonalStatusTab', () => {
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
       http.patch('/api/personal-status/1', () =>
-        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 })),
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
+      ),
     );
     render(admin);
     await screen.findByText('dienstbereit');

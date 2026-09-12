@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  abonniereLiveStatus,
-  leseLiveStatus,
-  setzeLiveStatusFuerTest,
-} from './liveStatusStore';
+import { abonniereLiveStatus, leseLiveStatus, setzeLiveStatusFuerTest } from './liveStatusStore';
 
 function melde(status: string) {
   window.dispatchEvent(new CustomEvent('lfh:live-status', { detail: { status } }));

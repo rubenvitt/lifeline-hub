@@ -141,7 +141,10 @@ async function seedeKraft(page: Page, einsatzId: string) {
       },
     },
   });
-  expect(antwort.ok(), `Seeding Personal: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  expect(
+    antwort.ok(),
+    `Seeding Personal: ${antwort.status()} ${await antwort.text()}`,
+  ).toBeTruthy();
 }
 
 /**
@@ -206,10 +209,10 @@ for (const { dichte, soll } of STAFFEL) {
       // Handschuh-Stufe am Tablet überhaupt erreichbar. `ThemeModeProvider` liest den
       // Speicher beim Montieren, ein Setzen ohne Neuladen bliebe folgenlos.
       await page.goto(`/einsaetze/${einsatzId}/personal`);
-      await page.evaluate(
-        ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
-        [DICHTE_SCHLUESSEL, dichte] as const,
-      );
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
       await page.reload();
     } else {
       await page.goto(`/einsaetze/${einsatzId}/personal`);

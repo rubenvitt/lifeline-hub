@@ -97,8 +97,10 @@ describe('zuUpdate', () => {
     // in ein explizites „An" — ohne Fehlerbild.
     const erbt = { ...VOLL, auto_etb_eintraege: null } as unknown as EinsatzEinstellungen;
     expect(zuUpdate(erbt).auto_etb_eintraege).toBeNull();
-    expect(zuUpdate({ ...VOLL, auto_etb_eintraege: 1 } as unknown as EinsatzEinstellungen)
-      .auto_etb_eintraege).toBe(true);
+    expect(
+      zuUpdate({ ...VOLL, auto_etb_eintraege: 1 } as unknown as EinsatzEinstellungen)
+        .auto_etb_eintraege,
+    ).toBe(true);
     expect(zuUpdate(VOLL).auto_etb_eintraege).toBe(false);
   });
 

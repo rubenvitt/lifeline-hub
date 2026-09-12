@@ -1,4 +1,16 @@
-import { Alert, App, Breadcrumb, Button, Collapse, Form, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Collapse,
+  Form,
+  Input,
+  Popconfirm,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
@@ -11,8 +23,14 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import {
-  aktualisiereDisposition, disponiereAdhoc, disponiereFahrzeug, entferneDisposition,
-  gibBesatzungFrei, listeEinsatzFahrzeuge, ordneBesatzungZu, type AdhocEingabe,
+  aktualisiereDisposition,
+  disponiereAdhoc,
+  disponiereFahrzeug,
+  entferneDisposition,
+  gibBesatzungFrei,
+  listeEinsatzFahrzeuge,
+  ordneBesatzungZu,
+  type AdhocEingabe,
 } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { ApiError } from '../api/client';
@@ -26,8 +44,18 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
-import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
-import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
+import {
+  nichtGefundenInhalt,
+  SeitenFehler,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
+import {
+  KATEGORIE_REIHENFOLGE,
+  KATEGORIE_WERTE,
+  kategorieEtikett,
+  kategorieVon,
+} from '../kraefte/statusAchse';
 import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 
@@ -99,9 +127,11 @@ function istBesatzungsStaerke(crew: EinsatzPersonal[]): Staerke {
 
 /** Soll gilt als erfüllt, wenn Ist in JEDER Position (F/UF/M) ≥ Soll ist (Überbesetzung zählt mit). */
 function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
-  return ist.fuehrer >= soll.fuehrer
-    && ist.unterfuehrer >= soll.unterfuehrer
-    && ist.mannschaft >= soll.mannschaft;
+  return (
+    ist.fuehrer >= soll.fuehrer &&
+    ist.unterfuehrer >= soll.unterfuehrer &&
+    ist.mannschaft >= soll.mannschaft
+  );
 }
 
 /**
@@ -112,10 +142,18 @@ function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
  */
 function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | null }) {
   if (!soll) {
-    return <Tag color="blue" title="kein Soll hinterlegt"><StaerkeAnzeige wert={ist} /></Tag>;
+    return (
+      <Tag color="blue" title="kein Soll hinterlegt">
+        <StaerkeAnzeige wert={ist} />
+      </Tag>
+    );
   }
   if (istSollErfuellt(ist, soll)) {
-    return <Tag color="green" title="Soll erfüllt"><StaerkeAnzeige wert={ist} /></Tag>;
+    return (
+      <Tag color="green" title="Soll erfüllt">
+        <StaerkeAnzeige wert={ist} />
+      </Tag>
+    );
   }
   return (
     <Tag color="red" title="unterbesetzt">
@@ -131,7 +169,12 @@ function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | n
  * (Transparenz der bewusst orthogonalen Zuordnung).
  */
 function BesatzungsBlock({
-  ef, personal, darfSchreiben, freiInhalt, onZuordnen, onFreigeben,
+  ef,
+  personal,
+  darfSchreiben,
+  freiInhalt,
+  onZuordnen,
+  onFreigeben,
 }: {
   ef: EinsatzFahrzeug;
   personal: EinsatzPersonal[];
@@ -156,18 +199,30 @@ function BesatzungsBlock({
         <BesatzungsStaerkeBadge ist={ist} soll={ef.soll_besatzung ?? null} />
       </Space>
       {crew.length === 0 ? (
-        <div><Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text></div>
+        <div>
+          <Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text>
+        </div>
       ) : (
         crew.map((m) => (
-          <Space key={m.id} style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}>
+          <Space
+            key={m.id}
+            style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
+          >
             <Space size={abstand.sm}>
-              <span>{m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}</span>
+              <span>
+                {m.name}
+                {m.staerke_position ? ` (${m.staerke_position})` : ''}
+              </span>
               {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
-                <Tag color="orange" style={{ margin: 0 }}>andere Einheit</Tag>
+                <Tag color="orange" style={{ margin: 0 }}>
+                  andere Einheit
+                </Tag>
               )}
             </Space>
             {darfSchreiben && (
-              <Button danger onClick={() => onFreigeben(m.id)}>Freigeben</Button>
+              <Button danger onClick={() => onFreigeben(m.id)}>
+                Freigeben
+              </Button>
             )}
           </Space>
         ))
@@ -196,13 +251,22 @@ export default function FahrzeugePage() {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const efQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
-  const statusQuery = useQuery({ queryKey: globalKeys.fahrzeugStatus(), queryFn: listeFahrzeugStatus });
-  const poolQuery = useQuery({ queryKey: globalKeys.fahrzeugeListe('im-dienst'), queryFn: () => listeFahrzeuge(true) });
+  const statusQuery = useQuery({
+    queryKey: globalKeys.fahrzeugStatus(),
+    queryFn: listeFahrzeugStatus,
+  });
+  const poolQuery = useQuery({
+    queryKey: globalKeys.fahrzeugeListe('im-dienst'),
+    queryFn: () => listeFahrzeuge(true),
+  });
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
@@ -222,11 +286,15 @@ export default function FahrzeugePage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const disponiereMutation = useMutation({
     mutationFn: (fahrzeugId: number) => disponiereFahrzeug(einsatzId, fahrzeugId),
-    onSuccess: () => { message.success('Fahrzeug disponiert'); invalidate(); },
+    onSuccess: () => {
+      message.success('Fahrzeug disponiert');
+      invalidate();
+    },
     onError: fehler,
   });
   // Schliessen und Leeren gehoeren seit LFH-332/B4 der Erfassungshuelle: sie schliesst ueber
@@ -246,36 +314,40 @@ export default function FahrzeugePage() {
       const vorher = qc.getQueryData<EinsatzFahrzeug[]>(queryKey)?.find((ef) => ef.id === v.efId);
       const status = statusQuery.data?.find((s) => s.id === v.statusId);
       qc.setQueryData<EinsatzFahrzeug[]>(queryKey, (alt) =>
-        alt?.map((ef) => ef.id === v.efId
-          ? {
-              ...ef,
-              status_id: v.statusId,
-              status_label: status?.label ?? ef.status_label,
-              status_kategorie: status?.kategorie ?? ef.status_kategorie,
-              status_farbe: status?.farbe ?? null,
-            }
-          : ef),
+        alt?.map((ef) =>
+          ef.id === v.efId
+            ? {
+                ...ef,
+                status_id: v.statusId,
+                status_label: status?.label ?? ef.status_label,
+                status_kategorie: status?.kategorie ?? ef.status_kategorie,
+                status_farbe: status?.farbe ?? null,
+              }
+            : ef,
+        ),
       );
       return { vorher };
     },
     onSuccess: (serverStand) => {
       qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (alt) =>
-        alt?.map((ef) => ef.id === serverStand.id ? serverStand : ef),
+        alt?.map((ef) => (ef.id === serverStand.id ? serverStand : ef)),
       );
     },
     onError: (e, v, kontext) => {
       const vorher = kontext?.vorher;
       if (vorher) {
         qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (aktuell) =>
-          aktuell?.map((ef) => ef.id === v.efId && ef.status_id === v.statusId
-            ? {
-                ...ef,
-                status_id: vorher.status_id,
-                status_label: vorher.status_label,
-                status_kategorie: vorher.status_kategorie,
-                status_farbe: vorher.status_farbe,
-              }
-            : ef),
+          aktuell?.map((ef) =>
+            ef.id === v.efId && ef.status_id === v.statusId
+              ? {
+                  ...ef,
+                  status_id: vorher.status_id,
+                  status_label: vorher.status_label,
+                  status_kategorie: vorher.status_kategorie,
+                  status_farbe: vorher.status_farbe,
+                }
+              : ef,
+          ),
         );
       }
       fehler(e);
@@ -383,14 +455,20 @@ export default function FahrzeugePage() {
       // nichts tut, ist schlechter als ein gesperrter (Bestandsverhalten des `Select`).
       gesperrt: statusMutation.isPending,
       onWaehlen: (wert: string | number) => {
-        if (!statusMutation.isPending) statusMutation.mutate({ efId: ef.id, statusId: Number(wert) });
+        if (!statusMutation.isPending)
+          statusMutation.mutate({ efId: ef.id, statusId: Number(wert) });
       },
     };
   };
-  const disponierteIds = new Set(efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null));
+  const disponierteIds = new Set(
+    efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null),
+  );
   const poolOptionen = (poolQuery.data ?? [])
     .filter((f) => !disponierteIds.has(f.id))
-    .map((f) => ({ value: f.id, label: `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}` }));
+    .map((f) => ({
+      value: f.id,
+      label: `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
+    }));
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
@@ -403,12 +481,14 @@ export default function FahrzeugePage() {
    * Admin-Schranke (nur `benutzer.rs` trägt eine). Ein „nur für Admins" am Fahrzeug-Pool
    * wäre ein erfundener Fehlerfall.
    */
-  const poolInhalt = nichtGefundenInhalt(poolQuery, {
-    allgemein: 'Fahrzeugliste konnte nicht geladen werden',
-  }) ?? 'Keine freien Fahrzeuge';
-  const besatzungInhalt = nichtGefundenInhalt(personalQuery, {
-    allgemein: 'Kräfte konnten nicht geladen werden',
-  }) ?? 'Keine freien Kräfte';
+  const poolInhalt =
+    nichtGefundenInhalt(poolQuery, {
+      allgemein: 'Fahrzeugliste konnte nicht geladen werden',
+    }) ?? 'Keine freien Fahrzeuge';
+  const besatzungInhalt =
+    nichtGefundenInhalt(personalQuery, {
+      allgemein: 'Kräfte konnten nicht geladen werden',
+    }) ?? 'Keine freien Kräfte';
 
   /**
    * Trägerfilter aus den EIGENEN Daten (Muster der Kräfteübersicht). `undefined`, wenn
@@ -420,12 +500,18 @@ export default function FahrzeugePage() {
    * kleine Verschiebung. Der Tausch ist gewollt: ein dauerhaft leeres Filterfeld sieht wie
    * ein Werkzeug aus und ist keins.
    */
-  const traegerWerte = [...new Set(efs.map((e) => e.traegerorganisation).filter((t): t is string => !!t))]
+  const traegerWerte = [
+    ...new Set(efs.map((e) => e.traegerorganisation).filter((t): t is string => !!t)),
+  ]
     .sort()
     .map((t) => ({ text: t, value: t }));
-  const traegerFilter = traegerWerte.length > 0
-    ? { werte: traegerWerte, trifft: (e: EinsatzFahrzeug, w: string) => e.traegerorganisation === w }
-    : undefined;
+  const traegerFilter =
+    traegerWerte.length > 0
+      ? {
+          werte: traegerWerte,
+          trifft: (e: EinsatzFahrzeug, w: string) => e.traegerorganisation === w,
+        }
+      : undefined;
 
   /**
    * Spaltenregister der Fahrzeugseite (LFH-330 · B2).
@@ -457,17 +543,27 @@ export default function FahrzeugePage() {
       ),
     },
     {
-      title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'typ',
-      sortWert: (ef) => ef.fahrzeugtyp, suchText: (ef) => ef.fahrzeugtyp,
+      title: 'Typ',
+      dataIndex: 'fahrzeugtyp',
+      key: 'typ',
+      sortWert: (ef) => ef.fahrzeugtyp,
+      suchText: (ef) => ef.fahrzeugtyp,
       render: (t) => t ?? '—',
     },
     {
-      title: 'Kennzeichen', dataIndex: 'kennzeichen', key: 'kennzeichen', abBreite: 'lg',
-      suchText: (ef) => ef.kennzeichen, render: (t) => t ?? '—',
+      title: 'Kennzeichen',
+      dataIndex: 'kennzeichen',
+      key: 'kennzeichen',
+      abBreite: 'lg',
+      suchText: (ef) => ef.kennzeichen,
+      render: (t) => t ?? '—',
     },
     {
-      title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger',
-      filter: traegerFilter, render: (t) => t ?? '—',
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      filter: traegerFilter,
+      render: (t) => t ?? '—',
     },
     {
       title: 'Status',
@@ -522,7 +618,10 @@ export default function FahrzeugePage() {
             key: 'aktionen' as const,
             immerSichtbar: true,
             render: (_: unknown, ef: EinsatzFahrzeug) => (
-              <Popconfirm title="Aus Einsatz entfernen?" onConfirm={() => entfernenMutation.mutate(ef.id)}>
+              <Popconfirm
+                title="Aus Einsatz entfernen?"
+                onConfirm={() => entfernenMutation.mutate(ef.id)}
+              >
                 {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung (LFH-352/LFH-315). Der
                     zweite Handgriff aus Kriterium 4 ist die Rückfrage, nicht die Farbe. */}
                 <Button>Entfernen</Button>
@@ -552,7 +651,11 @@ export default function FahrzeugePage() {
       }
       breadcrumb={
         <Breadcrumb
-          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Fahrzeuge' }]}
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Fahrzeuge' },
+          ]}
         />
       }
       aktionen={
@@ -570,14 +673,17 @@ export default function FahrzeugePage() {
               notFoundContent={poolInhalt}
               loading={disponiereMutation.isPending}
               disabled={disponiereMutation.isPending}
-              onSelect={(fahrzeugId) => { if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId); }}
+              onSelect={(fahrzeugId) => {
+                if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId);
+              }}
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
           </Space>
         )
       }
       hinweis={
-        !darfSchreiben && einsatz.status !== 'aktiv' && (
+        !darfSchreiben &&
+        einsatz.status !== 'aktiv' && (
           <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
         )
       }
@@ -622,82 +728,82 @@ export default function FahrzeugePage() {
           onWiederholen={() => void efQuery.refetch()}
         />
       ) : (
-      <>
-      {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
-      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
-      <Datensicht
-        bezeichnung="Fahrzeuge im Einsatz"
-        spalten={spalten}
-        daten={efs}
-        zeilenSchluessel="id"
-        ladend={efQuery.isLoading}
-        leerText="Noch keine Fahrzeuge disponiert"
-        suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
-        standardSortierung={{ spalte: 'funkrufname', richtung: 'auf' }}
-        spaltenAusVoreinstellung={['bemerkung']}
-        gruppen={{
-          schluessel: (ef) => kategorieVon(ef.status_kategorie),
-          etikett: kategorieEtikett,
-          reihenfolge: KATEGORIE_REIHENFOLGE,
-        }}
-        zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
-        // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar; die
-        // kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte. Läuft nur im
-        // Tabellenzweig — unter `md` fehlt der Block, und das ist an dieser Stelle sichtbar.
-        aufklappzeile={(ef) => (
-          <BesatzungsBlock
-            ef={ef}
-            personal={personal}
-            darfSchreiben={darfSchreiben}
-            freiInhalt={besatzungInhalt}
-            onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-            onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+        <>
+          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
+          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
+          <Datensicht
+            bezeichnung="Fahrzeuge im Einsatz"
+            spalten={spalten}
+            daten={efs}
+            zeilenSchluessel="id"
+            ladend={efQuery.isLoading}
+            leerText="Noch keine Fahrzeuge disponiert"
+            suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
+            standardSortierung={{ spalte: 'funkrufname', richtung: 'auf' }}
+            spaltenAusVoreinstellung={['bemerkung']}
+            gruppen={{
+              schluessel: (ef) => kategorieVon(ef.status_kategorie),
+              etikett: kategorieEtikett,
+              reihenfolge: KATEGORIE_REIHENFOLGE,
+            }}
+            zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
+            // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar; die
+            // kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte. Läuft nur im
+            // Tabellenzweig — unter `md` fehlt der Block, und das ist an dieser Stelle sichtbar.
+            aufklappzeile={(ef) => (
+              <BesatzungsBlock
+                ef={ef}
+                personal={personal}
+                darfSchreiben={darfSchreiben}
+                freiInhalt={besatzungInhalt}
+                onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
+                onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+              />
+            )}
+            karte={{
+              art: 'plan',
+              titel: { spalte: 'funkrufname' },
+              // NICHT das `render` der Statusspalte — der Slot nimmt die Vertragsachse als
+              // Deskriptor. Seit LFH-339 · C4 tragen beide Zweige damit dieselbe Darstellung
+              // UND denselben Bedienweg; die Mandantenfarbe geht über `statusBedienung.farbe`
+              // mit und steht auf Rand und Text, nie auf der Fläche.
+              status: (ef) => statusDarstellung(ef),
+              // Der Bedienweg sitzt hier und NICHT im `aktion`-Slot: der ist mit „Entfernen"
+              // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
+              statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
+              sekundaer: ['typ', 'traeger', 'besatzung'],
+              aktion: darfSchreiben
+                ? {
+                    etikett: 'Entfernen',
+                    bestaetigung: 'Aus Einsatz entfernen?',
+                    onKlick: (ef) => entfernenMutation.mutate(ef.id),
+                  }
+                : undefined,
+            }}
           />
-        )}
-        karte={{
-          art: 'plan',
-          titel: { spalte: 'funkrufname' },
-          // NICHT das `render` der Statusspalte — der Slot nimmt die Vertragsachse als
-          // Deskriptor. Seit LFH-339 · C4 tragen beide Zweige damit dieselbe Darstellung
-          // UND denselben Bedienweg; die Mandantenfarbe geht über `statusBedienung.farbe`
-          // mit und steht auf Rand und Text, nie auf der Fläche.
-          status: (ef) => statusDarstellung(ef),
-          // Der Bedienweg sitzt hier und NICHT im `aktion`-Slot: der ist mit „Entfernen"
-          // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
-          statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
-          sekundaer: ['typ', 'traeger', 'besatzung'],
-          aktion: darfSchreiben
-            ? {
-                etikett: 'Entfernen',
-                bestaetigung: 'Aus Einsatz entfernen?',
-                onKlick: (ef) => entfernenMutation.mutate(ef.id),
-              }
-            : undefined,
-        }}
-      />
-      </>
+        </>
       )}
 
       {/**
-        * Ad-hoc-Disposition als Schnellerfassung (LFH-332 · B4).
-        *
-        * SERIENMODUS, weil hier der Regelfall eine MENGE ist: trifft eine fremde Einheit ein,
-        * werden ihre Fahrzeuge nacheinander erfasst. „Speichern und nächste" hält den Dialog
-        * offen und den Fokus im Funkrufnamen; `Trägerorganisation` und `Fahrzeugtyp` überleben
-        * das Speichern (`uebernahme`) — beim Zug einer Einheit ist der Träger für alle gleich
-        * und der Typ oft auch, und genau diese beiden Wiederholfelder kosten sonst je Fahrzeug
-        * einen zweiten Tippdurchgang.
-        *
-        * FELDBUDGET: vier sichtbare Felder, `OPTA` liegt zugeklappt unter „Weitere Angaben".
-        * Die OPTA ist die taktisch-technische Betriebsstelle — bei einem ad-hoc erfassten
-        * Fremdfahrzeug ist sie im Erfassungsmoment meist unbekannt, während Funkrufname, Typ,
-        * Träger und Kennzeichen am Fahrzeug ablesbar sind.
-        *
-        * `forceRender` am Klapp-Bereich: das eingeklappte Feld bleibt im Baum, damit ein
-        * eingetragener und danach zugeklappter Wert beim Absenden mitgeht. (antds `preserve`
-        * hielte den WERT zwar ohnehin, aber erst nach einem ersten Rendern — und ohne
-        * `forceRender` ist das Feld für Tastatur und Prüfung schlicht nicht da.)
-        */}
+       * Ad-hoc-Disposition als Schnellerfassung (LFH-332 · B4).
+       *
+       * SERIENMODUS, weil hier der Regelfall eine MENGE ist: trifft eine fremde Einheit ein,
+       * werden ihre Fahrzeuge nacheinander erfasst. „Speichern und nächste" hält den Dialog
+       * offen und den Fokus im Funkrufnamen; `Trägerorganisation` und `Fahrzeugtyp` überleben
+       * das Speichern (`uebernahme`) — beim Zug einer Einheit ist der Träger für alle gleich
+       * und der Typ oft auch, und genau diese beiden Wiederholfelder kosten sonst je Fahrzeug
+       * einen zweiten Tippdurchgang.
+       *
+       * FELDBUDGET: vier sichtbare Felder, `OPTA` liegt zugeklappt unter „Weitere Angaben".
+       * Die OPTA ist die taktisch-technische Betriebsstelle — bei einem ad-hoc erfassten
+       * Fremdfahrzeug ist sie im Erfassungsmoment meist unbekannt, während Funkrufname, Typ,
+       * Träger und Kennzeichen am Fahrzeug ablesbar sind.
+       *
+       * `forceRender` am Klapp-Bereich: das eingeklappte Feld bleibt im Baum, damit ein
+       * eingetragener und danach zugeklappter Wert beim Absenden mitgeht. (antds `preserve`
+       * hielte den WERT zwar ohnehin, aber erst nach einem ersten Rendern — und ohne
+       * `forceRender` ist das Feld für Tastatur und Prüfung schlicht nicht da.)
+       */}
       <ErfassungsModal<AdhocEingabe>
         offen={adhocOffen}
         titel="Ad-hoc-Fahrzeug disponieren"
@@ -712,22 +818,36 @@ export default function FahrzeugePage() {
         onFertig={() => setAdhocOffen(false)}
         onAbbrechen={() => setAdhocOffen(false)}
       >
-        <Form.Item label="Funkrufname" name="funkrufname" rules={[{ required: true, whitespace: true }]}>
+        <Form.Item
+          label="Funkrufname"
+          name="funkrufname"
+          rules={[{ required: true, whitespace: true }]}
+        >
           <Input placeholder="z. B. Florian Nachbarstadt 44/1" />
         </Form.Item>
-        <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp"><Input /></Form.Item>
+        <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
+          <Input />
+        </Form.Item>
         <Form.Item label="Trägerorganisation" name="traegerorganisation">
           <Input placeholder="z. B. Feuerwehr Nachbarstadt" />
         </Form.Item>
-        <Form.Item label="Kennzeichen" name="kennzeichen"><Input /></Form.Item>
+        <Form.Item label="Kennzeichen" name="kennzeichen">
+          <Input />
+        </Form.Item>
         <Collapse
           ghost
-          items={[{
-            key: 'weitere',
-            label: 'Weitere Angaben',
-            forceRender: true,
-            children: <Form.Item label="OPTA" name="opta"><Input /></Form.Item>,
-          }]}
+          items={[
+            {
+              key: 'weitere',
+              label: 'Weitere Angaben',
+              forceRender: true,
+              children: (
+                <Form.Item label="OPTA" name="opta">
+                  <Input />
+                </Form.Item>
+              ),
+            },
+          ]}
         />
       </ErfassungsModal>
     </EinsatzSeite>

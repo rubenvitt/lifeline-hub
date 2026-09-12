@@ -6,7 +6,10 @@ import userEvent from '@testing-library/user-event';
 import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Button, Form, Input } from 'antd';
-import { CommandPaletteProvider, useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import {
+  CommandPaletteProvider,
+  useTastaturEbene,
+} from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import { renderMitProviders } from '../test/utils';
 import { flaeche } from '../theme/tokens';
@@ -94,7 +97,9 @@ describe('EinsatzSeite', () => {
   it('zeigt den Query-Datenstand im Seitenkopf', () => {
     const zeit = new Date(2026, 5, 10, 14, 7).getTime();
     renderMitProviders(
-      <EinsatzSeite titel="Liste" dataUpdatedAt={zeit}><div>Inhalt</div></EinsatzSeite>,
+      <EinsatzSeite titel="Liste" dataUpdatedAt={zeit}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
     );
     expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
   });
@@ -226,7 +231,11 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
    */
   function Werkzeugzeile({ zuruecksetzen }: { zuruecksetzen: () => void }) {
     const wurzel = useRef<HTMLDivElement>(null);
-    useTastaturEbene({ name: 'Werkzeugzeile', wurzel, aktionen: { 'filter-zuruecksetzen': zuruecksetzen } });
+    useTastaturEbene({
+      name: 'Werkzeugzeile',
+      wurzel,
+      aktionen: { 'filter-zuruecksetzen': zuruecksetzen },
+    });
     return (
       <div ref={wurzel}>
         <button type="button">Werkzeug</button>

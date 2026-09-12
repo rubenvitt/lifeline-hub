@@ -176,31 +176,31 @@ function SitzungsLayout() {
 
 /** Eine Routenquelle für Browser und Integrationstests; keine nachgelagerten Routes. */
 export const appRouten = createRoutesFromElements(
-    <Route element={<App />}>
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<BetriebsLayout />}>
-          {/* Ebene 1 — globale Shell */}
-          <Route element={<AppLayout />}>
-            <Route path="/einsaetze" element={<EinsaetzePage />} />
-            {/* Benutzer-Verwaltung wohnt jetzt in der Admin-Sidebar; Alt-Link bleibt als Redirect. */}
-            <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
-            {/* Alt-Route bleibt für externe Links / EinsatzSwitcher erhalten */}
-            <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
-            <Route path="/profil" element={<ProfilPage />} />
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
-              {adminGruppen.map((g) => (
-                <Fragment key={g.key}>
-                  {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}
-                  <Route path={g.key} element={<Navigate to={ersteSektionPfad(g.key)} replace />} />
-                  {g.sektionen.map((s) => (
-                    <Route key={s.key} path={`${g.key}/${s.key}`} element={s.element} />
-                  ))}
-                </Fragment>
-              ))}
-              <Route path="benutzer" element={<BenutzerPage />} />
-              {/* Detailrouten der Stammdaten (LFH-346 · A7). Sie liegen IM `AdminLayout`,
+  <Route element={<App />}>
+    <Route path="/login" element={<LoginPage />} />
+    <Route element={<RequireAuth />}>
+      <Route element={<BetriebsLayout />}>
+        {/* Ebene 1 — globale Shell */}
+        <Route element={<AppLayout />}>
+          <Route path="/einsaetze" element={<EinsaetzePage />} />
+          {/* Benutzer-Verwaltung wohnt jetzt in der Admin-Sidebar; Alt-Link bleibt als Redirect. */}
+          <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
+          {/* Alt-Route bleibt für externe Links / EinsatzSwitcher erhalten */}
+          <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
+          <Route path="/profil" element={<ProfilPage />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
+            {adminGruppen.map((g) => (
+              <Fragment key={g.key}>
+                {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}
+                <Route path={g.key} element={<Navigate to={ersteSektionPfad(g.key)} replace />} />
+                {g.sektionen.map((s) => (
+                  <Route key={s.key} path={`${g.key}/${s.key}`} element={s.element} />
+                ))}
+              </Fragment>
+            ))}
+            <Route path="benutzer" element={<BenutzerPage />} />
+            {/* Detailrouten der Stammdaten (LFH-346 · A7). Sie liegen IM `AdminLayout`,
                   behalten also die Sidebar — eine Detailseite ohne den Verwaltungsrahmen
                   wäre eine Sackgasse ohne Rückweg. Sie stehen NEBEN der `adminGruppen`-
                   Schleife, weil die Registry Sektionen führt, keine Detailadressen.
@@ -208,50 +208,50 @@ export const appRouten = createRoutesFromElements(
                   rankt nach Spezifität, `stammdaten/fahrzeuge` (statisch) schlägt
                   `stammdaten/fahrzeuge/:fahrzeugId` nicht, sondern trifft eine andere
                   Adresse — die Liste bleibt unter dem Pfad ohne id erreichbar. */}
-              <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
-              <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
-            </Route>
+            <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
+            <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
           </Route>
-          {/* Ebene 2 — Einsatz-Workspace */}
-          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-            <Route index element={<DefaultModulRedirect />} />
-            {modulRegistry.map((m) => (
-              <Route
-                key={m.key}
-                path={m.route}
-                element={
-                  m.verweistAuf ? (
-                    <ModulRedirect to={m.verweistAuf} />
-                  ) : (
-                    (MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />)
-                  )
-                }
-              >
-                {/* Das Einstellungs-Modul ist seit LFH-345 · C10 ein Layout mit vier
+        </Route>
+        {/* Ebene 2 — Einsatz-Workspace */}
+        <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+          <Route index element={<DefaultModulRedirect />} />
+          {modulRegistry.map((m) => (
+            <Route
+              key={m.key}
+              path={m.route}
+              element={
+                m.verweistAuf ? (
+                  <ModulRedirect to={m.verweistAuf} />
+                ) : (
+                  (MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />)
+                )
+              }
+            >
+              {/* Das Einstellungs-Modul ist seit LFH-345 · C10 ein Layout mit vier
                     Sektions-Routen. Die Kinder hängen HIER statt in einem eigenen
                     <Route path="einstellungen">, weil zwei Routen mit demselben Pfad
                     nebeneinander stünden; und nicht per Filter aus dem `map`, weil ein
                     Filter beim nächsten verschachtelten Modul still auseinanderginge. */}
-                {m.key === 'einsatz-einstellungen' && EINSTELLUNGEN_ROUTEN}
-              </Route>
-            ))}
-            <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
-            <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-            <Route path="bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
-            <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
-            <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
-            <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
-            <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
-            {/* Statisches Segment VOR der dynamischen Detail-Route. React Router rankt
+              {m.key === 'einsatz-einstellungen' && EINSTELLUNGEN_ROUTEN}
+            </Route>
+          ))}
+          <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
+          <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+          <Route path="bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
+          <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
+          <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
+          <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
+          <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
+          {/* Statisches Segment VOR der dynamischen Detail-Route. React Router rankt
                 statisch ohnehin höher — die Reihenfolge steht so da, damit ein Leser das
                 nicht prüfen muss (LFH-340 · C5). */}
-            <Route path="personen/aufnahme" element={<AufnahmePage />} />
-            <Route path="personen/:personId" element={<PersonenDetailPage />} />
-            <Route path="tiere/:tierId" element={<TiereDetailPage />} />
-            <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
-          </Route>
+          <Route path="personen/aufnahme" element={<AufnahmePage />} />
+          <Route path="personen/:personId" element={<PersonenDetailPage />} />
+          <Route path="tiere/:tierId" element={<TiereDetailPage />} />
+          <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/einsaetze" replace />} />
-    </Route>,
+    </Route>
+    <Route path="*" element={<Navigate to="/einsaetze" replace />} />
+  </Route>,
 );
