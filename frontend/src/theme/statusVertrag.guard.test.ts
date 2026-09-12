@@ -59,6 +59,12 @@
  *     {@link FORMERHALTEND} ist eine Liste, kein Kriterium — bewusst, siehe die Begründung
  *     dort: alles abzuschälen meldet `Record<Gruppe, Array<StatusDarstellung>>` und wäre
  *     ein Fehlalarm. Im Bestand kommt keine Hülle ausserhalb der Liste vor.
+ *   • **Eine gespreizte Prop**: `<Tag {...{ color: rollenFarbe(rolle, token) }}>` oder
+ *     `<Tag {...props}>`. {@link farbAusdruck} überspringt jede Prop-Expression als
+ *     Ganzes — das ist genau der Schritt, der das verschachtelte `color` einer
+ *     Nachbar-Prop draussen hält, und beides ist dieselbe Klammer. Der Nachbar-Guard
+ *     `components/dichte.guard.test.ts:39` führt den Spread aus demselben Grund als
+ *     Blindfleck. Im Bestand trägt kein `<Tag` eine gespreizte Prop (gemessen).
  *   • **Ein Namensraum-Import von antd** (`import * as antd from 'antd'`, dann
  *     `<antd.Tag color=…>`). {@link tagNamenIn} löst die Umbenennung beim benannten
  *     Import auf, nicht die Qualifizierung im JSX-Namen. Im Bestand kommt weder das eine
