@@ -9,6 +9,7 @@ pub mod repo;
 pub mod retention;
 pub mod schwaerzung_registry;
 
+use crate::stab::Sachgebiet;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -205,6 +206,7 @@ impl Einsatz {
         &self,
         meine_rolle: Option<String>,
         meine_fuehrungsstelle: Option<String>,
+        meine_sachgebiete: Vec<Sachgebiet>,
     ) -> EinsatzAnzeige {
         EinsatzAnzeige {
             id: self.id,
@@ -230,6 +232,7 @@ impl Einsatz {
             retention_bis: self.retention_bis.clone(),
             meine_rolle,
             meine_fuehrungsstelle,
+            meine_sachgebiete,
         }
     }
 }
@@ -267,6 +270,16 @@ pub struct EinsatzAnzeige {
     /// Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meine_fuehrungsstelle: Option<String>,
+    /// Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
+    /// diesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.
+    ///
+    /// **Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und
+    /// KEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über
+    /// `Einsatz::anzeige`, Liste über das Struct-Literal in `repo::liste_fuer`), und ein
+    /// Pfad, der auslässt, während der andere `[]` schickt, wäre nach der
+    /// Optionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung.
+    #[schema(required)]
+    pub meine_sachgebiete: Vec<Sachgebiet>,
 }
 
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).

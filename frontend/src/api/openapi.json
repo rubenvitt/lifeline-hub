@@ -748,6 +748,16 @@
           }
         }
       },
+      "BesetzungArt": {
+        "type": "string",
+        "description": "Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.\n\n**Keine Zeile = „nicht vergeben\"** — das ist der im Fükw der Führungsstufe B\ndokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.\nDer Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion\n(„haben wir S4 bedacht?\").",
+        "enum": [
+          "einsatzleitung",
+          "personal",
+          "extern",
+          "rueckwaertig"
+        ]
+      },
       "Betriebsart": {
         "type": "string",
         "description": "Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `betriebsart` (per-Variante, Großbuchstaben — `rename_all` trifft nicht).",
@@ -1570,7 +1580,8 @@
           "status",
           "begonnen_at",
           "einsatzart",
-          "angelegt_at"
+          "angelegt_at",
+          "meine_sachgebiete"
         ],
         "properties": {
           "abgeschlossen_at": {
@@ -1657,6 +1668,13 @@
                 "$ref": "#/components/schemas/EinsatzRolle"
               }
             ]
+          },
+          "meine_sachgebiete": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Sachgebiet"
+            },
+            "description": "Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in\ndiesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.\n\n**Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und\nKEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über\n`Einsatz::anzeige`, Liste über das Struct-Literal in `repo::liste_fuer`), und ein\nPfad, der auslässt, während der andere `[]` schickt, wäre nach der\nOptionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung."
           },
           "meldende_stelle": {
             "type": [
@@ -3921,6 +3939,7 @@
           "karte_bild",
           "etb",
           "befehl",
+          "stab",
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
@@ -5466,6 +5485,18 @@
           "extern"
         ]
       },
+      "Sachgebiet": {
+        "type": "string",
+        "description": "Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.\n\nDie Reihenfolge ist die der Anlage 2 und zugleich die Anzeigereihenfolge — sie ist\nTeil des Vertrags, nicht Dekoration (`ALLE` speist die sechs festen Zeilen).",
+        "enum": [
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6"
+        ]
+      },
       "SchadenAbschlussGrund": {
         "type": "string",
         "enum": [
@@ -5783,6 +5814,63 @@
           "sortier": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "StabAnzeige": {
+        "type": "object",
+        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.",
+        "required": [
+          "besetzung"
+        ],
+        "properties": {
+          "besetzung": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StabsfunktionAnzeige"
+            }
+          }
+        }
+      },
+      "StabsfunktionAnzeige": {
+        "type": "object",
+        "description": "Eine belegte Sachgebietszeile.\n\n`name` trägt je Art `snap_name` (Personal) bzw. `bezeichnung` (extern/rückwärtig) und ist\nbei [`BesetzungArt::Einsatzleitung`] absent. `personal_noch_disponiert` unterscheidet\n„Person ist weg\" von „Name war nie gesetzt\": der Führungsnachweis überlebt das Entfernen\nder Disposition (`ON DELETE SET NULL` + eingefrorener `snap_name`).",
+        "required": [
+          "sachgebiet",
+          "besetzung_art",
+          "personal_noch_disponiert",
+          "gesetzt_von_id",
+          "gesetzt_at"
+        ],
+        "properties": {
+          "besetzung_art": {
+            "$ref": "#/components/schemas/BesetzungArt"
+          },
+          "gesetzt_at": {
+            "type": "string"
+          },
+          "gesetzt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "personal_noch_disponiert": {
+            "type": "boolean"
+          },
+          "sachgebiet": {
+            "$ref": "#/components/schemas/Sachgebiet"
           }
         }
       },

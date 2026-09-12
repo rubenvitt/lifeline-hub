@@ -239,7 +239,10 @@ pub async fn erzeuge(
         version: 1,
         stand_at: stand_at.clone(),
         org_default,
-        einsatz: einsatz.anzeige(None, None),
+        // Der Snapshot hat keinen abfragenden Benutzer — dieselbe Begründung wie für
+        // `None` bei Rolle und Führungsstelle: es gibt niemanden, dessen Sachgebiete
+        // hier gemeint wären.
+        einsatz: einsatz.anzeige(None, None, Vec::new()),
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
         // inkl_storniert=false: der Stand spiegelt das sichtbare Lagebild, nicht stornierte Schäden.

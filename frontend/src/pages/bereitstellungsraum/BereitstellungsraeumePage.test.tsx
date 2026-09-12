@@ -32,6 +32,7 @@ function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
     meine_rolle: 'einsatzleitung',
     org_id: 1,
     org_name: 'Org',
+    meine_sachgebiete: [],
     ...over,
   };
 }
