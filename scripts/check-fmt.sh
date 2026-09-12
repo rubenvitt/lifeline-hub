@@ -46,6 +46,13 @@ fi
 echo "==> [2/2] prettier --check (Frontend-Baseline, LFH-354)"
 # `--check` listet die abweichenden Dateien und bricht; es schreibt nichts. Der Lauf schließt
 # das ganze Frontend ein (src/, e2e/, Konfigurationsdateien), abzüglich .prettierignore.
+#
+# BEWUSSTE GRENZE: geprüft wird `frontend/`, nicht das Repo-Root. Dort liegen mit
+# release.config.mjs, der Werkzeug-package.json, den Workflows und CLAUDE.md Dateien, die
+# Prettier ebenfalls anfassen würde — und für die der Sweep von LFH-354 nie gefahren ist. Sie
+# hier mitzunehmen hieße, das Gate rot zu machen, ohne die Baseline hergestellt zu haben; das
+# ist genau die Reihenfolge, an der ein Gate stirbt. Wer die Grenze verschieben will, fährt
+# erst den Sweep. Das Fehlen ist also bekannt, nicht übersehen.
 if ! $PNPM -C "$FE" exec prettier --check .; then
   echo "FEHLER: Frontend-Code ist nicht prettier-clean." >&2
   echo "        'pnpm -C frontend exec prettier --write .' laufen lassen und die" >&2
