@@ -21,6 +21,45 @@ ARBEIT="$(mktemp -d)"
 trap 'rm -rf "$ARBEIT"' EXIT
 fehler=0
 
+# HASHWERKZEUG: `shasum -a 256` ist die Konvention des Repos (build-offline-karten.sh,
+# artefakte.yml), `sha256sum` fehlt auf macOS. Die Wahl steht HIER und wird an die Attrappe
+# durchgereicht, damit beide Seiten desselben Vergleichs dasselbe Werkzeug nehmen.
+#
+# UND SEIN FEHLEN IST EIN ABBRUCH, KEIN LEERSTRING. Ohne diesen Riegel kollabieren beide
+# Seiten von Fall 2 zu "" und die Aussage „das Lockfile kam unverändert mit" ist trivial
+# grün, ohne dass je etwas gehasht wurde — nachgestellt, indem `sha256sum` aus dem PATH
+# genommen wurde: der Fall meldete „ok". Ein Test, der nicht rot werden kann, behauptet
+# eine Deckung, die er nicht hat.
+if command -v shasum >/dev/null 2>&1; then
+  HASHBEFEHL="shasum -a 256"
+elif command -v sha256sum >/dev/null 2>&1; then
+  HASHBEFEHL="sha256sum"
+else
+  echo "FEHLER: weder shasum noch sha256sum gefunden — der Lockfile-Vergleich" >&2
+  echo "        wäre ohne Hashwerkzeug still wirkungslos." >&2
+  exit 1
+fi
+export HASHBEFEHL
+
+hashe() { # <datei> -> gekürzter Hash
+  $HASHBEFEHL < "$1" | cut -c1-16
+}
+
+# PATH-Einträge fallenlassen, die ein echtes cargo-audit führen. Fall 8 braucht das:
+# `check-deps.sh` fragt zuerst `command -v cargo-audit` und erreicht die Attrappe gar
+# nicht, wenn das Werkzeug wirklich installiert ist — in der CI ist es das
+# (ci.yml installiert cargo-audit 0.22.2 vor den Schnellprüfungen).
+pfad_ohne_cargo_audit() {
+  local neu="" eintrag
+  local IFS=:
+  for eintrag in $PATH; do
+    if [ -n "$eintrag" ] && [ ! -x "$eintrag/cargo-audit" ]; then
+      neu="${neu:+$neu:}$eintrag"
+    fi
+  done
+  printf '%s\n' "$neu"
+}
+
 pruefe() { # <name> <erwartet> <gemessen>
   if [ "$2" = "$3" ]; then
     echo "  ok   $1"
@@ -68,7 +107,7 @@ for a in "$@"; do [ "$vorher" = "-C" ] && dir="$a"; vorher="$a"; done
 {
   echo "dir=$dir"
   if [ -f "$dir/pnpm-lock.yaml" ]; then
-    echo "lockfile=$(sha256sum < "$dir/pnpm-lock.yaml" | cut -c1-16)"
+    echo "lockfile=$(${HASHBEFEHL:?} < "$dir/pnpm-lock.yaml" | cut -c1-16)"
   else
     echo "lockfile=FEHLT"
   fi
@@ -100,13 +139,16 @@ CARGO
 
 # Führt das Skript im Skelett aus und gibt seinen Exit-Code aus. Der Befund landet in
 # $PROTOKOLL und wird von den Fällen danach gelesen.
-lauf() { # <repo> [env-zuweisungen...] -> gibt den Exit-Code aus
+lauf() { # [--ohne-cargo-audit] <repo> [env-zuweisungen...] -> gibt den Exit-Code aus
+  local basis="$PATH"
+  if [ "${1:-}" = --ohne-cargo-audit ]; then basis="$(pfad_ohne_cargo_audit)"; shift; fi
   local pfad="$1"; shift
   PROTOKOLL="$pfad/protokoll"
   rm -rf "$PROTOKOLL"; mkdir -p "$PROTOKOLL"
   local rc=0
-  env PATH="$pfad/bin:$PATH" PROTOKOLL="$PROTOKOLL" REPO_UNTER_TEST="$pfad" \
-      STUB_CARGO_AUDIT_DA=1 "$@" "$pfad/scripts/check-deps.sh" >/dev/null 2>&1 || rc=$?
+  env PATH="$pfad/bin:$basis" PROTOKOLL="$PROTOKOLL" REPO_UNTER_TEST="$pfad" \
+      STUB_CARGO_AUDIT_DA=1 "$@" "$pfad/scripts/check-deps.sh" \
+      > "$PROTOKOLL/ausgabe" 2>&1 || rc=$?
   printf '%s\n' "$rc"
 }
 
@@ -131,7 +173,7 @@ pruefe "der Audit läuft ausserhalb des Arbeitsbaums" "NEIN" "$(befund "$r" im_r
 # 2 — Das Lockfile kommt BYTE-IDENTISCH mit. Ohne diese Hälfte wäre Fall 1 auch dann grün,
 # wenn gar nichts kopiert würde und der Audit ein leeres Verzeichnis sähe.
 pruefe "das Lockfile kommt unverändert mit" \
-  "$(sha256sum < "$r/frontend/pnpm-lock.yaml" | cut -c1-16)" "$(befund "$r" lockfile)"
+  "$(hashe "$r/frontend/pnpm-lock.yaml")" "$(befund "$r" lockfile)"
 
 # 3 — pnpm-workspace.yaml MUSS mit: dort stehen die Overrides. Fehlte sie, liefe das Gate
 # nicht falsch grün, sondern falsch ROT — das andere Fehlerbild, das ein Gate abschaltet.
@@ -162,8 +204,16 @@ pruefe "ein cargo-audit-Fund bricht das Gate" "1" "$rc"
 # 8 — Ein unvollständiger Scan darf einen echten Fund nicht schlucken. Die Kombination ist
 # real: cargo-audit fehlt auf vielen Maschinen, und das Skript beendet sich in dem Fall
 # bewusst mit 0. Läge dieser Zweig VOR dem Frontend-Audit, ginge der Fund verloren.
-rc="$(lauf "$r" STUB_CARGO_AUDIT_DA=0 STUB_PNPM_RC=1)"
+#
+# DER PATH MUSS DAFÜR GEFILTERT WERDEN, und das ist gemessen statt vermutet: `check-deps.sh`
+# fragt zuerst `command -v cargo-audit`. Ist das Werkzeug echt installiert — in der CI ist es
+# das —, wird die Attrappe nie gefragt, der Zweig nie betreten, und dieser Fall wäre eine
+# Dublette von Fall 6. Deshalb wird zusätzlich BELEGT, dass der Zweig lief: ohne diese
+# Zeile ist „grün" von „gar nicht ausgeführt" nicht zu unterscheiden.
+rc="$(lauf --ohne-cargo-audit "$r" STUB_CARGO_AUDIT_DA=0 STUB_PNPM_RC=1)"
 pruefe "fehlendes cargo-audit schluckt den Frontend-Fund nicht" "1" "$rc"
+pruefe "fehlendes cargo-audit: der Zweig wurde wirklich betreten" "ja" \
+  "$(grep -q 'ÜBERSPRUNGEN: cargo-audit' "$r/protokoll/ausgabe" && echo ja || echo nein)"
 
 # 9 — Fehlt eine Manifest-Datei, wird laut abgebrochen statt eine Teilmenge zu prüfen.
 r="$(repo_neu ohne_lockfile)"; rm "$r/frontend/pnpm-lock.yaml"
