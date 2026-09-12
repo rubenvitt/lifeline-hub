@@ -9,7 +9,11 @@ einziges WIP-Modul der Kategorie Führung und nennt es als eigene Folge-Spec. Di
 Lagebesprechung als Kernobjekt), bewertet von drei unabhängigen Bewertern (Einsatzleiter im Fükw ·
 Fachlehrer FwDV 100 · Maintainer). Alle drei setzten den Feld-MVP mit deutlichem Abstand vorn
 (8,4–8,9 gegen 6,1–6,9) und forderten dieselben Korrekturen. Was hier steht, ist die Synthese; die
-verworfenen Alternativen stehen in Abschnitt 5 mit dem Grund, der sie gekippt hat.
+verworfenen Alternativen stehen in Abschnitt 5 mit dem Grund, der sie gekippt hat. Danach ein
+adversarialer Review über vier Dimensionen (Fachlichkeit · Konventionen · Datenmodell · Feldpassung):
+39 Findings, jedes einzeln auf Widerlegung geprüft, **8 bestätigt und eingearbeitet** — darunter die
+zwei Konstruktionsorte von `EinsatzAnzeige` (9.4), der idempotente DELETE (9.2), die tragfähige
+Rollback-Probe (9.5) und die handgebauten Link-Ziele mit Gate-3-Nachweis (10, ST9).
 
 > **Widerspruchsregel.** Wo dieses Dokument dem Ticket-Text widerspricht, gilt dieses Dokument; jede
 > Abweichung steht in Abschnitt 4 mit Beleg. Das Ticket verlangt „durchbrainstormen, was S1–S6 konkret
@@ -22,7 +26,7 @@ verworfenen Alternativen stehen in Abschnitt 5 mit dem Grund, der sie gekippt ha
 Das Modul `stab` ist seit dem Navigations-Redesign ein Platzhalter: `frontend/src/einsatz/modulRegistry.ts:61`
 trägt `status: 'wip'` mit „Stabsarbeit (S1–S6). Wird später ausgearbeitet.", die Route
 `/einsaetze/:id/stab` rendert `einsatz/ModulStub.tsx`. Backend-seitig existiert der Modul-Key
-(`src/einsatz/modul.rs:14`), aber keine Tabelle, kein Handler, keine Route. Die Kommandopalette filtert
+(`src/einsatz/modul.rs:15`), aber keine Tabelle, kein Handler, keine Route. Die Kommandopalette filtert
 das Modul als unfertig heraus.
 
 Was fehlt, ist nicht ein weiteres Erfassungsmodul. Der Bestand trägt die Sachgebiete inhaltlich schon
@@ -186,9 +190,11 @@ Nummeriert, je mit Begründung im selben Absatz. Wo das Ticket etwas anderes nah
    ist optional („Mehrheit der Kräfte hat kein Login", `migrations/0010`, mit partiellem UNIQUE-Index);
    Abschnittsleiter (`einsatzabschnitt.leiter_id`) und Einheitsführer (`einsatz_einheit.fuehrer_id`) zeigen
    bereits dorthin; `disposition_repo::liste_fuehrungskraefte` (`src/personal/disposition_repo.rs:356`)
-   liest dieselbe Tabelle. Ein Konto-Zwang zwänge einen Fernmelder oder Fachberater in eine
-   Freitextzeile *neben* seinem vorhandenen Personal-Datensatz — eine zweite Personenwahrheit, die das
-   Repo an drei Stellen längst aufgelöst hat. Die Benutzer-Kopplung für „meine Sachgebiete" entsteht
+   liest dieselbe Tabelle. Ein Konto-Zwang zwänge eine disponierte Einsatzkraft ohne Login — nach
+   `migrations/0010` der Normalfall —, die S1 oder S4 übernimmt, in eine `extern`-Freitextzeile *neben*
+   ihrem vorhandenen `einsatz_personal`-Datensatz: eine zweite Personenwahrheit, die das Repo an drei
+   Stellen längst aufgelöst hat. **Fernmelder und Fachberater sind hier kein Beispiel** — sie bekommen
+   nach Entscheidung 6 gar keine S-Zeile, in die sie gezwängt werden könnten. Die Benutzer-Kopplung für „meine Sachgebiete" entsteht
    **transitiv** über `personal.benutzer_id` (Entscheidung 11). `snap_name` wird beim Setzen eingefroren
    (Muster `einsatz_personal.snap_name`, `auftrag_empfaenger.snap_anzeige`): ein Führungsnachweis darf
    nicht mit der Disposition verschwinden.
@@ -203,7 +209,10 @@ Nummeriert, je mit Begründung im selben Absatz. Wo das Ticket etwas anderes nah
    (Tier A, `etb::system_audit_tx`) mit Vorher/Nachher — das ETB ist der Nachweis der Tätigkeit der
    Einsatzleitung (Anlage 5, S. 64), und für Stufe B ist der Verlauf damit beweissicher rekonstruierbar,
    ohne abfragbar sein zu müssen. Ablösungsketten (`von_at/bis_at/vorgaenger_id`) sind Langzeit-/Stufe-D-Bedarf
-   (THW-Ergänzung in Anlage 2 S. 55) und additiv nachrüstbar; `gesetzt_at` bleibt als Anker erhalten.
+   (THW-Ergänzung zu S1, **nicht** Teil der FwDV 100 Anlage 2 S. 55 — dort steht nur „führen von
+   Kräfteübersichten"; Ablösung/Schichtdienst/Unterbringung stehen in der THW-Lernunterlage Zugtrupp,
+   Abschn. 3.2, S. 14–15 `[sekundär]`, der Wortlaut der THW-DV 1-100 war nicht beschaffbar) und additiv
+   nachrüstbar; `gesetzt_at` bleibt als Anker erhalten.
 
 8. **Die Lagebesprechung ist ein schlankes Objekt, kein Lebenszyklus:** laufende Nummer, Zeitpunkt,
    **Entschluss (Pflicht)**, nächster Termin als Snapshot, Rückverweis auf den ETB-Eintrag. Kein Status
@@ -250,14 +259,19 @@ Nummeriert, je mit Begründung im selben Absatz. Wo das Ticket etwas anderes nah
     in `pages/MitgliederAbschnitt.tsx` nennt den Vorrang im `extra`-Text. Die Ablösung des Freitextfelds ist
     Teil des Folge-Tickets „Funktionskatalog" (Abschnitt 13), nicht dieser Spec.
 
-14. **Vorschläge statt Fremdschlüssel in den drei Freitext-Funktionsfeldern.** `erinnerung.empfaenger_funktion`
-    („noch kein FK; Stab-Modell folgt später", `migrations/0044_erinnerung.sql:14`),
-    `auftrag_empfaenger.funktion_text` (`0048`) und `etb_eintrag.empfaenger_funktion` bekommen in ihren
-    Masken Vorschläge der Form „S2 – Lage (Müller)" aus der Besetzung; der Freitext bleibt. Kein
-    FK-Umbau in diesem Ticket: eine halbe Migration (zwei von vier Feldern) wäre der schlechteste
-    Zwischenzustand, und keine Regex über Freitext — ein falsch geschriebenes „Versorgung" fiele still
-    heraus, ohne roten Test und ohne Fehlerbild. Der FK-Umbau ist das Folge-Ticket, das den Kommentar in
-    0044 einlöst.
+14. **Vorschläge statt Fremdschlüssel in den Freitext-Empfängerfeldern.** Zwei echte
+    Funktions-Freitextspalten — `erinnerung.empfaenger_funktion` („noch kein FK; Stab-Modell folgt
+    später", `migrations/0044_erinnerung.sql:14`) und `auftrag_empfaenger.funktion_text` (`0048`) —
+    plus die beiden ETB-Metadatenfelder `etb_eintrag.von`/`an` (`migrations/0004_etb.sql`;
+    **eine `etb_eintrag.empfaenger_funktion` gibt es nicht**) bekommen in ihren Masken Vorschläge der
+    Form „S2 – Lage (Müller)" aus der Besetzung; der Freitext bleibt. Die ETB-Felder sind dabei
+    semantisch etwas anderes: sie tragen heute Funkrufname/Stelle, nicht Sachgebiet — `useFunkrufnamen`
+    (`etb/funkrufnamen.ts`) speist sie aus disponierten Fahrzeugen und Einheiten. Der Stabsvorschlag
+    tritt dort **neben** die Funkrufnamen, er ersetzt sie nicht. Kein FK-Umbau in diesem Ticket: eine
+    halbe Migration (zwei der vier betroffenen Tabellen `erinnerung`, `auftrag_empfaenger`,
+    `etb_eintrag`, `einsatz_mitgliedschaft`) wäre der schlechteste Zwischenzustand, und keine Regex
+    über Freitext — ein falsch geschriebenes „Versorgung" fiele still heraus, ohne roten Test und ohne
+    Fehlerbild. Der FK-Umbau ist das Folge-Ticket, das den Kommentar in 0044 einlöst.
 
 15. **Lücken-Kennzahlen, höchstens zwei je Zeile, ausschließlich aus vorhandenen Queries:** S1 „Einheiten
     ohne Führer" · S3 „Abschnitte ohne Leiter", „Aufträge ohne Quittung" · S4 „Nachforderungen ohne Zusage" ·
@@ -446,9 +460,9 @@ Kette). Handler ausschließlich über `JsonBody`, `PfadParam`, `EinsatzLesezugri
 |---|---|---|
 | `GET /api/einsaetze/{id}/stab` | Lese | `StabAnzeige`. Termin aus `einsatz` mitgeliefert (Entscheidung 11). |
 | `PUT /api/einsaetze/{id}/stab/besetzung/{sachgebiet}` | Schreib + `fordere_aktiv` | Upsert (`INSERT … ON CONFLICT(einsatz_id, sachgebiet) DO UPDATE`). In einer `write_retry!`-Transaktion: Vorherstand lesen, Person-Zugehörigkeit prüfen, `snap_name` aus `einsatz_personal.snap_name`, Zeile schreiben, System-ETB Tier A („S2 Lage: Besetzung → Müller (vorher: nicht vergeben)"), danach `LiveEvent::Stab`. Antwort `StabAnzeige`. |
-| `DELETE /api/einsaetze/{id}/stab/besetzung/{sachgebiet}` | Schreib + `fordere_aktiv` | Zeile entfernen = „nicht vergeben"; System-ETB; `LiveEvent::Stab`. 404, wenn keine Zeile. |
+| `DELETE /api/einsaetze/{id}/stab/besetzung/{sachgebiet}` | Schreib + `fordere_aktiv` | Zeile entfernen = „nicht vergeben"; System-ETB; `LiveEvent::Stab`. **Idempotent:** keine Zeile = bereits „nicht vergeben" → **204 ohne ETB-Eintrag und ohne Live-Ereignis** (Begründung 9.2). |
 | `GET /api/einsaetze/{id}/stab/lagebesprechungen` | Lese | Liste absteigend nach `lfd_nr`; kein Cursor in v1 (Fükw-Einsatz: Dutzende, nicht Tausende `[abgeleitet]`; Paginierung ist Stufe-D-Bedarf). |
-| `POST /api/einsaetze/{id}/stab/lagebesprechungen` | Schreib + `fordere_aktiv` | **Eine Transaktion** (`write_retry!`): `lfd_nr` = MAX+1; `etb::repo::anlegen_tx` mit `typ = TYP_ENTSCHEIDUNG`, `ereigniszeit = abgehalten_at`, `veranlassung = "Lagebesprechung"`, Inhalt deterministisch gerendert (Abschnitt 9.1); Zeile mit `etb_eintrag_id`; bei vorhandenem Schlüssel `naechste_at`: `UPDATE einsatz SET naechste_lagebesprechung_at`. Publiziert `LiveEvent::Stab` und den ETB-Kurzruf `live.publiziere(einsatz_id, etb_id)`. Antwort: `StabAnzeige`, **nach** dem Schreiben frisch geladen (die Quittung trägt keinen Zustand, den es nie gab — LFH-340/C5). |
+| `POST /api/einsaetze/{id}/stab/lagebesprechungen` | Schreib + `fordere_aktiv` | **Eine Transaktion** (`write_retry!`): `lfd_nr` = MAX+1; `etb::repo::anlegen_tx` mit `typ = TYP_ENTSCHEIDUNG`, `ereigniszeit = abgehalten_at`, `veranlassung = "Lagebesprechung"`, Inhalt deterministisch gerendert (Abschnitt 9.1); Zeile mit `etb_eintrag_id`; bei vorhandenem Schlüssel `naechste_at`: `UPDATE einsatz SET naechste_lagebesprechung_at` — geführt als `WHERE id = ? AND status = 'aktiv'` mit ausdrücklichem Rollback bei `rows_affected == 0` (Muster `lagebericht/repo.rs:256-262`); das ist keine Redundanz zu `fordere_aktiv`, sondern der **einzige anfahrbare Rollback-Zweig** dieser Transaktion und damit der Träger der Atomaritäts-Zusicherung aus 9.5. Publiziert `LiveEvent::Stab` und den ETB-Kurzruf `live.publiziere(einsatz_id, etb_id)`. Antwort: `StabAnzeige`, **nach** dem Schreiben frisch geladen (die Quittung trägt keinen Zustand, den es nie gab — LFH-340/C5). |
 
 **9.1 Snapshot-Text** (deterministisch, zweimal rendern ist gleich — Test wie `lagebericht/mod.rs:238`):
 
@@ -466,9 +480,21 @@ nicht).
 > 200 Zeichen, leerer `entschluss`, nicht parsebares `abgehalten_at`/`naechste_at` → **400** (Feld isoliert).
 `personal` ohne `personal_id`, `extern`/`rueckwaertig` ohne `bezeichnung`, `einsatzleitung` mit Person
 (bedingte Pflicht = Zusammenhang, Referenzpaar `einsatz_tier.rs`/Status), `personal_id` nicht in diesem
-Einsatz (referenzielle Zuordenbarkeit, `sprechgruppe/repo.rs:207`), `naechste_at` ≤ `abgehalten_at` →
+Einsatz (referenzielle Zuordenbarkeit, `src/sprechgruppe/repo.rs:216-243` — `pruefe_zuordenbar`, Fehler bei `:234`), `naechste_at` ≤ `abgehalten_at` →
 **422**. Abgeschlossener Einsatz → Code von `fordere_aktiv` aus dem Bestand. Fremde Org/fremder Einsatz →
 404 aus dem Extractor; Beobachter → 403.
+
+**Der DELETE ist idempotent, und das ist eine Setzung gegen die Bestandskonvention.** Rund dreissig
+DELETE-Repos im Bestand (`uhs/platz_repo.rs:183`, `bereitstellungsraum/repo.rs:149`, …) liefern bei
+`rows_affected() == 0` einen 404 — dort adressiert der Pfad eine gelistete Entität, deren Fehlen ein
+Irrtum ist. Hier nicht: das Sachgebiet ist eine der **sechs festen** Zeilen, der Pfad existiert immer,
+und *dieselbe* Adresse trägt einen PUT-**Upsert**, der ohne Zeile gerade keinen 404 liefert. Nach
+Entscheidung 3 ist „keine Zeile" zudem der dokumentierte **Normalzustand** von S1/S4/S5/S6 im Fükw der
+Stufe B — ein 404 auf „nicht vergeben" wäre ein Fehler für den Zustand, der bereits gilt. Deshalb: keine
+Zeile → **204**, und zwar **ohne** System-ETB-Eintrag und **ohne** `LiveEvent::Stab` (ein Eintrag
+„Besetzung → nicht vergeben (vorher: nicht vergeben)" wäre ETB-Rauschen und widerspräche Entscheidung 7).
+Unverändert bleiben: fremde Org/fremder Einsatz → 404 aus dem Extractor, unbekanntes `sachgebiet` im
+Pfad → 400 (Feld isoliert), Beobachter → 403, abgeschlossener Einsatz → Code von `fordere_aktiv`.
 
 **9.3 Live:** `LiveEvent::Stab`, Wire `"stab"`, `ALLE` 26 → 27 (Länge **und** `contains` im Wire-Kontrakt),
 `modul_keys → &["stab"]` (nur das Modul des Datenobjekts, Füll-Regel `src/live/mod.rs:121`). FE:
@@ -477,17 +503,68 @@ Literal; die Lagebesprechungs-Historie hängt als Sub-Key `[stab, einsatzId, 'la
 demselben Prefix — **kein** eigener Singular-Key (Silent-Gap-Falle, `queryKeys.ts:61-68`). `einsatz` bleibt
 `NICHT_LIVE`; `meine_sachgebiete` wird beim nächsten Einsatz-Abruf frisch.
 
-**9.4 `meine_sachgebiete`** (`src/einsatz/repo.rs`, neben `fuehrungsstelle_von`):
+**9.4 `meine_sachgebiete` — ZWEI Pfade, zwei Abfrageformen** (`src/einsatz/repo.rs`). `EinsatzAnzeige`
+wird an genau zwei Stellen gebaut, und sie holen ihre Benutzer-Annotation schon heute verschieden — wer
+nur eine bedient, bricht den Build (das Feld ist `Vec<Sachgebiet>`, kein `Option`, kein Default):
+
+**(a) Detail-Pfad — `Einsatz::anzeige` (`src/einsatz/mod.rs:205-233`).** Die Signatur wächst auf **drei**
+Argumente: `anzeige(&self, meine_rolle, meine_fuehrungsstelle, meine_sachgebiete: Vec<Sachgebiet>)`. Neben
+`fuehrungsstelle_von` (`repo.rs:136`) tritt `sachgebiete_von(pool, einsatz_id, benutzer_id)`:
 `SELECT s.sachgebiet FROM einsatz_stabsfunktion s JOIN einsatz_personal ep ON s.personal_id = ep.id
 JOIN personal p ON ep.personal_id = p.id WHERE s.einsatz_id = ? AND p.benutzer_id = ? ORDER BY s.sachgebiet`.
-Ad-hoc-Personal (`personal_id IS NULL`) hat kein Konto und fällt korrekt heraus.
+Nachzuziehen sind **alle sieben** Aufrufstellen: `src/routes/einsatz.rs:87` (`anlegen` — der frische
+Einsatz hat keine Besetzung, `Vec::new()` als Literal), `:110`, `:129`, `:177`, `:196`, `:775` (je
+zusätzlich `sachgebiete_von` neben dem bestehenden `fuehrungsstelle_von`) sowie
+`src/lage_snapshot/repo.rs:242` (`anzeige(None, None, Vec::new())` — der Snapshot hat keinen abfragenden
+Benutzer, dieselbe Begründung wie für `None` bei Rolle und Führungsstelle dort).
+
+**(b) Listen-Pfad — `einsatz::repo::liste_fuer` (`repo.rs:154-246`).** Hier ist `Einsatz::anzeige`
+**nicht** beteiligt: die Funktion baut `EinsatzAnzeige` als Struct-Literal (`repo.rs:220`) und zieht
+`meine_fuehrungsstelle` als `m.fuehrungsstelle` aus dem bestehenden `LEFT JOIN einsatz_mitgliedschaft`
+(`repo.rs:194-199`). **Die Abfrage aus (a) je Zeile zu rufen ist verboten** — das wäre N+1 auf
+`GET /api/einsaetze`, der Route hinter der Einsatzauswahl; `liste_fuer` liest bewusst alles in EINER
+Abfrage und filtert danach in Rust (`darf_lesen`). Stattdessen eine **zweite, ebenfalls einmalige**
+Abfrage über alle Einsätze des Benutzers (`SELECT s.einsatz_id, s.sachgebiet … WHERE p.benutzer_id = ?
+ORDER BY s.einsatz_id, s.sachgebiet`) → `HashMap<i64, Vec<Sachgebiet>>`, im Literal per
+`.remove(&r.id).unwrap_or_default()`. Bewusst **kein** `GROUP_CONCAT` im bestehenden Join: das erzwänge
+ein `GROUP BY` über alle selektierten Spalten, und ein clientseitig gesplitteter String umginge den
+Enum-Wire-Kontrakt. Zwei Abfragen bleiben O(1) in der Zahl der Einsätze — das ist die Zusicherung.
+
+**Leer ist `[]`, in BEIDEN Pfaden — nie `absent`, nie `null`.** Das Feld trägt `#[schema(required)]` und
+kein `skip_serializing_if`; der generierte TS-Typ ist `Sachgebiet[]`. Ein Pfad, der auslässt, während der
+andere `[]` schickt, wäre nach der Optionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung.
+Ad-hoc-Personal (`personal_id IS NULL`) hat kein Konto und fällt aus beiden Abfragen korrekt heraus.
+**Test in 9.5 als Paar:** einmal gegen `GET /api/einsaetze/{id}`, einmal gegen `GET /api/einsaetze` mit
+zwei Einsätzen, in denen derselbe Benutzer verschiedene Sachgebiete trägt — nur die Listen-Hälfte fängt
+den stillen `Vec::new()`-Platzhalter im Struct-Literal; dazu ein Zähl-Test, dass `liste_fuer` bei n
+Einsätzen konstant **zwei** Statements absetzt.
 
 **9.5 Tests `tests/stab.rs`** (`common::setup_mit_pool_und_live`; `fremde_org_anlegen` ist Pflicht):
 Cross-Org 404 auf jeder Route; Beobachter 403; abgeschlossener Einsatz; Modul-Override `sichtbar=false`
 → Gate greift und kein SSE-Event; 400/422-Paare je Zeile aus 9.2; Upsert setzt Vorherstand in den
-ETB-Text; Personalunion (zwei Zeilen, eine Person); `snap_name` überlebt das Entfernen der Disposition
-(`personal_noch_disponiert=false`); Abschluss schreibt ETB-Eintrag, Zeile und Termin **atomar** (Rollback-Probe:
-ungültiges `naechste_at` → weder Eintrag noch Zeile); Tri-State des Termins (fehlt/null/Wert);
+ETB-Text; DELETE auf eine unbesetzte Zeile ist **204 und ein No-op** — als Paar mit dem belegten Fall:
+auf besetzter Zeile 204 + ETB-Eintrag + SSE-Ereignis, auf leerer Zeile 204 + **kein** ETB-Eintrag +
+**kein** SSE-Ereignis (gezählt, nicht bloss „kein 404"); zweimaliges DELETE hintereinander liefert
+zweimal 204 und genau einen ETB-Eintrag; Personalunion (zwei Zeilen, eine Person); `snap_name` überlebt das Entfernen der Disposition
+(`personal_noch_disponiert=false`); **Abschluss schreibt ETB-Eintrag, Zeile und Termin atomar — und die
+Rollback-Probe hängt ausdrücklich NICHT an einem ungültigen `naechste_at`.** Der Weg wäre gemessen keiner:
+9.2 lehnt den Wert im Handler ab (nicht parsebar → 400, `naechste_at` ≤ `abgehalten_at` → 422), und der
+Bestand normalisiert jede Zeitangabe vor dem Schreiben — `crate::etb::normalisiere_zeit` steht
+ausschließlich in `src/routes/*.rs`, nie in einem Repo. Der Request erreicht die Transaktion also nie; der
+Test bliebe auch dann grün, wenn ETB-Eintrag, Zeile und Termin-Update drei getrennte Aufrufe wären. Ein
+DB-seitiger Auffangpunkt existiert ebenfalls nicht (kein CHECK an `naechste_at`, keiner an
+`einsatz.naechste_lagebesprechung_at`). Die Probe hängt deshalb an einem Fehler **nach** dem ETB-Insert:
+der Termin-Schritt läuft als `UPDATE einsatz SET naechste_lagebesprechung_at = ? WHERE id = ? AND
+status = 'aktiv'` und rollt bei `rows_affected == 0` ausdrücklich zurück — Muster
+`src/lagebericht/repo.rs:256-262`. Der Test ruft die Repo-Funktion **direkt** gegen einen zwischenzeitlich
+abgeschlossenen Einsatz, weil `fordere_aktiv` den Zweig auf der Route verdeckt, und prüft **drei** Dinge:
+kein `etb_eintrag` mit `typ='entscheidung'`, keine `einsatz_lagebesprechung`-Zeile,
+`einsatz.naechste_lagebesprechung_at` unverändert. **Mutationsprobe im AK: die eine Transaktion durch drei
+Einzelaufrufe ersetzt → dieser Test wird rot.** Der 400/422-Fall des `naechste_at` bleibt eine eigene
+Zeile bei den Paaren aus 9.2 — er belegt „Validierung vor jedem Schreiben", nicht Atomarität. **Nicht
+gangbar und deshalb benannt:** eine vorbelegte Zeile gegen `UNIQUE (einsatz_id, lfd_nr)` erzeugt keinen
+Konflikt, weil `lfd_nr = COALESCE(MAX(lfd_nr)+1, 1)` in derselben Transaktion gelesen wird. Tri-State des
+Termins (fehlt/null/Wert);
 Snapshot-Determinismus; `lfd_nr` lückenlos bei parallelem POST; Schwärzung nullt `snap_name`/`bezeichnung`
 nur im betroffenen Einsatz und lässt `entschluss` stehen; `meine_sachgebiete` über `personal.benutzer_id`;
 `LiveEvent::Stab` im Replay-Ring. Guards: `einsatz_kontext_guard`, `json_extractor_guard`,
@@ -520,6 +597,8 @@ Lagebesprechungen der Einsatzleitung" — **erst nach ST3** (Entscheidung 18).
   Lücken-Kennzahlen als Text „2 Einheiten ohne Führer" mit Deeplink, Werkzeugzeile (Modul-Labels aus
   `modulRegistry`, **nur** freigegebene Module per `istModulFreigegeben`); genau eine Aktion „Besetzung
   ändern" (`Button`, erbt `controlHeight`). Die Zeile selbst ist kein Klickziel (kein nacktes `<div onClick>`).
+  Kennzahl- und Werkzeug-Deeplinks sind handgebaute Bedienziele und tragen `zeilenzielStil` (Bedienkontexte
+  unten); dasselbe gilt für den ETB-Link der Zeile *Letzte* im Kopfblock.
 - **Datenzustände:** Fehler ≠ leer je Sektion (`SeitenFehler`/`SeitenLeer`); eine Lücken-Kennzahl, deren
   Quellmodul der Benutzer nicht lesen darf, zeigt „—" mit Grund statt 0 (Rechte-Weiche, Entscheidung 15).
 - **Live:** `stab`-Event invalidiert `einsatz-stab`; die sechs Zeilen sind fest, die Historie wächst unten —
@@ -530,7 +609,12 @@ Lagebesprechungen der Einsatzleitung" — **erst nach ST3** (Entscheidung 18).
   Suchfeld; letzter Eintrag „Ad-hoc-Person anlegen …" öffnet die **bestehende** Personal-Schnellerfassung)
   oder Bezeichnung (`Input` ≤ 200). Da das erste Feld ein `Select` ist, wird die Struktur geprüft (kein
   `.ant-modal-footer`, Knopf im `<form>`), nicht „Enter sendet". Entfernen („nicht vergeben") ist eine
-  Option der Art, kein eigener Knopf; umkehrbar (erneut setzen) → keine Rückfrage. Kein Serienmodus.
+  Option der Art, kein eigener Knopf, und sie steht auf **allen sechs** Zeilen zur Wahl — auch auf den im
+  Fükw regelmäßig leeren (Entscheidung 3); der Backend-DELETE ist dafür idempotent (9.2). Die Maske ist
+  mit dem **aktuellen** Zustand vorbelegt und schickt bei **unverändertem** Wert gar keinen Request
+  (Wertgleichheits-Riegel, dieselbe Regel wie an `BemerkungZelle`) — geprüft als Paar: „leere Zeile
+  öffnen, ‚nicht vergeben' bestätigen → 0 Requests, kein Fehler, Modal schliesst" und „leere Zeile
+  öffnen, Person wählen → genau ein PUT". Umkehrbar (erneut setzen) → keine Rückfrage. Kein Serienmodus.
 - *Lagebesprechung abschließen* — 2 sichtbare Felder: Entschluss (`Input.TextArea`, Pflicht) und Nächste
   Lagebesprechung (`DatePicker showTime` + Schnellwahl-Knöpfe +30/+60/+120 min sowie „kein Termin"; die
   Schnellwahl-Logik wird aus `etb/WiedervorlageModal.tsx` in eine geteilte reine Funktion gehoben, nicht
@@ -551,10 +635,23 @@ ohne beides leer".
 `schnellaktionen.guard.test.ts` prüft die Deckung gegen die Seite, die `?neu=1` liest.
 
 **Bedienkontexte (LFH-327):** Fükw 1366 × 768 mit offenem Panel (≈ 1022 px Content, Abschnitt 3): Kopfblock
-plus sechs Zeilen ohne Querlauf — in Playwright gemessen. Führungs-Tablet: Dichte `komfortabel`, alle Ziele
-erben `controlHeight`; handgebaute Ziele gibt es nicht (die Zeile ist kein Klickziel, die Aktion ist ein
-`Button`). Mobil 390 px: Liste stapelt, `Descriptions column=1`. Nachtmodus: keine eigenen Farben, alles
-über `StatusTag`/Tokens. Kein `size="small"` auf Interaktivem, kein Emoji, kein Popover.
+plus sechs Zeilen ohne Querlauf — in Playwright gemessen. Führungs-Tablet: Dichte `komfortabel`. Die Zeile
+selbst ist kein Klickziel, und „Besetzung ändern" ist ein `Button` — der erbt `controlHeight` vom
+`ConfigProvider`. **Handgebaute Bedienziele gibt es trotzdem, und zwar drei Sorten:** der ETB-Link in der
+Zeile *Letzte*, der Deeplink an jeder Lücken-Kennzahl und die Modul-Deeplinks der Werkzeugzeile. Ein `<a>`
+erbt **keine** Steuerhöhe — LFH-396 hat 17 px in JEDER Dichtestufe gemessen, und die Prüfliste von LFH-336
+hatte genau diese Stelle als Annahme („Link erbt vom `ConfigProvider`") statt als Messung geführt; diese
+Annahme wird hier nicht wiederholt. Die drei Sorten tragen deshalb die ZWEI Angaben aus LFH-365
+(`minHeight: token.controlHeight` **plus** `padding` aus `token.paddingSM`/`token.padding`, aufgelöste
+Tokens über `theme.useToken()`, nie `var(--lfh-*)`) aus **einer** reinen, exportierten Stilfunktion
+`zeilenzielStil(token)` in `stab/zeilenziel.ts`, Schablone `bedienzielStil`
+(`pages/lagekarte/Sidebar.tsx`); `display: inline-flex`, weil die Links innerhalb einer Textzeile stehen.
+Rein und exportiert aus demselben Grund wie dort: `test/utils.tsx` montiert ein nacktes `ConfigProvider`
+ohne unser Theme und jsdom rechnet kein Layout, prüfbar ist also der **Inline-Style** über zwei
+Dichtestufen mit den Böden als **Literale** (30 / 48 / 72) — aus dem Token zurückgelesen prüfte der Test
+den Token gegen sich selbst. Mobil 390 px: Liste stapelt, `Descriptions column=1`. Nachtmodus: keine
+eigenen Farben, alles über `StatusTag`/Tokens. Kein `size="small"` auf Interaktivem, kein Emoji, kein
+Popover.
 
 ## 11. Berechtigungen, Isolation, Lebenszyklus
 
@@ -577,15 +674,15 @@ erben `controlHeight`; handgebaute Ziele gibt es nicht (die Zeile ist kein Klick
 | # | Titel | Umfang | Abhängig von |
 |---|---|---|---|
 | **ST0** | Design-Spec (dieses Dokument) | — | — |
-| **ST1** | Backend Besetzung S1–S6 | Migration 0102 (beide Tabellen), Enums + Wire-Kontrakt, `modul_marker Stab` + `PFAD_KEY`, Schwärzungs-Registry, `src/stab`, `routes/stab.rs` GET stab + PUT/DELETE besetzung, System-ETB Tier A, `LiveEvent::Stab` (ALLE 27, `as_str`, `modul_keys`), `meine_sachgebiete`, `api_doc` + Codegen, `tests/stab.rs` (Teil Besetzung) | ST0 |
-| **ST2** | Backend Lagebesprechung | POST/GET lagebesprechungen, `lfd_nr` unter `write_retry!`, ETB `entscheidung` in derselben Tx, Tri-State-Termin, `StabAnzeige` um letzte/anzahl/termin, Rollback-Probe, Determinismus-Test | ST1 |
+| **ST1** | Backend Besetzung S1–S6 | Migration 0102 (beide Tabellen), Enums + Wire-Kontrakt, `modul_marker Stab` + `PFAD_KEY`, Schwärzungs-Registry, `src/stab`, `routes/stab.rs` GET stab + PUT/DELETE besetzung, System-ETB Tier A, `LiveEvent::Stab` (ALLE 27, `as_str`, `modul_keys`), `meine_sachgebiete` in **beiden** Pfaden (`Einsatz::anzeige` mit drittem Argument samt sieben Aufrufstellen · `liste_fuer` mit zweiter Sammelabfrage, kein N+1 — Abschnitt 9.4), `api_doc` + Codegen, `tests/stab.rs` (Teil Besetzung) | ST0 |
+| **ST2** | Backend Lagebesprechung | POST/GET lagebesprechungen, `lfd_nr` unter `write_retry!`, ETB `entscheidung` in derselben Tx, Tri-State-Termin, `StabAnzeige` um letzte/anzahl/termin, Rollback-Probe am `rows_affected == 0`-Zweig des Termin-Updates (repo-nah, nicht über die Route; ein ungültiges `naechste_at` taugt dafür nicht — 9.5) **samt Mutationsprobe im AK: Tx durch drei Einzelaufrufe ersetzt ⇒ Test rot**, Determinismus-Test | ST1 |
 | **ST3** | WIP-Stellvertreter umziehen | `App.test.tsx`, `ModulStub.test.tsx`, `modulRegistry.test.ts:141` auf einen Registry-Stub (Muster `befehle.modulstatus.test.ts:31-38`); verhaltensneutral, Registry bleibt `wip`, Suite grün **vor** dem Flip | — |
 | **ST4** | Frontend Grundseite + Freischaltung | `api/stab.ts`, Query-Keys (+ Byte-Pin), `stabPfad`, `stab/sachgebiete.ts`, `StabPage` mit Besetzungsliste, `BesetzungModal`, `MODUL_ELEMENTE.stab`, Registry `wip → fertig` + Beschreibung; Vitest: Strukturtest der Maske, Rechte-Paar (Knopf gesperrt + Hinweis), sechs Zeilen auch ohne Daten, `istModulFreigegeben`-Filter der Deeplinks | ST1, ST3 |
 | **ST5** | Frontend Lagebesprechung abschließen | `LagebesprechungModal` (2 + 1), geteilte Schnellwahl-Funktion mit `WiedervorlageModal`, `lagebesprechungZustand` (DST-Tests), Fehler im Modal, Erfolgs-Toast mit ETB-Deeplink, Historie, Kommandopaletten-Schnellaktion mit `?neu=1` | ST2, ST4 |
 | **ST6** | Lücken-Kennzahlen | reine Funktionen `stab/luecken.ts` (Filter über geladene Listen, unit-getestet inkl. Leer-/Fehler-/Rechtefall), Einbindung in die sechs Zeilen mit Deeplinks | ST4 |
 | **ST7** | Vorschläge und ETB-Vorbelegung | `useStabsfunktionen`, Optionen in ETB an/von, Erinnerung, Auftrag; Vorrangregel in `Schnellerfassung.tsx`; `extra`-Text im Führungsstellen-Modal; Paar-Tests | ST4 |
 | **ST8** *(abwählbar)* | Termin ↔ Erinnerung | Nur nach eigener Entscheidung (Abschnitt 13, Punkt 3). Vorarbeit ist Teil des Subtasks: `anlegen_aus_frist` nimmt `&SqlitePool` und fährt `ON CONFLICT DO NOTHING` (`src/erinnerung/repo.rs:227-244`) — es braucht eine `_tx`-Variante nach dem Muster `schliesse_offene_auto_tx` (`:319`) und ein `verschiebe_auto_frist`. Fälligkeit = Termin (kein Vorlauf); `bezug_typ='lagebesprechung'`, `bezug_id=einsatz_id`; idempotent über `idx_erinnerung_auto_bezug`; auch der PATCH des Einsatzkopfs zieht die Erinnerung nach (beide Schreibpfade, beide getestet) | ST2 |
-| **ST9** | Prüfliste, e2e, Gate | `docs/superpowers/specs/<datum>-lfh-46-pruefliste.md` (Abschnitt 11.1), `e2e/stab.spec.ts` (Besetzung setzen → Vorschlag im ETB → Abschluss → ETB-Beleg typ `entscheidung` → Termin im Wiedervorlage-Modal), Breitenmessung 1366 px mit offenem Panel, Kontrast der StatusTags im Nachtmodus, `./scripts/check-all.sh` grün | ST5, ST6, ST7 |
+| **ST9** | Prüfliste, e2e, Gate | `docs/superpowers/specs/<datum>-lfh-46-pruefliste.md` (Abschnitt 11.1), `e2e/stab.spec.ts` (Besetzung setzen → Vorschlag im ETB → Abschluss → ETB-Beleg typ `entscheidung` → Termin im Wiedervorlage-Modal), Breitenmessung 1366 px mit offenem Panel, Kontrast der StatusTags im Nachtmodus; **Gate-3-Nachweis: die Stab-Route kommt in `e2e/gate3-trefflaeche.spec.ts` — dieselben vorhandenen Helfer (`alleHaltenStufe` u. a.), keine Kopie. Gemessen werden ETB-Link, Kennzahl-Deeplinks, Werkzeug-Deeplinks und der Aktions-`Button` über 30 / 48 / 72 px, Böden als Literale, Mengen über `alleHaltenStufe` mit gesäter Mindestzahl; Mutationsprobe „Stufe festgenagelt → rot" gefahren und im Kopfkommentar vermerkt.** Vitest daneben: `zeilenzielStil` über zwei Dichtestufen (30/48/72 als Literale, Ungleichheit zwischen den Stufen). `./scripts/check-all.sh` grün | ST5, ST6, ST7 |
 
 Ohne ST6 und ST7 ist das Modul „eine Liste, die niemand öffnet" — sie sind wertbestimmend, nicht optional.
 ST8 ist die einzige abwählbare Zeile.
@@ -604,7 +701,8 @@ eigene Datei. Vier Flächenarten und was dort überhaupt greifen kann:
 
 Die S5-Zeile hat keine eigene Datenquelle; sie wird als Teil der Besetzungsliste gegen Trefffläche,
 Kontrast, Nachtmodus und Leerzustand geprüft — „nicht anwendbar" gilt dort nur für Zeilen, die eine
-Zahl voraussetzen.
+Zahl voraussetzen. Das Verdikt zu Kriterium 1/2 (Trefflächen) stützt sich auf die **Messung** in
+`e2e/gate3-trefflaeche.spec.ts`, nicht auf die Annahme, ein Link erbe die Steuerhöhe.
 
 ## 13. Offene Punkte / Folge-Tickets (beim Spec-Abschluss angelegt)
 
@@ -614,10 +712,14 @@ Zahl voraussetzen.
    Kräfteübersicht. Träger ist eine `Datensicht`-Tabelle (→ `datensicht.guard.test.ts`, `KONSUMENTEN`), Ort
    noch offen (Sprechgruppen-/Kräfte-Kontext oder Unterroute des Stabs). Fachlich das stärkste
    S6-Artefakt; nicht v1, weil es eine eigene Fläche ist und die Contentbreite dafür vor dem Bau zu messen ist.
-2. **Funktionskatalog und FK-Umbau:** geschlossene Werte für `erinnerung.empfaenger_funktion`,
-   `auftrag_empfaenger.funktion_text`, `etb_eintrag.empfaenger_funktion`; Ablösung/Deprecation von
+2. **Funktionskatalog und FK-Umbau:** geschlossene Werte für `erinnerung.empfaenger_funktion` und
+   `auftrag_empfaenger.funktion_text`; Ablösung/Deprecation von
    `einsatz_mitgliedschaft.fuehrungsstelle` (LFH-461); dabei die `art`-Achse nach Anlage 1 Nr. 1.1.4/1.1.5
-   (Führungshilfspersonal, Fachberater) entscheiden. Erst nach dem Feldbefund aus Entscheidung 17.
+   (Führungshilfspersonal, Fachberater) entscheiden. **`etb_eintrag.von`/`an` gehören ausdrücklich NICHT
+   in diesen Umbau**: sie bezeichnen Absender/Empfänger einer Meldung (Funkrufname, Einheit, Stelle),
+   nicht ein Sachgebiet — ein Funktionskatalog-FK darauf verengte ein Feld, das den Funkverkehr abbildet.
+   Ob das ETB zusätzlich einen optionalen Stabsbezug bekommt, ist eine eigene Frage, kein Nebenprodukt
+   des Katalogs. Erst nach dem Feldbefund aus Entscheidung 17.
 3. **Termin ↔ Erinnerung (ST8):** LFH-463 hat „keine Kopplung" bewusst gewählt; eine einmalige Fälligkeit
    zum Termin ist kein Rhythmus, aber eine eigene Entscheidung — Pro: der einzige Nudge im Fükw ohne offene
    Stab-Seite; Contra: Alarmbudget und Nebenwirkung eines Einsatzdaten-Feldes in einem anderen Modul.
@@ -668,6 +770,8 @@ Zahl voraussetzen.
 - **BBK-Glossar „Verwaltungsstab"** (IMK-Beschluss 08.07.2004); **LFS-BW VwS-Grundlagen** (05.02.2026),
   Abschn. 4.5 (S. 9). **BayZBE Übersicht Stabsfunktionen** (03.03.2020), S. 2.
 - **DIN 14507-2/-3** nur sekundär (LFS-BW, Wikipedia „Einsatzleitwagen").
+- **THW-Lernunterlage Basisausbildung II Zugtrupp** (Abschn. 2.1.2.4, S. 8–10; 3.2, S. 14–15)
+  `[sekundär]` — Wortlaut der THW-DV 1-100 nicht beschaffbar; nicht tragend für eine Entscheidung.
 - **Repo-Belege:** `migrations/0100`, `0101`, `0044:14`, `0048`, `0013`, `0010`; `src/einsatz/modul.rs`,
   `src/einsatz/kontext.rs`, `src/live/mod.rs`, `src/etb/mod.rs`, `src/lagebericht/repo.rs`,
   `src/erinnerung/repo.rs:227-244, 319`, `src/einsatz/schwaerzung_registry.rs:720-730, 1008-1028`;
