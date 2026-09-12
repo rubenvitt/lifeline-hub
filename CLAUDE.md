@@ -1335,6 +1335,20 @@ Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `p
   --workspace` (Schritt 4) das bin-Target ohnehin mitbaut — e2e ist hier also faktisch
   immer dabei (+~30 s). Der Guard schützt die Fälle daneben: verkürzte Läufe, einzeln
   von Hand aufgerufene Schritte.
+  **Schritt 7 baut seit LFH-356 auch den Prod-Bundle** (`prod_bundle_bereitstellen`), und zwar
+  nur bei Bedarf: fehlt `frontend/dist/sw.js` oder ist eine Quelle neuer, läuft `pnpm build`
+  (~26 s lokal, ~1 min auf 2 vCPU). Grund ist `e2e/lagekarte-offline-precache.spec.ts`: einen
+  **Service Worker gibt es nur im Build** — `vite-plugin-pwa` ist ohne `devOptions` im
+  Dev-Server gar nicht aktiv, und sein Dev-SW wäre kein Precache der gehashten Assets, also
+  eine Attrappe. Ohne den Build überspringt sich der Spec laut, und ein Nachweis, der nie
+  läuft, ist keiner. **Ausgeliefert wird der Bundle vom e2e-Backend**, nicht von
+  `vite preview`: `src/static_files.rs` liest `frontend/dist` im Debug-Build zur Laufzeit vom
+  Dateisystem, das Backend läuft ohnehin, und damit ist die Seite same-origin mit der API —
+  kein zweiter Webserver, kein Preview-Proxy. In der geteilten CI baut jeder der vier Shards
+  (welcher den Spec fährt, steht vorher nicht fest); sie laufen parallel, der Aufschlag ist
+  einmal ~1 min. Bewusst **kein** dist-Artefakt zwischen den Jobs — das wäre ein Schritt, den
+  nur die CI kennt, und damit die Drift, gegen die LFH-522 den Workflow auf dieses Skript
+  zurückgeführt hat.
 - **Kein `| tail` um Gate-Kommandos** — das maskiert den Exit-Code, und eine rote Suite
   sieht dann grün aus.
 - **Ein Release entsteht nicht mehr je Merge, sondern je Arbeitsschub.** Der Release-Job
