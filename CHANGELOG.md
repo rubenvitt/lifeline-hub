@@ -1,3 +1,11 @@
+## [1.0.0-alpha.10](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.9...v1.0.0-alpha.10) (2026-09-12)
+
+### Bug Fixes
+
+* **lfh-316:** Advisory-Gate hermetisch gegen das Lockfile fahren ([c0afd94](https://github.com/rubenvitt/lifeline-hub/commit/c0afd949f7ac32db186ce5b0d5dca8849544c132))
+* **lfh-316:** python3 aus dem check-deps-Selbsttest entfernen ([c09e3d9](https://github.com/rubenvitt/lifeline-hub/commit/c09e3d97a002e441ecd401f03ff8191342ff81bd))
+* **lfh-316:** zwei vakuum-grüne Aussagen im check-deps-Selbsttest schliessen ([3d58bec](https://github.com/rubenvitt/lifeline-hub/commit/3d58bec8f324327c2197eafa583dc7dca353bccf))
+
 ## [1.0.0-alpha.9](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.8...v1.0.0-alpha.9) (2026-09-12)
 
 ### Bug Fixes
