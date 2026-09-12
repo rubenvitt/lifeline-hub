@@ -183,8 +183,13 @@ export default function StatusWahl<W extends string | number>({
           <span
             aria-hidden="true"
             style={{
-              display: 'inline-block', width: '0.5em', height: '0.5em', borderRadius: '50%',
-              backgroundColor: o.farbe?.trim() ? o.farbe.trim() : rollenFarbe(o.darstellung.rolle, token),
+              display: 'inline-block',
+              width: '0.5em',
+              height: '0.5em',
+              borderRadius: '50%',
+              backgroundColor: o.farbe?.trim()
+                ? o.farbe.trim()
+                : rollenFarbe(o.darstellung.rolle, token),
             }}
           />
         )}

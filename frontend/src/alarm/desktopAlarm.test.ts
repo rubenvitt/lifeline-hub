@@ -7,7 +7,10 @@ function stubNotification(permission: NotificationPermission) {
     const inst = { title, onclick: null as (() => void) | null, close: vi.fn() };
     instances.push(inst);
     return inst;
-  }) as unknown as typeof Notification & { permission: NotificationPermission; requestPermission: ReturnType<typeof vi.fn> };
+  }) as unknown as typeof Notification & {
+    permission: NotificationPermission;
+    requestPermission: ReturnType<typeof vi.fn>;
+  };
   Ctor.permission = permission;
   Ctor.requestPermission = vi.fn(() => Promise.resolve('granted' as NotificationPermission));
   vi.stubGlobal('Notification', Ctor);

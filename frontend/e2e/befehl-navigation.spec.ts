@@ -24,12 +24,18 @@ async function vorbereiten(page: Page) {
   return { api, liste, detail };
 }
 
-test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor der Navigation', async ({ page }) => {
+test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor der Navigation', async ({
+  page,
+}) => {
   const { api, liste, detail } = await vorbereiten(page);
   let fehler = true;
   await page.route(`**${api}`, async (route) => {
     if (route.request().method() === 'PATCH' && fehler) {
-      await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Speichern vorübergehend nicht möglich"}' });
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"Speichern vorübergehend nicht möglich"}',
+      });
     } else await route.continue();
   });
   await page.goto(detail);
@@ -48,7 +54,9 @@ test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor d
   expect((await gespeichert.json()).titel).toBe('Gesicherte neue Fassung');
 });
 
-test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten Versuch aus', async ({ page }) => {
+test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten Versuch aus', async ({
+  page,
+}) => {
   const { api, liste, detail } = await vorbereiten(page);
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.goto(liste);
@@ -58,7 +66,11 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
   // Ein abgelehnter PATCH hält die Fassung reproduzierbar offen; keine Zeitannahme.
   await page.route(`**${api}`, async (route) => {
     if (route.request().method() === 'PATCH') {
-      await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Offline"}' });
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"Offline"}',
+      });
     } else await route.continue();
   });
   await page.setViewportSize({ width: 390, height: 844 });

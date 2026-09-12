@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Button, Input, Slider, Space, theme, Tooltip } from 'antd';
-import { CameraOutlined, DownOutlined, HistoryOutlined, PauseOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import {
+  CameraOutlined,
+  DownOutlined,
+  HistoryOutlined,
+  PauseOutlined,
+  PlayCircleOutlined,
+} from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
@@ -72,7 +78,13 @@ function chipLabel(bezeichnung: string | null | undefined, standAt: string): str
  * Der Zeilenumbruch ist mitgedacht: der Rahmen trägt `flexWrap: 'wrap'`, die Leiste wird auf
  * höheren Dichtestufen also höher statt breiter und schneidet nichts ab.
  */
-export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWaehle, fehler }: SnapshotLeisteProps) {
+export function SnapshotLeiste({
+  einsatzId,
+  darfSichern,
+  aktiverSnapshotId,
+  onWaehle,
+  fehler,
+}: SnapshotLeisteProps) {
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const qc = useQueryClient();
@@ -214,10 +226,7 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
 
       {chrono.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 260 }}>
-          <Button
-            type={aktiverSnapshotId == null ? 'primary' : 'default'}
-            onClick={zurueckAktuell}
-          >
+          <Button type={aktiverSnapshotId == null ? 'primary' : 'default'} onClick={zurueckAktuell}>
             Aktuell
           </Button>
           <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
@@ -234,7 +243,10 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
             max={Math.max(0, chrono.length - 1)}
             value={aktiverIndex >= 0 ? aktiverIndex : 0}
             marks={marks}
-            tooltip={{ formatter: (i) => (i != null && chrono[i] ? chipLabel(chrono[i].bezeichnung, chrono[i].stand_at) : '') }}
+            tooltip={{
+              formatter: (i) =>
+                i != null && chrono[i] ? chipLabel(chrono[i].bezeichnung, chrono[i].stand_at) : '',
+            }}
             onChange={(i) => {
               setSpielt(false);
               onWaehle(chrono[i].id);
@@ -243,7 +255,9 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
             aria-label="Zeitleiste"
           />
           <span style={{ minWidth: 96, fontSize: 12, color: token.colorTextSecondary }}>
-            {aktiverIndex >= 0 ? chipLabel(chrono[aktiverIndex].bezeichnung, chrono[aktiverIndex].stand_at) : 'Live'}
+            {aktiverIndex >= 0
+              ? chipLabel(chrono[aktiverIndex].bezeichnung, chrono[aktiverIndex].stand_at)
+              : 'Live'}
           </span>
         </div>
       )}

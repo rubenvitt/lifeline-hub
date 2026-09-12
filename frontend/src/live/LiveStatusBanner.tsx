@@ -90,10 +90,7 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
   const queueBadges = (
     <Space size={12} wrap>
       {queue.ausstehend > 0 && (
-        <Space
-          size={4}
-          aria-label={`${queue.ausstehend} ausstehende Offline-Aktionen`}
-        >
+        <Space size={4} aria-label={`${queue.ausstehend} ausstehende Offline-Aktionen`}>
           <Badge count={queue.ausstehend} overflowCount={999} color={token.colorWarning} />
           <span>ausstehend</span>
         </Space>
@@ -118,11 +115,7 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
           onClick={() => setRecoveryOffen(true)}
         >
           <Space size={4}>
-            <Badge
-              count={queue.nicht_zugeordnet}
-              overflowCount={999}
-              color={token.colorWarning}
-            />
+            <Badge count={queue.nicht_zugeordnet} overflowCount={999} color={token.colorWarning} />
             <span>Alt-Daten – verwerfen</span>
           </Space>
         </Button>
@@ -137,12 +130,12 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
           type={typ}
           showIcon
           banner
-          title={(
+          title={
             <Space size={12} wrap>
               {hinweise.length > 0 && <span>{hinweise.join(' · ')}</span>}
               {queueBadges}
             </Space>
-          )}
+          }
           action={
             aktualisierungVerfuegbar ? (
               <Button type="link" loading={aktualisierungLaeuft} onClick={() => void neuLaden()}>

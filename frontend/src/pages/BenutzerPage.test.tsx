@@ -10,8 +10,14 @@ import BenutzerPage from './BenutzerPage';
 
 function benutzer(over: Partial<Record<string, unknown>> = {}) {
   return {
-    id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-    org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', ...over,
+    id: 1,
+    anzeigename: 'Admin',
+    benutzername: 'admin',
+    system_rolle: 'admin',
+    org_rolle: 'keine',
+    aktiv: true,
+    erstellt_at: '2026-05-23 10:00:00',
+    ...over,
   };
 }
 
@@ -39,7 +45,19 @@ describe('BenutzerPage', () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
       http.get('/api/benutzer', () =>
-        HttpResponse.json(angelegt ? [benutzer(), benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' })] : [benutzer()]),
+        HttpResponse.json(
+          angelegt
+            ? [
+                benutzer(),
+                benutzer({
+                  id: 2,
+                  anzeigename: 'Eva',
+                  benutzername: 'eva',
+                  system_rolle: 'keiner',
+                }),
+              ]
+            : [benutzer()],
+        ),
       ),
       http.post('/api/benutzer', () => {
         angelegt = true;
@@ -171,8 +189,20 @@ describe('BenutzerPage', () => {
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer(),
-          benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner', aktiv: false }),
-          benutzer({ id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner', aktiv: false }),
+          benutzer({
+            id: 2,
+            anzeigename: 'Eva',
+            benutzername: 'eva',
+            system_rolle: 'keiner',
+            aktiv: false,
+          }),
+          benutzer({
+            id: 3,
+            anzeigename: 'Max',
+            benutzername: 'max',
+            system_rolle: 'keiner',
+            aktiv: false,
+          }),
         ]),
       ),
       http.patch('/api/benutzer/:id', async ({ params }) => {
@@ -255,7 +285,13 @@ describe('BenutzerPage', () => {
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer(),
-          benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner', aktiv: false }),
+          benutzer({
+            id: 2,
+            anzeigename: 'Eva',
+            benutzername: 'eva',
+            system_rolle: 'keiner',
+            aktiv: false,
+          }),
         ]),
       ),
     );
@@ -345,10 +381,10 @@ describe('BenutzerPage', () => {
 
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {
     server.use(
-      http.get('/api/auth/me', () =>
-        HttpResponse.json({ ...benutzer(), system_rolle: 'keiner' }),
+      http.get('/api/auth/me', () => HttpResponse.json({ ...benutzer(), system_rolle: 'keiner' })),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
       ),
-      http.get('/api/benutzer', () => HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })),
     );
     renderMitProviders(
       <AuthProvider>
@@ -372,7 +408,8 @@ describe('BenutzerPage', () => {
    * ersten. Unterschieden wird deshalb an der sichtbaren Überschrift.
    */
   function dialogMitTitel(titel: string): HTMLElement {
-    const treffer = screen.getAllByRole('dialog')
+    const treffer = screen
+      .getAllByRole('dialog')
       .filter((d) => d.querySelector('.ant-modal-title')?.textContent === titel);
     if (treffer.length !== 1) {
       throw new Error(`Erwartet genau EIN Modal „${titel}", gefunden ${treffer.length}`);
@@ -428,8 +465,9 @@ describe('BenutzerPage', () => {
     await userEvent.click(within(evaZeile).getByRole('button', { name: 'Bearbeiten' }));
     const bearbeiten = dialogMitTitel('Benutzer bearbeiten');
     expect(bearbeiten.querySelector('.ant-modal-footer')).toBeNull();
-    expect(within(bearbeiten).getByRole('button', { name: 'Speichern' }).closest('form'))
-      .not.toBeNull();
+    expect(
+      within(bearbeiten).getByRole('button', { name: 'Speichern' }).closest('form'),
+    ).not.toBeNull();
   });
 
   /**
@@ -476,12 +514,18 @@ describe('BenutzerPage', () => {
       http.get('/api/benutzer', () =>
         HttpResponse.json([
           benutzer({
-            id: 2, anzeigename: 'Eva', benutzername: 'eva',
-            system_rolle: 'admin', org_rolle: 'fuehrungskraft',
+            id: 2,
+            anzeigename: 'Eva',
+            benutzername: 'eva',
+            system_rolle: 'admin',
+            org_rolle: 'fuehrungskraft',
           }),
           benutzer({
-            id: 3, anzeigename: 'Ben', benutzername: 'ben',
-            system_rolle: 'keiner', org_rolle: 'keine',
+            id: 3,
+            anzeigename: 'Ben',
+            benutzername: 'ben',
+            system_rolle: 'keiner',
+            org_rolle: 'keine',
           }),
         ]),
       ),
@@ -529,7 +573,8 @@ describe('BenutzerPage', () => {
       http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
       http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
       http.post('/api/benutzer', () =>
-        HttpResponse.json({ error: 'Benutzername bereits vergeben' }, { status: 422 })),
+        HttpResponse.json({ error: 'Benutzername bereits vergeben' }, { status: 422 }),
+      ),
     );
     renderMitProviders(
       <AuthProvider>

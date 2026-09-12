@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  ZULETZT_MAX, leseZuletztModule, loeseZuletztModule, merkeModulBesuch,
+  ZULETZT_MAX,
+  leseZuletztModule,
+  loeseZuletztModule,
+  merkeModulBesuch,
 } from './zuletztModule';
 
 describe('zuletztModule', () => {
@@ -84,9 +87,11 @@ describe('loeseZuletztModule', () => {
     // 'etb' liegt in 'erfassung', 'lagekarte' in 'lage' — je Ausschluss bleibt genau
     // das andere übrig. Getrennt geprüft, weil ein gemeinsamer Aufruf die leere Liste
     // liefert und damit nicht sagt, WELCHER Ausschluss gegriffen hat.
-    expect(loeseZuletztModule(1, null, undefined, { key: 'lagekarte' }).map((m) => m.key))
-      .toEqual(['etb']);
-    expect(loeseZuletztModule(1, null, undefined, { kategorie: 'erfassung' }).map((m) => m.key))
-      .toEqual(['lagekarte']);
+    expect(loeseZuletztModule(1, null, undefined, { key: 'lagekarte' }).map((m) => m.key)).toEqual([
+      'etb',
+    ]);
+    expect(
+      loeseZuletztModule(1, null, undefined, { kategorie: 'erfassung' }).map((m) => m.key),
+    ).toEqual(['lagekarte']);
   });
 });

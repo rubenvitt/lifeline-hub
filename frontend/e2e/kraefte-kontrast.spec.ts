@@ -27,7 +27,8 @@ async function kontrastVon(ziel: Locator) {
     for (let knoten: Element | null = el; knoten; knoten = knoten.parentElement) {
       const s = getComputedStyle(knoten);
       // Keine scheinpräzise Zahl für nicht modellierte Gruppen-Opacity/Gradienten.
-      if (s.opacity !== '1' || s.backgroundImage !== 'none') throw new Error(`Nicht ebene Fläche an ${knoten.tagName}.${knoten.className}`);
+      if (s.opacity !== '1' || s.backgroundImage !== 'none')
+        throw new Error(`Nicht ebene Fläche an ${knoten.tagName}.${knoten.className}`);
       const f = farbe(s.backgroundColor);
       lagen.push(f);
       if (f[3] === 1) break;
@@ -35,7 +36,10 @@ async function kontrastVon(ziel: Locator) {
     const grund = lagen.reverse().reduce((h, v) => mische(v, h), [0, 0, 0, 0] as Farbe);
     if (grund[3] !== 1) throw new Error('Keine opake Grundfläche gefunden');
     const luminanz = (f: Farbe) => {
-      const rgb = f.slice(0, 3).map((x) => x / 255).map((x) => x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+      const rgb = f
+        .slice(0, 3)
+        .map((x) => x / 255)
+        .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
       return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
     };
     const kontrast = (v: Farbe) => {
@@ -45,8 +49,11 @@ async function kontrastVon(ziel: Locator) {
     };
     const s = getComputedStyle(el);
     return {
-      text: s.color, rand: s.borderTopColor, grund: grund.slice(0, 3),
-      textKontrast: kontrast(farbe(s.color)), randKontrast: kontrast(farbe(s.borderTopColor)),
+      text: s.color,
+      rand: s.borderTopColor,
+      grund: grund.slice(0, 3),
+      textKontrast: kontrast(farbe(s.color)),
+      randKontrast: kontrast(farbe(s.borderTopColor)),
       randBreite: parseFloat(s.borderTopWidth),
     };
   });
@@ -73,7 +80,14 @@ const MATERIAL = [
   { status: 'defekt', rolle: 'alarm' },
   { status: 'desinfektion_noetig', rolle: 'achtung' },
 ] as const;
-const FREITEXT = ['#ffffff', '#000000', 'transparent', 'rgba(255, 255, 255, 0.1)', 'oklch(95% 0.02 100)', 'keine-gueltige-farbe'] as const;
+const FREITEXT = [
+  '#ffffff',
+  '#000000',
+  'transparent',
+  'rgba(255, 255, 255, 0.1)',
+  'oklch(95% 0.02 100)',
+  'keine-gueltige-farbe',
+] as const;
 
 /** Der dekorative Punkt muss die Eingabe erhalten; ungültiges CSS darf keine Textfarbe erben. */
 async function pruefeMandantenpunkt(punkt: Locator, eingabe: string) {
@@ -101,35 +115,59 @@ async function pruefeMandantenpunkt(punkt: Locator, eingabe: string) {
   expect(kasten.height).toBeGreaterThan(0);
 }
 
-test('Kontrastmesskern: opake und transparente Farben sowie eine absichtliche Kontrastverletzung', async ({ page }) => {
-  await page.setContent('<main style="background:rgb(255,255,255)"><span id="probe" style="color:rgba(0,0,0,.5);background:transparent;border:1px solid black">Probe</span></main>');
+test('Kontrastmesskern: opake und transparente Farben sowie eine absichtliche Kontrastverletzung', async ({
+  page,
+}) => {
+  await page.setContent(
+    '<main style="background:rgb(255,255,255)"><span id="probe" style="color:rgba(0,0,0,.5);background:transparent;border:1px solid black">Probe</span></main>',
+  );
   const ziel = page.locator('#probe');
   const halb = await kontrastVon(ziel);
   expect(halb.textKontrast).toBeGreaterThan(3.9);
   expect(halb.textKontrast).toBeLessThan(4.1);
   expect(halb.randKontrast).toBe(21);
-  await ziel.evaluate((el) => { el.style.color = 'white'; });
+  await ziel.evaluate((el) => {
+    el.style.color = 'white';
+  });
   expect((await kontrastVon(ziel)).textKontrast).toBe(1);
-  await ziel.evaluate((el) => { el.style.color = 'black'; });
+  await ziel.evaluate((el) => {
+    el.style.color = 'black';
+  });
   expect((await kontrastVon(ziel)).textKontrast).toBe(21);
 });
 
 for (const modus of ['light', 'dark']) {
-  test(`Kräfte: Statuswortlaut und tragender Rand auf Karte/Tabelle im Modus ${modus}`, async ({ page }) => {
+  test(`Kräfte: Statuswortlaut und tragender Rand auf Karte/Tabelle im Modus ${modus}`, async ({
+    page,
+  }) => {
     test.setTimeout(120_000);
     await anmelden(page);
     const lauf = Date.now();
-    const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E 446 Kontrast ${lauf}` });
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 446 Kontrast ${lauf}`,
+    });
     const basis = `/api/einsaetze/${einsatzId}`;
-    const faelle: { modul: string; kennung: string; rolle: string; farbe?: string; label?: string }[] = [];
+    const faelle: {
+      modul: string;
+      kennung: string;
+      rolle: string;
+      farbe?: string;
+      label?: string;
+    }[] = [];
     for (const { status, rolle } of MATERIAL) {
       const kennung = `Messmaterial ${status}`;
-      const id = await post(page, `${basis}/material`, { adhoc: { bezeichnung: kennung }, menge: 1 });
+      const id = await post(page, `${basis}/material`, {
+        adhoc: { bezeichnung: kennung },
+        menge: 1,
+      });
       const r = await page.request.patch(`${basis}/material/${id}`, { data: { status } });
       expect(r.ok(), await r.text()).toBeTruthy();
       faelle.push({ modul: 'material', kennung, rolle });
     }
-    for (const [modul, katalog, feld] of [['fahrzeuge', 'fahrzeug-status', 'funkrufname'], ['personal', 'personal-status', 'name']] as const) {
+    for (const [modul, katalog, feld] of [
+      ['fahrzeuge', 'fahrzeug-status', 'funkrufname'],
+      ['personal', 'personal-status', 'name'],
+    ] as const) {
       const neutral = `Messkraft ${modul} neutral`;
       const neutralId = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: neutral } });
       // Die API-Typen erlauben einen fehlenden Status. Neue Dispositionen erhalten jedoch
@@ -138,17 +176,34 @@ for (const modus of ['light', 'dark']) {
       await page.route(`**${basis}/${modul}`, async (route) => {
         const antwort = await route.fetch();
         const zeilen = (await antwort.json()) as { id: number }[];
-        await route.fulfill({ response: antwort, json: zeilen.map((z) => z.id === neutralId
-          ? { ...z, status_id: null, status_label: null, status_kategorie: null, status_farbe: null }
-          : z) });
+        await route.fulfill({
+          response: antwort,
+          json: zeilen.map((z) =>
+            z.id === neutralId
+              ? {
+                  ...z,
+                  status_id: null,
+                  status_label: null,
+                  status_kategorie: null,
+                  status_farbe: null,
+                }
+              : z,
+          ),
+        });
       });
       faelle.push({ modul, kennung: neutral, rolle: 'neutral' });
       for (const [i, farbe] of FREITEXT.entries()) {
         const kennung = `Messkraft ${modul} ${i}`;
         const label = `Messstatus 446 ${lauf} ${i}`;
-        const statusId = await post(page, `/api/${katalog}`, { label, kategorie: 'verfuegbar', farbe });
+        const statusId = await post(page, `/api/${katalog}`, {
+          label,
+          kategorie: 'verfuegbar',
+          farbe,
+        });
         const id = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: kennung } });
-        const r = await page.request.patch(`${basis}/${modul}/${id}`, { data: { status_id: statusId } });
+        const r = await page.request.patch(`${basis}/${modul}/${id}`, {
+          data: { status_id: statusId },
+        });
         expect(r.ok(), await r.text()).toBeTruthy();
         faelle.push({ modul, kennung, rolle: 'normal', farbe, label });
       }
@@ -165,7 +220,10 @@ for (const modus of ['light', 'dark']) {
         const zweig = breite === 390 ? '[data-lfh="datensicht-karte"]' : 'tr.ant-table-row';
         await expect(main.locator(zweig)).toHaveCount(fallmenge.length);
         for (const fall of fallmenge) {
-          const knopf = main.getByRole('button', { name: `Status von ${fall.kennung} ändern`, exact: true });
+          const knopf = main.getByRole('button', {
+            name: `Status von ${fall.kennung} ändern`,
+            exact: true,
+          });
           const etikett = knopf.locator('.ant-tag');
           await expect(etikett).toHaveAttribute('data-rolle', fall.rolle);
           // Kein Hovergrund aus einer vorausgehenden Interaktion in die Messung mischen.
@@ -187,13 +245,18 @@ for (const modus of ['light', 'dark']) {
           }
           const kontext = `${modus}, ${breite}px, ${fall.kennung}, ${fall.farbe ?? fall.rolle}: ${JSON.stringify(werte)}`;
           messwerte.push({ modus, breite, ...fall, ...werte });
-          expect.soft(werte.textKontrast, kontext).toBeGreaterThanOrEqual(modus === 'light' ? 7 : 5);
+          expect
+            .soft(werte.textKontrast, kontext)
+            .toBeGreaterThanOrEqual(modus === 'light' ? 7 : 5);
           expect.soft(werte.randBreite, kontext).toBeGreaterThan(0);
           expect.soft(werte.randKontrast, kontext).toBeGreaterThanOrEqual(3);
         }
       }
     }
-    await test.info().attach('kontrastwerte.json', { body: JSON.stringify(messwerte, null, 2), contentType: 'application/json' });
+    await test.info().attach('kontrastwerte.json', {
+      body: JSON.stringify(messwerte, null, 2),
+      contentType: 'application/json',
+    });
   });
 }
 
@@ -280,15 +343,21 @@ const KOPF_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. einsatzbereit$/];
 const ZEILEN_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. verf\.$/];
 
 for (const modus of ['light', 'dark'] as const) {
-  test(`Kräfteübersicht: Kopf-Statuszahlen und Verdichtungszeile im Modus ${modus}`, async ({ page }) => {
+  test(`Kräfteübersicht: Kopf-Statuszahlen und Verdichtungszeile im Modus ${modus}`, async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     await anmelden(page);
-    const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E 515 Kontrast ${Date.now()}` });
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 515 Kontrast ${Date.now()}`,
+    });
     const basis = `/api/einsaetze/${einsatzId}`;
     // Ohne Daten rendert die Verdichtungszeile `null` (Datenriegel) — die Messung liefe auf
     // einem Leerzustand. Die Fahrzeugachse des Kopfes steht dagegen auch bei lauter Nullen.
     await post(page, `${basis}/personal`, { adhoc: { name: 'Messkraft 515' } });
-    await post(page, `${basis}/fahrzeuge`, { adhoc: { funkrufname: 'Florian Musterstadt 3/44-1' } });
+    await post(page, `${basis}/fahrzeuge`, {
+      adhoc: { funkrufname: 'Florian Musterstadt 3/44-1' },
+    });
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
 
@@ -313,9 +382,9 @@ for (const modus of ['light', 'dark'] as const) {
         // steht trotzdem in jeder Meldung. `soft`, damit ein Lauf ALLE sechs Werte meldet
         // statt am ersten abzubrechen — bei einer Palettenänderung will man die ganze
         // Tabelle sehen, nicht eine Zeile davon.
-        expect.soft(werte.textKontrast, kontext).toBeGreaterThanOrEqual(
-          modus === 'dark' ? ZIEL.dark : BODEN,
-        );
+        expect
+          .soft(werte.textKontrast, kontext)
+          .toBeGreaterThanOrEqual(modus === 'dark' ? ZIEL.dark : BODEN);
       }
     }
 
@@ -334,8 +403,14 @@ for (const modus of ['light', 'dark'] as const) {
     // Die Gründe müssen sich unterscheiden — sonst hat (2) nur (1) wiederholt und der
     // ganze Zweitnachweis wäre eine Abschrift.
     const gruende = new Set(messwerte.map((w) => String(w.grund)));
-    expect(gruende.size, `Karten- und Seitengrund sind zwei Flächen: ${[...gruende]}`).toBeGreaterThan(1);
+    expect(
+      gruende.size,
+      `Karten- und Seitengrund sind zwei Flächen: ${[...gruende]}`,
+    ).toBeGreaterThan(1);
 
-    await test.info().attach('kontrastwerte.json', { body: JSON.stringify(messwerte, null, 2), contentType: 'application/json' });
+    await test.info().attach('kontrastwerte.json', {
+      body: JSON.stringify(messwerte, null, 2),
+      contentType: 'application/json',
+    });
   });
 }

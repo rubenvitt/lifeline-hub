@@ -14,7 +14,9 @@ const fx = vi.hoisted(() => {
   const fc = (coords: number[][]): FeatureCollection => ({
     type: 'FeatureCollection',
     features: coords.map((c) => ({
-      type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {},
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: c },
+      properties: {},
     })),
   });
   return { fc, nina: fc([[9, 50]]), kritisA: fc([[10, 51]]), kritisB: fc([[11, 52]]) };
@@ -26,13 +28,28 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
     ...actual,
     ladeFachebene: vi.fn((quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> => {
       if (quelle === 'nina')
-        return Promise.resolve({ quelle, status: 'ok', attribution: '© NINA', stand: null, features: fx.nina });
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: '© NINA',
+          stand: null,
+          features: fx.nina,
+        });
       if (quelle === 'kritis')
         return Promise.resolve({
-          quelle, status: 'ok', attribution: '© KRITIS', stand: null,
+          quelle,
+          status: 'ok',
+          attribution: '© KRITIS',
+          stand: null,
           features: bbox === 'bbox2' ? fx.kritisB : fx.kritisA,
         });
-      return Promise.resolve({ quelle, status: 'leer', attribution: '', stand: null, features: fx.fc([]) });
+      return Promise.resolve({
+        quelle,
+        status: 'leer',
+        attribution: '',
+        stand: null,
+        features: fx.fc([]),
+      });
     }),
   };
 });
@@ -69,8 +86,9 @@ describe('useFachebenen', () => {
     // Auf die geladenen Daten warten, nicht bloß auf die Sichtbarkeit (sonst Race: der
     // Layer erscheint mit leerer FeatureCollection, bevor die Query aufgelöst ist).
     await waitFor(() =>
-      expect(result.current.aktiveFachebenen.find((f) => f.def.key === 'nina')?.daten.features)
-        .toHaveLength(1),
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'nina')?.daten.features,
+      ).toHaveLength(1),
     );
     const nina = result.current.aktiveFachebenen.find((f) => f.def.key === 'nina');
     expect(nina?.daten.features).toHaveLength(1);
@@ -83,14 +101,16 @@ describe('useFachebenen', () => {
     act(() => result.current.onFachebeneToggle('kritis', true));
     act(() => result.current.setKritisBbox('bbox1'));
     await waitFor(() =>
-      expect(result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')?.daten.features)
-        .toHaveLength(1),
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')?.daten.features,
+      ).toHaveLength(1),
     );
     act(() => result.current.setKritisBbox('bbox2'));
     // Beide Objekte bleiben sichtbar (mergeFeatures akkumuliert), nicht nur das neue.
     await waitFor(() =>
-      expect(result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')?.daten.features)
-        .toHaveLength(2),
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')?.daten.features,
+      ).toHaveLength(2),
     );
   });
 
@@ -99,8 +119,9 @@ describe('useFachebenen', () => {
     act(() => result.current.onFachebeneToggle('nina', true));
     // Erst wenn die Daten geladen sind (kein Pending mehr), ist die combine-Ausgabe stabil.
     await waitFor(() =>
-      expect(result.current.aktiveFachebenen.find((f) => f.def.key === 'nina')?.daten.features)
-        .toHaveLength(1),
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'nina')?.daten.features,
+      ).toHaveLength(1),
     );
     const vorher = result.current.aktiveFachebenen;
     rerender();

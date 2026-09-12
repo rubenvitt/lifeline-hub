@@ -31,7 +31,11 @@ export function legeZoneAn(einsatzId: number, daten: ZoneNeu): Promise<LageZone>
   return apiSend<LageZone>(`/api/einsaetze/${einsatzId}/zonen`, 'POST', daten);
 }
 
-export function aktualisiereZone(einsatzId: number, zid: number, daten: ZonePatch): Promise<LageZone> {
+export function aktualisiereZone(
+  einsatzId: number,
+  zid: number,
+  daten: ZonePatch,
+): Promise<LageZone> {
   return apiSend<LageZone>(`/api/einsaetze/${einsatzId}/zonen/${zid}`, 'PATCH', daten);
 }
 

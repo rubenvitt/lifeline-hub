@@ -18,7 +18,9 @@ async function anmelden(page: Page) {
 // (LFH-25): kein „Neu"/„+ Platz"/„OK" mehr, sondern Leerzustand „Erste UHS anlegen" und
 // „Plätze anlegen" (Typ + Menge). Eine frisch angelegte UHS ist `geplant` → der
 // Bearbeiten-Modus (Platz-Karten ziehbar) ist standardmäßig aktiv.
-test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH aus', async ({ page }) => {
+test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH aus', async ({
+  page,
+}) => {
   await anmelden(page);
 
   // Einsatz anlegen — Mutation navigiert nach Erfolg nach /einsaetze/:id/<default-modul>.
@@ -77,7 +79,9 @@ test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH au
   expect(body.pos_y!).toBeGreaterThan(0);
 
   // Karte bleibt sichtbar an neuer Stelle (nicht „springt zurück").
-  await expect.poll(async () => (await karte.boundingBox())?.x ?? 0).toBeGreaterThan(before!.x + 20);
+  await expect
+    .poll(async () => (await karte.boundingBox())?.x ?? 0)
+    .toBeGreaterThan(before!.x + 20);
   const after = await karte.boundingBox();
   expect(after!.y).toBeGreaterThan(before!.y + 20);
 

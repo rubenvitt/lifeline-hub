@@ -219,28 +219,31 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const standRef = useRef(0);
 
   /** Der EINE Speicherweg. Lehnt mit dem Grund des Servers ab; Zustand setzt der Aufrufer. */
-  const speichereMit = useCallback((werte: W) => {
-    laeuftRef.current = true;
-    standRef.current = aenderungRef.current;
-    setSpeichertGerade(true);
-    const quittieren = quittungVorbereiten();
-    const auftrag = speichernRef.current(werte);
-    auftragRef.current = auftrag;
-    return auftrag
-      .then((r) => {
-        quittieren();
-        onGespeichertRef.current?.();
-        return r;
-      })
-      .finally(() => {
-        // Nur der Auftrag, der den Riegel HÄLT, gibt ihn frei — sonst öffnete ein zweiter,
-        // früher fertiger Auftrag die Pforte, während der erste noch unterwegs ist.
-        if (auftragRef.current !== auftrag) return;
-        laeuftRef.current = false;
-        auftragRef.current = null;
-        setSpeichertGerade(false);
-      });
-  }, [quittungVorbereiten]);
+  const speichereMit = useCallback(
+    (werte: W) => {
+      laeuftRef.current = true;
+      standRef.current = aenderungRef.current;
+      setSpeichertGerade(true);
+      const quittieren = quittungVorbereiten();
+      const auftrag = speichernRef.current(werte);
+      auftragRef.current = auftrag;
+      return auftrag
+        .then((r) => {
+          quittieren();
+          onGespeichertRef.current?.();
+          return r;
+        })
+        .finally(() => {
+          // Nur der Auftrag, der den Riegel HÄLT, gibt ihn frei — sonst öffnete ein zweiter,
+          // früher fertiger Auftrag die Pforte, während der erste noch unterwegs ist.
+          if (auftragRef.current !== auftrag) return;
+          laeuftRef.current = false;
+          auftragRef.current = null;
+          setSpeichertGerade(false);
+        });
+    },
+    [quittungVorbereiten],
+  );
 
   // In einer Ref, damit der Intervall-Effekt nicht bei jedem Render neu aufgesetzt wird
   // (sonst liefe die Frist nie ab — dieselbe Falle wie bei instabilen Effekt-Deps).
@@ -262,24 +265,27 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     speichereMit(form.getFieldsValue()).catch(meldeSpeicherfehler);
   };
 
-  const speichereJetzt = useCallback(async (werte: W) => {
-    // (a) SCHON GESICHERT. Der Blur-Autosave dieses Klicks ist bereits zurück, der Server
-    // trägt denselben Stand — ein PATCH wäre die Dublette. Dasselbe Urteil, das der
-    // Autosave über `ungespeichert` trifft, nur aus der Ref gelesen.
-    if (!laeuftRef.current && aenderungRef.current === gesichertRef.current) return;
-    // (b) NOCH UNTERWEGS und mit demselben Stand losgeschickt: anhängen statt doppeln.
-    const laufend =
-      laeuftRef.current && aenderungRef.current === standRef.current ? auftragRef.current : null;
-    try {
-      // (c) Sonst ein eigener PATCH — ungesicherter Stand, oder ein laufender Auftrag mit
-      // einem älteren.
-      if (laufend) await laufend;
-      else await speichereMit(werte);
-    } catch (e) {
-      meldeSpeicherfehler(e);
-      throw e; // Der Aufrufer entscheidet über Toast, Dialog und Freigabe.
-    }
-  }, [speichereMit, meldeSpeicherfehler]);
+  const speichereJetzt = useCallback(
+    async (werte: W) => {
+      // (a) SCHON GESICHERT. Der Blur-Autosave dieses Klicks ist bereits zurück, der Server
+      // trägt denselben Stand — ein PATCH wäre die Dublette. Dasselbe Urteil, das der
+      // Autosave über `ungespeichert` trifft, nur aus der Ref gelesen.
+      if (!laeuftRef.current && aenderungRef.current === gesichertRef.current) return;
+      // (b) NOCH UNTERWEGS und mit demselben Stand losgeschickt: anhängen statt doppeln.
+      const laufend =
+        laeuftRef.current && aenderungRef.current === standRef.current ? auftragRef.current : null;
+      try {
+        // (c) Sonst ein eigener PATCH — ungesicherter Stand, oder ein laufender Auftrag mit
+        // einem älteren.
+        if (laufend) await laufend;
+        else await speichereMit(werte);
+      } catch (e) {
+        meldeSpeicherfehler(e);
+        throw e; // Der Aufrufer entscheidet über Toast, Dialog und Freigabe.
+      }
+    },
+    [speichereMit, meldeSpeicherfehler],
+  );
 
   useEffect(() => {
     if (!istEntwurf) return;

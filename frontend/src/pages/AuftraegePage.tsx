@@ -13,10 +13,17 @@ export default function AuftraegePage() {
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
 
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;

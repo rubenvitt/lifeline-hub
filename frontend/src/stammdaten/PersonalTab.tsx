@@ -8,7 +8,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
-import { ladePersonalVorschlaege, listePersonal, POSITION_LABELS, setzeDienststatus } from '../api/personal';
+import {
+  ladePersonalVorschlaege,
+  listePersonal,
+  POSITION_LABELS,
+  setzeDienststatus,
+} from '../api/personal';
 import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
@@ -23,8 +28,14 @@ export default function PersonalTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Personal | null>(null);
 
-  const personalQuery = useQuery({ queryKey: globalKeys.personalListe('alle'), queryFn: () => listePersonal(false) });
-  const vorschlaegeQuery = useQuery({ queryKey: globalKeys.personalVorschlaege(), queryFn: ladePersonalVorschlaege });
+  const personalQuery = useQuery({
+    queryKey: globalKeys.personalListe('alle'),
+    queryFn: () => listePersonal(false),
+  });
+  const vorschlaegeQuery = useQuery({
+    queryKey: globalKeys.personalVorschlaege(),
+    queryFn: ladePersonalVorschlaege,
+  });
 
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
@@ -57,16 +68,25 @@ export default function PersonalTab() {
        */
       render: (_, p) => <Link to={personalDetailPfad(p.id)}>{p.name}</Link>,
     },
-    { title: 'Personalnr.', dataIndex: 'personalnummer', key: 'personalnummer', render: (t) => t ?? '—' },
+    {
+      title: 'Personalnr.',
+      dataIndex: 'personalnummer',
+      key: 'personalnummer',
+      render: (t) => t ?? '—',
+    },
     {
       title: 'Qualifikationen',
       key: 'qualifikationen',
       render: (_, p) =>
         p.qualifikationen.length ? (
           <Space size={[0, 4]} wrap>
-            {p.qualifikationen.map((q) => <Tag key={q.id}>{q.label}</Tag>)}
+            {p.qualifikationen.map((q) => (
+              <Tag key={q.id}>{q.label}</Tag>
+            ))}
           </Space>
-        ) : '—',
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Stärke-Position',
@@ -97,7 +117,11 @@ export default function PersonalTab() {
       ],
       onFilter: (wert, p) => p.dienststatus === wert,
       render: (_, p) =>
-        p.dienststatus === 'in_dienst' ? <Tag color="green">in Dienst</Tag> : <Tag>außer Dienst</Tag>,
+        p.dienststatus === 'in_dienst' ? (
+          <Tag color="green">in Dienst</Tag>
+        ) : (
+          <Tag>außer Dienst</Tag>
+        ),
     },
     ...(istAdmin
       ? ([
@@ -128,7 +152,13 @@ export default function PersonalTab() {
                 dienststatusMutation.isPending && dienststatusMutation.variables?.id === p.id;
               return (
                 <Space size="middle">
-                  <Button disabled={laeuft} onClick={() => { setBearbeite(p); setModalOffen(true); }}>
+                  <Button
+                    disabled={laeuft}
+                    onClick={() => {
+                      setBearbeite(p);
+                      setModalOffen(true);
+                    }}
+                  >
                     Bearbeiten
                   </Button>
                   {p.dienststatus === 'in_dienst' ? (
@@ -142,15 +172,20 @@ export default function PersonalTab() {
                         }
                       }}
                     >
-                      <Button danger loading={laeuft} disabled={laeuft}>Außer Dienst</Button>
+                      <Button danger loading={laeuft} disabled={laeuft}>
+                        Außer Dienst
+                      </Button>
                     </Popconfirm>
                   ) : (
-                    <Button loading={laeuft} disabled={laeuft}
+                    <Button
+                      loading={laeuft}
+                      disabled={laeuft}
                       onClick={() => {
                         if (!laeuft) {
                           dienststatusMutation.mutate({ id: p.id, inDienst: true });
                         }
-                      }}>
+                      }}
+                    >
                       Wieder in Dienst
                     </Button>
                   )}
@@ -172,7 +207,14 @@ export default function PersonalTab() {
            wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
            Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
            deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
-        <Button type="primary" disabled={!istAdmin} onClick={() => { setBearbeite(null); setModalOffen(true); }}>
+        <Button
+          type="primary"
+          disabled={!istAdmin}
+          onClick={() => {
+            setBearbeite(null);
+            setModalOffen(true);
+          }}
+        >
           Person anlegen
         </Button>
       }

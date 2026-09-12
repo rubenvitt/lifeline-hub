@@ -1,5 +1,19 @@
 import StatusTag from '../components/StatusTag';
-import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Descriptions,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from 'antd';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';
@@ -35,8 +49,14 @@ import {
   geschaedigtFelder,
 } from './schaeden/schadenHelfer';
 
-const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({ value: t, label: TYP_LABEL[t] }));
-const AUSMASS_OPTIONS = (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({ value: a, label: AUSMASS_META[a].label }));
+const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
+  value: t,
+  label: TYP_LABEL[t],
+}));
+const AUSMASS_OPTIONS = (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({
+  value: a,
+  label: AUSMASS_META[a].label,
+}));
 
 type EditWerte = SchadenPatch & { geschaedigt?: GeschaedigtWert };
 
@@ -63,7 +83,8 @@ export default function SchaedenDetailPage() {
   const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
   const [abschlussForm] = Form.useForm<{ abschluss_grund: string; notiz?: string }>();
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
@@ -74,7 +95,10 @@ export default function SchaedenDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.schaden(einsatzId, schadenId) });
   }
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const detailQuery = useQuery({
     queryKey: einsatzKeys.schaden(einsatzId, schadenId),
     queryFn: () => ladeSchaden(einsatzId, schadenId),
@@ -90,7 +114,10 @@ export default function SchaedenDetailPage() {
     // blanker `s.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
     mutationFn: (v: { daten: SchadenPatch; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisiereSchaden(einsatzId, schadenId, v.daten, v.overwrite ? undefined : v.basis),
-    onSuccess: () => { invalidateDetail(); editSitzung.beende(); },
+    onSuccess: () => {
+      invalidateDetail();
+      editSitzung.beende();
+    },
     onError: (e, v) => {
       // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Anders als beim
       // Person-PATCH (Referenz LFH-241) kennt die Schaden-Route einen ZWEITEN 409: den
@@ -106,7 +133,10 @@ export default function SchaedenDetailPage() {
           okButtonProps: { danger: true },
           cancelText: 'Neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
-          onCancel: () => { detailQuery.refetch(); editSitzung.beende(); },
+          onCancel: () => {
+            detailQuery.refetch();
+            editSitzung.beende();
+          },
         });
       } else {
         fehler(e);
@@ -115,16 +145,30 @@ export default function SchaedenDetailPage() {
   });
   const uebergebMutation = useMutation({
     mutationFn: (an: string) => uebergebeSchaden(einsatzId, schadenId, an),
-    onSuccess: () => { invalidateDetail(); setUebergebenOffen(false); uebergebForm.resetFields(); }, onError: fehler,
+    onSuccess: () => {
+      invalidateDetail();
+      setUebergebenOffen(false);
+      uebergebForm.resetFields();
+    },
+    onError: fehler,
   });
   const abschlussMutation = useMutation({
     mutationFn: (v: { abschluss_grund: string; notiz?: string }) =>
       schliesseSchadenAb(einsatzId, schadenId, v.abschluss_grund, v.notiz),
-    onSuccess: () => { invalidateDetail(); setAbschlussOffen(false); abschlussForm.resetFields(); }, onError: fehler,
+    onSuccess: () => {
+      invalidateDetail();
+      setAbschlussOffen(false);
+      abschlussForm.resetFields();
+    },
+    onError: fehler,
   });
   const stornoMutation = useMutation({
     mutationFn: () => storniereSchaden(einsatzId, schadenId),
-    onSuccess: () => { invalidate(); navigate(schaedenPfad(einsatzId)); }, onError: fehler,
+    onSuccess: () => {
+      invalidate();
+      navigate(schaedenPfad(einsatzId));
+    },
+    onError: fehler,
   });
 
   // NaN-/Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
@@ -132,7 +176,11 @@ export default function SchaedenDetailPage() {
     return <Navigate to={schaedenPfad(einsatzId)} replace />;
   }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -159,35 +207,54 @@ export default function SchaedenDetailPage() {
 
   // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item, sonst die Read-Anzeige — so bleibt
   // dieselbe Descriptions-Tabelle stehen, statt die Ansicht gegen ein separates Formular zu tauschen.
-  const zelle = (name: string, input: React.ReactNode, anzeige: React.ReactNode, rules?: object[]) =>
-    bearbeiten ? <Form.Item name={name} noStyle rules={rules}>{input}</Form.Item> : anzeige;
+  const zelle = (
+    name: string,
+    input: React.ReactNode,
+    anzeige: React.ReactNode,
+    rules?: object[],
+  ) =>
+    bearbeiten ? (
+      <Form.Item name={name} noStyle rules={rules}>
+        {input}
+      </Form.Item>
+    ) : (
+      anzeige
+    );
 
   const detailAnsicht = (
     <Descriptions column={1} size="small" bordered>
       <Descriptions.Item label="Typ">
-        {zelle('typ', <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />, <Tag>{TYP_LABEL[s.typ]}</Tag>)}
+        {zelle(
+          'typ',
+          <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />,
+          <Tag>{TYP_LABEL[s.typ]}</Tag>,
+        )}
       </Descriptions.Item>
       <Descriptions.Item label="Ausmaß">
-        {zelle('ausmass', <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
-          <StatusTag darstellung={AUSMASS_META[s.ausmass]} />)}
+        {zelle(
+          'ausmass',
+          <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
+          <StatusTag darstellung={AUSMASS_META[s.ausmass]} />,
+        )}
       </Descriptions.Item>
       <Descriptions.Item label="Ort">
-        {zelle('ort', <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />, s.ort,
-          [{ required: true, message: 'Ort ist Pflicht' }])}
+        {zelle('ort', <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />, s.ort, [
+          { required: true, message: 'Ort ist Pflicht' },
+        ])}
       </Descriptions.Item>
       <Descriptions.Item label="Beschreibung">
         {zelle('beschreibung', <Input.TextArea rows={2} />, s.beschreibung || '—')}
       </Descriptions.Item>
       {/**
-        * VERORTUNG (LFH-340 · C5, Befund M39). Bis dahin sagte die Seite kein Wort darüber,
-        * ob dieser Schaden auf der Karte steht — obwohl `lat`/`lon` seit jeher am Datensatz
-        * hängen und die Karte sie setzen kann. Eine Lage, die man nicht verorten kann, weil
-        * niemand sieht, dass sie unverortet ist, ist so gut wie nicht erfasst.
-        *
-        * Die Koordinate wird hier NICHT eingegeben: `SchadenEingabe` kennt kein lat/lon
-        * (nur `SchadenPatch` tut es), und ein Eingabefeld wäre eine Backend-Erweiterung.
-        * Der Weg ist deshalb der Auftrag an die Karte — sie hat die Mechanik bereits.
-        */}
+       * VERORTUNG (LFH-340 · C5, Befund M39). Bis dahin sagte die Seite kein Wort darüber,
+       * ob dieser Schaden auf der Karte steht — obwohl `lat`/`lon` seit jeher am Datensatz
+       * hängen und die Karte sie setzen kann. Eine Lage, die man nicht verorten kann, weil
+       * niemand sieht, dass sie unverortet ist, ist so gut wie nicht erfasst.
+       *
+       * Die Koordinate wird hier NICHT eingegeben: `SchadenEingabe` kennt kein lat/lon
+       * (nur `SchadenPatch` tut es), und ein Eingabefeld wäre eine Backend-Erweiterung.
+       * Der Weg ist deshalb der Auftrag an die Karte — sie hat die Mechanik bereits.
+       */}
       <Descriptions.Item label="Verortung">
         {s.lat != null && s.lon != null ? (
           <KoordinatenAnzeige lat={s.lat} lon={s.lon} einsatzId={einsatzId} />
@@ -203,9 +270,14 @@ export default function SchaedenDetailPage() {
         )}
       </Descriptions.Item>
       <Descriptions.Item label="Geschädigt">
-        {zelle('geschaedigt',
-          <GeschaedigtPicker einsatzId={einsatzId} orgName={einsatz.org_name ?? 'Eigene Organisation'} />,
-          geschaedigtAnzeige(s, einsatzId))}
+        {zelle(
+          'geschaedigt',
+          <GeschaedigtPicker
+            einsatzId={einsatzId}
+            orgName={einsatz.org_name ?? 'Eigene Organisation'}
+          />,
+          geschaedigtAnzeige(s, einsatzId),
+        )}
       </Descriptions.Item>
       {s.status !== 'offen' && (
         <Descriptions.Item label="Übergeben an">{s.uebergeben_an || '—'}</Descriptions.Item>
@@ -229,7 +301,10 @@ export default function SchaedenDetailPage() {
           { title: schadenRegistrierAnzeige(s.registrier_nr) },
         ]}
       />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} align="start">
+      <Space
+        style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}
+        align="start"
+      >
         <Space wrap>
           <Typography.Title level={3} style={{ margin: 0 }}>
             Schaden {schadenRegistrierAnzeige(s.registrier_nr)}
@@ -243,16 +318,30 @@ export default function SchaedenDetailPage() {
               <Button disabled={s.status !== 'offen'} onClick={() => setUebergebenOffen(true)}>
                 Übergeben
               </Button>
-              <Button disabled={s.status === 'abgeschlossen'} onClick={() => setAbschlussOffen(true)}>
+              <Button
+                disabled={s.status === 'abgeschlossen'}
+                onClick={() => setAbschlussOffen(true)}
+              >
                 Abschließen
               </Button>
-              <Button onClick={() => {
-                editSitzung.starte(s, {
-                  typ: s.typ, ausmass: s.ausmass, ort: s.ort, beschreibung: s.beschreibung,
-                  geschaedigt: geschaedigtAusSchaden(s),
-                });
-              }}>Bearbeiten</Button>
-              <Popconfirm title="Schaden stornieren?" onConfirm={() => stornoMutation.mutate()} okText="Stornieren">
+              <Button
+                onClick={() => {
+                  editSitzung.starte(s, {
+                    typ: s.typ,
+                    ausmass: s.ausmass,
+                    ort: s.ort,
+                    beschreibung: s.beschreibung,
+                    geschaedigt: geschaedigtAusSchaden(s),
+                  });
+                }}
+              >
+                Bearbeiten
+              </Button>
+              <Popconfirm
+                title="Schaden stornieren?"
+                onConfirm={() => stornoMutation.mutate()}
+                okText="Stornieren"
+              >
                 <Button danger>Stornieren</Button>
               </Popconfirm>
             </Space>
@@ -262,22 +351,31 @@ export default function SchaedenDetailPage() {
       </Space>
 
       {sitzung ? (
-        <Form form={editForm}
+        <Form
+          form={editForm}
           onFinish={(daten) => {
             const patch: SchadenPatch = {
-              typ: daten.typ, ausmass: daten.ausmass, ort: daten.ort, beschreibung: daten.beschreibung,
+              typ: daten.typ,
+              ausmass: daten.ausmass,
+              ort: daten.ort,
+              beschreibung: daten.beschreibung,
               // Geschädigt XOR: immer alle vier Felder explizit senden (das nicht gewählte ist null).
               ...geschaedigtFelder(daten.geschaedigt ?? null, orgId),
             };
             editMutation.mutate({ daten: patch, basis: sitzung.basis });
-          }}>
+          }}
+        >
           {detailAnsicht}
           <Space style={{ marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
+            <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
+              Speichern
+            </Button>
             <Button onClick={editSitzung.beende}>Abbrechen</Button>
           </Space>
         </Form>
-      ) : detailAnsicht}
+      ) : (
+        detailAnsicht
+      )}
 
       <Modal
         title="Schaden übergeben"
@@ -288,8 +386,16 @@ export default function SchaedenDetailPage() {
         confirmLoading={uebergebMutation.isPending}
         destroyOnHidden
       >
-        <Form form={uebergebForm} layout="vertical" onFinish={(v) => uebergebMutation.mutate(v.uebergeben_an)}>
-          <Form.Item label="Übergeben an" name="uebergeben_an" rules={[{ required: true, message: 'Adressat ist Pflicht' }]}>
+        <Form
+          form={uebergebForm}
+          layout="vertical"
+          onFinish={(v) => uebergebMutation.mutate(v.uebergeben_an)}
+        >
+          <Form.Item
+            label="Übergeben an"
+            name="uebergeben_an"
+            rules={[{ required: true, message: 'Adressat ist Pflicht' }]}
+          >
             <Input placeholder="z. B. Stadtwerke, Bauhof, Umweltamt" />
           </Form.Item>
         </Form>
@@ -305,7 +411,11 @@ export default function SchaedenDetailPage() {
         destroyOnHidden
       >
         <Form form={abschlussForm} layout="vertical" onFinish={(v) => abschlussMutation.mutate(v)}>
-          <Form.Item label="Abschlussgrund" name="abschluss_grund" rules={[{ required: true, message: 'Grund ist Pflicht' }]}>
+          <Form.Item
+            label="Abschlussgrund"
+            name="abschluss_grund"
+            rules={[{ required: true, message: 'Grund ist Pflicht' }]}
+          >
             <Select options={ABSCHLUSS_GRUENDE} />
           </Form.Item>
           <Form.Item label="Notiz (optional, wird an Beschreibung angehängt)" name="notiz">

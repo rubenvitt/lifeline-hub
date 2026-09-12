@@ -33,7 +33,9 @@ export function waehleInitialeBasemap(
     name != null && config.online_styles.some((s) => s.name === name);
 
   const modusGueltig = (m: BasemapModus): boolean =>
-    m === 'blind' || (m === 'online' && hatOnline) || (m === 'offline' && config.offline_verfuegbar);
+    m === 'blind' ||
+    (m === 'online' && hatOnline) ||
+    (m === 'offline' && config.offline_verfuegbar);
 
   const modus =
     gespeichert && modusGueltig(gespeichert.modus)
@@ -48,7 +50,9 @@ export function waehleInitialeBasemap(
       ? config.online_styles[0].name
       : null;
 
-  const kartenTheme = kartenThemeGueltig(gespeichert?.kartenTheme) ? gespeichert.kartenTheme : 'auto';
+  const kartenTheme = kartenThemeGueltig(gespeichert?.kartenTheme)
+    ? gespeichert.kartenTheme
+    : 'auto';
 
   return { modus, onlineView, kartenTheme };
 }

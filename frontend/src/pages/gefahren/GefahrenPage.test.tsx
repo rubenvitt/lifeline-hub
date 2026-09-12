@@ -13,10 +13,24 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { formatiereDatenstand } from '../../components/Datenstand';
 
 const einsatz = {
-  id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv', begonnen_at: '', abgeschlossen_at: null,
-  abgeschlossen_von: null, einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null, meldende_stelle: null,
-  sachverhalt: null, anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung',
+  id: 1,
+  bezeichnung: 'Lage',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
 };
 const gebiet = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
 
@@ -29,7 +43,9 @@ function handlers(gebiete: unknown[] = [gebiet], matrix: unknown[] = []) {
 }
 function renderPage() {
   return renderMitProviders(
-    <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
+    <Routes>
+      <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+    </Routes>,
     { route: '/einsaetze/1/gefahren' },
   );
 }
@@ -46,7 +62,13 @@ describe('GefahrenPage', () => {
   });
 
   it('wählt ein Gefahrengebiet mit Enter über die Auswahlzeile', async () => {
-    const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
+    const sued = {
+      id: 8,
+      einsatz_id: 1,
+      label: 'Süd',
+      zonen_ids: [11],
+      hoechste_warnstufe: 'mittel',
+    };
     server.use(
       ...handlers([gebiet, sued]),
       http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
@@ -66,25 +88,25 @@ describe('GefahrenPage', () => {
     const client = neuerQueryClient();
     const gebieteStand = new Date('2026-01-01T10:12:00Z').getTime();
     const matrixStand = new Date('2026-01-01T09:05:00Z').getTime();
-    for (const key of [
-      einsatzKeys.gefahrengebiete(1),
-      einsatzKeys.gefahrenmatrix(1, 7),
-    ]) client.setQueryDefaults(key, { staleTime: Infinity });
+    for (const key of [einsatzKeys.gefahrengebiete(1), einsatzKeys.gefahrenmatrix(1, 7)])
+      client.setQueryDefaults(key, { staleTime: Infinity });
     client.setQueryData(einsatzKeys.gefahrengebiete(1), [gebiet], { updatedAt: gebieteStand });
     client.setQueryData(einsatzKeys.gefahrenmatrix(1, 7), [], { updatedAt: matrixStand });
 
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/gefahren', client },
     );
 
     await screen.findByRole('list');
-    expect(await screen.findByLabelText(
-      `Datenstand ${formatiereDatenstand(matrixStand)}`,
-    )).toBeInTheDocument();
-    expect(screen.queryByLabelText(
-      `Datenstand ${formatiereDatenstand(gebieteStand)}`,
-    )).not.toBeInTheDocument();
+    expect(
+      await screen.findByLabelText(`Datenstand ${formatiereDatenstand(matrixStand)}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(`Datenstand ${formatiereDatenstand(gebieteStand)}`),
+    ).not.toBeInTheDocument();
   });
 
   /**
@@ -129,7 +151,9 @@ describe('GefahrenPage', () => {
     // deshalb die ABWESENHEIT des umgerechneten Werts, nicht der neue Wert — den positiv zu
     // pinnen prüfte antds Vorgaben, weil `test/utils.tsx` ein nacktes `ConfigProvider`
     // rendert (dieselbe Falle wie bei Höhen).
-    expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain('rgb(255, 163, 158)');
+    expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain(
+      'rgb(255, 163, 158)',
+    );
   });
 
   it('bietet „Auf Karte zeigen" mit Reverse-Deeplink auf die Lagekarte (LFH-155)', async () => {
@@ -140,8 +164,20 @@ describe('GefahrenPage', () => {
   });
 
   it('korrigiert die Auswahl, wenn das gewählte Gebiet aus der Liste verschwindet', async () => {
-    const nord = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
-    const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
+    const nord = {
+      id: 7,
+      einsatz_id: 1,
+      label: 'Nord',
+      zonen_ids: [9],
+      hoechste_warnstufe: 'hoch',
+    };
+    const sued = {
+      id: 8,
+      einsatz_id: 1,
+      label: 'Süd',
+      zonen_ids: [11],
+      hoechste_warnstufe: 'mittel',
+    };
     let aktuelle: unknown[] = [nord];
     let matrix8Angefragt = false;
     server.use(
@@ -155,7 +191,9 @@ describe('GefahrenPage', () => {
     );
     const client = neuerQueryClient();
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/gefahren', client },
     );
     // Gebiet 7 (Nord) ist gewählt, seine Matrix gerendert.
@@ -171,8 +209,20 @@ describe('GefahrenPage', () => {
   });
 
   it('?gefahrengebiet= wählt das Zielgebiet statt des ersten — auch unter StrictMode (LFH-150)', async () => {
-    const nord = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
-    const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
+    const nord = {
+      id: 7,
+      einsatz_id: 1,
+      label: 'Nord',
+      zonen_ids: [9],
+      hoechste_warnstufe: 'hoch',
+    };
+    const sued = {
+      id: 8,
+      einsatz_id: 1,
+      label: 'Süd',
+      zonen_ids: [11],
+      hoechste_warnstufe: 'mittel',
+    };
     const client = neuerQueryClient();
     // Wie nach Navigation von der Lagekarte: einsatz + gefahrengebiete sind bereits gecached
     // (gebieteQuery.isSuccess ist beim ersten Render true).
@@ -188,7 +238,9 @@ describe('GefahrenPage', () => {
     // Race zwischen Default-auf-erstes-Gebiet und Deeplink-Selektion auf.
     renderMitProviders(
       <StrictMode>
-        <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>
+        <Routes>
+          <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+        </Routes>
       </StrictMode>,
       { route: '/einsaetze/1/gefahren?gefahrengebiet=8', client },
     );
@@ -203,23 +255,40 @@ describe('GefahrenPage', () => {
       ...handlers(),
       http.put('/api/einsaetze/1/gefahrengebiete/7/matrix/bewertung', async ({ request }) => {
         put = (await request.json()) as typeof put;
-        return HttpResponse.json({ id: 1, gefahrengebiet_id: 7, ...put, beschreibung: null, gemeldet_von: null, aktualisiert_von: 1, erstellt_at: '', geaendert_at: '' });
+        return HttpResponse.json({
+          id: 1,
+          gefahrengebiet_id: 7,
+          ...put,
+          beschreibung: null,
+          gemeldet_von: null,
+          aktualisiert_von: 1,
+          erstellt_at: '',
+          geaendert_at: '',
+        });
       }),
     );
     renderPage();
     // Seit LFH-368/B5h trägt die Zelle EINEN Auslöser statt eines Mini-Selects; der
     // zugängliche Name nennt Zeile, Spalte und die aktuelle Stufe.
-    await userEvent.click(await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
+    );
     // Der Eintrag wird über das OFFENE Menü gegriffen — antd lässt die Portale
     // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbTabelle.test.tsx`).
-    const menue = document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
     if (!menue) throw new Error('kein offenes Menü im Baum');
     await userEvent.click(within(menue).getByRole('menuitem', { name: /hoch/i }));
     // Auf den PUT selbst warten: es gibt keinen Select-Neuzeichnung mehr, auf die
     // sich ein Textsucher stützen könnte.
-    await waitFor(() => expect(put).toMatchObject({
-      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
-    }));
+    await waitFor(() =>
+      expect(put).toMatchObject({
+        gefahrentyp: 'brand',
+        schutzobjekt: 'menschen',
+        warnstufe: 'hoch',
+      }),
+    );
   });
 
   it('benennt das gewählte Gefahrengebiet um (PATCH)', async () => {
@@ -228,7 +297,13 @@ describe('GefahrenPage', () => {
       ...handlers(),
       http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
         patch = (await request.json()) as typeof patch;
-        return HttpResponse.json({ id: 7, einsatz_id: 1, label: (patch as { label: string }).label, zonen_ids: [9], hoechste_warnstufe: 'hoch' });
+        return HttpResponse.json({
+          id: 7,
+          einsatz_id: 1,
+          label: (patch as { label: string }).label,
+          zonen_ids: [9],
+          hoechste_warnstufe: 'hoch',
+        });
       }),
     );
     renderPage();

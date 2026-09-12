@@ -17,10 +17,24 @@ vi.mock('../api/lageberichte');
 
 function bericht(over: Record<string, unknown> = {}) {
   return {
-    id: 9, einsatz_id: 1, vorlage: 'lagebericht', titel: 'Lage 1', zeitstand: '2026-06-02 10:00:00',
-    status: 'freigegeben', abschnitte: [], version: 1, vorgaenger_id: null, ersteller_id: 1,
-    ersteller_name: 'EL', erstellt_at: '', aktualisiert_at: '', freigegeben_von_id: 1,
-    freigegeben_von_name: 'EL', freigegeben_at: '2026-06-02 11:00:00', etb_eintrag_id: 5, ...over,
+    id: 9,
+    einsatz_id: 1,
+    vorlage: 'lagebericht',
+    titel: 'Lage 1',
+    zeitstand: '2026-06-02 10:00:00',
+    status: 'freigegeben',
+    abschnitte: [],
+    version: 1,
+    vorgaenger_id: null,
+    ersteller_id: 1,
+    ersteller_name: 'EL',
+    erstellt_at: '',
+    aktualisiert_at: '',
+    freigegeben_von_id: 1,
+    freigegeben_von_name: 'EL',
+    freigegeben_at: '2026-06-02 11:00:00',
+    etb_eintrag_id: 5,
+    ...over,
   };
 }
 
@@ -49,9 +63,12 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   });
 
   it('verlinkt vom freigegebenen Lagebericht per ?eintrag= auf den ETB-Eintrag (LFH-25)', async () => {
-    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(
-      { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung', bezeichnung: 'Übung' } as never,
-    );
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
     renderBei('/einsaetze/1/lageberichte/9');
     const link = await screen.findByRole('link', { name: /ETB-Eintrag/ });
@@ -65,9 +82,12 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
    * Alias"); wer nur eines umstellt, hat die Divergenz bloß verschoben.
    */
   it('malt den freigegebenen Status in der Phasenfarbe, nicht im Preset-Grün', async () => {
-    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(
-      { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung', bezeichnung: 'Übung' } as never,
-    );
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
     renderBei('/einsaetze/1/lageberichte/9');
     const etikett = (await screen.findByText('Freigegeben')).closest('.ant-tag');
@@ -94,7 +114,9 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 function renderMitZone(route: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   qc.setQueryData(einsatzKeys.einstellungen(1), {
-    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+    einsatz_id: 1,
+    zeitzone: 'Europe/Berlin',
+    org_defaults: { org_id: 1 },
   });
   return render(
     <QueryClientProvider client={qc}>
@@ -103,7 +125,10 @@ function renderMitZone(route: string) {
           <EinsatzAnzeigeProvider einsatzId={1}>
             <MemoryRouter initialEntries={[route]}>
               <Routes>
-                <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+                <Route
+                  path="/einsaetze/:id/lageberichte/:lbId"
+                  element={<LageberichtDetailPage />}
+                />
               </Routes>
             </MemoryRouter>
           </EinsatzAnzeigeProvider>
@@ -115,12 +140,17 @@ function renderMitZone(route: string) {
 
 describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
   it('zeigt die taktische DTG in der Anzeigezone, nicht den rohen UTC-Wirestring', async () => {
-    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(
-      { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung', bezeichnung: 'Übung' } as never,
-    );
-    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue(
-      { einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } } as never,
-    );
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1,
+      zeitzone: 'Europe/Berlin',
+      org_defaults: { org_id: 1 },
+    } as never);
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
       bericht({ zeitstand: '2026-07-25 12:00:00' }) as never,
     );
@@ -146,13 +176,18 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
  */
 describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   beforeEach(() => {
-    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(
-      { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung', bezeichnung: 'Übung' } as never,
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf' }) as never,
     );
-    vi.mocked(lageberichteApi.ladeLagebericht)
-      .mockResolvedValue(bericht({ status: 'entwurf' }) as never);
-    vi.mocked(lageberichteApi.aktualisiereLagebericht)
-      .mockResolvedValue(bericht({ status: 'entwurf' }) as never);
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf' }) as never,
+    );
     // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests dieser
     // Datei weiter, und „nicht aufgerufen" wäre nach dem ersten Test nie wieder grün.
     vi.mocked(lageberichteApi.gibLageberichtFrei).mockClear();
@@ -166,13 +201,15 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
 
   /** Siehe `BefehlDetailPage.test.tsx` — dort steht die Begründung dieser Abfrage. */
   function toastsMit(wortlaut: string) {
-    return [...document.querySelectorAll('.ant-message')]
-      .filter((n) => n.textContent?.includes(wortlaut));
+    return [...document.querySelectorAll('.ant-message')].filter((n) =>
+      n.textContent?.includes(wortlaut),
+    );
   }
 
   it('zeigt den Grund IM Dialog statt im Toast und lässt ihn offen', async () => {
-    vi.mocked(lageberichteApi.gibLageberichtFrei)
-      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    vi.mocked(lageberichteApi.gibLageberichtFrei).mockRejectedValue(
+      new ApiError(422, 'Abschnitt „Auftrag" ist leer'),
+    );
     const dialog = await oeffneFreigabe();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
 
@@ -195,8 +232,9 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   });
 
   it('hält die Freigabe zurück, wenn schon der Speicher-Vorlauf scheitert', async () => {
-    vi.mocked(lageberichteApi.aktualisiereLagebericht)
-      .mockRejectedValue(new ApiError(503, 'Dienst nicht erreichbar'));
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockRejectedValue(
+      new ApiError(503, 'Dienst nicht erreichbar'),
+    );
     const dialog = await oeffneFreigabe();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
 
@@ -208,8 +246,9 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
   });
 
   it('öffnet nach Abbrechen ohne den Grund des vorigen Versuchs', async () => {
-    vi.mocked(lageberichteApi.gibLageberichtFrei)
-      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    vi.mocked(lageberichteApi.gibLageberichtFrei).mockRejectedValue(
+      new ApiError(422, 'Abschnitt „Auftrag" ist leer'),
+    );
     const dialog = await oeffneFreigabe();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
     await within(dialog).findByText('Abschnitt „Auftrag" ist leer');

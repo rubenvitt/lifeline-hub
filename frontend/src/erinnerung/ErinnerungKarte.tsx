@@ -18,7 +18,10 @@ const TOOLTIP_ERLEDIGT = 'Erledigt = die erinnerte Handlung wurde durchgeführt 
  * Deeplink das referenzierte Objekt selektiert (`?auftrag=`/`?meldung=`/`?eintrag=`) statt nur
  * auf die ungefilterte Liste zu zeigen (F36/LFH-257). Ohne Treffer: kein Deeplink.
  */
-const BEZUG_LINK: Record<string, { pfad: (einsatzId: number, id: number) => string; wort: string }> = {
+const BEZUG_LINK: Record<
+  string,
+  { pfad: (einsatzId: number, id: number) => string; wort: string }
+> = {
   auftrag: { pfad: (einsatzId, id) => auftraegePfad(einsatzId, { auftrag: id }), wort: 'Auftrag' },
   meldung: { pfad: (einsatzId, id) => meldungenPfad(einsatzId, { meldung: id }), wort: 'Meldung' },
   etb: { pfad: (einsatzId, id) => etbPfad(einsatzId, { eintrag: id }), wort: 'ETB-Eintrag' },
@@ -32,7 +35,11 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
   const eid = parseRouteId(einsatzId);
   if (!bezug || eid == null) {
     // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → reines Tag ohne Link.
-    return <Tag color="cyan" style={{ margin: 0 }}>{text}</Tag>;
+    return (
+      <Tag color="cyan" style={{ margin: 0 }}>
+        {text}
+      </Tag>
+    );
   }
   return (
     <Tag color="cyan" style={{ margin: 0 }}>
@@ -56,7 +63,11 @@ export interface ErinnerungKarteProps {
  * Quittiert-vs-Erledigt bleibt fachlich getrennt (Tooltips + getrennte Aktionen, LFH-106).
  */
 export default function ErinnerungKarte({
-  erinnerung: e, ansicht = 'offen', darfSchreiben, onErledigen, onQuittieren,
+  erinnerung: e,
+  ansicht = 'offen',
+  darfSchreiben,
+  onErledigen,
+  onQuittieren,
 }: ErinnerungKarteProps) {
   const { token } = theme.useToken();
   const { id: einsatzId } = useParams();
@@ -72,16 +83,19 @@ export default function ErinnerungKarte({
   // Änderung nimmt der Server ihn auch an (`POST …/erinnerungen/{eid}/oeffnen`).
   // Die Tooltips BLEIBEN — sie tragen die fachliche Trennung Quittiert/Erledigt
   // (LFH-106), die der Rückfrage-Dialog nur mit übernommen hatte.
-  const aktionen: ReactNode[] = darfSchreiben && !istAbg
-    ? [
-        <Tooltip key="q" title={TOOLTIP_QUITTIEREN}>
-          <Button onClick={() => onQuittieren?.(e.id)}>Quittieren</Button>
-        </Tooltip>,
-        <Tooltip key="e" title={TOOLTIP_ERLEDIGT}>
-          <Button type="primary" onClick={() => onErledigen?.(e.id)}>Erledigt</Button>
-        </Tooltip>,
-      ]
-    : [];
+  const aktionen: ReactNode[] =
+    darfSchreiben && !istAbg
+      ? [
+          <Tooltip key="q" title={TOOLTIP_QUITTIEREN}>
+            <Button onClick={() => onQuittieren?.(e.id)}>Quittieren</Button>
+          </Tooltip>,
+          <Tooltip key="e" title={TOOLTIP_ERLEDIGT}>
+            <Button type="primary" onClick={() => onErledigen?.(e.id)}>
+              Erledigt
+            </Button>
+          </Tooltip>,
+        ]
+      : [];
 
   return (
     <Card
@@ -95,12 +109,26 @@ export default function ErinnerungKarte({
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
-          <Text strong style={{ fontSize: 15, lineHeight: 1.4 }}>{e.titel}</Text>
+          <Text strong style={{ fontSize: 15, lineHeight: 1.4 }}>
+            {e.titel}
+          </Text>
           {istAbg && <StatusBadge phase={status.phase} label={status.label} />}
-          {faellig && <Tag color="red" style={{ margin: 0 }}>fällig</Tag>}
+          {faellig && (
+            <Tag color="red" style={{ margin: 0 }}>
+              fällig
+            </Tag>
+          )}
           {e.intervall_minuten && <Tag style={{ margin: 0 }}>alle {e.intervall_minuten} Min</Tag>}
-          {e.quelle === 'auto_frist' && <Tag color="orange" style={{ margin: 0 }}>automatisch</Tag>}
-          {e.vollzug_status === 'vollzogen' && <Tag color="success" style={{ margin: 0 }}>Vollzogen</Tag>}
+          {e.quelle === 'auto_frist' && (
+            <Tag color="orange" style={{ margin: 0 }}>
+              automatisch
+            </Tag>
+          )}
+          {e.vollzug_status === 'vollzogen' && (
+            <Tag color="success" style={{ margin: 0 }}>
+              Vollzogen
+            </Tag>
+          )}
           <BezugLink e={e} einsatzId={einsatzId} />
         </Space>
         <Space size={10} wrap>
@@ -114,7 +142,9 @@ export default function ErinnerungKarte({
 
       <Space orientation="vertical" size={2} style={{ marginBottom: aktionen.length ? 8 : 0 }}>
         {e.empfaenger_funktion && (
-          <Text type="secondary" style={{ fontSize: 13 }}>für: {e.empfaenger_funktion}</Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            für: {e.empfaenger_funktion}
+          </Text>
         )}
         {e.beschreibung && <Text style={{ fontSize: 13 }}>{e.beschreibung}</Text>}
         {istAbg && (
@@ -123,10 +153,14 @@ export default function ErinnerungKarte({
                 neben dem grünen „Erledigt"-Badge irreführend (scheinbarer Widerspruch). */}
             {e.status === 'quittiert' && <QuittungIndikator quittiert am={e.quittiert_at} />}
             {e.status === 'erledigt' && e.erledigt_at && (
-              <Text type="secondary" style={{ fontSize: 13 }}>Erledigt: {formatZeit(e.erledigt_at)}</Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Erledigt: {formatZeit(e.erledigt_at)}
+              </Text>
             )}
             {e.status === 'quittiert' && e.quittiert_at && (
-              <Text type="secondary" style={{ fontSize: 13 }}>Quittiert: {formatZeit(e.quittiert_at)}</Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Quittiert: {formatZeit(e.quittiert_at)}
+              </Text>
             )}
           </Space>
         )}

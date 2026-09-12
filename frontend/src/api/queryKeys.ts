@@ -211,13 +211,15 @@ export const einsatzKeys = {
 
   // UHS
   uhs: (einsatzId: number) => [EINSATZ_KEYS.uhs, einsatzId] as const,
-  uhsDetail: (einsatzId: number, uhsId: number) => [EINSATZ_KEYS.uhsDetail, einsatzId, uhsId] as const,
+  uhsDetail: (einsatzId: number, uhsId: number) =>
+    [EINSATZ_KEYS.uhsDetail, einsatzId, uhsId] as const,
 
   // Schäden / Tiere (inkl. personenbezogener Kontext-Filter)
   schaeden: (einsatzId: number) => [EINSATZ_KEYS.schaeden, einsatzId] as const,
   schaedenGeschaedigt: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.schaeden, einsatzId, 'geschaedigt', personId] as const,
-  schaden: (einsatzId: number, schadenId: number) => [EINSATZ_KEYS.schaden, einsatzId, schadenId] as const,
+  schaden: (einsatzId: number, schadenId: number) =>
+    [EINSATZ_KEYS.schaden, einsatzId, schadenId] as const,
   tiere: (einsatzId: number) => [EINSATZ_KEYS.tiere, einsatzId] as const,
   tiereHalter: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.tiere, einsatzId, 'halter', personId] as const,
@@ -244,7 +246,8 @@ export const einsatzKeys = {
 
   // Befehle
   befehle: (einsatzId: number) => [EINSATZ_KEYS.befehle, einsatzId] as const,
-  befehl: (einsatzId: number, befehlId: number) => [EINSATZ_KEYS.befehl, einsatzId, befehlId] as const,
+  befehl: (einsatzId: number, befehlId: number) =>
+    [EINSATZ_KEYS.befehl, einsatzId, befehlId] as const,
 
   // Kommunikation
   chatKanaele: (einsatzId: number) => [EINSATZ_KEYS.chatKanaele, einsatzId] as const,

@@ -1275,9 +1275,41 @@ Lokal bleibt es der Weg vor dem Merge:
 ./scripts/check-all.sh     # alle Gates, vor dem Merge
 ```
 
-Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-codegen.sh`
-(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh`.
+Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `pnpm lint` →
+`check-typ-codegen.sh` (enthält `tsc`) → `cargo test --workspace` → Vitest →
+`check-deps.sh` → `pnpm e2e` → `release-ruhefenster.test.sh`.
+
+- **Schritt 1 prüft zwei Sprachen, nicht eine** (LFH-354). `prettier --check` liegt **in**
+  `check-fmt.sh` statt in einem eigenen Schritt: es ist dieselbe Frage wie bei rustfmt
+  („weicht die Formatierung von der Baseline ab?"), kostet Sekunden, und ein neuer Schritt
+  hätte `check-all.sh` umnummeriert, ohne etwas anderes zu fragen. Prettier lief bis dahin
+  in **keinem** Gate-Schritt, obwohl es seit jeher devDependency ist; die Folge war keine
+  Warnung, sondern ein stiller Aufschlag auf fremde Diffs — beim LFH-352-Merge zwei
+  Bestandsdateien mit rund 250 Zeilen Diff, token-genau gegengeprüft reine Formatierung.
+  **Das Gate steht nur, weil der einmalige Sweep davor lag** (564 von 787 Dateien wichen ab)
+  — ein rot geborenes Gate wird abgeschaltet statt befolgt.
+  **Prettier ist dabei nicht idempotent, und das ist gemessen:** nach dem ersten `--write`
+  wichen sechs Dateien weiterhin ab, weil eine Methodenkette wie
+  `vi.fn().mockResolvedValue({…})` im zweiten Lauf anders umbricht als im ersten. Ein Gate
+  prüft einen **Fixpunkt**; wer nach einem einzelnen `--write` noch rot ist, lässt es ein
+  zweites Mal laufen, statt die Datei von Hand zu biegen.
+  **Was der Sweep nicht anfassen durfte, steht in `frontend/.prettierignore`** — und die drei
+  generierten Dateien dort sind kein Geschmack: `openapi.json` und `types.generated.ts`
+  entstehen in `check-typ-codegen.sh` (Schritte 1+2) und werden dort in Schritt 3 per
+  `git diff --exit-code` geprüft. Formatiert committet, schriebe der Generator sie bei jedem
+  Lauf unformatiert zurück — das Typ-Gate wäre dauerhaft rot, während das Formatier-Gate das
+  Gegenteil verlangte. Zwei Gates, die einander brechen. Wer eine Datei ergänzt, begründet
+  sie dort; ein Einzelfall-Fix an der Datei selbst ist der falsche Ort.
+  **Eine `.git-blame-ignore-revs` braucht so ein Sweep NICHT — und das ist gemessen, nicht
+  angenommen.** Die naheliegende Sorge („564 Dateien Formatierung entwerten `git blame`
+  fürs ganze Frontend") trifft nicht zu: über 80 Dateien mit zusammen 14 100 Zeilen
+  beansprucht der Sweep-Commit im Blame genau **18 Zeilen**, und `blame.ignoreRevsFile`
+  ändert daran **nichts** — es sind die Zeilen, die Prettier durch einen Umbruch neu
+  erzeugt hat und die deshalb gar keinen Vorgänger haben, auf den git sie umhängen könnte.
+  Den Rest ordnet gits eigene Verschiebungserkennung von selbst dem Ursprungs-Commit zu.
+  Eine Ignore-Datei wäre hier also ein Artefakt ohne Wirkung, das eine Zusicherung behauptet,
+  die es nicht einlöst. Wer den nächsten Sweep fährt, misst nach, statt die Datei vorsorglich
+  anzulegen.
 
 - **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
   `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
@@ -1325,6 +1357,26 @@ Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-co
 `scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
 `cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories
 stehen mit Begründung in `.cargo/audit.toml` — was dort **nicht** steht, bricht den Build.
+
+**Die beiden Hälften haben BEIDE einen benannten Ort, und es sind nicht dieselben**
+(LFH-354). Rust: `.cargo/audit.toml`, eine Ignorier-Liste mit Begründung je Eintrag.
+Frontend: der **`overrides`-Block in `frontend/pnpm-workspace.yaml`** — dort steht die
+erzwungene sichere Mindestversion samt Kette und Begründung, und **eine Ignorier-Liste gibt
+es bewusst nicht**. Der Unterschied ist keine Nachlässigkeit, sondern die Lage: bei npm lässt
+sich eine transitive Version erzwingen, bei Cargo nicht. Genau deshalb braucht die Rust-Seite
+ein Werkzeug zum Stummschalten und die Frontend-Seite keines — **jeder `high`-Fund bricht und
+wird behoben**, `moderate`/`low` melden nur (`--audit-level=high`, sonst wäre das Gate durch
+Dev-Tooling-Rauschen dauerrot).
+**Ein leerer `auditConfig.ignoreGhsas`-Block „für später" gehört NICHT angelegt**, obwohl
+pnpm ihn mitbrächte: eine Ausnahmeliste ohne Eintrag sichert nichts zu — dieselbe Linie wie
+„ein Eintrag ohne Verstoß gilt selbst als Verstoß" bei der Dichte-Schuldmenge. Wer den ersten
+echten Fall hat — ein `high`-Advisory, das WEDER über einen Override noch über ein Upgrade
+erreichbar ist —, führt den Block **mit** diesem Eintrag ein, nach dem Muster von
+`.cargo/audit.toml`: warum kein Upgrade möglich ist, warum das Risiko in diesem Code nicht
+trägt, und woran man merkt, dass sich das ändert.
+**Bei einem Override werden BEIDE Grenzen gepflegt**, der Bereich und die Zielversion: dass
+ein Advisory sich unter einem festgenagelten Ziel wegbewegt und das Gate ohne eine Zeile
+Codeänderung rot wird, ist im Bestand dreimal passiert (`nanoid`, `fast-uri`, `js-yaml`).
 
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 

@@ -23,17 +23,32 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
 
   const eintraege: Array<{ key: string; at: string; node: ReactNode }> = [
     ...(person.sichtungen ?? []).map((s) => ({
-      key: `s-${s.id}`, at: s.gesichtet_at,
-      node: <span><SichtungsTag kategorie={s.kategorie} />
-        {s.notiz && <Typography.Text type="secondary"> — {s.notiz}</Typography.Text>}</span>,
+      key: `s-${s.id}`,
+      at: s.gesichtet_at,
+      node: (
+        <span>
+          <SichtungsTag kategorie={s.kategorie} />
+          {s.notiz && <Typography.Text type="secondary"> — {s.notiz}</Typography.Text>}
+        </span>
+      ),
     })),
     ...(person.notizen ?? []).map((n) => ({
-      key: `n-${n.id}`, at: n.erfasst_at,
-      node: <span><Tag>Notiz</Tag> {n.text}</span>,
+      key: `n-${n.id}`,
+      at: n.erfasst_at,
+      node: (
+        <span>
+          <Tag>Notiz</Tag> {n.text}
+        </span>
+      ),
     })),
     ...(person.verbleib ?? []).map((v) => ({
-      key: `v-${v.id}`, at: v.zeitpunkt_at,
-      node: <span><Tag color="purple">Verbleib</Tag> {kurzVerbleib(v)}</span>,
+      key: `v-${v.id}`,
+      at: v.zeitpunkt_at,
+      node: (
+        <span>
+          <Tag color="purple">Verbleib</Tag> {kurzVerbleib(v)}
+        </span>
+      ),
     })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
@@ -46,9 +61,15 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       {eintraege.map((e) => (
         <li
           key={e.key}
-          style={{ padding: `${token.paddingXXS}px 0`, borderBottom: `1px solid ${token.colorSplit}` }}
+          style={{
+            padding: `${token.paddingXXS}px 0`,
+            borderBottom: `1px solid ${token.colorSplit}`,
+          }}
         >
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, marginRight: token.marginXS }}>
+          <Typography.Text
+            type="secondary"
+            style={{ fontSize: token.fontSizeSM, marginRight: token.marginXS }}
+          >
             <ZeitAnzeige wert={e.at} format="dtgVoll" />
           </Typography.Text>
           {e.node}

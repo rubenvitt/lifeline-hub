@@ -55,13 +55,25 @@ const dateiname = (pfad: string): string => pfad.split('/').pop() ?? pfad;
 
 /** Meldet jede exportierte Objekt-Typ-Deklaration einer Datei (siehe Kopfkommentar). */
 export function scanneApiTypen(pfad: string, quelltext: string): ApiTypFund[] {
-  const quelle = ts.createSourceFile(pfad, quelltext, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+  const quelle = ts.createSourceFile(
+    pfad,
+    quelltext,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS,
+  );
   const funde: ApiTypFund[] = [];
   const zeileVon = (knoten: ts.Node): number =>
     quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1;
 
   const melde = (name: string, art: ApiTypArt, knoten: ts.Node): void => {
-    funde.push({ pfad, zeile: zeileVon(knoten), name, art, schluessel: `${dateiname(pfad)}#${name}` });
+    funde.push({
+      pfad,
+      zeile: zeileVon(knoten),
+      name,
+      art,
+      schluessel: `${dateiname(pfad)}#${name}`,
+    });
   };
 
   const gehe = (knoten: ts.Node): void => {

@@ -94,7 +94,11 @@ export function aktualisiereTier(
   return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere/${tierId}`, 'PATCH', body);
 }
 
-export function setzeTierStatus(einsatzId: number, tierId: number, daten: TierStatusEingabe): Promise<Tier> {
+export function setzeTierStatus(
+  einsatzId: number,
+  tierId: number,
+  daten: TierStatusEingabe,
+): Promise<Tier> {
   return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere/${tierId}/status`, 'POST', daten);
 }
 

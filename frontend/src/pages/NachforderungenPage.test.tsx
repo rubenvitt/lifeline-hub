@@ -9,7 +9,12 @@ import { AuthProvider } from '../auth/AuthContext';
 import type { Nachforderung } from '../api/types';
 
 vi.mock('../api/einsaetze', () => ({
-  ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
+  ladeEinsatz: vi.fn().mockResolvedValue({
+    id: 1,
+    bezeichnung: 'Lage',
+    status: 'aktiv',
+    meine_rolle: 'einsatzleitung',
+  }),
 }));
 
 const listeNachforderungen = vi.fn();
@@ -24,12 +29,28 @@ vi.mock('../api/nachforderungen', () => ({
 }));
 
 const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
-  id: 1, einsatz_id: 1, art: 'RTW', bezeichnung: '2 RTW zur Verstärkung', anzahl: 2,
-  adressat_kategorie: 'leitstelle', adressat_bezeichnung: 'Leitstelle Nord', begruendung: null,
-  prioritaet: 'dringend', status: 'angefordert',
-  zugesagt_at: null, unterwegs_at: null, eingetroffen_at: null, abgelehnt_at: null, abgelehnt_grund: null,
-  angefordert_at: '2026-06-12 09:00:00', etb_nachforderung_id: 7, erstellt_von_id: 1,
-  erstellt_at: '2026-06-12 09:00:00', erstellt_von_name: 'Leit', ist_offen: true, ...over,
+  id: 1,
+  einsatz_id: 1,
+  art: 'RTW',
+  bezeichnung: '2 RTW zur Verstärkung',
+  anzahl: 2,
+  adressat_kategorie: 'leitstelle',
+  adressat_bezeichnung: 'Leitstelle Nord',
+  begruendung: null,
+  prioritaet: 'dringend',
+  status: 'angefordert',
+  zugesagt_at: null,
+  unterwegs_at: null,
+  eingetroffen_at: null,
+  abgelehnt_at: null,
+  abgelehnt_grund: null,
+  angefordert_at: '2026-06-12 09:00:00',
+  etb_nachforderung_id: 7,
+  erstellt_von_id: 1,
+  erstellt_at: '2026-06-12 09:00:00',
+  erstellt_von_name: 'Leit',
+  ist_offen: true,
+  ...over,
 });
 
 function renderPage() {
@@ -39,7 +60,9 @@ function renderPage() {
       <AntApp>
         <AuthProvider>
           <MemoryRouter initialEntries={['/einsaetze/1/nachforderungen']}>
-            <Routes><Route path="/einsaetze/:id/nachforderungen" element={<NachforderungenPage />} /></Routes>
+            <Routes>
+              <Route path="/einsaetze/:id/nachforderungen" element={<NachforderungenPage />} />
+            </Routes>
           </MemoryRouter>
         </AuthProvider>
       </AntApp>
@@ -48,7 +71,10 @@ function renderPage() {
 }
 
 describe('NachforderungenPage', () => {
-  beforeEach(() => { vi.clearAllMocks(); listeNachforderungen.mockResolvedValue([nf()]); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listeNachforderungen.mockResolvedValue([nf()]);
+  });
 
   it('zeigt offene Nachforderungen', async () => {
     renderPage();
@@ -66,9 +92,16 @@ describe('NachforderungenPage', () => {
     await userEvent.type(screen.getByLabelText('Art'), 'SEG');
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
     await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
-    await waitFor(() => expect(legeNachforderungAn).toHaveBeenCalledWith(1, expect.objectContaining({
-      art: 'SEG', bezeichnung: 'Eine SEG', adressat_kategorie: 'leitstelle',
-    })));
+    await waitFor(() =>
+      expect(legeNachforderungAn).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          art: 'SEG',
+          bezeichnung: 'Eine SEG',
+          adressat_kategorie: 'leitstelle',
+        }),
+      ),
+    );
   });
 
   /**
@@ -95,7 +128,9 @@ describe('NachforderungenPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     // Zurück auf den Zustand VOR dem Klick — nicht auf den Anfang der Kette.
-    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenLastCalledWith(1, 1, 'angefordert'));
+    await waitFor(() =>
+      expect(setzeNachforderungStatus).toHaveBeenLastCalledWith(1, 1, 'angefordert'),
+    );
   });
 
   it('lehnt eine Nachforderung mit Grund ab (über Dialog)', async () => {
@@ -116,7 +151,13 @@ describe('NachforderungenPage', () => {
     // Eine offene + eine eingetroffene Nachforderung in EINER Antwort (kein Status-Filter mehr).
     listeNachforderungen.mockResolvedValue([
       nf({ id: 1, bezeichnung: '2 RTW zur Verstärkung', status: 'angefordert', ist_offen: true }),
-      nf({ id: 2, bezeichnung: 'Eingetroffene SEG', status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
+      nf({
+        id: 2,
+        bezeichnung: 'Eingetroffene SEG',
+        status: 'eingetroffen',
+        ist_offen: false,
+        eingetroffen_at: '2026-06-12 10:00:00',
+      }),
     ]);
     renderPage();
     // Default = Offen: nur die offene ist sichtbar.
@@ -131,7 +172,9 @@ describe('NachforderungenPage', () => {
   });
 
   it('eingetroffene Nachforderung zeigt keine Aktionen', async () => {
-    listeNachforderungen.mockResolvedValue([nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' })]);
+    listeNachforderungen.mockResolvedValue([
+      nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
+    ]);
     renderPage();
     // Eingetroffen landet in der Abgeschlossen-Ansicht → dorthin wechseln.
     await userEvent.click(await screen.findByText(/Abgeschlossen \(/));

@@ -35,7 +35,9 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.benutzerEinstellungenVon(null)).toEqual(['benutzer-einstellungen', null]);
     // ZWEI Benutzer, ZWEI Fächer. Das ist der Befund, gegen den der Key parametrisiert wurde:
     // ein prozessweiter QueryClient überlebt den Schichtwechsel ohne Neuladen.
-    expect(globalKeys.benutzerEinstellungenVon(1)).not.toEqual(globalKeys.benutzerEinstellungenVon(2));
+    expect(globalKeys.benutzerEinstellungenVon(1)).not.toEqual(
+      globalKeys.benutzerEinstellungenVon(2),
+    );
   });
 
   it('Stammdaten-Kataloge ohne Filter', () => {

@@ -64,7 +64,12 @@ interface Props {
  * Person zu übertragen — der teuerste denkbare Übernahmefehler an einer Aufnahme.
  */
 export default function PersonErfassungModal({
-  einsatzId, modus, isPending, onErfassen, onFertig, onCancel,
+  einsatzId,
+  modus,
+  isPending,
+  onErfassen,
+  onFertig,
+  onCancel,
 }: Props) {
   const [form] = Form.useForm<AufnahmeEingabe>();
   const geladeneOeffnung = useRef<string | null>(null);

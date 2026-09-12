@@ -1,4 +1,16 @@
-import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, InputNumber, Row, Switch, theme } from 'antd';
+import {
+  App,
+  AutoComplete,
+  Breadcrumb,
+  Button,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Row,
+  Switch,
+  theme,
+} from 'antd';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
@@ -78,7 +90,6 @@ export default function FahrzeugDetailPage() {
   });
 
   const fahrzeug = id == null ? undefined : fahrzeugeQuery.data?.find((f) => f.id === id);
-
 
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => aktualisiereFahrzeug(id!, zuEingabe(werte)),
@@ -196,7 +207,9 @@ export default function FahrzeugDetailPage() {
               <Form.Item
                 label="Funkrufname"
                 name="funkrufname"
-                rules={[{ required: true, whitespace: true, message: 'Funkrufname darf nicht leer sein' }]}
+                rules={[
+                  { required: true, whitespace: true, message: 'Funkrufname darf nicht leer sein' },
+                ]}
               >
                 <Input />
               </Form.Item>
@@ -228,10 +241,14 @@ export default function FahrzeugDetailPage() {
               </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
-              <Form.Item label="Kennzeichen" name="kennzeichen"><Input /></Form.Item>
+              <Form.Item label="Kennzeichen" name="kennzeichen">
+                <Input />
+              </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
-              <Form.Item label="OPTA" name="opta"><Input /></Form.Item>
+              <Form.Item label="OPTA" name="opta">
+                <Input />
+              </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
               <Form.Item label="Standort" name="standort">
@@ -251,7 +268,9 @@ export default function FahrzeugDetailPage() {
           <SektionHeader titel="Funk & Sonderrechte" />
           <Row gutter={token.margin}>
             <Col xs={24} lg={12}>
-              <Form.Item label="FMS-ISSI" name="fms_issi"><Input /></Form.Item>
+              <Form.Item label="FMS-ISSI" name="fms_issi">
+                <Input />
+              </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
               <Form.Item label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
@@ -283,7 +302,9 @@ export default function FahrzeugDetailPage() {
           </Row>
 
           <SektionHeader titel="Bemerkung" />
-          <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item label="Bemerkung" name="bemerkung">
+            <Input.TextArea rows={3} />
+          </Form.Item>
 
           {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf
               `htmlType="submit"`, und Enter sendet über die eingebaute Formularübermittlung

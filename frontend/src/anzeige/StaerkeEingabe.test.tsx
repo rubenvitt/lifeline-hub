@@ -14,7 +14,12 @@ describe('StaerkeEingabe', () => {
   });
 
   it('value gefüllt → Felder + Live-Gesamt', () => {
-    render(<StaerkeEingabe value={{ fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }} onChange={() => {}} />);
+    render(
+      <StaerkeEingabe
+        value={{ fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }}
+        onChange={() => {}}
+      />,
+    );
     expect(screen.getByLabelText('Führer')).toHaveValue('1');
     expect(screen.getByLabelText('Unterführer')).toHaveValue('3');
     expect(screen.getByLabelText('Mannschaft')).toHaveValue('18');
@@ -30,7 +35,9 @@ describe('StaerkeEingabe', () => {
 
   it('ein Feld von dreien leeren bleibt vollständige Stärke (leeres zählt als 0)', () => {
     const onChange = vi.fn();
-    render(<StaerkeEingabe value={{ fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }} onChange={onChange} />);
+    render(
+      <StaerkeEingabe value={{ fuehrer: 1, unterfuehrer: 2, mannschaft: 3 }} onChange={onChange} />,
+    );
     fireEvent.change(screen.getByLabelText('Führer'), { target: { value: '' } });
     expect(onChange).toHaveBeenLastCalledWith({ fuehrer: 0, unterfuehrer: 2, mannschaft: 3 });
   });
@@ -39,7 +46,15 @@ describe('StaerkeEingabe', () => {
     let zuletzt: Staerke | null = { fuehrer: 9, unterfuehrer: 9, mannschaft: 9 };
     function Wrapper() {
       const [v, setV] = useState<Staerke | null>({ fuehrer: 1, unterfuehrer: 2, mannschaft: 3 });
-      return <StaerkeEingabe value={v} onChange={(w) => { zuletzt = w; setV(w); }} />;
+      return (
+        <StaerkeEingabe
+          value={v}
+          onChange={(w) => {
+            zuletzt = w;
+            setV(w);
+          }}
+        />
+      );
     }
     render(<Wrapper />);
     fireEvent.change(screen.getByLabelText('Führer'), { target: { value: '' } });
@@ -60,7 +75,9 @@ describe('StaerkeEingabe', () => {
   it('externer value-Wechsel nach Mount spiegelt in die Felder', () => {
     const { rerender } = render(<StaerkeEingabe value={null} onChange={() => {}} />);
     expect(screen.getByLabelText('Führer')).toHaveValue('');
-    rerender(<StaerkeEingabe value={{ fuehrer: 4, unterfuehrer: 5, mannschaft: 6 }} onChange={() => {}} />);
+    rerender(
+      <StaerkeEingabe value={{ fuehrer: 4, unterfuehrer: 5, mannschaft: 6 }} onChange={() => {}} />,
+    );
     expect(screen.getByLabelText('Führer')).toHaveValue('4');
     expect(screen.getByLabelText('Unterführer')).toHaveValue('5');
     expect(screen.getByLabelText('Mannschaft')).toHaveValue('6');

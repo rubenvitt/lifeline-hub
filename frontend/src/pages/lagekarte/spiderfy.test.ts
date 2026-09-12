@@ -53,7 +53,10 @@ const idProjektor = {
 };
 
 const props = (schluessel: string, extra: Partial<MarkerProps> = {}): MarkerProps => ({
-  schluessel, typ: 'uhs', farbe: '#000', ...extra,
+  schluessel,
+  typ: 'uhs',
+  farbe: '#000',
+  ...extra,
 });
 
 describe('baueSpiderFc', () => {
@@ -71,7 +74,9 @@ describe('baueSpiderFc', () => {
       expect(leg.geometry.coordinates[0]).toEqual([100, 100]); // Beinchen startet am Anker
     }
     // Beinchen-Ende == zugehörige Leaf-Position
-    expect(legs.features[0].geometry.coordinates[1]).toEqual(leafFc.features[0].geometry.coordinates);
+    expect(legs.features[0].geometry.coordinates[1]).toEqual(
+      leafFc.features[0].geometry.coordinates,
+    );
   });
 
   it('ist leer bei keinen Leaves', () => {

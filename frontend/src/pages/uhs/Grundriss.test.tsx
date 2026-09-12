@@ -13,28 +13,69 @@ import { einsatzKeys } from '../../api/queryKeys';
 
 function person(over: Partial<Person>): Person {
   return {
-    id: 1, einsatz_id: 1, registrier_nr: 42, status: 'betroffen', name: null, vorname: null,
-    geschlecht: null, geburtsdatum: null, alter_geschaetzt: null, herkunft_adresse: null,
-    antreff_ort: null, melder_kontakt: null, notiz: null, erfasst_at: 'x', erfasst_von: 1,
-    geaendert_at: 'x', geaendert_von: 1, storniert_at: null, aktuelle_sichtung: null,
-    aktuelle_sichtung_at: null, aktueller_verbleib: null, aktuelle_uhs_id: null,
-    aktueller_platz_id: null, ...over,
+    id: 1,
+    einsatz_id: 1,
+    registrier_nr: 42,
+    status: 'betroffen',
+    name: null,
+    vorname: null,
+    geschlecht: null,
+    geburtsdatum: null,
+    alter_geschaetzt: null,
+    herkunft_adresse: null,
+    antreff_ort: null,
+    melder_kontakt: null,
+    notiz: null,
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
+    aktuelle_sichtung: null,
+    aktuelle_sichtung_at: null,
+    aktueller_verbleib: null,
+    aktuelle_uhs_id: null,
+    aktueller_platz_id: null,
+    ...over,
   };
 }
 
 function platz(over: Partial<UhsPlatz>): UhsPlatz {
   return {
-    id: 10, uhs_id: 1, typ: 'bett', bezeichnung: 'Bett 1', pos_x: 10, pos_y: 10,
-    verfuegbarkeit: 'frei', reserviert_fuer_person_id: null, storniert_at: null, ...over,
+    id: 10,
+    uhs_id: 1,
+    typ: 'bett',
+    bezeichnung: 'Bett 1',
+    pos_x: 10,
+    pos_y: 10,
+    verfuegbarkeit: 'frei',
+    reserviert_fuer_person_id: null,
+    storniert_at: null,
+    ...over,
   };
 }
 
 function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
   return {
-    id: 1, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz', bezeichnung: 'BHP 50',
-    standort: null, notiz: null, lat: null, lon: null, status: 'aktiv',
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
-    plaetze: [], belegungen: [], material: [], ...over,
+    id: 1,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    typ: 'behandlungsplatz',
+    bezeichnung: 'BHP 50',
+    standort: null,
+    notiz: null,
+    lat: null,
+    lon: null,
+    status: 'aktiv',
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
+    plaetze: [],
+    belegungen: [],
+    material: [],
+    ...over,
   };
 }
 
@@ -50,7 +91,7 @@ function renderGrundriss(uhs: UhsDetail, personen: Person[], schreibgeschuetzt =
           <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
         </AntApp>
       </QueryClientProvider>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
   return { ...ergebnis, client: qc };
 }
@@ -73,7 +114,9 @@ describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
     // Nur „frei" widerspricht „belegt". defekt/gesperrt/… sind eigenständige
     // Zustände, die auch bei Belegung informativ bleiben.
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
-    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })] });
+    const uhs = uhsDetail({
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })],
+    });
     renderGrundriss(uhs, [p]);
     expect(await screen.findByText('belegt')).toBeInTheDocument();
     expect(screen.getByText('defekt')).toBeInTheDocument();
@@ -98,8 +141,15 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
       http.post('/api/einsaetze/1/personen/7/uhs-belegung', async ({ request }) => {
         body = (await request.json()) as { art?: string };
         return HttpResponse.json({
-          id: 1, einsatz_id: 1, person_id: 7, uhs_id: 1, platz_id: null,
-          art: 'austritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+          id: 1,
+          einsatz_id: 1,
+          person_id: 7,
+          uhs_id: 1,
+          platz_id: null,
+          art: 'austritt',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
         });
       }),
     );
@@ -114,7 +164,9 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
     renderGrundriss(uhs, []);
     await screen.findByText('Bett 1');
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Verbleib / Entlassung erfassen' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -122,18 +174,33 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
   it('erfasst Transport (Default-Art) über den Platz-Button + Modal', async () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
-    let body: { art?: string; ziel?: string | null; transportmittel?: string | null; status?: string | null } | null = null;
+    let body: {
+      art?: string;
+      ziel?: string | null;
+      transportmittel?: string | null;
+      status?: string | null;
+    } | null = null;
     server.use(
       http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({
-          id: 1, einsatz_id: 1, person_id: 7, art: 'transport', transportmittel: 'RTW',
-          ziel: 'KH Mitte', status: 'abtransportiert', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+          id: 1,
+          einsatz_id: 1,
+          person_id: 7,
+          art: 'transport',
+          transportmittel: 'RTW',
+          ziel: 'KH Mitte',
+          status: 'abtransportiert',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
         });
       }),
     );
     renderGrundriss(uhs, [p]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
     // Abschluss-Screen: Art ist mit Transport vorbelegt → nur Ziel + Transportmittel erfassen.
     await userEvent.type(screen.getByRole('textbox', { name: /Transportmittel/ }), 'RTW');
     // Ziel ist das erste Arbeitsfeld; Enter dort muss die native Formularübermittlung auslösen.
@@ -153,13 +220,23 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
       http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({
-          id: 1, einsatz_id: 1, person_id: 7, art: 'entlassung', transportmittel: null,
-          ziel: null, status: null, notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+          id: 1,
+          einsatz_id: 1,
+          person_id: 7,
+          art: 'entlassung',
+          transportmittel: null,
+          ziel: null,
+          status: null,
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
         });
       }),
     );
     renderGrundriss(uhs, [p]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
     // Art von Transport auf „Entlassung vor Ort" umstellen.
     await userEvent.click(await screen.findByRole('combobox', { name: 'Art' }));
     await userEvent.click(await screen.findByText('Entlassung vor Ort'));
@@ -177,7 +254,9 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
     const ziel = await screen.findByRole('textbox', { name: /Ziel/ });
     await waitFor(() => expect(ziel).toHaveFocus());
     // „Art" bleibt trotz der Umsortierung sichtbar und bedienbar.
@@ -190,10 +269,15 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     // wäre der Wortlaut weg, obwohl der Verbleib nie ankam.
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
-    server.use(http.post('/api/einsaetze/1/personen/7/verbleib', () =>
-      HttpResponse.json({ error: 'Verbleib abgelehnt' }, { status: 500 })));
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/verbleib', () =>
+        HttpResponse.json({ error: 'Verbleib abgelehnt' }, { status: 500 }),
+      ),
+    );
     renderGrundriss(uhs, [p]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
     await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('Verbleib abgelehnt')).toBeInTheDocument();
@@ -277,10 +361,22 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
 
 describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
   it('zeigt aus DIESER UHS abtransportierte Personen in der rechten Spalte', async () => {
-    const p = person({ id: 9, registrier_nr: 9, aktuelle_uhs_id: null, aktueller_verbleib: 'Transport → KH Mitte' });
+    const p = person({
+      id: 9,
+      registrier_nr: 9,
+      aktuelle_uhs_id: null,
+      aktueller_verbleib: 'Transport → KH Mitte',
+    });
     const austritt: UhsBelegung = {
-      id: 1, einsatz_id: 1, person_id: 9, uhs_id: 1, platz_id: null,
-      art: 'austritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+      id: 1,
+      einsatz_id: 1,
+      person_id: 9,
+      uhs_id: 1,
+      platz_id: null,
+      art: 'austritt',
+      notiz: null,
+      zeitpunkt_at: 'x',
+      erfasst_von: 1,
     };
     const uhs = uhsDetail({ belegungen: [austritt] });
     renderGrundriss(uhs, [p]);
@@ -321,7 +417,10 @@ describe('Grundriss – Platz-Verfügbarkeit ohne Edit-Modus (LFH-17)', () => {
   });
 
   it('zeigt „als frei markieren" als direkte Primäraktion für einen Platz in Aufbereitung', async () => {
-    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })] });
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })],
+    });
     let body: { verfuegbarkeit?: string } | null = null;
     server.use(
       http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', async ({ request }) => {
@@ -336,7 +435,10 @@ describe('Grundriss – Platz-Verfügbarkeit ohne Edit-Modus (LFH-17)', () => {
   });
 
   it('zeigt KEINE „als frei markieren"-Primäraktion für einen bereits freien Platz', async () => {
-    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'frei' })] });
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'frei' })],
+    });
     renderGrundriss(uhs, []);
     await screen.findByText('Bett 1');
     expect(screen.queryByRole('button', { name: 'als frei markieren' })).not.toBeInTheDocument();
@@ -354,8 +456,12 @@ describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
     expect(await screen.findByText('belegt')).toBeInTheDocument();
     // … aber keine Schreibaktionen.
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Verbleib / Entlassung erfassen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Platzaktionen zu Bett 1/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Platzaktionen zu Bett 1/ }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Plätze anlegen' })).not.toBeInTheDocument();
   });
 });
@@ -386,8 +492,15 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     return http.post(`/api/einsaetze/1/personen/${personId}/uhs-belegung`, async ({ request }) => {
       senke.body = await request.json();
       return HttpResponse.json({
-        id: 1, einsatz_id: 1, person_id: personId, uhs_id: 1, platz_id: 10,
-        art: 'eintritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+        id: 1,
+        einsatz_id: 1,
+        person_id: personId,
+        uhs_id: 1,
+        platz_id: 10,
+        art: 'eintritt',
+        notiz: null,
+        zeitpunkt_at: 'x',
+        erfasst_von: 1,
       });
     });
   }
@@ -415,11 +528,15 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     const anderePerson = person({ id: 6, registrier_nr: 6, aktuelle_uhs_id: null });
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     let freigeben: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
-    server.use(http.post('/api/einsaetze/1/personen/5/uhs-belegung', async () => {
-      await gate;
-      return HttpResponse.json({ error: 'Platz inzwischen belegt' }, { status: 409 });
-    }));
+    const gate = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
+    server.use(
+      http.post('/api/einsaetze/1/personen/5/uhs-belegung', async () => {
+        await gate;
+        return HttpResponse.json({ error: 'Platz inzwischen belegt' }, { status: 409 });
+      }),
+    );
     const { client } = renderGrundriss(uhs, [p, anderePerson]);
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
@@ -435,24 +552,37 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     // Ein unabhängiger Live-/Refetch-Stand, der während unseres Requests eintrifft, darf
     // beim Fehler nicht durch einen Snapshot der gesamten Personenliste verloren gehen.
     let refetchFreigeben: (() => void) | undefined;
-    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
-    server.use(http.get('/api/einsaetze/1/personen', async () => {
-      await refetchGate;
-      return HttpResponse.json([{ ...p, name: 'Extern geändert' }, anderePerson]);
-    }));
+    const refetchGate = new Promise<void>((resolve) => {
+      refetchFreigeben = resolve;
+    });
+    server.use(
+      http.get('/api/einsaetze/1/personen', async () => {
+        await refetchGate;
+        return HttpResponse.json([{ ...p, name: 'Extern geändert' }, anderePerson]);
+      }),
+    );
     act(() => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), (aktuell) =>
-        aktuell?.map((eintrag) => eintrag.id === 5 ? { ...eintrag, name: 'Extern geändert' } : eintrag));
+        aktuell?.map((eintrag) =>
+          eintrag.id === 5 ? { ...eintrag, name: 'Extern geändert' } : eintrag,
+        ),
+      );
     });
 
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     await waitFor(() => {
       const zurueckgerollt = client.getQueryData<Person[]>(einsatzKeys.personen(1));
-      expect(zurueckgerollt?.find((eintrag) => eintrag.id === 5))
-        .toMatchObject({ aktuelle_uhs_id: null, aktueller_platz_id: null });
+      expect(zurueckgerollt?.find((eintrag) => eintrag.id === 5)).toMatchObject({
+        aktuelle_uhs_id: null,
+        aktueller_platz_id: null,
+      });
       expect(zurueckgerollt?.find((eintrag) => eintrag.id === 5)?.name).toBe('Extern geändert');
     });
-    await act(async () => { refetchFreigeben?.(); });
+    await act(async () => {
+      refetchFreigeben?.();
+    });
     expect(screen.queryByText('belegt')).not.toBeInTheDocument();
   });
 
@@ -502,8 +632,13 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     // eines Auswahlfelds, und eine Prüfung auf die Auswahl wäre blind — gemessen, der Test
     // blieb dann auch mit entferntem Riegel grün. Geprüft wird deshalb der DIALOG.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
-    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })] });
-    server.use(http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})));
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })],
+    });
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})),
+    );
     renderGrundriss(uhs, [p]);
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
@@ -516,8 +651,13 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     // Zweite Hälfte von AK2: die direkten Icon-Buttons stoppten bisher nur `pointerdown`,
     // nicht `click` — ein Wurzel-onClick feuerte damit bei jedem Aktionsklick mit.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
-    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })] });
-    server.use(http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})));
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })],
+    });
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', () => HttpResponse.json({})),
+    );
     renderGrundriss(uhs, [p]);
 
     await userEvent.click(await screen.findByRole('button', { name: 'als frei markieren' }));
@@ -533,7 +673,12 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     // allein wäre die Kandidatenmenge leer (er steht weder im Wartebereich noch unter
     // „noch nicht aufgenommen"), der Dialog zeigte „Niemand zuweisbar" statt einer Auswahl
     // — und eine Prüfung darauf bliebe auch ohne die `belegtVon`-Bedingung grün. Gemessen.
-    const belegend = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const belegend = person({
+      id: 7,
+      registrier_nr: 7,
+      aktuelle_uhs_id: 1,
+      aktueller_platz_id: 10,
+    });
     const wartend = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [belegend, wartend]);
@@ -551,7 +696,10 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     // Drag-Weg prüft die Verfügbarkeit ebenfalls nicht — der Klickweg darf nicht strenger
     // sein als die Geste, die er ersetzt.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
-    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'gesperrt' })] });
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'gesperrt' })],
+    });
     renderGrundriss(uhs, [p]);
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
@@ -652,8 +800,11 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert (kein leerer Drawer)', async () => {
     const p = person({ id: 11, registrier_nr: 11, aktuelle_uhs_id: null });
-    server.use(http.get('/api/einsaetze/1/personen/11', () =>
-      HttpResponse.json({ error: 'kaputt' }, { status: 500 })));
+    server.use(
+      http.get('/api/einsaetze/1/personen/11', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
     renderGrundriss(uhsDetail({}), [p]);
     await userEvent.click(await screen.findByText(/R-011|· unbekannt/));
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
@@ -711,8 +862,7 @@ describe('Grundriss – Aktionszeilen-Abstand der Platzkarte (LFH-378)', () => {
    * teilweise — erst die UNGLEICHHEIT über zwei Stufen lässt ihn auffliegen.
    */
   it('ist über zwei Dichtestufen ungleich, statt auf einem Festwert zu kleben', () => {
-    expect(aktionsabstand(tokenFuer('kompakt')))
-      .not.toBe(aktionsabstand(tokenFuer('komfortabel')));
+    expect(aktionsabstand(tokenFuer('kompakt'))).not.toBe(aktionsabstand(tokenFuer('komfortabel')));
   });
 
   /**
@@ -742,14 +892,25 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
    *  `pending`, und genau dieses Fenster ist der Gegenstand des Befunds. */
   function haengendeBelegung(personId: number) {
     let freigeben: (() => void) | undefined;
-    const tor = new Promise<void>((aufloesen) => { freigeben = aufloesen; });
-    server.use(http.post(`/api/einsaetze/1/personen/${personId}/uhs-belegung`, async () => {
-      await tor;
-      return HttpResponse.json({
-        id: 1, einsatz_id: 1, person_id: personId, uhs_id: 1, platz_id: null,
-        art: 'wechsel', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
-      });
-    }));
+    const tor = new Promise<void>((aufloesen) => {
+      freigeben = aufloesen;
+    });
+    server.use(
+      http.post(`/api/einsaetze/1/personen/${personId}/uhs-belegung`, async () => {
+        await tor;
+        return HttpResponse.json({
+          id: 1,
+          einsatz_id: 1,
+          person_id: personId,
+          uhs_id: 1,
+          platz_id: null,
+          art: 'wechsel',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
+        });
+      }),
+    );
     return () => freigeben?.();
   }
 
@@ -758,7 +919,9 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
    *  deshalb das Menü des zuerst geöffneten Platzes (gemessen: „Zurück in den
    *  Wartebereich" statt der Verfügbarkeiten). */
   function menue(): HTMLElement | null {
-    const offen = document.querySelectorAll('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    const offen = document.querySelectorAll(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
     return (offen[offen.length - 1] as HTMLElement) ?? null;
   }
 
@@ -774,7 +937,12 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
     // Damit verschwanden während JEDER Belegung ALLE Auslöser aus dem Baum — im Browser
     // gemessen 26 bis 397 ms lang. Ein Portal-Overlay stirbt mit seinem Auslöser; wer in
     // diesem Fenster klickt, greift ins Leere.
-    const belegend = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const belegend = person({
+      id: 7,
+      registrier_nr: 7,
+      aktuelle_uhs_id: 1,
+      aktueller_platz_id: 10,
+    });
     const freigeben = haengendeBelegung(7);
     renderGrundriss(zweiPlaetze(), [belegend]);
 
@@ -793,7 +961,12 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
     // Die Gegenaussage: `belegMut.isPending` hatte einen Zweck — es verhinderte, dass
     // parallel eine zweite Belegung angestoßen wird. Der Schutz muss die Trennung
     // überleben, sonst tauscht der Fix einen Bedienbefund gegen einen Datenbefund.
-    const belegend = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const belegend = person({
+      id: 7,
+      registrier_nr: 7,
+      aktuelle_uhs_id: 1,
+      aktueller_platz_id: 10,
+    });
     const wartend = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const freigeben = haengendeBelegung(7);
     renderGrundriss(zweiPlaetze(), [belegend, wartend]);
@@ -846,7 +1019,12 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
     // es ausdrücklich gesperrt werden, sonst tauscht der Fix einen Bedienbefund gegen
     // einen Datenbefund. Gesperrt, nicht entfernt — ein Verschwinden wäre genau der
     // Mechanismus, gegen den dieses Ticket geschrieben ist.
-    const wartend = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: 1, aktueller_platz_id: null });
+    const wartend = person({
+      id: 5,
+      registrier_nr: 5,
+      aktuelle_uhs_id: 1,
+      aktueller_platz_id: null,
+    });
     const freigeben = haengendeBelegung(5);
     renderGrundriss(zweiPlaetze(), [wartend]);
 

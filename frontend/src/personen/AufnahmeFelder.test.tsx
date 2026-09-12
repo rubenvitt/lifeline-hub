@@ -35,8 +35,9 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
 
   it('steht ganz oben — vor Geschlecht, Alter und Antreffort', () => {
     const { container } = zeige();
-    const beschriftungen = [...container.querySelectorAll('.ant-form-item label')]
-      .map((l) => l.textContent);
+    const beschriftungen = [...container.querySelectorAll('.ant-form-item label')].map(
+      (l) => l.textContent,
+    );
     expect(beschriftungen[0]).toBe('Sichtungskategorie');
   });
 

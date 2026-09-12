@@ -16,25 +16,56 @@ import { alsOrtszeit } from '../etb/filterZeit';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 
 const admin = {
-  id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-02 10:00:00',
+  id: 1,
+  anzeigename: 'A',
+  benutzername: 'a',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-06-02 10:00:00',
 };
 
 const einsatz: EinsatzAnzeige = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-06-02 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-06-02 09:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung', org_id: 1, org_name: 'Orga',
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-06-02 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-06-02 09:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
+  org_id: 1,
+  org_name: 'Orga',
 };
 
 const bericht: LageberichtAnzeige = {
-  id: 11, einsatz_id: 7, vorlage: 'freitext', titel: 'Lage 10:00', zeitstand: '2026-06-02 10:00:00',
-  status: 'entwurf', abschnitte: [{ schluessel: 'text', text: 'Inhalt' }], version: 1,
-  vorgaenger_id: null, ersteller_id: 1, ersteller_name: 'A', erstellt_at: '2026-06-02 10:00:00',
-  aktualisiert_at: '2026-06-02 10:00:00', freigegeben_von_id: null, freigegeben_von_name: null,
-  freigegeben_at: null, etb_eintrag_id: null,
+  id: 11,
+  einsatz_id: 7,
+  vorlage: 'freitext',
+  titel: 'Lage 10:00',
+  zeitstand: '2026-06-02 10:00:00',
+  status: 'entwurf',
+  abschnitte: [{ schluessel: 'text', text: 'Inhalt' }],
+  version: 1,
+  vorgaenger_id: null,
+  ersteller_id: 1,
+  ersteller_name: 'A',
+  erstellt_at: '2026-06-02 10:00:00',
+  aktualisiert_at: '2026-06-02 10:00:00',
+  freigegeben_von_id: null,
+  freigegeben_von_name: null,
+  freigegeben_at: null,
+  etb_eintrag_id: null,
 };
 
 /**
@@ -51,11 +82,23 @@ const bericht: LageberichtAnzeige = {
  */
 const KETTE: LageberichtAnzeige[] = [
   {
-    ...bericht, id: 14, titel: 'Vortrag Nachmittag', vorlage: 'lagebericht', version: 1,
-    status: 'freigegeben', zeitstand: '2026-06-02 09:00:00',
+    ...bericht,
+    id: 14,
+    titel: 'Vortrag Nachmittag',
+    vorlage: 'lagebericht',
+    version: 1,
+    status: 'freigegeben',
+    zeitstand: '2026-06-02 09:00:00',
   },
   { ...bericht, id: 11, version: 1, status: 'freigegeben', zeitstand: '2026-06-02 10:00:00' },
-  { ...bericht, id: 13, version: 2, status: 'entwurf', zeitstand: '2026-06-02 12:00:00', vorgaenger_id: 11 },
+  {
+    ...bericht,
+    id: 13,
+    version: 2,
+    status: 'entwurf',
+    zeitstand: '2026-06-02 12:00:00',
+    vorgaenger_id: 11,
+  },
 ];
 
 function setup(berichte: LageberichtAnzeige[] = [bericht]) {
@@ -75,7 +118,10 @@ function setup(berichte: LageberichtAnzeige[] = [bericht]) {
 }
 
 const lagebericht7Abschnitte: LageberichtAnzeige = {
-  ...bericht, id: 12, vorlage: 'lagebericht', titel: 'Lagevortrag',
+  ...bericht,
+  id: 12,
+  vorlage: 'lagebericht',
+  titel: 'Lagevortrag',
   abschnitte: [
     { schluessel: 'auftrag', text: '' },
     { schluessel: 'gefahren_schadenlage', text: '' },
@@ -196,8 +242,11 @@ describe('LageberichtDetailPage', () => {
 
   it('freigegebener Bericht ist read-only mit ETB-Link und Fortschreiben', async () => {
     setupDetail({
-      ...lagebericht7Abschnitte, status: 'freigegeben', etb_eintrag_id: 99,
-      freigegeben_von_name: 'A', freigegeben_at: '2026-06-02 11:00:00',
+      ...lagebericht7Abschnitte,
+      status: 'freigegeben',
+      etb_eintrag_id: 99,
+      freigegeben_von_name: 'A',
+      freigegeben_at: '2026-06-02 11:00:00',
     });
     expect(await screen.findByRole('button', { name: /Fortschreiben/i })).toBeInTheDocument();
     expect(screen.queryByLabelText('Auftrag')).not.toBeInTheDocument();
@@ -210,11 +259,18 @@ describe('LageberichtDetailPage', () => {
   });
 
   it('Freigeben öffnet einen Bestätigungsdialog', async () => {
-    setupDetail({ ...lagebericht7Abschnitte, abschnitte: [
-      { schluessel: 'auftrag', text: 'X' }, { schluessel: 'gefahren_schadenlage', text: '' },
-      { schluessel: 'eigene_lage', text: '' }, { schluessel: 'lageentwicklung', text: '' },
-      { schluessel: 'fuehrungsprobleme', text: '' }, { schluessel: 'antraege_vorschlaege', text: '' },
-      { schluessel: 'zusammenfassung', text: '' }] });
+    setupDetail({
+      ...lagebericht7Abschnitte,
+      abschnitte: [
+        { schluessel: 'auftrag', text: 'X' },
+        { schluessel: 'gefahren_schadenlage', text: '' },
+        { schluessel: 'eigene_lage', text: '' },
+        { schluessel: 'lageentwicklung', text: '' },
+        { schluessel: 'fuehrungsprobleme', text: '' },
+        { schluessel: 'antraege_vorschlaege', text: '' },
+        { schluessel: 'zusammenfassung', text: '' },
+      ],
+    });
     await screen.findByRole('button', { name: /Freigeben/i });
     await userEvent.click(screen.getByRole('button', { name: /Freigeben/i }));
     expect(await screen.findByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
@@ -229,7 +285,9 @@ describe('LageberichtDetailPage', () => {
     expect(screen.queryByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeNull();
     // Der Umschalter ist eine Einstellung in eigener Zeile, keine Aktion in der Knopfreihe.
     await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
-    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+    ).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
     // "## Schwerpunkt" darf NICHT als sichtbarer Text (außerhalb der Textarea) erscheinen
@@ -245,12 +303,16 @@ describe('LageberichtDetailPage', () => {
     await userEvent.type(auftragFeld, '## Schwerpunkt');
     const abschnitt = auftragFeld.closest('.ant-collapse-item') as HTMLElement;
     await userEvent.click(within(abschnitt).getByRole('button', { name: /Vorschau/ }));
-    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+    ).toBeInTheDocument();
   });
 
   it('Abschnittsnavigation listet alle acht Abschnitte, markiert leere und hält EINEN offen (H62)', async () => {
     const acht: LageberichtAnzeige = {
-      ...lagebericht7Abschnitte, id: 15, vorlage: 'lagebeurteilung',
+      ...lagebericht7Abschnitte,
+      id: 15,
+      vorlage: 'lagebeurteilung',
       abschnitte: [
         { schluessel: 'auftrag', text: 'Hochwasser' },
         { schluessel: 'anlass', text: '' },
@@ -267,8 +329,12 @@ describe('LageberichtDetailPage', () => {
     const koepfe = await screen.findAllByRole('tab');
     expect(koepfe).toHaveLength(8);
     // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke.
-    expect(screen.getByRole('tab', { name: /^expanded Auftrag$|^collapsed Auftrag$/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: /^expanded Auftrag$|^collapsed Auftrag$/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
+    ).toBeInTheDocument();
     expect(koepfe.filter((k) => k.getAttribute('aria-expanded') === 'true')).toHaveLength(1);
     // Die Marke folgt dem Tippen: leeren Abschnitt befüllen → „(leer)" verschwindet.
     await userEvent.click(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }));
@@ -295,7 +361,9 @@ describe('LageberichtDetailPage', () => {
       ],
     });
     // Markdown-Überschrift (h2) muss als Heading gerendert sein, nicht als Rohtext "## Schwerpunkt"
-    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+    ).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen, nicht als Rohtext "- Punkt A"
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
     // Leerer Abschnitt zeigt den Fallback "—"
@@ -355,13 +423,14 @@ function setupLebend(start: LageberichtAnzeige) {
  * Test hier einen geänderten Stand nach, nicht bloß eine Invalidierung.
  */
 describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)', () => {
-
   it('überschreibt getippten Text NICHT, wenn der Bericht serverseitig geändert wurde', async () => {
     const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
     const auftrag = await screen.findByLabelText('Auftrag');
     await userEvent.type(auftrag, 'Meine Fassung');
     await fremdeAenderung({
-      ...lagebericht7Abschnitte, titel: 'Fremde Fassung', aktualisiert_at: '2026-06-02 12:00:00',
+      ...lagebericht7Abschnitte,
+      titel: 'Fremde Fassung',
+      aktualisiert_at: '2026-06-02 12:00:00',
     });
     // ZUERST warten, bis der neue Stand nachweislich ANGEKOMMEN ist: die Überschrift kommt
     // aus der Query, nicht aus dem Formular — der unabhängige Zeuge. Ohne ihn bestünde die
@@ -374,8 +443,13 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
     const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
     await screen.findByLabelText('Auftrag');
     await fremdeAenderung({
-      ...lagebericht7Abschnitte, titel: 'Neu vom Server', aktualisiert_at: '2026-06-02 12:00:00',
-      abschnitte: [{ schluessel: 'auftrag', text: 'Fremder Text' }, ...lagebericht7Abschnitte.abschnitte.slice(1)],
+      ...lagebericht7Abschnitte,
+      titel: 'Neu vom Server',
+      aktualisiert_at: '2026-06-02 12:00:00',
+      abschnitte: [
+        { schluessel: 'auftrag', text: 'Fremder Text' },
+        ...lagebericht7Abschnitte.abschnitte.slice(1),
+      ],
     });
     await screen.findByRole('heading', { name: 'Neu vom Server' });
     expect(screen.getByLabelText('Auftrag')).toHaveValue('Fremder Text');
@@ -383,19 +457,30 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
 
   it('lädt beim Wechsel der Bericht-ID neu, auch wenn im alten Bericht etwas offen war', async () => {
     const zweiter: LageberichtAnzeige = {
-      ...lagebericht7Abschnitte, id: 13, titel: 'Zweiter Bericht',
-      abschnitte: [{ schluessel: 'auftrag', text: 'Text 13' }, ...lagebericht7Abschnitte.abschnitte.slice(1)],
+      ...lagebericht7Abschnitte,
+      id: 13,
+      titel: 'Zweiter Bericht',
+      abschnitte: [
+        { schluessel: 'auftrag', text: 'Text 13' },
+        ...lagebericht7Abschnitte.abschnitte.slice(1),
+      ],
     };
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(lagebericht7Abschnitte)),
       http.get('/api/einsaetze/7/lageberichte/13', () => HttpResponse.json(zweiter)),
-      http.patch('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(lagebericht7Abschnitte)),
+      http.patch('/api/einsaetze/7/lageberichte/12', () =>
+        HttpResponse.json(lagebericht7Abschnitte),
+      ),
     );
     function Weiter() {
       const navigate = useNavigate();
-      return <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>weiter</button>;
+      return (
+        <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>
+          weiter
+        </button>
+      );
     }
     renderMitProviders(
       <AuthProvider>
@@ -420,7 +505,9 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
     expect(patches).toHaveLength(0);
     await userEvent.tab();
     await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0].abschnitte).toEqual(expect.arrayContaining([{ schluessel: 'auftrag', text: 'x' }]));
+    expect(patches[0].abschnitte).toEqual(
+      expect.arrayContaining([{ schluessel: 'auftrag', text: 'x' }]),
+    );
     expect(await screen.findByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
   });
 
@@ -480,7 +567,8 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
   const teilweiseBefuellt: LageberichtAnzeige = {
     ...lagebericht7Abschnitte,
     abschnitte: lagebericht7Abschnitte.abschnitte.map((a, i) => ({
-      ...a, text: i < 2 ? `Stand ${i}` : '',
+      ...a,
+      text: i < 2 ? `Stand ${i}` : '',
     })),
   };
 
@@ -516,7 +604,8 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
     await fremdeAenderung({
       ...teilweiseBefuellt,
       abschnitte: teilweiseBefuellt.abschnitte.map((a) =>
-        a.schluessel === 'eigene_lage' ? { ...a, text: 'jetzt befüllt' } : a),
+        a.schluessel === 'eigene_lage' ? { ...a, text: 'jetzt befüllt' } : a,
+      ),
     });
     expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage')).toBeInTheDocument();
   });
@@ -525,7 +614,11 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
     // Die dritte Hook-Zusicherung aus dem Ticket: `key={lbId}` ist der Reset. Beide
     // Zustände gehören zu EINEM Bericht — ein mitgeschleppter offener Abschnitt zeigte am
     // nächsten Bericht einen Abschnitt, den niemand gewählt hat.
-    const zweiter: LageberichtAnzeige = { ...lagebericht7Abschnitte, id: 13, titel: 'Zweiter Bericht' };
+    const zweiter: LageberichtAnzeige = {
+      ...lagebericht7Abschnitte,
+      id: 13,
+      titel: 'Zweiter Bericht',
+    };
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
@@ -534,7 +627,11 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
     );
     function Weiter() {
       const navigate = useNavigate();
-      return <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>weiter</button>;
+      return (
+        <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>
+          weiter
+        </button>
+      );
     }
     renderMitProviders(
       <AuthProvider>
@@ -549,14 +646,16 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
     await userEvent.click(await screen.findByText('Zusammenfassung (leer)'));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
     await waitFor(() =>
-      expect(within(offeneKopfzeile()[0]).getByText('Zusammenfassung (leer)')).toBeInTheDocument());
+      expect(within(offeneKopfzeile()[0]).getByText('Zusammenfassung (leer)')).toBeInTheDocument(),
+    );
     expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).toBeChecked();
 
     await userEvent.click(screen.getByRole('button', { name: 'weiter' }));
     await screen.findByRole('heading', { name: 'Zweiter Bericht' });
     // Der zweite Bericht ist ganz leer → Einstieg ist „Auftrag", nicht die alte Wahl.
     await waitFor(() =>
-      expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument());
+      expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument(),
+    );
     expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
   });
 });
@@ -569,9 +668,10 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(start)),
       http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, () =>
-        (zustand.scheitert
+        zustand.scheitert
           ? HttpResponse.json({ error: 'Zeitstand liegt in der Zukunft' }, { status: 422 })
-          : HttpResponse.json(start))),
+          : HttpResponse.json(start),
+      ),
     );
     renderMitProviders(
       <AuthProvider>
@@ -607,7 +707,8 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
     zustand.scheitert = false;
     await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
     await waitFor(() =>
-      expect(screen.queryByText('Zeitstand liegt in der Zukunft')).not.toBeInTheDocument());
+      expect(screen.queryByText('Zeitstand liegt in der Zukunft')).not.toBeInTheDocument(),
+    );
   });
 });
 
@@ -619,7 +720,8 @@ describe('LageberichtePage', () => {
     // anders als beim Autosave drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
     server.use(
       http.post('/api/einsaetze/7/lageberichte', () =>
-        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 })),
+        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
+      ),
     );
     setup();
     await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
@@ -630,8 +732,9 @@ describe('LageberichtePage', () => {
     expect(treffer.closest('.ant-message')).toBeNull();
     // Der Dialog steht weiter offen und hat die Werte behalten.
     expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
-    expect((screen.getByLabelText('Titel') as HTMLInputElement).value)
-      .toMatch(/^Lageüberblick \d{4}$/);
+    expect((screen.getByLabelText('Titel') as HTMLInputElement).value).toMatch(
+      /^Lageüberblick \d{4}$/,
+    );
   });
 
   it('ersetzt den Grund beim nächsten Absenden, statt ihn zu stapeln (Gegenaussage)', async () => {
@@ -648,10 +751,12 @@ describe('LageberichtePage', () => {
      */
     let zweiter = false;
     server.use(
-      http.post('/api/einsaetze/7/lageberichte', () => HttpResponse.json(
-        { error: zweiter ? 'Vorlage unbekannt' : 'Titel bereits vergeben' },
-        { status: 409 },
-      )),
+      http.post('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json(
+          { error: zweiter ? 'Vorlage unbekannt' : 'Titel bereits vergeben' },
+          { status: 409 },
+        ),
+      ),
     );
     setup();
     await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
@@ -670,7 +775,8 @@ describe('LageberichtePage', () => {
     // stünde der Fehler des letzten Anlegeversuchs über einem frischen, leeren Formular.
     server.use(
       http.post('/api/einsaetze/7/lageberichte', () =>
-        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 })),
+        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
+      ),
     );
     setup();
     await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
@@ -717,7 +823,10 @@ describe('LageberichtePage', () => {
     expect(links.map((l) => l.getAttribute('href'))).toEqual(['/einsaetze/7/lageberichte/13']);
     // Kein zweiter Anker im Titel-Link: der Link entsteht in `karte.titel.ziel`.
     links.forEach((l) => expect(l.querySelector('a')).toBeNull());
-    expect(screen.getByRole('link', { name: 'v1' })).toHaveAttribute('href', '/einsaetze/7/lageberichte/11');
+    expect(screen.getByRole('link', { name: 'v1' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/lageberichte/11',
+    );
     expect(sicht).toHaveTextContent('v2');
     expect(sicht).toHaveTextContent(/Vorgänger:\s*v1/);
     // Die Vorlage steht je KETTE einmal, nicht je Fassung.
@@ -732,7 +841,9 @@ describe('LageberichtePage', () => {
 
     // Gruppenachse führend; der freigegebene Kopf 14 steht in seiner Gruppe.
     expect(
-      within(sicht).getAllByRole('link').map((l) => l.getAttribute('href')),
+      within(sicht)
+        .getAllByRole('link')
+        .map((l) => l.getAttribute('href')),
     ).toEqual([
       '/einsaetze/7/lageberichte/13',
       '/einsaetze/7/lageberichte/11',
@@ -768,7 +879,9 @@ describe('LageberichtePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     await userEvent.click(screen.getByRole('button', { name: /Neuer Bericht/i }));
     const zweites = await screen.findByLabelText('Titel');
-    await waitFor(() => expect((zweites as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/));
+    await waitFor(() =>
+      expect((zweites as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/),
+    );
   });
 
   it('schickt Vorlage und Titel; ein leerer Zeitstand wird nicht mitgeschickt', async () => {
@@ -815,7 +928,9 @@ describe('LageberichtePage', () => {
 
   it('trägt Überschrift und Kennzahlenzeile', async () => {
     setup(KETTE);
-    expect(await screen.findByRole('heading', { name: 'Lageberichte', level: 3 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Lageberichte', level: 3 }),
+    ).toBeInTheDocument();
     expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
   });
 });
@@ -849,7 +964,9 @@ function setupMitZone(berichte: LageberichtAnzeige[]) {
   // Query-Key-Registry). Hier hinge die Zone dann still wieder am MSW-Refetch.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(einsatzKeys.einstellungen(7), {
-    einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+    einsatz_id: 7,
+    zeitzone: 'Europe/Berlin',
+    org_defaults: { org_id: 1 },
   });
   return renderMitProviders(
     <AuthProvider>

@@ -29,9 +29,7 @@ export function setzeOrgModulEinstellung(
   modulKey: string,
   rolle: 'admin' | 'fuehrungskraft' | null,
 ): Promise<void> {
-  return apiSend<void>(
-    `/api/org-modul-einstellungen/${modulKey}`,
-    'PUT',
-    { benoetigte_rolle: rolle },
-  );
+  return apiSend<void>(`/api/org-modul-einstellungen/${modulKey}`, 'PUT', {
+    benoetigte_rolle: rolle,
+  });
 }

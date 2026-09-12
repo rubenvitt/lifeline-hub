@@ -41,7 +41,9 @@ describe('useQueryParamSelektion (LFH-25)', () => {
     const angewendet: number[] = [];
     const { result } = renderHook(
       () => {
-        useQueryParamSelektion('einheit', true, (id) => { if (id === 5) angewendet.push(id); });
+        useQueryParamSelektion('einheit', true, (id) => {
+          if (id === 5) angewendet.push(id);
+        });
         return useLocation();
       },
       { wrapper: wrapper('/x?einheit=99') },

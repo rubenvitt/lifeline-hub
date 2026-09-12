@@ -136,14 +136,14 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
      * dekodiert. Die tragende Zusicherung ist deshalb der Round-Trip darunter, nicht
      * das rohe Zeichen in der Zeile hier.
      */
-    expect(lagekartePfad(E, { platzieren: { typ: 'schaden', id: 7 } }))
-      .toBe('/einsaetze/5/lagekarte?platzieren=schaden%3A7');
+    expect(lagekartePfad(E, { platzieren: { typ: 'schaden', id: 7 } })).toBe(
+      '/einsaetze/5/lagekarte?platzieren=schaden%3A7',
+    );
   });
   it('der Platzier-Auftrag überlebt den Weg durch die URL', () => {
     const pfad = lagekartePfad(E, { platzieren: { typ: 'uhs', id: 3 } });
     const params = new URLSearchParams(pfad.split('?')[1]);
-    expect(parsePlatzierenAuftrag(params.get('platzieren')))
-      .toEqual({ typ: 'uhs', id: 3 });
+    expect(parsePlatzierenAuftrag(params.get('platzieren'))).toEqual({ typ: 'uhs', id: 3 });
   });
   it('parsePlatzierenAuftrag liest den Auftrag zurück', () => {
     expect(parsePlatzierenAuftrag('schaden:7')).toEqual({ typ: 'schaden', id: 7 });
@@ -195,7 +195,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(fahrzeugePfad(E, { fahrzeug: 6 })).toBe('/einsaetze/5/fahrzeuge?fahrzeug=6');
   });
   it('einsatzabschnittePfad mit ?abschnitt=', () => {
-    expect(einsatzabschnittePfad(E, { abschnitt: 2 })).toBe('/einsaetze/5/einsatzabschnitte?abschnitt=2');
+    expect(einsatzabschnittePfad(E, { abschnitt: 2 })).toBe(
+      '/einsaetze/5/einsatzabschnitte?abschnitt=2',
+    );
   });
   it('meldungenPfad mit ?meldung=', () => {
     expect(meldungenPfad(E, { meldung: 11 })).toBe('/einsaetze/5/meldungen?meldung=11');
@@ -253,8 +255,9 @@ describe('parseRouteId — strenger als nur NaN (Number.isInteger && > 0)', () =
 
 describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
   it('baut alle vier Filterwerte in die Query', () => {
-    expect(etbPfad(7, { q: 'brand', typ: 'meldung', von: '2026-08-21 06:00:00' }))
-      .toBe('/einsaetze/7/etb?q=brand&typ=meldung&von=2026-08-21%2006%3A00%3A00');
+    expect(etbPfad(7, { q: 'brand', typ: 'meldung', von: '2026-08-21 06:00:00' })).toBe(
+      '/einsaetze/7/etb?q=brand&typ=meldung&von=2026-08-21%2006%3A00%3A00',
+    );
   });
 
   it('lässt leere Werte weg statt leere Parameter zu schreiben', () => {
@@ -272,7 +275,9 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
     const pfad = etbPfad(7, { q: 'br and', typ: 'meldung', von: '2026-08-21 06:00:00' });
     const params = new URLSearchParams(pfad.split('?')[1]);
     expect(parseEtbFilter(params)).toEqual({
-      q: 'br and', typ: 'meldung', von: '2026-08-21 06:00:00',
+      q: 'br and',
+      typ: 'meldung',
+      von: '2026-08-21 06:00:00',
     });
   });
 

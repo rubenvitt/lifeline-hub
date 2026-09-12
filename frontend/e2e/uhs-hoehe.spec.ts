@@ -12,17 +12,23 @@ async function aufbauen(page: Page) {
   async function anlegen(pfad: string, data: unknown) {
     const antwort = await page.request.post(pfad, { data });
     expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
-    return await antwort.json() as { id: number };
+    return (await antwort.json()) as { id: number };
   }
   const einsatz = await anlegen('/api/einsaetze', { bezeichnung: `E2E UHS Höhe ${Date.now()}` });
   const uhs = await anlegen(`/api/einsaetze/${einsatz.id}/uhs`, {
-    typ: 'behandlungsplatz', bezeichnung: 'BHP Höhenprüfung',
+    typ: 'behandlungsplatz',
+    bezeichnung: 'BHP Höhenprüfung',
   });
-  await anlegen(`/api/einsaetze/${einsatz.id}/uhs/${uhs.id}/plaetze/bulk`, { typ: 'bett', menge: 2 });
+  await anlegen(`/api/einsaetze/${einsatz.id}/uhs/${uhs.id}/plaetze/bulk`, {
+    typ: 'bett',
+    menge: 2,
+  });
   return `/einsaetze/${einsatz.id}/unfallhilfsstellen/${uhs.id}`;
 }
 
-test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolgenden Reitern', async ({ page }) => {
+test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolgenden Reitern', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const pfad = await aufbauen(page);
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
@@ -32,7 +38,13 @@ test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolge
     const antwort = await route.fetch();
     await route.fulfill({
       response: antwort,
-      json: { ...await antwort.json(), notiz: 'Zugang über den Seiteneingang. Anmeldung im Vorraum, Materialausgabe gegenüber. '.repeat(10) },
+      json: {
+        ...(await antwort.json()),
+        notiz:
+          'Zugang über den Seiteneingang. Anmeldung im Vorraum, Materialausgabe gegenüber. '.repeat(
+            10,
+          ),
+      },
     });
   });
   await page.goto(pfad);
@@ -41,7 +53,9 @@ test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolge
   // Die bisherige Mindest-Arbeitsfläche war 380px; sie ist kein Kopf-Abzug.
   expect((await grundriss.boundingBox())!.height).toBeGreaterThanOrEqual(380);
   const reihenfolge = await grundriss.evaluate((el) => {
-    const material = [...document.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent === 'Material')!;
+    const material = [...document.querySelectorAll('[role="tab"]')].find(
+      (tab) => tab.textContent === 'Material',
+    )!;
     return material.getBoundingClientRect().top - el.getBoundingClientRect().bottom;
   });
   expect(reihenfolge).toBeGreaterThanOrEqual(0);
@@ -65,13 +79,18 @@ async function grundrissMessen(page: Page) {
 
 async function fuelltArbeitsflaeche(page: Page) {
   await expect(page.getByTestId('grundriss-rahmen')).toBeVisible();
-  await expect.poll(async () => {
-    const m = await grundrissMessen(page);
-    // LFH-462: Bei 390 × 844 und Handschuh-Dichte bleiben nach dem Kopf weniger
-    // als 380px. Der bestehende Mindestboden verlangt dann Dokument-Scroll.
-    const unterkante = Math.max(m.fenster - m.polster, m.oben + 380);
-    return Math.abs(m.unten - unterkante);
-  }, { message: 'Grundriss füllt die Resthöhe und wahrt mindestens 380px Arbeitsfläche' }).toBeLessThanOrEqual(1);
+  await expect
+    .poll(
+      async () => {
+        const m = await grundrissMessen(page);
+        // LFH-462: Bei 390 × 844 und Handschuh-Dichte bleiben nach dem Kopf weniger
+        // als 380px. Der bestehende Mindestboden verlangt dann Dokument-Scroll.
+        const unterkante = Math.max(m.fenster - m.polster, m.oben + 380);
+        return Math.abs(m.unten - unterkante);
+      },
+      { message: 'Grundriss füllt die Resthöhe und wahrt mindestens 380px Arbeitsfläche' },
+    )
+    .toBeLessThanOrEqual(1);
   const m = await grundrissMessen(page);
   expect(m.hoehe).toBeGreaterThanOrEqual(380);
   if (m.fenster - m.polster - m.oben >= 380) {
@@ -86,7 +105,9 @@ for (const breite of [1366, 1024, 390]) {
     const browserFehler: string[] = [];
     page.on('pageerror', (fehler) => browserFehler.push(fehler.message));
     // Vite fängt Window-Fehler ab, bevor Playwright `pageerror` bekommt.
-    await page.addInitScript(() => window.addEventListener('error', (e) => console.error(`LFH-459: ${e.message}`)));
+    await page.addInitScript(() =>
+      window.addEventListener('error', (e) => console.error(`LFH-459: ${e.message}`)),
+    );
     page.on('console', (meldung) => {
       if (meldung.text().startsWith('LFH-459:')) browserFehler.push(meldung.text());
     });
@@ -98,7 +119,7 @@ for (const breite of [1366, 1024, 390]) {
       await page.goto(pfad);
       await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
       await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
-      messungen.push({ dichte, ...await fuelltArbeitsflaeche(page) });
+      messungen.push({ dichte, ...(await fuelltArbeitsflaeche(page)) });
     }
     expect(messungen[0].hoehe).toBeGreaterThan(messungen[2].hoehe);
     // Prüft auch die innere Tabs-Kette: eine passende Außenhöhe allein könnte
@@ -113,7 +134,10 @@ for (const breite of [1366, 1024, 390]) {
     await page.screenshot({ path: testInfo.outputPath(`handschuh-${breite}.png`) });
     // Die nachfolgenden Reiter bleiben im Dokumentfluss erreichbar.
     await page.getByRole('tab', { name: 'Bewegungen', exact: true }).click();
-    await expect(page.getByRole('tab', { name: 'Bewegungen', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Bewegungen', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     const bewegungen = page.getByText('Keine Bewegungen erfasst', { exact: true });
     await bewegungen.scrollIntoViewIfNeeded();
     await expect(bewegungen).toBeInViewport();
@@ -132,6 +156,9 @@ for (const breite of [1366, 1024, 390]) {
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
     await fuelltArbeitsflaeche(page);
     expect(browserFehler).toEqual([]);
-    await testInfo.attach('hoehen.json', { body: JSON.stringify(messungen, null, 2), contentType: 'application/json' });
+    await testInfo.attach('hoehen.json', {
+      body: JSON.stringify(messungen, null, 2),
+      contentType: 'application/json',
+    });
   });
 }

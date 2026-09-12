@@ -51,10 +51,22 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   });
 
   it('bildet die Cross-Modul-Fan-outs korrekt ab', () => {
-    expect(EINSATZ_STREAM_EVENTS.lage_zone).toEqual([EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete]);
-    expect(EINSATZ_STREAM_EVENTS.gefahr).toEqual([EINSATZ_KEYS.gefahrenmatrix, EINSATZ_KEYS.gefahrengebiete]);
-    expect(EINSATZ_STREAM_EVENTS.meldung).toEqual([EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen]);
-    expect(EINSATZ_STREAM_EVENTS.bereitstellungsraum).toEqual([EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail]);
+    expect(EINSATZ_STREAM_EVENTS.lage_zone).toEqual([
+      EINSATZ_KEYS.zonen,
+      EINSATZ_KEYS.gefahrengebiete,
+    ]);
+    expect(EINSATZ_STREAM_EVENTS.gefahr).toEqual([
+      EINSATZ_KEYS.gefahrenmatrix,
+      EINSATZ_KEYS.gefahrengebiete,
+    ]);
+    expect(EINSATZ_STREAM_EVENTS.meldung).toEqual([
+      EINSATZ_KEYS.meldungen,
+      EINSATZ_KEYS.lagemeldungen,
+    ]);
+    expect(EINSATZ_STREAM_EVENTS.bereitstellungsraum).toEqual([
+      EINSATZ_KEYS.br,
+      EINSATZ_KEYS.brDetail,
+    ]);
   });
 
   it('mappt jedes Wire-Event auf mindestens einen Key', () => {
@@ -124,12 +136,30 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.gefahrenmatrix(1, 7)).toEqual(['gefahrenmatrix', 1, 7]);
     expect(einsatzKeys.gefahrenmatrix(1, null)).toEqual(['gefahrenmatrix', 1, null]);
     expect(einsatzKeys.chatNachrichtenKanal(1, 5)).toEqual(['einsatz-chat-nachrichten', 1, 5]);
-    expect(einsatzKeys.chatNachrichtenKanal(1, null)).toEqual(['einsatz-chat-nachrichten', 1, null]);
+    expect(einsatzKeys.chatNachrichtenKanal(1, null)).toEqual([
+      'einsatz-chat-nachrichten',
+      1,
+      null,
+    ]);
     expect(einsatzKeys.meldungenListe(1, 'alle')).toEqual(['einsatz-meldungen', 1, 'alle']);
-    expect(einsatzKeys.meldungenListe(1, 'eingehend')).toEqual(['einsatz-meldungen', 1, 'eingehend']);
-    expect(einsatzKeys.auftraegeListe(1, 'alle', 'alle')).toEqual(['einsatz-auftraege', 1, 'alle', 'alle']);
+    expect(einsatzKeys.meldungenListe(1, 'eingehend')).toEqual([
+      'einsatz-meldungen',
+      1,
+      'eingehend',
+    ]);
+    expect(einsatzKeys.auftraegeListe(1, 'alle', 'alle')).toEqual([
+      'einsatz-auftraege',
+      1,
+      'alle',
+      'alle',
+    ]);
     expect(einsatzKeys.tiereHalter(1, 2)).toEqual(['einsatz-tiere', 1, 'halter', 2]);
-    expect(einsatzKeys.schaedenGeschaedigt(1, 2)).toEqual(['einsatz-schaeden', 1, 'geschaedigt', 2]);
+    expect(einsatzKeys.schaedenGeschaedigt(1, 2)).toEqual([
+      'einsatz-schaeden',
+      1,
+      'geschaedigt',
+      2,
+    ]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // Die gerundeten Koordinaten sind Teil des Keys — Cache-Trefferquote hängt daran.
     expect(einsatzKeys.ortVorschau(1, 52.123, 13.456, 'uhs:5')).toEqual([

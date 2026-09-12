@@ -10,12 +10,8 @@ let entsperreAlarmTon: typeof import('./alarmTon').entsperreAlarmTon;
 
 beforeEach(async () => {
   vi.resetModules();
-  ({
-    setzeAlarmMute,
-    spieleAlarmTon,
-    pruefeAlarmTonBereitschaft,
-    entsperreAlarmTon,
-  } = await import('./alarmTon'));
+  ({ setzeAlarmMute, spieleAlarmTon, pruefeAlarmTonBereitschaft, entsperreAlarmTon } =
+    await import('./alarmTon'));
 });
 
 /** Minimaler AudioContext-Mock: zählt, ob ein Oszillator erzeugt/gestartet wurde. */
@@ -28,10 +24,20 @@ function mockAudio(
   const gainSet = vi.fn();
   let status = startStatus;
   const ctx = {
-    get state() { return status; },
+    get state() {
+      return status;
+    },
     currentTime: 0,
-    resume: vi.fn(async () => { status = statusNachResume; }),
-    createOscillator: vi.fn(() => ({ type: '', frequency: { value: 0 }, connect: vi.fn(), start, stop })),
+    resume: vi.fn(async () => {
+      status = statusNachResume;
+    }),
+    createOscillator: vi.fn(() => ({
+      type: '',
+      frequency: { value: 0 },
+      connect: vi.fn(),
+      start,
+      stop,
+    })),
     createGain: vi.fn(() => ({ gain: { value: 0, setValueAtTime: gainSet }, connect: vi.fn() })),
   };
   // Seit Vitest 4 wirft `new` auf einem vi.fn() mit Arrow — daher reguläre Funktion.

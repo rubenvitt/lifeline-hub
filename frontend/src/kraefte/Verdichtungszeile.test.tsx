@@ -20,7 +20,10 @@ beforeEach(() => {
 function setup() {
   return renderMitProviders(
     <Routes>
-      <Route path="/einsaetze/:id/fahrzeuge" element={<Verdichtungszeile einsatzId={1} pfad={kraefteuebersichtPfad(1)} />} />
+      <Route
+        path="/einsaetze/:id/fahrzeuge"
+        element={<Verdichtungszeile einsatzId={1} pfad={kraefteuebersichtPfad(1)} />}
+      />
     </Routes>,
     { route: '/einsaetze/1/fahrzeuge' },
   );
@@ -90,7 +93,9 @@ describe('Verdichtungszeile', () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([
       { staerke_position: 'fuehrer', status_kategorie: 'gebunden' },
     ] as never);
-    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([{ status_kategorie: 'verfuegbar' }] as never);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { status_kategorie: 'verfuegbar' },
+    ] as never);
     const { client } = setup();
     expect(await screen.findByText('1/0/0//1')).toBeInTheDocument();
 

@@ -8,8 +8,9 @@ export const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
   festnetz: 'Festnetz',
 };
 
-export const KOMMUNIKATIONSMITTEL_OPTIONEN = Object.entries(KOMMUNIKATIONSMITTEL_LABEL)
-  .map(([value, label]) => ({ value, label }));
+export const KOMMUNIKATIONSMITTEL_OPTIONEN = Object.entries(KOMMUNIKATIONSMITTEL_LABEL).map(
+  ([value, label]) => ({ value, label }),
+);
 
 interface FunkErreichbarkeitProps {
   sprechgruppen?: Sprechgruppe[] | null;
@@ -25,7 +26,10 @@ interface FunkErreichbarkeitProps {
  * Einsatzabschnitt (LFH-86/107) und Einheit (LFH-108), damit die Anzeige an einer Stelle lebt.
  */
 export default function FunkErreichbarkeit({
-  sprechgruppen, kommunikationsmittel, erreichbarkeit, leerText,
+  sprechgruppen,
+  kommunikationsmittel,
+  erreichbarkeit,
+  leerText,
 }: FunkErreichbarkeitProps) {
   const tmo = (sprechgruppen ?? []).filter((s) => s.betriebsart === 'TMO');
   const dmo = (sprechgruppen ?? []).filter((s) => s.betriebsart === 'DMO');
@@ -38,8 +42,16 @@ export default function FunkErreichbarkeit({
   return (
     <div data-testid="funk-erreichbarkeit">
       <Space size={[4, 4]} wrap>
-        {tmo.map((s) => <Tag key={s.id} color="blue">TMO: {s.bezeichnung}</Tag>)}
-        {dmo.map((s) => <Tag key={s.id} color="geekblue">DMO: {s.bezeichnung}</Tag>)}
+        {tmo.map((s) => (
+          <Tag key={s.id} color="blue">
+            TMO: {s.bezeichnung}
+          </Tag>
+        ))}
+        {dmo.map((s) => (
+          <Tag key={s.id} color="geekblue">
+            DMO: {s.bezeichnung}
+          </Tag>
+        ))}
         {kommunikationsmittel && (
           <Tag>{KOMMUNIKATIONSMITTEL_LABEL[kommunikationsmittel] ?? kommunikationsmittel}</Tag>
         )}

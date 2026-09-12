@@ -749,16 +749,17 @@ export function SpaltenSchalter<T, K extends string>(props: {
         onClick: ({ key }) => umschalten(key as K),
         items: waehlbar.map((spalte) => ({
           key: spalte.key,
-          label: (
-            /*
-             * Das Kästchen ist ANZEIGE, kein zweiter Umschalter: mit eigenem `onChange` würde
-             * ein Mausklick darauf zusätzlich das `onClick` des Eintrags auslösen und die
-             * Umschaltung im selben Atemzug zurücknehmen.
-             */
-            <Checkbox checked={!aus.includes(spalte.key)}>
-              {etikettVon(spalte) ?? spalte.key}
-            </Checkbox>
-          ),
+          label:
+            (
+              /*
+               * Das Kästchen ist ANZEIGE, kein zweiter Umschalter: mit eigenem `onChange` würde
+               * ein Mausklick darauf zusätzlich das `onClick` des Eintrags auslösen und die
+               * Umschaltung im selben Atemzug zurücknehmen.
+               */
+              <Checkbox checked={!aus.includes(spalte.key)}>
+                {etikettVon(spalte) ?? spalte.key}
+              </Checkbox>
+            ),
         })),
       }}
     >
@@ -1098,7 +1099,10 @@ export default function Datensicht<T extends object, const K extends string>(
      * also nichts, worauf eine Referenz zeigen könnte. Der Preis ist eine Kopplung an
      * antds Klassennamen — sichtbar hier statt versteckt in einer Hilfsfunktion.
      */
-    if (ziel instanceof Node && (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')) {
+    if (
+      ziel instanceof Node &&
+      (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')
+    ) {
       return;
     }
     setSchleuse({ art: 'offen' });
@@ -1157,99 +1161,100 @@ export default function Datensicht<T extends object, const K extends string>(
   const gruppenZaehler = gruppen ? gruppiere(sichtbareZeilen, gruppen) : [];
   const gruppenKarten = gruppenAchse ? gruppiere(sichtbareZeilen, gruppenAchse) : [];
 
-  const werkzeugzeile = (
-    /**
-     * IMMER gerendert, auch leer. Eine Zeile, die erst beim Eintreffen neuer Daten
-     * erscheint, verschiebt Inhalt und arbeitet gegen ihr eigenes Ziel — die
-     * Sticky-Reserve-Lehre aus B1. Und sie liegt AUSSERHALB des Tabellenrahmens, weil
-     * `katalogtabelle-schmal.spec.ts` die Bildlaufbreite an dessen Wurzelknoten misst.
-     */
-    <div
-      ref={werkzeugWurzel}
-      data-lfh="datensicht-werkzeuge"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        gap: token.paddingSM,
-        marginBlockEnd: token.marginXS,
-        minHeight: token.controlHeight,
-      }}
-    >
-      {werkzeuge}
-      {suche != null && baum == null && (
-        // Bewusst ein nacktes `<input type="search">` statt `Input.Search`: der
-        // Tabellenzweig läuft durch `KatalogTabelle`, dessen `suche` hier NICHT gesetzt
-        // wird — zwei Felder nebeneinander wären die Folge. Höhe aus `controlHeight`,
-        // kein `size`-Prop, fluide Breite ohne feste Zahl.
-        <input
-          type="search"
-          aria-label={`Suche in ${bezeichnung}`}
-          placeholder={suche.platzhalter}
-          value={suchbegriff}
-          onChange={(e) => {
-            setSuchbegriff(e.target.value);
-            nachBenutzeraktion();
-          }}
-          style={{
-            height: token.controlHeight,
-            width: '100%',
-            maxWidth: 220,
-            paddingInline: token.paddingSM,
-            border: `1px solid ${token.colorBorder}`,
-            borderRadius: token.borderRadius,
-            background: token.colorBgContainer,
-            color: token.colorText,
-            fontSize: token.fontSize,
-          }}
-        />
-      )}
-      {baum == null &&
-        filterSpalten.map((spalte) => (
-          <Select
-            key={spalte.key}
-            mode="multiple"
-            allowClear
-            maxTagCount="responsive"
-            aria-label={etikettVon(spalte) ?? spalte.key}
-            placeholder={etikettVon(spalte) ?? spalte.key}
-            value={[...(filterWerte[spalte.key] ?? [])]}
-            onChange={(werte: string[]) => {
-              setFilterWerte((vorher) => ({ ...vorher, [spalte.key]: werte }));
+  const werkzeugzeile =
+    (
+      /**
+       * IMMER gerendert, auch leer. Eine Zeile, die erst beim Eintreffen neuer Daten
+       * erscheint, verschiebt Inhalt und arbeitet gegen ihr eigenes Ziel — die
+       * Sticky-Reserve-Lehre aus B1. Und sie liegt AUSSERHALB des Tabellenrahmens, weil
+       * `katalogtabelle-schmal.spec.ts` die Bildlaufbreite an dessen Wurzelknoten misst.
+       */
+      <div
+        ref={werkzeugWurzel}
+        data-lfh="datensicht-werkzeuge"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: token.paddingSM,
+          marginBlockEnd: token.marginXS,
+          minHeight: token.controlHeight,
+        }}
+      >
+        {werkzeuge}
+        {suche != null && baum == null && (
+          // Bewusst ein nacktes `<input type="search">` statt `Input.Search`: der
+          // Tabellenzweig läuft durch `KatalogTabelle`, dessen `suche` hier NICHT gesetzt
+          // wird — zwei Felder nebeneinander wären die Folge. Höhe aus `controlHeight`,
+          // kein `size`-Prop, fluide Breite ohne feste Zahl.
+          <input
+            type="search"
+            aria-label={`Suche in ${bezeichnung}`}
+            placeholder={suche.platzhalter}
+            value={suchbegriff}
+            onChange={(e) => {
+              setSuchbegriff(e.target.value);
               nachBenutzeraktion();
             }}
-            options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
-            style={{ minWidth: 160 }}
+            style={{
+              height: token.controlHeight,
+              width: '100%',
+              maxWidth: 220,
+              paddingInline: token.paddingSM,
+              border: `1px solid ${token.colorBorder}`,
+              borderRadius: token.borderRadius,
+              background: token.colorBgContainer,
+              color: token.colorText,
+              fontSize: token.fontSize,
+            }}
           />
-        ))}
-      {alsTabelle && (
-        <SpaltenSchalter
-          bezeichnung={bezeichnung}
-          spalten={spalten}
-          aus={aktiveSpaltenAus}
-          onAus={setzeSpaltenAus}
-          offen={spaltenOffen}
-          onOffen={setSpaltenOffen}
-        />
-      )}
-      {gruppenZaehler.length > 0 && alsTabelle && (
-        <Space size={token.paddingXS} wrap>
-          {gruppenZaehler.map((g) => (
-            <Typography.Text key={g.wert} type="secondary">
-              {g.etikett} · {g.zeilen.length}
-            </Typography.Text>
+        )}
+        {baum == null &&
+          filterSpalten.map((spalte) => (
+            <Select
+              key={spalte.key}
+              mode="multiple"
+              allowClear
+              maxTagCount="responsive"
+              aria-label={etikettVon(spalte) ?? spalte.key}
+              placeholder={etikettVon(spalte) ?? spalte.key}
+              value={[...(filterWerte[spalte.key] ?? [])]}
+              onChange={(werte: string[]) => {
+                setFilterWerte((vorher) => ({ ...vorher, [spalte.key]: werte }));
+                nachBenutzeraktion();
+              }}
+              options={spalte.filter!.werte.map((w) => ({ value: w.value, label: w.text }))}
+              style={{ minWidth: 160 }}
+            />
           ))}
-        </Space>
-      )}
-      {zufluessig > 0 && (
-        // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5, CLS ≤ 0,1). Kein
-        // `danger`: Rot ist Gefahr, nicht Bedienung.
-        <Button type="primary" onClick={nachBenutzeraktion}>
-          {zufluessig === 1 ? '1 neuer Eintrag' : `${zufluessig} neue Einträge`} — anzeigen
-        </Button>
-      )}
-    </div>
-  );
+        {alsTabelle && (
+          <SpaltenSchalter
+            bezeichnung={bezeichnung}
+            spalten={spalten}
+            aus={aktiveSpaltenAus}
+            onAus={setzeSpaltenAus}
+            offen={spaltenOffen}
+            onOffen={setSpaltenOffen}
+          />
+        )}
+        {gruppenZaehler.length > 0 && alsTabelle && (
+          <Space size={token.paddingXS} wrap>
+            {gruppenZaehler.map((g) => (
+              <Typography.Text key={g.wert} type="secondary">
+                {g.etikett} · {g.zeilen.length}
+              </Typography.Text>
+            ))}
+          </Space>
+        )}
+        {zufluessig > 0 && (
+          // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5, CLS ≤ 0,1). Kein
+          // `danger`: Rot ist Gefahr, nicht Bedienung.
+          <Button type="primary" onClick={nachBenutzeraktion}>
+            {zufluessig === 1 ? '1 neuer Eintrag' : `${zufluessig} neue Einträge`} — anzeigen
+          </Button>
+        )}
+      </div>
+    );
 
   // ── Tabellenzweig ─────────────────────────────────────────────────────────────────
   /**
@@ -1268,8 +1273,15 @@ export default function Datensicht<T extends object, const K extends string>(
   const antdSpalten = useMemo<KatalogSpalte<T>[]>(
     () =>
       gezeigteSpalten.map((spalte) => {
-        const { etikett, sortWert, suchText, filter, abBreite: _ab, immerSichtbar, ...antd } =
-          spalte;
+        const {
+          etikett,
+          sortWert,
+          suchText,
+          filter,
+          abBreite: _ab,
+          immerSichtbar,
+          ...antd
+        } = spalte;
         void etikett;
         void suchText;
         void filter;
@@ -1291,7 +1303,11 @@ export default function Datensicht<T extends object, const K extends string>(
           gebaut.render = (_wert, zeile, index) => (
             <Link
               to={ziel(zeile)}
-              style={{ display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                minHeight: token.controlHeight,
+              }}
             >
               {zelle(spalte, zeile, index)}
             </Link>
@@ -1440,7 +1456,14 @@ export default function Datensicht<T extends object, const K extends string>(
       >
         <ListenEintrag actions={knopf ? [knopf] : undefined}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: token.marginXS,
+                flexWrap: 'wrap',
+              }}
+            >
               {ziel != null ? (
                 // Das Tastaturziel der Zeile: ein echter Link mit Höhe aus `controlHeight`.
                 // `ListenEintrag` ist ein nacktes `<div onClick>` und für die
@@ -1526,7 +1549,9 @@ export default function Datensicht<T extends object, const K extends string>(
                 )
               }
             >
-              {offen ? `${kinder.length} Untereinträge verbergen` : `${kinder.length} Untereinträge`}
+              {offen
+                ? `${kinder.length} Untereinträge verbergen`
+                : `${kinder.length} Untereinträge`}
             </Button>
           </div>
         )}

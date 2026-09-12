@@ -1,0 +1,26 @@
+# LFH-354: Was Prettier NICHT anfassen darf.
+#
+# GENERIERTE ARTEFAKTE — und das ist gemessen, nicht vorsorglich. openapi.json und
+# types.generated.ts entstehen in scripts/check-typ-codegen.sh (Schritte 1 und 2) und werden
+# dort in Schritt 3 per `git diff --exit-code` gegen den Commit geprüft. Wären sie
+# prettier-formatiert committet, schriebe der Generator sie bei jedem Lauf wieder
+# unformatiert zurück: Schritt 3 des Typ-Gates wäre dauerhaft rot, während Schritt 1 des
+# Formatier-Gates das Gegenteil verlangte. Zwei Gates, die sich gegenseitig brechen — und
+# ein Gate, das grundlos rot ist, wird abgeschaltet statt befolgt.
+#
+# Im Sweep von LFH-354 hätte das 3 Dateien mit zusammen rund 8 700 geänderten Zeilen
+# betroffen (openapi.json, types.generated.ts, pnpm-lock.yaml).
+src/api/openapi.json
+src/api/types.generated.ts
+
+# pnpm schreibt das Lockfile selbst; jede Formatierung wäre beim nächsten `pnpm install`
+# wieder weg. Zusätzlich kopiert scripts/check-deps.sh es byte-genau in sein
+# Audit-Verzeichnis — eine Formatierung hier änderte, WAS dort geprüft wird.
+pnpm-lock.yaml
+
+# Build-, Test- und Werkzeugausgaben. Nichts davon ist Quelltext, alles davon entsteht neu.
+dist/
+coverage/
+playwright-report/
+test-results/
+.vitest-reports/

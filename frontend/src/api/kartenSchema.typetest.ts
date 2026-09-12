@@ -23,18 +23,28 @@ export type _BarrelErreichbar = Assert<S extends object ? true : false>;
 
 // Union-Anker (`#[schema(value_type = OnlineStyleTyp)]`): vorher `string`, danach
 // `'vektor' | 'raster'`. `'quatsch' extends string` = true → Assert<false> vor der Änderung.
-export type _FormatIstUnion = Assert<'quatsch' extends S['OfflineRegionConfig']['format'] ? false : true>;
+export type _FormatIstUnion = Assert<
+  'quatsch' extends S['OfflineRegionConfig']['format'] ? false : true
+>;
 export type _OfflineFormatIstUnion = Assert<
   'quatsch' extends NonNullable<S['KarteConfigAntwort']['offline_format']> ? false : true
 >;
-export type _OnlineQuelleTypIstUnion = Assert<'quatsch' extends S['OnlineQuelle']['typ'] ? false : true>;
+export type _OnlineQuelleTypIstUnion = Assert<
+  'quatsch' extends S['OnlineQuelle']['typ'] ? false : true
+>;
 export type _StatusIstUnion = Assert<'quatsch' extends S['OfflineKarte']['status'] ? false : true>;
 
 // GeoJSON-Anker (`#[schema(value_type = GeoJsonFeatureCollection)]`): vorher `unknown`
 // (jeder Typ extendet `unknown` → Assert<false>), danach die Anker-Struktur.
-export type _FeaturesNichtUnknown = Assert<unknown extends S['FachebeneAntwort']['features'] ? false : true>;
-export type _FcHatFeatures = Assert<'features' extends keyof S['GeoJsonFeatureCollection'] ? true : false>;
+export type _FeaturesNichtUnknown = Assert<
+  unknown extends S['FachebeneAntwort']['features'] ? false : true
+>;
+export type _FcHatFeatures = Assert<
+  'features' extends keyof S['GeoJsonFeatureCollection'] ? true : false
+>;
 
 // Pflicht-Anker (`#[schema(required)]`): `typ` wird trotz `#[serde(default)]` immer
 // serialisiert. Vorher `typ?: …` → `undefined extends` true → Assert<false>.
-export type _OnlineStyleTypPflicht = Assert<undefined extends S['OnlineStyle']['typ'] ? false : true>;
+export type _OnlineStyleTypPflicht = Assert<
+  undefined extends S['OnlineStyle']['typ'] ? false : true
+>;

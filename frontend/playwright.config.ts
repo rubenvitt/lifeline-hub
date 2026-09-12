@@ -76,11 +76,13 @@ try {
  */
 async function freiePorts(anzahl: number): Promise<number[]> {
   const server = await Promise.all(
-    Array.from({ length: anzahl }, () =>
-      new Promise<ReturnType<typeof createServer>>((fertig) => {
-        const s = createServer();
-        s.listen(0, '127.0.0.1', () => fertig(s));
-      }),
+    Array.from(
+      { length: anzahl },
+      () =>
+        new Promise<ReturnType<typeof createServer>>((fertig) => {
+          const s = createServer();
+          s.listen(0, '127.0.0.1', () => fertig(s));
+        }),
     ),
   );
   const ports = server.map((s) => (s.address() as { port: number }).port);

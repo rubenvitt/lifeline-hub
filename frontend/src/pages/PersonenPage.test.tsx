@@ -27,9 +27,16 @@ import {
 import { useOfflineSync } from '../offline/useOfflineSync';
 
 class FakeEventSource {
-  url: string; closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {} removeEventListener() {} close() { this.closed = true; }
+  url: string;
+  closed = false;
+  constructor(url: string) {
+    this.url = url;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+  close() {
+    this.closed = true;
+  }
 }
 
 class FakeBroadcastChannel {
@@ -77,27 +84,64 @@ afterEach(() => {
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
 const nutzer = {
-  id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-27 10:00:00',
+  id: 1,
+  anzeigename: 'Nutzer',
+  benutzername: 'nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-27 10:00:00',
 };
 const einsatzAktiv = {
-  id: 1, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+  id: 1,
+  bezeichnung: 'Hochwasser',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-27 08:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-05-27 08:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
   meine_rolle: 'einsatzleitung',
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 
 const person: Person = {
-  id: 10, einsatz_id: 1, registrier_nr: 1, status: 'erfasst',
-  name: 'Mustermann', vorname: 'Max', geschlecht: 'maennlich', geburtsdatum: null,
-  alter_geschaetzt: 40, herkunft_adresse: null, antreff_ort: 'Brücke', melder_kontakt: null,
-  notiz: null, erfasst_at: '2026-05-27 09:00:00', erfasst_von: 1,
-  geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1, storniert_at: null,
+  id: 10,
+  einsatz_id: 1,
+  registrier_nr: 1,
+  status: 'erfasst',
+  name: 'Mustermann',
+  vorname: 'Max',
+  geschlecht: 'maennlich',
+  geburtsdatum: null,
+  alter_geschaetzt: 40,
+  herkunft_adresse: null,
+  antreff_ort: 'Brücke',
+  melder_kontakt: null,
+  notiz: null,
+  erfasst_at: '2026-05-27 09:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-27 09:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
 };
-const unbekannt = { ...person, id: 11, registrier_nr: 2, name: null, vorname: null, status: 'vermisst' };
+const unbekannt = {
+  ...person,
+  id: 11,
+  registrier_nr: 2,
+  name: null,
+  vorname: null,
+  status: 'vermisst',
+};
 
 /**
  * Zeilenfolge der Registriernummern in Dokumentordnung.
@@ -118,7 +162,11 @@ function quittungSchliessenButton(): HTMLButtonElement | null {
   return document.querySelector<HTMLButtonElement>('.ant-alert-close-icon');
 }
 
-function render(einsatzObj: typeof einsatzAktiv, personen: unknown[], route = '/einsaetze/1/personen') {
+function render(
+  einsatzObj: typeof einsatzAktiv,
+  personen: unknown[],
+  route = '/einsaetze/1/personen',
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
@@ -153,7 +201,12 @@ function renderMitEinsatzNavigation(route = '/einsaetze/1/personen') {
       <Routes>
         <Route
           path="/einsaetze/:id/personen"
-          element={<><EinsatzNavigation /><PersonenPage /></>}
+          element={
+            <>
+              <EinsatzNavigation />
+              <PersonenPage />
+            </>
+          }
         />
       </Routes>
     </AuthProvider>,
@@ -196,12 +249,30 @@ describe('PersonenPage', () => {
      * Schritt 3 nennt den Schaden beim Namen — eine fremde Menge auf einen fremden
      * Begriff gefiltert.
      */
-    const mueller = { ...person, id: 60, registrier_nr: 11, status: 'vermisst' as const,
-      name: 'Müller', vorname: 'Anna' };
-    const krause = { ...person, id: 61, registrier_nr: 12, status: 'vermisst' as const,
-      name: 'Krause', vorname: 'Bernd' };
-    const schmidt = { ...person, id: 62, registrier_nr: 13, status: 'betroffen' as const,
-      name: 'Schmidt', vorname: 'Carla' };
+    const mueller = {
+      ...person,
+      id: 60,
+      registrier_nr: 11,
+      status: 'vermisst' as const,
+      name: 'Müller',
+      vorname: 'Anna',
+    };
+    const krause = {
+      ...person,
+      id: 61,
+      registrier_nr: 12,
+      status: 'vermisst' as const,
+      name: 'Krause',
+      vorname: 'Bernd',
+    };
+    const schmidt = {
+      ...person,
+      id: 62,
+      registrier_nr: 13,
+      status: 'betroffen' as const,
+      name: 'Schmidt',
+      vorname: 'Carla',
+    };
     render(einsatzAktiv, [mueller, krause, schmidt]);
     await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
     expect(await screen.findByText('Krause, Bernd')).toBeInTheDocument();
@@ -248,7 +319,7 @@ describe('PersonenPage', () => {
     };
     server.use(
       http.post('/api/einsaetze/1/personen', async ({ request }) => {
-        const body = await request.json() as { status?: string; client_id?: string };
+        const body = (await request.json()) as { status?: string; client_id?: string };
         expect(body.status).toBe('vermisst');
         expect(body.client_id).toBeTruthy();
         return HttpResponse.json(vermisst, { status: 201 });
@@ -303,7 +374,8 @@ describe('PersonenPage', () => {
     // stünde — etwa ein „undefined" aus einem fehlenden Nachschlag.
     server.use(
       http.post('/api/einsaetze/1/personen', () =>
-        HttpResponse.json({ ...person, id: 49, registrier_nr: 49 }, { status: 201 })),
+        HttpResponse.json({ ...person, id: 49, registrier_nr: 49 }, { status: 201 }),
+      ),
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
@@ -331,10 +403,18 @@ describe('PersonenPage', () => {
     let ersterAbrufFreigeben!: () => void;
     let zweiterAbrufGestartet!: () => void;
     let zweiterAbrufFreigeben!: () => void;
-    const ersterStart = new Promise<void>((resolve) => { ersterAbrufGestartet = resolve; });
-    const ersterGate = new Promise<void>((resolve) => { ersterAbrufFreigeben = resolve; });
-    const zweiterStart = new Promise<void>((resolve) => { zweiterAbrufGestartet = resolve; });
-    const zweiterGate = new Promise<void>((resolve) => { zweiterAbrufFreigeben = resolve; });
+    const ersterStart = new Promise<void>((resolve) => {
+      ersterAbrufGestartet = resolve;
+    });
+    const ersterGate = new Promise<void>((resolve) => {
+      ersterAbrufFreigeben = resolve;
+    });
+    const zweiterStart = new Promise<void>((resolve) => {
+      zweiterAbrufGestartet = resolve;
+    });
+    const zweiterGate = new Promise<void>((resolve) => {
+      zweiterAbrufFreigeben = resolve;
+    });
     let abrufe = 0;
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
@@ -369,11 +449,17 @@ describe('PersonenPage', () => {
 
     expect(await screen.findByText('R-047')).toBeInTheDocument();
     expect(client.getQueryData(einsatzKeys.personen(1))).toBeUndefined();
-    await act(async () => { ersterAbrufFreigeben(); });
+    await act(async () => {
+      ersterAbrufFreigeben();
+    });
     expect(client.getQueryData(einsatzKeys.personen(1))).toBeUndefined();
 
-    await act(async () => { zweiterAbrufFreigeben(); });
-    await vi.waitFor(() => expect(client.getQueryData(einsatzKeys.personen(1))).toEqual([alt, neu]));
+    await act(async () => {
+      zweiterAbrufFreigeben();
+    });
+    await vi.waitFor(() =>
+      expect(client.getQueryData(einsatzKeys.personen(1))).toEqual([alt, neu]),
+    );
     expect(await screen.findByText('R-046')).toBeInTheDocument();
     expect(screen.getByText('R-047')).toBeInTheDocument();
   });
@@ -398,8 +484,12 @@ describe('PersonenPage', () => {
     };
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
-    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
-    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const postStart = new Promise<void>((resolve) => {
+      postGestartet = resolve;
+    });
+    const antwortGate = new Promise<void>((resolve) => {
+      antwortFreigeben = resolve;
+    });
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
@@ -407,7 +497,8 @@ describe('PersonenPage', () => {
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
       http.get('/api/einsaetze/:einsatzId/personen', ({ params }) =>
-        HttpResponse.json(params.einsatzId === '2' ? [personB] : [])),
+        HttpResponse.json(params.einsatzId === '2' ? [personB] : []),
+      ),
       http.post('/api/einsaetze/1/personen', async () => {
         postGestartet();
         await antwortGate;
@@ -425,7 +516,9 @@ describe('PersonenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('Schnellerfassung');
 
-    await act(async () => { antwortFreigeben(); });
+    await act(async () => {
+      antwortFreigeben();
+    });
     await vi.waitFor(() => expect(screen.queryByText('Erfasst als R-077')).not.toBeInTheDocument());
     expect(screen.getByText('Person B')).toBeInTheDocument();
     expect(screen.queryByText('Person A')).not.toBeInTheDocument();
@@ -453,15 +546,17 @@ describe('PersonenPage', () => {
     if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
     await act(async () => {
       client.setQueryData(einsatzKeys.personen(1), [vermisst]);
-      window.dispatchEvent(new CustomEvent(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, {
-        detail: {
-          art: 'person',
-          benutzerId: 1,
-          einsatzId: 1,
-          clientId: vorgemerkt.aktion.daten.client_id,
-          daten: vermisst,
-        },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, {
+          detail: {
+            art: 'person',
+            benutzerId: 1,
+            einsatzId: 1,
+            clientId: vorgemerkt.aktion.daten.client_id,
+            daten: vermisst,
+          },
+        }),
+      );
     });
 
     expect(await screen.findByText('Erfasst als R-048')).toBeInTheDocument();
@@ -481,7 +576,7 @@ describe('PersonenPage', () => {
     const post = vi.fn();
     server.use(
       http.post('/api/einsaetze/1/personen', async ({ request }) => {
-        const body = await request.json() as { client_id?: string; status?: string };
+        const body = (await request.json()) as { client_id?: string; status?: string };
         post(body);
         return HttpResponse.json(vermisst, { status: 201 });
       }),
@@ -498,9 +593,11 @@ describe('PersonenPage', () => {
     const globalerSync = renderMitProviders(<OfflineSyncTest benutzerId={nutzer.id} />);
     await vi.waitFor(() => expect(post).toHaveBeenCalledOnce());
     await vi.waitFor(async () =>
-      expect(await queueZaehlerLaden(nutzer.id, 1)).toMatchObject({ ausstehend: 0 }));
+      expect(await queueZaehlerLaden(nutzer.id, 1)).toMatchObject({ ausstehend: 0 }),
+    );
     await vi.waitFor(async () =>
-      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1));
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1),
+    );
     expect(await personErfassungsQuittungenLaden(2, 1)).toHaveLength(0);
     expect(await personErfassungsQuittungenLaden(nutzer.id, 2)).toHaveLength(0);
     globalerSync.unmount();
@@ -508,8 +605,7 @@ describe('PersonenPage', () => {
     const zweiteSeite = render(einsatzAktiv, [vermisst]);
     expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
-    expect((await screen.findByText('R-049')).closest('tr'))
-      .toHaveClass('zeile-hervorgehoben');
+    expect((await screen.findByText('R-049')).closest('tr')).toHaveClass('zeile-hervorgehoben');
     // Render allein ist kein globaler Ack: ein anderer sichtbarer Tab muss das
     // Receipt nach seinem datenarmen Signal noch aus IDB lesen können.
     expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
@@ -517,7 +613,8 @@ describe('PersonenPage', () => {
     if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
     await userEvent.click(schliessen);
     await vi.waitFor(async () =>
-      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0));
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0),
+    );
     zweiteSeite.unmount();
 
     render(einsatzAktiv, [vermisst]);
@@ -570,35 +667,43 @@ describe('PersonenPage', () => {
       daten: { name: 'Aus anderem Tab', status: 'vermisst', client_id: 'cross-tab-50' },
     });
     const [pending] = await schreibaktionenLaden(nutzer.id, 1);
-    expect(await schreibaktionPersonAbschliessen(nutzer.id, pending, crossTabPerson))
-      .not.toBeNull();
+    expect(
+      await schreibaktionPersonAbschliessen(nutzer.id, pending, crossTabPerson),
+    ).not.toBeNull();
 
     const kanal = FakeBroadcastChannel.instanzen[0];
     await act(async () => {
       kanal.sendeAusAnderemTab({
-        typ: 'person-erfassungsquittung', benutzerId: 2, einsatzId: 1,
+        typ: 'person-erfassungsquittung',
+        benutzerId: 2,
+        einsatzId: 1,
       });
       kanal.sendeAusAnderemTab({
-        typ: 'person-erfassungsquittung', benutzerId: nutzer.id, einsatzId: 2,
+        typ: 'person-erfassungsquittung',
+        benutzerId: nutzer.id,
+        einsatzId: 2,
       });
     });
     expect(screen.queryByText('Erfasst als R-050')).not.toBeInTheDocument();
 
     await act(async () => {
       kanal.sendeAusAnderemTab({
-        typ: 'person-erfassungsquittung', benutzerId: nutzer.id, einsatzId: 1,
+        typ: 'person-erfassungsquittung',
+        benutzerId: nutzer.id,
+        einsatzId: 1,
       });
     });
     expect(await screen.findByText('Erfasst als R-050')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
-    expect((await screen.findByText('R-050')).closest('tr'))
-      .toHaveClass('zeile-hervorgehoben');
+    expect((await screen.findByText('R-050')).closest('tr')).toHaveClass('zeile-hervorgehoben');
 
     // Wiederholtes Signal und konkurrierender Re-Read bleiben idempotent; erst
     // das explizite Schließen ist der persistente Ack.
     await act(async () => {
       kanal.sendeAusAnderemTab({
-        typ: 'person-erfassungsquittung', benutzerId: nutzer.id, einsatzId: 1,
+        typ: 'person-erfassungsquittung',
+        benutzerId: nutzer.id,
+        einsatzId: 1,
       });
     });
     expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
@@ -607,7 +712,8 @@ describe('PersonenPage', () => {
     if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
     await userEvent.click(schliessen);
     await vi.waitFor(async () =>
-      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0));
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0),
+    );
   });
 
   it('behält das Receipt im Hintergrund und lädt/quittiert es erst nach visible erneut', async () => {
@@ -639,7 +745,9 @@ describe('PersonenPage', () => {
       configurable: true,
       value: 'visible',
     });
-    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
     await vi.waitFor(() => expect(quittungSchliessenButton()).toBeInTheDocument());
     const schliessen = quittungSchliessenButton();
     if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
@@ -647,7 +755,8 @@ describe('PersonenPage', () => {
     expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
     await userEvent.click(schliessen);
     await vi.waitFor(async () =>
-      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0));
+      expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0),
+    );
   });
 
   it('ordnet auch einen Offline-Abschluss nach dem Routewechsel ausschließlich Einsatz A zu', async () => {
@@ -676,7 +785,8 @@ describe('PersonenPage', () => {
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
       http.get('/api/einsaetze/:einsatzId/personen', ({ params }) =>
-        HttpResponse.json(params.einsatzId === '2' ? [personB] : [])),
+        HttpResponse.json(params.einsatzId === '2' ? [personB] : []),
+      ),
     );
     const { container } = renderMitEinsatzNavigation();
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
@@ -689,15 +799,17 @@ describe('PersonenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     expect(await screen.findByText('Person B')).toBeInTheDocument();
     await act(async () => {
-      window.dispatchEvent(new CustomEvent(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, {
-        detail: {
-          art: 'person',
-          benutzerId: 1,
-          einsatzId: 1,
-          clientId: vorgemerkt.aktion.daten.client_id,
-          daten: personA,
-        },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, {
+          detail: {
+            art: 'person',
+            benutzerId: 1,
+            einsatzId: 1,
+            clientId: vorgemerkt.aktion.daten.client_id,
+            daten: personA,
+          },
+        }),
+      );
     });
 
     expect(screen.queryByText('Erfasst als R-078')).not.toBeInTheDocument();
@@ -726,8 +838,14 @@ describe('PersonenPage', () => {
   });
 
   it('zeigt SK-Badge und Lagebild-Zählungen', async () => {
-    const gesichtet = { ...person, id: 12, registrier_nr: 3, status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
+    const gesichtet = {
+      ...person,
+      id: 12,
+      registrier_nr: 3,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:30:00',
+    };
     render(einsatzAktiv, [person, unbekannt, gesichtet]);
     // Liste-Sicht „Alle" wählen, dann nach SK-Tag suchen
     await screen.findByText('R-001');
@@ -739,12 +857,30 @@ describe('PersonenPage', () => {
   });
 
   it('Patienten-Tab gruppiert SK I–IV + tot in Abschnitte, ohne unverletzt/ungesichtet', async () => {
-    const sk2 = { ...person, id: 12, registrier_nr: 3, status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
-    const totVerstorben = { ...person, id: 13, registrier_nr: 4, status: 'verstorben' as const,
-      aktuelle_sichtung: 'tot' as const, aktuelle_sichtung_at: '2026-05-27 09:40:00' };
-    const unverletzt = { ...person, id: 14, registrier_nr: 5, status: 'betroffen' as const,
-      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 09:50:00' };
+    const sk2 = {
+      ...person,
+      id: 12,
+      registrier_nr: 3,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:30:00',
+    };
+    const totVerstorben = {
+      ...person,
+      id: 13,
+      registrier_nr: 4,
+      status: 'verstorben' as const,
+      aktuelle_sichtung: 'tot' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:40:00',
+    };
+    const unverletzt = {
+      ...person,
+      id: 14,
+      registrier_nr: 5,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'unverletzt' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:50:00',
+    };
     render(einsatzAktiv, [person, sk2, totVerstorben, unverletzt]);
     await screen.findByText('R-001'); // ungesichtete Person im „Neu"-Tab
     await userEvent.click(screen.getByRole('tab', { name: 'Patienten' }));
@@ -773,12 +909,30 @@ describe('PersonenPage', () => {
   });
 
   it('Lagebild-Streifen zeigt „Patienten: N" (SK I–IV + tot)', async () => {
-    const sk2 = { ...person, id: 12, registrier_nr: 3, status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
-    const tot = { ...person, id: 13, registrier_nr: 4, status: 'verstorben' as const,
-      aktuelle_sichtung: 'tot' as const, aktuelle_sichtung_at: '2026-05-27 09:40:00' };
-    const unverletzt = { ...person, id: 14, registrier_nr: 5, status: 'betroffen' as const,
-      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 09:50:00' };
+    const sk2 = {
+      ...person,
+      id: 12,
+      registrier_nr: 3,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:30:00',
+    };
+    const tot = {
+      ...person,
+      id: 13,
+      registrier_nr: 4,
+      status: 'verstorben' as const,
+      aktuelle_sichtung: 'tot' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:40:00',
+    };
+    const unverletzt = {
+      ...person,
+      id: 14,
+      registrier_nr: 5,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'unverletzt' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:50:00',
+    };
     render(einsatzAktiv, [person, sk2, tot, unverletzt]);
     await screen.findByText('R-001');
     // Patienten = sk2 + tot = 2 (unverletzt + ungesichtet zählen nicht):
@@ -822,10 +976,22 @@ describe('PersonenPage', () => {
      * Zeitstempel ist eine Attrappe — diese beiden Personen tragen deshalb VERSCHIEDENE
      * Sichtungszeitpunkte, und die spätere wird zuerst geliefert.
      */
-    const spaet = { ...person, id: 40, registrier_nr: 8, status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:40:00' };
-    const frueh = { ...person, id: 41, registrier_nr: 9, status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:10:00' };
+    const spaet = {
+      ...person,
+      id: 40,
+      registrier_nr: 8,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:40:00',
+    };
+    const frueh = {
+      ...person,
+      id: 41,
+      registrier_nr: 9,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:10:00',
+    };
     render(einsatzAktiv, [spaet, frueh]);
     // Auf den REITER warten, nicht auf eine Zeile: beide Personen sind `betroffen` und
     // damit im Vorgabe-Reiter „Neu" unsichtbar.
@@ -847,10 +1013,22 @@ describe('PersonenPage', () => {
   });
 
   it('gibt nur BELEGTEN SK-Gruppen einen Zähler', async () => {
-    const sk2 = { ...person, id: 50, registrier_nr: 3, status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
-    const tot = { ...person, id: 51, registrier_nr: 4, status: 'verstorben' as const,
-      aktuelle_sichtung: 'tot' as const, aktuelle_sichtung_at: '2026-05-27 09:40:00' };
+    const sk2 = {
+      ...person,
+      id: 50,
+      registrier_nr: 3,
+      status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:30:00',
+    };
+    const tot = {
+      ...person,
+      id: 51,
+      registrier_nr: 4,
+      status: 'verstorben' as const,
+      aktuelle_sichtung: 'tot' as const,
+      aktuelle_sichtung_at: '2026-05-27 09:40:00',
+    };
     render(einsatzAktiv, [sk2, tot]);
     // Reiter statt Zeile abwarten: beide Personen sind im Vorgabe-Reiter „Neu" unsichtbar.
     await userEvent.click(await screen.findByRole('tab', { name: 'Patienten' }));

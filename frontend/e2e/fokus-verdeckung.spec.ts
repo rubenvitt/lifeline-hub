@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { detailBereit, einheitMitZuordnungen, kopfFelder, zuordnungsKarte } from './einheit-fixture';
+import {
+  detailBereit,
+  einheitMitZuordnungen,
+  kopfFelder,
+  zuordnungsKarte,
+} from './einheit-fixture';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 
 /**
@@ -144,7 +149,10 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
    * Untergrenze bleibt trotzdem erfüllt (Seitengröße 50 ≥ 9).
    */
   const zeilenzahl = await page.locator('tr.ant-table-row').count();
-  expect(zeilenzahl, 'Vorbedingung: mindestens 8 gesäte Zeilen + Harness-Admin').toBeGreaterThanOrEqual(9);
+  expect(
+    zeilenzahl,
+    'Vorbedingung: mindestens 8 gesäte Zeilen + Harness-Admin',
+  ).toBeGreaterThanOrEqual(9);
 
   // ── VORBEDINGUNGEN. Ohne sie ist „0 verdeckte Ziele" trivial wahr.
   const kopf = page.locator('.ant-table-sticky-holder');
@@ -328,18 +336,29 @@ async function einheitFokusBereit(page: Page, dichte: string) {
   for (const name of ['Speichern', 'Auflösen']) {
     ziele.push({ name, fokus: page.getByRole('main').getByRole('button', { name, exact: true }) });
   }
-  ziele.push({ name: 'neue Sprechgruppe anlegen', fokus: page.getByRole('main').getByRole('button', { name: /neue Sprechgruppe anlegen$/ }) });
+  ziele.push({
+    name: 'neue Sprechgruppe anlegen',
+    fokus: page.getByRole('main').getByRole('button', { name: /neue Sprechgruppe anlegen$/ }),
+  });
   for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
     const karte = zuordnungsKarte(page, titel);
-    ziele.push({ name: `${titel} entfernen`, fokus: karte.getByRole('button', { name: 'Entfernen', exact: true }) });
+    ziele.push({
+      name: `${titel} entfernen`,
+      fokus: karte.getByRole('button', { name: 'Entfernen', exact: true }),
+    });
     ziele.push({ name: `${titel} zuordnen`, fokus: karte.getByRole('combobox') });
   }
-  ziele.push({ name: 'Als Einheitsführer', fokus: zuordnungsKarte(page, 'Personal').getByRole('button', { name: 'Als Einheitsführer' }) });
+  ziele.push({
+    name: 'Als Einheitsführer',
+    fokus: zuordnungsKarte(page, 'Personal').getByRole('button', { name: 'Als Einheitsführer' }),
+  });
   for (const { name, fokus } of ziele) {
     await expect(fokus, name).toHaveCount(1);
     await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
   }
-  const leiste = page.getByRole('button', { name: 'Speichern', exact: true }).locator('xpath=ancestor::div[@style][contains(@style,"sticky")][1]');
+  const leiste = page
+    .getByRole('button', { name: 'Speichern', exact: true })
+    .locator('xpath=ancestor::div[@style][contains(@style,"sticky")][1]');
   await expect(leiste).toHaveCount(1);
   await expect(leiste).toHaveCSS('position', 'sticky');
   await leiste.evaluate((el) => el.classList.add('e2e-einheit-leiste'));
@@ -348,9 +367,14 @@ async function einheitFokusBereit(page: Page, dichte: string) {
   return { ziele: ziele.map(({ name }) => name), leiste };
 }
 
-for (const viewport of [{ width: 1366, height: 520 }, { width: 390, height: 420 }]) {
+for (const viewport of [
+  { width: 1366, height: 520 },
+  { width: 390, height: 420 },
+]) {
   for (const dichte of ['kompakt', 'handschuh']) {
-    test(`Einheit: alle Formular- und Zuordnungsziele frei bei ${viewport.width}px, ${dichte}`, async ({ page }) => {
+    test(`Einheit: alle Formular- und Zuordnungsziele frei bei ${viewport.width}px, ${dichte}`, async ({
+      page,
+    }) => {
       test.setTimeout(90_000);
       await page.setViewportSize(viewport);
       const { ziele, leiste } = await einheitFokusBereit(page, dichte);
@@ -360,10 +384,16 @@ for (const viewport of [{ width: 1366, height: 520 }, { width: 390, height: 420 
       await expect(leiste).toBeInViewport();
       await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
       const befund = await pruefeFokusVerdeckung(page, 60);
-      expect(befund.besuchteZiele.sort(), 'Jedes benannte Feld, jede Leisten- und Zuordnungsaktion muss per Tab besucht werden').toEqual(ziele.sort());
+      expect(
+        befund.besuchteZiele.sort(),
+        'Jedes benannte Feld, jede Leisten- und Zuordnungsaktion muss per Tab besucht werden',
+      ).toEqual(ziele.sort());
       expect(befund.fixierteKandidaten).toBeGreaterThan(0);
       expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
-      test.info().annotations.push({ type: 'messwert', description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen` });
+      test.info().annotations.push({
+        type: 'messwert',
+        description: `${viewport.width}px ${dichte}: ${befund.besuchteZiele.length} verschiedene Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,
+      });
     });
   }
 }
@@ -381,37 +411,69 @@ for (const { dichte, boden, abstand } of [
     await bezeichnung.fill('Messgruppe');
     await betriebsart.click();
     // AntD virtualisiert role=option in einen unsichtbaren ARIA-Hilfsknoten.
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^TMO$/ }).click();
+    await page
+      .locator('.ant-select-dropdown:visible .ant-select-item-option-content')
+      .filter({ hasText: /^TMO$/ })
+      .click();
     const ergaenzt = [
       { name: 'Neue Bezeichnung', fokus: bezeichnung, huelle: bezeichnung },
-      { name: 'Neue Betriebsart', fokus: betriebsart, huelle: page.locator('.ant-select').filter({ has: betriebsart }) },
-      ...['Anlegen', 'Abbrechen'].map((name) => ({ name, fokus: page.getByRole('button', { name, exact: true }), huelle: page.getByRole('button', { name, exact: true }) })),
+      {
+        name: 'Neue Betriebsart',
+        fokus: betriebsart,
+        huelle: page.locator('.ant-select').filter({ has: betriebsart }),
+      },
+      ...['Anlegen', 'Abbrechen'].map((name) => ({
+        name,
+        fokus: page.getByRole('button', { name, exact: true }),
+        huelle: page.getByRole('button', { name, exact: true }),
+      })),
     ];
     await expect(ergaenzt[2].fokus).toBeEnabled();
     const kaesten = [];
     for (const { name, fokus, huelle } of ergaenzt) {
       await fokus.evaluate((el, wert) => el.setAttribute('data-e2e-fokus', wert), name);
       const kasten = (await huelle.boundingBox())!;
-      expect(Math.min(kasten.width, kasten.height), `${name}, ${dichte}`).toBeGreaterThanOrEqual(boden - 0.5);
+      expect(Math.min(kasten.width, kasten.height), `${name}, ${dichte}`).toBeGreaterThanOrEqual(
+        boden - 0.5,
+      );
       kaesten.push(kasten);
     }
     for (let i = 1; i < kaesten.length; i++) {
       const a = kaesten[i - 1];
       const b = kaesten[i];
-      expect(Math.max(b.x - a.x - a.width, b.y - a.y - a.height), `Feldabstand ${dichte}, Paar ${i}`).toBeGreaterThanOrEqual(abstand - 0.5);
+      expect(
+        Math.max(b.x - a.x - a.width, b.y - a.y - a.height),
+        `Feldabstand ${dichte}, Paar ${i}`,
+      ).toBeGreaterThanOrEqual(abstand - 0.5);
     }
-    const breite = await page.evaluate(() => ({ inhalt: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
-    expect(breite.inhalt, `Kein horizontaler Überlauf bei geöffneter Schnellerfassung ${dichte}`).toBeLessThanOrEqual(breite.viewport);
+    const breite = await page.evaluate(() => ({
+      inhalt: document.documentElement.scrollWidth,
+      viewport: document.documentElement.clientWidth,
+    }));
+    expect(
+      breite.inhalt,
+      `Kein horizontaler Überlauf bei geöffneter Schnellerfassung ${dichte}`,
+    ).toBeLessThanOrEqual(breite.viewport);
     await page.getByRole('main').getByRole('link', { name: 'Einheiten', exact: true }).focus();
     const befund = await pruefeFokusVerdeckung(page, 60);
-    expect(befund.besuchteZiele.sort()).toEqual([...ziele.filter((name) => name !== 'neue Sprechgruppe anlegen'), ...ergaenzt.map(({ name }) => name)].sort());
+    expect(befund.besuchteZiele.sort()).toEqual(
+      [
+        ...ziele.filter((name) => name !== 'neue Sprechgruppe anlegen'),
+        ...ergaenzt.map(({ name }) => name),
+      ].sort(),
+    );
     expect(befund.fixierteKandidaten).toBeGreaterThan(0);
     expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
-    test.info().annotations.push({ type: 'messwert', description: `390px ${dichte}, Sprechgruppen offen: ${befund.besuchteZiele.length} Routenziele, ${befund.verdeckt.length} Verdeckungen, 4 Ziele ≥${boden}px, Abstände ≥${abstand}px, kein horizontaler Überlauf` });
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `390px ${dichte}, Sprechgruppen offen: ${befund.besuchteZiele.length} Routenziele, ${befund.verdeckt.length} Verdeckungen, 4 Ziele ≥${boden}px, Abstände ≥${abstand}px, kein horizontaler Überlauf`,
+    });
   });
 }
 
-test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste wird erkannt', async ({ page }) => {
+test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste wird erkannt', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1366, height: 520 });
   const { leiste } = await einheitFokusBereit(page, 'handschuh');
   await page.getByLabel('Name', { exact: true }).focus();
@@ -422,7 +484,14 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste
     probe.id = 'e2e-leistenprobe';
     probe.textContent = 'Leistenprobe';
     probe.setAttribute('data-e2e-fokus', 'Leistenprobe');
-    Object.assign(probe.style, { position: 'fixed', left: `${r.left + 10}px`, top: `${r.top + 10}px`, width: '40px', height: '20px', zIndex: '0' });
+    Object.assign(probe.style, {
+      position: 'fixed',
+      left: `${r.left + 10}px`,
+      top: `${r.top + 10}px`,
+      width: '40px',
+      height: '20px',
+      zIndex: '0',
+    });
     // Geschwister, kein Kind der Leiste: Vorfahren des Fokusziels sind keine Verdecker.
     el.before(probe);
     const start = document.createElement('button');
@@ -436,7 +505,9 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste
   expect(verdeckt.verdeckt).toHaveLength(1);
   expect(verdeckt.verdeckt[0]).toContain('e2e-einheit-leiste');
   // Gegenprobe am selben Ziel: die Geometrie außerhalb der Leiste muss frei sein.
-  await page.locator('#e2e-leistenprobe').evaluate((el) => { el.style.top = '100px'; });
+  await page.locator('#e2e-leistenprobe').evaluate((el) => {
+    el.style.top = '100px';
+  });
   await page.locator('#e2e-probenstart').focus();
   expect((await pruefeFokusVerdeckung(page, 1)).verdeckt).toEqual([]);
 });

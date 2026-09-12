@@ -73,7 +73,10 @@ function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
 function Huelle({
   speichern = () => Promise.resolve(),
   istEntwurf,
-}: { speichern?: (w: Daten) => Promise<unknown>; istEntwurf?: boolean }) {
+}: {
+  speichern?: (w: Daten) => Promise<unknown>;
+  istEntwurf?: boolean;
+}) {
   const [daten, setDaten] = useState<Daten>({ titel: 'Server 1' });
   return (
     <>
@@ -133,14 +136,21 @@ describe('useEntwurfVerlustschutz', () => {
     // Das Verlustfenster im Verlustschutz (Review LFH-348): der PATCH trägt S1, im Formular
     // steht S2 — eine Quittung für S1 darf nicht „alles gespeichert" bedeuten.
     let aufloesen: () => void = () => {};
-    const speichern = vi.fn(() => new Promise<void>((r) => { aufloesen = r; }));
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloesen = r;
+        }),
+    );
     render(<Huelle speichern={speichern} />);
     const feld = screen.getByLabelText('Titel');
     await userEvent.type(feld, 'a');
     await userEvent.tab(); // Autosave startet, Promise hängt
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
     await userEvent.type(feld, 'b'); // S2 entsteht, während S1 unterwegs ist
-    await act(async () => { aufloesen(); });
+    await act(async () => {
+      aufloesen();
+    });
     expect(screen.getByText('offen')).toBeInTheDocument();
     // Der Zeitstempel sagt trotzdem, dass ETWAS gesichert wurde.
     expect(screen.getByText(/zuletzt gespeichert/)).toBeInTheDocument();
@@ -159,9 +169,7 @@ describe('useEntwurfVerlustschutz', () => {
 
   it('räumt den Speicherfehler beim nächsten GELUNGENEN Speichern (Gegenaussage)', async () => {
     // Ein Fehlerzustand, der nie fällt, wäre so falsch wie einer, der zu früh geht.
-    const speichern = vi.fn()
-      .mockRejectedValueOnce(new Error('503'))
-      .mockResolvedValue(undefined);
+    const speichern = vi.fn().mockRejectedValueOnce(new Error('503')).mockResolvedValue(undefined);
     render(<Huelle speichern={speichern} />);
     const feld = screen.getByLabelText('Titel');
     await userEvent.type(feld, 'a');
@@ -181,9 +189,15 @@ describe('useEntwurfVerlustschutz', () => {
     // räumen liesse den Alert bei stehendem 503 im Takt verschwinden und wiederkommen
     // („Kein Blinken auf lesbarem Text", CLAUDE.md).
     let haengenAufloesen: () => void = () => {};
-    const speichern = vi.fn()
+    const speichern = vi
+      .fn()
       .mockRejectedValueOnce(new Error('503'))
-      .mockImplementationOnce(() => new Promise<void>((r) => { haengenAufloesen = r; }));
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((r) => {
+            haengenAufloesen = r;
+          }),
+      );
     render(<Huelle speichern={speichern} />);
     const feld = screen.getByLabelText('Titel');
     await userEvent.type(feld, 'a');
@@ -196,7 +210,9 @@ describe('useEntwurfVerlustschutz', () => {
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
     // Der zweite Versuch ist unterwegs und noch nicht gelungen.
     expect(screen.getByText('Grund: 503')).toBeInTheDocument();
-    await act(async () => { haengenAufloesen(); });
+    await act(async () => {
+      haengenAufloesen();
+    });
     await waitFor(() => expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument());
   });
 
@@ -205,9 +221,15 @@ describe('useEntwurfVerlustschutz', () => {
     // Der Server hat aber in BEIDEN erfolgreich gespeichert — räumte nur der eine, bliebe
     // nach einem von einem Tastenanschlag überholten Speichern ein veralteter Grund stehen.
     let haengenAufloesen: () => void = () => {};
-    const speichern = vi.fn()
+    const speichern = vi
+      .fn()
       .mockRejectedValueOnce(new Error('503'))
-      .mockImplementationOnce(() => new Promise<void>((r) => { haengenAufloesen = r; }));
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((r) => {
+            haengenAufloesen = r;
+          }),
+      );
     render(<Huelle speichern={speichern} />);
     const feld = screen.getByLabelText('Titel');
     await userEvent.type(feld, 'a');
@@ -219,7 +241,9 @@ describe('useEntwurfVerlustschutz', () => {
     await userEvent.tab();
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
     await userEvent.type(feld, 'c'); // S2 entsteht, während S1 unterwegs ist
-    await act(async () => { haengenAufloesen(); });
+    await act(async () => {
+      haengenAufloesen();
+    });
     await waitFor(() => expect(screen.queryByText(/^Grund:/)).not.toBeInTheDocument());
     // Der Merker bleibt trotzdem stehen — das Verlustfenster ist unverändert zugehalten.
     expect(screen.getByText('offen')).toBeInTheDocument();
@@ -270,7 +294,12 @@ describe('useEntwurfVerlustschutz', () => {
     // eines Knopfdrucks anordnet: der Autosave hängt nachweislich noch, wenn der explizite
     // Pfad losgeht — er darf dann keinen zweiten PATCH schicken, aber trotzdem quittieren.
     let aufloesen: () => void = () => {};
-    const speichern = vi.fn(() => new Promise<void>((r) => { aufloesen = r; }));
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloesen = r;
+        }),
+    );
     render(<Huelle speichern={speichern} />);
     const feld = screen.getByLabelText('Titel');
     await userEvent.type(feld, 'a');
@@ -283,7 +312,9 @@ describe('useEntwurfVerlustschutz', () => {
     expect(speichern).toHaveBeenCalledTimes(1);
     expect(screen.getByText('quittungen 0')).toBeInTheDocument(); // noch nicht zurück
 
-    await act(async () => { aufloesen(); });
+    await act(async () => {
+      aufloesen();
+    });
     expect(screen.getByText('quittungen 1')).toBeInTheDocument();
     expect(screen.getByText('sauber')).toBeInTheDocument();
     expect(screen.queryByText('speichert')).not.toBeInTheDocument();
@@ -294,7 +325,12 @@ describe('useEntwurfVerlustschutz', () => {
     // steht — genau das Verlustfenster, das der Änderungszähler zuhält. Ohne diese Hälfte
     // wäre ein Riegel, der immer anhängt, vom richtigen nicht zu unterscheiden.
     let aufloesen: () => void = () => {};
-    const speichern = vi.fn(() => new Promise<void>((r) => { aufloesen = r; }));
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloesen = r;
+        }),
+    );
     render(<Huelle speichern={speichern} />);
     const feld = screen.getByLabelText('Titel');
     await userEvent.type(feld, 'a');
@@ -305,7 +341,9 @@ describe('useEntwurfVerlustschutz', () => {
     await userEvent.click(speichernKnopf());
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
     expect(speichern).toHaveBeenLastCalledWith({ titel: 'Server 1ab' });
-    await act(async () => { aufloesen(); });
+    await act(async () => {
+      aufloesen();
+    });
   });
 
   it('gibt den Riegel nur an den Auftrag zurück, der ihn HÄLT', async () => {
@@ -314,7 +352,12 @@ describe('useEntwurfVerlustschutz', () => {
     // öffnen — sonst schickte der nächste Blur einen dritten PATCH neben die laufende
     // zweite, und die Reihenfolge der Schnappschüsse auf dem Server wäre offen.
     const aufloeser: Array<() => void> = [];
-    const speichern = vi.fn(() => new Promise<void>((r) => { aufloeser.push(r); }));
+    const speichern = vi.fn(
+      () =>
+        new Promise<void>((r) => {
+          aufloeser.push(r);
+        }),
+    );
     render(<Huelle speichern={speichern} />);
     const feld = screen.getByLabelText('Titel');
 
@@ -327,7 +370,9 @@ describe('useEntwurfVerlustschutz', () => {
     await waitFor(() => expect(speichern).toHaveBeenCalledTimes(2));
 
     // Auftrag 1 kommt zurück, Auftrag 2 hält den Riegel noch.
-    await act(async () => { aufloeser[0](); });
+    await act(async () => {
+      aufloeser[0]();
+    });
     expect(screen.getByText('speichert')).toBeInTheDocument();
 
     // Ein weiterer Blur mit UNVERÄNDERTEM Stand: Auftrag 2 trägt diesen Inhalt schon, es
@@ -337,7 +382,9 @@ describe('useEntwurfVerlustschutz', () => {
     await act(async () => {});
     expect(speichern).toHaveBeenCalledTimes(2);
 
-    await act(async () => { aufloeser[1](); });
+    await act(async () => {
+      aufloeser[1]();
+    });
   });
 
   it('speichert nach Ablauf der 30-s-Frist, auch ohne das Feld zu verlassen', async () => {
@@ -352,9 +399,13 @@ describe('useEntwurfVerlustschutz', () => {
       fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'S1' } });
       expect(speichern).not.toHaveBeenCalled();
       // Die FRIST ist die Aussage, nicht „irgendwann": eine Millisekunde davor noch nichts.
-      act(() => { vi.advanceTimersByTime(AUTOSAVE_MS - 1); });
+      act(() => {
+        vi.advanceTimersByTime(AUTOSAVE_MS - 1);
+      });
       expect(speichern).not.toHaveBeenCalled();
-      act(() => { vi.advanceTimersByTime(1); });
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
       expect(speichern).toHaveBeenCalledTimes(1);
       expect(speichern).toHaveBeenCalledWith({ titel: 'S1' });
     } finally {
@@ -370,7 +421,9 @@ describe('useEntwurfVerlustschutz', () => {
       const speichern = vi.fn().mockResolvedValue(undefined);
       render(<Huelle speichern={speichern} istEntwurf={false} />);
       fireEvent.change(screen.getByLabelText('Titel'), { target: { value: 'S1' } });
-      act(() => { vi.advanceTimersByTime(AUTOSAVE_MS * 3); });
+      act(() => {
+        vi.advanceTimersByTime(AUTOSAVE_MS * 3);
+      });
       expect(speichern).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();

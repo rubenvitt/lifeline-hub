@@ -17,50 +17,97 @@ import EinheitDetailPage from './EinheitDetailPage';
  */
 
 const tmoSprechgruppe = {
-  id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
-  betriebsart: 'TMO' as const, hinweis: null, aktiv: true, sortier: 0,
+  id: 7,
+  einsatz_id: 1,
+  einsatz_lokal: false,
+  bezeichnung: '412_F_DRK',
+  betriebsart: 'TMO' as const,
+  hinweis: null,
+  aktiv: true,
+  sortier: 0,
 };
 const dmoSprechgruppe = {
-  id: 8, einsatz_id: 1, einsatz_lokal: false, bezeichnung: 'DMO 31',
-  betriebsart: 'DMO' as const, hinweis: null, aktiv: true, sortier: 1,
+  id: 8,
+  einsatz_id: 1,
+  einsatz_lokal: false,
+  bezeichnung: 'DMO 31',
+  betriebsart: 'DMO' as const,
+  hinweis: null,
+  aktiv: true,
+  sortier: 1,
 };
 
 const einsatz = {
-  id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv', begonnen_at: '', abgeschlossen_at: null,
-  abgeschlossen_von: null, einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null, meldende_stelle: null,
-  sachverhalt: null, anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung',
+  id: 1,
+  bezeichnung: 'Lage',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
 };
 
 const einheiten = [
   {
-    id: 10, einsatz_id: 1, abschnitt_id: null, abschnitt_name: null, ueber_einheit_id: null,
-    typ_id: 1, typ_label: 'Zug', name: '1. Zug', fuehrer_id: null, fuehrer_name: null, bemerkung: null, sortier: 0,
-    soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+    id: 10,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    abschnitt_name: null,
+    ueber_einheit_id: null,
+    typ_id: 1,
+    typ_label: 'Zug',
+    name: '1. Zug',
+    fuehrer_id: null,
+    fuehrer_name: null,
+    bemerkung: null,
+    sortier: 0,
+    soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
+    ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
     ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
-    personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
+    personal_mitglieder: [],
+    fahrzeug_mitglieder: [],
+    material_mitglieder: [],
     sprechgruppen: [tmoSprechgruppe],
   },
 ];
 
 function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
   return [
-    http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, meine_rolle: rolle, status })),
+    http.get('/api/einsaetze/1', () =>
+      HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
+    ),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/einheit-typen', () => HttpResponse.json([
-      { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
-    ])),
+    http.get('/api/einheit-typen', () =>
+      HttpResponse.json([
+        { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
+      ]),
+    ),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([tmoSprechgruppe, dmoSprechgruppe])),
+    http.get('/api/einsaetze/1/sprechgruppen', () =>
+      HttpResponse.json([tmoSprechgruppe, dmoSprechgruppe]),
+    ),
   ];
 }
 
 function rendere(route = '/einsaetze/1/einheiten/10') {
   return renderMitProviders(
-    <Routes><Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} /></Routes>,
+    <Routes>
+      <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+    </Routes>,
     { route },
   );
 }
@@ -73,7 +120,9 @@ function rendere(route = '/einsaetze/1/einheiten/10') {
 function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
   server.use(...abweichungen, ...handlers());
   return renderMitProviders(
-    <Routes><Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} /></Routes>,
+    <Routes>
+      <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+    </Routes>,
     { route: '/einsaetze/1/einheiten/10' },
   );
 }
@@ -86,8 +135,9 @@ function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
  * die `combobox`-Rolle innerhalb des Feldes (Muster aus `EinheitenPage.test.tsx`).
  */
 async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
-    .find((s) => s.textContent?.includes(platzhalter));
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
+    s.textContent?.includes(platzhalter),
+  );
   expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
   await userEvent.click(within(feld!).getByRole('combobox'));
 }
@@ -175,7 +225,10 @@ describe('EinheitDetailPage · Funk und Kopfdaten (umgezogen aus EinheitenPage)'
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(patchBody).not.toBeNull());
-    expect(patchBody).toMatchObject({ kommunikationsmittel: 'digitalfunk', erreichbarkeit: '0151 23456' });
+    expect(patchBody).toMatchObject({
+      kommunikationsmittel: 'digitalfunk',
+      erreichbarkeit: '0151 23456',
+    });
   });
 
   it('sendet sprechgruppe_ids beim Speichern', async () => {
@@ -193,7 +246,7 @@ describe('EinheitDetailPage · Funk und Kopfdaten (umgezogen aus EinheitenPage)'
 
     // Vorbelegt mit tmoSprechgruppe.id=7.
     expect(patchBody).toHaveProperty('sprechgruppe_ids');
-    expect((patchBody!['sprechgruppe_ids'] as number[])).toContain(7);
+    expect(patchBody!['sprechgruppe_ids'] as number[]).toContain(7);
   });
 });
 
@@ -202,7 +255,9 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
     zeige(http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })));
     await screen.findByRole('heading', { name: '1. Zug', level: 3 });
     await userEvent.click(await screen.findByLabelText('Typ'));
-    expect(await screen.findByText('Einheitentypen konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Einheitentypen konnten nicht geladen werden'),
+    ).toBeInTheDocument();
   });
 
   it('Partnerhälfte: mit Typkatalog steht die Auswahl statt der Meldung', async () => {

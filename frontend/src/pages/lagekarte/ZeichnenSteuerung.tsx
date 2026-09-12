@@ -47,9 +47,15 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // die letzte Gelegenheit, sie vor dem Speichern zu widerrufen.
   const serienZeile = props.onSerieWechsel && (
     <Space>
-      <Switch checked={!!props.serie} onChange={props.onSerieWechsel} aria-label="Weitere zeichnen" />
+      <Switch
+        checked={!!props.serie}
+        onChange={props.onSerieWechsel}
+        aria-label="Weitere zeichnen"
+      />
       <Typography.Text>Weitere zeichnen</Typography.Text>
-      {gespeichert > 0 && <Typography.Text type="secondary">{gespeichert} gespeichert</Typography.Text>}
+      {gespeichert > 0 && (
+        <Typography.Text type="secondary">{gespeichert} gespeichert</Typography.Text>
+      )}
     </Space>
   );
   // Ein Knopf, zwei Wahrheiten (wie in der Sidebar): „Abbrechen" verwirft nur einen Entwurf.
@@ -78,15 +84,15 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         <Typography.Text strong>{props.titel}</Typography.Text>
         {bestaetigen ? (
           <>
-            <Typography.Text type="secondary">
-              Entwurf prüfen und speichern.
-            </Typography.Text>
+            <Typography.Text type="secondary">Entwurf prüfen und speichern.</Typography.Text>
             {serienZeile}
             <Space>
               <Button type="primary" loading={props.speichernLaeuft} onClick={props.onSpeichern}>
                 Speichern
               </Button>
-              <Button disabled={props.speichernLaeuft} onClick={props.onVerwerfen}>Verwerfen</Button>
+              <Button disabled={props.speichernLaeuft} onClick={props.onVerwerfen}>
+                Verwerfen
+              </Button>
             </Space>
           </>
         ) : (
@@ -96,7 +102,11 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
             </Typography.Text>
             {serienZeile}
             <Space>
-              <Button type="primary" disabled={props.abschliessenMoeglich === false} onClick={props.onAbschliessen}>
+              <Button
+                type="primary"
+                disabled={props.abschliessenMoeglich === false}
+                onClick={props.onAbschliessen}
+              >
                 Abschließen
               </Button>
               {beenden}

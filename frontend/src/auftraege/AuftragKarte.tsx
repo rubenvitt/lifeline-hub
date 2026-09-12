@@ -1,5 +1,14 @@
 import {
-  Button, Card, Collapse, Descriptions, Flex, Popconfirm, Space, Tag, Typography, theme,
+  Button,
+  Card,
+  Collapse,
+  Descriptions,
+  Flex,
+  Popconfirm,
+  Space,
+  Tag,
+  Typography,
+  theme,
 } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
@@ -25,13 +34,11 @@ const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
 /** Liefert die gesetzten (nicht-null/nicht-leer) Schemafelder eines Auftrags.
  *  erteilt_at ist ein UTC-Zeitstempel → lokal über formatZeit. */
 function gefuellteFelder(a: Auftrag): { label: string; wert: string }[] {
-  return SCHEMA_FELDER
-    .map(({ key, label, zeit }) => {
-      const roh = (a[key] ?? '') as string;
-      const wert = zeit && roh ? formatZeit(roh) : roh;
-      return { label, wert };
-    })
-    .filter(({ wert }) => typeof wert === 'string' && wert.trim() !== '');
+  return SCHEMA_FELDER.map(({ key, label, zeit }) => {
+    const roh = (a[key] ?? '') as string;
+    const wert = zeit && roh ? formatZeit(roh) : roh;
+    return { label, wert };
+  }).filter(({ wert }) => typeof wert === 'string' && wert.trim() !== '');
 }
 
 export interface AuftragKarteProps {
@@ -55,8 +62,17 @@ export interface AuftragKarteProps {
  * (colorErrorBg/colorError) statt hartkodiertem Rosa.
  */
 export default function AuftragKarte({
-  auftrag: a, ansicht = 'offen', einsatzId, darfSchreiben, hervorgehoben,
-  quittierungLaeuft, quittierungZiel, onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
+  auftrag: a,
+  ansicht = 'offen',
+  einsatzId,
+  darfSchreiben,
+  hervorgehoben,
+  quittierungLaeuft,
+  quittierungZiel,
+  onQuittieren,
+  onInArbeit,
+  onVollzugMelden,
+  onAbnehmen,
 }: AuftragKarteProps) {
   const { token } = theme.useToken();
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
@@ -87,9 +103,9 @@ export default function AuftragKarte({
   // hängt bewusst NICHT mehr am Schreibrecht, nur noch ihr Knopf: sonst verlöre ein
   // Beobachter mit dem Chip zugleich den Namen des offenen Empfängers.
   const istQuittierungZiel = (empfaengerId: number) =>
-    !!quittierungLaeuft
-    && quittierungZiel?.auftragId === a.id
-    && quittierungZiel.empfaengerId === empfaengerId;
+    !!quittierungLaeuft &&
+    quittierungZiel?.auftragId === a.id &&
+    quittierungZiel.empfaengerId === empfaengerId;
   // Der optimistische Cache markiert das Ziel sofort als quittiert. Solange der Request
   // läuft, bleibt es trotzdem als ladender Aktionsknopf sichtbar; andere Quittierungen
   // sind serialisiert und damit gesperrt.
@@ -105,23 +121,31 @@ export default function AuftragKarte({
         // Änderung `status: 'offen'` an — aber NUR aus `in_arbeit`.
         // „Abnehmen" (unten) behält seine Rückfrage: die Abnahme ist der
         // fachliche Schlusspunkt und hat keinen Rückweg.
-        a.bearbeitungsstatus === 'offen' && onInArbeit
-          ? <Button key="ia" onClick={() => onInArbeit(a.id)}>In Bearbeitung</Button> : null,
+        a.bearbeitungsstatus === 'offen' && onInArbeit ? (
+          <Button key="ia" onClick={() => onInArbeit(a.id)}>
+            In Bearbeitung
+          </Button>
+        ) : null,
         // „Vollzug melden" öffnet das Modal (= eigene Bestätigung) → kein Popconfirm.
-        (a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') && onVollzugMelden
-          ? <Button key="vm" onClick={() => onVollzugMelden(a.id)}>Vollzug melden</Button> : null,
-        a.bearbeitungsstatus === 'vollzogen' && onAbnehmen
-          ? (
-            <Popconfirm
-              key="ab"
-              title="Auftrag abnehmen?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onAbnehmen(a.id)}
-            >
-              <Button type="primary" ghost>Abnehmen</Button>
-            </Popconfirm>
-          ) : null,
+        (a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit') &&
+        onVollzugMelden ? (
+          <Button key="vm" onClick={() => onVollzugMelden(a.id)}>
+            Vollzug melden
+          </Button>
+        ) : null,
+        a.bearbeitungsstatus === 'vollzogen' && onAbnehmen ? (
+          <Popconfirm
+            key="ab"
+            title="Auftrag abnehmen?"
+            okText="Bestätigen"
+            cancelText="Abbrechen"
+            onConfirm={() => onAbnehmen(a.id)}
+          >
+            <Button type="primary" ghost>
+              Abnehmen
+            </Button>
+          </Popconfirm>
+        ) : null,
       ].filter(Boolean)
     : [];
 
@@ -144,9 +168,19 @@ export default function AuftragKarte({
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
-          <Tag color={prio.color} style={{ margin: 0, fontWeight: 600 }}>{prio.label}</Tag>
-          <StatusBadge phase={status.phase} label={status.label} unbearbeitet={!!status.unbearbeitet} />
-          {a.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
+          <Tag color={prio.color} style={{ margin: 0, fontWeight: 600 }}>
+            {prio.label}
+          </Tag>
+          <StatusBadge
+            phase={status.phase}
+            label={status.label}
+            unbearbeitet={!!status.unbearbeitet}
+          />
+          {a.richtung === 'extern' && (
+            <Tag color="purple" style={{ margin: 0 }}>
+              Extern
+            </Tag>
+          )}
           {a.quell_etb_eintrag_id != null && einsatzId != null && (
             <Link to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>↗ ETB-Eintrag</Link>
           )}
@@ -157,11 +191,17 @@ export default function AuftragKarte({
               <ClockCircleOutlined /> Überfällig
             </Text>
           )}
-          {a.frist_at && <Text type="secondary" style={{ fontSize: 12 }}>Frist {formatZeit(a.frist_at)}</Text>}
+          {a.frist_at && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Frist {formatZeit(a.frist_at)}
+            </Text>
+          )}
         </Space>
       </Flex>
 
-      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: 8 }}>{a.auftrag_text}</Text>
+      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: 8 }}>
+        {a.auftrag_text}
+      </Text>
 
       <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
         <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
@@ -173,7 +213,11 @@ export default function AuftragKarte({
               {e.snap_anzeige} ✓
             </Tag>
           ))}
-          {restEmpf > 0 && <Text type="secondary" style={{ fontSize: 12 }}>+{restEmpf}</Text>}
+          {restEmpf > 0 && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              +{restEmpf}
+            </Text>
+          )}
         </Space>
       </Flex>
 
@@ -187,7 +231,9 @@ export default function AuftragKarte({
           gleichnamige Knöpfe nicht auseinanderzuhalten. */}
       {offeneEmpf.length > 0 && (
         <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
-          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>Quittung offen:</Text>
+          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+            Quittung offen:
+          </Text>
           {offeneEmpf.map((e) => (
             <Space key={e.id} size={4}>
               <Text style={{ fontSize: 13 }}>{e.snap_anzeige}</Text>
@@ -217,14 +263,27 @@ export default function AuftragKarte({
 
       {ansicht === 'abgeschlossen' && (
         <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
-          {a.vollzogen_at && <Text type="secondary" style={{ fontSize: 13 }}>Vollzogen am: {formatZeit(a.vollzogen_at)}</Text>}
-          {a.abgenommen_at && <Text type="secondary" style={{ fontSize: 13 }}>Abgenommen am: {formatZeit(a.abgenommen_at)}</Text>}
-          {a.vollzugsmeldung && <Text type="secondary" style={{ fontSize: 13 }}>Vollzugsvermerk: {a.vollzugsmeldung}</Text>}
+          {a.vollzogen_at && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Vollzogen am: {formatZeit(a.vollzogen_at)}
+            </Text>
+          )}
+          {a.abgenommen_at && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Abgenommen am: {formatZeit(a.abgenommen_at)}
+            </Text>
+          )}
+          {a.vollzugsmeldung && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Vollzugsvermerk: {a.vollzugsmeldung}
+            </Text>
+          )}
         </Space>
       )}
       {ansicht !== 'abgeschlossen' && a.vollzugsmeldung && (
         <Text style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>
-          <Text type="secondary">Vollzug: </Text>{a.vollzugsmeldung}
+          <Text type="secondary">Vollzug: </Text>
+          {a.vollzugsmeldung}
         </Text>
       )}
 
@@ -232,17 +291,21 @@ export default function AuftragKarte({
         <Collapse
           ghost
           style={{ marginInline: -8 }}
-          items={[{
-            key: 'details',
-            label: 'Befehlsdetails',
-            children: (
-              <Descriptions size="small" column={1} bordered>
-                {details.map(({ label, wert }) => (
-                  <Descriptions.Item key={label} label={label}>{wert}</Descriptions.Item>
-                ))}
-              </Descriptions>
-            ),
-          }]}
+          items={[
+            {
+              key: 'details',
+              label: 'Befehlsdetails',
+              children: (
+                <Descriptions size="small" column={1} bordered>
+                  {details.map(({ label, wert }) => (
+                    <Descriptions.Item key={label} label={label}>
+                      {wert}
+                    </Descriptions.Item>
+                  ))}
+                </Descriptions>
+              ),
+            },
+          ]}
         />
       )}
 

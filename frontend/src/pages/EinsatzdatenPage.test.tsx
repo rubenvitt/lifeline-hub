@@ -14,26 +14,60 @@ import EinsatzdatenPage, { pickerZuWire, wireZuPicker } from './EinsatzdatenPage
 dayjs.extend(utc);
 
 const admin: BenutzerAnzeige = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
+  totp_aktiviert: false,
 };
 
 const basisEinsatz: EinsatzAnzeige = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: 'H1', status: 'aktiv',
-  begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: '2026-001', angelegt_at: '2026-05-23 09:00:05',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: 'H1',
+  status: 'aktiv',
+  begonnen_at: '2026-05-23 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: '2026-001',
+  angelegt_at: '2026-05-23 09:00:05',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
   meine_rolle: 'einsatzleitung',
-  org_id: 1, org_name: 'DRK Musterstadt',
+  org_id: 1,
+  org_name: 'DRK Musterstadt',
 };
 
 const mitglieder = [
-  { benutzer_id: 1, anzeigename: 'Admin', benutzername: 'admin', einsatz_rolle: 'einsatzleitung', zugewiesen_at: '2026-05-23 09:00:00' },
-  { benutzer_id: 2, anzeigename: 'Frank Führung', benutzername: 'frank', einsatz_rolle: 'fuehrungspersonal', zugewiesen_at: '2026-05-23 09:05:00' },
+  {
+    benutzer_id: 1,
+    anzeigename: 'Admin',
+    benutzername: 'admin',
+    einsatz_rolle: 'einsatzleitung',
+    zugewiesen_at: '2026-05-23 09:00:00',
+  },
+  {
+    benutzer_id: 2,
+    anzeigename: 'Frank Führung',
+    benutzername: 'frank',
+    einsatz_rolle: 'fuehrungspersonal',
+    zugewiesen_at: '2026-05-23 09:05:00',
+  },
 ];
 
-const vorschlaege = [{ id: 1, text: 'H1' }, { id: 2, text: 'MANV' }];
+const vorschlaege = [
+  { id: 1, text: 'H1' },
+  { id: 2, text: 'MANV' },
+];
 
 interface SetupOpts {
   einsatz?: Partial<EinsatzAnzeige>;
@@ -49,7 +83,9 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
     http.get('/api/benutzer', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
-    http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+    http.get('/api/einsaetze/:id/ort-vorschau', () =>
+      HttpResponse.json({ peilung: null, ortsname: null }),
+    ),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -62,17 +98,21 @@ function setup(opts: SetupOpts = {}) {
 }
 
 describe('Führungsstellen-Berechtigung', () => {
-  it.each([null, 'beobachter', 'fuehrungspersonal'] as const)('LFH-461 Review: System-Admin mit Einsatzrolle %s darf keine Führungsstelle bearbeiten', async (meine_rolle) => {
-    setup({ einsatz: { meine_rolle } });
-    await screen.findByText('Frank Führung');
-    expect(screen.queryAllByRole('button', { name: /Führungsstelle für/ })).toHaveLength(0);
-  });
+  it.each([null, 'beobachter', 'fuehrungspersonal'] as const)(
+    'LFH-461 Review: System-Admin mit Einsatzrolle %s darf keine Führungsstelle bearbeiten',
+    async (meine_rolle) => {
+      setup({ einsatz: { meine_rolle } });
+      await screen.findByText('Frank Führung');
+      expect(screen.queryAllByRole('button', { name: /Führungsstelle für/ })).toHaveLength(0);
+    },
+  );
 
   it('LFH-461 Review: aktive Einsatzleitung darf die Führungsstelle bearbeiten', async () => {
     setup({ benutzer: { ...admin, system_rolle: 'keiner' } });
-    expect(await screen.findByRole('button', { name: 'Führungsstelle für Frank Führung bearbeiten' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Führungsstelle für Frank Führung bearbeiten' }),
+    ).toBeInTheDocument();
   });
-
 });
 
 describe('Alarmzeit-Wandlung (Wire ↔ Picker)', () => {
@@ -113,10 +153,12 @@ describe('EinsatzdatenPage', () => {
   it('LFH-463: zeigt den Besprechungstermin lokal und speichert denselben UTC-Instant', async () => {
     let patchBody: Record<string, unknown> = {};
     setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
-    server.use(http.patch('/api/einsaetze/7', async ({ request }) => {
-      patchBody = await request.json() as Record<string, unknown>;
-      return HttpResponse.json(basisEinsatz);
-    }));
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisEinsatz);
+      }),
+    );
     expect(await screen.findByText('Nächste Lagebesprechung')).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
@@ -130,10 +172,12 @@ describe('EinsatzdatenPage', () => {
   it('LFH-463: leeren des Besprechungstermins sendet explizit null', async () => {
     let patchBody: Record<string, unknown> = {};
     setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
-    server.use(http.patch('/api/einsaetze/7', async ({ request }) => {
-      patchBody = await request.json() as Record<string, unknown>;
-      return HttpResponse.json(basisEinsatz);
-    }));
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisEinsatz);
+      }),
+    );
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     const feld = screen.getByLabelText('Nächste Lagebesprechung (optional)');
@@ -169,7 +213,6 @@ describe('EinsatzdatenPage', () => {
     await waitFor(() => expect(patchBody.begonnen_at).toBe('2026-05-23 09:00:00'));
   });
 
-
   it('zeigt Kopfdaten im Lesemodus, leere Felder als —', async () => {
     setup();
     expect(await screen.findByText('Realeinsatz')).toBeInTheDocument();
@@ -194,7 +237,11 @@ describe('EinsatzdatenPage', () => {
     server.use(
       http.patch('/api/einsaetze/7', async ({ request }) => {
         patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...basisEinsatz, einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 });
+        return HttpResponse.json({
+          ...basisEinsatz,
+          einsatzort_lat: 48.1234,
+          einsatzort_lon: 11.5678,
+        });
       }),
     );
 
@@ -212,7 +259,10 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('versteckt den Bearbeiten-Button für Beobachter', async () => {
-    setup({ einsatz: { meine_rolle: 'beobachter' }, benutzer: { ...admin, system_rolle: 'keiner' } });
+    setup({
+      einsatz: { meine_rolle: 'beobachter' },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
     await screen.findByText('Realeinsatz');
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
@@ -251,7 +301,10 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('zeigt die Zugriff-Namen read-only auch für Beobachter', async () => {
-    setup({ einsatz: { meine_rolle: 'beobachter' }, benutzer: { ...admin, system_rolle: 'keiner' } });
+    setup({
+      einsatz: { meine_rolle: 'beobachter' },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
     expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
@@ -267,7 +320,10 @@ describe('EinsatzdatenPage', () => {
   it('blendet Verwaltungs-Aktionen für Führungspersonal aus', async () => {
     // benutzer ohne System-Admin: sonst gewährt der admin-globale Zweig (LFH-234) die
     // Leitungs-/Verwaltungsrechte auch dem Führungspersonal-Konto. Hier zählt die Einsatz-Rolle.
-    setup({ einsatz: { meine_rolle: 'fuehrungspersonal' }, benutzer: { ...admin, system_rolle: 'keiner' } });
+    setup({
+      einsatz: { meine_rolle: 'fuehrungspersonal' },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
     expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();

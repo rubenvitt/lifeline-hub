@@ -3,7 +3,11 @@ import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import type { OnlineStyle } from '../api/karte';
-import { ladeOnlineQuellenKatalog, legeOnlineQuelleAn, type OnlineQuelleBody } from '../api/onlineQuellen';
+import {
+  ladeOnlineQuellenKatalog,
+  legeOnlineQuelleAn,
+  type OnlineQuelleBody,
+} from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import { globalKeys } from '../api/queryKeys';
 

@@ -52,9 +52,10 @@ describe('invalidiereKarte: Charakterisierung des Ist-Verhaltens (LFH-307)', () 
     // Vorbedingung: frisch gesetzt ist nichts stale. Ohne diesen Anker könnte der Test auch
     // dann grün sein, wenn die Einträge nie existiert haben.
     for (const k of keys) {
-      expect(qc.getQueryState(k)?.isInvalidated ?? true, `vorher nicht stale: ${JSON.stringify(k)}`).toBe(
-        false,
-      );
+      expect(
+        qc.getQueryState(k)?.isInvalidated ?? true,
+        `vorher nicht stale: ${JSON.stringify(k)}`,
+      ).toBe(false);
     }
 
     invalidiereKarte(qc);

@@ -103,7 +103,9 @@ async function vorbereiten(page: Page) {
   berichtId ??= await lageberichtAnlegen(page, einsatzId);
 }
 
-test('Detailseite „Lagevortrag zur Entscheidung" bleibt bei 1366 px unter der halben Bestandshöhe', async ({ page }) => {
+test('Detailseite „Lagevortrag zur Entscheidung" bleibt bei 1366 px unter der halben Bestandshöhe', async ({
+  page,
+}) => {
   await vorbereiten(page);
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${berichtId}`);
@@ -139,12 +141,16 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
     await expect(page.getByRole('heading', { level: 3 })).toBeVisible();
     // Der gesäte Datensatz als Anker: eine leere Seite hätte trivial keinen Überlauf.
     await expect(
-      page.getByText(pfad === 'lageberichte' ? 'Lagevortrag zur Entscheidung 1000' : /Brücke Nord gesperrt/),
+      page.getByText(
+        pfad === 'lageberichte' ? 'Lagevortrag zur Entscheidung 1000' : /Brücke Nord gesperrt/,
+      ),
     ).toBeVisible();
     const mass = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
       klient: document.documentElement.clientWidth,
     }));
-    expect(mass.scroll, `${pfad}: Body breiter als der Viewport`).toBeLessThanOrEqual(mass.klient + 1);
+    expect(mass.scroll, `${pfad}: Body breiter als der Viewport`).toBeLessThanOrEqual(
+      mass.klient + 1,
+    );
   });
 }

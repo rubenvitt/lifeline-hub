@@ -13,8 +13,13 @@ import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/k
 import AppLayout from './AppLayout';
 
 const admin = {
-  id: 1, anzeigename: 'Chef', benutzername: 'chef', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Chef',
+  benutzername: 'chef',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 
 function setup(me: Record<string, unknown>) {
@@ -182,11 +187,18 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
 
   it('zeigt für Berechtigte den freien Link ohne Sperrhinweis', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json({
-        id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
-        org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
-        totp_aktiviert: false,
-      })),
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({
+          id: 1,
+          anzeigename: 'A',
+          benutzername: 'a',
+          system_rolle: 'admin',
+          org_rolle: 'keine',
+          aktiv: true,
+          erstellt_at: '2026-05-23 10:00:00',
+          totp_aktiviert: false,
+        }),
+      ),
     );
     renderMitProviders(
       <CommandPaletteProvider>

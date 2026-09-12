@@ -1,8 +1,14 @@
 import { Button, Checkbox, Form, Modal, Space, Tooltip, Typography, theme } from 'antd';
 import type { FormInstance, FormProps } from 'antd';
 import {
-  useCallback, useEffect, useImperativeHandle, useRef, useState,
-  type KeyboardEvent, type ReactNode, type Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
@@ -115,8 +121,8 @@ export function serienKuerzel(userAgent: string) {
 const SERIEN_KUERZEL = serienKuerzel(typeof navigator === 'undefined' ? '' : navigator.userAgent);
 
 const UEBERNAHME_ERKLAERUNG =
-  'Beim „Speichern und nächste" bleiben die Wiederholfelder stehen, alle übrigen Felder werden geleert. '
-  + 'Auf den Knopf rechts hat der Schalter keinen Einfluss — der schliesst den Dialog.';
+  'Beim „Speichern und nächste" bleiben die Wiederholfelder stehen, alle übrigen Felder werden geleert. ' +
+  'Auf den Knopf rechts hat der Schalter keinen Einfluss — der schliesst den Dialog.';
 
 export interface ErfassungsFormularSteuerung {
   /** Bricht über denselben Reset-Pfad wie Knopf und Tastatur-Registry ab. */
@@ -167,8 +173,18 @@ interface ErfassungsFormularProps<T> {
  * und steckt in `ErfassungsModal` für Dialoge.
  */
 export function ErfassungsFormular<T extends object>({
-  form, onErfassen, onErfasst, onFertig, onAbbrechen, laeuft = false,
-  erfassenText = 'Erfassen', serie = false, uebernahme, initialValues, steuerungRef, children,
+  form,
+  onErfassen,
+  onErfasst,
+  onFertig,
+  onAbbrechen,
+  laeuft = false,
+  erfassenText = 'Erfassen',
+  serie = false,
+  uebernahme,
+  initialValues,
+  steuerungRef,
+  children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
   const wurzel = useRef<HTMLDivElement>(null);
@@ -217,52 +233,55 @@ export function ErfassungsFormular<T extends object>({
     if (fokusTick > 0) fokussiereErstesFeld(wurzel.current);
   }, [fokusTick]);
 
-  const abschicken = useCallback(async (werte: T) => {
-    // Der Riegel liegt HIER und nicht am Knopf: über das Tastenkürzel erreicht
-    // eine gehaltene Taste den Knopf nie, und `loading` blockiert nur Klicks.
-    if (sendetRef.current) return;
-    sendetRef.current = true;
-    const abbruchGeneration = abbruchGenerationRef.current;
-    const serienlauf = serienlaufRef.current;
-    serienlaufRef.current = false;
-    // Werte VOR dem Zurücksetzen sichern — danach sind sie weg.
-    const behaltene = Object.fromEntries(
-      (uebernahme ?? []).map((feld) => [feld, werte[feld]]),
-    ) as Partial<T>;
-    let serverErfolg = false;
-    try {
+  const abschicken = useCallback(
+    async (werte: T) => {
+      // Der Riegel liegt HIER und nicht am Knopf: über das Tastenkürzel erreicht
+      // eine gehaltene Taste den Knopf nie, und `loading` blockiert nur Klicks.
+      if (sendetRef.current) return;
+      sendetRef.current = true;
+      const abbruchGeneration = abbruchGenerationRef.current;
+      const serienlauf = serienlaufRef.current;
+      serienlaufRef.current = false;
+      // Werte VOR dem Zurücksetzen sichern — danach sind sie weg.
+      const behaltene = Object.fromEntries(
+        (uebernahme ?? []).map((feld) => [feld, werte[feld]]),
+      ) as Partial<T>;
+      let serverErfolg = false;
       try {
-        await onErfassen(werte);
-        serverErfolg = true;
-      } catch {
-        // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
-        // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
-      }
-      if (!serverErfolg || abbruchGenerationRef.current !== abbruchGeneration) return;
+        try {
+          await onErfassen(werte);
+          serverErfolg = true;
+        } catch {
+          // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
+          // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
+        }
+        if (!serverErfolg || abbruchGenerationRef.current !== abbruchGeneration) return;
 
-      try {
-        await onErfasst?.(werte);
-      } catch {
-        // Der Server hat bereits erfolgreich gespeichert. Ein lokaler Folgefehler
-        // darf den Satz nicht offen und damit versehentlich wiederholbar lassen.
-      }
-      // Der Hook ist awaitbar: ein Abbruch währenddessen bleibt maßgeblich und
-      // hat Reset/Callback bereits selbst ausgeführt.
-      if (abbruchGenerationRef.current !== abbruchGeneration) return;
+        try {
+          await onErfasst?.(werte);
+        } catch {
+          // Der Server hat bereits erfolgreich gespeichert. Ein lokaler Folgefehler
+          // darf den Satz nicht offen und damit versehentlich wiederholbar lassen.
+        }
+        // Der Hook ist awaitbar: ein Abbruch währenddessen bleibt maßgeblich und
+        // hat Reset/Callback bereits selbst ausgeführt.
+        if (abbruchGenerationRef.current !== abbruchGeneration) return;
 
-      setZaehler((n) => n + 1);
-      if (!serienlauf) {
+        setZaehler((n) => n + 1);
+        if (!serienlauf) {
+          form.resetFields();
+          onFertig();
+          return;
+        }
         form.resetFields();
-        onFertig();
-        return;
+        if (behalten && uebernahme?.length) form.setFieldsValue(behaltene);
+        setFokusTick((n) => n + 1);
+      } finally {
+        sendetRef.current = false;
       }
-      form.resetFields();
-      if (behalten && uebernahme?.length) form.setFieldsValue(behaltene);
-      setFokusTick((n) => n + 1);
-    } finally {
-      sendetRef.current = false;
-    }
-  }, [behalten, form, onErfassen, onErfasst, onFertig, uebernahme]);
+    },
+    [behalten, form, onErfassen, onErfasst, onFertig, uebernahme],
+  );
 
   /**
    * Der Serienlauf — eine Funktion für Knopf UND Tastenkürzel. Zwei Kopien
@@ -283,9 +302,15 @@ export function ErfassungsFormular<T extends object>({
     // keine Serien-Marke setzen. Eine stehengebliebene Marke färbt das nächste
     // reguläre Absenden still zum Serienlauf (s. `onFinishFailed` unten).
     if (
-      e.nativeEvent.isComposing || e.repeat || e.shiftKey || e.altKey
-      || !serie || e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)
-    ) return;
+      e.nativeEvent.isComposing ||
+      e.repeat ||
+      e.shiftKey ||
+      e.altKey ||
+      !serie ||
+      e.key !== 'Enter' ||
+      !(e.metaKey || e.ctrlKey)
+    )
+      return;
     e.preventDefault();
     serienSpeichern();
   }
@@ -320,12 +345,15 @@ export function ErfassungsFormular<T extends object>({
         layout="vertical"
         initialValues={initialValues}
         onFinish={abschicken}
-        onFinishFailed={() => { serienlaufRef.current = false; }}
+        onFinishFailed={() => {
+          serienlaufRef.current = false;
+        }}
       >
         {children}
         <div
           style={{
-            marginTop: token.margin, paddingTop: token.paddingSM,
+            marginTop: token.margin,
+            paddingTop: token.paddingSM,
             borderTop: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
@@ -338,8 +366,11 @@ export function ErfassungsFormular<T extends object>({
           {serie && (
             <div
               style={{
-                display: 'flex', alignItems: 'center', gap: token.marginXS,
-                flexWrap: 'wrap', marginBottom: token.marginXS,
+                display: 'flex',
+                alignItems: 'center',
+                gap: token.marginXS,
+                flexWrap: 'wrap',
+                marginBottom: token.marginXS,
               }}
             >
               {uebernahme != null && uebernahme.length > 0 && (
@@ -365,12 +396,17 @@ export function ErfassungsFormular<T extends object>({
               // eine Vorlesehilfe buchstabierte „Strg Plus Pfeil".
               <Button loading={laeuft} onClick={serienSpeichern}>
                 Speichern und nächste
-                <span aria-hidden style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}>
+                <span
+                  aria-hidden
+                  style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
+                >
                   {SERIEN_KUERZEL}
                 </span>
               </Button>
             )}
-            <Button type="primary" htmlType="submit" loading={laeuft}>{erfassenText}</Button>
+            <Button type="primary" htmlType="submit" loading={laeuft}>
+              {erfassenText}
+            </Button>
           </Space>
         </div>
       </Form>
@@ -409,7 +445,10 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
  * rufen dieselbe Funktion über `ErfassungsFormularSteuerung` auf.
  */
 export function ErfassungsModal<T extends object>({
-  offen, titel, onAbbrechen, ...rest
+  offen,
+  titel,
+  onAbbrechen,
+  ...rest
 }: ErfassungsModalProps<T>) {
   const { form } = rest;
   const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
@@ -430,11 +469,7 @@ export function ErfassungsModal<T extends object>({
       destroyOnHidden
       keyboard={false}
     >
-      <ErfassungsFormular<T>
-        onAbbrechen={onAbbrechen}
-        {...rest}
-        steuerungRef={formularSteuerung}
-      />
+      <ErfassungsFormular<T> onAbbrechen={onAbbrechen} {...rest} steuerungRef={formularSteuerung} />
     </Modal>
   );
 }

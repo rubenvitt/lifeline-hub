@@ -27,8 +27,15 @@ describe('ZeichnenSteuerung', () => {
   it('rendert nichts, wenn inaktiv', () => {
     const { container } = render(
       <App>
-        <ZeichnenSteuerung aktiv={false} titel="x" phase="zeichnen"
-          onAbschliessen={vi.fn()} onAbbrechen={vi.fn()} onSpeichern={vi.fn()} onVerwerfen={vi.fn()} />
+        <ZeichnenSteuerung
+          aktiv={false}
+          titel="x"
+          phase="zeichnen"
+          onAbschliessen={vi.fn()}
+          onAbbrechen={vi.fn()}
+          onSpeichern={vi.fn()}
+          onVerwerfen={vi.fn()}
+        />
       </App>,
     );
     expect(container.textContent).not.toContain('Abschließen');

@@ -71,9 +71,7 @@ function RecoveryCard({
         column={1}
         items={[
           { key: 'einsatz', label: 'Einsatz', children: `#${einsatzId}` },
-          ...(zeitpunkt
-            ? [{ key: 'zeitpunkt', label: 'Vorgemerkt', children: zeitpunkt }]
-            : []),
+          ...(zeitpunkt ? [{ key: 'zeitpunkt', label: 'Vorgemerkt', children: zeitpunkt }] : []),
           {
             key: 'grund',
             label: 'Grund',
@@ -134,17 +132,14 @@ export default function OfflineRecoveryDrawer({
 
   useEffect(() => {
     if (!open) return;
-    const neuLaden = () => void laden().catch(() => message.error('Recovery-Daten konnten nicht geladen werden'));
+    const neuLaden = () =>
+      void laden().catch(() => message.error('Recovery-Daten konnten nicht geladen werden'));
     neuLaden();
     window.addEventListener(OFFLINE_QUEUE_EVENT, neuLaden);
     return () => window.removeEventListener(OFFLINE_QUEUE_EVENT, neuLaden);
   }, [laden, message, open]);
 
-  const ausfuehren = async (
-    schluessel: string,
-    aktion: () => Promise<boolean>,
-    erfolg: string,
-  ) => {
+  const ausfuehren = async (schluessel: string, aktion: () => Promise<boolean>, erfolg: string) => {
     setAktionLaeuft(schluessel);
     try {
       if (!(await aktion())) throw new Error('Eintrag ist nicht mehr verfügbar');
@@ -167,7 +162,9 @@ export default function OfflineRecoveryDrawer({
       <Button
         type="primary"
         loading={aktionLaeuft === `${schluessel}:retry`}
-        onClick={() => void ausfuehren(`${schluessel}:retry`, wiederholen, 'Aktion erneut vorgemerkt')}
+        onClick={() =>
+          void ausfuehren(`${schluessel}:retry`, wiederholen, 'Aktion erneut vorgemerkt')
+        }
       >
         {wiederholenText}
       </Button>
@@ -179,10 +176,7 @@ export default function OfflineRecoveryDrawer({
         okButtonProps={{ danger: true }}
         onConfirm={() => ausfuehren(`${schluessel}:discard`, verwerfen, 'Offline-Aktion verworfen')}
       >
-        <Button
-          danger
-          loading={aktionLaeuft === `${schluessel}:discard`}
-        >
+        <Button danger loading={aktionLaeuft === `${schluessel}:discard`}>
           Verwerfen
         </Button>
       </Popconfirm>
@@ -190,7 +184,7 @@ export default function OfflineRecoveryDrawer({
   );
   const alsAktuellerBenutzer = (
     aktion: (aktuellerBenutzerId: number) => Promise<boolean>,
-  ): Promise<boolean> => benutzerId == null ? Promise.resolve(false) : aktion(benutzerId);
+  ): Promise<boolean> => (benutzerId == null ? Promise.resolve(false) : aktion(benutzerId));
 
   const scopeAktuell = geladenerScope === scopeKey;
   const sichtbareEtb = scopeAktuell ? etb : [];
@@ -217,12 +211,12 @@ export default function OfflineRecoveryDrawer({
             type="warning"
             showIcon
             title="Nicht attribuierbare Alt-Daten"
-            description={(
+            description={
               <Space orientation="vertical" size="small">
                 <Typography.Text>
                   {sichtbareNichtZugeordnet} lokale Offline-Aktion(en) aus einer früheren
-                  App-Version sind keinem Benutzer sicher zuordenbar. Inhalt, Einsatz und
-                  weitere Metadaten werden nicht angezeigt und können nicht übernommen werden.
+                  App-Version sind keinem Benutzer sicher zuordenbar. Inhalt, Einsatz und weitere
+                  Metadaten werden nicht angezeigt und können nicht übernommen werden.
                 </Typography.Text>
                 <Popconfirm
                   title="Alle nicht attribuierbaren Alt-Daten endgültig verwerfen?"
@@ -230,57 +224,60 @@ export default function OfflineRecoveryDrawer({
                   okText="Alle Alt-Daten endgültig verwerfen"
                   cancelText="Abbrechen"
                   okButtonProps={{ danger: true }}
-                  onConfirm={() => ausfuehren(
-                    'legacy:discard-all',
-                    async () => (await queueNichtZugeordnetAlleVerwerfen()) > 0,
-                    'Nicht attribuierbare Alt-Daten verworfen',
-                  )}
+                  onConfirm={() =>
+                    ausfuehren(
+                      'legacy:discard-all',
+                      async () => (await queueNichtZugeordnetAlleVerwerfen()) > 0,
+                      'Nicht attribuierbare Alt-Daten verworfen',
+                    )
+                  }
                 >
-                  <Button
-                    danger
-                    loading={aktionLaeuft === 'legacy:discard-all'}
-                  >
+                  <Button danger loading={aktionLaeuft === 'legacy:discard-all'}>
                     Alle Alt-Daten verwerfen
                   </Button>
                 </Popconfirm>
               </Space>
-            )}
+            }
           />
         )}
 
-        {sichtbareEtb.map((eintrag) => eintrag.id == null ? null : (
-          <RecoveryCard
-            key={`etb:${eintrag.id}`}
-            titel="Abgelehnter ETB-Eintrag"
-            einsatzId={eintrag.einsatz_id}
-            zeitpunkt={eintrag.erstellt_at}
-            grund={eintrag.grund}
-            daten={eintrag.eintrag}
-            aktionen={knoepfe(
-              `etb:${eintrag.id}`,
-              () => alsAktuellerBenutzer((id) => abgelehntWiederholen(id, eintrag.id!)),
-              () => alsAktuellerBenutzer((id) => abgelehntEntfernen(id, eintrag.id!)),
-            )}
-          />
-        ))}
+        {sichtbareEtb.map((eintrag) =>
+          eintrag.id == null ? null : (
+            <RecoveryCard
+              key={`etb:${eintrag.id}`}
+              titel="Abgelehnter ETB-Eintrag"
+              einsatzId={eintrag.einsatz_id}
+              zeitpunkt={eintrag.erstellt_at}
+              grund={eintrag.grund}
+              daten={eintrag.eintrag}
+              aktionen={knoepfe(
+                `etb:${eintrag.id}`,
+                () => alsAktuellerBenutzer((id) => abgelehntWiederholen(id, eintrag.id!)),
+                () => alsAktuellerBenutzer((id) => abgelehntEntfernen(id, eintrag.id!)),
+              )}
+            />
+          ),
+        )}
 
-        {sichtbareSchreibaktionen.map((eintrag) => eintrag.id == null ? null : (
-          <RecoveryCard
-            key={`schreiben:${eintrag.id}`}
-            titel={`Abgelehnte ${aktionsTitel(eintrag.aktion.art)}`}
-            einsatzId={eintrag.einsatz_id}
-            zeitpunkt={eintrag.erstellt_at}
-            grund={eintrag.grund}
-            daten={eintrag.aktion.daten}
-            aktionen={knoepfe(
-              `schreiben:${eintrag.id}`,
-              () => alsAktuellerBenutzer((id) =>
-                schreibaktionAbgelehntWiederholen(id, eintrag.id!)),
-              () => alsAktuellerBenutzer((id) =>
-                schreibaktionAbgelehntVerwerfen(id, eintrag.id!)),
-            )}
-          />
-        ))}
+        {sichtbareSchreibaktionen.map((eintrag) =>
+          eintrag.id == null ? null : (
+            <RecoveryCard
+              key={`schreiben:${eintrag.id}`}
+              titel={`Abgelehnte ${aktionsTitel(eintrag.aktion.art)}`}
+              einsatzId={eintrag.einsatz_id}
+              zeitpunkt={eintrag.erstellt_at}
+              grund={eintrag.grund}
+              daten={eintrag.aktion.daten}
+              aktionen={knoepfe(
+                `schreiben:${eintrag.id}`,
+                () =>
+                  alsAktuellerBenutzer((id) => schreibaktionAbgelehntWiederholen(id, eintrag.id!)),
+                () =>
+                  alsAktuellerBenutzer((id) => schreibaktionAbgelehntVerwerfen(id, eintrag.id!)),
+              )}
+            />
+          ),
+        )}
 
         {leer && <Empty description="Keine wiederherzustellenden Offline-Aktionen" />}
       </Space>

@@ -85,8 +85,16 @@ export function findeNeuLeser(pfad: string, quelltext: string): NeuLeser[] {
     if (ts.isCallExpression(knoten) && ts.isPropertyAccessExpression(knoten.expression)) {
       const name = knoten.expression.name.text;
       const erstes = knoten.arguments[0];
-      if ((name === 'get' || name === 'has') && erstes && ts.isStringLiteralLike(erstes) && erstes.text === 'neu') {
-        funde.push({ pfad, zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1 });
+      if (
+        (name === 'get' || name === 'has') &&
+        erstes &&
+        ts.isStringLiteralLike(erstes) &&
+        erstes.text === 'neu'
+      ) {
+        funde.push({
+          pfad,
+          zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
+        });
       }
     }
     ts.forEachChild(knoten, gehe);
@@ -146,8 +154,14 @@ const zeige = (l: NeuLeser): string => `${l.pfad}:${l.zeile}`;
 describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
   it('scannt die Quellen und findet Leser', () => {
     expect(Object.keys(dateien).length).toBeGreaterThan(200);
-    expect(LESER.length, 'kein einziger `?neu=1`-Leser gefunden — Glob oder Prädikat kaputt').toBeGreaterThan(0);
-    expect(SCHNELLAKTIONEN.length, 'leere Schnellaktions-Tabelle macht jede Aussage unten trivial').toBeGreaterThan(0);
+    expect(
+      LESER.length,
+      'kein einziger `?neu=1`-Leser gefunden — Glob oder Prädikat kaputt',
+    ).toBeGreaterThan(0);
+    expect(
+      SCHNELLAKTIONEN.length,
+      'leere Schnellaktions-Tabelle macht jede Aussage unten trivial',
+    ).toBeGreaterThan(0);
   });
 
   /**
@@ -173,10 +187,16 @@ describe('Schnellaktionen-Guard: Trägermodul', () => {
   it('nennt je Eintrag ein FERTIGES Modul der Registry', () => {
     for (const a of SCHNELLAKTIONEN) {
       const m = modulRegistry.find((x) => x.key === a.modulKey);
-      expect(m, `Schnellaktion „${a.label}" nennt das unbekannte Modul '${a.modulKey}'`).toBeDefined();
+      expect(
+        m,
+        `Schnellaktion „${a.label}" nennt das unbekannte Modul '${a.modulKey}'`,
+      ).toBeDefined();
       // Spiegel des Freigabefilters in `baueBefehle`: ein unfertiges Trägermodul liefert dort
       // ohnehin keine Schnellaktion, die Zeile wäre also tote Tabelle.
-      expect(m!.status, `Trägermodul '${a.modulKey}' ist nicht 'fertig' — die Zeile kann nie erscheinen`).toBe('fertig');
+      expect(
+        m!.status,
+        `Trägermodul '${a.modulKey}' ist nicht 'fertig' — die Zeile kann nie erscheinen`,
+      ).toBe('fertig');
     }
   });
 });
@@ -196,7 +216,9 @@ describe('Schnellaktionen-Guard: Ziel', () => {
       // Über `URLSearchParams` statt per String-Vergleich: `?q=x&neu=1` und `?neu=1` sind
       // dieselbe Aussage, ein `endsWith('neu=1')` wäre an der Parameterreihenfolge hängen
       // geblieben.
-      expect(new URLSearchParams(query).get('neu'), `„${a.label}" (${ziel}) trägt kein neu=1`).toBe('1');
+      expect(new URLSearchParams(query).get('neu'), `„${a.label}" (${ziel}) trägt kein neu=1`).toBe(
+        '1',
+      );
     }
   });
 });
@@ -209,9 +231,9 @@ describe('Schnellaktionen-Guard: Deckung', () => {
     for (const a of SCHNELLAKTIONEN) {
       expect(
         LESER_MODULE.get(a.modulKey) ?? [],
-        `Schnellaktion „${a.label}" zeigt auf das Modul '${a.modulKey}', aber KEINE Seite dieses `
-          + `Moduls liest ?neu=1. Gefundene Leser:\n${LESER.map(zeige).join('\n')}\n`
-          + `Zugeordnet: ${[...LESER_MODULE].map(([k, v]) => `${k} ← ${v.join(', ')}`).join(' | ')}`,
+        `Schnellaktion „${a.label}" zeigt auf das Modul '${a.modulKey}', aber KEINE Seite dieses ` +
+          `Moduls liest ?neu=1. Gefundene Leser:\n${LESER.map(zeige).join('\n')}\n` +
+          `Zugeordnet: ${[...LESER_MODULE].map(([k, v]) => `${k} ← ${v.join(', ')}`).join(' | ')}`,
       ).not.toHaveLength(0);
     }
   });
@@ -227,8 +249,8 @@ describe('Schnellaktionen-Guard: Deckung', () => {
     const verwaist = LESER.filter((l) => modulZuLeserDatei(l.pfad).length === 0);
     expect(
       verwaist.map(zeige),
-      'Diese Dateien lesen ?neu=1, ihr Name trifft aber keinen Registry-Eintrag — die '
-        + 'Deckungsaussage oben kann sie nicht sehen. Datei umbenennen oder die Zuordnung erweitern.',
+      'Diese Dateien lesen ?neu=1, ihr Name trifft aber keinen Registry-Eintrag — die ' +
+        'Deckungsaussage oben kann sie nicht sehen. Datei umbenennen oder die Zuordnung erweitern.',
     ).toEqual([]);
     const mehrdeutig = LESER.filter((l) => modulZuLeserDatei(l.pfad).length > 1);
     expect(mehrdeutig.map(zeige), 'Dateiname trifft mehrere Registry-Einträge').toEqual([]);

@@ -15,7 +15,9 @@ describe('wendeKartenDatenAn', () => {
     const handler: Record<string, Array<() => void>> = {};
     const map = {
       isStyleLoaded: istGeladen,
-      on: vi.fn((ev: string, cb: () => void) => { (handler[ev] ??= []).push(cb); }),
+      on: vi.fn((ev: string, cb: () => void) => {
+        (handler[ev] ??= []).push(cb);
+      }),
       off: vi.fn((ev: string, cb: () => void) => {
         handler[ev] = (handler[ev] ?? []).filter((h) => h !== cb);
       }),

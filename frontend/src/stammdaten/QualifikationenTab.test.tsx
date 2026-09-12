@@ -8,8 +8,13 @@ import { AuthProvider } from '../auth/AuthContext';
 import QualifikationenTab from './QualifikationenTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
@@ -82,7 +87,10 @@ describe('QualifikationenTab', () => {
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(labels(container)).toEqual(['Gruppenführer', 'Sanitäter']);
 
-    await userEvent.type(container.querySelector<HTMLInputElement>('input[type="search"]')!, 'Sani');
+    await userEvent.type(
+      container.querySelector<HTMLInputElement>('input[type="search"]')!,
+      'Sani',
+    );
     expect(labels(container)).toEqual(['Sanitäter']);
 
     // Kein Trichter, und das ist eine Aussage: der Katalog hat keine Status-/Kategoriespalte,
@@ -178,7 +186,9 @@ describe('QualifikationenTab', () => {
     const dialog = await screen.findByRole('dialog');
 
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
-    expect(within(dialog).getByRole('button', { name: 'Speichern' }).closest('form')).not.toBeNull();
+    expect(
+      within(dialog).getByRole('button', { name: 'Speichern' }).closest('form'),
+    ).not.toBeNull();
   });
 
   /**
@@ -204,7 +214,8 @@ describe('QualifikationenTab', () => {
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
       http.patch('/api/qualifikationen/1', () =>
-        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 })),
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
+      ),
     );
     render(admin);
     await screen.findByText('Sanitäter');

@@ -134,7 +134,10 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
           const ungeladen = quellen.filter((q) => !map.isSourceLoaded(q));
           return `map.loaded() ist false; ungeladen: ${ungeladen.join(', ') || '(keine)'}`;
         }),
-      { timeout: 15_000, message: 'Karte wird nie fertig — Verdacht: maplibre-Worker antwortet nicht' },
+      {
+        timeout: 15_000,
+        message: 'Karte wird nie fertig — Verdacht: maplibre-Worker antwortet nicht',
+      },
     )
     .toBe('geladen');
 

@@ -41,7 +41,17 @@ interface Props {
  * voll kompatibel. Die Vorschau nutzt die XSS-sichere `Markdown`-Komponente.
  */
 const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
-  { value = '', onChange, layout = 'split', variante = 'dokument', placeholder, autoSize, rows, id, onKeyDown },
+  {
+    value = '',
+    onChange,
+    layout = 'split',
+    variante = 'dokument',
+    placeholder,
+    autoSize,
+    rows,
+    id,
+    onKeyDown,
+  },
   ref,
 ) {
   const [aktiv, setAktiv] = useState<'schreiben' | 'vorschau'>('schreiben');
@@ -71,11 +81,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
       <div className="markdown-editor markdown-editor--toggle">
         {textfeld}
         <div style={{ marginTop: 4 }}>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => setVorschauOffen((v) => !v)}
-          >
+          <Button type="text" icon={<EyeOutlined />} onClick={() => setVorschauOffen((v) => !v)}>
             Vorschau
           </Button>
         </div>

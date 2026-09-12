@@ -75,14 +75,29 @@ export default function KraefteOhneBrSidebar({
           nicht am Layout (Falle aus LFH-343 · H51) — deshalb ein Maß in dvh direkt am Container. */}
       <div style={{ maxHeight: 'min(60dvh, 560px)', overflowY: 'auto' }}>
         {leer && <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>}
-        {!leer && gruppen.length === 0 && <Typography.Text type="secondary">keine Treffer</Typography.Text>}
+        {!leer && gruppen.length === 0 && (
+          <Typography.Text type="secondary">keine Treffer</Typography.Text>
+        )}
         {gruppen.map((g) => (
           <div key={g.titel} style={{ marginBottom: token.marginSM }}>
-            <Typography.Text type="secondary" strong style={{ display: 'block', marginBottom: token.marginXXS }}>
+            <Typography.Text
+              type="secondary"
+              strong
+              style={{ display: 'block', marginBottom: token.marginXXS }}
+            >
               {g.titel}
             </Typography.Text>
             {g.einheiten.map((e) => (
-              <div key={`einheit-${e.id}`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+              <div
+                key={`einheit-${e.id}`}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginBottom: 6,
+                }}
+              >
                 <Tag style={{ flex: 1, minWidth: 0 }}>{e.name}</Tag>
                 {!schreibgeschuetzt && (
                   <Button type="primary" onClick={() => onZuweisenEinheit(e)}>
@@ -92,7 +107,16 @@ export default function KraefteOhneBrSidebar({
               </div>
             ))}
             {g.fahrzeuge.map((f) => (
-              <div key={`fahrzeug-${f.id}`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+              <div
+                key={`fahrzeug-${f.id}`}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginBottom: 6,
+                }}
+              >
                 <Tag style={{ flex: 1, minWidth: 0 }}>{f.funkrufname}</Tag>
                 {!schreibgeschuetzt && (
                   <Button type="primary" onClick={() => onZuweisenFahrzeug(f)}>

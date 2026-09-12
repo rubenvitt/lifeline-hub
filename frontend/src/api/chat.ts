@@ -1,7 +1,6 @@
 import { apiGet, apiSend, apiUpload } from './client';
 import type { Anhang, BezugTyp, ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
 
-
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
   return apiGet<ChatKanal[]>(`/api/einsaetze/${einsatzId}/chat/kanaele`);
 }
@@ -31,7 +30,9 @@ export function listeNachrichten(
   beforeId?: number,
 ): Promise<ChatNachricht[]> {
   const q = beforeId !== undefined ? `?before_id=${beforeId}` : '';
-  return apiGet<ChatNachricht[]>(`/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten${q}`);
+  return apiGet<ChatNachricht[]>(
+    `/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten${q}`,
+  );
 }
 
 /** Lädt Dateien hoch und liefert die Anhang-Metadaten zurück (LFH-102). Der
@@ -56,8 +57,16 @@ export function sendeNachricht(
   );
 }
 
-export function bearbeiteNachricht(einsatzId: number, nachrichtId: number, inhalt: string): Promise<ChatNachricht> {
-  return apiSend<ChatNachricht>(`/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}`, 'PATCH', { inhalt });
+export function bearbeiteNachricht(
+  einsatzId: number,
+  nachrichtId: number,
+  inhalt: string,
+): Promise<ChatNachricht> {
+  return apiSend<ChatNachricht>(
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}`,
+    'PATCH',
+    { inhalt },
+  );
 }
 
 export function loescheNachricht(einsatzId: number, nachrichtId: number): Promise<void> {
@@ -73,14 +82,17 @@ export function setzeBezug(
   zielId: number,
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/bezug`, 'PUT', { typ, ziel_id: zielId },
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/bezug`,
+    'PUT',
+    { typ, ziel_id: zielId },
   );
 }
 
 /** Löst den Sachbezug einer Nachricht (LFH-103). */
 export function loescheBezug(einsatzId: number, nachrichtId: number): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/bezug`, 'DELETE',
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/bezug`,
+    'DELETE',
   );
 }
 
@@ -91,7 +103,9 @@ export function heraufstufenZuEtb(
   inhalt: string,
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-etb`, 'POST', { typ, inhalt },
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-etb`,
+    'POST',
+    { typ, inhalt },
   );
 }
 
@@ -103,6 +117,8 @@ export function heraufstufenZuAuftrag(
   daten: NeuerAuftrag,
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-auftrag`, 'POST', daten,
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-auftrag`,
+    'POST',
+    daten,
   );
 }

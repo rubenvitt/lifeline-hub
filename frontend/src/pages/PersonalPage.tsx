@@ -12,8 +12,12 @@ import { useAuth } from '../auth/AuthContext';
 import { listePersonal, POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
 import {
-  aktualisiereDisposition, disponiereAdhoc, disponierePerson, entferneDisposition,
-  listeEinsatzPersonal, type AdhocEingabe,
+  aktualisiereDisposition,
+  disponiereAdhoc,
+  disponierePerson,
+  entferneDisposition,
+  listeEinsatzPersonal,
+  type AdhocEingabe,
 } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -23,11 +27,21 @@ import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
-import { nichtGefundenInhalt, SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import {
+  nichtGefundenInhalt,
+  SeitenFehler,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
-import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
+import {
+  KATEGORIE_REIHENFOLGE,
+  KATEGORIE_WERTE,
+  kategorieEtikett,
+  kategorieVon,
+} from '../kraefte/statusAchse';
 import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
 
@@ -77,13 +91,22 @@ export default function PersonalPage() {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const epQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
-  const statusQuery = useQuery({ queryKey: globalKeys.personalStatus(), queryFn: listePersonalStatus });
-  const poolQuery = useQuery({ queryKey: globalKeys.personalListe('im-dienst'), queryFn: () => listePersonal(true) });
+  const statusQuery = useQuery({
+    queryKey: globalKeys.personalStatus(),
+    queryFn: listePersonalStatus,
+  });
+  const poolQuery = useQuery({
+    queryKey: globalKeys.personalListe('im-dienst'),
+    queryFn: () => listePersonal(true),
+  });
   // LFH-139: Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label
   // (Gegenrichtung zur Fahrzeugseite). Reine Anzeige — keine eigene Backend-Erweiterung.
   const einheitenQuery = useQuery({
@@ -109,11 +132,15 @@ export default function PersonalPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const disponiereMutation = useMutation({
     mutationFn: (personalId: number) => disponierePerson(einsatzId, personalId),
-    onSuccess: () => { message.success('Personal disponiert'); invalidate(); },
+    onSuccess: () => {
+      message.success('Personal disponiert');
+      invalidate();
+    },
     onError: fehler,
   });
   const adhocMutation = useMutation({
@@ -132,36 +159,40 @@ export default function PersonalPage() {
       const vorher = qc.getQueryData<EinsatzPersonal[]>(queryKey)?.find((ep) => ep.id === v.epId);
       const status = statusQuery.data?.find((s) => s.id === v.statusId);
       qc.setQueryData<EinsatzPersonal[]>(queryKey, (alt) =>
-        alt?.map((ep) => ep.id === v.epId
-          ? {
-              ...ep,
-              status_id: v.statusId,
-              status_label: status?.label ?? ep.status_label,
-              status_kategorie: status?.kategorie ?? ep.status_kategorie,
-              status_farbe: status?.farbe ?? null,
-            }
-          : ep),
+        alt?.map((ep) =>
+          ep.id === v.epId
+            ? {
+                ...ep,
+                status_id: v.statusId,
+                status_label: status?.label ?? ep.status_label,
+                status_kategorie: status?.kategorie ?? ep.status_kategorie,
+                status_farbe: status?.farbe ?? null,
+              }
+            : ep,
+        ),
       );
       return { vorher };
     },
     onSuccess: (serverStand) => {
       qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (alt) =>
-        alt?.map((ep) => ep.id === serverStand.id ? serverStand : ep),
+        alt?.map((ep) => (ep.id === serverStand.id ? serverStand : ep)),
       );
     },
     onError: (e, v, kontext) => {
       const vorher = kontext?.vorher;
       if (vorher) {
         qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (aktuell) =>
-          aktuell?.map((ep) => ep.id === v.epId && ep.status_id === v.statusId
-            ? {
-                ...ep,
-                status_id: vorher.status_id,
-                status_label: vorher.status_label,
-                status_kategorie: vorher.status_kategorie,
-                status_farbe: vorher.status_farbe,
-              }
-            : ep),
+          aktuell?.map((ep) =>
+            ep.id === v.epId && ep.status_id === v.statusId
+              ? {
+                  ...ep,
+                  status_id: vorher.status_id,
+                  status_label: vorher.status_label,
+                  status_kategorie: vorher.status_kategorie,
+                  status_farbe: vorher.status_farbe,
+                }
+              : ep,
+          ),
         );
       }
       fehler(e);
@@ -251,15 +282,21 @@ export default function PersonalPage() {
       laeuft,
       gesperrt: statusMutation.isPending,
       onWaehlen: (wert: string | number) => {
-        if (!statusMutation.isPending) statusMutation.mutate({ epId: ep.id, statusId: Number(wert) });
+        if (!statusMutation.isPending)
+          statusMutation.mutate({ epId: ep.id, statusId: Number(wert) });
       },
     };
   };
 
-  const disponierteIds = new Set(eps.map((e) => e.personal_id).filter((x): x is number => x != null));
+  const disponierteIds = new Set(
+    eps.map((e) => e.personal_id).filter((x): x is number => x != null),
+  );
   const poolOptionen = (poolQuery.data ?? [])
     .filter((p) => !disponierteIds.has(p.id))
-    .map((p) => ({ value: p.id, label: `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}` }));
+    .map((p) => ({
+      value: p.id,
+      label: `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,
+    }));
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, OB die Liste überhaupt ankam
@@ -269,9 +306,10 @@ export default function PersonalPage() {
    *
    * KEIN `kein403`: `src/routes/personal.rs` ist org-lesbar ohne Admin-Schranke.
    */
-  const poolInhalt = nichtGefundenInhalt(poolQuery, {
-    allgemein: 'Personalliste konnte nicht geladen werden',
-  }) ?? 'Keine freien Personen';
+  const poolInhalt =
+    nichtGefundenInhalt(poolQuery, {
+      allgemein: 'Personalliste konnte nicht geladen werden',
+    }) ?? 'Keine freien Personen';
 
   /**
    * Trägerfilter aus den EIGENEN Daten; `undefined` ohne Werte — ein Filterfeld mit null
@@ -282,12 +320,18 @@ export default function PersonalPage() {
    * kleine Verschiebung. Der Tausch ist gewollt: ein dauerhaft leeres Filterfeld sieht wie
    * ein Werkzeug aus und ist keins.
    */
-  const traegerWerte = [...new Set(eps.map((e) => e.traegerorganisation).filter((t): t is string => !!t))]
+  const traegerWerte = [
+    ...new Set(eps.map((e) => e.traegerorganisation).filter((t): t is string => !!t)),
+  ]
     .sort()
     .map((t) => ({ text: t, value: t }));
-  const traegerFilter = traegerWerte.length > 0
-    ? { werte: traegerWerte, trifft: (e: EinsatzPersonal, w: string) => e.traegerorganisation === w }
-    : undefined;
+  const traegerFilter =
+    traegerWerte.length > 0
+      ? {
+          werte: traegerWerte,
+          trifft: (e: EinsatzPersonal, w: string) => e.traegerorganisation === w,
+        }
+      : undefined;
 
   /**
    * Spaltenregister der Personalseite — die breiteste Fläche des Repos (9 Spalten) und
@@ -322,12 +366,19 @@ export default function PersonalPage() {
       ),
     },
     {
-      title: 'Funktion', dataIndex: 'funktion', key: 'funktion',
-      sortWert: (ep) => ep.funktion, suchText: (ep) => ep.funktion, render: (t) => t ?? '—',
+      title: 'Funktion',
+      dataIndex: 'funktion',
+      key: 'funktion',
+      sortWert: (ep) => ep.funktion,
+      suchText: (ep) => ep.funktion,
+      render: (t) => t ?? '—',
     },
     {
-      title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger',
-      filter: traegerFilter, render: (t) => t ?? '—',
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      filter: traegerFilter,
+      render: (t) => t ?? '—',
     },
     {
       title: 'Fahrzeug',
@@ -359,10 +410,14 @@ export default function PersonalPage() {
             placeholder="—"
             allowClear
             options={POSITION_OPTIONEN}
-            onChange={(position) => positionMutation.mutate({ epId: ep.id, position: position ?? null })}
+            onChange={(position) =>
+              positionMutation.mutate({ epId: ep.id, position: position ?? null })
+            }
           />
+        ) : ep.staerke_position ? (
+          POSITION_LABELS[ep.staerke_position]
         ) : (
-          ep.staerke_position ? POSITION_LABELS[ep.staerke_position] : '—'
+          '—'
         ),
     },
     {
@@ -404,7 +459,10 @@ export default function PersonalPage() {
             key: 'aktionen' as const,
             immerSichtbar: true,
             render: (_: unknown, ep: EinsatzPersonal) => (
-              <Popconfirm title="Aus Einsatz entfernen?" onConfirm={() => entfernenMutation.mutate(ep.id)}>
+              <Popconfirm
+                title="Aus Einsatz entfernen?"
+                onConfirm={() => entfernenMutation.mutate(ep.id)}
+              >
                 {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff
                     aus Kriterium 4 ist die Rückfrage. */}
                 <Button>Entfernen</Button>
@@ -435,7 +493,11 @@ export default function PersonalPage() {
       }
       breadcrumb={
         <Breadcrumb
-          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Personal' }]}
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Personal' },
+          ]}
         />
       }
       aktionen={
@@ -450,14 +512,17 @@ export default function PersonalPage() {
               notFoundContent={poolInhalt}
               loading={disponiereMutation.isPending}
               disabled={disponiereMutation.isPending}
-              onSelect={(personalId) => { if (personalId != null) disponiereMutation.mutate(personalId); }}
+              onSelect={(personalId) => {
+                if (personalId != null) disponiereMutation.mutate(personalId);
+              }}
             />
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
           </Space>
         )
       }
       hinweis={
-        !darfSchreiben && einsatz.status !== 'aktiv' && (
+        !darfSchreiben &&
+        einsatz.status !== 'aktiv' && (
           <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
         )
       }
@@ -502,59 +567,59 @@ export default function PersonalPage() {
           onWiederholen={() => void epQuery.refetch()}
         />
       ) : (
-      <>
-      {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
-      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
-      <Datensicht
-        bezeichnung="Personal im Einsatz"
-        spalten={spalten}
-        daten={eps}
-        zeilenSchluessel="id"
-        ladend={epQuery.isLoading}
-        leerText="Noch kein Personal disponiert"
-        suche={{ platzhalter: 'Name, Funktion' }}
-        standardSortierung={{ spalte: 'name', richtung: 'auf' }}
-        spaltenAusVoreinstellung={['bemerkung']}
-        gruppen={{
-          schluessel: (ep) => kategorieVon(ep.status_kategorie),
-          etikett: kategorieEtikett,
-          reihenfolge: KATEGORIE_REIHENFOLGE,
-        }}
-        zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
-        karte={{
-          art: 'plan',
-          titel: { spalte: 'name' },
-          status: (ep) => statusDarstellung(ep),
-          // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entfernen"
-          // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
-          statusBedienung: (ep) => (darfSchreiben ? statusBedienungVon(ep) : null),
-          sekundaer: ['funktion', 'einheit', 'fahrzeug'],
-          aktion: darfSchreiben
-            ? {
-                etikett: 'Entfernen',
-                bestaetigung: 'Aus Einsatz entfernen?',
-                onKlick: (ep) => entfernenMutation.mutate(ep.id),
-              }
-            : undefined,
-        }}
-      />
-      </>
+        <>
+          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
+          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
+          <Datensicht
+            bezeichnung="Personal im Einsatz"
+            spalten={spalten}
+            daten={eps}
+            zeilenSchluessel="id"
+            ladend={epQuery.isLoading}
+            leerText="Noch kein Personal disponiert"
+            suche={{ platzhalter: 'Name, Funktion' }}
+            standardSortierung={{ spalte: 'name', richtung: 'auf' }}
+            spaltenAusVoreinstellung={['bemerkung']}
+            gruppen={{
+              schluessel: (ep) => kategorieVon(ep.status_kategorie),
+              etikett: kategorieEtikett,
+              reihenfolge: KATEGORIE_REIHENFOLGE,
+            }}
+            zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
+            karte={{
+              art: 'plan',
+              titel: { spalte: 'name' },
+              status: (ep) => statusDarstellung(ep),
+              // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entfernen"
+              // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
+              statusBedienung: (ep) => (darfSchreiben ? statusBedienungVon(ep) : null),
+              sekundaer: ['funktion', 'einheit', 'fahrzeug'],
+              aktion: darfSchreiben
+                ? {
+                    etikett: 'Entfernen',
+                    bestaetigung: 'Aus Einsatz entfernen?',
+                    onKlick: (ep) => entfernenMutation.mutate(ep.id),
+                  }
+                : undefined,
+            }}
+          />
+        </>
       )}
 
       {/*
-        * Ad-hoc-Disposition — Schnellerfassung mit Serienmodus (LFH-332/B4). An der
-        * Bereitstellung wird eine Helferkette am Stück aufgenommen, deshalb bleibt der
-        * Dialog nach „Speichern und nächste" stehen; Trägerorganisation und
-        * Stärke-Position überleben das Speichern, weil sie sich über eine Kette hinweg
-        * am seltensten ändern (dieselbe Einheit, dieselbe Funktionsebene).
-        *
-        * FELDBUDGET: hier ist NICHTS eingedampft, und das ist kein Versäumnis — die
-        * Maske trägt bereits genau vier Felder (Name, Funktion, Trägerorganisation,
-        * Stärke-Position) und liegt damit im Rahmen der Modal-/Schnellerfassungs-
-        * Leitlinie (LFH-19: ≤ ~4 Felder). Es gibt nichts wegzunehmen: Name ist Pflicht,
-        * die anderen drei sind genau die Angaben, die eine ad-hoc erfasste Person von
-        * einer namenlosen Zeile unterscheiden.
-        */}
+       * Ad-hoc-Disposition — Schnellerfassung mit Serienmodus (LFH-332/B4). An der
+       * Bereitstellung wird eine Helferkette am Stück aufgenommen, deshalb bleibt der
+       * Dialog nach „Speichern und nächste" stehen; Trägerorganisation und
+       * Stärke-Position überleben das Speichern, weil sie sich über eine Kette hinweg
+       * am seltensten ändern (dieselbe Einheit, dieselbe Funktionsebene).
+       *
+       * FELDBUDGET: hier ist NICHTS eingedampft, und das ist kein Versäumnis — die
+       * Maske trägt bereits genau vier Felder (Name, Funktion, Trägerorganisation,
+       * Stärke-Position) und liegt damit im Rahmen der Modal-/Schnellerfassungs-
+       * Leitlinie (LFH-19: ≤ ~4 Felder). Es gibt nichts wegzunehmen: Name ist Pflicht,
+       * die anderen drei sind genau die Angaben, die eine ad-hoc erfasste Person von
+       * einer namenlosen Zeile unterscheiden.
+       */}
       <ErfassungsModal<AdhocEingabe>
         offen={adhocOffen}
         titel="Ad-hoc-Person disponieren"
@@ -570,7 +635,9 @@ export default function PersonalPage() {
         <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
           <Input placeholder="z. B. Dr. Schmidt" />
         </Form.Item>
-        <Form.Item label="Funktion" name="funktion"><Input placeholder="z. B. Notarzt" /></Form.Item>
+        <Form.Item label="Funktion" name="funktion">
+          <Input placeholder="z. B. Notarzt" />
+        </Form.Item>
         <Form.Item label="Trägerorganisation" name="traegerorganisation">
           <Input placeholder="z. B. KV Musterstadt" />
         </Form.Item>

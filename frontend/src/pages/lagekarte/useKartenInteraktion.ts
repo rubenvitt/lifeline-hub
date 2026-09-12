@@ -23,7 +23,11 @@ import type { ZeichenModus } from './zeichnen';
 import type { PlatzierenPunktTyp } from './Sidebar';
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
-function kopfMitKoordinate(e: EinsatzAnzeige, lat: number | null, lon: number | null): KopfdatenUpdate {
+function kopfMitKoordinate(
+  e: EinsatzAnzeige,
+  lat: number | null,
+  lon: number | null,
+): KopfdatenUpdate {
   return {
     bezeichnung: e.bezeichnung,
     stichwort: e.stichwort ?? null,
@@ -138,7 +142,13 @@ interface KartenInteraktionArgs {
  * Zonen-Entwurf als Orphan liegen — von jsdom-Tests nicht gefangen).
  */
 export function useKartenInteraktion({
-  einsatzId, einsatz, darfSchreiben, alleVerortet, aktiveAnsichtId, fehler, erfolg,
+  einsatzId,
+  einsatz,
+  darfSchreiben,
+  alleVerortet,
+  aktiveAnsichtId,
+  fehler,
+  erfolg,
 }: KartenInteraktionArgs) {
   const qc = useQueryClient();
 
@@ -189,7 +199,8 @@ export function useKartenInteraktion({
   // Stabile Identität (useCallback): diese Setter stehen in Effekt-Deps von LagekartePage
   // (Reverse-Deeplink LFH-155). setSelektion ist selbst stabil, daher leere Deps.
   const setAuswahl = useCallback(
-    (s: string | null) => setSelektion(s != null ? { art: 'objekt', schluessel: s } : { art: 'keine' }),
+    (s: string | null) =>
+      setSelektion(s != null ? { art: 'objekt', schluessel: s } : { art: 'keine' }),
     [],
   );
   const setZoneAuswahl = useCallback(
@@ -197,7 +208,8 @@ export function useKartenInteraktion({
     [],
   );
   const setFachebeneAuswahl = useCallback(
-    (w: FachebeneAuswahl | null) => setSelektion(w != null ? { art: 'fachebene', wert: w } : { art: 'keine' }),
+    (w: FachebeneAuswahl | null) =>
+      setSelektion(w != null ? { art: 'fachebene', wert: w } : { art: 'keine' }),
     [],
   );
 
@@ -245,7 +257,9 @@ export function useKartenInteraktion({
       dispatch({ t: 'beenden', arten: ['platzieren'] });
     },
     onError: fehler,
-    onSettled: () => { verortenLaeuft.current = false; },
+    onSettled: () => {
+      verortenLaeuft.current = false;
+    },
   });
 
   // Freies Zeichen am Klickpunkt anlegen (LFH-170); Spec kommt aus dem Platzier-Modus.
@@ -284,7 +298,8 @@ export function useKartenInteraktion({
       // isPending-Guard: ein zweiter (Doppel-)Klick während des laufenden POST würde ein
       // Duplikat anlegen (legeFreiesZeichenAn ist nicht idempotent). zeichenPlatzieren wird
       // erst in onSuccess geleert, daher hier gegen die pendende Mutation gaten.
-      if (!legeZeichenMutation.isPending) legeZeichenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
+      if (!legeZeichenMutation.isPending)
+        legeZeichenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
       return;
     }
     // Mutation-State erreicht den naechsten Render asynchron. Der Ref schliesst deshalb
@@ -360,7 +375,7 @@ export function useKartenInteraktion({
       typ: zu.typ,
       geometrie_typ: zu.geometrie.type,
       geometrie: JSON.stringify(zu.geometrie),
-      farbe: zu.typ === 'freie_skizze' ? zu.farbe ?? null : null,
+      farbe: zu.typ === 'freie_skizze' ? (zu.farbe ?? null) : null,
       ansicht_id: aktiveAnsichtId ?? null,
     })
       .then(() => {
@@ -428,10 +443,13 @@ export function useKartenInteraktion({
    * in der URL stehen, und der Test lief in seinen Timeout statt in eine Zusicherung.
    * `dispatch` und `setAuswahl` sind beide stabil, die leeren Deps sind also vollständig.
    */
-  const onPlatzierenStart = useCallback((z: { typ: PlatzierenPunktTyp; id: number }) => {
-    dispatch({ t: 'platzieren', ziel: z });
-    setAuswahl(null);
-  }, [setAuswahl]);
+  const onPlatzierenStart = useCallback(
+    (z: { typ: PlatzierenPunktTyp; id: number }) => {
+      dispatch({ t: 'platzieren', ziel: z });
+      setAuswahl(null);
+    },
+    [setAuswahl],
+  );
   const onPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['platzieren'] });
   const onAbschnittZeichnenStart = (id: number) => {
     dispatch({ t: 'abschnitt', id });

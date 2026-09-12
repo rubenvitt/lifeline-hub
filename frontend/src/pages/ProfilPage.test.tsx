@@ -194,7 +194,9 @@ describe('ProfilPage — Passkey-Enroll (LFH-275)', () => {
 
     await screen.findByText(/Profil/);
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Passkey registrieren' })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole('button', { name: 'Passkey registrieren' }),
+      ).not.toBeInTheDocument(),
     );
   });
 });
@@ -211,7 +213,8 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
-          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          otpauth_url:
+            'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
           secret_base32: 'JBSWY3DPEHPK3PXP',
         }),
       ),
@@ -249,7 +252,8 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
-          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          otpauth_url:
+            'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
           secret_base32: 'JBSWY3DPEHPK3PXP',
         }),
       ),
@@ -288,7 +292,8 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
-          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          otpauth_url:
+            'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
           secret_base32: 'JBSWY3DPEHPK3PXP',
         }),
       ),
@@ -320,7 +325,8 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
-          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          otpauth_url:
+            'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
           secret_base32: 'JBSWY3DPEHPK3PXP',
         }),
       ),
@@ -343,7 +349,8 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
-          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          otpauth_url:
+            'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
           secret_base32: 'JBSWY3DPEHPK3PXP',
         }),
       ),
@@ -389,7 +396,8 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
-          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          otpauth_url:
+            'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
           secret_base32: 'JBSWY3DPEHPK3PXP',
         }),
       ),

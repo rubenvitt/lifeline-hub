@@ -23,7 +23,13 @@ describe('ladeBauStatus', () => {
     server.use(
       http.get('/api/karte/offline-karten/bau-status', () =>
         HttpResponse.json([
-          { id: 1, slug: 'bayern', status: { status: 'building' }, gestartet: '2026-01-01T00:00:00Z', beendet: null },
+          {
+            id: 1,
+            slug: 'bayern',
+            status: { status: 'building' },
+            gestartet: '2026-01-01T00:00:00Z',
+            beendet: null,
+          },
         ]),
       ),
     );
@@ -60,7 +66,9 @@ describe('ladeBaubareRegionen', () => {
   it('parst die Liste baubarer Regionen', async () => {
     server.use(
       http.get('/api/karte/offline-karten/baubare-regionen', () =>
-        HttpResponse.json([{ slug: 'bayern', name: 'Bayern', region: 'DE-BY', gruppe: 'Bundesländer' }]),
+        HttpResponse.json([
+          { slug: 'bayern', name: 'Bayern', region: 'DE-BY', gruppe: 'Bundesländer' },
+        ]),
       ),
     );
     await expect(ladeBaubareRegionen()).resolves.toEqual([

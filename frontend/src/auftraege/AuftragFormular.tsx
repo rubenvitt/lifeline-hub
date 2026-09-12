@@ -3,7 +3,13 @@ import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { useEffect, type ReactNode } from 'react';
 import dayjs from 'dayjs';
-import type { AdressatKategorie, AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger, Richtung } from '../api/types';
+import type {
+  AdressatKategorie,
+  AuftragPrioritaet,
+  NeuerAuftrag,
+  NeuerEmpfaenger,
+  Richtung,
+} from '../api/types';
 
 const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
   { value: 'leitstelle', label: 'Leitstelle' },
@@ -87,7 +93,14 @@ function baueEmpfaenger(werte: string[]): NeuerEmpfaenger[] {
 const UEBERNAHME: (keyof FormWerte & string)[] = ['empfaenger', 'prioritaet', 'richtung'];
 
 export default function AuftragFormular({
-  senden, abschnitte, einheiten, onAnlegen, initialText, zitat, serie = false, onFertig,
+  senden,
+  abschnitte,
+  einheiten,
+  onAnlegen,
+  initialText,
+  zitat,
+  serie = false,
+  onFertig,
   card = true,
 }: {
   senden: boolean;
@@ -172,8 +185,14 @@ export default function AuftragFormular({
   };
 
   const zielOptionen = [
-    { label: 'Einsatzabschnitte', options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })) },
-    { label: 'Einheiten', options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })) },
+    {
+      label: 'Einsatzabschnitte',
+      options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })),
+    },
+    {
+      label: 'Einheiten',
+      options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })),
+    },
   ];
 
   /**
@@ -196,10 +215,13 @@ export default function AuftragFormular({
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="richtung" label="Richtung">
-            <Select<Richtung> aria-label="Richtung" options={[
-              { value: 'intern', label: 'Intern' },
-              { value: 'extern', label: 'Extern' },
-            ]} />
+            <Select<Richtung>
+              aria-label="Richtung"
+              options={[
+                { value: 'intern', label: 'Intern' },
+                { value: 'extern', label: 'Extern' },
+              ]}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
@@ -242,7 +264,10 @@ export default function AuftragFormular({
         </Col>
         <Col xs={24} sm={8}>
           <Form.Item name="zeit" label="Zeit / Wann">
-            <Input aria-label="Zeit / Wann" placeholder="z. B. sofort, bis 14:00, nach Eintreffen" />
+            <Input
+              aria-label="Zeit / Wann"
+              placeholder="z. B. sofort, bis 14:00, nach Eintreffen"
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
@@ -270,10 +295,21 @@ export default function AuftragFormular({
     <ErfassungsFormular<FormWerte>
       form={form}
       initialValues={{
-        empfaenger: [], externKategorie: 'leitstelle', externBezeichnung: '',
-        text: initialText ?? '', absicht: '', lage: '', ort: '', zeit: '', mittel: '',
-        verbindung: '', sicherheit: '', prioritaet: 'normal', richtung: 'intern',
-        frist: null, erteiltAm: dayjs(),
+        empfaenger: [],
+        externKategorie: 'leitstelle',
+        externBezeichnung: '',
+        text: initialText ?? '',
+        absicht: '',
+        lage: '',
+        ort: '',
+        zeit: '',
+        mittel: '',
+        verbindung: '',
+        sicherheit: '',
+        prioritaet: 'normal',
+        richtung: 'intern',
+        frist: null,
+        erteiltAm: dayjs(),
       }}
       onErfassen={absenden}
       // Wie beim Meldungs-Zwilling: das Inline-Formular schliesst sich nach dem
@@ -315,11 +351,14 @@ export default function AuftragFormular({
         </Col>
         <Col xs={24} sm={6}>
           <Form.Item name="prioritaet" label="Priorität">
-            <Select<AuftragPrioritaet> aria-label="Priorität" options={[
-              { value: 'sofort', label: 'Sofort' },
-              { value: 'dringend', label: 'Dringend' },
-              { value: 'normal', label: 'Normal' },
-            ]} />
+            <Select<AuftragPrioritaet>
+              aria-label="Priorität"
+              options={[
+                { value: 'sofort', label: 'Sofort' },
+                { value: 'dringend', label: 'Dringend' },
+                { value: 'normal', label: 'Normal' },
+              ]}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={6}>
@@ -331,15 +370,21 @@ export default function AuftragFormular({
       <Collapse
         ghost
         style={{ marginInline: -8, marginBottom: 8 }}
-        items={[{
-          key: 'schema',
-          label: 'Befehlsschema und Richtung (optional)',
-          children: schemaFelder,
-        }]}
+        items={[
+          {
+            key: 'schema',
+            label: 'Befehlsschema und Richtung (optional)',
+            children: schemaFelder,
+          },
+        ]}
       />
     </ErfassungsFormular>
   );
 
   if (!card) return formular;
-  return <Card size="small" title="Neuer Auftrag/Befehl">{formular}</Card>;
+  return (
+    <Card size="small" title="Neuer Auftrag/Befehl">
+      {formular}
+    </Card>
+  );
 }

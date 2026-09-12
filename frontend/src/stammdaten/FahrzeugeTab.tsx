@@ -29,8 +29,14 @@ export default function FahrzeugeTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Fahrzeug | null>(null);
 
-  const fahrzeugeQuery = useQuery({ queryKey: globalKeys.fahrzeugeListe('alle'), queryFn: () => listeFahrzeuge(false) });
-  const vorschlaegeQuery = useQuery({ queryKey: globalKeys.fahrzeugVorschlaege(), queryFn: ladeFahrzeugVorschlaege });
+  const fahrzeugeQuery = useQuery({
+    queryKey: globalKeys.fahrzeugeListe('alle'),
+    queryFn: () => listeFahrzeuge(false),
+  });
+  const vorschlaegeQuery = useQuery({
+    queryKey: globalKeys.fahrzeugVorschlaege(),
+    queryFn: ladeFahrzeugVorschlaege,
+  });
 
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
@@ -92,7 +98,11 @@ export default function FahrzeugeTab() {
       ],
       onFilter: (wert, f) => f.dienststatus === String(wert),
       render: (_, f) =>
-        f.dienststatus === 'in_dienst' ? <Tag color="green">in Dienst</Tag> : <Tag>außer Dienst</Tag>,
+        f.dienststatus === 'in_dienst' ? (
+          <Tag color="green">in Dienst</Tag>
+        ) : (
+          <Tag>außer Dienst</Tag>
+        ),
     },
     ...(istAdmin
       ? ([
@@ -123,7 +133,13 @@ export default function FahrzeugeTab() {
                 dienststatusMutation.isPending && dienststatusMutation.variables?.id === f.id;
               return (
                 <Space size="middle">
-                  <Button disabled={laeuft} onClick={() => { setBearbeite(f); setModalOffen(true); }}>
+                  <Button
+                    disabled={laeuft}
+                    onClick={() => {
+                      setBearbeite(f);
+                      setModalOffen(true);
+                    }}
+                  >
                     Bearbeiten
                   </Button>
                   {f.dienststatus === 'in_dienst' ? (
@@ -137,15 +153,20 @@ export default function FahrzeugeTab() {
                         }
                       }}
                     >
-                      <Button danger loading={laeuft} disabled={laeuft}>Außer Dienst</Button>
+                      <Button danger loading={laeuft} disabled={laeuft}>
+                        Außer Dienst
+                      </Button>
                     </Popconfirm>
                   ) : (
-                    <Button loading={laeuft} disabled={laeuft}
+                    <Button
+                      loading={laeuft}
+                      disabled={laeuft}
                       onClick={() => {
                         if (!laeuft) {
                           dienststatusMutation.mutate({ id: f.id, inDienst: true });
                         }
-                      }}>
+                      }}
+                    >
                       Wieder in Dienst
                     </Button>
                   )}
@@ -167,7 +188,14 @@ export default function FahrzeugeTab() {
            wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
            Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
            deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
-        <Button type="primary" disabled={!istAdmin} onClick={() => { setBearbeite(null); setModalOffen(true); }}>
+        <Button
+          type="primary"
+          disabled={!istAdmin}
+          onClick={() => {
+            setBearbeite(null);
+            setModalOffen(true);
+          }}
+        >
           Fahrzeug anlegen
         </Button>
       }
@@ -201,7 +229,9 @@ export default function FahrzeugeTab() {
       <FahrzeugFormModal
         offen={modalOffen}
         fahrzeug={bearbeite}
-        vorschlaege={vorschlaegeQuery.data ?? { fahrzeugtyp: [], traegerorganisation: [], standort: [] }}
+        vorschlaege={
+          vorschlaegeQuery.data ?? { fahrzeugtyp: [], traegerorganisation: [], standort: [] }
+        }
         onClose={() => setModalOffen(false)}
       />
     </AdminPage>

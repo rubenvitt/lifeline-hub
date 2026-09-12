@@ -9,7 +9,14 @@ import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { fehlerText } from '../api/client';
-import { bestaetigeMeldung, erteileAuftragAusMeldung, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
+import {
+  bestaetigeMeldung,
+  erteileAuftragAusMeldung,
+  listeMeldungen,
+  markiereLagerelevant,
+  setzeMeldungStatus,
+  weiseBearbeiterZu,
+} from '../api/meldungen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import type { Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
@@ -52,11 +59,23 @@ export default function MeldungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const mitgliederQuery = useQuery({ queryKey: einsatzKeys.mitglieder(einsatzId), queryFn: () => ladeMitglieder(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
+  const mitgliederQuery = useQuery({
+    queryKey: einsatzKeys.mitglieder(einsatzId),
+    queryFn: () => ladeMitglieder(einsatzId),
+  });
   // Auftrags-Ziele für das Meldung→Auftrag-Formular (wie AuftraegePage/ChatPage).
-  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+  });
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+  });
 
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Meldungen laden, Server-Default).
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
@@ -83,13 +102,17 @@ export default function MeldungenPage() {
   useQueryParamSelektion('meldung', meldungenQuery.isSuccess, (mid) => {
     const m = (meldungenQuery.data ?? []).find((x) => x.id === mid);
     if (!m) return;
-    setAnsicht(istAbgeschlossen(MELDUNG_STATUS[m.status]?.phase ?? 'offen') ? 'abgeschlossen' : 'offen');
+    setAnsicht(
+      istAbgeschlossen(MELDUNG_STATUS[m.status]?.phase ?? 'offen') ? 'abgeschlossen' : 'offen',
+    );
     setRichtungFilter(undefined);
     setHighlightMeldungId(mid);
   });
   useEffect(() => {
     if (highlightMeldungId == null) return;
-    document.querySelector(`[data-meldung-id="${highlightMeldungId}"]`)?.scrollIntoView?.({ block: 'center' });
+    document
+      .querySelector(`[data-meldung-id="${highlightMeldungId}"]`)
+      ?.scrollIntoView?.({ block: 'center' });
   }, [highlightMeldungId]);
 
   const fehler = (e: unknown) => message.error(fehlerText(e));
@@ -130,16 +153,20 @@ export default function MeldungenPage() {
    * Rückgängig-Toast erzeugen, sonst schaukelte sich das Paar endlos auf.
    */
   const statusMutation = useMutation({
-    mutationFn: ({ meldungId, status }: {
-      meldungId: number; status: MeldungStatus; vorher?: MeldungStatus; zurueck?: boolean;
+    mutationFn: ({
+      meldungId,
+      status,
+    }: {
+      meldungId: number;
+      status: MeldungStatus;
+      vorher?: MeldungStatus;
+      zurueck?: boolean;
     }) => setzeMeldungStatus(einsatzId, meldungId, status),
     onSuccess: (_daten, { meldungId, status, vorher, zurueck }) => {
       invalidiere();
       if (zurueck || !vorher) return;
-      zeigeRueckgaengig(
-        message,
-        `Meldung ${MELDUNG_STATUS[status]?.label ?? status}`,
-        () => statusMutation.mutate({ meldungId, status: vorher, zurueck: true }),
+      zeigeRueckgaengig(message, `Meldung ${MELDUNG_STATUS[status]?.label ?? status}`, () =>
+        statusMutation.mutate({ meldungId, status: vorher, zurueck: true }),
       );
     },
     onError: fehler,
@@ -163,7 +190,10 @@ export default function MeldungenPage() {
   });
   const bestaetigenMutation = useMutation({
     mutationFn: (meldungId: number) => bestaetigeMeldung(einsatzId, meldungId),
-    onSuccess: () => { invalidiere(); message.success('Sofortmeldung bestätigt'); },
+    onSuccess: () => {
+      invalidiere();
+      message.success('Sofortmeldung bestätigt');
+    },
     onError: fehler,
   });
   const auftragMutation = useMutation({
@@ -194,7 +224,11 @@ export default function MeldungenPage() {
   });
 
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -205,8 +239,12 @@ export default function MeldungenPage() {
 
   // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
   const phaseVon = (m: Meldung) => MELDUNG_STATUS[m.status]?.phase ?? 'offen';
-  const offene = alleMeldungen.filter((m) => !istAbgeschlossen(phaseVon(m))).sort(vergleicheMeldung);
-  const abgeschlossene = alleMeldungen.filter((m) => istAbgeschlossen(phaseVon(m))).sort(vergleicheAbgeschlossen);
+  const offene = alleMeldungen
+    .filter((m) => !istAbgeschlossen(phaseVon(m)))
+    .sort(vergleicheMeldung);
+  const abgeschlossene = alleMeldungen
+    .filter((m) => istAbgeschlossen(phaseVon(m)))
+    .sort(vergleicheAbgeschlossen);
   const mitglieder = mitgliederQuery.data ?? [];
 
   // Zwei Gruppen in der Offen-Ansicht (LFH-343 · C8, Befund H47). Die Seite war
@@ -232,7 +270,8 @@ export default function MeldungenPage() {
       const vorher = alleMeldungen.find((m) => m.id === meldungId)?.status;
       statusMutation.mutate({ meldungId, status, vorher });
     },
-    onZuweisen: (meldungId: number, bearbeiterId: number | null) => zuweisenMutation.mutate({ meldungId, bearbeiterId }),
+    onZuweisen: (meldungId: number, bearbeiterId: number | null) =>
+      zuweisenMutation.mutate({ meldungId, bearbeiterId }),
     onLagerelevant: (meldungId: number) => {
       const m = alleMeldungen.find((x) => x.id === meldungId) ?? null;
       setLageMeldung(m);
@@ -258,11 +297,15 @@ export default function MeldungenPage() {
       />
       <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
         <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>Meldungen (eingehend)</Typography.Title>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            Meldungen (eingehend)
+          </Typography.Title>
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
-          <div><Datenstand dataUpdatedAt={meldungenQuery.dataUpdatedAt} /></div>
+          <div>
+            <Datenstand dataUpdatedAt={meldungenQuery.dataUpdatedAt} />
+          </div>
         </div>
         {darfSchreiben && (
           <Button
@@ -281,14 +324,14 @@ export default function MeldungenPage() {
           size="small"
           title="Neue Meldung erfassen"
           style={{ marginBottom: 16 }}
-          extra={(
+          extra={
             <Button
               type="text"
               icon={<CloseOutlined />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />
-          )}
+          }
         >
           <MeldungFormular
             card={false}
@@ -302,9 +345,22 @@ export default function MeldungenPage() {
       )}
 
       {meldungenQuery.isError && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Meldungen konnten nicht geladen werden" />
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="Meldungen konnten nicht geladen werden"
+        />
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 16,
+          alignItems: 'center',
+        }}
+      >
         <Segmented
           value={ansicht}
           onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
@@ -357,9 +413,11 @@ export default function MeldungenPage() {
         onAbbrechen={() => setAuftragMeldung(null)}
         // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
         // wenn der Auftrag wirklich angekommen ist (LFH-332/B4).
-        onAnlegen={(daten) => (auftragMeldung
-          ? auftragMutation.mutateAsync({ meldungId: auftragMeldung.id, daten })
-          : Promise.reject(new Error('Keine Quellmeldung')))}
+        onAnlegen={(daten) =>
+          auftragMeldung
+            ? auftragMutation.mutateAsync({ meldungId: auftragMeldung.id, daten })
+            : Promise.reject(new Error('Keine Quellmeldung'))
+        }
       />
     </div>
   );

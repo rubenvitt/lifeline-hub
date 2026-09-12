@@ -5,8 +5,17 @@ import GefahrenZelleDetails, { type GefahrenZelleDetailsProps } from './Gefahren
 import type { GefahrBewertung } from '../../api/types';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
-  id: 1, gefahrengebiet_id: 7, gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
-  beschreibung: null, gemeldet_von: null, aktualisiert_von: 1, erstellt_at: '', geaendert_at: '', ...over,
+  id: 1,
+  gefahrengebiet_id: 7,
+  gefahrentyp: 'brand',
+  schutzobjekt: 'menschen',
+  warnstufe: 'hoch',
+  beschreibung: null,
+  gemeldet_von: null,
+  aktualisiert_von: 1,
+  erstellt_at: '',
+  geaendert_at: '',
+  ...over,
 });
 
 const PFLICHT: GefahrenZelleDetailsProps = {
@@ -40,11 +49,18 @@ describe('GefahrenZelleDetails', () => {
     );
     expect(await screen.findByLabelText('Beschreibung')).toHaveValue('Dachstuhl');
 
-    rerender(dialog({
-      kennung: 'brand×tiere',
-      titel: 'Brand × Tiere',
-      zelle: zelle({ id: 2, schutzobjekt: 'tiere', beschreibung: 'Weidezaun', gemeldet_von: null }),
-    }));
+    rerender(
+      dialog({
+        kennung: 'brand×tiere',
+        titel: 'Brand × Tiere',
+        zelle: zelle({
+          id: 2,
+          schutzobjekt: 'tiere',
+          beschreibung: 'Weidezaun',
+          gemeldet_von: null,
+        }),
+      }),
+    );
     expect(screen.getByLabelText('Beschreibung')).toHaveValue('Weidezaun');
     expect(screen.getByLabelText('Gemeldet von')).toHaveValue('');
   });

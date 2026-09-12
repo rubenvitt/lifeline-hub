@@ -33,10 +33,6 @@ export function Select<
   ...rest
 }: SelectProps<ValueType, OptionType> & { ref?: Ref<RefSelectProps> }): ReactElement {
   return (
-    <AntSelect<ValueType, OptionType>
-      ref={ref}
-      showSearch={showSearch ?? SUCH_DEFAULT}
-      {...rest}
-    />
+    <AntSelect<ValueType, OptionType> ref={ref} showSearch={showSearch ?? SUCH_DEFAULT} {...rest} />
   );
 }

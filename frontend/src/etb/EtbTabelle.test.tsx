@@ -23,8 +23,10 @@ beforeEach(() => setzeViewportBreite(1366));
  * gepufferte Zeile braucht, gibt `zeilen` direkt.
  */
 function renderTabelle(
-  props: Omit<Partial<TabellenProps>, 'zeilen'>
-    & { eintraege?: EtbEintragAnzeige[]; zeilen?: readonly EtbZeile[] },
+  props: Omit<Partial<TabellenProps>, 'zeilen'> & {
+    eintraege?: EtbEintragAnzeige[];
+    zeilen?: readonly EtbZeile[];
+  },
 ) {
   const { eintraege, zeilen, ...rest } = props;
   return render(
@@ -40,7 +42,9 @@ function renderTabelle(
 
 function ausstehend(over: Partial<AusstehenderEintrag> = {}): AusstehenderEintrag {
   return {
-    id: 1, benutzer_id: 1, einsatz_id: 1,
+    id: 1,
+    benutzer_id: 1,
+    einsatz_id: 1,
     eintrag: { typ: 'meldung', inhalt: 'Noch nicht gesendet' },
     erstellt_at: '2026-05-23 10:05:00',
     ...over,
@@ -113,7 +117,9 @@ describe('EtbTabelle', () => {
    */
   it('beschriftet nachgetragene Einträge mit dem Wort „Nachtrag"', () => {
     renderTabelle({
-      eintraege: [eintrag({ ereigniszeit: '2026-05-23 09:00:00', received_at: '2026-05-23 10:00:00' })],
+      eintraege: [
+        eintrag({ ereigniszeit: '2026-05-23 09:00:00', received_at: '2026-05-23 10:00:00' }),
+      ],
     });
     expect(screen.getByRole('cell', { name: /Nachtrag/ })).toBeInTheDocument();
     expect(screen.queryByText('⧖')).not.toBeInTheDocument();
@@ -161,7 +167,8 @@ describe('EtbTabelle', () => {
   it('zeigt einen Deeplink-Badge auf den gekoppelten Befehl (LFH-25)', () => {
     renderTabelle({ eintraege: [eintrag({ id: 5, befehl_id: 42 })] });
     expect(screen.getByRole('link', { name: /Befehl/ })).toHaveAttribute(
-      'href', '/einsaetze/1/auftraege/befehle/42',
+      'href',
+      '/einsaetze/1/auftraege/befehle/42',
     );
   });
 
@@ -169,7 +176,9 @@ describe('EtbTabelle', () => {
     const { container } = renderTabelle({ eintraege: [eintrag({ id: 9 })], highlightId: 9 });
     // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix — die Queue-`id` eines
     // gepufferten Eintrags kollidierte sonst mit der DB-`id`.
-    expect(container.querySelector('[data-row-key="eintrag-9"]')).toHaveClass('zeile-hervorgehoben');
+    expect(container.querySelector('[data-row-key="eintrag-9"]')).toHaveClass(
+      'zeile-hervorgehoben',
+    );
   });
 });
 
@@ -455,9 +464,13 @@ describe('EtbTabelle – gepufferte Einträge (LFH-342 · C7, Befund M82)', () =
     expect(screen.getByText('abgelehnt')).toBeInTheDocument();
     // Kein Menü: eine Ablehnung verlangt eine Entscheidung, und beide Wege stehen da.
     await userEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
-    expect(onErneutSenden).toHaveBeenCalledWith(expect.objectContaining({ grund: 'Einsatz abgeschlossen' }));
+    expect(onErneutSenden).toHaveBeenCalledWith(
+      expect.objectContaining({ grund: 'Einsatz abgeschlossen' }),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
-    expect(onVerwerfen).toHaveBeenCalledWith(expect.objectContaining({ grund: 'Einsatz abgeschlossen' }));
+    expect(onVerwerfen).toHaveBeenCalledWith(
+      expect.objectContaining({ grund: 'Einsatz abgeschlossen' }),
+    );
   });
 
   /**
@@ -505,9 +518,9 @@ describe('EtbTabelle — Fließender Meldungstext (LFH-523)', () => {
   }
 
   const LANG =
-    'Im Kellergeschoss des Anwesens Musterweg 3 steht das Wasser rund achtzig Zentimeter '
-    + 'hoch. Die Heizungsanlage ist betroffen, der Hausanschlusskasten noch trocken. '
-    + 'Eigentümer vor Ort, Zugang über die Hofseite möglich.';
+    'Im Kellergeschoss des Anwesens Musterweg 3 steht das Wasser rund achtzig Zentimeter ' +
+    'hoch. Die Heizungsanlage ist betroffen, der Hausanschlusskasten noch trocken. ' +
+    'Eigentümer vor Ort, Zugang über die Hofseite möglich.';
 
   it('deckelt die Tabellenbreite, statt sie vom längsten Text treiben zu lassen', () => {
     setzeViewportBreite(1366);

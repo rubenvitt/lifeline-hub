@@ -3,7 +3,9 @@ import { abstand, form } from '../theme/tokens';
 import { ModulListe } from './ModulPanel';
 import {
   moduleNachKategorie,
-  type Kategorie, type KategorieKey, type ModulEintrag,
+  type Kategorie,
+  type KategorieKey,
+  type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';

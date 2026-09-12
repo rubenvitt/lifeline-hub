@@ -21,8 +21,14 @@ export default function MaterialTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Material | null>(null);
 
-  const materialQuery = useQuery({ queryKey: globalKeys.materialListe('alle'), queryFn: () => listeMaterial(false) });
-  const kategorienQuery = useQuery({ queryKey: globalKeys.materialKategorien(), queryFn: listeKategorien });
+  const materialQuery = useQuery({
+    queryKey: globalKeys.materialListe('alle'),
+    queryFn: () => listeMaterial(false),
+  });
+  const kategorienQuery = useQuery({
+    queryKey: globalKeys.materialKategorien(),
+    queryFn: listeKategorien,
+  });
 
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
@@ -48,7 +54,12 @@ export default function MaterialTab() {
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
     },
     { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie', render: (t) => t ?? '—' },
-    { title: 'Bestandsnummer', dataIndex: 'bestandsnummer', key: 'bestandsnummer', render: (t) => t ?? '—' },
+    {
+      title: 'Bestandsnummer',
+      dataIndex: 'bestandsnummer',
+      key: 'bestandsnummer',
+      render: (t) => t ?? '—',
+    },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
     {
       title: 'Status',
@@ -72,7 +83,11 @@ export default function MaterialTab() {
       ],
       onFilter: (wert, m) => m.dienststatus === String(wert),
       render: (_, m) =>
-        m.dienststatus === 'in_dienst' ? <Tag color="green">in Dienst</Tag> : <Tag>außer Dienst</Tag>,
+        m.dienststatus === 'in_dienst' ? (
+          <Tag color="green">in Dienst</Tag>
+        ) : (
+          <Tag>außer Dienst</Tag>
+        ),
     },
     ...(istAdmin
       ? ([
@@ -103,7 +118,13 @@ export default function MaterialTab() {
                 dienststatusMutation.isPending && dienststatusMutation.variables?.id === m.id;
               return (
                 <Space size="middle">
-                  <Button disabled={laeuft} onClick={() => { setBearbeite(m); setModalOffen(true); }}>
+                  <Button
+                    disabled={laeuft}
+                    onClick={() => {
+                      setBearbeite(m);
+                      setModalOffen(true);
+                    }}
+                  >
                     Bearbeiten
                   </Button>
                   {m.dienststatus === 'in_dienst' ? (
@@ -117,15 +138,20 @@ export default function MaterialTab() {
                         }
                       }}
                     >
-                      <Button danger loading={laeuft} disabled={laeuft}>Außer Dienst</Button>
+                      <Button danger loading={laeuft} disabled={laeuft}>
+                        Außer Dienst
+                      </Button>
                     </Popconfirm>
                   ) : (
-                    <Button loading={laeuft} disabled={laeuft}
+                    <Button
+                      loading={laeuft}
+                      disabled={laeuft}
                       onClick={() => {
                         if (!laeuft) {
                           dienststatusMutation.mutate({ id: m.id, inDienst: true });
                         }
-                      }}>
+                      }}
+                    >
                       Wieder in Dienst
                     </Button>
                   )}
@@ -147,7 +173,14 @@ export default function MaterialTab() {
            wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
            Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
            deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
-        <Button type="primary" disabled={!istAdmin} onClick={() => { setBearbeite(null); setModalOffen(true); }}>
+        <Button
+          type="primary"
+          disabled={!istAdmin}
+          onClick={() => {
+            setBearbeite(null);
+            setModalOffen(true);
+          }}
+        >
           Material anlegen
         </Button>
       }

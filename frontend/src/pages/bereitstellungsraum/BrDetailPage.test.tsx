@@ -23,48 +23,103 @@ vi.mock('./BrSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return {
-    id: 1, bezeichnung: 'Test-Einsatz', stichwort: null, status: 'aktiv',
-    begonnen_at: 'x', abgeschlossen_at: null, abgeschlossen_von: null,
-    einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: 'x',
-    leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-    meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-    meine_rolle: 'fuehrungspersonal', org_id: 1, org_name: 'Org',
+    id: 1,
+    bezeichnung: 'Test-Einsatz',
+    stichwort: null,
+    status: 'aktiv',
+    begonnen_at: 'x',
+    abgeschlossen_at: null,
+    abgeschlossen_von: null,
+    einsatzart: 'realeinsatz',
+    einsatznummer_intern: null,
+    angelegt_at: 'x',
+    leitstellen_nr: null,
+    einsatzort: null,
+    einsatzort_lat: null,
+    einsatzort_lon: null,
+    meldende_stelle: null,
+    sachverhalt: null,
+    anzahl_betroffene_initial: null,
+    meine_rolle: 'fuehrungspersonal',
+    org_id: 1,
+    org_name: 'Org',
     ...over,
   };
 }
 
 function brDetail(over: Partial<BrDetail> = {}): BrDetail {
   return {
-    id: 1, einsatz_id: 1, abschnitt_id: null, bezeichnung: 'BR Alpha',
-    standort: null, notiz: null, status: 'aktiv',
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1,
-    storniert_at: null, einheiten: [], fahrzeuge: [],
+    id: 1,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    bezeichnung: 'BR Alpha',
+    standort: null,
+    notiz: null,
+    status: 'aktiv',
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
+    einheiten: [],
+    fahrzeuge: [],
     ...over,
   };
 }
 
 function fahrzeug(over: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug {
   return {
-    id: 20, einsatz_id: 1, fahrzeug_id: null, einheit_id: null, ist_adhoc: true,
-    funkrufname: 'Florian 1', kennzeichen: null, fahrzeugtyp: null, opta: null,
-    traegerorganisation: null, status_id: null, status_label: null,
-    status_kategorie: null, status_farbe: null, bemerkung: null,
-    disponiert_at: 'x', disponiert_von: null,
-    lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
-    aktueller_br_id: null, soll_besatzung: null,
+    id: 20,
+    einsatz_id: 1,
+    fahrzeug_id: null,
+    einheit_id: null,
+    ist_adhoc: true,
+    funkrufname: 'Florian 1',
+    kennzeichen: null,
+    fahrzeugtyp: null,
+    opta: null,
+    traegerorganisation: null,
+    status_id: null,
+    status_label: null,
+    status_kategorie: null,
+    status_farbe: null,
+    bemerkung: null,
+    disponiert_at: 'x',
+    disponiert_von: null,
+    lat: null,
+    lon: null,
+    tz_fachaufgabe: null,
+    tz_organisation: null,
+    aktueller_br_id: null,
+    soll_besatzung: null,
     ...over,
   };
 }
 
 function einheit(over: Partial<Einheit> = {}): Einheit {
   return {
-    id: 30, einsatz_id: 1, abschnitt_id: null, abschnitt_name: null,
-    ueber_einheit_id: null, typ_id: null, typ_label: null, name: 'Einheit Beta',
-    fuehrer_id: null, fuehrer_name: null, bemerkung: null, sortier: 0,
-    soll: null, ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    id: 30,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    abschnitt_name: null,
+    ueber_einheit_id: null,
+    typ_id: null,
+    typ_label: null,
+    name: 'Einheit Beta',
+    fuehrer_id: null,
+    fuehrer_name: null,
+    bemerkung: null,
+    sortier: 0,
+    soll: null,
+    ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-    personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
-    lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
+    personal_mitglieder: [],
+    fahrzeug_mitglieder: [],
+    material_mitglieder: [],
+    lat: null,
+    lon: null,
+    tz_fachaufgabe: null,
+    tz_organisation: null,
     aktueller_br_id: null,
     sprechgruppen: [],
     ...over,
@@ -98,7 +153,10 @@ function renderBrBei(route: string) {
         <AuthProvider>
           <MemoryRouter initialEntries={[route]}>
             <Routes>
-              <Route path="/einsaetze/:id/bereitstellungsraeume/liste" element={<div>BR-LISTE</div>} />
+              <Route
+                path="/einsaetze/:id/bereitstellungsraeume/liste"
+                element={<div>BR-LISTE</div>}
+              />
               <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
             </Routes>
           </MemoryRouter>
@@ -133,8 +191,15 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
       http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json({
-          id: 1, einsatz_id: 1, br_id: 1, objekt_typ: 'einheit', objekt_id: 10,
-          art: 'austritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+          id: 1,
+          einsatz_id: 1,
+          br_id: 1,
+          objekt_typ: 'einheit',
+          objekt_id: 10,
+          art: 'austritt',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
         });
       }),
     );
@@ -171,8 +236,15 @@ describe('BrDetailPage – Sidebar zuweisen (LFH-14)', () => {
       http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', async ({ request }) => {
         capturedBody = await request.json();
         return HttpResponse.json({
-          id: 2, einsatz_id: 1, br_id: 1, objekt_typ: 'fahrzeug', objekt_id: 20,
-          art: 'eintritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+          id: 2,
+          einsatz_id: 1,
+          br_id: 1,
+          objekt_typ: 'fahrzeug',
+          objekt_id: 20,
+          art: 'eintritt',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
         });
       }),
     );
@@ -280,17 +352,35 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
 
 describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
   it('zeigt je bereitgestellter Einheit Typ und Stärke sowie die Summenzeile', async () => {
-    const zug = einheit({ id: 10, name: 'Zug 1', typ_label: 'Zug', ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 } });
-    const trupp = einheit({ id: 11, name: 'Trupp 2', typ_label: 'Trupp', ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 } });
-    const br = brDetail({ einheiten: [{ id: 10, name: 'Zug 1' }, { id: 11, name: 'Trupp 2' }], fahrzeuge: [{ id: 5, funkrufname: 'Florian 1' }] });
+    const zug = einheit({
+      id: 10,
+      name: 'Zug 1',
+      typ_label: 'Zug',
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
+    });
+    const trupp = einheit({
+      id: 11,
+      name: 'Trupp 2',
+      typ_label: 'Trupp',
+      ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 },
+    });
+    const br = brDetail({
+      einheiten: [
+        { id: 10, name: 'Zug 1' },
+        { id: 11, name: 'Trupp 2' },
+      ],
+      fahrzeuge: [{ id: 5, funkrufname: 'Florian 1' }],
+    });
 
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug, trupp])),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([
-        fahrzeug({ id: 5, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', aktueller_br_id: 1 }),
-      ])),
+      http.get('/api/einsaetze/1/fahrzeuge', () =>
+        HttpResponse.json([
+          fahrzeug({ id: 5, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', aktueller_br_id: 1 }),
+        ]),
+      ),
     );
 
     renderBrDetail();
@@ -308,9 +398,16 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
     // BR trägt zwei Einheiten, die Einheiten-Query liefert nur eine davon zurück
     // (Teilausfall/Cache-Lücke) — die Summenzeile darf keine vollständig aussehende,
     // in Wahrheit zu kleine Zahl zeigen.
-    const zug = einheit({ id: 10, name: 'Zug 1', ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 } });
+    const zug = einheit({
+      id: 10,
+      name: 'Zug 1',
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
+    });
     const br = brDetail({
-      einheiten: [{ id: 10, name: 'Zug 1' }, { id: 11, name: 'Trupp 2' }],
+      einheiten: [
+        { id: 10, name: 'Zug 1' },
+        { id: 11, name: 'Trupp 2' },
+      ],
       fahrzeuge: [],
     });
 
@@ -326,7 +423,9 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
     const summe = await screen.findByTestId('br-summe');
     expect(summe).toHaveTextContent('Bereitgestellt: —');
     expect(summe).not.toHaveTextContent('//');
-    expect(screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)')).toBeInTheDocument();
+    expect(
+      screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)'),
+    ).toBeInTheDocument();
     // Namen bleiben aus `br.einheiten` sichtbar, auch wenn die Detaildaten fehlen.
     expect(screen.getByText('Trupp 2')).toBeInTheDocument();
   });
@@ -346,7 +445,9 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
     expect(await screen.findByText('Zug 1')).toBeInTheDocument();
     const summe = screen.getByTestId('br-summe');
     expect(summe).toHaveTextContent('Bereitgestellt: —');
-    expect(screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)')).toBeInTheDocument();
+    expect(
+      screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)'),
+    ).toBeInTheDocument();
   });
 });
 

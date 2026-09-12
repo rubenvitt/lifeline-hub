@@ -31,8 +31,17 @@ export interface MeldungListeProps {
  * ist in die Karte gewandert.
  */
 export default function MeldungListe({
-  meldungen, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder, highlightId,
-  onStatus, onZuweisen, onLagerelevant, onBestaetigen, onAuftragErteilen,
+  meldungen,
+  ansicht = 'offen',
+  einsatzId,
+  darfSchreiben,
+  mitglieder,
+  highlightId,
+  onStatus,
+  onZuweisen,
+  onLagerelevant,
+  onBestaetigen,
+  onAuftragErteilen,
 }: MeldungListeProps) {
   if (meldungen.length === 0) return <SeitenLeer titel="Keine Meldungen" />;
   return (

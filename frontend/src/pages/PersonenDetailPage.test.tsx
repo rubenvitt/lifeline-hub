@@ -12,9 +12,16 @@ import { einsatzKeys } from '../api/queryKeys';
 import { erzeugeQueryClient } from '../api/queryClient';
 
 class FakeEventSource {
-  url: string; closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {} removeEventListener() {} close() { this.closed = true; }
+  url: string;
+  closed = false;
+  constructor(url: string) {
+    this.url = url;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+  close() {
+    this.closed = true;
+  }
 }
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
@@ -22,28 +29,64 @@ afterEach(() => vi.unstubAllGlobals());
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
 const nutzer = {
-  id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-27 10:00:00',
+  id: 1,
+  anzeigename: 'Nutzer',
+  benutzername: 'nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-27 10:00:00',
 };
 const einsatzAktiv = {
-  id: 1, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+  id: 1,
+  bezeichnung: 'Hochwasser',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-27 08:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-05-27 08:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
   meine_rolle: 'einsatzleitung',
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 
 const detail = {
-  id: 10, einsatz_id: 1, registrier_nr: 1, status: 'erfasst',
-  name: 'Mustermann', vorname: 'Max', geschlecht: 'maennlich', geburtsdatum: null,
-  alter_geschaetzt: 40, herkunft_adresse: null, antreff_ort: 'Brücke', melder_kontakt: null,
-  notiz: null, erfasst_at: '2026-05-27 09:00:00', erfasst_von: 1,
-  geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1, storniert_at: null,
-  aktuelle_sichtung: null, aktuelle_sichtung_at: null, aktueller_verbleib: null,
-  aktuelle_uhs_id: null, aktueller_platz_id: null,
-  sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
+  id: 10,
+  einsatz_id: 1,
+  registrier_nr: 1,
+  status: 'erfasst',
+  name: 'Mustermann',
+  vorname: 'Max',
+  geschlecht: 'maennlich',
+  geburtsdatum: null,
+  alter_geschaetzt: 40,
+  herkunft_adresse: null,
+  antreff_ort: 'Brücke',
+  melder_kontakt: null,
+  notiz: null,
+  erfasst_at: '2026-05-27 09:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-27 09:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
+  aktuelle_sichtung: null,
+  aktuelle_sichtung_at: null,
+  aktueller_verbleib: null,
+  aktuelle_uhs_id: null,
+  aktueller_platz_id: null,
+  sichtungen: [],
+  notizen: [],
+  verbleib: [],
+  abgleiche: [],
 } as PersonDetail;
 
 function render(
@@ -106,7 +149,12 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 
   it('verlinkt „Als Geschädigte" auf die Schaden-Detailseite (LFH-148)', async () => {
     const schaden = {
-      id: 99, einsatz_id: 1, registrier_nr: 5, typ: 'sachschaden', ausmass: 'gering', status: 'offen',
+      id: 99,
+      einsatz_id: 1,
+      registrier_nr: 5,
+      typ: 'sachschaden',
+      ausmass: 'gering',
+      status: 'offen',
     };
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden])),
@@ -280,8 +328,12 @@ describe('PersonenDetailPage — Kopfleiste', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     const menue = await oeffneKopfmenue();
     expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
-    const eintraege = [...menue.querySelectorAll('[role="menuitem"], .ant-dropdown-menu-item-divider')];
-    const trenner = eintraege.findIndex((e) => e.classList.contains('ant-dropdown-menu-item-divider'));
+    const eintraege = [
+      ...menue.querySelectorAll('[role="menuitem"], .ant-dropdown-menu-item-divider'),
+    ];
+    const trenner = eintraege.findIndex((e) =>
+      e.classList.contains('ant-dropdown-menu-item-divider'),
+    );
     const storno = eintraege.findIndex((e) => (e.textContent ?? '').includes('Stornieren'));
     expect(trenner).toBeGreaterThan(-1);
     expect(storno).toBeGreaterThan(trenner);
@@ -333,9 +385,19 @@ describe('PersonenDetailPage — med. Verlauf', () => {
     let gerufen: { kategorie?: string } = {};
     render(einsatzAktiv, detail, [
       http.post('/api/einsaetze/1/personen/10/sichtung', async ({ request }) => {
-        gerufen = await request.json() as { kategorie?: string };
-        return HttpResponse.json({ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'sk2',
-          notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }, { status: 201 });
+        gerufen = (await request.json()) as { kategorie?: string };
+        return HttpResponse.json(
+          {
+            id: 1,
+            einsatz_id: 1,
+            person_id: 10,
+            kategorie: 'sk2',
+            notiz: null,
+            gesichtet_at: '2026-05-27 10:00:00',
+            gesichtet_von: 1,
+          },
+          { status: 201 },
+        );
       }),
     ]);
     // Seit LFH-340 · C5 ist das die PRIMÄRAKTION des Kopfes, und sie heißt bei einer
@@ -348,9 +410,22 @@ describe('PersonenDetailPage — med. Verlauf', () => {
   });
 
   it('zeigt bei Sichtung=tot den Hinweis „Status → verstorben"', async () => {
-    const totDetail = { ...detail, aktuelle_sichtung: 'tot' as Sichtungskategorie, aktuelle_sichtung_at: '2026-05-27 10:00:00',
-      sichtungen: [{ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'tot' as Sichtungskategorie,
-        notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }] } as PersonDetail;
+    const totDetail = {
+      ...detail,
+      aktuelle_sichtung: 'tot' as Sichtungskategorie,
+      aktuelle_sichtung_at: '2026-05-27 10:00:00',
+      sichtungen: [
+        {
+          id: 1,
+          einsatz_id: 1,
+          person_id: 10,
+          kategorie: 'tot' as Sichtungskategorie,
+          notiz: null,
+          gesichtet_at: '2026-05-27 10:00:00',
+          gesichtet_von: 1,
+        },
+      ],
+    } as PersonDetail;
     render(einsatzAktiv, totDetail);
     expect(await screen.findByRole('button', { name: /Status → verstorben/ })).toBeInTheDocument();
   });
@@ -358,8 +433,17 @@ describe('PersonenDetailPage — med. Verlauf', () => {
   it('zeigt die Chronologie-Zeiten taktisch formatiert (LFH-141), nicht als Rohstring', async () => {
     const mitSichtung = {
       ...detail,
-      sichtungen: [{ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'sk2' as Sichtungskategorie,
-        notiz: 'Befund', gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }],
+      sichtungen: [
+        {
+          id: 1,
+          einsatz_id: 1,
+          person_id: 10,
+          kategorie: 'sk2' as Sichtungskategorie,
+          notiz: 'Befund',
+          gesichtet_at: '2026-05-27 10:00:00',
+          gesichtet_von: 1,
+        },
+      ],
     } as PersonDetail;
     render(einsatzAktiv, mitSichtung);
     await screen.findByRole('heading', { name: /Person R-001/ });
@@ -375,10 +459,16 @@ describe('PersonenDetailPage — Stammdaten', () => {
   it('rollt nur den Status zurück und bewahrt neuere Listen- und Detailfelder', async () => {
     const mitVerlauf = {
       ...detail,
-      notizen: [{
-        id: 7, einsatz_id: 1, person_id: 10, text: 'bestehender Verlauf',
-        erfasst_at: '2026-05-27 09:30:00', erfasst_von: 1,
-      }],
+      notizen: [
+        {
+          id: 7,
+          einsatz_id: 1,
+          person_id: 10,
+          text: 'bestehender Verlauf',
+          erfasst_at: '2026-05-27 09:30:00',
+          erfasst_von: 1,
+        },
+      ],
     } as PersonDetail;
     const anderePerson: Person = {
       ...detail,
@@ -388,20 +478,29 @@ describe('PersonenDetailPage — Stammdaten', () => {
     };
     let statusFreigeben!: () => void;
     let refetchFreigeben!: () => void;
-    const statusGate = new Promise<void>((resolve) => { statusFreigeben = resolve; });
-    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    const statusGate = new Promise<void>((resolve) => {
+      statusFreigeben = resolve;
+    });
+    const refetchGate = new Promise<void>((resolve) => {
+      refetchFreigeben = resolve;
+    });
     let detailAbrufe = 0;
-    const { client } = render(einsatzAktiv, mitVerlauf, [
-      http.get('/api/einsaetze/1/personen/10', async () => {
-        detailAbrufe += 1;
-        if (detailAbrufe > 1) await refetchGate;
-        return HttpResponse.json(mitVerlauf);
-      }),
-      http.post('/api/einsaetze/1/personen/10/status', async () => {
-        await statusGate;
-        return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 500 });
-      }),
-    ], true);
+    const { client } = render(
+      einsatzAktiv,
+      mitVerlauf,
+      [
+        http.get('/api/einsaetze/1/personen/10', async () => {
+          detailAbrufe += 1;
+          if (detailAbrufe > 1) await refetchGate;
+          return HttpResponse.json(mitVerlauf);
+        }),
+        http.post('/api/einsaetze/1/personen/10/status', async () => {
+          await statusGate;
+          return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 500 });
+        }),
+      ],
+      true,
+    );
     await screen.findByRole('heading', { name: /Person R-001/ });
     act(() => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [mitVerlauf, anderePerson]);
@@ -425,17 +524,26 @@ describe('PersonenDetailPage — Stammdaten', () => {
     };
     act(() => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), (aktuell) =>
-        aktuell?.map((eintrag) => eintrag.id === 10
-          ? { ...eintrag, name: 'Neuer Listenname' }
-          : { ...eintrag, notiz: 'Andere Zeile aktualisiert' }));
-      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), (aktuell) => aktuell && ({
-        ...aktuell,
-        name: 'Neuer Detailname',
-        notizen: [...aktuell.notizen, neueNotiz],
-      }));
+        aktuell?.map((eintrag) =>
+          eintrag.id === 10
+            ? { ...eintrag, name: 'Neuer Listenname' }
+            : { ...eintrag, notiz: 'Andere Zeile aktualisiert' },
+        ),
+      );
+      client.setQueryData<PersonDetail>(
+        einsatzKeys.person(1, 10),
+        (aktuell) =>
+          aktuell && {
+            ...aktuell,
+            name: 'Neuer Detailname',
+            notizen: [...aktuell.notizen, neueNotiz],
+          },
+      );
     });
 
-    await act(async () => { statusFreigeben(); });
+    await act(async () => {
+      statusFreigeben();
+    });
     await vi.waitFor(() => {
       const zurueckgerollt = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
       expect(zurueckgerollt?.status).toBe('erfasst');
@@ -448,26 +556,37 @@ describe('PersonenDetailPage — Stammdaten', () => {
       name: 'Neuer Listenname',
     });
     expect(liste?.find((eintrag) => eintrag.id === 11)?.notiz).toBe('Andere Zeile aktualisiert');
-    await act(async () => { refetchFreigeben(); });
+    await act(async () => {
+      refetchFreigeben();
+    });
   });
 
   it('überschreibt beim Fehler keinen inzwischen neueren Statusstand', async () => {
     let statusFreigeben!: () => void;
     let refetchFreigeben!: () => void;
-    const statusGate = new Promise<void>((resolve) => { statusFreigeben = resolve; });
-    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
+    const statusGate = new Promise<void>((resolve) => {
+      statusFreigeben = resolve;
+    });
+    const refetchGate = new Promise<void>((resolve) => {
+      refetchFreigeben = resolve;
+    });
     let detailAbrufe = 0;
-    const { client } = render(einsatzAktiv, detail, [
-      http.get('/api/einsaetze/1/personen/10', async () => {
-        detailAbrufe += 1;
-        if (detailAbrufe > 1) await refetchGate;
-        return HttpResponse.json(detail);
-      }),
-      http.post('/api/einsaetze/1/personen/10/status', async () => {
-        await statusGate;
-        return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 500 });
-      }),
-    ], true);
+    const { client } = render(
+      einsatzAktiv,
+      detail,
+      [
+        http.get('/api/einsaetze/1/personen/10', async () => {
+          detailAbrufe += 1;
+          if (detailAbrufe > 1) await refetchGate;
+          return HttpResponse.json(detail);
+        }),
+        http.post('/api/einsaetze/1/personen/10/status', async () => {
+          await statusGate;
+          return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 500 });
+        }),
+      ],
+      true,
+    );
     await screen.findByRole('heading', { name: /Person R-001/ });
     act(() => {
       client.setQueryData<Person[]>(einsatzKeys.personen(1), [detail]);
@@ -485,16 +604,23 @@ describe('PersonenDetailPage — Stammdaten', () => {
           status: 'vermisst',
           name: 'Neuer Listenstand',
           geaendert_at: '2026-05-27 09:15:00',
-        })));
-      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), (aktuell) => aktuell && ({
-        ...aktuell,
-        status: 'vermisst',
-        name: 'Neuer Detailstand',
-        geaendert_at: '2026-05-27 09:15:00',
-      }));
+        })),
+      );
+      client.setQueryData<PersonDetail>(
+        einsatzKeys.person(1, 10),
+        (aktuell) =>
+          aktuell && {
+            ...aktuell,
+            status: 'vermisst',
+            name: 'Neuer Detailstand',
+            geaendert_at: '2026-05-27 09:15:00',
+          },
+      );
     });
 
-    await act(async () => { statusFreigeben(); });
+    await act(async () => {
+      statusFreigeben();
+    });
     await vi.waitFor(() => {
       expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))).toMatchObject({
         status: 'vermisst',
@@ -507,7 +633,9 @@ describe('PersonenDetailPage — Stammdaten', () => {
       name: 'Neuer Listenstand',
       geaendert_at: '2026-05-27 09:15:00',
     });
-    await act(async () => { refetchFreigeben(); });
+    await act(async () => {
+      refetchFreigeben();
+    });
   });
 
   it('zeigt Read-Modus mit Stammdaten', async () => {
@@ -542,7 +670,9 @@ describe('PersonenDetailPage — Stammdaten', () => {
       }),
     ]);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    expect(client.getQueryCache().find({ queryKey: einsatzKeys.person(1, 10) })?.options.retry).toBe(false);
+    expect(
+      client.getQueryCache().find({ queryKey: einsatzKeys.person(1, 10) })?.options.retry,
+    ).toBe(false);
 
     await ausMenue(/Bearbeiten/);
     const name = screen.getByDisplayValue('Mustermann');
@@ -595,7 +725,10 @@ describe('PersonenDetailPage — Stammdaten', () => {
     render(einsatzAktiv, detail, [
       http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json({ error: 'Einsatz ist abgeschlossen und schreibgeschützt' }, { status: 409 });
+        return HttpResponse.json(
+          { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
+          { status: 409 },
+        );
       }),
     ]);
     await ausMenue(/Bearbeiten/);
@@ -604,7 +737,9 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await vi.waitFor(() => expect(koerper).toHaveLength(2));
     // Die Servermeldung belegt den else-Zweig (`fehler`); ein zweiter Dialog wäre das Rennen
     // aus H65, dessen einziger Ausweg „Neu laden" ist.
-    expect(await screen.findByText('Einsatz ist abgeschlossen und schreibgeschützt')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Überschreiben' })).toHaveLength(1);
   });
 
@@ -629,11 +764,19 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
     const vermissteDetail = {
       ...detail,
       status: 'vermisst' as const,
-      abgleiche: [{
-        id: 5, einsatz_id: 1, vermisst_person_id: 10, gefunden_person_id: 21,
-        status: 'verdacht', erstellt_at: '2026-05-27 10:00:00', erstellt_von: 1,
-        entschieden_at: null, entschieden_von: null,
-      }],
+      abgleiche: [
+        {
+          id: 5,
+          einsatz_id: 1,
+          vermisst_person_id: 10,
+          gefunden_person_id: 21,
+          status: 'verdacht',
+          erstellt_at: '2026-05-27 10:00:00',
+          erstellt_von: 1,
+          entschieden_at: null,
+          entschieden_von: null,
+        },
+      ],
     } as PersonDetail;
     let entscheidung: string | undefined;
     render(einsatzAktiv, vermissteDetail, [
@@ -651,15 +794,35 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
       http.get('/api/einsaetze/1/tiere', ({ request }) => {
         const url = new URL(request.url);
         if (url.searchParams.get('halter_person_id') === '10') {
-          return HttpResponse.json([{
-            id: 30, einsatz_id: 1, registrier_nr: 7, status: 'aktiv', spezies: 'hund',
-            rasse_beschreibung: null, rufname: 'Rex', geschlecht: null, alter_geschaetzt: null,
-            farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
-            halter_person_id: 10, halter_kontakt: null, antreff_ort: null, notiz: null,
-            abschluss_grund: null, abschluss_ziel: null, erfasst_at: '2026-05-27 09:00:00',
-            erfasst_von: 1, geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1,
-            storniert_at: null, halter_registrier_nr: 1, halter_storniert_at: null,
-          }]);
+          return HttpResponse.json([
+            {
+              id: 30,
+              einsatz_id: 1,
+              registrier_nr: 7,
+              status: 'aktiv',
+              spezies: 'hund',
+              rasse_beschreibung: null,
+              rufname: 'Rex',
+              geschlecht: null,
+              alter_geschaetzt: null,
+              farbe_beschreibung: null,
+              kennzeichnung: null,
+              groesse_gewicht: null,
+              halter_person_id: 10,
+              halter_kontakt: null,
+              antreff_ort: null,
+              notiz: null,
+              abschluss_grund: null,
+              abschluss_ziel: null,
+              erfasst_at: '2026-05-27 09:00:00',
+              erfasst_von: 1,
+              geaendert_at: '2026-05-27 09:00:00',
+              geaendert_von: 1,
+              storniert_at: null,
+              halter_registrier_nr: 1,
+              halter_storniert_at: null,
+            },
+          ]);
         }
         return HttpResponse.json([]);
       }),
@@ -678,15 +841,32 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
       http.get('/api/einsaetze/1/schaeden', ({ request }) => {
         const url = new URL(request.url);
         if (url.searchParams.get('geschaedigt_person_id') === '10') {
-          return HttpResponse.json([{
-            id: 7, einsatz_id: 1, registrier_nr: 3, status: 'offen', typ: 'umweltschaden',
-            ausmass: 'mittel', ort: 'Hauptstr. 1', beschreibung: '', geschaedigt_person_id: 10,
-            geschaedigt_kontakt: null, uebergeben_an: null, uebergeben_at: null,
-            abschluss_grund: null, abschluss_at: null, erfasst_at: '2026-05-29 10:00:00',
-            erfasst_von: 1, geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1,
-            storniert_at: null, storniert_von: null, geschaedigt_registrier_nr: null,
-            geschaedigt_storniert_at: null,
-          }]);
+          return HttpResponse.json([
+            {
+              id: 7,
+              einsatz_id: 1,
+              registrier_nr: 3,
+              status: 'offen',
+              typ: 'umweltschaden',
+              ausmass: 'mittel',
+              ort: 'Hauptstr. 1',
+              beschreibung: '',
+              geschaedigt_person_id: 10,
+              geschaedigt_kontakt: null,
+              uebergeben_an: null,
+              uebergeben_at: null,
+              abschluss_grund: null,
+              abschluss_at: null,
+              erfasst_at: '2026-05-29 10:00:00',
+              erfasst_von: 1,
+              geaendert_at: '2026-05-29 10:00:00',
+              geaendert_von: 1,
+              storniert_at: null,
+              storniert_von: null,
+              geschaedigt_registrier_nr: null,
+              geschaedigt_storniert_at: null,
+            },
+          ]);
         }
         return HttpResponse.json([]);
       }),
@@ -700,22 +880,32 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
 describe('PersonenDetailPage — Robustheit', () => {
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
     render(einsatzAktiv, detail, [
-      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/einsaetze/1/personen/10', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
     ]);
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 
   it('zeigt das Patient-Tag bei gesichteter Person (SK I)', async () => {
-    const patient = { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk1',
-      aktuelle_sichtung_at: '2026-05-27 10:00:00' } as PersonDetail;
+    const patient = {
+      ...detail,
+      status: 'betroffen',
+      aktuelle_sichtung: 'sk1',
+      aktuelle_sichtung_at: '2026-05-27 10:00:00',
+    } as PersonDetail;
     render(einsatzAktiv, patient);
     expect((await screen.findAllByText('Patient')).length).toBeGreaterThan(0);
   });
 
   it('zeigt KEIN Patient-Tag bei unverletzter Person', async () => {
-    const unverletzt = { ...detail, status: 'betroffen', aktuelle_sichtung: 'unverletzt',
-      aktuelle_sichtung_at: '2026-05-27 10:00:00' } as PersonDetail;
+    const unverletzt = {
+      ...detail,
+      status: 'betroffen',
+      aktuelle_sichtung: 'unverletzt',
+      aktuelle_sichtung_at: '2026-05-27 10:00:00',
+    } as PersonDetail;
     render(einsatzAktiv, unverletzt);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByText('Patient')).not.toBeInTheDocument();
@@ -726,8 +916,26 @@ describe('PersonenDetailPage — Robustheit', () => {
 // UHS/einem Platz zuweisen (eintritt/wechsel), austragen (austritt); art spiegelt die
 // belegMut-Logik des Grundrisses (aktuelle_uhs_id ? 'wechsel' : 'eintritt').
 const uhsListe = [
-  { id: 5, einsatz_id: 1, bezeichnung: 'BHP 50', typ: 'behandlungsplatz', status: 'aktiv', abschnitt_id: null, standort: null, notiz: null },
-  { id: 6, einsatz_id: 1, bezeichnung: 'PA 1', typ: 'patientenablage', status: 'aktiv', abschnitt_id: null, standort: null, notiz: null },
+  {
+    id: 5,
+    einsatz_id: 1,
+    bezeichnung: 'BHP 50',
+    typ: 'behandlungsplatz',
+    status: 'aktiv',
+    abschnitt_id: null,
+    standort: null,
+    notiz: null,
+  },
+  {
+    id: 6,
+    einsatz_id: 1,
+    bezeichnung: 'PA 1',
+    typ: 'patientenablage',
+    status: 'aktiv',
+    abschnitt_id: null,
+    standort: null,
+    notiz: null,
+  },
 ];
 
 describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
@@ -745,9 +953,21 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
-        gesendet = await request.json() as { art?: string; uhs_id?: number };
-        return HttpResponse.json({ id: 1, einsatz_id: 1, person_id: 10, uhs_id: 5, platz_id: null,
-          art: 'eintritt', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
+        gesendet = (await request.json()) as { art?: string; uhs_id?: number };
+        return HttpResponse.json(
+          {
+            id: 1,
+            einsatz_id: 1,
+            person_id: 10,
+            uhs_id: 5,
+            platz_id: null,
+            art: 'eintritt',
+            notiz: null,
+            zeitpunkt_at: '2026-05-27 10:00:00',
+            erfasst_von: 1,
+          },
+          { status: 201 },
+        );
       }),
     ]);
     await klappeZuordnungenAuf();
@@ -764,9 +984,21 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     render(einsatzAktiv, belegt, [
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
-        gesendet = await request.json() as { art?: string; uhs_id?: number };
-        return HttpResponse.json({ id: 2, einsatz_id: 1, person_id: 10, uhs_id: 6, platz_id: null,
-          art: 'wechsel', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
+        gesendet = (await request.json()) as { art?: string; uhs_id?: number };
+        return HttpResponse.json(
+          {
+            id: 2,
+            einsatz_id: 1,
+            person_id: 10,
+            uhs_id: 6,
+            platz_id: null,
+            art: 'wechsel',
+            notiz: null,
+            zeitpunkt_at: '2026-05-27 10:00:00',
+            erfasst_von: 1,
+          },
+          { status: 201 },
+        );
       }),
     ]);
     await klappeZuordnungenAuf();
@@ -783,9 +1015,21 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     render(einsatzAktiv, belegt, [
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
-        gesendet = await request.json() as { art?: string };
-        return HttpResponse.json({ id: 3, einsatz_id: 1, person_id: 10, uhs_id: 5, platz_id: null,
-          art: 'austritt', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
+        gesendet = (await request.json()) as { art?: string };
+        return HttpResponse.json(
+          {
+            id: 3,
+            einsatz_id: 1,
+            person_id: 10,
+            uhs_id: 5,
+            platz_id: null,
+            art: 'austritt',
+            notiz: null,
+            zeitpunkt_at: '2026-05-27 10:00:00',
+            erfasst_von: 1,
+          },
+          { status: 201 },
+        );
       }),
     ]);
     await klappeZuordnungenAuf();
@@ -804,10 +1048,21 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
 
   it('bietet im UHS-Picker nur aktive UHS an (geplante ausgeschlossen)', async () => {
     render(einsatzAktiv, detail, [
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-        ...uhsListe,
-        { id: 7, einsatz_id: 1, bezeichnung: 'BHP geplant', typ: 'behandlungsplatz', status: 'geplant', abschnitt_id: null, standort: null, notiz: null },
-      ])),
+      http.get('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json([
+          ...uhsListe,
+          {
+            id: 7,
+            einsatz_id: 1,
+            bezeichnung: 'BHP geplant',
+            typ: 'behandlungsplatz',
+            status: 'geplant',
+            abschnitt_id: null,
+            standort: null,
+            notiz: null,
+          },
+        ]),
+      ),
     ]);
     await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
@@ -821,25 +1076,73 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
 // Der Picker bietet nur FREIE Ziele (kein Halter/Geschädigter, nicht storniert/abgeschlossen);
 // Zuweisen setzt die FK + leert die konkurrierenden XOR-Slots im selben PATCH (PATCH-XOR).
 const freiesTier = {
-  id: 40, einsatz_id: 1, registrier_nr: 8, status: 'aktiv', spezies: 'katze',
-  rasse_beschreibung: null, rufname: 'Minka', geschlecht: null, alter_geschaetzt: null,
-  farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
-  halter_person_id: null, halter_kontakt: null, antreff_ort: null, notiz: null,
-  erfasst_at: '2026-05-27 09:00:00', erfasst_von: 1, geaendert_at: '2026-05-27 09:00:00',
-  geaendert_von: 1, storniert_at: null, halter_registrier_nr: null, halter_storniert_at: null,
+  id: 40,
+  einsatz_id: 1,
+  registrier_nr: 8,
+  status: 'aktiv',
+  spezies: 'katze',
+  rasse_beschreibung: null,
+  rufname: 'Minka',
+  geschlecht: null,
+  alter_geschaetzt: null,
+  farbe_beschreibung: null,
+  kennzeichnung: null,
+  groesse_gewicht: null,
+  halter_person_id: null,
+  halter_kontakt: null,
+  antreff_ort: null,
+  notiz: null,
+  erfasst_at: '2026-05-27 09:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-27 09:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
+  halter_registrier_nr: null,
+  halter_storniert_at: null,
 };
-const zugeordnetesTier = { ...freiesTier, id: 30, registrier_nr: 7, spezies: 'hund', rufname: 'Rex',
-  halter_person_id: 10, halter_registrier_nr: 1 };
+const zugeordnetesTier = {
+  ...freiesTier,
+  id: 30,
+  registrier_nr: 7,
+  spezies: 'hund',
+  rufname: 'Rex',
+  halter_person_id: 10,
+  halter_registrier_nr: 1,
+};
 const freierSchaden = {
-  id: 50, einsatz_id: 1, registrier_nr: 9, status: 'offen', typ: 'sachschaden', ausmass: 'gering',
-  ort: 'Weg 2', beschreibung: '', geschaedigt_person_id: null, geschaedigt_personal_id: null,
-  geschaedigt_organisation_id: null, geschaedigt_kontakt: null, uebergeben_an: null, uebergeben_at: null,
-  abschluss_grund: null, abschluss_at: null, erfasst_at: '2026-05-29 10:00:00', erfasst_von: 1,
-  geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1, storniert_at: null, storniert_von: null,
-  geschaedigt_registrier_nr: null, geschaedigt_storniert_at: null,
+  id: 50,
+  einsatz_id: 1,
+  registrier_nr: 9,
+  status: 'offen',
+  typ: 'sachschaden',
+  ausmass: 'gering',
+  ort: 'Weg 2',
+  beschreibung: '',
+  geschaedigt_person_id: null,
+  geschaedigt_personal_id: null,
+  geschaedigt_organisation_id: null,
+  geschaedigt_kontakt: null,
+  uebergeben_an: null,
+  uebergeben_at: null,
+  abschluss_grund: null,
+  abschluss_at: null,
+  erfasst_at: '2026-05-29 10:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-29 10:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
+  storniert_von: null,
+  geschaedigt_registrier_nr: null,
+  geschaedigt_storniert_at: null,
 };
-const zugeordneterSchaden = { ...freierSchaden, id: 7, registrier_nr: 3, typ: 'umweltschaden',
-  ausmass: 'mittel', geschaedigt_person_id: 10 };
+const zugeordneterSchaden = {
+  ...freierSchaden,
+  id: 7,
+  registrier_nr: 3,
+  typ: 'umweltschaden',
+  ausmass: 'mittel',
+  geschaedigt_person_id: 10,
+};
 
 describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
   it('weist der Person ein freies Tier als Halter zu (XOR-Leerung)', async () => {
@@ -852,7 +1155,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json([freiesTier]);
       }),
       http.patch('/api/einsaetze/1/tiere/40', async ({ request }) => {
-        patch = await request.json() as Record<string, unknown>;
+        patch = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...freiesTier, halter_person_id: 10 });
       }),
     ]);
@@ -861,7 +1164,9 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
     await userEvent.click(await screen.findByText(/Minka/));
     await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
-    await vi.waitFor(() => expect(patch).toMatchObject({ halter_person_id: 10, halter_kontakt: null }));
+    await vi.waitFor(() =>
+      expect(patch).toMatchObject({ halter_person_id: 10, halter_kontakt: null }),
+    );
   });
 
   it('löst die Halter-Zuordnung eines zugeordneten Tiers (halter_person_id=null)', async () => {
@@ -869,11 +1174,12 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/tiere', ({ request }) => {
         const url = new URL(request.url);
-        if (url.searchParams.get('halter_person_id') === '10') return HttpResponse.json([zugeordnetesTier]);
+        if (url.searchParams.get('halter_person_id') === '10')
+          return HttpResponse.json([zugeordnetesTier]);
         return HttpResponse.json([]);
       }),
       http.patch('/api/einsaetze/1/tiere/30', async ({ request }) => {
-        patch = await request.json() as Record<string, unknown>;
+        patch = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...zugeordnetesTier, halter_person_id: null });
       }),
     ]);
@@ -892,7 +1198,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json([freierSchaden]);
       }),
       http.patch('/api/einsaetze/1/schaeden/50', async ({ request }) => {
-        patch = await request.json() as Record<string, unknown>;
+        patch = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...freierSchaden, geschaedigt_person_id: 10 });
       }),
     ]);
@@ -901,10 +1207,14 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
     await userEvent.click(await screen.findByText(/S-009/));
     await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
-    await vi.waitFor(() => expect(patch).toMatchObject({
-      geschaedigt_person_id: 10, geschaedigt_personal_id: null,
-      geschaedigt_organisation_id: null, geschaedigt_kontakt: null,
-    }));
+    await vi.waitFor(() =>
+      expect(patch).toMatchObject({
+        geschaedigt_person_id: 10,
+        geschaedigt_personal_id: null,
+        geschaedigt_organisation_id: null,
+        geschaedigt_kontakt: null,
+      }),
+    );
   });
 
   it('löst die Geschädigt-Zuordnung eines Schadens (geschaedigt_person_id=null)', async () => {
@@ -912,11 +1222,12 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/schaeden', ({ request }) => {
         const url = new URL(request.url);
-        if (url.searchParams.get('geschaedigt_person_id') === '10') return HttpResponse.json([zugeordneterSchaden]);
+        if (url.searchParams.get('geschaedigt_person_id') === '10')
+          return HttpResponse.json([zugeordneterSchaden]);
         return HttpResponse.json([]);
       }),
       http.patch('/api/einsaetze/1/schaeden/7', async ({ request }) => {
-        patch = await request.json() as Record<string, unknown>;
+        patch = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...zugeordneterSchaden, geschaedigt_person_id: null });
       }),
     ]);
@@ -949,8 +1260,20 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         if (url.searchParams.get('geschaedigt_person_id') === '10') return HttpResponse.json([]);
         return HttpResponse.json([
           freierSchaden, // S-009, frei + offen → im Picker
-          { ...freierSchaden, id: 51, registrier_nr: 10, typ: 'brandschaden', geschaedigt_person_id: 99 }, // belegt → raus
-          { ...freierSchaden, id: 52, registrier_nr: 11, typ: 'wasserschaden', status: 'abgeschlossen' }, // abgeschlossen → raus
+          {
+            ...freierSchaden,
+            id: 51,
+            registrier_nr: 10,
+            typ: 'brandschaden',
+            geschaedigt_person_id: 99,
+          }, // belegt → raus
+          {
+            ...freierSchaden,
+            id: 52,
+            registrier_nr: 11,
+            typ: 'wasserschaden',
+            status: 'abgeschlossen',
+          }, // abgeschlossen → raus
         ]);
       }),
     ]);

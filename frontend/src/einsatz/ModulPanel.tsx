@@ -208,7 +208,11 @@ export function ModulListe({
               <span
                 title="Öffnet in der Lagekarte"
                 aria-hidden
-                style={{ display: 'inline-flex', flexShrink: 0, marginLeft: zaehlerSichtbar ? 0 : 'auto' }}
+                style={{
+                  display: 'inline-flex',
+                  flexShrink: 0,
+                  marginLeft: zaehlerSichtbar ? 0 : 'auto',
+                }}
               >
                 <ExportOutlined />
               </span>
@@ -219,7 +223,14 @@ export function ModulListe({
                 gewinnt) und zerlegte ein Bedienelement in zwei Tooltip-Zonen mit
                 verschiedenem Wortlaut, um dieselbe Sache zu sagen. */}
             {gesperrt && (
-              <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0, marginLeft: zaehlerSichtbar ? 0 : 'auto' }}>
+              <span
+                aria-hidden
+                style={{
+                  display: 'inline-flex',
+                  flexShrink: 0,
+                  marginLeft: zaehlerSichtbar ? 0 : 'auto',
+                }}
+              >
                 <LockOutlined />
               </span>
             )}

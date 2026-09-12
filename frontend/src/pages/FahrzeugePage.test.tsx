@@ -13,26 +13,57 @@ import FahrzeugePage from './FahrzeugePage';
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
 const nutzer = {
-  id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Nutzer',
+  benutzername: 'nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 
 function einsatz(overrides: Record<string, unknown> = {}) {
   return {
-    id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
-    begonnen_at: '2026-05-26 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-    einsatzart: 'realeinsatz', einsatznummer_intern: '2026-001', angelegt_at: '2026-05-26 09:00:00',
-    leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-    meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung', ...overrides,
+    id: 7,
+    bezeichnung: 'Hochwasser Nord',
+    stichwort: null,
+    status: 'aktiv',
+    begonnen_at: '2026-05-26 09:00:00',
+    abgeschlossen_at: null,
+    abgeschlossen_von: null,
+    einsatzart: 'realeinsatz',
+    einsatznummer_intern: '2026-001',
+    angelegt_at: '2026-05-26 09:00:00',
+    leitstellen_nr: null,
+    einsatzort: null,
+    einsatzort_lat: null,
+    einsatzort_lon: null,
+    meldende_stelle: null,
+    sachverhalt: null,
+    anzahl_betroffene_initial: null,
+    meine_rolle: 'einsatzleitung',
+    ...overrides,
   };
 }
 
 const ef = {
-  id: 10, einsatz_id: 7, fahrzeug_id: 1, einheit_id: null, ist_adhoc: false, funkrufname: 'Florian 1',
-  kennzeichen: 'XX-AB 1', fahrzeugtyp: 'LF 20', opta: null, traegerorganisation: null,
-  status_id: 2, status_label: 'disponiert', status_kategorie: 'gebunden', status_farbe: null,
-  bemerkung: null, disponiert_at: '2026-05-26 09:10:00', disponiert_von: 1,
+  id: 10,
+  einsatz_id: 7,
+  fahrzeug_id: 1,
+  einheit_id: null,
+  ist_adhoc: false,
+  funkrufname: 'Florian 1',
+  kennzeichen: 'XX-AB 1',
+  fahrzeugtyp: 'LF 20',
+  opta: null,
+  traegerorganisation: null,
+  status_id: 2,
+  status_label: 'disponiert',
+  status_kategorie: 'gebunden',
+  status_farbe: null,
+  bemerkung: null,
+  disponiert_at: '2026-05-26 09:10:00',
+  disponiert_von: 1,
   soll_besatzung: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
 };
 const stati = [
@@ -42,10 +73,24 @@ const stati = [
 
 function person(overrides: Record<string, unknown> = {}) {
   return {
-    id: 100, einsatz_id: 7, personal_id: 5, einheit_id: null, fahrzeug_id: null, ist_adhoc: false,
-    name: 'Anna Crew', funktion: null, traegerorganisation: null, staerke_position: 'mannschaft',
-    status_id: null, status_label: null, status_kategorie: null, status_farbe: null,
-    bemerkung: null, disponiert_at: '2026-05-26 09:10:00', disponiert_von: 1, ...overrides,
+    id: 100,
+    einsatz_id: 7,
+    personal_id: 5,
+    einheit_id: null,
+    fahrzeug_id: null,
+    ist_adhoc: false,
+    name: 'Anna Crew',
+    funktion: null,
+    traegerorganisation: null,
+    staerke_position: 'mannschaft',
+    status_id: null,
+    status_label: null,
+    status_kategorie: null,
+    status_farbe: null,
+    bemerkung: null,
+    disponiert_at: '2026-05-26 09:10:00',
+    disponiert_von: 1,
+    ...overrides,
   };
 }
 
@@ -81,7 +126,9 @@ function render(
  * und genau einen Treffer verlangen (Muster `meldungen/MeldungKarte.test.tsx`).
  */
 async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promise<HTMLElement> {
-  await userEvent.click(within(zeile).getByRole('button', { name: `Status von ${funkrufname} ändern` }));
+  await userEvent.click(
+    within(zeile).getByRole('button', { name: `Status von ${funkrufname} ändern` }),
+  );
   const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
     (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
   );
@@ -125,23 +172,31 @@ describe('FahrzeugePage', () => {
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
     expect(within(zeile).queryByRole('combobox')).toBeNull();
-    expect(within(zeile).getByRole('button', { name: 'Status von Florian 1 ändern' })).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('button', { name: 'Status von Florian 1 ändern' }),
+    ).toBeInTheDocument();
 
     // Der ganze Katalog steht im Menü — senkrecht, weil zehn Werte in keine waagerechte
     // Reihe passen (Zielform-Spec §3).
     const menue = await oeffneStatusmenue(zeile, 'Florian 1');
     for (const s of stati) {
-      expect(within(menue).getByRole('menuitem', { name: new RegExp(s.label) })).toBeInTheDocument();
+      expect(
+        within(menue).getByRole('menuitem', { name: new RegExp(s.label) }),
+      ).toBeInTheDocument();
     }
   });
 
   it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
     let freigeben: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
-    server.use(http.patch('/api/einsaetze/7/fahrzeuge/10', async () => {
-      await gate;
-      return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
-    }));
+    const gate = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
+    server.use(
+      http.patch('/api/einsaetze/7/fahrzeuge/10', async () => {
+        await gate;
+        return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
+      }),
+    );
     const zweitesFahrzeug = { ...ef, id: 11, funkrufname: 'Florian 2' };
     const { container, client } = render(einsatz(), [], [ef, zweitesFahrzeug]);
     await screen.findByText('Florian 1');
@@ -160,28 +215,40 @@ describe('FahrzeugePage', () => {
     // Zeile eine zweite an.
     expect(within(zeile).getByRole('button', { name: /Status von Florian 1/ })).toBeDisabled();
     expect(
-      within(container.querySelector('[data-row-key="11"]') as HTMLElement)
-        .getByRole('button', { name: /Status von Florian 2/ }),
+      within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('button', {
+        name: /Status von Florian 2/,
+      }),
     ).toBeDisabled();
 
     let refetchFreigeben: (() => void) | undefined;
-    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
-    server.use(http.get('/api/einsaetze/7/fahrzeuge', async () => {
-      await refetchGate;
-      return HttpResponse.json([{ ...ef, funkrufname: 'Extern geändert' }, zweitesFahrzeug]);
-    }));
+    const refetchGate = new Promise<void>((resolve) => {
+      refetchFreigeben = resolve;
+    });
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', async () => {
+        await refetchGate;
+        return HttpResponse.json([{ ...ef, funkrufname: 'Extern geändert' }, zweitesFahrzeug]);
+      }),
+    );
     act(() => {
       client.setQueryData<(typeof ef)[]>(einsatzKeys.fahrzeuge(7), (aktuell) =>
-        aktuell?.map((eintrag) => eintrag.id === 10 ? { ...eintrag, funkrufname: 'Extern geändert' } : eintrag));
+        aktuell?.map((eintrag) =>
+          eintrag.id === 10 ? { ...eintrag, funkrufname: 'Extern geändert' } : eintrag,
+        ),
+      );
     });
 
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     await waitFor(() => {
       const stand = client.getQueryData<(typeof ef)[]>(einsatzKeys.fahrzeuge(7));
       expect(stand?.find((eintrag) => eintrag.id === 10)?.status_id).toBe(2);
       expect(stand?.find((eintrag) => eintrag.id === 10)?.funkrufname).toBe('Extern geändert');
     });
-    await act(async () => { refetchFreigeben?.(); });
+    await act(async () => {
+      refetchFreigeben?.();
+    });
   });
 
   it('hebt per ?fahrzeug=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
@@ -244,7 +311,12 @@ describe('FahrzeugePage', () => {
     // LFH-9: Eine Kraft ist physisch auf dem Fahrzeug und gehört zur Stärke, auch ohne
     // explizite F/UF-Position. Sammeltopf in der BOS-Schreibweise ist die Mannschaft.
     const fuehrer = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
-    const ohnePosition = person({ id: 101, name: 'asdasd', fahrzeug_id: 10, staerke_position: null });
+    const ohnePosition = person({
+      id: 101,
+      name: 'asdasd',
+      fahrzeug_id: 10,
+      staerke_position: null,
+    });
     const { container } = render(einsatz(), [fuehrer, ohnePosition]);
     await screen.findByText('Florian 1');
     // 1 Führer + 1 ohne Position → 1/0/1//2 (nicht 1/0/0//1, die zweite Kraft verschwindet sonst).
@@ -290,8 +362,18 @@ describe('FahrzeugePage', () => {
   });
 
   it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker nach dem Aufklappen', async () => {
-    const crew = person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10, staerke_position: 'mannschaft' });
-    const frei = person({ id: 101, name: 'Bert Frei', fahrzeug_id: null, staerke_position: 'fuehrer' });
+    const crew = person({
+      id: 100,
+      name: 'Anna Crew',
+      fahrzeug_id: 10,
+      staerke_position: 'mannschaft',
+    });
+    const frei = person({
+      id: 101,
+      name: 'Bert Frei',
+      fahrzeug_id: null,
+      staerke_position: 'fuehrer',
+    });
     const { container } = render(einsatz(), [crew, frei]);
     await screen.findByText('Florian 1');
 
@@ -332,7 +414,11 @@ describe('FahrzeugePage', () => {
    */
   const efGebunden = { ...ef, id: 10, funkrufname: 'Florian 1' };
   const efVerfuegbar = {
-    ...ef, id: 11, funkrufname: 'Florian 9', status_id: 3, status_label: 'einsatzbereit',
+    ...ef,
+    id: 11,
+    funkrufname: 'Florian 9',
+    status_id: 3,
+    status_label: 'einsatzbereit',
     status_kategorie: 'verfuegbar',
   };
   const zeilenFolge = (container: HTMLElement) =>
@@ -491,7 +577,9 @@ describe('FahrzeugePage', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(within(zeile).getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' })).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
   });
 
@@ -621,7 +709,9 @@ describe('FahrzeugePage · Datenzustände', () => {
     const { client } = zeige(http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])));
     await screen.findByText('Florian 1');
 
-    server.use(http.get('/api/einsaetze/7/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () => new HttpResponse(null, { status: 500 })),
+    );
     await client.refetchQueries({ queryKey: einsatzKeys.fahrzeuge(7) });
 
     expect(
@@ -629,13 +719,17 @@ describe('FahrzeugePage · Datenzustände', () => {
     ).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
     expect(screen.getByText('Florian 1')).toBeInTheDocument();
-    expect(screen.queryByText('Disponierte Fahrzeuge konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Disponierte Fahrzeuge konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   it('gescheiterter Statuskatalog: Banner über der Tabelle', async () => {
     zeige(http.get('/api/fahrzeug-status', () => new HttpResponse(null, { status: 500 })));
     expect(
-      await screen.findByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+      await screen.findByText(
+        'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -643,15 +737,21 @@ describe('FahrzeugePage · Datenzustände', () => {
     zeige();
     await screen.findByText('Noch keine Fahrzeuge disponiert');
     expect(
-      screen.queryByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+      screen.queryByText(
+        'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich',
+      ),
     ).not.toBeInTheDocument();
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Fahrzeuge"', async () => {
-    const { container } = zeige(http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
+    const { container } = zeige(
+      http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })),
+    );
     await screen.findByText('Noch keine Fahrzeuge disponiert');
     await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
-    expect(await screen.findByText('Fahrzeugliste konnte nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Fahrzeugliste konnte nicht geladen werden'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Keine freien Fahrzeuge')).not.toBeInTheDocument();
   });
 
@@ -682,7 +782,9 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   it('Partnerhälfte: leere Personalliste behält „Keine freien Kräfte"', async () => {
-    const { container } = zeige(http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])));
+    const { container } = zeige(
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
+    );
     await screen.findByText('Florian 1');
     await klappeZeileAuf(container);
     await oeffneAuswahl(container, 'Kraft zur Besatzung …');
@@ -735,7 +837,10 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
   it('zeigt höchstens vier Felder — das fünfte liegt zugeklappt, aber im Baum', async () => {
     const dialog = await oeffneAdhoc();
     expect(sichtbareFelder(dialog)).toEqual([
-      'Funkrufname', 'Fahrzeugtyp', 'Trägerorganisation', 'Kennzeichen',
+      'Funkrufname',
+      'Fahrzeugtyp',
+      'Trägerorganisation',
+      'Kennzeichen',
     ]);
     // Das `forceRender`-Beweisstück: eingeklappt UND trotzdem da, damit ein eingetragener
     // Wert beim Absenden mitgeht und das Feld für Tastatur und Prüfung existiert.
@@ -755,7 +860,9 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
         const koerper = (await request.json()) as { adhoc: Record<string, unknown> };
         gesendet.push(koerper.adhoc);
         return HttpResponse.json({
-          ...ef, id: 20 + gesendet.length, ist_adhoc: true,
+          ...ef,
+          id: 20 + gesendet.length,
+          ist_adhoc: true,
           funkrufname: String(koerper.adhoc.funkrufname),
         });
       }),
@@ -772,7 +879,11 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
     // wirklich gespeichert wurde, nicht bloß nichts passiert ist.
     expect(await within(dialog).findByText('Erfasst: 1')).toBeInTheDocument();
     expect(gesendet).toEqual([
-      { funkrufname: 'Florian Nachbarstadt 44/1', fahrzeugtyp: 'LF 20', traegerorganisation: 'FF Nachbarstadt' },
+      {
+        funkrufname: 'Florian Nachbarstadt 44/1',
+        fahrzeugtyp: 'LF 20',
+        traegerorganisation: 'FF Nachbarstadt',
+      },
     ]);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
@@ -817,7 +928,8 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
   it('Gegenprobe: „Disponieren" fährt den Dialog zu', async () => {
     server.use(
       http.post('/api/einsaetze/7/fahrzeuge', () =>
-        HttpResponse.json({ ...ef, id: 21, ist_adhoc: true, funkrufname: 'Florian 44/1' })),
+        HttpResponse.json({ ...ef, id: 21, ist_adhoc: true, funkrufname: 'Florian 44/1' }),
+      ),
     );
     const dialog = await oeffneAdhoc();
     expect(dialog).not.toHaveClass('ant-zoom-leave');
@@ -836,8 +948,9 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
  * Combobox — der Knoten, den auch eine Tastaturbedienung fokussiert.
  */
 async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
-    .find((s) => s.textContent?.includes(platzhalter));
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
+    s.textContent?.includes(platzhalter),
+  );
   expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
   await userEvent.click(within(feld!).getByRole('combobox'));
 }

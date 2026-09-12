@@ -1,7 +1,28 @@
 import { bezugsDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
-import { Alert, App, Breadcrumb, Button, Col, Collapse, Descriptions, Dropdown, Form, Input, InputNumber, Modal, Row, Space, Spin, Tag, Typography, theme, type MenuProps, type TableColumnsType } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Col,
+  Collapse,
+  Descriptions,
+  Dropdown,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Row,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+  theme,
+  type MenuProps,
+  type TableColumnsType,
+} from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -10,11 +31,31 @@ import { useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { darfImEinsatzSchreiben, darfEinsatzLeiten, istEinsatzLeitung } from '../einsatz/schreibrecht';
+import {
+  darfImEinsatzSchreiben,
+  darfEinsatzLeiten,
+  istEinsatzLeitung,
+} from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
+import {
+  aktualisierePerson,
+  entscheideAbgleich,
+  erfasseSichtung,
+  erfasseVerbleib,
+  ladePerson,
+  ladePersonAudit,
+  legeNotizAn,
+  registrierAnzeige,
+  setzePersonStatus,
+  stornierePerson,
+  type PersonEingabe,
+} from '../api/einsatzPerson';
 import { listeTiere, tierRegistrierAnzeige, aktualisiereTier } from '../api/einsatzTier';
-import { listeSchaeden, schadenRegistrierAnzeige, aktualisiereSchaden } from '../api/einsatzSchaden';
+import {
+  listeSchaeden,
+  schadenRegistrierAnzeige,
+  aktualisiereSchaden,
+} from '../api/einsatzSchaden';
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -25,22 +66,46 @@ import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { flaeche } from '../theme/tokens';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import KatalogTabelle from '../components/KatalogTabelle';
-import type { Person, PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, VerbleibArt } from '../api/types';
-import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
+import type {
+  Person,
+  PersonDetail,
+  PersonStatus,
+  PersonZugriff,
+  Schaden,
+  Sichtungskategorie,
+  Spezies,
+  Tier,
+  VerbleibArt,
+} from '../api/types';
+import {
+  parseRouteId,
+  personenPfad,
+  schadenDetailPfad,
+  tiereDetailPfad,
+} from '../routing/deeplinks';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
-  hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
-  kleintier: 'Kleintier', wildtier: 'Wildtier', sonstige: 'Sonstige',
+  hund: 'Hund',
+  katze: 'Katze',
+  grosstier: 'Großtier',
+  nutzgefluegel: 'Nutzgeflügel',
+  kleintier: 'Kleintier',
+  wildtier: 'Wildtier',
+  sonstige: 'Sonstige',
 };
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
   switch (aktuell) {
-    case 'erfasst': return ['vermisst', 'betroffen', 'verstorben', 'abgemeldet'];
-    case 'vermisst': return ['betroffen', 'verstorben', 'abgemeldet'];
-    case 'betroffen': return ['vermisst', 'verstorben', 'abgemeldet'];
+    case 'erfasst':
+      return ['vermisst', 'betroffen', 'verstorben', 'abgemeldet'];
+    case 'vermisst':
+      return ['betroffen', 'verstorben', 'abgemeldet'];
+    case 'betroffen':
+      return ['vermisst', 'verstorben', 'abgemeldet'];
     case 'verstorben':
-    case 'abgemeldet': return ['erfasst', 'vermisst', 'betroffen'];
+    case 'abgemeldet':
+      return ['erfasst', 'vermisst', 'betroffen'];
   }
 }
 
@@ -59,8 +124,21 @@ const IRREVERSIBEL: PersonStatus[] = ['verstorben'];
  * Rangfolge an EINER Stelle entschieden wird statt im JSX.
  */
 type Kopfaktion =
-  | { art: 'sichten' | 'verbleib' | 'bearbeiten' | 'stornieren'; key: string; label: string; danger?: boolean; trennerDavor?: boolean }
-  | { art: 'status'; key: string; label: string; status: PersonStatus; danger?: boolean; trennerDavor?: boolean };
+  | {
+      art: 'sichten' | 'verbleib' | 'bearbeiten' | 'stornieren';
+      key: string;
+      label: string;
+      danger?: boolean;
+      trennerDavor?: boolean;
+    }
+  | {
+      art: 'status';
+      key: string;
+      label: string;
+      status: PersonStatus;
+      danger?: boolean;
+      trennerDavor?: boolean;
+    };
 
 /** Kopfaktionen → antd-Menüeinträge, Trenner eingefügt. */
 function menueEintraege(aktionen: Kopfaktion[]): MenuProps['items'] {
@@ -86,7 +164,8 @@ export default function PersonenDetailPage() {
   const [editForm] = Form.useForm<PersonEingabe>();
   const editSitzung = useEditSitzung<PersonEingabe>(editForm);
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
@@ -97,7 +176,10 @@ export default function PersonenDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, personId) });
   }
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const detailQuery = useQuery({
     queryKey: einsatzKeys.person(einsatzId, personId),
     queryFn: () => ladePerson(einsatzId, personId),
@@ -122,7 +204,8 @@ export default function PersonenDetailPage() {
   });
   const schaedenDerPersonQuery = useQuery({
     queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId),
-    queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
+    queryFn: () =>
+      listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
     enabled: idGueltig && zuordnungenOffen,
   });
   /**
@@ -157,49 +240,51 @@ export default function PersonenDetailPage() {
         qc.cancelQueries({ queryKey: listenKey }),
         qc.cancelQueries({ queryKey: detailKey }),
       ]);
-      const listeVorher = qc.getQueryData<Person[]>(listenKey)
+      const listeVorher = qc
+        .getQueryData<Person[]>(listenKey)
         ?.find((person) => person.id === v.personId);
       const detailVorher = qc.getQueryData<PersonDetail>(detailKey);
       qc.setQueryData<Person[]>(listenKey, (alt) =>
-        alt?.map((person) => person.id === v.personId ? { ...person, status: v.status } : person));
-      qc.setQueryData<PersonDetail>(detailKey, (alt) => alt ? { ...alt, status: v.status } : alt);
+        alt?.map((person) => (person.id === v.personId ? { ...person, status: v.status } : person)),
+      );
+      qc.setQueryData<PersonDetail>(detailKey, (alt) => (alt ? { ...alt, status: v.status } : alt));
       return { listenKey, detailKey, listeVorher, detailVorher };
     },
     onSuccess: (serverStand, variablen) => {
       qc.setQueryData<Person[]>(einsatzKeys.personen(variablen.einsatzId), (alt) =>
-        alt?.map((person) => person.id === serverStand.id ? serverStand : person));
+        alt?.map((person) => (person.id === serverStand.id ? serverStand : person)),
+      );
       qc.setQueryData<PersonDetail>(
         einsatzKeys.person(variablen.einsatzId, serverStand.id),
-        (alt) =>
-        alt ? { ...alt, ...serverStand } : alt);
+        (alt) => (alt ? { ...alt, ...serverStand } : alt),
+      );
     },
     onError: (e, variablen, kontext) => {
       if (kontext?.listeVorher) {
         qc.setQueryData<Person[]>(kontext.listenKey, (aktuell) =>
-          aktuell?.map((person) => (
+          aktuell?.map((person) =>
             person.id === variablen.personId &&
             person.status === variablen.status &&
             person.geaendert_at === kontext.listeVorher?.geaendert_at
               ? { ...person, status: kontext.listeVorher.status }
-              : person
-          )));
+              : person,
+          ),
+        );
       }
       if (kontext?.detailVorher) {
-        qc.setQueryData<PersonDetail>(
-          kontext.detailKey,
-          (aktuell) => (
-            aktuell?.status === variablen.status &&
-            aktuell.geaendert_at === kontext.detailVorher?.geaendert_at
-              ? { ...aktuell, status: kontext.detailVorher.status }
-              : aktuell
-          ),
+        qc.setQueryData<PersonDetail>(kontext.detailKey, (aktuell) =>
+          aktuell?.status === variablen.status &&
+          aktuell.geaendert_at === kontext.detailVorher?.geaendert_at
+            ? { ...aktuell, status: kontext.detailVorher.status }
+            : aktuell,
         );
       }
       const aktuelleRoute = aktuelleRouteRef.current;
       if (
         aktuelleRoute.einsatzId === variablen.einsatzId &&
         aktuelleRoute.personId === variablen.personId
-      ) fehler(e);
+      )
+        fehler(e);
     },
     onSettled: (_daten, _fehler, variablen) => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(variablen.einsatzId) });
@@ -218,7 +303,10 @@ export default function PersonenDetailPage() {
     // blanker `p.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
     mutationFn: (v: { daten: PersonEingabe; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisierePerson(einsatzId, personId, v.daten, v.overwrite ? undefined : v.basis),
-    onSuccess: () => { invalidateDetail(); editSitzung.beende(); },
+    onSuccess: () => {
+      invalidateDetail();
+      editSitzung.beende();
+    },
     onError: (e, v) => {
       // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Die Personen-Route kennt
       // einen ZWEITEN 409, der kein CAS-Konflikt ist: `fordere_aktiv` („Einsatz ist
@@ -235,7 +323,10 @@ export default function PersonenDetailPage() {
           okButtonProps: { danger: true },
           cancelText: 'Neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
-          onCancel: () => { detailQuery.refetch(); editSitzung.beende(); },
+          onCancel: () => {
+            detailQuery.refetch();
+            editSitzung.beende();
+          },
         });
       } else {
         fehler(e);
@@ -244,7 +335,11 @@ export default function PersonenDetailPage() {
   });
   const stornoMutation = useMutation({
     mutationFn: (pid: number) => stornierePerson(einsatzId, pid),
-    onSuccess: () => { invalidate(); navigate(personenPfad(einsatzId)); }, onError: fehler,
+    onSuccess: () => {
+      invalidate();
+      navigate(personenPfad(einsatzId));
+    },
+    onError: fehler,
   });
 
   /**
@@ -262,7 +357,11 @@ export default function PersonenDetailPage() {
   const sichtungMutation = useMutation({
     mutationFn: (v: { kategorie: Sichtungskategorie; notiz?: string }) =>
       erfasseSichtung(einsatzId, personId, v.kategorie, v.notiz ?? null),
-    onSuccess: () => { invalidateDetail(); setReSichtenOffen(false); sichtungForm.resetFields(); },
+    onSuccess: () => {
+      invalidateDetail();
+      setReSichtenOffen(false);
+      sichtungForm.resetFields();
+    },
     onError: fehler,
   });
 
@@ -270,20 +369,40 @@ export default function PersonenDetailPage() {
   const [notizForm] = Form.useForm<{ text: string }>();
   const notizMutation = useMutation({
     mutationFn: (v: { text: string }) => legeNotizAn(einsatzId, personId, v.text),
-    onSuccess: () => { invalidateDetail(); notizForm.resetFields(); },
+    onSuccess: () => {
+      invalidateDetail();
+      notizForm.resetFields();
+    },
     onError: fehler,
   });
 
   // E-2: Verbleib
   const [verbleibOffen, setVerbleibOffen] = useState(false);
-  const [verbleibForm] = Form.useForm<{ art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }>();
+  const [verbleibForm] = Form.useForm<{
+    art: VerbleibArt;
+    ziel?: string;
+    transportmittel?: string;
+    notiz?: string;
+  }>();
   const verbleibMutation = useMutation({
-    mutationFn: (v: { art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }) =>
+    mutationFn: (v: {
+      art: VerbleibArt;
+      ziel?: string;
+      transportmittel?: string;
+      notiz?: string;
+    }) =>
       erfasseVerbleib(einsatzId, personId, {
-        art: v.art, ziel: v.ziel ?? null, transportmittel: v.transportmittel ?? null,
-        status: v.art === 'transport' ? 'abtransportiert' : null, notiz: v.notiz ?? null,
+        art: v.art,
+        ziel: v.ziel ?? null,
+        transportmittel: v.transportmittel ?? null,
+        status: v.art === 'transport' ? 'abtransportiert' : null,
+        notiz: v.notiz ?? null,
       }),
-    onSuccess: () => { invalidateDetail(); setVerbleibOffen(false); verbleibForm.resetFields(); },
+    onSuccess: () => {
+      invalidateDetail();
+      setVerbleibOffen(false);
+      verbleibForm.resetFields();
+    },
     onError: fehler,
   });
 
@@ -301,7 +420,11 @@ export default function PersonenDetailPage() {
         uhs_id: v.uhs_id,
         notiz: v.notiz ?? null,
       }),
-    onSuccess: () => { invalidateUhs(); setUhsModalOffen(false); uhsForm.resetFields(); },
+    onSuccess: () => {
+      invalidateUhs();
+      setUhsModalOffen(false);
+      uhsForm.resetFields();
+    },
     onError: fehler,
   });
   const austrittMutation = useMutation({
@@ -337,31 +460,48 @@ export default function PersonenDetailPage() {
   const tierZuweisenMut = useMutation({
     mutationFn: (tierId: number) =>
       aktualisiereTier(einsatzId, tierId, { halter_person_id: personId, halter_kontakt: null }),
-    onSuccess: () => { invalidateZuordnung(); setTierModalOffen(false); tierForm.resetFields(); },
+    onSuccess: () => {
+      invalidateZuordnung();
+      setTierModalOffen(false);
+      tierForm.resetFields();
+    },
     onError: fehler,
   });
   const tierLoesenMut = useMutation({
     mutationFn: (tierId: number) => aktualisiereTier(einsatzId, tierId, { halter_person_id: null }),
-    onSuccess: invalidateZuordnung, onError: fehler,
+    onSuccess: invalidateZuordnung,
+    onError: fehler,
   });
   const schadenZuweisenMut = useMutation({
     mutationFn: (schadenId: number) =>
       aktualisiereSchaden(einsatzId, schadenId, {
-        geschaedigt_person_id: personId, geschaedigt_personal_id: null,
-        geschaedigt_organisation_id: null, geschaedigt_kontakt: null,
+        geschaedigt_person_id: personId,
+        geschaedigt_personal_id: null,
+        geschaedigt_organisation_id: null,
+        geschaedigt_kontakt: null,
       }),
-    onSuccess: () => { invalidateZuordnung(); setSchadenModalOffen(false); schadenForm.resetFields(); },
+    onSuccess: () => {
+      invalidateZuordnung();
+      setSchadenModalOffen(false);
+      schadenForm.resetFields();
+    },
     onError: fehler,
   });
   const schadenLoesenMut = useMutation({
-    mutationFn: (schadenId: number) => aktualisiereSchaden(einsatzId, schadenId, { geschaedigt_person_id: null }),
-    onSuccess: invalidateZuordnung, onError: fehler,
+    mutationFn: (schadenId: number) =>
+      aktualisiereSchaden(einsatzId, schadenId, { geschaedigt_person_id: null }),
+    onSuccess: invalidateZuordnung,
+    onError: fehler,
   });
 
   const abgleichEntscheidenMutation = useMutation({
-    mutationFn: (v: { vermisstId: number; abgleichId: number; entscheidung: 'bestaetigt' | 'verworfen' }) =>
-      entscheideAbgleich(einsatzId, v.vermisstId, v.abgleichId, v.entscheidung),
-    onSuccess: invalidateDetail, onError: fehler,
+    mutationFn: (v: {
+      vermisstId: number;
+      abgleichId: number;
+      entscheidung: 'bestaetigt' | 'verworfen';
+    }) => entscheideAbgleich(einsatzId, v.vermisstId, v.abgleichId, v.entscheidung),
+    onSuccess: invalidateDetail,
+    onError: fehler,
   });
 
   // Die „Zugeordnete Tiere/Schäden"-Blöcke werden über den konsolidierten Einsatz-Live-
@@ -377,7 +517,11 @@ export default function PersonenDetailPage() {
   }
 
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -409,13 +553,21 @@ export default function PersonenDetailPage() {
   );
   const freieSchaeden = (freieSchaedenQuery.data ?? []).filter(
     (s) =>
-      s.geschaedigt_person_id == null && s.geschaedigt_personal_id == null &&
-      s.geschaedigt_organisation_id == null && s.geschaedigt_kontakt == null &&
-      s.storniert_at == null && s.status !== 'abgeschlossen',
+      s.geschaedigt_person_id == null &&
+      s.geschaedigt_personal_id == null &&
+      s.geschaedigt_organisation_id == null &&
+      s.geschaedigt_kontakt == null &&
+      s.storniert_at == null &&
+      s.status !== 'abgeschlossen',
   );
 
   const auditSpalten: TableColumnsType<PersonZugriff> = [
-    { title: 'Wann', dataIndex: 'zugriff_at', key: 'zugriff_at', render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" /> },
+    {
+      title: 'Wann',
+      dataIndex: 'zugriff_at',
+      key: 'zugriff_at',
+      render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" />,
+    },
     { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
     { title: 'Art', dataIndex: 'art', key: 'art' },
   ];
@@ -425,9 +577,11 @@ export default function PersonenDetailPage() {
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
         <Space wrap>
           {istPatient(person) && <Tag color="geekblue">Patient</Tag>}
-          {person.aktuelle_sichtung
-            ? <SichtungsTag kategorie={person.aktuelle_sichtung} praefix="SK: " />
-            : <Tag>ungesichtet</Tag>}
+          {person.aktuelle_sichtung ? (
+            <SichtungsTag kategorie={person.aktuelle_sichtung} praefix="SK: " />
+          ) : (
+            <Tag>ungesichtet</Tag>
+          )}
           {person.aktueller_verbleib && <Tag color="purple">{person.aktueller_verbleib}</Tag>}
         </Space>
         {/* „Re-Sichten" und „Verbleib erfassen" standen bis LFH-340 · C5 hier als eigene
@@ -437,7 +591,8 @@ export default function PersonenDetailPage() {
             was zu tun ist. */}
         {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
           <Alert
-            type="warning" showIcon
+            type="warning"
+            showIcon
             title="Sichtung = tot. Admin-Status wurde NICHT automatisch geändert."
             action={
               <Button
@@ -452,11 +607,13 @@ export default function PersonenDetailPage() {
                   statusMutation.variables?.einsatzId === einsatzId &&
                   statusMutation.variables.personId === person.id
                 }
-                onClick={() => statusMutation.mutate({
-                  einsatzId,
-                  personId: person.id,
-                  status: 'verstorben',
-                })}
+                onClick={() =>
+                  statusMutation.mutate({
+                    einsatzId,
+                    personId: person.id,
+                    status: 'verstorben',
+                  })
+                }
               >
                 Status → verstorben
               </Button>
@@ -465,30 +622,56 @@ export default function PersonenDetailPage() {
         )}
         {darfSchreiben && !person.storniert_at && (
           <Form form={notizForm} layout="vertical" onFinish={notizMutation.mutate}>
-            <Form.Item label="Befund/Verlaufsnotiz (append-only, kein ETB)" name="text"
-              rules={[{ required: true, message: 'Bitte Text eingeben' }]}>
+            <Form.Item
+              label="Befund/Verlaufsnotiz (append-only, kein ETB)"
+              name="text"
+              rules={[{ required: true, message: 'Bitte Text eingeben' }]}
+            >
               <Input.TextArea rows={2} />
             </Form.Item>
-            <Button type="primary" htmlType="submit" loading={notizMutation.isPending}>Notiz anlegen</Button>
+            <Button type="primary" htmlType="submit" loading={notizMutation.isPending}>
+              Notiz anlegen
+            </Button>
           </Form>
         )}
         <div>
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+          <Typography.Text
+            type="secondary"
+            style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
+          >
             Chronologischer Verlauf (neueste zuerst)
           </Typography.Text>
           <PersonVerlauf person={person} />
         </div>
         {(person.abgleiche?.length ?? 0) > 0 && (
           <div>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+            <Typography.Text
+              type="secondary"
+              style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
+            >
               Vermisstenabgleich
             </Typography.Text>
             <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
               {person.abgleiche.map((a) => (
                 <li key={a.id} style={{ padding: '4px 0' }}>
-                  <Tag color={a.status === 'bestaetigt' ? 'green' : a.status === 'verworfen' ? 'default' : 'gold'}>{a.status}</Tag>
+                  <Tag
+                    color={
+                      a.status === 'bestaetigt'
+                        ? 'green'
+                        : a.status === 'verworfen'
+                          ? 'default'
+                          : 'gold'
+                    }
+                  >
+                    {a.status}
+                  </Tag>
                   <Typography.Text>
-                    R-{String(a.vermisst_person_id === person.id ? a.gefunden_person_id : a.vermisst_person_id).padStart(3, '0')}
+                    R-
+                    {String(
+                      a.vermisst_person_id === person.id
+                        ? a.gefunden_person_id
+                        : a.vermisst_person_id,
+                    ).padStart(3, '0')}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
                     /* `size="middle"` wie an der UHS-Zeile (LFH-363): „Verwerfen" ist
@@ -496,16 +679,30 @@ export default function PersonenDetailPage() {
                        mit LFH-340 · C5 abgetragen, weil das Bündel die Datei ohnehin
                        anfasste — der Scanner hat ihn selbst gemeldet. */
                     <Space size="middle" style={{ marginLeft: 12 }}>
-                      <Button type="primary"
+                      <Button
+                        type="primary"
                         disabled={!darfEinsatzLeiten(einsatz, benutzer)}
-                        onClick={() => abgleichEntscheidenMutation.mutate({
-                          vermisstId: person.id, abgleichId: a.id, entscheidung: 'bestaetigt' })}>
+                        onClick={() =>
+                          abgleichEntscheidenMutation.mutate({
+                            vermisstId: person.id,
+                            abgleichId: a.id,
+                            entscheidung: 'bestaetigt',
+                          })
+                        }
+                      >
                         Bestätigen
                       </Button>
-                      <Button danger
+                      <Button
+                        danger
                         disabled={!darfEinsatzLeiten(einsatz, benutzer)}
-                        onClick={() => abgleichEntscheidenMutation.mutate({
-                          vermisstId: person.id, abgleichId: a.id, entscheidung: 'verworfen' })}>
+                        onClick={() =>
+                          abgleichEntscheidenMutation.mutate({
+                            vermisstId: person.id,
+                            abgleichId: a.id,
+                            entscheidung: 'verworfen',
+                          })
+                        }
+                      >
                         Verwerfen
                       </Button>
                     </Space>
@@ -528,24 +725,51 @@ export default function PersonenDetailPage() {
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
         {sitzung ? (
-          <Form form={editForm} layout="vertical" initialValues={sitzung.werte}
-            onFinish={(daten) => editMutation.mutate({ daten, basis: sitzung.basis })}>
-            <Form.Item label="Name" name="name"><Input /></Form.Item>
-            <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
-            <Form.Item label="Geschlecht" name="geschlecht">
-              <Select allowClear options={[
-                { value: 'maennlich', label: 'männlich' }, { value: 'weiblich', label: 'weiblich' },
-                { value: 'divers', label: 'divers' }, { value: 'unbekannt', label: 'unbekannt' },
-              ]} />
+          <Form
+            form={editForm}
+            layout="vertical"
+            initialValues={sitzung.werte}
+            onFinish={(daten) => editMutation.mutate({ daten, basis: sitzung.basis })}
+          >
+            <Form.Item label="Name" name="name">
+              <Input />
             </Form.Item>
-            <Form.Item label="Geburtsdatum (YYYY-MM-DD)" name="geburtsdatum"><Input /></Form.Item>
-            <Form.Item label="Geschätztes Alter" name="alter_geschaetzt"><InputNumber min={0} max={120} /></Form.Item>
-            <Form.Item label="Herkunft / Adresse" name="herkunft_adresse"><Input /></Form.Item>
-            <Form.Item label="Antreffort" name="antreff_ort"><Input /></Form.Item>
-            <Form.Item label="Melder / Kontakt" name="melder_kontakt"><Input /></Form.Item>
-            <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+            <Form.Item label="Vorname" name="vorname">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Geschlecht" name="geschlecht">
+              <Select
+                allowClear
+                options={[
+                  { value: 'maennlich', label: 'männlich' },
+                  { value: 'weiblich', label: 'weiblich' },
+                  { value: 'divers', label: 'divers' },
+                  { value: 'unbekannt', label: 'unbekannt' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="Geburtsdatum (YYYY-MM-DD)" name="geburtsdatum">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Geschätztes Alter" name="alter_geschaetzt">
+              <InputNumber min={0} max={120} />
+            </Form.Item>
+            <Form.Item label="Herkunft / Adresse" name="herkunft_adresse">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Antreffort" name="antreff_ort">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Melder / Kontakt" name="melder_kontakt">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Notiz" name="notiz">
+              <Input.TextArea rows={2} />
+            </Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
+              <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
+                Speichern
+              </Button>
               <Button onClick={editSitzung.beende}>Abbrechen</Button>
             </Space>
           </Form>
@@ -555,30 +779,36 @@ export default function PersonenDetailPage() {
             <Descriptions.Item label="Vorname">{person.vorname ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Geschlecht">{person.geschlecht ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Geburtsdatum">{person.geburtsdatum ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Alter (geschätzt)">{person.alter_geschaetzt ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Herkunft / Adresse">{person.herkunft_adresse ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="Alter (geschätzt)">
+              {person.alter_geschaetzt ?? '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Herkunft / Adresse">
+              {person.herkunft_adresse ?? '—'}
+            </Descriptions.Item>
             <Descriptions.Item label="Antreffort">{person.antreff_ort ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Melder / Kontakt">{person.melder_kontakt ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="Melder / Kontakt">
+              {person.melder_kontakt ?? '—'}
+            </Descriptions.Item>
             <Descriptions.Item label="Notiz">{person.notiz ?? '—'}</Descriptions.Item>
           </Descriptions>
         )}
 
         {/**
-          * ZUORDNUNGEN UND AUDIT LADEN ERST BEIM AUFKLAPPEN (LFH-340 · C5, Befund M40).
-          *
-          * Die Seite setzte beim Öffnen sechs Abfragen ab, um eine nachgetragene Sichtung zu
-          * ermöglichen — fünf davon für Blöcke, die man in dieser Lage gar nicht ansieht.
-          * Kopf und medizinischer Verlauf kommen aus DEMSELBEN Detail-Abruf und stehen
-          * deshalb weiterhin sofort.
-          *
-          * KEIN `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim
-          * Aufklappen" wäre nicht mehr von „immer da" zu unterscheiden — die Zählung im
-          * Test bewiese nichts mehr.
-          *
-          * Die UHS-Verortung steht MIT im Panel, obwohl `aktuelle_uhs_id` aus dem Detail
-          * kommt: nur der KLARTEXT-Name braucht die UHS-Liste, und dafür gibt es seit jeher
-          * den Rückfallwert `UHS #id`. Zugeklappt kostet der Name nichts.
-          */}
+         * ZUORDNUNGEN UND AUDIT LADEN ERST BEIM AUFKLAPPEN (LFH-340 · C5, Befund M40).
+         *
+         * Die Seite setzte beim Öffnen sechs Abfragen ab, um eine nachgetragene Sichtung zu
+         * ermöglichen — fünf davon für Blöcke, die man in dieser Lage gar nicht ansieht.
+         * Kopf und medizinischer Verlauf kommen aus DEMSELBEN Detail-Abruf und stehen
+         * deshalb weiterhin sofort.
+         *
+         * KEIN `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim
+         * Aufklappen" wäre nicht mehr von „immer da" zu unterscheiden — die Zählung im
+         * Test bewiese nichts mehr.
+         *
+         * Die UHS-Verortung steht MIT im Panel, obwohl `aktuelle_uhs_id` aus dem Detail
+         * kommt: nur der KLARTEXT-Name braucht die UHS-Liste, und dafür gibt es seit jeher
+         * den Rückfallwert `UHS #id`. Zugeklappt kostet der Name nichts.
+         */}
         <Collapse
           ghost
           activeKey={[
@@ -598,17 +828,27 @@ export default function PersonenDetailPage() {
                 <Space orientation="vertical" style={{ width: '100%' }} size="large">
                   <div>
                     <Space wrap>
-                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
+                      >
                         Zugeordnete Tiere
                       </Typography.Text>
                       {darfZuordnen && (
-                        <Button onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
+                        <Button
+                          onClick={() => {
+                            tierForm.resetFields();
+                            setTierModalOffen(true);
+                          }}
+                        >
                           Tier zuweisen
                         </Button>
                       )}
                     </Space>
                     {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
-                      <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                      <div>
+                        <Typography.Text type="secondary">keine</Typography.Text>
+                      </div>
                     ) : (
                       <Space wrap style={{ marginTop: 4 }}>
                         {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
@@ -618,11 +858,14 @@ export default function PersonenDetailPage() {
                               style={{ cursor: 'pointer' }}
                               onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
                             >
-                              {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
+                              {tierRegistrierAnzeige(t.registrier_nr)}{' '}
+                              {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
                               {t.rufname ? ` „${t.rufname}"` : ''}
                             </Tag>
                             {darfZuordnen && (
-                              <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
+                              <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>
+                                lösen
+                              </Button>
                             )}
                           </Space>
                         ))}
@@ -632,28 +875,41 @@ export default function PersonenDetailPage() {
 
                   <div>
                     <Space wrap>
-                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
+                      >
                         Als Geschädigte bei Schäden
                       </Typography.Text>
                       {darfZuordnen && (
-                        <Button onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
+                        <Button
+                          onClick={() => {
+                            schadenForm.resetFields();
+                            setSchadenModalOffen(true);
+                          }}
+                        >
                           Schaden zuweisen
                         </Button>
                       )}
                     </Space>
                     {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
-                      <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                      <div>
+                        <Typography.Text type="secondary">keine</Typography.Text>
+                      </div>
                     ) : (
                       <Space wrap style={{ marginTop: 4 }}>
                         {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
                           <Space key={sch.id} size={4}>
                             <Link to={schadenDetailPfad(einsatzId, sch.id)}>
                               <Tag color="orange" style={{ cursor: 'pointer' }}>
-                                {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
+                                {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} (
+                                {sch.ausmass}) — {sch.status}
                               </Tag>
                             </Link>
                             {darfZuordnen && (
-                              <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
+                              <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>
+                                lösen
+                              </Button>
                             )}
                           </Space>
                         ))}
@@ -662,7 +918,10 @@ export default function PersonenDetailPage() {
                   </div>
 
                   <div>
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
+                    <Typography.Text
+                      type="secondary"
+                      style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
+                    >
                       UHS-Verortung
                     </Typography.Text>
                     <div style={{ marginTop: 4 }}>
@@ -671,16 +930,25 @@ export default function PersonenDetailPage() {
                         // einem `danger`-Knopf und mindestens einer weiteren Aktion trägt
                         // mindestens `token.marginSM` Abstand — antds Vorgabe liegt darunter.
                         <Space wrap size="middle">
-                          <StatusTag darstellung={bezugsDarstellung(
-                            uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
-                              ?? `UHS #${person.aktuelle_uhs_id}`
-                          )} />
+                          <StatusTag
+                            darstellung={bezugsDarstellung(
+                              uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)
+                                ?.bezeichnung ?? `UHS #${person.aktuelle_uhs_id}`,
+                            )}
+                          />
                           {darfSchreiben && !person.storniert_at && (
                             <>
-                              <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                              <Button
+                                onClick={() => {
+                                  uhsForm.resetFields();
+                                  setUhsModalOffen(true);
+                                }}
+                              >
                                 UHS ändern
                               </Button>
-                              <Button danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
+                              <Button danger onClick={() => austrittMutation.mutate()}>
+                                Austragen
+                              </Button>
                             </>
                           )}
                         </Space>
@@ -688,7 +956,12 @@ export default function PersonenDetailPage() {
                         <Space wrap>
                           <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
                           {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
-                            <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                            <Button
+                              onClick={() => {
+                                uhsForm.resetFields();
+                                setUhsModalOffen(true);
+                              }}
+                            >
                               UHS zuweisen
                             </Button>
                           )}
@@ -700,19 +973,22 @@ export default function PersonenDetailPage() {
               ),
             },
             ...(istEinsatzLeitung(einsatz)
-              ? [{
-                  key: 'audit',
-                  label: 'Zugriffs-Audit',
-                  children: (
-                    <KatalogTabelle<PersonZugriff>
-                      rowKey="id" pagination={false}
-                      loading={auditQuery.isLoading}
-                      dataSource={auditQuery.data ?? []}
-                      columns={auditSpalten}
-                      locale={{ emptyText: 'Noch keine Zugriffe' }}
-                    />
-                  ),
-                }]
+              ? [
+                  {
+                    key: 'audit',
+                    label: 'Zugriffs-Audit',
+                    children: (
+                      <KatalogTabelle<PersonZugriff>
+                        rowKey="id"
+                        pagination={false}
+                        loading={auditQuery.isLoading}
+                        dataSource={auditQuery.data ?? []}
+                        columns={auditSpalten}
+                        locale={{ emptyText: 'Noch keine Zugriffe' }}
+                      />
+                    ),
+                  },
+                ]
               : []),
           ]}
         />
@@ -738,10 +1014,22 @@ export default function PersonenDetailPage() {
   }
 
   function fuehreKopfaktionAus(aktion: Kopfaktion) {
-    if (aktion.art === 'sichten') { setReSichtenOffen(true); return; }
-    if (aktion.art === 'verbleib') { setVerbleibOffen(true); return; }
-    if (aktion.art === 'bearbeiten') { starteBearbeiten(); return; }
-    if (aktion.art !== 'status') { setStornoOffen(true); return; }
+    if (aktion.art === 'sichten') {
+      setReSichtenOffen(true);
+      return;
+    }
+    if (aktion.art === 'verbleib') {
+      setVerbleibOffen(true);
+      return;
+    }
+    if (aktion.art === 'bearbeiten') {
+      starteBearbeiten();
+      return;
+    }
+    if (aktion.art !== 'status') {
+      setStornoOffen(true);
+      return;
+    }
     // Statuswechsel: irreversible Ziele über den Dialog, umkehrbare direkt. „Umkehrbar"
     // heißt hier, dass `naechsteStatus` einen Weg zurück kennt — bei `verstorben` und
     // `abgemeldet` steht er zwar formal in der Tabelle, aber ein versehentliches
@@ -794,7 +1082,12 @@ export default function PersonenDetailPage() {
     };
 
     const primaer = p.aktuelle_sichtung == null ? sichten : verbleib;
-    const uebrig = [primaer === sichten ? verbleib : sichten, bearbeiten, ...statuswechsel, stornieren];
+    const uebrig = [
+      primaer === sichten ? verbleib : sichten,
+      bearbeiten,
+      ...statuswechsel,
+      stornieren,
+    ];
     return { primaer, weitere: uebrig };
   })();
 
@@ -881,7 +1174,12 @@ export default function PersonenDetailPage() {
     >
       <Row gutter={24}>
         <Col xs={24} lg={12}>
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>Stammdaten</Typography.Text>
+          <Typography.Text
+            type="secondary"
+            style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
+          >
+            Stammdaten
+          </Typography.Text>
           {stammdatenSpalte(p)}
         </Col>
         <Col xs={24} lg={12}>
@@ -896,7 +1194,8 @@ export default function PersonenDetailPage() {
         okButtonProps={{ danger: true }}
         confirmLoading={laeuftStatus}
         onOk={() => {
-          if (statusDialog) statusMutation.mutate({ einsatzId, personId: p.id, status: statusDialog });
+          if (statusDialog)
+            statusMutation.mutate({ einsatzId, personId: p.id, status: statusDialog });
           setStatusDialog(null);
         }}
         onCancel={() => setStatusDialog(null)}
@@ -911,7 +1210,10 @@ export default function PersonenDetailPage() {
         okText="Stornieren"
         okButtonProps={{ danger: true }}
         confirmLoading={stornoMutation.isPending}
-        onOk={() => { stornoMutation.mutate(p.id); setStornoOffen(false); }}
+        onOk={() => {
+          stornoMutation.mutate(p.id);
+          setStornoOffen(false);
+        }}
         onCancel={() => setStornoOffen(false)}
       >
         Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
@@ -923,12 +1225,20 @@ export default function PersonenDetailPage() {
         okText="Übernehmen"
         confirmLoading={sichtungMutation.isPending}
         onOk={() => sichtungForm.submit()}
-        onCancel={() => { setReSichtenOffen(false); sichtungForm.resetFields(); }}
+        onCancel={() => {
+          setReSichtenOffen(false);
+          sichtungForm.resetFields();
+        }}
         destroyOnHidden
       >
         <Form form={sichtungForm} layout="vertical" onFinish={sichtungMutation.mutate}>
           <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
-            <Select options={(Object.keys(SK_META) as Sichtungskategorie[]).map((k) => ({ value: k, label: SK_META[k].label }))} />
+            <Select
+              options={(Object.keys(SK_META) as Sichtungskategorie[]).map((k) => ({
+                value: k,
+                label: SK_META[k].label,
+              }))}
+            />
           </Form.Item>
           <Form.Item label="Kurzbegründung (optional)" name="notiz">
             <Input />
@@ -942,21 +1252,32 @@ export default function PersonenDetailPage() {
         okText="Erfassen"
         confirmLoading={verbleibMutation.isPending}
         onOk={() => verbleibForm.submit()}
-        onCancel={() => { setVerbleibOffen(false); verbleibForm.resetFields(); }}
+        onCancel={() => {
+          setVerbleibOffen(false);
+          verbleibForm.resetFields();
+        }}
         destroyOnHidden
       >
         <Form form={verbleibForm} layout="vertical" onFinish={verbleibMutation.mutate}>
           <Form.Item label="Art" name="art" rules={[{ required: true }]}>
-            <Select options={[
-              { value: 'transport', label: 'Transport' },
-              { value: 'entlassung', label: 'Entlassung vor Ort' },
-              { value: 'vor_ort', label: 'verbleibt vor Ort' },
-              { value: 'verstorben', label: 'Verbleib des Leichnams' },
-            ]} />
+            <Select
+              options={[
+                { value: 'transport', label: 'Transport' },
+                { value: 'entlassung', label: 'Entlassung vor Ort' },
+                { value: 'vor_ort', label: 'verbleibt vor Ort' },
+                { value: 'verstorben', label: 'Verbleib des Leichnams' },
+              ]}
+            />
           </Form.Item>
-          <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
-          <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
-          <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel">
+            <Input />
+          </Form.Item>
+          <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel">
+            <Input />
+          </Form.Item>
+          <Form.Item label="Notiz" name="notiz">
+            <Input.TextArea rows={2} />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -966,11 +1287,18 @@ export default function PersonenDetailPage() {
         okText="Zuweisen"
         confirmLoading={belegungMutation.isPending}
         onOk={() => uhsForm.submit()}
-        onCancel={() => { setUhsModalOffen(false); uhsForm.resetFields(); }}
+        onCancel={() => {
+          setUhsModalOffen(false);
+          uhsForm.resetFields();
+        }}
         destroyOnHidden
       >
         <Form form={uhsForm} layout="vertical" onFinish={(v) => belegungMutation.mutate(v)}>
-          <Form.Item label="Unfallhilfsstelle" name="uhs_id" rules={[{ required: true, message: 'Bitte UHS wählen' }]}>
+          <Form.Item
+            label="Unfallhilfsstelle"
+            name="uhs_id"
+            rules={[{ required: true, message: 'Bitte UHS wählen' }]}
+          >
             <Select
               placeholder="aktive UHS wählen"
               options={(uhsListeQuery.data ?? [])
@@ -978,7 +1306,9 @@ export default function PersonenDetailPage() {
                 .map((u) => ({ value: u.id, label: u.bezeichnung }))}
             />
           </Form.Item>
-          <Form.Item label="Notiz (optional)" name="notiz"><Input /></Form.Item>
+          <Form.Item label="Notiz (optional)" name="notiz">
+            <Input />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -988,11 +1318,18 @@ export default function PersonenDetailPage() {
         okText="Zuweisen"
         confirmLoading={tierZuweisenMut.isPending}
         onOk={() => tierForm.submit()}
-        onCancel={() => { setTierModalOffen(false); tierForm.resetFields(); }}
+        onCancel={() => {
+          setTierModalOffen(false);
+          tierForm.resetFields();
+        }}
         destroyOnHidden
       >
         <Form form={tierForm} layout="vertical" onFinish={(v) => tierZuweisenMut.mutate(v.tier_id)}>
-          <Form.Item label="Tier" name="tier_id" rules={[{ required: true, message: 'Bitte Tier wählen' }]}>
+          <Form.Item
+            label="Tier"
+            name="tier_id"
+            rules={[{ required: true, message: 'Bitte Tier wählen' }]}
+          >
             <Select
               placeholder="freies Tier wählen"
               loading={freieTiereQuery.isLoading}
@@ -1012,11 +1349,22 @@ export default function PersonenDetailPage() {
         okText="Zuweisen"
         confirmLoading={schadenZuweisenMut.isPending}
         onOk={() => schadenForm.submit()}
-        onCancel={() => { setSchadenModalOffen(false); schadenForm.resetFields(); }}
+        onCancel={() => {
+          setSchadenModalOffen(false);
+          schadenForm.resetFields();
+        }}
         destroyOnHidden
       >
-        <Form form={schadenForm} layout="vertical" onFinish={(v) => schadenZuweisenMut.mutate(v.schaden_id)}>
-          <Form.Item label="Schaden" name="schaden_id" rules={[{ required: true, message: 'Bitte Schaden wählen' }]}>
+        <Form
+          form={schadenForm}
+          layout="vertical"
+          onFinish={(v) => schadenZuweisenMut.mutate(v.schaden_id)}
+        >
+          <Form.Item
+            label="Schaden"
+            name="schaden_id"
+            rules={[{ required: true, message: 'Bitte Schaden wählen' }]}
+          >
             <Select
               placeholder="freien Schaden wählen"
               loading={freieSchaedenQuery.isLoading}

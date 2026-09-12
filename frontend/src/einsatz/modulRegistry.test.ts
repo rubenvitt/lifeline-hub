@@ -17,15 +17,25 @@ import {
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 const admin: BenutzerAnzeige = {
-  id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'A',
+  benutzername: 'a',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
+  totp_aktiviert: false,
 };
 const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
 const fk: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
 
 const offen: ModulEintrag = {
-  key: 'x', kategorie: 'erfassung', label: 'X', icon: modulRegistry[0].icon,
-  route: 'x', status: 'geplant',
+  key: 'x',
+  kategorie: 'erfassung',
+  label: 'X',
+  icon: modulRegistry[0].icon,
+  route: 'x',
+  status: 'geplant',
 };
 const adminModul: ModulEintrag = { ...offen, benoetigteRolle: 'admin' };
 const fkModul: ModulEintrag = { ...offen, benoetigteRolle: 'fuehrungskraft' };
@@ -68,8 +78,19 @@ describe('modulRegistry', () => {
 
   // --- Override-Kontext (LFH-132) ---
 
-  const ov = (key: string, sichtbar: boolean, rolle: 'admin' | 'fuehrungskraft' | null = null): ModulOverrides => ({
-    [key]: { einsatz_id: 1, modul_key: key, sichtbar, benoetigte_rolle: rolle, geaendert_at: null, geaendert_von: null },
+  const ov = (
+    key: string,
+    sichtbar: boolean,
+    rolle: 'admin' | 'fuehrungskraft' | null = null,
+  ): ModulOverrides => ({
+    [key]: {
+      einsatz_id: 1,
+      modul_key: key,
+      sichtbar,
+      benoetigte_rolle: rolle,
+      geaendert_at: null,
+      geaendert_von: null,
+    },
   });
 
   it('istModulAusblendbar: Stammdaten + Einstellungen nicht ausblendbar', () => {
@@ -96,7 +117,9 @@ describe('modulRegistry', () => {
   it('istModulGesperrt: nicht-ausblendbares Modul nie rollen-gesperrt (Selbst-Aussperr-Schutz)', () => {
     const einstellungen = modulRegistry.find((m) => m.key === 'einsatz-einstellungen')!;
     // Selbst mit (defensiv ohnehin abgelehntem) Rollen-Override bleibt es frei.
-    expect(istModulGesperrt(einstellungen, ohne, ov('einsatz-einstellungen', true, 'fuehrungskraft'))).toBe(false);
+    expect(
+      istModulGesperrt(einstellungen, ohne, ov('einsatz-einstellungen', true, 'fuehrungskraft')),
+    ).toBe(false);
   });
 
   it('istModulGesperrt: Override-Rolle hat Vorrang vor Registry-Default', () => {
@@ -193,8 +216,9 @@ describe('modulRegistry', () => {
   });
 
   it('modulZielRoute: Deep-Link-Ziel hat Vorrang vor der eigenen Route', () => {
-    expect(modulZielRoute({ ...offen, route: 'gefahrenzonen', verweistAuf: 'lagekarte' }))
-      .toBe('lagekarte');
+    expect(modulZielRoute({ ...offen, route: 'gefahrenzonen', verweistAuf: 'lagekarte' })).toBe(
+      'lagekarte',
+    );
   });
 
   it('modulZielRoute: ohne Deep-Link die eigene Route', () => {
@@ -204,8 +228,14 @@ describe('modulRegistry', () => {
 
 describe('erstesFreigegebenesModul (LFH-337)', () => {
   const admin: BenutzerAnzeige = {
-    id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
-    org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
+    id: 1,
+    anzeigename: 'A',
+    benutzername: 'a',
+    system_rolle: 'admin',
+    org_rolle: 'keine',
+    aktiv: true,
+    erstellt_at: '2026-05-23 10:00:00',
+    totp_aktiviert: false,
   };
 
   it('liefert das erste fertige Modul der Kategorie in Registry-Reihenfolge', () => {
@@ -222,8 +252,12 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
     const erstes = erstesFreigegebenesModul('kraefte', admin)!;
     const m = erstesFreigegebenesModul('kraefte', admin, {
       [erstes.key]: {
-        einsatz_id: 1, modul_key: erstes.key, sichtbar: false,
-        benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        einsatz_id: 1,
+        modul_key: erstes.key,
+        sichtbar: false,
+        benoetigte_rolle: null,
+        geaendert_at: null,
+        geaendert_von: null,
       },
     });
     // Konkretes Folgemodul statt bloßer Ungleichheit (Fix-Runde 1): ein Resolver, der bei
@@ -243,8 +277,12 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
     const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
     const m = erstesFreigegebenesModul('kraefte', ohne, {
       [erstes.key]: {
-        einsatz_id: 1, modul_key: erstes.key, sichtbar: true,
-        benoetigte_rolle: 'admin', geaendert_at: null, geaendert_von: null,
+        einsatz_id: 1,
+        modul_key: erstes.key,
+        sichtbar: true,
+        benoetigte_rolle: 'admin',
+        geaendert_at: null,
+        geaendert_von: null,
       },
     });
     // Konkretes Folgemodul statt bloßer Ungleichheit — dieselbe Begründung wie im Test darüber.

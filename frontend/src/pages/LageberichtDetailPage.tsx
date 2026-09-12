@@ -1,4 +1,18 @@
-import { App, Breadcrumb, Button, Checkbox, DatePicker, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
+import {
+  App,
+  Breadcrumb,
+  Button,
+  Checkbox,
+  DatePicker,
+  Flex,
+  Form,
+  Input,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+  theme,
+} from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -6,7 +20,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { parseRouteId, lageberichtePfad, lageberichtDetailPfad, etbPfad } from '../routing/deeplinks';
+import {
+  parseRouteId,
+  lageberichtePfad,
+  lageberichtDetailPfad,
+  etbPfad,
+} from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import {
@@ -118,10 +137,11 @@ function LageberichtDetail() {
   if (einstieg === null && berichtQuery.data && vorlageDef) {
     const geladen = berichtQuery.data;
     setEinstieg({
-      feld: einstiegsAbschnitt(
-        vorlageDef.abschnitte.map((a) => a.schluessel),
-        (schluessel) => geladen.abschnitte.find((x) => x.schluessel === schluessel)?.text,
-      ) ?? null,
+      feld:
+        einstiegsAbschnitt(
+          vorlageDef.abschnitte.map((a) => a.schluessel),
+          (schluessel) => geladen.abschnitte.find((x) => x.schluessel === schluessel)?.text,
+        ) ?? null,
     });
   }
 
@@ -362,10 +382,15 @@ function LageberichtDetail() {
         <Space wrap>
           <Button onClick={() => window.print()}>Drucken / als PDF</Button>
           {!istEntwurf && bericht.etb_eintrag_id != null && (
-            <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
+            <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>
+              Zum ETB-Eintrag
+            </Link>
           )}
           {!istEntwurf && darfSchreiben && (
-            <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>
+            <Button
+              onClick={() => fortschreibenMutation.mutate()}
+              loading={fortschreibenMutation.isPending}
+            >
               Fortschreiben
             </Button>
           )}
@@ -390,7 +415,11 @@ function LageberichtDetail() {
               <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
                 Entwurf speichern
               </Button>
-              <Button type="primary" onClick={freigabeBestaetigen} loading={freigebenMutation.isPending}>
+              <Button
+                type="primary"
+                onClick={freigabeBestaetigen}
+                loading={freigebenMutation.isPending}
+              >
                 Freigeben
               </Button>
             </>
@@ -438,7 +467,12 @@ function LageberichtDetail() {
           <Form.Item label="Zeitstand" name="zeitstand">
             {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
                 würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die DB. */}
-            <DatePicker showTime allowClear={false} format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+            <DatePicker
+              showTime
+              allowClear={false}
+              format="DD.MM.YYYY HH:mm"
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Checkbox
             checked={vorschauNeben}
@@ -468,9 +502,11 @@ function LageberichtDetail() {
             return (
               <section key={a.schluessel} style={{ marginBottom: 16 }}>
                 <Typography.Title level={5}>{a.label}</Typography.Title>
-                {text.trim()
-                  ? <Markdown variante="dokument">{text}</Markdown>
-                  : <Typography.Paragraph>—</Typography.Paragraph>}
+                {text.trim() ? (
+                  <Markdown variante="dokument">{text}</Markdown>
+                ) : (
+                  <Typography.Paragraph>—</Typography.Paragraph>
+                )}
               </section>
             );
           })}

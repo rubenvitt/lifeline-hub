@@ -75,8 +75,10 @@ export function kategorieVon(kat: StatusKategorie | null | undefined): Kategorie
  * Werteliste für `DatensichtSpalte.filter` und für die Filterleiste der Kräfteübersicht.
  * Die drei Vertragslabel kommen aus `statusKategorie`, das vierte aus {@link OHNE_STATUS}.
  */
-export const KATEGORIE_WERTE: readonly { readonly text: string; readonly value: KategorieOderOhne }[] =
-  KATEGORIE_REIHENFOLGE.map((value) => ({ value, text: kategorieEtikett(value) }));
+export const KATEGORIE_WERTE: readonly {
+  readonly text: string;
+  readonly value: KategorieOderOhne;
+}[] = KATEGORIE_REIHENFOLGE.map((value) => ({ value, text: kategorieEtikett(value) }));
 
 /** Ein Zählfeld der Ampelzeile: Kurztext, Volltext, Zahl und optionale Dringlichkeitsstufe. */
 export interface AmpelFeld {

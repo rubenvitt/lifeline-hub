@@ -27,7 +27,10 @@ export default function BuchstabierHilfe({ text }: { text: string }) {
       <Segmented
         value={tafel}
         onChange={(v) => setTafel(v as Buchstabiertafel)}
-        options={[{ value: 'din5009', label: 'Deutsch' }, { value: 'nato', label: 'NATO' }]}
+        options={[
+          { value: 'din5009', label: 'Deutsch' },
+          { value: 'nato', label: 'NATO' },
+        ]}
       />
       <div style={{ marginTop: 8 }}>
         {text.trim() === '' ? (
@@ -40,7 +43,9 @@ export default function BuchstabierHilfe({ text }: { text: string }) {
                   <Typography.Text strong>{z.zeichen}</Typography.Text> <span>{z.wort}</span>
                 </Tag>
               ) : (
-                <Typography.Text key={i} type="secondary">{z.zeichen === ' ' ? '␣' : z.zeichen}</Typography.Text>
+                <Typography.Text key={i} type="secondary">
+                  {z.zeichen === ' ' ? '␣' : z.zeichen}
+                </Typography.Text>
               ),
             )}
           </Space>

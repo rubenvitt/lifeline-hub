@@ -103,7 +103,11 @@ describe('SchnellAnlegen', () => {
     // naechste Eingabe steht schon im Feld. Ein unbedingtes Leeren im Erfolgsfall
     // — so macht es das Vorbild — friesse sie.
     let aufloesen!: () => void;
-    const anlegen = vi.fn().mockReturnValue(new Promise<void>((r) => { aufloesen = r; }));
+    const anlegen = vi.fn().mockReturnValue(
+      new Promise<void>((r) => {
+        aufloesen = r;
+      }),
+    );
     renderZeile(anlegen);
 
     await userEvent.type(feld(), 'A');

@@ -6,8 +6,13 @@ import AuftragFormular from './AuftragFormular';
 
 /** Die sieben SKK-Schemafelder, die das Ticket namentlich hinter den Collapse schickt. */
 const SKK = [
-  'Absicht / Ziel', 'Lage', 'Ort / Wo', 'Zeit / Wann', 'Mittel / Womit',
-  'Verbindung / Meldewege', 'Sicherheit / Besonderes',
+  'Absicht / Ziel',
+  'Lage',
+  'Ort / Wo',
+  'Zeit / Wann',
+  'Mittel / Womit',
+  'Verbindung / Meldewege',
+  'Sicherheit / Besonderes',
 ];
 
 function felderZaehlen(): number {
@@ -64,10 +69,12 @@ describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
-    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
-      auftrag_text: 'Erkunden',
-      empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'S3' }],
-    }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auftrag_text: 'Erkunden',
+        empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'S3' }],
+      }),
+    );
   });
 
   it('erkennt einen gewählten Abschnitt als strukturiertes Ziel', async () => {
@@ -80,8 +87,10 @@ describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
 
     // Der Präfix `abschnitt:` unterscheidet die beiden Sorten im selben Feld.
-    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
-      empfaenger: [{ empfaenger_typ: 'abschnitt', abschnitt_id: 1 }],
-    }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empfaenger: [{ empfaenger_typ: 'abschnitt', abschnitt_id: 1 }],
+      }),
+    );
   });
 });

@@ -9,8 +9,13 @@ import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 
 function entwurf(over: Partial<EtbEntwurf> = {}): EtbEntwurf {
   return {
-    id: 'vorhanden', einsatz_id: 7, inhalt: 'Bestand', typ: 'meldung',
-    erstellt_at: '2026-06-22T10:00:00.000Z', geaendert_at: '2026-06-22T10:00:00.000Z', ...over,
+    id: 'vorhanden',
+    einsatz_id: 7,
+    inhalt: 'Bestand',
+    typ: 'meldung',
+    erstellt_at: '2026-06-22T10:00:00.000Z',
+    geaendert_at: '2026-06-22T10:00:00.000Z',
+    ...over,
   };
 }
 
@@ -26,40 +31,50 @@ afterEach(() => {
 describe('useEtbEntwuerfe', () => {
   it('LFH-461 Review: Kontextwechsel während IndexedDB lädt verwendet die aktuelle Stelle', async () => {
     let freigeben!: (werte: EtbEntwurf[]) => void;
-    const laden = vi.spyOn(entwurfStore, 'entwuerfeLaden')
-      .mockReturnValueOnce(new Promise<EtbEntwurf[]>((resolve) => { freigeben = resolve; }));
-    const { result, rerender } = renderHook(
-      ({ stelle }) => useEtbEntwuerfe(7, stelle),
-      { initialProps: { stelle: 'Alter Cache' } },
+    const laden = vi.spyOn(entwurfStore, 'entwuerfeLaden').mockReturnValueOnce(
+      new Promise<EtbEntwurf[]>((resolve) => {
+        freigeben = resolve;
+      }),
     );
+    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(7, stelle), {
+      initialProps: { stelle: 'Alter Cache' },
+    });
     await waitFor(() => expect(laden).toHaveBeenCalledTimes(1));
     rerender({ stelle: 'Neue Leitung' });
     await waitFor(() => expect(result.current.entwuerfe[0]?.an).toBe('Neue Leitung'));
-    await act(async () => { freigeben([]); });
+    await act(async () => {
+      freigeben([]);
+    });
     expect(result.current.entwuerfe).toHaveLength(1);
     expect(result.current.entwuerfe[0].an).toBe('Neue Leitung');
   });
 
   it('LFH-461: nur der erste neue Entwurf bekommt die Stelle; Rerender und Folgeentwürfe nicht', async () => {
-    const { result, rerender } = renderHook(
-      ({ stelle }) => useEtbEntwuerfe(7, stelle),
-      { initialProps: { stelle: 'Florian Leitung' } },
-    );
+    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(7, stelle), {
+      initialProps: { stelle: 'Florian Leitung' },
+    });
     await waitFor(() => expect(result.current.entwuerfe[0]?.an).toBe('Florian Leitung'));
     const id = result.current.aktiverId!;
-    act(() => result.current.entwurfAktualisieren(id, { inhalt: 'Text', typ: 'meldung', metadaten: {} }));
+    act(() =>
+      result.current.entwurfAktualisieren(id, { inhalt: 'Text', typ: 'meldung', metadaten: {} }),
+    );
     rerender({ stelle: 'Andere Leitung' });
     expect(result.current.entwuerfe[0].an).toBeUndefined();
-    await act(async () => { await result.current.entwurfSchliessen(id); });
+    await act(async () => {
+      await result.current.entwurfSchliessen(id);
+    });
     expect(result.current.entwuerfe[0].an).toBeUndefined();
   });
 
-  it.each(['Eigener Empfänger', undefined])('LFH-461: geladener Entwurf bleibt maßgeblich (%s)', async (an) => {
-    await entwurfSpeichern(entwurf({ an }));
-    const { result } = renderHook(() => useEtbEntwuerfe(7, 'Florian Leitung'));
-    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
-    expect(result.current.entwuerfe[0].an).toBe(an);
-  });
+  it.each(['Eigener Empfänger', undefined])(
+    'LFH-461: geladener Entwurf bleibt maßgeblich (%s)',
+    async (an) => {
+      await entwurfSpeichern(entwurf({ an }));
+      const { result } = renderHook(() => useEtbEntwuerfe(7, 'Florian Leitung'));
+      await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+      expect(result.current.entwuerfe[0].an).toBe(an);
+    },
+  );
 
   it('garantiert nach dem Laden mindestens einen (leeren) Entwurf', async () => {
     const { result } = renderHook(() => useEtbEntwuerfe(7));
@@ -103,7 +118,9 @@ describe('useEtbEntwuerfe', () => {
     const { result } = renderHook(() => useEtbEntwuerfe(7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
 
-    await act(async () => { await result.current.entwurfSchliessen('x'); });
+    await act(async () => {
+      await result.current.entwurfSchliessen('x');
+    });
     expect(await entwuerfeLaden(7)).toHaveLength(0);
     expect(result.current.entwuerfe).toHaveLength(1); // neuer leerer Tab
     expect(result.current.entwuerfe[0].inhalt).toBe('');

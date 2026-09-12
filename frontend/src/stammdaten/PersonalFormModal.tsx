@@ -41,7 +41,10 @@ export default function PersonalFormModal({
   const qc = useQueryClient();
   const { message } = App.useApp();
 
-  const qualQuery = useQuery({ queryKey: globalKeys.qualifikationen(), queryFn: listeQualifikationen });
+  const qualQuery = useQuery({
+    queryKey: globalKeys.qualifikationen(),
+    queryFn: listeQualifikationen,
+  });
 
   /**
    * VORBELEGUNG, kein Zurücksetzen (LFH-332/B4, Regel 3). Der Anlegen-Zweig, der
@@ -120,20 +123,34 @@ export default function PersonalFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}>
+      <Form.Item
+        label="Name"
+        name="name"
+        rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
+      >
         <Input />
       </Form.Item>
-      <Form.Item label="Personalnummer" name="personalnummer"><Input /></Form.Item>
+      <Form.Item label="Personalnummer" name="personalnummer">
+        <Input />
+      </Form.Item>
       <Form.Item label="Trägerorganisation" name="traegerorganisation">
         <AutoComplete
           options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. DRK Musterstadt"
-          showSearch={{ filterOption: (input, option) => (option?.value ?? '').toLowerCase().includes(input.toLowerCase()) }}
+          showSearch={{
+            filterOption: (input, option) =>
+              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+          }}
         />
       </Form.Item>
       <Form.Item label="Qualifikationen" name="qualifikation_ids">
-        <Select mode="multiple" allowClear options={qualOptionen} placeholder="Qualifikationen wählen" />
+        <Select
+          mode="multiple"
+          allowClear
+          options={qualOptionen}
+          placeholder="Qualifikationen wählen"
+        />
       </Form.Item>
       {/* NUR im Bearbeiten-Modus — beim Anlegen gibt es noch keine id und damit keine Route. */}
       {person && (

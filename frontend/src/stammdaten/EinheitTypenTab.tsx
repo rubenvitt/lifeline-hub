@@ -1,5 +1,12 @@
 import {
-  App, Button, Form, Input, InputNumber, Popconfirm, Space, type TableColumnsType,
+  App,
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Space,
+  type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -12,7 +19,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import {
-  aktualisiereTyp, deaktiviereTyp, legeTypAn, listeEinheitTypen, type TypEingabe,
+  aktualisiereTyp,
+  deaktiviereTyp,
+  legeTypAn,
+  listeEinheitTypen,
+  type TypEingabe,
 } from '../api/einheitTypen';
 import type { EinheitTyp, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -66,13 +77,14 @@ export default function EinheitTypenTab() {
    * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
    */
   const schnellAnlegen = useMutation({
-    mutationFn: (label: string) => legeTypAn({
-      label,
-      soll_fuehrer: null,
-      soll_unterfuehrer: null,
-      soll_mannschaft: null,
-      sortier: 0,
-    }),
+    mutationFn: (label: string) =>
+      legeTypAn({
+        label,
+        soll_fuehrer: null,
+        soll_unterfuehrer: null,
+        soll_mannschaft: null,
+        sortier: 0,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
@@ -80,7 +92,8 @@ export default function EinheitTypenTab() {
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereTyp(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
   // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
@@ -109,7 +122,11 @@ export default function EinheitTypenTab() {
       // (`einheit/typ_repo.rs`: ORDER BY sortier, id), die die Zug-vor-Gruppe-Ordnung hält.
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
     },
-    { title: 'Soll-Stärke (F/UF/M//Σ)', key: 'soll', render: (_, t) => <StaerkeAnzeige wert={t.soll ?? null} /> },
+    {
+      title: 'Soll-Stärke (F/UF/M//Σ)',
+      key: 'soll',
+      render: (_, t) => <StaerkeAnzeige wert={t.soll ?? null} />,
+    },
     {
       title: 'Sortierung',
       dataIndex: 'sortier',
@@ -144,7 +161,7 @@ export default function EinheitTypenTab() {
       titel="Einheitstypen"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
         einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
@@ -221,7 +238,9 @@ export default function EinheitTypenTab() {
         <Form.Item label="Soll-Stärke (vollständig oder leer lassen)" name="soll">
           <StaerkeEingabe />
         </Form.Item>
-        <Form.Item label="Sortierung" name="sortier"><InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} /></Form.Item>
+        <Form.Item label="Sortierung" name="sortier">
+          <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
+        </Form.Item>
       </ErfassungsModal>
     </AdminPage>
   );

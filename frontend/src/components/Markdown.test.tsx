@@ -37,9 +37,7 @@ describe('Markdown', () => {
   });
 
   it('rendert <img onerror=…> nicht als HTML-Element', () => {
-    const { container } = render(
-      <Markdown>{'<img src=x onerror="alert(1)">'}</Markdown>,
-    );
+    const { container } = render(<Markdown>{'<img src=x onerror="alert(1)">'}</Markdown>);
     expect(container.querySelector('img')).toBeNull();
   });
 

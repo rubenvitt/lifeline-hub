@@ -8,8 +8,17 @@ import GefahrenMatrix, { type GefahrenMatrixProps } from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
-  id: 1, gefahrengebiet_id: 7, gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
-  beschreibung: null, gemeldet_von: null, aktualisiert_von: 1, erstellt_at: '', geaendert_at: '', ...over,
+  id: 1,
+  gefahrengebiet_id: 7,
+  gefahrentyp: 'brand',
+  schutzobjekt: 'menschen',
+  warnstufe: 'hoch',
+  beschreibung: null,
+  gemeldet_von: null,
+  aktualisiert_von: 1,
+  erstellt_at: '',
+  geaendert_at: '',
+  ...over,
 });
 
 /**
@@ -31,7 +40,8 @@ function imMenue() {
   const offen = Array.from(
     document.querySelectorAll<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden)'),
   ).filter((d) => d.style.pointerEvents !== 'none');
-  if (offen.length !== 1) throw new Error(`genau ein offenes Menü erwartet, ${offen.length} gefunden`);
+  if (offen.length !== 1)
+    throw new Error(`genau ein offenes Menü erwartet, ${offen.length} gefunden`);
   const menue = offen[0].querySelector('[role="menu"]');
   if (!menue) throw new Error('das offene Dropdown trägt kein Menü');
   return within(menue as HTMLElement);
@@ -59,7 +69,9 @@ function rendereMatrix(over: Partial<GefahrenMatrixProps> = {}) {
 
 /** Öffnet den Detail-Dialog einer Zelle der Zeile Brand und wartet, bis er steht. */
 async function oeffneDetails(stufe: string, spalte = 'Menschen') {
-  await userEvent.click(screen.getByRole('button', { name: `Bewertung Brand × ${spalte}: ${stufe}` }));
+  await userEvent.click(
+    screen.getByRole('button', { name: `Bewertung Brand × ${spalte}: ${stufe}` }),
+  );
   await userEvent.click(imMenue().getByRole('menuitem', { name: 'Details …' }));
   return screen.findByLabelText('Beschreibung');
 }
@@ -78,14 +90,21 @@ describe('GefahrenMatrix', () => {
   it('setzt eine Warnstufe über das Zellmenü und ruft onSetzen mit vollem Zell-Zustand', async () => {
     const onSetzen = vi.fn();
     rendereMatrix({ onSetzen });
-    await userEvent.click(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
+    );
     // Regex mit `i`: der Eintrag heißt „H · Hoch", der Vorgabe-Normalisierer von
     // Testing Library trimmt und faltet Leerraum, aber er kleinschreibt nicht.
     await userEvent.click(imMenue().getByRole('menuitem', { name: /hoch/i }));
-    await waitFor(() => expect(onSetzen).toHaveBeenCalledWith({
-      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
-      beschreibung: null, gemeldet_von: null,
-    }));
+    await waitFor(() =>
+      expect(onSetzen).toHaveBeenCalledWith({
+        gefahrentyp: 'brand',
+        schutzobjekt: 'menschen',
+        warnstufe: 'hoch',
+        beschreibung: null,
+        gemeldet_von: null,
+      }),
+    );
   });
 
   it('gibt jeder Zelle einen eigenen Namen — 65 gleichnamige Knöpfe wären keine Bedienung', () => {
@@ -111,10 +130,15 @@ describe('GefahrenMatrix', () => {
     rendereMatrix({ matrix, onSetzen });
     await userEvent.click(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch' }));
     await userEvent.click(imMenue().getByRole('menuitem', { name: /akut/i }));
-    await waitFor(() => expect(onSetzen).toHaveBeenCalledWith({
-      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'akut',
-      beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW',
-    }));
+    await waitFor(() =>
+      expect(onSetzen).toHaveBeenCalledWith({
+        gefahrentyp: 'brand',
+        schutzobjekt: 'menschen',
+        warnstufe: 'akut',
+        beschreibung: 'Dachstuhl',
+        gemeldet_von: 'KdoW',
+      }),
+    );
   });
 
   it('sperrt beim laufenden PUT NUR die betroffene Zelle, nicht die anderen 57', () => {
@@ -122,7 +146,9 @@ describe('GefahrenMatrix', () => {
     // antd klont den Auslöser mit `disabled` (`antd/es/dropdown/dropdown.js:125`:
     // `disabled: child.props.disabled ?? disabled`) — die Prop am Dropdown erreicht
     // also wirklich den Knopf, nicht nur das Popup.
-    expect(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
+    ).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Bewertung Brand × Tiere: keine' })).toBeEnabled();
   });
 
@@ -209,14 +235,22 @@ describe('GefahrenMatrix', () => {
    */
   it('speichert die AKTUELLE Warnstufe, nicht die beim Öffnen gesehene', async () => {
     const onDetailsSpeichern = vi.fn().mockResolvedValue(undefined);
-    const { rerender } = rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })], onDetailsSpeichern });
+    const { rerender } = rendereMatrix({
+      matrix: [zelle({ warnstufe: 'hoch' })],
+      onDetailsSpeichern,
+    });
     await oeffneDetails('hoch');
     rerender(matrixElement({ matrix: [zelle({ warnstufe: 'akut' })], onDetailsSpeichern }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalledWith({
-      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'akut',
-      beschreibung: null, gemeldet_von: null,
-    }));
+    await waitFor(() =>
+      expect(onDetailsSpeichern).toHaveBeenCalledWith({
+        gefahrentyp: 'brand',
+        schutzobjekt: 'menschen',
+        warnstufe: 'akut',
+        beschreibung: null,
+        gemeldet_von: null,
+      }),
+    );
   });
 
   /**
@@ -233,9 +267,11 @@ describe('GefahrenMatrix', () => {
     const feld = await oeffneDetails('hoch');
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Dachstuhl brennt');
-    rerender(matrixElement({
-      matrix: [zelle({ warnstufe: 'akut', beschreibung: 'vom Server' })],
-    }));
+    rerender(
+      matrixElement({
+        matrix: [zelle({ warnstufe: 'akut', beschreibung: 'vom Server' })],
+      }),
+    );
     expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
   });
 });

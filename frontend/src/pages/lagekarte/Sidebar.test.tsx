@@ -104,20 +104,22 @@ describe('Sidebar Bild-Hintergründe', () => {
       <Sidebar
         {...basisProps}
         darfSchreiben
-        bilder={[{
-          id: 1,
-          name: 'Lageplan',
-          opazitaet: 80,
-          sichtbar: true,
-          einsatz_id: 7,
-          mime: 'image/png',
-          groesse: 1,
-          ecken_json: '[]',
-          reihenfolge: 0,
-          hochgeladen_von: 1,
-          erstellt_at: '',
-          geaendert_at: '',
-        }]}
+        bilder={[
+          {
+            id: 1,
+            name: 'Lageplan',
+            opazitaet: 80,
+            sichtbar: true,
+            einsatz_id: 7,
+            mime: 'image/png',
+            groesse: 1,
+            ecken_json: '[]',
+            reihenfolge: 0,
+            hochgeladen_von: 1,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+        ]}
         onBildToggle={onBildToggle}
         bildPlatzierenId={null}
       />,
@@ -130,12 +132,7 @@ describe('Sidebar Bild-Hintergründe', () => {
 
   it('ohne Schreibrecht kein Upload-Button', () => {
     renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        darfSchreiben={false}
-        bilder={[]}
-        bildPlatzierenId={null}
-      />,
+      <Sidebar {...basisProps} darfSchreiben={false} bilder={[]} bildPlatzierenId={null} />,
     );
     expect(screen.queryByText(/Bild hochladen/i)).not.toBeInTheDocument();
   });
@@ -189,11 +186,11 @@ describe('Sidebar Bild-Hintergründe', () => {
     // Der direkte Zentrieren-Knopf ist weg: sonst wäre die Bündelung nur eine Ergänzung.
     expect(screen.queryByRole('button', { name: /Lageplan zentrieren/i })).not.toBeInTheDocument();
     const menue = await oeffneBildMenue('Aktionen zu Lageplan');
-    expect(within(menue).getAllByRole('menuitem').map((e) => e.textContent)).toEqual([
-      'Auf Bild zentrieren',
-      'Auf der Karte platzieren',
-      'Bild entfernen …',
-    ]);
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Auf Bild zentrieren', 'Auf der Karte platzieren', 'Bild entfernen …']);
   });
 
   /**
@@ -224,7 +221,12 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('Zentrieren aus dem Menü fliegt die Karte auf das Bild', async () => {
     const onBildZentrieren = vi.fn();
     renderMitProviders(
-      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} onBildZentrieren={onBildZentrieren} />,
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        onBildZentrieren={onBildZentrieren}
+      />,
     );
     const menue = await oeffneBildMenue('Aktionen zu Lageplan');
     await userEvent.click(within(menue).getByRole('menuitem', { name: /Auf Bild zentrieren/ }));
@@ -242,7 +244,12 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('Entfernen fragt nach und bestätigt mit einem roten Knopf', async () => {
     const onBildLoeschen = vi.fn();
     renderMitProviders(
-      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} onBildLoeschen={onBildLoeschen} />,
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        onBildLoeschen={onBildLoeschen}
+      />,
     );
     const menue = await oeffneBildMenue('Aktionen zu Lageplan');
     await userEvent.click(within(menue).getByRole('menuitem', { name: /Bild entfernen/ }));
@@ -258,7 +265,12 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('Abbrechen entfernt nichts', async () => {
     const onBildLoeschen = vi.fn();
     renderMitProviders(
-      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} onBildLoeschen={onBildLoeschen} />,
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        onBildLoeschen={onBildLoeschen}
+      />,
     );
     const menue = await oeffneBildMenue('Aktionen zu Lageplan');
     await userEvent.click(within(menue).getByRole('menuitem', { name: /Bild entfernen/ }));
@@ -280,7 +292,9 @@ describe('Sidebar Bild-Hintergründe', () => {
       />,
     );
     let menue = await oeffneBildMenue('Aktionen zu Lageplan');
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /Auf der Karte platzieren/ }));
+    await userEvent.click(
+      within(menue).getByRole('menuitem', { name: /Auf der Karte platzieren/ }),
+    );
     expect(onBildPlatzieren).toHaveBeenCalledWith(1);
 
     // Im laufenden Modus wechselt derselbe Eintrag Beschriftung UND Wirkung.
@@ -322,13 +336,24 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('zeigt den Karten-Design-Umschalter nur im Offline-Modus und meldet die Wahl', () => {
     const onKartenThemeWechsel = vi.fn();
     const { rerender } = renderMitProviders(
-      <Sidebar {...basisProps} basemap="online" onlineVerfuegbar onKartenThemeWechsel={onKartenThemeWechsel} />,
+      <Sidebar
+        {...basisProps}
+        basemap="online"
+        onlineVerfuegbar
+        onKartenThemeWechsel={onKartenThemeWechsel}
+      />,
     );
     // Online: kein Karten-Design-Umschalter.
     expect(screen.queryByRole('radiogroup', { name: /Karten-Design/i })).not.toBeInTheDocument();
     // Offline: Umschalter da, Klick auf „Dunkel" meldet 'dark'.
     rerender(
-      <Sidebar {...basisProps} basemap="offline" offlineVerfuegbar kartenTheme="auto" onKartenThemeWechsel={onKartenThemeWechsel} />,
+      <Sidebar
+        {...basisProps}
+        basemap="offline"
+        offlineVerfuegbar
+        kartenTheme="auto"
+        onKartenThemeWechsel={onKartenThemeWechsel}
+      />,
     );
     fireEvent.click(screen.getByRole('radio', { name: /Dunkel/i }));
     expect(onKartenThemeWechsel).toHaveBeenCalledWith('dark');
@@ -337,7 +362,10 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('schaltet den „Taktische Zeichen"-Ebenen-Toggle (LFH-170)', () => {
     const onLayerToggle = vi.fn();
     renderMitProviders(<Sidebar {...basisProps} onLayerToggle={onLayerToggle} />);
-    const toggle = screen.getByText('Taktische Zeichen').closest('.ant-space')?.querySelector('button[role="switch"]');
+    const toggle = screen
+      .getByText('Taktische Zeichen')
+      .closest('.ant-space')
+      ?.querySelector('button[role="switch"]');
     expect(toggle).toBeTruthy();
     fireEvent.click(toggle as Element);
     expect(onLayerToggle).toHaveBeenCalledWith('freies_zeichen', false);
@@ -345,7 +373,9 @@ describe('Sidebar Bild-Hintergründe', () => {
 
   it('öffnet den Zeichen-Picker und startet das Platzieren mit der Entwurfs-Spec (LFH-170)', () => {
     const onZeichenPlatzierenStart = vi.fn();
-    renderMitProviders(<Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />);
+    renderMitProviders(
+      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
+    );
     // Picker ist zunächst geschlossen (kein Dauer-Combobox in der Sidebar).
     expect(screen.queryByLabelText('Grundzeichen')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
@@ -498,7 +528,12 @@ describe('Sidebar Fehler-Slots', () => {
         {...basisProps}
         darfSchreiben
         bilder={[]}
-        sektionFehler={{ bilder: { text: 'Bild-Hintergründe konnten nicht geladen werden', onWiederholen: vi.fn() } }}
+        sektionFehler={{
+          bilder: {
+            text: 'Bild-Hintergründe konnten nicht geladen werden',
+            onWiederholen: vi.fn(),
+          },
+        }}
       />,
     );
     expect(screen.getByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
@@ -509,7 +544,9 @@ describe('Sidebar Fehler-Slots', () => {
 
   it('„Bild-Hintergründe": ohne Fehler kein Slot', () => {
     renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[]} />);
-    expect(screen.queryByText('Bild-Hintergründe konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Bild-Hintergründe konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/Bild hochladen/i)).toBeInTheDocument();
   });
 
@@ -527,7 +564,12 @@ describe('Sidebar Fehler-Slots', () => {
         darfSchreiben
         bilder={[bildLageplan]}
         onBildToggle={onBildToggle}
-        sektionFehler={{ bilder: { text: 'Bild-Hintergründe konnten nicht geladen werden', onWiederholen: vi.fn() } }}
+        sektionFehler={{
+          bilder: {
+            text: 'Bild-Hintergründe konnten nicht geladen werden',
+            onWiederholen: vi.fn(),
+          },
+        }}
       />,
     );
     expect(screen.getByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
@@ -543,7 +585,12 @@ describe('Sidebar Fehler-Slots', () => {
       <Sidebar
         {...basisProps}
         ansichten={[]}
-        sektionFehler={{ ansichten: { text: 'Kartenansichten konnten nicht geladen werden', onWiederholen: vi.fn() } }}
+        sektionFehler={{
+          ansichten: {
+            text: 'Kartenansichten konnten nicht geladen werden',
+            onWiederholen: vi.fn(),
+          },
+        }}
       />,
     );
     expect(screen.getByText('Kartenansichten konnten nicht geladen werden')).toBeInTheDocument();
@@ -551,7 +598,9 @@ describe('Sidebar Fehler-Slots', () => {
 
   it('Ansichts-Switcher: ohne Fehler kein Slot', () => {
     renderMitProviders(<Sidebar {...basisProps} ansichten={[]} />);
-    expect(screen.queryByText('Kartenansichten konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Kartenansichten konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   /**
@@ -580,7 +629,17 @@ describe('Sidebar Fehler-Slots', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        verortet={[{ schluessel: 'uhs-7', typ: 'uhs', id: 7, lat: 50, lon: 8, label: 'UHS Nord', farbe: '#1677ff' }]}
+        verortet={[
+          {
+            schluessel: 'uhs-7',
+            typ: 'uhs',
+            id: 7,
+            lat: 50,
+            lon: 8,
+            label: 'UHS Nord',
+            farbe: '#1677ff',
+          },
+        ]}
         onMarkerWaehlen={onMarkerWaehlen}
       />,
     );
@@ -599,7 +658,9 @@ describe('Sidebar Fehler-Slots', () => {
       <Sidebar
         {...basisProps}
         nichtVerortet={[]}
-        sektionFehler={{ nichtVerortet: { text: 'Objektlisten konnten nicht geladen werden', onWiederholen } }}
+        sektionFehler={{
+          nichtVerortet: { text: 'Objektlisten konnten nicht geladen werden', onWiederholen },
+        }}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
@@ -681,7 +742,12 @@ describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
   it('liefert null, sobald das Bild aus der Liste fällt', () => {
     expect(loeschDialogBild(bilder, 1)).not.toBeNull();
     // Derselbe Zustand nach einem SSE-Update, das genau dieses Bild entfernt hat:
-    expect(loeschDialogBild(bilder.filter((b) => b.id !== 1), 1)).toBeNull();
+    expect(
+      loeschDialogBild(
+        bilder.filter((b) => b.id !== 1),
+        1,
+      ),
+    ).toBeNull();
   });
 
   it('liefert null, wenn gar keine Rückfrage offensteht', () => {

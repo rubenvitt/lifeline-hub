@@ -42,9 +42,7 @@ export function schreibeBefehlFort(
   id: number,
   zeitstand?: string,
 ): Promise<BefehlAnzeige> {
-  return apiSend<BefehlAnzeige>(
-    `/api/einsaetze/${einsatzId}/befehle/${id}/fortschreiben`,
-    'POST',
-    { zeitstand },
-  );
+  return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/befehle/${id}/fortschreiben`, 'POST', {
+    zeitstand,
+  });
 }

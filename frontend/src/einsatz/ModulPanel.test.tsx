@@ -13,18 +13,34 @@ const ueberschreibung = (
   benoetigteRolle: 'admin' | 'fuehrungskraft' | null = null,
 ): ModulOverrides => ({
   [modulKey]: {
-    einsatz_id: 1, modul_key: modulKey, sichtbar,
-    benoetigte_rolle: benoetigteRolle, geaendert_at: null, geaendert_von: null,
+    einsatz_id: 1,
+    modul_key: modulKey,
+    sichtbar,
+    benoetigte_rolle: benoetigteRolle,
+    geaendert_at: null,
+    geaendert_von: null,
   },
 });
 
 const ohne: BenutzerAnzeige = {
-  id: 1, anzeigename: 'E', benutzername: 'e', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'E',
+  benutzername: 'e',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
+  totp_aktiviert: false,
 };
 
 const basis = (over: Partial<ModulEintrag>): ModulEintrag => ({
-  key: 'k', kategorie: 'erfassung', label: 'L', icon: () => null, route: 'k', status: 'geplant', ...over,
+  key: 'k',
+  kategorie: 'erfassung',
+  label: 'L',
+  icon: () => null,
+  route: 'k',
+  status: 'geplant',
+  ...over,
 });
 
 const module: ModulEintrag[] = [
@@ -37,8 +53,11 @@ describe('ModulPanel', () => {
   it('listet Module, markiert WIP, sperrt rollengeschuetzte', () => {
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={ohne}
-        aktiverModulKey="etb" onModulKlick={() => {}}
+        titel="Erfassung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey="etb"
+        onModulKlick={() => {}}
       />,
     );
     expect(screen.getByText('Erfassung')).toBeInTheDocument();
@@ -59,8 +78,11 @@ describe('ModulPanel', () => {
   it('haelt den WIP-Marker aus dem Accessible Name heraus', () => {
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={ohne}
-        aktiverModulKey={null} onModulKlick={() => {}}
+        titel="Erfassung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
       />,
     );
     expect(screen.getByRole('button', { name: 'Sachschäden' })).toBeInTheDocument();
@@ -73,7 +95,15 @@ describe('ModulPanel', () => {
     renderMitProviders(
       <ModulPanel
         titel="Lage"
-        module={[basis({ key: 'gefahrenzonen', label: 'Gefahren-/Absperrzonen', route: 'gefahrenzonen', status: 'fertig', verweistAuf: 'lagekarte' })]}
+        module={[
+          basis({
+            key: 'gefahrenzonen',
+            label: 'Gefahren-/Absperrzonen',
+            route: 'gefahrenzonen',
+            status: 'fertig',
+            verweistAuf: 'lagekarte',
+          }),
+        ]}
         benutzer={ohne}
         aktiverModulKey={null}
         onModulKlick={() => {}}
@@ -85,9 +115,12 @@ describe('ModulPanel', () => {
   it('blendet ein ausgeblendetes Modul nicht in der Liste ein (LFH-132)', () => {
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={ohne}
+        titel="Erfassung"
+        module={module}
+        benutzer={ohne}
         overrides={ueberschreibung('sach', false)}
-        aktiverModulKey="etb" onModulKlick={() => {}}
+        aktiverModulKey="etb"
+        onModulKlick={() => {}}
       />,
     );
     expect(screen.getByRole('button', { name: /ETB/ })).toBeInTheDocument();
@@ -95,12 +128,22 @@ describe('ModulPanel', () => {
   });
 
   it('rendert ein nicht-ausblendbares Modul trotz sichtbar=false (LFH-132)', () => {
-    const stamm = [basis({ key: 'einsatzdaten', label: 'Einsatzdaten', route: 'einsatzdaten', status: 'fertig' })];
+    const stamm = [
+      basis({
+        key: 'einsatzdaten',
+        label: 'Einsatzdaten',
+        route: 'einsatzdaten',
+        status: 'fertig',
+      }),
+    ];
     renderMitProviders(
       <ModulPanel
-        titel="Führung" module={stamm} benutzer={ohne}
+        titel="Führung"
+        module={stamm}
+        benutzer={ohne}
         overrides={ueberschreibung('einsatzdaten', false)}
-        aktiverModulKey={null} onModulKlick={() => {}}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
       />,
     );
     expect(screen.getByRole('button', { name: 'Einsatzdaten' })).toBeInTheDocument();
@@ -109,9 +152,12 @@ describe('ModulPanel', () => {
   it('sperrt ein Modul per Override-Rolle, auch ohne Registry-Default (LFH-132)', () => {
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={ohne}
+        titel="Erfassung"
+        module={module}
+        benutzer={ohne}
         overrides={ueberschreibung('etb', true, 'fuehrungskraft')}
-        aktiverModulKey={null} onModulKlick={() => {}}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
       />,
     );
     expect(screen.getByRole('button', { name: /ETB/ })).toBeDisabled();
@@ -121,8 +167,11 @@ describe('ModulPanel', () => {
     const onKlick = vi.fn();
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={ohne}
-        aktiverModulKey={null} onModulKlick={onKlick}
+        titel="Erfassung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={onKlick}
       />,
     );
     await userEvent.click(screen.getByRole('button', { name: /ETB/ }));
@@ -133,10 +182,15 @@ describe('ModulPanel', () => {
     renderMitProviders(
       <ModulPanel
         titel="Kommunikation"
-        module={[basis({
-          key: 'meldungen', label: 'Meldungen', route: 'meldungen', status: 'fertig',
-          zaehlerQuelle: 'meldungen',
-        })]}
+        module={[
+          basis({
+            key: 'meldungen',
+            label: 'Meldungen',
+            route: 'meldungen',
+            status: 'fertig',
+            zaehlerQuelle: 'meldungen',
+          }),
+        ]}
         benutzer={ohne}
         aktiverModulKey={null}
         onModulKlick={() => {}}
@@ -147,7 +201,10 @@ describe('ModulPanel', () => {
       name: 'Meldungen, 5 offene Meldungen, davon 2 ungesehen',
     });
     expect(knopf.querySelector('.ant-badge')).not.toBeNull();
-    expect(screen.getByTitle('5 offene Meldungen, davon 2 ungesehen')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByTitle('5 offene Meldungen, davon 2 ungesehen')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
   });
 
   it('traegt den Testanker des e2e-Trefflaechennachweises', () => {
@@ -156,8 +213,11 @@ describe('ModulPanel', () => {
     // einen e2e-Lauf rot, dessen Ursache dann in einer anderen Datei liegt.
     const { container } = renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={ohne}
-        aktiverModulKey={null} onModulKlick={() => {}}
+        titel="Erfassung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
       />,
     );
     expect(container.querySelector('[data-lfh="modul-panel"]')).not.toBeNull();
@@ -170,8 +230,11 @@ describe('ModulPanel', () => {
      */
     const { container } = renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={ohne}
-        aktiverModulKey="etb" onModulKlick={() => {}}
+        titel="Erfassung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey="etb"
+        onModulKlick={() => {}}
       />,
     );
     expect(screen.getByRole('button', { name: /ETB/ })).toHaveAttribute('aria-current', 'true');
@@ -192,9 +255,13 @@ describe('ModulPanel', () => {
     const { container } = renderMitProviders(
       <ModulPanel
         titel="Erfassung"
-        module={[...module, basis({ key: 'gz', label: 'Zonen', route: 'gz', verweistAuf: 'lagekarte' })]}
+        module={[
+          ...module,
+          basis({ key: 'gz', label: 'Zonen', route: 'gz', verweistAuf: 'lagekarte' }),
+        ]}
         benutzer={ohne}
-        aktiverModulKey={null} onModulKlick={() => {}}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
       />,
     );
     for (const name of ['Sachschäden', 'Geheim', 'Zonen']) {
@@ -214,7 +281,9 @@ describe('ModulPanel · Zuletzt (LFH-337 · H12)', () => {
         benutzer={null}
         aktiverModulKey={null}
         onModulKlick={() => {}}
-        zuletztModule={[basis({ key: 'personen', label: 'Personen', route: 'personen', status: 'fertig' })]}
+        zuletztModule={[
+          basis({ key: 'personen', label: 'Personen', route: 'personen', status: 'fertig' }),
+        ]}
       />,
     );
     const panel = screen.getByText('Zuletzt');
@@ -222,8 +291,9 @@ describe('ModulPanel · Zuletzt (LFH-337 · H12)', () => {
     // Die REIHENFOLGE ist die Aussage: die Abkürzung oben, die Kategorie darunter.
     // `compareDocumentPosition` statt eines Index — der Titel ist kein Listenelement.
     const kategorie = screen.getByText('Erfassung');
-    expect(panel.compareDocumentPosition(kategorie) & Node.DOCUMENT_POSITION_FOLLOWING)
-      .toBeTruthy();
+    expect(
+      panel.compareDocumentPosition(kategorie) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('lässt die Zuletzt-Gruppe ganz weg, wenn nichts gemerkt ist', () => {
@@ -231,8 +301,12 @@ describe('ModulPanel · Zuletzt (LFH-337 · H12)', () => {
     // im 220-px-Panel und verspricht eine Abkürzung, die es nicht gibt.
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={null}
-        aktiverModulKey={null} onModulKlick={() => {}} zuletztModule={[]}
+        titel="Erfassung"
+        module={module}
+        benutzer={null}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        zuletztModule={[]}
       />,
     );
     expect(screen.queryByText('Zuletzt')).toBeNull();
@@ -240,11 +314,20 @@ describe('ModulPanel · Zuletzt (LFH-337 · H12)', () => {
 
   it('meldet den Klick auf ein Zuletzt-Modul mit dem Modul', async () => {
     const onKlick = vi.fn();
-    const personen = basis({ key: 'personen', label: 'Personen', route: 'personen', status: 'fertig' });
+    const personen = basis({
+      key: 'personen',
+      label: 'Personen',
+      route: 'personen',
+      status: 'fertig',
+    });
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung" module={module} benutzer={null}
-        aktiverModulKey={null} onModulKlick={onKlick} zuletztModule={[personen]}
+        titel="Erfassung"
+        module={module}
+        benutzer={null}
+        aktiverModulKey={null}
+        onModulKlick={onKlick}
+        zuletztModule={[personen]}
       />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Personen' }));
@@ -314,7 +397,9 @@ describe('ModulPanel · Dichte', () => {
   it('markiert die aktive Zeile mit einem Balken ZUSAETZLICH zur Flaeche', () => {
     const aktiv = modulZeilenStil(tokenFuer('kompakt'), { ...frei, aktiv: true });
     expect(aktiv.borderLeft).toBe('3px solid #BEDIEN');
-    expect(aktiv.background, 'der Balken ergaenzt die Flaeche, ersetzt sie nicht').toBe('#BEDIENBG');
+    expect(aktiv.background, 'der Balken ergaenzt die Flaeche, ersetzt sie nicht').toBe(
+      '#BEDIENBG',
+    );
     // Inaktiv bleibt der Platz reserviert — sonst springt die Zeile beim Aktivieren.
     expect(modulZeilenStil(tokenFuer('kompakt'), frei).borderLeft).toBe('3px solid transparent');
   });
