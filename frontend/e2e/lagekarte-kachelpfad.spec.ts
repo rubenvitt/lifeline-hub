@@ -12,12 +12,11 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // über `setWorkerUrl`).
 //
 // DIE QUELLE STELLT DER TEST SELBST. Kein Tile-Server, kein Seed, kein Netz: `page.route`
-// beantwortet `/api/karte/config` mit einem Online-VEKTOR-View und dessen Style-JSON mit einer
-// Vector-Source. Die Kachel-Antwort ist ein LEERER Körper — eine null-Byte-Antwort ist eine
-// gültige, leere Mapbox-Vector-Tile, der Worker parst sie also fehlerfrei statt einen
-// Tile-Error zu werfen (gemessen: `isSourceLoaded('fixture')` true). Und `page.route` greift
-// auch für die Anfragen des maplibre-WORKERS (gemessen: 4 von 4 Kacheln abgefangen) — das war
-// die offene Frage aus dem Ticket („Route-Stub oder Fixture-Backend").
+// beantwortet `/api/karte/config` mit einem Online-VEKTOR-View, dessen Style-JSON mit einer
+// Vector-Source und die Kacheln mit 33 Bytes handgeschriebenem Protobuf — einer echten,
+// minimalen Vector-Tile (Aufbau und Begründung an `KACHEL_BYTES`). Und `page.route` greift auch
+// für die Anfragen des maplibre-WORKERS (gemessen: 4 von 4 Kacheln abgefangen) — das war die
+// offene Frage aus dem Ticket („Route-Stub oder Fixture-Backend").
 //
 // VEKTOR, NICHT RASTER, und das ist keine Geschmacksfrage: Raster-Kacheln lädt maplibre auf dem
 // Hauptthread. Nur eine Vector-Source schickt die Anfrage durch den Worker — also durch die
@@ -36,8 +35,15 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // gestellt → `aus === ein` → rot.
 //
 // Die Netz-Assertionen bleiben daneben stehen, weil sie etwas ANDERES belegen: dass die
-// absolutierte URL wirklich abgesetzt und die Antwort vom Worker verarbeitet wurde. Bei totem
+// absolutierte URL wirklich abgesetzt und die Antwort vom Worker gelesen wurde. Bei totem
 // Worker (gemessen im Smoke) bliebe die Quelle ungeladen.
+//
+// UND „GELESEN" HEISST DEKODIERT, NICHT `loaded()`. Auch das ist gemessen und korrigiert den
+// ersten Anlauf: mit Müll statt Protobuf als Kachel-Körper blieb dieser Test grün. MapLibre
+// führt eine gescheiterte Kachel als `errored`, und `isSourceLoaded()`/`loaded()` zählen das wie
+// geladen (die Mechanik steht im Kopf von `stilFehlerWaechter.ts`); der Kachel-Fehler kommt als
+// `error`-Event, nicht als Ausnahme, also bleibt `pageerror` ebenfalls leer. Die Zusicherung
+// hängt deshalb an `querySourceFeatures` — ein Merkmal entsteht nur aus gelesenen Bytes.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -47,6 +53,48 @@ const KACHEL_VORLAGE = '/api/karte/proxy/9/tile/{z}/{x}/{y}.pbf';
 const STIL_PFAD = '/api/karte/proxy/9/style.json';
 /** Präfix der substituierten Kachel-URLs — ohne Platzhalter, so wie MapLibre sie anfragt. */
 const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+/** Name des Layers IM Kachel-Körper; muss zum `source-layer` des Fixture-Styles passen. */
+const KACHEL_LAYER = 'strassen';
+
+/**
+ * Eine echte, minimale Mapbox-Vector-Tile: ein Layer `strassen` mit EINER LineString-Geometrie.
+ *
+ * WARUM VON HAND UND NICHT LEER (gemessen, und es korrigiert den ersten Anlauf dieses Specs):
+ * ein leerer Körper ist eine gültige LEERE Vector-Tile — damit war „die Kachel wurde geparst"
+ * nicht prüfbar, und schlimmer: mit ausgesprochenem MÜLL als Körper (`'KEIN PROTOBUF …'`) blieb
+ * der Test grün. MapLibre führt eine gescheiterte Kachel als `errored`, und sowohl
+ * `isSourceLoaded()` als auch `loaded()` zählen `errored` wie `loaded` (dieselbe Mechanik, die
+ * `stilFehlerWaechter.ts` im Kopf beschreibt); der Kachel-Fehler läuft als `error`-Event, nicht
+ * als Ausnahme, also bleibt auch `pageerror` leer. Geprüft wird deshalb ein DEKODIERTES
+ * MERKMAL (`querySourceFeatures`) — das entsteht nur, wenn der Worker die Bytes wirklich gelesen
+ * hat.
+ *
+ * KEINE neue Abhängigkeit dafür: 33 Bytes Protobuf sind billiger als eine Kachel-Bibliothek im
+ * Testpfad, und die Bytes können nicht still verrotten — sind sie falsch, findet
+ * `querySourceFeatures` nichts und der Test wird rot. Aufbau (vector_tile.proto):
+ *   1A 1F                        Tile.layers (Feld 3, Länge 31)
+ *     78 02                      Layer.version = 2            (Feld 15)
+ *     0A 08 'strassen'           Layer.name                   (Feld 1)
+ *     12 0E                      Layer.features (Feld 2, Länge 14)
+ *       08 01                    Feature.id = 1               (Feld 1)
+ *       18 02                    Feature.type = LINESTRING    (Feld 3)
+ *       22 08 …                  Feature.geometry, gepackt    (Feld 4)
+ *            09                  MoveTo, 1×
+ *            00 00               dx=0, dy=0       (Zickzack)
+ *            0A                  LineTo, 1×
+ *            C8 01 C8 01         dx=+100, dy=+100 (Zickzack 200)
+ *     28 80 20                   Layer.extent = 4096          (Feld 5)
+ * Ohne `tags` braucht die Kachel weder `keys` noch `values`.
+ */
+const KACHEL_BYTES = Buffer.from([
+  0x1a, 0x1f,
+  // Layer
+  0x78, 0x02, 0x0a, 0x08, 0x73, 0x74, 0x72, 0x61, 0x73, 0x73, 0x65, 0x6e,
+  // Feature
+  0x12, 0x0e, 0x08, 0x01, 0x18, 0x02, 0x22, 0x08, 0x09, 0x00, 0x00, 0x0a, 0xc8, 0x01, 0xc8, 0x01,
+  // extent
+  0x28, 0x80, 0x20,
+]);
 
 /** Ausschnitt des DEV-Mitschnitts aus `Kartenflaeche.tsx`. Bewusst hier nachgebildet statt aus
  *  `src/` importiert: der Spec-Ordner bindet nicht gegen die Anwendung. */
@@ -59,6 +107,7 @@ interface MapHaken {
   getStyle(): { sources?: Record<string, unknown> } | undefined;
   isSourceLoaded(id: string): boolean;
   loaded(): boolean;
+  querySourceFeatures(id: string, optionen: { sourceLayer: string }): unknown[];
 }
 
 async function anmelden(page: Page) {
@@ -119,18 +168,17 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
         layers: [
           { id: 'fixture-grund', type: 'background', paint: { 'background-color': '#e8e8e8' } },
           // Ohne einen Layer AUF der Source fragt MapLibre keine Kachel an.
-          { id: 'fixture-linien', type: 'line', source: 'fixture', 'source-layer': 'strassen' },
+          { id: 'fixture-linien', type: 'line', source: 'fixture', 'source-layer': KACHEL_LAYER },
         ],
       },
     }),
   );
   await page.route(`**${KACHEL_PRAEFIX}**`, (route: Route) => {
     kachelAnfragen.push(route.request().url());
-    // Leerer Körper = gültige leere Vector-Tile → der Worker parst statt zu fehlern.
     return route.fulfill({
       status: 200,
       contentType: 'application/x-protobuf',
-      body: Buffer.alloc(0),
+      body: KACHEL_BYTES,
     });
   });
 
@@ -182,8 +230,18 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
   }
 
   // (2) Die absolutierte URL wurde auch wirklich abgesetzt — mit genau dieser Origin.
-  expect(kachelAnfragen.length, 'keine Kachel-Anfrage am Netz angekommen').toBeGreaterThan(0);
-  for (const url of kachelAnfragen) {
+  //     GEWARTET, nicht bloß behauptet: der Mitschnitt oben entsteht auf dem HAUPTTHREAD, bevor
+  //     MapLibre den Worker-Fetch abschickt. Die Poll-Bedingung (1) kann also erfüllt sein,
+  //     während `page.route` noch nichts gesehen hat — eine synchrone Prüfung hier wäre ein
+  //     Rennen, das nur auf einer langsamen/belasteten Maschine verliert.
+  await expect
+    .poll(() => kachelAnfragen.length, {
+      timeout: 20_000,
+      message: 'keine Kachel-Anfrage am Netz angekommen',
+    })
+    .toBeGreaterThan(0);
+  // Momentaufnahme: die Liste wächst weiter, während darüber iteriert wird.
+  for (const url of [...kachelAnfragen]) {
     expect(url.startsWith(`${erwarteteHerkunft}${KACHEL_PRAEFIX}`), `Kachel-URL: ${url}`).toBe(
       true,
     );
@@ -194,25 +252,35 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
     expect(url).not.toContain('{');
   }
 
-  // (3) Und der Worker hat die Antwort VERARBEITET. Das ist der Teil, den keine URL-Prüfung
-  //     zeigt: bei totem Worker bleibt die Quelle ungeladen, während Canvas und Controls
-  //     unverändert dastehen (im Smoke gemessen).
+  // (3) Und der Worker hat die Antwort GELESEN. Das ist der Teil, den keine URL-Prüfung zeigt:
+  //     bei totem Worker bleibt die Quelle ungeladen, während Canvas und Controls unverändert
+  //     dastehen (im Smoke gemessen).
+  //     Die tragende Zeile ist das DEKODIERTE MERKMAL, nicht `loaded()`: eine gescheiterte
+  //     Kachel gilt MapLibre als `errored`, und das zählt in `isSourceLoaded()`/`loaded()` wie
+  //     geladen. Gemessen mit Müll statt Protobuf als Körper — ohne die Merkmalsprüfung blieb
+  //     dieser Test grün (Begründung und Byte-Aufbau oben an KACHEL_BYTES).
   await expect
     .poll(
       () =>
-        page.evaluate(() => {
+        page.evaluate((kachelLayer) => {
           const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
           if (!map) return 'kein Karten-Handle (window.__lfhKarte fehlt)';
           if (!map.getStyle()?.sources?.fixture) return 'Fixture-Quelle fehlt im Style';
           if (!map.isSourceLoaded('fixture')) return 'Fixture-Quelle ungeladen';
-          return map.loaded() ? 'geladen' : 'map.loaded() ist false';
-        }),
+          if (!map.loaded()) return 'map.loaded() ist false';
+          const merkmale = map.querySourceFeatures('fixture', { sourceLayer: kachelLayer }).length;
+          if (merkmale === 0)
+            return 'Quelle geladen, aber KEIN dekodiertes Merkmal — Kachel nicht geparst';
+          return 'dekodiert';
+        }, KACHEL_LAYER),
       {
         timeout: 20_000,
-        message: 'Kachel-Quelle wird nie fertig — Verdacht: der maplibre-Worker antwortet nicht',
+        message:
+          'Kachel wird nie gelesen — Verdacht: der maplibre-Worker antwortet nicht, ' +
+          'oder die Kachel-Bytes sind nicht dekodierbar',
       },
     )
-    .toBe('geladen');
+    .toBe('dekodiert');
 
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
