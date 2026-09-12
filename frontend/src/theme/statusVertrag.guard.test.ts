@@ -91,7 +91,32 @@
  *     Zeichenketten, aber keine Regex-Literale, und beendet das Tag dort zu früh.
  *     Altlast, wortgleich mit dem Blindfleck von `dichte.guard.test.ts`.
  *
- * ── DIE EINE RICHTUNG, IN DER DIESER GUARD ZU VIEL MELDEN KANN ─────────────────
+ * ── ZWEI RICHTUNGEN, IN DENEN DIESE GUARDS ZU VIEL MELDEN KÖNNEN ───────────────
+ *
+ * (1) EIN GLEICHNAMIGER TYP. Guard 1 vergleicht den Werttyp dem NAMEN nach. Gäbe es
+ * irgendwo einen zweiten, unverwandten Typ `StatusDarstellung`, würde eine Karte darüber
+ * gemeldet. Der naheliegende Gegenvorschlag — den Typ nur zählen, wenn die Datei ihn
+ * nachweislich importiert, wie {@link vertragsNamenIn} es für die WERTE tut — ist hier
+ * bewusst NICHT umgesetzt, und der Unterschied ist gemessen, nicht geahnt:
+ *
+ *   • Der Bestand kennt **eine** Deklaration dieses Namens (`statusFarben.ts:94`). Ein
+ *     zweiter Typ gleichen Namens wäre in diesem Repo selbst ein Befund, kein Normalfall.
+ *   • Bei den WERTEN war die Namensgleichheit real und belegt (`STATUS_META` liegt einmal
+ *     im Vertrag und einmal als eigene Tier-Karte, `dringlichkeit`/`sichtung` sind
+ *     gewöhnliche Fachwörter). Bei einem erfundenen Typnamen ist sie es nicht.
+ *   • Vor allem: der Import-Nachweis ist bei einem TYP löchriger als bei einem Wert. Der
+ *     Bestand schreibt ihn schon in zwei Formen (`import type { StatusDarstellung }` und
+ *     `import { …, type StatusDarstellung }`), dazu kämen Re-Export-Ketten. Jede Form, die
+ *     der Nachweis verfehlt, wird zum FALSCH-NEGATIV — und zwar an der Hauptzusicherung
+ *     dieses Guards. Bei den Werten trägt daneben noch der Wire-Wert-Fühler; hier gäbe es
+ *     nichts, was den Ausfall auffängt.
+ *
+ * Ein Fehlalarm nennt Datei, Zeile und Ausdruck und ist in Minuten geklärt; ein
+ * verpasster Vertragsbruch bleibt unsichtbar. Taucht je ein echtes Homonym auf, ist das
+ * der Anlass, hier neu zu entscheiden — dann aber mit dem Syntaxbaum, nicht mit einem
+ * zweiten Import-Regex.
+ *
+ * (2) EIN WIRE-WERT, DEN EINE NICHT-VERTRAGS-ACHSE TEILT.
  *
  * Der Wire-Wert-Fühler ist eine HEURISTIK über Zeichenketten, kein Typurteil. Gemessen
  * am 12.09.2026: `TierStatus` ist `'aktiv' | 'vermisst' | 'abgeschlossen'` und teilt damit
