@@ -90,9 +90,15 @@
  *     als {@link Flaechendarstellung} benannt. Sie wird hier nicht als Ausnahme
  *     GELISTET, sondern vom Schnitt gar nicht erst erfasst: eine Ausnahmeliste, die den
  *     legitimen Fall nennt, veraltet mit ihm.
- *   • **Ein Wire-Wert aus einer Variablen**: `color={AKTIV === e.status ? …}` mit
- *     `const AKTIV = 'aktiv'` woanders. Im Bestand kommt das an keiner der 132
- *     `<Tag color=`-Stellen vor.
+ *   • **JEDE Indirektion über eine Bindung** — in beiden Fühlern dieselbe Grenze:
+ *     `const AKTIV = 'aktiv'` und dann `color={AKTIV === e.status ? …}` (Wire-Wert), oder
+ *     `const farbwert = rollenFarbe(…)` und dann `color={farbwert}` (Vertragsname). Der
+ *     Ausdruck nennt dann weder das eine noch das andere, und was hier steht, ist wahr:
+ *     der Scanner sieht Zeichen, keine Auswertung. Das ist keine Lücke IM Scanner,
+ *     sondern die Fähigkeit, die er nicht hat — sie käme mit dem Syntaxbaum, nicht mit
+ *     einem weiteren Sonderfall. Im Bestand kommt beides an keiner der 132
+ *     `<Tag color=`-Stellen vor (gemessen: kein `color={<bezeichner>}` ausserhalb der
+ *     Tests).
  *   • **Ein Regex-Literal in einer Nachbar-Prop** desselben Tags: {@link tagEnde} kennt
  *     Zeichenketten, aber keine Regex-Literale, und beendet das Tag dort zu früh.
  *     Altlast, wortgleich mit dem Blindfleck von `dichte.guard.test.ts`.
