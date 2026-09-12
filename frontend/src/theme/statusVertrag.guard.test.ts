@@ -49,13 +49,10 @@
  *     die ABWESENHEIT eines Enum-Werts und damit gerade keine Enum-Achse (die Datei
  *     begründet das über 20 Zeilen). Wer eine ganze Achse als lauter Einzel-Konstanten
  *     danebenbaut, umgeht den Guard — das ist Aufwand, keine Nachlässigkeit.
- *   • **Ein anderer Wert-Typ als `StatusDarstellung` selbst**: `Record<X,
- *     StatusDarstellung | null>` oder `Record<X, StatusDarstellung>[]`. Das Muster
- *     verlangt den Typ als LETZTES Typargument, und das ist kein Versehen — die
- *     naheliegende Lockerung (`Record<[^>]*StatusDarstellung[^>]*>`) macht aus
- *     `components/StatusTag.tsx:6` (`Record<NonNullable<StatusDarstellung['form']>,
- *     string>`) einen Fehlalarm, also aus einem Konsumenten einen Verstoß. Im Bestand
- *     kommt keine der beiden Formen vor.
+ *   • **Ein Alias als Wert-Typ**: `type Karte = StatusDarstellung` und dann
+ *     `Record<X, Karte>`. Der Parser vergleicht den letzten Typparameter dem NAMEN nach
+ *     (seine Vereinigungsglieder einzeln, `| null` fällt also auf); er löst keine Aliase
+ *     auf — das wäre ein Typchecker, kein Guard. Im Bestand gibt es keinen solchen Alias.
  *   • **Eine FUNKTION, die eine `StatusDarstellung` baut**: `pages/MaterialPage.tsx:74`,
  *     `pages/FahrzeugePage.tsx:103`, `pages/PersonalPage.tsx:79`. Alle drei liegen auf
  *     der DB-Achse (`status_farbe`, mandantengepflegter Freitext), die der Kopf von
@@ -167,13 +164,79 @@ function ausserhalbDesVertrags(pfad: string): boolean {
 /**
  * Ein `Record<…, StatusDarstellung>` — und NUR mit `StatusDarstellung` als WERT-Typ.
  *
- * `[^>]*` überquert kein `>`, damit trifft das Muster `Record<Dringlichkeit,
- * StatusDarstellung>` (auch über mehrere Zeilen, `[^>]` schließt `\n` ein) und lässt
- * `Record<NonNullable<StatusDarstellung['form']>, string>` in Ruhe — die Schlüssel-Rolle
- * ist Konsum, keine Definition. Genau diese Form steht in `components/StatusTag.tsx:6`
- * und wäre der erste Fehlalarm gewesen.
+ * WARUM EIN PARSER UND KEINE REGEX, gemessen im Codex-Review zu diesem PR: die erste
+ * Fassung war `Record<[^>]*,\s*StatusDarstellung\s*>`, und `[^>]` überquert kein `>` —
+ * ein verschachteltes Typargument im SCHLÜSSEL beendete den Ausdruck vorzeitig.
+ * `Record<Exclude<MeinStatus, null>, StatusDarstellung>` ist gültiges TypeScript, ist
+ * genau die verbotene Karte und lief unsichtbar durch. Die naheliegende Lockerung
+ * (`Record<[^>]*StatusDarstellung[^>]*>`) tauscht das Loch gegen einen Fehlalarm: sie
+ * meldet `Record<NonNullable<StatusDarstellung['form']>, string>` aus
+ * `components/StatusTag.tsx:6`, also einen Konsumenten. Beides vermeidet nur, wer die
+ * Typargumente wirklich zerlegt.
+ *
+ * NEBENEFFEKT, und er schließt einen zuvor DOKUMENTIERTEN Blindfleck: weil der letzte
+ * Parameter als Vereinigung gelesen wird, fällt auch `Record<X, StatusDarstellung | null>`
+ * auf. Der Kopfkommentar führte ihn bis hierher als bekannte Grenze.
  */
-const KARTE = /Record<[^>]*,\s*StatusDarstellung\s*>/;
+function typargumente(text: string, auf: number): string[] | null {
+  let tiefe = 0;
+  let anfuehrung: string | null = null;
+  let letzter = auf + 1;
+  const args: string[] = [];
+  for (let i = auf; i < text.length; i++) {
+    const z = text[i];
+    if (anfuehrung) {
+      if (z === '\\') i++;
+      else if (z === anfuehrung) anfuehrung = null;
+      continue;
+    }
+    if (z === '"' || z === "'" || z === '`') anfuehrung = z;
+    else if (z === '<' || z === '[' || z === '(' || z === '{') tiefe++;
+    else if (z === ']' || z === ')' || z === '}') tiefe--;
+    else if (z === ',' && tiefe === 1) {
+      args.push(text.slice(letzter, i));
+      letzter = i + 1;
+    } else if (z === '>') {
+      tiefe--;
+      if (tiefe === 0) {
+        args.push(text.slice(letzter, i));
+        return args;
+      }
+    }
+  }
+  return null; // schließt nicht — kein Urteil, lieber kein Befund als ein erfundener
+}
+
+/** Zerlegt den letzten Typparameter in seine Vereinigungsglieder auf oberster Ebene. */
+function vereinigungsglieder(arg: string): string[] {
+  const teile: string[] = [];
+  let tiefe = 0;
+  let letzter = 0;
+  for (let i = 0; i < arg.length; i++) {
+    const z = arg[i];
+    if (z === '<' || z === '[' || z === '(' || z === '{') tiefe++;
+    else if (z === '>' || z === ']' || z === ')' || z === '}') tiefe--;
+    else if (z === '|' && tiefe === 0) {
+      teile.push(arg.slice(letzter, i));
+      letzter = i + 1;
+    }
+  }
+  teile.push(arg.slice(letzter));
+  return teile.map((t) => t.trim());
+}
+
+/** Stellen, an denen ein `Record<…>` den Vertragstyp als WERT trägt (Index des `Record`). */
+export function kartenStellen(text: string): number[] {
+  const treffer: number[] = [];
+  for (let i = text.indexOf('Record<'); i !== -1; i = text.indexOf('Record<', i + 7)) {
+    const args = typargumente(text, i + 'Record'.length);
+    if (!args || args.length < 2) continue;
+    if (vereinigungsglieder(args[args.length - 1]).includes('StatusDarstellung')) {
+      treffer.push(i);
+    }
+  }
+  return treffer;
+}
 
 export function kartenBefunde(dateien: Record<string, string>): string[] {
   const verstoesse: string[] = [];
@@ -181,16 +244,10 @@ export function kartenBefunde(dateien: Record<string, string>): string[] {
     if (!ausserhalbDesVertrags(pfad)) continue;
     if (!inhalt.includes('StatusDarstellung')) continue;
     const sichtbar = ohneKommentare(inhalt).join('\n');
-    let rest = sichtbar;
-    let versatz = 0;
-    for (;;) {
-      const treffer = KARTE.exec(rest);
-      if (!treffer) break;
-      const absolut = versatz + treffer.index;
-      const zeile = sichtbar.slice(0, absolut).split('\n').length;
-      verstoesse.push(`${pfad}:${zeile}  ${treffer[0].replace(/\s+/g, ' ')}`);
-      versatz = absolut + treffer[0].length;
-      rest = sichtbar.slice(versatz);
+    for (const stelle of kartenStellen(sichtbar)) {
+      const zeile = sichtbar.slice(0, stelle).split('\n').length;
+      const auszug = sichtbar.slice(stelle, stelle + 120).replace(/\s+/g, ' ');
+      verstoesse.push(`${pfad}:${zeile}  ${auszug.slice(0, 80)}`);
     }
   }
   return verstoesse;
@@ -240,6 +297,41 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
         '/src/theme/statusFarben.ts': 'export const k: Record<X, StatusDarstellung> = {};',
       }),
     ).toEqual([]);
+  });
+
+  it('zerlegt die Typargumente, statt am ersten `>` abzubrechen', () => {
+    // Im Codex-Review gefunden: ein verschachteltes Typargument im SCHLÜSSEL beendete
+    // die alte Regex vorzeitig. Gültiges TypeScript, genau die verbotene Karte, unsichtbar.
+    expect(
+      kartenBefunde({
+        '/src/pages/Eng.ts': 'const k: Record<Exclude<MeinStatus, null>, StatusDarstellung> = {};',
+      }),
+    ).toHaveLength(1);
+
+    // Dieselbe Zerlegung schließt den früher DOKUMENTIERTEN Blindfleck mit: der letzte
+    // Parameter wird als Vereinigung gelesen.
+    expect(
+      kartenBefunde({
+        '/src/pages/Union.ts': 'const k: Record<X, StatusDarstellung | null> = {};',
+      }),
+    ).toHaveLength(1);
+
+    // Und die Gegenrichtung bleibt ruhig — sonst hätte der Parser nur das Loch gegen
+    // einen Fehlalarm getauscht. `Partial<>` daneben zeigt, dass die Schachtelung nach
+    // AUSSEN nicht stört.
+    expect(
+      kartenBefunde({
+        '/src/components/Attrappe5.tsx': [
+          "const F: Record<NonNullable<StatusDarstellung['form']>, string> = {};",
+          'const G: Record<Exclude<A, B>, string> = {};',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+    expect(
+      kartenBefunde({
+        '/src/pages/Teil.ts': 'const k: Partial<Record<X, StatusDarstellung>> = {};',
+      }),
+    ).toHaveLength(1);
   });
 
   it('lässt Konsumenten in Ruhe — Prop, Rückgabetyp, Schlüsselrolle', () => {
@@ -304,26 +396,14 @@ export function tagEnde(text: string, start: number): number {
 }
 
 /**
- * Der Wert der `color`-Prop eines Tag-Textes, oder `null`.
- *
- * Nur auf ATTRIBUT-Ebene: `style={{ color: farbe }}` ist keine `color`-Prop, und ein
- * verschachteltes Element in einer Nachbar-Prop soll nicht mitzählen. Deshalb wird die
- * geschweifte Klammer balanciert gegriffen (Zeichenketten übersprungen, damit ein `}`
- * IM String die Bilanz nicht verschiebt — der Fehler, der in LFH-364 gemessen wurde).
+ * Balanciertes Ende eines `{…}`-Ausdrucks ab `auf` (Index der öffnenden Klammer);
+ * `tag.length`, wenn er nicht schließt. Überspringt Zeichenketten, damit eine Klammer
+ * IM String die Bilanz nicht verschiebt (der in LFH-364 gemessene Fehler).
  */
-export function farbAusdruck(tag: string): string | null {
-  const treffer = /(?:^|[\s{])color\s*=\s*/.exec(tag);
-  if (!treffer) return null;
-  const ab = treffer.index + treffer[0].length;
-  const erstes = tag[ab];
-  if (erstes === '"' || erstes === "'") {
-    const zu = tag.indexOf(erstes, ab + 1);
-    return zu === -1 ? tag.slice(ab) : tag.slice(ab, zu + 1);
-  }
-  if (erstes !== '{') return null;
+function klammerEnde(tag: string, auf: number): number {
   let tiefe = 0;
   let anfuehrung: string | null = null;
-  for (let i = ab; i < tag.length; i++) {
+  for (let i = auf; i < tag.length; i++) {
     const z = tag[i];
     if (anfuehrung) {
       if (z === '\\') i++;
@@ -332,9 +412,63 @@ export function farbAusdruck(tag: string): string | null {
     }
     if (z === '"' || z === "'" || z === '`') anfuehrung = z;
     else if (z === '{') tiefe++;
-    else if (z === '}' && --tiefe === 0) return tag.slice(ab, i + 1);
+    else if (z === '}' && --tiefe === 0) return i + 1;
   }
-  return tag.slice(ab);
+  return tag.length;
+}
+
+/**
+ * Der Wert der `color`-Prop eines Tag-Textes, oder `null` — AUF ATTRIBUTEBENE.
+ *
+ * „Attributebene" ist hier die ganze Aussage, nicht eine Feinheit (im Codex-Review zu
+ * diesem PR gefunden). Die erste Fassung nahm das ERSTE `color=` im Tag-Text, und das
+ * kann in einer Nachbar-Prop stecken: `<Tag icon={<Icon color="blue" />} color={…}>`.
+ * Beide Richtungen gehen dann schief — ein verschachteltes Vertrags-`color` erzeugte
+ * einen Fehlalarm für den Tag, und ein verschachteltes Preset verdeckte ein verbotenes
+ * äußeres `color={rollenFarbe(…)}` vollständig, weil nur der erste Treffer angesehen
+ * wurde. Ein Guard, der aus dem falschen Grund rot wird, kostet die Zeit dessen, der
+ * ihn debuggt; einer, der aus dem falschen Grund grün bleibt, ist schlimmer.
+ *
+ * Der Durchlauf überspringt deshalb jede Prop-Expression als Ganzes ({@link klammerEnde})
+ * und sieht nur, was zwischen den Attributen steht. `style={{ color: farbe }}` fällt
+ * damit ebenfalls heraus — richtig so, das ist keine `color`-Prop.
+ */
+export function farbAusdruck(tag: string): string | null {
+  let i = 0;
+  let anfuehrung: string | null = null;
+  while (i < tag.length) {
+    const z = tag[i];
+    if (anfuehrung) {
+      if (z === '\\') i++;
+      else if (z === anfuehrung) anfuehrung = null;
+      i++;
+      continue;
+    }
+    if (z === '"' || z === "'" || z === '`') {
+      anfuehrung = z;
+      i++;
+      continue;
+    }
+    if (z === '{') {
+      i = klammerEnde(tag, i);
+      continue;
+    }
+    // Ein Attributname beginnt hinter Leerraum — `<Tag` selbst und `bgColor=` fallen
+    // damit heraus, `<Tag\ncolor=` (Prettier bricht um) bleibt drin.
+    if (/\s/.test(z) && /^color\s*=\s*/.test(tag.slice(i + 1))) {
+      const wert = /^color\s*=\s*/.exec(tag.slice(i + 1))!;
+      const ab = i + 1 + wert[0].length;
+      const erstes = tag[ab];
+      if (erstes === '"' || erstes === "'") {
+        const schluss = tag.indexOf(erstes, ab + 1);
+        return schluss === -1 ? tag.slice(ab) : tag.slice(ab, schluss + 1);
+      }
+      if (erstes !== '{') return null;
+      return tag.slice(ab, klammerEnde(tag, ab));
+    }
+    i++;
+  }
+  return null;
 }
 
 /**
@@ -446,6 +580,28 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
           "<Tag onClick={() => tu(x)} color={s === 'abgeschlossen' ? 'default' : 'green'}>",
       }),
     ).toHaveLength(1);
+  });
+
+  it('liest die `color`-Prop des Tags, nicht die eines Elements in einer Nachbar-Prop', () => {
+    // Im Codex-Review gefunden, und der Fall geht in BEIDE Richtungen schief.
+    // (a) Falsch-negativ: ein verschachteltes Preset verdeckte das verbotene äußere
+    //     `color` vollständig, weil nur der erste Treffer angesehen wurde.
+    const verdeckt = tagBefunde({
+      '/src/pages/Verschachtelt.tsx':
+        '<Tag icon={<Icon color="blue" />} color={rollenFarbe(warnstufeKarte[s].rolle, t)}>',
+    });
+    expect(verdeckt).toHaveLength(1);
+
+    // (b) Falsch-positiv: ein Vertrags-`color` INNEN gehört nicht dem Tag. Ein anderes
+    //     Element als `<Tag>` ist dokumentierter Blindfleck, kein Befund dieses Guards.
+    expect(
+      tagBefunde({
+        '/src/pages/Innen.tsx': '<Tag icon={<Icon color={warnstufeKarte[s].rolle} />}>{x}</Tag>',
+      }),
+    ).toEqual([]);
+
+    // `style={{ color: … }}` ist keine `color`-Prop — dieselbe Trennung, anderer Anlass.
+    expect(farbAusdruck("<Tag style={{ color: 'aktiv' }}>")).toBeNull();
   });
 
   it('lässt die legitimen Nachbarn in Ruhe', () => {
