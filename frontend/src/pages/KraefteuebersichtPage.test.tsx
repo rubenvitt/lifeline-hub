@@ -424,13 +424,20 @@ describe('KraefteuebersichtPage', () => {
     const hier = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
     const druckblock = css.slice(css.indexOf('@media print'));
+    // DIE MARKEN SIND REGULÄRE AUSDRÜCKE, NICHT ZEICHENKETTEN — Lehre aus LFH-354, kein
+    // Stil. Der Attributselektor stand hier als `[data-lfh="datensicht-werkzeuge"]` mit
+    // doppelten Anführungszeichen; der einmalige Prettier-Sweep hat die Regeldatei auf
+    // einfache umgestellt (`singleQuote` aus .prettierrc gilt bei Prettier AUCH für CSS),
+    // und dieser Test wurde rot, ohne dass eine Druckregel gefehlt hätte. In CSS sind beide
+    // Schreibweisen identisch — ein Test, der sie unterscheidet, prüft die Formatierung der
+    // Datei statt ihrer Aussage und meldet einen Mangel, den es nicht gibt.
     for (const marke of [
-      '.ant-table-body',
-      '.ant-table-sticky-holder',
-      '.ant-table-cell-fix-start',
-      '[data-lfh="datensicht-werkzeuge"]',
+      /\.ant-table-body\b/,
+      /\.ant-table-sticky-holder\b/,
+      /\.ant-table-cell-fix-start\b/,
+      /\[data-lfh=['"]datensicht-werkzeuge['"]\]/,
     ]) {
-      expect(druckblock, `Druckregel für ${marke} fehlt`).toContain(marke);
+      expect(druckblock, `Druckregel für ${marke} fehlt`).toMatch(marke);
     }
     expect(druckblock).toMatch(/overflow:\s*visible\s*!important/);
   });
