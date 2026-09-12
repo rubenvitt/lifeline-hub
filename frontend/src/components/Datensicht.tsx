@@ -1,6 +1,6 @@
 import { Button, Checkbox, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
-import type { TableColumnType, TableColumnsType } from 'antd';
+import type { TableColumnType } from 'antd';
 import {
   isValidElement,
   useCallback,
@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 import { Link } from 'react-router';
-import KatalogTabelle from './KatalogTabelle';
+import KatalogTabelle, { type KatalogSpalte } from './KatalogTabelle';
 import { Liste, ListenEintrag } from './Liste';
 import { Select } from './Select';
 import StatusTag from './StatusTag';
@@ -163,6 +163,16 @@ export type DatensichtSpalte<T, K extends string = string> = AntdErbe<T> & {
   };
   /** Erst ab dieser Breite in der TABELLE sichtbar (Ersatz für antds Breiten-Prop). */
   abBreite?: AbBreitePunkt;
+  /**
+   * Diese Spalte FLIESST im Tabellenzweig: sie nimmt den Rest der Breite und bricht um,
+   * statt die Tabelle zu verbreitern (LFH-523). Wert ist ihr Mindestmaß in px.
+   *
+   * Durchgereicht an {@link KatalogSpalte.mindestBreite} — EIN Begriff, zwei Träger, wie
+   * bei `suchText`. Im KARTENZWEIG wirkungslos und das mit Absicht: eine Karte ist so breit
+   * wie ihre Fläche, dort bricht der Text ohnehin um. Genau deshalb war der Befund von
+   * LFH-523 ein reiner Tabellenbefund.
+   */
+  mindestBreite?: number;
   /** Nicht abwählbar (Aktionsspalte). Spalte 0 ist es immer, unabhängig vom Flag. */
   immerSichtbar?: boolean;
 };
@@ -1248,7 +1258,14 @@ export default function Datensicht<T extends object, const K extends string>(
    * Injektion von `sorter: true` samt kontrollierter Richtung. `sorter: true` heißt für
    * antd „extern sortiert" — es zeichnet nur den Pfeil, sortiert wird in `effektiveDaten`.
    */
-  const antdSpalten = useMemo<TableColumnsType<T>>(
+  /**
+   * `mindestBreite` wird ABSICHTLICH NICHT herausgelöst, anders als `suchText` daneben: es
+   * ist die Fließmarke, die `KatalogTabelle` für seine Breitenrechnung braucht (LFH-523),
+   * und die Zieltypisierung als {@link KatalogSpalte} macht dieses Durchreichen sichtbar
+   * statt zum Nebeneffekt des Spreads. Als `TableColumnsType` getippt fiele das Feld aus
+   * dem Typ und der nächste Umbau hier nähme es stillschweigend mit.
+   */
+  const antdSpalten = useMemo<KatalogSpalte<T>[]>(
     () =>
       gezeigteSpalten.map((spalte) => {
         const { etikett, sortWert, suchText, filter, abBreite: _ab, immerSichtbar, ...antd } =
@@ -1258,7 +1275,7 @@ export default function Datensicht<T extends object, const K extends string>(
         void filter;
         void _ab;
         void immerSichtbar;
-        const gebaut: TableColumnType<T> = { ...antd };
+        const gebaut: KatalogSpalte<T> = { ...antd };
 
         /**
          * Der Titel-Link steht in BEIDEN Zweigen, nicht nur in der Karte: er ist das

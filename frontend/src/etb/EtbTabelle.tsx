@@ -344,7 +344,24 @@ export default function EtbTabelle({
       key: 'vonan', title: 'Von → An', etikett: 'Von → An', width: 160, abBreite: 'xxl',
       render: (_, z) => vonAn(z),
     },
-    { key: 'inhalt', title: 'Inhalt', etikett: 'Inhalt', render: (_, z) => inhaltsBlock(z) },
+    /*
+     * DIE FLIESSSPALTE (LFH-523). Ohne sie rechnet die Tabelle mit `max-content`, und ein
+     * normal umbrechbarer Meldungstext bleibt EINZEILIG statt umzubrechen: gemessen 1484 px
+     * Text gegen 936 px Sicht, 1122 px innerer Überlauf bei 1280 px. Der Kartenzweig
+     * derselben Daten bricht denselben Text um — der Tabelle fehlte bloß der Deckel.
+     *
+     * DIE ZAHL IST EINE UNTERGRENZE, keine Breite: der Text bekommt den Rest der Fläche und
+     * fällt erst bei sehr schmaler Tabelle auf diese 320 px zurück. Gewählt ist sie gegen
+     * die SCHMALSTE Fläche, auf der die Tabelle überhaupt steht — unter `xl` (1200 px) sind
+     * es Karten, und bei 1200 px Viewport bleiben gemessen rund 856 px Contentbreite. Mit
+     * den vier festen Spalten (88 + 180 + 130 + 96 = 494) liegt der Deckel bei 814 px und
+     * damit unter der Fläche: kein innerer Überlauf an der engsten Stelle. Eine größere Zahl
+     * holte den Überlauf zurück, den dieses Ticket entfernt.
+     */
+    {
+      key: 'inhalt', title: 'Inhalt', etikett: 'Inhalt', mindestBreite: 320,
+      render: (_, z) => inhaltsBlock(z),
+    },
     {
       key: 'erfasser', title: 'Erfasser', etikett: 'Erfasser', width: 120, abBreite: 'xxl',
       render: (_, z) => (z.art === 'eintrag' ? z.eintrag.erfasser_name : '—'),
