@@ -113,9 +113,24 @@ export type KatalogSpalte<T> = NonNullable<TableProps<T>['columns']>[number] & {
    * die Spaltenfelder selbst — ein unbekanntes Feld landet also in keinem DOM-Attribut.
    */
   suchText?: (zeile: T) => string | null | undefined;
+  /**
+   * Diese Spalte FLIESST: sie nimmt den Rest der Sichtbreite und bricht ihren Inhalt um,
+   * statt die Tabelle zu verbreitern. Der Wert ist ihr Mindestmaß in px (LFH-523).
+   *
+   * Gegenstück zu antds `width`, nicht Ergänzung: eine Spalte trägt das eine ODER das
+   * andere. `width` sagt „so breit", `mindestBreite` sagt „mindestens so breit, sonst der
+   * Rest" — und genau dieser Rest fehlte dem Meldungstext des Einsatztagebuchs.
+   *
+   * OPT-IN, und das ist der Punkt: ohne diesen Haken bleibt jede der achtzehn
+   * Katalogtabellen inhaltsgetrieben wie bisher. Siehe {@link fliessBreite}.
+   */
+  mindestBreite?: number;
 };
 
-export type KatalogTabelleProps<T> = Omit<TableProps<T>, 'scroll' | 'sticky' | 'columns'> & {
+export type KatalogTabelleProps<T> = Omit<
+  TableProps<T>,
+  'scroll' | 'sticky' | 'columns' | 'tableLayout'
+> & {
   /**
    * Wie antds `columns`, je Spalte um {@link KatalogSpalte.suchText} erweitert. Der Zusatz ist
    * OPTIONAL — eine als `TableColumnsType<T>` annotierte Spaltenliste bleibt zuweisbar, und
@@ -166,6 +181,87 @@ function zellenWert<T>(spalte: Spalte<T>, zeile: T): unknown {
     wert = (wert as Record<string, unknown>)[String(glied)];
   }
   return wert;
+}
+
+/**
+ * Das Ergebnis der Breitenrechnung: entweder eine Zahl (gedeckelt) oder das
+ * inhaltsgetriebene `'max-content'` des Bestands, dann mit Grund.
+ */
+export interface Fliessmass {
+  /** Was als `scroll.x` an antd geht. */
+  x: number | 'max-content';
+  /** Gesetzt, wenn ein Opt-in vorlag, aber nicht trug. Wird in DEV gemeldet. */
+  warnung?: string;
+}
+
+/**
+ * Die Tabellenbreite aus den ÜBERGEBENEN Spalten (LFH-523) — rein und exportiert, damit die
+ * Zusicherung ohne Rendern prüfbar ist (Muster `bedienzielStil`, `aktionsabstand`).
+ *
+ * ── DER BEFUND ──────────────────────────────────────────────────────────────────
+ *
+ * `scroll={{ x: 'max-content' }}` macht die Tabellenbreite inhaltsgetrieben. Eine Spalte
+ * ohne `width` trägt dann ihre volle `max-content`-Breite bei, und ein normal umbrechbarer
+ * Meldungstext bleibt EINZEILIG statt umzubrechen: im Handschuhmodus gemessen 1484 px Text
+ * gegen 936 px Sicht, 1122 px innerer Überlauf bei 1280 px und 1036 px bei 1366 px. Der
+ * Kartenzweig derselben Daten bricht denselben Text um — der Tabelle fehlte bloß der
+ * Deckel, gegen den sie hätte umbrechen können.
+ *
+ * ── DIE RECHNUNG ────────────────────────────────────────────────────────────────
+ *
+ * Trägt genau EINE Spalte {@link KatalogSpalte.mindestBreite}, ist die Breite
+ * `Σ(width der übrigen) + mindestBreite`. Antd behält daneben sein `min-width: 100%`; die
+ * Tabelle füllt also weiter den Container und scrollt erst UNTERHALB dieser Zahl in sich.
+ *
+ * **Warum das die ≥50-%-Zusicherung aus LFH-342 · C7 nicht anfasst:** liegt die gerechnete
+ * Zahl unter der Containerbreite, ist die BENUTZTE Breite in beiden Fassungen dieselbe
+ * (`min-width: 100%` gewinnt gegen beide), und die `auto`-Layoutrechnung verteilt die
+ * Spalten danach identisch. Auseinander gehen die zwei Fassungen erst, wenn `max-content`
+ * den Container ÜBERSTEIGT — und das ist genau der Befund, nicht die Zusicherung.
+ *
+ * ── ZWEI ABBRÜCHE, BEIDE MIT GRUND STATT STILL ──────────────────────────────────
+ *
+ * · **Eine Nachbarspalte ohne Zahlbreite.** Dann wäre die Summe geraten, und ein geratener
+ *   Deckel ist schlechter als keiner: er behauptete eine Breite, die die Spalte nicht hält.
+ *   Erfasst ist auch die Zeichenkettenform (`width: '20%'`) und die Spaltengruppe, die gar
+ *   keine Blattbreite hat.
+ * · **Zwei Fließspalten.** Das sind kein Deckel, sondern zwei Reste — welche der beiden den
+ *   Überschuss bekäme, entschiede die Layoutrechnung und nicht der Entwurf.
+ *
+ * In beiden Fällen bleibt es beim Bestandsverhalten, und der Grund geht als DEV-Warnung
+ * heraus. Ein Opt-in, das still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
+ */
+export function fliessBreite<T>(
+  spalten: readonly KatalogSpalte<T>[] | undefined,
+): Fliessmass {
+  const fliessend = (spalten ?? []).filter((s) => s.mindestBreite != null);
+  if (fliessend.length === 0) return { x: 'max-content' };
+  if (fliessend.length > 1) {
+    return {
+      x: 'max-content',
+      warnung:
+        `Mehr als eine Fließspalte (${fliessend.map((s) => String(s.key)).join(', ')}) — ` +
+        'die Tabellenbreite bleibt inhaltsgetrieben. Genau eine Spalte nimmt den Rest.',
+    };
+  }
+  let summe = 0;
+  for (const spalte of spalten ?? []) {
+    if (spalte.mindestBreite != null) {
+      summe += spalte.mindestBreite;
+      continue;
+    }
+    if (typeof spalte.width !== 'number') {
+      return {
+        x: 'max-content',
+        warnung:
+          `Die Spalte „${String(spalte.key ?? spalte.title)}" hat keine Zahlbreite — neben ` +
+          'einer Fließspalte ist die Tabellenbreite damit nicht ausrechenbar und bleibt ' +
+          'inhaltsgetrieben.',
+      };
+    }
+    summe += spalte.width;
+  }
+  return { x: summe };
 }
 
 /**
@@ -294,6 +390,21 @@ export default function KatalogTabelle<T extends object>({
     );
   }, [dataSource, columns, suchbegriff]);
 
+  /**
+   * Die gedeckelte Tabellenbreite (LFH-523). Gerechnet wird über `fixierteSpalten`, also
+   * über die Garnitur, die auch WIRKLICH gerendert wird — `Datensicht` hat `abBreite`-Spalten
+   * da längst herausgefiltert, und ein Deckel aus einer Vollmenge wäre genau dort zu breit,
+   * wo der Befund gemessen wurde.
+   */
+  const { x: scrollX, warnung: breitenWarnung } = useMemo(
+    () => fliessBreite(fixierteSpalten),
+    [fixierteSpalten],
+  );
+  useEffect(() => {
+    if (!import.meta.env.DEV || breitenWarnung == null) return;
+    console.warn(`[KatalogTabelle] ${breitenWarnung}`);
+  }, [breitenWarnung]);
+
   const identifier = bezugsSchluessel(columns?.[0]);
   useEffect(() => {
     if (!import.meta.env.DEV || identifier !== 'id') return;
@@ -358,7 +469,22 @@ export default function KatalogTabelle<T extends object>({
         // jede Textzusicherung darauf entweder falsch oder umgebungsabhängig. Am
         // Berührungsgerät trägt er ohnehin nichts.
         showSorterTooltip={false}
-        scroll={{ x: 'max-content' }}
+        scroll={{ x: scrollX }}
+        /*
+         * GEMESSEN an `@rc-component/table/es/Table.js`: das Layout wählt rc-table selbst —
+         * `if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'`. Dieses
+         * Primitiv fixiert Spalte 0 IMMER, `fixColumn` ist also gesetzt; eine Zahl statt
+         * `'max-content'` kippte das Layout still auf `fixed`. Unter `fixed` ist eine
+         * Spaltenbreite BINDEND statt bevorzugt — die 96 px der ETB-Aktionsspalte schnitten
+         * den 72-px-Knopf der Handschuhstufe an, und die Mindestinhaltsbreite jeder anderen
+         * Spalte gleich mit. `auto` ist zugleich das, was der Bestand schon fährt.
+         *
+         * Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und im
+         * Sonderfall einer Spaltengruppe an Position 0 (dann fixiert das Primitiv nichts,
+         * und `sticky` führt auf `fixed`) wäre ein hartes `auto` eine stille Änderung an
+         * einer Tabelle, die von LFH-523 gar nicht handelt.
+         */
+        tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
         sticky
       />
     </>

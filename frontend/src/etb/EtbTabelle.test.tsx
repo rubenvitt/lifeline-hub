@@ -480,3 +480,67 @@ describe('EtbTabelle – gepufferte Einträge (LFH-342 · C7, Befund M82)', () =
     expect(screen.getByText('Noch nicht gesendet')).toBeInTheDocument();
   });
 });
+
+/**
+ * Der Meldungstext fließt (LFH-523).
+ *
+ * DER BEFUND, gemessen auf `origin/main` 17aed41c: ein normal umbrechbarer Meldungstext mit
+ * 209 Zeichen bleibt im Tabellenzweig EINZEILIG und verbreitert ihn — im Handschuhmodus
+ * 1484 px Text gegen 936 px Sicht, 1122 px innerer Überlauf bei 1280 px und 1036 px bei
+ * 1366 px. Der Kartenzweig derselben Daten bricht denselben Text um; der Tabelle fehlte der
+ * Deckel, gegen den sie hätte umbrechen können.
+ *
+ * WAS HIER PRÜFBAR IST, IST DIE RECHNUNG — nicht ihre Wirkung: `vite.config.ts` fährt
+ * `css: false`, jsdom rechnet kein Layout, alle Breiten sind 0. Dass der Text im Browser
+ * wirklich umbricht und der innere Überlauf verschwindet, misst
+ * `e2e/etb-chronologie.spec.ts`. Hier steht die Zusicherung, dass die Chronologie das
+ * Opt-in überhaupt SETZT und mit welcher Zahl — ohne sie wäre der Browsertest der einzige
+ * Ort, an dem ein Rückbau auffiele.
+ */
+describe('EtbTabelle — Fließender Meldungstext (LFH-523)', () => {
+  function tabellenBreite(): string {
+    const tabelle = document.querySelector<HTMLTableElement>('.ant-table-body table');
+    expect(tabelle, 'Tabellenzweig nicht gerendert').not.toBeNull();
+    return tabelle!.style.width;
+  }
+
+  const LANG =
+    'Im Kellergeschoss des Anwesens Musterweg 3 steht das Wasser rund achtzig Zentimeter '
+    + 'hoch. Die Heizungsanlage ist betroffen, der Hausanschlusskasten noch trocken. '
+    + 'Eigentümer vor Ort, Zugang über die Hofseite möglich.';
+
+  it('deckelt die Tabellenbreite, statt sie vom längsten Text treiben zu lassen', () => {
+    setzeViewportBreite(1366);
+    renderTabelle({ eintraege: [eintrag({ inhalt: LANG })], onBerichtigen: () => {} });
+
+    // 88 (Nr.) + 180 (Zeit) + 130 (Typ) + 320 (Inhalt) + 96 (Aktionen). Von→An und
+    // Erfasser tragen `abBreite: 'xxl'` und sind bei 1366 px zu Recht draußen.
+    // Als Literal hingeschrieben: aus den Spalten zurückgerechnet prüfte die Zeile die
+    // Rechnung gegen sich selbst.
+    expect(tabellenBreite()).toBe('814px');
+  });
+
+  it('nimmt die Nebenspalten mit in den Deckel, sobald sie sichtbar sind', () => {
+    // Ab `xxl` stehen Von→An (160) und Erfasser (120) wieder da — der Deckel wächst mit,
+    // sonst bliebe dem Text bei breitem Schirm weniger als die Rechnung verspricht.
+    setzeViewportBreite(1600);
+    renderTabelle({ eintraege: [eintrag({ inhalt: LANG })], onBerichtigen: () => {} });
+    expect(tabellenBreite()).toBe('1094px');
+  });
+
+  it('lässt die Aktionsspalte aus dem Deckel, wenn die Seite keine Aktion mitgibt', () => {
+    // Ein Leser ohne Schreibrecht bekommt keine Aktionsspalte (Bestandsweiche) — und dann
+    // auch nicht ihre 96 px im Deckel. Ein fester Deckel verschenkte hier Textbreite.
+    setzeViewportBreite(1366);
+    renderTabelle({ eintraege: [eintrag({ inhalt: LANG })] });
+    expect(tabellenBreite()).toBe('718px');
+  });
+
+  it('hält den Deckel unter der schmalsten Fläche, auf der die Tabelle überhaupt steht', () => {
+    // Die Chronologie wechselt bei `xl` (1200 px) auf Karten. Bei 1200 px Viewport blieben
+    // gemessen rund 856 px Contentbreite (1280 px Viewport → 936 px Sicht). Läge der Deckel
+    // DARÜBER, bliebe genau der Überlauf stehen, gegen den dieses Ticket gebaut ist —
+    // die Tabelle scrollte dann wieder in sich, nur mit anderer Zahl.
+    expect(814).toBeLessThanOrEqual(856);
+  });
+});
