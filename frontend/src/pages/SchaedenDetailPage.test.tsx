@@ -1,9 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
+import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import SchaedenDetailPage from './SchaedenDetailPage';
@@ -141,6 +142,35 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body).not.toBeNull());
+    expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');
+  });
+
+  it('hält die Baseline fest, wenn die Detail-Query bei offener Maske refetcht (LFH-303)', async () => {
+    // Auslöser im Betrieb: Fensterwechsel bei `staleTime` 10 s und TanStacks Vorgabe
+    // `refetchOnWindowFocus: true`. Der Hintergrund-Refetch legt den FREMDEN, neueren
+    // Stand in den Cache; ginge der als Baseline raus, verglich der Server ihn mit sich
+    // selbst und die fremde Änderung wäre still überschrieben (LFH-241/F10 ausgehebelt).
+    let stand: Record<string, unknown> = basisSchaden();
+    let body: Record<string, unknown> | null = null;
+    const { client } = render(einsatzAktiv, basisSchaden(), [
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisSchaden());
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+
+    stand = basisSchaden({ geaendert_at: '2026-05-29 12:30:00', ort: 'Fremde Straße' });
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) });
+    });
+    await vi.waitFor(() =>
+      expect(client.getQueryData<{ geaendert_at: string }>(einsatzKeys.schaden(1, 10))?.geaendert_at)
+        .toBe('2026-05-29 12:30:00'));
+
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');

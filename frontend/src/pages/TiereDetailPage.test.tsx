@@ -1,9 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
+import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import TiereDetailPage from './TiereDetailPage';
@@ -109,6 +110,36 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body).not.toBeNull());
+    expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
+  });
+
+  it('hält die Baseline fest, wenn die Detail-Query bei offener Maske refetcht (LFH-303)', async () => {
+    // Der Auslöser im Betrieb ist ein Fensterwechsel: `staleTime` ist 10 s, TanStacks
+    // `refetchOnWindowFocus` steht auf der Vorgabe `true`. Kommt der Bearbeiter zurück,
+    // refetcht die Detail-Query im Hintergrund und der FREMDE, neuere Stand steht im
+    // Cache. Ginge der als Baseline raus, verglich der Server ihn mit sich selbst — die
+    // CAS-Prüfung passte, und die fremde Änderung wäre still überschrieben.
+    let stand: Tier = tierBasis;
+    let body: Record<string, unknown> | null = null;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+
+    stand = { ...tierBasis, geaendert_at: '2026-05-29 11:30:00', rufname: 'Fremd' };
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) });
+    });
+    await vi.waitFor(() =>
+      expect(client.getQueryData<Tier>(einsatzKeys.tier(1, 10))?.geaendert_at)
+        .toBe('2026-05-29 11:30:00'));
+
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
