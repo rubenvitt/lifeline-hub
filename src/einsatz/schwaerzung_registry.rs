@@ -728,6 +728,47 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zugewiesen_at", G_ZEIT),
         ],
     },
+    // LFH-46: Besetzung der Sachgebiete S1–S6. `snap_name`/`bezeichnung` sind PII (Name einer
+    // Person bzw. eines Externen) und werden genullt — dieselbe Linie wie
+    // `einsatz_mitgliedschaft.fuehrungsstelle` oben. Das Skelett (welches Sachgebiet war WIE
+    // besetzt, von wem und wann gesetzt) bleibt als anonymer Führungsnachweis stehen.
+    TabellenRegel {
+        tabelle: "einsatz_stabsfunktion",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("sachgebiet", G_ENUM),
+            retain("besetzung_art", G_ENUM),
+            retain("personal_id", G_FK),
+            scrub("snap_name", Strategie::NullSetzen), // REVIEW: Name der disponierten Person
+            scrub("bezeichnung", Strategie::NullSetzen), // REVIEW: Name/Stelle extern bzw. rückwärtig
+            retain("gesetzt_von_id", G_FK),
+            retain("gesetzt_at", G_ZEIT),
+        ],
+    },
+    // LFH-46: abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG) —
+    // dieselbe Klassifikation wie `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe
+    // Entschluss der Einsatzleitung ist. Ein Alleingang auf Scrub für genau eine der drei
+    // Tabellen wäre inkonsistent; käme die Linie „Führungs-Freitexte scrubben", dann für alle
+    // drei gemeinsam.
+    TabellenRegel {
+        tabelle: "einsatz_lagebesprechung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("lfd_nr", G_ZAEHLER),
+            retain("abgehalten_at", G_ZEIT),
+            retain("entschluss", G_FUEHRUNG),
+            retain("naechste_at", G_ZEIT),
+            retain("etb_eintrag_id", G_FK),
+            retain("erfasst_von_id", G_FK),
+            retain("erfasst_at", G_ZEIT),
+        ],
+    },
     TabellenRegel {
         tabelle: "einsatz_einstellungen",
         scoping: Scoping::EinsatzId,

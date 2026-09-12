@@ -84,7 +84,12 @@ pub async fn anlegen(
     .await?;
     Ok((
         StatusCode::CREATED,
-        Json(einsatz.anzeige(Some(EINSATZ_ROLLE_LEITUNG.to_string()), None)),
+        Json(einsatz.anzeige(
+            Some(EINSATZ_ROLLE_LEITUNG.to_string()),
+            None,
+            // Ein frisch angelegter Einsatz hat keine Besetzung — Literal statt Abfrage.
+            Vec::new(),
+        )),
     ))
 }
 
@@ -110,6 +115,7 @@ pub async fn detail(
     Ok(Json(einsatz.anzeige(
         rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
     )))
 }
 
@@ -129,6 +135,7 @@ pub async fn abschliessen(
     Ok(Json(aktualisiert.anzeige(
         rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
     )))
 }
 
@@ -177,6 +184,7 @@ pub async fn aufbewahrungsfrist_setzen(
         return Ok(Json(einsatz.anzeige(
             rolle.map(|r| r.as_str().to_string()),
             repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+            crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
         )));
     }
     if ist_fristverkuerzung(alt, neue_frist.as_deref()) && !req.bestaetigt {
@@ -196,6 +204,7 @@ pub async fn aufbewahrungsfrist_setzen(
     Ok(Json(aktualisiert.anzeige(
         rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
     )))
 }
 
@@ -775,5 +784,6 @@ pub async fn aktualisieren(
     Ok(Json(aktualisiert.anzeige(
         rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
+        crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
     )))
 }

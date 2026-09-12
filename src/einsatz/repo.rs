@@ -202,6 +202,12 @@ pub async fn liste_fuer(
     .fetch_all(pool)
     .await?;
 
+    // ZWEITE, ebenfalls EINMALIGE Abfrage (LFH-46): die Sachgebiete des Benutzers über ALLE
+    // Einsätze. Die Detail-Abfrage (`stab::repo::sachgebiete_von`) je Zeile zu rufen wäre N+1
+    // auf `GET /api/einsaetze` — der Route hinter der Einsatzauswahl. Zwei Statements bleiben
+    // O(1) in der Zahl der Einsätze; genau das sichert `liste_fuer` zu.
+    let mut sachgebiete = crate::stab::repo::sachgebiete_je_einsatz(pool, benutzer.id).await?;
+
     let jetzt = Utc::now();
     Ok(rows
         .into_iter()
@@ -241,6 +247,9 @@ pub async fn liste_fuer(
             retention_bis: r.retention_bis,
             meine_rolle: r.meine_rolle,
             meine_fuehrungsstelle: r.meine_fuehrungsstelle,
+            // `remove` statt `get`: jede Einsatz-id kommt genau einmal vor, der Eintrag wird
+            // also nicht mehr gebraucht — das spart das Klonen des Vec.
+            meine_sachgebiete: sachgebiete.remove(&r.id).unwrap_or_default(),
         })
         .collect())
 }

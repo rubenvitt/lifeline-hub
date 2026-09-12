@@ -51,6 +51,7 @@ export const EINSATZ_KEYS = {
   befehl: 'einsatz-befehl',
   kartenAnsicht: 'einsatz-karten-ansicht',
   lageSnapshot: 'einsatz-lage-snapshot',
+  stab: 'einsatz-stab',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -135,6 +136,11 @@ export const EINSATZ_STREAM_EVENTS = {
   // Lage-Snapshots live (LFH-321): Anlegen/Ändern/Löschen eines Standes publiziert
   // `lage_snapshot` → die Snapshot-Liste/Zeitleiste aller Betrachter aktualisiert sich.
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
+  // Führungsorganisation live (LFH-46): Besetzung S1–S6 und Lagebesprechungen. Die
+  // Lagebesprechungs-Historie hängt als Sub-Key unter DEMSELBEN Prefix
+  // (['einsatz-stab', einsatzId, 'lagebesprechungen']) — kein eigener Singular-Key,
+  // sonst entstünde die Silent-Gap-Falle der Detail-Keys oben.
+  stab: [EINSATZ_KEYS.stab],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -239,6 +245,9 @@ export const einsatzKeys = {
   lagebericht: (einsatzId: number, berichtId: number) =>
     [EINSATZ_KEYS.lagebericht, einsatzId, berichtId] as const,
   kartenbilder: (einsatzId: number) => [EINSATZ_KEYS.kartenbilder, einsatzId] as const,
+
+  // Stab (LFH-46): Führungsorganisation S1–S6.
+  stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,
 
   // Bereitstellungsraum
   br: (einsatzId: number) => [EINSATZ_KEYS.br, einsatzId] as const,

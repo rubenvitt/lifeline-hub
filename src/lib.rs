@@ -43,6 +43,7 @@ pub mod personal;
 pub mod routes;
 pub mod schaden;
 pub mod sprechgruppe;
+pub mod stab;
 pub mod staerke;
 pub mod static_files;
 pub mod stichwort;

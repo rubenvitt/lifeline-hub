@@ -268,6 +268,16 @@ export interface components {
             geaendert_at?: string | null;
         };
         /**
+         * @description Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.
+         *
+         *     **Keine Zeile = „nicht vergeben"** — das ist der im Fükw der Führungsstufe B
+         *     dokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.
+         *     Der Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion
+         *     („haben wir S4 bedacht?").
+         * @enum {string}
+         */
+        BesetzungArt: "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
+        /**
          * @description Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `betriebsart` (per-Variante, Großbuchstaben — `rename_all` trifft nicht).
          * @enum {string}
@@ -567,6 +577,17 @@ export interface components {
             /** @description Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung. */
             meine_fuehrungsstelle?: string | null;
             meine_rolle?: null | components["schemas"]["EinsatzRolle"];
+            /**
+             * @description Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
+             *     diesem Einsatz besetzt (LFH-46). Transitiv über `personal.benutzer_id`.
+             *
+             *     **Leer ist `[]`, nie `absent` und nie `null`** — daher `#[schema(required)]` und
+             *     KEIN `skip_serializing_if`: das Feld wird an zwei Stellen gebaut (Detail über
+             *     `Einsatz::anzeige`, Liste über das Struct-Literal in `repo::liste_fuer`), und ein
+             *     Pfad, der auslässt, während der andere `[]` schickt, wäre nach der
+             *     Optionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung.
+             */
+            meine_sachgebiete: components["schemas"]["Sachgebiet"][];
             meldende_stelle?: string | null;
             /** @description Nächste Lagebesprechung als expliziter UTC-Termin; fehlt ohne gesetzten Termin. */
             naechste_lagebesprechung_at?: string | null;
@@ -1335,11 +1356,35 @@ export interface components {
          */
         LageberichtVorlage: "lagebericht" | "lagebeurteilung" | "freitext";
         /**
+         * @description Eine abgeschlossene Lagebesprechung.
+         *
+         *     Der Entschluss steht zusätzlich im ETB (`typ='entscheidung'`, `etb_eintrag_id`); die Zeile
+         *     trägt Nummer, Zeitpunkt und den **Snapshot** des beim Abschluss gesetzten Termins.
+         *     `naechste_at` ist damit Beweiswert, **keine** zweite lebende Terminwahrheit — die bleibt
+         *     `einsatz.naechste_lagebesprechung_at` (Entscheidung 11).
+         */
+        LagebesprechungAnzeige: {
+            abgehalten_at: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            entschluss: string;
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von_id: number;
+            /** Format: int64 */
+            etb_eintrag_id: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            lfd_nr: number;
+            naechste_at?: string | null;
+        };
+        /**
          * @description SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -1897,6 +1942,14 @@ export interface components {
          * @enum {string}
          */
         Richtung: "intern" | "extern";
+        /**
+         * @description Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.
+         *
+         *     Die Reihenfolge ist die der Anlage 2 und zugleich die Anzeigereihenfolge — sie ist
+         *     Teil des Vertrags, nicht Dekoration (`ALLE` speist die sechs festen Zeilen).
+         * @enum {string}
+         */
+        Sachgebiet: "s1" | "s2" | "s3" | "s4" | "s5" | "s6";
         /** @enum {string} */
         SchadenAbschlussGrund: "behoben" | "kein_handlungsbedarf" | "abgewiesen";
         SchadenAnzeige: {
@@ -1991,6 +2044,43 @@ export interface components {
             id: number;
             /** Format: int64 */
             sortier: number;
+        };
+        /**
+         * @description Die Führungsorganisation eines Einsatzes.
+         *
+         *     `besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen
+         *     Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
+         *     schicken hiesse, „nicht vergeben" als Datensatz zu erfinden.
+         *
+         *     `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der
+         *     Countdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im
+         *     `NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.
+         */
+        StabAnzeige: {
+            /** Format: int64 */
+            anzahl_lagebesprechungen: number;
+            besetzung: components["schemas"]["StabsfunktionAnzeige"][];
+            letzte_lagebesprechung?: null | components["schemas"]["LagebesprechungAnzeige"];
+            naechste_lagebesprechung_at?: string | null;
+        };
+        /**
+         * @description Eine belegte Sachgebietszeile.
+         *
+         *     `name` trägt je Art `snap_name` (Personal) bzw. `bezeichnung` (extern/rückwärtig) und ist
+         *     bei [`BesetzungArt::Einsatzleitung`] absent. `personal_noch_disponiert` unterscheidet
+         *     „Person ist weg" von „Name war nie gesetzt": der Führungsnachweis überlebt das Entfernen
+         *     der Disposition (`ON DELETE SET NULL` + eingefrorener `snap_name`).
+         */
+        StabsfunktionAnzeige: {
+            besetzung_art: components["schemas"]["BesetzungArt"];
+            gesetzt_at: string;
+            /** Format: int64 */
+            gesetzt_von_id: number;
+            name?: string | null;
+            /** Format: int64 */
+            personal_id?: number | null;
+            personal_noch_disponiert: boolean;
+            sachgebiet: components["schemas"]["Sachgebiet"];
         };
         /**
          * @description Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.
