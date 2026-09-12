@@ -55,6 +55,11 @@
  *     Punkt-Abschnitt (ein Namensraum-Import `sf.StatusDarstellung` fällt ebenfalls auf).
  *     Aliase löst er nicht auf; das wäre ein Typchecker, kein Guard. Im Bestand gibt es
  *     keinen solchen Alias.
+ *   • **Ein Vertragsname, der über EINE ZWEITE Datei umbenannt weitergereicht wird**:
+ *     `personen/personMeta.ts:31` exportiert `personStatus as STATUS_META` weiter.
+ *     {@link vertragsNamenIn} löst die Umbenennung beim DIREKTEN Import auf, folgt aber
+ *     keiner Re-Export-Kette. Gemessen am 12.09.2026 geht kein Konsument dieser
+ *     Re-Exporte über `<Tag color=` — alle nutzen `StatusTag` oder nur `.label`.
  *   • **Ein mehrzeiliges Template-Literal mit einem Kommentarzeichen darin.** Der
  *     Kommentar-Stripper erkennt eine Zeichenkette nur, wenn sie auf ihrer Zeile schließt —
  *     die Beschränkung verhindert, dass ein Apostroph in JSX-Text den halben Rest
@@ -559,6 +564,40 @@ const VERTRAGS_NAMEN: readonly string[] = [
   'flaechenFarbe',
 ];
 
+/**
+ * Die Vertragsnamen, wie SIE IN DIESER DATEI HEISSEN — inklusive Umbenennung beim
+ * Import (`import { rollenFarbe as farbe }`).
+ *
+ * Im Codex-Review gefunden, und es ist kein konstruierter Fall: `pages/uhs/Grundriss.tsx`
+ * importiert heute `verfuegbarkeit as verfuegbarkeitVertrag`. Ohne Auflösung trägt ein
+ * `<Tag color={farbe(wk[s].rolle, token)}>` weder einen bekannten Namen noch ein
+ * Wire-Literal und läuft durch.
+ *
+ * WARUM JE DATEI UND NICHT EINE GLOBALE NAMENSLISTE — gemessen, nicht abgeleitet:
+ * `personen/personMeta.ts` reicht `personStatus as STATUS_META` weiter, und
+ * `pages/TiereDetailPage.tsx:44` hat eine EIGENE, gleichnamige Konstante über
+ * `TierStatus` (kein Vertrags-Enum), die zu Recht `<Tag color={STATUS_META[…].color}>`
+ * malt. Eine globale Liste hätte diese Zeile gemeldet — ein Fehlalarm aus reiner
+ * Namensgleichheit, und der ist beim Debuggen teurer als die Lücke, die er schliesst.
+ *
+ * Der zweite Sprung fehlt bewusst: wer `STATUS_META` aus `personMeta` importiert, wird
+ * hier nicht aufgelöst. Gemessen am 12.09.2026 geht KEIN Konsument dieser Re-Exporte
+ * über `<Tag color=` — alle nutzen `StatusTag` oder nur `.label`.
+ */
+function vertragsNamenIn(inhalt: string): readonly string[] {
+  const namen = new Set(VERTRAGS_NAMEN);
+  const importe = inhalt.matchAll(
+    /import\s*\{([^}]*)\}\s*from\s*['"][^'"]*theme\/statusFarben['"]/g,
+  );
+  for (const [, liste] of importe) {
+    for (const teil of liste.split(',')) {
+      const teile = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)\s*$/.exec(teil);
+      if (teile && VERTRAGS_NAMEN.includes(teile[1])) namen.add(teile[2]);
+    }
+  }
+  return [...namen];
+}
+
 const LITERAL = /(['"`])([^'"`]*)\1/g;
 
 export function tagBefunde(dateien: Record<string, string>): string[] {
@@ -567,6 +606,7 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
     if (!ausserhalbDesVertrags(pfad)) continue;
     if (!roh.includes('<Tag')) continue;
     const inhalt = ohneKommentare(roh).join('\n');
+    const namen = vertragsNamenIn(inhalt);
     for (let i = inhalt.indexOf('<Tag'); i !== -1; i = inhalt.indexOf('<Tag', i + 4)) {
       if (!/[\s/>]/.test(inhalt[i + 4] ?? '')) continue; // `<Tagline` o. ä.
       const ende = tagEnde(inhalt, i);
@@ -574,7 +614,7 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
       const tag = inhalt.slice(i, ende + 1);
       const farbe = farbAusdruck(tag);
       if (!farbe) continue;
-      const grund = grundFuerBefund(farbe);
+      const grund = grundFuerBefund(farbe, namen);
       if (!grund) continue;
       const zeile = inhalt.slice(0, i).split('\n').length;
       verstoesse.push(`${pfad}:${zeile}  ${grund}  ${tag.replace(/\s+/g, ' ').slice(0, 110)}`);
@@ -585,8 +625,8 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
 
 /** Warum dieser `color`-Ausdruck ein Befund ist — oder `null`. Der Grund steht in der
  *  Meldung, weil die zwei Fälle verschiedene Abhilfen haben. */
-function grundFuerBefund(farbe: string): string | null {
-  for (const name of VERTRAGS_NAMEN) {
+function grundFuerBefund(farbe: string, namen: readonly string[]): string | null {
+  for (const name of namen) {
     if (new RegExp(`\\b${name}\\b`).test(farbe)) return `liest \`${name}\``;
   }
   // `[, , wert]`, nicht `[, wert]`: Gruppe 1 ist das Anführungszeichen, Gruppe 2 der
@@ -688,6 +728,32 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       tagBefunde({
         '/src/pages/Echt.tsx':
           "// <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}> wäre falsch\nconst a = 1;",
+      }),
+    ).toEqual([]);
+  });
+
+  it('löst eine Umbenennung beim Import auf — je Datei, nicht global', () => {
+    // Im Codex-Review gefunden, und der Alias ist im Bestand real:
+    // `pages/uhs/Grundriss.tsx` importiert `verfuegbarkeit as verfuegbarkeitVertrag`.
+    const umbenannt = tagBefunde({
+      '/src/pages/Alias.tsx': [
+        "import { rollenFarbe as farbe, warnstufeKarte as wk } from '../theme/statusFarben';",
+        '<Tag color={farbe(wk[s].rolle, token)}>{wk[s].label}</Tag>',
+      ].join('\n'),
+    });
+    expect(umbenannt).toHaveLength(1);
+    expect(umbenannt[0]).toMatch(/liest `(farbe|wk)`/);
+
+    // DIE GEGENPROBE, und sie ist der Grund für „je Datei": `pages/TiereDetailPage.tsx`
+    // hat eine EIGENE `STATUS_META` über `TierStatus` — kein Vertrags-Enum — und malt
+    // damit zu Recht. Eine globale Namensliste hätte die Zeile gemeldet, sobald
+    // `personen/personMeta.ts` denselben Namen für eine Vertragskarte vergibt.
+    expect(
+      tagBefunde({
+        '/src/pages/EigenerName.tsx': [
+          'const STATUS_META: Record<TierStatus, { label: string; color: string }> = {};',
+          '<Tag color={STATUS_META[t.status].color}>{STATUS_META[t.status].label}</Tag>',
+        ].join('\n'),
       }),
     ).toEqual([]);
   });
