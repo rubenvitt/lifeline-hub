@@ -1,3 +1,9 @@
+## [1.0.0-alpha.7](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.6...v1.0.0-alpha.7) (2026-09-12)
+
+### Bug Fixes
+
+* **cas:** Baseline beim Öffnen der Maske einfrieren statt beim Absenden lesen (LFH-303) ([015b7c0](https://github.com/rubenvitt/lifeline-hub/commit/015b7c0c0638732499c18ffb56235e1f389a4673))
+
 ## [1.0.0-alpha.6](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.5...v1.0.0-alpha.6) (2026-09-12)
 
 ### Bug Fixes
