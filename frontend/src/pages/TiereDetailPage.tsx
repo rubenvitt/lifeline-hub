@@ -13,6 +13,11 @@ import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
+import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
+
+/** Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte
+ *  Halter-Auswahl, die erst beim Absenden in das XOR-Feldpaar zerlegt wird. */
+type TierFormWerte = TierPatch & { halter?: HalterWert | null };
 
 const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
   aktiv: { label: 'aktiv', color: 'green' },
@@ -62,8 +67,14 @@ export default function TiereDetailPage() {
 
   const qc = useQueryClient();
   const { message, modal } = App.useApp();
-  const [bearbeiten, setBearbeiten] = useState(false);
-  const [editForm] = Form.useForm<TierPatch & { halter?: HalterWert }>();
+  const [editForm] = Form.useForm<TierFormWerte>();
+  const editSitzung = useEditSitzung<TierFormWerte>(editForm);
+  // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
+  // verengt: `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der
+  // unmögliche Fall still ein Schreiben OHNE Lock — also genau der blinde Overwrite,
+  // gegen den F10 gebaut ist.
+  const sitzung = editSitzung.sitzung;
+  const bearbeiten = sitzung != null;
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   const [abschlussForm] = Form.useForm<{ abschluss_grund: AbschlussGrund; abschluss_ziel?: string }>();
 
@@ -85,12 +96,16 @@ export default function TiereDetailPage() {
     enabled: idGueltig,
   });
 
-  // Optimistisches Lock (LFH-299/F10): `basis` trägt den beim Laden gelesenen geaendert_at-Stand;
-  // ein 409 öffnet den Konfliktdialog (neu laden vs. überschreiben), statt still zu überschreiben.
+  // Optimistisches Lock (LFH-299/F10): `basis` trägt den beim ÖFFNEN der Maske eingefrorenen
+  // geaendert_at-Stand (LFH-303 — aus den Live-Query-Daten gelesen hebelte ein
+  // Hintergrund-Refetch das Lock aus); ein 409 öffnet den Konfliktdialog (neu laden vs.
+  // überschreiben), statt still zu überschreiben.
   const editMutation = useMutation({
-    mutationFn: (v: { daten: TierPatch; basis?: string; overwrite?: boolean }) =>
+    // `basis` ist eine `CasBasis` und damit nur aus `useEditSitzung` zu bekommen: ein
+    // blanker `t.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
+    mutationFn: (v: { daten: TierPatch; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisiereTier(einsatzId, tierId, v.daten, v.overwrite ? undefined : v.basis),
-    onSuccess: () => { invalidateDetail(); setBearbeiten(false); },
+    onSuccess: () => { invalidateDetail(); editSitzung.beende(); },
     onError: (e, v) => {
       // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Anders als beim
       // Person-PATCH (Referenz LFH-241) kennt die Tier-Route einen ZWEITEN 409: den
@@ -106,7 +121,7 @@ export default function TiereDetailPage() {
           okButtonProps: { danger: true },
           cancelText: 'Neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
-          onCancel: () => { detailQuery.refetch(); setBearbeiten(false); },
+          onCancel: () => { detailQuery.refetch(); editSitzung.beende(); },
         });
       } else {
         fehler(e);
@@ -228,8 +243,7 @@ export default function TiereDetailPage() {
                 ),
               )}
               <Button onClick={() => {
-                setBearbeiten(true);
-                editForm.setFieldsValue({
+                editSitzung.starte(t, {
                   rufname: t.rufname,
                   rasse_beschreibung: t.rasse_beschreibung,
                   geschlecht: t.geschlecht,
@@ -254,7 +268,7 @@ export default function TiereDetailPage() {
       </Space>
 
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
-        {bearbeiten ? (
+        {sitzung ? (
           <Form form={editForm}
             onFinish={(daten) => {
               const h = daten.halter ?? null;
@@ -267,12 +281,12 @@ export default function TiereDetailPage() {
                 halter_person_id: h?.typ === 'person' ? h.refId : null,
                 halter_kontakt: h?.typ === 'extern' ? h.kontakt : null,
               };
-              editMutation.mutate({ daten: patch, basis: t.geaendert_at });
+              editMutation.mutate({ daten: patch, basis: sitzung.basis });
             }}>
             {detailAnsicht}
             <Space style={{ marginTop: 16 }}>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
-              <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
+              <Button onClick={editSitzung.beende}>Abbrechen</Button>
             </Space>
           </Form>
         ) : detailAnsicht}
