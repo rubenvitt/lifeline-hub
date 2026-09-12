@@ -126,6 +126,35 @@ gegen die Tabellenbreite: `KatalogTabelle` rendert mit `width: max-content`, bei
 wächst die Tabelle über den Container und ein Verhältnis Spalte-zu-Tabelle würde kleiner,
 obwohl der Text mehr Platz hat.
 
+**Zwei schwebende Bänder an einem Rand werden gestapelt, nicht gestaffelt** (LFH-355,
+`pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
+Zeitachsen-/Snapshot-Leiste (`bottom: 12`, volle Breite) lagen beide absolut auf `zIndex: 5`
+über der Lagekarte. Bei Gleichstand gewinnt die spätere DOM-Position — die Leiste verdeckte
+im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, also ausgeklappt)
+„Abschließen"/„Abbrechen" vollständig; aus dem Zeichenmodus kam man nur über Tastatur oder
+Reload heraus. Der Fix ist **ein gemeinsamer, absolut positionierter Rahmen mit den Bändern
+als Flow-Geschwistern in einer Spalte**, nicht ein höherer `zIndex`: der hätte den Klick
+zurückgeholt und die Überdeckung gelassen, nur andersherum. Zwei Elemente im normalen Fluss
+können sich nicht überlagern — das folgt aus dem Layout statt aus einer Zahl, und deshalb
+gilt es bei jeder Breite. Die Bänder geben dafür ihre **eigene Positionierung ab** und nehmen
+`bandStil('voll' | 'mitte' | 'links')`; wer einem von ihnen `position: 'absolute'`
+zurückgibt, nimmt es aus dem Fluss und holt den Bug mit (drei Vitest-Guards, per
+Mutationsprobe belegt). Der Rahmen trägt `pointerEvents: 'none'`, jedes Band `'auto'` — ohne
+diese Gegenzeile schluckte der Leerraum zwischen den Bändern jedes Ziehen auf der Karte,
+mit nur der einen Hälfte wäre ein Band sichtbar und tot.
+**`toBeVisible()` ist in Playwright kein Beleg für Klickbarkeit** — auf dem verdeckten Knopf
+war es grün, während der Klick in den 30-s-Timeout lief („`<div>` intercepts pointer
+events"). Diese Falle ist **generisch für die e2e-Suite**, nicht auf diese Stelle beschränkt:
+wer eine Bedienbarkeit zusichern will, klickt. Und ein e2e-Test, der eine Überdeckung
+**umgeht** (hier: die Zeitachse einklappen, um an die Knöpfe zu kommen), lässt genau den
+Zustand ungetestet, den der Nutzer antrifft — die Umgehung gehört mit dem Fix weg, die
+Vorbedingung („die Leiste steht ausgeklappt da") bleibt stehen, sonst wird die Messung
+still wertlos statt rot. Gemessen wird in `e2e/lagekarte-smoke.spec.ts` mit echten
+Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px**, und das ist eine Aussage
+statt einer Lücke: die Lagekarten-Sidebar ist fest 300 px breit, dort bliebe für die
+Kartenfläche nichts übrig — eine eigene Frage (Sidebar-Responsivität), kein Teil dieser
+Stapelentscheidung.
+
 **Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
 mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem
 Drawer statt inline. Er zeigt **Navigation, keine Entität** — kein Datensatz, kein Formular,

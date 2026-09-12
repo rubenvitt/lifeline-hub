@@ -26,6 +26,7 @@ import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
+import { KartenFuss } from './lagekarte/KartenFuss';
 import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
 
@@ -575,42 +576,6 @@ export default function LagekartePage() {
             platzierBild={aktivesPlatzierBild}
             onPlatzierGeometrie={onPlatzierGeometrie}
           />
-          <ZeichnenSteuerung
-            aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
-            titel={
-              zeichneAbschnittId != null
-                ? 'Abschnitt'
-                : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
-                    (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie' ? 'Linie' : 'Fläche'
-                  }`
-            }
-            phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
-            speichernLaeuft={zoneSpeichern}
-            abschliessenMoeglich={zeichnenBereit}
-            onAbschliessen={() => {
-              const abgeschlossen =
-                zeichneAbschnittId != null
-                  ? kartenRef.current?.abschnittAbschliessen()
-                  : kartenRef.current?.zoneAbschliessen();
-              if (!abgeschlossen) {
-                message.warning(
-                  zeichneAbschnittId == null && zoneEntwurf?.modus === 'linie'
-                    ? 'Mindestens 2 verschiedene Punkte für eine Linie'
-                    : 'Mindestens 3 verschiedene Punkte für eine Fläche',
-                );
-              }
-            }}
-            onAbbrechen={onZeichnenAbbrechen}
-            onSpeichern={bestaetigungSpeichern}
-            onVerwerfen={bestaetigungVerwerfen}
-            // Serienmodus nur für Zonen (LFH-332/M76) — eine Abschnittsfläche gehört zu genau
-            // einem Abschnitt, für sie gibt es keine Folge. Ohne onSerieWechsel rendert die
-            // Steuerung im Abschnitt-Fall unverändert.
-            serie={zeichneAbschnittId != null ? undefined : zoneSerie}
-            onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
-            serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
-            onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
-          />
           {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
             <Inspector
               einsatzId={einsatzId}
@@ -660,13 +625,59 @@ export default function LagekartePage() {
               onZurueckAktuell={() => waehleSnapshot(null)}
             />
           )}
-          <SnapshotLeiste
-            einsatzId={einsatzId}
-            darfSichern={!!darfSchreiben}
-            aktiverSnapshotId={snapshotParam}
-            onWaehle={waehleSnapshot}
-            fehler={fehler}
-          />
+          {/* Gemeinsamer unterer Rand (LFH-355): Zeichnen-Steuerung ÜBER der Zeitachse,
+              beide als Flow-Bänder in einer Spalte. Vorher lagen sie absolut auf demselben
+              zIndex und die später gerenderte Leiste verdeckte die Steuerung vollständig —
+              „Abschließen"/„Abbrechen" waren im Default-Zustand nicht bedienbar. Die
+              Begründung, warum es ein Rahmen und kein höherer zIndex ist, steht in
+              `lagekarte/KartenFuss.tsx`. */}
+          <KartenFuss>
+            <ZeichnenSteuerung
+              aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
+              titel={
+                zeichneAbschnittId != null
+                  ? 'Abschnitt'
+                  : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
+                      (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie'
+                        ? 'Linie'
+                        : 'Fläche'
+                    }`
+              }
+              phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
+              speichernLaeuft={zoneSpeichern}
+              abschliessenMoeglich={zeichnenBereit}
+              onAbschliessen={() => {
+                const abgeschlossen =
+                  zeichneAbschnittId != null
+                    ? kartenRef.current?.abschnittAbschliessen()
+                    : kartenRef.current?.zoneAbschliessen();
+                if (!abgeschlossen) {
+                  message.warning(
+                    zeichneAbschnittId == null && zoneEntwurf?.modus === 'linie'
+                      ? 'Mindestens 2 verschiedene Punkte für eine Linie'
+                      : 'Mindestens 3 verschiedene Punkte für eine Fläche',
+                  );
+                }
+              }}
+              onAbbrechen={onZeichnenAbbrechen}
+              onSpeichern={bestaetigungSpeichern}
+              onVerwerfen={bestaetigungVerwerfen}
+              // Serienmodus nur für Zonen (LFH-332/M76) — eine Abschnittsfläche gehört zu genau
+              // einem Abschnitt, für sie gibt es keine Folge. Ohne onSerieWechsel rendert die
+              // Steuerung im Abschnitt-Fall unverändert.
+              serie={zeichneAbschnittId != null ? undefined : zoneSerie}
+              onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
+              serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
+              onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
+            />
+            <SnapshotLeiste
+              einsatzId={einsatzId}
+              darfSichern={!!darfSchreiben}
+              aktiverSnapshotId={snapshotParam}
+              onWaehle={waehleSnapshot}
+              fehler={fehler}
+            />
+          </KartenFuss>
         </div>
       </div>
     </div>
