@@ -100,4 +100,21 @@ describe('zonenBeschriftung', () => {
     expect(zonenBeschriftung('Absperrung Süd', null)).toBe('Absperrung Süd');
     expect(zonenBeschriftung(null, null)).toBe('');
   });
+
+  // Codex-Review zu LFH-357 (P1): das Ladegate der Karte hängt an `einsatz`/`config`, NICHT an
+  // der Gefahrengebiete-Query — die Karte zeichnet Zonen also, während die Gebiete noch laden
+  // oder gescheitert sind. Der Nachschlag geht dann ins Leere, und „keine" wäre an dieser Stelle
+  // eine Behauptung über Daten, die es nicht gibt. Genau der Maßstab, den dieser Fix selbst
+  // an das Wort „unbewertet" angelegt hat.
+  it('nennt einen fehlenden Nachschlag `unbekannt` statt ihn zu `keine` zu runden', () => {
+    expect(zonenBeschriftung('Werk', 'unbekannt')).toBe('Werk\nWarnstufe: unbekannt');
+    expect(zonenBeschriftung(null, 'unbekannt')).toBe('Warnstufe: unbekannt');
+    // Die tragende Aussage: `unbekannt` und `keine` sind ZWEI Zustände, nicht einer.
+    expect(zonenBeschriftung('Werk', 'unbekannt')).not.toBe(zonenBeschriftung('Werk', 'keine'));
+  });
+
+  it('bleibt mit `unbekannt` von allen fünf echten Stufen unterscheidbar', () => {
+    const texte = [...ALLE, 'unbekannt' as const].map((s) => zonenBeschriftung('Werk', s));
+    expect(new Set(texte).size).toBe(6);
+  });
 });

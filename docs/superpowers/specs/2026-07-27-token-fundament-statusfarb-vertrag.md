@@ -245,6 +245,16 @@ Wort, das die Unterscheidung behauptet, behauptet mehr als die Daten hergeben. D
 bleibt davon unberührt — sie ist die Vorsichtsentscheidung von `gefahrengebietStil`, und der
 Text sagt jetzt dazu, worauf sie sich stützt.
 
+**Ein fehlender Nachschlag ist ein dritter Zustand, kein gerundeter `keine`** (Codex-Review zu
+LFH-357, P1). `ladt` in `useLagekarteDaten` hängt an `einsatz`/`config` und **nicht** an der
+Gefahrengebiete-Query: die Karte zeichnet Zonen also, während die Gebiete noch laden oder ihr
+Abruf gescheitert ist, und `gebietWarnstufe.get(...)` geht ins Leere. Für die **Farbe** ist der
+Fallback auf `keine` dort richtig und bleibt (Alarm — vorsichtshalber). Für den **Text** nicht:
+„Warnstufe: keine" wäre eine Behauptung über Daten, die es gerade nicht gibt — exakt der
+Maßstab, mit dem der Absatz darüber „unbewertet" verwirft. `zonenBeschriftung` nimmt deshalb
+`Warnstufe | 'unbekannt' | null` und schreibt „Warnstufe: unbekannt". Beide Hälften gehören als
+Paar geprüft: ohne die Farb-Zusicherung bliebe ein Fix, der die Fläche mit entfärbt, grün.
+
 **Was damit NICHT zugesichert ist:** MapLibre lässt Symbol-Labels bei Kollision weg
 (`zonen-label` fährt ohne `text-allow-overlap`). Steht ein Zonenlabel dicht an einem anderen,
 kann der Text ausfallen — dann trägt wieder nur die Farbe. Das ist der Bestand seit es die

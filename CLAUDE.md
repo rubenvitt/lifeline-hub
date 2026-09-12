@@ -49,7 +49,12 @@ bleibt deshalb an keinem Vertragseintrag gesetzt, statt der Vollständigkeit hal
 werden. Träger ist die reine, exportierte `zonenBeschriftung` (`pages/lagekarte/zonenStil.ts`):
 „Warnstufe: <label>" unter dem Zonennamen, `label` ausschliesslich aus `warnstufeKarte` — wer
 das Wort dort ändert, ändert die Kartenbeschriftung mit. Zonen ohne Warnstufe behalten ihren
-Namen unverändert. **„Warnstufe: keine" heisst „keine Stufe gesetzt", nicht „unbewertet"**:
+Namen unverändert. **Ein fehlender Nachschlag heisst „Warnstufe: unbekannt", nicht „keine"**:
+das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`, NICHT an der Gefahrengebiete-Query
+— die Zone wird also gezeichnet, während die Gebiete noch laden oder ihr Abruf gescheitert ist.
+Die **Farbe** rundet dort vorsichtshalber auf `keine` (Alarm, unverändert), der **Text** nicht;
+`zonenBeschriftung` hat dafür drei Zustände statt zwei. **„Warnstufe: keine" heisst „keine Stufe
+gesetzt", nicht „unbewertet"**:
 `src/gefahr/repo.rs` rechnet die höchste Stufe über ein Severity-`MAX`, in dem `'keine'`
 denselben Rang **0** bekommt wie gar keine Bewertung — die beiden Fälle sind aus den Daten
 nicht trennbar, ein Wort, das sie trennt, behauptet zu viel. Die rote Fläche bleibt davon

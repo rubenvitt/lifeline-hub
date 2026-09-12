@@ -244,14 +244,23 @@ export function useLagekarteDaten({
         const g = parseGeometry(z.geometrie);
         if (!g) return [];
         // EINE Ableitung der Stufe für BEIDE Kanäle: Farbe und Beschriftung dürfen nicht
-        // auseinanderlaufen (LFH-357). `null` = diese Zonenart trägt gar keine Stufe.
-        const warnstufe =
-          z.typ === 'gefahrengebiet' && z.gefahrengebiet_id != null
-            ? (gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine')
-            : null;
+        // auseinanderlaufen (LFH-357). Den FEHLENDEN Nachschlag behandeln sie aber
+        // verschieden, und das ist Absicht (Codex-Review): `ladt` hängt an `einsatz`/`config`,
+        // nicht an der Gebiets-Query — die Zone wird also gezeichnet, während der Nachschlag
+        // noch leer ist (Ladefenster) oder leer bleibt (gescheiterter Abruf). Die Farbe rundet
+        // dann vorsichtshalber auf `keine` (Alarm, unveränderte A2-Entscheidung), der Text
+        // nicht: „keine" wäre dort eine Behauptung über Daten, die es gerade nicht gibt.
+        const gebietId = z.typ === 'gefahrengebiet' ? z.gefahrengebiet_id : null;
+        const warnstufe = gebietId != null ? gebietWarnstufe.get(gebietId) : undefined;
         const stil =
-          warnstufe !== null ? gefahrengebietStil(warnstufe, token) : zoneStil(z.typ, z.farbe);
-        return [{ id: z.id, geometrie: g, label: zonenBeschriftung(z.label, warnstufe), stil }];
+          gebietId != null
+            ? gefahrengebietStil(warnstufe ?? 'keine', token)
+            : zoneStil(z.typ, z.farbe);
+        const beschriftung = zonenBeschriftung(
+          z.label,
+          gebietId != null ? (warnstufe ?? 'unbekannt') : null,
+        );
+        return [{ id: z.id, geometrie: g, label: beschriftung, stil }];
       }),
     [zonen, zeigeZonen, gebietWarnstufe, token],
   );

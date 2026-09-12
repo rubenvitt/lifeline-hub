@@ -98,15 +98,23 @@ export function gefahrengebietStil(warnstufe: Warnstufe, token: GlobalToken): Zo
  * Dass die Fläche dabei trotzdem rot bleibt, ist die Vorsichtsentscheidung aus
  * {@link gefahrengebietStil} — der Text sagt jetzt dazu, worauf sie sich stützt.
  *
- * `warnstufe === null` ist der Normalfall JEDER anderen Zonenart: sie trägt keine Stufe,
- * also bleibt ihr Name unverändert. Die Stufe gehört ans Gefahrengebiet, nicht an die Zone.
+ * DREI Zustände, nicht zwei. `null` ist der Normalfall JEDER anderen Zonenart: sie trägt
+ * keine Stufe, also bleibt ihr Name unverändert — die Stufe gehört ans Gefahrengebiet, nicht
+ * an die Zone. `'unbekannt'` ist der Fall, in dem der Nachschlag ins Leere geht: das Ladegate
+ * der Karte hängt an `einsatz`/`config`, NICHT an der Gefahrengebiete-Query
+ * (`useLagekarteDaten.ts`) — die Karte zeichnet Zonen also, während die Gebiete noch laden
+ * oder ihr Abruf gescheitert ist. Für die FARBE wird das vorsichtshalber wie `keine`
+ * behandelt (Alarm, unverändert); für den TEXT nicht, denn dort wäre „keine" eine Behauptung
+ * über Daten, die es gerade nicht gibt — derselbe Maßstab wie eine Zeile höher bei
+ * „unbewertet". Gefunden im Codex-Review zu LFH-357.
  */
 export function zonenBeschriftung(
   label: string | null | undefined,
-  warnstufe: Warnstufe | null,
+  warnstufe: Warnstufe | 'unbekannt' | null,
 ): string {
   const name = label?.trim() ?? '';
   if (warnstufe === null) return name;
-  const stufe = `Warnstufe: ${warnstufeKarte[warnstufe].label}`;
+  const wort = warnstufe === 'unbekannt' ? 'unbekannt' : warnstufeKarte[warnstufe].label;
+  const stufe = `Warnstufe: ${wort}`;
   return name ? `${name}\n${stufe}` : stufe;
 }
