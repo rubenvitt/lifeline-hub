@@ -304,6 +304,13 @@ function typargumente(text: string, auf: number): string[] | null {
     else if (z === ',' && tiefe === 1) {
       args.push(text.slice(letzter, i));
       letzter = i + 1;
+    } else if (z === '>' && text[i - 1] === '=') {
+      // Der Pfeil eines FUNKTIONSTYPS, kein schliessendes Typargument. Ohne diese
+      // Ausnahme senkt `(x: X) => string` die Bilanz, das echte `>` bringt sie nie auf
+      // null, `typargumente` gibt `null` zurück — und die Karte liefe unsichtbar durch
+      // (im Codex-Review gefunden; `components/dichte.guard.test.ts` führt denselben Fall
+      // als Blindfleck, dort ohne Folgen).
+      continue;
     } else if (z === '>') {
       tiefe--;
       if (tiefe === 0) {
@@ -361,6 +368,7 @@ function typglieder(arg: string): string[] {
   let letzter = 0;
   for (let i = 0; i < arg.length; i++) {
     const z = arg[i];
+    if (z === '>' && arg[i - 1] === '=') continue; // Pfeil eines Funktionstyps, siehe oben
     if (z === '<' || z === '[' || z === '(' || z === '{') tiefe++;
     else if (z === '>' || z === ']' || z === ')' || z === '}') tiefe--;
     else if ((z === '|' || z === '&') && tiefe === 0) {
@@ -370,6 +378,29 @@ function typglieder(arg: string): string[] {
   }
   teile.push(arg.slice(letzter));
   return teile.map((t) => t.trim());
+}
+
+/**
+ * Trägt dieser Typausdruck den Vertragstyp — als Glied, unter einer Hülle, oder beides?
+ *
+ * REKURSIV, und das ist eine Korrektur (im Codex-Review gefunden): {@link typglieder} und
+ * {@link blattTyp} griffen ineinander verzahnt, aber nur EINE Runde tief. Bei
+ * `Readonly<StatusDarstellung & { icon: ReactNode }>` liegt das `&` beim Zerlegen noch
+ * verschachtelt, und nach dem Abschälen wurde die Vereinigung nie erneut geteilt — der
+ * Vergleich sah die ganze Zeichenkette und fand nichts. Beide Einzelfälle hatten ihre
+ * Zusicherung, ihre KOMBINATION hatte keine; das ist die Sorte Lücke, die zwischen zwei
+ * richtigen Bausteinen entsteht.
+ *
+ * Die Rekursion läuft nur, wenn {@link blattTyp} wirklich etwas abgeschält hat — sonst
+ * stünde hier eine Endlosschleife statt eines Guards.
+ */
+function traegtVertragstyp(ausdruck: string): boolean {
+  for (const glied of typglieder(ausdruck)) {
+    const blatt = blattTyp(glied);
+    if ((blatt.split('.').pop() ?? blatt).trim() === 'StatusDarstellung') return true;
+    if (blatt !== glied.trim() && traegtVertragstyp(blatt)) return true;
+  }
+  return false;
 }
 
 /** Stellen, an denen ein `Record<…>` den Vertragstyp als WERT trägt (Index des `Record`). */
@@ -382,11 +413,7 @@ export function kartenStellen(text: string): number[] {
     // sf.StatusDarstellung>`, gültiges TypeScript) nicht am Vergleich vorbeiläuft —
     // im Codex-Review gefunden. Aliase löst der Guard weiterhin nicht auf, das wäre ein
     // Typchecker; ein QUALIFIZIERTER Name ist aber derselbe Typ, nur anders geschrieben.
-    const glieder = typglieder(args[args.length - 1]).map((g) => {
-      const blatt = blattTyp(g);
-      return blatt.split('.').pop()?.trim() ?? blatt;
-    });
-    if (glieder.includes('StatusDarstellung')) {
+    if (traegtVertragstyp(args[args.length - 1])) {
       treffer.push(i);
     }
   }
@@ -530,6 +557,42 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
           'const b: Record<X, Promise<StatusDarstellung>> = {};',
           'const c: Record<X, Set<StatusDarstellung>> = {};',
         ].join('\n'),
+      }),
+    ).toEqual([]);
+  });
+
+  it('lässt sich von einem Funktionstyp nicht aus dem Tritt bringen', () => {
+    // Das `>` in `=>` senkte die Klammerbilanz, das echte `>` brachte sie nie auf null,
+    // `typargumente` gab `null` zurück — die Karte lief unsichtbar durch.
+    expect(
+      kartenBefunde({
+        '/src/pages/Pfeil.ts':
+          'const k: Record<MeinStatus, StatusDarstellung & { format: (x: X) => string }> = {};',
+      }),
+    ).toHaveLength(1);
+    // Auch als reiner Werttyp, ohne Durchschnitt daneben.
+    expect(
+      kartenBefunde({
+        '/src/pages/Pfeil2.ts': 'const k: Record<Fn<(x: X) => Y>, StatusDarstellung> = {};',
+      }),
+    ).toHaveLength(1);
+  });
+
+  it('setzt Abschälen und Zerlegen zusammen — beide Bausteine, EIN Ausdruck', () => {
+    // Im Codex-Review gefunden: beide Einzelfälle hatten ihre Zusicherung, ihre
+    // KOMBINATION hatte keine. Beim Zerlegen liegt das `&` noch unter `Readonly<…>`,
+    // und nach dem Abschälen wurde nie erneut geteilt.
+    expect(
+      kartenBefunde({
+        '/src/pages/Beides.ts':
+          'const k: Record<X, Readonly<StatusDarstellung & { icon: ReactNode }>> = {};',
+      }),
+    ).toHaveLength(1);
+    // Und die Gegenrichtung, damit die Rekursion nicht einfach alles meldet: eine
+    // Sammlung unter einer Hülle bleibt ruhig.
+    expect(
+      kartenBefunde({
+        '/src/pages/Beides2.ts': 'const k: Record<X, Readonly<Array<StatusDarstellung>>> = {};',
       }),
     ).toEqual([]);
   });
