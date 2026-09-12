@@ -1,30 +1,59 @@
 // frontend/src/command-palette/befehle.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import {
-  baueBefehle, kuerzelFuerTastaturAktion, tastaturAktionFuerEreignis,
-  TASTATUR_AKTIONEN, TASTATUR_AKTION_REIHENFOLGE,
+  baueBefehle,
+  kuerzelFuerTastaturAktion,
+  tastaturAktionFuerEreignis,
+  TASTATUR_AKTIONEN,
+  TASTATUR_AKTION_REIHENFOLGE,
 } from './befehle';
 import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
-import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverride, Koordinatenformat } from '../api/types';
+import type {
+  BenutzerAnzeige,
+  EinsatzAnzeige,
+  ModulOverride,
+  Koordinatenformat,
+} from '../api/types';
 
 const fuehrungskraft: BenutzerAnzeige = {
-  id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'EL',
+  benutzername: 'el',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+  aktiv: true,
+  erstellt_at: '',
+  totp_aktiviert: false,
 };
 const sichter: BenutzerAnzeige = { ...fuehrungskraft, id: 2, org_rolle: 'keine' };
 const admin: BenutzerAnzeige = { ...fuehrungskraft, id: 3, system_rolle: 'admin' };
 
 /** Vollständiges ModulOverride bauen (alle 6 Pflichtfelder), Default frei+sichtbar. */
 function ueberschreibung(felder: Partial<ModulOverride>): ModulOverride {
-  return { einsatz_id: 5, modul_key: 'etb', sichtbar: true, benoetigte_rolle: null, geaendert_at: null, geaendert_von: null, ...felder };
+  return {
+    einsatz_id: 5,
+    modul_key: 'etb',
+    sichtbar: true,
+    benoetigte_rolle: null,
+    geaendert_at: null,
+    geaendert_von: null,
+    ...felder,
+  };
 }
 
 function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
   return {
-    einsatzId: 5, benutzer: fuehrungskraft, einsaetze: [], overrides: undefined,
+    einsatzId: 5,
+    benutzer: fuehrungskraft,
+    einsaetze: [],
+    overrides: undefined,
     darfSchreibenImEinsatz: true,
-    navigate: vi.fn(), setThemeModus: vi.fn(), setDichte: vi.fn(), setKoordinaten: vi.fn(), logout: vi.fn(),
+    navigate: vi.fn(),
+    setThemeModus: vi.fn(),
+    setDichte: vi.fn(),
+    setKoordinaten: vi.fn(),
+    logout: vi.fn(),
     ...over,
   };
 }
@@ -45,19 +74,33 @@ describe('baueBefehle — Module', () => {
   });
   it('sperrt rollen-pflichtige Module für Nicht-Berechtigte aus (Override)', () => {
     const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
-    expect(baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some((x) => x.id === 'modul:etb')).toBe(true);
-    expect(baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'modul:etb')).toBe(false);
+    expect(
+      baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some(
+        (x) => x.id === 'modul:etb',
+      ),
+    ).toBe(true);
+    expect(
+      baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'modul:etb'),
+    ).toBe(false);
   });
   it('versteckt unsichtbar geschaltete Module für alle (Override)', () => {
     const overrides = { etb: ueberschreibung({ sichtbar: false }) };
-    expect(baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some((x) => x.id === 'modul:etb')).toBe(false);
+    expect(
+      baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some(
+        (x) => x.id === 'modul:etb',
+      ),
+    ).toBe(false);
   });
 });
 
 describe('baueBefehle — Navigation/Berechtigung', () => {
   it('zeigt die Benutzerverwaltung nur für System-Admins', () => {
-    expect(baueBefehle(kontext({ benutzer: admin })).some((x) => x.id === 'nav:benutzer')).toBe(true);
-    expect(baueBefehle(kontext({ benutzer: fuehrungskraft })).some((x) => x.id === 'nav:benutzer')).toBe(false);
+    expect(baueBefehle(kontext({ benutzer: admin })).some((x) => x.id === 'nav:benutzer')).toBe(
+      true,
+    );
+    expect(
+      baueBefehle(kontext({ benutzer: fuehrungskraft })).some((x) => x.id === 'nav:benutzer'),
+    ).toBe(false);
   });
   // LFH-328/M8: vorher hingen auch diese zwei an `system_rolle === 'admin'` allein — eine
   // Führungskraft sah „Verwaltung" in der Topbar und durfte die Route betreten, fand den
@@ -80,13 +123,33 @@ describe('baueBefehle — Navigation/Berechtigung', () => {
 });
 
 const aktiverEinsatz: EinsatzAnzeige = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: 'THW', status: 'aktiv',
-  begonnen_at: '', abgeschlossen_at: null, abgeschlossen_von: null, einsatzart: 'realeinsatz',
-  einsatznummer_intern: null, angelegt_at: '', leitstellen_nr: null, einsatzort: null,
-  einsatzort_lat: null, einsatzort_lon: null, meldende_stelle: null, sachverhalt: null,
-  anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung', org_id: 1, org_name: 'KV',
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: 'THW',
+  status: 'aktiv',
+  begonnen_at: '',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
+  org_id: 1,
+  org_name: 'KV',
 };
-const beendet: EinsatzAnzeige = { ...aktiverEinsatz, id: 8, bezeichnung: 'Altfall', status: 'abgeschlossen' };
+const beendet: EinsatzAnzeige = {
+  ...aktiverEinsatz,
+  id: 8,
+  bezeichnung: 'Altfall',
+  status: 'abgeschlossen',
+};
 
 describe('baueBefehle — Schnellaktionen', () => {
   it('verdrahtet die Top-4-Aktionen mit ?neu=1 für Berechtigte', () => {
@@ -96,9 +159,12 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(person).toBeDefined();
     person!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/personen?neu=1');
-    expect(b.map((x) => x.id).filter((id) => id.startsWith('aktion:'))).toEqual(
-      ['aktion:personen', 'aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden'],
-    );
+    expect(b.map((x) => x.id).filter((id) => id.startsWith('aktion:'))).toEqual([
+      'aktion:personen',
+      'aktion:etb',
+      'aktion:unfallhilfsstellen',
+      'aktion:schaeden',
+    ]);
   });
   /**
    * Die vier Ziele stammen aus `routing/deeplinks.ts` (LFH-331 · B3), nicht aus einem
@@ -126,8 +192,14 @@ describe('baueBefehle — Schnellaktionen', () => {
   });
   it('folgt dem Rollen-Lock: gesperrte Trägermodule liefern keine Schnellaktion', () => {
     const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
-    expect(baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'aktion:etb')).toBe(false);
-    expect(baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some((x) => x.id === 'aktion:etb')).toBe(true);
+    expect(
+      baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'aktion:etb'),
+    ).toBe(false);
+    expect(
+      baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some(
+        (x) => x.id === 'aktion:etb',
+      ),
+    ).toBe(true);
   });
   it('versteckt ALLE Schnellaktionen wenn darfSchreibenImEinsatz=false (Beobachter/abgeschlossen)', () => {
     const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false }));
@@ -186,20 +258,34 @@ describe('Tastaturaktionen', () => {
     [{ key: 'Enter', ctrlKey: false, metaKey: false }, null],
     [{ key: 'Backspace', ctrlKey: false, metaKey: false }, null],
   ] as const)('ordnet %o der Aktion %s zu', (taste, erwartet) => {
-    expect(tastaturAktionFuerEreignis({
-      ...taste,
-      defaultPrevented: false,
-      repeat: false,
-    })).toBe(erwartet);
+    expect(
+      tastaturAktionFuerEreignis({
+        ...taste,
+        defaultPrevented: false,
+        repeat: false,
+      }),
+    ).toBe(erwartet);
   });
 
   it('ignoriert bereits behandelte und wiederholte Mutationsereignisse', () => {
-    expect(tastaturAktionFuerEreignis({
-      key: 's', ctrlKey: true, metaKey: false, defaultPrevented: true, repeat: false,
-    })).toBeNull();
-    expect(tastaturAktionFuerEreignis({
-      key: 's', ctrlKey: true, metaKey: false, defaultPrevented: false, repeat: true,
-    })).toBeNull();
+    expect(
+      tastaturAktionFuerEreignis({
+        key: 's',
+        ctrlKey: true,
+        metaKey: false,
+        defaultPrevented: true,
+        repeat: false,
+      }),
+    ).toBeNull();
+    expect(
+      tastaturAktionFuerEreignis({
+        key: 's',
+        ctrlKey: true,
+        metaKey: false,
+        defaultPrevented: false,
+        repeat: true,
+      }),
+    ).toBeNull();
   });
 
   it.each([
@@ -208,30 +294,38 @@ describe('Tastaturaktionen', () => {
     { key: 'Backspace', ctrlKey: true, metaKey: false, altKey: true },
     { key: 'Escape', ctrlKey: false, metaKey: false, shiftKey: true },
   ])('ignoriert zusätzliche Shift-/Alt-Modifier: %o', (taste) => {
-    expect(tastaturAktionFuerEreignis({
-      ...taste,
-      defaultPrevented: false,
-      repeat: false,
-    })).toBeNull();
+    expect(
+      tastaturAktionFuerEreignis({
+        ...taste,
+        defaultPrevented: false,
+        repeat: false,
+      }),
+    ).toBeNull();
   });
 
   it('ignoriert Mutationsereignisse während einer IME-Komposition', () => {
     const ereignis = {
-      key: 'Enter', ctrlKey: true, metaKey: false,
-      defaultPrevented: false, repeat: false, isComposing: true,
+      key: 'Enter',
+      ctrlKey: true,
+      metaKey: false,
+      defaultPrevented: false,
+      repeat: false,
+      isComposing: true,
     };
     expect(tastaturAktionFuerEreignis(ereignis)).toBeNull();
   });
 
   it('liefert plattformgerechte sichtbare Kürzel', () => {
-    expect(kuerzelFuerTastaturAktion('speichern', 'Mozilla/5.0 (Macintosh; Intel Mac OS X)'))
-      .toBe('⌘ S / ⌘ ↵');
-    expect(kuerzelFuerTastaturAktion('speichern', 'Mozilla/5.0 (X11; Linux x86_64)'))
-      .toBe('Strg + S / Strg + ↵');
-    expect(kuerzelFuerTastaturAktion('verwerfen', 'Mozilla/5.0 (X11; Linux x86_64)'))
-      .toBe('Esc');
-    expect(kuerzelFuerTastaturAktion('filter-zuruecksetzen', 'Mozilla/5.0 (Macintosh)'))
-      .toBe('⌘ ⌫');
+    expect(kuerzelFuerTastaturAktion('speichern', 'Mozilla/5.0 (Macintosh; Intel Mac OS X)')).toBe(
+      '⌘ S / ⌘ ↵',
+    );
+    expect(kuerzelFuerTastaturAktion('speichern', 'Mozilla/5.0 (X11; Linux x86_64)')).toBe(
+      'Strg + S / Strg + ↵',
+    );
+    expect(kuerzelFuerTastaturAktion('verwerfen', 'Mozilla/5.0 (X11; Linux x86_64)')).toBe('Esc');
+    expect(kuerzelFuerTastaturAktion('filter-zuruecksetzen', 'Mozilla/5.0 (Macintosh)')).toBe(
+      '⌘ ⌫',
+    );
     // Gegenaussage zu den drei gebundenen Ids (LFH-391 · B3): eine Aktion OHNE Tastenweg
     // hat kein Kürzel. Bis hierher fiel jede unbekannte Id auf das Filter-Kürzel durch.
     expect(kuerzelFuerTastaturAktion('neue-zeile', 'Mozilla/5.0 (X11; Linux x86_64)')).toBeNull();
@@ -241,18 +335,24 @@ describe('Tastaturaktionen', () => {
   it('erzeugt nur für registrierte Callbacks sichtbare Aktionsbefehle', () => {
     const speichern = vi.fn();
     const filterZuruecksetzen = vi.fn();
-    const b = baueBefehle(kontext({
-      tastaturAktionen: {
-        speichern,
-        'filter-zuruecksetzen': filterZuruecksetzen,
-      },
-      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
-    }));
+    const b = baueBefehle(
+      kontext({
+        tastaturAktionen: {
+          speichern,
+          'filter-zuruecksetzen': filterZuruecksetzen,
+        },
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+      }),
+    );
 
     const aktionsbefehle = b.filter((x) => x.gruppe === 'aktionen');
     expect(aktionsbefehle.map(({ id, label, kuerzel }) => ({ id, label, kuerzel }))).toEqual([
       { id: 'tastatur:speichern', label: 'Speichern', kuerzel: 'Strg + S / Strg + ↵' },
-      { id: 'tastatur:filter-zuruecksetzen', label: 'Filter zurücksetzen', kuerzel: 'Strg + Rücktaste' },
+      {
+        id: 'tastatur:filter-zuruecksetzen',
+        label: 'Filter zurücksetzen',
+        kuerzel: 'Strg + Rücktaste',
+      },
     ]);
     expect(aktionsbefehle.some((x) => x.id === 'tastatur:verwerfen')).toBe(false);
 
@@ -264,10 +364,12 @@ describe('Tastaturaktionen', () => {
 
   it('eine Aktion ohne Tastenbindung trägt KEIN Kürzel', () => {
     const neueZeile = vi.fn();
-    const b = baueBefehle(kontext({
-      tastaturAktionen: { 'neue-zeile': neueZeile },
-      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
-    }));
+    const b = baueBefehle(
+      kontext({
+        tastaturAktionen: { 'neue-zeile': neueZeile },
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+      }),
+    );
 
     const befehl = b.find((x) => x.id === 'tastatur:neue-zeile');
     expect(befehl).toBeDefined();
@@ -287,10 +389,12 @@ describe('Tastaturaktionen', () => {
 
   it('zeigt das Kürzel weiter an, wo eine Tastenbindung existiert', () => {
     // Positivhälfte zur Aussage darüber: der Zweig ist nicht pauschal abgeschaltet.
-    const b = baueBefehle(kontext({
-      tastaturAktionen: { speichern: vi.fn() },
-      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
-    }));
+    const b = baueBefehle(
+      kontext({
+        tastaturAktionen: { speichern: vi.fn() },
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+      }),
+    );
     const befehl = b.find((x) => x.id === 'tastatur:speichern');
     expect('kuerzel' in befehl!).toBe(true);
     expect(befehl!.kuerzel).toBe('Strg + S / Strg + ↵');
@@ -303,8 +407,7 @@ describe('Tastaturaktionen', () => {
      * hat. Genau diese Lücke schließt dieser Guard: eine Id ohne Eintrag in der
      * Ordnungsliste erschiene sonst nie in der Palette — stumm, ohne Typfehler.
      */
-    expect([...TASTATUR_AKTION_REIHENFOLGE].sort())
-      .toEqual(Object.keys(TASTATUR_AKTIONEN).sort());
+    expect([...TASTATUR_AKTION_REIHENFOLGE].sort()).toEqual(Object.keys(TASTATUR_AKTIONEN).sort());
     expect(new Set(TASTATUR_AKTION_REIHENFOLGE).size).toBe(TASTATUR_AKTION_REIHENFOLGE.length);
   });
 });
@@ -352,10 +455,14 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
    */
   it('lässt das Modul, auf dem man steht, aus Zuletzt heraus', () => {
     const befehle = baueBefehle({
-      ...kontext(), einsatzId: 1, zuletztModulKeys: ['etb', 'personen'], aktuellerModulKey: 'etb',
+      ...kontext(),
+      einsatzId: 1,
+      zuletztModulKeys: ['etb', 'personen'],
+      aktuellerModulKey: 'etb',
     });
-    expect(befehle.filter((b) => b.gruppe === 'zuletzt').map((b) => b.id))
-      .toEqual(['zuletzt:personen']);
+    expect(befehle.filter((b) => b.gruppe === 'zuletzt').map((b) => b.id)).toEqual([
+      'zuletzt:personen',
+    ]);
   });
 
   it('nimmt ein ausgeblendetes Modul NICHT in Zuletzt auf', () => {
@@ -461,12 +568,14 @@ describe('baueBefehle — Zuletzt ausgeführt', () => {
    */
   it('löst eine ID nicht auf, die es in der aktuellen Liste nicht mehr gibt', () => {
     const mitRecht = baueBefehle({
-      ...kontext({ benutzer: admin }), zuletztBefehlIds: ['nav:admin'],
+      ...kontext({ benutzer: admin }),
+      zuletztBefehlIds: ['nav:admin'],
     });
     expect(mitRecht.some((x) => x.id === 'ausgefuehrt:nav:admin')).toBe(true);
 
     const ohneRecht = baueBefehle({
-      ...kontext({ benutzer: sichter }), zuletztBefehlIds: ['nav:admin'],
+      ...kontext({ benutzer: sichter }),
+      zuletztBefehlIds: ['nav:admin'],
     });
     expect(ohneRecht.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
     // Gegenprobe zur Trivialität: die Gruppe ist leer, nicht die ganze Liste.
@@ -486,14 +595,18 @@ describe('baueBefehle — Zuletzt ausgeführt', () => {
    */
   it('löst eine gemerkte Modul-ID NICHT auf, auch wenn sie im Serverstand steht', () => {
     const b = baueBefehle({
-      ...kontext(), zuletztModulKeys: ['etb'], zuletztBefehlIds: ['modul:etb', 'zuletzt:etb'],
+      ...kontext(),
+      zuletztModulKeys: ['etb'],
+      zuletztBefehlIds: ['modul:etb', 'zuletzt:etb'],
     });
     expect(b.some((x) => x.gruppe === 'ausgefuehrt')).toBe(false);
   });
 
   it('vergibt Ausgeführt-Befehlen eigene ids, die mit nichts kollidieren', () => {
     const ids = baueBefehle({
-      ...kontext(), zuletztModulKeys: ['etb'], zuletztBefehlIds: ['nav:profil', 'koord:utm'],
+      ...kontext(),
+      zuletztModulKeys: ['etb'],
+      zuletztBefehlIds: ['nav:profil', 'koord:utm'],
     }).map((x) => x.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -503,7 +616,9 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
   it('meldet das Ausführen eines Navigations-, Einstellungs- und Schnellaktions-Befehls', () => {
     for (const id of ['nav:profil', 'koord:utm', 'aktion:personen']) {
       const merkeBefehl = vi.fn();
-      baueBefehle({ ...kontext(), merkeBefehl }).find((b) => b.id === id)!.ausfuehren();
+      baueBefehle({ ...kontext(), merkeBefehl })
+        .find((b) => b.id === id)!
+        .ausfuehren();
       expect(merkeBefehl, id).toHaveBeenCalledWith(id);
     }
   });
@@ -511,7 +626,9 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
   it('meldet das Ausführen NICHT für Module, Zuletzt und Tastatur-Aktionen', () => {
     const merkeBefehl = vi.fn();
     const b = baueBefehle({
-      ...kontext(), zuletztModulKeys: ['etb'], merkeBefehl,
+      ...kontext(),
+      zuletztModulKeys: ['etb'],
+      merkeBefehl,
       tastaturAktionen: { speichern: vi.fn() },
     });
     for (const id of ['modul:etb', 'zuletzt:etb', 'tastatur:speichern']) {
@@ -525,7 +642,12 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
     const reihenfolge: string[] = [];
     const merkeBefehl = vi.fn(() => reihenfolge.push('merke'));
     const b = baueBefehle({
-      ...kontext({ navigate: (p: string) => { reihenfolge.push('nav'); navigate(p); } }),
+      ...kontext({
+        navigate: (p: string) => {
+          reihenfolge.push('nav');
+          navigate(p);
+        },
+      }),
       merkeBefehl,
     });
 
@@ -554,7 +676,8 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
     const logout = vi.fn();
 
     baueBefehle({ ...kontext({ logout }), merkeBefehl })
-      .find((x) => x.id === 'nav:abmelden')!.ausfuehren();
+      .find((x) => x.id === 'nav:abmelden')!
+      .ausfuehren();
 
     expect(logout).toHaveBeenCalledTimes(1);
     expect(merkeBefehl).not.toHaveBeenCalled();

@@ -316,7 +316,13 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     mockEndpunkte({
       personen: [person('sk3')],
       meldungen: [
-        meldung({ id: 77, lfd_nr: 12, absender: 'ELW 1', inhalt: 'Strom ausgefallen', ereigniszeit: '2026-06-11 14:05:00' }),
+        meldung({
+          id: 77,
+          lfd_nr: 12,
+          absender: 'ELW 1',
+          inhalt: 'Strom ausgefallen',
+          ereigniszeit: '2026-06-11 14:05:00',
+        }),
       ],
     });
     render();
@@ -335,7 +341,12 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
     mockEndpunkte({
       personen: [person('sk3')],
       auftraege: [
-        auftrag({ id: 88, lfd_nr: 4, auftrag_text: 'Pumpe an Deich 3 setzen', frist_at: '2026-06-11 16:30:00' }),
+        auftrag({
+          id: 88,
+          lfd_nr: 4,
+          auftrag_text: 'Pumpe an Deich 3 setzen',
+          frist_at: '2026-06-11 16:30:00',
+        }),
       ],
     });
     render();
@@ -504,11 +515,20 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
       personen: [person('sk3')],
       lageberichte: [
         {
-          id: 3, einsatz_id: 1, titel: 'Lage 14:00', status: 'freigegeben',
-          zeitstand: '2026-06-11 14:00:00', ersteller_id: 1, ersteller_name: 'Muster',
-          erstellt_at: '2026-06-11 14:00:00', aktualisiert_at: '2026-06-11 14:00:00',
-          version: 1, vorlage: 'lagebericht',
-          abschnitte: [{ schluessel: 'gefahren_schadenlage', text: 'Pegel bei 6,20 m, weiter steigend.' }],
+          id: 3,
+          einsatz_id: 1,
+          titel: 'Lage 14:00',
+          status: 'freigegeben',
+          zeitstand: '2026-06-11 14:00:00',
+          ersteller_id: 1,
+          ersteller_name: 'Muster',
+          erstellt_at: '2026-06-11 14:00:00',
+          aktualisiert_at: '2026-06-11 14:00:00',
+          version: 1,
+          vorlage: 'lagebericht',
+          abschnitte: [
+            { schluessel: 'gefahren_schadenlage', text: 'Pegel bei 6,20 m, weiter steigend.' },
+          ],
         },
       ],
     });
@@ -675,7 +695,9 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
   it('das Band nennt während des Abrufs den Ladezustand', async () => {
     mockEndpunkte({ einsatzLaedt: true });
     render();
-    expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe('wird abgerufen');
+    expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe(
+      'wird abgerufen',
+    );
   });
 
   /**
@@ -1002,7 +1024,9 @@ describe('Der Dringlichkeitsmarker (LFH-395)', () => {
     const zeilen = quelle.split('\n').filter((z) => z.includes('lfh-zeichen'));
     expect(zeilen.length, 'die Marker der Seite werden nicht mehr gefunden').toBeGreaterThan(0);
     for (const z of zeilen) {
-      expect(z.trim(), 'Marker ohne Formklasse').toMatch(/lfh-zeichen--(dreieck|kreis|balken|\$\{)/);
+      expect(z.trim(), 'Marker ohne Formklasse').toMatch(
+        /lfh-zeichen--(dreieck|kreis|balken|\$\{)/,
+      );
     }
   });
 });
@@ -1052,7 +1076,9 @@ function renderMitZone() {
   // Query-Key-Registry). Hier hinge die Zone dann still wieder am MSW-Refetch.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(einsatzKeys.einstellungen(1), {
-    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+    einsatz_id: 1,
+    zeitzone: 'Europe/Berlin',
+    org_defaults: { org_id: 1 },
   });
   return renderMitProviders(
     <EinsatzAnzeigeProvider einsatzId={1}>
@@ -1070,10 +1096,17 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
       personen: [person('sk3')],
       lageberichte: [
         {
-          id: 3, einsatz_id: 1, titel: 'Lage 14:00', status: 'freigegeben',
-          zeitstand: '2026-07-25 12:00:00', ersteller_id: 1, ersteller_name: 'Muster',
-          erstellt_at: '2026-07-25 12:00:00', aktualisiert_at: '2026-07-25 12:00:00',
-          version: 1, vorlage: 'lagebericht',
+          id: 3,
+          einsatz_id: 1,
+          titel: 'Lage 14:00',
+          status: 'freigegeben',
+          zeitstand: '2026-07-25 12:00:00',
+          ersteller_id: 1,
+          ersteller_name: 'Muster',
+          erstellt_at: '2026-07-25 12:00:00',
+          aktualisiert_at: '2026-07-25 12:00:00',
+          version: 1,
+          vorlage: 'lagebericht',
           abschnitte: [{ schluessel: 'gefahren_schadenlage', text: 'Pegel steigend.' }],
         },
       ],

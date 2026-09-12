@@ -4,7 +4,13 @@ import { ErfassungsFormular } from '../components/Erfassung';
 import { ThunderboltOutlined, SendOutlined } from '@ant-design/icons';
 import { useEffect } from 'react';
 import dayjs from 'dayjs';
-import type { Meldungsart, MeldungMeldeweg, MeldungPrioritaet, NeueMeldung, Richtung } from '../api/types';
+import type {
+  Meldungsart,
+  MeldungMeldeweg,
+  MeldungPrioritaet,
+  NeueMeldung,
+  Richtung,
+} from '../api/types';
 
 const { TextArea } = Input;
 
@@ -27,9 +33,16 @@ interface MeldungFormWerte {
 }
 
 const DEFAULTS: MeldungFormWerte = {
-  absender: '', empfaenger: '', meldeweg: 'funk', meldungsart: 'sonstige',
-  prioritaet: 'normal', richtung: 'intern', ereigniszeit: null, inhalt: '',
-  bestaetigung_pflicht: false, frist_min: null,
+  absender: '',
+  empfaenger: '',
+  meldeweg: 'funk',
+  meldungsart: 'sonstige',
+  prioritaet: 'normal',
+  richtung: 'intern',
+  ereigniszeit: null,
+  inhalt: '',
+  bestaetigung_pflicht: false,
+  frist_min: null,
 };
 
 /**
@@ -45,7 +58,11 @@ const DEFAULTS: MeldungFormWerte = {
  */
 const UEBERNAHME: (keyof MeldungFormWerte & string)[] = ['absender', 'meldeweg', 'empfaenger'];
 
-export default function MeldungFormular({ senden, onAnlegen, card = true }: {
+export default function MeldungFormular({
+  senden,
+  onAnlegen,
+  card = true,
+}: {
   senden: boolean;
   /**
    * Speichern. **Muss bei Ablehnung ablehnen** (`mutateAsync`, nicht `mutate`) —
@@ -71,7 +88,11 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
 
   /** Fast-Path: Sofortmeldung vorbelegen (Art + Priorität sofort), Fokus auf den Wortlaut. */
   const sofortVorbelegen = () => {
-    form.setFieldsValue({ meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true });
+    form.setFieldsValue({
+      meldungsart: 'sofortmeldung',
+      prioritaet: 'sofort',
+      bestaetigung_pflicht: true,
+    });
   };
 
   /** Fast-Path: Lagemeldung an übergeordnete Führung (extern, LFH-87). */
@@ -149,49 +170,62 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="meldeweg" label="Meldeweg">
-            <Select<MeldungMeldeweg> options={[
-              { value: 'funk', label: 'Funk' },
-              { value: 'telefon', label: 'Telefon' },
-              { value: 'persoenlich', label: 'Persönlich' },
-              { value: 'sonstige', label: 'Sonstige' },
-            ]} />
+            <Select<MeldungMeldeweg>
+              options={[
+                { value: 'funk', label: 'Funk' },
+                { value: 'telefon', label: 'Telefon' },
+                { value: 'persoenlich', label: 'Persönlich' },
+                { value: 'sonstige', label: 'Sonstige' },
+              ]}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="meldungsart" label="Meldungsart">
-            <Select<Meldungsart> options={[
-              { value: 'lagemeldung', label: 'Lagemeldung' },
-              { value: 'sofortmeldung', label: 'Sofortmeldung' },
-              { value: 'rueckmeldung', label: 'Rückmeldung' },
-              { value: 'vollzugsmeldung', label: 'Vollzugsmeldung' },
-              { value: 'anfrage', label: 'Anfrage' },
-              { value: 'sonstige', label: 'Sonstige' },
-            ]} />
+            <Select<Meldungsart>
+              options={[
+                { value: 'lagemeldung', label: 'Lagemeldung' },
+                { value: 'sofortmeldung', label: 'Sofortmeldung' },
+                { value: 'rueckmeldung', label: 'Rückmeldung' },
+                { value: 'vollzugsmeldung', label: 'Vollzugsmeldung' },
+                { value: 'anfrage', label: 'Anfrage' },
+                { value: 'sonstige', label: 'Sonstige' },
+              ]}
+            />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={8}>
           <Form.Item name="prioritaet" label="Priorität">
-            <Select<MeldungPrioritaet> options={[
-              { value: 'sofort', label: 'Sofort' },
-              { value: 'dringend', label: 'Dringend' },
-              { value: 'normal', label: 'Normal' },
-            ]} />
+            <Select<MeldungPrioritaet>
+              options={[
+                { value: 'sofort', label: 'Sofort' },
+                { value: 'dringend', label: 'Dringend' },
+                { value: 'normal', label: 'Normal' },
+              ]}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
           <Form.Item name="richtung" label="Richtung">
-            <Select<Richtung> aria-label="Richtung" options={[
-              { value: 'intern', label: 'Intern' },
-              { value: 'extern', label: 'Extern' },
-            ]} />
+            <Select<Richtung>
+              aria-label="Richtung"
+              options={[
+                { value: 'intern', label: 'Intern' },
+                { value: 'extern', label: 'Extern' },
+              ]}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
           <Form.Item name="ereigniszeit" label="Ereigniszeit (≠ Erfassung)">
-            <DatePicker showTime style={{ width: '100%' }}
-              format="YYYY-MM-DD HH:mm" placeholder="leer = jetzt" />
+            <DatePicker
+              showTime
+              style={{ width: '100%' }}
+              format="YYYY-MM-DD HH:mm"
+              placeholder="leer = jetzt"
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -223,5 +257,9 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
   );
 
   if (!card) return formular;
-  return <Card size="small" title="Neue Meldung erfassen">{formular}</Card>;
+  return (
+    <Card size="small" title="Neue Meldung erfassen">
+      {formular}
+    </Card>
+  );
 }

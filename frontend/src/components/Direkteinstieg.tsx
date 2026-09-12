@@ -31,7 +31,13 @@ export interface DirekteinstiegProps<T extends { id: number }> {
  * nicht weg — wer gerade im Leerzustand steht und anlegt, wird über `onAngelegt` geführt.
  */
 export default function Direkteinstieg<T extends { id: number }>({
-  query, waehle, detailPfad, fehlerText, leerTitel, leerAktionLabel, anlegen,
+  query,
+  waehle,
+  detailPfad,
+  fehlerText,
+  leerTitel,
+  leerAktionLabel,
+  anlegen,
 }: DirekteinstiegProps<T>) {
   const navigate = useNavigate();
   const entscheidung = useRef<{ id: number | null } | null>(null);
@@ -40,7 +46,13 @@ export default function Direkteinstieg<T extends { id: number }>({
 
   if (!entscheidung.current) {
     if (query.error) {
-      return <SeitenFehler text={fehlerText} ursache={query.error} onWiederholen={() => void query.refetch()} />;
+      return (
+        <SeitenFehler
+          text={fehlerText}
+          ursache={query.error}
+          onWiederholen={() => void query.refetch()}
+        />
+      );
     }
     return <SeitenSkeleton />;
   }
@@ -49,8 +61,15 @@ export default function Direkteinstieg<T extends { id: number }>({
 
   return (
     <div style={{ padding: 16 }}>
-      <SeitenLeer titel={leerTitel} aktion={{ label: leerAktionLabel, onClick: () => setOffen(true) }} />
-      {anlegen({ open: offen, onClose: () => setOffen(false), onAngelegt: (e) => navigate(detailPfad(e.id)) })}
+      <SeitenLeer
+        titel={leerTitel}
+        aktion={{ label: leerAktionLabel, onClick: () => setOffen(true) }}
+      />
+      {anlegen({
+        open: offen,
+        onClose: () => setOffen(false),
+        onAngelegt: (e) => navigate(detailPfad(e.id)),
+      })}
     </div>
   );
 }

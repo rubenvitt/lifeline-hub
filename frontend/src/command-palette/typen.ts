@@ -1,6 +1,11 @@
 // frontend/src/command-palette/typen.ts
 import type { IconType } from 'react-icons';
-import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides, Koordinatenformat } from '../api/types';
+import type {
+  BenutzerAnzeige,
+  EinsatzAnzeige,
+  ModulOverrides,
+  Koordinatenformat,
+} from '../api/types';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 // NUR-TYP-IMPORT, und nur deshalb unbedenklich: `datensaetze.ts` importiert von hier
@@ -24,7 +29,7 @@ import type { DatensatzQuellen } from './datensaetze';
  * Record hat keine vertragliche Ordnung, die Palette-Gruppe aber schon).
  */
 export type TastaturAktionId =
-  | 'speichern' | 'verwerfen' | 'filter-zuruecksetzen' | 'neue-zeile' | 'spalten';
+  'speichern' | 'verwerfen' | 'filter-zuruecksetzen' | 'neue-zeile' | 'spalten';
 
 export type TastaturAktionen = Partial<Record<TastaturAktionId, () => void>>;
 
@@ -150,7 +155,15 @@ export interface BefehlKontext {
  *    über doppelte `cmd-<id>` mehrdeutig. Dafür `typen.test.ts`.
  */
 export const GRUPPEN_REIHENFOLGE = [
-  'ausgefuehrt', 'aktionen', 'datensaetze', 'schnellaktionen', 'zuletzt', 'module', 'einsaetze', 'einstellungen', 'navigation',
+  'ausgefuehrt',
+  'aktionen',
+  'datensaetze',
+  'schnellaktionen',
+  'zuletzt',
+  'module',
+  'einsaetze',
+  'einstellungen',
+  'navigation',
 ] as const;
 
 export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {

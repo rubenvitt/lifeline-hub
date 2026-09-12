@@ -25,7 +25,9 @@ function probe() {
       <Form form={form}>
         {/* Der Datensatz steht im Baum, damit ein Prop-Wechsel wirklich rendert. */}
         <div data-testid="stand">{datensatz.geaendert_at}</div>
-        <Form.Item name="name"><Input /></Form.Item>
+        <Form.Item name="name">
+          <Input />
+        </Form.Item>
       </Form>
     );
   }

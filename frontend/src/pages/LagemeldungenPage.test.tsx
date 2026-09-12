@@ -10,36 +10,58 @@ import { alsOrtszeit } from '../etb/filterZeit';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
-  ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter' }),
+  ladeEinsatz: vi
+    .fn()
+    .mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter' }),
 }));
 const listeLageMeldungen = vi.fn();
-vi.mock('../api/meldungen', () => ({ listeLageMeldungen: (...a: unknown[]) => listeLageMeldungen(...a) }));
+vi.mock('../api/meldungen', () => ({
+  listeLageMeldungen: (...a: unknown[]) => listeLageMeldungen(...a),
+}));
 
 const lage = (over: Partial<LageMeldung> = {}): LageMeldung => ({
-  id: 1, einsatz_id: 1, meldung_id: 3, text: 'Brücke gesperrt', lat: null, lon: null,
-  erstellt_von_id: 1, erstellt_at: '2026-06-12 09:00:00', meldung_lfd_nr: 5, meldung_absender: 'Florian Nord 1', ...over,
+  id: 1,
+  einsatz_id: 1,
+  meldung_id: 3,
+  text: 'Brücke gesperrt',
+  lat: null,
+  lon: null,
+  erstellt_von_id: 1,
+  erstellt_at: '2026-06-12 09:00:00',
+  meldung_lfd_nr: 5,
+  meldung_absender: 'Florian Nord 1',
+  ...over,
 });
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={client}><AntApp>
-      <MemoryRouter initialEntries={['/einsaetze/1/lagemeldungen']}>
-        <Routes><Route path="/einsaetze/:id/lagemeldungen" element={<LagemeldungenPage />} /></Routes>
-      </MemoryRouter>
-    </AntApp></QueryClientProvider>,
+    <QueryClientProvider client={client}>
+      <AntApp>
+        <MemoryRouter initialEntries={['/einsaetze/1/lagemeldungen']}>
+          <Routes>
+            <Route path="/einsaetze/:id/lagemeldungen" element={<LagemeldungenPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AntApp>
+    </QueryClientProvider>,
   );
 }
 
 /** Ein antd-`Select`-Eintrag: erst den Auslöser öffnen, dann den echten Options-Knoten klicken. */
 async function waehleOption(label: string) {
-  const option = (await screen.findAllByText(label)).find((el) => el.closest('.ant-select-item-option'));
+  const option = (await screen.findAllByText(label)).find((el) =>
+    el.closest('.ant-select-item-option'),
+  );
   expect(option).toBeTruthy();
   await userEvent.click(option!);
 }
 
 describe('LagemeldungenPage', () => {
-  beforeEach(() => { vi.clearAllMocks(); listeLageMeldungen.mockResolvedValue([lage()]); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listeLageMeldungen.mockResolvedValue([lage()]);
+  });
 
   it('zeigt Lageobjekte mit nachvollziehbarer Herkunft', async () => {
     renderPage();
@@ -60,7 +82,9 @@ describe('LagemeldungenPage', () => {
     const link = await screen.findByRole('link', { name: 'Meldung #5' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=3');
     // `format="kurz"`: nicht heute → `DDHHmm` in Ortszeit, kein roher Wirestring.
-    expect(screen.getByText(alsOrtszeit('2026-06-12 09:00:00')!.format('DDHHmm'))).toBeInTheDocument();
+    expect(
+      screen.getByText(alsOrtszeit('2026-06-12 09:00:00')!.format('DDHHmm')),
+    ).toBeInTheDocument();
     expect(screen.queryByText('2026-06-12 09:00:00')).toBeNull();
   });
 
@@ -76,7 +100,9 @@ describe('LagemeldungenPage', () => {
     // Liste ABSICHTLICH aufsteigend geliefert: nur so ist die Umkehr beweiskräftig.
     expect(text.indexOf('Neu')).toBeLessThan(text.indexOf('Alt'));
     const tag = (s: string) => alsOrtszeit(s)!.format('DD.MM.YYYY');
-    expect(text.indexOf(tag('2026-06-13 07:00:00'))).toBeLessThan(text.indexOf(tag('2026-06-12 09:00:00')));
+    expect(text.indexOf(tag('2026-06-13 07:00:00'))).toBeLessThan(
+      text.indexOf(tag('2026-06-12 09:00:00')),
+    );
   });
 
   it('filtert auf Einträge mit Koordinaten', async () => {
@@ -123,7 +149,9 @@ describe('LagemeldungenPage', () => {
   it('zeigt Leerzustand ohne Lageobjekte', async () => {
     listeLageMeldungen.mockResolvedValue([]);
     const { container } = renderPage();
-    expect(await screen.findByText('Noch keine lagerelevanten Meldungen übergeben')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Noch keine lagerelevanten Meldungen übergeben'),
+    ).toBeInTheDocument();
     expect(container.querySelector('.ant-empty')).toBeNull();
   });
 });

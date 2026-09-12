@@ -152,14 +152,20 @@ async function tippverzoegerung(page: Page, text: string): Promise<Messung> {
   await page.evaluate(() => {
     const fenster = window as unknown as { __latenzen: number[] };
     fenster.__latenzen = [];
-    document.addEventListener('keydown', () => {
-      const start = performance.now();
-      // Zwei Rahmen: der erste läuft VOR dem Paint des laufenden Rahmens, der zweite
-      // danach — erst dort ist das Bild, das die Person sieht, tatsächlich gezeichnet.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        fenster.__latenzen.push(performance.now() - start);
-      }));
-    }, { capture: true });
+    document.addEventListener(
+      'keydown',
+      () => {
+        const start = performance.now();
+        // Zwei Rahmen: der erste läuft VOR dem Paint des laufenden Rahmens, der zweite
+        // danach — erst dort ist das Bild, das die Person sieht, tatsächlich gezeichnet.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            fenster.__latenzen.push(performance.now() - start);
+          }),
+        );
+      },
+      { capture: true },
+    );
   });
 
   // 30 ms Abstand ≈ schnelles Schreiben (rund 400 Zeichen/Minute) und lässt jeden Anschlag
@@ -186,7 +192,9 @@ const TEXT = 'Lage unveraendert, Abschnitt wird fortgeschrieben.'.slice(0, ANSCH
 // Erster Lauf zahlt den Vite-Kaltstart der Detailroute mit.
 test.setTimeout(120_000);
 
-test('Tippen im Lageberichtsentwurf: Verzögerung Anschlag-bis-Bild bei 1366 px', async ({ page }) => {
+test('Tippen im Lageberichtsentwurf: Verzögerung Anschlag-bis-Bild bei 1366 px', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Tippen LB ${Date.now()}`);
   const berichtId = await lageberichtAnlegen(page, einsatzId);
@@ -212,11 +220,11 @@ test('Tippen im Lageberichtsentwurf: Verzögerung Anschlag-bis-Bild bei 1366 px'
   const bf = await tippverzoegerung(page, TEXT);
 
   const bericht =
-    `[gemessen] 1366x768, ${lb.anzahl} Anschläge — Lagebericht (8 Editoren): `
-    + `Median ${lb.median.toFixed(1)} ms, p90 ${lb.p90.toFixed(1)} ms, `
-    + `schlechtester ${lb.schlechtester.toFixed(1)} ms · `
-    + `Befehl (ohne useWatch, 5 Editoren): Median ${bf.median.toFixed(1)} ms, `
-    + `p90 ${bf.p90.toFixed(1)} ms, schlechtester ${bf.schlechtester.toFixed(1)} ms`;
+    `[gemessen] 1366x768, ${lb.anzahl} Anschläge — Lagebericht (8 Editoren): ` +
+    `Median ${lb.median.toFixed(1)} ms, p90 ${lb.p90.toFixed(1)} ms, ` +
+    `schlechtester ${lb.schlechtester.toFixed(1)} ms · ` +
+    `Befehl (ohne useWatch, 5 Editoren): Median ${bf.median.toFixed(1)} ms, ` +
+    `p90 ${bf.p90.toFixed(1)} ms, schlechtester ${bf.schlechtester.toFixed(1)} ms`;
   console.log(bericht);
   test.info().annotations.push({ type: 'gemessen', description: bericht });
 
@@ -224,13 +232,19 @@ test('Tippen im Lageberichtsentwurf: Verzögerung Anschlag-bis-Bild bei 1366 px'
   // ist die einzige Aussage, die auch auf zwei geteilten Kernen trägt — sie würde auffallen,
   // wenn `useWatch` irgendwann ganz entfiele und dieser Test nichts mehr vergleicht. Kein
   // Schwellwert, nur die Richtung.
-  expect(bf.median, `Kontrolle nicht schneller als die beobachtete Seite. ${bericht}`)
-    .toBeLessThanOrEqual(lb.median);
+  expect(
+    bf.median,
+    `Kontrolle nicht schneller als die beobachtete Seite. ${bericht}`,
+  ).toBeLessThanOrEqual(lb.median);
 
   if (!LATENZ_GATE) return;
-  expect(lb.p90, `p90 über dem Deckel — Memoisierung des Akkordeons aufgehoben? ${bericht}`)
-    .toBeLessThanOrEqual(P90_MAX_MS);
+  expect(
+    lb.p90,
+    `p90 über dem Deckel — Memoisierung des Akkordeons aufgehoben? ${bericht}`,
+  ).toBeLessThanOrEqual(P90_MAX_MS);
   expect(lb.median, `Median über RAIL-Budget. ${bericht}`).toBeLessThanOrEqual(MEDIAN_MAX_MS);
-  expect(lb.schlechtester, `schlechtester Anschlag weiter gewachsen. ${bericht}`)
-    .toBeLessThanOrEqual(SCHLECHTESTER_MAX_MS);
+  expect(
+    lb.schlechtester,
+    `schlechtester Anschlag weiter gewachsen. ${bericht}`,
+  ).toBeLessThanOrEqual(SCHLECHTESTER_MAX_MS);
 });

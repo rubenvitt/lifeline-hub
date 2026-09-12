@@ -376,7 +376,9 @@ export default function EinsaetzePage() {
         erfassenText="Anlegen"
         laeuft={anlegen.isPending}
         initialValues={{ einsatzart: 'realeinsatz' as Einsatzart, begonnen_at: dayjs() }}
-        onErfassen={async (w) => { await anlegen.mutateAsync(w); }}
+        onErfassen={async (w) => {
+          await anlegen.mutateAsync(w);
+        }}
         onFertig={() => setDialogOffen(false)}
         onAbbrechen={() => setDialogOffen(false)}
       >

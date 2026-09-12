@@ -34,9 +34,30 @@ function inspector(): ReactElement {
 /** Einstellungen mit gewünschtem Koordinatenformat (Rest Default). */
 function einstellungen(format: EinsatzEinstellungen['koordinatenformat']): EinsatzEinstellungen {
   return {
-    einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
-    fachebenen_sichtbar: null, zeitzone: null, zeitformat: null, einheiten: null,
-    koordinatenformat: format, etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+    einsatz_id: 1,
+    standard_modul: null,
+    basemap_modus: null,
+    karten_zoom_start: null,
+    fachebenen_sichtbar: null,
+    zeitzone: null,
+    zeitformat: null,
+    einheiten: null,
+    koordinatenformat: format,
+    etb_nummer_praefix: null,
+    etb_nummer_start: null,
+    meldung_nummer_praefix: null,
+    meldung_nummer_start: null,
+    auftrag_nummer_praefix: null,
+    auftrag_nummer_start: null,
+    meldung_bestaetigung_frist_min: null,
+    auftrag_quittierung_frist_min: null,
+    auto_etb_eintraege: null,
+    etb_nummer_eingefroren: false,
+    meldung_nummer_eingefroren: false,
+    auftrag_nummer_eingefroren: false,
+    retention_dauer_tage: null,
+    geaendert_at: null,
+    geaendert_von: null,
     org_defaults: { org_id: 1 },
   };
 }
@@ -44,7 +65,9 @@ function einstellungen(format: EinsatzEinstellungen['koordinatenformat']): Einsa
 describe('Inspector Koordinatenanzeige', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
     );
   });
 
@@ -68,7 +91,9 @@ describe('Inspector Koordinatenanzeige', () => {
 describe('Inspector Kennzahlen (LFH-146)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
     );
   });
 
@@ -82,14 +107,27 @@ describe('Inspector Kennzahlen (LFH-146)', () => {
     farbe: '#722ed1',
     geometrie: {
       type: 'Polygon',
-      coordinates: [[[8, 50], [8.02, 50], [8.02, 50.02], [8, 50.02], [8, 50]]],
+      coordinates: [
+        [
+          [8, 50],
+          [8.02, 50],
+          [8.02, 50.02],
+          [8, 50.02],
+          [8, 50],
+        ],
+      ],
     },
   } as KarteMarker;
 
   it('zeigt Fläche und Umfang für einen Abschnitt-Marker mit Geometrie', () => {
     renderMitProviders(
-      <Inspector einsatzId={1} marker={abschnittMarker} darfSchreiben={false}
-        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+      <Inspector
+        einsatzId={1}
+        marker={abschnittMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
     );
     expect(screen.getByText('Fläche')).toBeInTheDocument();
     expect(screen.getByText('Umfang')).toBeInTheDocument();
@@ -105,21 +143,35 @@ describe('Inspector Kennzahlen (LFH-146)', () => {
 describe('Inspector Symbol-Auswahl — Beschriftung (LFH-328)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
     );
   });
 
   // Bewusst MIT gesetztem `tz`: bei leerem Select wäre der Accessible Name auch dann sauber,
   // wenn die Beschriftung das Feld umschlösse — der gewählte Wert ist der Prüfstein.
   const einheitMarker = {
-    schluessel: 'einheit-4', typ: 'einheit', id: 4, lat: 50.1, lon: 8.1, label: '1. Zug', farbe: '#1677ff',
+    schluessel: 'einheit-4',
+    typ: 'einheit',
+    id: 4,
+    lat: 50.1,
+    lon: 8.1,
+    label: '1. Zug',
+    farbe: '#1677ff',
     tz: { fachaufgabe: 'rettungswesen', organisation: 'feuerwehr' },
   } as KarteMarker;
 
   it('der sichtbare Beschriftungstext ist der Accessible Name der Selects', () => {
     renderMitProviders(
-      <Inspector einsatzId={1} marker={einheitMarker} darfSchreiben
-        onSchliessen={() => {}} onVerortungLoeschen={() => {}} onSymbolAendern={() => {}} />,
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+        onSymbolAendern={() => {}}
+      />,
     );
     expect(screen.getByRole('combobox', { name: 'Fachaufgabe' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Organisation (Override)' })).toBeInTheDocument();
@@ -131,12 +183,20 @@ describe('Inspector Symbol-Auswahl — Beschriftung (LFH-328)', () => {
 describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
     );
   });
 
   const schadenMarker = {
-    schluessel: 'schaden-2', typ: 'schaden', id: 2, lat: 52.0, lon: 9.9, label: 'S-002', farbe: '#faad14',
+    schluessel: 'schaden-2',
+    typ: 'schaden',
+    id: 2,
+    lat: 52.0,
+    lon: 9.9,
+    label: 'S-002',
+    farbe: '#faad14',
   } as KarteMarker;
 
   // Gemessen an der Vorlage: „Im Fach-Modul öffnen" + „Verortung löschen" tragen nebeneinander
@@ -147,15 +207,23 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
   // die den Überlauf unmöglich macht.
   it('stapelt die Aktionen senkrecht, jede über die volle Kartenbreite', () => {
     renderMitProviders(
-      <Inspector einsatzId={1} marker={schadenMarker} darfSchreiben
-        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+      <Inspector
+        einsatzId={1}
+        marker={schadenMarker}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
     );
     const modulLink = screen.getByRole('link', { name: 'Im Fach-Modul öffnen' });
     const loeschen = screen.getByRole('button', { name: 'Verortung löschen' });
 
     // `size="middle"` statt des Vorgabe-Abstands: der rote Knopf steht sonst 3–7 px unter
     // einem neutralen (CLAUDE.md, „Rot steht auch nicht bündig neben Neutralem").
-    expect(loeschen.closest('.ant-space')).toHaveClass('ant-space-vertical', 'ant-space-gap-row-middle');
+    expect(loeschen.closest('.ant-space')).toHaveClass(
+      'ant-space-vertical',
+      'ant-space-gap-row-middle',
+    );
     expect(loeschen).toHaveClass('ant-btn-block');
     // Der Anker ist inline — ohne eigenes `display: block` liefe `block` am Knopf darin
     // ins Leere und die Zeile bliebe schmal.
@@ -167,8 +235,13 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
   // ist hier kein Dreipunkt-Menü richtig, und deshalb muss der direkte Knopf dann weg sein.
   it('ohne Schreibrecht bleibt allein der Modul-Link', () => {
     renderMitProviders(
-      <Inspector einsatzId={1} marker={schadenMarker} darfSchreiben={false}
-        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+      <Inspector
+        einsatzId={1}
+        marker={schadenMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
     );
     expect(screen.getByRole('link', { name: 'Im Fach-Modul öffnen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Verortung löschen' })).not.toBeInTheDocument();
@@ -179,13 +252,19 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
       http.get('/api/einsaetze/:id/ort-vorschau', () =>
         HttpResponse.json({
           peilung: { distanz_m: 20, richtung: 'O', bezug_label: 'S-1' },
-          ortsname: 'St. Michaelis, Bethelner Straße, Burgstemmen, Nordstemmen, Landkreis Hildesheim, Niedersachsen, 31171, Deutschland',
+          ortsname:
+            'St. Michaelis, Bethelner Straße, Burgstemmen, Nordstemmen, Landkreis Hildesheim, Niedersachsen, 31171, Deutschland',
         }),
       ),
     );
     renderMitProviders(
-      <Inspector einsatzId={1} marker={schadenMarker} darfSchreiben={false}
-        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+      <Inspector
+        einsatzId={1}
+        marker={schadenMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
     );
     // Die Kürzung selbst rechnet der Browser (`-webkit-line-clamp`); jsdom meldet keine
     // Unterstützung und fällt auf den Messpfad zurück. Belegbar ist deshalb, DASS die
@@ -198,17 +277,30 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
 describe('Inspector Typ-Tag (LFH-276)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
     );
   });
 
   it('zeigt für einen Personal-Marker den Typ-Tag „Personal" (nicht „Führungskraft")', () => {
     const fuehrungMarker = {
-      schluessel: 'fuehrung-7', typ: 'fuehrung', id: 7, lat: 50.2, lon: 8.5, label: 'Zugführer', farbe: '#1677ff',
+      schluessel: 'fuehrung-7',
+      typ: 'fuehrung',
+      id: 7,
+      lat: 50.2,
+      lon: 8.5,
+      label: 'Zugführer',
+      farbe: '#1677ff',
     } as KarteMarker;
     renderMitProviders(
-      <Inspector einsatzId={1} marker={fuehrungMarker} darfSchreiben={false}
-        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+      <Inspector
+        einsatzId={1}
+        marker={fuehrungMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
     );
     expect(screen.getByText('Personal')).toBeInTheDocument();
     expect(screen.queryByText('Führungskraft')).not.toBeInTheDocument();

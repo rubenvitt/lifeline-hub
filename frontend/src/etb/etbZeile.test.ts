@@ -3,21 +3,36 @@ import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
 import { baueZeilen } from './etbZeile';
 
-const E = (id: number): EtbEintragAnzeige => ({
-  id, lfd_nr: id, typ: 'meldung', inhalt: `Eintrag ${id}`, von: null, an: null,
-  meldeweg: null, veranlassung: null, erfasser_id: 1, erfasser_name: 'Admin',
-  ereigniszeit: '2026-08-21 10:00:00', received_at: '2026-08-21 10:00:01',
-  erfasst_lokal_at: null, berichtigt_eintrag_id: null,
-} as unknown as EtbEintragAnzeige);
+const E = (id: number): EtbEintragAnzeige =>
+  ({
+    id,
+    lfd_nr: id,
+    typ: 'meldung',
+    inhalt: `Eintrag ${id}`,
+    von: null,
+    an: null,
+    meldeweg: null,
+    veranlassung: null,
+    erfasser_id: 1,
+    erfasser_name: 'Admin',
+    ereigniszeit: '2026-08-21 10:00:00',
+    received_at: '2026-08-21 10:00:01',
+    erfasst_lokal_at: null,
+    berichtigt_eintrag_id: null,
+  }) as unknown as EtbEintragAnzeige;
 
 const A = (id?: number): AusstehenderEintrag => ({
-  id, benutzer_id: 1, einsatz_id: 7,
+  id,
+  benutzer_id: 1,
+  einsatz_id: 7,
   eintrag: { typ: 'meldung', inhalt: 'ungesendet' },
   erstellt_at: '2026-08-21 10:05:00',
 });
 
 const X = (id?: number): AbgelehnterEintrag => ({
-  ...A(id), grund: 'Einsatz abgeschlossen', abgelehnt_at: '2026-08-21 10:06:00',
+  ...A(id),
+  grund: 'Einsatz abgeschlossen',
+  abgelehnt_at: '2026-08-21 10:06:00',
 });
 
 describe('baueZeilen (LFH-342 · C7, Befund M82)', () => {
@@ -38,8 +53,7 @@ describe('baueZeilen (LFH-342 · C7, Befund M82)', () => {
     // `[data-row-key="…"]`-Highlight des Deeplinks `?eintrag=` die falsche Zeile.
     const zeilen = baueZeilen({ eintraege: [E(3)], ausstehend: [A(3)], abgelehnt: [X(3)] });
     expect(new Set(zeilen.map((z) => z.schluessel)).size).toBe(3);
-    expect(zeilen.map((z) => z.schluessel))
-      .toEqual(['abgelehnt-3', 'ausstehend-3', 'eintrag-3']);
+    expect(zeilen.map((z) => z.schluessel)).toEqual(['abgelehnt-3', 'ausstehend-3', 'eintrag-3']);
   });
 
   it('kommt ohne id aus — die Queue vergibt sie erst beim Schreiben', () => {

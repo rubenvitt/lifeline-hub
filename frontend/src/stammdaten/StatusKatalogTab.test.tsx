@@ -8,8 +8,13 @@ import { AuthProvider } from '../auth/AuthContext';
 import StatusKatalogTab from './StatusKatalogTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
@@ -27,7 +32,14 @@ const status: {
   fms_anker: number | null;
   sortier: number;
 }[] = [
-  { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, fms_anker: 1, sortier: 10 },
+  {
+    id: 1,
+    label: 'einsatzbereit',
+    kategorie: 'verfuegbar',
+    farbe: null,
+    fms_anker: 1,
+    sortier: 10,
+  },
   { id: 2, label: 'disponiert', kategorie: 'gebunden', farbe: null, fms_anker: 3, sortier: 20 },
 ];
 
@@ -200,8 +212,12 @@ describe('StatusKatalogTab', () => {
       http.post('/api/fahrzeug-status', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json({
-          id: 9, label: 'nicht einsatzbereit', kategorie: 'gebunden',
-          farbe: null, fms_anker: null, sortier: 0,
+          id: 9,
+          label: 'nicht einsatzbereit',
+          kategorie: 'gebunden',
+          farbe: null,
+          fms_anker: null,
+          sortier: 0,
         });
       }),
     );
@@ -214,13 +230,15 @@ describe('StatusKatalogTab', () => {
     );
 
     await waitFor(() =>
-      expect(ruempfe).toEqual([{
-        label: 'nicht einsatzbereit',
-        kategorie: 'gebunden',
-        farbe: null,
-        fms_anker: null,
-        sortier: 0,
-      }]),
+      expect(ruempfe).toEqual([
+        {
+          label: 'nicht einsatzbereit',
+          kategorie: 'gebunden',
+          farbe: null,
+          fms_anker: null,
+          sortier: 0,
+        },
+      ]),
     );
   });
 
@@ -267,16 +285,31 @@ describe('StatusKatalogTab', () => {
    */
   it('ein zweiter Datensatz erbt keine Werte des ersten', async () => {
     render(admin, [
-      { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: '#112233', fms_anker: 5, sortier: 10 },
-      { id: 2, label: 'disponiert', kategorie: 'gebunden', farbe: null, fms_anker: null, sortier: 20 },
+      {
+        id: 1,
+        label: 'einsatzbereit',
+        kategorie: 'verfuegbar',
+        farbe: '#112233',
+        fms_anker: 5,
+        sortier: 10,
+      },
+      {
+        id: 2,
+        label: 'disponiert',
+        kategorie: 'gebunden',
+        farbe: null,
+        fms_anker: null,
+        sortier: 20,
+      },
     ]);
     await screen.findByText('einsatzbereit');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
     const ersterDialog = await screen.findByRole('dialog');
     await userEvent.click(within(ersterDialog).getByRole('button', { name: /Weitere Angaben/ }));
-    expect(await within(ersterDialog).findByLabelText('FMS-Anker (0–9, optional)'))
-      .toHaveValue('5');
+    expect(await within(ersterDialog).findByLabelText('FMS-Anker (0–9, optional)')).toHaveValue(
+      '5',
+    );
     await userEvent.click(within(ersterDialog).getByRole('button', { name: /Cancel|Abbrechen/ }));
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[1]);
@@ -287,8 +320,9 @@ describe('StatusKatalogTab', () => {
     // Der Collapse ist im frisch montierten Dialog wieder zu (`destroyOnHidden`) — das
     // Aufklappen gehört also zur Prüfung, nicht bloss der Griff danach.
     await userEvent.click(within(zweiterDialog).getByRole('button', { name: /Weitere Angaben/ }));
-    expect(await within(zweiterDialog).findByLabelText('FMS-Anker (0–9, optional)'))
-      .toHaveValue('');
+    expect(await within(zweiterDialog).findByLabelText('FMS-Anker (0–9, optional)')).toHaveValue(
+      '',
+    );
     expect(within(zweiterDialog).getByLabelText('Farbe (Hex, optional)')).toHaveValue('');
   });
 
@@ -310,7 +344,9 @@ describe('StatusKatalogTab', () => {
     const dialog = await screen.findByRole('dialog');
 
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
-    expect(within(dialog).getByRole('button', { name: 'Speichern' }).closest('form')).not.toBeNull();
+    expect(
+      within(dialog).getByRole('button', { name: 'Speichern' }).closest('form'),
+    ).not.toBeNull();
   });
 
   /**
@@ -335,7 +371,8 @@ describe('StatusKatalogTab', () => {
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
       http.patch('/api/fahrzeug-status/1', () =>
-        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 })),
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
+      ),
     );
     render(admin);
     await screen.findByText('einsatzbereit');
@@ -349,8 +386,9 @@ describe('StatusKatalogTab', () => {
 
     await screen.findByText('Label bereits vergeben');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(within(screen.getByRole('dialog')).getByLabelText('Label'))
-      .toHaveValue('bedingt einsatzbereit');
+    expect(within(screen.getByRole('dialog')).getByLabelText('Label')).toHaveValue(
+      'bedingt einsatzbereit',
+    );
   });
 
   /**
@@ -377,7 +415,14 @@ describe('StatusKatalogTab', () => {
       }),
     );
     render(admin, [
-      { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: '#112233', fms_anker: 5, sortier: 10 },
+      {
+        id: 1,
+        label: 'einsatzbereit',
+        kategorie: 'verfuegbar',
+        farbe: '#112233',
+        fms_anker: 5,
+        sortier: 10,
+      },
     ]);
     await screen.findByText('einsatzbereit');
     await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
@@ -413,7 +458,14 @@ describe('StatusKatalogTab', () => {
       }),
     );
     render(admin, [
-      { id: 1, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: '#112233', fms_anker: 5, sortier: 10 },
+      {
+        id: 1,
+        label: 'einsatzbereit',
+        kategorie: 'verfuegbar',
+        farbe: '#112233',
+        fms_anker: 5,
+        sortier: 10,
+      },
     ]);
     await screen.findByText('einsatzbereit');
     await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);

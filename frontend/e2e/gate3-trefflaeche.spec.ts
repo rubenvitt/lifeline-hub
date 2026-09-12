@@ -1,5 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { detailBereit, einheitMitZuordnungen, kopfFelder, zuordnungsKarte } from './einheit-fixture';
+import {
+  detailBereit,
+  einheitMitZuordnungen,
+  kopfFelder,
+  zuordnungsKarte,
+} from './einheit-fixture';
 
 /**
  * Gate 3 der Bedien-Leitlinie: Lage-Dashboard und Einsatzauswahl (LFH-396, Nachzug zur
@@ -384,12 +389,13 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-
 // ── Einheiten-Detailroute (LFH-446, Nachzug zu LFH-339 · Kriterium 2) ────────────────
 // Sichtbare Feldhüllen, Zuordnungszeilen und Aktionsabstände werden im Browser gemessen.
 // Die Böden stehen als Literale; weder CSS-Tokens noch `data-dichte` ersetzen die Geometrie.
 
-test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und den Aktionsabstand', async ({ page }) => {
+test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und den Aktionsabstand', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
@@ -408,7 +414,10 @@ test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und de
       const entfernen = karte.getByRole('button', { name: 'Entfernen', exact: true });
       // Die Zeile trägt minHeight; die Schaltfläche darin ist ein eigenes Bedienziel.
       const zeile = entfernen.locator('xpath=ancestor::div[contains(@style,"space-between")][1]');
-      kleinsteZeile = Math.min(kleinsteZeile, await haeltStufe(zeile, soll, `${titel}-Zuordnungszeile (${dichte})`));
+      kleinsteZeile = Math.min(
+        kleinsteZeile,
+        await haeltStufe(zeile, soll, `${titel}-Zuordnungszeile (${dichte})`),
+      );
       ziele.push({ name: `${titel} entfernen`, ziel: entfernen });
       ziele.push({ name: `${titel} zuordnen`, ziel: karte.locator('.ant-select') });
       if (titel === 'Personal') {
@@ -423,16 +432,29 @@ test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und de
         const knopf = (await entfernen.boundingBox())!;
         const abstand = auswahl.y - (knopf.y + knopf.height);
         kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
-        expect(abstand, `${titel}: Abstand Aktion/Zuordnung ${dichte}, Zeilenhöhe ${r.height}`).toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
+        expect(
+          abstand,
+          `${titel}: Abstand Aktion/Zuordnung ${dichte}, Zeilenhöhe ${r.height}`,
+        ).toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
       }
     }
-    const speichern = page.getByRole('main').getByRole('button', { name: 'Speichern', exact: true });
+    const speichern = page
+      .getByRole('main')
+      .getByRole('button', { name: 'Speichern', exact: true });
     const aufloesen = page.getByRole('main').getByRole('button', { name: 'Auflösen', exact: true });
-    const neueSprechgruppe = page.getByRole('main').getByRole('button', { name: /neue Sprechgruppe anlegen$/ });
-    ziele.push({ name: 'Speichern', ziel: speichern }, { name: 'Auflösen', ziel: aufloesen }, { name: 'neue Sprechgruppe anlegen', ziel: neueSprechgruppe });
+    const neueSprechgruppe = page
+      .getByRole('main')
+      .getByRole('button', { name: /neue Sprechgruppe anlegen$/ });
+    ziele.push(
+      { name: 'Speichern', ziel: speichern },
+      { name: 'Auflösen', ziel: aufloesen },
+      { name: 'neue Sprechgruppe anlegen', ziel: neueSprechgruppe },
+    );
     aktionsreihen.push([speichern, aufloesen]);
     const felder = kopfFelder(page);
-    const staerke = ['Führer', 'Unterführer', 'Mannschaft'].map((name) => felder.find((f) => f.name === name)!.huelle);
+    const staerke = ['Führer', 'Unterführer', 'Mannschaft'].map(
+      (name) => felder.find((f) => f.name === name)!.huelle,
+    );
     aktionsreihen.push([staerke[0], staerke[1]], [staerke[1], staerke[2]]);
     aktionsreihen.push([felder.find((f) => f.name === 'Sprechgruppen')!.huelle, neueSprechgruppe]);
     expect(ziele).toHaveLength(21);
@@ -449,14 +471,18 @@ test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und de
         const b = (await rechts.boundingBox())!;
         const abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
         kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
-        expect.soft(abstand, `Aktionsabstand ${dichte}: ${links} → ${rechts}`).toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
+        expect
+          .soft(abstand, `Aktionsabstand ${dichte}: ${links} → ${rechts}`)
+          .toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
       }
     }
     // Auch die einblendbaren Sprechgruppenfelder gehören zu dieser Formularroute.
     await neueSprechgruppe.click();
     const main = page.getByRole('main');
     const bezeichnung = main.getByRole('textbox', { name: 'Neue Bezeichnung', exact: true });
-    const betriebsart = main.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: 'Neue Betriebsart', exact: true }) });
+    const betriebsart = main
+      .locator('.ant-select')
+      .filter({ has: page.getByRole('combobox', { name: 'Neue Betriebsart', exact: true }) });
     const anlegen = main.getByRole('button', { name: 'Anlegen', exact: true });
     const abbrechen = main.getByRole('button', { name: 'Abbrechen', exact: true });
     for (const feld of [bezeichnung, betriebsart, anlegen, abbrechen]) {
@@ -472,16 +498,22 @@ test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und de
         const b = (await reihe[i].boundingBox())!;
         const abstand = Math.max(b.x - a.x - a.width, b.y - a.y - a.height);
         kleinsterAbstand = Math.min(kleinsterAbstand, abstand);
-        expect.soft(abstand, `Sprechgruppen-Feldabstand ${dichte}, Paar ${i}`).toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
+        expect
+          .soft(abstand, `Sprechgruppen-Feldabstand ${dichte}, Paar ${i}`)
+          .toBeGreaterThanOrEqual((dichte === 'handschuh' ? 16 : 8) - SUBPIXEL);
       }
     }
     await abbrechen.click();
-    messwerte.push(`${dichte}: ${ziele.length} Grundziele + 4 Sprechgruppenfelder, kleinste Achse ${minimum.toFixed(2)}px, Zuordnungszeile ${kleinsteZeile}px${dichte !== 'kompakt' ? `, Abstand ${kleinsterAbstand}px` : ''}`);
+    messwerte.push(
+      `${dichte}: ${ziele.length} Grundziele + 4 Sprechgruppenfelder, kleinste Achse ${minimum.toFixed(2)}px, Zuordnungszeile ${kleinsteZeile}px${dichte !== 'kompakt' ? `, Abstand ${kleinsterAbstand}px` : ''}`,
+    );
   }
   test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
 });
 
-test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhstufe durch', async ({ page }) => {
+test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhstufe durch', async ({
+  page,
+}) => {
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const { pfad } = await einheitMitZuordnungen(page);
@@ -491,16 +523,20 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
   const name = page.getByLabel('Name', { exact: true });
   await haeltStufe(name, 72, 'Handschuhfeld vor Mutation');
   await name.evaluate((el) => el.setAttribute('data-e2e-kompakt', 'true'));
-  const mutation = await page.addStyleTag({ content: '[data-e2e-kompakt] { height: 30px !important; min-height: 30px !important; max-height: 30px !important; font-size: 13px !important; line-height: 1.5 !important; padding-block: 0 !important; transition: none !important; }' });
+  const mutation = await page.addStyleTag({
+    content:
+      '[data-e2e-kompakt] { height: 30px !important; min-height: 30px !important; max-height: 30px !important; font-size: 13px !important; line-height: 1.5 !important; padding-block: 0 !important; transition: none !important; }',
+  });
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
   expect((await name.boundingBox())!.height).toBe(30);
   await expect(haeltStufe(name, 72, 'Feste Kompaktgröße')).rejects.toThrow(/Feste Kompaktgröße/);
   await mutation.evaluate((el) => el.parentNode?.removeChild(el));
   // Die Wiederherstellung durchläuft wieder den normalen Dichte-Übergang.
-  await expect.poll(async () => (await name.boundingBox())!.height).toBeGreaterThanOrEqual(72 - SUBPIXEL);
+  await expect
+    .poll(async () => (await name.boundingBox())!.height)
+    .toBeGreaterThanOrEqual(72 - SUBPIXEL);
   await haeltStufe(name, 72, 'Handschuhfeld nach Wiederherstellung');
 });
-
 
 // ── Einsatz-Navigationsrahmen (LFH-516, Nachzug zu LFH-337 · C2, Kriterium 2) ────────
 //
@@ -690,8 +726,10 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
      * Zeilennummer. Die Klasse verschwindet dagegen erst, wenn rc-motion fertig ist
      * (gemessen: ab ~200 ms trägt das Modal nur noch `ant-modal` + Emotion-Klasse).
      */
-    await expect(page.locator('.ant-modal'), 'die Einblendung der Palette ist durch')
-      .not.toHaveClass(/ant-zoom/);
+    await expect(
+      page.locator('.ant-modal'),
+      'die Einblendung der Palette ist durch',
+    ).not.toHaveClass(/ant-zoom/);
     /**
      * Der Locator ist auf die Listbox GESCOPT. Gemessen ist das heute folgenlos (48
      * `role="option"` auf der Seite, alle 48 in der Palette), aber `role="option"` ist die
@@ -706,9 +744,9 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
     );
 
     gemessen.push(
-      `${dichte}: Rail ${railZiel} (Soll ≥ ${BODEN.mitA1Boden[dichte]}), Panel ${panelZeile}, `
-        + `Wechsler ${wechsler}, Desktop ${desktop}, Ton ${ton}, Suchen ${suchen}, `
-        + `Benutzermenü ${benutzer} (Soll ≥ ${BODEN.benutzermenue[dichte]}), Palette ${zeile}`,
+      `${dichte}: Rail ${railZiel} (Soll ≥ ${BODEN.mitA1Boden[dichte]}), Panel ${panelZeile}, ` +
+        `Wechsler ${wechsler}, Desktop ${desktop}, Ton ${ton}, Suchen ${suchen}, ` +
+        `Benutzermenü ${benutzer} (Soll ≥ ${BODEN.benutzermenue[dichte]}), Palette ${zeile}`,
     );
   }
 
@@ -759,8 +797,8 @@ test('Globale Kopfzeile: Logo, Verwaltungs-Link, Suchzugang und Benutzermenü fo
     );
 
     gemessen.push(
-      `${dichte}: Logo ${logo}, Verwaltung ${verwaltung}, Suchen ${suchen}, `
-        + `Benutzermenü ${benutzer} (Soll ≥ ${BODEN.benutzermenue[dichte]})`,
+      `${dichte}: Logo ${logo}, Verwaltung ${verwaltung}, Suchen ${suchen}, ` +
+        `Benutzermenü ${benutzer} (Soll ≥ ${BODEN.benutzermenue[dichte]})`,
     );
   }
 
@@ -833,16 +871,15 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
     );
 
     gemessen.push(
-      `${dichte}: Hamburger ${griff}×${griffBreite}, Suchen ${suchen} `
-        + `(Soll ≥ ${BODEN.mitA1Boden[dichte]}), Modulzeile ${modulZeile}, `
-        + `Akkordeon-Kopf ${kopfHoehe}, Schließer ${schliesser} `
-        + `(feste 48 — LFH-537, Soll ≥ ${BODEN.fest48[dichte]})`,
+      `${dichte}: Hamburger ${griff}×${griffBreite}, Suchen ${suchen} ` +
+        `(Soll ≥ ${BODEN.mitA1Boden[dichte]}), Modulzeile ${modulZeile}, ` +
+        `Akkordeon-Kopf ${kopfHoehe}, Schließer ${schliesser} ` +
+        `(feste 48 — LFH-537, Soll ≥ ${BODEN.fest48[dichte]})`,
     );
   }
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
-
 
 // ── Kräfteübersicht und Verdichtungszeile (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 2) ──
 //
@@ -1008,7 +1045,13 @@ test('Verdichtungszeile: der Kräfteübersicht-Link folgt der Dichte-Staffel 30 
   // Die Zeile rendert `null`, solange NICHT BEIDE Listen da sind (`Verdichtungszeile.tsx`,
   // Datenriegel). Leere Listen zählen als Daten — gesät wird trotzdem, sonst misst der Test
   // eine Zeile aus lauter Nullen und die Fahrzeugachse hätte nichts zu zeigen.
-  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Verdichtung' } }, 'Personal');
+  await anlegen(
+    page,
+    einsatzId,
+    'personal',
+    { adhoc: { name: 'Messkraft Verdichtung' } },
+    'Personal',
+  );
   await anlegen(
     page,
     einsatzId,

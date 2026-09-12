@@ -14,30 +14,65 @@ afterEach(() => vi.restoreAllMocks());
 // Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
 const nutzer = {
-  id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-02 10:00:00',
+  id: 1,
+  anzeigename: 'A',
+  benutzername: 'a',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-06-02 10:00:00',
 };
 
 const einsatz: EinsatzAnzeige = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-06-02 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-06-02 09:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung', org_id: 1, org_name: 'Orga',
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-06-02 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-06-02 09:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
+  org_id: 1,
+  org_name: 'Orga',
 };
 
 const kanal: ChatKanal = {
-  id: 1, einsatz_id: 7, name: 'Allgemein', beschreibung: null,
-  erstellt_von_id: 1, erstellt_at: '2026-06-10 09:00:00', archiviert_at: null,
-  letzte_nachricht_at: '2026-06-10 10:00:00', ungelesen_anzahl: 0,
+  id: 1,
+  einsatz_id: 7,
+  name: 'Allgemein',
+  beschreibung: null,
+  erstellt_von_id: 1,
+  erstellt_at: '2026-06-10 09:00:00',
+  archiviert_at: null,
+  letzte_nachricht_at: '2026-06-10 10:00:00',
+  ungelesen_anzahl: 0,
 };
 
 const nachricht: ChatNachricht = {
-  id: 5, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'A',
-  inhalt: 'Erste Lage', erstellt_at: '2026-06-10 10:00:00',
-  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
-  bezug_typ: null, bezug_id: null, anhaenge: [],
+  id: 5,
+  einsatz_id: 7,
+  kanal_id: 1,
+  autor_id: 1,
+  autor_name: 'A',
+  inhalt: 'Erste Lage',
+  erstellt_at: '2026-06-10 10:00:00',
+  bearbeitet_at: null,
+  geloescht_at: null,
+  etb_eintrag_id: null,
+  auftrag_id: null,
+  bezug_typ: null,
+  bezug_id: null,
+  anhaenge: [],
 };
 
 function setup(ungelesen = 0, onGelesen?: () => void) {
@@ -45,9 +80,14 @@ function setup(ungelesen = 0, onGelesen?: () => void) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([{
-      ...kanal, ungelesen_anzahl: ungelesen,
-    }])),
+    http.get('/api/einsaetze/7/chat/kanaele', () =>
+      HttpResponse.json([
+        {
+          ...kanal,
+          ungelesen_anzahl: ungelesen,
+        },
+      ]),
+    ),
     http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
     http.post('/api/einsaetze/7/chat/kanaele/1/gelesen', () => {
       onGelesen?.();
@@ -83,17 +123,19 @@ describe('ChatPage', () => {
 
   it('markiert den erfolgreich geöffneten Kanal persistent gelesen', async () => {
     let markiert = 0;
-    setup(1, () => { markiert += 1; });
+    setup(1, () => {
+      markiert += 1;
+    });
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
     await waitFor(() => expect(markiert).toBeGreaterThan(0));
   });
 
   it('markiert neue Nachrichten im Hintergrund erst beim Zurückkehren gelesen', async () => {
-    const sichtbarkeit = vi
-      .spyOn(document, 'visibilityState', 'get')
-      .mockReturnValue('hidden');
+    const sichtbarkeit = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
     let markiert = 0;
-    setup(1, () => { markiert += 1; });
+    setup(1, () => {
+      markiert += 1;
+    });
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
     expect(markiert).toBe(0);
@@ -106,7 +148,9 @@ describe('ChatPage', () => {
   it('lädt ältere Nachrichten über den "Ältere laden"-Button nach (before_id)', async () => {
     // Erste Seite: volle Seitengröße (100) → es gibt mehr → Button erscheint.
     const ersteSeite: ChatNachricht[] = Array.from({ length: 100 }, (_, i) => ({
-      ...nachricht, id: 200 - i, inhalt: `Aktuell ${200 - i}`,
+      ...nachricht,
+      id: 200 - i,
+      inhalt: `Aktuell ${200 - i}`,
     }));
     let zweiteSeiteAngefragtMit: string | null = null;
     server.use(
@@ -149,17 +193,27 @@ describe('ChatPage', () => {
   it('lädt die Bezug-Listen nicht eager, wenn keine Nachricht einen Bezug trägt', async () => {
     const listenAufgerufen: string[] = [];
     const spy = (pfad: string) =>
-      http.get(`/api/einsaetze/7/${pfad}`, () => { listenAufgerufen.push(pfad); return HttpResponse.json([]); });
+      http.get(`/api/einsaetze/7/${pfad}`, () => {
+        listenAufgerufen.push(pfad);
+        return HttpResponse.json([]);
+      });
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
-      spy('schaeden'), spy('uhs'), spy('personen'), spy('lageberichte'), spy('meldungen'), spy('auftraege'),
+      spy('schaeden'),
+      spy('uhs'),
+      spy('personen'),
+      spy('lageberichte'),
+      spy('meldungen'),
+      spy('auftraege'),
     );
     renderMitProviders(
       <AuthProvider>
-        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
       </AuthProvider>,
       { route: '/einsaetze/7/chat' },
     );
@@ -177,7 +231,8 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
       http.get('/api/einsaetze/7/schaeden', () =>
-        HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }])),
+        HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }]),
+      ),
       http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/personen', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json([])),
@@ -191,7 +246,9 @@ describe('ChatPage', () => {
     );
     renderMitProviders(
       <AuthProvider>
-        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
       </AuthProvider>,
       { route: '/einsaetze/7/chat' },
     );
@@ -220,7 +277,11 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
       http.patch('/api/einsaetze/7/chat/nachrichten/5', async ({ request }) => {
         bearbeitet = (await request.json()) as { inhalt: string };
-        nachrichten[0] = { ...nachricht, inhalt: bearbeitet.inhalt, bearbeitet_at: '2026-06-10 11:00:00' };
+        nachrichten[0] = {
+          ...nachricht,
+          inhalt: bearbeitet.inhalt,
+          bearbeitet_at: '2026-06-10 11:00:00',
+        };
         return HttpResponse.json(nachrichten[0]);
       }),
     );
@@ -254,13 +315,17 @@ describe('ChatPage', () => {
   it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
-      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, status: 'abgeschlossen' })),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, status: 'abgeschlossen' }),
+      ),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
     );
     renderMitProviders(
       <AuthProvider>
-        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
       </AuthProvider>,
       { route: '/einsaetze/7/chat' },
     );
@@ -272,18 +337,24 @@ describe('ChatPage', () => {
   it('zeigt ohne Führungsrolle einen Read-only-Hinweis (Einsatz aktiv)', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
-      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' })),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
+      ),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
     );
     renderMitProviders(
       <AuthProvider>
-        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
       </AuthProvider>,
       { route: '/einsaetze/7/chat' },
     );
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    expect(screen.getByText(/Einsatzleitung und dem Führungspersonal vorbehalten/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Einsatzleitung und dem Führungspersonal vorbehalten/i),
+    ).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Nachricht…')).not.toBeInTheDocument();
   });
 
@@ -297,9 +368,20 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
       http.post('/api/einsaetze/7/anhaenge', () =>
         HttpResponse.json(
-          [{ id: 99, einsatz_id: 7, dateiname: 'lage.pdf', mime: 'application/pdf', groesse: 3, hochgeladen_von: 1, erstellt_at: '2026-06-10 10:00:00' }],
+          [
+            {
+              id: 99,
+              einsatz_id: 7,
+              dateiname: 'lage.pdf',
+              mime: 'application/pdf',
+              groesse: 3,
+              hochgeladen_von: 1,
+              erstellt_at: '2026-06-10 10:00:00',
+            },
+          ],
           { status: 201 },
-        )),
+        ),
+      ),
       http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
         gesendet = (await request.json()) as { inhalt: string; anhang_ids: number[] };
         const neu: ChatNachricht = { ...nachricht, id: 6, inhalt: gesendet.inhalt };
@@ -329,10 +411,7 @@ describe('ChatPage', () => {
   it('verwendet nach einem Einsatzwechsel ausschließlich einen Kanal des neuen Einsatzes', async () => {
     const nachrichtenRequests: string[] = [];
     const gesendetAn: string[] = [];
-    const kanaeleA: ChatKanal[] = [
-      kanal,
-      { ...kanal, id: 2, name: 'A Spezial' },
-    ];
+    const kanaeleA: ChatKanal[] = [kanal, { ...kanal, id: 2, name: 'A Spezial' }];
     const kanalB: ChatKanal = {
       ...kanal,
       id: 9,
@@ -352,15 +431,13 @@ describe('ChatPage', () => {
         return HttpResponse.json({ ...einsatz, id: zielId, bezeichnung: `Einsatz ${zielId}` });
       }),
       http.get('/api/einsaetze/:einsatzId/chat/kanaele', ({ params }) =>
-        HttpResponse.json(params.einsatzId === '8' ? [kanalB] : kanaeleA)),
-      http.get(
-        '/api/einsaetze/:einsatzId/chat/kanaele/:kanalId/nachrichten',
-        ({ params }) => {
-          const ziel = `${params.einsatzId}/${params.kanalId}`;
-          nachrichtenRequests.push(ziel);
-          return HttpResponse.json(nachrichtenNachKanal.get(ziel) ?? []);
-        },
+        HttpResponse.json(params.einsatzId === '8' ? [kanalB] : kanaeleA),
       ),
+      http.get('/api/einsaetze/:einsatzId/chat/kanaele/:kanalId/nachrichten', ({ params }) => {
+        const ziel = `${params.einsatzId}/${params.kanalId}`;
+        nachrichtenRequests.push(ziel);
+        return HttpResponse.json(nachrichtenNachKanal.get(ziel) ?? []);
+      }),
       http.post(
         '/api/einsaetze/:einsatzId/chat/kanaele/:kanalId/nachrichten',
         async ({ params, request }) => {

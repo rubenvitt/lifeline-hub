@@ -1,4 +1,16 @@
-import { Alert, App, Breadcrumb, Button, Card, Flex, Input, Modal, Segmented, Spin, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Card,
+  Flex,
+  Input,
+  Modal,
+  Segmented,
+  Spin,
+  Typography,
+} from 'antd';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -8,7 +20,12 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { legeNachforderungAn, lehneNachforderungAb, listeNachforderungen, setzeNachforderungStatus } from '../api/nachforderungen';
+import {
+  legeNachforderungAn,
+  lehneNachforderungAb,
+  listeNachforderungen,
+  setzeNachforderungStatus,
+} from '../api/nachforderungen';
 import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../api/types';
 import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -35,14 +52,18 @@ export default function NachforderungenPage() {
   const [ablehnenId, setAblehnenId] = useState<number | null>(null);
   const [ablehnenGrund, setAblehnenGrund] = useState('');
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig → ALLE Nachforderungen laden.
   const nfQuery = useQuery({
     queryKey: einsatzKeys.nachforderungen(einsatzId),
     queryFn: () => listeNachforderungen(einsatzId, {}),
   });
 
-  const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
+  const invalidiere = () =>
+    qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
   // Bei Fehler (insb. 422 aus der optimistischen Sperre) zusätzlich invalidieren,
   // damit der ggf. veraltete View den echten Status nachlädt.
   const fehler = (e: unknown) => {
@@ -56,7 +77,10 @@ export default function NachforderungenPage() {
     // offen, damit die nächste Nachforderung ohne Aufklappen weitergeht. Der
     // conditional Render der Card würde es sonst unmounten, samt Serienzähler
     // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
-    onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); },
+    onSuccess: () => {
+      invalidiere();
+      message.success('Nachforderung abgesetzt');
+    },
     onError: fehler,
   });
   /**
@@ -69,23 +93,31 @@ export default function NachforderungenPage() {
    * eigenen Rückgängig-Toast erzeugen, sonst schaukelte sich das Paar endlos auf.
    */
   const statusMutation = useMutation({
-    mutationFn: ({ nfId, status }: {
-      nfId: number; status: NachforderungStatus; vorher?: NachforderungStatus; zurueck?: boolean;
+    mutationFn: ({
+      nfId,
+      status,
+    }: {
+      nfId: number;
+      status: NachforderungStatus;
+      vorher?: NachforderungStatus;
+      zurueck?: boolean;
     }) => setzeNachforderungStatus(einsatzId, nfId, status),
     onSuccess: (_daten, { nfId, status, vorher, zurueck }) => {
       invalidiere();
       if (zurueck || !vorher) return;
-      zeigeRueckgaengig(
-        message,
-        `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`,
-        () => statusMutation.mutate({ nfId, status: vorher, zurueck: true }),
+      zeigeRueckgaengig(message, `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`, () =>
+        statusMutation.mutate({ nfId, status: vorher, zurueck: true }),
       );
     },
     onError: fehler,
   });
   const ablehnenMutation = useMutation({
-    mutationFn: ({ nfId, grund }: { nfId: number; grund?: string }) => lehneNachforderungAb(einsatzId, nfId, grund),
-    onSuccess: () => { invalidiere(); message.success('Nachforderung abgelehnt'); },
+    mutationFn: ({ nfId, grund }: { nfId: number; grund?: string }) =>
+      lehneNachforderungAb(einsatzId, nfId, grund),
+    onSuccess: () => {
+      invalidiere();
+      message.success('Nachforderung abgelehnt');
+    },
     onError: fehler,
   });
   const ablehnenBestaetigen = () => {
@@ -97,7 +129,11 @@ export default function NachforderungenPage() {
   };
 
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -108,7 +144,8 @@ export default function NachforderungenPage() {
 
   // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen
   // (eingetroffen → abgeschlossen, abgelehnt → ausnahme zählen als „abgeschlossen").
-  const istAbg = (n: Nachforderung) => istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
+  const istAbg = (n: Nachforderung) =>
+    istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
   const offene = alle.filter((n) => !istAbg(n));
   const abgeschlossene = alle.filter(istAbg);
 
@@ -118,8 +155,9 @@ export default function NachforderungenPage() {
     return rang !== 0 ? rang : b.angefordert_at.localeCompare(a.angefordert_at);
   });
   // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
-  const abgeschlosseneSortiert = [...abgeschlossene]
-    .sort((a, b) => abschlussZeit(b).localeCompare(abschlussZeit(a)));
+  const abgeschlosseneSortiert = [...abgeschlossene].sort((a, b) =>
+    abschlussZeit(b).localeCompare(abschlussZeit(a)),
+  );
 
   const listenProps = {
     darfSchreiben,
@@ -127,7 +165,10 @@ export default function NachforderungenPage() {
       const vorher = alle.find((n) => n.id === nfId)?.status;
       statusMutation.mutate({ nfId, status, vorher });
     },
-    onAblehnen: (nfId: number) => { setAblehnenId(nfId); setAblehnenGrund(''); },
+    onAblehnen: (nfId: number) => {
+      setAblehnenId(nfId);
+      setAblehnenGrund('');
+    },
   };
 
   return (
@@ -142,11 +183,15 @@ export default function NachforderungenPage() {
       />
       <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
         <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>Nachforderung Kräfte/Mittel</Typography.Title>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            Nachforderung Kräfte/Mittel
+          </Typography.Title>
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
-          <div><Datenstand dataUpdatedAt={nfQuery.dataUpdatedAt} /></div>
+          <div>
+            <Datenstand dataUpdatedAt={nfQuery.dataUpdatedAt} />
+          </div>
         </div>
         {darfSchreiben && (
           <Button
@@ -165,14 +210,14 @@ export default function NachforderungenPage() {
           size="small"
           title="Neue Nachforderung"
           style={{ marginBottom: 16 }}
-          extra={(
+          extra={
             <Button
               type="text"
               icon={<CloseOutlined />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />
-          )}
+          }
         >
           <NachforderungFormular
             card={false}
@@ -185,9 +230,22 @@ export default function NachforderungenPage() {
       )}
 
       {nfQuery.isError && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Nachforderungen konnten nicht geladen werden" />
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="Nachforderungen konnten nicht geladen werden"
+        />
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 16,
+          alignItems: 'center',
+        }}
+      >
         <Segmented
           value={ansicht}
           onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
@@ -200,7 +258,11 @@ export default function NachforderungenPage() {
       {ansicht === 'offen' ? (
         <NachforderungListe nachforderungen={offeneSortiert} ansicht="offen" {...listenProps} />
       ) : (
-        <NachforderungListe nachforderungen={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
+        <NachforderungListe
+          nachforderungen={abgeschlosseneSortiert}
+          ansicht="abgeschlossen"
+          {...listenProps}
+        />
       )}
       <Modal
         open={ablehnenId != null}
@@ -208,7 +270,10 @@ export default function NachforderungenPage() {
         okText="Ablehnen"
         okButtonProps={{ danger: true }}
         onOk={ablehnenBestaetigen}
-        onCancel={() => { setAblehnenId(null); setAblehnenGrund(''); }}
+        onCancel={() => {
+          setAblehnenId(null);
+          setAblehnenGrund('');
+        }}
       >
         <Input.TextArea
           aria-label="Ablehnungsgrund"

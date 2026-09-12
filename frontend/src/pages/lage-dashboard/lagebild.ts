@@ -165,7 +165,13 @@ export interface Lagebild {
   schaedenGesamt: number;
   tiereAktiv: number;
   zonen: number;
-  bericht: { titel: string; status: string; stand: string; von: string; auszug: string | null } | null;
+  bericht: {
+    titel: string;
+    status: string;
+    stand: string;
+    von: string;
+    auszug: string | null;
+  } | null;
   meldungszeilen: Meldungszeile[];
   auftragszeilen: Auftragszeile[];
   auftraegeOffen: number;

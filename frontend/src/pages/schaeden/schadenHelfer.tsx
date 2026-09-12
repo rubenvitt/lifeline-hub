@@ -3,19 +3,17 @@ import { Typography } from 'antd';
 import StatusTag from '../../components/StatusTag';
 import { bezugsDarstellung } from '../../theme/statusFarben';
 import { personDetailPfad, personalPfad } from '../../routing/deeplinks';
-import type {
-  Schaden,
-  SchadenAbschlussGrund,
-  SchadenStatus,
-  SchadenTyp,
-} from '../../api/types';
+import type { Schaden, SchadenAbschlussGrund, SchadenStatus, SchadenTyp } from '../../api/types';
 import type { GeschaedigtWert } from './GeschaedigtPicker';
 
 // Gemeinsame Anzeige-/Mapping-Helfer für Schäden-Liste (SchaedenPage) und
 // -Detailseite (SchaedenDetailPage). Insbesondere die Geschädigt-XOR-Abbildung auf die
 // vier Backend-Felder liegt damit an EINER Stelle (sonst fehleranfällig dupliziert).
 
-export { schadenStatus as STATUS_META, schadenAusmass as AUSMASS_META } from '../../theme/statusFarben';
+export {
+  schadenStatus as STATUS_META,
+  schadenAusmass as AUSMASS_META,
+} from '../../theme/statusFarben';
 
 export const TYP_LABEL: Record<SchadenTyp, string> = {
   sachschaden: 'Sachschaden',
@@ -26,17 +24,18 @@ export const TYP_LABEL: Record<SchadenTyp, string> = {
   sonstige: 'Sonstige',
 };
 
-
 export const ABSCHLUSS_LABEL: Record<SchadenAbschlussGrund, string> = {
   behoben: 'behoben',
   kein_handlungsbedarf: 'kein Handlungsbedarf',
   abgewiesen: 'abgewiesen',
 };
 
-export const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlussGrund[]).map((g) => ({
-  value: g,
-  label: ABSCHLUSS_LABEL[g],
-}));
+export const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlussGrund[]).map(
+  (g) => ({
+    value: g,
+    label: ABSCHLUSS_LABEL[g],
+  }),
+);
 
 export function pad3(nr: number): string {
   return String(nr).padStart(3, '0');
@@ -65,7 +64,9 @@ export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNo
     }
     // Deeplink auf die Personen-Detailseite (LFH-25), falls die Person-id bekannt ist.
     return s.geschaedigt_person_id != null ? (
-      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}><StatusTag darstellung={bezugsDarstellung(label)} /></Link>
+      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}>
+        <StatusTag darstellung={bezugsDarstellung(label)} />
+      </Link>
     ) : (
       <StatusTag darstellung={bezugsDarstellung(label)} />
     );
@@ -79,7 +80,11 @@ export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNo
     );
   }
   if (s.geschaedigt_organisation_id != null) {
-    return <StatusTag darstellung={bezugsDarstellung(s.geschaedigt_organisation_name ?? 'Eigene Organisation')} />;
+    return (
+      <StatusTag
+        darstellung={bezugsDarstellung(s.geschaedigt_organisation_name ?? 'Eigene Organisation')}
+      />
+    );
   }
   if (s.geschaedigt_kontakt) return <Typography.Text>{s.geschaedigt_kontakt}</Typography.Text>;
   return <Typography.Text type="secondary">—</Typography.Text>;
@@ -92,11 +97,17 @@ export function geschaedigtAusSchaden(s: Schaden): GeschaedigtWert {
       typ: 'person',
       refId: s.geschaedigt_person_id,
       label:
-        s.geschaedigt_registrier_nr != null ? `R-${pad3(s.geschaedigt_registrier_nr)}` : 'Betroffene Person',
+        s.geschaedigt_registrier_nr != null
+          ? `R-${pad3(s.geschaedigt_registrier_nr)}`
+          : 'Betroffene Person',
     };
   }
   if (s.geschaedigt_personal_id != null) {
-    return { typ: 'personal', refId: s.geschaedigt_personal_id, label: s.geschaedigt_personal_name ?? 'Einsatzkraft' };
+    return {
+      typ: 'personal',
+      refId: s.geschaedigt_personal_id,
+      label: s.geschaedigt_personal_name ?? 'Einsatzkraft',
+    };
   }
   if (s.geschaedigt_organisation_id != null) {
     return { typ: 'organisation', label: s.geschaedigt_organisation_name ?? 'Eigene Organisation' };

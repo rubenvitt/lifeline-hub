@@ -11,13 +11,23 @@ import EtbPage from './EtbPage';
 // Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
 const nutzer = {
-  id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Nutzer',
+  benutzername: 'nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 function einsatz(status: string) {
   return {
-    id: 7, bezeichnung: 'Hochwasser', stichwort: null, status,
-    begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
+    id: 7,
+    bezeichnung: 'Hochwasser',
+    stichwort: null,
+    status,
+    begonnen_at: '2026-05-23 09:00:00',
+    abgeschlossen_at: null,
+    abgeschlossen_von: null,
     meine_rolle: 'einsatzleitung',
   };
 }

@@ -98,9 +98,27 @@ async function seede(page: Page, einsatzId: string, pfad: string, data: unknown,
 }
 
 async function seedeAlles(page: Page, einsatzId: string) {
-  await seede(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname: FUNKRUFNAME, fahrzeugtyp: 'LF 20' } }, 'Fahrzeug');
-  await seede(page, einsatzId, 'personal', { adhoc: { name: KRAFT, funktion: 'Abschnittsleitung' } }, 'Personal');
-  await seede(page, einsatzId, 'material', { adhoc: { bezeichnung: MATERIAL, menge: 12 } }, 'Material');
+  await seede(
+    page,
+    einsatzId,
+    'fahrzeuge',
+    { adhoc: { funkrufname: FUNKRUFNAME, fahrzeugtyp: 'LF 20' } },
+    'Fahrzeug',
+  );
+  await seede(
+    page,
+    einsatzId,
+    'personal',
+    { adhoc: { name: KRAFT, funktion: 'Abschnittsleitung' } },
+    'Personal',
+  );
+  await seede(
+    page,
+    einsatzId,
+    'material',
+    { adhoc: { bezeichnung: MATERIAL, menge: 12 } },
+    'Material',
+  );
   await seede(page, einsatzId, 'einheiten', { name: '1. Zug' }, 'Einheit');
 }
 
@@ -129,12 +147,18 @@ async function keinQuerlauf(page: Page, pfad: string, inhaltsWortlaut: string | 
     `${pfad}: der Inhalt muss vor der Messung stehen — sonst misst der Test den Ladezustand`,
   ).toBeVisible();
   await expect
-    .poll(async () => page.evaluate(() => ({
-      scroll: document.documentElement.scrollWidth,
-      client: document.documentElement.clientWidth,
-    })).then((m) => m.scroll - m.client), {
-      message: `${pfad} läuft waagerecht über`,
-    })
+    .poll(
+      async () =>
+        page
+          .evaluate(() => ({
+            scroll: document.documentElement.scrollWidth,
+            client: document.documentElement.clientWidth,
+          }))
+          .then((m) => m.scroll - m.client),
+      {
+        message: `${pfad} läuft waagerecht über`,
+      },
+    )
     .toBeLessThanOrEqual(SUBPIXEL);
 }
 
@@ -158,7 +182,9 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async (
 });
 
 for (const { dichte, soll } of STAFFEL) {
-  test(`Stufe ${dichte}: der Statuswechsel ist auf 390 px ein Ziel von ${soll} px`, async ({ page }) => {
+  test(`Stufe ${dichte}: der Statuswechsel ist auf 390 px ein Ziel von ${soll} px`, async ({
+    page,
+  }) => {
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `Statusziel ${dichte} ${Date.now()}`);
     await seedeAlles(page, einsatzId);
@@ -170,10 +196,10 @@ for (const { dichte, soll } of STAFFEL) {
       // Handschuh-Stufe erreichbar. `ThemeModeProvider` liest den Speicher beim Montieren,
       // ein Setzen ohne Neuladen bliebe folgenlos.
       await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
-      await page.evaluate(
-        ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
-        [DICHTE_SCHLUESSEL, dichte] as const,
-      );
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
       await page.reload();
     } else {
       await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
@@ -201,11 +227,15 @@ for (const { dichte, soll } of STAFFEL) {
     // Und er BEDIENT auch: ein Ziel der richtigen Größe, das nichts öffnet, wäre die
     // halbe Aussage. Das Menü liegt im Portal — deshalb seitenweit gesucht, nicht in der Karte.
     await ausloeser.click();
-    await expect(page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')).toBeVisible();
+    await expect(
+      page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
+    ).toBeVisible();
   });
 }
 
-test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue Einheit"', async ({ page }) => {
+test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue Einheit"', async ({
+  page,
+}) => {
   /**
    * AK 5. Der Knopf schrieb bis C4 sofort einen Platzhalter-Datensatz in die Datenbank.
    * Gemessen wird der PERSISTIERTE Bestand über die API, nicht die Anzeige: eine Zählung im
@@ -226,7 +256,10 @@ test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue 
 
   // Auf den Seiteninhalt gescopt, nicht seitenweit: die Kopfzeile ist eine `banner`-Landmarke
   // und trägt eigene Knöpfe. `exact`, damit ein Name mit Zusatz nicht mitzählt.
-  const bildenKnopf = page.getByRole('main').getByRole('button', { name: 'Einheit bilden', exact: true }).first();
+  const bildenKnopf = page
+    .getByRole('main')
+    .getByRole('button', { name: 'Einheit bilden', exact: true })
+    .first();
 
   const anzahlEinheiten = async () => {
     const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`);
@@ -249,7 +282,9 @@ test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue 
   await dialog.getByLabel('Name').fill('2. Zug');
   await dialog.getByRole('button', { name: 'Bilden' }).click();
 
-  await expect.poll(anzahlEinheiten, { message: 'Absenden legt genau eine Einheit an' }).toBe(vorher + 1);
+  await expect
+    .poll(anzahlEinheiten, { message: 'Absenden legt genau eine Einheit an' })
+    .toBe(vorher + 1);
 
   const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`);
   const namen = ((await antwort.json()) as { name: string }[]).map((e) => e.name);

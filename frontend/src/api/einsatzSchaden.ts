@@ -45,7 +45,8 @@ export function listeSchaeden(einsatzId: number, filter: SchaedenFilter = {}): P
   if (filter.status) params.set('status', filter.status);
   if (filter.typ) params.set('typ', filter.typ);
   if (filter.ausmass) params.set('ausmass', filter.ausmass);
-  if (filter.geschaedigtPersonId != null) params.set('geschaedigt_person_id', String(filter.geschaedigtPersonId));
+  if (filter.geschaedigtPersonId != null)
+    params.set('geschaedigt_person_id', String(filter.geschaedigtPersonId));
   if (filter.inklStorniert) params.set('inkl_storniert', 'true');
   const q = params.toString();
   return apiGet<Schaden[]>(`/api/einsaetze/${einsatzId}/schaeden${q ? `?${q}` : ''}`);
@@ -75,8 +76,14 @@ export function aktualisiereSchaden(
   return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}`, 'PATCH', body);
 }
 
-export function uebergebeSchaden(einsatzId: number, schadenId: number, uebergeben_an: string): Promise<Schaden> {
-  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}/uebergeben`, 'POST', { uebergeben_an });
+export function uebergebeSchaden(
+  einsatzId: number,
+  schadenId: number,
+  uebergeben_an: string,
+): Promise<Schaden> {
+  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}/uebergeben`, 'POST', {
+    uebergeben_an,
+  });
 }
 
 export function schliesseSchadenAb(
@@ -85,10 +92,14 @@ export function schliesseSchadenAb(
   abschluss_grund: string,
   notiz?: string,
 ): Promise<Schaden> {
-  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}/abschliessen`, 'POST', {
-    abschluss_grund,
-    notiz: notiz ?? null,
-  });
+  return apiSend<Schaden>(
+    `/api/einsaetze/${einsatzId}/schaeden/${schadenId}/abschliessen`,
+    'POST',
+    {
+      abschluss_grund,
+      notiz: notiz ?? null,
+    },
+  );
 }
 
 export function storniereSchaden(einsatzId: number, schadenId: number): Promise<void> {

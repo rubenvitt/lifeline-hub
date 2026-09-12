@@ -4,7 +4,13 @@ import { buchstabiere } from './buchstabieren';
 describe('buchstabiere', () => {
   it('buchstabiert Text mit der klassischen deutschen Tafel (DIN 5009)', () => {
     expect(buchstabiere('Florian').map((z) => z.wort)).toEqual([
-      'Friedrich', 'Ludwig', 'Otto', 'Richard', 'Ida', 'Anton', 'Nordpol',
+      'Friedrich',
+      'Ludwig',
+      'Otto',
+      'Richard',
+      'Ida',
+      'Anton',
+      'Nordpol',
     ]);
   });
 

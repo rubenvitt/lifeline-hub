@@ -33,8 +33,14 @@ import type { PaletteModus } from './typen';
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({
     benutzer: {
-      id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-      org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
+      id: 1,
+      anzeigename: 'EL',
+      benutzername: 'el',
+      system_rolle: 'keiner',
+      org_rolle: 'fuehrungskraft',
+      aktiv: true,
+      erstellt_at: '',
+      totp_aktiviert: false,
     },
     laedt: false,
     login: vi.fn(),
@@ -59,7 +65,13 @@ function json(name: string, koerper: object[]) {
   };
 }
 
-const PERSON = { id: 7, einsatz_id: EINSATZ, registrier_nr: 42, status: 'betroffen', name: 'Meier' };
+const PERSON = {
+  id: 7,
+  einsatz_id: EINSATZ,
+  registrier_nr: 42,
+  status: 'betroffen',
+  name: 'Meier',
+};
 const FAHRZEUG = { id: 3, einsatz_id: EINSATZ, funkrufname: 'Florian 42' };
 
 beforeEach(() => {
@@ -87,7 +99,10 @@ beforeEach(() => {
   );
 });
 
-function wrapperFuer(): { client: QueryClient; Wrapper: (p: { children: ReactNode }) => ReactNode } {
+function wrapperFuer(): {
+  client: QueryClient;
+  Wrapper: (p: { children: ReactNode }) => ReactNode;
+} {
   const client = neuerQueryClient();
   return {
     client,
@@ -105,19 +120,26 @@ function wrapperFuer(): { client: QueryClient; Wrapper: (p: { children: ReactNod
  * damit trivial grün und könnten nicht rot werden.
  */
 async function ruhe() {
-  await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 30));
+  });
 }
 
-interface Eingabe { suche: string; modus?: PaletteModus; einsatzId?: number | null }
+interface Eingabe {
+  suche: string;
+  modus?: PaletteModus;
+  einsatzId?: number | null;
+}
 
 function starte(anfang: Eingabe) {
   const { client, Wrapper } = wrapperFuer();
   const gerendert = renderHook(
-    (p: Eingabe) => useDatensaetze({
-      einsatzId: p.einsatzId === undefined ? EINSATZ : p.einsatzId,
-      modus: p.modus ?? 'alles',
-      suche: p.suche,
-    }),
+    (p: Eingabe) =>
+      useDatensaetze({
+        einsatzId: p.einsatzId === undefined ? EINSATZ : p.einsatzId,
+        modus: p.modus ?? 'alles',
+        suche: p.suche,
+      }),
     { wrapper: Wrapper, initialProps: anfang },
   );
   return { client, ...gerendert };
@@ -166,8 +188,12 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
   it('lädt die freigegebenen Listen und lässt die des ausgeblendeten Moduls ungefragt', async () => {
     overrides = {
       personen: {
-        einsatz_id: EINSATZ, modul_key: 'personen', sichtbar: false,
-        benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        einsatz_id: EINSATZ,
+        modul_key: 'personen',
+        sichtbar: false,
+        benoetigte_rolle: null,
+        geaendert_at: null,
+        geaendert_von: null,
       },
     };
     starte({ suche: 'meier' });
@@ -323,10 +349,10 @@ describe('useDatensaetze — Cache-Fach der ETB-Seite', () => {
     einsatzKeys.etbListe(EINSATZ, parseEtbFilter(new URLSearchParams(`q=${q}`)));
 
   it('hasht die Palettenschlüssel anders als den Schlüssel der ETB-Seite', () => {
-    expect(hashKey(etbSuchSchluessel(EINSATZ, 'brand')))
-      .not.toBe(hashKey(seitenSchluessel('brand')));
-    expect(hashKey(etbNummerSchluessel(EINSATZ, 42)))
-      .not.toBe(hashKey(seitenSchluessel('42')));
+    expect(hashKey(etbSuchSchluessel(EINSATZ, 'brand'))).not.toBe(
+      hashKey(seitenSchluessel('brand')),
+    );
+    expect(hashKey(etbNummerSchluessel(EINSATZ, 42))).not.toBe(hashKey(seitenSchluessel('42')));
   });
 
   /**
@@ -375,9 +401,13 @@ describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
     await waitFor(() => expect(zaehler.einheiten).toBe(1));
     await ruhe();
 
-    expect(Object.keys(zaehler).sort()).toEqual(
-      ['einheiten', 'fahrzeuge', 'modul-overrides', 'personal', 'personen'],
-    );
+    expect(Object.keys(zaehler).sort()).toEqual([
+      'einheiten',
+      'fahrzeuge',
+      'modul-overrides',
+      'personal',
+      'personen',
+    ]);
   });
 
   it('holt unter „#" nur den ETB', async () => {
@@ -406,7 +436,9 @@ describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
     rerender({ suche: 'meier', modus: 'kraefte' });
     await ruhe();
 
-    expect(result.current.schaeden, 'die abgeschaltete Query liefert ihren Cache weiter').toEqual([]);
+    expect(result.current.schaeden, 'die abgeschaltete Query liefert ihren Cache weiter').toEqual(
+      [],
+    );
     expect(zaehler.schaeden, 'aber sie fragt nicht erneut').toBe(1);
   });
 });

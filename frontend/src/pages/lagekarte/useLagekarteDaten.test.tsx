@@ -10,7 +10,13 @@ import { gefahrengebietStil } from './zonenStil';
 
 // darfSchreiben wird im Snapshot-Modus hart auf false gefahren → benutzer egal.
 vi.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ benutzer: null, laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn() }),
+  useAuth: () => ({
+    benutzer: null,
+    laedt: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    aktualisiere: vi.fn(),
+  }),
 }));
 
 const ladeLageSnapshot = vi.fn();
@@ -48,7 +54,15 @@ function dokument(warnstufe: string) {
       uhs: [],
       schaeden: [],
       einheiten: [
-        { id: 1, name: 'Zug 1', typ_label: 'Zug', lat: 50.1, lon: 8.6, tz_fachaufgabe: null, tz_organisation: null },
+        {
+          id: 1,
+          name: 'Zug 1',
+          typ_label: 'Zug',
+          lat: 50.1,
+          lon: 8.6,
+          tz_fachaufgabe: null,
+          tz_organisation: null,
+        },
       ],
       fahrzeuge: [],
       fuehrungskraefte: [],
@@ -63,7 +77,14 @@ function dokument(warnstufe: string) {
           gefahrengebiet_id: 7,
           geometrie: JSON.stringify({
             type: 'Polygon',
-            coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]],
+            coordinates: [
+              [
+                [8.6, 50.1],
+                [8.7, 50.1],
+                [8.7, 50.2],
+                [8.6, 50.1],
+              ],
+            ],
           }),
           farbe: null,
           label: null,
@@ -82,9 +103,14 @@ describe('useLagekarteDaten Standquelle', () => {
     // Deferred Promise: die Pending-Phase explizit festnageln — sonst greift waitFor(false) sofort
     // und die `istSnapshot ? snapQuery.isLoading`-Regel bliebe ungetestet (Review-Fix #5).
     let aufloesen!: (v: unknown) => void;
-    ladeLageSnapshot.mockReturnValue(new Promise((r) => { aufloesen = r; }));
+    ladeLageSnapshot.mockReturnValue(
+      new Promise((r) => {
+        aufloesen = r;
+      }),
+    );
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     // Solange das Dokument nicht da ist, MUSS ladt true sein (die disabled Live-Queries melden
@@ -101,7 +127,8 @@ describe('useLagekarteDaten Standquelle', () => {
   it('speist die Gefahrengebiet-Warnstufe aus dem eingefrorenen Dokument, nicht aus Live', async () => {
     ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
@@ -121,7 +148,8 @@ describe('useLagekarteDaten Standquelle', () => {
   it('speist den org_default aus dem Dokument in die Marker-TZ, nicht aus Live (Review-Fix #4)', async () => {
     ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.alleVerortet.length).toBeGreaterThan(0));
@@ -146,7 +174,9 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
     // einem „alles, was rot ist"-Sammelsurium: nur die zwei stehen in der Meldung. Wäre der
     // Render-Kontext im Katalog, käme die Liste hier auf fünf Einträge.
     server.use(
-      http.get('/api/einsaetze/5', () => HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' })),
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
       http.get('/api/einsaetze/5/uhs', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/zonen', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
@@ -163,20 +193,34 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/karte/fuehrungskraefte',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
     );
-    const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }),
-      { wrapper: wrapper() },
-    );
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toHaveLength(2));
     expect(result.current.fehlerhafteQuellen).toEqual(['Unfallhilfsstellen', 'Zonen']);
   });
 
   it('ist bei vollständigem Abruf leer', async () => {
     server.use(
-      http.get('/api/einsaetze/5', () => HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' })),
-      http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
-      http.get('/api/karte/config', () => HttpResponse.json({ online_styles: [], offline_verfuegbar: false, offline_tiles_url: null, offline_attribution: null, offline_regionen: [], karten_bau_verfuegbar: false })),
-      http.get('/api/einsaetze/5/einstellungen', () => HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } })),
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
+      ),
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/schaeden',
@@ -190,10 +234,9 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/karte/fuehrungskraefte',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
     );
-    const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }),
-      { wrapper: wrapper() },
-    );
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.ladt).toBe(false));
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
@@ -204,7 +247,8 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
     // nur das Dokument treffen.
     ladeLageSnapshot.mockRejectedValue(new Error('weg'));
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Gesicherter Stand']));

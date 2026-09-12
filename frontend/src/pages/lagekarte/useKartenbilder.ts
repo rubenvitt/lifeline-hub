@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  listeHintergrundbilder, aktualisiereHintergrundbild, ladeHintergrundbildHoch,
-  loescheHintergrundbild, ladeBildBlobUrl, type Ecken,
+  listeHintergrundbilder,
+  aktualisiereHintergrundbild,
+  ladeHintergrundbildHoch,
+  loescheHintergrundbild,
+  ladeBildBlobUrl,
+  type Ecken,
 } from '../../api/kartenbilder';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
@@ -48,7 +52,14 @@ interface KartenbilderArgs {
  * LFH-166/LFH-35), Overlay-Ableitung und die CRUD-/Platzier-Handler. `bildPlatzierenId`
  * kommt als FSM-Parameter herein — die Reset-Logik liegt in useKartenInteraktion.
  */
-export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle = { typ: 'live' }, fehler }: KartenbilderArgs) {
+export function useKartenbilder({
+  einsatzId,
+  kartenRef,
+  bildPlatzierenId,
+  aktiveAnsichtId,
+  quelle = { typ: 'live' },
+  fehler,
+}: KartenbilderArgs) {
   const qc = useQueryClient();
   const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
   // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
@@ -74,7 +85,8 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
     ? (snapQuery.data?.daten as SnapshotDaten | undefined)?.bilder
     : bilderQuery.data;
 
-  const invalidiereBilder = () => qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
+  const invalidiereBilder = () =>
+    qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
 
   // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern inkrementell revoken).
   // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
@@ -89,15 +101,17 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
     let abgebrochen = false;
     for (const b of bilder) {
       if (!blobUrlsRef.current[b.id]) {
-        ladeBildBlobUrl(einsatzId, b.id).then((url) => {
-          if (!abgebrochen) {
-            blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
-            setBlobUrls(blobUrlsRef.current);
-          }
-        }).catch((e) => {
-          // Lade-Fehler sichtbar machen statt lautlos schlucken (maskierte sonst C1).
-          if (!abgebrochen) fehler(e);
-        });
+        ladeBildBlobUrl(einsatzId, b.id)
+          .then((url) => {
+            if (!abgebrochen) {
+              blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
+              setBlobUrls(blobUrlsRef.current);
+            }
+          })
+          .catch((e) => {
+            // Lade-Fehler sichtbar machen statt lautlos schlucken (maskierte sonst C1).
+            if (!abgebrochen) fehler(e);
+          });
       }
     }
     // Entfernte Bilder (z. B. gelöscht, oder Einsatzwechsel/Listen-Swap) inkrementell
@@ -122,9 +136,12 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
 
   // Unmount-only: beim Verlassen der Karte alle dann noch aktuellen Blob-URLs freigeben.
   // Separater Effekt mit leeren deps → läuft NUR beim Unmount, nicht bei jedem Refetch.
-  useEffect(() => () => {
-    Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
-  }, []);
+  useEffect(
+    () => () => {
+      Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
+    },
+    [],
+  );
 
   // Ansichts-Filter (B/LFH-320, client-seitig): Bilder der aktiven Ansicht PLUS die
   // ansichtslosen (`ansicht_id == null`, auf allen Ansichten). `== null` fängt sowohl `null`
@@ -137,15 +154,16 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
   // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
   // was den bilder-Effekt der Kartenflaeche bei jedem Render unnötig feuert.
   const bildOverlays = useMemo<BildOverlay[]>(
-    () => sichtbareBilder
-      .filter((b) => blobUrls[b.id])
-      .map((b) => ({
-        id: b.id,
-        blobUrl: blobUrls[b.id],
-        ecken: JSON.parse(b.ecken_json) as Ecken,
-        opazitaet: b.opazitaet,
-        sichtbar: b.sichtbar,
-      })),
+    () =>
+      sichtbareBilder
+        .filter((b) => blobUrls[b.id])
+        .map((b) => ({
+          id: b.id,
+          blobUrl: blobUrls[b.id],
+          ecken: JSON.parse(b.ecken_json) as Ecken,
+          opazitaet: b.opazitaet,
+          sichtbar: b.sichtbar,
+        })),
     [sichtbareBilder, blobUrls],
   );
 
@@ -153,7 +171,8 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
     // Bild-Seitenverhältnis lesen → mittig im aktuellen Viewport platzieren, unverzerrt.
     // Fallback (Karte noch nicht bereit): kleines achsenparalleles Rechteck.
     const ar = await leseBildSeitenverhaeltnis(datei);
-    const ecken: Ecken = kartenRef.current?.initialeEckenFuerBild(ar) ?? eckenAusBounds(9, 49.95, 9.1, 50);
+    const ecken: Ecken =
+      kartenRef.current?.initialeEckenFuerBild(ar) ?? eckenAusBounds(9, 49.95, 9.1, 50);
     await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name, aktiveAnsichtId ?? null);
     invalidiereBilder();
   };
@@ -176,7 +195,9 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
   };
   const onPlatzierGeometrie = async (ecken: Ecken) => {
     if (bildPlatzierenId == null) return;
-    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(ecken) });
+    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, {
+      ecken_json: JSON.stringify(ecken),
+    });
     invalidiereBilder();
   };
   const onBildZentrieren = (id: number) => {
@@ -195,7 +216,9 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
     const ecken = JSON.parse(b.ecken_json) as Ecken;
     const [clng, clat] = zentroid(ecken);
     const neu = verschiebeEcken(ecken, lon - clng, lat - clat);
-    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(neu) });
+    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, {
+      ecken_json: JSON.stringify(neu),
+    });
     invalidiereBilder();
   };
 

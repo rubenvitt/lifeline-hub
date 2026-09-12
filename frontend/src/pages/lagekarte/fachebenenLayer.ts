@@ -5,7 +5,11 @@ import type { FeatureCollection, FachebeneQuelle } from '../../api/fachebenen';
 export const fachebeneSourceId = (key: string) => `fachebene-${key}`;
 
 /** Idempotent: Source + (Polygon: fill/line | Punkt: circle)-Layer je Fachebene. */
-export function sorgeFuerFachebeneLayer(map: MapLibreMap, def: FachebeneDef, daten: FeatureCollection) {
+export function sorgeFuerFachebeneLayer(
+  map: MapLibreMap,
+  def: FachebeneDef,
+  daten: FeatureCollection,
+) {
   const src = fachebeneSourceId(def.key);
   if (!map.getSource(src)) {
     map.addSource(src, { type: 'geojson', data: daten as never });
@@ -62,14 +66,20 @@ export function entferneFachebeneLayer(map: MapLibreMap, key: FachebeneQuelle) {
 }
 
 /** Daten einer bestehenden Fachebene-Source aktualisieren. */
-export function setzeFachebeneDaten(map: MapLibreMap, key: FachebeneQuelle, daten: FeatureCollection) {
+export function setzeFachebeneDaten(
+  map: MapLibreMap,
+  key: FachebeneQuelle,
+  daten: FeatureCollection,
+) {
   const s = map.getSource(fachebeneSourceId(key)) as GeoJSONSource | undefined;
   if (s) s.setData(daten as never);
 }
 
 /** Der anklickbare Layer einer Fachebene (Polygon → Fläche, Punkt → Kreis). */
 export function fachebeneClickLayerId(def: FachebeneDef): string {
-  return def.geometrieTyp === 'polygon' ? `fachebene-${def.key}-fill` : `fachebene-${def.key}-circle`;
+  return def.geometrieTyp === 'polygon'
+    ? `fachebene-${def.key}-fill`
+    : `fachebene-${def.key}-circle`;
 }
 
 const KATEGORIE_LABEL: Record<string, string> = {

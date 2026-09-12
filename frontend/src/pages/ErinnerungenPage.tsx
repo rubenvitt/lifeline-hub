@@ -9,11 +9,19 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import {
-  erledigeErinnerung, legeErinnerungAn, listeErinnerungen, oeffneErinnerung, quittiereErinnerung,
+  erledigeErinnerung,
+  legeErinnerungAn,
+  listeErinnerungen,
+  oeffneErinnerung,
+  quittiereErinnerung,
 } from '../api/erinnerungen';
 import type { Erinnerung, NeueErinnerung } from '../api/types';
 import {
-  ERINNERUNG_STATUS, GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, istAbgeschlossen,
+  ERINNERUNG_STATUS,
+  GRUPPE_LABEL,
+  GRUPPE_ORDNUNG,
+  faelligGruppe,
+  istAbgeschlossen,
   type FaelligGruppe,
 } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -37,14 +45,18 @@ export default function ErinnerungenPage() {
   // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
   const [formOffen, setFormOffen] = useState(false);
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig → ALLE Erinnerungen laden.
   const erinnerungenQuery = useQuery({
     queryKey: einsatzKeys.erinnerungen(einsatzId),
     queryFn: () => listeErinnerungen(einsatzId, false),
   });
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
 
   const anlegenMutation = useMutation({
@@ -53,7 +65,10 @@ export default function ErinnerungenPage() {
     // offen, damit die nächste Erinnerung ohne Aufklappen weitergeht. Der
     // conditional Render der Card würde es sonst unmounten, samt Serienzähler
     // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
-    onSuccess: () => { invalidiere(); message.success('Erinnerung angelegt'); },
+    onSuccess: () => {
+      invalidiere();
+      message.success('Erinnerung angelegt');
+    },
     onError: fehler,
   });
   /**
@@ -64,7 +79,8 @@ export default function ErinnerungenPage() {
    */
   const oeffnenMutation = useMutation({
     mutationFn: (eid: number) => oeffneErinnerung(einsatzId, eid),
-    onSuccess: invalidiere, onError: fehler,
+    onSuccess: invalidiere,
+    onError: fehler,
   });
   const erledigenMutation = useMutation({
     mutationFn: (eid: number) => erledigeErinnerung(einsatzId, eid),
@@ -84,7 +100,11 @@ export default function ErinnerungenPage() {
   });
 
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -94,22 +114,27 @@ export default function ErinnerungenPage() {
   const alleErinnerungen = erinnerungenQuery.data ?? [];
 
   // Offen/Abgeschlossen clientseitig ueber die gemeinsame Phasen-Semantik trennen.
-  const offene = alleErinnerungen.filter((e) => !istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'));
-  const abgeschlossene = alleErinnerungen.filter((e) => istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'));
+  const offene = alleErinnerungen.filter(
+    (e) => !istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'),
+  );
+  const abgeschlossene = alleErinnerungen.filter((e) =>
+    istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'),
+  );
 
   // Offen-Ansicht: nach Faelligkeit gruppieren, je Gruppe nach faellig_at aufsteigend.
-  const offeneGruppen: { gruppe: FaelligGruppe; erinnerungen: Erinnerung[] }[] = GRUPPE_ORDNUNG
-    .map((gruppe) => ({
+  const offeneGruppen: { gruppe: FaelligGruppe; erinnerungen: Erinnerung[] }[] = GRUPPE_ORDNUNG.map(
+    (gruppe) => ({
       gruppe,
       erinnerungen: offene
         .filter((e) => faelligGruppe(e.faellig_at, e.ist_faellig) === gruppe)
         .sort((a, b) => (a.faellig_at ?? '￿').localeCompare(b.faellig_at ?? '￿')),
-    }))
-    .filter(({ erinnerungen }) => erinnerungen.length > 0);
+    }),
+  ).filter(({ erinnerungen }) => erinnerungen.length > 0);
 
   // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
-  const abgeschlosseneSortiert = [...abgeschlossene]
-    .sort((a, b) => abschlussZeit(b).localeCompare(abschlussZeit(a)));
+  const abgeschlosseneSortiert = [...abgeschlossene].sort((a, b) =>
+    abschlussZeit(b).localeCompare(abschlussZeit(a)),
+  );
 
   const listenProps = {
     darfSchreiben,
@@ -129,11 +154,15 @@ export default function ErinnerungenPage() {
       />
       <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
         <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>Erinnerungen</Typography.Title>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            Erinnerungen
+          </Typography.Title>
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
-          <div><Datenstand dataUpdatedAt={erinnerungenQuery.dataUpdatedAt} /></div>
+          <div>
+            <Datenstand dataUpdatedAt={erinnerungenQuery.dataUpdatedAt} />
+          </div>
         </div>
         {darfSchreiben && (
           <Button
@@ -152,25 +181,42 @@ export default function ErinnerungenPage() {
           size="small"
           title="Neue Erinnerung"
           style={{ marginBottom: 16 }}
-          extra={(
+          extra={
             <Button
               type="text"
               icon={<CloseOutlined />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />
-          )}
+          }
         >
           {/* mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die
               Erinnerung wirklich angekommen ist (LFH-332/B4). */}
-          <ErinnerungFormular card={false} senden={anlegenMutation.isPending} onAnlegen={(d) => anlegenMutation.mutateAsync(d)} />
+          <ErinnerungFormular
+            card={false}
+            senden={anlegenMutation.isPending}
+            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
+          />
         </Card>
       )}
 
       {erinnerungenQuery.isError && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Erinnerungen konnten nicht geladen werden" />
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="Erinnerungen konnten nicht geladen werden"
+        />
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 16,
+          alignItems: 'center',
+        }}
+      >
         <Segmented
           value={ansicht}
           onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
@@ -194,7 +240,11 @@ export default function ErinnerungenPage() {
           ))
         )
       ) : (
-        <ErinnerungListe erinnerungen={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
+        <ErinnerungListe
+          erinnerungen={abgeschlosseneSortiert}
+          ansicht="abgeschlossen"
+          {...listenProps}
+        />
       )}
     </div>
   );

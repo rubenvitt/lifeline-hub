@@ -19,7 +19,13 @@ import { listeLageMeldungen } from '../../api/meldungen';
 import { ladeOrganisation } from '../../api/organisation';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import type { Warnstufe } from '../../api/types';
-import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, baueFreieZeichenMarker, type KarteMarker } from './marker';
+import {
+  baueMarker,
+  baueTaktischeMarker,
+  baueLageMeldungMarker,
+  baueFreieZeichenMarker,
+  type KarteMarker,
+} from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import { baueTzProps } from './taktischesZeichen';
 import { zoneStil, gefahrengebietStil } from './zonenStil';
@@ -49,7 +55,12 @@ interface LagekarteDatenArgs {
  * ROHEN DTO-Listen in dieselben Ableiter (`baueMarker` etc.) fließen — die Rückgabeform bleibt
  * identisch, die Konsumenten bleiben unverändert.
  */
-export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quelle = { typ: 'live' } }: LagekarteDatenArgs) {
+export function useLagekarteDaten({
+  einsatzId,
+  zeigeZonen,
+  aktiveAnsichtId,
+  quelle = { typ: 'live' },
+}: LagekarteDatenArgs) {
   const { benutzer } = useAuth();
   // Kartenstil-Module (`marker.ts`, `zonenStil.ts`) erzeugen MapLibre-`paint`-Werte und haben
   // deshalb keinen eigenen `useToken()`-Zugang (LFH-328/A2). Diese Ebene kennt den aktiven
@@ -66,8 +77,16 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
     enabled: snapshotId != null,
   });
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId), enabled: liveAn });
-  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId), enabled: liveAn });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+    enabled: liveAn,
+  });
+  const uhsQuery = useQuery({
+    queryKey: einsatzKeys.uhs(einsatzId),
+    queryFn: () => listeUhs(einsatzId),
+    enabled: liveAn,
+  });
   const schaedenQuery = useQuery({
     queryKey: einsatzKeys.schaeden(einsatzId),
     queryFn: () => listeSchaeden(einsatzId),
@@ -98,7 +117,11 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
     queryFn: () => listeFreieZeichen(einsatzId),
     enabled: liveAn,
   });
-  const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId), enabled: liveAn });
+  const gebieteQuery = useQuery({
+    queryKey: einsatzKeys.gefahrengebiete(einsatzId),
+    queryFn: () => ladeGefahrengebiete(einsatzId),
+    enabled: liveAn,
+  });
   const lageMeldungenQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
@@ -109,7 +132,11 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
     queryFn: () => listeFuehrungskraefte(einsatzId),
     enabled: liveAn,
   });
-  const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation, enabled: liveAn });
+  const orgQuery = useQuery({
+    queryKey: globalKeys.organisation(),
+    queryFn: ladeOrganisation,
+    enabled: liveAn,
+  });
   // Config + Einstellungen sind reiner Render-Kontext (Style-Katalog, Basemap-Defaults), kein Teil
   // des eingefrorenen Lagebilds → auch im Historien-Modus live.
   const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
@@ -259,10 +286,19 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
     ];
     return katalog.filter(([, kaputt]) => kaputt).map(([name]) => name);
   }, [
-    istSnapshot, snapQuery.isError,
-    einsatzQuery.isError, uhsQuery.isError, schaedenQuery.isError, einheitenQuery.isError,
-    fahrzeugeQuery.isError, abschnitteQuery.isError, zonenQuery.isError, freieZeichenQuery.isError,
-    gebieteQuery.isError, lageMeldungenQuery.isError, fkQuery.isError,
+    istSnapshot,
+    snapQuery.isError,
+    einsatzQuery.isError,
+    uhsQuery.isError,
+    schaedenQuery.isError,
+    einheitenQuery.isError,
+    fahrzeugeQuery.isError,
+    abschnitteQuery.isError,
+    zonenQuery.isError,
+    freieZeichenQuery.isError,
+    gebieteQuery.isError,
+    lageMeldungenQuery.isError,
+    fkQuery.isError,
   ]);
 
   // Erneuter Abruf: gezielt nur die GESCHEITERTEN Quellen. Ein pauschales Invalidieren träfe
@@ -270,8 +306,18 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
   // Bewusst KEIN Namenskatalog hier — die Namen leben genau einmal, oben.
   const neuLaden = () => {
     for (const q of [
-      snapQuery, einsatzQuery, uhsQuery, schaedenQuery, einheitenQuery, fahrzeugeQuery,
-      abschnitteQuery, zonenQuery, freieZeichenQuery, gebieteQuery, lageMeldungenQuery, fkQuery,
+      snapQuery,
+      einsatzQuery,
+      uhsQuery,
+      schaedenQuery,
+      einheitenQuery,
+      fahrzeugeQuery,
+      abschnitteQuery,
+      zonenQuery,
+      freieZeichenQuery,
+      gebieteQuery,
+      lageMeldungenQuery,
+      fkQuery,
     ]) {
       if (q.isError) void q.refetch();
     }
@@ -282,15 +328,15 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
     [lageMeldungenRoh],
   );
 
-  const freieZeichenMarker = useMemo(
-    () => baueFreieZeichenMarker(freieZeichen),
-    [freieZeichen],
-  );
+  const freieZeichenMarker = useMemo(() => baueFreieZeichenMarker(freieZeichen), [freieZeichen]);
 
   const alleVerortet = useMemo(
     () => [
-      ...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker),
-      ...lageMeldungMarker, ...freieZeichenMarker,
+      ...verortet,
+      ...taktisch.verortet,
+      ...flaechen.map((f) => f.tzMarker),
+      ...lageMeldungMarker,
+      ...freieZeichenMarker,
     ],
     [verortet, taktisch.verortet, flaechen, lageMeldungMarker, freieZeichenMarker],
   );

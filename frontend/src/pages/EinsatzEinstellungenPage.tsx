@@ -108,7 +108,12 @@ export default function EinsatzEinstellungenPage() {
 
   if (daten.laedt) return <SeitenSkeleton />;
   if (!daten.einsatz) {
-    return <SeitenFehler text="Einstellungen nicht ladbar oder kein Zugriff" onWiederholen={daten.neuLaden} />;
+    return (
+      <SeitenFehler
+        text="Einstellungen nicht ladbar oder kein Zugriff"
+        onWiederholen={daten.neuLaden}
+      />
+    );
   }
 
   return (
@@ -131,7 +136,9 @@ export default function EinsatzEinstellungenPage() {
           das AKTIVE Feld auf, der Ausdruck laeuft also genau einmal. */}
       <Tabs
         activeKey={aktiv}
-        onChange={(key) => navigate(einsatzEinstellungenPfad(einsatzId, key as EinstellungenSektion))}
+        onChange={(key) =>
+          navigate(einsatzEinstellungenPfad(einsatzId, key as EinstellungenSektion))
+        }
         items={EINSTELLUNGEN_SEKTIONEN.map((s) => ({
           key: s.key,
           label: s.label,

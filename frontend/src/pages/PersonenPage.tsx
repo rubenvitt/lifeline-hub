@@ -67,7 +67,10 @@ export default function PersonenPage() {
 
   // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const personenQuery = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
@@ -75,8 +78,12 @@ export default function PersonenPage() {
 
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [modusNachEinsatz, setModusNachEinsatz] = useState<Record<number, ErfassungsModus | null>>({});
-  const [highlightNachEinsatz, setHighlightNachEinsatz] = useState<Record<number, number | null>>({});
+  const [modusNachEinsatz, setModusNachEinsatz] = useState<Record<number, ErfassungsModus | null>>(
+    {},
+  );
+  const [highlightNachEinsatz, setHighlightNachEinsatz] = useState<Record<number, number | null>>(
+    {},
+  );
   const [quittungNachEinsatz, setQuittungNachEinsatz] = useState<
     Record<number, ErfassungsQuittung | null>
   >({});
@@ -95,9 +102,8 @@ export default function PersonenPage() {
   const modus = modusNachEinsatz[einsatzId] ?? null;
   const highlightPersonId = highlightNachEinsatz[einsatzId] ?? null;
   const roheErfassungsQuittung = quittungNachEinsatz[einsatzId] ?? null;
-  const erfassungsQuittung = roheErfassungsQuittung?.benutzerId === benutzer?.id
-    ? roheErfassungsQuittung
-    : null;
+  const erfassungsQuittung =
+    roheErfassungsQuittung?.benutzerId === benutzer?.id ? roheErfassungsQuittung : null;
 
   const setModusFuer = (zielEinsatzId: number, neuerModus: ErfassungsModus | null) => {
     setModusNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: neuerModus }));
@@ -155,8 +161,9 @@ export default function PersonenPage() {
           bestaetigenNach:
             qc.getQueryState(einsatzKeys.personen(zielEinsatzId))?.dataUpdatedAt ?? 0,
         },
-        ...alt.filter((eintrag) =>
-          eintrag.einsatzId !== zielEinsatzId || eintrag.person.id !== person.id),
+        ...alt.filter(
+          (eintrag) => eintrag.einsatzId !== zielEinsatzId || eintrag.person.id !== person.id,
+        ),
       ]);
       setHighlightFuer(zielEinsatzId, person.id);
       setQuittungFuer(zielEinsatzId, {
@@ -182,17 +189,21 @@ export default function PersonenPage() {
     const serverIds = new Set((personenQuery.data ?? []).map((person) => person.id));
     if (serverIds.size === 0) return;
     setFrischErfasst((alt) => {
-      const offen = alt.filter((eintrag) =>
-        eintrag.einsatzId !== einsatzId ||
-        personenQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
-        !serverIds.has(eintrag.person.id));
+      const offen = alt.filter(
+        (eintrag) =>
+          eintrag.einsatzId !== einsatzId ||
+          personenQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
+          !serverIds.has(eintrag.person.id),
+      );
       return offen.length === alt.length ? alt : offen;
     });
   }, [einsatzId, personenQuery.data, personenQuery.dataUpdatedAt]);
 
   useEffect(() => {
     pageMontiert.current = true;
-    return () => { pageMontiert.current = false; };
+    return () => {
+      pageMontiert.current = false;
+    };
   }, []);
 
   const ladePersistiertePersonQuittungen = useCallback(async () => {
@@ -208,11 +219,11 @@ export default function PersonenPage() {
         kontext.benutzerId !== zielBenutzerId ||
         kontext.einsatzId !== einsatzId ||
         quittungen.length === 0
-      ) return;
+      )
+        return;
 
       const neueste = quittungen[quittungen.length - 1];
-      const bestaetigenNach =
-        qc.getQueryState(einsatzKeys.personen(einsatzId))?.dataUpdatedAt ?? 0;
+      const bestaetigenNach = qc.getQueryState(einsatzKeys.personen(einsatzId))?.dataUpdatedAt ?? 0;
       const quittungsIds = new Set(quittungen.map((quittung) => quittung.person.id));
       setFrischErfasst((alt) => [
         ...quittungen.map((quittung) => ({
@@ -220,30 +231,30 @@ export default function PersonenPage() {
           person: quittung.person,
           bestaetigenNach,
         })),
-        ...alt.filter((eintrag) =>
-          eintrag.einsatzId !== einsatzId || !quittungsIds.has(eintrag.person.id)),
+        ...alt.filter(
+          (eintrag) => eintrag.einsatzId !== einsatzId || !quittungsIds.has(eintrag.person.id),
+        ),
       ]);
       setSichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: neueste.sicht }));
       setHighlightNachEinsatz((alt) => ({ ...alt, [einsatzId]: neueste.person.id }));
       setQuittungNachEinsatz((alt) => {
         const bisher = alt[einsatzId];
-        const bisherigeIds = bisher?.benutzerId === zielBenutzerId
-          ? bisher.persistenzClientIds ?? []
-          : [];
+        const bisherigeIds =
+          bisher?.benutzerId === zielBenutzerId ? (bisher.persistenzClientIds ?? []) : [];
         return {
           ...alt,
           [einsatzId]: {
             typ: 'success',
-            text: quittungen.length === 1
-              ? `Erfasst als ${registrierAnzeige(neueste.person.registrier_nr)}`
-              : `Erfasst als ${quittungen
-                  .map((quittung) => registrierAnzeige(quittung.person.registrier_nr))
-                  .join(', ')}`,
+            text:
+              quittungen.length === 1
+                ? `Erfasst als ${registrierAnzeige(neueste.person.registrier_nr)}`
+                : `Erfasst als ${quittungen
+                    .map((quittung) => registrierAnzeige(quittung.person.registrier_nr))
+                    .join(', ')}`,
             benutzerId: zielBenutzerId,
-            persistenzClientIds: [...new Set([
-              ...bisherigeIds,
-              ...quittungen.map((quittung) => quittung.client_id),
-            ])],
+            persistenzClientIds: [
+              ...new Set([...bisherigeIds, ...quittungen.map((quittung) => quittung.client_id)]),
+            ],
           },
         };
       });
@@ -259,10 +270,14 @@ export default function PersonenPage() {
     void ladePersistiertePersonQuittungen();
   }, [ladePersistiertePersonQuittungen]);
 
-  useEffect(() => beobachteOfflinePersonQuittungen((signal) => {
-    if (signal.benutzerId !== benutzer?.id || signal.einsatzId !== einsatzId) return;
-    void ladePersistiertePersonQuittungen();
-  }), [benutzer?.id, einsatzId, ladePersistiertePersonQuittungen]);
+  useEffect(
+    () =>
+      beobachteOfflinePersonQuittungen((signal) => {
+        if (signal.benutzerId !== benutzer?.id || signal.einsatzId !== einsatzId) return;
+        void ladePersistiertePersonQuittungen();
+      }),
+    [benutzer?.id, einsatzId, ladePersistiertePersonQuittungen],
+  );
 
   useEffect(() => {
     const sichtbarkeitGeaendert = () => {
@@ -277,10 +292,7 @@ export default function PersonenPage() {
   useEffect(() => {
     const erfolgreichGesendet = (event: Event) => {
       const detail = (event as CustomEvent<OfflineSchreibaktionGesendet>).detail;
-      if (
-        detail?.art !== 'person' ||
-        detail.benutzerId !== benutzer?.id
-      ) return;
+      if (detail?.art !== 'person' || detail.benutzerId !== benutzer?.id) return;
       setFrischErfasst((alt) => [
         {
           einsatzId: detail.einsatzId,
@@ -288,10 +300,13 @@ export default function PersonenPage() {
           bestaetigenNach:
             qc.getQueryState(einsatzKeys.personen(detail.einsatzId))?.dataUpdatedAt ?? 0,
         },
-        ...alt.filter((eintrag) =>
-          eintrag.einsatzId !== detail.einsatzId || eintrag.person.id !== detail.daten.id),
+        ...alt.filter(
+          (eintrag) =>
+            eintrag.einsatzId !== detail.einsatzId || eintrag.person.id !== detail.daten.id,
+        ),
       ]);
-      const zielSicht = detail.sicht ??
+      const zielSicht =
+        detail.sicht ??
         (detail.daten.status === 'vermisst' || detail.daten.status === 'betroffen'
           ? detail.daten.status
           : 'erfasst');
@@ -299,9 +314,8 @@ export default function PersonenPage() {
       setHighlightFuer(detail.einsatzId, detail.daten.id);
       setQuittungNachEinsatz((alt) => {
         const bisher = alt[detail.einsatzId];
-        const bisherigeIds = bisher?.benutzerId === detail.benutzerId
-          ? bisher.persistenzClientIds ?? []
-          : [];
+        const bisherigeIds =
+          bisher?.benutzerId === detail.benutzerId ? (bisher.persistenzClientIds ?? []) : [];
         return {
           ...alt,
           [detail.einsatzId]: {
@@ -331,7 +345,8 @@ export default function PersonenPage() {
     if (persistenzClientIds.length === 0) return;
     void Promise.all(
       persistenzClientIds.map((clientId) =>
-        personErfassungsQuittungEntfernen(benutzer.id, einsatzId, clientId)),
+        personErfassungsQuittungEntfernen(benutzer.id, einsatzId, clientId),
+      ),
     ).catch(() => undefined);
   };
 
@@ -353,12 +368,23 @@ export default function PersonenPage() {
     if (darfSchr) setModusFuer(einsatzId, 'schnell');
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, einsatzQuery.data, benutzer, einsatzId]);
+  }, [
+    searchParams,
+    setSearchParams,
+    einsatzQuery.isLoading,
+    einsatzQuery.data,
+    benutzer,
+    einsatzId,
+  ]);
 
   const abgleichVorschlagMutation = useMutation({
     mutationFn: (v: { vermisstId: number; gefundenId: number }) =>
       schlageAbgleichVor(einsatzId, v.vermisstId, v.gefundenId),
-    onSuccess: () => { invalidate(); setAbgleichFuer(null); message.success('Verdachts-Abgleich angelegt'); },
+    onSuccess: () => {
+      invalidate();
+      setAbgleichFuer(null);
+      message.success('Verdachts-Abgleich angelegt');
+    },
     onError: fehler,
   });
 
@@ -442,15 +468,23 @@ export default function PersonenPage() {
       }
       breadcrumb={
         <Breadcrumb
-          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Personen' }]}
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Personen' },
+          ]}
         />
       }
       aktionen={
         darfSchreiben && (
           <Space wrap style={{ minWidth: 0 }}>
-            <Button type="primary" onClick={() => setModusFuer(einsatzId, 'schnell')}>Schnellerfassung</Button>
+            <Button type="primary" onClick={() => setModusFuer(einsatzId, 'schnell')}>
+              Schnellerfassung
+            </Button>
             <Button onClick={() => setModusFuer(einsatzId, 'vermisst')}>Vermisst melden</Button>
-            <Button onClick={() => setModusFuer(einsatzId, 'betroffen')}>Betroffene/n erfassen</Button>
+            <Button onClick={() => setModusFuer(einsatzId, 'betroffen')}>
+              Betroffene/n erfassen
+            </Button>
           </Space>
         )
       }
@@ -458,7 +492,8 @@ export default function PersonenPage() {
       // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber.
       neueZeile={darfSchreiben ? () => setModusFuer(einsatzId, 'schnell') : undefined}
       hinweis={
-        !darfSchreiben && einsatz.status !== 'aktiv' && (
+        !darfSchreiben &&
+        einsatz.status !== 'aktiv' && (
           <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
         )
       }
@@ -473,11 +508,15 @@ export default function PersonenPage() {
           type={erfassungsQuittung.typ}
           showIcon
           title={erfassungsQuittung.text}
-          closable={dokumentSichtbar ? {
-            onClose: quittungSchliessen,
-            closeIcon: <CloseOutlined />,
-            'aria-label': 'Bestätigung schließen',
-          } : false}
+          closable={
+            dokumentSichtbar
+              ? {
+                  onClose: quittungSchliessen,
+                  closeIcon: <CloseOutlined />,
+                  'aria-label': 'Bestätigung schließen',
+                }
+              : false
+          }
         />
       )}
 
@@ -495,7 +534,9 @@ export default function PersonenPage() {
         />
       ) : (
         <>
-          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void personenQuery.refetch()} />}
+          {standVeraltet && (
+            <SeitenStandVeraltet onWiederholen={() => void personenQuery.refetch()} />
+          )}
 
           {/* Der Streifen steht INNERHALB des Datenzweigs, nicht darüber: er zählt aus
               derselben Menge. Über dem Fehler stehend meldete er „Patienten: 0" neben der
@@ -504,90 +545,91 @@ export default function PersonenPage() {
           <LagebildStreifen alle={alle} />
 
           {sicht === 'patienten' ? (
-          /**
-           * EINE Sicht mit Gruppenachse statt fünf Tabellen: damit gibt es eine stehende
-           * Kopfzeile, eine fixierte Kennungsspalte und einen Spaltenschalter statt fünf.
-           * Die Ordnung ist die Dringlichkeit — SK-Rang zuerst (Gruppenachse ist die führende
-           * Sortierachse), innerhalb der Kategorie der ÄLTESTE Sichtungszeitpunkt zuerst.
-           */
-          <Datensicht
             /**
-             * `key` ist hier NICHT Kosmetik, sondern das Einzige, was die beiden Sichten
-             * trennt. Sie stehen an DERSELBEN Stelle im Elementbaum und haben denselben
-             * Komponententyp — React reicht die Instanz samt internem Zustand (Sortierung,
-             * Suchbegriff, Spaltenauswahl, Zeilenschleuse) einfach weiter, statt neu zu
-             * montieren. Gemessen: ohne die Schlüssel behielt der Patienten-Reiter die
-             * `standardSortierung` der Listen-Sicht (`reg`), und die Dringlichkeitsordnung
-             * nach `seit` griff nie — ohne Fehler, ohne Warnung. `datensicht.guard.test.ts`
-             * hält die Regel seither fest.
+             * EINE Sicht mit Gruppenachse statt fünf Tabellen: damit gibt es eine stehende
+             * Kopfzeile, eine fixierte Kennungsspalte und einen Spaltenschalter statt fünf.
+             * Die Ordnung ist die Dringlichkeit — SK-Rang zuerst (Gruppenachse ist die führende
+             * Sortierachse), innerhalb der Kategorie der ÄLTESTE Sichtungszeitpunkt zuerst.
              */
-            key="patienten"
-            bezeichnung="Patienten nach Sichtungskategorie"
-            spalten={personenSpalten}
-            daten={alle.filter(istPatient)}
-            zeilenSchluessel="id"
-            ladend={personenQuery.isLoading}
-            leerText="Keine Patienten in diesem Einsatz."
-            standardSortierung={{ spalte: 'seit', richtung: 'auf' }}
-            gruppen={{
-              schluessel: (p) => p.aktuelle_sichtung ?? 'ohne',
-              // 'ohne' ist hier unerreichbar (`istPatient` filtert es weg) und steht nur,
-              // damit die Funktion total bleibt statt an einem Nachschlag zu werfen.
-              etikett: (sk) => (sk === 'ohne' ? 'ohne SK' : SK_META[sk as Sichtungskategorie].label),
-              reihenfolge: [...PATIENT_SK],
-            }}
-            onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
-            zeilenKlasse={(p) => p.id === highlightPersonId ? 'zeile-hervorgehoben' : undefined}
-            karte={personenKarte(einsatzId)}
-          />
-        ) : (
-          <Datensicht
-            /**
-             * Gegenstück zum Schlüssel oben — mit einem Zusatz, der dort nicht nötig ist:
-             * der Schlüssel trägt den REITER, nicht bloß den Zweig. Diese eine Stelle im
-             * Baum bedient FÜNF Sichten mit fünf verschiedenen Datenmengen; bei konstantem
-             * Schlüssel reicht React auch beim Reiterwechsel dieselbe Instanz weiter.
-             * Gemessen: im Reiter „Vermisst" nach einem Namen gesucht und auf „Betroffen"
-             * gewechselt — dort stand der Begriff noch im Feld und filterte eine fremde
-             * Menge auf leer. Kein Fehler, keine Warnung, nur fehlende Zeilen.
-             *
-             * Der Preis, vierfach und gewollt: mit dem Reiterwechsel fallen auch
-             * Sortierung, Spaltenauswahl, die Spaltenfilter und die Zeilenschleuse
-             * (Sammelbanner) zurück. Alle vier sind Zustand IM Primitiv
-             * (`eigeneSortierung`, `eigeneSpaltenAus`, `filterWerte`, `schleuse` in
-             * `Datensicht.tsx`) — der Remount trifft sie zwangsläufig alle, das ist keine
-             * Auswahl, sondern die Folge. Drei davon wollen wir; die Sortierung ist
-             * hingenommenes Beiwerk — ihre Spalten sind über die fünf Reiter bis auf
-             * `abgleich` dieselben, ein Zurückfallen auf `standardSortierung` wäre also
-             * verzichtbar und ist nur nicht getrennt abschaltbar.
-             * Für die Spaltenauswahl ist das nicht nur hinnehmbar, sondern richtig — die
-             * Spaltenliste ist je Reiter eine andere (`abgleichSpalten` existiert nur unter
-             * `sicht === 'vermisst'`), eine mitgeschleppte Auswahl trüge also Schlüssel,
-             * die es in der nächsten Sicht gar nicht gibt. Für die Spaltenfilter gilt
-             * dasselbe eine Stufe schärfer: ihre Werte stammen aus der Menge, in der sie
-             * gesetzt wurden, und würden in der nächsten Sicht Zeilen aus einem Grund
-             * ausblenden, der auf dem Reiter nirgends sichtbar ist.
-             */
-            key={`liste-${sicht}`}
-            bezeichnung="Personen"
-            spalten={listenSpalten}
-            daten={filterPersonen(alle, sicht)}
-            zeilenSchluessel="id"
-            ladend={personenQuery.isLoading}
-            leerText="Keine Personen in dieser Sicht"
-            suche={{ platzhalter: 'R-Nr. oder Name' }}
-            standardSortierung={{ spalte: 'reg', richtung: 'auf' }}
-            onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
-            zeilenKlasse={(p) => p.id === highlightPersonId ? 'zeile-hervorgehoben' : undefined}
-            karte={{
-              ...personenKarte(einsatzId),
-              // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (24 px hoch,
-              // 200 px fest breit) — der Deskriptor ersetzt es durch einen Knopf plus Dialog.
-              aktion: darfAbgleichen
-                ? { etikett: 'Abgleich vorschlagen …', onKlick: (p) => setAbgleichFuer(p) }
-                : undefined,
-            }}
-          />
+            <Datensicht
+              /**
+               * `key` ist hier NICHT Kosmetik, sondern das Einzige, was die beiden Sichten
+               * trennt. Sie stehen an DERSELBEN Stelle im Elementbaum und haben denselben
+               * Komponententyp — React reicht die Instanz samt internem Zustand (Sortierung,
+               * Suchbegriff, Spaltenauswahl, Zeilenschleuse) einfach weiter, statt neu zu
+               * montieren. Gemessen: ohne die Schlüssel behielt der Patienten-Reiter die
+               * `standardSortierung` der Listen-Sicht (`reg`), und die Dringlichkeitsordnung
+               * nach `seit` griff nie — ohne Fehler, ohne Warnung. `datensicht.guard.test.ts`
+               * hält die Regel seither fest.
+               */
+              key="patienten"
+              bezeichnung="Patienten nach Sichtungskategorie"
+              spalten={personenSpalten}
+              daten={alle.filter(istPatient)}
+              zeilenSchluessel="id"
+              ladend={personenQuery.isLoading}
+              leerText="Keine Patienten in diesem Einsatz."
+              standardSortierung={{ spalte: 'seit', richtung: 'auf' }}
+              gruppen={{
+                schluessel: (p) => p.aktuelle_sichtung ?? 'ohne',
+                // 'ohne' ist hier unerreichbar (`istPatient` filtert es weg) und steht nur,
+                // damit die Funktion total bleibt statt an einem Nachschlag zu werfen.
+                etikett: (sk) =>
+                  sk === 'ohne' ? 'ohne SK' : SK_META[sk as Sichtungskategorie].label,
+                reihenfolge: [...PATIENT_SK],
+              }}
+              onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
+              zeilenKlasse={(p) => (p.id === highlightPersonId ? 'zeile-hervorgehoben' : undefined)}
+              karte={personenKarte(einsatzId)}
+            />
+          ) : (
+            <Datensicht
+              /**
+               * Gegenstück zum Schlüssel oben — mit einem Zusatz, der dort nicht nötig ist:
+               * der Schlüssel trägt den REITER, nicht bloß den Zweig. Diese eine Stelle im
+               * Baum bedient FÜNF Sichten mit fünf verschiedenen Datenmengen; bei konstantem
+               * Schlüssel reicht React auch beim Reiterwechsel dieselbe Instanz weiter.
+               * Gemessen: im Reiter „Vermisst" nach einem Namen gesucht und auf „Betroffen"
+               * gewechselt — dort stand der Begriff noch im Feld und filterte eine fremde
+               * Menge auf leer. Kein Fehler, keine Warnung, nur fehlende Zeilen.
+               *
+               * Der Preis, vierfach und gewollt: mit dem Reiterwechsel fallen auch
+               * Sortierung, Spaltenauswahl, die Spaltenfilter und die Zeilenschleuse
+               * (Sammelbanner) zurück. Alle vier sind Zustand IM Primitiv
+               * (`eigeneSortierung`, `eigeneSpaltenAus`, `filterWerte`, `schleuse` in
+               * `Datensicht.tsx`) — der Remount trifft sie zwangsläufig alle, das ist keine
+               * Auswahl, sondern die Folge. Drei davon wollen wir; die Sortierung ist
+               * hingenommenes Beiwerk — ihre Spalten sind über die fünf Reiter bis auf
+               * `abgleich` dieselben, ein Zurückfallen auf `standardSortierung` wäre also
+               * verzichtbar und ist nur nicht getrennt abschaltbar.
+               * Für die Spaltenauswahl ist das nicht nur hinnehmbar, sondern richtig — die
+               * Spaltenliste ist je Reiter eine andere (`abgleichSpalten` existiert nur unter
+               * `sicht === 'vermisst'`), eine mitgeschleppte Auswahl trüge also Schlüssel,
+               * die es in der nächsten Sicht gar nicht gibt. Für die Spaltenfilter gilt
+               * dasselbe eine Stufe schärfer: ihre Werte stammen aus der Menge, in der sie
+               * gesetzt wurden, und würden in der nächsten Sicht Zeilen aus einem Grund
+               * ausblenden, der auf dem Reiter nirgends sichtbar ist.
+               */
+              key={`liste-${sicht}`}
+              bezeichnung="Personen"
+              spalten={listenSpalten}
+              daten={filterPersonen(alle, sicht)}
+              zeilenSchluessel="id"
+              ladend={personenQuery.isLoading}
+              leerText="Keine Personen in dieser Sicht"
+              suche={{ platzhalter: 'R-Nr. oder Name' }}
+              standardSortierung={{ spalte: 'reg', richtung: 'auf' }}
+              onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
+              zeilenKlasse={(p) => (p.id === highlightPersonId ? 'zeile-hervorgehoben' : undefined)}
+              karte={{
+                ...personenKarte(einsatzId),
+                // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (24 px hoch,
+                // 200 px fest breit) — der Deskriptor ersetzt es durch einen Knopf plus Dialog.
+                aktion: darfAbgleichen
+                  ? { etikett: 'Abgleich vorschlagen …', onKlick: (p) => setAbgleichFuer(p) }
+                  : undefined,
+              }}
+            />
           )}
         </>
       )}
@@ -607,9 +649,7 @@ export default function PersonenPage() {
         key={einsatzId}
         einsatzId={einsatzId}
         modus={modus}
-        isPending={
-          anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId
-        }
+        isPending={anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId}
         onCancel={() => setModusFuer(einsatzId, null)}
         onFertig={() => setModusFuer(einsatzId, null)}
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der
@@ -621,7 +661,8 @@ export default function PersonenPage() {
             benutzerId: benutzer.id,
             einsatzId,
             daten,
-            folgeStatus: modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
+            folgeStatus:
+              modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
           });
         }}
       />

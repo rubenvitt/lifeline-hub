@@ -34,14 +34,20 @@ function fakeMap(istGeladen: () => boolean) {
   const setData = vi.fn();
   const map = {
     isStyleLoaded: istGeladen,
-    on: vi.fn((ev: string, cb: () => void) => { (handler[ev] ??= []).push(cb); }),
+    on: vi.fn((ev: string, cb: () => void) => {
+      (handler[ev] ??= []).push(cb);
+    }),
     off: vi.fn((ev: string, cb: () => void) => {
       handler[ev] = (handler[ev] ?? []).filter((h) => h !== cb);
     }),
     getSource: vi.fn((id: string) => (sources.has(id) ? { setData } : undefined)),
-    addSource: vi.fn((id: string) => { sources.add(id); }),
+    addSource: vi.fn((id: string) => {
+      sources.add(id);
+    }),
     getLayer: vi.fn((id: string) => (layers.has(id) ? {} : undefined)),
-    addLayer: vi.fn((spec: { id: string }) => { layers.add(spec.id); }),
+    addLayer: vi.fn((spec: { id: string }) => {
+      layers.add(spec.id);
+    }),
     moveLayer: vi.fn(),
     feuere: (ev: string) => (handler[ev] ?? []).slice().forEach((h) => h()),
   };
@@ -51,18 +57,29 @@ function fakeMap(istGeladen: () => boolean) {
 
 /** Erweiterte Fake-Map mit image-source-Support (setCoordinates) und setPaintProperty. */
 function fakeMapMitBild() {
-  const sources = new Map<string, { setData: ReturnType<typeof vi.fn>; setCoordinates: ReturnType<typeof vi.fn> }>();
+  const sources = new Map<
+    string,
+    { setData: ReturnType<typeof vi.fn>; setCoordinates: ReturnType<typeof vi.fn> }
+  >();
   const layers = new Set<string>();
   return {
     isStyleLoaded: () => true,
     on: vi.fn(),
     off: vi.fn(),
     getSource: vi.fn((id: string) => sources.get(id)),
-    addSource: vi.fn((id: string) => { sources.set(id, { setData: vi.fn(), setCoordinates: vi.fn() }); }),
-    removeSource: vi.fn((id: string) => { sources.delete(id); }),
+    addSource: vi.fn((id: string) => {
+      sources.set(id, { setData: vi.fn(), setCoordinates: vi.fn() });
+    }),
+    removeSource: vi.fn((id: string) => {
+      sources.delete(id);
+    }),
     getLayer: vi.fn((id: string) => (layers.has(id) ? {} : undefined)),
-    addLayer: vi.fn((spec: { id: string }) => { layers.add(spec.id); }),
-    removeLayer: vi.fn((id: string) => { layers.delete(id); }),
+    addLayer: vi.fn((spec: { id: string }) => {
+      layers.add(spec.id);
+    }),
+    removeLayer: vi.fn((id: string) => {
+      layers.delete(id);
+    }),
     setPaintProperty: vi.fn(),
     _layers: layers,
   };
@@ -70,7 +87,17 @@ function fakeMapMitBild() {
 
 const ZONE: ZoneFeature = {
   id: 1,
-  geometrie: { type: 'Polygon', coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]] },
+  geometrie: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [8.6, 50.1],
+        [8.7, 50.1],
+        [8.7, 50.2],
+        [8.6, 50.1],
+      ],
+    ],
+  },
   label: 'Sperrzone',
   stil: { fillColor: '#f00', fillOpacity: 0.2, lineColor: '#f00', lineWidth: 2 },
 };
@@ -97,9 +124,26 @@ describe('reAnlegenAlles', () => {
 
   it('reAnlegenAlles legt Bild-Layer mit an', () => {
     const map = fakeMapMitBild();
-    reAnlegenAlles(map as never, leereFlaechen, leereZonen, [], [
-      { id: 5, blobUrl: 'blob:x', ecken: [[9, 50], [9.1, 50], [9.1, 49.9], [9, 49.9]], opazitaet: 100, sichtbar: true },
-    ]);
+    reAnlegenAlles(
+      map as never,
+      leereFlaechen,
+      leereZonen,
+      [],
+      [
+        {
+          id: 5,
+          blobUrl: 'blob:x',
+          ecken: [
+            [9, 50],
+            [9.1, 50],
+            [9.1, 49.9],
+            [9, 49.9],
+          ],
+          opazitaet: 100,
+          sichtbar: true,
+        },
+      ],
+    );
     expect(map._layers.has('bild-5-raster')).toBe(true);
   });
 });
@@ -107,7 +151,11 @@ describe('reAnlegenAlles', () => {
 describe('planeReAnlegenNachStyle', () => {
   it('legt NICHT an, solange der neue Style (Online-Tiles) noch lädt', () => {
     const { map, addSource } = fakeMap(() => false);
-    planeReAnlegenNachStyle(map, () => baueZonenFc([]) as never, () => baueZonenFc([ZONE]));
+    planeReAnlegenNachStyle(
+      map,
+      () => baueZonenFc([]) as never,
+      () => baueZonenFc([ZONE]),
+    );
 
     // Frame während des Tile-Ladens → noch nichts angelegt (das ist der Bug-Kern:
     // styledata-Gate hätte hier resigniert und nie wieder re-angelegt).
@@ -119,7 +167,11 @@ describe('planeReAnlegenNachStyle', () => {
     let geladen = false;
     const { map, addSource, setData } = fakeMap(() => geladen);
     const zonen = baueZonenFc([ZONE]);
-    planeReAnlegenNachStyle(map, () => baueZonenFc([]) as never, () => zonen);
+    planeReAnlegenNachStyle(
+      map,
+      () => baueZonenFc([]) as never,
+      () => zonen,
+    );
 
     map.feuere('render'); // lädt noch
     expect(addSource).not.toHaveBeenCalled();
@@ -135,7 +187,11 @@ describe('planeReAnlegenNachStyle', () => {
     let geladen = false;
     let aktuell = baueZonenFc([]);
     const { map, setData } = fakeMap(() => geladen);
-    planeReAnlegenNachStyle(map, () => baueZonenFc([]) as never, () => aktuell);
+    planeReAnlegenNachStyle(
+      map,
+      () => baueZonenFc([]) as never,
+      () => aktuell,
+    );
 
     // Daten ändern sich, NACHDEM geplant wurde, aber BEVOR der Style fertig ist.
     aktuell = baueZonenFc([ZONE]);
@@ -169,8 +225,13 @@ describe('planeReAnlegenNachStyle — Marker', () => {
     const marker = { type: 'FeatureCollection' as const, features: [] };
     const einsatzort = { type: 'FeatureCollection' as const, features: [] };
     planeReAnlegenNachStyle(
-      map, () => leereFlaechen, () => leereZonen, () => [], () => [],
-      () => marker as never, () => einsatzort as never,
+      map,
+      () => leereFlaechen,
+      () => leereZonen,
+      () => [],
+      () => [],
+      () => marker as never,
+      () => einsatzort as never,
     );
     geladen = true;
     map.feuere('render');

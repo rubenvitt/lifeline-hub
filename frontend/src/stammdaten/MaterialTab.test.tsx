@@ -8,15 +8,26 @@ import { AuthProvider } from '../auth/AuthContext';
 import MaterialTab from './MaterialTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-27 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-27 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 const material = {
-  id: 1, bezeichnung: 'Wolldecke', kategorie: 'Betreuung', bestandsnummer: null,
-  traegerorganisation: null, standort: null, bemerkung: null,
-  dienststatus: 'in_dienst', angelegt_at: '2026-05-27 10:00:00',
+  id: 1,
+  bezeichnung: 'Wolldecke',
+  kategorie: 'Betreuung',
+  bestandsnummer: null,
+  traegerorganisation: null,
+  standort: null,
+  bemerkung: null,
+  dienststatus: 'in_dienst',
+  angelegt_at: '2026-05-27 10:00:00',
 };
 
 // Voreinstellung bleibt EIN Posten: die Bestandsprüfungen unten greifen „Bearbeiten" per
@@ -71,7 +82,9 @@ describe('MaterialTab', () => {
   it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
     const gerufen: string[] = [];
     let freigeben: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
     server.use(
       http.post('/api/material/:id/ausser-dienst', async ({ params }) => {
         gerufen.push(`ausser-dienst/${params.id}`);
@@ -97,16 +110,22 @@ describe('MaterialTab', () => {
 
     // Die eigene Zeile ist gesperrt und zeigt den Lauf …
     expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
-    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass('ant-btn-loading');
+    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass(
+      'ant-btn-loading',
+    );
     expect(within(erste).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
     // … die FREMDE Zeile bleibt bedienbar.
     expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
     expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).toBeEnabled();
-    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
 
     await userEvent.click(within(zweite).getByRole('button', { name: 'Wieder in Dienst' }));
     await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1', 'in-dienst/2']));
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
   });
 
   /**

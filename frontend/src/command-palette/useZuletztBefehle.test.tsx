@@ -13,8 +13,14 @@ import { SCHLUESSEL_ZULETZT_BEFEHLE } from './zuletztBefehle';
 import type { BenutzerEinstellungen } from '../api/types';
 
 const nutzer = {
-  id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'EL',
+  benutzername: 'el',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+  aktiv: true,
+  erstellt_at: '',
+  totp_aktiviert: false,
 };
 
 /** Die zweite Schicht am selben Rechner — andere `id`, sonst gleich gebaut. */
@@ -46,7 +52,10 @@ const putHandler = () =>
 /** Kurzer Vorlauf in ECHTZEIT. Für die Negativaussagen „es wurde NICHT geschrieben" gibt es
  *  kein Ereignis, auf das `waitFor` warten könnte — ohne diesen Vorlauf wäre `puts` auch bei
  *  kaputter Fassung noch leer, weil der msw-Handler erst einen Makrotask später schreibt. */
-const flush = () => new Promise((r) => { setTimeout(r, 40); });
+const flush = () =>
+  new Promise((r) => {
+    setTimeout(r, 40);
+  });
 
 /** Handler-Satz für den angemeldeten Fall. `serverStand` ist der Ausgangsinhalt des Fachs. */
 function handler(serverStand: BenutzerEinstellungen) {
@@ -99,9 +108,11 @@ describe('useZuletztBefehle', () => {
     result.current.merke('nav:profil');
 
     await waitFor(() => expect(result.current.ids).toEqual(['nav:profil', 'koord:utm']));
-    await waitFor(() => expect(puts).toEqual([
-      { schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:profil","koord:utm"]' },
-    ]));
+    await waitFor(() =>
+      expect(puts).toEqual([
+        { schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:profil","koord:utm"]' },
+      ]),
+    );
   });
 
   /**
@@ -128,17 +139,17 @@ describe('useZuletztBefehle', () => {
     // dessen `/api/auth/me` zurück ist, beobachtet der zweite Hook das Fach `[…, null]` und
     // nicht das des Benutzers. Gemessen: ohne dieses Warten stand das Fach zwischenzeitlich
     // ohne Beobachter da, wurde weggeräumt und danach frisch vom Server geholt.
-    const bleibt = renderHook(
-      () => ({ auth: useAuth(), g: useZuletztBefehle() }), { wrapper: Wrapper },
-    );
+    const bleibt = renderHook(() => ({ auth: useAuth(), g: useZuletztBefehle() }), {
+      wrapper: Wrapper,
+    });
     await waitFor(() => expect(bleibt.result.current.auth.benutzer).not.toBeNull());
 
     unmount();
     merke('nav:profil');
 
-    await waitFor(() => expect(puts).toEqual([
-      { schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:profil"]' },
-    ]));
+    await waitFor(() =>
+      expect(puts).toEqual([{ schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:profil"]' }]),
+    );
     expect(client.getQueryData(globalKeys.benutzerEinstellungenVon(nutzer.id))).toEqual(
       stand(['nav:profil']),
     );
@@ -151,7 +162,8 @@ describe('useZuletztBefehle', () => {
     server.use(
       ...handler(stand([])),
       http.put('/api/benutzer-einstellungen/:schluessel', () =>
-        HttpResponse.json({ error: 'Unbekannter Einstellungs-Schlüssel' }, { status: 400 })),
+        HttpResponse.json({ error: 'Unbekannter Einstellungs-Schlüssel' }, { status: 400 }),
+      ),
     );
     const { Wrapper } = wrapper();
     const { result } = renderHook(() => useZuletztBefehle(), { wrapper: Wrapper });
@@ -186,14 +198,15 @@ describe('useZuletztBefehle', () => {
     // Der Schreibweg holt seit dem Bestands-Riegel selbst nach, wenn der Cache leer ist —
     // ohne Sitzung darf er das NICHT: der 401 liefe in `queryClient.ts` durch
     // `meldeSitzungAbgelaufen()`, und die Anmeldeseite bekäme „Sitzung abgelaufen" ohne Anlass.
-    act(() => { result.current.merke('nav:profil'); });
+    act(() => {
+      result.current.merke('nav:profil');
+    });
     await flush();
 
     expect(gets).toBe(0);
     expect(puts).toEqual([]);
   });
 });
-
 
 /**
  * DER SERVER-SLOT IST PRO BENUTZER, sein Cache-Fach muss es auch sein (Review-Befund zu
@@ -227,17 +240,25 @@ describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
     ];
   }
 
-  async function wechsle(result: { current: { auth: { logout: () => Promise<void>; login: (a: string, b: string) => Promise<unknown> } } }) {
-    await act(async () => { await result.current.auth.logout(); });
-    await act(async () => { await result.current.auth.login('s2', 'geheim'); });
+  async function wechsle(result: {
+    current: {
+      auth: { logout: () => Promise<void>; login: (a: string, b: string) => Promise<unknown> };
+    };
+  }) {
+    await act(async () => {
+      await result.current.auth.logout();
+    });
+    await act(async () => {
+      await result.current.auth.login('s2', 'geheim');
+    });
   }
 
   it('zeigt nach dem Wechsel das Fach der NEUEN Schicht, nicht das der alten', async () => {
     server.use(...zweiSchichten());
     const { Wrapper } = wrapper();
-    const { result } = renderHook(
-      () => ({ auth: useAuth(), g: useZuletztBefehle() }), { wrapper: Wrapper },
-    );
+    const { result } = renderHook(() => ({ auth: useAuth(), g: useZuletztBefehle() }), {
+      wrapper: Wrapper,
+    });
     await waitFor(() => expect(result.current.g.ids).toEqual(['nav:profil']));
 
     await wechsle(result);
@@ -250,18 +271,22 @@ describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
   it('schreibt den ersten Befehl der neuen Schicht auf DEREN Bestand', async () => {
     server.use(...zweiSchichten());
     const { Wrapper } = wrapper();
-    const { result } = renderHook(
-      () => ({ auth: useAuth(), g: useZuletztBefehle() }), { wrapper: Wrapper },
-    );
+    const { result } = renderHook(() => ({ auth: useAuth(), g: useZuletztBefehle() }), {
+      wrapper: Wrapper,
+    });
     await waitFor(() => expect(result.current.g.ids).toEqual(['nav:profil']));
 
     await wechsle(result);
     await waitFor(() => expect(result.current.g.ids).toEqual(['koord:utm']));
-    act(() => { result.current.g.merke('nav:admin'); });
+    act(() => {
+      result.current.g.merke('nav:admin');
+    });
 
-    await waitFor(() => expect(puts).toEqual([
-      { schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:admin","koord:utm"]' },
-    ]));
+    await waitFor(() =>
+      expect(puts).toEqual([
+        { schluessel: SCHLUESSEL_ZULETZT_BEFEHLE, wert: '["nav:admin","koord:utm"]' },
+      ]),
+    );
   });
 });
 
@@ -277,7 +302,9 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
   /** GET, der erst auf Kommando antwortet. */
   function langsam(ids: string[]) {
     let loese: () => void = () => {};
-    const frei = new Promise<void>((r) => { loese = r; });
+    const frei = new Promise<void>((r) => {
+      loese = r;
+    });
     const handler = [
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/benutzer-einstellungen', async () => {
@@ -297,17 +324,23 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
     const { result } = renderHook(() => useZuletztBefehle(), { wrapper: Wrapper });
     await waitFor(() => expect(gets).toBe(1));
 
-    act(() => { result.current.merke('nav:admin'); });
+    act(() => {
+      result.current.merke('nav:admin');
+    });
     await flush();
 
     expect(puts, 'ein unbekannter Bestand darf nicht ersetzt werden').toEqual([]);
 
     loese();
 
-    await waitFor(() => expect(puts).toEqual([{
-      schluessel: SCHLUESSEL_ZULETZT_BEFEHLE,
-      wert: '["nav:admin","koord:utm","koord:dms","nav:profil"]',
-    }]));
+    await waitFor(() =>
+      expect(puts).toEqual([
+        {
+          schluessel: SCHLUESSEL_ZULETZT_BEFEHLE,
+          wert: '["nav:admin","koord:utm","koord:dms","nav:profil"]',
+        },
+      ]),
+    );
   });
 
   /**
@@ -322,17 +355,23 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
     const { result } = renderHook(() => useZuletztBefehle(), { wrapper: Wrapper });
     await waitFor(() => expect(gets).toBe(1));
 
-    act(() => { result.current.merke('nav:admin'); });
+    act(() => {
+      result.current.merke('nav:admin');
+    });
     loese();
 
     await waitFor(() => expect(result.current.ids).toEqual(['nav:admin', 'koord:utm']));
 
     // Und der NÄCHSTE Schreibvorgang trägt ihn weiter, statt ihn zu löschen.
-    act(() => { result.current.merke('nav:stammdaten'); });
-    await waitFor(() => expect(puts[puts.length - 1]).toEqual({
-      schluessel: SCHLUESSEL_ZULETZT_BEFEHLE,
-      wert: '["nav:stammdaten","nav:admin","koord:utm"]',
-    }));
+    act(() => {
+      result.current.merke('nav:stammdaten');
+    });
+    await waitFor(() =>
+      expect(puts[puts.length - 1]).toEqual({
+        schluessel: SCHLUESSEL_ZULETZT_BEFEHLE,
+        wert: '["nav:stammdaten","nav:admin","koord:utm"]',
+      }),
+    );
   });
 
   /** Scheitert der GET, ist der Bestand DAUERHAFT unbekannt. Dann geht der eine Befehl
@@ -351,7 +390,9 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
     const { result } = renderHook(() => useZuletztBefehle(), { wrapper: Wrapper });
     await waitFor(() => expect(gets).toBe(1));
 
-    act(() => { result.current.merke('nav:admin'); });
+    act(() => {
+      result.current.merke('nav:admin');
+    });
     await flush();
 
     expect(puts).toEqual([]);

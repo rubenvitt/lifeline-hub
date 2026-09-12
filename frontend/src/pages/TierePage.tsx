@@ -6,10 +6,19 @@ import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from '../api/einsatzTier';
+import {
+  legeTierAn,
+  listeTiere,
+  tierRegistrierAnzeige,
+  type TierEingabe,
+} from '../api/einsatzTier';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import Datensicht, { scrolleZurZeile, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, {
+  scrolleZurZeile,
+  spaltenFuer,
+  type Kartenplan,
+} from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { flaeche } from '../theme/tokens';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -30,8 +39,13 @@ const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
 };
 
 const SPEZIES_META: Record<Spezies, string> = {
-  hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
-  kleintier: 'Kleintier', wildtier: 'Wildtier', sonstige: 'Sonstige',
+  hund: 'Hund',
+  katze: 'Katze',
+  grosstier: 'Großtier',
+  nutzgefluegel: 'Nutzgeflügel',
+  kleintier: 'Kleintier',
+  wildtier: 'Wildtier',
+  sonstige: 'Sonstige',
 };
 const SPEZIES_KEYS = Object.keys(SPEZIES_META) as Spezies[];
 
@@ -55,9 +69,11 @@ function halterNummer(t: Tier): string | null {
 function halterAnzeige(t: Tier): React.ReactNode {
   const label = halterNummer(t);
   if (label != null) {
-    return t.halter_storniert_at
-      ? <Typography.Text type="secondary">Halter (storniert): {label}</Typography.Text>
-      : <Tag color="blue">{label}</Tag>;
+    return t.halter_storniert_at ? (
+      <Typography.Text type="secondary">Halter (storniert): {label}</Typography.Text>
+    ) : (
+      <Tag color="blue">{label}</Tag>
+    );
   }
   if (t.halter_kontakt) return <Typography.Text>{t.halter_kontakt}</Typography.Text>;
   return <Typography.Text type="secondary">unbekannt</Typography.Text>;
@@ -79,7 +95,9 @@ const tierSpalten = spaltenFuer<Tier>()([
     sortWert: (t) => t.registrier_nr,
     suchText: (t) => tierRegistrierAnzeige(t.registrier_nr),
     // KEIN Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
-    render: (_, t) => <Typography.Text strong>{tierRegistrierAnzeige(t.registrier_nr)}</Typography.Text>,
+    render: (_, t) => (
+      <Typography.Text strong>{tierRegistrierAnzeige(t.registrier_nr)}</Typography.Text>
+    ),
   },
   {
     title: 'Status',
@@ -159,13 +177,17 @@ export default function TierePage() {
   const { benutzer } = useAuth();
   const navigate = useNavigate();
   const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
-  const [speziesNachEinsatz, setSpeziesNachEinsatz] = useState<Record<number, Spezies | undefined>>({});
+  const [speziesNachEinsatz, setSpeziesNachEinsatz] = useState<Record<number, Spezies | undefined>>(
+    {},
+  );
   const [highlight, setHighlight] = useState<{ einsatzId: number; tierId: number } | null>(null);
-  const [frischAngelegt, setFrischAngelegt] = useState<Array<{
-    einsatzId: number;
-    tier: Tier;
-    bestaetigenNach: number;
-  }>>([]);
+  const [frischAngelegt, setFrischAngelegt] = useState<
+    Array<{
+      einsatzId: number;
+      tier: Tier;
+      bestaetigenNach: number;
+    }>
+  >([]);
   const aktuellerEinsatzRef = useRef(einsatzId);
   aktuellerEinsatzRef.current = einsatzId;
   const sicht = sichtNachEinsatz[einsatzId] ?? 'aktiv';
@@ -180,8 +202,14 @@ export default function TierePage() {
 
   // Tier-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
   // im EinsatzLayout, `tier`-Event → 'einsatz-tiere') live gehalten — LFH-75.
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const tiereQuery = useQuery({ queryKey: einsatzKeys.tiere(einsatzId), queryFn: () => listeTiere(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
+  const tiereQuery = useQuery({
+    queryKey: einsatzKeys.tiere(einsatzId),
+    queryFn: () => listeTiere(einsatzId),
+  });
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -211,7 +239,8 @@ export default function TierePage() {
     form.setFieldValue('antreff_ort', ort);
   }, [aktuellerModus, einsatzId, form]);
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   useEffect(() => {
     if (highlight?.einsatzId !== einsatzId) return;
@@ -222,10 +251,12 @@ export default function TierePage() {
     const serverIds = new Set((tiereQuery.data ?? []).map((tier) => tier.id));
     if (serverIds.size === 0) return;
     setFrischAngelegt((alt) => {
-      const offen = alt.filter((eintrag) =>
-        eintrag.einsatzId !== einsatzId ||
-        tiereQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
-        !serverIds.has(eintrag.tier.id));
+      const offen = alt.filter(
+        (eintrag) =>
+          eintrag.einsatzId !== einsatzId ||
+          tiereQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
+          !serverIds.has(eintrag.tier.id),
+      );
       return offen.length === alt.length ? alt : offen;
     });
   }, [einsatzId, tiereQuery.data, tiereQuery.dataUpdatedAt]);
@@ -256,8 +287,9 @@ export default function TierePage() {
           bestaetigenNach:
             qc.getQueryState(einsatzKeys.tiere(variablen.einsatzId))?.dataUpdatedAt ?? 0,
         },
-        ...alt.filter((eintrag) =>
-          eintrag.einsatzId !== variablen.einsatzId || eintrag.tier.id !== tier.id),
+        ...alt.filter(
+          (eintrag) => eintrag.einsatzId !== variablen.einsatzId || eintrag.tier.id !== tier.id,
+        ),
       ]);
       setHighlight({ einsatzId: variablen.einsatzId, tierId: tier.id });
       setSichtFuer(variablen.einsatzId, tier.status);
@@ -331,14 +363,22 @@ export default function TierePage() {
       }
       breadcrumb={
         <Breadcrumb
-          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Tiere' }]}
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Tiere' },
+          ]}
         />
       }
       aktionen={
         darfSchreiben && (
           <Space wrap style={{ minWidth: 0 }}>
-            <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>Schnellerfassung</Button>
-            <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>Vermisst melden</Button>
+            <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>
+              Schnellerfassung
+            </Button>
+            <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>
+              Vermisst melden
+            </Button>
           </Space>
         )
       }
@@ -346,21 +386,32 @@ export default function TierePage() {
       // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber.
       neueZeile={darfSchreiben ? () => setModus({ einsatzId, wert: 'schnell' }) : undefined}
       hinweis={
-        !darfSchreiben && einsatz.status !== 'aktiv' && (
+        !darfSchreiben &&
+        einsatz.status !== 'aktiv' && (
           <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
         )
       }
     >
-      <Tabs activeKey={sicht} onChange={(k) => setSichtFuer(einsatzId, k as Sicht)} items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))} />
+      <Tabs
+        activeKey={sicht}
+        onChange={(k) => setSichtFuer(einsatzId, k as Sicht)}
+        items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))}
+      />
 
       <Space wrap style={{ marginBottom: 12 }}>
         <Typography.Text type="secondary">Spezies:</Typography.Text>
         {/* `aria-label`, weil die `Typography.Text` daneben kein `<label>` ist (kein `htmlFor`,
             keine Umschließung): ohne ihn hat das Feld keinen zugänglichen Namen und ist nur
             solange eindeutig auffindbar, wie es die einzige Combobox der Seite ist. */}
-        <Select<Spezies | undefined> aria-label="Spezies" allowClear placeholder="alle" style={{ width: 180 }}
-          value={speziesFilter} onChange={(v) => setSpeziesFuer(einsatzId, v)}
-          options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
+        <Select<Spezies | undefined>
+          aria-label="Spezies"
+          allowClear
+          placeholder="alle"
+          style={{ width: 180 }}
+          value={speziesFilter}
+          onChange={(v) => setSpeziesFuer(einsatzId, v)}
+          options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))}
+        />
       </Space>
 
       {listeGescheitert ? (
@@ -421,42 +472,40 @@ export default function TierePage() {
             standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
             onZeileKlick={(t) => navigate(tiereDetailPfad(einsatzId, t.id))}
             karte={tierKarte(einsatzId)}
-            zeilenKlasse={(t) => (
+            zeilenKlasse={(t) =>
               highlight?.einsatzId === einsatzId && t.id === highlight.tierId
                 ? 'zeile-hervorgehoben'
                 : undefined
-            )}
+            }
           />
         </>
       )}
 
       {/**
-        * SERIENMODUS (LFH-332 · B4). An einer Sammelstelle kommen die Tiere in Serie an —
-        * ein Dialog, der nach jedem Satz zufällt, kostet dort je Tier einen Klick auf
-        * „Schnellerfassung" und einen weiteren in das erste Feld.
-        *
-        * `uebernahme` trägt genau die zwei Felder, die sich an einer Sammelstelle NICHT
-        * ändern: der Antreffort ist die Sammelstelle selbst, und wer eine Reihe Nutzgeflügel
-        * aufnimmt, wählt die Spezies sonst zwanzigmal neu (das Zurücksetzen fiele auf
-        * `initialValues` = 'hund' zurück). Die übrigen Felder — Rufname, Rasse, Farbe,
-        * Kennzeichnung, Halter-Kontakt, Notiz — beschreiben das EINZELNE Tier; sie
-        * mitzunehmen hiesse, den vorigen Satz zu wiederholen.
-        *
-        * Der sitzungsweite Antreffort ist ein eigener Vertrag: nach erfolgreicher Mutation
-        * wird er einsatz- und maskenbezogen gemerkt und beim Öffnen einmal per Formularwert
-        * eingesetzt. Er gehört nicht zu `initialValues`, damit ein Serien-Reset bei
-        * ausgeschaltetem B4-Schalter leer bleibt.
-        *
-        * `status` steht bewusst nicht im Formular: er kommt aus dem Modus, mit dem der
-        * Dialog geöffnet wurde, und die Ableitung sitzt deshalb in `onErfassen`.
-        */}
+       * SERIENMODUS (LFH-332 · B4). An einer Sammelstelle kommen die Tiere in Serie an —
+       * ein Dialog, der nach jedem Satz zufällt, kostet dort je Tier einen Klick auf
+       * „Schnellerfassung" und einen weiteren in das erste Feld.
+       *
+       * `uebernahme` trägt genau die zwei Felder, die sich an einer Sammelstelle NICHT
+       * ändern: der Antreffort ist die Sammelstelle selbst, und wer eine Reihe Nutzgeflügel
+       * aufnimmt, wählt die Spezies sonst zwanzigmal neu (das Zurücksetzen fiele auf
+       * `initialValues` = 'hund' zurück). Die übrigen Felder — Rufname, Rasse, Farbe,
+       * Kennzeichnung, Halter-Kontakt, Notiz — beschreiben das EINZELNE Tier; sie
+       * mitzunehmen hiesse, den vorigen Satz zu wiederholen.
+       *
+       * Der sitzungsweite Antreffort ist ein eigener Vertrag: nach erfolgreicher Mutation
+       * wird er einsatz- und maskenbezogen gemerkt und beim Öffnen einmal per Formularwert
+       * eingesetzt. Er gehört nicht zu `initialValues`, damit ein Serien-Reset bei
+       * ausgeschaltetem B4-Schalter leer bleibt.
+       *
+       * `status` steht bewusst nicht im Formular: er kommt aus dem Modus, mit dem der
+       * Dialog geöffnet wurde, und die Ableitung sitzt deshalb in `onErfassen`.
+       */}
       <ErfassungsModal<TierEingabe>
         offen={aktuellerModus !== null}
         titel={aktuellerModus === 'vermisst' ? 'Vermisst melden' : 'Schnellerfassung'}
         form={form}
-        laeuft={
-          anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId
-        }
+        laeuft={anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId}
         initialValues={{ spezies: 'hund' }}
         serie
         uebernahme={['spezies', 'antreff_ort']}
@@ -477,23 +526,41 @@ export default function TierePage() {
             schreibeErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort', daten.antreff_ort);
           }
         }}
-        onFertig={() => setModus((alt) => alt?.einsatzId === einsatzId ? null : alt)}
-        onAbbrechen={() => setModus((alt) => alt?.einsatzId === einsatzId ? null : alt)}
+        onFertig={() => setModus((alt) => (alt?.einsatzId === einsatzId ? null : alt))}
+        onAbbrechen={() => setModus((alt) => (alt?.einsatzId === einsatzId ? null : alt))}
       >
-        <Form.Item label="Spezies" name="spezies" rules={[{ required: true, message: 'Bitte Spezies wählen' }]}>
+        <Form.Item
+          label="Spezies"
+          name="spezies"
+          rules={[{ required: true, message: 'Bitte Spezies wählen' }]}
+        >
           <Select options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
         </Form.Item>
-        <Form.Item label="Rufname" name="rufname"><Input /></Form.Item>
-        <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung"><Input placeholder="z. B. Haflinger, Deutscher Schäferhund" /></Form.Item>
-        <Form.Item label="Antreffort" name="antreff_ort"><Input placeholder="z. B. Weide, Sammelstelle" /></Form.Item>
+        <Form.Item label="Rufname" name="rufname">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung">
+          <Input placeholder="z. B. Haflinger, Deutscher Schäferhund" />
+        </Form.Item>
+        <Form.Item label="Antreffort" name="antreff_ort">
+          <Input placeholder="z. B. Weide, Sammelstelle" />
+        </Form.Item>
         {aktuellerModus === 'vermisst' && (
           <>
-            <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung"><Input /></Form.Item>
-            <Form.Item label="Kennzeichnung (Chip/Tätowierung/Halsband)" name="kennzeichnung"><Input /></Form.Item>
-            <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt"><Input placeholder="meldender Halter" /></Form.Item>
+            <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Kennzeichnung (Chip/Tätowierung/Halsband)" name="kennzeichnung">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt">
+              <Input placeholder="meldender Halter" />
+            </Form.Item>
           </>
         )}
-        <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+        <Form.Item label="Notiz" name="notiz">
+          <Input.TextArea rows={2} />
+        </Form.Item>
       </ErfassungsModal>
     </EinsatzSeite>
   );

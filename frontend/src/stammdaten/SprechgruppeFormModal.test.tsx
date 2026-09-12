@@ -35,7 +35,13 @@ function Harness({ bestand }: { bestand?: Sprechgruppe | null }) {
   const [aktuell, setAktuell] = useState<Sprechgruppe | null>(bestand ?? null);
   return (
     <>
-      <button type="button" onClick={() => { setAktuell(null); setOffen(true); }}>
+      <button
+        type="button"
+        onClick={() => {
+          setAktuell(null);
+          setOffen(true);
+        }}
+      >
         Wieder öffnen
       </button>
       <SprechgruppeFormModal offen={offen} sprechgruppe={aktuell} onClose={() => setOffen(false)} />

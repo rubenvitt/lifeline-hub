@@ -1,10 +1,7 @@
 import { App, Drawer, Form, Input } from 'antd';
 import { useCallback, useEffect, useRef } from 'react';
 import { Select } from '../../components/Select';
-import {
-  ErfassungsFormular,
-  type ErfassungsFormularSteuerung,
-} from '../../components/Erfassung';
+import { ErfassungsFormular, type ErfassungsFormularSteuerung } from '../../components/Erfassung';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeUhsAn, type UhsEingabe } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';
@@ -86,11 +83,17 @@ export default function UhsAnlegenDrawer({ einsatzId, open, onClose, onAngelegt 
         erfassenText="Anlegen"
         initialValues={{ typ: 'behandlungsplatz' }}
       >
-        <Form.Item label="Bezeichnung" name="bezeichnung" rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}>
+        <Form.Item
+          label="Bezeichnung"
+          name="bezeichnung"
+          rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}
+        >
           <Input placeholder="z. B. BHP 50" />
         </Form.Item>
         <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
-          <Select options={Object.entries(uhsTyp).map(([v, d]) => ({ value: v, label: d.label }))} />
+          <Select
+            options={Object.entries(uhsTyp).map(([v, d]) => ({ value: v, label: d.label }))}
+          />
         </Form.Item>
         <Form.Item label="Standort (optional)" name="standort">
           <Input placeholder="Adresse / Hinweis" />

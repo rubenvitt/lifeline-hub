@@ -231,9 +231,7 @@ export interface Fliessmass {
  * In beiden Fällen bleibt es beim Bestandsverhalten, und der Grund geht als DEV-Warnung
  * heraus. Ein Opt-in, das still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
  */
-export function fliessBreite<T>(
-  spalten: readonly KatalogSpalte<T>[] | undefined,
-): Fliessmass {
+export function fliessBreite<T>(spalten: readonly KatalogSpalte<T>[] | undefined): Fliessmass {
   const fliessend = (spalten ?? []).filter((s) => s.mindestBreite != null);
   if (fliessend.length === 0) return { x: 'max-content' };
   if (fliessend.length > 1) {

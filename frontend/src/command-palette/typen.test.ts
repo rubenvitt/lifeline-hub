@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { GRUPPEN_REIHENFOLGE, GRUPPE_MERKBAR, GRUPPE_NUR_ORDNUNG, type BefehlGruppe } from './typen';
+import {
+  GRUPPEN_REIHENFOLGE,
+  GRUPPE_MERKBAR,
+  GRUPPE_NUR_ORDNUNG,
+  type BefehlGruppe,
+} from './typen';
 
 /**
  * Was der TYP nicht sehen kann (LFH-391 · A2).

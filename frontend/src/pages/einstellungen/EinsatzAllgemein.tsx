@@ -147,7 +147,11 @@ export default function EinsatzAllgemein() {
           name="koordinatenformat"
           extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
         >
-          <Select allowClear placeholder="WGS84 dezimal (Standard)" options={KOORDINATEN_OPTIONEN} />
+          <Select
+            allowClear
+            placeholder="WGS84 dezimal (Standard)"
+            options={KOORDINATEN_OPTIONEN}
+          />
         </Form.Item>
 
         <div style={speicherLeisteStil(token)}>

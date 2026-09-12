@@ -165,8 +165,11 @@ describe('PersonErfassungModal — Feldbudget', () => {
     const { unmount } = renderMitProviders(
       <PersonErfassungModal
         einsatzId={1}
-        modus="vermisst" isPending={false}
-        onErfassen={vi.fn().mockResolvedValue(undefined)} onFertig={vi.fn()} onCancel={vi.fn()}
+        modus="vermisst"
+        isPending={false}
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onFertig={vi.fn()}
+        onCancel={vi.fn()}
       />,
     );
     const nutzer = userEvent.setup();
@@ -232,7 +235,9 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
     ersteAnsicht.unmount();
 
     zeige();
-    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'),
+    );
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
@@ -253,14 +258,19 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
 
   it('merkt einen Ort nach Abbruch während des Speicherns nicht', async () => {
     let antwortFreigeben!: () => void;
-    const antwort = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const antwort = new Promise<void>((resolve) => {
+      antwortFreigeben = resolve;
+    });
     const ansicht = zeige({ onErfassen: vi.fn(() => antwort) });
 
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Abbruchort Person');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(ansicht.onErfassen).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-    await act(async () => { antwortFreigeben(); await antwort; });
+    await act(async () => {
+      antwortFreigeben();
+      await antwort;
+    });
 
     expect(ansicht.onCancel).toHaveBeenCalledTimes(1);
     expect(ansicht.onFertig).not.toHaveBeenCalled();
@@ -272,7 +282,9 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'),
+    );
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
     await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));

@@ -36,7 +36,9 @@ const person: Personal = {
 
 function handler(onPost: (body: unknown) => void = () => {}) {
   server.use(
-    http.get('/api/qualifikationen', () => HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }])),
+    http.get('/api/qualifikationen', () =>
+      HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }]),
+    ),
     http.get('/api/benutzer', () => HttpResponse.json([])),
     http.post('/api/personal', async ({ request }) => {
       onPost(await request.json());
@@ -60,14 +62,23 @@ function Harness({ bestand, onClose }: { bestand?: Personal | null; onClose?: ()
   const [person, setPerson] = useState<Personal | null>(bestand ?? null);
   return (
     <>
-      <button type="button" onClick={() => { setPerson(null); setOffen(true); }}>
+      <button
+        type="button"
+        onClick={() => {
+          setPerson(null);
+          setOffen(true);
+        }}
+      >
         Wieder öffnen
       </button>
       <PersonalFormModal
         offen={offen}
         person={person}
         vorschlaege={{ traegerorganisation: ['DRK Musterstadt'] }}
-        onClose={() => { setOffen(false); onClose?.(); }}
+        onClose={() => {
+          setOffen(false);
+          onClose?.();
+        }}
       />
     </>
   );
@@ -192,7 +203,10 @@ describe('PersonalFormModal — Schnellerfassung (LFH-346/A7)', () => {
 
     await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
     expect(Object.keys(gesendet.mock.calls[0][0] as object).sort()).toEqual([
-      'name', 'personalnummer', 'qualifikation_ids', 'traegerorganisation',
+      'name',
+      'personalnummer',
+      'qualifikation_ids',
+      'traegerorganisation',
     ]);
   });
 

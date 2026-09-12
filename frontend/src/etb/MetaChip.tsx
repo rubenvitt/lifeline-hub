@@ -29,46 +29,62 @@ function feldDef(feld: MetaFeld) {
 function anzeige(feld: MetaFeld, wert: Wert): string {
   if (wert == null) return '';
   if (feldDef(feld).editor === 'zeit') return (wert as dayjs.Dayjs).format('HHmm');
-  if (feld === 'meldeweg') return MELDEWEG_OPTIONEN.find((o) => o.value === wert)?.label ?? String(wert);
+  if (feld === 'meldeweg')
+    return MELDEWEG_OPTIONEN.find((o) => o.value === wert)?.label ?? String(wert);
   return String(wert);
 }
 
-export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCancel, onRemove, onEdit }: Props) {
+export default function MetaChip({
+  feld,
+  editing,
+  wert,
+  optionen,
+  onCommit,
+  onCancel,
+  onRemove,
+  onEdit,
+}: Props) {
   const d = feldDef(feld);
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
 
   if (editing) {
     if (d.editor === 'text') {
-      const editor = optionen && optionen.length > 0 ? (
-        <AutoComplete
-          autoFocus
-          aria-label={d.label}
-          style={{ width: 200 }}
-          value={text}
-          onChange={(v) => setText(v)}
-          // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
-          onSelect={(v) => onCommit(feld, v)}
-          options={optionen.map((o) => ({ value: o }))}
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { if (text.trim()) onCommit(feld, text.trim()); else onCancel(feld); }
-            if (e.key === 'Escape') onCancel(feld);
-          }}
-        />
-      ) : (
-        <Input
-          autoFocus
-          aria-label={d.label}
-          style={{ width: 160 }}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onPressEnter={() => (text.trim() ? onCommit(feld, text.trim()) : onCancel(feld))}
-          onKeyDown={(e) => { if (e.key === 'Escape') onCancel(feld); }}
-        />
-      );
+      const editor =
+        optionen && optionen.length > 0 ? (
+          <AutoComplete
+            autoFocus
+            aria-label={d.label}
+            style={{ width: 200 }}
+            value={text}
+            onChange={(v) => setText(v)}
+            // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
+            onSelect={(v) => onCommit(feld, v)}
+            options={optionen.map((o) => ({ value: o }))}
+            showSearch={{
+              filterOption: (input, option) =>
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (text.trim()) onCommit(feld, text.trim());
+                else onCancel(feld);
+              }
+              if (e.key === 'Escape') onCancel(feld);
+            }}
+          />
+        ) : (
+          <Input
+            autoFocus
+            aria-label={d.label}
+            style={{ width: 160 }}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onPressEnter={() => (text.trim() ? onCommit(feld, text.trim()) : onCancel(feld))}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onCancel(feld);
+            }}
+          />
+        );
       // LFH-110: Buchstabierhilfe additiv am Von/An-Feld (Funkrufname/Absender/Empfänger).
       if (feld === 'von' || feld === 'an') {
         return (
@@ -99,7 +115,9 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
           options={MELDEWEG_OPTIONEN}
           value={typeof wert === 'string' ? (wert as MeldeWeg) : undefined}
           onSelect={(v) => onCommit(feld, v as MeldeWeg)}
-          onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') onCancel(feld); }}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (e.key === 'Escape') onCancel(feld);
+          }}
         />
       );
     }
@@ -111,7 +129,9 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
         aria-label={d.label}
         defaultValue={dayjs.isDayjs(wert) ? wert : dayjs()}
         onOk={(v) => onCommit(feld, v)}
-        onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') onCancel(feld); }}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          if (e.key === 'Escape') onCancel(feld);
+        }}
       />
     );
   }
@@ -171,11 +191,7 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
           Dichtestufe mit (30 / 48 / 72 px). Genau das konnte das ~10-px-`closeIcon`
           nicht, das hier vorher stand.
         */}
-        <Button
-          type="text"
-          aria-label={`Aktionen zu ${d.label}`}
-          icon={<MoreOutlined />}
-        />
+        <Button type="text" aria-label={`Aktionen zu ${d.label}`} icon={<MoreOutlined />} />
       </Dropdown>
     </Tag>
   );

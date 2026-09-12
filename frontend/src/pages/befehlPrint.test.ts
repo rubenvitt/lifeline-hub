@@ -50,7 +50,10 @@ function regeln(): Regel[] {
 }
 
 function einzeln(regel: Regel): string[] {
-  return regel.selektor.split(',').map((s) => s.trim()).filter(Boolean);
+  return regel.selektor
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function versteckt(regel: Regel): boolean {

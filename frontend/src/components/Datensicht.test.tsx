@@ -509,7 +509,9 @@ describe('pruefeKartenplan()', () => {
 
   it('meldet doppelte Spaltenschlüssel', () => {
     const doppelt = [...spalten, { key: 'typ' as FahrzeugKey, title: 'Typ nochmal' }];
-    expect(meldung(pruefeKartenplan({ spalten: doppelt, karte }, 'Fahrzeuge'), 'doppelt')).toHaveLength(1);
+    expect(
+      meldung(pruefeKartenplan({ spalten: doppelt, karte }, 'Fahrzeuge'), 'doppelt'),
+    ).toHaveLength(1);
   });
 
   it('meldet eine sekundaer-Spalte ohne Etikett', () => {
@@ -616,7 +618,15 @@ describe('Konstanten', () => {
  */
 describe('Typgrenzen (nur tsc)', () => {
   it('Slot-Tippfehler und der vierte Sekundärslot brechen den Typcheck', () => {
-    const gut = <Datensicht bezeichnung="A" spalten={spalten} daten={DREI} zeilenSchluessel="id" karte={karte} />;
+    const gut = (
+      <Datensicht
+        bezeichnung="A"
+        spalten={spalten}
+        daten={DREI}
+        zeilenSchluessel="id"
+        karte={karte}
+      />
+    );
 
     const tippfehler = (
       <Datensicht
@@ -664,7 +674,11 @@ describe('Typgrenzen (nur tsc)', () => {
 // S7 · die zwei Zweige
 // ────────────────────────────────────────────────────────────────────────────────────
 
-const DREI = [F(1, 'Florian 1', { traeger: 'FW' }), F(2, 'Rotkreuz 2', { traeger: 'HiOrg' }), F(3, 'Florian 3')];
+const DREI = [
+  F(1, 'Florian 1', { traeger: 'FW' }),
+  F(2, 'Rotkreuz 2', { traeger: 'HiOrg' }),
+  F(3, 'Florian 3'),
+];
 
 function rendere(props: Partial<Parameters<typeof Datensicht<Fahrzeug, FahrzeugKey>>[0]> = {}) {
   return renderMitProviders(
@@ -684,7 +698,8 @@ const karten = (c: HTMLElement) => c.querySelectorAll('[data-lfh="datensicht-kar
 
 describe('Datensicht · Formachse', () => {
   it.each([768, 991, 992, 1024, 1199, 1200, 1280, 1366])(
-    'LFH-464: optionaler xl-Umbruch bei %i px, Default bleibt md', (breite) => {
+    'LFH-464: optionaler xl-Umbruch bei %i px, Default bleibt md',
+    (breite) => {
       setzeViewportBreite(breite);
       const optional = rendere({ tabelleAb: 'xl' });
       expect(tabellen(optional.container)).toHaveLength(breite >= 1200 ? 1 : 0);
@@ -697,7 +712,8 @@ describe('Datensicht · Formachse', () => {
   );
 
   it.each(['tabelle', 'karte'] as const)(
-    'LFH-464: feste Form %s gewinnt gegen den optionalen Umbruch', (form) => {
+    'LFH-464: feste Form %s gewinnt gegen den optionalen Umbruch',
+    (form) => {
       setzeViewportBreite(form === 'tabelle' ? 390 : 1600);
       const { container } = rendere({ form, tabelleAb: 'xl' });
       expect(tabellen(container)).toHaveLength(form === 'tabelle' ? 1 : 0);
@@ -956,7 +972,9 @@ describe('Datensicht · Tabellenzweig', () => {
      * nichts" und Kriterium 7.
      */
     const { container } = rendere({ spaltenAusVoreinstellung: ['traeger'] });
-    const kopfzellen = [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
+    const kopfzellen = [...container.querySelectorAll('th.ant-table-cell')].map(
+      (z) => z.textContent,
+    );
     expect(kopfzellen).toEqual(['Funkrufname', 'Typ']);
 
     const schalter = screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ });
@@ -990,7 +1008,10 @@ describe('Datensicht · Tabellenzweig', () => {
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(namen(container)).toEqual(['Florian 1', 'Rotkreuz 2', 'Florian 3']);
 
-    await userEvent.type(container.querySelector<HTMLInputElement>('input[type="search"]')!, 'Rotkreuz');
+    await userEvent.type(
+      container.querySelector<HTMLInputElement>('input[type="search"]')!,
+      'Rotkreuz',
+    );
     expect(namen(container)).toEqual(['Rotkreuz 2']);
   });
 
@@ -1002,20 +1023,16 @@ describe('Datensicht · Tabellenzweig', () => {
       sortierung: { spalte: 'funkrufname', richtung: 'auf' },
       onSortierung,
     });
-    expect([...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent)).toEqual([
-      'Florian 1',
-      'Florian 3',
-      'Rotkreuz 2',
-    ]);
+    expect(
+      [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent),
+    ).toEqual(['Florian 1', 'Florian 3', 'Rotkreuz 2']);
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(onSortierung).toHaveBeenCalledWith({ spalte: 'funkrufname', richtung: 'ab' });
 
     // Kontrolliert heißt kontrolliert: ohne Zutun des Aufrufers bleibt die Anzeige stehen.
-    expect([...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent)).toEqual([
-      'Florian 1',
-      'Florian 3',
-      'Rotkreuz 2',
-    ]);
+    expect(
+      [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent),
+    ).toEqual(['Florian 1', 'Florian 3', 'Rotkreuz 2']);
   });
 
   it('Spaltenfilter stehen in der Werkzeugzeile und wirken auf die Zeilenmenge', async () => {
@@ -1027,10 +1044,9 @@ describe('Datensicht · Tabellenzweig', () => {
 
     await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
     await userEvent.click(await screen.findByTitle('Feuerwehr'));
-    expect([...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent)).toEqual([
-      'Florian 1',
-      'Florian 3',
-    ]);
+    expect(
+      [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent),
+    ).toEqual(['Florian 1', 'Florian 3']);
   });
 
   it('Strg/⌘ + Backspace in der Werkzeugleiste leert Suche und internen Spaltenfilter', async () => {
@@ -1046,7 +1062,10 @@ describe('Datensicht · Tabellenzweig', () => {
 
     suche.focus();
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Backspace',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(suche, ereignis);
 
@@ -1064,7 +1083,10 @@ describe('Datensicht · Tabellenzweig', () => {
     const ergebnisLink = screen.getByRole('link', { name: 'Florian 1' });
     ergebnisLink.focus();
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Backspace',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(ergebnisLink, ereignis);
 
@@ -1176,7 +1198,11 @@ describe('Datensicht · Tabellenzweig', () => {
       { key: 'bez', title: 'Bezeichnung', dataIndex: 'bezeichnung', immerSichtbar: true },
     ]);
     const daten: Zeile[] = [
-      { key: 'a', bezeichnung: 'Abschnitt Nord', kinder: [{ key: 'a1', bezeichnung: 'Einheit 1' }] },
+      {
+        key: 'a',
+        bezeichnung: 'Abschnitt Nord',
+        kinder: [{ key: 'a1', bezeichnung: 'Einheit 1' }],
+      },
     ];
     const onAufgeklappt = vi.fn();
     const zu = renderMitProviders(
@@ -1227,7 +1253,11 @@ describe('Datensicht · Tabellenzweig', () => {
       { key: 'bez', title: 'Bezeichnung', dataIndex: 'bezeichnung', immerSichtbar: true },
     ]);
     const daten: Zeile[] = [
-      { key: 'a', bezeichnung: 'Abschnitt Nord', kinder: [{ key: 'a1', bezeichnung: 'Einheit 1' }] },
+      {
+        key: 'a',
+        bezeichnung: 'Abschnitt Nord',
+        kinder: [{ key: 'a1', bezeichnung: 'Einheit 1' }],
+      },
     ];
     const onAufgeklappt = vi.fn();
     renderMitProviders(
@@ -1378,7 +1408,9 @@ describe('Datensicht · Zeilenschleuse', () => {
     let menue: HTMLElement | null = null;
     for (let i = 0; i < 3 && !menue; i += 1) {
       await userEvent.click(knopf);
-      menue = document.querySelector<HTMLElement>('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+      menue = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
     }
     expect(menue, 'der Spaltenschalter ließ sich in drei Klicks nicht öffnen').not.toBeNull();
 
@@ -1464,7 +1496,10 @@ describe('Datensicht · Zeilenschleuse', () => {
      * genau in der Sekunde, in der jemand bedient. Deshalb `!wurzel.contains(relatedTarget)`.
      */
     const onSortierung = vi.fn();
-    const { container, rerender } = rendere({ suche: { platzhalter: 'Funkrufname' }, onSortierung });
+    const { container, rerender } = rendere({
+      suche: { platzhalter: 'Funkrufname' },
+      onSortierung,
+    });
     screen.getByRole('link', { name: 'Florian 1' }).focus();
 
     const mehr = [...DREI, F(4, 'Florian 4')];
@@ -1590,7 +1625,8 @@ describe('Datensicht · Zeilenschleuse', () => {
     setzeViewportBreite(390);
     const gruppen = {
       schluessel: (f: Fahrzeug) => f.traeger ?? 'ohne',
-      etikett: (w: string) => (w === 'FW' ? 'Feuerwehr' : w === 'HiOrg' ? 'Hilfsorganisation' : 'ohne Träger'),
+      etikett: (w: string) =>
+        w === 'FW' ? 'Feuerwehr' : w === 'HiOrg' ? 'Hilfsorganisation' : 'ohne Träger',
       reihenfolge: ['FW', 'HiOrg'],
     };
     const { rerender } = rendere({ gruppen });
@@ -1609,7 +1645,10 @@ describe('Datensicht · Zeilenschleuse', () => {
       />,
     );
 
-    expect(screen.getByText('Feuerwehr · 2'), 'die Karte bleibt unter ihrem alten Kopf').toBeInTheDocument();
+    expect(
+      screen.getByText('Feuerwehr · 2'),
+      'die Karte bleibt unter ihrem alten Kopf',
+    ).toBeInTheDocument();
     expect(screen.getByText('Hilfsorganisation · 1')).toBeInTheDocument();
     // Der neue Wert steht trotzdem in der Karte — eingefroren ist die POSITION, nicht der Inhalt.
     expect(screen.getAllByText('HiOrg')).toHaveLength(2);

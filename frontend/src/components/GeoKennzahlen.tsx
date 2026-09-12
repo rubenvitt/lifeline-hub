@@ -43,11 +43,7 @@ export function KennzahlZeile({ label, wert, zahl = true }: KennzahlZeileProps) 
     >
       <Typography.Text type="secondary">{label}</Typography.Text>
       <Typography.Text
-        style={
-          zahl
-            ? { fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }
-            : undefined
-        }
+        style={zahl ? { fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' } : undefined}
       >
         {wert}
       </Typography.Text>

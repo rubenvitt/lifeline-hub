@@ -1,13 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  baueMarkerFc, baueEinsatzortFc, sorgeFuerMarkerLayer, reAnlegenMarker,
-  MARKER_CLUSTER_QUELLE, MARKER_EINSATZORT_QUELLE, MARKER_KLICK_LAYER,
-  SPIDER_LEAVES_QUELLE, SPIDER_LEGS_QUELLE, SPIDER_KLICK_LAYER, setzeSpiderDaten,
+  baueMarkerFc,
+  baueEinsatzortFc,
+  sorgeFuerMarkerLayer,
+  reAnlegenMarker,
+  MARKER_CLUSTER_QUELLE,
+  MARKER_EINSATZORT_QUELLE,
+  MARKER_KLICK_LAYER,
+  SPIDER_LEAVES_QUELLE,
+  SPIDER_LEGS_QUELLE,
+  SPIDER_KLICK_LAYER,
+  setzeSpiderDaten,
 } from './markerLayer';
 import type { KarteMarker } from './marker';
 
 const mk = (p: Partial<KarteMarker>): KarteMarker => ({
-  schluessel: 'x', typ: 'uhs', id: 1, lat: 50, lon: 8, label: 'X', farbe: '#000', ...p,
+  schluessel: 'x',
+  typ: 'uhs',
+  id: 1,
+  lat: 50,
+  lon: 8,
+  label: 'X',
+  farbe: '#000',
+  ...p,
 });
 
 describe('baueMarkerFc', () => {
@@ -20,10 +35,14 @@ describe('baueMarkerFc', () => {
   });
 
   it('setzt icon für TZ-Marker und statusFarbe für Fahrzeuge', () => {
-    const fc = baueMarkerFc([mk({
-      schluessel: 'fahrzeug-1', typ: 'fahrzeug',
-      tz: { grundzeichen: 'kraftfahrzeug-landgebunden' }, statusFarbe: '#00ff00',
-    })]);
+    const fc = baueMarkerFc([
+      mk({
+        schluessel: 'fahrzeug-1',
+        typ: 'fahrzeug',
+        tz: { grundzeichen: 'kraftfahrzeug-landgebunden' },
+        statusFarbe: '#00ff00',
+      }),
+    ]);
     expect(fc.features[0].properties.icon?.startsWith('tz|')).toBe(true);
     expect(fc.features[0].properties.statusFarbe).toBe('#00ff00');
   });
@@ -42,7 +61,12 @@ describe('baueMarkerFc', () => {
   it('behält Reihenfolge, propagiert Schaden-Farbe und schreibt typ (für die Cluster-Aggregation)', () => {
     const fc = baueMarkerFc([
       mk({ schluessel: 'uhs-5' }),
-      mk({ schluessel: 'schaden-9', typ: 'schaden', farbe: '#f5222d', tz: { grundzeichen: 'gefahr', farbe: '#f5222d' } }),
+      mk({
+        schluessel: 'schaden-9',
+        typ: 'schaden',
+        farbe: '#f5222d',
+        tz: { grundzeichen: 'gefahr', farbe: '#f5222d' },
+      }),
     ]);
     expect(fc.features.map((f) => f.properties.schluessel)).toEqual(['uhs-5', 'schaden-9']);
     expect(fc.features.map((f) => f.properties.typ)).toEqual(['uhs', 'schaden']);
@@ -71,10 +95,16 @@ function fakeMap() {
   const moves: string[] = [];
   const map = {
     getSource: vi.fn((id: string) => sources.get(id)),
-    addSource: vi.fn((id: string, spec: unknown) => { sources.set(id, { spec, setData: vi.fn() }); }),
+    addSource: vi.fn((id: string, spec: unknown) => {
+      sources.set(id, { spec, setData: vi.fn() });
+    }),
     getLayer: vi.fn((id: string) => layers.get(id)),
-    addLayer: vi.fn((spec: { id: string }) => { layers.set(spec.id, spec); }),
-    moveLayer: vi.fn((id: string) => { moves.push(id); }),
+    addLayer: vi.fn((spec: { id: string }) => {
+      layers.set(spec.id, spec);
+    }),
+    moveLayer: vi.fn((id: string) => {
+      moves.push(id);
+    }),
   };
   return { map, sources, layers, moves };
 }
@@ -85,7 +115,10 @@ describe('sorgeFuerMarkerLayer', () => {
   it('legt die Cluster-Source mit cluster:true und per-Typ clusterProperties an', () => {
     const { map, sources } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    const spec = sources.get(MARKER_CLUSTER_QUELLE)!.spec as { cluster: boolean; clusterProperties: Record<string, unknown> };
+    const spec = sources.get(MARKER_CLUSTER_QUELLE)!.spec as {
+      cluster: boolean;
+      clusterProperties: Record<string, unknown>;
+    };
     expect(spec.cluster).toBe(true);
     expect(spec.clusterProperties.c_fahrzeug).toBeDefined(); // Donut-Aggregation pro Typ
     expect(spec.clusterProperties.c_schaden).toBeDefined();
@@ -95,7 +128,12 @@ describe('sorgeFuerMarkerLayer', () => {
   it('legt die Einzelmarker-Layer an, aber KEINE circle/symbol-Cluster-Layer (Cluster = DOM-Donut)', () => {
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    for (const id of ['marker-status-ring', 'marker-kreis', 'marker-symbol', 'marker-einsatzort-symbol']) {
+    for (const id of [
+      'marker-status-ring',
+      'marker-kreis',
+      'marker-symbol',
+      'marker-einsatzort-symbol',
+    ]) {
       expect(layers.has(id)).toBe(true);
     }
     expect(layers.has('marker-cluster-bubble')).toBe(false);
@@ -130,8 +168,14 @@ describe('sorgeFuerMarkerLayer', () => {
     // Jeder Layer wird per moveLayer (ohne beforeId) ans Ende = nach oben geschoben, in Mal-Reihenfolge.
     // Marker zuerst, dann der transiente Spider darüber (Beinchen unter den Leaf-Symbolen). Cluster = DOM-Marker.
     expect(moves).toEqual([
-      'marker-status-ring', 'marker-kreis', 'marker-symbol', 'marker-einsatzort-symbol',
-      'spider-legs-line', 'spider-status-ring', 'spider-kreis', 'spider-symbol',
+      'marker-status-ring',
+      'marker-kreis',
+      'marker-symbol',
+      'marker-einsatzort-symbol',
+      'spider-legs-line',
+      'spider-status-ring',
+      'spider-kreis',
+      'spider-symbol',
     ]);
   });
 
@@ -147,7 +191,10 @@ describe('sorgeFuerMarkerLayer', () => {
 describe('reAnlegenMarker', () => {
   it('legt an und spielt die (nicht-leeren) Daten unverändert in beide Sources ein', () => {
     const { map, sources } = fakeMap();
-    const marker = baueMarkerFc([mk({ schluessel: 'uhs-5' }), mk({ schluessel: 'schaden-9', typ: 'schaden' })]);
+    const marker = baueMarkerFc([
+      mk({ schluessel: 'uhs-5' }),
+      mk({ schluessel: 'schaden-9', typ: 'schaden' }),
+    ]);
     const einsatzort = baueEinsatzortFc([mk({ schluessel: 'einsatzort', typ: 'einsatzort' })]);
     reAnlegenMarker(map as never, marker, einsatzort);
     expect(sources.get(MARKER_CLUSTER_QUELLE)!.setData).toHaveBeenCalledWith(marker);
@@ -162,7 +209,9 @@ describe('Spider-Layer', () => {
     sorgeFuerMarkerLayer(map as never, leer, leer);
     expect(sources.has(SPIDER_LEAVES_QUELLE)).toBe(true);
     expect(sources.has(SPIDER_LEGS_QUELLE)).toBe(true);
-    expect((sources.get(SPIDER_LEAVES_QUELLE)!.spec as { cluster?: boolean }).cluster).toBeUndefined();
+    expect(
+      (sources.get(SPIDER_LEAVES_QUELLE)!.spec as { cluster?: boolean }).cluster,
+    ).toBeUndefined();
     for (const id of ['spider-legs-line', 'spider-status-ring', 'spider-kreis', 'spider-symbol']) {
       expect(layers.has(id)).toBe(true);
     }

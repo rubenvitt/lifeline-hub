@@ -20,11 +20,14 @@ const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'e
 
 function renderAt(bid: number | string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = createMemoryRouter([
-    { path: '/einsaetze', element: <div>EINSATZ-LISTE</div> },
-    { path: '/einsaetze/:id/auftraege', element: <div>AUFTRAEGE-LISTE</div> },
-    { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
-  ], { initialEntries: ['/einsaetze/1/auftraege', `/einsaetze/1/auftraege/befehle/${bid}`] });
+  const router = createMemoryRouter(
+    [
+      { path: '/einsaetze', element: <div>EINSATZ-LISTE</div> },
+      { path: '/einsaetze/:id/auftraege', element: <div>AUFTRAEGE-LISTE</div> },
+      { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
+    ],
+    { initialEntries: ['/einsaetze/1/auftraege', `/einsaetze/1/auftraege/befehle/${bid}`] },
+  );
   const ergebnis = render(
     <QueryClientProvider client={qc}>
       <AntApp>
@@ -59,7 +62,8 @@ function renderAt(bid: number | string) {
        * Test war ohne diese Zeile grün, bevor es einen Riegel gab).
        */
       await waitFor(() =>
-        expect(vi.mocked(befehleApi.ladeBefehl).mock.calls.length).toBeGreaterThan(vorher));
+        expect(vi.mocked(befehleApi.ladeBefehl).mock.calls.length).toBeGreaterThan(vorher),
+      );
     },
   };
 }
@@ -70,11 +74,23 @@ beforeEach(() => {
 
 function befehl(status: 'entwurf' | 'freigegeben') {
   return {
-    id: 7, einsatz_id: 1, vorlage: 'befehl_ladef', titel: 'Befehl 1',
-    zeitstand: '2026-06-02 10:00:00', status, abschnitte: [],
-    version: 1, vorgaenger_id: null, ersteller_id: 1, ersteller_name: 'EL',
-    erstellt_at: '', aktualisiert_at: '', freigegeben_von_id: null,
-    freigegeben_von_name: null, freigegeben_at: null, etb_eintrag_id: status === 'freigegeben' ? 5 : null,
+    id: 7,
+    einsatz_id: 1,
+    vorlage: 'befehl_ladef',
+    titel: 'Befehl 1',
+    zeitstand: '2026-06-02 10:00:00',
+    status,
+    abschnitte: [],
+    version: 1,
+    vorgaenger_id: null,
+    ersteller_id: 1,
+    ersteller_name: 'EL',
+    erstellt_at: '',
+    aktualisiert_at: '',
+    freigegeben_von_id: null,
+    freigegeben_von_name: null,
+    freigegeben_at: null,
+    etb_eintrag_id: status === 'freigegeben' ? 5 : null,
   };
 }
 
@@ -308,16 +324,26 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
 function renderMitZone(bid: number) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   qc.setQueryData(einsatzKeys.einstellungen(1), {
-    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+    einsatz_id: 1,
+    zeitzone: 'Europe/Berlin',
+    org_defaults: { org_id: 1 },
   });
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
           <EinsatzAnzeigeProvider einsatzId={1}>
-            <RouterProvider router={createMemoryRouter([
-              { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
-            ], { initialEntries: [`/einsaetze/1/auftraege/befehle/${bid}`] })} />
+            <RouterProvider
+              router={createMemoryRouter(
+                [
+                  {
+                    path: '/einsaetze/:id/auftraege/befehle/:befehlId',
+                    element: <BefehlDetailPage />,
+                  },
+                ],
+                { initialEntries: [`/einsaetze/1/auftraege/befehle/${bid}`] },
+              )}
+            />
           </EinsatzAnzeigeProvider>
         </AuthProvider>
       </AntApp>
@@ -327,12 +353,15 @@ function renderMitZone(bid: number) {
 
 describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
   it('zeigt die taktische DTG in der Anzeigezone, nicht den rohen UTC-Wirestring', async () => {
-    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue(
-      { einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } } as never,
-    );
-    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(
-      { ...befehl('freigegeben'), zeitstand: '2026-07-25 12:00:00' } as never,
-    );
+    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1,
+      zeitzone: 'Europe/Berlin',
+      org_defaults: { org_id: 1 },
+    } as never);
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('freigegeben'),
+      zeitstand: '2026-07-25 12:00:00',
+    } as never);
     renderMitZone(7);
 
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
@@ -340,7 +369,6 @@ describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });
-
 
 describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
   beforeEach(() => {
@@ -352,13 +380,27 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
   function halteSpeichernAn() {
     let resolve!: (wert: never) => void;
     let reject!: (fehler: Error) => void;
-    vi.mocked(befehleApi.aktualisiereBefehl).mockImplementation(() =>
-      new Promise((ja, nein) => { resolve = ja; reject = nein; }));
+    vi.mocked(befehleApi.aktualisiereBefehl).mockImplementation(
+      () =>
+        new Promise((ja, nein) => {
+          resolve = ja;
+          reject = nein;
+        }),
+    );
     return {
-      erfolg: () => act(async () => { resolve(befehl('entwurf') as never); }),
-      fehler: () => act(async () => { reject(new Error('Netz unterbrochen')); }),
+      erfolg: () =>
+        act(async () => {
+          resolve(befehl('entwurf') as never);
+        }),
+      fehler: () =>
+        act(async () => {
+          reject(new Error('Netz unterbrochen'));
+        }),
       /** Wie `fehler`, aber mit einem bestimmten Grund — der Wortlaut trägt die Aussage. */
-      ablehnen: (e: Error) => act(async () => { reject(e); }),
+      ablehnen: (e: Error) =>
+        act(async () => {
+          reject(e);
+        }),
     };
   }
 
@@ -409,8 +451,11 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
     await userEvent.click(weiter);
     await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(2));
-    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(1, 7,
-      expect.objectContaining({ titel: 'Befehl 1 neu' }));
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(
+      1,
+      7,
+      expect.objectContaining({ titel: 'Befehl 1 neu' }),
+    );
     expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
     await erneut.erfolg();
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
@@ -465,7 +510,9 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     await userEvent.type(titel, ' a');
     await userEvent.tab();
     await userEvent.type(titel, ' b');
-    await act(async () => { await router.navigate(-1); });
+    await act(async () => {
+      await router.navigate(-1);
+    });
     await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await save.erfolg();
     expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
@@ -481,7 +528,9 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     fireEvent.submit(titel.closest('form')!);
     await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1));
     await userEvent.type(titel, ' b');
-    await act(async () => { await router.navigate('/einsaetze/1/auftraege'); });
+    await act(async () => {
+      await router.navigate('/einsaetze/1/auftraege');
+    });
     await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await save.erfolg();
     expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/7');
@@ -501,8 +550,11 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1);
     await save.erfolg();
     await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(2));
-    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(1, 7,
-      expect.objectContaining({ titel: 'Befehl 1 a b' }));
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(
+      1,
+      7,
+      expect.objectContaining({ titel: 'Befehl 1 a b' }),
+    );
     expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/7');
     await save.erfolg();
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
@@ -527,19 +579,24 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
   it('lässt Query-/Hash-Wechsel im selben Editor ohne Dialog zu', async () => {
     const { router } = renderAt(7);
     await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
-    await act(async () => { await router.navigate('?ansicht=test#lage'); });
+    await act(async () => {
+      await router.navigate('?ansicht=test#lage');
+    });
     expect(screen.getByLabelText('Titel')).toHaveValue('Befehl 1 neu');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(router.state.location.hash).toBe('#lage');
   });
 
-  it.each(['entwurf', 'freigegeben'] as const)('lässt die unveränderte Fassung %s direkt gehen', async (status) => {
-    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl(status) as never);
-    renderAt(7);
-    await userEvent.click(await screen.findByRole('link', { name: 'Aufträge/Befehle' }));
-    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
+  it.each(['entwurf', 'freigegeben'] as const)(
+    'lässt die unveränderte Fassung %s direkt gehen',
+    async (status) => {
+      vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl(status) as never);
+      renderAt(7);
+      await userEvent.click(await screen.findByRole('link', { name: 'Aufträge/Befehle' }));
+      expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    },
+  );
 
   it('verlangt beim ausdrücklichen Speichern einen gültigen Titel', async () => {
     halteSpeichernAn();
@@ -614,12 +671,15 @@ describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
    * stehenbliebe, während die Knöpfe unten kleben, wäre auf 390 px aus dem Bild gescrollt,
    * genau während man tippt.
    */
-  it.each([390, 1024])('trägt den Autosave-Beleg bei %ipx im selben Block wie die Knöpfe', async (breite) => {
-    setzeViewportBreite(breite);
-    renderAt(7);
-    await userEvent.type(await screen.findByLabelText('Titel'), ' x');
-    expect(within(aktionsblock()!).getByText('ungespeicherte Änderungen')).toBeInTheDocument();
-  });
+  it.each([390, 1024])(
+    'trägt den Autosave-Beleg bei %ipx im selben Block wie die Knöpfe',
+    async (breite) => {
+      setzeViewportBreite(breite);
+      renderAt(7);
+      await userEvent.type(await screen.findByLabelText('Titel'), ' x');
+      expect(within(aktionsblock()!).getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+    },
+  );
 });
 
 /**
@@ -635,8 +695,9 @@ describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
 describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
   it('lässt den Grund eines gescheiterten Autosave in der Seite stehen, nicht nur im Toast', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
-    vi.mocked(befehleApi.aktualisiereBefehl)
-      .mockRejectedValue(new ApiError(503, 'Dienst nicht erreichbar'));
+    vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
+      new ApiError(503, 'Dienst nicht erreichbar'),
+    );
     renderAt(7);
     await userEvent.type(await screen.findByLabelText('Titel'), 'x');
     await userEvent.tab();
@@ -659,7 +720,8 @@ describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
     await waitFor(() =>
-      expect(screen.queryByText('Dienst nicht erreichbar')).not.toBeInTheDocument());
+      expect(screen.queryByText('Dienst nicht erreichbar')).not.toBeInTheDocument(),
+    );
   });
 
   it('behandelt das Verlassen des Editors nicht als Speicherfehler', async () => {
@@ -667,8 +729,9 @@ describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
     // Alert dafür behauptete einen Verlust, den es nicht gab — und stünde auf der Seite,
     // die man gerade verlassen hat.
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
-    vi.mocked(befehleApi.aktualisiereBefehl)
-      .mockRejectedValue(new DOMException('Editor verlassen', 'AbortError'));
+    vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
+      new DOMException('Editor verlassen', 'AbortError'),
+    );
     renderAt(7);
     await userEvent.type(await screen.findByLabelText('Titel'), 'x');
     await userEvent.tab();
@@ -716,13 +779,15 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
    * Seiten-Alert, der das Schliessen überlebt). Gezählt wird deshalb genau die Queue.
    */
   function toastsMit(wortlaut: string) {
-    return [...document.querySelectorAll('.ant-message')]
-      .filter((n) => n.textContent?.includes(wortlaut));
+    return [...document.querySelectorAll('.ant-message')].filter((n) =>
+      n.textContent?.includes(wortlaut),
+    );
   }
 
   it('zeigt den Grund IM Dialog statt im Toast und lässt ihn offen', async () => {
-    vi.mocked(befehleApi.gibBefehlFrei)
-      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    vi.mocked(befehleApi.gibBefehlFrei).mockRejectedValue(
+      new ApiError(422, 'Abschnitt „Auftrag" ist leer'),
+    );
     renderAt(7);
     const dialog = await oeffneFreigabe();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
@@ -753,8 +818,9 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
    * Grund trägt eine andere Überschrift, weil er der Person etwas anderes sagt.
    */
   it('hält die Freigabe zurück, wenn schon der Speicher-Vorlauf scheitert', async () => {
-    vi.mocked(befehleApi.aktualisiereBefehl)
-      .mockRejectedValue(new ApiError(503, 'Dienst nicht erreichbar'));
+    vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
+      new ApiError(503, 'Dienst nicht erreichbar'),
+    );
     renderAt(7);
     const dialog = await oeffneFreigabe();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
@@ -772,8 +838,9 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
    * eine Meldung über etwas, das gerade gar nicht passiert ist.
    */
   it('öffnet nach Abbrechen ohne den Grund des vorigen Versuchs', async () => {
-    vi.mocked(befehleApi.gibBefehlFrei)
-      .mockRejectedValue(new ApiError(422, 'Abschnitt „Auftrag" ist leer'));
+    vi.mocked(befehleApi.gibBefehlFrei).mockRejectedValue(
+      new ApiError(422, 'Abschnitt „Auftrag" ist leer'),
+    );
     renderAt(7);
     const dialog = await oeffneFreigabe();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));

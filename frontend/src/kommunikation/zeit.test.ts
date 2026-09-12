@@ -42,8 +42,8 @@ describe('formatZeitKurz', () => {
 describe('formatZeitMitKonvention', () => {
   it('wendet die Zeitzone an, ignoriert aber 12h (taktisch immer 24h)', () => {
     const wire = '2026-06-11 15:00:00'; // 15:00 UTC → 17:00 Berlin
-    expect(
-      formatZeitMitKonvention(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' }),
-    ).toBe('111700JUN2026');
+    expect(formatZeitMitKonvention(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' })).toBe(
+      '111700JUN2026',
+    );
   });
 });

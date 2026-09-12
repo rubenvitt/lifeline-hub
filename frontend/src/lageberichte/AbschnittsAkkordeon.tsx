@@ -106,7 +106,11 @@ export interface AbschnittsAkkordeonProps {
  * nichts kaputt macht — es wird nur wieder langsam.
  */
 export const AbschnittsAkkordeon = memo(function AbschnittsAkkordeon({
-  abschnitte, befuellt, offen, onOffen, editor,
+  abschnitte,
+  befuellt,
+  offen,
+  onOffen,
+  editor,
 }: AbschnittsAkkordeonProps) {
   const { token } = theme.useToken();
   return (
@@ -127,7 +131,10 @@ export const AbschnittsAkkordeon = memo(function AbschnittsAkkordeon({
           forceRender: true,
           label: (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXXS }}>
-              <span aria-hidden style={{ color: voll ? token.colorSuccess : token.colorTextSecondary }}>
+              <span
+                aria-hidden
+                style={{ color: voll ? token.colorSuccess : token.colorTextSecondary }}
+              >
                 {voll ? <CheckCircleOutlined /> : <MinusCircleOutlined />}
               </span>
               <Typography.Text strong={voll} type={voll ? undefined : 'secondary'}>

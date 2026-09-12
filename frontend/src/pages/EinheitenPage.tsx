@@ -1,8 +1,26 @@
-import { Alert, App, Breadcrumb, Button, Card, Form, Input, Space, Tag, theme, Tree, Typography, type TreeDataNode } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Card,
+  Form,
+  Input,
+  Space,
+  Tag,
+  theme,
+  Tree,
+  Typography,
+  type TreeDataNode,
+} from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import {
-  SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet, nichtGefundenInhalt,
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+  nichtGefundenInhalt,
 } from '../components/SeitenZustand';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMemo, useState } from 'react';
@@ -65,11 +83,19 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
           {e.typ_label && <Tag>{e.typ_label}</Tag>}
           <Tag color="blue">
             <StaerkeAnzeige wert={e.ist} />
-            {e.soll ? <> / Soll <StaerkeAnzeige wert={e.soll} /></> : null}
+            {e.soll ? (
+              <>
+                {' '}
+                / Soll <StaerkeAnzeige wert={e.soll} />
+              </>
+            ) : null}
           </Tag>
           {e.fuehrer_name && (
             <span style={{ color: sekundaerFarbe }}>
-              <span aria-hidden="true"><UserOutlined /></span> {e.fuehrer_name}
+              <span aria-hidden="true">
+                <UserOutlined />
+              </span>{' '}
+              {e.fuehrer_name}
             </span>
           )}
         </Space>
@@ -96,8 +122,14 @@ export default function EinheitenPage() {
   const [bildenForm] = Form.useForm<BildenWerte>();
   const { token } = theme.useToken();
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+  });
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
@@ -124,7 +156,8 @@ export default function EinheitenPage() {
   const [searchParams] = useSearchParams();
   const deeplinkZiel = parseRouteId(searchParams.get('einheit') ?? undefined);
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   /**
    * „Einheit bilden" fragt seit LFH-339 · C4 zuerst (Befund M27).
@@ -196,33 +229,48 @@ export default function EinheitenPage() {
 
   return (
     <div>
-      <Breadcrumb style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Einheiten' }]} />
+      <Breadcrumb
+        style={{ marginBottom: 12 }}
+        items={[
+          { title: <Link to="/einsaetze">Einsätze</Link> },
+          { title: einsatz.bezeichnung },
+          { title: 'Einheiten' },
+        ]}
+      />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space orientation="vertical" size={0}>
           <Space>
-            <Typography.Title level={3} style={{ margin: 0 }}>Einheiten</Typography.Title>
+            <Typography.Title level={3} style={{ margin: 0 }}>
+              Einheiten
+            </Typography.Title>
             <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
           </Space>
           <Datenstand dataUpdatedAt={einheitenQuery.dataUpdatedAt} />
         </Space>
         {darfSchreiben && (
-          <Button type="primary" onClick={() => setBildenOffen(true)}>Einheit bilden</Button>
+          <Button type="primary" onClick={() => setBildenOffen(true)}>
+            Einheit bilden
+          </Button>
         )}
       </Space>
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        <Alert
+          style={{ marginBottom: 12 }}
+          type="info"
+          showIcon
+          title="Einsatz ist abgeschlossen — nur Ansicht."
+        />
       )}
 
       <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
 
       {/**
-        * Die Gliederung ist seit C4 die GANZE Seite — die Detailhälfte ist auf eine eigene
-        * Route gezogen. Was von M25 bleibt, ist der Umbruch: die Karte hatte
-        * `flex: '0 0 360px'` ohne `flexWrap`, also eine Breite, die auf 390 px nicht passt
-        * und nicht ausweichen darf. Jetzt wächst sie mit und deckelt bei 360 px auf breitem
-        * Schirm, wo ein Baum nicht über die ganze Fläche laufen soll.
-        */}
+       * Die Gliederung ist seit C4 die GANZE Seite — die Detailhälfte ist auf eine eigene
+       * Route gezogen. Was von M25 bleibt, ist der Umbruch: die Karte hatte
+       * `flex: '0 0 360px'` ohne `flexWrap`, also eine Breite, die auf 390 px nicht passt
+       * und nicht ausweichen darf. Jetzt wächst sie mit und deckelt bei 360 px auf breitem
+       * Schirm, wo ein Baum nicht über die ganze Fläche laufen soll.
+       */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <Card style={{ flex: '1 1 clamp(260px, 30%, 360px)' }} size="small" title="Gliederung">
           {/* DREI Zustände, nicht zwei (LFH-331 · B3). Die frühere Weiche hing an
@@ -247,10 +295,10 @@ export default function EinheitenPage() {
               hinweis="Die Gliederung entsteht mit der ersten gebildeten Einheit."
               aktion={
                 darfSchreiben
-                  // Wortlaut BYTE-GLEICH zum Kopfknopf: es ist dieselbe Handlung, und eine
-                  // zweite Schreibweise für dieselbe Geste ist genau der Befund, den B3
-                  // behebt.
-                  ? { label: 'Einheit bilden', onClick: () => setBildenOffen(true) }
+                  ? // Wortlaut BYTE-GLEICH zum Kopfknopf: es ist dieselbe Handlung, und eine
+                    // zweite Schreibweise für dieselbe Geste ist genau der Befund, den B3
+                    // behebt.
+                    { label: 'Einheit bilden', onClick: () => setBildenOffen(true) }
                   : undefined
               }
             />
@@ -287,11 +335,14 @@ export default function EinheitenPage() {
           <Input placeholder="z. B. 2. Zug" />
         </Form.Item>
         <Form.Item label="Typ" name="typ_id">
-          <Select allowClear placeholder="Typ wählen"
+          <Select
+            allowClear
+            placeholder="Typ wählen"
             notFoundContent={nichtGefundenInhalt(typenQuery, {
               allgemein: 'Einheitentypen konnten nicht geladen werden',
             })}
-            options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))} />
+            options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
+          />
         </Form.Item>
       </ErfassungsModal>
     </div>

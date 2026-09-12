@@ -21,7 +21,10 @@ import { describe, expect, it } from 'vitest';
 
 // `src` deckt den Anwendungscode ab; `e2e` liegt ebenfalls in der tsconfig und
 // unterliegt damit derselben Regel.
-const dateien = { ...import.meta.glob('/src/**/*.{ts,tsx}'), ...import.meta.glob('/e2e/**/*.{ts,tsx}') };
+const dateien = {
+  ...import.meta.glob('/src/**/*.{ts,tsx}'),
+  ...import.meta.glob('/e2e/**/*.{ts,tsx}'),
+};
 
 /** Findet Pfade, die sich nur in der Endung unterscheiden. */
 export function basenameKollisionen(pfade: string[]): string[][] {
@@ -52,7 +55,11 @@ describe('Dateinamen-Guard: keine .ts/.tsx-Basename-Kollisionen', () => {
   it('erkennt eine Kollision tatsächlich (Selbst-Beweis)', () => {
     // Ein Guard, der nur per Konstruktion grün ist, sagt nichts aus.
     expect(
-      basenameKollisionen(['/src/a/Sidebar.test.ts', '/src/a/Sidebar.test.tsx', '/src/a/Andere.tsx']),
+      basenameKollisionen([
+        '/src/a/Sidebar.test.ts',
+        '/src/a/Sidebar.test.tsx',
+        '/src/a/Andere.tsx',
+      ]),
     ).toEqual([['/src/a/Sidebar.test.ts', '/src/a/Sidebar.test.tsx']]);
 
     // Gleicher Basename in VERSCHIEDENEN Ordnern ist kein Problem.

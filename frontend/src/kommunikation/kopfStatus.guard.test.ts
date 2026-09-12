@@ -86,7 +86,9 @@ describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
     // `[^>]*` statt `\s+`: `<Tag style={{…}} color="green">` matchte sonst nicht, und
     // Prettier sortiert JSX-Attribute nicht um. Beide Reihenfolgen kommen im Bestand vor
     // (`meldungen/MeldungKarte.tsx` color-first, `erinnerung/ErinnerungKarte.tsx` style-first).
-    expect(gruppe, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(/<Tag(?=[\s>])[^>]*\scolor=/);
+    expect(gruppe, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(
+      /<Tag(?=[\s>])[^>]*\scolor=/,
+    );
     // Der Schnitt hat wirklich die Gruppe erwischt — sonst prüfte die Zeile darüber
     // eine leere Zeichenkette gegen eine Abwesenheit und wäre immer grün. Zugleich die
     // Gegenprobe gegen das bloße Entfernen der Etikettengruppe.
@@ -98,7 +100,9 @@ describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
     // „Freigegeben" als Literal ist die belastbare Gegenprobe; „Entwurf" trägt daneben
     // die Knopfbeschriftung „Entwurf speichern" und taugt dafür nicht.
     // Alle drei Quote-Stile: `toContain("'…'")` liefe an `"Freigegeben"` vorbei.
-    expect(gruppe, `${datei}: Statuslabel nicht abgeschrieben`).not.toMatch(/['"`]Freigegeben['"`]/);
+    expect(gruppe, `${datei}: Statuslabel nicht abgeschrieben`).not.toMatch(
+      /['"`]Freigegeben['"`]/,
+    );
     expect(gruppe, `${datei}: liest die Achse`).toContain(zugriff);
     const badges = gruppe.match(/<StatusBadge/g) ?? [];
     expect(badges, `${datei}: genau ein Statusetikett im Kopf`).toHaveLength(1);

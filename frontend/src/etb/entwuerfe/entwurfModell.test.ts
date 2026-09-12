@@ -8,14 +8,21 @@ dayjs.extend(utc);
 
 function entwurf(over: Partial<EtbEntwurf> = {}): EtbEntwurf {
   return {
-    id: 'a', einsatz_id: 7, inhalt: '', typ: 'meldung',
-    erstellt_at: '2026-06-22T10:00:00.000Z', geaendert_at: '2026-06-22T10:00:00.000Z', ...over,
+    id: 'a',
+    einsatz_id: 7,
+    inhalt: '',
+    typ: 'meldung',
+    erstellt_at: '2026-06-22T10:00:00.000Z',
+    geaendert_at: '2026-06-22T10:00:00.000Z',
+    ...over,
   };
 }
 
 describe('zuWerte', () => {
   it('wandelt ereigniszeit (ISO) zurück in ein dayjs-Objekt', () => {
-    const w = zuWerte(entwurf({ ereigniszeit: '2026-06-22T08:30:00.000Z', von: 'ELW 1', typ: 'lage', inhalt: 'X' }));
+    const w = zuWerte(
+      entwurf({ ereigniszeit: '2026-06-22T08:30:00.000Z', von: 'ELW 1', typ: 'lage', inhalt: 'X' }),
+    );
     expect(w.inhalt).toBe('X');
     expect(w.typ).toBe('lage');
     expect(w.metadaten.von).toBe('ELW 1');
@@ -30,10 +37,20 @@ describe('zuWerte', () => {
 describe('werteZuPatch', () => {
   it('serialisiert ein dayjs-ereigniszeit zu ISO und lässt leere Felder weg', () => {
     const patch = werteZuPatch({
-      inhalt: 'Lage', typ: 'meldung',
-      metadaten: { von: 'ELW 1', ereigniszeit: dayjs.utc('2026-06-22T08:30:00.000Z'), an: '' as unknown as string },
+      inhalt: 'Lage',
+      typ: 'meldung',
+      metadaten: {
+        von: 'ELW 1',
+        ereigniszeit: dayjs.utc('2026-06-22T08:30:00.000Z'),
+        an: '' as unknown as string,
+      },
     });
-    expect(patch).toMatchObject({ inhalt: 'Lage', typ: 'meldung', von: 'ELW 1', ereigniszeit: '2026-06-22T08:30:00.000Z' });
+    expect(patch).toMatchObject({
+      inhalt: 'Lage',
+      typ: 'meldung',
+      von: 'ELW 1',
+      ereigniszeit: '2026-06-22T08:30:00.000Z',
+    });
     expect(patch.an).toBeUndefined();
   });
 });

@@ -62,7 +62,12 @@ const SCHNELLWAHL = [
  * Auswegen. Die Maske wurde für N22 ohnehin angefasst — und die Erfassungs-Norm gilt
  * genau dann (LFH-332 · B4).
  */
-export default function WiedervorlageModal({ einsatzId, eintrag, onClose, naechsteLagebesprechungAt }: {
+export default function WiedervorlageModal({
+  einsatzId,
+  eintrag,
+  onClose,
+  naechsteLagebesprechungAt,
+}: {
   einsatzId: number;
   eintrag: EtbEintragAnzeige | null;
   onClose: () => void;
@@ -74,7 +79,8 @@ export default function WiedervorlageModal({ einsatzId, eintrag, onClose, naechs
   const [zeitPruefung, pruefeZeit] = useReducer((wert: number) => wert + 1, 0);
   // Der Wirestring ist UTC ohne Offset. Lokal parsen würde den Instant verschieben.
   const lagebesprechung = naechsteLagebesprechungAt
-    ? dayjs.utc(naechsteLagebesprechungAt).local() : null;
+    ? dayjs.utc(naechsteLagebesprechungAt).local()
+    : null;
   const terminBekannt = lagebesprechung?.isValid() && lagebesprechung.isAfter(dayjs());
   const offen = eintrag !== null;
 
@@ -125,7 +131,11 @@ export default function WiedervorlageModal({ einsatzId, eintrag, onClose, naechs
           : undefined
       }
     >
-      <Form.Item label="Titel" name="titel" rules={[{ required: true, message: 'Titel ist erforderlich' }]}>
+      <Form.Item
+        label="Titel"
+        name="titel"
+        rules={[{ required: true, message: 'Titel ist erforderlich' }]}
+      >
         <Input />
       </Form.Item>
       <Form.Item label="Fällig am" required style={{ marginBottom: abstand.md }}>
@@ -145,19 +155,25 @@ export default function WiedervorlageModal({ einsatzId, eintrag, onClose, naechs
             </Button>
           ))}
           {terminBekannt && (
-            <Button onClick={() => {
-              // Ein Systemzeitsprung kann dem Timer zuvorkommen.
-              if (!lagebesprechung?.isAfter(dayjs())) {
-                pruefeZeit();
-                return;
-              }
-              form.setFieldValue('faellig', lagebesprechung);
-            }}>
+            <Button
+              onClick={() => {
+                // Ein Systemzeitsprung kann dem Timer zuvorkommen.
+                if (!lagebesprechung?.isAfter(dayjs())) {
+                  pruefeZeit();
+                  return;
+                }
+                form.setFieldValue('faellig', lagebesprechung);
+              }}
+            >
               Nächste Lagebesprechung
             </Button>
           )}
         </Space>
-        <Form.Item name="faellig" noStyle rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}>
+        <Form.Item
+          name="faellig"
+          noStyle
+          rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
+        >
           <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
         </Form.Item>
       </Form.Item>

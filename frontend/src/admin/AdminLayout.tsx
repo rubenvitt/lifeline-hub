@@ -46,7 +46,10 @@ function sektionsKey(gruppe: string, sektion: string): string {
 function markierterKey(keys: string[], aktiv: string): string | undefined {
   return keys
     .filter((k) => aktiv === k || aktiv.startsWith(`${k}/`))
-    .reduce<string | undefined>((beste, k) => (beste && beste.length >= k.length ? beste : k), undefined);
+    .reduce<string | undefined>(
+      (beste, k) => (beste && beste.length >= k.length ? beste : k),
+      undefined,
+    );
 }
 
 export default function AdminLayout() {

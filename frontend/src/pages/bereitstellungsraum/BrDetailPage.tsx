@@ -1,4 +1,15 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Descriptions,
+  Popconfirm,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
 import { useEffect } from 'react';
@@ -75,13 +86,19 @@ export default function BrDetailPage() {
 
   const statusMut = useMutation({
     mutationFn: (status: BrStatus) => setzeBrStatus(einsatzId, brId, status),
-    onSuccess: () => { message.success('Status gewechselt'); invalidate(); },
+    onSuccess: () => {
+      message.success('Status gewechselt');
+      invalidate();
+    },
     onError: fehler,
   });
 
   const stornoMut = useMutation({
     mutationFn: () => storniereBr(einsatzId, brId),
-    onSuccess: () => { message.success('BR storniert'); invalidate(); },
+    onSuccess: () => {
+      message.success('BR storniert');
+      invalidate();
+    },
     onError: fehler,
   });
 
@@ -89,7 +106,10 @@ export default function BrDetailPage() {
     mutationFn: belegeBr.bind(null, einsatzId, brId),
     // Fester Schlüssel (N8): ein serieller Zuweisen/Entfernen-Lauf ERSETZT den stehenden
     // Toast statt ihn zu stapeln — dieselbe Bauform wie `kommunikation/rueckgaengig.tsx`.
-    onSuccess: () => { message.success({ content: 'Erfolgreich', key: 'br-belegung' }); invalidate(); },
+    onSuccess: () => {
+      message.success({ content: 'Erfolgreich', key: 'br-belegung' });
+      invalidate();
+    },
     onError: fehler,
   });
 
@@ -98,7 +118,11 @@ export default function BrDetailPage() {
     return <Navigate to={listenPfad} replace />;
   }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.error || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -109,7 +133,10 @@ export default function BrDetailPage() {
 
   const einsatz = einsatzQuery.data;
   const br = detailQuery.data;
-  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer) || br.status === 'geplant' || br.status === 'aufgeloest';
+  const schreibgeschuetzt =
+    !darfImEinsatzSchreiben(einsatz, benutzer) ||
+    br.status === 'geplant' ||
+    br.status === 'aufgeloest';
 
   function onZuweisenEinheit(einheit: Einheit) {
     belegungMut.mutate({ objekt_typ: 'einheit', objekt_id: einheit.id, art: 'eintritt' });
@@ -131,7 +158,9 @@ export default function BrDetailPage() {
   // id+name, die vollen Daten liegen in Queries, die die Sidebar ohnehin braucht.
   const einheitVon = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e]));
   const fahrzeugVon = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f]));
-  const bereitgestellt = br.einheiten.map((e) => einheitVon.get(e.id)).filter((e): e is Einheit => e != null);
+  const bereitgestellt = br.einheiten
+    .map((e) => einheitVon.get(e.id))
+    .filter((e): e is Einheit => e != null);
   // Final-Review Befund A: `bereitgestellt` verwirft lautlos jede Einheit, die in
   // `einheitenQuery.data` fehlt (Query lädt noch, ist gescheitert, oder der Cache ist
   // nur teilweise gefüllt). Eine Summe über diese verkürzte Menge wäre eine zu kleine,
@@ -151,12 +180,14 @@ export default function BrDetailPage() {
         </Space>
       }
       breadcrumb={
-        <Breadcrumb items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
-          { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
-          { title: br.bezeichnung },
-        ]} />
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
+            { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
+            { title: br.bezeichnung },
+          ]}
+        />
       }
       aktionen={
         <Space>
@@ -166,7 +197,9 @@ export default function BrDetailPage() {
               description="Nur möglich, wenn keine Kraft mehr belegt ist."
               onConfirm={() => statusMut.mutate('aufgeloest')}
             >
-              <Button danger loading={statusMut.isPending}>Auflösen</Button>
+              <Button danger loading={statusMut.isPending}>
+                Auflösen
+              </Button>
             </Popconfirm>
           )}
           {darfImEinsatzSchreiben(einsatz, benutzer) && br.status === 'geplant' && (
@@ -179,7 +212,9 @@ export default function BrDetailPage() {
                 In Betrieb nehmen
               </Button>
               <Popconfirm title="BR stornieren?" onConfirm={() => stornoMut.mutate()}>
-                <Button danger loading={stornoMut.isPending}>Stornieren</Button>
+                <Button danger loading={stornoMut.isPending}>
+                  Stornieren
+                </Button>
               </Popconfirm>
             </>
           )}
@@ -187,8 +222,12 @@ export default function BrDetailPage() {
       }
     >
       <Descriptions column={2} style={{ marginBottom: abstand.lg }}>
-        <Descriptions.Item label="Standort" span={2}>{br.standort ?? '—'}</Descriptions.Item>
-        <Descriptions.Item label="Notiz" span={2}>{br.notiz ?? '—'}</Descriptions.Item>
+        <Descriptions.Item label="Standort" span={2}>
+          {br.standort ?? '—'}
+        </Descriptions.Item>
+        <Descriptions.Item label="Notiz" span={2}>
+          {br.notiz ?? '—'}
+        </Descriptions.Item>
       </Descriptions>
 
       {/* Unter `md` stapeln statt der 240-px-Sidebar neben dem Hauptbereich (LFH-341 · H40) —
@@ -197,14 +236,19 @@ export default function BrDetailPage() {
           eine Spalte quetschen, obwohl die Karte selbst schon auf `100%` steht. */}
       <div
         data-testid="br-detail-rahmen"
-        style={{ display: 'flex', flexDirection: breit ? 'row' : 'column', gap: abstand.lg, alignItems: breit ? 'flex-start' : 'stretch' }}
+        style={{
+          display: 'flex',
+          flexDirection: breit ? 'row' : 'column',
+          gap: abstand.lg,
+          alignItems: breit ? 'flex-start' : 'stretch',
+        }}
       >
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
           <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
             <Typography.Text strong>
-              Bereitgestellt: {unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />} · {fahrzeugZahl}{' '}
-              {fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
+              Bereitgestellt: {unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />} ·{' '}
+              {fahrzeugZahl} {fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
             </Typography.Text>
             {unvollstaendig && (
               <div>
@@ -239,7 +283,9 @@ export default function BrDetailPage() {
                 <Space wrap>
                   <span>{e.name}</span>
                   {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
-                  <Tag color="blue"><StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} /></Tag>
+                  <Tag color="blue">
+                    <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
+                  </Tag>
                 </Space>
               </ListenEintrag>
             )}
@@ -268,7 +314,9 @@ export default function BrDetailPage() {
               >
                 <Space wrap>
                   <span>{f.funkrufname}</span>
-                  {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
+                  {fahrzeugVon.get(f.id)?.fahrzeugtyp && (
+                    <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>
+                  )}
                 </Space>
               </ListenEintrag>
             )}

@@ -96,7 +96,13 @@ const befehlSpalten = spaltenFuer<BefehlAnzeige>()([
   },
 ]);
 
-export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: number; darfSchreiben: boolean }) {
+export default function BefehlListe({
+  einsatzId,
+  darfSchreiben,
+}: {
+  einsatzId: number;
+  darfSchreiben: boolean;
+}) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [anlegenOffen, setAnlegenOffen] = useState(false);
@@ -107,11 +113,16 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
     queryFn: () => listeBefehle(einsatzId),
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeuerBefehl) => legeBefehlAn(einsatzId, daten),
-    onSuccess: () => { invalidate(); setAnlegenOffen(false); form.resetFields(); },
+    onSuccess: () => {
+      invalidate();
+      setAnlegenOffen(false);
+      form.resetFields();
+    },
     onError: fehler,
   });
 
@@ -122,7 +133,9 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
     <div>
       <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
         <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>Befehle</Typography.Title>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            Befehle
+          </Typography.Title>
           {/*
             Zählt den BESTAND, während die Gruppenköpfe das ANGEZEIGTE zählen — bei aktiver
             Suche laufen die Zahlen deshalb auseinander. Gewollt: die Kopfzeile ist die
@@ -131,7 +144,9 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
           <Typography.Text type="secondary">
             {befehle.length} Befehle · {entwuerfe} im Entwurf
           </Typography.Text>
-          <div><Datenstand dataUpdatedAt={befehleQuery.dataUpdatedAt} /></div>
+          <div>
+            <Datenstand dataUpdatedAt={befehleQuery.dataUpdatedAt} />
+          </div>
         </div>
         {darfSchreiben && (
           // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
@@ -184,11 +199,20 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
         onCancel={() => setAnlegenOffen(false)}
         destroyOnHidden
       >
-        <Form<NeuerBefehl> form={form} layout="vertical" initialValues={{ vorlage: 'befehl_lad' }} onFinish={(w) => anlegenMutation.mutate(w)}>
+        <Form<NeuerBefehl>
+          form={form}
+          layout="vertical"
+          initialValues={{ vorlage: 'befehl_lad' }}
+          onFinish={(w) => anlegenMutation.mutate(w)}
+        >
           <Form.Item label="Schema" name="vorlage" rules={[{ required: true }]}>
             <Select options={VORLAGEN.map((v) => ({ value: v.schluessel, label: v.label }))} />
           </Form.Item>
-          <Form.Item label="Titel" name="titel" rules={[{ required: true, message: 'Titel erforderlich' }]}>
+          <Form.Item
+            label="Titel"
+            name="titel"
+            rules={[{ required: true, message: 'Titel erforderlich' }]}
+          >
             <Input placeholder="z. B. Befehl an 2. Zug 10:30" />
           </Form.Item>
         </Form>

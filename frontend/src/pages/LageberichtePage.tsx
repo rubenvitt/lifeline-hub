@@ -197,7 +197,9 @@ export default function LageberichtePage() {
     );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Typography.Text type="danger">Einsatz nicht gefunden oder kein Zugriff.</Typography.Text>;
+    return (
+      <Typography.Text type="danger">Einsatz nicht gefunden oder kein Zugriff.</Typography.Text>
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
@@ -229,7 +231,9 @@ export default function LageberichtePage() {
           <Typography.Text type="secondary">
             {berichte.length} Berichte in {koepfe.length} Ketten · {entwuerfe} im Entwurf
           </Typography.Text>
-          <div><Datenstand dataUpdatedAt={berichteQuery.dataUpdatedAt} /></div>
+          <div>
+            <Datenstand dataUpdatedAt={berichteQuery.dataUpdatedAt} />
+          </div>
         </div>
         {darfSchreiben && (
           // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
@@ -239,7 +243,10 @@ export default function LageberichtePage() {
             type="primary"
             icon={<PlusOutlined />}
             aria-label="Neuer Bericht"
-            onClick={() => { anlegenMutation.reset(); setAnlegenOffen(true); }}
+            onClick={() => {
+              anlegenMutation.reset();
+              setAnlegenOffen(true);
+            }}
           >
             Neuer Bericht
           </Button>
@@ -294,7 +301,11 @@ export default function LageberichtePage() {
             <SpeicherFehler fehler={anlegenMutation.error} titel="Nicht angelegt" />
           </div>
         )}
-        <Form.Item label="Titel" name="titel" rules={[{ required: true, message: 'Titel erforderlich' }]}>
+        <Form.Item
+          label="Titel"
+          name="titel"
+          rules={[{ required: true, message: 'Titel erforderlich' }]}
+        >
           <Input placeholder="z. B. Lageüberblick 1030" />
         </Form.Item>
         <Form.Item label="Vorlage" name="vorlage" rules={[{ required: true }]}>

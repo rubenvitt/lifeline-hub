@@ -132,7 +132,10 @@ export function SeitenLeer({ titel, hinweis, aktion }: SeitenLeerProps) {
         <div style={{ marginBlockStart: token.margin }}>
           <Button
             type="primary"
-            onClick={aktion.onClick ?? (aktion.pfad != null ? () => void navigate(aktion.pfad!) : undefined)}
+            onClick={
+              aktion.onClick ??
+              (aktion.pfad != null ? () => void navigate(aktion.pfad!) : undefined)
+            }
           >
             {aktion.label}
           </Button>
@@ -209,7 +212,13 @@ interface SeitenSackgasseProps {
  * derselben Gestalt: dort ist bereits festgelegt, dass der Aufrufer den Pfad baut
  * (über `routing/deeplinks.ts`) und das Primitiv keine Einsatz-Routen kennt.
  */
-export function SeitenSackgasse({ titel, hinweis, ursache, onWiederholen, rueckweg }: SeitenSackgasseProps) {
+export function SeitenSackgasse({
+  titel,
+  hinweis,
+  ursache,
+  onWiederholen,
+  rueckweg,
+}: SeitenSackgasseProps) {
   const navigate = useNavigate();
   const knoepfe = [
     onWiederholen && (
@@ -224,7 +233,12 @@ export function SeitenSackgasse({ titel, hinweis, ursache, onWiederholen, rueckw
     ),
   ].filter(Boolean);
   return (
-    <Result status="error" title={titel} subTitle={hinweis ?? ursacheText(ursache)} extra={knoepfe} />
+    <Result
+      status="error"
+      title={titel}
+      subTitle={hinweis ?? ursacheText(ursache)}
+      extra={knoepfe}
+    />
   );
 }
 

@@ -70,16 +70,18 @@ describe('CommandPalette · Bedienziel-Boden der Datensatz-Zeile', () => {
     renderMitProviders(
       <CommandPalette
         befehle={[]}
-        datensatzTreffer={[{
-          befehl: {
-            id: 'datensatz:personen:7',
-            gruppe: 'datensaetze',
-            label: 'Personen · R-042 · Müller',
-            ausfuehren: () => {},
+        datensatzTreffer={[
+          {
+            befehl: {
+              id: 'datensatz:personen:7',
+              gruppe: 'datensaetze',
+              label: 'Personen · R-042 · Müller',
+              ausfuehren: () => {},
+            },
+            score: 0,
+            stufe: 0,
           },
-          score: 0,
-          stufe: 0,
-        }]}
+        ]}
         schliesse={() => {}}
       />,
     );

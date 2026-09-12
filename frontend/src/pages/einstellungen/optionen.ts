@@ -27,9 +27,19 @@ export const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
 
 /** Kuratierte IANA-Zeitzonen; Freitext bleibt über die `AutoComplete` möglich. */
 export const ZEITZONEN_OPTIONEN = [
-  'Europe/Berlin', 'Europe/London', 'Europe/Paris', 'Europe/Zurich', 'Europe/Vienna',
-  'Europe/Warsaw', 'Europe/Moscow', 'UTC', 'America/New_York', 'America/Los_Angeles',
-  'Asia/Istanbul', 'Asia/Dubai', 'Asia/Tokyo',
+  'Europe/Berlin',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Zurich',
+  'Europe/Vienna',
+  'Europe/Warsaw',
+  'Europe/Moscow',
+  'UTC',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Asia/Istanbul',
+  'Asia/Dubai',
+  'Asia/Tokyo',
 ].map((z) => ({ value: z }));
 
 export const ZEITFORMAT_OPTIONEN: { value: Zeitformat; label: string }[] = [

@@ -1,8 +1,19 @@
 // frontend/src/command-palette/befehle.ts
-import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDesktop, TbWorld, TbArrowsMinimize, TbArrowsMaximize, TbHandStop } from 'react-icons/tb';
 import {
-  modulRegistry, istModulFreigegeben, modulZielRoute,
-} from '../einsatz/modulRegistry';
+  TbList,
+  TbUser,
+  TbSettings,
+  TbLogout,
+  TbPlus,
+  TbSun,
+  TbMoon,
+  TbDeviceDesktop,
+  TbWorld,
+  TbArrowsMinimize,
+  TbArrowsMaximize,
+  TbHandStop,
+} from 'react-icons/tb';
+import { modulRegistry, istModulFreigegeben, modulZielRoute } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
   einsaetzePfad,
@@ -43,11 +54,36 @@ import type { Koordinatenformat } from '../api/types';
  * und wandert nicht in die `modulRegistry` — die ist heute frei von Router-/Deeplink-Bezügen,
  * ein `pfad`-Closure zöge `routing/deeplinks.ts` in jeden Test, der sie anfasst.
  */
-export const SCHNELLAKTIONEN: { modulKey: string; pfad: (einsatzId: number) => string; label: string; schlagworte: string[] }[] = [
-  { modulKey: 'personen', pfad: (id) => personenPfad(id, { neu: true }), label: 'Neue Person erfassen', schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'] },
-  { modulKey: 'etb', pfad: (id) => etbPfad(id, { neu: true }), label: 'Neuer ETB-Eintrag', schlagworte: ['tagebuch', 'meldung', 'eintrag'] },
-  { modulKey: 'unfallhilfsstellen', pfad: (id) => unfallhilfsstellenListePfad(id, { neu: true }), label: 'Neue Unfallhilfsstelle', schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'] },
-  { modulKey: 'schaeden', pfad: (id) => schaedenPfad(id, { neu: true }), label: 'Neuen Schaden erfassen', schlagworte: ['schaden', 'objekt'] },
+export const SCHNELLAKTIONEN: {
+  modulKey: string;
+  pfad: (einsatzId: number) => string;
+  label: string;
+  schlagworte: string[];
+}[] = [
+  {
+    modulKey: 'personen',
+    pfad: (id) => personenPfad(id, { neu: true }),
+    label: 'Neue Person erfassen',
+    schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'],
+  },
+  {
+    modulKey: 'etb',
+    pfad: (id) => etbPfad(id, { neu: true }),
+    label: 'Neuer ETB-Eintrag',
+    schlagworte: ['tagebuch', 'meldung', 'eintrag'],
+  },
+  {
+    modulKey: 'unfallhilfsstellen',
+    pfad: (id) => unfallhilfsstellenListePfad(id, { neu: true }),
+    label: 'Neue Unfallhilfsstelle',
+    schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'],
+  },
+  {
+    modulKey: 'schaeden',
+    pfad: (id) => schaedenPfad(id, { neu: true }),
+    label: 'Neuen Schaden erfassen',
+    schlagworte: ['schaden', 'objekt'],
+  },
 ];
 
 const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconType }[] = [
@@ -63,7 +99,12 @@ const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconT
  *  Zustandsfeld, die Palette zeigt also nicht an, welche Stufe gerade gilt. */
 const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: IconType }[] = [
   { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: TbArrowsMinimize },
-  { id: 'dichte:komfortabel', label: 'Dichte: Komfortabel', stufe: 'komfortabel', icon: TbArrowsMaximize },
+  {
+    id: 'dichte:komfortabel',
+    label: 'Dichte: Komfortabel',
+    stufe: 'komfortabel',
+    icon: TbArrowsMaximize,
+  },
   { id: 'dichte:handschuh', label: 'Dichte: Handschuh', stufe: 'handschuh', icon: TbHandStop },
 ];
 
@@ -141,7 +182,11 @@ export const TASTATUR_AKTIONEN: Record<TastaturAktionId, TastaturAktionDefinitio
  * hier gerade tun", und ihre Reihenfolge ist von `befehle.test.ts` gepinnt.
  */
 export const TASTATUR_AKTION_REIHENFOLGE: readonly TastaturAktionId[] = [
-  'speichern', 'verwerfen', 'filter-zuruecksetzen', 'neue-zeile', 'spalten',
+  'speichern',
+  'verwerfen',
+  'filter-zuruecksetzen',
+  'neue-zeile',
+  'spalten',
 ];
 
 /** Reine Auflösung der globalen Mutationskürzel. Bereits behandelte und wiederholte
@@ -207,8 +252,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
-        id: `zuletzt:${m.key}`, gruppe: 'zuletzt', label: m.label, icon: m.icon,
-        ausfuehren: () => { k.merkeModulBesuch?.(m.key); k.navigate(ziel); },
+        id: `zuletzt:${m.key}`,
+        gruppe: 'zuletzt',
+        label: m.label,
+        icon: m.icon,
+        ausfuehren: () => {
+          k.merkeModulBesuch?.(m.key);
+          k.navigate(ziel);
+        },
       });
     }
 
@@ -217,9 +268,15 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       if (!istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
-        id: `modul:${m.key}`, gruppe: 'module', label: m.label, icon: m.icon,
+        id: `modul:${m.key}`,
+        gruppe: 'module',
+        label: m.label,
+        icon: m.icon,
         schlagworte: m.beschreibung ? [m.beschreibung] : undefined,
-        ausfuehren: () => { k.merkeModulBesuch?.(m.key); k.navigate(ziel); },
+        ausfuehren: () => {
+          k.merkeModulBesuch?.(m.key);
+          k.navigate(ziel);
+        },
       });
     }
 
@@ -234,8 +291,12 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
         const ziel = a.pfad(k.einsatzId);
         befehle.push({
-          id: `aktion:${a.modulKey}`, gruppe: 'schnellaktionen', label: a.label,
-          icon: TbPlus, schlagworte: a.schlagworte, ausfuehren: () => k.navigate(ziel),
+          id: `aktion:${a.modulKey}`,
+          gruppe: 'schnellaktionen',
+          label: a.label,
+          icon: TbPlus,
+          schlagworte: a.schlagworte,
+          ausfuehren: () => k.navigate(ziel),
         });
       }
     }
@@ -245,7 +306,10 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
   for (const e of k.einsaetze) {
     if (e.status !== 'aktiv') continue;
     befehle.push({
-      id: `einsatz:${e.id}`, gruppe: 'einsaetze', label: e.bezeichnung, icon: TbList,
+      id: `einsatz:${e.id}`,
+      gruppe: 'einsaetze',
+      label: e.bezeichnung,
+      icon: TbList,
       schlagworte: e.stichwort ? [e.stichwort] : undefined,
       ausfuehren: () => k.navigate(einsatzPfad(e.id)),
     });
@@ -253,37 +317,95 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
 
   // 6. Schnelleinstellungen — global
   for (const t of THEME_BEFEHLE) {
-    befehle.push({ id: t.id, gruppe: 'einstellungen', label: t.label, icon: t.icon, schlagworte: ['theme', 'hell', 'dunkel'], ausfuehren: () => k.setThemeModus(t.modus) });
+    befehle.push({
+      id: t.id,
+      gruppe: 'einstellungen',
+      label: t.label,
+      icon: t.icon,
+      schlagworte: ['theme', 'hell', 'dunkel'],
+      ausfuehren: () => k.setThemeModus(t.modus),
+    });
   }
   for (const d of DICHTE_BEFEHLE) {
-    befehle.push({ id: d.id, gruppe: 'einstellungen', label: d.label, icon: d.icon, schlagworte: ['dichte', 'treffflaeche', 'handschuh', 'tablet', 'bedienung'], ausfuehren: () => k.setDichte(d.stufe) });
+    befehle.push({
+      id: d.id,
+      gruppe: 'einstellungen',
+      label: d.label,
+      icon: d.icon,
+      schlagworte: ['dichte', 'treffflaeche', 'handschuh', 'tablet', 'bedienung'],
+      ausfuehren: () => k.setDichte(d.stufe),
+    });
   }
   for (const c of KOORD_BEFEHLE) {
-    befehle.push({ id: `koord:${c.format}`, gruppe: 'einstellungen', label: `Koordinaten: ${c.label}`, icon: TbWorld, schlagworte: ['koordinaten', 'format', c.format], ausfuehren: () => k.setKoordinaten(c.format) });
+    befehle.push({
+      id: `koord:${c.format}`,
+      gruppe: 'einstellungen',
+      label: `Koordinaten: ${c.label}`,
+      icon: TbWorld,
+      schlagworte: ['koordinaten', 'format', c.format],
+      ausfuehren: () => k.setKoordinaten(c.format),
+    });
   }
 
   // 7. Navigation — global
-  befehle.push({ id: 'nav:einsaetze', gruppe: 'navigation', label: 'Alle Einsätze', icon: TbList, ausfuehren: () => k.navigate(einsaetzePfad()) });
-  befehle.push({ id: 'nav:profil', gruppe: 'navigation', label: 'Profil', icon: TbUser, ausfuehren: () => k.navigate('/profil') });
+  befehle.push({
+    id: 'nav:einsaetze',
+    gruppe: 'navigation',
+    label: 'Alle Einsätze',
+    icon: TbList,
+    ausfuehren: () => k.navigate(einsaetzePfad()),
+  });
+  befehle.push({
+    id: 'nav:profil',
+    gruppe: 'navigation',
+    label: 'Profil',
+    icon: TbUser,
+    ausfuehren: () => k.navigate('/profil'),
+  });
   // Zwei Stufen, bewusst getrennt (LFH-328/M8): Verwaltungsbereich und Stammdaten hängen am
   // AdminLayout-Gate `darfVerwaltung` — vorher standen sie unter `system_rolle === 'admin'`
   // allein, weshalb eine Führungskraft „Verwaltung" in der Topbar sah und die Route betreten
   // durfte, den Eintrag hier aber nicht fand.
   if (darfVerwaltung(k.benutzer)) {
-    befehle.push({ id: 'nav:stammdaten', gruppe: 'navigation', label: 'Stammdaten', icon: TbList, ausfuehren: () => k.navigate('/stammdaten') });
-    befehle.push({ id: 'nav:admin', gruppe: 'navigation', label: 'Administration', icon: TbSettings, ausfuehren: () => k.navigate('/admin') });
+    befehle.push({
+      id: 'nav:stammdaten',
+      gruppe: 'navigation',
+      label: 'Stammdaten',
+      icon: TbList,
+      ausfuehren: () => k.navigate('/stammdaten'),
+    });
+    befehle.push({
+      id: 'nav:admin',
+      gruppe: 'navigation',
+      label: 'Administration',
+      icon: TbSettings,
+      ausfuehren: () => k.navigate('/admin'),
+    });
   }
   // Die Benutzerverwaltung bleibt strenger: `/benutzer` leitet auf `/admin/benutzer`, und
   // AdminLayout zeigt diesen Menüpunkt nur System-Admins. Sie mitzuziehen wäre eine Ausweitung.
   if (k.benutzer?.system_rolle === 'admin') {
-    befehle.push({ id: 'nav:benutzer', gruppe: 'navigation', label: 'Benutzerverwaltung', icon: TbUser, ausfuehren: () => k.navigate('/benutzer') });
+    befehle.push({
+      id: 'nav:benutzer',
+      gruppe: 'navigation',
+      label: 'Benutzerverwaltung',
+      icon: TbUser,
+      ausfuehren: () => k.navigate('/benutzer'),
+    });
   }
   // `nichtMerkbar`: der einzige Befehl der Palette ohne Rückweg. Merkbar stünde er nach der
   // ersten Benutzung dauerhaft als erste, VORAUSGEWÄHLTE Zeile der Startansicht — `Strg/⌘+K`
   // + Enter beendete dann die Sitzung statt den erwarteten Kontextbefehl auszulösen
   // (Review-Befund zu Etappe D). Die Gruppe `navigation` bleibt merkbar; die Ausnahme ist
   // dieser Befehl, nicht seine Nachbarschaft.
-  befehle.push({ id: 'nav:abmelden', gruppe: 'navigation', label: 'Abmelden', icon: TbLogout, nichtMerkbar: true, ausfuehren: () => k.logout() });
+  befehle.push({
+    id: 'nav:abmelden',
+    gruppe: 'navigation',
+    label: 'Abmelden',
+    icon: TbLogout,
+    nichtMerkbar: true,
+    ausfuehren: () => k.logout(),
+  });
 
   // 8. Gedächtnis (LFH-391 · Etappe D) — ZULETZT, weil beide Hälften die FERTIGE Liste
   //    brauchen: die Meldung hängt an jedem merkbaren Befehl, und die Auflösung greift auf
@@ -327,9 +449,17 @@ function mitGedaechtnis(befehle: Befehl[], k: BefehlKontext): Befehl[] {
   // ist kein Sonderfall ohne Fall: `useBefehle` wird auch ausserhalb der Palette gerendert,
   // und die Prop ist wie `merkeModulBesuch` optional.
   const merkend = k.merkeBefehl
-    ? befehle.map((b) => (istMerkbar(b)
-      ? { ...b, ausfuehren: () => { k.merkeBefehl?.(b.id); b.ausfuehren(); } }
-      : b))
+    ? befehle.map((b) =>
+        istMerkbar(b)
+          ? {
+              ...b,
+              ausfuehren: () => {
+                k.merkeBefehl?.(b.id);
+                b.ausfuehren();
+              },
+            }
+          : b,
+      )
     : befehle;
 
   const ausgefuehrt: Befehl[] = [];
@@ -339,7 +469,11 @@ function mitGedaechtnis(befehle: Befehl[], k: BefehlKontext): Befehl[] {
     // Server und kann von einem älteren Client stammen, der `GRUPPE_MERKBAR` noch nicht
     // kannte. Ohne diese Zeile stünde ein Modul zum DRITTEN Mal in der Liste.
     if (!treffer || !istMerkbar(treffer)) continue;
-    ausgefuehrt.push({ ...treffer, id: `${AUSGEFUEHRT_PRAEFIX}${treffer.id}`, gruppe: 'ausgefuehrt' });
+    ausgefuehrt.push({
+      ...treffer,
+      id: `${AUSGEFUEHRT_PRAEFIX}${treffer.id}`,
+      gruppe: 'ausgefuehrt',
+    });
   }
   return ausgefuehrt.length > 0 ? [...merkend, ...ausgefuehrt] : merkend;
 }

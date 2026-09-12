@@ -4,7 +4,11 @@ import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
-import { CommandPaletteProvider, useTastaturEbene, verschmelzeAktionen } from './CommandPaletteProvider';
+import {
+  CommandPaletteProvider,
+  useTastaturEbene,
+  verschmelzeAktionen,
+} from './CommandPaletteProvider';
 import type { TastaturAktionen } from './typen';
 
 vi.mock('./useBefehle', () => {
@@ -71,7 +75,11 @@ describe('CommandPaletteProvider', () => {
 
   it('öffnet die Palette mit STRG+K und schließt mit erneutem Druck', async () => {
     const u = userEvent.setup();
-    renderMitProviders(<CommandPaletteProvider><div>App-Inhalt</div></CommandPaletteProvider>);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div>App-Inhalt</div>
+      </CommandPaletteProvider>,
+    );
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     await u.keyboard('{Control>}k{/Control}');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -81,7 +89,11 @@ describe('CommandPaletteProvider', () => {
 
   it('öffnet die Palette auch mit CMD+K (Meta-Taste, AK1)', async () => {
     const u = userEvent.setup();
-    renderMitProviders(<CommandPaletteProvider><div>App-Inhalt</div></CommandPaletteProvider>);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div>App-Inhalt</div>
+      </CommandPaletteProvider>,
+    );
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     await u.keyboard('{Meta>}k{/Meta}');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -111,7 +123,11 @@ describe('CommandPaletteProvider', () => {
 
   it('lässt eine offene Palette bei komponierendem Escape offen', async () => {
     const u = userEvent.setup();
-    renderMitProviders(<CommandPaletteProvider><div>App-Inhalt</div></CommandPaletteProvider>);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div>App-Inhalt</div>
+      </CommandPaletteProvider>,
+    );
     await u.keyboard('{Control>}k{/Control}');
     const eingabe = screen.getByRole('combobox');
 
@@ -121,7 +137,11 @@ describe('CommandPaletteProvider', () => {
   });
 
   it('ignoriert Cmd/Strg+K mit Shift oder Alt', () => {
-    renderMitProviders(<CommandPaletteProvider><div>App-Inhalt</div></CommandPaletteProvider>);
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div>App-Inhalt</div>
+      </CommandPaletteProvider>,
+    );
 
     const shiftK = taste(window, { key: 'k', ctrlKey: true, shiftKey: true });
     const altK = taste(window, { key: 'k', metaKey: true, altKey: true });
@@ -136,7 +156,10 @@ describe('CommandPaletteProvider', () => {
     const filterZuruecksetzen = vi.fn();
     renderMitProviders(
       <CommandPaletteProvider>
-        <Ebene name="formular" aktionen={{ speichern, 'filter-zuruecksetzen': filterZuruecksetzen }} />
+        <Ebene
+          name="formular"
+          aktionen={{ speichern, 'filter-zuruecksetzen': filterZuruecksetzen }}
+        />
       </CommandPaletteProvider>,
     );
     screen.getByRole('button', { name: 'formular fokussieren' }).focus();
@@ -341,7 +364,10 @@ describe('CommandPaletteProvider', () => {
           <Ebene name="verlassener Reiter" aktionen={{ speichern }} />
         </div>
         <div>
-          <Ebene name="sichtbarer Reiter" aktionen={{ 'filter-zuruecksetzen': filterZuruecksetzen }} />
+          <Ebene
+            name="sichtbarer Reiter"
+            aktionen={{ 'filter-zuruecksetzen': filterZuruecksetzen }}
+          />
         </div>
         <button type="button">unregistrierte Kopfzeile</button>
       </CommandPaletteProvider>,
@@ -401,7 +427,9 @@ describe('CommandPaletteProvider', () => {
     renderMitProviders(
       <CommandPaletteProvider>
         <Ebene name="formular" aktionen={{ speichern }}>
-          <button type="button" onKeyDown={(event) => event.preventDefault()}>lokal behandelt</button>
+          <button type="button" onKeyDown={(event) => event.preventDefault()}>
+            lokal behandelt
+          </button>
         </Ebene>
       </CommandPaletteProvider>,
     );
@@ -445,7 +473,10 @@ describe('CommandPaletteProvider', () => {
     const filterZuruecksetzen = vi.fn();
     renderMitProviders(
       <CommandPaletteProvider>
-        <Ebene name="formular" aktionen={{ speichern, verwerfen, 'filter-zuruecksetzen': filterZuruecksetzen }} />
+        <Ebene
+          name="formular"
+          aktionen={{ speichern, verwerfen, 'filter-zuruecksetzen': filterZuruecksetzen }}
+        />
       </CommandPaletteProvider>,
     );
     screen.getByRole('button', { name: 'formular fokussieren' }).focus();
@@ -480,7 +511,9 @@ describe('CommandPaletteProvider', () => {
     const input = screen.getByRole('combobox');
     input.addEventListener('keydown', (event) => event.preventDefault(), { once: true });
     const verhindert = new KeyboardEvent('keydown', {
-      key: 'Escape', bubbles: true, cancelable: true,
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
     });
     input.dispatchEvent(verhindert);
 
@@ -496,7 +529,9 @@ describe('CommandPaletteProvider', () => {
       return (
         <CommandPaletteProvider>
           {sichtbar && <Ebene name="formular" aktionen={{ speichern }} />}
-          <button type="button" onClick={() => setSichtbar(false)}>entfernen</button>
+          <button type="button" onClick={() => setSichtbar(false)}>
+            entfernen
+          </button>
         </CommandPaletteProvider>
       );
     }
@@ -532,9 +567,14 @@ describe('CommandPaletteProvider', () => {
           <div>
             <Ebene name="seite" aktionen={{ speichern }}>
               {werkzeug && (
-                <Ebene name="werkzeugzeile" aktionen={{ 'filter-zuruecksetzen': filterZuruecksetzen }} />
+                <Ebene
+                  name="werkzeugzeile"
+                  aktionen={{ 'filter-zuruecksetzen': filterZuruecksetzen }}
+                />
               )}
-              <button type="button" onClick={() => setWerkzeug(false)}>Werkzeugzeile entfernen</button>
+              <button type="button" onClick={() => setWerkzeug(false)}>
+                Werkzeugzeile entfernen
+              </button>
             </Ebene>
           </div>
         </CommandPaletteProvider>
@@ -568,7 +608,9 @@ describe('CommandPaletteProvider', () => {
       return (
         <CommandPaletteProvider>
           <Ebene name="formular" aktionen={{ speichern: aktuell ? nachher : vorher }}>
-            <button type="button" onClick={() => setAktuell(true)}>Callback wechseln</button>
+            <button type="button" onClick={() => setAktuell(true)}>
+              Callback wechseln
+            </button>
           </Ebene>
         </CommandPaletteProvider>
       );
@@ -597,7 +639,9 @@ describe('CommandPaletteProvider', () => {
             name="kontext"
             aktionen={filter ? { 'filter-zuruecksetzen': vi.fn() } : { speichern: vi.fn() }}
           >
-            <button type="button" onClick={() => setFilter(true)}>Aktionen wechseln</button>
+            <button type="button" onClick={() => setFilter(true)}>
+              Aktionen wechseln
+            </button>
           </Ebene>
         </CommandPaletteProvider>
       );

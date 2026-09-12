@@ -21,10 +21,22 @@ export interface EtbEntwurfsTabsProps {
 }
 
 export default function EtbEntwurfsTabs({
-  einsatzId, erfassen, bausteine, einsatz, kontextLaedt = false, werteBehalten, onWerteBehaltenChange,
+  einsatzId,
+  erfassen,
+  bausteine,
+  einsatz,
+  kontextLaedt = false,
+  werteBehalten,
+  onWerteBehaltenChange,
 }: EtbEntwurfsTabsProps) {
-  const { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen } =
-    useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle, kontextLaedt);
+  const {
+    entwuerfe,
+    aktiverId,
+    neuerEntwurf,
+    entwurfSchliessen,
+    entwurfAktualisieren,
+    aktivenSetzen,
+  } = useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle, kontextLaedt);
 
   /**
    * Wertübernahme über die Remount-Grenze (LFH-332/H61).

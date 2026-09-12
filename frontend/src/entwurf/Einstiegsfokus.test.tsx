@@ -10,9 +10,9 @@ describe('einstiegsAbschnitt', () => {
   const texte = (m: Record<string, string>) => (s: string) => m[s];
 
   it('nimmt den ersten Abschnitt OHNE Text', () => {
-    expect(
-      einstiegsAbschnitt(['a', 'b', 'c'], texte({ a: 'voll', b: '', c: 'auch voll' })),
-    ).toBe('b');
+    expect(einstiegsAbschnitt(['a', 'b', 'c'], texte({ a: 'voll', b: '', c: 'auch voll' }))).toBe(
+      'b',
+    );
   });
 
   it('zählt Leerraum nicht als Text (wie `befuellteAbschnitte`)', () => {
@@ -78,7 +78,9 @@ describe('Einstiegsfokus', () => {
       const [da, setDa] = useState(false);
       return (
         <>
-          <button type="button" onClick={() => setDa(true)}>Drucken</button>
+          <button type="button" onClick={() => setDa(true)}>
+            Drucken
+          </button>
           {da && <Maske feld="eigene_lage" />}
         </>
       );

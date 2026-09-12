@@ -5,7 +5,10 @@ import { renderMitProviders } from '../../test/utils';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import FreiesZeichenPicker, { type FreiesZeichenPickerProps } from './FreiesZeichenPicker';
 
-function render(wert: FreiesZeichenUpdate, onChange = vi.fn<FreiesZeichenPickerProps['onChange']>()) {
+function render(
+  wert: FreiesZeichenUpdate,
+  onChange = vi.fn<FreiesZeichenPickerProps['onChange']>(),
+) {
   renderMitProviders(<FreiesZeichenPicker wert={wert} onChange={onChange} />);
   return { onChange };
 }
@@ -47,7 +50,9 @@ describe('FreiesZeichenPicker — accepts-Gating der Overlays', () => {
     );
     expect(sichtbar('Funktion')).toBe(true);
     expect(sichtbar('Fachaufgabe')).toBe(true);
-    rerender(<FreiesZeichenPicker wert={{ grundzeichen: 'taktische-formation' }} onChange={vi.fn()} />);
+    rerender(
+      <FreiesZeichenPicker wert={{ grundzeichen: 'taktische-formation' }} onChange={vi.fn()} />,
+    );
     expect(sichtbar('Funktion')).toBe(false);
     expect(sichtbar('Einheit')).toBe(true);
   });
@@ -61,7 +66,11 @@ describe('FreiesZeichenPicker — onChange-Spec', () => {
     await userEvent.click(opt[opt.length - 1]);
     await waitFor(() =>
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ grundzeichen: 'taktische-formation', organisation: 'feuerwehr', label: 'Zug 1' }),
+        expect.objectContaining({
+          grundzeichen: 'taktische-formation',
+          organisation: 'feuerwehr',
+          label: 'Zug 1',
+        }),
       ),
     );
   });
@@ -79,7 +88,12 @@ describe('FreiesZeichenPicker — onChange-Spec', () => {
     // „ohne" akzeptiert nur symbol → funktion + fachaufgabe werden gestrippt, symbol bleibt.
     await waitFor(() =>
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ grundzeichen: 'ohne', funktion: null, fachaufgabe: null, symbol: 'drehleiter' }),
+        expect.objectContaining({
+          grundzeichen: 'ohne',
+          funktion: null,
+          fachaufgabe: null,
+          symbol: 'drehleiter',
+        }),
       ),
     );
   });
@@ -89,6 +103,8 @@ describe('FreiesZeichenPicker — onChange-Spec', () => {
     const input = screen.getByLabelText('Bezeichnung');
     fireEvent.change(input, { target: { value: 'EA Nord' } });
     fireEvent.blur(input);
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'taktische-formation', label: 'EA Nord' }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ grundzeichen: 'taktische-formation', label: 'EA Nord' }),
+    );
   });
 });

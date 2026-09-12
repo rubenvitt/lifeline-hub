@@ -1,4 +1,13 @@
-import { App, Button, Form, Input, InputNumber, Popconfirm, Space, type TableColumnsType } from 'antd';
+import {
+  App,
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Space,
+  type TableColumnsType,
+} from 'antd';
 import AdminPage from '../components/AdminPage';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -11,7 +20,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import {
-  aktualisiereStatus, deaktiviereStatus, legeStatusAn, listePersonalStatus, type StatusEingabe,
+  aktualisiereStatus,
+  deaktiviereStatus,
+  legeStatusAn,
+  listePersonalStatus,
+  type StatusEingabe,
 } from '../api/personalStatus';
 import type { PersonalStatus, StatusKategorie } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
@@ -19,7 +32,6 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { leerZuNull } from '../api/patchTriState';
 import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
-
 
 interface FormWerte {
   label: string;
@@ -40,7 +52,10 @@ export default function PersonalStatusTab() {
   // hier abweichen.
   const [bearbeite, setBearbeite] = useState<PersonalStatus | null>(null);
 
-  const statusQuery = useQuery({ queryKey: globalKeys.personalStatus(), queryFn: listePersonalStatus });
+  const statusQuery = useQuery({
+    queryKey: globalKeys.personalStatus(),
+    queryFn: listePersonalStatus,
+  });
 
   const speichern = useMutation({
     mutationFn: ({ id, werte }: { id: number; werte: FormWerte }) => {
@@ -78,7 +93,8 @@ export default function PersonalStatusTab() {
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereStatus(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.personalStatus() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
   // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
@@ -156,7 +172,7 @@ export default function PersonalStatusTab() {
       titel="Personal-Status"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
         einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
@@ -232,7 +248,8 @@ export default function PersonalStatusTab() {
         <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
           <Select
             options={(Object.keys(statusKategorie) as StatusKategorie[]).map((k) => ({
-              value: k, label: statusKategorie[k].label,
+              value: k,
+              label: statusKategorie[k].label,
             }))}
           />
         </Form.Item>

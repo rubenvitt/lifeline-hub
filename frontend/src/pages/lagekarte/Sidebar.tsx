@@ -1,8 +1,29 @@
-import { Badge, Button, Card, Dropdown, Modal, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
+import {
+  Badge,
+  Button,
+  Card,
+  Dropdown,
+  Modal,
+  Radio,
+  Slider,
+  Space,
+  Spin,
+  Switch,
+  theme,
+  Tooltip,
+  Typography,
+  Upload,
+} from 'antd';
 import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
-import { AimOutlined, DeleteOutlined, FullscreenOutlined, MoreOutlined, UploadOutlined } from '@ant-design/icons';
+import {
+  AimOutlined,
+  DeleteOutlined,
+  FullscreenOutlined,
+  MoreOutlined,
+  UploadOutlined,
+} from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
@@ -46,13 +67,19 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
 
 /** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss).
  *  Einsatzort-Marker trägt die echte einsatzId, nicht die Dummy-0 aus dem Platzierungs-Ziel. */
-export function ortVorschauExclude(ziel: SidebarProps['platzierungZiel'], einsatzId: number): string | undefined {
+export function ortVorschauExclude(
+  ziel: SidebarProps['platzierungZiel'],
+  einsatzId: number,
+): string | undefined {
   if (!ziel) return undefined;
   if (ziel.typ === 'einsatzort') return `einsatzort:${einsatzId}`; // Marker-id = echte Einsatz-ID, nicht 0
   // Sidebar-Typen → Backend-Marker-Typ-Tags. 'fuehrung' = Personal-Führung → 'personal'.
   const map: Record<string, string> = {
-    uhs: 'uhs', schaden: 'schaden', einheit: 'einheit',
-    fahrzeug: 'fahrzeug', fuehrung: 'personal',
+    uhs: 'uhs',
+    schaden: 'schaden',
+    einheit: 'einheit',
+    fahrzeug: 'fahrzeug',
+    fuehrung: 'personal',
   };
   const typ = map[ziel.typ];
   return typ ? `${typ}:${ziel.id}` : undefined;
@@ -133,7 +160,12 @@ export interface SidebarProps {
   fachebenenSichtbar: import('./fachebenenAuswahl').FachebenenSichtbar;
   onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
   /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
-  fachebenenStatus: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, import('../../api/fachebenen').FachebeneStatus>>;
+  fachebenenStatus: Partial<
+    Record<
+      import('../../api/fachebenen').FachebeneQuelle,
+      import('../../api/fachebenen').FachebeneStatus
+    >
+  >;
   /** KRITIS ist aktiv, aber die Karte ist zu weit herausgezoomt für eine Abfrage. */
   kritisZoomZuKlein?: boolean;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
@@ -171,7 +203,13 @@ export interface SidebarProps {
 /** Ein Fehler-Slot als Markup — oder nichts. Hält die drei Aufrufstellen unten einzeilig. */
 function FehlerSlot({ fehler }: { fehler?: SektionFehler }) {
   if (!fehler) return null;
-  return <SeitenFehler text={fehler.text} ursache={fehler.ursache} onWiederholen={fehler.onWiederholen} />;
+  return (
+    <SeitenFehler
+      text={fehler.text}
+      ursache={fehler.ursache}
+      onWiederholen={fehler.onWiederholen}
+    />
+  );
 }
 
 /**
@@ -236,7 +274,11 @@ export function loeschDialogBild<T extends { id: number; name: string }>(
  * (`components/Datensicht.tsx`, Festlegung 4). Der Boden hier ist die Trefffläche, nicht der
  * ganze Zugang.
  */
-export function bedienzielStil(token: { controlHeight: number; paddingSM: number; padding: number }) {
+export function bedienzielStil(token: {
+  controlHeight: number;
+  paddingSM: number;
+  padding: number;
+}) {
   return {
     cursor: 'pointer',
     display: 'flex',
@@ -258,7 +300,9 @@ export default function Sidebar(props: SidebarProps) {
   // Freies-Zeichen-Schnellerfassung (LFH-170): Picker erst auf Klick sichtbar (kein Dauer-
   // Combobox in der Sidebar), Entwurf bleibt über Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
-  const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({ grundzeichen: 'taktische-formation' });
+  const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
+    grundzeichen: 'taktische-formation',
+  });
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
   /**
@@ -311,17 +355,17 @@ export default function Sidebar(props: SidebarProps) {
           <FehlerSlot fehler={sektionFehler.ansichten} />
         </div>
       ) : (
-      <AnsichtSwitcher
-        ansichten={props.ansichten}
-        aktiveAnsichtId={props.aktiveAnsichtId}
-        darfSchreiben={darfSchreiben}
-        busy={props.ansichtBusy}
-        onWaehlen={props.onAnsichtWaehlen}
-        onNeu={props.onAnsichtNeu}
-        onUmbenennen={props.onAnsichtUmbenennen}
-        onStandard={props.onAnsichtStandard}
-        onLoeschen={props.onAnsichtLoeschen}
-      />
+        <AnsichtSwitcher
+          ansichten={props.ansichten}
+          aktiveAnsichtId={props.aktiveAnsichtId}
+          darfSchreiben={darfSchreiben}
+          busy={props.ansichtBusy}
+          onWaehlen={props.onAnsichtWaehlen}
+          onNeu={props.onAnsichtNeu}
+          onUmbenennen={props.onAnsichtUmbenennen}
+          onStandard={props.onAnsichtStandard}
+          onLoeschen={props.onAnsichtLoeschen}
+        />
       )}
       <Card
         size="small"
@@ -358,49 +402,45 @@ export default function Sidebar(props: SidebarProps) {
           <SeitenLeer titel="Alles verortet" />
         ) : (
           <>
-          <VeraltetSlot fehler={sektionFehler.nichtVerortet} />
-          <Liste
-            size="small"
-            dataSource={nichtVerortet}
-            rowKey={(o) => `${o.typ}-${o.id}`}
-            renderItem={(o) => {
-              const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
-              let action: React.ReactNode = null;
-              if (darfSchreiben) {
-                if (o.typ === 'abschnitt') {
-                  action = (
-                    <Button type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
-                      Fläche zeichnen
-                    </Button>
-                  );
-                } else if (aktiv) {
-                  action = (
-                    <Button onClick={props.onPlatzierenAbbrechen}>
-                      Abbrechen
-                    </Button>
-                  );
-                } else {
-                  // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
-                  const punktTyp = o.typ;
-                  action = (
-                    <Button
-                      type="primary"
-                      onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
-                    >
-                      Platzieren
-                    </Button>
-                  );
+            <VeraltetSlot fehler={sektionFehler.nichtVerortet} />
+            <Liste
+              size="small"
+              dataSource={nichtVerortet}
+              rowKey={(o) => `${o.typ}-${o.id}`}
+              renderItem={(o) => {
+                const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
+                let action: React.ReactNode = null;
+                if (darfSchreiben) {
+                  if (o.typ === 'abschnitt') {
+                    action = (
+                      <Button type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
+                        Fläche zeichnen
+                      </Button>
+                    );
+                  } else if (aktiv) {
+                    action = <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>;
+                  } else {
+                    // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
+                    const punktTyp = o.typ;
+                    action = (
+                      <Button
+                        type="primary"
+                        onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
+                      >
+                        Platzieren
+                      </Button>
+                    );
+                  }
                 }
-              }
-              return (
-                <ListenEintrag actions={action ? [action] : []}>
-                  <Typography.Text>
-                    {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
-                  </Typography.Text>
-                </ListenEintrag>
-              );
-            }}
-          />
+                return (
+                  <ListenEintrag actions={action ? [action] : []}>
+                    <Typography.Text>
+                      {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
+                    </Typography.Text>
+                  </ListenEintrag>
+                );
+              }}
+            />
           </>
         )}
       </Card>
@@ -441,9 +481,7 @@ export default function Sidebar(props: SidebarProps) {
           </Typography.Text>
           {darfSchreiben &&
             (platzierungZiel?.typ === 'einsatzort' ? (
-              <Button onClick={props.onPlatzierenAbbrechen}>
-                Abbrechen
-              </Button>
+              <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>
             ) : (
               <Button
                 type={props.einsatzortVerortet ? 'default' : 'primary'}
@@ -466,7 +504,10 @@ export default function Sidebar(props: SidebarProps) {
           dataSource={uhsVerortet}
           rowKey={(m) => m.schluessel}
           renderItem={(m) => (
-            <ListenEintrag style={bedienzielStil(token)} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
+            <ListenEintrag
+              style={bedienzielStil(token)}
+              onClick={() => props.onMarkerWaehlen(m.schluessel)}
+            >
               {m.label}
             </ListenEintrag>
           )}
@@ -477,7 +518,10 @@ export default function Sidebar(props: SidebarProps) {
           dataSource={schadenVerortet}
           rowKey={(m) => m.schluessel}
           renderItem={(m) => (
-            <ListenEintrag style={bedienzielStil(token)} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
+            <ListenEintrag
+              style={bedienzielStil(token)}
+              onClick={() => props.onMarkerWaehlen(m.schluessel)}
+            >
               {m.label}
             </ListenEintrag>
           )}
@@ -493,7 +537,12 @@ export default function Sidebar(props: SidebarProps) {
             {/* Seit LFH-320 schreibt der Button in die AKTIVE Ansicht, nicht in eine
                 einsatzweite Einstellung — die alte Beschriftung „Für den Einsatz speichern"
                 legte genau das Gegenteil nahe (LFH-325). */}
-            <Button type="primary" block loading={props.ansichtSpeichert} onClick={props.onAnsichtSpeichern}>
+            <Button
+              type="primary"
+              block
+              loading={props.ansichtSpeichert}
+              onClick={props.onAnsichtSpeichern}
+            >
               In dieser Ansicht speichern
             </Button>
           </Space>
@@ -503,35 +552,67 @@ export default function Sidebar(props: SidebarProps) {
       <Card size="small" title="Ebenen" style={{ marginBottom: 12 }}>
         <Space orientation="vertical">
           <Space>
-            <Switch checked={props.layer.einsatzort} onChange={(v) => props.onLayerToggle('einsatzort', v)} />
+            <Switch
+              checked={props.layer.einsatzort}
+              onChange={(v) => props.onLayerToggle('einsatzort', v)}
+            />
             Einsatzort
           </Space>
           <Space>
             <Switch checked={props.layer.uhs} onChange={(v) => props.onLayerToggle('uhs', v)} /> UHS
           </Space>
           <Space>
-            <Switch checked={props.layer.schaden} onChange={(v) => props.onLayerToggle('schaden', v)} /> Schäden
+            <Switch
+              checked={props.layer.schaden}
+              onChange={(v) => props.onLayerToggle('schaden', v)}
+            />{' '}
+            Schäden
           </Space>
           <Space>
-            <Switch checked={props.layer.einheit} onChange={(v) => props.onLayerToggle('einheit', v)} /> Einheiten
+            <Switch
+              checked={props.layer.einheit}
+              onChange={(v) => props.onLayerToggle('einheit', v)}
+            />{' '}
+            Einheiten
           </Space>
           <Space>
-            <Switch checked={props.layer.fahrzeug} onChange={(v) => props.onLayerToggle('fahrzeug', v)} /> Fahrzeuge
+            <Switch
+              checked={props.layer.fahrzeug}
+              onChange={(v) => props.onLayerToggle('fahrzeug', v)}
+            />{' '}
+            Fahrzeuge
           </Space>
           <Space>
-            <Switch checked={props.layer.fuehrung} onChange={(v) => props.onLayerToggle('fuehrung', v)} /> Personal
+            <Switch
+              checked={props.layer.fuehrung}
+              onChange={(v) => props.onLayerToggle('fuehrung', v)}
+            />{' '}
+            Personal
           </Space>
           <Space>
-            <Switch checked={props.layer.abschnitt} onChange={(v) => props.onLayerToggle('abschnitt', v)} /> Abschnitte
+            <Switch
+              checked={props.layer.abschnitt}
+              onChange={(v) => props.onLayerToggle('abschnitt', v)}
+            />{' '}
+            Abschnitte
           </Space>
           <Space>
-            <Switch checked={props.layer.zone} onChange={(v) => props.onLayerToggle('zone', v)} /> Zonen
+            <Switch checked={props.layer.zone} onChange={(v) => props.onLayerToggle('zone', v)} />{' '}
+            Zonen
           </Space>
           <Space>
-            <Switch checked={props.layer.lagemeldung} onChange={(v) => props.onLayerToggle('lagemeldung', v)} /> Lagemeldungen
+            <Switch
+              checked={props.layer.lagemeldung}
+              onChange={(v) => props.onLayerToggle('lagemeldung', v)}
+            />{' '}
+            Lagemeldungen
           </Space>
           <Space>
-            <Switch checked={props.layer.freies_zeichen} onChange={(v) => props.onLayerToggle('freies_zeichen', v)} /> Taktische Zeichen
+            <Switch
+              checked={props.layer.freies_zeichen}
+              onChange={(v) => props.onLayerToggle('freies_zeichen', v)}
+            />{' '}
+            Taktische Zeichen
           </Space>
         </Space>
       </Card>
@@ -548,27 +629,30 @@ export default function Sidebar(props: SidebarProps) {
             return (
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Space>
-                  <Switch
-                    checked={sichtbar}
-                    onChange={(v) => props.onFachebeneToggle(key, v)}
-                  />
+                  <Switch checked={sichtbar} onChange={(v) => props.onFachebeneToggle(key, v)} />
                   <span style={{ color: def.farbe }}>●</span> {def.label}
                 </Space>
                 {laedt ? (
                   <Spin size="small" />
                 ) : zoomHinweis ? (
                   <Tooltip title="KRITIS-Objekte werden erst ab einer näheren Zoomstufe geladen">
-                    <Typography.Text type="warning" style={{ fontSize: 11 }}>näher heranzoomen</Typography.Text>
+                    <Typography.Text type="warning" style={{ fontSize: 11 }}>
+                      näher heranzoomen
+                    </Typography.Text>
                   </Tooltip>
                 ) : (
                   <>
                     {sichtbar && offline && (
                       <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
-                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>offline</Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                          offline
+                        </Typography.Text>
                       </Tooltip>
                     )}
                     {sichtbar && status === 'leer' && (
-                      <Typography.Text type="secondary" style={{ fontSize: 11 }}>keine Daten</Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                        keine Daten
+                      </Typography.Text>
                     )}
                   </>
                 )}
@@ -599,7 +683,10 @@ export default function Sidebar(props: SidebarProps) {
           {props.bilder.map((b) => {
             const imPlatzieren = props.bildPlatzierenId === b.id;
             return (
-              <div key={b.id} style={{ borderBottom: `1px solid ${token.colorSplit}`, paddingBottom: 6 }}>
+              <div
+                key={b.id}
+                style={{ borderBottom: `1px solid ${token.colorSplit}`, paddingBottom: 6 }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Switch
                     checked={b.sichtbar}
@@ -609,13 +696,17 @@ export default function Sidebar(props: SidebarProps) {
                   />
                   <Typography.Text
                     ellipsis={{ tooltip: b.name }}
-                    editable={darfSchreiben ? {
-                      tooltip: 'Umbenennen',
-                      onChange: (val) => {
-                        const t = val.trim();
-                        if (t && t !== b.name) props.onBildUmbenennen(b.id, t);
-                      },
-                    } : false}
+                    editable={
+                      darfSchreiben
+                        ? {
+                            tooltip: 'Umbenennen',
+                            onChange: (val) => {
+                              const t = val.trim();
+                              if (t && t !== b.name) props.onBildUmbenennen(b.id, t);
+                            },
+                          }
+                        : false
+                    }
                     style={{ flex: 1, minWidth: 0 }}
                   >
                     {b.name}
@@ -652,7 +743,9 @@ export default function Sidebar(props: SidebarProps) {
                             {
                               key: 'platzieren',
                               icon: <AimOutlined />,
-                              label: imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren',
+                              label: imPlatzieren
+                                ? 'Platzieren beenden'
+                                : 'Auf der Karte platzieren',
                             },
                             /*
                              * Die Trennung zwischen destruktiver und harmloser Aktion (AK2): im
@@ -735,7 +828,8 @@ export default function Sidebar(props: SidebarProps) {
                     }}
                   >
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ = drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
+                      Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ =
+                      drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
                     </Typography.Text>
                     <div style={{ marginTop: 6 }}>
                       <KoordinatenEingabe
@@ -808,8 +902,7 @@ export default function Sidebar(props: SidebarProps) {
         destroyOnHidden
       >
         <Typography.Paragraph>
-          Das Bild wird aus der Lagekarte entfernt. Bereits gesetzte Eckpunkte gehen dabei
-          verloren.
+          Das Bild wird aus der Lagekarte entfernt. Bereits gesetzte Eckpunkte gehen dabei verloren.
         </Typography.Paragraph>
       </Modal>
 
@@ -827,12 +920,20 @@ export default function Sidebar(props: SidebarProps) {
                         sonst bereits gespeicherte Zonen nachträglich uminterpretieren. Das
                         Literal bleibt bewusst stehen (LFH-328/T14). */}
                     <Button
-                      onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'polygon', farbe: '#1677ff' })}
+                      onClick={() =>
+                        props.onZoneZeichnenStart({
+                          typ: t.typ,
+                          modus: 'polygon',
+                          farbe: '#1677ff',
+                        })
+                      }
                     >
                       Fläche
                     </Button>
                     <Button
-                      onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'linie', farbe: '#1677ff' })}
+                      onClick={() =>
+                        props.onZoneZeichnenStart({ typ: t.typ, modus: 'linie', farbe: '#1677ff' })
+                      }
                     >
                       Linie
                     </Button>
@@ -884,9 +985,7 @@ export default function Sidebar(props: SidebarProps) {
                   Fertig
                 </Button>
               ) : (
-                <Button onClick={props.onZeichenPlatzierenAbbrechen}>
-                  Abbrechen
-                </Button>
+                <Button onClick={props.onZeichenPlatzierenAbbrechen}>Abbrechen</Button>
               )}
             </Space>
           ) : zeichenPickerOffen ? (
@@ -902,9 +1001,7 @@ export default function Sidebar(props: SidebarProps) {
                 >
                   Platzieren
                 </Button>
-                <Button onClick={() => setZeichenPickerOffen(false)}>
-                  Abbrechen
-                </Button>
+                <Button onClick={() => setZeichenPickerOffen(false)}>Abbrechen</Button>
               </Space>
             </Space>
           ) : (
@@ -945,7 +1042,10 @@ export default function Sidebar(props: SidebarProps) {
         )}
         {props.basemap === 'offline' && (
           <div style={{ marginTop: 8 }}>
-            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+            <Typography.Text
+              type="secondary"
+              style={{ fontSize: 12, display: 'block', marginBottom: 4 }}
+            >
               Karten-Design
             </Typography.Text>
             <Radio.Group
@@ -964,7 +1064,10 @@ export default function Sidebar(props: SidebarProps) {
           </div>
         )}
         {props.basemap === 'blind' && (
-          <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
+          <Typography.Paragraph
+            type="secondary"
+            style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}
+          >
             Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
           </Typography.Paragraph>
         )}

@@ -1,6 +1,10 @@
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import {
-  taktischeUhrzeit, taktischeDtg, taktischeDtgVoll, formatZeitKurz, type AnzeigeKonventionen,
+  taktischeUhrzeit,
+  taktischeDtg,
+  taktischeDtgVoll,
+  formatZeitKurz,
+  type AnzeigeKonventionen,
 } from './format';
 
 /**
@@ -15,7 +19,10 @@ import {
  */
 export type ZeitFormat = 'uhrzeit' | 'dtg' | 'dtgVoll' | 'kurz';
 
-const FORMATTER: Record<ZeitFormat, (utc: string | null | undefined, konv: AnzeigeKonventionen) => string> = {
+const FORMATTER: Record<
+  ZeitFormat,
+  (utc: string | null | undefined, konv: AnzeigeKonventionen) => string
+> = {
   uhrzeit: taktischeUhrzeit,
   dtg: taktischeDtg,
   dtgVoll: taktischeDtgVoll,
@@ -23,8 +30,12 @@ const FORMATTER: Record<ZeitFormat, (utc: string | null | undefined, konv: Anzei
 };
 
 export default function ZeitAnzeige({
-  wert, format = 'dtgVoll',
-}: { wert?: string | null; format?: ZeitFormat }) {
+  wert,
+  format = 'dtgVoll',
+}: {
+  wert?: string | null;
+  format?: ZeitFormat;
+}) {
   const { konventionen } = useAnzeigeKonventionen();
   return <>{FORMATTER[format](wert, konventionen)}</>;
 }

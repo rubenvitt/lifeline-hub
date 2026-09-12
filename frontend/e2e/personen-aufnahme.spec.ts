@@ -64,7 +64,9 @@ function skFlaeche(page: Page, label: string) {
   return sichtung(page).getByText(label, { exact: true });
 }
 
-test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel', async ({ page }) => {
+test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Aufnahme ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen`);

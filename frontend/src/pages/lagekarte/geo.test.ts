@@ -16,12 +16,31 @@ import type { GeoJsonPolygon, GeoJsonLineString } from './geo';
 // Ein 0,01° × 0,01°-Kästchen nahe Breite 50 (Rhein-Main). Als geschlossener Ring.
 const BOX: GeoJsonPolygon = {
   type: 'Polygon',
-  coordinates: [[[8, 50], [8.01, 50], [8.01, 50.01], [8, 50.01], [8, 50]]],
+  coordinates: [
+    [
+      [8, 50],
+      [8.01, 50],
+      [8.01, 50.01],
+      [8, 50.01],
+      [8, 50],
+    ],
+  ],
 };
 
 describe('polygonZentroid', () => {
   it('Mittelpunkt eines Quadrats', () => {
-    const gj = { type: 'Polygon' as const, coordinates: [[[0,0],[2,0],[2,2],[0,2],[0,0]]] };
+    const gj = {
+      type: 'Polygon' as const,
+      coordinates: [
+        [
+          [0, 0],
+          [2, 0],
+          [2, 2],
+          [0, 2],
+          [0, 0],
+        ],
+      ],
+    };
     const [lon, lat] = polygonZentroid(gj)!;
     expect(lon).toBeCloseTo(1, 6);
     expect(lat).toBeCloseTo(1, 6);
@@ -33,7 +52,9 @@ describe('polygonZentroid', () => {
 
 describe('parseGeometry', () => {
   it('liest ein Polygon', () => {
-    const g = parseGeometry('{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}');
+    const g = parseGeometry(
+      '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+    );
     expect(g?.type).toBe('Polygon');
   });
   it('liest einen LineString', () => {
@@ -49,12 +70,31 @@ describe('parseGeometry', () => {
 
 describe('lineLaengeM', () => {
   it('1° Breiten-Segment ≈ 111195 m (Haversine, R=6371000)', () => {
-    const line: GeoJsonLineString = { type: 'LineString', coordinates: [[8, 50], [8, 51]] };
+    const line: GeoJsonLineString = {
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 51],
+      ],
+    };
     expect(lineLaengeM(line)).toBeCloseTo(111195, -2); // ±~50 m
   });
   it('summiert mehrere Segmente', () => {
-    const line: GeoJsonLineString = { type: 'LineString', coordinates: [[8, 50], [8, 50.5], [8, 51]] };
-    const einzeln: GeoJsonLineString = { type: 'LineString', coordinates: [[8, 50], [8, 51]] };
+    const line: GeoJsonLineString = {
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 50.5],
+        [8, 51],
+      ],
+    };
+    const einzeln: GeoJsonLineString = {
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 51],
+      ],
+    };
     expect(lineLaengeM(line)).toBeCloseTo(lineLaengeM(einzeln), 0);
   });
   it('leer/entartet → 0', () => {
@@ -66,8 +106,20 @@ describe('lineLaengeM', () => {
 describe('polygonUmfangM', () => {
   it('Umfang = Summe der Außenring-Kanten (Haversine)', () => {
     // Rechteck: 2×(Breite + Höhe), unabhängig über lineLaengeM der Kanten geprüft.
-    const breite = lineLaengeM({ type: 'LineString', coordinates: [[8, 50], [8.01, 50]] });
-    const hoehe = lineLaengeM({ type: 'LineString', coordinates: [[8, 50], [8, 50.01]] });
+    const breite = lineLaengeM({
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8.01, 50],
+      ],
+    });
+    const hoehe = lineLaengeM({
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 50.01],
+      ],
+    });
     expect(polygonUmfangM(BOX)).toBeCloseTo(2 * (breite + hoehe), -1);
   });
   it('leer → 0', () => {
@@ -77,8 +129,20 @@ describe('polygonUmfangM', () => {
 
 describe('polygonFlaecheM2', () => {
   it('Rechteck ≈ Breite × Höhe (Kreuzcheck gegen Haversine-Kanten, nicht dieselbe Projektion)', () => {
-    const breite = lineLaengeM({ type: 'LineString', coordinates: [[8, 50], [8.01, 50]] });
-    const hoehe = lineLaengeM({ type: 'LineString', coordinates: [[8, 50], [8, 50.01]] });
+    const breite = lineLaengeM({
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8.01, 50],
+      ],
+    });
+    const hoehe = lineLaengeM({
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 50.01],
+      ],
+    });
     const erwartet = breite * hoehe;
     const ist = polygonFlaecheM2(BOX);
     expect(Math.abs(ist - erwartet) / erwartet).toBeLessThan(0.02); // <2 %
@@ -86,17 +150,44 @@ describe('polygonFlaecheM2', () => {
   it('leer/entartet → 0', () => {
     expect(polygonFlaecheM2({ type: 'Polygon', coordinates: [] })).toBe(0);
     // kollinear (Linie als „Polygon") → keine Fläche
-    expect(polygonFlaecheM2({ type: 'Polygon', coordinates: [[[8, 50], [8.02, 50], [8.04, 50], [8, 50]]] }))
-      .toBeCloseTo(0, 5);
+    expect(
+      polygonFlaecheM2({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [8, 50],
+            [8.02, 50],
+            [8.04, 50],
+            [8, 50],
+          ],
+        ],
+      }),
+    ).toBeCloseTo(0, 5);
   });
   it('Polygon mit Loch = Außenring minus Loch', () => {
     const aussen: GeoJsonPolygon = {
       type: 'Polygon',
-      coordinates: [[[8, 50], [8.02, 50], [8.02, 50.02], [8, 50.02], [8, 50]]],
+      coordinates: [
+        [
+          [8, 50],
+          [8.02, 50],
+          [8.02, 50.02],
+          [8, 50.02],
+          [8, 50],
+        ],
+      ],
     };
     const loch: GeoJsonPolygon = {
       type: 'Polygon',
-      coordinates: [[[8.005, 50.005], [8.015, 50.005], [8.015, 50.015], [8.005, 50.015], [8.005, 50.005]]],
+      coordinates: [
+        [
+          [8.005, 50.005],
+          [8.015, 50.005],
+          [8.015, 50.015],
+          [8.005, 50.015],
+          [8.005, 50.005],
+        ],
+      ],
     };
     const mitLoch: GeoJsonPolygon = {
       type: 'Polygon',
@@ -136,7 +227,13 @@ describe('geoKennzahlen (Dispatcher über lose Geometrie)', () => {
     expect(k?.laengeM).toBeUndefined();
   });
   it('LineString → Länge, keine Fläche', () => {
-    const k = geoKennzahlen({ type: 'LineString', coordinates: [[8, 50], [8, 51]] });
+    const k = geoKennzahlen({
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 51],
+      ],
+    });
     expect(k?.laengeM).toBeGreaterThan(0);
     expect(k?.flaecheM2).toBeUndefined();
   });
@@ -150,10 +247,25 @@ describe('geoKennzahlen (Dispatcher über lose Geometrie)', () => {
     expect(multi.umfangM).toBeCloseTo(2 * einzeln.umfangM!, -1);
   });
   it('MultiLineString → summierte Länge', () => {
-    const einzeln = geoKennzahlen({ type: 'LineString', coordinates: [[8, 50], [8, 51]] })!;
+    const einzeln = geoKennzahlen({
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 51],
+      ],
+    })!;
     const multi = geoKennzahlen({
       type: 'MultiLineString',
-      coordinates: [[[8, 50], [8, 51]], [[8, 50], [8, 51]]],
+      coordinates: [
+        [
+          [8, 50],
+          [8, 51],
+        ],
+        [
+          [8, 50],
+          [8, 51],
+        ],
+      ],
     })!;
     expect(multi.laengeM).toBeCloseTo(2 * einzeln.laengeM!, 0);
   });
@@ -171,10 +283,24 @@ describe('punktInPolygon / findeGeometrieAn', () => {
   it('MultiPolygon mit Loch (even-odd): Punkt im Loch → false, im Vollteil → true', () => {
     const mitLoch = {
       type: 'MultiPolygon' as const,
-      coordinates: [[
-        [[8, 50], [8.02, 50], [8.02, 50.02], [8, 50.02], [8, 50]], // Außenring
-        [[8.005, 50.005], [8.015, 50.005], [8.015, 50.015], [8.005, 50.015], [8.005, 50.005]], // Loch
-      ]],
+      coordinates: [
+        [
+          [
+            [8, 50],
+            [8.02, 50],
+            [8.02, 50.02],
+            [8, 50.02],
+            [8, 50],
+          ], // Außenring
+          [
+            [8.005, 50.005],
+            [8.015, 50.005],
+            [8.015, 50.015],
+            [8.005, 50.015],
+            [8.005, 50.005],
+          ], // Loch
+        ],
+      ],
     };
     expect(punktInPolygon({ lng: 8.01, lat: 50.01 }, mitLoch)).toBe(false); // im Loch
     expect(punktInPolygon({ lng: 8.001, lat: 50.001 }, mitLoch)).toBe(true); // im Rand-Vollteil

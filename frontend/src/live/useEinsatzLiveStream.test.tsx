@@ -115,9 +115,9 @@ describe('useEinsatzLiveStream', () => {
       const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
       expect(keys).toContain('einsatz-personal');
     });
-    expect(
-      spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]),
-    ).not.toContain('einsatz-personen');
+    expect(spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0])).not.toContain(
+      'einsatz-personen',
+    );
   });
 
   it('invalidiert gefahrenmatrix bei gefahr-Event', async () => {
@@ -328,7 +328,10 @@ describe('useEinsatzLiveStream', () => {
         <Probe id={9} />
       </QueryClientProvider>,
     );
-    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9, erinnerung_id: 5, bezug_typ: null, bezug_id: null }));
+    FakeEventSource.letzte?.emit(
+      'erinnerung',
+      JSON.stringify({ einsatz_id: 9, erinnerung_id: 5, bezug_typ: null, bezug_id: null }),
+    );
     await waitFor(() => expect(alarm).toHaveBeenCalled());
     window.removeEventListener('lfh:erinnerung-alarm', alarm);
   });
@@ -344,7 +347,10 @@ describe('useEinsatzLiveStream', () => {
         <Probe id={9} />
       </QueryClientProvider>,
     );
-    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9, erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 }));
+    FakeEventSource.letzte?.emit(
+      'erinnerung',
+      JSON.stringify({ einsatz_id: 9, erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 }),
+    );
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
       expect(calls).toContainEqual(['einsatz-auftraege', 9]);
@@ -364,7 +370,10 @@ describe('useEinsatzLiveStream', () => {
         <Probe id={9} />
       </QueryClientProvider>,
     );
-    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9, erinnerung_id: 7, bezug_typ: 'meldung', bezug_id: 3 }));
+    FakeEventSource.letzte?.emit(
+      'erinnerung',
+      JSON.stringify({ einsatz_id: 9, erinnerung_id: 7, bezug_typ: 'meldung', bezug_id: 3 }),
+    );
     // Registry-Invalidierung von einsatz-erinnerungen läuft trotzdem.
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
@@ -405,7 +414,8 @@ describe('useEinsatzLiveStream', () => {
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
     const status: string[] = [];
-    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
     window.addEventListener('lfh:live-status', onStatus);
     render(
       <QueryClientProvider client={client}>
@@ -442,7 +452,8 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const status: string[] = [];
-    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
     window.addEventListener('lfh:live-status', onStatus);
     render(
       <QueryClientProvider client={client}>
@@ -457,7 +468,8 @@ describe('useEinsatzLiveStream', () => {
   it('meldet beim Unmount idle, damit der globale Hinweis nicht auf anderen Routen stehenbleibt', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const status: string[] = [];
-    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
     window.addEventListener('lfh:live-status', onStatus);
     const { unmount } = render(
       <QueryClientProvider client={neuerQueryClient()}>
@@ -478,7 +490,8 @@ describe('useEinsatzLiveStream', () => {
     const authVerloren = vi.fn();
     window.addEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     const status: string[] = [];
-    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
     window.addEventListener('lfh:live-status', onStatus);
     const client = neuerQueryClient();
     render(
@@ -509,9 +522,7 @@ describe('useEinsatzLiveStream', () => {
     const quelle = FakeEventSource.letzte;
     setTimeoutSpy.mockClear();
     quelle?.emitError(FakeEventSource.CLOSED);
-    await waitFor(() =>
-      expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(true),
-    );
+    await waitFor(() => expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(true));
     expect(timeoutSpy).toHaveBeenCalledWith(15_000);
     expect(authVerloren).not.toHaveBeenCalled();
     expect(quelle?.closed).toBe(true); // tote Quelle vor Reconnect geschlossen

@@ -35,7 +35,14 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
           onClick={() =>
             props.onFlaecheGezeichnet?.({
               type: 'Polygon',
-              coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]],
+              coordinates: [
+                [
+                  [8.6, 50.1],
+                  [8.7, 50.1],
+                  [8.7, 50.2],
+                  [8.6, 50.1],
+                ],
+              ],
             })
           }
         >
@@ -54,8 +61,24 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
           onClick={() =>
             props.onZoneGezeichnet?.(
               props.zoneZeichnen === 'linie'
-                ? { type: 'LineString', coordinates: [[8.6, 50.1], [8.7, 50.2]] }
-                : { type: 'Polygon', coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]] },
+                ? {
+                    type: 'LineString',
+                    coordinates: [
+                      [8.6, 50.1],
+                      [8.7, 50.2],
+                    ],
+                  }
+                : {
+                    type: 'Polygon',
+                    coordinates: [
+                      [
+                        [8.6, 50.1],
+                        [8.7, 50.1],
+                        [8.7, 50.2],
+                        [8.6, 50.1],
+                      ],
+                    ],
+                  },
             )
           }
         >
@@ -267,7 +290,9 @@ function basisHandler(
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),
-    http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
+    http.get('/api/organisation', () =>
+      HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
+    ),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
     http.get('/api/einsaetze/1/einstellungen', () => HttpResponse.json(EINSTELLUNGEN)),
     http.get('/api/einsaetze/1/lage-snapshots', () => HttpResponse.json([])),
@@ -276,7 +301,15 @@ function basisHandler(
     // den config-Verfügbarkeits-Default (wie vor der Kartenansichten-Umstellung).
     http.get('/api/einsaetze/1/karten-ansichten', () =>
       HttpResponse.json([
-        { id: 1, einsatz_id: 1, name: 'Standard', reihenfolge: 0, ist_standard: true, erstellt_at: '', geaendert_at: '' },
+        {
+          id: 1,
+          einsatz_id: 1,
+          name: 'Standard',
+          reihenfolge: 0,
+          ist_standard: true,
+          erstellt_at: '',
+          geaendert_at: '',
+        },
       ]),
     ),
   );
@@ -334,8 +367,12 @@ describe('quellenMeldung', () => {
   it('kürzt darüber hinaus — die vierte Quelle wird zur Zahl', () => {
     // Die Einzahl steht ausgeschrieben da: „und 1 weitere" ist kein deutscher Satz, und
     // genau dieser Grenzfall wird über die Seite nie erreicht (dort scheitern 1 oder alle 11).
-    expect(quellenMeldung(['A', 'B', 'C', 'D'])).toBe('Lagebild unvollständig: A, B, C und eine weitere');
-    expect(quellenMeldung(['A', 'B', 'C', 'D', 'E'])).toBe('Lagebild unvollständig: A, B, C und 2 weitere');
+    expect(quellenMeldung(['A', 'B', 'C', 'D'])).toBe(
+      'Lagebild unvollständig: A, B, C und eine weitere',
+    );
+    expect(quellenMeldung(['A', 'B', 'C', 'D', 'E'])).toBe(
+      'Lagebild unvollständig: A, B, C und 2 weitere',
+    );
   });
 });
 
@@ -416,7 +453,9 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
     // nicht sehen, ob die Seite ihn je füllt.
     basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
     renderSeite();
-    expect(await screen.findByText('Objektlisten konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Objektlisten konnten nicht geladen werden'),
+    ).toBeInTheDocument();
     // Die unterscheidende Zusicherung: ohne die Verdrahtung ist `nichtVerortet` schlicht
     // leer (die Quelle ist ja tot) und die Sektion behauptete „Alles verortet" — eine
     // Erfolgsaussage über Daten, die niemand geladen hat.
@@ -428,10 +467,15 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
 
   it('meldet die gescheiterte Bilder-Query in ihrer Sektion', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/karte/hintergrundbilder', () => new HttpResponse(null, { status: 500 })),
+      http.get(
+        '/api/einsaetze/1/karte/hintergrundbilder',
+        () => new HttpResponse(null, { status: 500 }),
+      ),
     ]);
     renderSeite();
-    expect(await screen.findByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Bild-Hintergründe konnten nicht geladen werden'),
+    ).toBeInTheDocument();
     // Kein Lagebild-Fehler → kein Overlay. Der Slot ersetzt es nicht, er ergänzt es.
     expect(screen.queryByTestId('lagebild-unvollstaendig')).not.toBeInTheDocument();
   });
@@ -441,7 +485,9 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
       http.get('/api/einsaetze/1/karten-ansichten', () => new HttpResponse(null, { status: 500 })),
     ]);
     renderSeite();
-    expect(await screen.findByText('Kartenansichten konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Kartenansichten konnten nicht geladen werden'),
+    ).toBeInTheDocument();
   });
 
   it('ohne Fehler trägt die Sidebar keinen der drei Slots', async () => {
@@ -449,8 +495,12 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
     renderSeite();
     expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
     expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
-    expect(screen.queryByText('Bild-Hintergründe konnten nicht geladen werden')).not.toBeInTheDocument();
-    expect(screen.queryByText('Kartenansichten konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Bild-Hintergründe konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Kartenansichten konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -524,11 +574,25 @@ describe('LagekartePage', () => {
   it('rendert freie taktische Zeichen als Marker (Datenpfad: Query → alleVerortet → sichtbar) (LFH-170)', async () => {
     basisHandler([
       http.get('/api/einsaetze/1/freie-zeichen', () =>
-        HttpResponse.json([{
-          id: 42, einsatz_id: 1, lat: 50.1, lon: 8.6, grundzeichen: 'stelle',
-          organisation: null, fachaufgabe: null, symbol: null, einheit: null, funktion: null,
-          farbe: null, label: 'Sammelplatz', erstellt_von: 1, erstellt_at: '', geaendert_at: '',
-        }]),
+        HttpResponse.json([
+          {
+            id: 42,
+            einsatz_id: 1,
+            lat: 50.1,
+            lon: 8.6,
+            grundzeichen: 'stelle',
+            organisation: null,
+            fachaufgabe: null,
+            symbol: null,
+            einheit: null,
+            funktion: null,
+            farbe: null,
+            label: 'Sammelplatz',
+            erstellt_von: 1,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+        ]),
       ),
     ]);
     renderSeite();
@@ -538,11 +602,25 @@ describe('LagekartePage', () => {
   it('Marker-Klick auf ein freies Zeichen öffnet den FreiesZeichenInspector (kein Fach-Modul-Link) (LFH-170)', async () => {
     basisHandler([
       http.get('/api/einsaetze/1/freie-zeichen', () =>
-        HttpResponse.json([{
-          id: 42, einsatz_id: 1, lat: 50.1, lon: 8.6, grundzeichen: 'stelle',
-          organisation: null, fachaufgabe: null, symbol: null, einheit: null, funktion: null,
-          farbe: null, label: 'Sammelplatz', erstellt_von: 1, erstellt_at: '', geaendert_at: '',
-        }]),
+        HttpResponse.json([
+          {
+            id: 42,
+            einsatz_id: 1,
+            lat: 50.1,
+            lon: 8.6,
+            grundzeichen: 'stelle',
+            organisation: null,
+            fachaufgabe: null,
+            symbol: null,
+            einheit: null,
+            funktion: null,
+            farbe: null,
+            label: 'Sammelplatz',
+            erstellt_von: 1,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+        ]),
       ),
     ]);
     const user = userEvent.setup();
@@ -592,7 +670,9 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: von Online auf Blind wechseln, Marker bleiben sichtbar', async () => {
     basisHandler([], {
-      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
+      online_styles: [
+        { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
+      ],
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
@@ -617,7 +697,9 @@ describe('LagekartePage', () => {
 
   it('Schmutzig-Erkennung: Basemap-Wechsel blendet „In dieser Ansicht speichern" ein (LFH-319)', async () => {
     basisHandler([], {
-      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
+      online_styles: [
+        { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
+      ],
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
@@ -643,7 +725,9 @@ describe('LagekartePage', () => {
     renderSeite();
     await screen.findByText('marker-schaden-9');
     expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(
+      true,
+    );
     expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).disabled).toBe(false);
     expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).checked).toBe(true);
   });
@@ -656,7 +740,9 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
     basisHandler([], {
-      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
+      online_styles: [
+        { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
+      ],
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
@@ -665,8 +751,12 @@ describe('LagekartePage', () => {
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(false);
-    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(
+      false,
+    );
+    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(
+      false,
+    );
     // Default-Modus ist 'online' → kein Blind-Hinweis sichtbar.
     expect(screen.queryByText(/Keine Basemap konfiguriert/i)).not.toBeInTheDocument();
   });
@@ -683,7 +773,9 @@ describe('LagekartePage', () => {
     renderSeite();
     await screen.findByText('marker-schaden-9');
     expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(
+      false,
+    );
     // defaultModus springt auf 'offline'
     expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).checked).toBe(true);
   });
@@ -718,7 +810,9 @@ describe('LagekartePage', () => {
     renderSeite();
     // Mehrere "Platzieren"-Buttons (UHS BHP 50 + Einheit Zug 1) → über das List-Item
     // der Einheit eindeutig treffen.
-    const item = (await screen.findByText('Einheit: Zug 1')).closest('.listen-eintrag') as HTMLElement;
+    const item = (await screen.findByText('Einheit: Zug 1')).closest(
+      '.listen-eintrag',
+    ) as HTMLElement;
     await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('karte-klick'));
     await waitFor(() => expect(body).toMatchObject({ lat: 50.1, lon: 8.6 }));
@@ -730,7 +824,10 @@ describe('LagekartePage', () => {
       http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([ABSCHNITT_OHNE_FLAECHE])),
       http.patch('/api/einsaetze/1/abschnitte/3/flaeche', async ({ request }) => {
         body = (await request.json()) as { flaeche_geojson?: string };
-        return HttpResponse.json({ ...ABSCHNITT_OHNE_FLAECHE, flaeche_geojson: body.flaeche_geojson });
+        return HttpResponse.json({
+          ...ABSCHNITT_OHNE_FLAECHE,
+          flaeche_geojson: body.flaeche_geojson,
+        });
       }),
     ]);
     const user = userEvent.setup();
@@ -747,7 +844,9 @@ describe('LagekartePage', () => {
 
   it('rendert verortetes Personal als taktische Zeichen (alle über karte/fuehrungskraefte, LFH-276)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([FUEHRUNGSKRAFT_VERORTET])),
+      http.get('/api/einsaetze/1/karte/fuehrungskraefte', () =>
+        HttpResponse.json([FUEHRUNGSKRAFT_VERORTET]),
+      ),
     ]);
     renderSeite();
     // Verortetes Personal erzeugt marker-fuehrung-<id> (Marker-Typ bleibt 'fuehrung').
@@ -807,7 +906,19 @@ describe('LagekartePage', () => {
     basisHandler([
       http.post('/api/einsaetze/1/zonen', async ({ request }) => {
         body = (await request.json()) as typeof body;
-        return HttpResponse.json({ id: 5, einsatz_id: 1, typ: body!.typ, geometrie_typ: body!.geometrie_typ, geometrie: body!.geometrie, label: null, farbe: null, notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' });
+        return HttpResponse.json({
+          id: 5,
+          einsatz_id: 1,
+          typ: body!.typ,
+          geometrie_typ: body!.geometrie_typ,
+          geometrie: body!.geometrie,
+          label: null,
+          farbe: null,
+          notiz: null,
+          erstellt_von: 1,
+          erstellt_at: '',
+          geaendert_at: '',
+        });
       }),
     ]);
     const user = userEvent.setup();
@@ -826,7 +937,19 @@ describe('LagekartePage', () => {
     basisHandler([
       http.post('/api/einsaetze/1/zonen', async ({ request }) => {
         body = (await request.json()) as typeof body;
-        return HttpResponse.json({ id: 6, einsatz_id: 1, typ: 'absperrgrenze', geometrie_typ: 'LineString', geometrie: '{}', label: null, farbe: null, notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' });
+        return HttpResponse.json({
+          id: 6,
+          einsatz_id: 1,
+          typ: 'absperrgrenze',
+          geometrie_typ: 'LineString',
+          geometrie: '{}',
+          label: null,
+          farbe: null,
+          notiz: null,
+          erstellt_von: 1,
+          erstellt_at: '',
+          geaendert_at: '',
+        });
       }),
     ]);
     const user = userEvent.setup();
@@ -841,9 +964,19 @@ describe('LagekartePage', () => {
 
   it('öffnet den Inspector per Klick und ändert das Label (PATCH)', async () => {
     let patch: { label?: string } | null = null;
-    const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',
+    const ZONE_FREI = {
+      id: 7,
+      einsatz_id: 1,
+      typ: 'freie_skizze',
+      geometrie_typ: 'Polygon',
       geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
-      label: 'Skizze', farbe: '#00ff00', notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' };
+      label: 'Skizze',
+      farbe: '#00ff00',
+      notiz: null,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
     basisHandler([
       http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_FREI])),
       http.patch('/api/einsaetze/1/zonen/7', async ({ request }) => {
@@ -864,12 +997,26 @@ describe('LagekartePage', () => {
 
   it('Reverse-Deeplink ?gefahrengebiet= selektiert die zugehörige Zone (LFH-155)', async () => {
     const ZONE_GG = {
-      id: 7, einsatz_id: 1, typ: 'gefahrengebiet', geometrie_typ: 'Polygon',
+      id: 7,
+      einsatz_id: 1,
+      typ: 'gefahrengebiet',
+      geometrie_typ: 'Polygon',
       geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
-      label: 'GG-Zone', farbe: null, notiz: null, gefahrengebiet_id: 10,
-      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+      label: 'GG-Zone',
+      farbe: null,
+      notiz: null,
+      gefahrengebiet_id: 10,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
     };
-    const GEBIET = { id: 10, einsatz_id: 1, label: 'Nord', zonen_ids: [7], hoechste_warnstufe: 'keine' };
+    const GEBIET = {
+      id: 10,
+      einsatz_id: 1,
+      label: 'Nord',
+      zonen_ids: [7],
+      hoechste_warnstufe: 'keine',
+    };
     basisHandler([
       http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_GG])),
       http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([GEBIET])),
@@ -881,12 +1028,26 @@ describe('LagekartePage', () => {
 
   it('Reverse-Deeplink ?gefahrengebiet=: räumt den Param aus der URL (apply-then-clean) und die Selektion bleibt bestehen (LFH-155)', async () => {
     const ZONE_GG = {
-      id: 7, einsatz_id: 1, typ: 'gefahrengebiet', geometrie_typ: 'Polygon',
+      id: 7,
+      einsatz_id: 1,
+      typ: 'gefahrengebiet',
+      geometrie_typ: 'Polygon',
       geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
-      label: 'GG-Zone', farbe: null, notiz: null, gefahrengebiet_id: 10,
-      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+      label: 'GG-Zone',
+      farbe: null,
+      notiz: null,
+      gefahrengebiet_id: 10,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
     };
-    const GEBIET = { id: 10, einsatz_id: 1, label: 'Nord', zonen_ids: [7], hoechste_warnstufe: 'keine' };
+    const GEBIET = {
+      id: 10,
+      einsatz_id: 1,
+      label: 'Nord',
+      zonen_ids: [7],
+      hoechste_warnstufe: 'keine',
+    };
     basisHandler([
       http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_GG])),
       http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([GEBIET])),
@@ -934,7 +1095,9 @@ describe('LagekartePage', () => {
     // Einladung in einen 403 — der Param wird trotzdem geräumt, damit ein Neuladen ihn nicht
     // wieder aufgreift.
     basisHandler([
-      http.get('/api/einsaetze/1', () => HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' })),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=schaden:10');
 
@@ -946,12 +1109,25 @@ describe('LagekartePage', () => {
 
   it('hebt eine Zone auf (DELETE)', async () => {
     let geloescht = false;
-    const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',
+    const ZONE_FREI = {
+      id: 7,
+      einsatz_id: 1,
+      typ: 'freie_skizze',
+      geometrie_typ: 'Polygon',
       geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
-      label: 'Skizze', farbe: '#00ff00', notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' };
+      label: 'Skizze',
+      farbe: '#00ff00',
+      notiz: null,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
     basisHandler([
       http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_FREI])),
-      http.delete('/api/einsaetze/1/zonen/7', () => { geloescht = true; return new HttpResponse(null, { status: 204 }); }),
+      http.delete('/api/einsaetze/1/zonen/7', () => {
+        geloescht = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
     ]);
     const user = userEvent.setup();
     renderSeite();
@@ -969,7 +1145,12 @@ describe('LagekartePage', () => {
       name: 'lageplan.png',
       mime: 'image/png',
       groesse: 12345,
-      ecken_json: JSON.stringify([[9.0, 50.0], [9.1, 50.0], [9.1, 49.9], [9.0, 49.9]]),
+      ecken_json: JSON.stringify([
+        [9.0, 50.0],
+        [9.1, 50.0],
+        [9.1, 49.9],
+        [9.0, 49.9],
+      ]),
       opazitaet: 80,
       sichtbar: true,
       reihenfolge: 1,
@@ -985,11 +1166,13 @@ describe('LagekartePage', () => {
       // („unhandled exception during the handler lookup"), der Download liefert nichts
       // und der Test scheitert an einer leeren Anzeige — sieht aus wie eine kaputte
       // Komponente, ist aber die Vorrichtung. Der MIME-Typ trägt der Header.
-      http.get('/api/einsaetze/1/karte/hintergrundbilder/3/download', () =>
-        new HttpResponse(new TextEncoder().encode('pixeldata'), {
-          status: 200,
-          headers: { 'Content-Type': 'image/png' },
-        }),
+      http.get(
+        '/api/einsaetze/1/karte/hintergrundbilder/3/download',
+        () =>
+          new HttpResponse(new TextEncoder().encode('pixeldata'), {
+            status: 200,
+            headers: { 'Content-Type': 'image/png' },
+          }),
       ),
     ]);
     renderSeite();
@@ -1020,7 +1203,12 @@ describe('LagekartePage', () => {
       name,
       mime: 'image/png',
       groesse: 12345,
-      ecken_json: JSON.stringify([[9.0, 50.0], [9.1, 50.0], [9.1, 49.9], [9.0, 49.9]]),
+      ecken_json: JSON.stringify([
+        [9.0, 50.0],
+        [9.1, 50.0],
+        [9.1, 49.9],
+        [9.0, 49.9],
+      ]),
       opazitaet: 80,
       sichtbar: true,
       reihenfolge: 1,
@@ -1036,11 +1224,13 @@ describe('LagekartePage', () => {
       http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json(bilderListe)),
       // Beide Downloads liefern Pixeldaten — die konkrete id steckt im Pfad.
       // Kein `new Blob(...)` als Body, Begründung siehe oben beim Smoke-Test.
-      http.get('/api/einsaetze/1/karte/hintergrundbilder/:bildId/download', () =>
-        new HttpResponse(new TextEncoder().encode('pixeldata'), {
-          status: 200,
-          headers: { 'Content-Type': 'image/png' },
-        }),
+      http.get(
+        '/api/einsaetze/1/karte/hintergrundbilder/:bildId/download',
+        () =>
+          new HttpResponse(new TextEncoder().encode('pixeldata'), {
+            status: 200,
+            headers: { 'Content-Type': 'image/png' },
+          }),
       ),
     ]);
     const { client, unmount } = renderSeite();
@@ -1094,9 +1284,17 @@ function erstelleZonenPostSpy() {
     anzahl += 1;
     letzterBody = (await request.json()) as typeof letzterBody;
     return HttpResponse.json({
-      id: 5, einsatz_id: 1, typ: letzterBody!.typ, geometrie_typ: letzterBody!.geometrie_typ,
-      geometrie: letzterBody!.geometrie, label: null, farbe: null, notiz: null,
-      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+      id: 5,
+      einsatz_id: 1,
+      typ: letzterBody!.typ,
+      geometrie_typ: letzterBody!.geometrie_typ,
+      geometrie: letzterBody!.geometrie,
+      label: null,
+      farbe: null,
+      notiz: null,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
     });
   });
   return { handler, count: () => anzahl, lastBody: () => letzterBody! };
@@ -1146,7 +1344,9 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     expect(spy.count()).toBe(0);
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument(),
+    );
   });
 
   it('Abbrechen in Phase zeichnen → kein POST, Overlay weg', async () => {
@@ -1157,7 +1357,9 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByRole('button', { name: 'Abbrechen' }));
     expect(spy.count()).toBe(0);
-    await waitFor(() => expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
+    );
   });
 
   it('neuer Zeichenstart während offener Bestätigung räumt die alte Bestätigung weg (kein hängendes Overlay)', async () => {

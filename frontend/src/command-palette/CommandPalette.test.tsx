@@ -7,7 +7,12 @@ import { CommandPalette } from './CommandPalette';
 import type { Treffer } from './fuzzy';
 import type { Befehl, PaletteModus } from './typen';
 
-function befehl(id: string, label: string, ausfuehren = () => {}, gruppe: Befehl['gruppe'] = 'module'): Befehl {
+function befehl(
+  id: string,
+  label: string,
+  ausfuehren = () => {},
+  gruppe: Befehl['gruppe'] = 'module',
+): Befehl {
   return { id, gruppe, label, ausfuehren };
 }
 
@@ -15,7 +20,10 @@ describe('CommandPalette', () => {
   it('filtert die Liste per Sucheingabe', async () => {
     const u = userEvent.setup();
     renderMitProviders(
-      <CommandPalette befehle={[befehl('a', 'ETB'), befehl('b', 'Lagekarte')]} schliesse={() => {}} />,
+      <CommandPalette
+        befehle={[befehl('a', 'ETB'), befehl('b', 'Lagekarte')]}
+        schliesse={() => {}}
+      />,
     );
     await u.type(screen.getByRole('combobox'), 'lage');
     expect(screen.queryByText('ETB')).not.toBeInTheDocument();
@@ -26,7 +34,9 @@ describe('CommandPalette', () => {
     const u = userEvent.setup();
     const aus = vi.fn();
     const schliesse = vi.fn();
-    renderMitProviders(<CommandPalette befehle={[befehl('a', 'ETB', aus)]} schliesse={schliesse} />);
+    renderMitProviders(
+      <CommandPalette befehle={[befehl('a', 'ETB', aus)]} schliesse={schliesse} />,
+    );
     await u.keyboard('{Enter}');
     expect(aus).toHaveBeenCalledTimes(1);
     expect(schliesse).toHaveBeenCalledTimes(1);
@@ -36,7 +46,10 @@ describe('CommandPalette', () => {
     const u = userEvent.setup();
     const zweit = vi.fn();
     renderMitProviders(
-      <CommandPalette befehle={[befehl('a', 'Erstes'), befehl('b', 'Zweites', zweit)]} schliesse={() => {}} />,
+      <CommandPalette
+        befehle={[befehl('a', 'Erstes'), befehl('b', 'Zweites', zweit)]}
+        schliesse={() => {}}
+      />,
     );
     await u.keyboard('{ArrowDown}{Enter}');
     expect(zweit).toHaveBeenCalledTimes(1);
@@ -46,7 +59,9 @@ describe('CommandPalette', () => {
     const u = userEvent.setup();
     const aus = vi.fn();
     const schliesse = vi.fn();
-    renderMitProviders(<CommandPalette befehle={[befehl('a', 'ETB', aus)]} schliesse={schliesse} />);
+    renderMitProviders(
+      <CommandPalette befehle={[befehl('a', 'ETB', aus)]} schliesse={schliesse} />,
+    );
 
     await u.keyboard('{Control>}{Enter}{/Control}');
 
@@ -105,7 +120,13 @@ describe('CommandPalette', () => {
  * Rauschen bis A3 an erster Stelle.
  */
 const rangKorpus: Befehl[] = [
-  { id: 'modul:etb', gruppe: 'module', label: 'ETB', schlagworte: ['tagebuch'], ausfuehren: () => {} },
+  {
+    id: 'modul:etb',
+    gruppe: 'module',
+    label: 'ETB',
+    schlagworte: ['tagebuch'],
+    ausfuehren: () => {},
+  },
   {
     id: 'aktion:personen',
     gruppe: 'schnellaktionen',
@@ -146,7 +167,12 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
     // verlangt nur `schnellaktionen` vor `module`, `aktionen` bleibt unangetastet.
     const befehle: Befehl[] = [
       { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
-      { id: 'aktion:etb', gruppe: 'schnellaktionen', label: 'Neuer ETB-Eintrag', ausfuehren: () => {} },
+      {
+        id: 'aktion:etb',
+        gruppe: 'schnellaktionen',
+        label: 'Neuer ETB-Eintrag',
+        ausfuehren: () => {},
+      },
     ];
     renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
     const optionen = screen.getAllByRole('option');
@@ -158,7 +184,12 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
     // B7: die Gruppierung ist Darstellung, die Navigation bleibt EINE flache Liste.
     const befehle: Befehl[] = [
       { id: 'modul:etb', gruppe: 'module', label: 'Einsatztagebuch', ausfuehren: () => {} },
-      { id: 'aktion:etb', gruppe: 'schnellaktionen', label: 'Neuer ETB-Eintrag', ausfuehren: () => {} },
+      {
+        id: 'aktion:etb',
+        gruppe: 'schnellaktionen',
+        label: 'Neuer ETB-Eintrag',
+        ausfuehren: () => {},
+      },
     ];
     renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
     await userEvent.keyboard('{ArrowDown}');
@@ -232,7 +263,12 @@ describe('CommandPalette · label-gleiche Zwillinge (LFH-391 · A3)', () => {
 /** Ein Befehl je Gruppe: nur so ist „genau diese zwei bleiben übrig" eine Aussage. */
 const modusKorpus: Befehl[] = [
   { id: 'aktion:speichern', gruppe: 'aktionen', label: 'Speichern', ausfuehren: () => {} },
-  { id: 'schnell:person', gruppe: 'schnellaktionen', label: 'Neue Person erfassen', ausfuehren: () => {} },
+  {
+    id: 'schnell:person',
+    gruppe: 'schnellaktionen',
+    label: 'Neue Person erfassen',
+    ausfuehren: () => {},
+  },
   { id: 'modul:personen', gruppe: 'module', label: 'Personen', ausfuehren: () => {} },
   { id: 'einstellung:dunkel', gruppe: 'einstellungen', label: 'Dunkel', ausfuehren: () => {} },
 ];
@@ -256,7 +292,8 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
     // Der Rest ist leer, also gilt weiter die kuratierte Startansicht MIT Rahmen —
     // eingeschränkt, nicht umsortiert.
     expect(screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'))).toEqual([
-      'Aktionen', 'Schnellaktionen',
+      'Aktionen',
+      'Schnellaktionen',
     ]);
   });
 
@@ -328,7 +365,6 @@ describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
   });
 });
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 /**
  * Datensatz-Treffer kommen als FERTIGE `Treffer` herein, nicht als `Befehl` (LFH-391 · C3).
@@ -340,7 +376,12 @@ describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
  * zurückzurechnen. Ein Umweg über `Befehl[]` verlöre sie still, und mit ihr das zentrale
  * Akzeptanzkriterium des Tickets.
  */
-const datensatz = (id: string, label: string, ausfuehren = () => {}, stufe: 0 | 1 | 2 | 3 = 0): Treffer => ({
+const datensatz = (
+  id: string,
+  label: string,
+  ausfuehren = () => {},
+  stufe: 0 | 1 | 2 | 3 = 0,
+): Treffer => ({
   befehl: { id, gruppe: 'datensaetze', label, ausfuehren },
   score: 0,
   stufe,
@@ -416,21 +457,24 @@ describe('CommandPalette · Präfixmodi „#" und „@" (LFH-391 · C3)', () => 
   it.each([
     ['#', 'Nur Einsatztagebuch', 'datensatz:etb:7', 'Einsatztagebuch · #12 · Person gemeldet'],
     ['@', 'Nur Personen und Kräfte', 'datensatz:personen:7', 'Personen · R-042 · Person Nord'],
-  ])('lässt unter „%s" die statischen Befehle weg und die Datensatz-Treffer stehen', async (praefix, hinweis, id, label) => {
-    const u = userEvent.setup();
-    renderMitProviders(
-      <CommandPalette
-        befehle={modusKorpus}
-        datensatzTreffer={[datensatz(id, label)]}
-        schliesse={() => {}}
-      />,
-    );
+  ])(
+    'lässt unter „%s" die statischen Befehle weg und die Datensatz-Treffer stehen',
+    async (praefix, hinweis, id, label) => {
+      const u = userEvent.setup();
+      renderMitProviders(
+        <CommandPalette
+          befehle={modusKorpus}
+          datensatzTreffer={[datensatz(id, label)]}
+          schliesse={() => {}}
+        />,
+      );
 
-    await u.type(screen.getByRole('combobox'), praefix + 'person');
+      await u.type(screen.getByRole('combobox'), praefix + 'person');
 
-    expect(optionsTexte()).toEqual([label]);
-    expect(modusZeile()).toHaveTextContent(hinweis);
-  });
+      expect(optionsTexte()).toEqual([label]);
+      expect(modusZeile()).toHaveTextContent(hinweis);
+    },
+  );
 
   /** Gegenprobe mit demselben Suchwort: ohne Präfix stehen die statischen Befehle da. */
   it('zeigt dasselbe Suchwort ohne Präfix samt statischer Befehle', async () => {
@@ -508,7 +552,11 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
   it('nimmt beim Kürzen auf ein Zeichen die anstehenden Datensatz-Treffer zurück', async () => {
     const u = userEvent.setup();
     renderMitProviders(
-      <CommandPalette befehle={modusKorpus} datensatzTreffer={personTreffer} schliesse={() => {}} />,
+      <CommandPalette
+        befehle={modusKorpus}
+        datensatzTreffer={personTreffer}
+        schliesse={() => {}}
+      />,
     );
 
     await u.type(screen.getByRole('combobox'), '@meier');
@@ -572,15 +620,18 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
    * BEFUND 8: das nackte Präfix. Wer es aus der Legende übernimmt, hat noch keine Suche
    * gestellt — „Keine Treffer" beantwortet dort eine Frage, die niemand gestellt hat.
    */
-  it.each(['@', '#'])('fordert bei nacktem „%s" zum Weitertippen auf, statt Treffer zu verneinen', async (praefix) => {
-    const u = userEvent.setup();
-    renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
+  it.each(['@', '#'])(
+    'fordert bei nacktem „%s" zum Weitertippen auf, statt Treffer zu verneinen',
+    async (praefix) => {
+      const u = userEvent.setup();
+      renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
 
-    await u.type(screen.getByRole('combobox'), praefix);
+      await u.type(screen.getByRole('combobox'), praefix);
 
-    expect(screen.getByText(/Mindestens 2 Zeichen/)).toBeInTheDocument();
-    expect(screen.queryByText('Keine Treffer')).not.toBeInTheDocument();
-  });
+      expect(screen.getByText(/Mindestens 2 Zeichen/)).toBeInTheDocument();
+      expect(screen.queryByText('Keine Treffer')).not.toBeInTheDocument();
+    },
+  );
 
   /**
    * Gegenaussage zur Zeile darüber, und sie trägt: '>' ist KEIN Datensatz-Modus. Ohne sie
@@ -663,7 +714,10 @@ describe('CommandPalette · Leerzustand als Live-Region (LFH-391 · C, Review)',
  * Produktion nicht vor.
  */
 describe('CommandPalette · Auswahl beim Nachrücken (LFH-391 · C3)', () => {
-  const module = [befehl('modul:lagekarte', 'Lagekarte'), befehl('modul:lagemeldungen', 'Lagemeldungen')];
+  const module = [
+    befehl('modul:lagekarte', 'Lagekarte'),
+    befehl('modul:lagemeldungen', 'Lagemeldungen'),
+  ];
 
   it('hält die Auswahl auf demselben Befehl, wenn Datensatz-Treffer nachrücken', async () => {
     const u = userEvent.setup();
@@ -673,7 +727,10 @@ describe('CommandPalette · Auswahl beim Nachrücken (LFH-391 · C3)', () => {
 
     await u.type(screen.getByRole('combobox'), 'lage');
     await u.keyboard('{ArrowDown}');
-    expect(screen.getByRole('option', { name: 'Lagemeldungen' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: 'Lagemeldungen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
 
     rerender(
       <CommandPalette
@@ -688,20 +745,29 @@ describe('CommandPalette · Auswahl beim Nachrücken (LFH-391 · C3)', () => {
 
     // Die zwei Nummerntreffer stehen jetzt VOR den Modulzeilen — die Marke wandert mit.
     expect(optionsTexte().slice(0, 2)).toEqual([
-      'Personen · R-042 · Lage Nord', 'Schäden · S-042 · Lagerhalle',
+      'Personen · R-042 · Lage Nord',
+      'Schäden · S-042 · Lagerhalle',
     ]);
-    expect(screen.getByRole('option', { name: 'Lagemeldungen' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: 'Lagemeldungen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 
   /** Gegenaussage: ein neuer Suchbegriff setzt die Auswahl sehr wohl auf die erste Zeile
    *  zurück — ein Merker, der das überlebte, markierte eine Zeile aus der alten Liste. */
   it('setzt die Auswahl bei einem neuen Suchbegriff auf die erste Zeile zurück', async () => {
     const u = userEvent.setup();
-    renderMitProviders(<CommandPalette befehle={module} datensatzTreffer={[]} schliesse={() => {}} />);
+    renderMitProviders(
+      <CommandPalette befehle={module} datensatzTreffer={[]} schliesse={() => {}} />,
+    );
 
     await u.type(screen.getByRole('combobox'), 'lage');
     await u.keyboard('{ArrowDown}');
-    expect(screen.getByRole('option', { name: 'Lagemeldungen' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: 'Lagemeldungen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
 
     await u.type(screen.getByRole('combobox'), 'k');
 
@@ -744,7 +810,9 @@ describe('CommandPalette · Entprellung nach aussen (LFH-391 · C3)', () => {
       // eine Verzögerung des LETZTEN Zeichens und die Zahl bliebe bei 13.
       expect(melde).not.toHaveBeenCalled();
 
-      act(() => { vi.advanceTimersByTime(400); });
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
 
       expect(melde.mock.calls.length).toBeLessThanOrEqual(2);
       expect(melde).toHaveBeenLastCalledWith('alles', 'brandausbruch');
@@ -783,7 +851,9 @@ describe('CommandPalette · Entprellung nach aussen (LFH-391 · C3)', () => {
       );
       tippe(screen.getByRole('combobox'), '@meier');
 
-      act(() => { vi.advanceTimersByTime(400); });
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
 
       expect(melde).toHaveBeenLastCalledWith('kraefte', 'meier');
     } finally {

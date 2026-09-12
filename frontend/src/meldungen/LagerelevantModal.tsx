@@ -31,7 +31,14 @@ interface FormWerte {
  * KoordinatenEingabe liefert immer lat+lon gemeinsam oder null — kein Paar-Validator nötig.
  * Die Übergabe-Aktion ist einmalig (MeldungListe blendet sie danach aus).
  */
-export default function LagerelevantModal({ offen, meldung, senden, einsatzId, onAbbrechen, onUebergeben }: Props) {
+export default function LagerelevantModal({
+  offen,
+  meldung,
+  senden,
+  einsatzId,
+  onAbbrechen,
+  onUebergeben,
+}: Props) {
   const [form] = Form.useForm<FormWerte>();
 
   // Bei jedem Öffnen frisch: Text mit dem Meldungsinhalt vorbelegen, Koordinaten leer.

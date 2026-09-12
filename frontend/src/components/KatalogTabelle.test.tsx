@@ -299,7 +299,10 @@ describe('KatalogTabelle · Suche', () => {
     expect(container.querySelectorAll('tr.ant-table-row')).toHaveLength(1);
 
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Backspace',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(feld, ereignis);
 
@@ -311,7 +314,11 @@ describe('KatalogTabelle · Suche', () => {
   it('umfasst mit seiner Shortcut-Wurzel keine Werkzeugknöpfe in Tabellenzellen', async () => {
     const spaltenMitAktion: TableColumnsType<Zeile> = [
       ...SPALTEN.slice(0, 2),
-      { title: 'Aktionen', key: 'aktionen', render: () => <button type="button">Zeile bearbeiten</button> },
+      {
+        title: 'Aktionen',
+        key: 'aktionen',
+        render: () => <button type="button">Zeile bearbeiten</button>,
+      },
     ];
     const { container } = renderMitProviders(
       <KatalogTabelle<Zeile>
@@ -327,7 +334,10 @@ describe('KatalogTabelle · Suche', () => {
     const aktion = screen.getAllByRole('button', { name: 'Zeile bearbeiten' })[0];
     aktion.focus();
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Backspace',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(aktion, ereignis);
 
@@ -840,7 +850,12 @@ describe('KatalogTabelle — Fließspalte (LFH-523)', () => {
 
   it('fällt ohne Fließspalte auf das inhaltsgetriebene Verhalten zurück', () => {
     const { container } = renderMitProviders(
-      <KatalogTabelle<Zeile> rowKey="id" columns={SPALTEN} dataSource={ZEILEN} pagination={false} />,
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={SPALTEN}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
     );
     const tabelle = koerperTabelle(container);
     expect(tabelle.style.width).toBe('max-content');
@@ -900,14 +915,21 @@ describe('fliessBreite', () => {
 
   it('summiert Zahlbreiten und das Mindestmaß', () => {
     expect(
-      fliessBreite<X>([{ key: 'a', width: 80 }, { key: 'b', mindestBreite: 320 }, { key: 'c', width: 96 }]),
+      fliessBreite<X>([
+        { key: 'a', width: 80 },
+        { key: 'b', mindestBreite: 320 },
+        { key: 'c', width: 96 },
+      ]),
     ).toEqual({ x: 496 });
   });
 
   it('verweigert die Rechnung bei einer Breite in Zeichenkettenform', () => {
     // `width: '20%'` ist relativ zur Tabelle, die wir gerade erst ausrechnen — die Summe
     // wäre zirkulär. Antds Typ lässt die Form zu, also muss die Rechnung sie abfangen.
-    const mass = fliessBreite<X>([{ key: 'a', width: '20%' }, { key: 'b', mindestBreite: 320 }]);
+    const mass = fliessBreite<X>([
+      { key: 'a', width: '20%' },
+      { key: 'b', mindestBreite: 320 },
+    ]);
     expect(mass.x).toBe('max-content');
     expect(mass.warnung).toContain('a');
   });

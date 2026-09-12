@@ -9,17 +9,32 @@ import type { BauJob, OfflineKarte, OfflineKatalogEintrag } from '../api/offline
 import OfflineRegionPicker from './OfflineRegionPicker';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-06-26 10:00:00',
 };
 
 const bremenEintrag: OfflineKatalogEintrag = {
-  name: 'Bremen', url: 'https://m/bremen.mbtiles', region: 'DE-HB', groesse: 100_000_000,
-  lizenz: '© OpenStreetMap contributors (ODbL)', kachel_schema: 'shortbread', quelle: 'q',
-  sha256: 'a'.repeat(64), gruppe: 'Bundesländer',
+  name: 'Bremen',
+  url: 'https://m/bremen.mbtiles',
+  region: 'DE-HB',
+  groesse: 100_000_000,
+  lizenz: '© OpenStreetMap contributors (ODbL)',
+  kachel_schema: 'shortbread',
+  quelle: 'q',
+  sha256: 'a'.repeat(64),
+  gruppe: 'Bundesländer',
 };
 const bayernEintrag: OfflineKatalogEintrag = {
-  ...bremenEintrag, name: 'Bayern', url: 'https://m/bayern.mbtiles', region: 'DE-BY', sha256: 'b'.repeat(64),
+  ...bremenEintrag,
+  name: 'Bayern',
+  url: 'https://m/bayern.mbtiles',
+  region: 'DE-BY',
+  sha256: 'b'.repeat(64),
 };
 
 const baubar = [
@@ -28,20 +43,31 @@ const baubar = [
 ];
 
 /** Mockt die Picker-Endpunkte. Default: karten-service da, Bremen gebaut (lieferbar), Bayern nicht. */
-function mockPicker(opts: {
-  karten?: OfflineKarte[];
-  katalog?: OfflineKatalogEintrag[];
-  katalogFrisch?: OfflineKatalogEintrag[];
-  bauJobs?: BauJob[];
-  bauVerfuegbar?: boolean;
-} = {}) {
-  const { karten = [], katalog = [bremenEintrag], katalogFrisch, bauJobs = [], bauVerfuegbar = true } = opts;
+function mockPicker(
+  opts: {
+    karten?: OfflineKarte[];
+    katalog?: OfflineKatalogEintrag[];
+    katalogFrisch?: OfflineKatalogEintrag[];
+    bauJobs?: BauJob[];
+    bauVerfuegbar?: boolean;
+  } = {},
+) {
+  const {
+    karten = [],
+    katalog = [bremenEintrag],
+    katalogFrisch,
+    bauJobs = [],
+    bauVerfuegbar = true,
+  } = opts;
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/karte/config', () =>
       HttpResponse.json({
-        online_styles: [], offline_verfuegbar: false, offline_tiles_url: null,
-        offline_attribution: null, karten_bau_verfuegbar: bauVerfuegbar,
+        online_styles: [],
+        offline_verfuegbar: false,
+        offline_tiles_url: null,
+        offline_attribution: null,
+        karten_bau_verfuegbar: bauVerfuegbar,
       }),
     ),
     http.get('/api/karte/offline-karten/baubare-regionen', () => HttpResponse.json(baubar)),
@@ -66,10 +92,21 @@ describe('OfflineRegionPicker', () => {
   it('adaptiver Button je Zustand: gebaut → Laden, ungebaut → Bauen & laden, auf Gerät → Auf dem Gerät', async () => {
     // Bremen ist auf dem Gerät (bereit), Bayern ungebaut, ein dritter gebaut aber nicht geladen.
     const bremenAufGeraet: OfflineKarte = {
-      id: 1, name: 'Bremen', pfad: 'karte-1.mbtiles', quell_url: 'https://m/bremen.mbtiles',
-      lizenz: 'ODbL', kachel_schema: 'shortbread', format: 'pbf', groesse: 1, sha256: 'x',
+      id: 1,
+      name: 'Bremen',
+      pfad: 'karte-1.mbtiles',
+      quell_url: 'https://m/bremen.mbtiles',
+      lizenz: 'ODbL',
+      kachel_schema: 'shortbread',
+      format: 'pbf',
+      groesse: 1,
+      sha256: 'x',
       // LFH-265: `update_verfuegbar` ist Pflichtfeld im generierten Schema.
-      download_at: 'd', status: 'bereit', aktiv_basemap: false, sortier: 0, update_verfuegbar: false,
+      download_at: 'd',
+      status: 'bereit',
+      aktiv_basemap: false,
+      sortier: 0,
+      update_verfuegbar: false,
     };
     mockPicker({ karten: [bremenAufGeraet], katalog: [bremenEintrag] });
     render();
@@ -94,7 +131,9 @@ describe('OfflineRegionPicker', () => {
     await userEvent.click(ladenBtns[0]);
     await waitFor(() => expect(body).not.toBeNull());
     expect(body).toMatchObject({
-      name: 'Bremen', url: 'https://m/bremen.mbtiles', sha256_erwartet: 'a'.repeat(64),
+      name: 'Bremen',
+      url: 'https://m/bremen.mbtiles',
+      sha256_erwartet: 'a'.repeat(64),
       groesse_erwartet: 100_000_000,
     });
   });

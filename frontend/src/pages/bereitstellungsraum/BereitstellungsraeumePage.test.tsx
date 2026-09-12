@@ -12,21 +12,43 @@ import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProv
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
   return {
-    id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv',
-    begonnen_at: 'x', abgeschlossen_at: null, abgeschlossen_von: null,
-    einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: 'x',
-    leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-    meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung', org_id: 1, org_name: 'Org',
+    id: 1,
+    bezeichnung: 'Lage',
+    stichwort: null,
+    status: 'aktiv',
+    begonnen_at: 'x',
+    abgeschlossen_at: null,
+    abgeschlossen_von: null,
+    einsatzart: 'realeinsatz',
+    einsatznummer_intern: null,
+    angelegt_at: 'x',
+    leitstellen_nr: null,
+    einsatzort: null,
+    einsatzort_lat: null,
+    einsatzort_lon: null,
+    meldende_stelle: null,
+    sachverhalt: null,
+    anzahl_betroffene_initial: null,
+    meine_rolle: 'einsatzleitung',
+    org_id: 1,
+    org_name: 'Org',
     ...over,
   };
 }
 
 function br(over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {
   return {
-    id: 1, einsatz_id: 1, abschnitt_id: null, bezeichnung: 'BR Ost',
-    standort: null, notiz: null, status: 'aktiv',
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1,
+    id: 1,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    bezeichnung: 'BR Ost',
+    standort: null,
+    notiz: null,
+    status: 'aktiv',
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
     storniert_at: null,
     ...over,
   };
@@ -36,7 +58,10 @@ function renderPage() {
   return renderMitProviders(
     <CommandPaletteProvider>
       <Routes>
-        <Route path="/einsaetze/:id/bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
+        <Route
+          path="/einsaetze/:id/bereitstellungsraeume/liste"
+          element={<BereitstellungsraeumePage />}
+        />
       </Routes>
     </CommandPaletteProvider>,
     { route: '/einsaetze/1/bereitstellungsraeume/liste' },
@@ -45,7 +70,11 @@ function renderPage() {
 
 function EinsatzWechsel() {
   const navigate = useNavigate();
-  return <button onClick={() => navigate('/einsaetze/2/bereitstellungsraeume/liste')}>Zu Einsatz B</button>;
+  return (
+    <button onClick={() => navigate('/einsaetze/2/bereitstellungsraeume/liste')}>
+      Zu Einsatz B
+    </button>
+  );
 }
 
 function PfadProbe() {
@@ -58,7 +87,10 @@ function renderWechselPage() {
       <EinsatzWechsel />
       <PfadProbe />
       <Routes>
-        <Route path="/einsaetze/:id/bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
+        <Route
+          path="/einsaetze/:id/bereitstellungsraeume/liste"
+          element={<BereitstellungsraeumePage />}
+        />
         <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<div>BR-DETAIL</div>} />
       </Routes>
     </CommandPaletteProvider>,
@@ -87,7 +119,10 @@ describe('BereitstellungsraeumePage', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => new HttpResponse(null, { status: 500 })),
+      http.get(
+        '/api/einsaetze/1/bereitstellungsraeume',
+        () => new HttpResponse(null, { status: 500 }),
+      ),
     );
     renderPage();
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
@@ -122,7 +157,10 @@ describe('BereitstellungsraeumePage', () => {
     await screen.findByText('BR Ost');
 
     server.use(
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => new HttpResponse(null, { status: 500 })),
+      http.get(
+        '/api/einsaetze/1/bereitstellungsraeume',
+        () => new HttpResponse(null, { status: 500 }),
+      ),
     );
     await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
 
@@ -131,7 +169,9 @@ describe('BereitstellungsraeumePage', () => {
     ).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
     expect(screen.getByText('BR Ost')).toBeInTheDocument();
-    expect(screen.queryByText('Bereitstellungsräume konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Bereitstellungsräume konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   /**
@@ -180,7 +220,10 @@ describe('BereitstellungsraeumePage', () => {
     await screen.findByText('Noch keine Bereitstellungsräume erfasst');
 
     server.use(
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => new HttpResponse(null, { status: 500 })),
+      http.get(
+        '/api/einsaetze/1/bereitstellungsraeume',
+        () => new HttpResponse(null, { status: 500 }),
+      ),
     );
     await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
 
@@ -188,7 +231,9 @@ describe('BereitstellungsraeumePage', () => {
       await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
     ).toBeInTheDocument();
     expect(screen.getByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
-    expect(screen.queryByText('Bereitstellungsräume konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Bereitstellungsräume konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   it('fokussiert Bezeichnung und legt per Enter aus diesem Feld an', async () => {
@@ -213,7 +258,8 @@ describe('BereitstellungsraeumePage', () => {
   it('setzt beim Einsatzwechsel alle Werte des offenen BR-Drawers zurück', async () => {
     server.use(
       http.get('/api/einsaetze/:einsatzId', ({ params }) =>
-        HttpResponse.json(einsatz({ id: Number(params.einsatzId) }))),
+        HttpResponse.json(einsatz({ id: Number(params.einsatzId) })),
+      ),
       http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
     );
     renderWechselPage();
@@ -249,7 +295,8 @@ describe('BereitstellungsraeumePage', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
       http.post('/api/einsaetze/1/bereitstellungsraeume', () =>
-        HttpResponse.json({ error: 'Bereitstellungsraum abgelehnt' }, { status: 500 })),
+        HttpResponse.json({ error: 'Bereitstellungsraum abgelehnt' }, { status: 500 }),
+      ),
     );
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
@@ -265,8 +312,12 @@ describe('BereitstellungsraeumePage', () => {
   it('navigiert nach Schließen während des Anlegens nicht verspätet', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
-    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
-    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const postStart = new Promise<void>((resolve) => {
+      postGestartet = resolve;
+    });
+    const antwortGate = new Promise<void>((resolve) => {
+      antwortFreigeben = resolve;
+    });
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
@@ -282,20 +333,29 @@ describe('BereitstellungsraeumePage', () => {
     await userEvent.type(screen.getByPlaceholderText('z. B. BR Ost'), 'BR West{Enter}');
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-    await act(async () => { antwortFreigeben(); });
+    await act(async () => {
+      antwortFreigeben();
+    });
     await screen.findByText('Bereitstellungsraum angelegt');
 
-    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/bereitstellungsraeume/liste');
+    expect(screen.getByTestId('pfad')).toHaveTextContent(
+      '/einsaetze/1/bereitstellungsraeume/liste',
+    );
   });
 
   it('bindet einen laufenden Auftrag an dessen Einsatz-ID', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
-    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
-    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const postStart = new Promise<void>((resolve) => {
+      postGestartet = resolve;
+    });
+    const antwortGate = new Promise<void>((resolve) => {
+      antwortFreigeben = resolve;
+    });
     server.use(
       http.get('/api/einsaetze/:einsatzId', ({ params }) =>
-        HttpResponse.json(einsatz({ id: Number(params.einsatzId) }))),
+        HttpResponse.json(einsatz({ id: Number(params.einsatzId) })),
+      ),
       http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
       http.post('/api/einsaetze/1/bereitstellungsraeume', async () => {
         postGestartet();
@@ -310,10 +370,12 @@ describe('BereitstellungsraeumePage', () => {
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     await waitFor(() => expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/2/'));
-    await act(async () => { antwortFreigeben(); });
+    await act(async () => {
+      antwortFreigeben();
+    });
 
-    await waitFor(() => expect(screen.getByTestId('pfad')).toHaveTextContent(
-      '/einsaetze/1/bereitstellungsraeume/23',
-    ));
+    await waitFor(() =>
+      expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/bereitstellungsraeume/23'),
+    );
   });
 });

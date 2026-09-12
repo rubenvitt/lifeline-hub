@@ -12,9 +12,21 @@ import { App as AntApp } from 'antd';
 
 function uhs(id: number, status: UhsStatus): Uhs {
   return {
-    id, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-    bezeichnung: `UHS ${id}`, standort: null, notiz: null, lat: null, lon: null, status,
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+    id,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    typ: 'behandlungsplatz',
+    bezeichnung: `UHS ${id}`,
+    standort: null,
+    notiz: null,
+    lat: null,
+    lon: null,
+    status,
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
   };
 }
 
@@ -25,18 +37,22 @@ function DetailStub() {
 }
 
 function renderDefault(client?: QueryClient) {
-  const qc = client ?? new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const qc =
+    client ?? new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <MemoryRouter initialEntries={['/einsaetze/1/unfallhilfsstellen']}>
           <Routes>
-            <Route path="/einsaetze/:id/unfallhilfsstellen" element={<UnfallhilfsstellenDefault />} />
+            <Route
+              path="/einsaetze/:id/unfallhilfsstellen"
+              element={<UnfallhilfsstellenDefault />}
+            />
             <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<DetailStub />} />
           </Routes>
         </MemoryRouter>
       </AntApp>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
   return qc;
 }
@@ -45,26 +61,32 @@ describe('UnfallhilfsstellenDefault', () => {
   beforeEach(() => localStorage.clear());
 
   it('leitet auf die älteste aktive UHS um, wenn keine zuletzt ausgewählte gemerkt ist', async () => {
-    server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-      uhs(7, 'aktiv'), uhs(3, 'aktiv'), uhs(9, 'geplant'),
-    ])));
+    server.use(
+      http.get('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json([uhs(7, 'aktiv'), uhs(3, 'aktiv'), uhs(9, 'geplant')]),
+      ),
+    );
     renderDefault();
     expect(await screen.findByText('DETAIL-3')).toBeInTheDocument();
   });
 
   it('bevorzugt die zuletzt ausgewählte UHS — auch vor einer aktiven', async () => {
     merkeLetzteUhs(1, 9);
-    server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-      uhs(3, 'aktiv'), uhs(9, 'geplant'),
-    ])));
+    server.use(
+      http.get('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json([uhs(3, 'aktiv'), uhs(9, 'geplant')]),
+      ),
+    );
     renderDefault();
     expect(await screen.findByText('DETAIL-9')).toBeInTheDocument();
   });
 
   it('leitet auf die zuletzt angelegte UHS um, wenn keine aktive existiert', async () => {
-    server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-      uhs(2, 'geplant'), uhs(7, 'aufgeloest'), uhs(4, 'geplant'),
-    ])));
+    server.use(
+      http.get('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json([uhs(2, 'geplant'), uhs(7, 'aufgeloest'), uhs(4, 'geplant')]),
+      ),
+    );
     renderDefault();
     expect(await screen.findByText('DETAIL-7')).toBeInTheDocument();
   });

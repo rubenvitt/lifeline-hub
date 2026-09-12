@@ -64,7 +64,10 @@ export default function LagekartePage() {
   // Karten-Config vorziehen — dieselbe globale Query wie in useLagekarteDaten (react-query
   // dedupliziert), aber hier zuerst, weil useKartenAnsicht sie für die config-validierte
   // Hydration der Ansicht braucht (löst die Zirkularität config↔layer↔config auf).
-  const { data: config } = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
+  const { data: config } = useQuery({
+    queryKey: globalKeys.karteConfig(),
+    queryFn: ladeKarteConfig,
+  });
 
   // Aktive Ansicht (B/LFH-320) aus dem ?ansicht=-Query-Param; die Seite besitzt die URL,
   // der Hook liest sie als Prop (bleibt Router-frei/testbar).
@@ -80,28 +83,68 @@ export default function LagekartePage() {
   // Erkennung, „Für den Einsatz speichern" und die Ansichts-Verwaltung. Löst die drei
   // getrennten localStorage-Quellen ab.
   const {
-    ansichten, aktiveAnsichtId,
-    ansichtenFehler, ansichtenFehlerUrsache, ansichtenNeuLaden,
-    neueAnsicht, umbenennen, setzeStandard, loeschen, ansichtBusy,
-    basemap, setBasemap, onlineStilName, setOnlineStilName, kartenTheme, setKartenTheme,
-    fachebenenSichtbar, setFachebenenSichtbar, layer, setLayer,
-    effektiveBasemap, onStyleFehler, dirty, speichern, speichertGerade,
+    ansichten,
+    aktiveAnsichtId,
+    ansichtenFehler,
+    ansichtenFehlerUrsache,
+    ansichtenNeuLaden,
+    neueAnsicht,
+    umbenennen,
+    setzeStandard,
+    loeschen,
+    ansichtBusy,
+    basemap,
+    setBasemap,
+    onlineStilName,
+    setOnlineStilName,
+    kartenTheme,
+    setKartenTheme,
+    fachebenenSichtbar,
+    setFachebenenSichtbar,
+    layer,
+    setLayer,
+    effektiveBasemap,
+    onStyleFehler,
+    dirty,
+    speichern,
+    speichertGerade,
   } = useKartenAnsicht({ einsatzId, config, aktiveAnsichtId: ansichtParam });
 
   // Domänen-Daten + Marker-Ableitungen (SSE-Live liegt im EinsatzLayout, keine eigene
   // EventSource hier — eine 2. Verbindung/Seite spränge das HTTP/1.1-6-Limit).
   const {
-    einsatz, darfSchreiben, ladt, gebiete, fehlerhafteQuellen, neuLaden,
-    verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen, freieZeichen,
+    einsatz,
+    darfSchreiben,
+    ladt,
+    gebiete,
+    fehlerhafteQuellen,
+    neuLaden,
+    verortet,
+    flaechen,
+    zonenFeatures,
+    alleVerortet,
+    nichtVerortetAlle,
+    zonen,
+    freieZeichen,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
   const {
-    onFachebeneToggle, aktiveFachebenen, fachebenenStatus, fachebenenLaedt,
-    fachebenenAttribution, kritisZoomZuKlein, setKritisBbox, setKartenZoom,
+    onFachebeneToggle,
+    aktiveFachebenen,
+    fachebenenStatus,
+    fachebenenLaedt,
+    fachebenenAttribution,
+    kritisZoomZuKlein,
+    setKritisBbox,
+    setKartenZoom,
   } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
 
   const { style, basisAttribution } = useBasemap({
-    basemap: effektiveBasemap, onlineStilName, kartenTheme, config, effektiv,
+    basemap: effektiveBasemap,
+    onlineStilName,
+    kartenTheme,
+    config,
+    effektiv,
   });
 
   // Stabiler Fehler-Handler (message aus App.useApp ist stabil) → als ehrliche Dep in Effekten
@@ -110,7 +153,12 @@ export default function LagekartePage() {
     (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
     [message],
   );
-  const erfolg = useCallback((text: string) => { message.success(text); }, [message]);
+  const erfolg = useCallback(
+    (text: string) => {
+      message.success(text);
+    },
+    [message],
+  );
 
   // „In dieser Ansicht speichern": aktuellen Karten-Zustand in die AKTIVE Ansicht schreiben
   // (nicht einsatzweit, LFH-320/323), mit Erfolgs-/Fehler-Feedback (die Mutation wirft —
@@ -137,7 +185,8 @@ export default function LagekartePage() {
 
   // Snapshot-Liste (für den Banner-Zeitstempel; Cache-geteilt mit der Snapshot-Leiste).
   const { snapshots } = useLageSnapshots(einsatzId);
-  const aktiverSnapshot = snapshotParam != null ? snapshots.find((s) => s.id === snapshotParam) : undefined;
+  const aktiverSnapshot =
+    snapshotParam != null ? snapshots.find((s) => s.id === snapshotParam) : undefined;
 
   // Snapshot wählen/verlassen: ?snapshot= setzen bzw. räumen (Deeplink-Muster wie ?ansicht=).
   const waehleSnapshot = useCallback(
@@ -205,19 +254,58 @@ export default function LagekartePage() {
   );
 
   const {
-    platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
-    zoneZeichnenNonce, zoneAuswahl, auswahl, flyToZiel, fachebeneAuswahl, bildPlatzierenId,
-    zeichenPlatzieren, exklusiverModusAktiv,
-    zeichenSerie, setZeichenSerie, zeichenSerieAnzahl, zoneSerie, setZoneSerie, zoneSerieAnzahl,
-    setAuswahl, setZoneAuswahl, setFachebeneAuswahl, setFlyToZiel,
-    onKarteKlick, onMarkerWaehlen, loescheVerortung, aendereSymbol,
-    bestaetigungSpeichern, bestaetigungVerwerfen,
-    onPlatzierenStart, onPlatzierenAbbrechen, onAbschnittZeichnenStart, onZoneZeichnenStart,
-    onZeichenPlatzierenStart, onZeichenPlatzierenAbbrechen, onZeichenPlatzierenFertig,
-    onZoneZeichnenFertig, zeichenAendern, zeichenVerschieben, zeichenLoeschen,
-    onKoordinateEingeben, onEinsatzortPlatzieren, onBildPlatzieren, onBildPlatzierenFertig,
-    onFlaecheGezeichnet, onFlaecheKlick, onZoneKlick, onZoneGezeichnet, onFachebeneKlick,
-    onZeichnenAbbrechen, zoneAendern, zoneLoeschen,
+    platzierungZiel,
+    zeichneAbschnittId,
+    zoneEntwurf,
+    zoneBestaetigung,
+    zoneSpeichern,
+    zoneZeichnenNonce,
+    zoneAuswahl,
+    auswahl,
+    flyToZiel,
+    fachebeneAuswahl,
+    bildPlatzierenId,
+    zeichenPlatzieren,
+    exklusiverModusAktiv,
+    zeichenSerie,
+    setZeichenSerie,
+    zeichenSerieAnzahl,
+    zoneSerie,
+    setZoneSerie,
+    zoneSerieAnzahl,
+    setAuswahl,
+    setZoneAuswahl,
+    setFachebeneAuswahl,
+    setFlyToZiel,
+    onKarteKlick,
+    onMarkerWaehlen,
+    loescheVerortung,
+    aendereSymbol,
+    bestaetigungSpeichern,
+    bestaetigungVerwerfen,
+    onPlatzierenStart,
+    onPlatzierenAbbrechen,
+    onAbschnittZeichnenStart,
+    onZoneZeichnenStart,
+    onZeichenPlatzierenStart,
+    onZeichenPlatzierenAbbrechen,
+    onZeichenPlatzierenFertig,
+    onZoneZeichnenFertig,
+    zeichenAendern,
+    zeichenVerschieben,
+    zeichenLoeschen,
+    onKoordinateEingeben,
+    onEinsatzortPlatzieren,
+    onBildPlatzieren,
+    onBildPlatzierenFertig,
+    onFlaecheGezeichnet,
+    onFlaecheKlick,
+    onZoneKlick,
+    onZoneGezeichnet,
+    onFachebeneKlick,
+    onZeichnenAbbrechen,
+    zoneAendern,
+    zoneLoeschen,
   } = useKartenInteraktion({
     einsatzId,
     einsatz,
@@ -229,17 +317,30 @@ export default function LagekartePage() {
   });
 
   const {
-    bilder, bildOverlays, aktivesPlatzierBild, bildPlatzierZentrum,
-    bilderFehler, bilderFehlerUrsache, bilderNeuLaden,
-    onBildUpload, onBildToggle, onBildOpazitaet, onBildLoeschen, onBildVerschieben,
-    onPlatzierGeometrie, onBildZentrieren, onBildUmbenennen, onBildMittelpunkt,
+    bilder,
+    bildOverlays,
+    aktivesPlatzierBild,
+    bildPlatzierZentrum,
+    bilderFehler,
+    bilderFehlerUrsache,
+    bilderNeuLaden,
+    onBildUpload,
+    onBildToggle,
+    onBildOpazitaet,
+    onBildLoeschen,
+    onBildVerschieben,
+    onPlatzierGeometrie,
+    onBildZentrieren,
+    onBildUmbenennen,
+    onBildMittelpunkt,
   } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
 
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
   // Freies taktisches Zeichen zur Marker-Auswahl (LFH-170): der Inspector editiert den ROHEN
   // Record, nicht die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
-  const ausgewaehltesZeichen = freieZeichen.find((z) => `freies_zeichen-${z.id}` === auswahl) ?? null;
+  const ausgewaehltesZeichen =
+    freieZeichen.find((z) => `freies_zeichen-${z.id}` === auswahl) ?? null;
   const ausgewaehlteZone = useMemo(
     () => zonen.find((z) => z.id === zoneAuswahl) ?? null,
     [zonen, zoneAuswahl],
@@ -450,7 +551,11 @@ export default function LagekartePage() {
             }}
             flyToZiel={flyToZiel}
             onStyleFehler={onStyleFehler}
-            flaechen={layer.abschnitt ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon })) : []}
+            flaechen={
+              layer.abschnitt
+                ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon }))
+                : []
+            }
             zeichnen={zeichneAbschnittId != null}
             onFlaecheGezeichnet={onFlaecheGezeichnet}
             onFlaecheKlick={onFlaecheKlick}
@@ -461,7 +566,9 @@ export default function LagekartePage() {
             onZoneGezeichnet={onZoneGezeichnet}
             onZeichnenBereitAenderung={setZeichnenBereit}
             fachebenen={aktiveFachebenen}
-            onBboxAenderung={fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined}
+            onBboxAenderung={
+              fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined
+            }
             onZoomAenderung={setKartenZoom}
             onFachebeneKlick={onFachebeneKlick}
             bilder={bildOverlays}
@@ -481,9 +588,10 @@ export default function LagekartePage() {
             speichernLaeuft={zoneSpeichern}
             abschliessenMoeglich={zeichnenBereit}
             onAbschliessen={() => {
-              const abgeschlossen = zeichneAbschnittId != null
-                ? kartenRef.current?.abschnittAbschliessen()
-                : kartenRef.current?.zoneAbschliessen();
+              const abgeschlossen =
+                zeichneAbschnittId != null
+                  ? kartenRef.current?.abschnittAbschliessen()
+                  : kartenRef.current?.zoneAbschliessen();
               if (!abgeschlossen) {
                 message.warning(
                   zeichneAbschnittId == null && zoneEntwurf?.modus === 'linie'

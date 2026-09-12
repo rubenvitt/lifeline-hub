@@ -1,4 +1,16 @@
-import { App, Breadcrumb, Button, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
+import {
+  App,
+  Breadcrumb,
+  Button,
+  Flex,
+  Form,
+  Input,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+  theme,
+} from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,12 +20,7 @@ import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, befehlDetailPfad, auftraegePfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import {
-  aktualisiereBefehl,
-  gibBefehlFrei,
-  ladeBefehl,
-  schreibeBefehlFort,
-} from '../api/befehle';
+import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
 import type { BefehlAbschnitt, BefehlAnzeige } from '../api/types';
 import { vorlage } from '../befehle/vorlagen';
 import Markdown from '../components/Markdown';
@@ -58,9 +65,11 @@ import './befehlAktionsleiste.css';
 function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
   if (!leiste) return;
   const wurzel = document.documentElement;
-  const aktualisiere = () => wurzel.style.setProperty(
-    '--lfh-befehl-fokusabstand', `${leiste.getBoundingClientRect().height + abstand}px`,
-  );
+  const aktualisiere = () =>
+    wurzel.style.setProperty(
+      '--lfh-befehl-fokusabstand',
+      `${leiste.getBoundingClientRect().height + abstand}px`,
+    );
   aktualisiere();
   const beobachter = new ResizeObserver(aktualisiere);
   beobachter.observe(leiste);
@@ -107,7 +116,9 @@ function BefehlDetail() {
   const aktiv = useRef(true);
   useEffect(() => {
     aktiv.current = true;
-    return () => { aktiv.current = false; };
+    return () => {
+      aktiv.current = false;
+    };
   }, []);
 
   const einsatzQuery = useQuery({
@@ -315,7 +326,10 @@ function BefehlDetail() {
           <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
         )}
         {!istEntwurf && darfSchreiben && (
-          <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>
+          <Button
+            onClick={() => fortschreibenMutation.mutate()}
+            loading={fortschreibenMutation.isPending}
+          >
             Fortschreiben
           </Button>
         )}
@@ -340,7 +354,11 @@ function BefehlDetail() {
             <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
               Entwurf speichern
             </Button>
-            <Button type="primary" onClick={freigabeBestaetigen} loading={freigebenMutation.isPending}>
+            <Button
+              type="primary"
+              onClick={freigabeBestaetigen}
+              loading={freigebenMutation.isPending}
+            >
               Freigeben
             </Button>
           </>
@@ -488,9 +506,11 @@ function BefehlDetail() {
             return (
               <section key={a.schluessel} style={{ marginBottom: 16 }}>
                 <Typography.Title level={5}>{a.label}</Typography.Title>
-                {text.trim()
-                  ? <Markdown variante="dokument">{text}</Markdown>
-                  : <Typography.Paragraph>—</Typography.Paragraph>}
+                {text.trim() ? (
+                  <Markdown variante="dokument">{text}</Markdown>
+                ) : (
+                  <Typography.Paragraph>—</Typography.Paragraph>
+                )}
               </section>
             );
           })}

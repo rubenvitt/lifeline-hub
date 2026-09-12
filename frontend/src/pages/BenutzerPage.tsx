@@ -1,5 +1,13 @@
 import {
-  App, Button, Collapse, Form, Input, Popconfirm, Space, Tag, type TableColumnsType,
+  App,
+  Button,
+  Collapse,
+  Form,
+  Input,
+  Popconfirm,
+  Space,
+  Tag,
+  type TableColumnsType,
 } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -64,11 +72,13 @@ export default function BenutzerPage() {
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBenutzer(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
   const bearbeiten = useMutation({
-    mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) => bearbeiteBenutzer(id, patch),
+    mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) =>
+      bearbeiteBenutzer(id, patch),
     // Diese Mutation trägt ZWEI Wege: den Bearbeiten-Dialog und „Reaktivieren" in der
     // Zeile. Das Schliessen des Dialogs macht deshalb `onFertig` an der Hülle, nicht
     // dieser Erfolgszweig — der lief bisher auch nach einem Reaktivieren mit.
@@ -109,7 +119,12 @@ export default function BenutzerPage() {
     },
     // Die Suche liest den ROHWERT der Spalte, nicht das Gerenderte: das führende „@" ist reine
     // Darstellung, gesucht wird „eva", nicht „@eva".
-    { title: 'Benutzername', dataIndex: 'benutzername', key: 'benutzername', render: (t) => `@${t}` },
+    {
+      title: 'Benutzername',
+      dataIndex: 'benutzername',
+      key: 'benutzername',
+      render: (t) => `@${t}`,
+    },
     {
       title: 'Rollen',
       key: 'rollen',
@@ -265,20 +280,22 @@ export default function BenutzerPage() {
         <Collapse
           ghost
           style={{ marginInline: -8 }}
-          items={[{
-            key: 'rollen',
-            label: 'Weitere Angaben',
-            children: (
-              <>
-                <Form.Item label="System-Rolle" name="system_rolle">
-                  <Select options={SYSTEM_ROLLEN} />
-                </Form.Item>
-                <Form.Item label="Org-Rolle" name="org_rolle">
-                  <Select options={ORG_ROLLEN} />
-                </Form.Item>
-              </>
-            ),
-          }]}
+          items={[
+            {
+              key: 'rollen',
+              label: 'Weitere Angaben',
+              children: (
+                <>
+                  <Form.Item label="System-Rolle" name="system_rolle">
+                    <Select options={SYSTEM_ROLLEN} />
+                  </Form.Item>
+                  <Form.Item label="Org-Rolle" name="org_rolle">
+                    <Select options={ORG_ROLLEN} />
+                  </Form.Item>
+                </>
+              ),
+            },
+          ]}
         />
       </ErfassungsModal>
 

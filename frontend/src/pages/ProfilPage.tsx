@@ -254,8 +254,8 @@ export default function ProfilPage() {
                   </Button>
                 ) : (
                   <Typography.Text type="secondary">
-                    Kopieren ist auf dieser Verbindung nicht möglich — die Codes oben lassen
-                    sich markieren und kopieren.
+                    Kopieren ist auf dieser Verbindung nicht möglich — die Codes oben lassen sich
+                    markieren und kopieren.
                   </Typography.Text>
                 )}
               </div>
@@ -271,15 +271,15 @@ export default function ProfilPage() {
           <>
             <Alert type="success" title="2FA aktiv" showIcon style={{ marginBottom: 8 }} />
             <Typography.Paragraph type="secondary">
-              Deaktivieren ist aktuell nur über einen Admin-Reset möglich (self-service
-              Deaktivieren ist bewusst nicht vorgesehen).
+              Deaktivieren ist aktuell nur über einen Admin-Reset möglich (self-service Deaktivieren
+              ist bewusst nicht vorgesehen).
             </Typography.Paragraph>
           </>
         ) : totpEnrollment ? (
           <div>
             <Typography.Paragraph type="secondary">
-              QR-Code mit deiner Authenticator-App scannen (oder das Secret manuell eintragen)
-              und den generierten Code bestätigen.
+              QR-Code mit deiner Authenticator-App scannen (oder das Secret manuell eintragen) und
+              den generierten Code bestätigen.
             </Typography.Paragraph>
             <div
               style={{
@@ -328,7 +328,6 @@ export default function ProfilPage() {
           </>
         )}
       </div>
-
     </div>
   );
 }

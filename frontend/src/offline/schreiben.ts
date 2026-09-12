@@ -7,8 +7,7 @@ import { istOfflineTransient } from './fehler';
 import { schreibaktionEinreihen } from './queue';
 
 export type OfflineSchreibErgebnis<T> =
-  | { zustand: 'gesendet'; daten: T }
-  | { zustand: 'vorgemerkt'; client_id: string };
+  { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
 
 function clientId(vorgegeben?: string): string {
   return vorgegeben ?? crypto.randomUUID();

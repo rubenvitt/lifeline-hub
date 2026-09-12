@@ -92,13 +92,21 @@ const AUSNAHMEN: Record<string, string> = {
  * folgen zu lassen. Er ist zugleich das Ziel der Mutationsprobe (siehe unten).
  */
 const MIGRIERTE_RESPONSE_TYPEN = [
-  'OnlineStyle', 'OfflineRegion', 'KarteServerConfig', // karte.ts
-  'OfflineKarte', 'OfflineKatalogEintrag', 'VorhandeneKarte', // offlineKarten.ts
-  'BauJob', 'BauJobStatus', 'BaubareRegion', // offlineKarten.ts (LFH-323, karten-service-Kontrakt)
+  'OnlineStyle',
+  'OfflineRegion',
+  'KarteServerConfig', // karte.ts
+  'OfflineKarte',
+  'OfflineKatalogEintrag',
+  'VorhandeneKarte', // offlineKarten.ts
+  'BauJob',
+  'BauJobStatus',
+  'BaubareRegion', // offlineKarten.ts (LFH-323, karten-service-Kontrakt)
   'OnlineQuelle', // onlineQuellen.ts
-  'FeatureCollection', 'FachebeneAntwort', // fachebenen.ts
+  'FeatureCollection',
+  'FachebeneAntwort', // fachebenen.ts
   'Hintergrundbild', // kartenbilder.ts
-  'Peilung', 'OrtVorschau', // ortVorschau.ts
+  'Peilung',
+  'OrtVorschau', // ortVorschau.ts
 ] as const;
 
 // Alle API-Seam-Quellen als Rohtext (Vite). Das Glob bleibt bewusst HIER und nicht im Scanner —
@@ -138,12 +146,15 @@ describe('API-Response-Typen-Guard: der Scan läuft überhaupt', () => {
   it('erkennt beide Formen (interface UND Objekt-Typ-Alias)', () => {
     // Ohne diesen Test könnte der `objekt-alias`-Zweig des Scanners still kaputtgehen und die
     // naheliegendste Umgehung (`export type X = { … }` statt `export interface X`) stünde offen.
-    const probe = scanneApiTypen('probe.ts', [
-      'export interface A { x: number }',
-      'export type B = { y: string };',
-      "export type C = S['Egal'];", // Re-Export — darf NICHT auffallen
-      'type D = { z: boolean };', // nicht exportiert — darf NICHT auffallen
-    ].join('\n'));
+    const probe = scanneApiTypen(
+      'probe.ts',
+      [
+        'export interface A { x: number }',
+        'export type B = { y: string };',
+        "export type C = S['Egal'];", // Re-Export — darf NICHT auffallen
+        'type D = { z: boolean };', // nicht exportiert — darf NICHT auffallen
+      ].join('\n'),
+    );
     expect(probe.map((f) => `${f.name}:${f.art}`)).toEqual(['A:interface', 'B:objekt-alias']);
   });
 });

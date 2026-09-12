@@ -5,7 +5,13 @@ import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
 import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
-import { SEITENGROESSE, erteileAuftragAusEtb, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
+import {
+  SEITENGROESSE,
+  erteileAuftragAusEtb,
+  listeEtb,
+  type EtbFilterWerte,
+  type NeuerEintrag,
+} from '../api/etb';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
@@ -111,17 +117,21 @@ export default function EtbPage() {
   const bausteineQuery = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
   // Auftrags-Ziele für das ETB→Auftrag-Formular (wie AuftraegePage/MeldungenPage).
-  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+  });
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+  });
 
   const etbQuery = useInfiniteQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, filter),
     queryFn: ({ pageParam }) => listeEtb(einsatzId, { ...filter, before_lfd_nr: pageParam }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (letzteSeite) =>
-      letzteSeite.length === SEITENGROESSE
-        ? letzteSeite[letzteSeite.length - 1].lfd_nr
-        : undefined,
+      letzteSeite.length === SEITENGROESSE ? letzteSeite[letzteSeite.length - 1].lfd_nr : undefined,
   });
 
   // Die leere Ersatzliste bleibt: die Chronologie braucht ein Array, und solange der
@@ -163,8 +173,12 @@ export default function EtbPage() {
     // Schnellwahl anbieten; bei Fehler bleiben die relativen Vorgaben bedienbar.
     // Die Identität schützt vor Antworten nach Schließen oder erneutem Öffnen.
     void ladeEinsatz(einsatzId).then(
-      (frisch) => setWiedervorlageZu((aktuell) => aktuell === kontext
-        ? { ...kontext, termin: frisch.naechste_lagebesprechung_at } : aktuell),
+      (frisch) =>
+        setWiedervorlageZu((aktuell) =>
+          aktuell === kontext
+            ? { ...kontext, termin: frisch.naechste_lagebesprechung_at }
+            : aktuell,
+        ),
       () => {},
     );
   }
@@ -216,7 +230,13 @@ export default function EtbPage() {
     searchParams.delete('eintrag');
     setSearchParams(searchParams, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zielEintragId, etbQuery.data, etbQuery.hasNextPage, etbQuery.isFetchingNextPage, etbQuery.isLoading]);
+  }, [
+    zielEintragId,
+    etbQuery.data,
+    etbQuery.hasNextPage,
+    etbQuery.isFetchingNextPage,
+    etbQuery.isLoading,
+  ]);
 
   useEffect(() => {
     if (highlightId == null) return;
@@ -241,8 +261,7 @@ export default function EtbPage() {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       message.success('Einsatz abgeschlossen');
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Abschließen fehlgeschlagen'),
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Abschließen fehlgeschlagen'),
   });
 
   const auftragMutation = useMutation({
@@ -255,7 +274,8 @@ export default function EtbPage() {
       setAuftragZu(null);
       message.success('Auftrag aus ETB-Eintrag erteilt');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Auftrag erteilen fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Auftrag erteilen fehlgeschlagen'),
   });
 
   /**
@@ -332,10 +352,7 @@ export default function EtbPage() {
           Kontextwechsel mitten im Tagebuch. Klick auf „Einsätze“ führt zur Liste zurück. */}
       <Breadcrumb
         style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-        ]}
+        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
       />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space orientation="vertical" size={0}>
@@ -423,10 +440,7 @@ export default function EtbPage() {
                 <li key={a.id}>
                   {a.eintrag.inhalt} — {a.grund}
                   {a.id != null && (
-                    <Button
-                      type="link"
-                      onClick={() => void abgelehntVerwerfen(a.id!)}
-                    >
+                    <Button type="link" onClick={() => void abgelehntVerwerfen(a.id!)}>
                       verwerfen
                     </Button>
                   )}
@@ -462,7 +476,9 @@ export default function EtbPage() {
         onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
         onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
         onErneutSenden={(p) => void abgelehntErneutSenden(p)}
-        onVerwerfen={(p) => { if (p.id != null) void abgelehntVerwerfen(p.id); }}
+        onVerwerfen={(p) => {
+          if (p.id != null) void abgelehntVerwerfen(p.id);
+        }}
       />
 
       {etbQuery.hasNextPage && (
@@ -491,9 +507,11 @@ export default function EtbPage() {
           // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
           // wenn der Auftrag wirklich angekommen ist (LFH-332/B4, gezogen von
           // LFH-343 · C8 — dieselbe Bauform wie Meldung→Auftrag und Chat→Auftrag).
-          onAnlegen={(daten) => (auftragZu
-            ? auftragMutation.mutateAsync({ eintragId: auftragZu.id, daten })
-            : Promise.reject(new Error('Kein Quell-Eintrag')))}
+          onAnlegen={(daten) =>
+            auftragZu
+              ? auftragMutation.mutateAsync({ eintragId: auftragZu.id, daten })
+              : Promise.reject(new Error('Kein Quell-Eintrag'))
+          }
         />
       )}
     </div>

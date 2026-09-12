@@ -1,3 +1,9 @@
+## [1.0.0-alpha.9](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.8...v1.0.0-alpha.9) (2026-09-12)
+
+### Bug Fixes
+
+* **lfh-354:** Drucktest gegen die Anführungszeichen-Schreibweise unempfindlich machen ([1cac5c6](https://github.com/rubenvitt/lifeline-hub/commit/1cac5c6519ec0240e31f5a1615a1ae3f87148cd7))
+
 ## [1.0.0-alpha.8](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.7...v1.0.0-alpha.8) (2026-09-12)
 
 ### Bug Fixes

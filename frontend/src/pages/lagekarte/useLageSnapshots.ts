@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
-import { ladeLageSnapshots, erzeugeLageSnapshot, loescheLageSnapshot } from '../../api/lageSnapshot';
+import {
+  ladeLageSnapshots,
+  erzeugeLageSnapshot,
+  loescheLageSnapshot,
+} from '../../api/lageSnapshot';
 
 /**
  * Daten-Leg der Lage-Snapshots (LFH-321): Metadaten-Liste + „Stand sichern"/Löschen.

@@ -82,7 +82,12 @@ describe('BemerkungZelle', () => {
      */
     const onSpeichern = vi.fn();
     renderMitProviders(
-      <BemerkungZelle wert="Tank leer" darfSchreiben kennung="Florian 1" onSpeichern={onSpeichern} />,
+      <BemerkungZelle
+        wert="Tank leer"
+        darfSchreiben
+        kennung="Florian 1"
+        onSpeichern={onSpeichern}
+      />,
     );
 
     expect(screen.getByText('Tank leer')).toBeInTheDocument();
@@ -95,7 +100,9 @@ describe('BemerkungZelle', () => {
      * einen Namen, den nie jemand zu sehen bekommt, und bräche, sobald die Testhülle eine
      * Locale bekommt.
      */
-    await userEvent.click(screen.getByRole('button', { name: 'Bemerkung zu Florian 1 bearbeiten' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bemerkung zu Florian 1 bearbeiten' }),
+    );
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
@@ -202,7 +209,9 @@ describe('BemerkungZelle', () => {
 
     const leer = screen.getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' });
     expect(leer).toHaveTextContent(BEMERKUNG_HINZUFUEGEN);
-    expect(screen.getByRole('button', { name: 'Bemerkung zu Florian 2 bearbeiten' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Bemerkung zu Florian 2 bearbeiten' }),
+    ).toBeInTheDocument();
   });
 
   it('ohne Änderung wird nicht gespeichert — ein Fehlklick kostet keinen Schreibvorgang', async () => {

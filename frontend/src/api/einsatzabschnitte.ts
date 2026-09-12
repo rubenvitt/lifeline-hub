@@ -17,11 +17,18 @@ export function listeAbschnitte(einsatzId: number): Promise<Einsatzabschnitt[]> 
   return apiGet<Einsatzabschnitt[]>(`/api/einsaetze/${einsatzId}/abschnitte`);
 }
 
-export function legeAbschnittAn(einsatzId: number, daten: AbschnittEingabe): Promise<Einsatzabschnitt> {
+export function legeAbschnittAn(
+  einsatzId: number,
+  daten: AbschnittEingabe,
+): Promise<Einsatzabschnitt> {
   return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte`, 'POST', daten);
 }
 
-export function aktualisiereAbschnitt(einsatzId: number, aid: number, daten: AbschnittEingabe): Promise<Einsatzabschnitt> {
+export function aktualisiereAbschnitt(
+  einsatzId: number,
+  aid: number,
+  daten: AbschnittEingabe,
+): Promise<Einsatzabschnitt> {
   return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}`, 'PATCH', daten);
 }
 
@@ -38,6 +45,14 @@ export interface FlaechePatch {
 }
 
 /** L‑2: Zeichnet/aktualisiert die taktische Fläche eines Abschnitts. */
-export function zeichneAbschnitt(einsatzId: number, aid: number, daten: FlaechePatch): Promise<Einsatzabschnitt> {
-  return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}/flaeche`, 'PATCH', daten);
+export function zeichneAbschnitt(
+  einsatzId: number,
+  aid: number,
+  daten: FlaechePatch,
+): Promise<Einsatzabschnitt> {
+  return apiSend<Einsatzabschnitt>(
+    `/api/einsaetze/${einsatzId}/abschnitte/${aid}/flaeche`,
+    'PATCH',
+    daten,
+  );
 }

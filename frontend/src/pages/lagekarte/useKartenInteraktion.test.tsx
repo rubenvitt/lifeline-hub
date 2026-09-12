@@ -74,13 +74,26 @@ const POLYGON: GeoJsonGeometry = {
 // DESSELBEN Modus (der Entwurf bleibt während der Bestätigung stehen) und dürfen daher
 // koexistieren. Zwei verschiedene Familien gleichzeitig sind dagegen immer ein Defekt.
 const MODI: { name: string; familie: string; betreten: (r: HookResult) => void }[] = [
-  { name: 'platzieren', familie: 'platzieren', betreten: (r) => act(() => r.current.onPlatzierenStart({ typ: 'uhs', id: 2 })) },
-  { name: 'bild-platzieren', familie: 'bild', betreten: (r) => act(() => r.current.onBildPlatzieren(7)) },
-  { name: 'abschnitt-zeichnen', familie: 'abschnitt', betreten: (r) => act(() => r.current.onAbschnittZeichnenStart(3)) },
+  {
+    name: 'platzieren',
+    familie: 'platzieren',
+    betreten: (r) => act(() => r.current.onPlatzierenStart({ typ: 'uhs', id: 2 })),
+  },
+  {
+    name: 'bild-platzieren',
+    familie: 'bild',
+    betreten: (r) => act(() => r.current.onBildPlatzieren(7)),
+  },
+  {
+    name: 'abschnitt-zeichnen',
+    familie: 'abschnitt',
+    betreten: (r) => act(() => r.current.onAbschnittZeichnenStart(3)),
+  },
   {
     name: 'zone-zeichnen',
     familie: 'zone',
-    betreten: (r) => act(() => r.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' })),
+    betreten: (r) =>
+      act(() => r.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' })),
   },
   {
     name: 'zone-bestaetigung',
@@ -157,11 +170,23 @@ describe('useKartenInteraktion — Exklusivität der Interaktionsmodi (LFH-243)'
 // offen sein. Auch hier erzwang jeder Klick-Handler die Exklusivität per Reset-Kaskade,
 // und onFlaecheKlick vergaß zoneAuswahl → zwei Panels gleichzeitig (LagekartePage rendert
 // jeden Inspektor unabhängig, ohne else). Erschöpfend statt stichprobenartig geprüft.
-const SELEKTIONEN: { name: string; feld: 'auswahl' | 'zoneAuswahl' | 'fachebeneAuswahl'; waehlen: (r: HookResult) => void }[] = [
-  { name: 'marker', feld: 'auswahl', waehlen: (r) => act(() => r.current.onMarkerWaehlen('uhs-1')) },
+const SELEKTIONEN: {
+  name: string;
+  feld: 'auswahl' | 'zoneAuswahl' | 'fachebeneAuswahl';
+  waehlen: (r: HookResult) => void;
+}[] = [
+  {
+    name: 'marker',
+    feld: 'auswahl',
+    waehlen: (r) => act(() => r.current.onMarkerWaehlen('uhs-1')),
+  },
   { name: 'abschnitt', feld: 'auswahl', waehlen: (r) => act(() => r.current.onFlaecheKlick(3)) },
   { name: 'zone', feld: 'zoneAuswahl', waehlen: (r) => act(() => r.current.onZoneKlick(5)) },
-  { name: 'fachebene', feld: 'fachebeneAuswahl', waehlen: (r) => act(() => r.current.onFachebeneKlick({ a: 1 }, 'nina')) },
+  {
+    name: 'fachebene',
+    feld: 'fachebeneAuswahl',
+    waehlen: (r) => act(() => r.current.onFachebeneKlick({ a: 1 }, 'nina')),
+  },
 ];
 
 function aktiveSelektionen(r: HookResult): string[] {
@@ -192,8 +217,12 @@ describe('useKartenInteraktion — Verorten', () => {
   it('sendet bei zwei Klicks im selben Renderfenster nur eine Positionsänderung', async () => {
     let freigeben: (() => void) | undefined;
     einsatzUhsApi.aktualisiereUhs.mockReset();
-    einsatzUhsApi.aktualisiereUhs.mockImplementation(() =>
-      new Promise((resolve) => { freigeben = () => resolve({ id: 2 }); }));
+    einsatzUhsApi.aktualisiereUhs.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          freigeben = () => resolve({ id: 2 });
+        }),
+    );
     const { result } = rendere();
 
     act(() => result.current.onPlatzierenStart({ typ: 'uhs', id: 2 }));
@@ -204,7 +233,9 @@ describe('useKartenInteraktion — Verorten', () => {
 
     await waitFor(() => expect(einsatzUhsApi.aktualisiereUhs).toHaveBeenCalledTimes(1));
     expect(einsatzUhsApi.aktualisiereUhs).toHaveBeenCalledWith(1, 2, { lat: 50.1, lon: 8.6 });
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     einsatzUhsApi.aktualisiereUhs.mockReset();
     einsatzUhsApi.aktualisiereUhs.mockImplementation(() => Promise.resolve({ id: 2 }));
   });
@@ -219,7 +250,17 @@ describe('useKartenInteraktion — Selektions-Gate während exklusiver Modi (LFH
     });
     it('onFachebeneKlick reicht die (un-geclippte) Geometrie an fachebeneAuswahl durch (LFH-146)', () => {
       const { result } = rendere();
-      const geom = { type: 'Polygon', coordinates: [[[8, 50], [8.1, 50], [8.1, 50.1], [8, 50]]] };
+      const geom = {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [8, 50],
+            [8.1, 50],
+            [8.1, 50.1],
+            [8, 50],
+          ],
+        ],
+      };
       act(() => result.current.onFachebeneKlick({ a: 1 }, 'nina', geom));
       expect(result.current.fachebeneAuswahl?.geometrie).toBe(geom);
     });
@@ -286,7 +327,10 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
   // Restabdeckung Mutual-Exclusion (LFH-170): jeder weitere exklusive Start-Handler räumt
   // einen offenen zeichenPlatzieren-Modus (onZoneZeichnenStart ist oben schon geprüft).
   const RAEUMT_ZEICHEN_PLATZIEREN: { name: string; start: (r: HookResult) => void }[] = [
-    { name: 'onAbschnittZeichnenStart', start: (r) => act(() => r.current.onAbschnittZeichnenStart(3)) },
+    {
+      name: 'onAbschnittZeichnenStart',
+      start: (r) => act(() => r.current.onAbschnittZeichnenStart(3)),
+    },
     { name: 'onEinsatzortPlatzieren', start: (r) => act(() => r.current.onEinsatzortPlatzieren()) },
     { name: 'onBildPlatzieren', start: (r) => act(() => r.current.onBildPlatzieren(7)) },
   ];
@@ -339,11 +383,15 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     const erfolg = vi.fn();
     const { result } = rendere(vi.fn(), erfolg);
 
-    await act(async () => { await result.current.zoneAendern(5, { label: 'Nord' }); });
+    await act(async () => {
+      await result.current.zoneAendern(5, { label: 'Nord' });
+    });
     expect(lagezonenApi.aktualisiereZone).toHaveBeenCalledWith(1, 5, { label: 'Nord' });
     expect(erfolg).toHaveBeenCalledWith('Zone gespeichert');
 
-    await act(async () => { await result.current.zoneLoeschen(5); });
+    await act(async () => {
+      await result.current.zoneLoeschen(5);
+    });
     expect(lagezonenApi.loescheZone).toHaveBeenCalledWith(1, 5);
     expect(erfolg).toHaveBeenCalledWith('Zone aufgehoben');
   });
@@ -355,7 +403,10 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     let aufloesen: (v: { id: number }) => void = () => {};
     freieZeichenApi.legeFreiesZeichenAn.mockReset();
     freieZeichenApi.legeFreiesZeichenAn.mockImplementation(
-      () => new Promise((r) => { aufloesen = r; }),
+      () =>
+        new Promise((r) => {
+          aufloesen = r;
+        }),
     );
     const { result } = rendere();
     act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
@@ -391,9 +442,7 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     act(() => {
       result.current.zeichenLoeschen(42);
     });
-    await waitFor(() =>
-      expect(freieZeichenApi.loescheFreiesZeichen).toHaveBeenCalledWith(1, 42),
-    );
+    await waitFor(() => expect(freieZeichenApi.loescheFreiesZeichen).toHaveBeenCalledWith(1, 42));
     // setAuswahl(null) läuft im .then nach erfolgreichem DELETE.
     await waitFor(() => expect(result.current.auswahl).toBeNull());
   });
@@ -411,7 +460,9 @@ describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => 
    *  `toHaveBeenCalled()` wäre beim zweiten Klick schon durch den ersten erfüllt. */
   async function platziere(result: HookResult, lng: number, lat: number, malCount: number) {
     act(() => result.current.onKarteKlick({ lng, lat }));
-    await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(malCount));
+    await waitFor(() =>
+      expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(malCount),
+    );
   }
 
   it('ist Vorgabe AN', () => {
@@ -460,7 +511,9 @@ describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => 
     await platziere(result, 8.6, 50.1, 1);
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
 
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'zweite Serie' }));
+    act(() =>
+      result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'zweite Serie' }),
+    );
     expect(result.current.zeichenSerieAnzahl).toBe(0);
   });
 });
@@ -490,7 +543,11 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     expect(erfolg).toHaveBeenCalledWith('Zone angelegt');
 
     // Erste Hälfte: der Modus steht noch, mit demselben Entwurf und ohne alte Bestätigung.
-    expect(result.current.zoneEntwurf).toEqual({ typ: 'gefahrengebiet', modus: 'polygon', farbe: undefined });
+    expect(result.current.zoneEntwurf).toEqual({
+      typ: 'gefahrengebiet',
+      modus: 'polygon',
+      farbe: undefined,
+    });
     expect(result.current.zoneBestaetigung).toBeNull();
     expect(result.current.zoneSpeichern).toBe(false);
     // Zweite Hälfte — ohne sie beweist der Test die Falle nicht: der Zonen-Effekt in
@@ -541,7 +598,10 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     lagezonenApi.legeZoneAn.mockClear();
     let loese: () => void = () => {};
     lagezonenApi.legeZoneAn.mockImplementationOnce(
-      () => new Promise<{ id: number }>((r) => { loese = () => r({ id: 9 }); }),
+      () =>
+        new Promise<{ id: number }>((r) => {
+          loese = () => r({ id: 9 });
+        }),
     );
     const { result } = rendere();
     bisZurBestaetigung(result);
@@ -554,7 +614,9 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
     expect(result.current.zeichenPlatzieren).not.toBeNull();
 
-    await act(async () => { loese(); });
+    await act(async () => {
+      loese();
+    });
 
     expect(result.current.zeichenPlatzieren).not.toBeNull();
     expect(result.current.zoneEntwurf ?? null).toBeNull();

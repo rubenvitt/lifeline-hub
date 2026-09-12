@@ -36,7 +36,13 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 /** Die fünf Abschnitte der Vorlage `befehl_ladef` (`src/befehle/vorlagen.ts`). */
-const ABSCHNITTE = ['Lage', 'Auftrag', 'Durchführung', 'Einsatzunterstützung', 'Führung und Kommunikation'];
+const ABSCHNITTE = [
+  'Lage',
+  'Auftrag',
+  'Durchführung',
+  'Einsatzunterstützung',
+  'Führung und Kommunikation',
+];
 const AKTIONEN = ['Drucken / als PDF', 'Entwurf speichern', 'Freigeben'];
 
 /**
@@ -146,107 +152,117 @@ async function entwurfBereit(
 }
 
 for (const dichte of ['kompakt', 'handschuh'] as const) {
-test(`390 px, ${dichte}: die Leiste ist verankert, „Freigeben" bleibt im Bild und verdeckt kein Fokusziel`, async ({ page }) => {
-  test.setTimeout(90_000);
-  const { block, seite, zielnamen, letzterAbschnitt } = await entwurfBereit(page, { width: 390, height: 844 }, dichte);
+  test(`390 px, ${dichte}: die Leiste ist verankert, „Freigeben" bleibt im Bild und verdeckt kein Fokusziel`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const { block, seite, zielnamen, letzterAbschnitt } = await entwurfBereit(
+      page,
+      { width: 390, height: 844 },
+      dichte,
+    );
 
-  await expect(block, 'unterhalb von `lg` gehören die Aktionen an den unteren Rand').toHaveCSS(
-    'position',
-    'sticky',
-  );
+    await expect(block, 'unterhalb von `lg` gehören die Aktionen an den unteren Rand').toHaveCSS(
+      'position',
+      'sticky',
+    );
 
-  // Vorbedingung: ohne Bildlaufreserve klebt die Leiste am Seitenende statt über dem
-  // Inhalt, und jede Aussage darunter wäre trivial wahr.
-  const reserve = await page.evaluate(
-    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
-  );
-  expect(reserve, 'Vorbedingung: die Seite muss überhaupt scrollen').toBeGreaterThan(0);
+    // Vorbedingung: ohne Bildlaufreserve klebt die Leiste am Seitenende statt über dem
+    // Inhalt, und jede Aussage darunter wäre trivial wahr.
+    const reserve = await page.evaluate(
+      () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    );
+    expect(reserve, 'Vorbedingung: die Seite muss überhaupt scrollen').toBeGreaterThan(0);
 
-  // Das Akzeptanzkriterium wörtlich: Cursor im letzten Abschnittsfeld, „Freigeben"
-  // erreichbar ohne zu scrollen. `toBeInViewport`, nicht `toBeVisible` — ein Element
-  // unterhalb des sichtbaren Bereichs ist im Sinne von `toBeVisible` sichtbar.
-  await letzterAbschnitt.focus();
-  await expect(seite.getByRole('button', { name: 'Freigeben', exact: true })).toBeInViewport();
+    // Das Akzeptanzkriterium wörtlich: Cursor im letzten Abschnittsfeld, „Freigeben"
+    // erreichbar ohne zu scrollen. `toBeInViewport`, nicht `toBeVisible` — ein Element
+    // unterhalb des sichtbaren Bereichs ist im Sinne von `toBeVisible` sichtbar.
+    await letzterAbschnitt.focus();
+    await expect(seite.getByRole('button', { name: 'Freigeben', exact: true })).toBeInViewport();
 
-  // Und das Feld selbst darf dabei nicht hinter die Leiste gerutscht sein.
-  await expect(letzterAbschnitt).toBeInViewport();
+    // Und das Feld selbst darf dabei nicht hinter die Leiste gerutscht sein.
+    await expect(letzterAbschnitt).toBeInViewport();
 
-  /**
-   * Der Streifen, den `toBeInViewport()` und der Messkern beide nicht sehen — Begründung an
-   * `kleinsterFreiraum`. Die Schranke ist aus der Messung gesetzt, nicht gerundet
-   * abgeschrieben: im Vorzustand (ohne Abzug) sind es −1 px, mit Abzug 42 (`kompakt`) bzw.
-   * 133 (`handschuh`); die Mutationsprobe „Regel entfernt" färbt sie rot. Sie ist
-   * zugleich die einzige Zeile, die den Abzug auch dann prüft, wenn er am falschen
-   * Scrollport hinge — dort wäre die Eigenschaft gesetzt, aber wirkungslos, und die
-   * Kopplungsprüfung oben bliebe grün.
-   */
-  await seite.getByRole('link', { name: 'Aufträge/Befehle' }).focus();
-  const freiraum = await kleinsterFreiraum(page, 30);
-  expect(
-    freiraum,
-    `kleinster freier Streifen eines Formularfelds über der Leiste (${Math.round(freiraum)}px)`,
-  ).toBeGreaterThan(20);
+    /**
+     * Der Streifen, den `toBeInViewport()` und der Messkern beide nicht sehen — Begründung an
+     * `kleinsterFreiraum`. Die Schranke ist aus der Messung gesetzt, nicht gerundet
+     * abgeschrieben: im Vorzustand (ohne Abzug) sind es −1 px, mit Abzug 42 (`kompakt`) bzw.
+     * 133 (`handschuh`); die Mutationsprobe „Regel entfernt" färbt sie rot. Sie ist
+     * zugleich die einzige Zeile, die den Abzug auch dann prüft, wenn er am falschen
+     * Scrollport hinge — dort wäre die Eigenschaft gesetzt, aber wirkungslos, und die
+     * Kopplungsprüfung oben bliebe grün.
+     */
+    await seite.getByRole('link', { name: 'Aufträge/Befehle' }).focus();
+    const freiraum = await kleinsterFreiraum(page, 30);
+    expect(
+      freiraum,
+      `kleinster freier Streifen eines Formularfelds über der Leiste (${Math.round(freiraum)}px)`,
+    ).toBeGreaterThan(20);
 
-  /**
-   * DER FOKUS-SCROLL RECHNET DIE LEISTE AB — und diese Zusicherung steht hier, weil der
-   * Messkern sie NICHT trägt: er meldet nur VOLLSTÄNDIGE Verdeckung (WCAG 2.4.11 Minimum),
-   * und ein 164 px hohes Abschnittsfeld ist von einer 78 px hohen Leiste nie vollständig
-   * verdeckt. Die WIRKUNG prüft die Freiraum-Zeile darüber; diese hier prüft den
-   * MECHANISMUS und deckt den Fall mit ab, den die Geometrie in `handschuh` nicht mehr
-   * scharf stellt — dort bleibt der Streifen auch ohne Abzug über der Schranke.
-   *
-   * Geprüft wird die KOPPLUNG, nicht ein Pixelwert: `scroll-padding-block-end` am
-   * Scrollport trägt die gemessene Leistenhöhe. Fällt die CSS-Regel weg oder setzt der
-   * ResizeObserver die Eigenschaft nicht, wird diese Zeile rot — beides per Mutationsprobe
-   * belegt. Was hier NICHT behauptet wird: vollständige Freistellung (2.4.12 Enhanced) —
-   * ein Feld, das höher ist als der Restraum, lässt sich nicht freistellen.
-   */
-  const abzug = await page.evaluate(
-    () => Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
-  );
-  const leistenhoehe = (await block.boundingBox())!.height;
-  expect(abzug, `Fokus-Scroll-Abzug ${abzug}px gegen Leistenhöhe ${leistenhoehe}px`)
-    .toBeGreaterThanOrEqual(leistenhoehe);
+    /**
+     * DER FOKUS-SCROLL RECHNET DIE LEISTE AB — und diese Zusicherung steht hier, weil der
+     * Messkern sie NICHT trägt: er meldet nur VOLLSTÄNDIGE Verdeckung (WCAG 2.4.11 Minimum),
+     * und ein 164 px hohes Abschnittsfeld ist von einer 78 px hohen Leiste nie vollständig
+     * verdeckt. Die WIRKUNG prüft die Freiraum-Zeile darüber; diese hier prüft den
+     * MECHANISMUS und deckt den Fall mit ab, den die Geometrie in `handschuh` nicht mehr
+     * scharf stellt — dort bleibt der Streifen auch ohne Abzug über der Schranke.
+     *
+     * Geprüft wird die KOPPLUNG, nicht ein Pixelwert: `scroll-padding-block-end` am
+     * Scrollport trägt die gemessene Leistenhöhe. Fällt die CSS-Regel weg oder setzt der
+     * ResizeObserver die Eigenschaft nicht, wird diese Zeile rot — beides per Mutationsprobe
+     * belegt. Was hier NICHT behauptet wird: vollständige Freistellung (2.4.12 Enhanced) —
+     * ein Feld, das höher ist als der Restraum, lässt sich nicht freistellen.
+     */
+    const abzug = await page.evaluate(() =>
+      Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
+    );
+    const leistenhoehe = (await block.boundingBox())!.height;
+    expect(
+      abzug,
+      `Fokus-Scroll-Abzug ${abzug}px gegen Leistenhöhe ${leistenhoehe}px`,
+    ).toBeGreaterThanOrEqual(leistenhoehe);
 
-  await seite.getByRole('link', { name: 'Aufträge/Befehle' }).focus();
-  const befund = await pruefeFokusVerdeckung(page, 60);
-  expect(
-    befund.besuchteZiele.sort(),
-    'Vorbedingung: jedes Feld und jede Aktion muss per Tabulator besucht werden',
-  ).toEqual([...zielnamen].sort());
-  expect(befund.fixierteKandidaten, 'Vorbedingung: fixierte Knoten vorhanden').toBeGreaterThan(0);
-  expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+    await seite.getByRole('link', { name: 'Aufträge/Befehle' }).focus();
+    const befund = await pruefeFokusVerdeckung(page, 60);
+    expect(
+      befund.besuchteZiele.sort(),
+      'Vorbedingung: jedes Feld und jede Aktion muss per Tabulator besucht werden',
+    ).toEqual([...zielnamen].sort());
+    expect(befund.fixierteKandidaten, 'Vorbedingung: fixierte Knoten vorhanden').toBeGreaterThan(0);
+    expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
 
-  /**
-   * DIE GLOBALE EIGENSCHAFT WIRD BEIM VERLASSEN WIEDER WEGGENOMMEN. Sie hängt am
-   * Wurzelelement und überlebt damit die Route — anders als bei LFH-446, wo das
-   * unmountende `<form>` sie trug. Bliebe sie stehen, verschöbe sie den Fokus-Scroll auf
-   * JEDER folgenden schmalen Route um eine Leistenhöhe, die es dort nicht gibt: kein
-   * sichtbarer Fehler, keine Fehlermeldung. Die Zeile belegt zugleich, dass React die
-   * zurückgegebene Aufräumfunktion des Callback-Refs überhaupt ruft — empirisch statt
-   * nach Präzedenz.
-   */
-  await seite.getByRole('link', { name: 'Aufträge/Befehle' }).click();
-  // Auf den ABGEHÄNGTEN Baum warten, nicht auf die gewechselte URL: React räumt eine Runde
-  // später auf als der Router navigiert, und ein Blick direkt nach `toHaveURL` liest noch
-  // den alten Wert (gemessen: 85 px, obwohl die Aufräumfunktion einwandfrei läuft).
-  await expect(page).toHaveURL(/\/auftraege$/);
-  await expect(page.locator('.befehl-print-root')).toHaveCount(0);
-  expect(
-    await page.evaluate(
-      () => Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
-    ),
-    'nach dem Verlassen der Seite darf kein Abzug stehenbleiben',
-  ).toBe(0);
+    /**
+     * DIE GLOBALE EIGENSCHAFT WIRD BEIM VERLASSEN WIEDER WEGGENOMMEN. Sie hängt am
+     * Wurzelelement und überlebt damit die Route — anders als bei LFH-446, wo das
+     * unmountende `<form>` sie trug. Bliebe sie stehen, verschöbe sie den Fokus-Scroll auf
+     * JEDER folgenden schmalen Route um eine Leistenhöhe, die es dort nicht gibt: kein
+     * sichtbarer Fehler, keine Fehlermeldung. Die Zeile belegt zugleich, dass React die
+     * zurückgegebene Aufräumfunktion des Callback-Refs überhaupt ruft — empirisch statt
+     * nach Präzedenz.
+     */
+    await seite.getByRole('link', { name: 'Aufträge/Befehle' }).click();
+    // Auf den ABGEHÄNGTEN Baum warten, nicht auf die gewechselte URL: React räumt eine Runde
+    // später auf als der Router navigiert, und ein Blick direkt nach `toHaveURL` liest noch
+    // den alten Wert (gemessen: 85 px, obwohl die Aufräumfunktion einwandfrei läuft).
+    await expect(page).toHaveURL(/\/auftraege$/);
+    await expect(page.locator('.befehl-print-root')).toHaveCount(0);
+    expect(
+      await page.evaluate(() =>
+        Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
+      ),
+      'nach dem Verlassen der Seite darf kein Abzug stehenbleiben',
+    ).toBe(0);
 
-  test.info().annotations.push({
-    type: 'messwert',
-    description: `390×844 ${dichte}: Leiste ${Math.round(leistenhoehe)}px, Abzug ${abzug}px, frei ${Math.round(freiraum)}px, ${befund.besuchteZiele.length} Routenziele, ${befund.stoppsGesamt} Stopps, Reserve ${reserve}px, ${befund.verdeckt.length} Verdeckungen`,
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `390×844 ${dichte}: Leiste ${Math.round(leistenhoehe)}px, Abzug ${abzug}px, frei ${Math.round(freiraum)}px, ${befund.besuchteZiele.length} Routenziele, ${befund.stoppsGesamt} Stopps, Reserve ${reserve}px, ${befund.verdeckt.length} Verdeckungen`,
+    });
   });
-});
 }
 
-test('1024 px: oberhalb der Schwelle ist NICHTS verankert, die Aktionen stehen im Kopf', async ({ page }) => {
+test('1024 px: oberhalb der Schwelle ist NICHTS verankert, die Aktionen stehen im Kopf', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   const { block, seite, zielnamen } = await entwurfBereit(page, { width: 1024, height: 768 });
 
@@ -269,8 +285,8 @@ test('1024 px: oberhalb der Schwelle ist NICHTS verankert, die Aktionen stehen i
   // abzuziehen. Ein Bau, der den Abzug fest verdrahtet, verschöbe hier jeden Fokus-Scroll
   // um eine Leistenhöhe, die es nicht gibt.
   expect(
-    await page.evaluate(
-      () => Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
+    await page.evaluate(() =>
+      Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
     ),
     'ohne verankerte Leiste kein Fokus-Scroll-Abzug',
   ).toBe(0);
@@ -286,7 +302,9 @@ test('1024 px: oberhalb der Schwelle ist NICHTS verankert, die Aktionen stehen i
   });
 });
 
-test('Selbstbeweis: ein Fokusziel hinter der echten Aktionsleiste wird erkannt', async ({ page }) => {
+test('Selbstbeweis: ein Fokusziel hinter der echten Aktionsleiste wird erkannt', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   const { block, seite } = await entwurfBereit(page, { width: 390, height: 844 });
   await block.evaluate((el) => el.classList.add('e2e-befehl-leiste'));
@@ -300,8 +318,12 @@ test('Selbstbeweis: ein Fokusziel hinter der echten Aktionsleiste wird erkannt',
     probe.textContent = 'Leistenprobe';
     probe.setAttribute('data-e2e-fokus', 'Leistenprobe');
     Object.assign(probe.style, {
-      position: 'fixed', left: `${r.left + 10}px`, top: `${r.top + 10}px`,
-      width: '40px', height: '20px', zIndex: '0',
+      position: 'fixed',
+      left: `${r.left + 10}px`,
+      top: `${r.top + 10}px`,
+      width: '40px',
+      height: '20px',
+      zIndex: '0',
     });
     // GESCHWISTER, kein Kind: ein `sticky` Vorfahr trägt sein Ziel, er verdeckt es nicht —
     // der Messkern nimmt Vorfahren ausdrücklich aus.
@@ -320,7 +342,9 @@ test('Selbstbeweis: ein Fokusziel hinter der echten Aktionsleiste wird erkannt',
 
   // Gegenprobe am SELBEN Ziel: außerhalb der Leistengeometrie muss es frei sein. Ohne sie
   // bliebe offen, ob der Kern nicht jedes Ziel meldet.
-  await page.locator('#e2e-leistenprobe').evaluate((el) => { el.style.top = '100px'; });
+  await page.locator('#e2e-leistenprobe').evaluate((el) => {
+    el.style.top = '100px';
+  });
   await page.locator('#e2e-probenstart').focus();
   expect((await pruefeFokusVerdeckung(page, 1)).verdeckt).toEqual([]);
 });

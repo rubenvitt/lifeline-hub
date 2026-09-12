@@ -46,7 +46,13 @@ function renderLeiste(liste: Snap[], props: Record<string, unknown>) {
     </QueryClientProvider>
   );
   return render(
-    <SnapshotLeiste einsatzId={5} darfSichern={false} onWaehle={vi.fn()} fehler={vi.fn()} {...props} />,
+    <SnapshotLeiste
+      einsatzId={5}
+      darfSichern={false}
+      onWaehle={vi.fn()}
+      fehler={vi.fn()}
+      {...props}
+    />,
     { wrapper: Wrapper },
   );
 }
@@ -115,7 +121,13 @@ describe('SnapshotLeiste', () => {
 
     // LagekartePage würde ?snapshot=10 setzen → Rerender mit aktivem Stand 10 (spielt bleibt an).
     rerender(
-      <SnapshotLeiste einsatzId={5} darfSichern={false} aktiverSnapshotId={10} onWaehle={onWaehle} fehler={vi.fn()} />,
+      <SnapshotLeiste
+        einsatzId={5}
+        darfSichern={false}
+        aktiverSnapshotId={10}
+        onWaehle={onWaehle}
+        fehler={vi.fn()}
+      />,
     );
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS);
     expect(ladeLageSnapshot).toHaveBeenCalledWith(5, 20); // Vorladen des nächsten Dokuments
@@ -134,7 +146,13 @@ describe('SnapshotLeiste', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Abspielen' }));
     rerender(
-      <SnapshotLeiste einsatzId={5} darfSichern={false} aktiverSnapshotId={10} onWaehle={onWaehle} fehler={vi.fn()} />,
+      <SnapshotLeiste
+        einsatzId={5}
+        darfSichern={false}
+        aktiverSnapshotId={10}
+        onWaehle={onWaehle}
+        fehler={vi.fn()}
+      />,
     );
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS);
     expect(onWaehle).toHaveBeenLastCalledWith(20);
@@ -143,7 +161,13 @@ describe('SnapshotLeiste', () => {
     // Wiedergabe stoppt. Ohne den next>=length-Guard würfe chrono[2] hier (Out-of-Bounds).
     onWaehle.mockClear();
     rerender(
-      <SnapshotLeiste einsatzId={5} darfSichern={false} aktiverSnapshotId={20} onWaehle={onWaehle} fehler={vi.fn()} />,
+      <SnapshotLeiste
+        einsatzId={5}
+        darfSichern={false}
+        aktiverSnapshotId={20}
+        onWaehle={onWaehle}
+        fehler={vi.fn()}
+      />,
     );
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS * 2);
     expect(onWaehle).not.toHaveBeenCalled();

@@ -606,8 +606,14 @@ export function reiterBefunde(dateien: Record<string, string>, nur: readonly str
 
 /** Verbotene Formen im Primitiv, je mit Grund für die Fehlermeldung. */
 const VERBOTEN_IM_PRIMITIV: readonly { muster: RegExp; grund: string }[] = [
-  { muster: elementMuster('Table'), grund: 'keine zweite Tabellenwahrheit — über KatalogTabelle rendern' },
-  { muster: /\bscroll=\{\{/g, grund: 'der waagerechte Bildlauf gehört KatalogTabelle, nicht hierher' },
+  {
+    muster: elementMuster('Table'),
+    grund: 'keine zweite Tabellenwahrheit — über KatalogTabelle rendern',
+  },
+  {
+    muster: /\bscroll=\{\{/g,
+    grund: 'der waagerechte Bildlauf gehört KatalogTabelle, nicht hierher',
+  },
   {
     muster: elementMuster('Card'),
     grund: 'die Kartenform ist Liste/ListenEintrag — ein Rahmen doppelt die li-Trennlinie',
@@ -646,10 +652,14 @@ const VERBOTEN_BEIM_KONSUMENTEN: readonly { muster: RegExp; grund: string }[] = 
   { muster: /\bscroll=\{\{/g, grund: 'der Bildlauf gehört dem Primitiv' },
   { muster: /\bsorter:/g, grund: 'Sortierung läuft über sortWert, nicht über antds Haken' },
   { muster: /\bfilters:/g, grund: 'Filter laufen über filter: { werte, trifft }' },
-  { muster: /\bresponsive:/g, grund: 'Spaltenbreiten laufen über abBreite (sonst lügt der Zähler)' },
+  {
+    muster: /\bresponsive:/g,
+    grund: 'Spaltenbreiten laufen über abBreite (sonst lügt der Zähler)',
+  },
   {
     muster: /\bdefaultSortOrder\b/g,
-    grund: 'die Voreinstellung läuft über standardSortierung — `DatensichtSpalte` blendet ' +
+    grund:
+      'die Voreinstellung läuft über standardSortierung — `DatensichtSpalte` blendet ' +
       'antds Prop aus, ein Nachzügler säße also stumm in der Spaltenliste',
   },
 ];
@@ -669,7 +679,8 @@ const VERBOTEN_BEI_VOLLMENGE: readonly { muster: RegExp; grund: string }[] = [
   },
   {
     muster: /\bsortWert:/g,
-    grund: 'im Baumzweig gibt effektiveDaten die Daten referenzgleich zurück — der Pfeil ' +
+    grund:
+      'im Baumzweig gibt effektiveDaten die Daten referenzgleich zurück — der Pfeil ' +
       'verspräche eine Ordnung, die nie eintritt',
   },
   { muster: /\bstandardSortierung=/g, grund: 'siehe sortWert — die Baumordnung ist die Ordnung' },
@@ -805,7 +816,9 @@ const AUSNAHMEN = {
 
 describe('Datensicht-Guard (LFH-330 · B2)', () => {
   it('LFH-464: ausschließlich das vermessene ETB setzt einen eigenen Umbruch', () => {
-    const mitUmbruch = KONSUMENTEN.filter((pfad) => /\btabelleAb\s*=/.test(ohneKommentare(dateien[pfad])));
+    const mitUmbruch = KONSUMENTEN.filter((pfad) =>
+      /\btabelleAb\s*=/.test(ohneKommentare(dateien[pfad])),
+    );
     expect(mitUmbruch).toEqual(['/src/etb/EtbTabelle.tsx']);
     expect(ohneKommentare(dateien['/src/etb/EtbTabelle.tsx'])).toContain('tabelleAb="xl"');
   });
@@ -955,7 +968,10 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // (c) KONSTANTER Schlüssel über achsunabhängigen Daten ist richtig, nicht verdächtig —
     // die Form von `key="patienten"`. Ohne diese Zeile wäre die Regel an PersonenPage rot.
     expect(
-      lauf([...reiter, 'const y = <Datensicht key="patienten" daten={alle.filter(istPatient)} />;']),
+      lauf([
+        ...reiter,
+        'const y = <Datensicht key="patienten" daten={alle.filter(istPatient)} />;',
+      ]),
     ).toEqual([]);
 
     // (d) Ohne Schalterachse gibt es keinen Reiter, den ein Schlüssel tragen könnte. Ohne
@@ -1035,9 +1051,9 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
 
   it('Selbstbeweis: zwei Sichten mit demselben Schlüssel fallen auf, mit verschiedenen nicht', () => {
     const gleich = 'const x = offen ? <Datensicht key="liste" /> : <Datensicht key="liste" />;';
-    expect(schluesselBefunde({ '/src/pages/Doppelt.tsx': gleich }, ['/src/pages/Doppelt.tsx'])).toEqual([
-      '/src/pages/Doppelt.tsx: 2 Sichten teilen den key "liste".',
-    ]);
+    expect(
+      schluesselBefunde({ '/src/pages/Doppelt.tsx': gleich }, ['/src/pages/Doppelt.tsx']),
+    ).toEqual(['/src/pages/Doppelt.tsx: 2 Sichten teilen den key "liste".']);
     const verschieden = 'const x = offen ? <Datensicht key="a" /> : <Datensicht key="b" />;';
     expect(
       schluesselBefunde({ '/src/pages/Doppelt.tsx': verschieden }, ['/src/pages/Doppelt.tsx']),
@@ -1080,7 +1096,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
 
   it('Selbstbeweis: die Begründungsmarken werden verlangt', () => {
     const ohneBegruendung = { [PRIMITIV]: 'const a = <KatalogTabelle columns={c} />;' };
-    const gemeldet = befunde(ohneBegruendung, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] });
+    const gemeldet = befunde(ohneBegruendung, {
+      eigenbau: [],
+      nurKarte: [],
+      nurTabelle: [],
+      vollmenge: [],
+    });
     expect(gemeldet.filter((b) => b.includes('schriftliche Begründung'))).toHaveLength(2);
   });
 
@@ -1132,7 +1153,9 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(mitPflicht).toHaveLength(4);
     // Dieselbe Datei OHNE Eintrag ist sauber. Das ist die Aussage der Liste: sie ist
     // dateibezogen, keine repoweite Zusicherung — Suche und Filter sind das Normale.
-    expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual([]);
+    expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual(
+      [],
+    );
   });
 
   it('Selbstbeweis: Input.Search bleibt in einer Vollmengen-Pflichtdatei erlaubt', () => {
@@ -1174,7 +1197,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       ),
     ).toBe(true);
     expect(
-      befunde(baum, { eigenbau: ['/src/pages/Eigen.tsx'], nurKarte: [], nurTabelle: [], vollmenge: [] }),
+      befunde(baum, {
+        eigenbau: ['/src/pages/Eigen.tsx'],
+        nurKarte: [],
+        nurTabelle: [],
+        vollmenge: [],
+      }),
     ).toEqual([]);
   });
 
@@ -1191,17 +1219,29 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
       nurTabelle: [],
       vollmenge: [],
     });
-    expect(gemeldet).toEqual(['/src/pages/Befehle.tsx: steht in NUR_KARTE, trägt aber kein form="karte".']);
+    expect(gemeldet).toEqual([
+      '/src/pages/Befehle.tsx: steht in NUR_KARTE, trägt aber kein form="karte".',
+    ]);
   });
 
   it('Selbstbeweis: tote Ausnahmeeinträge werden gemeldet', () => {
     const baum = { [PRIMITIV]: 'KARTEN-AUSNAHME TRENNLINIE\n<KatalogTabelle columns={c} />' };
     expect(
-      befunde(baum, { eigenbau: [], nurKarte: ['/src/pages/Weg.tsx'], nurTabelle: [], vollmenge: [] }),
+      befunde(baum, {
+        eigenbau: [],
+        nurKarte: ['/src/pages/Weg.tsx'],
+        nurTabelle: [],
+        vollmenge: [],
+      }),
     ).toEqual(['tote Ausnahme in NUR_KARTE: /src/pages/Weg.tsx']);
     // Auch die vierte Liste rottet nicht still: ein Eintrag ohne Datei fällt genauso auf.
     expect(
-      befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: ['/src/pages/Weg.tsx'] }),
+      befunde(baum, {
+        eigenbau: [],
+        nurKarte: [],
+        nurTabelle: [],
+        vollmenge: ['/src/pages/Weg.tsx'],
+      }),
     ).toEqual(['tote Ausnahme in VOLLMENGE_PFLICHT: /src/pages/Weg.tsx']);
   });
 
@@ -1218,7 +1258,9 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // Die Verbotsformen liegen im Kommentar → 0 Befunde. Die BEGRÜNDUNG liegt ebenfalls im
     // Kommentar und wird trotzdem gefunden, weil sie am Rohtext gemessen wird — genau diese
     // Asymmetrie ist der Grund für die zwei Textquellen.
-    expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual([]);
+    expect(befunde(baum, { eigenbau: [], nurKarte: [], nurTabelle: [], vollmenge: [] })).toEqual(
+      [],
+    );
   });
 
   it('Selbstbeweis: die generische Schreibweise wird richtig zugeordnet', () => {

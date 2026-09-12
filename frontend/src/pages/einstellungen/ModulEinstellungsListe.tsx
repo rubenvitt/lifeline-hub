@@ -256,7 +256,9 @@ export default function ModulEinstellungsListe({
           {!istSchmal && (
             <div style={{ ...raster, fontSize: token.fontSizeSM, opacity: 0.6 }}>
               <span>Modul</span>
-              {sichtbarSpalte && <span style={{ textAlign: 'center' }}>{sichtbarSpalte.titel}</span>}
+              {sichtbarSpalte && (
+                <span style={{ textAlign: 'center' }}>{sichtbarSpalte.titel}</span>
+              )}
               <span>{rollenSpalte}</span>
             </div>
           )}

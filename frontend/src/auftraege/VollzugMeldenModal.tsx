@@ -1,7 +1,11 @@
 import { App, Input, Modal } from 'antd';
 import { useState } from 'react';
 
-export default function VollzugMeldenModal({ offen, onAbbrechen, onBestaetigen }: {
+export default function VollzugMeldenModal({
+  offen,
+  onAbbrechen,
+  onBestaetigen,
+}: {
   offen: boolean;
   onAbbrechen: () => void;
   onBestaetigen: (vollzugsmeldung: string) => void;
@@ -13,9 +17,15 @@ export default function VollzugMeldenModal({ offen, onAbbrechen, onBestaetigen }
       title="Vollzug melden"
       open={offen}
       okText="Vollzug melden"
-      onCancel={() => { setText(''); onAbbrechen(); }}
+      onCancel={() => {
+        setText('');
+        onAbbrechen();
+      }}
       onOk={() => {
-        if (!text.trim()) { message.error('Rückmeldung erforderlich'); return; }
+        if (!text.trim()) {
+          message.error('Rückmeldung erforderlich');
+          return;
+        }
         onBestaetigen(text.trim());
         setText('');
       }}

@@ -171,7 +171,11 @@ describe('materialStatus', () => {
 
   it('deckt das Enum vollständig ab — eine sechste Variante bricht hier', () => {
     const alle: MaterialStatus[] = [
-      'einsatzbereit', 'im_einsatz', 'defekt', 'verbraucht', 'desinfektion_noetig',
+      'einsatzbereit',
+      'im_einsatz',
+      'defekt',
+      'verbraucht',
+      'desinfektion_noetig',
     ];
     expect(Object.keys(sf.materialStatus).sort()).toEqual([...alle].sort());
   });
@@ -186,8 +190,14 @@ describe('materialStatus', () => {
 
 describe('Betroffenen-Farbachsen (LFH-455)', () => {
   it('bewahrt die fachliche Farbsprache als eigene Achse', () => {
-    expect(Object.fromEntries(Object.entries(sf.sichtung).map(([k, d]) => [k, d.farbe])))
-      .toEqual({ sk1: 'rot', sk2: 'gelb', sk3: 'gruen', sk4: 'blau', tot: 'schwarz', unverletzt: null });
+    expect(Object.fromEntries(Object.entries(sf.sichtung).map(([k, d]) => [k, d.farbe]))).toEqual({
+      sk1: 'rot',
+      sk2: 'gelb',
+      sk3: 'gruen',
+      sk4: 'blau',
+      tot: 'schwarz',
+      unverletzt: null,
+    });
     expect(Object.values(sf.sichtung).every((d) => d.label.trim().length > 0)).toBe(true);
   });
   it('ordnet Schadensstatus und Schadensausmaß ihren Rollen zu', () => {
@@ -196,8 +206,9 @@ describe('Betroffenen-Farbachsen (LFH-455)', () => {
       uebergeben: { label: 'übergeben', rolle: 'bedien' },
       abgeschlossen: { label: 'abgeschlossen', rolle: 'neutral' },
     });
-    expect(Object.fromEntries(Object.entries(sf.schadenAusmass).map(([k, d]) => [k, d.rolle])))
-      .toEqual({ gering: 'neutral', mittel: 'achtung', gross: 'achtung', katastrophal: 'alarm' });
+    expect(
+      Object.fromEntries(Object.entries(sf.schadenAusmass).map(([k, d]) => [k, d.rolle])),
+    ).toEqual({ gering: 'neutral', mittel: 'achtung', gross: 'achtung', katastrophal: 'alarm' });
   });
   it('kennzeichnet Bezüge als Beziehung mit expliziter Beschriftung', () => {
     expect(sf.bezugsDarstellung('UHS Nord')).toEqual({ label: 'UHS Nord', rolle: 'bedien' });

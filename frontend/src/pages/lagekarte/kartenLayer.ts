@@ -192,8 +192,15 @@ export function planeReAnlegenNachStyle(
   getMarker?: () => MarkerFeatureCollection,
   getEinsatzort?: () => MarkerFeatureCollection,
 ) {
-  wendeKartenDatenAn(map, () => reAnlegenAlles(
-    map, getFlaechen(), getZonen(), getFachebenen(), getBilder(),
-    getMarker?.(), getEinsatzort?.(),
-  ));
+  wendeKartenDatenAn(map, () =>
+    reAnlegenAlles(
+      map,
+      getFlaechen(),
+      getZonen(),
+      getFachebenen(),
+      getBilder(),
+      getMarker?.(),
+      getEinsatzort?.(),
+    ),
+  );
 }

@@ -113,8 +113,10 @@ export default function AufnahmePage() {
         setQuittung('Offline vorgemerkt — Registriernummer folgt nach der Übertragung.');
       } else {
         const person = ergebnis.daten;
-        const zusatz = uhsAuftrag && person.aktuelle_uhs_id === uhsAuftrag
-          && person.aktueller_platz_id === null ? ' · im Wartebereich' : '';
+        const zusatz =
+          uhsAuftrag && person.aktuelle_uhs_id === uhsAuftrag && person.aktueller_platz_id === null
+            ? ' · im Wartebereich'
+            : '';
         if (uhsAuftrag) {
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsAuftrag) });
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
@@ -174,9 +176,11 @@ export default function AufnahmePage() {
               // läuft. Der UHS-NAME wird hier bewusst nicht geladen: das bräuchte eine
               // zusätzliche Query nur für einen Breadcrumb-Titel; die Rückverlinkung
               // allein beantwortet die Frage aus dem Brief.
-              title: uhsAuftrag
-                ? <Link to={uhsDetailPfad(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
-                : <Link to={personenPfad(einsatzId)}>Personen</Link>,
+              title: uhsAuftrag ? (
+                <Link to={uhsDetailPfad(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
+              ) : (
+                <Link to={personenPfad(einsatzId)}>Personen</Link>
+              ),
             },
             { title: 'Aufnahme' },
           ]}

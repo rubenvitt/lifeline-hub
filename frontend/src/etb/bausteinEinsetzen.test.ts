@@ -3,7 +3,16 @@ import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
 import { ermittlePlatzhalter, setzeBausteinEin } from './bausteinEinsetzen';
 
 function baustein(p: Partial<EtbBaustein>): EtbBaustein {
-  return { id: 1, label: 'B', typ: 'meldung', inhalt: '', meldeweg: null, veranlassung: null, sortier: 0, ...p };
+  return {
+    id: 1,
+    label: 'B',
+    typ: 'meldung',
+    inhalt: '',
+    meldeweg: null,
+    veranlassung: null,
+    sortier: 0,
+    ...p,
+  };
 }
 
 const einsatz = {
@@ -33,7 +42,10 @@ describe('ermittlePlatzhalter', () => {
 
 describe('setzeBausteinEin', () => {
   it('substituiert Auto-Kontext still und manuelle Werte', () => {
-    const b = baustein({ typ: 'meldung', inhalt: '{einheit} an {einsatzort} (Einsatz {einsatz}).' });
+    const b = baustein({
+      typ: 'meldung',
+      inhalt: '{einheit} an {einsatzort} (Einsatz {einsatz}).',
+    });
     const ergebnis = setzeBausteinEin(b, einsatz, { einheit: '1. Zug' });
     expect(ergebnis).toEqual({
       typ: 'meldung',

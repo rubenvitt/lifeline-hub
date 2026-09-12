@@ -26,8 +26,7 @@ import {
 const BACKOFF_MS = [1_000, 5_000, 15_000, 30_000];
 
 type QueueElement =
-  | { art: 'etb'; wert: AusstehenderEintrag }
-  | { art: 'schreiben'; wert: AusstehendeSchreibaktion };
+  { art: 'etb'; wert: AusstehenderEintrag } | { art: 'schreiben'; wert: AusstehendeSchreibaktion };
 
 function fehlermeldung(e: unknown): string {
   return e instanceof ApiError ? e.message : 'Abgelehnt';
@@ -47,99 +46,99 @@ export function useOfflineSync(benutzerId?: number): void {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushRef = useRef<() => Promise<void>>(async () => {});
 
-  const verarbeiteEinsatz = useCallback(async (
-    aktuellerBenutzerId: number,
-    elemente: QueueElement[],
-  ) => {
-    let transientOffen = false;
-    for (const element of elemente) {
-      if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
-      try {
-        if (element.art === 'etb') {
-          await erfasseEtb(element.wert.einsatz_id, element.wert.eintrag, {
-            offlineQueueBenutzerId: aktuellerBenutzerId,
-          });
-          if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
-          await queueEntfernen(aktuellerBenutzerId, element.wert.id!);
-          void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
-        } else if (element.wert.aktion.art === 'person') {
-          const person = await legePersonAn(
-            element.wert.einsatz_id,
-            element.wert.aktion.daten,
-            { offlineQueueBenutzerId: aktuellerBenutzerId },
-          );
-          if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
-          const quittung = await schreibaktionPersonAbschliessen(
-            aktuellerBenutzerId,
-            element.wert,
-            person,
-          );
-          // Ein konkurrierender Tab kann dieselbe Pending-Zeile zwischen HTTP-Antwort
-          // und Transaktion bereits abgeschlossen haben. Dessen persistente Quittung
-          // ist dann die einzige UI-Wahrheit; hier wird kein zweites Signal erzeugt.
-          if (!quittung) continue;
-          qc.setQueryData<Person[]>(einsatzKeys.personen(element.wert.einsatz_id), (alt) => {
-            if (!alt) return alt;
-            const ohne = alt.filter((wert) => wert.id !== person.id);
-            return [...ohne, person];
-          });
-          void qc.invalidateQueries({
-            queryKey: einsatzKeys.personen(element.wert.einsatz_id),
-            refetchType: 'none',
-          });
-          void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
-          // Der Anlege-Request kann zugleich den UHS-Eintritt enthalten (LFH-458).
-          // Auch ohne funktionierenden Live-Stream muss die gerade offene UHS nachladen.
-          const uhsId = element.wert.aktion.daten.uhs_id;
-          if (uhsId != null) {
-            void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(element.wert.einsatz_id) });
-            void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(element.wert.einsatz_id, uhsId) });
-          }
-          meldeOfflineSchreibaktionGesendet({
-            art: 'person',
-            benutzerId: aktuellerBenutzerId,
-            einsatzId: element.wert.einsatz_id,
-            clientId: quittung.client_id,
-            daten: person,
-            sicht: quittung.sicht,
-          });
-        } else {
-          const meldung = await legeMeldungAn(
-            element.wert.einsatz_id,
-            element.wert.aktion.daten,
-            { offlineQueueBenutzerId: aktuellerBenutzerId },
-          );
-          if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
-          await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
-          void qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(element.wert.einsatz_id) });
-          void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
-          const clientId = element.wert.aktion.daten.client_id;
-          if (clientId) {
+  const verarbeiteEinsatz = useCallback(
+    async (aktuellerBenutzerId: number, elemente: QueueElement[]) => {
+      let transientOffen = false;
+      for (const element of elemente) {
+        if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+        try {
+          if (element.art === 'etb') {
+            await erfasseEtb(element.wert.einsatz_id, element.wert.eintrag, {
+              offlineQueueBenutzerId: aktuellerBenutzerId,
+            });
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            await queueEntfernen(aktuellerBenutzerId, element.wert.id!);
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
+          } else if (element.wert.aktion.art === 'person') {
+            const person = await legePersonAn(element.wert.einsatz_id, element.wert.aktion.daten, {
+              offlineQueueBenutzerId: aktuellerBenutzerId,
+            });
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            const quittung = await schreibaktionPersonAbschliessen(
+              aktuellerBenutzerId,
+              element.wert,
+              person,
+            );
+            // Ein konkurrierender Tab kann dieselbe Pending-Zeile zwischen HTTP-Antwort
+            // und Transaktion bereits abgeschlossen haben. Dessen persistente Quittung
+            // ist dann die einzige UI-Wahrheit; hier wird kein zweites Signal erzeugt.
+            if (!quittung) continue;
+            qc.setQueryData<Person[]>(einsatzKeys.personen(element.wert.einsatz_id), (alt) => {
+              if (!alt) return alt;
+              const ohne = alt.filter((wert) => wert.id !== person.id);
+              return [...ohne, person];
+            });
+            void qc.invalidateQueries({
+              queryKey: einsatzKeys.personen(element.wert.einsatz_id),
+              refetchType: 'none',
+            });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
+            // Der Anlege-Request kann zugleich den UHS-Eintritt enthalten (LFH-458).
+            // Auch ohne funktionierenden Live-Stream muss die gerade offene UHS nachladen.
+            const uhsId = element.wert.aktion.daten.uhs_id;
+            if (uhsId != null) {
+              void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(element.wert.einsatz_id) });
+              void qc.invalidateQueries({
+                queryKey: einsatzKeys.uhsDetail(element.wert.einsatz_id, uhsId),
+              });
+            }
             meldeOfflineSchreibaktionGesendet({
-              art: 'meldung',
+              art: 'person',
               benutzerId: aktuellerBenutzerId,
               einsatzId: element.wert.einsatz_id,
-              clientId,
-              daten: meldung,
+              clientId: quittung.client_id,
+              daten: person,
+              sicht: quittung.sicht,
             });
+          } else {
+            const meldung = await legeMeldungAn(
+              element.wert.einsatz_id,
+              element.wert.aktion.daten,
+              { offlineQueueBenutzerId: aktuellerBenutzerId },
+            );
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+            void qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(element.wert.einsatz_id) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
+            const clientId = element.wert.aktion.daten.client_id;
+            if (clientId) {
+              meldeOfflineSchreibaktionGesendet({
+                art: 'meldung',
+                benutzerId: aktuellerBenutzerId,
+                einsatzId: element.wert.einsatz_id,
+                clientId,
+                daten: meldung,
+              });
+            }
+          }
+        } catch (e) {
+          if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+          if (istOfflineTransient(e)) {
+            if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
+            transientOffen = true;
+            break; // Reihenfolge innerhalb eines Einsatzes wahren
+          }
+          if (element.art === 'etb') {
+            await queueAblehnen(aktuellerBenutzerId, element.wert, fehlermeldung(e));
+          } else {
+            await schreibaktionAblehnen(aktuellerBenutzerId, element.wert, fehlermeldung(e));
           }
         }
-      } catch (e) {
-        if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
-        if (istOfflineTransient(e)) {
-          if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
-          transientOffen = true;
-          break; // Reihenfolge innerhalb eines Einsatzes wahren
-        }
-        if (element.art === 'etb') {
-          await queueAblehnen(aktuellerBenutzerId, element.wert, fehlermeldung(e));
-        } else {
-          await schreibaktionAblehnen(aktuellerBenutzerId, element.wert, fehlermeldung(e));
-        }
       }
-    }
-    return transientOffen;
-  }, [qc]);
+      return transientOffen;
+    },
+    [qc],
+  );
 
   const flush = useCallback(async () => {
     if (!montiert.current || benutzerId == null || !navigator.onLine) return;
@@ -176,9 +175,11 @@ export function useOfflineSync(benutzerId?: number): void {
               ...aktuelleEtb.map((wert): QueueElement => ({ art: 'etb', wert })),
               ...aktuelleSchreibaktionen.map((wert): QueueElement => ({ art: 'schreiben', wert })),
             ];
-            elemente.sort((a, b) =>
-              a.wert.erstellt_at.localeCompare(b.wert.erstellt_at) ||
-              (a.wert.id ?? 0) - (b.wert.id ?? 0));
+            elemente.sort(
+              (a, b) =>
+                a.wert.erstellt_at.localeCompare(b.wert.erstellt_at) ||
+                (a.wert.id ?? 0) - (b.wert.id ?? 0),
+            );
             return verarbeiteEinsatz(benutzerId, elemente);
           };
 

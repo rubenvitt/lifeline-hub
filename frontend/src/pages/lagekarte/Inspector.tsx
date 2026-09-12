@@ -60,22 +60,36 @@ const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschn
  *  `abschnitt` → kein eindeutiges Backend-Tag → undefined (exclude weggelassen). */
 function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined {
   switch (m.typ) {
-    case 'einsatzort': return `einsatzort:${einsatzId}`;
-    case 'uhs':        return `uhs:${m.id}`;
-    case 'schaden':    return `schaden:${m.id}`;
-    case 'einheit':    return `einheit:${m.id}`;
-    case 'fahrzeug':   return `fahrzeug:${m.id}`;
-    case 'fuehrung':   return `personal:${m.id}`;
-    case 'lagemeldung': return `lagemeldung:${m.id}`;
+    case 'einsatzort':
+      return `einsatzort:${einsatzId}`;
+    case 'uhs':
+      return `uhs:${m.id}`;
+    case 'schaden':
+      return `schaden:${m.id}`;
+    case 'einheit':
+      return `einheit:${m.id}`;
+    case 'fahrzeug':
+      return `fahrzeug:${m.id}`;
+    case 'fuehrung':
+      return `personal:${m.id}`;
+    case 'lagemeldung':
+      return `lagemeldung:${m.id}`;
     // Freie Zeichen haben kein Fachobjekt-Backend-Tag → keine Ort-Vorschau-Exklusion.
-    case 'freies_zeichen': return undefined;
-    case 'abschnitt':  return undefined;
+    case 'freies_zeichen':
+      return undefined;
+    case 'abschnitt':
+      return undefined;
   }
 }
 
 /** Kompakter Marker-Inspector mit Link ins jeweilige Fach-Modul. */
 export default function Inspector({
-  einsatzId, marker, darfSchreiben, onSchliessen, onVerortungLoeschen, onSymbolAendern,
+  einsatzId,
+  marker,
+  darfSchreiben,
+  onSchliessen,
+  onVerortungLoeschen,
+  onSymbolAendern,
 }: InspectorProps) {
   const { token } = theme.useToken();
   // Eigene ids statt fester Literale: der Inspector kann neben anderen Feldern derselben
@@ -90,7 +104,9 @@ export default function Inspector({
 
   return (
     <KartenDetailCard titel={marker.label} akzentFarbe={marker.farbe} onSchliessen={onSchliessen}>
-      <Tag color={marker.farbe} style={{ marginBottom: token.marginXS }}>{TYP_LABEL[marker.typ]}</Tag>
+      <Tag color={marker.farbe} style={{ marginBottom: token.marginXS }}>
+        {TYP_LABEL[marker.typ]}
+      </Tag>
       <Descriptions column={1}>
         {marker.typ === 'lagemeldung' && marker.lageMeldung && (
           <Descriptions.Item label="Absender">{marker.lageMeldung.absender}</Descriptions.Item>
@@ -106,7 +122,13 @@ export default function Inspector({
               hängt und die Karte auf Touch bedient wird: was hier steht, muss ohne ihn
               tragen. Wo das nicht reicht, führt der Knopf darunter ins Fach-Modul, das die
               Adresse ungekürzt zeigt. */}
-          <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} maxOrtZeilen={3} />
+          <KoordinatenAnzeige
+            lat={marker.lat}
+            lon={marker.lon}
+            einsatzId={einsatzId}
+            exclude={inspectorExclude(marker, einsatzId)}
+            maxOrtZeilen={3}
+          />
         </Descriptions.Item>
       </Descriptions>
       {/* Abstand am Aufrufer wie im FachebenenInspector: `GeoKennzahlen` rendert ohne
@@ -118,7 +140,11 @@ export default function Inspector({
         </div>
       )}
       {symbolAuswahl && (
-        <Space orientation="vertical" size={token.marginXS} style={{ width: '100%', marginTop: token.marginXS }}>
+        <Space
+          orientation="vertical"
+          size={token.marginXS}
+          style={{ width: '100%', marginTop: token.marginXS }}
+        >
           {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen. Zwei Quellen wären eine
               doppelte Benennung, bei der `aria-label` gewinnt und den sichtbaren Text vom
               Accessible Name abkoppelt. */}
@@ -152,7 +178,11 @@ export default function Inspector({
           und `FreiesZeichenInspector` an derselben Karte.
           Kein Dreipunkt-Menü: gezählt wird nach der Rechteprüfung (LFH-366), und ohne
           Schreibrecht bleibt hier genau eine Aktion. */}
-      <Space orientation="vertical" size="middle" style={{ width: '100%', marginTop: token.marginXS }}>
+      <Space
+        orientation="vertical"
+        size="middle"
+        style={{ width: '100%', marginTop: token.marginXS }}
+      >
         {/* `display: block` am Anker: er ist inline, sonst liefe das `block` am Knopf darin
             ins Leere und die Zeile bliebe auf Textbreite. */}
         <Link to={modulLink} style={{ display: 'block' }}>

@@ -12,13 +12,23 @@ import { server } from './test/server';
 import { SITZUNG_ABGELAUFEN } from './auth/sitzungsEvent';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 const einsatz = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null,
-  abgeschlossen_von: null, meine_rolle: 'einsatzleitung',
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-23 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  meine_rolle: 'einsatzleitung',
 };
 
 afterEach(() => vi.restoreAllMocks());
@@ -26,13 +36,18 @@ afterEach(() => vi.restoreAllMocks());
 function renderApp(route: string) {
   const client = neuerQueryClient();
   const router = createMemoryRouter(appRouten, { initialEntries: [route] });
-  return { router, ...render(
-    <QueryClientProvider client={client}>
-      <ConfigProvider>
-        <AntApp><RouterProvider router={router} /></AntApp>
-      </ConfigProvider>
-    </QueryClientProvider>,
-  ) };
+  return {
+    router,
+    ...render(
+      <QueryClientProvider client={client}>
+        <ConfigProvider>
+          <AntApp>
+            <RouterProvider router={router} />
+          </AntApp>
+        </ConfigProvider>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 describe('App-Routing', () => {
@@ -56,9 +71,13 @@ describe('App-Routing', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
     await screen.findByText(/🚧 Stab/);
     expect(router.state.location).toMatchObject({
-      pathname: '/einsaetze/7/stab', search: '?ansicht=detail', hash: '#lage',
+      pathname: '/einsaetze/7/stab',
+      search: '?ansicht=detail',
+      hash: '#lage',
     });
-    await act(async () => { await router.navigate('/einsaetze'); });
+    await act(async () => {
+      await router.navigate('/einsaetze');
+    });
     expect(await screen.findByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
     expect(pruefungen).toBe(1);
   });
@@ -73,7 +92,9 @@ describe('App-Routing', () => {
     const { router } = renderApp('/einsaetze');
     await screen.findByRole('button', { name: 'Neuer Einsatz' });
     const ziel = '/einsaetze/7/stab?ansicht=detail#lage';
-    await act(async () => { await router.navigate(ziel); });
+    await act(async () => {
+      await router.navigate(ziel);
+    });
     await screen.findByText(/🚧 Stab/);
     act(() => window.dispatchEvent(new Event(SITZUNG_ABGELAUFEN)));
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
@@ -159,7 +180,11 @@ describe('App-Routing', () => {
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/gefahrengebiete', () => HttpResponse.json([{ id: 1, einsatz_id: 7, label: 'Nord', zonen_ids: [], hoechste_warnstufe: 'keine' }])),
+      http.get('/api/einsaetze/7/gefahrengebiete', () =>
+        HttpResponse.json([
+          { id: 1, einsatz_id: 7, label: 'Nord', zonen_ids: [], hoechste_warnstufe: 'keine' },
+        ]),
+      ),
       http.get('/api/einsaetze/7/gefahrengebiete/1/matrix', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7/gefahren');
@@ -182,7 +207,12 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/einstellungen', () =>
-        HttpResponse.json({ einsatz_id: 7, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false }),
+        HttpResponse.json({
+          einsatz_id: 7,
+          etb_nummer_eingefroren: false,
+          meldung_nummer_eingefroren: false,
+          auftrag_nummer_eingefroren: false,
+        }),
       ),
     );
   }

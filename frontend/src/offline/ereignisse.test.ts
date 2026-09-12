@@ -56,7 +56,9 @@ afterEach(() => {
 describe('datenarmes Offline-Receipt-Signal', () => {
   it('fällt bei gescheiterter BroadcastChannel-Konstruktion auf Storage zurück', () => {
     class WirftBeimOeffnen {
-      constructor() { throw new Error('gesperrt'); }
+      constructor() {
+        throw new Error('gesperrt');
+      }
     }
     vi.stubGlobal('BroadcastChannel', WirftBeimOeffnen);
     const { removeItem, setItem } = installiereStorageSpion();
@@ -67,7 +69,9 @@ describe('datenarmes Offline-Receipt-Signal', () => {
     const [key, serialisiert] = setItem.mock.calls[0];
     expect(key).toBe('lfh:offline-quittung-signal');
     expect(JSON.parse(serialisiert)).toEqual({
-      typ: 'person-erfassungsquittung', benutzerId: 11, einsatzId: 22,
+      typ: 'person-erfassungsquittung',
+      benutzerId: 11,
+      einsatzId: 22,
     });
     expect(serialisiert).not.toContain('bleibt-lokal');
   });
@@ -75,10 +79,14 @@ describe('datenarmes Offline-Receipt-Signal', () => {
   it('fällt auch bei gescheitertem postMessage ohne Flush-Fehler auf Storage zurück', () => {
     const close = vi.fn();
     class WirftBeimSenden {
-      postMessage() { throw new Error('inzwischen geschlossen'); }
+      postMessage() {
+        throw new Error('inzwischen geschlossen');
+      }
       addEventListener() {}
       removeEventListener() {}
-      close() { close(); }
+      close() {
+        close();
+      }
     }
     vi.stubGlobal('BroadcastChannel', WirftBeimSenden);
     const { setItem } = installiereStorageSpion();
@@ -87,7 +95,9 @@ describe('datenarmes Offline-Receipt-Signal', () => {
     expect(close).toHaveBeenCalledOnce();
     expect(setItem).toHaveBeenCalledOnce();
     expect(JSON.parse(setItem.mock.calls[0][1])).toEqual({
-      typ: 'person-erfassungsquittung', benutzerId: 11, einsatzId: 22,
+      typ: 'person-erfassungsquittung',
+      benutzerId: 11,
+      einsatzId: 22,
     });
   });
 });

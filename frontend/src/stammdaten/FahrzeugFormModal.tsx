@@ -142,7 +142,9 @@ export default function FahrzeugFormModal({
           }}
         />
       </Form.Item>
-      <Form.Item label="Kennzeichen" name="kennzeichen"><Input /></Form.Item>
+      <Form.Item label="Kennzeichen" name="kennzeichen">
+        <Input />
+      </Form.Item>
       {/* NUR im Bearbeiten-Modus: ein neu angelegtes Fahrzeug hat noch keine id und damit
           keine Route. Der Weg zu den sieben übrigen Feldern ist damit von hier aus
           sichtbar, statt dass sie unauffindbar wären. */}

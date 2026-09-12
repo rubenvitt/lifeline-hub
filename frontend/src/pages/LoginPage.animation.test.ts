@@ -15,10 +15,7 @@ import { describe, expect, it } from 'vitest';
  * führt keine Animationen aus; `getComputedStyle` auf eine Keyframe-Animation liefert dort
  * nichts Belastbares. Der Text ist die Wahrheit, die im Browser ankommt.
  */
-const css = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'LoginPage.css'),
-  'utf8',
-);
+const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'LoginPage.css'), 'utf8');
 
 /**
  * Schneidet den Regelkörper eines Selektors heraus (erste Fundstelle); `''`, wenn es die

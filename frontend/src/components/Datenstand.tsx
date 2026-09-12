@@ -16,8 +16,8 @@ export function formatiereDatenstand(dataUpdatedAt: number): string {
  * Gesamtansicht. Ein neuer Teilabruf darf die übrigen, älteren Daten nicht jünger ausweisen.
  */
 export function gemeinsamerDatenstand(...zeitstempel: Array<number | undefined>): number {
-  const geladen = zeitstempel.filter((wert): wert is number =>
-    typeof wert === 'number' && Number.isFinite(wert) && wert > 0,
+  const geladen = zeitstempel.filter(
+    (wert): wert is number => typeof wert === 'number' && Number.isFinite(wert) && wert > 0,
   );
   return geladen.length > 0 ? Math.min(...geladen) : 0;
 }

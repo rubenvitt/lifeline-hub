@@ -6,9 +6,17 @@ import { rollenFarbe } from '../../theme/statusFarben';
 import AbschnittKnoten from './AbschnittKnoten';
 
 const nord = {
-  id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: 3,
-  leiter_name: 'Leiter Nord', bemerkung: null, sortier: 0, sprechgruppen: [],
-  kommunikationsmittel: null, erreichbarkeit: '0151 1',
+  id: 5,
+  einsatz_id: 1,
+  ueber_abschnitt_id: null,
+  name: 'Nord',
+  leiter_id: 3,
+  leiter_name: 'Leiter Nord',
+  bemerkung: null,
+  sortier: 0,
+  sprechgruppen: [],
+  kommunikationsmittel: null,
+  erreichbarkeit: '0151 1',
 } as unknown as Einsatzabschnitt;
 
 /** Liest die Tokens desselben Providers, in dem der Knoten steht — der Vergleich prüft den
@@ -37,7 +45,11 @@ function normalisiere(wert: string | undefined): string {
   return el.style.color;
 }
 
-function renderKnoten(abschnitt: Einsatzabschnitt, staerke = { fuehrer: 1, unterfuehrer: 3, mannschaft: 4 }, anzahl = 2) {
+function renderKnoten(
+  abschnitt: Einsatzabschnitt,
+  staerke = { fuehrer: 1, unterfuehrer: 3, mannschaft: 4 },
+  anzahl = 2,
+) {
   render(
     <ConfigProvider>
       <TokenSonde />

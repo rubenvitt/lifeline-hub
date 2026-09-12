@@ -65,9 +65,7 @@ export interface EditSitzungSteuerung<W> {
  * Das Formular wird MIT befüllt, weil nur so Werte und Basis nachweislich aus einem
  * Snapshot stammen: zwei getrennte Aufrufe könnten wieder auseinanderlaufen.
  */
-export function useEditSitzung<W extends object>(
-  form: FormInstance<W>,
-): EditSitzungSteuerung<W> {
+export function useEditSitzung<W extends object>(form: FormInstance<W>): EditSitzungSteuerung<W> {
   const [sitzung, setSitzung] = useState<EditSitzung<W> | null>(null);
 
   const starte = useCallback(
