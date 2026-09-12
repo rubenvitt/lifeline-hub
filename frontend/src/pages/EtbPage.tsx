@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
@@ -32,6 +32,8 @@ import { scrolleZurZeile } from '../components/Datensicht';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import Datenstand from '../components/Datenstand';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import StatusTag from '../components/StatusTag';
+import { einsatzStatus } from '../theme/statusFarben';
 
 export default function EtbPage() {
   const { id } = useParams();
@@ -360,7 +362,7 @@ export default function EtbPage() {
             <Typography.Title level={3} style={{ margin: 0 }}>
               {einsatz.bezeichnung}
             </Typography.Title>
-            <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
           </Space>
           <Datenstand dataUpdatedAt={etbQuery.dataUpdatedAt} />
         </Space>

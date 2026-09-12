@@ -15,11 +15,16 @@
  * `kommunikation/phase.ts` namentlich verbietet — und träfe acht Konsumenten in vier
  * Modulen samt `unbearbeitet`-Zweikanal (C8/H47). Das bleibt ein eigenes Ticket.
  *
- * Die Linie ist nicht neu: `einsatz/einsatzStatus.ts` trägt den Vertragstyp
- * `StatusDarstellung` und liegt trotzdem bewusst außerhalb von `statusFarben.ts` — mit
- * derselben Begründung (dessen Abdeckungsguard zählt gegen ein `toHaveLength`, ein
- * Eintrag mehr ist eine Vertragsänderung, kein Nebenprodukt). Dies ist die zweite
- * Anwendung, nicht eine Ausrede für diesen einen Fall.
+ * NACHTRAG LFH-358, und er dreht die halbe Begründung um: dieser Absatz berief sich auf
+ * `einsatz/einsatzStatus.ts` als Präzedenz („trägt den Vertragstyp und liegt trotzdem
+ * außerhalb, weil der Abdeckungsguard gegen ein `toHaveLength` zählt"). Diese Präzedenz
+ * gibt es nicht mehr — LFH-358 hat die Vertragsänderung vorgenommen, den Eintrag geholt
+ * und zwei Guards gegen eine Wiederholung gesetzt (`theme/statusVertrag.guard.test.ts`).
+ * Die Entscheidung HIER steht trotzdem, aber auf ihrem eigenen Grund: `PHASE_META` trägt
+ * `StatusDarstellung` gar nicht (`Record<KommPhase, { color, label }>`), der Umzug wäre
+ * also kein Heben, sondern eine Umschreibung — samt acht Konsumenten in vier Modulen.
+ * Der Kartenguard erfasst sie aus demselben Grund nicht; das ist kein Schlupfloch,
+ * sondern die Grenze zwischen „steht im Vertrag" und „gehört in den Vertrag".
  *
  * WAS DIE UMSTELLUNG FARBLICH BEWIRKT — gemessen, nicht per Analogie behauptet: `PHASE_META`
  * führt antds STATUS-Farben (`default`/`processing`/`success`/`error`), keine Presets.

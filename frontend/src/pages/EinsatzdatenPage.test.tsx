@@ -405,7 +405,7 @@ describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
 
     // Die zweite, unterscheidende Hälfte: ein lokales `status[0].toUpperCase()` erfüllte
     // das Paar oben vollständig. Erst `data-rolle` belegt, dass der Wert durch
-    // `EINSATZ_STATUS` und `StatusTag` gelaufen ist — und damit über die Rollenachse des
+    // `einsatzStatus` und `StatusTag` gelaufen ist — und damit über die Rollenachse des
     // Statusfarb-Vertrags statt über eine erfundene Farbe.
     expect(tag.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'neutral');
   });

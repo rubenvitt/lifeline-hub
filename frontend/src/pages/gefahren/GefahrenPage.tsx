@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Space, Spin, Tag, Typography, theme } from 'antd';
+import { Alert, App, Button, Space, Spin, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -17,7 +17,8 @@ import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
-import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
+import { warnstufeKarte } from '../../theme/statusFarben';
+import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
@@ -233,12 +234,14 @@ export default function GefahrenPage() {
             }}
           >
             <Space>
-              {/* Etikett, nicht Fläche: `warnstufeKarte` liefert die Rolle, `rollenFarbe`
-                  den Wert des aktiven Modus. Vorher stand hier `warnstufeFarbe` — dieselbe
-                  Sortenverwechslung, die LFH-328 in `ZonenInspector.tsx` behoben hat. */}
-              <Tag color={rollenFarbe(warnstufeKarte[g.hoechste_warnstufe].rolle, token)}>
-                {warnstufeKarte[g.hoechste_warnstufe].label}
-              </Tag>
+              {/* Etikett, nicht Fläche: `warnstufeKarte` liefert die Rolle. Vorher stand hier
+                  `warnstufeFarbe` — dieselbe Sortenverwechslung, die LFH-328 in
+                  `ZonenInspector.tsx` behoben hat —, danach ein `rollenFarbe`-Wert an antds
+                  `color`-Prop. Auch das ist falsch und seit LFH-358 vom Guard erfasst: antd 6
+                  rechnet für einen Nicht-Preset ein STATISCHES Farbpaar aus der Zeichenkette
+                  (`StatusTag.tsx` zitiert die Stelle), der Modus erreicht es also nicht mehr,
+                  und der Wortlaut steht als Fläche statt als Rand. `StatusTag` löst beides. */}
+              <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
               <span>{gefahrengebietName(g.label, g.id)}</span>
               <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
             </Space>
