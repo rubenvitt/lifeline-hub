@@ -244,15 +244,32 @@ export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
  * Warnstufe als **Objektsignatur auf der Karte** (früher `WARNSTUFE_KARTE`,
  * `pages/lagekarte/zonenStil.ts`).
  *
- * `keine` ist bewusst `alarm`: ein noch unbewertetes Gefahrengebiet wird vorsichtshalber
- * als Gefahr dargestellt, nicht „ruhiger" als `niedrig`. Wer hier auf `normal` zieht,
- * dreht eine Sicherheitsentscheidung zurück — die Gegenlesart steht als
+ * `keine` ist bewusst `alarm`: ein Gefahrengebiet ohne gesetzte Warnstufe wird
+ * vorsichtshalber als Gefahr dargestellt, nicht „ruhiger" als `niedrig`. Wer hier auf
+ * `normal` zieht, dreht eine Sicherheitsentscheidung zurück — die Gegenlesart steht als
  * {@link warnstufeKennzahl} daneben, nicht statt dessen.
  *
  * AUFLÖSUNGSVERLUST: der Bestand hatte fünf verschiedene Rot-/Gelbtöne, A0 hat drei
  * Statusrollen. `niedrig`/`mittel` fallen damit auf dieselbe Rolle, ebenso
- * `keine`/`hoch`/`akut`. Wer die fünf Stufen visuell unterscheiden muss, nutzt `label`
- * (immer vorhanden) oder `form` — nicht eine sechste Farbe.
+ * `keine`/`hoch`/`akut` — die Farbe unterscheidet ZWEI Stufen, nicht fünf. Eine sechste
+ * Farbe gibt es dafür weiterhin nicht.
+ *
+ * DIE A2-BEGRÜNDUNG DAZU WAR FALSCH; LFH-357 hat sie eingelöst statt sie umzuschreiben.
+ * Sie lautete „wer die fünf Stufen unterscheiden muss, nutzt `label` (immer vorhanden)
+ * oder `form`" — auf der Kartenfläche hielt keine der beiden Hälften:
+ *
+ * - `label` stand dort NICHT: `pages/lagekarte/kartenLayer.ts` beschriftete eine Zone mit
+ *   ihrem NAMEN, und `ZoneStil` hat kein Feld für Text oder Form. Operativ sahen damit
+ *   `niedrig` und `mittel` identisch aus, ebenso `hoch`, `akut` und ein Gebiet ohne Stufe.
+ * - `form` kann es grundsätzlich nicht: es trägt DREI Zeichen (`FORM_ZEICHEN`,
+ *   `components/StatusTag.tsx`) für fünf Stufen. Es ist in diesem Vertrag an keinem
+ *   Eintrag gesetzt, und LFH-357 ändert daran nichts — ein dritter Kanal, der die
+ *   Auflösung gar nicht herstellen kann, wird nicht gesetzt, bloss weil es ihn gibt.
+ *
+ * Der tragende zweite Kanal auf der Karte ist deshalb der TEXT, und er steht jetzt wirklich
+ * dort: `pages/lagekarte/zonenStil.ts:zonenBeschriftung` setzt „Warnstufe: <label>" unter
+ * den Zonennamen und liest `label` VON HIER. Wer ein Wort in dieser Map ändert, ändert die
+ * Kartenbeschriftung mit — das ist Absicht, nicht Nebenwirkung.
  */
 export const warnstufeKarte: Record<Warnstufe, StatusDarstellung> = {
   keine: { rolle: 'alarm', label: 'keine' },

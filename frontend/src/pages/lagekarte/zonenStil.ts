@@ -75,3 +75,46 @@ export function gefahrengebietStil(warnstufe: Warnstufe, token: GlobalToken): Zo
   const c = rollenFarbe(warnstufeKarte[warnstufe].rolle, token);
   return { fillColor: c, fillOpacity: 0.25, lineColor: c, lineWidth: 2 };
 }
+
+/**
+ * Beschriftung einer Zone auf der Kartenfläche (LFH-357).
+ *
+ * DIE FARBE TRÄGT DIE SKALA NICHT. `warnstufeKarte` bildet fünf Stufen auf zwei
+ * unterscheidbare Rollen ab (`achtung`: niedrig/mittel · `alarm`: keine/hoch/akut) — ein
+ * Gebiet der Stufe `niedrig` und eines der Stufe `mittel` sahen auf der Karte identisch
+ * aus, ebenso `hoch`, `akut` und ein Gebiet ohne gesetzte Stufe. A2 (LFH-328) hielt das
+ * für gedeckt („wer die fünf Stufen unterscheiden muss, nutzt `label` oder `form`"), aber
+ * auf der Kartenfläche stand keiner der beiden Kanäle: der Zonen-Text trug den ZONENNAMEN,
+ * und `form` kann es grundsätzlich nicht — es hat drei Zeichen für fünf Stufen.
+ *
+ * Der tragende zweite Kanal ist deshalb der TEXT (WCAG 1.4.1, A1 Festlegung 5), und sein
+ * Wortlaut kommt aus dem Vertrag: {@link warnstufeKarte}`[stufe].label` ist die einzige
+ * Quelle. Wer das Wort dort ändert, ändert die Kartenbeschriftung mit — das ist Absicht.
+ *
+ * `Warnstufe: keine` heißt „keine Stufe gesetzt", nicht „keine Gefahr" — und genau deshalb
+ * steht dort nicht „unbewertet": gemessen am Backend (`src/gefahr/repo.rs`, Severity-MAX)
+ * entsteht Rang 0 SOWOHL aus gar keiner Bewertung ALS AUCH aus lauter `keine`-Zellen. Die
+ * Abfrage kann die beiden Fälle nicht trennen; ein Wort, das es behauptet, wäre falsch.
+ * Dass die Fläche dabei trotzdem rot bleibt, ist die Vorsichtsentscheidung aus
+ * {@link gefahrengebietStil} — der Text sagt jetzt dazu, worauf sie sich stützt.
+ *
+ * DREI Zustände, nicht zwei. `null` ist der Normalfall JEDER anderen Zonenart: sie trägt
+ * keine Stufe, also bleibt ihr Name unverändert — die Stufe gehört ans Gefahrengebiet, nicht
+ * an die Zone. `'unbekannt'` ist der Fall, in dem der Nachschlag ins Leere geht: das Ladegate
+ * der Karte hängt an `einsatz`/`config`, NICHT an der Gefahrengebiete-Query
+ * (`useLagekarteDaten.ts`) — die Karte zeichnet Zonen also, während die Gebiete noch laden
+ * oder ihr Abruf gescheitert ist. Für die FARBE wird das vorsichtshalber wie `keine`
+ * behandelt (Alarm, unverändert); für den TEXT nicht, denn dort wäre „keine" eine Behauptung
+ * über Daten, die es gerade nicht gibt — derselbe Maßstab wie eine Zeile höher bei
+ * „unbewertet". Gefunden im Codex-Review zu LFH-357.
+ */
+export function zonenBeschriftung(
+  label: string | null | undefined,
+  warnstufe: Warnstufe | 'unbekannt' | null,
+): string {
+  const name = label?.trim() ?? '';
+  if (warnstufe === null) return name;
+  const wort = warnstufe === 'unbekannt' ? 'unbekannt' : warnstufeKarte[warnstufe].label;
+  const stufe = `Warnstufe: ${wort}`;
+  return name ? `${name}\n${stufe}` : stufe;
+}

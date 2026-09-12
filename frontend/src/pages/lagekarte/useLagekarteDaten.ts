@@ -28,7 +28,7 @@ import {
 } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import { baueTzProps } from './taktischesZeichen';
-import { zoneStil, gefahrengebietStil } from './zonenStil';
+import { zoneStil, gefahrengebietStil, zonenBeschriftung } from './zonenStil';
 import type { ZoneFeature } from './kartenLayer';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 
@@ -243,11 +243,24 @@ export function useLagekarteDaten({
       (zeigeZonen ? zonen : []).flatMap((z) => {
         const g = parseGeometry(z.geometrie);
         if (!g) return [];
+        // EINE Ableitung der Stufe für BEIDE Kanäle: Farbe und Beschriftung dürfen nicht
+        // auseinanderlaufen (LFH-357). Den FEHLENDEN Nachschlag behandeln sie aber
+        // verschieden, und das ist Absicht (Codex-Review): `ladt` hängt an `einsatz`/`config`,
+        // nicht an der Gebiets-Query — die Zone wird also gezeichnet, während der Nachschlag
+        // noch leer ist (Ladefenster) oder leer bleibt (gescheiterter Abruf). Die Farbe rundet
+        // dann vorsichtshalber auf `keine` (Alarm, unveränderte A2-Entscheidung), der Text
+        // nicht: „keine" wäre dort eine Behauptung über Daten, die es gerade nicht gibt.
+        const gebietId = z.typ === 'gefahrengebiet' ? z.gefahrengebiet_id : null;
+        const warnstufe = gebietId != null ? gebietWarnstufe.get(gebietId) : undefined;
         const stil =
-          z.typ === 'gefahrengebiet' && z.gefahrengebiet_id != null
-            ? gefahrengebietStil(gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine', token)
+          gebietId != null
+            ? gefahrengebietStil(warnstufe ?? 'keine', token)
             : zoneStil(z.typ, z.farbe);
-        return [{ id: z.id, geometrie: g, label: z.label ?? null, stil }];
+        const beschriftung = zonenBeschriftung(
+          z.label,
+          gebietId != null ? (warnstufe ?? 'unbekannt') : null,
+        );
+        return [{ id: z.id, geometrie: g, label: beschriftung, stil }];
       }),
     [zonen, zeigeZonen, gebietWarnstufe, token],
   );
