@@ -145,6 +145,25 @@ describe('useLagekarteDaten Standquelle', () => {
     expect(result.current.zonenFeatures[0].stil).not.toEqual(gefahrengebietStil('keine', token));
   });
 
+  // LFH-357: die Stufe muss auf der Kartenfläche ANKOMMEN. `stil` allein kann sie nicht tragen —
+  // `niedrig`/`mittel` fallen auf dieselbe Rolle, `keine`/`hoch`/`akut` ebenso. Der Text ist der
+  // zweite Kanal, und diese Zusicherung prüft die VERDRAHTUNG: dass der Hook ihn setzt.
+  it('trägt die Warnstufe in die Zonenbeschriftung, nicht nur in die Farbe', async () => {
+    ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
+    // Die Zone im Dokument hat keinen eigenen Namen (`label: null`) — übrig bleibt die Stufe.
+    // Erwartung als LITERAL, nicht über `zonenBeschriftung`: sonst stünden beide Seiten auf
+    // derselben Quelle und eine verbogene Beschriftung bliebe grün.
+    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: mittel');
+    // Gegenprobe gegen die Nachbarin auf DERSELBEN Farbe — sie muss am Text auseinandergehen.
+    expect(result.current.zonenFeatures[0].label).not.toBe('Warnstufe: niedrig');
+  });
+
   it('speist den org_default aus dem Dokument in die Marker-TZ, nicht aus Live (Review-Fix #4)', async () => {
     ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
     const { result } = renderHook(

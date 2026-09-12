@@ -28,7 +28,7 @@ import {
 } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import { baueTzProps } from './taktischesZeichen';
-import { zoneStil, gefahrengebietStil } from './zonenStil';
+import { zoneStil, gefahrengebietStil, zonenBeschriftung } from './zonenStil';
 import type { ZoneFeature } from './kartenLayer';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 
@@ -243,11 +243,15 @@ export function useLagekarteDaten({
       (zeigeZonen ? zonen : []).flatMap((z) => {
         const g = parseGeometry(z.geometrie);
         if (!g) return [];
-        const stil =
+        // EINE Ableitung der Stufe für BEIDE Kanäle: Farbe und Beschriftung dürfen nicht
+        // auseinanderlaufen (LFH-357). `null` = diese Zonenart trägt gar keine Stufe.
+        const warnstufe =
           z.typ === 'gefahrengebiet' && z.gefahrengebiet_id != null
-            ? gefahrengebietStil(gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine', token)
-            : zoneStil(z.typ, z.farbe);
-        return [{ id: z.id, geometrie: g, label: z.label ?? null, stil }];
+            ? (gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine')
+            : null;
+        const stil =
+          warnstufe !== null ? gefahrengebietStil(warnstufe, token) : zoneStil(z.typ, z.farbe);
+        return [{ id: z.id, geometrie: g, label: zonenBeschriftung(z.label, warnstufe), stil }];
       }),
     [zonen, zeigeZonen, gebietWarnstufe, token],
   );
