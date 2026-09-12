@@ -55,6 +55,10 @@
  *     (`sf.StatusDarstellung` fällt auf) und den Kern unter durchsichtigen Hüllen
  *     (`Readonly<StatusDarstellung>` fällt auf). Aliase löst er nicht auf; das wäre ein
  *     Typchecker, kein Guard. Im Bestand gibt es keinen solchen Alias.
+ *   • **Eine unbekannte formerhaltende Hülle** um den Werttyp (`DeepReadonly<…>` o. ä.).
+ *     {@link FORMERHALTEND} ist eine Liste, kein Kriterium — bewusst, siehe die Begründung
+ *     dort: alles abzuschälen meldet `Record<Gruppe, Array<StatusDarstellung>>` und wäre
+ *     ein Fehlalarm. Im Bestand kommt keine Hülle ausserhalb der Liste vor.
  *   • **Ein Namensraum-Import von antd** (`import * as antd from 'antd'`, dann
  *     `<antd.Tag color=…>`). {@link tagNamenIn} löst die Umbenennung beim benannten
  *     Import auf, nicht die Qualifizierung im JSX-Namen. Im Bestand kommt weder das eine
@@ -281,25 +285,46 @@ function typargumente(text: string, auf: number): string[] | null {
 }
 
 /**
- * Schält durchsichtige Hüllen vom Werttyp ab: `Readonly<StatusDarstellung>` ist derselbe
- * Vertragstyp, nur anders geschrieben (im Codex-Review gefunden). Abgeschält wird JEDE
- * Hülle mit genau EINEM Typargument — `Readonly`, `Required`, `Partial`, eine eigene —,
- * weil die Liste sonst bei der nächsten Hilfstype veraltet und der Guard still durchlässt.
- * Mehrfach geschachtelt läuft die Schleife bis zum blanken Namen.
+ * Hüllen, die die FORM des Werts erhalten — `Readonly<StatusDarstellung>` ist derselbe
+ * Vertragstyp, nur anders geschrieben.
+ *
+ * EINE NAMENSLISTE, und das ist eine Korrektur: die erste Fassung schälte JEDE Hülle mit
+ * genau einem Typargument ab, mit der Begründung, eine Liste veralte bei der nächsten
+ * Hilfstype. Das war die falsche Abwägung (im Codex-Review gefunden). `Array`, `Promise`
+ * und `Set` haben ebenfalls ein Typargument und sind gerade NICHT durchsichtig — ein
+ * `Record<Gruppe, Array<StatusDarstellung>>` gruppiert Darstellungen, es bildet kein Enum
+ * auf seine Darstellung ab, und es zu melden wäre ein Fehlalarm.
+ *
+ * Die zwei Fehlerrichtungen sind nicht gleich viel wert: eine unvollständige Liste lässt
+ * eine neue Hilfstype durch (Falsch-Negativ, dokumentierter Blindfleck), das Abschälen
+ * von allem meldet gültigen Code (Fehlalarm). Und ein Gate, das aus dem falschen Grund
+ * rot wird, wird abgeschaltet statt befolgt — das wiegt hier schwerer.
  */
+const FORMERHALTEND = ['Readonly', 'Required', 'Partial', 'NonNullable'];
+
+/** Schält {@link FORMERHALTEND}e Hüllen ab, mehrfach geschachtelt bis zum blanken Namen. */
 function blattTyp(arg: string): string {
   let rest = arg.trim();
   for (;;) {
     const auf = rest.indexOf('<');
     if (auf === -1 || !rest.endsWith('>')) return rest;
+    if (!FORMERHALTEND.includes(rest.slice(0, auf).trim())) return rest;
     const args = typargumente(rest, auf);
     if (!args || args.length !== 1) return rest;
     rest = args[0].trim();
   }
 }
 
-/** Zerlegt den letzten Typparameter in seine Vereinigungsglieder auf oberster Ebene. */
-function vereinigungsglieder(arg: string): string[] {
+/**
+ * Zerlegt den letzten Typparameter in seine Glieder auf oberster Ebene — Vereinigung `|`
+ * UND Durchschnitt `&`.
+ *
+ * Der Durchschnitt kam im Codex-Review dazu: `Record<X, StatusDarstellung & { icon: … }>`
+ * erweitert den Vertragseintrag um Zusatzfelder und ist damit erst recht eine Karte über
+ * dem Vertragstyp. Beide Trennzeichen zusammen zu behandeln ist richtig, weil BEIDE den
+ * Vertragstyp als Glied führen können und die Frage hier nur lautet „kommt er vor?".
+ */
+function typglieder(arg: string): string[] {
   const teile: string[] = [];
   let tiefe = 0;
   let letzter = 0;
@@ -307,7 +332,7 @@ function vereinigungsglieder(arg: string): string[] {
     const z = arg[i];
     if (z === '<' || z === '[' || z === '(' || z === '{') tiefe++;
     else if (z === '>' || z === ']' || z === ')' || z === '}') tiefe--;
-    else if (z === '|' && tiefe === 0) {
+    else if ((z === '|' || z === '&') && tiefe === 0) {
       teile.push(arg.slice(letzter, i));
       letzter = i + 1;
     }
@@ -326,7 +351,7 @@ export function kartenStellen(text: string): number[] {
     // sf.StatusDarstellung>`, gültiges TypeScript) nicht am Vergleich vorbeiläuft —
     // im Codex-Review gefunden. Aliase löst der Guard weiterhin nicht auf, das wäre ein
     // Typchecker; ein QUALIFIZIERTER Name ist aber derselbe Typ, nur anders geschrieben.
-    const glieder = vereinigungsglieder(args[args.length - 1]).map((g) => {
+    const glieder = typglieder(args[args.length - 1]).map((g) => {
       const blatt = blattTyp(g);
       return blatt.split('.').pop()?.trim() ?? blatt;
     });
@@ -462,6 +487,34 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
     // Und die Gegenrichtung: eine Hülle um etwas ANDERES bleibt ruhig.
     expect(
       kartenBefunde({ '/src/pages/Fremd.ts': 'const k: Record<X, Readonly<TierMeta>> = {};' }),
+    ).toEqual([]);
+
+    // NICHT jede Hülle mit einem Typargument ist durchsichtig: eine Sammlung von
+    // Darstellungen bildet kein Enum auf SEINE Darstellung ab. Das zu melden wäre ein
+    // Fehlalarm — und ein Gate, das aus dem falschen Grund rot wird, wird abgeschaltet.
+    expect(
+      kartenBefunde({
+        '/src/pages/Sammlung.ts': [
+          'const a: Record<Gruppe, Array<StatusDarstellung>> = {};',
+          'const b: Record<X, Promise<StatusDarstellung>> = {};',
+          'const c: Record<X, Set<StatusDarstellung>> = {};',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+  });
+
+  it('erkennt den Vertragstyp auch als Glied eines Durchschnitts', () => {
+    // `StatusDarstellung & { icon }` erweitert den Vertragseintrag — erst recht eine Karte
+    // über dem Vertragstyp. Im Codex-Review gefunden.
+    expect(
+      kartenBefunde({
+        '/src/pages/Schnitt.ts':
+          'const k: Record<MeinStatus, StatusDarstellung & { icon: ReactNode }> = {};',
+      }),
+    ).toHaveLength(1);
+    // Gegenrichtung: ein Durchschnitt ohne den Vertragstyp bleibt ruhig.
+    expect(
+      kartenBefunde({ '/src/pages/Fremdschnitt.ts': 'const k: Record<X, Foo & Bar> = {};' }),
     ).toEqual([]);
   });
 
