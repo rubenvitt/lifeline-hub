@@ -27,6 +27,13 @@ import { expect, test, type Page } from '@playwright/test';
 // (`sources: {}` + ein Background-Layer). Die Map konstruiert also garantiert, Canvas
 // und Controls erscheinen — und es wird nie eine Kachel geladen. Der Test hängt damit
 // weder an einem Tile-Server noch an Seed-Daten.
+//
+// DIESE ENTSCHEIDUNG BLEIBT, und der Kachel-Pfad ist trotzdem geprüft — nur nicht hier
+// (LFH-356). Wer eine Zusicherung über Kacheln, `transformRequest`/`absolutiereProxyAnfrage`
+// oder den Offline-Vorratscache des Tile-Workers sucht oder ergänzen will, findet sie in
+// `lagekarte-kachelpfad.spec.ts` (Fixture-Basemap per `page.route`, Vector-Source durch den
+// Worker) und `lagekarte-offline-precache.spec.ts` (Prod-Bundle vom e2e-Backend, Service
+// Worker, `setOffline`). Diese Datei bleibt der schnelle, quellenlose Lebensnachweis.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
