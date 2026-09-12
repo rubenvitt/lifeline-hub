@@ -155,12 +155,21 @@ pub struct AbschlussEingabe {
 ///
 /// Liefert `(lfd_nr, etb_eintrag_id)` für die Quittung und den ETB-Kurzruf.
 ///
-/// **Der Termin-Schritt ist der einzige anfahrbare Rollback-Zweig dieser Transaktion** und
-/// damit der Träger der Atomaritäts-Zusicherung: er läuft als
-/// `UPDATE … WHERE id = ? AND status = 'aktiv'` und rollt bei `rows_affected == 0`
-/// ausdrücklich zurück (Muster `lagebericht/repo.rs::freigeben`). Das ist **keine** Redundanz
-/// zu `fordere_aktiv` auf der Route — über die Route ist der Zweig gar nicht erreichbar,
-/// weshalb der Test die Funktion direkt ruft.
+/// **Der Aktiv-Riegel nach den beiden Inserts ist der Rollback-Zweig dieser Transaktion** und
+/// damit der Träger der Atomaritäts-Zusicherung: schlägt er an, verwirft der Rollback
+/// ETB-Eintrag UND Zeile (Muster `lagebericht/repo.rs::freigeben`).
+///
+/// Das ist **keine** Redundanz zu `fordere_aktiv` auf der Route, und der Zweig ist **sehr
+/// wohl über die Route erreichbar** — eine frühere Fassung dieses Kommentars behauptete das
+/// Gegenteil und lag falsch: `fordere_aktiv` liest im Extractor einen Stand von VOR der
+/// Transaktion, und `write_retry!` (`src/tx.rs`) wartet bei BUSY am `BEGIN IMMEDIATE` mit
+/// Backoff. Hält ein konkurrierendes „Einsatz abschliessen" gerade den Schreib-Lock, wartet
+/// dieser Aufruf also absichtlich, bis jenes committet hat — der Retry-Pfad VERBREITERT das
+/// Fenster, statt es zu schliessen. Genau deshalb ist der Riegel unbedingt und nicht an den
+/// Termin-Schlüssel gehängt.
+///
+/// Der Test ruft die Funktion trotzdem direkt: über die Route ist der Zweig zwar erreichbar,
+/// aber nur in einem Rennen, das ein Test nicht verlässlich herstellt.
 pub async fn lagebesprechung_abschliessen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -237,22 +246,46 @@ pub async fn lagebesprechung_abschliessen(
         .execute(&mut *conn)
         .await?;
 
-        // 5. Der Einsatztermin — nur bei gesetztem Schlüssel (Tri-State).
+        // 5. Der Einsatz muss noch aktiv sein — UNBEDINGT, nicht nur wenn ein Termin mitkommt.
+        //
+        // Die Prüfung steht ABSICHTLICH hier, nach den beiden Inserts: sie ist damit der
+        // Träger der Atomaritäts-Zusicherung (Rollback verwirft ETB-Eintrag UND Zeile → kein
+        // verwaister Beleg). Vorgezogen wäre sie billiger, aber dann schriebe die Transaktion
+        // im Fehlerfall gar nichts, und die Mutationsprobe in `tests/stab.rs` („eine
+        // Transaktion durch drei Einzelaufrufe ersetzt ⇒ Test rot") verlöre ihren Gegenstand.
+        //
+        // Unbedingt statt am Termin-Schlüssel hängend (Codex-Review zu PR #60, P2): sonst
+        // liefe der Abschluss OHNE `naechste_at` durch die Transaktion, ohne den Zustand des
+        // Einsatzes je zu prüfen. `fordere_aktiv` im Extractor liest einen Stand von VOR der
+        // Transaktion; ein ETB-Eintrag vom Typ `entscheidung` ist append-only und gehört nicht
+        // in einen abgeschlossenen Einsatz. Der Riegel schliesst das Fenster ganz, weil
+        // `write_retry!` mit `BEGIN IMMEDIATE` den Schreib-Lock schon am BEGIN hält: ein
+        // konkurrierender Abschluss committet entweder vor unserem BEGIN (dann sieht dieses
+        // SELECT ihn) oder erst nach unserem COMMIT.
+        let noch_aktiv: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM einsatz WHERE id = ? AND status = 'aktiv'")
+                .bind(einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        if noch_aktiv.is_none() {
+            // 409, NICHT 422: das ist der Lebenszyklus des Einsatzes, und dieselbe Tatsache
+            // beantwortet `fordere_aktiv` am Route-Gate mit `Conflict`
+            // (`einsatz/berechtigung.rs`). Zwei Codes für denselben Sachverhalt, unterschieden
+            // nur durch Timing, wären für einen Client nicht auseinanderzuhalten.
+            return Err(AppError::Conflict(
+                "Einsatz ist abgeschlossen und schreibgeschützt".into(),
+            ));
+        }
+
+        // 6. Der Einsatztermin — nur bei gesetztem Schlüssel (Tri-State). Ohne
+        //    `status`-Prädikat: Schritt 5 hat es in derselben Transaktion bereits belegt, ein
+        //    zweites hier wäre ein Zweig, den kein Test mehr erreichen kann.
         if let Some(wert) = &eingabe.naechste_at {
-            let betroffen = sqlx::query(
-                "UPDATE einsatz SET naechste_lagebesprechung_at = ? WHERE id = ? AND status = 'aktiv'",
-            )
-            .bind(wert.as_deref())
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?
-            .rows_affected();
-            if betroffen == 0 {
-                // Rollback verwirft ETB-Eintrag UND Zeile → kein verwaister Beleg.
-                return Err(AppError::UnprocessableEntity(
-                    "Einsatz ist nicht (mehr) aktiv".into(),
-                ));
-            }
+            sqlx::query("UPDATE einsatz SET naechste_lagebesprechung_at = ? WHERE id = ?")
+                .bind(wert.as_deref())
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?;
         }
 
         Ok((lfd_nr, etb_id))
@@ -298,49 +331,67 @@ fn zustand_text(art: Option<BesetzungArt>, name: Option<&str>) -> String {
 }
 
 /// Der Vorherstand einer Zeile, als Text für den ETB-Eintrag.
-async fn vorher_text(
+/// Der fachliche Stand einer Zeile: `None` = nicht vergeben.
+type Stand = Option<(BesetzungArt, Option<i64>, Option<String>)>;
+
+/// Liest den Vorherstand ROH — für den ETB-Text **und** für den Gleichheitsvergleich.
+/// Beides aus einer Abfrage, damit die Frage „hat sich etwas geändert?" nicht an einem
+/// gerenderten Text hängt (ein Textvergleich würde `extern`/`rueckwaertig` mit gleichem
+/// Namen verwechseln, sobald sich die Formatierung einmal ändert).
+async fn vorher_stand(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     sachgebiet: Sachgebiet,
-) -> Result<String, AppError> {
-    let row: Option<(String, Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT besetzung_art, snap_name, bezeichnung FROM einsatz_stabsfunktion \
+) -> Result<Stand, AppError> {
+    let row: Option<(String, Option<i64>, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT besetzung_art, personal_id, snap_name, bezeichnung FROM einsatz_stabsfunktion \
          WHERE einsatz_id = ? AND sachgebiet = ?",
     )
     .bind(einsatz_id)
     .bind(sachgebiet.as_str())
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(match row {
+    Ok(row.and_then(|(art, pid, snap, bez)| {
+        let art = BesetzungArt::parse(&art)?;
+        let name = match art {
+            BesetzungArt::Personal => snap,
+            BesetzungArt::Extern | BesetzungArt::Rueckwaertig => bez,
+            BesetzungArt::Einsatzleitung => None,
+        };
+        Some((art, pid, name))
+    }))
+}
+
+/// Der Vorherstand als Text für den ETB-Eintrag.
+fn stand_text(stand: &Stand) -> String {
+    match stand {
         None => zustand_text(None, None),
-        Some((art, snap, bez)) => {
-            let art = BesetzungArt::parse(&art);
-            let name = match art {
-                Some(BesetzungArt::Personal) => snap,
-                Some(BesetzungArt::Extern) | Some(BesetzungArt::Rueckwaertig) => bez,
-                _ => None,
-            };
-            zustand_text(art, name.as_deref())
-        }
-    })
+        Some((art, _, name)) => zustand_text(Some(*art), name.as_deref()),
+    }
 }
 
 /// Setzt (Upsert) die Besetzung eines Sachgebiets und schreibt den System-ETB-Eintrag in
 /// **derselben** Transaktion (Tier A).
+/// Liefert `(StabAnzeige, etb_eintrag_id)`. Die id trägt den ETB-Kurzruf des Aufrufers:
+/// **ohne ihn bliebe die ETB-Chronologie anderer Betrachter still veraltet**, denn
+/// `EINSATZ_STREAM_EVENTS.stab` invalidiert nur den Stab-Prefix, den ETB-Cache invalidiert
+/// ausschliesslich das `etb`-Ereignis (Muster: `auftrag`, `befehl`, `chat`, `lagebericht`).
 pub async fn setzen(
     pool: &SqlitePool,
     einsatz_id: i64,
     sachgebiet: Sachgebiet,
     benutzer_id: i64,
     eingabe: &BesetzungEingabe,
-) -> Result<StabAnzeige, AppError> {
+) -> Result<(StabAnzeige, Option<i64>), AppError> {
     let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
         .await?
         .etb_startwert();
 
-    write_retry!(pool, |conn| {
-        // 1. Vorherstand lesen — er geht in den ETB-Text ein und ist nach dem Upsert weg.
-        let vorher = vorher_text(conn, einsatz_id, sachgebiet).await?;
+    let etb_id = write_retry!(pool, |conn| {
+        // 1. Vorherstand lesen — er geht in den ETB-Text ein, entscheidet über den
+        //    Gleichheitsfall und ist nach dem Upsert weg.
+        let vorher_stand = vorher_stand(conn, einsatz_id, sachgebiet).await?;
+        let vorher = stand_text(&vorher_stand);
 
         // 2. Person-Zugehörigkeit prüfen und `snap_name` einfrieren.
         let snap_name = match eingabe.besetzung_art {
@@ -392,17 +443,44 @@ pub async fn setzen(
                 _ => bezeichnung.as_deref(),
             },
         );
+        // Der Eintrag ist BEDINGT: nur bei fachlicher Änderung. Ohne den Riegel schriebe ein
+        // Doppelklick im Modal oder ein Retry nach verlorener Antwort „S2 Lage: Besetzung →
+        // Müller (vorher: Müller)" ins Tagebuch — und weil Entscheidung 7 bewusst KEINE
+        // Besetzungshistorie führt, ist das ETB der einzige Nachweis des Verlaufs; eine
+        // Dublette dort ist von einem echten Wechsel nicht zu unterscheiden.
+        //
+        // Zeilen-Write und SSE bleiben unbedingt — `gesetzt_at`/`gesetzt_von_id` sollen den
+        // Klick festhalten, und eine doppelte Invalidierung ist harmlos. Genau diese
+        // Aufteilung fahren die vier Bestandsstellen mit bedingtem System-ETB:
+        // `einsatz_fahrzeug.rs`, `einsatz_personal.rs`, `einsatz_material.rs`,
+        // `einsatz_einheit.rs`.
+        //
+        // Verglichen wird der FACHLICHE Stand, nicht der gerenderte Text: sonst hinge die
+        // Zusicherung an der Formatierung des ETB-Satzes.
+        let nachher_stand: Stand = Some((
+            eingabe.besetzung_art,
+            personal_id,
+            match eingabe.besetzung_art {
+                BesetzungArt::Personal => snap_name.clone(),
+                _ => bezeichnung.clone(),
+            },
+        ));
+        if nachher_stand == vorher_stand {
+            return Ok(None);
+        }
+
         let inhalt = format!(
             "{}: Besetzung → {} (vorher: {})",
             sachgebiet.kurz_mit_label(),
             nachher,
             vorher
         );
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &inhalt).await?;
-        Ok(())
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &inhalt)
+            .await
+            .map(Some)
     })?;
 
-    laden(pool, einsatz_id).await
+    Ok((laden(pool, einsatz_id).await?, etb_id))
 }
 
 /// Entfernt die Besetzung eines Sachgebiets („nicht vergeben").
@@ -413,19 +491,22 @@ pub async fn setzen(
 /// das Sachgebiet ist eine der **sechs festen** Zeilen, der Pfad existiert immer, und
 /// „keine Zeile" ist der dokumentierte Normalzustand. Ohne Zeile also: kein ETB-Eintrag,
 /// kein Live-Ereignis (ein Eintrag „→ nicht vergeben (vorher: nicht vergeben)" wäre
-/// ETB-Rauschen). `false` = es war nichts zu tun.
+/// ETB-Rauschen).
+///
+/// `None` = es war nichts zu tun; `Some(etb_eintrag_id)` = Zeile entfernt und Beleg
+/// geschrieben. Die id trägt den ETB-Kurzruf des Aufrufers (siehe [`setzen`]).
 pub async fn entfernen(
     pool: &SqlitePool,
     einsatz_id: i64,
     sachgebiet: Sachgebiet,
     benutzer_id: i64,
-) -> Result<bool, AppError> {
+) -> Result<Option<i64>, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
         .await?
         .etb_startwert();
 
     write_retry!(pool, |conn| {
-        let vorher = vorher_text(conn, einsatz_id, sachgebiet).await?;
+        let vorher = stand_text(&vorher_stand(conn, einsatz_id, sachgebiet).await?);
         let betroffen = sqlx::query(
             "DELETE FROM einsatz_stabsfunktion WHERE einsatz_id = ? AND sachgebiet = ?",
         )
@@ -435,15 +516,17 @@ pub async fn entfernen(
         .await?
         .rows_affected();
         if betroffen == 0 {
-            return Ok(false);
+            return Ok(None);
         }
         let inhalt = format!(
             "{}: Besetzung → nicht vergeben (vorher: {})",
             sachgebiet.kurz_mit_label(),
             vorher
         );
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &inhalt).await?;
-        Ok(true)
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &inhalt)
+                .await?;
+        Ok(Some(etb_id))
     })
 }
 

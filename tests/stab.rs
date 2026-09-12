@@ -462,13 +462,19 @@ async fn delete_ist_idempotent_und_auf_leerer_zeile_ein_no_op() {
         0,
         "ein Eintrag „→ nicht vergeben (vorher: nicht vergeben)\" wäre ETB-Rauschen"
     );
-    let mut stab_events = 0;
+    let (mut stab_events, mut etb_events) = (0, 0);
     while let Ok(n) = rx.try_recv() {
-        if n.event.as_str() == "stab" {
-            stab_events += 1;
+        match n.event.as_str() {
+            "stab" => stab_events += 1,
+            "etb" => etb_events += 1,
+            _ => {}
         }
     }
     assert_eq!(stab_events, 0, "No-op feuert kein Live-Ereignis");
+    assert_eq!(
+        etb_events, 0,
+        "No-op schreibt keinen ETB-Eintrag, also auch kein `etb`-Ereignis"
+    );
 
     // (b) Besetzte Zeile: 204, genau ein ETB-Eintrag, genau ein SSE-Ereignis.
     anfrage(
@@ -492,13 +498,19 @@ async fn delete_ist_idempotent_und_auf_leerer_zeile_ein_no_op() {
         .await,
         1
     );
-    let mut stab_events = 0;
+    let (mut stab_events, mut etb_events) = (0, 0);
     while let Ok(n) = rx.try_recv() {
-        if n.event.as_str() == "stab" {
-            stab_events += 1;
+        match n.event.as_str() {
+            "stab" => stab_events += 1,
+            "etb" => etb_events += 1,
+            _ => {}
         }
     }
     assert_eq!(stab_events, 1, "echte Änderung feuert genau einmal");
+    assert_eq!(
+        etb_events, 1,
+        "der wirksame DELETE schreibt einen ETB-Eintrag und muss ihn auch publizieren"
+    );
 }
 
 /// Zweimal DELETE hintereinander: zweimal 204, aber genau EIN ETB-Eintrag.
@@ -552,13 +564,22 @@ async fn setzen_feuert_stab_event() {
     )
     .await;
 
-    let mut sah_stab = false;
+    let (mut sah_stab, mut sah_etb) = (false, false);
     while let Ok(n) = rx.try_recv() {
-        if n.event.as_str() == "stab" && n.data.contains(&einsatz.to_string()) {
-            sah_stab = true;
+        match n.event.as_str() {
+            "stab" if n.data.contains(&einsatz.to_string()) => sah_stab = true,
+            "etb" => sah_etb = true,
+            _ => {}
         }
     }
     assert!(sah_stab, "Setzen muss ein `stab`-SSE-Ereignis feuern");
+    // Der System-ETB-Eintrag entsteht im selben Commit. Ohne den ETB-Kurzruf bliebe die
+    // Chronologie eines zweiten Betrachters still veraltet: `EINSATZ_STREAM_EVENTS.stab`
+    // invalidiert nur den Stab-Prefix, den ETB-Cache invalidiert allein das `etb`-Ereignis.
+    assert!(
+        sah_etb,
+        "Setzen schreibt einen ETB-Eintrag und muss deshalb auch das `etb`-Ereignis feuern"
+    );
 }
 
 // ---------- meine_sachgebiete: BEIDE Pfade ----------
@@ -1087,7 +1108,12 @@ async fn abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck() {
         },
     )
     .await;
-    assert!(fehler.is_err(), "inaktiver Einsatz muss scheitern");
+    let fehler = fehler.expect_err("inaktiver Einsatz muss scheitern");
+    assert_eq!(
+        fehler.status(),
+        StatusCode::CONFLICT,
+        "Lebenszyklus des Einsatzes → 409, dieselbe Antwort wie `fordere_aktiv` am Route-Gate"
+    );
 
     // (1) Kein ETB-Eintrag vom Typ `entscheidung`.
     let etb: i64 = sqlx::query_scalar(
@@ -1118,9 +1144,12 @@ async fn abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck() {
     assert_eq!(termin.as_deref(), Some("2026-09-12 20:00:00"));
 }
 
-/// Der Abschluss ist über die Route auf einem abgeschlossenen Einsatz gar nicht erreichbar —
-/// `fordere_aktiv` im Extractor greift vorher. Das ist die Ergänzung zur Probe oben, nicht
-/// ihr Ersatz.
+/// Der Normalfall über die Route: `fordere_aktiv` im Extractor greift, bevor die Transaktion
+/// beginnt → 409. Das ist die Ergänzung zu den Rollback-Proben oben, nicht ihr Ersatz.
+///
+/// **Nicht** zu verwechseln mit „der Riegel in der Transaktion ist unerreichbar": er ist es
+/// nicht (siehe `stab::repo::lagebesprechung_abschliessen`). Beide Wege antworten deshalb
+/// mit demselben Code — 409 —, sonst hinge die Antwort am Timing.
 #[tokio::test]
 async fn abschluss_auf_abgeschlossenem_einsatz_ist_409() {
     let app = setup().await;
@@ -1177,4 +1206,186 @@ async fn schwaerzung_laesst_den_entschluss_stehen() {
         entschluss, "Riegelstellung Nordufer halten",
         "Führungs-Freitext bleibt — Alleingang auf Scrub für EINE der drei Tabellen wäre inkonsistent"
     );
+}
+
+/// **Der Fall, den der Termin-Schlüssel bisher verdeckt hat** (Codex-Review zu PR #60, P2).
+///
+/// Ohne `naechste_at` lief der Abschluss durch die Transaktion, ohne den Zustand des
+/// Einsatzes je zu prüfen — `fordere_aktiv` im Extractor liest einen Stand von VOR der
+/// Transaktion. Ein ETB-Eintrag vom Typ `entscheidung` ist append-only und gehört nicht in
+/// einen abgeschlossenen Einsatz.
+///
+/// Das **Paar** zu `abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck`: dort MIT
+/// Termin, hier OHNE. Nur zusammen belegen sie, dass der Riegel unbedingt greift und nicht
+/// bloss als Nebenwirkung des Termin-Updates.
+#[tokio::test]
+async fn abschluss_ohne_termin_rollt_bei_inaktivem_einsatz_ebenfalls_zurueck() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+
+    let fehler = lifeline_hub::stab::repo::lagebesprechung_abschliessen(
+        &pool,
+        einsatz,
+        1,
+        &lifeline_hub::stab::repo::AbschlussEingabe {
+            entschluss: "Darf nicht bestehen bleiben".into(),
+            abgehalten_at: "2026-09-12 18:00:00".into(),
+            // KEIN Termin — genau der Pfad, der vorher ungeprüft durchlief.
+            naechste_at: None,
+        },
+    )
+    .await;
+    assert!(
+        fehler.is_err(),
+        "inaktiver Einsatz muss auch ohne Termin scheitern"
+    );
+
+    let etb: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'entscheidung'",
+    )
+    .bind(einsatz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        etb, 0,
+        "kein append-only Beleg in einem abgeschlossenen Einsatz"
+    );
+
+    let zeilen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_lagebesprechung WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(zeilen, 0);
+}
+
+/// **Das PUT-Gegenstück zu `zweimal_delete_liefert_zweimal_204_und_einen_etb_eintrag`.**
+///
+/// Der System-ETB-Eintrag ist bedingt: nur bei fachlicher Änderung. Ohne den Riegel schriebe
+/// ein Doppelklick im Modal oder ein Retry nach verlorener Antwort „Besetzung → Müller
+/// (vorher: Müller)" ins Tagebuch — und weil Entscheidung 7 bewusst KEINE Besetzungshistorie
+/// führt, ist das ETB der einzige Nachweis des Verlaufs; eine Dublette dort ist von einem
+/// echten Wechsel nicht zu unterscheiden.
+///
+/// Die Zeile selbst wird trotzdem geschrieben (`gesetzt_at` hält den Klick fest) und das
+/// `stab`-Ereignis trotzdem gefeuert — dieselbe Aufteilung wie an den vier Bestandsstellen
+/// mit bedingtem System-ETB (`einsatz_fahrzeug`, `einsatz_personal`, `einsatz_material`,
+/// `einsatz_einheit`).
+#[tokio::test]
+async fn zweimal_setzen_mit_gleichem_wert_schreibt_einen_etb_eintrag() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, "Müller", None).await;
+    let ep = disponieren(&app, &admin, einsatz, person).await;
+    let body = format!(r#"{{"besetzung_art":"personal","personal_id":{ep}}}"#);
+
+    for _ in 0..2 {
+        let (status, _) = anfrage(
+            &app,
+            "PUT",
+            &besetzung_pfad(einsatz, "s2"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    assert_eq!(
+        etb_treffer(&app, &admin, einsatz, "S2 Lage: Besetzung").await,
+        1,
+        "der zweite, wertgleiche PUT darf keinen zweiten ETB-Eintrag schreiben"
+    );
+    assert_eq!(
+        etb_treffer(&app, &admin, einsatz, "(vorher: Müller)").await,
+        0,
+        "„→ Müller (vorher: Müller)\" wäre genau das Rauschen, das der Riegel verhindert"
+    );
+
+    // Eine ECHTE Änderung schreibt weiter — sonst wäre der Riegel zu scharf.
+    let mut rx = live.abonniere(einsatz);
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &besetzung_pfad(einsatz, "s2"),
+        &admin,
+        Some(r#"{"besetzung_art":"einsatzleitung"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        etb_treffer(
+            &app,
+            &admin,
+            einsatz,
+            "Besetzung → Einsatzleitung (vorher: Müller)"
+        )
+        .await,
+        1
+    );
+    let (mut stab_events, mut etb_events) = (0, 0);
+    while let Ok(n) = rx.try_recv() {
+        match n.event.as_str() {
+            "stab" => stab_events += 1,
+            "etb" => etb_events += 1,
+            _ => {}
+        }
+    }
+    assert_eq!(stab_events, 1);
+    assert_eq!(etb_events, 1);
+}
+
+/// Der wertgleiche PUT ist ein No-op AM ETB, nicht an der Zeile: `gesetzt_at` soll den Klick
+/// festhalten, und das `stab`-Ereignis feuert weiter (eine doppelte Invalidierung ist
+/// harmlos, ein verschluckter Zustandswechsel wäre es nicht).
+#[tokio::test]
+async fn wertgleicher_put_schreibt_die_zeile_trotzdem() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    anfrage(
+        &app,
+        "PUT",
+        &besetzung_pfad(einsatz, "s6"),
+        &admin,
+        Some(r#"{"besetzung_art":"rueckwaertig","bezeichnung":"Leitstelle"}"#),
+    )
+    .await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &besetzung_pfad(einsatz, "s6"),
+        &admin,
+        Some(r#"{"besetzung_art":"rueckwaertig","bezeichnung":"Leitstelle"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        json["besetzung"][0]["name"], "Leitstelle",
+        "die Zeile steht"
+    );
+
+    let (mut stab_events, mut etb_events) = (0, 0);
+    while let Ok(n) = rx.try_recv() {
+        match n.event.as_str() {
+            "stab" => stab_events += 1,
+            "etb" => etb_events += 1,
+            _ => {}
+        }
+    }
+    assert_eq!(stab_events, 1, "das Zustandsereignis feuert weiter");
+    assert_eq!(etb_events, 0, "es gibt keinen ETB-Eintrag zu melden");
 }

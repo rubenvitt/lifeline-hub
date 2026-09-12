@@ -143,7 +143,7 @@ pub async fn besetzung_setzen(
     let einsatz_id = ctx.einsatz.id;
     let sachgebiet = sachgebiet_aus_pfad(&sachgebiet)?;
     let eingabe = validiere(req)?;
-    let stab = repo::setzen(
+    let (stab, etb_id) = repo::setzen(
         &state.pool,
         einsatz_id,
         sachgebiet,
@@ -151,6 +151,13 @@ pub async fn besetzung_setzen(
         &eingabe,
     )
     .await?;
+    // `None` = der Wert war unverändert, es gibt keinen ETB-Eintrag zu melden. Sonst: der
+    // Eintrag entstand im selben Commit → ETB-Kurzruf mitschicken. Ohne ihn bliebe die
+    // ETB-Chronologie eines zweiten Betrachters still veraltet, denn `stab` invalidiert nur
+    // den Stab-Prefix.
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     sse(&state, einsatz_id);
     Ok(Json(stab))
 }
@@ -165,8 +172,11 @@ pub async fn besetzung_entfernen(
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let sachgebiet = sachgebiet_aus_pfad(&sachgebiet)?;
-    let geaendert = repo::entfernen(&state.pool, einsatz_id, sachgebiet, ctx.benutzer.id).await?;
-    if geaendert {
+    // `None` = die Zeile war schon „nicht vergeben" → No-op ohne ETB-Eintrag und ohne
+    // Live-Ereignis (Spec 9.2). Nur der WIRKSAME Fall publiziert.
+    let etb_id = repo::entfernen(&state.pool, einsatz_id, sachgebiet, ctx.benutzer.id).await?;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
         sse(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
