@@ -79,8 +79,9 @@ import type {
  * ── DIE GRENZEN SIND SEIT LFH-358 MASCHINELL, NICHT MEHR NUR AUFGESCHRIEBEN ─────
  *
  * `theme/statusVertrag.guard.test.ts` trägt beide Hälften: keine
- * `Record<…, StatusDarstellung>` außerhalb `theme/` (sonst läuft sie am selbst
- * ableitenden Abdeckungstest in `statusFarben.test.ts` vorbei), und kein
+ * `Record<…, StatusDarstellung>` außerhalb DIESER DATEI — nicht bloß außerhalb des
+ * Verzeichnisses, denn ein Geschwistermodul exportiert nichts über sie und liefe am
+ * selbst ableitenden Abdeckungstest in `statusFarben.test.ts` genauso vorbei —, und kein
  * `<Tag color={…}>`, das ein Vertrags-Enum einfärbt — dafür ist
  * `components/StatusTag.tsx` da. Beide Guards listen ihre blinden Flecken im
  * Kopfkommentar mit gemessener Fundstelle; das ist Teil des Vertrags, nicht Beiwerk.

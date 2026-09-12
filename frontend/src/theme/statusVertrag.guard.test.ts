@@ -143,14 +143,26 @@ function ohneKommentare(inhalt: string): string[] {
   return zeilen;
 }
 
-/** Der Vertrag selbst, seine Tests und der Codegen sind kein Prüfgegenstand. */
+/**
+ * Der Vertrag selbst, die Tests und der Codegen sind kein Prüfgegenstand — und der
+ * Vertrag ist EINE DATEI, nicht das Verzeichnis.
+ *
+ * Die erste Fassung nahm `/src/theme/` ganz heraus. Das war falsch, und zwar genau im
+ * Sinne der Zusicherung (im Codex-Review zu diesem PR gefunden): eine Karte in einem
+ * Geschwistermodul wie `theme/darstellungOptionen.ts` wäre von `statusFarben.ts` nicht
+ * exportiert, liefe also am selbst ableitenden {@link ALLE_MAPS} des Abdeckungstests
+ * genauso vorbei wie eine Karte in `pages/` — und der Guard hätte dazu geschwiegen.
+ * „Im selben Ordner" ist kein Ersatz für „im Vertrag". Gemessen am 12.09.2026 trägt
+ * kein Geschwistermodul eine solche Karte; der engere Schnitt kostet also nichts und
+ * schließt die Lücke, bevor sie jemand füllt.
+ */
 function ausserhalbDesVertrags(pfad: string): boolean {
-  if (pfad.startsWith('/src/theme/')) return false;
+  if (pfad === '/src/theme/statusFarben.ts') return false;
   if (/\.test\.[jt]sx?$/.test(pfad) || /\.generated\.[jt]sx?$/.test(pfad)) return false;
   return true;
 }
 
-// ─────────────────────────── Guard 1: Karten außerhalb theme/ ───────────────────
+// ──────────────────── Guard 1: Karten neben der Vertragsdatei ──────────────────
 
 /**
  * Ein `Record<…, StatusDarstellung>` — und NUR mit `StatusDarstellung` als WERT-Typ.
@@ -184,7 +196,7 @@ export function kartenBefunde(dateien: Record<string, string>): string[] {
   return verstoesse;
 }
 
-describe('Statusfarb-Vertrag: keine Karte außerhalb theme/ (LFH-358)', () => {
+describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', () => {
   it('findet keinen `Record<…, StatusDarstellung>` neben dem Vertrag', () => {
     const verstoesse = kartenBefunde(lieseQuellen(SRC));
     expect(
@@ -198,7 +210,7 @@ describe('Statusfarb-Vertrag: keine Karte außerhalb theme/ (LFH-358)', () => {
 
   // DIE MUTATIONSPROBE, festgeschrieben statt einmal von Hand gefahren: ohne sie wäre
   // die leere Liste oben auch dann grün, wenn der Scanner gar nichts fände.
-  it('wird rot, sobald eine Karte außerhalb theme/ angelegt wird', () => {
+  it('wird rot, sobald eine Karte neben der Vertragsdatei angelegt wird', () => {
     const einzeilig = kartenBefunde({
       '/src/pages/Irgendwas.tsx': 'const x: Record<MeinEnum, StatusDarstellung> = { a: b };',
     });
@@ -212,6 +224,22 @@ describe('Statusfarb-Vertrag: keine Karte außerhalb theme/ (LFH-358)', () => {
           'export const k: Record<\n  Dringlichkeit,\n  StatusDarstellung\n> = {};',
       }),
     ).toHaveLength(1);
+
+    // UND im Vertragsverzeichnis selbst: ein Geschwistermodul ist nicht der Vertrag.
+    // Es exportiert nichts über `statusFarben.ts`, läuft also am Abdeckungstest genauso
+    // vorbei wie eine Karte in `pages/` — mit dem Verzeichnis-Schnitt der ersten Fassung
+    // war genau dieser Fall unsichtbar.
+    expect(
+      kartenBefunde({
+        '/src/theme/darstellungOptionen.ts': 'const k: Record<X, StatusDarstellung> = {};',
+      }),
+    ).toHaveLength(1);
+    // Die Vertragsdatei selbst bleibt draußen, sonst meldete der Guard jede echte Karte.
+    expect(
+      kartenBefunde({
+        '/src/theme/statusFarben.ts': 'export const k: Record<X, StatusDarstellung> = {};',
+      }),
+    ).toEqual([]);
   });
 
   it('lässt Konsumenten in Ruhe — Prop, Rückgabetyp, Schlüsselrolle', () => {
@@ -241,7 +269,7 @@ describe('Statusfarb-Vertrag: keine Karte außerhalb theme/ (LFH-358)', () => {
     const traeger = Object.entries(dateien).filter(
       ([p, i]) => ausserhalbDesVertrags(p) && i.includes('StatusDarstellung'),
     );
-    // Gemessen am 12.09.2026: NEUN Nicht-Test-Dateien außerhalb theme/ nennen den Typ —
+    // Gemessen am 12.09.2026: NEUN Nicht-Test-Dateien neben dem Vertrag nennen den Typ —
     // vier Primitive (`StatusTag`, `StatusWahl`, `Datensicht`, `EinstiegSwitcher`), die drei
     // DB-Achsen-Funktionen, `kraefte/statusAchse.ts` und `lage-dashboard/lagebild.ts`. Die
     // untere Schranke hält den Scan ehrlich, ohne bei jedem neuen Konsumenten rot zu werden.
@@ -480,7 +508,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
             .join('\n')
             .match(/<Tag(?=[\s/>])/g) ?? [],
       );
-    // Gemessen am 12.09.2026: 132 `<Tag`-Stellen außerhalb theme/ und außerhalb der Tests
+    // Gemessen am 12.09.2026: 132 `<Tag`-Stellen neben dem Vertrag und außerhalb der Tests
     // (Kommentarinhalt abgezogen, roh sind es 134). Die untere Schranke ist der Selbsttest
     // gegen einen Schnitt, der nichts mehr findet und deshalb trivial grün wäre.
     expect(stellen.length).toBeGreaterThanOrEqual(100);
