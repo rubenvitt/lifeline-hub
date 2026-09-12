@@ -12,6 +12,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import { formatZeitKurz } from '../../anzeige/format';
 import { useLageSnapshots } from './useLageSnapshots';
+import { bandStil } from './KartenFuss';
 
 /** Feste Anzeigedauer je Stand im Replay (D/LFH-322). */
 export const ANZEIGE_MS = 2500;
@@ -171,10 +172,9 @@ export function SnapshotLeiste({
           aria-label="Zeitachse einblenden"
           onClick={() => klappeUm(false)}
           style={{
-            position: 'absolute',
-            bottom: 12,
-            left: 12,
-            zIndex: 5,
+            // Eingeklappt bleibt der Knopf unten links — jetzt als linksbündiges Band im
+            // `KartenFuss` (LFH-355) statt absolut positioniert.
+            ...bandStil('links'),
             background: token.colorBgElevated,
             boxShadow: token.boxShadow,
           }}
@@ -187,12 +187,14 @@ export function SnapshotLeiste({
 
   return (
     <div
+      // Stabiler Griff für die Überdeckungsmessung in `e2e/lagekarte-smoke.spec.ts`
+      // (LFH-355) — die Klassen dieser Leiste sind antd-Interna.
+      data-lfh="zeitachse"
       style={{
-        position: 'absolute',
-        bottom: 12,
-        left: 12,
-        right: 12,
-        zIndex: 5,
+        // Volle Kartenbreite, aber IM Fuß-Rahmen (LFH-355): absolut positioniert lag dieses
+        // Band auf demselben `zIndex: 5` wie die ZeichnenSteuerung und verdeckte sie — als
+        // Flow-Band stapeln sich beide, statt sich zu überlagern.
+        ...bandStil('voll'),
         display: 'flex',
         alignItems: 'center',
         gap: 12,

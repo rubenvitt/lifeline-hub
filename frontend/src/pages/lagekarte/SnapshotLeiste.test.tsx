@@ -239,3 +239,24 @@ describe('SnapshotLeiste', () => {
     expect(screen.getByRole('button', { name: 'Abspielen' })).toBeInTheDocument();
   });
 });
+
+describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
+  it('ausgeklappt: volle Bandbreite im Fluss, ohne eigene Positionierung', () => {
+    const { container } = renderLeiste([snapshot()], { darfSichern: true });
+    const band = container.querySelector('div[style*="pointer-events"]') as HTMLElement;
+    expect(band.style.position).toBe('');
+    expect(band.style.zIndex).toBe('');
+    expect(band.style.alignSelf).toBe('stretch');
+    expect(band.style.pointerEvents).toBe('auto');
+  });
+
+  it('eingeklappt: linksbündiger Knopf im Fluss, ohne eigene Positionierung', async () => {
+    renderLeiste([snapshot()], { darfSichern: true });
+    await userEvent.click(screen.getByRole('button', { name: 'Zeitachse ausblenden' }));
+    const knopf = screen.getByRole('button', { name: 'Zeitachse einblenden' });
+    expect(knopf.style.position).toBe('');
+    expect(knopf.style.zIndex).toBe('');
+    expect(knopf.style.alignSelf).toBe('flex-start');
+    expect(knopf.style.pointerEvents).toBe('auto');
+  });
+});
