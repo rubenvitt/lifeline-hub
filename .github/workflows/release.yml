@@ -13,6 +13,16 @@
 #
 # `workflow_call` erbt den auslösenden Ereigniskontext, damit stimmt `GITHUB_REF` von selbst
 # und es braucht keinen nachgebauten Branch-Wechsel.
+#
+# NICHT JEDER AUFRUF FÜHRT ZU EINEM RELEASE. Der Schritt „Ruhefenster" unten kann den Lauf
+# still zurücktreten lassen, und das ist der Normalfall bei schnell aufeinanderfolgenden
+# Merges: sonst trüge jeder gemergte Pull Request seine eigene Vorabversion, deren Notizen
+# eine Handvoll Commits enthalten. Die Regel und ihre zwei Hälften stehen im Kopf von
+# `scripts/release-ruhefenster.sh` — hier wird sie nur aufgerufen. Dass die Entscheidung
+# in einem Skript liegt und nicht in diesem YAML, ist dieselbe Arbeitsteilung wie beim
+# Sammel-Gate (`scripts/check-all.sh`): das Skript ist die Wahrheit, die CI ist der Ort,
+# an dem es läuft — und nur so ist sie überhaupt testbar (`release-ruhefenster.test.sh`,
+# Schritt 8 des Gates).
 name: Release
 
 on:
@@ -33,7 +43,13 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 45 statt der früheren 20 Minuten, und die Zahl hängt am Ruhefenster: dessen Deckel
+    # steht bei 30 Minuten (RUHEFENSTER_DECKEL_SEK), die eigentliche Release-Arbeit braucht
+    # gemessen rund zehn. Bliebe es bei 20, würde ein wartender Lauf vom Job-Timeout
+    # abgeschnitten — und zwar möglicherweise MITTEN im Release, was genau den Tag ohne
+    # Release erzeugt, gegen den der Nebenläufigkeits-Kommentar in ci.yml argumentiert.
+    # Wer den Deckel hebt, hebt diese Zahl mit.
+    timeout-minutes: 45
     steps:
       # Solange die App fehlt, ist „nichts tun" das richtige Verhalten — nicht „scheitern".
       # Ein rot geborener Workflow wird abgeschaltet statt eingerichtet.
@@ -82,35 +98,47 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
-      - name: Rust-Toolchain (stable)
+      # VOR JEDER TEUREN UND VOR JEDER SCHREIBENDEN HANDLUNG. Der Schritt braucht nur den
+      # Checkout — Toolchains, pnpm-Install und semantic-release hängen unten an seinem
+      # Ergebnis und laufen bei einem Rücktritt gar nicht erst an.
+      #
+      # `git fetch` im Skript braucht die Zugangsdaten aus dem Checkout oben
+      # (`persist-credentials: true`) — ohne sie sieht es den Kanal nicht und hielte einen
+      # überholten Lauf für aktuell.
+      - name: Ruhefenster
+        id: fenster
         if: steps.bereit.outputs.bereit == 'true'
+        run: ./scripts/release-ruhefenster.sh --branch "$GITHUB_REF_NAME" --sha "$GITHUB_SHA"
+
+      - name: Rust-Toolchain (stable)
+        if: steps.fenster.outputs.freigabe == 'true'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
 
       # cargo-set-version aus cargo-edit bumpt Cargo.toml UND Cargo.lock (siehe prepareCmd
       # in release.config.mjs). Ohne Lock-Bump bräche der nächste --frozen-lockfile-Lauf.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: edit-cache
-        if: steps.bereit.outputs.bereit == 'true'
+        if: steps.fenster.outputs.freigabe == 'true'
         with:
           path: ~/.cargo/bin/cargo-set-version
           key: cargo-edit-0.13.7-${{ runner.os }}
       - name: cargo-edit
-        if: steps.bereit.outputs.bereit == 'true' && steps.edit-cache.outputs.cache-hit != 'true'
+        if: steps.fenster.outputs.freigabe == 'true' && steps.edit-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-edit --locked --version 0.13.7 --no-default-features --features set-version
 
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        if: steps.bereit.outputs.bereit == 'true'
+        if: steps.fenster.outputs.freigabe == 'true'
         with:
           version: 2026.9.1
           install_args: node@26.7.0 pnpm@11.10.0
           cache: true
 
       - name: Release-Werkzeug installieren
-        if: steps.bereit.outputs.bereit == 'true'
+        if: steps.fenster.outputs.freigabe == 'true'
         run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm install --frozen-lockfile
 
       - name: semantic-release
-        if: steps.bereit.outputs.bereit == 'true'
+        if: steps.fenster.outputs.freigabe == 'true'
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GIT_AUTHOR_NAME: lifeline-hub-release

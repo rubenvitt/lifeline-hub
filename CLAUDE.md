@@ -1276,7 +1276,8 @@ Lokal bleibt es der Weg vor dem Merge:
 ```
 
 Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-codegen.sh`
-(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e`.
+(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
+`release-ruhefenster.test.sh`.
 
 - **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
   `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
@@ -1304,6 +1305,22 @@ Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-co
   von Hand aufgerufene Schritte.
 - **Kein `| tail` um Gate-Kommandos** — das maskiert den Exit-Code, und eine rote Suite
   sieht dann grün aus.
+- **Ein Release entsteht nicht mehr je Merge, sondern je Arbeitsschub.** Der Release-Job
+  hängt weiter am grünen Push-Gate, tritt davor aber selbst zurück, wenn auf dem Kanal
+  schon ein neuerer Commit liegt — dessen Lauf macht das eine Sammel-Release, und die
+  Notizen enthalten die übersprungenen Commits mit. Dazu ein Ruhefenster von 15 Minuten
+  auf den jüngsten Commit für den Fall, dass das Gate schneller ist als der Abstand
+  zwischen zwei Merges. Träger ist `scripts/release-ruhefenster.sh` (Aufruf in
+  `release.yml`, Begründung im Dateikopf), Schritt 8 des Gates ist sein Selbsttest.
+  **Ein übersprungener Release-Job ist der Normalfall, kein Fehlerbild.**
+  **`chore(release):`-Commits zählen dabei nicht als „neuer Commit"** — sie sind der
+  Versions-Commit von semantic-release und danach HEAD des Kanals; ein naiver Vergleich
+  „HEAD == mein Commit?" liesse ab dem ersten Release JEDEN Lauf zurücktreten, und es
+  entstünde nie wieder eine Version. Dasselbe gilt für den Zeitstempel, an dem das
+  Ruhefenster rechnet: zwei Stellen, zwei Tests (Fall 3 und 6 im Selbsttest).
+  Wer das Fenster vergrössert, hebt den Job-Timeout in `release.yml` mit und bedenkt, dass
+  Push-Läufe desselben Kanals in EINER Nebenläufigkeitsgruppe stehen — ein wartender
+  Release hält den nächsten Gate-Lauf auf.
 
 `scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
 `cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories
