@@ -51,10 +51,10 @@
  *     danebenbaut, umgeht den Guard — das ist Aufwand, keine Nachlässigkeit.
  *   • **Ein Alias als Wert-Typ**: `type Karte = StatusDarstellung` und dann
  *     `Record<X, Karte>`. Der Parser vergleicht den letzten Typparameter dem NAMEN nach —
- *     seine Vereinigungsglieder einzeln (`| null` fällt also auf) und jeweils den letzten
- *     Punkt-Abschnitt (ein Namensraum-Import `sf.StatusDarstellung` fällt ebenfalls auf).
- *     Aliase löst er nicht auf; das wäre ein Typchecker, kein Guard. Im Bestand gibt es
- *     keinen solchen Alias.
+ *     seine Vereinigungsglieder einzeln (`| null` fällt auf), den letzten Punkt-Abschnitt
+ *     (`sf.StatusDarstellung` fällt auf) und den Kern unter durchsichtigen Hüllen
+ *     (`Readonly<StatusDarstellung>` fällt auf). Aliase löst er nicht auf; das wäre ein
+ *     Typchecker, kein Guard. Im Bestand gibt es keinen solchen Alias.
  *   • **Ein Vertragsname, der über EINE ZWEITE Datei umbenannt weitergereicht wird**:
  *     `personen/personMeta.ts:31` exportiert `personStatus as STATUS_META` weiter.
  *     {@link vertragsNamenIn} löst die Umbenennung beim DIREKTEN Import auf, folgt aber
@@ -82,6 +82,27 @@
  *   • **Ein Regex-Literal in einer Nachbar-Prop** desselben Tags: {@link tagEnde} kennt
  *     Zeichenketten, aber keine Regex-Literale, und beendet das Tag dort zu früh.
  *     Altlast, wortgleich mit dem Blindfleck von `dichte.guard.test.ts`.
+ *
+ * ── DIE EINE RICHTUNG, IN DER DIESER GUARD ZU VIEL MELDEN KANN ─────────────────
+ *
+ * Der Wire-Wert-Fühler ist eine HEURISTIK über Zeichenketten, kein Typurteil. Gemessen
+ * am 12.09.2026: `TierStatus` ist `'aktiv' | 'vermisst' | 'abgeschlossen'` und teilt damit
+ * ALLE DREI Werte mit Vertragskarten (`einsatzStatus`, `personStatus`) — obwohl der Kopf
+ * von `statusFarben.ts` die Tier-Achse ausdrücklich draussen führt. Ein
+ * `<Tag color={t.status === 'aktiv' ? 'green' : 'default'}>` über einem TIER würde hier
+ * also als Einsatz-Status gemeldet, und das wäre ein Fehlalarm (im Codex-Review benannt).
+ *
+ * Er tritt heute nicht auf, und zwar nicht zufällig: `pages/TierePage.tsx` und
+ * `pages/TiereDetailPage.tsx` färben über eine eigene `STATUS_META`-Karte statt über ein
+ * Literal — das ist die Bauform, die das Repo auch für Achsen ausserhalb des Vertrags
+ * fährt. Wer sie durch einen Inline-Vergleich ersetzt, bekommt diesen Guard rot; die
+ * Abhilfe ist dann die Karte, nicht eine Ausnahme hier.
+ *
+ * Sauber trennen liesse sich das nur über den TYP des Ausdrucks, also über den
+ * TypeScript-Syntaxbaum. Das ist die benannte Grenze dieses Guards und der Grund, warum
+ * die Umstellung als eigener Befund geführt wird (siehe nächster Abschnitt) — nicht als
+ * Nebenprodukt. Den Fühler dafür aufzugeben ist keine Option: er hat die ZEHN
+ * Bestandsfunde geliefert, die dieses Ticket überhaupt sichtbar gemacht haben.
  *
  * ── EINE ZWEITE KOPIE VON `tagEnde`, UND WARUM SIE HIER TROTZDEM STEHT ──────────
  *
@@ -255,6 +276,24 @@ function typargumente(text: string, auf: number): string[] | null {
   return null; // schließt nicht — kein Urteil, lieber kein Befund als ein erfundener
 }
 
+/**
+ * Schält durchsichtige Hüllen vom Werttyp ab: `Readonly<StatusDarstellung>` ist derselbe
+ * Vertragstyp, nur anders geschrieben (im Codex-Review gefunden). Abgeschält wird JEDE
+ * Hülle mit genau EINEM Typargument — `Readonly`, `Required`, `Partial`, eine eigene —,
+ * weil die Liste sonst bei der nächsten Hilfstype veraltet und der Guard still durchlässt.
+ * Mehrfach geschachtelt läuft die Schleife bis zum blanken Namen.
+ */
+function blattTyp(arg: string): string {
+  let rest = arg.trim();
+  for (;;) {
+    const auf = rest.indexOf('<');
+    if (auf === -1 || !rest.endsWith('>')) return rest;
+    const args = typargumente(rest, auf);
+    if (!args || args.length !== 1) return rest;
+    rest = args[0].trim();
+  }
+}
+
 /** Zerlegt den letzten Typparameter in seine Vereinigungsglieder auf oberster Ebene. */
 function vereinigungsglieder(arg: string): string[] {
   const teile: string[] = [];
@@ -283,9 +322,10 @@ export function kartenStellen(text: string): number[] {
     // sf.StatusDarstellung>`, gültiges TypeScript) nicht am Vergleich vorbeiläuft —
     // im Codex-Review gefunden. Aliase löst der Guard weiterhin nicht auf, das wäre ein
     // Typchecker; ein QUALIFIZIERTER Name ist aber derselbe Typ, nur anders geschrieben.
-    const glieder = vereinigungsglieder(args[args.length - 1]).map(
-      (g) => g.split('.').pop()?.trim() ?? g,
-    );
+    const glieder = vereinigungsglieder(args[args.length - 1]).map((g) => {
+      const blatt = blattTyp(g);
+      return blatt.split('.').pop()?.trim() ?? blatt;
+    });
     if (glieder.includes('StatusDarstellung')) {
       treffer.push(i);
     }
@@ -399,6 +439,25 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
           'function d(x: X): StatusDarstellung { return { rolle: "neutral", label: "x" }; }',
         ].join('\n'),
       }),
+    ).toEqual([]);
+  });
+
+  it('erkennt den Vertragstyp unter einer durchsichtigen Hülle', () => {
+    // `Readonly<StatusDarstellung>` ist derselbe Vertragstyp, nur anders geschrieben.
+    expect(
+      kartenBefunde({
+        '/src/pages/Hoh.ts': 'const k: Record<X, Readonly<StatusDarstellung>> = {};',
+      }),
+    ).toHaveLength(1);
+    // Mehrfach geschachtelt ebenso — die Schleife läuft bis zum blanken Namen.
+    expect(
+      kartenBefunde({
+        '/src/pages/Tief.ts': 'const k: Record<X, Readonly<Required<StatusDarstellung>>> = {};',
+      }),
+    ).toHaveLength(1);
+    // Und die Gegenrichtung: eine Hülle um etwas ANDERES bleibt ruhig.
+    expect(
+      kartenBefunde({ '/src/pages/Fremd.ts': 'const k: Record<X, Readonly<TierMeta>> = {};' }),
     ).toEqual([]);
   });
 
@@ -586,9 +645,11 @@ const VERTRAGS_NAMEN: readonly string[] = [
  */
 function vertragsNamenIn(inhalt: string): readonly string[] {
   const namen = new Set(VERTRAGS_NAMEN);
-  const importe = inhalt.matchAll(
-    /import\s*\{([^}]*)\}\s*from\s*['"][^'"]*theme\/statusFarben['"]/g,
-  );
+  // `[^'"]*statusFarben`, NICHT `theme/statusFarben`: ein Geschwistermodul schreibt
+  // `from './statusFarben'` — ohne Verzeichnis im Pfad. Dass die Geschwister im Schnitt
+  // liegen, ist die Zusicherung von Guard 1; sie hier wieder auszuschliessen wäre
+  // derselbe Fehler eine Ebene tiefer (im Codex-Review gefunden).
+  const importe = inhalt.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*statusFarben['"]/g);
   for (const [, liste] of importe) {
     for (const teil of liste.split(',')) {
       const teile = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)\s*$/.exec(teil);
@@ -743,6 +804,17 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     });
     expect(umbenannt).toHaveLength(1);
     expect(umbenannt[0]).toMatch(/liest `(farbe|wk)`/);
+
+    // Und das Geschwistermodul, das ohne Verzeichnis importiert — genau der Schnitt,
+    // den Guard 1 abdeckt, also muss die Auflösung ihn auch abdecken.
+    expect(
+      tagBefunde({
+        '/src/theme/nachbar.ts': [
+          "import { rollenFarbe as farbe } from './statusFarben';",
+          '<Tag color={farbe(rolle, token)}>x</Tag>',
+        ].join('\n'),
+      }),
+    ).toHaveLength(1);
 
     // DIE GEGENPROBE, und sie ist der Grund für „je Datei": `pages/TiereDetailPage.tsx`
     // hat eine EIGENE `STATUS_META` über `TierStatus` — kein Vertrags-Enum — und malt
