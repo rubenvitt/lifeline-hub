@@ -1,3 +1,9 @@
+## [1.0.0-alpha.6](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.5...v1.0.0-alpha.6) (2026-09-12)
+
+### Bug Fixes
+
+* **etb:** langen Meldungstext im Tabellenzweig umbrechen (LFH-523) ([44efa8a](https://github.com/rubenvitt/lifeline-hub/commit/44efa8a12e472c3400bad86fcc2af3c9ed4d8665))
+
 ## [1.0.0-alpha.5](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.4...v1.0.0-alpha.5) (2026-09-11)
 
 ### Bug Fixes
