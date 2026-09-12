@@ -1277,7 +1277,7 @@ Lokal bleibt es der Weg vor dem Merge:
 
 Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-codegen.sh`
 (enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh`.
+`release-ruhefenster.test.sh` → `check-deps.test.sh`.
 
 - **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
   `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
@@ -1325,6 +1325,39 @@ Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-co
 `scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
 `cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories
 stehen mit Begründung in `.cargo/audit.toml` — was dort **nicht** steht, bricht den Build.
+
+**Das Advisory-Gate prüft das Lockfile, nicht den lokalen Installationszustand**
+(LFH-316). Der Befund war zwei Arbeitsbäume desselben Commits mit zwei Antworten — der
+lang gewachsene Haupt-Checkout gab Entwarnung, der frische Worktree meldete zwei Funde.
+Ein falsch-grünes Sicherheits-Gate ist schlechter als gar keines: es erzeugt begründetes
+Vertrauen. Der Frontend-Audit läuft deshalb in einem Wegwerf-Verzeichnis **ausserhalb des
+Arbeitsbaums**, in dem ausschliesslich `package.json`, `pnpm-lock.yaml` und
+`pnpm-workspace.yaml` liegen; `node_modules` kann das Ergebnis nicht mehr erreichen.
+**Die Ursache aus dem Ticket ist dabei korrigiert, nicht übernommen** — gemessen an
+pnpm 11.10.0 liest `pnpm audit` die *wanted lockfile*
+(`plugin-commands-audit/lib/audit.js` ruft `readWantedLockfile`), und ein nachgebautes
+stale `node_modules` ändert die Antwort heute **nicht**. Genau darauf ruhte die
+Zusicherung aber, und nichts pinnte sie: die Hilfe desselben Aufrufs sagt „Checks for
+known security issues with the **installed** packages", und `frontend/mise.toml` führt
+pnpm als `latest`. Eine Eigenschaft, die man sich von einer Bibliotheksversion leiht, ist
+keine Zusicherung — der Umbau stellt sie strukturell her.
+**Zwei Dinge gehören dazu, sonst kippt das falsche Grün nur die Seite:**
+`pnpm-workspace.yaml` **muss** mitkopiert werden (dort stehen seit pnpm 10 die Overrides —
+ohne sie liefe das Gate falsch ROT, und ein grundlos rotes Gate wird abgeschaltet), und
+die Kopierliste trägt einen **Riegel gegen ihre eigene Veralterung**: bekommt das Frontend
+echte Workspace-Pakete, fehlen deren `package.json` im Wegwerf-Verzeichnis und der
+Audit-Baum wäre still unvollständig — das Skript bricht deshalb laut ab, sobald das
+Lockfile einen Importer neben `.` führt. Der **Node-Pin** (`node@26.7.0`) steht jetzt auch
+hier, nicht nur in `check-all.sh`: er ist dieselbe Hälfte der Frage, auf welcher Maschine
+das Gate dasselbe sagt.
+**Schritt 9 ist der Selbsttest dazu** (`scripts/check-deps.test.sh`, im `schnell`-Bündel,
+ohne Netz, ~1 s). Er misst **nicht**, was der Audit findet — das hängt an der
+Advisory-Datenbank und ändert sich über Nacht —, sondern worauf er schaut und ob sein
+Urteil durchschlägt. Die tragenden Aussagen sind die **negativen**: „der Audit sieht
+`node_modules` NICHT" und „ein Fund bricht das Gate". „Er sieht das Lockfile" allein wäre
+auch dann grün, wenn er nebenher den halben Arbeitsbaum sähe. Per Mutationsprobe belegt:
+der Audit zurück auf `-C "$FE"` färbt drei Aussagen rot, der entfernte Importer-Riegel
+zwei, die fehlende `pnpm-workspace.yaml` eine.
 
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 
