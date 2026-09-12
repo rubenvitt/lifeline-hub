@@ -480,6 +480,19 @@ jobs:
   # Auf `berichte` wird bewusst NICHT gewartet: der Job läuft mit `!cancelled()` und wäre
   # auch dann grün, wenn alle Shards rot waren. Auf `coverage` ebenso wenig — die Zahl ist
   # informativ und soll nichts aufhalten.
+  #
+  # EIN AUFRUF IST KEIN RELEASE. Seit dem Ruhefenster (siehe release.yml und
+  # `scripts/release-ruhefenster.sh`) tritt der Job still zurück, wenn auf dem Kanal
+  # inzwischen ein neuerer Commit liegt — bei drei Merges kurz hintereinander entsteht so
+  # EINE Vorabversion statt dreier. Ein übersprungener Release-Job ist damit der Normalfall
+  # und kein Fehlerbild; welcher Grund gerade greift, steht im Protokoll des Schritts.
+  #
+  # Zusammenspiel mit der Nebenläufigkeit oben: Push-Läufe desselben Kanals stehen in EINER
+  # Gruppe und warten aufeinander. Ein Release-Job, der sein Ruhefenster abwartet, hält den
+  # Lauf des nächsten Pushes also auf. Das ist eingepreist und klein — das Gate verbraucht
+  # von den 15 Minuten Fenster gemessen schon rund 14, gewartet wird der Rest. Wer das
+  # Fenster deutlich vergrößert, verlängert damit auch die Rückmeldung auf dem Kanal; dann
+  # gehört der Release in eine eigene Nebenläufigkeitsgruppe statt in ein größeres Fenster.
   release:
     name: Release
     needs: [schnell, rust, frontend, e2e]

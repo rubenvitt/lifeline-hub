@@ -30,7 +30,8 @@ set -euo pipefail
 
 # Bündel-Auswahl für die parallele CI (LFH-534). OHNE Argument läuft alles wie bisher —
 # das ist der Weg vor dem Merge und die Vorgabe, an der sich nichts geändert hat.
-#   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories   (Sekunden bis ~1:20)
+#   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
+#                    Ruhefenster-Selbsttest                  (Sekunden bis ~1:20)
 #   --nur rust       cargo test --workspace                  (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
@@ -45,7 +46,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     --nur=*) NUR="${1#--nur=}"; shift ;;
-    -h|--help) sed -n '31,40p' "$0"; exit 0 ;;
+    -h|--help) sed -n '31,39p' "$0"; exit 0 ;;
     *) echo "FEHLER: unbekanntes Argument '$1'." >&2; exit 2 ;;
   esac
 done
@@ -78,7 +79,7 @@ FE="$ROOT/frontend"
 # ändert, prüft BEIDE Schritte (5 und 7) — eine Version, die nur einen davon grün
 # macht, ist keine.
 PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
-SCHRITTE=7
+SCHRITTE=8
 
 # ZEITZONE FESTNAGELN (LFH-522, gemessen im ersten CI-Lauf).
 # Ohne diese Zeile hängt das Ergebnis der Suite an der Zone des Rechners: `EtbFilterleiste`
@@ -210,14 +211,23 @@ schritt_7() {
   fi
 }
 
+schritt_8() {
+  echo "==> [8/$SCHRITTE] Ruhefenster vor dem Release (Selbsttest)"
+  # Im `schnell`-Bündel und nicht bei den teuren Suiten: der Test baut ein paar
+  # Temp-Repositories und ist in rund vier Sekunden durch. Er prüft NICHT das Release
+  # selbst, sondern die Entscheidung, ob ein Lauf releasen darf — und die ist in beide
+  # Richtungen still (Begründung im Kopf des Testskripts).
+  "$ROOT/scripts/release-ruhefenster.test.sh"
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
-BUENDEL_schnell="1 2 3 6"
+BUENDEL_schnell="1 2 3 6 8"
 BUENDEL_rust="4"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7"
+BUENDEL_alle="1 2 3 4 5 6 7 8"
 
 # SELBSTPRÜFUNG: die vier Bündel müssen ZUSAMMEN genau die sieben Schritte ergeben — jeden
 # genau einmal. Ohne diese Zeile fiele beim Umsortieren still ein Schritt aus der CI heraus,
