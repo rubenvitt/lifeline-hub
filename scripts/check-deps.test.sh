@@ -225,13 +225,33 @@ pruefe "fehlendes Lockfile: der Audit läuft gar nicht erst" "nein" \
 # 10 — DER RIEGEL GEGEN DAS NÄCHSTE FALSCHE GRÜN: bekommt das Frontend echte
 # Workspace-Pakete, fehlen deren package.json im Wegwerf-Verzeichnis und der Audit-Baum
 # wäre still unvollständig. Dann ist die Kopierliste zu erweitern — und bis dahin bricht es.
+#
+# DAS LOCKFILE WIRD GESCHRIEBEN, NICHT NACHTRÄGLICH VERÄNDERT. Ein Ersetzen von Hand
+# brauchte ein Werkzeug, das dieses Projekt nicht voraussetzt — die README nennt Rust,
+# Node/pnpm über mise, Perl, einen C-Compiler und nasm, kein Python, und kein anderes
+# Skript unter scripts/ ruft eines. Ein Selbsttest, der auf einer Maschine ohne dieses
+# Werkzeug abbricht, reisst unter `set -e` das GANZE check-all.sh mit: aus einem Gate,
+# das eine Lücke schliessen soll, würde eines, das grundlos rot ist — und ein grundlos
+# rotes Gate wird abgeschaltet statt befolgt.
 r="$(repo_neu fremder_importer)"
-python3 - "$r/frontend/pnpm-lock.yaml" <<'PY'
-import sys
-p = sys.argv[1]
-s = open(p).read().replace("packages:", "  pakete/a:\n    dependencies: {}\n\npackages:", 1)
-open(p, "w").write(s)
-PY
+cat > "$r/frontend/pnpm-lock.yaml" <<'LOCK'
+lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    dependencies:
+      linke-tuete:
+        specifier: ^1.0.0
+        version: 1.0.0
+
+  pakete/a:
+    dependencies: {}
+
+packages:
+
+  linke-tuete@1.0.0: {}
+LOCK
 rc="$(lauf "$r")"
 pruefe "ein zweiter Importer bricht laut ab" "1" "$rc"
 pruefe "zweiter Importer: der Audit läuft gar nicht erst" "nein" \
