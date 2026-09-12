@@ -9,7 +9,7 @@
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
 
-use super::{BesetzungArt, Sachgebiet, StabAnzeige, StabsfunktionAnzeige};
+use super::{BesetzungArt, LagebesprechungAnzeige, Sachgebiet, StabAnzeige, StabsfunktionAnzeige};
 use crate::error::AppError;
 use crate::write_retry;
 
@@ -74,14 +74,188 @@ const SELECT_ZEILEN: &str = "SELECT s.sachgebiet, s.besetzung_art, s.personal_id
      WHERE s.einsatz_id = ? \
      ORDER BY s.sachgebiet";
 
+// Die Spaltenliste steht in beiden Abfragen AUSGESCHRIEBEN statt als zusammengesetzter String:
+// `sqlx` lehnt dynamisch gebaute SQL-Strings ab (Injection-Audit), ein `format!` wäre hier also
+// nicht bloss unnötig, sondern ein Compile-Fehler.
+const SELECT_LETZTE_BESPRECHUNG: &str =
+    "SELECT id, einsatz_id, lfd_nr, abgehalten_at, entschluss, naechste_at, \
+            etb_eintrag_id, erfasst_von_id, erfasst_at \
+     FROM einsatz_lagebesprechung WHERE einsatz_id = ? ORDER BY lfd_nr DESC LIMIT 1";
+
+const SELECT_BESPRECHUNGEN: &str =
+    "SELECT id, einsatz_id, lfd_nr, abgehalten_at, entschluss, naechste_at, \
+            etb_eintrag_id, erfasst_von_id, erfasst_at \
+     FROM einsatz_lagebesprechung WHERE einsatz_id = ? ORDER BY lfd_nr DESC";
+
 /// Lädt die Führungsorganisation eines Einsatzes (nur belegte Zeilen, `s1..s6`).
+///
+/// Der Termin kommt aus `einsatz` — eine Spalte, kein eigenes Cache-Fach (Entscheidung 11).
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<StabAnzeige, AppError> {
     let zeilen = sqlx::query_as::<_, Zeile>(SELECT_ZEILEN)
         .bind(einsatz_id)
         .fetch_all(pool)
         .await?;
+
+    let letzte = sqlx::query_as::<_, LagebesprechungAnzeige>(SELECT_LETZTE_BESPRECHUNG)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+
+    let anzahl: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_lagebesprechung WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_one(pool)
+            .await?;
+
+    let termin: Option<String> =
+        sqlx::query_scalar("SELECT naechste_lagebesprechung_at FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?
+            .flatten();
+
     Ok(StabAnzeige {
         besetzung: zeilen.into_iter().map(Zeile::zu_anzeige).collect(),
+        letzte_lagebesprechung: letzte,
+        anzahl_lagebesprechungen: anzahl,
+        naechste_lagebesprechung_at: termin,
+    })
+}
+
+/// Alle Lagebesprechungen absteigend nach `lfd_nr`.
+///
+/// Kein Cursor in v1: im Fükw entstehen Dutzende, nicht Tausende `[abgeleitet]`;
+/// Paginierung ist Stufe-D-Bedarf.
+pub async fn lagebesprechungen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<LagebesprechungAnzeige>, AppError> {
+    sqlx::query_as::<_, LagebesprechungAnzeige>(SELECT_BESPRECHUNGEN)
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// Validierte Eingabe für den Abschluss einer Lagebesprechung.
+///
+/// `naechste_at` ist **Tri-State**: `None` = Termin unverändert, `Some(None)` = Termin löschen,
+/// `Some(Some(t))` = Termin setzen. Die Zeiten sind bereits normalisiert (Route).
+#[derive(Debug, Clone)]
+pub struct AbschlussEingabe {
+    pub entschluss: String,
+    pub abgehalten_at: String,
+    pub naechste_at: Option<Option<String>>,
+}
+
+/// Schliesst eine Lagebesprechung ab: ETB-Eintrag (`typ='entscheidung'`), Zeile mit
+/// Rückverweis und — bei gesetztem Schlüssel — der Einsatztermin, alles in **EINER**
+/// Transaktion (Entscheidung 9; FwDV 100 Abschn. 3.3.3.2, S. 42: „bei oder unmittelbar nach
+/// Erteilung dokumentieren").
+///
+/// Liefert `(lfd_nr, etb_eintrag_id)` für die Quittung und den ETB-Kurzruf.
+///
+/// **Der Termin-Schritt ist der einzige anfahrbare Rollback-Zweig dieser Transaktion** und
+/// damit der Träger der Atomaritäts-Zusicherung: er läuft als
+/// `UPDATE … WHERE id = ? AND status = 'aktiv'` und rollt bei `rows_affected == 0`
+/// ausdrücklich zurück (Muster `lagebericht/repo.rs::freigeben`). Das ist **keine** Redundanz
+/// zu `fordere_aktiv` auf der Route — über die Route ist der Zweig gar nicht erreichbar,
+/// weshalb der Test die Funktion direkt ruft.
+pub async fn lagebesprechung_abschliessen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    eingabe: &AbschlussEingabe,
+) -> Result<(i64, i64), AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+
+    write_retry!(pool, |conn| {
+        // 1. Server-autoritative, lückenlose Nummer je Einsatz.
+        let lfd_nr: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(lfd_nr) + 1, 1) FROM einsatz_lagebesprechung WHERE einsatz_id = ?",
+        )
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+
+        // 2. Der Termin-Snapshot: bei `None` (unverändert) der AKTUELLE Wert aus `einsatz` —
+        //    der Beleg muss tragen, welcher Termin nach der Besprechung galt, nicht „nichts".
+        let snapshot: Option<String> = match &eingabe.naechste_at {
+            Some(wert) => wert.clone(),
+            None => {
+                sqlx::query_scalar("SELECT naechste_lagebesprechung_at FROM einsatz WHERE id = ?")
+                    .bind(einsatz_id)
+                    .fetch_optional(&mut *conn)
+                    .await?
+                    .flatten()
+            }
+        };
+
+        // 3. ETB-Eintrag vom Typ `entscheidung` — ein FACHLICHER Eintrag (kein `system`): er
+        //    dokumentiert die Entscheidung der Einsatzleitung, nicht eine Systemhandlung.
+        let inhalt = super::render_snapshot(
+            lfd_nr,
+            &eingabe.abgehalten_at,
+            &eingabe.entschluss,
+            snapshot.as_deref(),
+        );
+        let etb_id = crate::etb::repo::anlegen_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_ENTSCHEIDUNG,
+                inhalt: &inhalt,
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: Some("Lagebesprechung"),
+                ereigniszeit: Some(&eingabe.abgehalten_at),
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
+        .await?;
+
+        // 4. Die Zeile mit Rückverweis auf den Beleg.
+        sqlx::query(
+            "INSERT INTO einsatz_lagebesprechung \
+                (einsatz_id, lfd_nr, abgehalten_at, entschluss, naechste_at, etb_eintrag_id, \
+                 erfasst_von_id, erfasst_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+        )
+        .bind(einsatz_id)
+        .bind(lfd_nr)
+        .bind(&eingabe.abgehalten_at)
+        .bind(eingabe.entschluss.trim())
+        .bind(snapshot.as_deref())
+        .bind(etb_id)
+        .bind(benutzer_id)
+        .execute(&mut *conn)
+        .await?;
+
+        // 5. Der Einsatztermin — nur bei gesetztem Schlüssel (Tri-State).
+        if let Some(wert) = &eingabe.naechste_at {
+            let betroffen = sqlx::query(
+                "UPDATE einsatz SET naechste_lagebesprechung_at = ? WHERE id = ? AND status = 'aktiv'",
+            )
+            .bind(wert.as_deref())
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected();
+            if betroffen == 0 {
+                // Rollback verwirft ETB-Eintrag UND Zeile → kein verwaister Beleg.
+                return Err(AppError::UnprocessableEntity(
+                    "Einsatz ist nicht (mehr) aktiv".into(),
+                ));
+            }
+        }
+
+        Ok((lfd_nr, etb_id))
     })
 }
 

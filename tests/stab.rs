@@ -775,3 +775,406 @@ async fn schwaerzung_nullt_namen_nur_im_betroffenen_einsatz() {
     .unwrap();
     assert_eq!(art, "rueckwaertig");
 }
+
+// ---------- Lagebesprechung (ST2) ----------
+
+fn besprechungen_pfad(einsatz: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/{PFAD}/lagebesprechungen")
+}
+
+/// Zählt ETB-Einträge vom Typ `entscheidung`.
+async fn entscheidungen(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
+    let (_, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    json.as_array()
+        .map(|a| a.iter().filter(|e| e["typ"] == "entscheidung").count())
+        .unwrap_or(0)
+}
+
+#[tokio::test]
+async fn abschluss_schreibt_etb_entscheidung_zeile_und_termin() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &admin,
+        Some(
+            r#"{"entschluss":"Abschnitte bilden, Riegelstellung halten",
+                "abgehalten_at":"2026-09-12 14:30:00",
+                "naechste_at":"2026-09-12 16:30:00"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+
+    // Die Quittung ist der FRISCH geladene Stab — nicht ein Zustand, den es nie gab.
+    assert_eq!(json["anzahl_lagebesprechungen"], 1);
+    assert_eq!(json["letzte_lagebesprechung"]["lfd_nr"], 1);
+    assert_eq!(
+        json["letzte_lagebesprechung"]["entschluss"],
+        "Abschnitte bilden, Riegelstellung halten"
+    );
+    assert_eq!(
+        json["naechste_lagebesprechung_at"], "2026-09-12 16:30:00",
+        "der Termin kommt aus `einsatz` und wird mitgeliefert"
+    );
+
+    // Der Beleg: genau EIN ETB-Eintrag vom Typ `entscheidung`, mit dem Snapshot-Text.
+    assert_eq!(entscheidungen(&app, &admin, einsatz).await, 1);
+    assert_eq!(
+        etb_treffer(
+            &app,
+            &admin,
+            einsatz,
+            "Lagebesprechung Nr. 1 (2026-09-12 14:30:00)"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        etb_treffer(
+            &app,
+            &admin,
+            einsatz,
+            "Nächste Lagebesprechung: 2026-09-12 16:30:00"
+        )
+        .await,
+        1
+    );
+
+    // Und der Termin steht auch am Einsatzkopf (EINE Wahrheit, Entscheidung 11).
+    let (_, kopf) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(kopf["naechste_lagebesprechung_at"], "2026-09-12 16:30:00");
+
+    // Beide Live-Ereignisse: `stab` und der ETB-Kurzruf.
+    let (mut sah_stab, mut sah_etb) = (false, false);
+    while let Ok(n) = rx.try_recv() {
+        match n.event.as_str() {
+            "stab" => sah_stab = true,
+            "etb" => sah_etb = true,
+            _ => {}
+        }
+    }
+    assert!(sah_stab, "`stab`-Ereignis fehlt");
+    assert!(
+        sah_etb,
+        "ETB-Kurzruf fehlt — der Eintrag entstand im selben Commit"
+    );
+}
+
+/// Der Termin ist **Tri-State**: Feld fehlt = unverändert, `null` = löschen, Wert = setzen.
+#[tokio::test]
+async fn termin_ist_tri_state() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    // Wert setzen.
+    anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &admin,
+        Some(r#"{"entschluss":"A","abgehalten_at":"2026-09-12 10:00:00","naechste_at":"2026-09-12 12:00:00"}"#),
+    )
+    .await;
+
+    // Feld FEHLT → Termin unverändert, und der Snapshot trägt den geltenden Termin.
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &admin,
+        Some(r#"{"entschluss":"B","abgehalten_at":"2026-09-12 11:00:00"}"#),
+    )
+    .await;
+    assert_eq!(
+        json["naechste_lagebesprechung_at"], "2026-09-12 12:00:00",
+        "ohne Schlüssel bleibt der Termin stehen"
+    );
+    assert_eq!(
+        json["letzte_lagebesprechung"]["naechste_at"], "2026-09-12 12:00:00",
+        "der Snapshot trägt den GELTENDEN Termin, nicht „nichts\""
+    );
+
+    // `null` → Termin löschen.
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &admin,
+        Some(r#"{"entschluss":"C","abgehalten_at":"2026-09-12 12:30:00","naechste_at":null}"#),
+    )
+    .await;
+    assert!(
+        json.get("naechste_lagebesprechung_at").is_none(),
+        "null löscht den Termin: {json}"
+    );
+    assert_eq!(
+        etb_treffer(
+            &app,
+            &admin,
+            einsatz,
+            "Nächste Lagebesprechung: kein Termin"
+        )
+        .await,
+        1,
+        "„kein Termin\" ist eine Aussage und gehört in den Beleg"
+    );
+}
+
+#[tokio::test]
+async fn lfd_nr_ist_luckenlos_und_historie_absteigend() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    for i in 0..3 {
+        let (status, _) = anfrage(
+            &app,
+            "POST",
+            &besprechungen_pfad(einsatz),
+            &admin,
+            Some(&format!(
+                r#"{{"entschluss":"Entschluss {i}","abgehalten_at":"2026-09-12 1{i}:00:00"}}"#
+            )),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+    }
+
+    let (status, json) = anfrage(&app, "GET", &besprechungen_pfad(einsatz), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 3);
+    let nummern: Vec<i64> = liste
+        .iter()
+        .map(|e| e["lfd_nr"].as_i64().unwrap())
+        .collect();
+    assert_eq!(nummern, vec![3, 2, 1], "absteigend, lückenlos");
+    // Jede Zeile trägt ihren eigenen Beleg.
+    assert_eq!(entscheidungen(&app, &admin, einsatz).await, 3);
+}
+
+#[tokio::test]
+async fn leerer_entschluss_ist_400_und_termin_vor_besprechung_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    for body in [
+        r#"{"entschluss":""}"#,
+        r#"{"entschluss":"   "}"#,
+        r#"{"entschluss":"A","abgehalten_at":"kein Datum"}"#,
+        r#"{"entschluss":"A","naechste_at":"kein Datum"}"#,
+    ] {
+        let (status, _) = anfrage(
+            &app,
+            "POST",
+            &besprechungen_pfad(einsatz),
+            &admin,
+            Some(body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "erwartet 400 für {body}");
+    }
+
+    // Zusammenhang zweier Felder → 422.
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &admin,
+        Some(r#"{"entschluss":"A","abgehalten_at":"2026-09-12 14:00:00","naechste_at":"2026-09-12 13:00:00"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Keiner der Fehlversuche hat einen Beleg hinterlassen.
+    assert_eq!(entscheidungen(&app, &admin, einsatz).await, 0);
+}
+
+#[tokio::test]
+async fn beobachter_darf_historie_lesen_aber_nicht_abschliessen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let beob = benutzer_anlegen(&app, &admin, "zuschauer", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&app, "zuschauer", "zuschauerpw1").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &besprechungen_pfad(einsatz),
+        &beob_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &beob_cookie,
+        Some(r#"{"entschluss":"A"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// **Die Atomaritäts-Probe.** Sie hängt ausdrücklich NICHT an einem ungültigen
+/// `naechste_at`: die Route lehnt den Wert vorher ab (400/422), der Request erreicht die
+/// Transaktion also nie — ein solcher Test bliebe auch dann grün, wenn ETB-Eintrag, Zeile
+/// und Termin-Update drei getrennte Aufrufe wären.
+///
+/// Sie hängt stattdessen am Fehler **nach** dem ETB-Insert: der Termin-Schritt läuft als
+/// `UPDATE … WHERE id = ? AND status = 'aktiv'` und rollt bei `rows_affected == 0` zurück.
+/// Gerufen wird die Repo-Funktion **direkt**, weil `fordere_aktiv` den Zweig auf der Route
+/// verdeckt.
+///
+/// **Mutationsprobe gefahren:** die eine Transaktion durch drei Einzelaufrufe ersetzt →
+/// dieser Test wird rot (der ETB-Eintrag bleibt dann stehen).
+#[tokio::test]
+async fn abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    // Einen Termin vorbelegen, damit „unverändert" beweisbar ist.
+    sqlx::query(
+        "UPDATE einsatz SET naechste_lagebesprechung_at = '2026-09-12 20:00:00' WHERE id = ?",
+    )
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
+    // Einsatz abschliessen — damit trifft das `status = 'aktiv'`-Prädikat keine Zeile.
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+
+    let fehler = lifeline_hub::stab::repo::lagebesprechung_abschliessen(
+        &pool,
+        einsatz,
+        1,
+        &lifeline_hub::stab::repo::AbschlussEingabe {
+            entschluss: "Darf nicht bestehen bleiben".into(),
+            abgehalten_at: "2026-09-12 18:00:00".into(),
+            naechste_at: Some(Some("2026-09-12 19:00:00".into())),
+        },
+    )
+    .await;
+    assert!(fehler.is_err(), "inaktiver Einsatz muss scheitern");
+
+    // (1) Kein ETB-Eintrag vom Typ `entscheidung`.
+    let etb: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'entscheidung'",
+    )
+    .bind(einsatz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(etb, 0, "der ETB-Eintrag muss mit zurückgerollt sein");
+
+    // (2) Keine Lagebesprechungs-Zeile.
+    let zeilen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_lagebesprechung WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(zeilen, 0);
+
+    // (3) Der Termin ist unverändert.
+    let termin: Option<String> =
+        sqlx::query_scalar("SELECT naechste_lagebesprechung_at FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(termin.as_deref(), Some("2026-09-12 20:00:00"));
+}
+
+/// Der Abschluss ist über die Route auf einem abgeschlossenen Einsatz gar nicht erreichbar —
+/// `fordere_aktiv` im Extractor greift vorher. Das ist die Ergänzung zur Probe oben, nicht
+/// ihr Ersatz.
+#[tokio::test]
+async fn abschluss_auf_abgeschlossenem_einsatz_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &admin,
+        Some(r#"{"entschluss":"A"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+/// Die Schwärzung lässt `entschluss` stehen (G_FUEHRUNG) — dieselbe Klassifikation wie
+/// `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe Entschluss ist.
+#[tokio::test]
+async fn schwaerzung_laesst_den_entschluss_stehen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    anfrage(
+        &app,
+        "POST",
+        &besprechungen_pfad(einsatz),
+        &admin,
+        Some(r#"{"entschluss":"Riegelstellung Nordufer halten"}"#),
+    )
+    .await;
+
+    let mut tx = pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let entschluss: String =
+        sqlx::query_scalar("SELECT entschluss FROM einsatz_lagebesprechung WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        entschluss, "Riegelstellung Nordufer halten",
+        "Führungs-Freitext bleibt — Alleingang auf Scrub für EINE der drei Tabellen wäre inkonsistent"
+    );
+}

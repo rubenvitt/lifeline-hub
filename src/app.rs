@@ -259,6 +259,11 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",
             put(routes::stab::besetzung_setzen).delete(routes::stab::besetzung_entfernen),
         )
+        .route(
+            "/api/einsaetze/{id}/stab/lagebesprechungen",
+            get(routes::stab::lagebesprechungen_liste)
+                .post(routes::stab::lagebesprechung_abschliessen),
+        )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(
             "/api/einsaetze/{id}/meldungen",

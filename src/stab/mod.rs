@@ -182,14 +182,67 @@ pub struct StabsfunktionAnzeige {
     pub gesetzt_at: String,
 }
 
+/// Eine abgeschlossene Lagebesprechung.
+///
+/// Der Entschluss steht zusätzlich im ETB (`typ='entscheidung'`, `etb_eintrag_id`); die Zeile
+/// trägt Nummer, Zeitpunkt und den **Snapshot** des beim Abschluss gesetzten Termins.
+/// `naechste_at` ist damit Beweiswert, **keine** zweite lebende Terminwahrheit — die bleibt
+/// `einsatz.naechste_lagebesprechung_at` (Entscheidung 11).
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct LagebesprechungAnzeige {
+    pub id: i64,
+    pub einsatz_id: i64,
+    pub lfd_nr: i64,
+    pub abgehalten_at: String,
+    pub entschluss: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub naechste_at: Option<String>,
+    pub etb_eintrag_id: i64,
+    pub erfasst_von_id: i64,
+    pub erfasst_at: String,
+}
+
 /// Die Führungsorganisation eines Einsatzes.
 ///
 /// `besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen
 /// Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
 /// schicken hiesse, „nicht vergeben" als Datensatz zu erfinden.
+///
+/// `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der
+/// Countdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im
+/// `NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct StabAnzeige {
     pub besetzung: Vec<StabsfunktionAnzeige>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letzte_lagebesprechung: Option<LagebesprechungAnzeige>,
+    pub anzahl_lagebesprechungen: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub naechste_lagebesprechung_at: Option<String>,
+}
+
+/// Rendert den ETB-Snapshot einer Lagebesprechung (Abschnitt 9.1 der Spec).
+///
+/// **Deterministisch**: zweimal gerufen ist das Ergebnis gleich — der Text ist ein
+/// beweissichernder ETB-Inhalt, keine Anzeige. Leere Angaben werden ausgelassen statt als
+/// „—" gerendert („nur Neuerungen"); ohne Termin steht ausdrücklich „kein Termin", weil das
+/// eine Aussage ist und keine fehlende Angabe.
+///
+/// Die Zeiten gehen als bereits normalisierte UTC-Strings herein (`etb::normalisiere_zeit`
+/// läuft in der Route) — dieselbe Arbeitsteilung wie bei `lagebericht::render_snapshot`.
+pub fn render_snapshot(
+    lfd_nr: i64,
+    abgehalten_at: &str,
+    entschluss: &str,
+    naechste_at: Option<&str>,
+) -> String {
+    let mut out = format!("Lagebesprechung Nr. {lfd_nr} ({abgehalten_at})\n");
+    out.push_str(&format!("Entschluss: {}\n", entschluss.trim()));
+    out.push_str(&format!(
+        "Nächste Lagebesprechung: {}",
+        naechste_at.unwrap_or("kein Termin")
+    ));
+    out
 }
 
 #[cfg(test)]
@@ -213,6 +266,39 @@ mod tests {
         }
         assert_eq!(BesetzungArt::parse("nicht_vergeben"), None);
         assert_eq!(BesetzungArt::parse(""), None);
+    }
+
+    #[test]
+    fn snapshot_ist_deterministisch() {
+        let a = render_snapshot(
+            3,
+            "2026-09-12 14:30:00",
+            "Lage unverändert",
+            Some("2026-09-12 16:30:00"),
+        );
+        let b = render_snapshot(
+            3,
+            "2026-09-12 14:30:00",
+            "Lage unverändert",
+            Some("2026-09-12 16:30:00"),
+        );
+        assert_eq!(a, b, "zweimal rendern muss gleich sein");
+        assert!(a.contains("Lagebesprechung Nr. 3 (2026-09-12 14:30:00)"));
+        assert!(a.contains("Entschluss: Lage unverändert"));
+        assert!(a.contains("Nächste Lagebesprechung: 2026-09-12 16:30:00"));
+    }
+
+    /// „kein Termin" ist eine AUSSAGE, keine fehlende Angabe — sie gehört in den Beleg.
+    #[test]
+    fn snapshot_ohne_termin_sagt_kein_termin() {
+        let t = render_snapshot(1, "2026-09-12 08:00:00", "Abschnitte bilden", None);
+        assert!(t.contains("Nächste Lagebesprechung: kein Termin"), "{t}");
+    }
+
+    #[test]
+    fn snapshot_trimmt_den_entschluss() {
+        let t = render_snapshot(1, "2026-09-12 08:00:00", "  Maßnahmen fortführen  ", None);
+        assert!(t.contains("Entschluss: Maßnahmen fortführen\n"), "{t}");
     }
 
     /// Die Anzeigereihenfolge der sechs Zeilen ist Teil des Vertrags (Anlage 2).

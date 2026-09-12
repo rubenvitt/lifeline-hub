@@ -1356,6 +1356,30 @@ export interface components {
          */
         LageberichtVorlage: "lagebericht" | "lagebeurteilung" | "freitext";
         /**
+         * @description Eine abgeschlossene Lagebesprechung.
+         *
+         *     Der Entschluss steht zusätzlich im ETB (`typ='entscheidung'`, `etb_eintrag_id`); die Zeile
+         *     trägt Nummer, Zeitpunkt und den **Snapshot** des beim Abschluss gesetzten Termins.
+         *     `naechste_at` ist damit Beweiswert, **keine** zweite lebende Terminwahrheit — die bleibt
+         *     `einsatz.naechste_lagebesprechung_at` (Entscheidung 11).
+         */
+        LagebesprechungAnzeige: {
+            abgehalten_at: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            entschluss: string;
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von_id: number;
+            /** Format: int64 */
+            etb_eintrag_id: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            lfd_nr: number;
+            naechste_at?: string | null;
+        };
+        /**
          * @description SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
@@ -2027,9 +2051,17 @@ export interface components {
          *     `besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen
          *     Zeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu
          *     schicken hiesse, „nicht vergeben" als Datensatz zu erfinden.
+         *
+         *     `naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der
+         *     Countdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im
+         *     `NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.
          */
         StabAnzeige: {
+            /** Format: int64 */
+            anzahl_lagebesprechungen: number;
             besetzung: components["schemas"]["StabsfunktionAnzeige"][];
+            letzte_lagebesprechung?: null | components["schemas"]["LagebesprechungAnzeige"];
+            naechste_lagebesprechung_at?: string | null;
         };
         /**
          * @description Eine belegte Sachgebietszeile.

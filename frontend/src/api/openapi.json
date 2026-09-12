@@ -3913,6 +3913,57 @@
           "freitext"
         ]
       },
+      "LagebesprechungAnzeige": {
+        "type": "object",
+        "description": "Eine abgeschlossene Lagebesprechung.\n\nDer Entschluss steht zusätzlich im ETB (`typ='entscheidung'`, `etb_eintrag_id`); die Zeile\nträgt Nummer, Zeitpunkt und den **Snapshot** des beim Abschluss gesetzten Termins.\n`naechste_at` ist damit Beweiswert, **keine** zweite lebende Terminwahrheit — die bleibt\n`einsatz.naechste_lagebesprechung_at` (Entscheidung 11).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "lfd_nr",
+          "abgehalten_at",
+          "entschluss",
+          "etb_eintrag_id",
+          "erfasst_von_id",
+          "erfasst_at"
+        ],
+        "properties": {
+          "abgehalten_at": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "entschluss": {
+            "type": "string"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "etb_eintrag_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "naechste_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "LiveEvent": {
         "type": "string",
         "description": "SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;\ndie Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.",
@@ -5819,16 +5870,37 @@
       },
       "StabAnzeige": {
         "type": "object",
-        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.",
+        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.\n\n`naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**, damit der\nCountdown auf beiden Fahrzeugschirmen live ist, obwohl der Einsatzkopf FE-seitig im\n`NICHT_LIVE`-Fach bleibt (Entscheidung 11). Kein zweiter Speicherort.",
         "required": [
-          "besetzung"
+          "besetzung",
+          "anzahl_lagebesprechungen"
         ],
         "properties": {
+          "anzahl_lagebesprechungen": {
+            "type": "integer",
+            "format": "int64"
+          },
           "besetzung": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/StabsfunktionAnzeige"
             }
+          },
+          "letzte_lagebesprechung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LagebesprechungAnzeige"
+              }
+            ]
+          },
+          "naechste_lagebesprechung_at": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

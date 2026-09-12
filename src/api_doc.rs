@@ -155,6 +155,7 @@ use utoipa::OpenApi;
         crate::schaden::SchadenTyp,
         crate::sprechgruppe::SprechgruppeAnzeige,
         crate::stab::BesetzungArt,
+        crate::stab::LagebesprechungAnzeige,
         crate::stab::Sachgebiet,
         crate::stab::StabAnzeige,
         crate::stab::StabsfunktionAnzeige,

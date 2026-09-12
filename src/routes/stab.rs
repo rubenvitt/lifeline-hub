@@ -16,8 +16,14 @@ use crate::einsatz::modul::Stab;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
-use crate::stab::repo::{self, BesetzungEingabe};
-use crate::stab::{BesetzungArt, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
+use crate::routes::support;
+use crate::stab::repo::{self, AbschlussEingabe, BesetzungEingabe};
+use crate::stab::{BesetzungArt, LagebesprechungAnzeige, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
+
+/// Aktuelle Server-Zeit im SQLite-Format (Default-Zeitpunkt der Besprechung).
+fn jetzt() -> String {
+    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
 
 fn sse(state: &AppState, einsatz_id: i64) {
     state.live.publiziere_event(
@@ -164,6 +170,88 @@ pub async fn besetzung_entfernen(
         sse(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LagebesprechungAbschluss {
+    entschluss: String,
+    /// Zeitpunkt der Besprechung; fehlt = jetzt.
+    #[serde(default)]
+    abgehalten_at: Option<String>,
+    /// **Tri-State** wie am Einsatzkopf (`routes/einsatz.rs`): Feld fehlt = Termin
+    /// unverändert, `null` = Termin löschen, Wert = Termin setzen.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    naechste_at: Option<Option<String>>,
+}
+
+/// GET /api/einsaetze/{id}/stab/lagebesprechungen — Historie, absteigend.
+pub async fn lagebesprechungen_liste(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Stab>,
+) -> Result<Json<Vec<LagebesprechungAnzeige>>, AppError> {
+    let liste = repo::lagebesprechungen(&state.pool, ctx.einsatz.id).await?;
+    Ok(Json(liste))
+}
+
+/// POST /api/einsaetze/{id}/stab/lagebesprechungen — Lagebesprechung abschliessen.
+///
+/// Die Antwort wird **nach** dem Schreiben frisch geladen: die Quittung darf keinen Zustand
+/// tragen, den es nie gab (LFH-340/C5).
+pub async fn lagebesprechung_abschliessen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    JsonBody(req): JsonBody<LagebesprechungAbschluss>,
+) -> Result<(StatusCode, Json<StabAnzeige>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+
+    // Ein leeres Pflichtfeld scheitert am Feld ISOLIERT → 400 (LFH-267). „Lage unverändert,
+    // Maßnahmen fortführen" ist ein gültiger Entschluss, ein leerer Eintrag vom Typ
+    // `entscheidung` wäre semantisch leer.
+    let entschluss = req.entschluss.trim().to_string();
+    if entschluss.is_empty() {
+        return Err(AppError::Validation(
+            "entschluss darf nicht leer sein".into(),
+        ));
+    }
+
+    // Nicht parsebare Zeit → 400 (Feld isoliert). `normalisiere_zeit` läuft in der ROUTE, nie
+    // im Repo — dieselbe Arbeitsteilung wie im Bestand.
+    let abgehalten_at = match req.abgehalten_at.as_deref().map(str::trim) {
+        Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
+        _ => jetzt(),
+    };
+    let naechste_at = match support::trimme_tri(req.naechste_at) {
+        Some(Some(s)) => Some(Some(crate::etb::normalisiere_zeit(&s)?)),
+        Some(None) => Some(None),
+        None => None,
+    };
+
+    // Ein Termin VOR der Besprechung ist ein Zusammenhang zweier Felder → 422.
+    if let Some(Some(t)) = &naechste_at {
+        if t.as_str() <= abgehalten_at.as_str() {
+            return Err(AppError::UnprocessableEntity(
+                "naechste_at muss nach abgehalten_at liegen".into(),
+            ));
+        }
+    }
+
+    let (_lfd_nr, etb_id) = repo::lagebesprechung_abschliessen(
+        &state.pool,
+        einsatz_id,
+        ctx.benutzer.id,
+        &AbschlussEingabe {
+            entschluss,
+            abgehalten_at,
+            naechste_at,
+        },
+    )
+    .await?;
+
+    let stab = repo::laden(&state.pool, einsatz_id).await?;
+    // Der ETB-Eintrag entstand im selben Commit → ETB-Kurzruf mitschicken.
+    state.live.publiziere(einsatz_id, etb_id);
+    sse(&state, einsatz_id);
+    Ok((StatusCode::CREATED, Json(stab)))
 }
 
 #[cfg(test)]
