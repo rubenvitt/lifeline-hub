@@ -55,6 +55,10 @@
  *     (`sf.StatusDarstellung` fällt auf) und den Kern unter durchsichtigen Hüllen
  *     (`Readonly<StatusDarstellung>` fällt auf). Aliase löst er nicht auf; das wäre ein
  *     Typchecker, kein Guard. Im Bestand gibt es keinen solchen Alias.
+ *   • **Ein Namensraum-Import von antd** (`import * as antd from 'antd'`, dann
+ *     `<antd.Tag color=…>`). {@link tagNamenIn} löst die Umbenennung beim benannten
+ *     Import auf, nicht die Qualifizierung im JSX-Namen. Im Bestand kommt weder das eine
+ *     noch das andere vor (gemessen).
  *   • **Ein Vertragsname, der über EINE ZWEITE Datei umbenannt weitergereicht wird**:
  *     `personen/personMeta.ts:31` exportiert `personStatus as STATUS_META` weiter.
  *     {@link vertragsNamenIn} löst die Umbenennung beim DIREKTEN Import auf, folgt aber
@@ -661,24 +665,53 @@ function vertragsNamenIn(inhalt: string): readonly string[] {
 
 const LITERAL = /(['"`])([^'"`]*)\1/g;
 
+/**
+ * Die lokalen Namen von antds `Tag` in dieser Datei — `Tag` selbst plus Umbenennungen
+ * beim Import (`import { Tag as StatusLabel } from 'antd'`).
+ *
+ * Dieselbe Auflösung wie {@link vertragsNamenIn}, nur auf der anderen Seite des
+ * Ausdrucks: dort der gelesene Vertragsname, hier das bemalte Element. Im Bestand
+ * benennt niemand `Tag` um (gemessen am 12.09.2026); die Maschinerie stand aber schon,
+ * und sie nur einseitig anzuwenden wäre eine Lücke aus Nachlässigkeit statt aus
+ * Entscheidung.
+ *
+ * `Tag` steht IMMER im Topf, auch ohne passenden Import — sonst hinge die Zusicherung
+ * an einer Importzeile, und eine Datei mit `<Tag` ohne Import wäre ohnehin kaputt.
+ * Nicht erfasst: ein Namensraum-Import (`import * as antd from 'antd'` mit
+ * `<antd.Tag …>`); im Bestand kommt er an keiner Stelle vor.
+ */
+function tagNamenIn(inhalt: string): readonly string[] {
+  const namen = new Set(['Tag']);
+  for (const [, liste] of inhalt.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]antd['"]/g)) {
+    for (const teil of liste.split(',')) {
+      const um = /^\s*Tag\s+as\s+([A-Za-z_$][\w$]*)\s*$/.exec(teil);
+      if (um) namen.add(um[1]);
+    }
+  }
+  return [...namen];
+}
+
 export function tagBefunde(dateien: Record<string, string>): string[] {
   const verstoesse: string[] = [];
   for (const [pfad, roh] of Object.entries(dateien)) {
     if (!ausserhalbDesVertrags(pfad)) continue;
-    if (!roh.includes('<Tag')) continue;
     const inhalt = ohneKommentare(roh).join('\n');
     const namen = vertragsNamenIn(inhalt);
-    for (let i = inhalt.indexOf('<Tag'); i !== -1; i = inhalt.indexOf('<Tag', i + 4)) {
-      if (!/[\s/>]/.test(inhalt[i + 4] ?? '')) continue; // `<Tagline` o. ä.
-      const ende = tagEnde(inhalt, i);
-      if (ende === -1) continue;
-      const tag = inhalt.slice(i, ende + 1);
-      const farbe = farbAusdruck(tag);
-      if (!farbe) continue;
-      const grund = grundFuerBefund(farbe, namen);
-      if (!grund) continue;
-      const zeile = inhalt.slice(0, i).split('\n').length;
-      verstoesse.push(`${pfad}:${zeile}  ${grund}  ${tag.replace(/\s+/g, ' ').slice(0, 110)}`);
+    for (const element of tagNamenIn(inhalt)) {
+      const marke = `<${element}`;
+      for (let i = inhalt.indexOf(marke); i !== -1; i = inhalt.indexOf(marke, i + marke.length)) {
+        // `<Tagline` o. ä. — der Name muss hier enden.
+        if (!/[\s/>]/.test(inhalt[i + marke.length] ?? '')) continue;
+        const ende = tagEnde(inhalt, i);
+        if (ende === -1) continue;
+        const tag = inhalt.slice(i, ende + 1);
+        const farbe = farbAusdruck(tag);
+        if (!farbe) continue;
+        const grund = grundFuerBefund(farbe, namen);
+        if (!grund) continue;
+        const zeile = inhalt.slice(0, i).split('\n').length;
+        verstoesse.push(`${pfad}:${zeile}  ${grund}  ${tag.replace(/\s+/g, ' ').slice(0, 110)}`);
+      }
     }
   }
   return verstoesse;
@@ -826,6 +859,27 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
           'const STATUS_META: Record<TierStatus, { label: string; color: string }> = {};',
           '<Tag color={STATUS_META[t.status].color}>{STATUS_META[t.status].label}</Tag>',
         ].join('\n'),
+      }),
+    ).toEqual([]);
+  });
+
+  it('folgt auch einer Umbenennung des Tags selbst', () => {
+    // Die andere Seite des Ausdrucks: nicht der gelesene Vertragsname, sondern das
+    // bemalte Element. Im Codex-Review gefunden; im Bestand benennt niemand `Tag` um.
+    const umbenannt = tagBefunde({
+      '/src/pages/TagAlias.tsx': [
+        "import { Tag as StatusLabel } from 'antd';",
+        '<StatusLabel color={rollenFarbe(warnstufeKarte[s].rolle, token)}>x</StatusLabel>',
+      ].join('\n'),
+    });
+    expect(umbenannt).toHaveLength(1);
+
+    // Gegenprobe: ein gleichnamiges Element OHNE den antd-Import bleibt unsichtbar —
+    // sonst meldete der Guard jedes fremde `color` an irgendeinem Element.
+    expect(
+      tagBefunde({
+        '/src/pages/Fremdes.tsx':
+          '<StatusLabel color={rollenFarbe(warnstufeKarte[s].rolle, token)}>x</StatusLabel>',
       }),
     ).toEqual([]);
   });
