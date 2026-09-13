@@ -961,8 +961,31 @@ const LITERAL = /(['"`])([^'"`]*)\1/g;
  * und sie nur einseitig anzuwenden wäre eine Lücke aus Nachlässigkeit statt aus
  * Entscheidung.
  *
- * `Tag` steht IMMER im Topf, auch ohne passenden Import — sonst hinge die Zusicherung
- * an einer Importzeile, und eine Datei mit `<Tag` ohne Import wäre ohnehin kaputt.
+ * `Tag` steht IMMER im Topf, auch ohne passenden antd-Import — eine bewusste
+ * ÜBER-Annäherung, und die Begründung hier stand zuerst falsch: sie sprach vom Fall
+ * „gar kein Import" („die Datei wäre ohnehin kaputt"). Der Fall, auf den es ankommt,
+ * ist ein anderer und kam im Codex-Review: ein `Tag`, der aus einer ANDEREN Quelle
+ * kommt.
+ *
+ * Ihn sauber auszuschliessen kann ein Textscanner nicht, und das ist der Grund für die
+ * Setzung: `import { Tag } from './ui'` ist EIN Text mit zwei entgegengesetzten
+ * Bedeutungen — ein Sammelmodul, das antds `Tag` weiterreicht (muss gescannt werden),
+ * und eine eigene Komponente gleichen Namens (müsste draussen bleiben). Welche von
+ * beiden, sagt erst die Bindung. Dieselbe Wurzel wie die drei Grenzen oben.
+ *
+ * Wo die Unterscheidung nicht möglich ist, entscheidet die RICHTUNG des Irrtums. Ein
+ * gemeldeter Treffer ist sichtbar und kann bestritten werden; ein stilles Grün über
+ * einer verbotenen Darstellung kann das nicht — und Letzteres ist genau der Zustand,
+ * gegen den dieser Guard gebaut ist. Dazu kommt, dass ein handbemaltes
+ * `<Tag color={rollenFarbe(…)}>` auch auf einer EIGENEN Komponente das ist, was die
+ * A2-Regel verbietet („Statusfarbe nur als Punkt/Rand/Beistrich"); antds statisches
+ * Farbpaar ist der Ursprung der Regel, nicht ihre Grenze.
+ *
+ * Gemessen am 13.09.2026: es gibt im Repo keine Nicht-antd-Komponente namens `Tag` und
+ * kein Sammelmodul, das aus `antd` weiterexportiert — beide Seiten des Falls sind heute
+ * hypothetisch. Meldet der Guard hier je einen legitimen Fall, ist das eine Entscheidung
+ * mit Fundstelle statt einer Vermutung.
+ *
  * Nicht erfasst: ein Namensraum-Import (`import * as antd from 'antd'` mit
  * `<antd.Tag …>`); im Bestand kommt er an keiner Stelle vor.
  */
@@ -1240,6 +1263,36 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
         '/src/pages/Praefix.tsx': [
           "import { rollenFarbe as farbe } from '../theme/statusFarben';",
           '<Tag color={farbeVonWoanders(x)}>x</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+  });
+
+  it('scannt `<Tag>` auch ohne antd-Importzeile — bewusste Über-Annäherung', () => {
+    // Im Codex-Review vorgeschlagen, den Topf nur aus einem echten antd-Import zu
+    // füllen. Bewusst NICHT übernommen: `import { Tag } from './ui'` ist EIN Text mit
+    // zwei Bedeutungen — Sammelmodul (muss gescannt werden) oder eigene Komponente
+    // (müsste draussen bleiben) —, und welche, sagt erst die Bindung. Wo ein
+    // Textscanner nicht unterscheiden kann, entscheidet die Richtung des Irrtums: ein
+    // Treffer ist sichtbar und bestreitbar, ein stilles Grün über einer verbotenen
+    // Darstellung nicht. Siehe Kopfkommentar von `tagNamenIn`.
+    const ohneImport = tagBefunde({
+      '/src/pages/Sammelmodul.tsx': [
+        "import { Tag } from '../components/ui';",
+        "import { rollenFarbe, warnstufeKarte } from '../theme/statusFarben';",
+        '<Tag color={rollenFarbe(warnstufeKarte[s].rolle, token)}>x</Tag>',
+      ].join('\n'),
+    });
+    expect(ohneImport).toHaveLength(1);
+
+    // Die Gegenprobe: die Über-Annäherung greift NUR über den Namen `Tag`, nicht über
+    // jedes Element mit einer `color`-Prop. Ohne sie wäre die Zusicherung oben von
+    // „der Guard meldet alles" nicht zu unterscheiden.
+    expect(
+      tagBefunde({
+        '/src/pages/Anderes.tsx': [
+          "import { rollenFarbe, warnstufeKarte } from '../theme/statusFarben';",
+          '<Marker color={rollenFarbe(warnstufeKarte[s].rolle, token)}>x</Marker>',
         ].join('\n'),
       }),
     ).toEqual([]);
