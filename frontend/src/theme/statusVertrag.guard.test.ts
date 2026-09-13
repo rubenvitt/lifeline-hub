@@ -1247,6 +1247,20 @@ function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<s
   for (let i = 0; i < treffer.length; i++) {
     const stelle = treffer[i].index ?? 0;
     if (!ausdruck.slice(0, stelle).trimEnd().endsWith('.')) {
+      // Ein Objekt-SCHLUESSEL nennt den Namen, liest die Bindung aber nicht (im
+      // Codex-Review gefunden): in `{ dringlichkeit: eigeneFarbe }` steht der Name
+      // links vom Doppelpunkt. Die KURZFORM `{ dringlichkeit }` liest sie sehr wohl
+      // und hat keinen Doppelpunkt — deshalb reicht „folgt ein `:`" NICHT als
+      // Kennzeichen: im Fragezeichen-Ausdruck `x ? dringlichkeit : andere` folgt
+      // ebenfalls einer, und dort ist es ein echter Zugriff. Ein Schluessel steht
+      // zusaetzlich hinter `{` oder `,`, ein Ternaer-Zweig hinter `?`.
+      const davor = ausdruck.slice(0, stelle).trimEnd();
+      const danach = ausdruck.slice(stelle + treffer[i][0].length).trimStart();
+      const istSchluessel = danach.startsWith(':') && (davor.endsWith('{') || davor.endsWith(','));
+      if (istSchluessel) {
+        istWurzel[i] = false;
+        continue;
+      }
       istWurzel[i] = true;
       wurzeln.add(treffer[i][0]);
       continue;
@@ -1693,6 +1707,39 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
         ].join('\n'),
       }),
     ).toEqual([]);
+  });
+
+  it('zaehlt einen Objekt-Schluessel nicht als Lesen — die Kurzform dagegen schon', () => {
+    // Im Codex-Review gefunden: `{ dringlichkeit: eigeneFarbe }` nennt den Namen, liest
+    // die Bindung aber nicht. Die KURZFORM `{ dringlichkeit }` liest sie sehr wohl —
+    // beide Faelle gehoeren als Paar geprueft, sonst ist der Fix eine Abschaltung.
+    expect(
+      tagBefunde({
+        '/src/pages/Schluessel.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          '<Tag color={waehle({ dringlichkeit: eigeneFarbe })}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+
+    const kurz = tagBefunde({
+      '/src/pages/Kurzform.tsx': [
+        "import { dringlichkeit } from '../theme/statusFarben';",
+        '<Tag color={waehle({ dringlichkeit })}>{y}</Tag>',
+      ].join('\n'),
+    });
+    expect(kurz).toHaveLength(1);
+
+    // Und die Falle daneben: im Fragezeichen-Ausdruck steht vor dem Doppelpunkt ein
+    // echter Zugriff, kein Schluessel. Ein Fix, der nur auf das folgende `:` sieht,
+    // verschluckt ihn.
+    const frage = tagBefunde({
+      '/src/pages/Frage.tsx': [
+        "import { dringlichkeit } from '../theme/statusFarben';",
+        '<Tag color={x ? dringlichkeit : andere}>{y}</Tag>',
+      ].join('\n'),
+    });
+    expect(frage).toHaveLength(1);
   });
 
   it('haelt ein Apostroph im JSX-Text nicht fuer den Anfang einer Zeichenkette', () => {
