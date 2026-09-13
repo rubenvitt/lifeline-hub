@@ -1,3 +1,15 @@
+## [1.0.0-alpha.11](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.10...v1.0.0-alpha.11) (2026-09-13)
+
+### Features
+
+* **stab:** Backend Besetzung S1–S6 (LFH-539) ([ccdb3e7](https://github.com/rubenvitt/lifeline-hub/commit/ccdb3e7671914d70185002f5f26862e4dc5f4979))
+* **stab:** Lagebesprechung abschliessen als eine Transaktion (LFH-540) ([98be0dd](https://github.com/rubenvitt/lifeline-hub/commit/98be0dd04e49c2c12ffb2fbf8637984bf48d3d18))
+
+### Bug Fixes
+
+* **stab:** Review-Befunde zu PR [#60](https://github.com/rubenvitt/lifeline-hub/issues/60) (LFH-539/540) ([39131a4](https://github.com/rubenvitt/lifeline-hub/commit/39131a40491219fa6f948c1593267cef96a91a5b))
+* **stab:** zweite Review-Runde zu PR [#60](https://github.com/rubenvitt/lifeline-hub/issues/60) (LFH-539/540) ([4abf5ca](https://github.com/rubenvitt/lifeline-hub/commit/4abf5ca6ef9b8f40e9ed1829da6df4e8f76b4be6))
+
 ## [1.0.0-alpha.10](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.9...v1.0.0-alpha.10) (2026-09-12)
 
 ### Bug Fixes
