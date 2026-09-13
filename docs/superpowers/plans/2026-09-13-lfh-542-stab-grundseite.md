@@ -34,7 +34,7 @@
 
 | Datei | Verantwortung |
 |---|---|
-| `frontend/src/api/types.ts` (Modify) | Re-Exporte `Stab`, `Stabsfunktion`, `Lagebesprechung`, `Sachgebiet`, `BesetzungArt`; FE-lokaler Body `BesetzungSetzen` |
+| `frontend/src/api/types.ts` (Modify) | Re-Exporte `Stab`, `Stabsfunktion`, `Lagebesprechung`, `Sachgebiet`, `BesetzungArt`; FE-lokaler Body `BesetzungBody` |
 | `frontend/src/api/stab.ts` (Create) | `ladeStab`, `setzeBesetzung`, `entferneBesetzung` |
 | `frontend/src/routing/deeplinks.ts` (Modify) | `stabPfad(einsatzId, { neu? })` |
 | `frontend/src/stab/sachgebiete.ts` (Create) | Konstante `SACHGEBIETE`: Kürzel, Label, Anlage-2-Kurztext, Seite, Werkzeug-Modulschlüssel |
@@ -58,7 +58,7 @@
 - Test: `frontend/src/routing/deeplinks.test.ts`
 
 **Interfaces:**
-- Produces: `type Stab`, `type Stabsfunktion`, `type Lagebesprechung`, `type Sachgebiet`, `type BesetzungArt`, `interface BesetzungSetzen { besetzung_art: BesetzungArt; personal_id?: number; bezeichnung?: string }` aus `api/types`; `ladeStab(einsatzId: number): Promise<Stab>`, `setzeBesetzung(einsatzId: number, sachgebiet: Sachgebiet, daten: BesetzungSetzen): Promise<Stab>`, `entferneBesetzung(einsatzId: number, sachgebiet: Sachgebiet): Promise<void>` aus `api/stab`; `stabPfad(einsatzId: number, opts?: { neu?: boolean }): string` aus `routing/deeplinks`.
+- Produces: `type Stab`, `type Stabsfunktion`, `type Lagebesprechung`, `type Sachgebiet`, `type BesetzungArt`, `interface BesetzungBody { besetzung_art: BesetzungArt; personal_id?: number; bezeichnung?: string }` aus `api/types`; `ladeStab(einsatzId: number): Promise<Stab>`, `setzeBesetzung(einsatzId: number, sachgebiet: Sachgebiet, daten: BesetzungBody): Promise<Stab>`, `entferneBesetzung(einsatzId: number, sachgebiet: Sachgebiet): Promise<void>` aus `api/stab`; `stabPfad(einsatzId: number, opts?: { neu?: boolean }): string` aus `routing/deeplinks`.
 
 - [ ] **Step 1: Failing test für `stabPfad`**
 
@@ -113,7 +113,7 @@ export type BesetzungArt = S['BesetzungArt'];
  * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422
  * (`src/routes/stab.rs:80-118`) — Aufrufer schicken NUR das Feld, das die Art verlangt.
  */
-export interface BesetzungSetzen {
+export interface BesetzungBody {
   besetzung_art: BesetzungArt;
   personal_id?: number;
   bezeichnung?: string;
@@ -124,7 +124,7 @@ Neue Datei `frontend/src/api/stab.ts`:
 
 ```ts
 import { apiGet, apiSend } from './client';
-import type { BesetzungSetzen, Sachgebiet, Stab } from './types';
+import type { BesetzungBody, Sachgebiet, Stab } from './types';
 
 /** Führungsorganisation eines Einsatzes (LFH-46). `besetzung` trägt nur belegte Zeilen. */
 export function ladeStab(einsatzId: number): Promise<Stab> {
@@ -134,7 +134,7 @@ export function ladeStab(einsatzId: number): Promise<Stab> {
 export function setzeBesetzung(
   einsatzId: number,
   sachgebiet: Sachgebiet,
-  daten: BesetzungSetzen,
+  daten: BesetzungBody,
 ): Promise<Stab> {
   return apiSend<Stab>(`/api/einsaetze/${einsatzId}/stab/besetzung/${sachgebiet}`, 'PUT', daten);
 }
@@ -168,7 +168,7 @@ git commit -m "feat(stab): API-Client, Typen und stabPfad (LFH-542)"
 - Create: `frontend/src/stab/besetzung.ts`, `frontend/src/stab/besetzung.test.ts`
 
 **Interfaces:**
-- Consumes: `Sachgebiet`, `Stab`, `Stabsfunktion`, `BesetzungArt`, `BesetzungSetzen` aus `api/types` (Task 1); `StatusDarstellung` aus `theme/statusFarben`; `modulRegistry` aus `einsatz/modulRegistry` (nur im Test).
+- Consumes: `Sachgebiet`, `Stab`, `Stabsfunktion`, `BesetzungArt`, `BesetzungBody` aus `api/types` (Task 1); `StatusDarstellung` aus `theme/statusFarben`; `modulRegistry` aus `einsatz/modulRegistry` (nur im Test).
 - Produces:
   - `interface SachgebietEintrag { sachgebiet: Sachgebiet; kuerzel: string; label: string; aufgaben: string; seite: number; werkzeuge: readonly string[] }`, `const SACHGEBIETE: readonly SachgebietEintrag[]`
   - `type BesetzungWahl = BesetzungArt | 'nicht_vergeben'`
@@ -177,7 +177,7 @@ git commit -m "feat(stab): API-Client, Typen und stabPfad (LFH-542)"
   - `zeileFuer(stab: Stab | undefined, sachgebiet: Sachgebiet): Stabsfunktion | undefined`
   - `besetzungDarstellung(zeile: Stabsfunktion | undefined): StatusDarstellung`
   - `besetzungFormWerte(zeile: Stabsfunktion | undefined): BesetzungFormWerte`
-  - `type BesetzungAktion = { typ: 'keine' } | { typ: 'entfernen' } | { typ: 'setzen'; daten: BesetzungSetzen }`
+  - `type BesetzungAktion = { typ: 'keine' } | { typ: 'entfernen' } | { typ: 'setzen'; daten: BesetzungBody }`
   - `besetzungAktion(zeile: Stabsfunktion | undefined, werte: BesetzungFormWerte): BesetzungAktion`
   - `besetzungRechteText(einsatzStatus: string): string`
 
@@ -458,7 +458,7 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
 - [ ] **Step 4: `stab/besetzung.ts` anlegen**
 
 ```ts
-import type { BesetzungArt, BesetzungSetzen, Sachgebiet, Stab, Stabsfunktion } from '../api/types';
+import type { BesetzungArt, BesetzungBody, Sachgebiet, Stab, Stabsfunktion } from '../api/types';
 import type { StatusDarstellung } from '../theme/statusFarben';
 
 /** „Nicht vergeben" ist KEIN Datensatz (keine Zeile vom Server), aber eine Wahl in der Maske. */
@@ -526,7 +526,7 @@ export function besetzungFormWerte(zeile: Stabsfunktion | undefined): BesetzungF
 export type BesetzungAktion =
   | { typ: 'keine' }
   | { typ: 'entfernen' }
-  | { typ: 'setzen'; daten: BesetzungSetzen };
+  | { typ: 'setzen'; daten: BesetzungBody };
 
 /**
  * Was die Maske beim Übernehmen schickt — mit Wertgleichheits-Riegel.
