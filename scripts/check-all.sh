@@ -26,6 +26,12 @@
 # beiseitegeschobene Binary lag nach dem Lauf wieder da und e2e lief). Innerhalb dieses
 # Skripts ist e2e damit faktisch immer dabei (+~30 s). Der Guard ist das Netz für alles
 # andere: verkürzte Läufe, umgebaute Reihenfolge, Aufruf einzelner Schritte von Hand.
+#
+# Schritt 7 stellt außerdem `frontend/dist` bereit (LFH-356, `prod_bundle_bereitstellen`):
+# `e2e/lagekarte-offline-precache.spec.ts` prüft, dass der maplibre-Tile-Worker offline aus dem
+# Service-Worker-Precache kommt — und einen Service Worker gibt es nur im PROD-Bundle. Ohne
+# diesen Build überspringt sich der Spec laut, und ein Nachweis, der nie läuft, ist keiner.
+# Gebaut wird nur, wenn der Bundle fehlt oder älter ist als die Quellen (~26 s lokal).
 set -euo pipefail
 
 # Bündel-Auswahl für die parallele CI (LFH-534). OHNE Argument läuft alles wie bisher —
@@ -157,6 +163,49 @@ schritt_6() {
   "$ROOT/scripts/check-deps.sh"
 }
 
+# Stellt frontend/dist bereit — den PROD-Bundle, den e2e/lagekarte-offline-precache.spec.ts
+# braucht (LFH-356). Begründung dort im Kopf: den Service Worker und sein Precache-Manifest gibt
+# es nur im Build, der Dev-Server hat beides nicht. Ausgeliefert wird der Bundle vom e2e-Backend
+# selbst (rust-embed liest `frontend/dist` im Debug-Build zur Laufzeit vom Dateisystem), es
+# braucht also keinen zweiten Webserver — nur die gebauten Dateien.
+#
+# GEBAUT WIRD NUR BEI BEDARF. Ein Bundle, das älter ist als die Quellen, prüft die Mechanik
+# weiterhin ehrlich (er wird als Ganzes ausgeliefert, ist also in sich schlüssig) — was er nicht
+# mehr fängt, ist eine FRISCHE Änderung, die das Precachen bricht. Genau deshalb ist die
+# Veraltungsprüfung bewusst grob-konservativ: irgendeine Quelle neuer als sw.js → neu bauen.
+# Lieber einmal zu oft 26 s (gemessen lokal; auf einem 2-vCPU-Runner ~1 min) als ein Gate, das
+# eine gebrochene Precache-Konfiguration übersieht.
+#
+# Der Preis in der geteilten CI: jeder der vier e2e-Shards baut, obwohl nur einer den Spec
+# fährt — welcher, steht vorher nicht fest. Sie laufen parallel, der Aufschlag auf die Laufzeit
+# ist also einmal ~1 min, nicht viermal. Bewusst KEIN dist-Artefakt zwischen den Jobs: das wäre
+# ein Schritt, den nur die CI kennt, und damit genau die Drift, gegen die LFH-522 den Workflow
+# auf dieses Skript zurückgeführt hat.
+prod_bundle_bereitstellen() {
+  local sw="$FE/dist/sw.js" grund="" neuer
+  if [ ! -f "$sw" ]; then
+    grund="fehlt"
+  else
+    # Kein `-quit`/`head` (Portabilität bzw. SIGPIPE unter pipefail): die Liste wird ganz
+    # gelesen und nur auf „leer oder nicht" geprüft.
+    # Alles, was in den Bundle eingeht: Quellen, statische Dateien, Bau- und Typkonfiguration,
+    # Abhängigkeiten. Ein fehlender Pfad ist unschädlich (stderr verworfen, `|| true`), die
+    # übrigen werden weiter gelesen — die Liste darf also vorauseilend vollständig sein.
+    neuer="$(find "$FE/src" "$FE/public" "$FE/index.html" "$FE/vite.config.ts" \
+      "$FE/tsconfig.json" "$FE/tsconfig.node.json" "$FE/package.json" "$FE/pnpm-lock.yaml" \
+      -newer "$sw" 2>/dev/null || true)"
+    [ -z "$neuer" ] || grund="älter als die Quellen"
+  fi
+  if [ -z "$grund" ]; then
+    echo "    Prod-Bundle aktuell — kein Neubau (Offline-Precache-Nachweis, LFH-356)."
+    return 0
+  fi
+  echo "    Prod-Bundle $grund → 'pnpm run build' (für den Offline-Precache-Nachweis, LFH-356)"
+  # `run build` ausgeschrieben, nicht `pnpm build`: der Kurzweg hängt daran, dass pnpm keinen
+  # eigenen Unterbefehl dieses Namens hat — eine Zusicherung, die von der pnpm-Version kommt.
+  $PNPM -C "$FE" run build
+}
+
 schritt_7() {
   echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)${PW_SHARD:+ (Anteil $PW_SHARD)}"
   # Cargo baut nicht zwingend nach ./target (globales build.target-dir, siehe
@@ -187,6 +236,10 @@ schritt_7() {
     # lib/dev-env.sh): Playwright merged webServer.env mit process.env, das e2e-Backend
     # erbte sonst die Dev-Umgebung. Bewusst dort statt hier, weil `pnpm e2e` laut LFH-309
     # auch alleinstehend sauber laufen muss — ohne diesen Wrapper.
+    #
+    # Der Prod-Bundle wird erst HIER bereitgestellt, innerhalb des Binary-Zweigs: ohne Binary
+    # läuft keine Suite, und dann wäre der Build 26 s für nichts.
+    prod_bundle_bereitstellen
     $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"}
   elif [ -n "${PW_BINAER:-}" ]; then
     # Wer den Pfad ausdrücklich setzt, erwartet dort ein lauffähiges Binary. Hier still zu
