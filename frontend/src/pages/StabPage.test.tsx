@@ -13,7 +13,12 @@ class FakeEventSource {
   removeEventListener() {}
   close() {}
 }
-beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+/** Zählt die Antworten des Overrides-Handlers — Anker gegen das Rennen im Werkzeug-Link-Test. */
+let overrideAufrufe = 0;
+beforeEach(() => {
+  overrideAufrufe = 0;
+  vi.stubGlobal('EventSource', FakeEventSource);
+});
 afterEach(() => vi.unstubAllGlobals());
 
 const nutzer = {
@@ -48,7 +53,10 @@ function rendere({
         ? HttpResponse.json(stab)
         : HttpResponse.json({ error: 'kaputt' }, { status: stabStatus }),
     ),
-    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json(overrides)),
+    http.get('/api/einsaetze/1/modul-overrides', () => {
+      overrideAufrufe += 1;
+      return HttpResponse.json(overrides);
+    }),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -174,7 +182,10 @@ describe('StabPage', () => {
       '/einsaetze/1/nachforderungen',
     );
     const s6 = screen.getByRole('group', { name: 'Werkzeuge S6' });
-    expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull();
+    // Die Gruppen stehen schon vor der Override-Antwort da (Ruling 2). Erst positiv auf die
+    // Antwort warten — ein `waitFor` auf `null` wäre sonst sofort und trivial grün.
+    await waitFor(() => expect(overrideAufrufe).toBe(1));
+    await waitFor(() => expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull());
     expect(within(s6).getByRole('link', { name: label('einsatzabschnitte') })).toBeInTheDocument();
   });
 
