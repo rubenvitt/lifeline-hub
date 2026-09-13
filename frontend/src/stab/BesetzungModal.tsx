@@ -44,6 +44,11 @@ export default function BesetzungModal({
   onSchliessen,
 }: BesetzungModalProps) {
   const qc = useQueryClient();
+  // Stand beim ÖFFNEN einfrieren (LFH-303): `zeile` kommt live aus der Query, `initialValues`
+  // liest rc-field-form nur beim Montieren. Verglichen gegen den Live-Stand löschte ein
+  // unverändertes „Übernehmen" eine fremd gesetzte Besetzung (DELETE) oder setzte eine fremd
+  // geänderte zurück (PUT). Die Seite montiert je Öffnung mit `key`, Montieren = Öffnen.
+  const [basis] = useState(zeile);
   const [form] = Form.useForm<BesetzungFormWerte>();
   const art = Form.useWatch('art', form);
   const [adhocOffen, setAdhocOffen] = useState(false);
@@ -80,11 +85,11 @@ export default function BesetzungModal({
         offen
         titel={`Besetzung ${eintrag.kuerzel} · ${eintrag.label}`}
         form={form}
-        initialValues={besetzungFormWerte(zeile)}
+        initialValues={besetzungFormWerte(basis)}
         erfassenText="Übernehmen"
         laeuft={mutation.isPending}
         onErfassen={async (werte) => {
-          const aktion = besetzungAktion(zeile, werte);
+          const aktion = besetzungAktion(basis, werte);
           if (aktion.typ !== 'keine') await mutation.mutateAsync(aktion);
         }}
         onFertig={onSchliessen}

@@ -104,6 +104,60 @@ describe('BesetzungModal', () => {
     expect(puts).toEqual([]);
   });
 
+  /**
+   * LFH-303-Fehlerklasse: die Seite reicht `zeile` live aus der Query durch. Trifft während der
+   * offenen Maske ein `stab`-Ereignis ein, ändert sich `zeile` — das Formular nicht. Verglichen
+   * wird deshalb gegen den Stand beim ÖFFNEN; ein Bestätigen ohne Änderung schreibt nie.
+   * Je `rerender` ein NEUES Element: dasselbe Element-Objekt liesse React den Teilbaum
+   * überspringen, und der Test wäre trivial grün.
+   */
+  describe('Stand beim Öffnen ist die Basis, nicht der Live-Stand', () => {
+    const fremdGesetzt: Stabsfunktion = {
+      sachgebiet: 's2',
+      besetzung_art: 'personal',
+      personal_id: 7,
+      name: 'Müller',
+      personal_noch_disponiert: true,
+      gesetzt_at: '2026-09-13 10:05:00',
+      gesetzt_von_id: 2,
+    };
+
+    function oeffneLeerDannFremdGesetzt(onSchliessen: () => void) {
+      const { rerender } = renderMitProviders(
+        <BesetzungModal einsatzId={1} eintrag={S2} zeile={undefined} onSchliessen={onSchliessen} />,
+      );
+      rerender(
+        <BesetzungModal
+          einsatzId={1}
+          eintrag={S2}
+          zeile={{ ...fremdGesetzt }}
+          onSchliessen={onSchliessen}
+        />,
+      );
+    }
+
+    it('fremd gesetzt, hier ohne Änderung übernommen → 0 PUT, 0 DELETE, Maske schliesst', async () => {
+      const onSchliessen = vi.fn();
+      oeffneLeerDannFremdGesetzt(onSchliessen);
+      await userEvent.click(await screen.findByRole('button', { name: 'Übernehmen' }));
+      await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+      expect(puts).toEqual([]);
+      expect(deletes).toBe(0);
+    });
+
+    it('Gegenfall: fremd gesetzt, hier eine Person gewählt → genau ein PUT', async () => {
+      const onSchliessen = vi.fn();
+      oeffneLeerDannFremdGesetzt(onSchliessen);
+      await screen.findByRole('button', { name: 'Übernehmen' });
+      await waehle('Besetzung', 'disponierte Person');
+      await waehle('Person', 'Schulz');
+      await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+      await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+      expect(puts).toEqual([{ besetzung_art: 'personal', personal_id: 99 }]);
+      expect(deletes).toBe(0);
+    });
+  });
+
   it('extern verlangt eine Bezeichnung und schickt nur sie', async () => {
     const onSchliessen = rendere(undefined);
     await screen.findByRole('button', { name: 'Übernehmen' });
