@@ -31,6 +31,7 @@ pub enum LiveEvent {
     KarteBild,
     Etb,
     Befehl,
+    Stab,
     KartenAnsicht,
     LageSnapshot,
     Sofortmeldung,
@@ -40,7 +41,7 @@ pub enum LiveEvent {
 impl LiveEvent {
     /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
     /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
-    pub const ALLE: [LiveEvent; 26] = [
+    pub const ALLE: [LiveEvent; 27] = [
         LiveEvent::Uhs,
         LiveEvent::Schaden,
         LiveEvent::Fahrzeug,
@@ -63,6 +64,7 @@ impl LiveEvent {
         LiveEvent::KarteBild,
         LiveEvent::Etb,
         LiveEvent::Befehl,
+        LiveEvent::Stab,
         LiveEvent::KartenAnsicht,
         LiveEvent::LageSnapshot,
         LiveEvent::Sofortmeldung,
@@ -96,6 +98,7 @@ impl LiveEvent {
             LiveEvent::KarteBild => "karte_bild",
             LiveEvent::Etb => "etb",
             LiveEvent::Befehl => "befehl",
+            LiveEvent::Stab => "stab",
             LiveEvent::KartenAnsicht => "karten_ansicht",
             LiveEvent::LageSnapshot => "lage_snapshot",
             LiveEvent::Sofortmeldung => "sofortmeldung",
@@ -158,6 +161,13 @@ impl LiveEvent {
             LiveEvent::Etb => &["etb"],
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
+            // Nur `stab`: Besetzung und Lagebesprechungen sind Datenobjekte des Stab-Moduls.
+            // NICHT `einsatzdaten`, obwohl der Lagebesprechungs-Abschluss
+            // `einsatz.naechste_lagebesprechung_at` mitschreibt (Entscheidung 11): ein
+            // `einsatzdaten`-Leser ohne Stab-Recht erführe sonst, DASS eine Besprechung
+            // stattgefunden hat. Der Einsatzkopf bleibt FE-seitig NICHT_LIVE und wird beim
+            // nächsten Abruf frisch — der dokumentierte Nachlauf, kein Fehler.
+            LiveEvent::Stab => &["stab"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
             LiveEvent::KartenAnsicht => &["lagekarte"],
@@ -517,6 +527,7 @@ mod tests {
             (LiveEvent::KarteBild, &["lagekarte"]),
             (LiveEvent::Etb, &["etb"]),
             (LiveEvent::Befehl, &["auftraege"]),
+            (LiveEvent::Stab, &["stab"]),
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),
