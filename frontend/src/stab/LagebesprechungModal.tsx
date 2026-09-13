@@ -13,6 +13,7 @@ import {
   abschlussVorbelegung,
   eigeneLagebesprechung,
   naechsteNachBesprechung,
+  terminBezug,
   type AbschlussFormWerte,
 } from './lagebesprechungAbschluss';
 
@@ -120,8 +121,14 @@ export default function LagebesprechungModal({
                 onClick={() =>
                   form.setFieldValue(
                     'naechste',
-                    // Ab dem ZEITPUNKT der Besprechung, nicht ab jetzt (Controller-Entscheidung 1).
-                    schnellwahlTermin(form.getFieldValue('abgehalten') ?? dayjs(), s.minuten),
+                    // Ab dem SPÄTEREN von Zeitpunkt der Besprechung und jetzt (Ruling 12): ein
+                    // Zeitpunkt in der Zukunft verhindert das 422 (`naechste ≤ abgehalten`), ein
+                    // zurückliegender — nachträglich erfasst oder beim Öffnen eingefroren — lässt
+                    // „+1 h" nicht in der Vergangenheit landen.
+                    schnellwahlTermin(
+                      terminBezug(form.getFieldValue('abgehalten'), dayjs()),
+                      s.minuten,
+                    ),
                   )
                 }
               >

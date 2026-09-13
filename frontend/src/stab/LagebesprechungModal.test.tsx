@@ -251,14 +251,48 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
     expect(within(dialog).queryByRole('button', { name: '+15 min' })).toBeNull();
   });
 
-  it('die Schnellwahl rechnet vom Zeitpunkt der Besprechung, nicht von der Wanduhr', async () => {
+  /**
+   * M2 (Ruling 12): Bezug der Schnellwahl ist der SPÄTERE von Zeitpunkt der Besprechung und
+   * jetzt. Die drei Fälle unterscheiden sich nur im Zeitpunkt — jeder trennt eine andere
+   * Fehlrechnung ab (nur Zeitpunkt · nur Wanduhr).
+   */
+  async function setzeZeitpunkt(dialog: HTMLElement, minuten: number) {
+    const u = userEvent.setup();
+    await u.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    // Kein `toBeVisible` als Wartebedingung: jsdom beendet die Aufklapp-Bewegung von `CSSMotion`
+    // nicht, das Feld bliebe dafür „unsichtbar". Getragen wird die Aussage vom gesendeten Body.
+    const eingabe = feld(dialog, 'Zeitpunkt der Besprechung');
+    await u.click(eingabe);
+    await u.clear(eingabe);
+    await u.type(eingabe, `${dayjs(JETZT).add(minuten, 'minute').format(ZEITFORMAT)}{Enter}`);
+  }
+
+  it('Schnellwahl: der Zeitpunkt liegt zurück (eingefroren, die Wanduhr läuft) → ab jetzt', async () => {
     const dialog = await zeige();
-    // Die Wanduhr läuft zehn Minuten weiter, der eingefrorene Zeitpunkt nicht. Ab der Wanduhr
-    // gerechnet käme wireAb(70) an.
+    // Die Wanduhr läuft zehn Minuten weiter, der eingefrorene Zeitpunkt nicht. Ab dem Zeitpunkt
+    // gerechnet käme wireAb(60) an — ein Termin, der schon zehn Minuten näher liegt als gewählt.
     vi.setSystemTime(new Date(JETZT.getTime() + 10 * 60_000));
     await userEvent.click(within(dialog).getByRole('button', { name: '+1 h' }));
     await absenden(dialog);
-    expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(0), naechste_at: wireAb(60) });
+    expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(0), naechste_at: wireAb(70) });
+  });
+
+  it('Schnellwahl: nachträglich erfasste Besprechung (Zeitpunkt −60 min) → ab jetzt', async () => {
+    const dialog = await zeige();
+    await setzeZeitpunkt(dialog, -60);
+    await userEvent.click(within(dialog).getByRole('button', { name: '+1 h' }));
+    await absenden(dialog);
+    // Ab dem Zeitpunkt gerechnet käme wireAb(0) an: „+1 h" läge in der Vergangenheit.
+    expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(-60), naechste_at: wireAb(60) });
+  });
+
+  it('Schnellwahl: Zeitpunkt in der Zukunft → ab dem Zeitpunkt (Gegenfall)', async () => {
+    const dialog = await zeige();
+    await setzeZeitpunkt(dialog, 30);
+    await userEvent.click(within(dialog).getByRole('button', { name: '+1 h' }));
+    await absenden(dialog);
+    // Ab jetzt gerechnet käme wireAb(60) an — nur 30 min nach der Besprechung.
+    expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(30), naechste_at: wireAb(90) });
   });
 });
 
