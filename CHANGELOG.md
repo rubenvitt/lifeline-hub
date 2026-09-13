@@ -1,3 +1,34 @@
+## [1.0.0-alpha.15](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.14...v1.0.0-alpha.15) (2026-09-13)
+
+### Features
+
+* **theme:** Statusfarb-Vertrag abdichten (LFH-358) ([7c0f62b](https://github.com/rubenvitt/lifeline-hub/commit/7c0f62ba32e371f20a25015e66e381a2b009d8ef))
+
+### Bug Fixes
+
+* **theme:** den Zeichenketten-Filter auch am Tag-Guard (LFH-358) ([b194669](https://github.com/rubenvitt/lifeline-hub/commit/b1946694e53969d107a7338c9c98aab581fe6c44))
+* **theme:** der Alias muss die Wurzel der Kette sein (LFH-358) ([e49d790](https://github.com/rubenvitt/lifeline-hub/commit/e49d79016cf1ba1576be8731bd1ac538e629027f))
+* **theme:** der Namensvergleich nimmt Bezeichner, keine Muster (LFH-358) ([c30b5e6](https://github.com/rubenvitt/lifeline-hub/commit/c30b5e62d54507f9abfec0006821cab535c2b684))
+* **theme:** der Namensvergleich sieht keine Zeichenketten (LFH-358) ([f40dae2](https://github.com/rubenvitt/lifeline-hub/commit/f40dae2488be7e5d42fd04a3ed48847080be4345))
+* **theme:** der Wire-Scan steigt in eine Template-Substitution hinab (LFH-358) ([b07f2c6](https://github.com/rubenvitt/lifeline-hub/commit/b07f2c62ef830f1c856db6a853e32b1c27bd9911))
+* **theme:** der Wire-Wert-Scan kennt jetzt Maskierung (LFH-358) ([c4fe51d](https://github.com/rubenvitt/lifeline-hub/commit/c4fe51d3ab5f69cf00938b49b0a54be2b1e8bfcd))
+* **theme:** die Karten-Marke braucht eine Wortgrenze (LFH-358) ([d564cbb](https://github.com/rubenvitt/lifeline-hub/commit/d564cbb890ca9807b8f555e1b360fd73aa2aa226))
+* **theme:** die Methoden-Kurzform ist auch ein Schluessel (LFH-358) ([1c5d2e0](https://github.com/rubenvitt/lifeline-hub/commit/1c5d2e0d6a8f0719aa3267c210c99a186d5bf296))
+* **theme:** ein Apostroph im JSX-Text ist kein Zeichenketten-Anfang (LFH-358) ([5370b3b](https://github.com/rubenvitt/lifeline-hub/commit/5370b3bf2883d719fb46bf571ce7f52efde71890))
+* **theme:** ein Namensraum wird über seinen Alias gelesen (LFH-358) ([a39a320](https://github.com/rubenvitt/lifeline-hub/commit/a39a320fba9f01334439eb2321f4aaf7a58a0816))
+* **theme:** ein Objekt-Schluessel liest keine Bindung (LFH-358) ([dee8aed](https://github.com/rubenvitt/lifeline-hub/commit/dee8aed5fc70122174fe7a704494216e413988c9))
+* **theme:** eine Klammer ist Gruppierung, kein Typ (LFH-358) ([dbedfb9](https://github.com/rubenvitt/lifeline-hub/commit/dbedfb93a8a02981c63729deec0ae3a892a4ed74))
+* **theme:** eine Zeichenkette ist keine Deklaration (LFH-358) ([878115d](https://github.com/rubenvitt/lifeline-hub/commit/878115d636facf53e6d8ba2e5c198ccbf44f267b))
+* **theme:** Funktionstyp und Hülle-plus-Durchschnitt im Typparser (LFH-358) ([4e3071b](https://github.com/rubenvitt/lifeline-hub/commit/4e3071bd2168ee6c2e5385905077250ad04f92a1))
+* **theme:** Geschwister-Import und durchsichtige Hüllen im Vertrags-Guard (LFH-358) ([2aaa262](https://github.com/rubenvitt/lifeline-hub/commit/2aaa2626b01bafa0e38d35683107990d124af54d))
+* **theme:** Hüllen-Abschälung eingrenzen, Durchschnitt erkennen (LFH-358) ([4ec37a1](https://github.com/rubenvitt/lifeline-hub/commit/4ec37a12988d29b56fccdd4fac53018fc0b9a194))
+* **theme:** kanonische Anweisung nachziehen, Guards gegen drei Umgehungen härten (LFH-358) ([72d9393](https://github.com/rubenvitt/lifeline-hub/commit/72d939373d24ef2354ccc98b02eec4946d6307b0))
+* **theme:** Kartenguard schneidet die Vertragsdatei, nicht das Verzeichnis (LFH-358) ([572f8d4](https://github.com/rubenvitt/lifeline-hub/commit/572f8d4c4499e13e06de65cc0187064cf23ed578))
+* **theme:** Tag-Guard folgt auch einer Umbenennung des Tags selbst (LFH-358) ([5a3162e](https://github.com/rubenvitt/lifeline-hub/commit/5a3162ebe68ff1a3fbbdfac1ddaa76bdb4773bb5))
+* **theme:** Tag-Guard löst umbenannte Vertragsimporte auf (LFH-358) ([e14b660](https://github.com/rubenvitt/lifeline-hub/commit/e14b66059b660f7b711210fe53d2d94cd30794a1))
+* **theme:** Vertrags-Guards zerlegen Typargumente und Attributebene (LFH-358) ([9cecaa8](https://github.com/rubenvitt/lifeline-hub/commit/9cecaa8404f61f69de8ac7c1d2cf1246627b2003))
+* **theme:** Vertragsnamen nur zählen, wo sie importiert sind (LFH-358) ([dde4944](https://github.com/rubenvitt/lifeline-hub/commit/dde4944f1289d571035892ba56af57fbf6236635))
+
 ## [1.0.0-alpha.14](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.13...v1.0.0-alpha.14) (2026-09-13)
 
 ### Bug Fixes
