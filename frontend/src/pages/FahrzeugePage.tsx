@@ -56,8 +56,9 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
+import { einsatzStatus, statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
+import StatusTag from '../components/StatusTag';
 
 /**
  * Statusanzeige eines disponierten Fahrzeugs — und zugleich die GRENZE des
@@ -639,14 +640,7 @@ export default function FahrzeugePage() {
       titel={
         <Space>
           Fahrzeuge
-          {/* BEFUND (LFH-328/A2): der Einsatz-Status trägt hier weiterhin antd-Farbnamen und
-              den ROHEN Enum-String statt einer Statusrolle. `statusFarben.ts` hat für
-              `EinsatzStatus` keinen Eintrag — die Vertragstabelle der Spec (§1.3) listet acht
-              Enums, dieses ist keins davon. Die Zuordnung ist zwar entschieden (Spec §6,
-              Prüflistenzeile 7), steht aber als lokale Map in `EinsaetzePage`. Sie hierher zu
-              kopieren wäre eine dritte Wahrheit, sie nach `statusFarben.ts` zu heben eine
-              Vertragserweiterung — beides ist nicht A2s Auftrag (Spec §5 Befund 7). */}
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       breadcrumb={

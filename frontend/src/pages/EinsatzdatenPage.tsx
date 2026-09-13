@@ -44,8 +44,8 @@ import type { Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
-import { EINSATZ_STATUS } from '../einsatz/einsatzStatus';
 import StatusTag from '../components/StatusTag';
+import { einsatzStatus } from '../theme/statusFarben';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -238,10 +238,10 @@ export default function EinsatzdatenPage() {
           {einsatz.bezeichnung}
           {/* Vorher stand hier der ROHE Wire-Wert in einem `Tag color="green"` — also
               „aktiv"/„abgeschlossen" klein geschrieben und mit einer Farbe, die an
-              keiner Rolle hing. Beides kommt jetzt aus `einsatz/einsatzStatus.ts`
+              keiner Rolle hing. Beides kommt jetzt aus `theme/statusFarben.ts`
               (Beschriftung als zweiter Kanal) über `StatusTag` (Rollenfarbe auf Rand
               und Text, nie als Fläche). */}
-          <StatusTag darstellung={EINSATZ_STATUS[einsatz.status]} />
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       breadcrumb={

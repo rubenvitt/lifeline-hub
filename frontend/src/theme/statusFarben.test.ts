@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import * as sf from './statusFarben';
 import { antdToken, farbenDunkel, farbenHell, type Farbrollen } from './tokens';
-import type { MaterialStatus } from '../api/types';
+import type { EinsatzStatus, MaterialStatus } from '../api/types';
 
 /** Vollständiger GlobalToken eines Modus — dieselbe Ableitung wie im `ThemeModeProvider`,
  *  damit der Test die echte Kette Rolle → antd-Token prüft und nicht ein Stück davon. */
@@ -30,10 +30,16 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle dreizehn Vertrags-Enums ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle fünfzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+    // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
+    // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
+    // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
+    // an genau dieser Liste vorbei; das war der Befund, nicht die Zahl.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
       'belegungsArt',
       'brStatus',
+      'dringlichkeit',
+      'einsatzStatus',
       'etbTyp',
       'materialStatus',
       'personStatus',
@@ -151,7 +157,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(13);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(15);
   });
 });
 
@@ -212,5 +218,55 @@ describe('Betroffenen-Farbachsen (LFH-455)', () => {
   });
   it('kennzeichnet Bezüge als Beziehung mit expliziter Beschriftung', () => {
     expect(sf.bezugsDarstellung('UHS Nord')).toEqual({ label: 'UHS Nord', rolle: 'bedien' });
+  });
+});
+
+/**
+ * Übernommen aus dem gelöschten `einsatz/einsatzStatus.test.ts` (LFH-358). Die Zuordnung
+ * selbst wird hier nicht erfunden, sondern zitiert (A0-Spec §6, Prüflistenzeile 7).
+ * Geprüft wird deshalb NICHT „sieht plausibel aus", sondern die drei Eigenschaften, die
+ * beim Umzug aus `EinsaetzePage` bzw. beim Heben in den Vertrag verlorengehen könnten.
+ */
+describe('einsatzStatus (LFH-345 · C10 Befund M14, LFH-358)', () => {
+  it('deckt das Enum vollständig ab — eine dritte Variante bricht hier', () => {
+    // Die Liste steht als LITERAL da, nicht aus `Object.keys(…)` abgeleitet: sonst prüfte
+    // die Zusicherung die Map gegen sich selbst und wäre auch bei einer fehlenden Variante
+    // grün. Der `EinsatzStatus[]`-Typ zieht die zweite Hälfte nach — kommt aus dem Codegen
+    // ein dritter Wert, bricht schon der Typcheck.
+    const alle: EinsatzStatus[] = ['aktiv', 'abgeschlossen'];
+    expect(Object.keys(sf.einsatzStatus).sort()).toEqual([...alle].sort());
+  });
+
+  it('zeigt ein Wort, nicht den Wire-Wert — genau der gemeldete Mangel', () => {
+    // DAS ist die Aussage des Befunds: in zehn Seitenköpfen stand `{einsatz.status}`, also
+    // der rohe Enum-String klein geschrieben. Ein `label`, das gleich dem Schlüssel ist,
+    // wäre die Rückkehr dorthin — mit dem Unterschied, dass sie dann wie eine gepflegte
+    // Beschriftung aussähe.
+    for (const [wire, d] of Object.entries(sf.einsatzStatus)) {
+      expect(d.label).not.toBe(wire);
+    }
+    expect(sf.einsatzStatus.aktiv.label).toBe('Aktiv');
+    expect(sf.einsatzStatus.abgeschlossen.label).toBe('Abgeschlossen');
+  });
+
+  it('trägt die zitierten Rollen — kein erfundener Farbwert', () => {
+    expect(sf.einsatzStatus.aktiv.rolle).toBe('normal');
+    expect(sf.einsatzStatus.abgeschlossen.rolle).toBe('neutral');
+  });
+});
+
+describe('dringlichkeit (LFH-395, hierher mit LFH-358)', () => {
+  it('bleibt über die drei stufbaren Rollen geschlüsselt, nicht über alle sechs', () => {
+    // Die Verengung ist die Zusicherung: `LageDashboardPage` setzt den Schlüssel in einen
+    // KLASSENNAMEN (`lfh-plakette--${stufe}`), und `theme/sprache.css` hat genau für diese
+    // drei eine Regel. Ein vierter Schlüssel wäre still ungestylt.
+    expect(Object.keys(sf.dringlichkeit).sort()).toEqual(['achtung', 'alarm', 'normal']);
+  });
+
+  it('trägt den zweiten UND dritten Kanal — Wort und Form, je Stufe verschieden', () => {
+    const formen = Object.values(sf.dringlichkeit).map((d) => d.form);
+    expect(new Set(formen).size).toBe(formen.length);
+    expect(formen).not.toContain(undefined);
+    expect(sf.dringlichkeit.alarm.label).toBe('dringend');
   });
 });

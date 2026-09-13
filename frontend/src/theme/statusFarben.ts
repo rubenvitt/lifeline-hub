@@ -4,6 +4,7 @@ import type {
   BelegungsArt,
   Ausmass,
   BrStatus,
+  EinsatzStatus,
   EtbTyp,
   MaterialStatus,
   PersonStatus,
@@ -52,6 +53,9 @@ import type {
  * seither trägt er seine Karte HIER ({@link materialStatus}), nicht mehr draußen.
  * LFH-455 nimmt Personenstatus, Schadensstatus und Schadensausmaß auf. Sichtung liegt
  * hier als eigener Vertrag: eine fachliche Farbkennzeichnung, keine A0-Statusrolle.
+ * LFH-358 holt die zwei Karten herein, die den Vertragstyp {@link StatusDarstellung}
+ * schon trugen und trotzdem draußen lagen ({@link einsatzStatus},
+ * {@link dringlichkeit}) — beide mit derselben, inzwischen eingelösten Begründung.
  *
  * ── DIE DRITTE DARSTELLUNGSSORTE: FLÄCHE (aufgelöst mit LFH-368 · B5h) ──────────
  *
@@ -70,9 +74,17 @@ import type {
  * Gefunden im Code-Review zu LFH-328: `pages/lagekarte/ZonenInspector.tsx` benutzte
  * `warnstufeFarbe` für ein Status-Etikett und ist auf {@link warnstufeKarte} gezogen
  * worden. LFH-368 hat denselben Fehlgriff in `pages/gefahren/GefahrenPage.tsx`
- * gefunden und behandelt ihn im selben Umbau. Ein Guard „kein `Tag color=` über
- * einem Vertrags-Enum außerhalb `theme/`" wäre die maschinelle Fassung dieser
- * Grenze und ist als Folge-Ticket erfasst.
+ * gefunden und behandelt ihn im selben Umbau.
+ *
+ * ── DIE GRENZEN SIND SEIT LFH-358 MASCHINELL, NICHT MEHR NUR AUFGESCHRIEBEN ─────
+ *
+ * `theme/statusVertrag.guard.test.ts` trägt beide Hälften: keine
+ * `Record<…, StatusDarstellung>` außerhalb DIESER DATEI — nicht bloß außerhalb des
+ * Verzeichnisses, denn ein Geschwistermodul exportiert nichts über sie und liefe am
+ * selbst ableitenden Abdeckungstest in `statusFarben.test.ts` genauso vorbei —, und kein
+ * `<Tag color={…}>`, das ein Vertrags-Enum einfärbt — dafür ist
+ * `components/StatusTag.tsx` da. Beide Guards listen ihre blinden Flecken im
+ * Kopfkommentar mit gemessener Fundstelle; das ist Teil des Vertrags, nicht Beiwerk.
  */
 
 /** Eine A0-Statusrolle. Farbwerte stehen ausschließlich in `tokens.ts`/`rollen.css`. */
@@ -85,6 +97,37 @@ export interface StatusDarstellung {
   label: string;
   form?: 'dreieck' | 'kreis' | 'balken';
 }
+
+/**
+ * Status eines Einsatzes (LFH-328 · A2 als Zuordnung, LFH-345 · C10 raus aus der Seite,
+ * LFH-358 herauf in den Vertrag).
+ *
+ * DER UMWEG IST DIE GESCHICHTE DIESES EINTRAGS, und er gehört hierher, weil er die
+ * Regel erklärt: die Karte lag zuerst als modul-lokale Konstante in `EinsaetzePage`.
+ * Der zweite Leser (`EinsatzdatenPage`) hatte sie NICHT — dort stand `{einsatz.status}`
+ * roh im Titel-Tag, also der Wire-Wert klein geschrieben. C10 hat sie deshalb nach
+ * `einsatz/einsatzStatus.ts` gezogen, aber bewusst NICHT hierher: der Abdeckungstest
+ * zählte gegen ein `toHaveLength`, ein Eintrag mehr wäre eine Vertragsänderung gewesen
+ * und damit eine eigene Entscheidung. LFH-358 ist diese Entscheidung.
+ *
+ * Sie war nötig, weil die Zwischenstation genau das Loch offen ließ, gegen das der
+ * Vertrag gebaut ist: eine Karte AUSSERHALB dieser Datei lief am selbst
+ * ableitenden Abdeckungstest vorbei — und während sie draußen stand, malten ZEHN
+ * Seiten weiter `<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>` mit
+ * dem rohen Wire-Wert darin. Also derselbe Befund wie an `EinsatzdatenPage`, zehnmal,
+ * gemessen am 12.09.2026. Der Umzug allein hatte ihn nicht geschlossen; die zwei
+ * Guards in `statusVertrag.guard.test.ts` schließen ihn.
+ *
+ * Die Zuordnung selbst ist nicht hier entschieden, sondern zitiert (A0-Spec §6,
+ * Prüflistenzeile 7: `aktiv` → `normal`, `abgeschlossen` → `neutral`).
+ */
+export const einsatzStatus: Record<EinsatzStatus, StatusDarstellung> = {
+  // Großgeschrieben, weil es eine BESCHRIFTUNG ist und kein Enum-Wert. Der Bestand
+  // gab hier den Schlüssel selbst zurück — dann ist der zweite Kanal formal erfüllt und
+  // sagt trotzdem nur, wie das Feld in der Datenbank heißt.
+  aktiv: { rolle: 'normal', label: 'Aktiv' },
+  abgeschlossen: { rolle: 'neutral', label: 'Abgeschlossen' },
+};
 
 /** Registrierung/Fallbearbeitung, unabhängig von der medizinischen Sichtung.
  * Abgemeldet ist keine medizinische Entwarnung; verstorben kein Alarm wie SK I. */
@@ -281,6 +324,51 @@ export const warnstufeKennzahl: Record<Warnstufe, StatusDarstellung> = {
   mittel: { rolle: 'achtung', label: 'mittel' },
   hoch: { rolle: 'alarm', label: 'hoch' },
   akut: { rolle: 'alarm', label: 'akut' },
+};
+
+/**
+ * Die drei Rollen, die eine Kennzahl **stufen** können — bewusst eine VERENGUNG von
+ * {@link Statusrolle}, kein Alias (LFH-328 · A2, hierher mit LFH-358).
+ *
+ * `Extract<>` statt einer zweiten Literalliste: die Werte bleiben dieselben drei, aber
+ * eine Umbenennung im Vertrag bricht die Konsumenten im Typcheck, statt still
+ * auseinanderzulaufen.
+ *
+ * Warum nicht alle sechs Rollen? Weil `LageDashboardPage` den Wert in einen
+ * KLASSENNAMEN einsetzt (`lfh-plakette--${stufe}`, `lfh-kz--${stufe}`) und
+ * `theme/sprache.css` genau für diese drei eine Regel hat. `Statusrolle` dort
+ * einzusetzen erlaubte ein `lfh-plakette--marke` — ein Klassenname ohne CSS, still
+ * ungestylt, und jsdom rechnet kein Layout, würde den Ausfall also in keinem Test
+ * zeigen. Die Verengung ist damit das Ehrlichere, nicht das Bequemere.
+ */
+export type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
+
+/**
+ * Der ZWEITE KANAL des Dringlichkeitsmarkers (LFH-395, WCAG 1.4.1).
+ *
+ * Die einzige Karte dieses Vertrags, deren Schlüssel KEIN Domänen-Enum ist, sondern
+ * eine {@link Statusrolle}: sie beschriftet die Stufe selbst. `form` ist dabei kein
+ * neu erfundenes Vokabular — {@link StatusDarstellung} führt den Slot seit LFH-328 als
+ * „optional zusätzlich", er hatte nur nie einen Konsumenten. Wer einen zweiten
+ * braucht, nimmt dieselben drei Werte, statt eine vierte Form danebenzustellen.
+ *
+ * SIE LAG BIS LFH-358 IN `pages/lage-dashboard/lagebild.ts`, mit derselben Begründung
+ * wie `einsatzStatus`: der Abdeckungstest zählte gegen ein `toHaveLength`, ein
+ * elfter Eintrag wäre eine Vertragsänderung gewesen. Beide Begründungen sind mit
+ * diesem Ticket eingelöst statt fortgeschrieben — eine Karte, die den Vertragstyp
+ * trägt und trotzdem draußen liegt, ist genau der Präzedenzfall, der die Aussage des
+ * Abdeckungstests untergräbt.
+ *
+ * `label` benennt die STUFE, nicht ihren Anlass — und das ist erzwungen, nicht
+ * gewählt: derselbe `alarm` entsteht an der Auftrags- wie an der Meldungszeile aus
+ * `ist_ueberfaellig`, `achtung` aber nur an der Meldungszeile (Status `neu`) und an
+ * der Auftragszeile gar nicht. Ein Wort je Anlass bräuchte also eine Map je Liste;
+ * ein Wort je Stufe trägt beide.
+ */
+export const dringlichkeit: Record<Dringlichkeit, StatusDarstellung> = {
+  alarm: { rolle: 'alarm', label: 'dringend', form: 'dreieck' },
+  achtung: { rolle: 'achtung', label: 'erhöht', form: 'balken' },
+  normal: { rolle: 'normal', label: 'normal', form: 'kreis' },
 };
 
 /**

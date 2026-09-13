@@ -31,6 +31,8 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
 import { filterTiere, type TiereSicht } from './tiere/tierHelfer';
 import type { Spezies, Tier, TierStatus } from '../api/types';
+import StatusTag from '../components/StatusTag';
+import { einsatzStatus } from '../theme/statusFarben';
 
 const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
   aktiv: { label: 'aktiv', color: 'green' },
@@ -355,10 +357,7 @@ export default function TierePage() {
       titel={
         <Space>
           Tiere
-          {/* BEFUND wie in `PersonalPage`/`SchaedenPage`: `EinsatzStatus` hat keine
-              Statusrolle in `theme/statusFarben.ts`. Der Tag bleibt deshalb auf
-              antd-Farbnamen und rohem Enum-Wert stehen. */}
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       breadcrumb={

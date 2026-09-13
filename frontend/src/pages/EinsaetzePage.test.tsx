@@ -391,8 +391,8 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
     mockEinsaetze([e({ einsatzart: 'uebung' })]);
     render();
-    // Grossgeschrieben seit LFH-345 · C10 (M14): die Map liegt jetzt in
-    // `einsatz/einsatzStatus.ts` und trägt eine BESCHRIFTUNG statt des Wire-Werts.
+    // Grossgeschrieben seit LFH-345 · C10 (M14): die Map trägt eine BESCHRIFTUNG statt
+    // des Wire-Werts; seit LFH-358 steht sie im Vertrag (`theme/statusFarben.ts`).
     // Vorher stand hier 'aktiv' — also der Enum-Schlüssel, der nur zufällig lesbar war.
     expect(await screen.findByText('Aktiv')).toBeInTheDocument();
     expect(screen.getByText('Übung')).toBeInTheDocument();
