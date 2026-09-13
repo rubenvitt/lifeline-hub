@@ -168,6 +168,43 @@ describe('BesetzungModal', () => {
     expect(puts).toEqual([{ besetzung_art: 'extern', bezeichnung: 'Dr. Weber' }]);
   });
 
+  /**
+   * Ein abgelehnter PUT steht IN der Maske (LFH-345 · C10/H14), die Felder bleiben — und beim
+   * nächsten Absenden räumt react-query `error` weg, der Alert geht. Beide Hälften gehören
+   * zusammen: ein Alert, der stehen bleibt, wäre so falsch wie einer, der nie kommt. Der Text
+   * ist die Meldung aus dem `{error}`-Body (`fehlerWerfen` → `ApiError.message`).
+   */
+  it('abgelehnter PUT: Grund steht im Dialog, Felder bleiben; erneutes Übernehmen räumt ihn', async () => {
+    const grund = 'Einsatz ist abgeschlossen und schreibgeschützt';
+    server.use(
+      http.put('/api/einsaetze/1/stab/besetzung/s2', () =>
+        HttpResponse.json({ error: grund }, { status: 409 }),
+      ),
+    );
+    const onSchliessen = rendere(undefined);
+    await screen.findByRole('button', { name: 'Übernehmen' });
+    await waehle('Besetzung', 'extern (nicht disponiert)');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Dr. Weber');
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+
+    const dialog = document.querySelector<HTMLElement>('.ant-modal')!;
+    expect(await within(dialog).findByText(grund)).toBeInTheDocument();
+    expect(onSchliessen).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Bezeichnung')).toHaveValue('Dr. Weber');
+
+    server.use(
+      http.put('/api/einsaetze/1/stab/besetzung/s2', async ({ request }) => {
+        puts.push(await request.json());
+        return HttpResponse.json({ anzahl_lagebesprechungen: 0, besetzung: [] });
+      }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    // Die Maske bleibt im Test montiert (`offen` ist fest) — geprüft wird der Dialogknoten.
+    expect(within(dialog).queryByText(grund)).toBeNull();
+    expect(puts).toEqual([{ besetzung_art: 'extern', bezeichnung: 'Dr. Weber' }]);
+  });
+
   it('bietet die Ad-hoc-Anlage als letzten Eintrag der Personenwahl an', async () => {
     rendere(undefined);
     await screen.findByRole('button', { name: 'Übernehmen' });
