@@ -121,6 +121,17 @@ describe('besetzungAktion', () => {
     });
   });
 
+  it('Person geleert (null nach abgebrochener Ad-hoc-Anlage) → keine Aktion, nie ein null-PUT', () => {
+    expect(besetzungAktion(undefined, { art: 'personal', personal_id: null })).toEqual({
+      typ: 'keine',
+    });
+    expect(
+      besetzungAktion(zeile({ personal_id: undefined }), { art: 'personal', personal_id: null }),
+    ).toEqual({
+      typ: 'keine',
+    });
+  });
+
   it('dieselbe Person erneut → keine Aktion; eine andere Person → setzen', () => {
     expect(besetzungAktion(zeile(), { art: 'personal', personal_id: 99 })).toEqual({
       typ: 'keine',

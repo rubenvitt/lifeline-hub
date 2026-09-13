@@ -1,4 +1,11 @@
-import type { BesetzungArt, BesetzungBody, Sachgebiet, Stab, Stabsfunktion } from '../api/types';
+import type {
+  BesetzungArt,
+  BesetzungBody,
+  EinsatzStatus,
+  Sachgebiet,
+  Stab,
+  Stabsfunktion,
+} from '../api/types';
 import type { StatusDarstellung } from '../theme/statusFarben';
 
 /** „Nicht vergeben" ist KEIN Datensatz (keine Zeile vom Server), aber eine Wahl in der Maske. */
@@ -6,8 +13,11 @@ export type BesetzungWahl = BesetzungArt | 'nicht_vergeben';
 
 export interface BesetzungFormWerte {
   art: BesetzungWahl;
-  /** `EinsatzPersonal.id` (= `einsatz_personal.id`), nicht `EinsatzPersonal.personal_id`. */
-  personal_id?: number;
+  /**
+   * `EinsatzPersonal.id` (= `einsatz_personal.id`), nicht `EinsatzPersonal.personal_id`.
+   * `null` nach einer abgebrochenen Ad-hoc-Anlage (Ruling 4/8) — `required` weist es ab.
+   */
+  personal_id?: number | null;
   bezeichnung?: string;
 }
 
@@ -103,10 +113,11 @@ export function besetzungAktion(
     case 'einsatzleitung':
       return { typ: 'setzen', daten: { besetzung_art: 'einsatzleitung' } };
     case 'personal':
-      return {
-        typ: 'setzen',
-        daten: { besetzung_art: 'personal', personal_id: werte.personal_id },
-      };
+      // Ohne gewählte Person gibt es nichts zu setzen; `required` hält diesen Zweig in der
+      // Maske ohnehin fern. `BesetzungBody.personal_id` bleibt eine Zahl, kein `null`.
+      return werte.personal_id != null
+        ? { typ: 'setzen', daten: { besetzung_art: 'personal', personal_id: werte.personal_id } }
+        : { typ: 'keine' };
     case 'extern':
     case 'rueckwaertig':
       return { typ: 'setzen', daten: { besetzung_art: werte.art, bezeichnung } };
@@ -114,7 +125,7 @@ export function besetzungAktion(
 }
 
 /** Grund der fehlenden Schreibberechtigung als ganzer Satz (CLAUDE.md, LFH-345 · C10/M16). */
-export function besetzungRechteText(einsatzStatus: string): string {
+export function besetzungRechteText(einsatzStatus: EinsatzStatus): string {
   return einsatzStatus !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — die Führungsorganisation ist nur noch lesbar.'
     : 'Nur Einsatzleitung und Führungspersonal können die Besetzung ändern.';
