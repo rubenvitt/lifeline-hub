@@ -109,15 +109,15 @@ Die Zahl 14 der Werkzeug-Links ist **[abgeleitet]** aus `stab/sachgebiete.ts`: 3
 | 6 | **Kein Status allein über Farbe** — jede Statusfarbe zusätzlich mit Text, Symbol oder Form, 0 Ausnahmen (WCAG 1.4.1 Level A; MIL 5.4.6.8; 1 von 12 Männern, NEI). | **erfüllt** | Die Wahl ist ein Wort je Option (`BESETZUNG_OPTIONEN`), der Fehler ein Satz im Dialog: `BesetzungModal.test.tsx` „abgelehnter PUT: Grund steht im Dialog, Felder bleiben; erneutes Übernehmen räumt ihn"; Pflichtmeldung als Text: „abgebrochene Ad-hoc-Anlage: Person leer, Übernehmen meldet die Pflicht, kein Request" | — |
 | 7 | **Eine Farbe = eine Bedeutung** — Palette auf Doppelbelegung geprüft, gesättigte Farbe nur für abnorme Zustände, Grundfläche aus A0 (weder `#000000` noch `#ffffff`) — ASM Consortium. | **erfüllt** | Rot nur für den Fehler (`SpeicherFehler`), kein `danger`-Knopf (Grep `bdba173c` 0) — „nicht vergeben" ist eine Option, kein roter Knopf | — |
 | 8 | **Helligkeits-/Kontrastregler** vorhanden und bei aktiver Warnung nicht bis AUS dimmbar — 1 Regler, 1 Sperre (MIL 5.2.2.1.9, 5.2.4.2.2.3). | **offen** | app-weite Lücke, kein Regler | LFH-397 |
-| 9 | **Kritische Anzeigen im Blickfeld** — innerhalb 15° der normalen Blickachse, nicht am Layoutrand (MIL 5.2.2.1.7). | **erfüllt** | Ein abgelehnter PUT (409) steht **im** Dialog, nicht nur im Toast, und die Maske bleibt offen: `BesetzungModal.test.tsx` „abgelehnter PUT: Grund steht im Dialog, Felder bleiben; erneutes Übernehmen räumt ihn" | — |
-| 10 | **Alarmbudget eingehalten** — 1–2 je 10 min im Dauerbetrieb, < 10 in den ersten 10 min einer Großlage, ≤ 10 je 10-min-Fenster, ~80/15/5 %, 0 flatternde Alarme, ≤ 3 Eskalationsstufen (EEMUA 191 S. 96/97; ISA-18.2). | **nicht anwendbar** | Die Maske erzeugt keine Meldung: kein Erfolgs- und kein Fehler-Toast (Grep `bdba173c`: kein Toast-Aufruf in `BesetzungModal.tsx`); der Fehler steht im Dialog (Nr. 9) | — |
+| 9 | **Kritische Anzeigen im Blickfeld** — innerhalb 15° der normalen Blickachse, nicht am Layoutrand (MIL 5.2.2.1.7). | **offen** | **Trägt:** Ein abgelehnter PUT (409) steht **im** Dialog, nicht nur im Toast, und die Maske bleibt offen: `BesetzungModal.test.tsx` „abgelehnter PUT: Grund steht im Dialog, Felder bleiben; erneutes Übernehmen räumt ihn". **Offen:** Der Ad-hoc-Weg („Ad-hoc-Person anlegen …") öffnet die gestapelte `AdhocPersonModal`. Scheitert dort der POST, meldet sie den Grund ausschließlich über `message.error` (`kraefte/AdhocPersonModal.tsx:52`), also nach rund drei Sekunden verschwunden und nicht im Dialog. Das ist der H14-/LFH-535-Befund an einer Maske, die dieses Kriterium mit abdeckt | LFH-547 |
+| 10 | **Alarmbudget eingehalten** — 1–2 je 10 min im Dauerbetrieb, < 10 in den ersten 10 min einer Großlage, ≤ 10 je 10-min-Fenster, ~80/15/5 %, 0 flatternde Alarme, ≤ 3 Eskalationsstufen (EEMUA 191 S. 96/97; ISA-18.2). | **nicht anwendbar** | Die Maske selbst erzeugt keine Meldung: kein Erfolgs- und kein Fehler-Toast (Grep `bdba173c`: kein Toast-Aufruf in `BesetzungModal.tsx`), ihr Fehler steht im Dialog. **Ausnahme:** Der Ad-hoc-Weg erzeugt bei gescheiterter Anlage einen Fehler-Toast (`kraefte/AdhocPersonModal.tsx:52`). Er kommt nur als Antwort auf eine eigene Handlung, nie aus einem Live-Ereignis, und ist damit keine ungefragte Zustandsmeldung im Sinne des Budgets. Dass er am falschen Ort steht, ist Nr. 9 | — |
 | 11 | **Warnverhalten** — kein Blinken auf lesbarem Text, ≤ 2 Blinkraten (schnellere ≤ 5 Hz, langsamere ≥ 0,8 Hz), jede Warnung quittierbar, jeder Ton mit visueller Entsprechung (MIL 5.2.1.5.5.3/.4/.5, 5.3.6.3). | **erfüllt** | Kein Blinken (Grep 0), kein Ton; der Fehler steht still und geht beim nächsten Absenden — Test Nr. 9, zweite Hälfte | — |
-| 12 | **Kein Sprung unter dem Cursor** — CLS ≤ 0,1 (75. Perzentil, web.dev); neue Datensätze nur als opt-in-Sammelbanner (WCAG 3.2.5 / G76). | **erfüllt** | Ein fremder Live-Stand ändert die offene Maske nicht, die Basis ist beim Öffnen eingefroren (LFH-303): `BesetzungModal.test.tsx` „fremd gesetzt, hier ohne Änderung übernommen → 0 PUT, 0 DELETE, Maske schliesst" / „Gegenfall: fremd gesetzt, hier eine Person gewählt → genau ein PUT". Die Optionsliste der Personenwahl folgt dem Live-Key `einsatz-personal` — Bestandsverhalten jedes `Select`, keine Datensatzliste der Seite | — |
+| 12 | **Kein Sprung unter dem Cursor** — CLS ≤ 0,1 (75. Perzentil, web.dev); neue Datensätze nur als opt-in-Sammelbanner (WCAG 3.2.5 / G76). | **offen** | **Trägt:** Ein fremder Live-Stand ändert die **Vergleichsbasis** der offenen Maske nicht, sie ist beim Öffnen eingefroren (LFH-303): `BesetzungModal.test.tsx` „fremd gesetzt, hier ohne Änderung übernommen → 0 PUT, 0 DELETE, Maske schliesst" / „Gegenfall: fremd gesetzt, hier eine Person gewählt → genau ein PUT". **Offen:** Die **Optionsliste** der Personenwahl ist nicht eingefroren. Sie wird aus dem Live-Key `einsatz-personal` gebaut (`BesetzungModal.tsx`, `personenOptionen`), und die Events `personal`/`einheit` invalidieren ihn (`api/queryKeys.ts`). Kommt bei geöffnetem Dropdown eine Person hinzu, rückt sie vor „Ad-hoc-Person anlegen …" ein und schiebt diesen Eintrag unter dem Zeiger weg, ohne Sammelbanner. Abhilfe: Optionen während der Wahl einfrieren oder neue Personen hinten anhängen | LFH-547 |
 | 13 | **Fokus nie verdeckt** — 0 vollständig verdeckte Fokusziele beim Tab-Durchlauf hinter fixierten Köpfen, Fußleisten oder Drawern (WCAG 2.4.11 AA). | **erfüllt [abgeleitet]** | Keine fixierte Konstruktion in Hülle oder Maske (Grep `sticky`/`fixed` in `Erfassung.tsx` und `BesetzungModal.tsx` = 0); die gestapelte Ad-hoc-Maske liegt oben und trägt den Fokus selbst. Kein Tab-Durchlauf gemessen | — |
 | 14 | **Tabellenseite vollständig** — fixierte Kopfzeile, fixierte menschenlesbare Identifierspalte, umschaltbarer Spaltensatz mit Zähler ausgeblendeter Spalten, keine Auflösung in Karten, wo verglichen wird (NN/g Data Tables / Mobile Tables). | **nicht anwendbar** | Maske, keine Menge | — |
 | 15 | **Erfassungsmaske vollständig** — Defaults vorbelegt, sichtbar und einzeln überschreibbar (MIL 5.14.7.1/.3), „Speichern und nächsten anlegen" mit gehaltenem Kontext (5.14.7.4), Sammelliste mit Ändern/Entfernen je Zeile (DWP „Add another thing"), Labels über dem Feld (50 ms statt 500 ms Sakkade, Penzo), volle Tastaturbedienung (WCAG 2.1.1). | **offen** | **Trägt:** Hülle `ErfassungsModal`, Struktur statt „Enter sendet" (erstes Feld ist ein `Select`, `BaseSelect` ruft `preventDefault`) — `BesetzungModal.test.tsx` „trägt die Erfassungs-Norm: keine Modal-Fusszeile, Knopf im <form>"; vorbelegt mit dem aktuellen Zustand und einzeln überschreibbar (`stab/besetzung.test.ts` „belegt die Maske mit dem aktuellen Zustand vor", Wertgleichheits-Riegel „leere Zeile, „nicht vergeben" bestätigt → keine Aktion" und `BesetzungModal.test.tsx` „leere Zeile, „nicht vergeben" bestätigt → 0 Requests, kein Fehler, Maske schliesst"); Fokus ins erste Feld und Zurücksetzen auf allen Wegen aus der Hülle (`Erfassung.test.tsx` „setzt den Fokus beim Öffnen auf das erste Feld", „leert die Felder auch über Escape und das Schliesskreuz, nicht nur über den Knopf"); Labels über dem Feld (`Erfassung.tsx:345` `layout="vertical"`); die Sammelliste mit Ändern je Zeile ist die Besetzungsliste (`StabPage.test.tsx` „„Besetzung ändern" öffnet die Maske der Zeile"). **Bewusst nicht:** „Speichern und nächsten" — Einzelvorgang, sechs feste Zeilen (Spec §12.1). **Offen:** ein Tastatur-Durchlauf dieser Maske (Art wählen → Person/Bezeichnung → Übernehmen, samt Ad-hoc-Weg) ist nirgends geprüft | LFH-547 |
 
-**Verdikt-Bilanz:** 8 erfüllt · 4 offen · 3 nicht anwendbar.
+**Verdikt-Bilanz:** 6 erfüllt · 6 offen · 3 nicht anwendbar.
 
 ---
 
@@ -151,9 +151,9 @@ Die Zahl 14 der Werkzeug-Links ist **[abgeleitet]** aus `stab/sachgebiete.ts`: 3
 | --- | --- | --- | --- |
 | 1 · Besetzungsliste | 6 | 4 | 5 |
 | 2 · Kopfblock Lagebesprechung | 6 | 6 | 3 |
-| 3 · Modal „Besetzung ändern" | 8 | 4 | 3 |
+| 3 · Modal „Besetzung ändern" | 6 | 6 | 3 |
 | 4 · Modal „Lagebesprechung abschließen" | 8 | 6 | 1 |
-| **Summe (60 Zeilen)** | **28** | **20** | **12** |
+| **Summe (60 Zeilen)** | **26** | **22** | **12** |
 
 ## Offene Punkte
 
@@ -172,6 +172,8 @@ Die Zahl 14 der Werkzeug-Links ist **[abgeleitet]** aus `stab/sachgebiete.ts`: 3
 | 3 · 2 | Höhe und Abstand der Maskenziele in `handschuh` | LFH-547 |
 | 3 · 5 | Nachtkontrast Platzhalter, Fehler-`Alert`, Optionsliste | LFH-547 |
 | 3 · 8 | Regler (app-weit) | LFH-397 |
+| 3 · 9 | Ad-hoc-Anlage meldet einen gescheiterten POST nur per Toast (`AdhocPersonModal.tsx:52`), nicht im Dialog — wahrscheinlicher Befund | LFH-547 |
+| 3 · 12 | Optionsliste der Personenwahl folgt live `einsatz-personal`; neue Person verschiebt „Ad-hoc-Person anlegen …" unter dem Zeiger — wahrscheinlicher Befund | LFH-547 |
 | 3 · 15 | Tastatur-Durchlauf der Maske inkl. Ad-hoc-Weg | LFH-547 |
 | 4 · 1 | Trefffläche des Toast-Knopfs „Zum ETB-Eintrag" (6 s) und des Kopfs „Weitere Angaben" | LFH-547 |
 | 4 · 2 | Abstand der Schnellwahl-Knöpfe in `handschuh` ([abgeleitet] 7 px statt 16) | LFH-547 |
@@ -186,7 +188,9 @@ unter `createBrowserRouter`, Tastaturweg zum Toast (6 s), Seitenhöhe mit > 3 Be
 **Aus dieser Prüfliste neu dazu:** Abstand ≥ 16 px an Werkzeug-Links, Historien-Zielen und
 Schnellwahl (1·2, 2·2, 4·2); Expander-Kopf (2·1); die beiden Masken in `handschuh` (3·2) und
 im Nachtmodus (3·5, 4·5); Tastatur-Durchlauf der Besetzungsmaske (3·15); Toast über dem
-Fokusziel (4·13); die Verschiebung bei ≤ 3 Historien-Einträgen (1·12, 2·12).
+Fokusziel (4·13); die Verschiebung bei ≤ 3 Historien-Einträgen (1·12, 2·12); der Fehler der
+Ad-hoc-Anlage nur im Toast (3·9) und die live wachsende Optionsliste der Personenwahl (3·12),
+beide aus dem Codex-Review zu #63.
 
 **Nachprüfung nach ST6/ST7 (keine eigene Zeile, aber Pflicht):** mit den Lücken-Kennzahlen
 (LFH-544) bekommt die Besetzungsliste eine vierte Sorte handgebauter Ziele (Kennzahl-Deeplinks,
