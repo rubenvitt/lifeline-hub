@@ -242,10 +242,10 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     //    Eigenes id-Präfix: derselbe Registry-Eintrag steht hier UND unter „Module", und
     //    zwei gleiche `id` machten `aria-activedescendant` mehrdeutig.
     //    DAS AKTUELLE MODUL FÄLLT HERAUS (LFH-391 · C4): ein Sprung auf die Seite, auf der
-    //    man steht, verkürzt keinen Weg und kostet einen der drei Plätze — dieselbe Regel,
-    //    die `loeseZuletztModule` im Navigationsrahmen seit LFH-337 · H12 fährt. Der
-    //    Kategorie-Ausschluss von dort gilt hier NICHT: die Palette zeigt kein Panel, in dem
-    //    das Nachbarmodul ohnehin zwei Zeilen tiefer stünde.
+    //    man steht, verkürzt keinen Weg und kostet einen der drei Plätze. (Die frühere
+    //    Panel-Gruppe „Zuletzt" im Navigationsrahmen fuhr dieselbe Regel und zusätzlich
+    //    einen Kategorie-Ausschluss; sie ist seit 13.09.2026 entfernt, Begründung an
+    //    `einsatz/ModulPanel.tsx`. Hier ist die Palette die einzige Zuletzt-Fläche.)
     for (const key of k.zuletztModulKeys ?? []) {
       if (key === k.aktuellerModulKey) continue;
       const m = modulRegistry.find((x) => x.key === key);
