@@ -64,14 +64,34 @@ describe('lagebesprechungZustand', () => {
     );
   });
 
-  it('genau am Termin gilt als überfällig — eine Sekunde davor noch nicht (Grenze ≤)', () => {
+  /** Ruling 12: unter einer Minute sagte „in 0 min"/„seit 0 min überfällig" nichts Lesbares. */
+  it('genau am Termin „jetzt fällig" (achtung) — eine Sekunde davor „in < 1 min" (neutral)', () => {
     expect(lagebesprechungZustand(wire('2026-09-13T10:00:00Z'), jetzt)).toEqual({
       rolle: 'achtung',
-      label: 'seit 0 min überfällig',
+      label: 'jetzt fällig',
     });
     expect(lagebesprechungZustand(wire('2026-09-13T10:00:01Z'), jetzt)).toEqual({
       rolle: 'neutral',
-      label: 'in 0 min',
+      label: 'in < 1 min',
+    });
+  });
+
+  it('ab einer vollen Minute der bisherige Wortlaut — 59 s bleiben unter der Grenze', () => {
+    expect(lagebesprechungZustand(wire('2026-09-13T09:59:01Z'), jetzt)).toEqual({
+      rolle: 'achtung',
+      label: 'jetzt fällig',
+    });
+    expect(lagebesprechungZustand(wire('2026-09-13T09:59:00Z'), jetzt)).toEqual({
+      rolle: 'achtung',
+      label: 'seit 1 min überfällig',
+    });
+    expect(lagebesprechungZustand(wire('2026-09-13T10:00:59Z'), jetzt)).toEqual({
+      rolle: 'neutral',
+      label: 'in < 1 min',
+    });
+    expect(lagebesprechungZustand(wire('2026-09-13T10:01:00Z'), jetzt)).toEqual({
+      rolle: 'neutral',
+      label: 'in 1 min',
     });
   });
 });

@@ -31,6 +31,9 @@ export function dauerText(minuten: number): string {
  * Gerechnet wird in absoluten Millisekunden, nie in Wanduhrzeit — an der Sommerzeitgrenze
  * lägen sonst eine Stunde daneben. `termin ≤ jetzt` gilt als überfällig; abgerundet.
  *
+ * Unter einer vollen Minute (Ruling 12): „in < 1 min" neutral und, ab dem Termin, „jetzt fällig"
+ * `achtung` — „in 0 min"/„seit 0 min überfällig" sagten nichts Lesbares.
+ *
  * Eine FUNKTION, keine Karte: `statusVertrag.guard` verbietet `Record<…, StatusDarstellung>`
  * außerhalb `theme/statusFarben.ts`, und dort zählt der Abdeckungstest die Vertragskarten.
  */
@@ -43,6 +46,9 @@ export function lagebesprechungZustand(
   if (!termin) return { rolle: 'neutral', label: 'Termin unlesbar' };
   const abstandMs = termin.valueOf() - jetzt.valueOf();
   const minuten = Math.floor(Math.abs(abstandMs) / 60_000);
-  if (abstandMs > 0) return { rolle: 'neutral', label: `in ${dauerText(minuten)}` };
+  if (abstandMs > 0) {
+    return { rolle: 'neutral', label: minuten === 0 ? 'in < 1 min' : `in ${dauerText(minuten)}` };
+  }
+  if (minuten === 0) return { rolle: 'achtung', label: 'jetzt fällig' };
   return { rolle: 'achtung', label: `seit ${dauerText(minuten)} überfällig` };
 }
