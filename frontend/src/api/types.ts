@@ -326,6 +326,37 @@ export type BefehlStatus = S['BefehlStatus'];
 export type BefehlAbschnitt = S['BefehlAbschnitt'];
 export type BefehlAnzeige = S['BefehlAnzeige'];
 
+// ============================== LFH-46 Stab (S1–S6) ==============================
+export type Stab = S['StabAnzeige'];
+export type Stabsfunktion = S['StabsfunktionAnzeige'];
+export type Lagebesprechung = S['LagebesprechungAnzeige'];
+export type Sachgebiet = S['Sachgebiet'];
+export type BesetzungArt = S['BesetzungArt'];
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.
+ * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422
+ * (`src/routes/stab.rs:80-118`) — Aufrufer schicken NUR das Feld, das die Art verlangt.
+ */
+export interface BesetzungBody {
+  besetzung_art: BesetzungArt;
+  personal_id?: number;
+  bezeichnung?: string;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/stab/lagebesprechungen`, FE-lokal.
+ *
+ * `naechste_at` ist DREIWERTIG (`src/routes/stab.rs:193-194, 233-237`): Schlüssel fehlt =
+ * Termin unverändert · `null` = löschen · Wert = setzen. Ein leerer String löscht STILL
+ * (`support::trimme_tri`) — Aufrufer schicken nie `''`. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
+ */
+export interface LagebesprechungAbschlussBody {
+  entschluss: string;
+  abgehalten_at?: string;
+  naechste_at?: string | null;
+}
+
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
 

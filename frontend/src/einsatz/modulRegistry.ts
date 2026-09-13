@@ -99,8 +99,8 @@ export const modulRegistry: ModulEintrag[] = [
     label: 'Stab',
     icon: TbBuildingCommunity,
     route: 'stab',
-    status: 'wip',
-    beschreibung: 'Stabsarbeit (S1–S6). Wird später ausgearbeitet.',
+    status: 'fertig',
+    beschreibung: 'Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung',
   },
   // Kräfte & Mittel
   {

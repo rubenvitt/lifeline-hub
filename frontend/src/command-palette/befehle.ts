@@ -22,6 +22,7 @@ import {
   etbPfad,
   personenPfad,
   schaedenPfad,
+  stabPfad,
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
 import type { IconType } from 'react-icons';
@@ -40,7 +41,7 @@ import type { Koordinatenformat } from '../api/types';
  * `UnfallhilfsstellenDefault` zeigt — eine Seite, die `?neu=1` nicht liest. Die
  * Schnellaktion lief damit ins Leere. Ein Routenstück nur für diese eine Zeile
  * auszunehmen hätte zwei Wahrheiten für dieselbe Sache stehen lassen; deshalb tragen
- * alle vier Zeilen den Builder.
+ * alle Zeilen den Builder.
  *
  * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT und bewusst NICHT die Registry-Reihenfolge
  * (LFH-391 · A1). Die Registry ordnet nach Kategorie — das ist die NAVIGATIONS-Rangfolge,
@@ -83,6 +84,14 @@ export const SCHNELLAKTIONEN: {
     pfad: (id) => schaedenPfad(id, { neu: true }),
     label: 'Neuen Schaden erfassen',
     schlagworte: ['schaden', 'objekt'],
+  },
+  {
+    // LFH-543: ans ENDE — die Tabelle ordnet nach Erfassungshäufigkeit, eine Lagebesprechung
+    // fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden. Leser: `pages/StabPage.tsx`.
+    modulKey: 'stab',
+    pfad: (id) => stabPfad(id, { neu: true }),
+    label: 'Lagebesprechung abschließen',
+    schlagworte: ['lagebesprechung', 'entschluss', 'stab', 'führungsvorgang'],
   },
 ];
 

@@ -153,7 +153,7 @@ const beendet: EinsatzAnzeige = {
 };
 
 describe('baueBefehle — Schnellaktionen', () => {
-  it('verdrahtet die Top-4-Aktionen mit ?neu=1 für Berechtigte', () => {
+  it('verdrahtet die Schnellaktionen mit ?neu=1 für Berechtigte', () => {
     const k = kontext();
     const b = baueBefehle(k);
     const person = b.find((x) => x.id === 'aktion:personen');
@@ -165,10 +165,11 @@ describe('baueBefehle — Schnellaktionen', () => {
       'aktion:etb',
       'aktion:unfallhilfsstellen',
       'aktion:schaeden',
+      'aktion:stab',
     ]);
   });
   /**
-   * Die vier Ziele stammen aus `routing/deeplinks.ts` (LFH-331 · B3), nicht aus einem
+   * Die Ziele stammen aus `routing/deeplinks.ts` (LFH-331 · B3), nicht aus einem
    * Vorlagentext von Hand. Der Unterschied ist an EINER Zeile messbar und war ein
    * echter Fehler: die Unfallhilfsstellen liegen unter `/unfallhilfsstellen/liste`,
    * während `/unfallhilfsstellen` auf `UnfallhilfsstellenDefault` zeigt — eine Seite,
@@ -182,6 +183,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:etb', '/einsaetze/5/etb?neu=1'],
       ['aktion:unfallhilfsstellen', '/einsaetze/5/unfallhilfsstellen/liste?neu=1'],
       ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
+      ['aktion:stab', '/einsaetze/5/stab?neu=1'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);

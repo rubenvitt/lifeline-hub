@@ -6,7 +6,7 @@ import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
 import { einsatzModulPfad } from '../routing/deeplinks';
 
 /**
- * Guard (LFH-391 · A1): die vier Schnellaktionen der Kommandopalette zeigen auf Seiten, die
+ * Guard (LFH-391 · A1): die Schnellaktionen der Kommandopalette zeigen auf Seiten, die
  * `?neu=1` auch WIRKLICH lesen — und auf ein fertiges Modul der Registry.
  *
  * Warum überhaupt ein Guard: eine Schnellaktion, die ins Leere läuft, macht keinen Test rot

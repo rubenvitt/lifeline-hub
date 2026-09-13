@@ -7,6 +7,7 @@ import { legeErinnerungAn } from '../api/erinnerungen';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { ErfassungsModal } from '../components/Erfassung';
+import { SCHNELLWAHL_TERMIN, schnellwahlTermin } from '../components/terminSchnellwahl';
 import { abstand } from '../theme/tokens';
 import type { EtbEintragAnzeige } from '../api/types';
 
@@ -44,12 +45,9 @@ const VORGABE_MINUTEN = 30;
  * LFH-463 ergänzt unten den expliziten Einsatztermin, sofern er bekannt und zukünftig ist.
  * Er ist ein absoluter Zeitpunkt; die vier relativen Vorbelegungen bleiben unverändert.
  */
-const SCHNELLWAHL = [
-  { label: '+15 min', minuten: 15 },
-  { label: '+30 min', minuten: 30 },
-  { label: '+1 h', minuten: 60 },
-  { label: '+2 h', minuten: 120 },
-] as const;
+// Die Tabelle ist seit LFH-543 geteilt (`components/terminSchnellwahl.ts`); die Wiedervorlage
+// nimmt alle vier Einträge und rechnet weiterhin ab jetzt.
+const SCHNELLWAHL = SCHNELLWAHL_TERMIN;
 
 /**
  * Legt aus einem ETB-Eintrag eine terminierte Erinnerung/Wiedervorlage an (LFH-106).
@@ -149,7 +147,7 @@ export default function WiedervorlageModal({
           {SCHNELLWAHL.map((s) => (
             <Button
               key={s.label}
-              onClick={() => form.setFieldValue('faellig', dayjs().add(s.minuten, 'minute'))}
+              onClick={() => form.setFieldValue('faellig', schnellwahlTermin(dayjs(), s.minuten))}
             >
               {s.label}
             </Button>
