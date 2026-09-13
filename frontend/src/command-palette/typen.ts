@@ -80,9 +80,8 @@ export interface BefehlKontext {
    * `modulAusPfad` (`einsatz/modulRegistry.ts`), Arbeitspunkt 3 des Tickets (LFH-391 · C4).
    *
    * Konsument ist die Zuletzt-Gruppe: die Seite, auf der man steht, ist keine Abkürzung.
-   * Damit gilt hier dieselbe Regel wie im Navigationsrahmen (`loeseZuletztModule`), der sie
-   * seit LFH-337 · H12 fährt — die Palette führte als einzige Fläche einen Sprung auf die
-   * eigene Seite, und zwar auf dem knappsten der drei Plätze.
+   * Die Palette führte bis LFH-391 · C4 einen Sprung auf die eigene Seite, und zwar auf dem
+   * knappsten der drei Plätze.
    *
    * OPTIONAL wie sein Geschwister `zuletztModulKeys`, und aus demselben Grund: ohne
    * gemerkte Module hat er gar keine Bedeutung. (In `DatensatzKontext` ist der gleichnamige
@@ -90,7 +89,7 @@ export interface BefehlKontext {
    *
    * KEIN Konsument in den übrigen sechs Gruppen, und das ist Absicht: die Modul-Gruppe
    * behält den Eintrag der aktuellen Seite, weil sie den MODULBESTAND zeigt und nicht eine
-   * Abkürzung — dieselbe Trennung wie zwischen „Zuletzt" und Modul-Panel im Rahmen.
+   * Abkürzung.
    */
   aktuellerModulKey?: string | null;
   /**
