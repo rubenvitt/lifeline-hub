@@ -113,6 +113,7 @@ modul_marker! {
     Lagemeldungen => "lagemeldungen",
     Auftraege => "auftraege",
     Lagekarte => "lagekarte",
+    Stab => "stab",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -124,6 +125,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/lage/meldungen", Some("lagemeldungen")),
     ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
     ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
+    ("/api/einsaetze/{id}/stab", Some("stab")),
     ("/api/einsaetze/{id}/karten-ansichten", Some("lagekarte")),
     ("/api/einsaetze/{id}/lage-snapshots", Some("lagekarte")),
     ("/api/einsaetze/{id}/anhaenge", None),
@@ -217,6 +219,7 @@ mod tests {
         assert_eq!(Meldungen::KEY, Some("meldungen"));
         assert_eq!(Lagemeldungen::KEY, Some("lagemeldungen"));
         assert_eq!(Auftraege::KEY, Some("auftraege"));
+        assert_eq!(Stab::KEY, Some("stab"));
         assert_eq!(OhneModul::KEY, None);
     }
 
