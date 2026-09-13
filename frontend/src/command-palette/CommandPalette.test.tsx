@@ -216,9 +216,12 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
     ];
     renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
     // jsdom rechnet kein Layout — prüfbar ist der gesetzte WERT, nicht die Pixelhöhe.
-    expect(document.getElementById('cmd-liste')).toHaveStyle({
-      maxHeight: 'min(60vh, 480px)',
-    });
+    // Gegen den Inline-Wert, nicht `toHaveStyle`: das vergleicht mit `getComputedStyle`,
+    // und jsdom 30 löst Längen dort in px auf (gemessen `460.8px` = 60vh bei 768 px
+    // Fensterhöhe). Die Aussage „relativ gedeckelt" wäre dann nicht mehr prüfbar.
+    const liste = document.getElementById('cmd-liste');
+    expect(liste).not.toBeNull();
+    expect(liste!.style.maxHeight).toBe('min(60vh, 480px)');
   });
 });
 
