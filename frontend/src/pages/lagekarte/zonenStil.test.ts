@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
-import { gefahrengebietStil, zoneStil, ZONE_TYPEN } from './zonenStil';
+import { gefahrengebietStil, zoneStil, zonenBeschriftung, ZONE_TYPEN } from './zonenStil';
 import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
+import type { Warnstufe } from '../../api/types';
 
 /** Reine Ableitung ohne Render — Erwartung und Code lesen denselben Token, geprüft wird
  *  die ROLLE, nicht der Wert. */
@@ -55,5 +56,65 @@ describe('zoneStil', () => {
     expect(freie.geometrie).toBe('beides');
     expect(ZONE_TYPEN.find((t) => t.typ === 'absperrgrenze')!.geometrie).toBe('LineString');
     expect(ZONE_TYPEN.find((t) => t.typ === 'gefahrengebiet')!.geometrie).toBe('Polygon');
+  });
+});
+
+// LFH-357: die Farbe allein trägt die Skala NICHT — fünf Stufen fallen auf zwei Rollen
+// (`achtung`: niedrig/mittel, `alarm`: keine/hoch/akut). Der zweite Kanal auf der Kartenfläche
+// ist der Beschriftungstext; A2 hatte dafür `label` ODER `form` genannt, beide standen dort nicht
+// zur Verfügung. Diese Tests sind die Zusicherung, dass der Text sie jetzt wirklich auflöst.
+describe('zonenBeschriftung', () => {
+  const ALLE = Object.keys(warnstufeKarte) as Warnstufe[];
+
+  it('macht alle fünf Warnstufen am Text unterscheidbar', () => {
+    const texte = ALLE.map((s) => zonenBeschriftung('Werkshalle Nord', s));
+    expect(texte).toHaveLength(5);
+    // Paarweise verschieden — genau das, was die Farbachse nicht leisten kann.
+    expect(new Set(texte).size).toBe(5);
+  });
+
+  it('trennt `keine` von `akut`, obwohl beide auf der Rolle alarm liegen', () => {
+    const token = theme.getDesignToken();
+    // Vorbedingung: die Farbe ist hier tatsächlich gleich — sonst prüfte der Test nichts.
+    expect(gefahrengebietStil('keine', token).lineColor).toBe(
+      gefahrengebietStil('akut', token).lineColor,
+    );
+    expect(zonenBeschriftung('Werk', 'keine')).not.toBe(zonenBeschriftung('Werk', 'akut'));
+  });
+
+  it('nimmt den Wortlaut aus dem Statusfarb-Vertrag, nicht aus einem eigenen Literal', () => {
+    for (const stufe of ALLE) {
+      expect(zonenBeschriftung(null, stufe), stufe).toContain(warnstufeKarte[stufe].label);
+    }
+  });
+
+  it('stellt die Stufe unter den Zonennamen; ohne Namen steht sie allein', () => {
+    expect(zonenBeschriftung('Werkshalle Nord', 'hoch')).toBe('Werkshalle Nord\nWarnstufe: hoch');
+    expect(zonenBeschriftung(null, 'hoch')).toBe('Warnstufe: hoch');
+    // Ein Name aus lauter Leerzeichen ist kein Name — sonst stünde die Stufe in Zeile zwei
+    // unter einer leeren Zeile eins.
+    expect(zonenBeschriftung('   ', 'hoch')).toBe('Warnstufe: hoch');
+  });
+
+  it('lässt Zonen ohne Warnstufe unverändert — die Stufe gehört nur ans Gefahrengebiet', () => {
+    expect(zonenBeschriftung('Absperrung Süd', null)).toBe('Absperrung Süd');
+    expect(zonenBeschriftung(null, null)).toBe('');
+  });
+
+  // Codex-Review zu LFH-357 (P1): das Ladegate der Karte hängt an `einsatz`/`config`, NICHT an
+  // der Gefahrengebiete-Query — die Karte zeichnet Zonen also, während die Gebiete noch laden
+  // oder gescheitert sind. Der Nachschlag geht dann ins Leere, und „keine" wäre an dieser Stelle
+  // eine Behauptung über Daten, die es nicht gibt. Genau der Maßstab, den dieser Fix selbst
+  // an das Wort „unbewertet" angelegt hat.
+  it('nennt einen fehlenden Nachschlag `unbekannt` statt ihn zu `keine` zu runden', () => {
+    expect(zonenBeschriftung('Werk', 'unbekannt')).toBe('Werk\nWarnstufe: unbekannt');
+    expect(zonenBeschriftung(null, 'unbekannt')).toBe('Warnstufe: unbekannt');
+    // Die tragende Aussage: `unbekannt` und `keine` sind ZWEI Zustände, nicht einer.
+    expect(zonenBeschriftung('Werk', 'unbekannt')).not.toBe(zonenBeschriftung('Werk', 'keine'));
+  });
+
+  it('bleibt mit `unbekannt` von allen fünf echten Stufen unterscheidbar', () => {
+    const texte = [...ALLE, 'unbekannt' as const].map((s) => zonenBeschriftung('Werk', s));
+    expect(new Set(texte).size).toBe(6);
   });
 });

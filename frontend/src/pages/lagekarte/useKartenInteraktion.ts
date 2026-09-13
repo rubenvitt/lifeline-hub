@@ -380,7 +380,18 @@ export function useKartenInteraktion({
     })
       .then(() => {
         erfolg('Zone angelegt');
-        return qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }).then(() => true);
+        // BEIDE Fächer, wie im Änder- und im Löschpfad weiter unten: das Anlegen einer
+        // `gefahrengebiet`-Zone legt serverseitig eine neue Gruppe an
+        // (`lage_zone/repo.rs:anlegen_tx` → `gebiet_anlegen`). Ohne die zweite Invalidierung
+        // trägt die frische Zone eine `gefahrengebiet_id`, die die veraltete Gebiets-Liste
+        // nicht kennt — der Nachschlag geht ins Leere und die Karte beschriftet sie
+        // „Warnstufe: unbekannt", bis ein fremder Refetch kommt. Der SSE-Fan-out räumt beides
+        // ab (`lage_zone` → zonen + gefahrengebiete); die Lücke trägt also nur, solange der
+        // Live-Strom hängt — genau dann, wenn niemand sie sich erklären kann.
+        return Promise.all([
+          qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }),
+          qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
+        ]).then(() => true);
       })
       .catch((e) => {
         fehler(e);
