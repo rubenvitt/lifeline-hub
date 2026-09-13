@@ -1,4 +1,5 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
+import { bandStil } from './KartenFuss';
 
 export type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
 
@@ -71,11 +72,11 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
     <Card
       size="small"
       style={{
-        position: 'absolute',
-        left: '50%',
-        bottom: 16,
-        transform: 'translateX(-50%)',
-        zIndex: 5,
+        // Positionierung gehört dem `KartenFuss` (LFH-355), nicht dieser Karte: sie lag
+        // hier absolut auf `zIndex: 5` und wurde von der gleich hohen, später gerenderten
+        // SnapshotLeiste verdeckt. Als Flow-Band in der Fuß-Spalte kann das nicht wieder
+        // passieren — wer ihr `position: 'absolute'` zurückgibt, holt den Bug mit.
+        ...bandStil('mitte'),
         boxShadow: token.boxShadowSecondary,
         minWidth: 320,
       }}
