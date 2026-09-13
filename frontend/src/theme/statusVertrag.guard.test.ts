@@ -347,9 +347,29 @@ function typargumente(text: string, auf: number): string[] | null {
 const FORMERHALTEND = ['Readonly', 'Required', 'Partial', 'NonNullable'];
 
 /** Schält {@link FORMERHALTEND}e Hüllen ab, mehrfach geschachtelt bis zum blanken Namen. */
+/** Index der zur Klammer bei 0 gehoerenden schliessenden Klammer, oder `-1`. */
+function klammerPaarEnde(text: string): number {
+  let tiefe = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '(') tiefe++;
+    else if (text[i] === ')' && --tiefe === 0) return i;
+  }
+  return -1;
+}
+
 function blattTyp(arg: string): string {
   let rest = arg.trim();
   for (;;) {
+    // Eine UMSCHLIESSENDE Klammer ist Gruppierung, kein Typ (im Codex-Review gefunden):
+    // `typglieder` laesst die Vereinigung in `(StatusDarstellung | null) & {…}` bewusst
+    // stehen, weil sie in Klammertiefe > 0 liegt — dann muss das Abschaelen sie oeffnen,
+    // sonst vergleicht der Aufrufer die Klammer mitsamt Inhalt gegen einen Namen und
+    // findet nie etwas. Geprueft wird, dass die Klammer den GANZEN Ausdruck umschliesst;
+    // bei `(A|B)&(C)` schliesst die erste vor dem Ende, und der Ausdruck bleibt stehen.
+    if (rest.startsWith('(') && klammerPaarEnde(rest) === rest.length - 1) {
+      rest = rest.slice(1, -1).trim();
+      continue;
+    }
     const auf = rest.indexOf('<');
     if (auf === -1 || !rest.endsWith('>')) return rest;
     if (!FORMERHALTEND.includes(rest.slice(0, auf).trim())) return rest;
@@ -683,6 +703,41 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
     expect(
       kartenBefunde({
         '/src/pages/Beides2.ts': 'const k: Record<X, Readonly<Array<StatusDarstellung>>> = {};',
+      }),
+    ).toEqual([]);
+  });
+
+  it('steigt in eine Klammer-Gruppierung hinab', () => {
+    // Im Codex-Review gefunden: `typglieder` laesst die Vereinigung IN der Klammer
+    // bewusst stehen (Tiefe > 0), `blattTyp` schaelte die Klammer aber nicht ab — der
+    // Vergleich sah `(StatusDarstellung | null)` und blieb gruen. Klammern sind
+    // Gruppierung, kein Typ.
+    expect(
+      kartenBefunde({
+        '/src/pages/Gruppe.ts':
+          'const k: Record<X, (StatusDarstellung | null) & { icon: ReactNode }> = {};',
+      }),
+    ).toHaveLength(1);
+    // Auch einfach geklammert, ohne Durchschnitt daneben.
+    expect(
+      kartenBefunde({ '/src/pages/Gruppe2.ts': 'const k: Record<X, (StatusDarstellung)> = {};' }),
+    ).toHaveLength(1);
+    // Gegenprobe: eine Klammer ohne den Vertragstyp bleibt ruhig — sonst meldete das
+    // Abschaelen jede Gruppierung.
+    expect(
+      kartenBefunde({
+        '/src/pages/Gruppe3.ts': 'const k: Record<X, (TierMeta | null) & { icon: R }> = {};',
+      }),
+    ).toEqual([]);
+    // Ein geklammerter ARRAY-Typ ist weiterhin eine Sammlung, keine Karte: die Klammer
+    // umschliesst hier NICHT den ganzen Ausdruck, also wird sie nicht abgeschaelt.
+    expect(
+      kartenBefunde({ '/src/pages/Gruppe5.ts': 'const k: Record<X, (StatusDarstellung)[]> = {};' }),
+    ).toEqual([]);
+    // Und die Sammlung bleibt draussen, auch geklammert.
+    expect(
+      kartenBefunde({
+        '/src/pages/Gruppe4.ts': 'const k: Record<X, (Array<StatusDarstellung>)> = {};',
       }),
     ).toEqual([]);
   });
