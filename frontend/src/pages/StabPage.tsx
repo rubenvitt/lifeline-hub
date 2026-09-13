@@ -1,7 +1,7 @@
-import { Breadcrumb, Button, Flex, Space, Typography, theme } from 'antd';
+import { App, Breadcrumb, Button, Flex, Skeleton, Space, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
@@ -17,6 +17,10 @@ import { modulZielRoute } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import BesetzungModal from '../stab/BesetzungModal';
+import LagebesprechungHistorie from '../stab/LagebesprechungHistorie';
+import LagebesprechungModal from '../stab/LagebesprechungModal';
+import LagebesprechungStand from '../stab/LagebesprechungStand';
+import { zeigeAbschlussToast } from '../stab/abschlussToast';
 import { besetzungDarstellung, besetzungRechteText, zeileFuer } from '../stab/besetzung';
 import { SACHGEBIETE } from '../stab/sachgebiete';
 import { werkzeugeFuer } from '../stab/werkzeuge';
@@ -24,22 +28,29 @@ import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { einsatzStatus } from '../theme/statusFarben';
 
 /**
- * Modul „Stab" (LFH-46): Führungsorganisation S1–S6 als sechs feste Zeilen.
+ * Modul „Stab" (LFH-46): Lagebesprechung und Führungsorganisation S1–S6.
  *
- * UI-Form (Spec Entscheidung 16): eine Vollseite, eine `Liste` — hier wird nichts verglichen,
- * sortiert oder gefiltert (LFH-330/B2), also keine Tabelle. Die Zeile selbst ist kein Klickziel;
- * genau eine Aktion „Besetzung ändern" je Zeile, ohne Schreibrecht entfällt sie und ein Satz
- * nennt den Grund (LFH-346 · C11). Die Kopfaktion „Lagebesprechung abschließen" und die
- * Lagebesprechungs-Sektion folgen in ST5 (LFH-543), die Lücken-Kennzahlen in ST6 (LFH-544).
+ * UI-Form (Spec Entscheidung 16): eine Vollseite, zwei Sektionen, zwei Masken. Die Besetzung ist
+ * eine `Liste` mit sechs festen Zeilen — hier wird nichts verglichen (LFH-330/B2). Die Zeile ist
+ * kein Klickziel; genau eine Aktion „Besetzung ändern" je Zeile, ohne Schreibrecht entfällt sie
+ * und ein Satz nennt den Grund (LFH-346 · C11).
  *
- * Live: das `stab`-Ereignis invalidiert `einsatz-stab` über den Einsatz-Stream (Bestand).
+ * Der Kopf trägt genau eine Primäraktion „Lagebesprechung abschließen" (LFH-543). Sie ÖFFNET ein
+ * Modal und gehört deshalb in den Kopf; ohne Schreibrecht steht sie gesperrt da (C10/M16), und
+ * `neueZeile` der Kommandopalette trägt denselben Riegel. Die Lücken-Kennzahlen folgen in ST6.
+ *
+ * Live: das `stab`-Ereignis invalidiert `einsatz-stab` samt Historie (Bestand).
  */
 export default function StabPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const { token } = theme.useToken();
+  const { message } = App.useApp();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [offenFuer, setOffenFuer] = useState<Sachgebiet | null>(null);
+  const [abschlussOffen, setAbschlussOffen] = useState(false);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -54,6 +65,36 @@ export default function StabPage() {
     queryFn: () => ladeModulOverrides(einsatzId),
   });
 
+  // VOR den frühen Returns (Hook-Reihenfolge): der `?neu=1`-Leser darunter braucht das Recht,
+  // bevor der Einsatz sicher geladen ist. `darfImEinsatzSchreiben` liefert für `undefined` false
+  // (Muster `SchaedenPage.tsx:210`).
+  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const stabDa = stabQuery.data != null;
+  // Ohne Stand fehlte der bestehende Termin zur Vorbelegung — ein unverändertes Absenden
+  // schickte `naechste_at: null` und löschte ihn (Plan-Abweichung 7).
+  const abschlussErlaubt = darfSchreiben && stabDa;
+  const oeffneAbschluss = useCallback(() => setAbschlussOffen(true), []);
+
+  // Schnellaktion: ?neu=1 öffnet den Abschluss der Lagebesprechung (Kommandopalette, LFH-543).
+  // Das LITERAL `searchParams.get('neu')` muss in DIESER Datei stehen:
+  // `schnellaktionen.guard.test.ts` ordnet den Leser über den Dateinamen dem Modul zu.
+  // Warten, bis Einsatz UND Stand geladen sind; Parameter immer räumen (apply-then-clean),
+  // die Maske nur mit Schreibrecht und Stand öffnen.
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (einsatzQuery.isLoading || stabQuery.isLoading) return;
+    if (darfSchreiben && stabDa) setAbschlussOffen(true);
+    searchParams.delete('neu');
+    setSearchParams(searchParams, { replace: true });
+  }, [
+    searchParams,
+    setSearchParams,
+    einsatzQuery.isLoading,
+    stabQuery.isLoading,
+    darfSchreiben,
+    stabDa,
+  ]);
+
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -65,7 +106,6 @@ export default function StabPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   // Fehler ≠ leer (LFH-331 · B3): ohne Daten tritt der Fehler an die Stelle der Liste — sechs
   // „nicht vergeben" wären sonst eine Aussage über eine Menge, die nie ankam.
@@ -92,6 +132,14 @@ export default function StabPage() {
           ]}
         />
       }
+      // Gesperrt statt versteckt (C10/M16): der Hinweis darunter nennt den Grund.
+      aktionen={
+        <Button type="primary" disabled={!abschlussErlaubt} onClick={oeffneAbschluss}>
+          Lagebesprechung abschließen
+        </Button>
+      }
+      // Derselbe Riegel wie am Knopf — die Palette ist ein zweiter Weg auf dieselbe Aktion.
+      neueZeile={abschlussErlaubt ? oeffneAbschluss : undefined}
       // Bedingt übergeben, nicht über `sichtbar` allein: `EinsatzSeite` rendert den Slot, sobald
       // er truthy ist — ein JSX-Element ist das immer, auch wenn es `null` zurückgibt, und
       // hinterliesse mit Schreibrecht ein leeres `div` mit Aussenabstand (Muster `SchaedenPage`).
@@ -99,6 +147,25 @@ export default function StabPage() {
         !darfSchreiben && <RechteHinweis sichtbar text={besetzungRechteText(einsatz.status)} />
       }
     >
+      <SektionHeader titel="Lagebesprechung" />
+      <section aria-label="Lagebesprechung" style={{ marginBottom: token.marginLG }}>
+        <Flex vertical gap={token.margin}>
+          {stabGescheitert ? (
+            <SeitenFehler
+              text="Stand der Lagebesprechung konnte nicht geladen werden"
+              ursache={stabQuery.error}
+              onWiederholen={() => void stabQuery.refetch()}
+            />
+          ) : stabQuery.data ? (
+            <LagebesprechungStand einsatzId={einsatzId} stab={stabQuery.data} />
+          ) : (
+            // Vor dem Laden wird kein Termin behauptet (Ruling 1).
+            <Skeleton title={false} paragraph={{ rows: 3 }} />
+          )}
+          <LagebesprechungHistorie einsatzId={einsatzId} />
+        </Flex>
+      </section>
+
       <SektionHeader titel="Besetzung S1–S6" />
       <section aria-label="Besetzung S1–S6">
         {stabGescheitert ? (
@@ -188,6 +255,19 @@ export default function StabPage() {
           eintrag={offenerEintrag}
           zeile={zeileFuer(stabQuery.data, offenerEintrag.sachgebiet)}
           onSchliessen={() => setOffenFuer(null)}
+        />
+      )}
+      {/* Montiert = offen: die Maske friert Vorbelegung und Basis beim Montieren ein, und jede
+          Öffnung hat eine frische Mutation ohne alten Fehler. Der Toast nimmt das `navigate`
+          DIESER Seite — `<AntApp>` liegt außerhalb des Routers. */}
+      {abschlussOffen && darfSchreiben && stabQuery.data && (
+        <LagebesprechungModal
+          einsatzId={einsatzId}
+          stab={stabQuery.data}
+          onAbgeschlossen={(eigene) =>
+            zeigeAbschlussToast(message, { einsatzId, eigene, navigate })
+          }
+          onSchliessen={() => setAbschlussOffen(false)}
         />
       )}
     </EinsatzSeite>

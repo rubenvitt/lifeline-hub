@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
@@ -38,12 +38,20 @@ const einsatz = (over: object = {}) => ({
 });
 const leererStab = { anzahl_lagebesprechungen: 0, besetzung: [] };
 const label = (key: string) => modulRegistry.find((m) => m.key === key)!.label;
+const GRUND = 'Einsatz ist abgeschlossen und schreibgeschützt';
+
+function Ort() {
+  const ort = useLocation();
+  return <output aria-label="Ort">{ort.pathname + ort.search}</output>;
+}
 
 function rendere({
   einsatzObj = einsatz(),
   stab = leererStab as object,
   stabStatus = 200,
   overrides = {} as object,
+  route = '/einsaetze/1/stab',
+  post = () => HttpResponse.json(leererStab, { status: 201 }) as Response,
 } = {}) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
@@ -53,6 +61,8 @@ function rendere({
         ? HttpResponse.json(stab)
         : HttpResponse.json({ error: 'kaputt' }, { status: stabStatus }),
     ),
+    http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
+    http.post('/api/einsaetze/1/stab/lagebesprechungen', () => post()),
     http.get('/api/einsaetze/1/modul-overrides', () => {
       overrideAufrufe += 1;
       return HttpResponse.json(overrides);
@@ -61,14 +71,33 @@ function rendere({
   );
   return renderMitProviders(
     <Routes>
-      <Route path="/einsaetze/:id/stab" element={<StabPage />} />
+      <Route
+        path="/einsaetze/:id/stab"
+        element={
+          <>
+            <StabPage />
+            <Ort />
+          </>
+        }
+      />
     </Routes>,
-    { route: '/einsaetze/1/stab' },
+    { route },
   );
 }
 
 async function besetzungsSektion() {
   return screen.findByRole('region', { name: 'Besetzung S1–S6' });
+}
+async function lagebesprechungSektion() {
+  return screen.findByRole('region', { name: 'Lagebesprechung' });
+}
+const kopfaktion = () => screen.findByRole('button', { name: 'Lagebesprechung abschließen' });
+/** Primäraktionen IM Kopf — derselbe Zuschnitt wie die Dev-Warnung von `EinsatzSeite`. */
+function primaerImKopf(): number {
+  const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+  return [...(kopf?.querySelectorAll('button') ?? [])].filter((b) =>
+    [...b.classList].some((k) => k.endsWith('-btn-primary')),
+  ).length;
 }
 
 describe('StabPage', () => {
@@ -145,12 +174,13 @@ describe('StabPage', () => {
     });
   });
 
-  it('behauptet während des Ladens keine Besetzung', async () => {
+  it('behauptet während des Ladens keine Besetzung und keinen Termin, sperrt die Kopfaktion', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
       // Antwort bleibt aus: der Abruf steht dauerhaft auf „lädt".
       http.get('/api/einsaetze/1/stab', () => new Promise<never>(() => {})),
+      http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
     );
     renderMitProviders(
@@ -163,6 +193,9 @@ describe('StabPage', () => {
     expect(within(sektion).getAllByRole('heading', { level: 4 })).toHaveLength(6);
     expect(within(sektion).queryByText('nicht vergeben')).toBeNull();
     expect(within(sektion).queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
+    // Ohne Stand fehlte der Termin zur Vorbelegung — gesperrt (Gegenfall: Kopfaktion-Test unten).
+    expect(await kopfaktion()).toBeDisabled();
+    expect(within(await lagebesprechungSektion()).queryByText('kein Termin')).toBeNull();
   });
 
   it('Fehler ist nicht leer: ein gescheiterter Abruf behauptet keine sechs leeren Zeilen', async () => {
@@ -197,5 +230,99 @@ describe('StabPage', () => {
     });
     await userEvent.click(knopf);
     expect(await screen.findByText('Besetzung S4 · Versorgung')).toBeInTheDocument();
+  });
+});
+
+describe('StabPage · Sektion Lagebesprechung', () => {
+  it('zeigt den Stand und die leere Historie', async () => {
+    rendere();
+    const sektion = await lagebesprechungSektion();
+    expect(await within(sektion).findByText('kein Termin')).toBeInTheDocument();
+    expect(
+      await within(sektion).findByText('Noch keine Lagebesprechung abgeschlossen'),
+    ).toBeInTheDocument();
+  });
+
+  it('Fehler ist nicht leer: ohne Stand kein „kein Termin"', async () => {
+    rendere({ stabStatus: 500 });
+    const sektion = await lagebesprechungSektion();
+    expect(
+      await within(sektion).findByText('Stand der Lagebesprechung konnte nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(within(sektion).queryByText('kein Termin')).toBeNull();
+  });
+});
+
+describe('StabPage · Kopfaktion „Lagebesprechung abschließen"', () => {
+  it('ist mit Schreibrecht die eine Primäraktion und öffnet die Maske', async () => {
+    rendere();
+    const knopf = await kopfaktion();
+    await waitFor(() => expect(knopf).toBeEnabled());
+    expect(primaerImKopf()).toBe(1);
+    await userEvent.click(knopf);
+    expect(
+      await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('ist als Beobachter gesperrt statt versteckt, der Hinweis nennt den Grund', async () => {
+    rendere({ einsatzObj: einsatz({ meine_rolle: 'beobachter' }) });
+    expect(await screen.findByText(/Lagebesprechungen abschließen/)).toBeInTheDocument();
+    expect(await kopfaktion()).toBeDisabled();
+    expect(primaerImKopf()).toBe(1);
+  });
+
+  it('ist im abgeschlossenen Einsatz gesperrt', async () => {
+    rendere({ einsatzObj: einsatz({ status: 'abgeschlossen' }) });
+    await screen.findByText(/Der Einsatz ist abgeschlossen/);
+    expect(await kopfaktion()).toBeDisabled();
+  });
+
+  /**
+   * Belegt Abweichung 6: Öffnen = Montieren, jede Öffnung hat eine frische Mutation. Die Maske
+   * wird beim Schliessen AUSGEHÄNGT (nicht `open=false`) — deshalb darf hier auf das Verschwinden
+   * des Dialogs gewartet werden. Bleibt dieser `waitFor` rot, steht der Dialog noch in der
+   * Verlassen-Bewegung: dann auf `ant-zoom-leave` umstellen (Muster `LageberichtDetailPage.test.tsx`).
+   */
+  it('öffnet nach einem Fehler ohne den Grund des vorigen Versuchs', async () => {
+    rendere({ post: () => HttpResponse.json({ error: GRUND }, { status: 409 }) as Response });
+    const u = userEvent.setup();
+    const knopf = await kopfaktion();
+    await waitFor(() => expect(knopf).toBeEnabled());
+
+    await u.click(knopf);
+    const erster = await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
+    await u.type(within(erster).getByLabelText('Entschluss'), 'Lage unverändert');
+    await u.click(within(erster).getByRole('button', { name: 'Abschließen' }));
+    expect(await within(erster).findByText(GRUND)).toBeInTheDocument();
+
+    await u.click(within(erster).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
+
+    await u.click(knopf);
+    const zweiter = await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
+    expect(within(zweiter).queryByText(GRUND)).toBeNull();
+  });
+});
+
+describe('StabPage · ?neu=1 (Schnellaktion)', () => {
+  const ort = () => screen.getByRole('status', { name: 'Ort' });
+
+  it('öffnet die Maske mit Schreibrecht und räumt den Parameter', async () => {
+    rendere({ route: '/einsaetze/1/stab?neu=1' });
+    expect(
+      await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(ort()).toHaveTextContent(/^\/einsaetze\/1\/stab$/));
+  });
+
+  it('öffnet als Beobachter keine Maske, räumt den Parameter aber trotzdem', async () => {
+    rendere({
+      einsatzObj: einsatz({ meine_rolle: 'beobachter' }),
+      route: '/einsaetze/1/stab?neu=1',
+    });
+    // Positiv zuerst: der Leser ist gelaufen. Sonst wäre das `null` unten trivial.
+    await waitFor(() => expect(ort()).toHaveTextContent(/^\/einsaetze\/1\/stab$/));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

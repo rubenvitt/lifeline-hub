@@ -178,4 +178,11 @@ describe('besetzungRechteText', () => {
     expect(besetzungRechteText('abgeschlossen')).toMatch(/abgeschlossen/);
     expect(besetzungRechteText('aktiv')).toMatch(/Einsatzleitung und Führungspersonal/);
   });
+
+  /** Seit LFH-543 sperrt der Hinweis ZWEI Wege — Zeilenaktion und Kopfaktion. */
+  it('nennt beide gesperrten Wege', () => {
+    expect(besetzungRechteText('aktiv')).toMatch(/Besetzung ändern/);
+    expect(besetzungRechteText('aktiv')).toMatch(/Lagebesprechungen abschließen/);
+    expect(besetzungRechteText('abgeschlossen')).toMatch(/Lagebesprechungen/);
+  });
 });

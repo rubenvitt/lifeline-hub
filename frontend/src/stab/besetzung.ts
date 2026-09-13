@@ -124,9 +124,12 @@ export function besetzungAktion(
   }
 }
 
-/** Grund der fehlenden Schreibberechtigung als ganzer Satz (CLAUDE.md, LFH-345 · C10/M16). */
+/**
+ * Grund der fehlenden Schreibberechtigung als ganzer Satz (CLAUDE.md, LFH-345 · C10/M16).
+ * Nennt seit LFH-543 beide gesperrten Wege der Seite: Besetzung und Lagebesprechung.
+ */
 export function besetzungRechteText(einsatzStatus: EinsatzStatus): string {
   return einsatzStatus !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — die Führungsorganisation ist nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können die Besetzung ändern.';
+    ? 'Der Einsatz ist abgeschlossen — Führungsorganisation und Lagebesprechungen sind nur noch lesbar.'
+    : 'Nur Einsatzleitung und Führungspersonal können die Besetzung ändern und Lagebesprechungen abschließen.';
 }
