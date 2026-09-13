@@ -64,6 +64,37 @@ async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
 }
 
+/**
+ * Zeichnen-Steuerung und Zeitachse dürfen sich nicht überlagern (LFH-355, AK3).
+ *
+ * Gemessen wird mit echten Bounding-Boxen, weil genau das in jsdom nicht geht — die
+ * Vitest-Seite (`KartenFuss.test.tsx` und die beiden Band-Tests) kann nur die Struktur
+ * pinnen, aus der die Zusicherung folgt. Die Rechnung ist die gewöhnliche
+ * Rechteck-Schnittmenge: überlappt wird nur, wenn sich BEIDE Achsen überschneiden.
+ */
+async function ohneUeberdeckung(page: Page, wo: string) {
+  const steuerung = page.locator('[data-lfh="karten-fuss"] > .ant-card');
+  const zeitachse = page.locator('[data-lfh="zeitachse"]');
+  const a = await steuerung.boundingBox();
+  const b = await zeitachse.boundingBox();
+  expect(a, `${wo}: Zeichnen-Steuerung hat keine Box`).not.toBeNull();
+  expect(b, `${wo}: Zeitachse hat keine Box`).not.toBeNull();
+  const ueberlappt =
+    a!.x < b!.x + b!.width &&
+    b!.x < a!.x + a!.width &&
+    a!.y < b!.y + b!.height &&
+    b!.y < a!.y + a!.height;
+  expect(
+    ueberlappt,
+    `${wo}: Steuerung ${JSON.stringify(a)} überlappt Zeitachse ${JSON.stringify(b)}`,
+  ).toBe(false);
+  // Und zwar in der gemeinten Richtung: die Steuerung schwenkt ÜBER der Leiste ein,
+  // statt sich irgendwo daneben zu verstecken.
+  expect(a!.y + a!.height, `${wo}: Steuerung steht nicht über der Zeitachse`).toBeLessThanOrEqual(
+    b!.y,
+  );
+}
+
 test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ page }) => {
   const seitenFehler: Error[] = [];
   page.on('pageerror', (fehler) => seitenFehler.push(fehler));
@@ -141,13 +172,18 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
     )
     .toBe('geladen');
 
-  // Zeitachse einklappen — nicht kosmetisch, sondern Voraussetzung: die ausgeklappte
-  // SnapshotLeiste liegt mit `left:12/right:12` über die volle Kartenbreite, bei gleichem
-  // zIndex (5) wie die ZeichnenSteuerung und später im DOM. Sie überdeckt deren Buttons
-  // daher vollständig (gemessen: Klick auf „Abbrechen" läuft in den Timeout, „<div>
-  // intercepts pointer events"). `toBeVisible()` würde das NICHT bemerken — CSS-Sichtbarkeit
-  // ist keine Klickbarkeit. Eingeklappt schrumpft die Leiste auf einen Button unten links.
-  await page.getByRole('button', { name: 'Zeitachse ausblenden' }).click();
+  // DEFAULT-ZUSTAND, ausdrücklich (LFH-355). Bis dahin klappte dieser Test die Zeitachse
+  // hier ein — nicht kosmetisch, sondern als Umgehung: die ausgeklappte SnapshotLeiste lag
+  // mit `left:12/right:12` über die volle Kartenbreite, auf demselben zIndex (5) wie die
+  // ZeichnenSteuerung und später im DOM, und verdeckte deren Buttons vollständig (gemessen:
+  // Klick auf „Abbrechen" lief in den 30-s-Timeout mit „<div> intercepts pointer events").
+  // Damit blieb genau der Zustand ungetestet, den ein neuer Nutzer antrifft — der
+  // localStorage-Schlüssel ist ungesetzt, die Leiste also ausgeklappt.
+  //
+  // Seit beide Bänder im `KartenFuss` stapeln, ist die Umgehung weg. Die Zeile unten bleibt
+  // als VORBEDINGUNG stehen: fiele die Leiste künftig weg oder startete sie eingeklappt,
+  // wären die Überdeckungsmessungen darunter still wertlos statt rot.
+  await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
 
   // terra-draw: der Adapter ruft beim Start `addSource`/`addLayer` auf der Map auf und
   // setzt den Cursor über `map.getCanvas().style.cursor`. Der Cursor ist der einzige
@@ -160,9 +196,28 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await expect(canvas).toHaveCSS('cursor', 'crosshair');
 
-  // Abbrechen fährt `stoppen()` → `draw.stop()` → Adapter-`unregister()` mit
+  await ohneUeberdeckung(page, 'Desktop 1280 px');
+
+  // Der eigentliche Beleg für LFH-355 ist DIESER Klick, nicht die Boxen-Rechnung darüber:
+  // er ist die Messung, die vorher in den Timeout lief. `toBeVisible()` war auf dem
+  // verdeckten Button grün — CSS-Sichtbarkeit ist in Playwright keine Klickbarkeit, und
+  // diese Falle ist generisch für die Suite, nicht auf diese Stelle beschränkt.
+  //
+  // Abbrechen fährt zugleich `stoppen()` → `draw.stop()` → Adapter-`unregister()` mit
   // `removeLayer`/`removeSource`. Der Abbau ist eine eigene MapLibre-API-Fläche und
   // damit eine eigene Bruchstelle — deshalb wird er mitgelaufen, nicht nur der Aufbau.
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
+
+  // Schmale Fläche (LFH-355, AK3). 1024 × 768 ist der Führungs-Tablet-Kontext der
+  // Bedien-Leitlinie und die schmalste Breite, auf der diese Seite überhaupt eine
+  // Zeichenfläche trägt: die Lagekarten-Sidebar ist fest 300 px breit und die
+  // ZeichnenSteuerung fordert `minWidth: 320` — bei 390 px bliebe für die Karte nichts
+  // übrig. Das ist eine eigene Frage (Sidebar-Responsivität), keine dieses Tickets.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
+  await ohneUeberdeckung(page, 'Tablet 1024 px');
   await page.getByRole('button', { name: 'Abbrechen' }).click();
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
 
