@@ -117,6 +117,24 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+// Echte Uhr, beim Laden gesichert: eine Datei, die Fake-Timer aktiv zurücklässt, darf den
+// Drain unten nicht endlos hängen lassen.
+const echterSetTimeout = globalThis.setTimeout;
+
+// Timer-Drain vor dem Abbau der jsdom-Umgebung (PR #55, antd 6.5.2 → 6.6.3).
+// antds `form/hooks/useDebounce` (ErrorList jedes `Form.Item`) läuft seit 6.6 über
+// `useDelayState` aus @rc-component/util und setzt bei leerem Fehler-Array einen
+// 10-ms-`setTimeout` — OHNE Abräumen beim Unmount (6.5.2 hatte `clearTimeout` im
+// Effekt-Cleanup). `cleanup()` hängt die Komponente ab, der Node-Timer bleibt. Endet eine
+// Datei in diesen 10 ms, feuert er nach dem Environment-Teardown; das `setState` auf den
+// abgehängten Fiber erreicht react-doms `resolveUpdatePriority`, das `window.event` liest →
+// „ReferenceError: window is not defined" als Unhandled Error, Vitest exitet 1 bei grünen
+// Tests. react-dom ist daran unbeteiligt: die Stelle ist in 19.2.8 und 19.3.0 identisch.
+// Nur Timer am DATEIENDE können den Teardown überleben — frühere laufen im nächsten Test ab
+// —, deshalb einmal je Datei statt je Test. Node löst Timer nach Fälligkeit aus: alles, was
+// vor diesem Drain mit ≤ 10 ms geplant wurde, feuert garantiert vorher, auch unter Last.
+afterAll(() => new Promise<void>((fertig) => echterSetTimeout(fertig, 25)));
+
 // jsdom kennt keine EventSource — No-op-Stub verhindert ReferenceError in Seiten-Tests, die
 // useEinsatzLiveStream mounten. beforeEach stellt den Stub nach vi.unstubAllGlobals() (z. B. in
 // den useEinsatzLiveStream-Tests, die eine FakeEventSource stubben) wieder her.
