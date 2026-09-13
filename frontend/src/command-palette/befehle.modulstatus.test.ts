@@ -87,12 +87,12 @@ describe('baueBefehle — Schnellaktionen folgen der Leseachse', () => {
   });
 
   /** Gegenaussage zur Negativaussage: es fällt nicht alles weg, der Filter trifft genau das
-   *  gestubbte Modul — und die Reihenfolge der übrigen drei bleibt die der Tabelle. */
+   *  gestubbte Modul — und die Reihenfolge der übrigen bleibt die der Tabelle. */
   it('lässt die Schnellaktionen der fertigen Module stehen', () => {
     expect(
       baueBefehle(kontext())
         .map((x) => x.id)
         .filter((id) => id.startsWith('aktion:')),
-    ).toEqual(['aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden']);
+    ).toEqual(['aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden', 'aktion:stab']);
   });
 });
