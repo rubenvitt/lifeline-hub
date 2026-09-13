@@ -1,3 +1,17 @@
+## [1.0.0-alpha.13](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.12...v1.0.0-alpha.13) (2026-09-13)
+
+### Bug Fixes
+
+* **lagekarte:** Anlegen einer Gefahrengebiet-Zone invalidiert auch die Gruppen ([83015c3](https://github.com/rubenvitt/lifeline-hub/commit/83015c3b25856b43014de1f593a0ff8415faa95d))
+* **lagekarte:** fehlender Gebiets-Nachschlag heisst „unbekannt", nicht „keine" ([59d788b](https://github.com/rubenvitt/lifeline-hub/commit/59d788bb3a952df17f995724fa4a9467ac8a1be3))
+* **lagekarte:** Warnstufe als Text an der Zone, statt nur als Farbe ([2b5ab87](https://github.com/rubenvitt/lifeline-hub/commit/2b5ab878fb5bed1689c09eb18ccb145f12ca8892))
+
+## [1.0.0-alpha.12](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.11...v1.0.0-alpha.12) (2026-09-13)
+
+### Bug Fixes
+
+* **lagekarte:** Zeichnen-Steuerung nicht mehr von der Zeitachse verdeckt ([837f48b](https://github.com/rubenvitt/lifeline-hub/commit/837f48b05afea6d9ecbc18112b824b75e7556654))
+
 ## [1.0.0-alpha.11](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.10...v1.0.0-alpha.11) (2026-09-13)
 
 ### Features

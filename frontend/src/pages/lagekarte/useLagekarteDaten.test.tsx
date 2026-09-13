@@ -36,7 +36,7 @@ function wrapper() {
 /** Minimal-Snapshot-Dokument: eine Gefahrengebiet-Zone (EINGEFRORENE Warnstufe) + eine verortete
  *  Einheit OHNE eigene Org (org-scoped tz_organisation=null) → prüft den org_default-Freeze.
  *  `stand_at` bewusst im ECHTEN naiven UTC-Wire-Format (ohne 'T'/'Z'), wie das Backend liefert. */
-function dokument(warnstufe: string) {
+function dokument(warnstufe: string, ohneGebiete = false) {
   const stand = '2026-07-24 08:00:00';
   return {
     id: 9,
@@ -91,7 +91,7 @@ function dokument(warnstufe: string) {
           ansicht_id: null,
         },
       ],
-      gefahrengebiete: [{ id: 7, hoechste_warnstufe: warnstufe }],
+      gefahrengebiete: ohneGebiete ? [] : [{ id: 7, hoechste_warnstufe: warnstufe }],
     },
   };
 }
@@ -143,6 +143,46 @@ describe('useLagekarteDaten Standquelle', () => {
     // (dokumentierter Auflösungsverlust), die Gegenprobe würde damit stillschweigend leer.
     expect(result.current.zonenFeatures[0].stil).toEqual(gefahrengebietStil('mittel', token));
     expect(result.current.zonenFeatures[0].stil).not.toEqual(gefahrengebietStil('keine', token));
+  });
+
+  // LFH-357: die Stufe muss auf der Kartenfläche ANKOMMEN. `stil` allein kann sie nicht tragen —
+  // `niedrig`/`mittel` fallen auf dieselbe Rolle, `keine`/`hoch`/`akut` ebenso. Der Text ist der
+  // zweite Kanal, und diese Zusicherung prüft die VERDRAHTUNG: dass der Hook ihn setzt.
+  it('trägt die Warnstufe in die Zonenbeschriftung, nicht nur in die Farbe', async () => {
+    ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
+    // Die Zone im Dokument hat keinen eigenen Namen (`label: null`) — übrig bleibt die Stufe.
+    // Erwartung als LITERAL, nicht über `zonenBeschriftung`: sonst stünden beide Seiten auf
+    // derselben Quelle und eine verbogene Beschriftung bliebe grün.
+    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: mittel');
+    // Gegenprobe gegen die Nachbarin auf DERSELBEN Farbe — sie muss am Text auseinandergehen.
+    expect(result.current.zonenFeatures[0].label).not.toBe('Warnstufe: niedrig');
+  });
+
+  // Codex-Review zu LFH-357 (P1): das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`,
+  // NICHT an der Gefahrengebiete-Query — die Zone wird also gezeichnet, während der Nachschlag
+  // noch leer ist (Ladefenster) oder leer bleibt (gescheiterter Abruf). Der Farb-Fallback auf
+  // `keine` ist dort richtig und bleibt; der TEXT darf die Stufe nicht behaupten.
+  it('sagt `unbekannt`, wenn der Gebiets-Nachschlag ins Leere geht — die Farbe bleibt Alarm', async () => {
+    ladeLageSnapshot.mockResolvedValue(dokument('mittel', true));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
+    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: unbekannt');
+    // Die zweite Hälfte der Zusicherung: der vorsichtshalber rote Fallback ist NICHT
+    // mitgewandert. Ohne sie beliesse ein Fix, der die Fläche entfärbt, den Test grün.
+    const { result: tk } = renderHook(() => theme.useToken(), { wrapper: wrapper() });
+    expect(result.current.zonenFeatures[0].stil).toEqual(
+      gefahrengebietStil('keine', tk.current.token),
+    );
   });
 
   it('speist den org_default aus dem Dokument in die Marker-TZ, nicht aus Live (Review-Fix #4)', async () => {
