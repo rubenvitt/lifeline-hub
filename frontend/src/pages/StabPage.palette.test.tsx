@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -51,13 +51,15 @@ const einsatzAktiv = {
   org_id: 5,
 };
 
-function render(einsatzObj: object) {
+function render(
+  einsatzObj: object,
+  stab: () => Response | Promise<Response> = () =>
+    HttpResponse.json({ anzahl_lagebesprechungen: 0, besetzung: [] }),
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/stab', () =>
-      HttpResponse.json({ anzahl_lagebesprechungen: 0, besetzung: [] }),
-    ),
+    http.get('/api/einsaetze/1/stab', stab),
     http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
   );
@@ -100,6 +102,21 @@ describe('StabPage · „Neue Zeile" in der Kommandopalette', () => {
     await u.keyboard('{Control>}k{/Control}');
     // Positivhälfte: die Palette IST offen (ihr Eingabefeld trägt `role="combobox"`,
     // `CommandPalette.tsx:299`) — sonst belegte das `null` unten nur eine geschlossene Palette.
+    expect(await screen.findByRole('combobox')).toBeInTheDocument();
+    expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
+  });
+
+  /** Ruling 4 / Plan-Abweichung 7: ohne Stand fehlte der Termin zur Vorbelegung. */
+  it('bietet sie NICHT an, solange der Stand lädt', async () => {
+    const u = userEvent.setup();
+    render(einsatzAktiv, () => new Promise<never>(() => {}));
+    const sektion = await screen.findByRole('region', { name: 'Lagebesprechung' });
+    // Schreibrecht besteht (kein Rechte-Hinweis) und der Stand lädt (kein Termin behauptet) —
+    // sonst fehlte der Eintrag aus dem falschen Grund.
+    await waitFor(() => expect(screen.queryByText(/Nur Einsatzleitung/)).toBeNull());
+    expect(within(sektion).queryByText('kein Termin')).toBeNull();
+    await u.keyboard('{Control>}k{/Control}');
+    // Positivhälfte: die Palette IST offen.
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
     expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
   });

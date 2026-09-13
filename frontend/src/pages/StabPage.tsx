@@ -75,6 +75,13 @@ export default function StabPage() {
   const abschlussErlaubt = darfSchreiben && stabDa;
   const oeffneAbschluss = useCallback(() => setAbschlussOffen(true), []);
 
+  // Fällt das Recht (oder der Stand) bei offener Maske weg, hängt der Render sie aus — der
+  // Merker bliebe aber stehen, und kämen die Rechte zurück, stünde die Maske ungefragt wieder
+  // auf (Ruling 13). Deshalb auch den Merker räumen.
+  useEffect(() => {
+    if (abschlussOffen && !abschlussErlaubt) setAbschlussOffen(false);
+  }, [abschlussOffen, abschlussErlaubt]);
+
   // Schnellaktion: ?neu=1 öffnet den Abschluss der Lagebesprechung (Kommandopalette, LFH-543).
   // Das LITERAL `searchParams.get('neu')` muss in DIESER Datei stehen:
   // `schnellaktionen.guard.test.ts` ordnet den Leser über den Dateinamen dem Modul zu.

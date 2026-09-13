@@ -1,8 +1,9 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
+import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
@@ -276,6 +277,51 @@ describe('StabPage · Kopfaktion „Lagebesprechung abschließen"', () => {
     rendere({ einsatzObj: einsatz({ status: 'abgeschlossen' }) });
     await screen.findByText(/Der Einsatz ist abgeschlossen/);
     expect(await kopfaktion()).toBeDisabled();
+  });
+
+  /**
+   * Ruling 4: ohne Stand fehlte der Termin zur Vorbelegung. Die Positivhälfte steht davor
+   * (Schreibrecht besteht) und dahinter (derselbe Nutzer, der Stand kommt an → frei) — sonst
+   * wäre „gesperrt" aus dem falschen Grund richtig.
+   */
+  it('ist bei dauerhaft gescheitertem Stand gesperrt, ohne eigenen Hinweis', async () => {
+    rendere({ stabStatus: 500 });
+    const sektion = await lagebesprechungSektion();
+    expect(
+      await within(sektion).findByText('Stand der Lagebesprechung konnte nicht geladen werden'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText(/Nur Einsatzleitung/)).toBeNull());
+    expect(await kopfaktion()).toBeDisabled();
+
+    server.use(http.get('/api/einsaetze/1/stab', () => HttpResponse.json(leererStab)));
+    await userEvent.click(within(sektion).getByRole('button', { name: /Wiederholen|Erneut/ }));
+    await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
+  });
+
+  /**
+   * M3 (Ruling 13): fallen die Rechte bei offener Maske weg, ist sie weg — und sie steht nicht
+   * wieder auf, wenn die Rechte zurückkommen. Die Positivhälfte (Kopfaktion wieder frei) steht
+   * VOR der Negativaussage: ohne sie belegte „kein Dialog" nur eine noch gesperrte Seite.
+   */
+  it('schließt die Maske beim Rechteverlust und öffnet sie danach nicht von selbst', async () => {
+    const { client } = rendere();
+    const u = userEvent.setup();
+    const knopf = await kopfaktion();
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await u.click(knopf);
+    await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ status: 'abgeschlossen' }))),
+    );
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    expect(await screen.findByText(/Der Einsatz ist abgeschlossen/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
+
+    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())));
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
+    expect(screen.queryAllByRole('dialog')).toHaveLength(0);
   });
 
   /**
