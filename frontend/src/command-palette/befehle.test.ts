@@ -143,6 +143,7 @@ const aktiverEinsatz: EinsatzAnzeige = {
   meine_rolle: 'einsatzleitung',
   org_id: 1,
   org_name: 'KV',
+  meine_sachgebiete: [],
 };
 const beendet: EinsatzAnzeige = {
   ...aktiverEinsatz,

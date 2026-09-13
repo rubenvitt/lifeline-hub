@@ -497,6 +497,31 @@ fn orphan_enums_wire() {
     });
 }
 
+/// LFH-46: Führungsorganisation. `Sachgebiet` trägt die DB-CHECK-Werte `'s1'..'s6'` aus
+/// `migrations/0102_stab.sql` — ein Drift zwischen Enum und CHECK endet in einem 500 aus dem
+/// Constraint-Sicherheitsnetz statt in einer fachlichen Antwort. `BesetzungArt` ebenso.
+#[test]
+fn stab_sachgebiet_wire() {
+    enum_wire_as_str!(lifeline_hub::stab::Sachgebiet {
+        S1,
+        S2,
+        S3,
+        S4,
+        S5,
+        S6,
+    });
+}
+
+#[test]
+fn stab_besetzung_art_wire() {
+    enum_wire_as_str!(lifeline_hub::stab::BesetzungArt {
+        Einsatzleitung,
+        Personal,
+        Extern,
+        Rueckwaertig,
+    });
+}
+
 /// LFH-298: SSE-Wire-Event-Namen als BE↔FE-Kontrakt. `LiveEvent` ist die Wahrheitsquelle der
 /// Wire-Event-Namen — die Emitter routen über `as_str()`, utoipa erzeugt daraus die
 /// FE-Union (`types.generated.ts`). Pinnt jede Variante gegen ihr load-bearing Wire-Literal
@@ -531,6 +556,7 @@ fn live_event_wire() {
         KarteBild => "karte_bild",
         Etb => "etb",
         Befehl => "befehl",
+        Stab => "stab",
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",

@@ -13,6 +13,11 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.gefahrenmatrix).toBe('gefahrenmatrix');
     expect(EINSATZ_KEYS.br).toBe('einsatz-br');
     expect(EINSATZ_KEYS.brDetail).toBe('einsatz-br-detail');
+    // LFH-46: als HANDGESCHRIEBENES Literal, nicht über `EINSATZ_KEYS.stab` — sonst prüfte
+    // der Pin die Konstante gegen sich selbst. Ein geänderter Query-Key bricht nichts, er
+    // trifft still ein anderes Cache-Fach: kein Fehler, kein roter Test, kein auffälliger
+    // Request. Der Byte-Pin ist die einzige Stelle, die das bemerkt.
+    expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
   });
 });
 
@@ -113,6 +118,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.auftraege(1)).toEqual(['einsatz-auftraege', 1]);
     expect(einsatzKeys.nachforderungen(1)).toEqual(['einsatz-nachforderungen', 1]);
     expect(einsatzKeys.etb(1)).toEqual(['etb', 1]);
+    expect(einsatzKeys.stab(1)).toEqual(['einsatz-stab', 1]);
   });
 
   it('baut die 3-elementigen Detail-Keys als [prefix, einsatzId, id]', () => {
