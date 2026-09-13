@@ -450,11 +450,28 @@ function inZeichenkette(zeile: string, spalte: number): boolean {
   return false;
 }
 
-/** Stellen, an denen ein `Record<…>` den Vertragstyp als WERT trägt (Index des `Record`). */
+/**
+ * Stellen, an denen ein `Record<…>` den Vertragstyp als WERT trägt (Index des `Record`).
+ *
+ * Die Marke braucht eine Wortgrenze DAVOR (im Codex-Review gefunden): ohne sie beginnt
+ * die Teilstringsuche mitten in einem fremden Bezeichner, und `CustomRecord<K,
+ * StatusDarstellung>` oder ein Aufruf `parseRecord<Input, StatusDarstellung>()` wären
+ * gemeldet worden — beides gültiger, unverwandter Code. Heute kommt kein solcher Name im
+ * Baum vor (gegengezählt: null Treffer für `[A-Za-z0-9_$]Record<`), der Fall ist also
+ * latent; ein Fehlalarm, der erst beim nächsten Helfernamen zuschlägt, ist trotzdem
+ * einer — und der Guard, der aus dem falschen Grund rot wird, kostet die Zeit dessen,
+ * der ihn debuggt.
+ *
+ * Ein **Punkt** davor zählt bewusst NICHT als Grenze: `sf.Record<X, StatusDarstellung>`
+ * ist derselbe eingebaute Abbildungstyp, nur über einen Namensraum geschrieben — dieselbe
+ * Linie wie beim Wert-Typ eine Zeile weiter unten. `CustomRecord` dagegen ist ein ANDERER
+ * Bezeichner, kein anders geschriebener gleicher.
+ */
 export function kartenStellen(text: string): number[] {
   const treffer: number[] = [];
   const zeilen = text.split('\n');
   for (let i = text.indexOf('Record<'); i !== -1; i = text.indexOf('Record<', i + 7)) {
+    if (/[A-Za-z0-9_$]/.test(text[i - 1] ?? '')) continue;
     const davor = text.slice(0, i).split('\n');
     const zeile = zeilen[davor.length - 1] ?? '';
     if (inZeichenkette(zeile, davor[davor.length - 1].length)) continue;
@@ -683,6 +700,34 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
     expect(
       kartenBefunde({ '/src/pages/Fremdschnitt.ts': 'const k: Record<X, Foo & Bar> = {};' }),
     ).toEqual([]);
+  });
+
+  it('greift nur am eigenstaendigen `Record` — `CustomRecord<…>` ist ein anderer Name', () => {
+    // Im Codex-Review gefunden. Die Teilstringsuche begann sonst mitten im fremden
+    // Bezeichner; beide Bauformen sind gueltiger, unverwandter Code.
+    expect(
+      kartenBefunde({
+        '/src/pages/Eigen.ts': 'const k: CustomRecord<MeinStatus, StatusDarstellung> = {};',
+      }),
+    ).toEqual([]);
+    expect(
+      kartenBefunde({
+        '/src/pages/Aufruf.ts': 'const k = parseRecord<Input, StatusDarstellung>(roh);',
+      }),
+    ).toEqual([]);
+    // Die Gegenprobe traegt die Aussage: ein ECHTES `Record` in derselben Datei wird
+    // weiterhin gefunden — sonst waere die Wortgrenze von „Guard abgeschaltet" nicht zu
+    // unterscheiden.
+    expect(
+      kartenBefunde({
+        '/src/pages/Beide.ts':
+          'type A = CustomRecord<X, StatusDarstellung>;\nconst k: Record<Y, StatusDarstellung> = {};',
+      }),
+    ).toHaveLength(1);
+    // Und der Punkt ist KEINE Grenze: ein Namensraum-`Record` ist derselbe Abbildungstyp.
+    expect(
+      kartenBefunde({ '/src/pages/NsRec.ts': 'const k: sf.Record<X, StatusDarstellung> = {};' }),
+    ).toHaveLength(1);
   });
 
   it('erkennt den Vertragstyp auch qualifiziert — `sf.StatusDarstellung`', () => {
