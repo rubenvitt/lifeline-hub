@@ -1005,11 +1005,30 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
   return verstoesse;
 }
 
-/** Warum dieser `color`-Ausdruck ein Befund ist — oder `null`. Der Grund steht in der
- *  Meldung, weil die zwei Fälle verschiedene Abhilfen haben. */
+/** Die Bezeichner eines Ausdrucks. `$` gehört dazu — JavaScript lässt es im Namen zu. */
+const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
+
+/**
+ * Warum dieser `color`-Ausdruck ein Befund ist — oder `null`. Der Grund steht in der
+ * Meldung, weil die zwei Fälle verschiedene Abhilfen haben.
+ *
+ * Der Namensvergleich zerlegt den Ausdruck in BEZEICHNER, statt aus dem Namen eine
+ * Regex zu bauen (im Codex-Review gefunden). Ein Alias darf ein `$` tragen
+ * (`import { rollenFarbe as farbe$ }` ist gültiges JavaScript), und interpoliert wird
+ * daraus ein Endanker — `<Tag color={farbe$(rolle, token)}>` lief durch, der Guard
+ * blieb grün über einer verbotenen Darstellung.
+ *
+ * **Escapen allein behebt das NICHT, und das ist gemessen** (die naheliegende erste
+ * Abhilfe): mit maskiertem `$` verlangt das nachgestellte `\b` eine Wortgrenze hinter
+ * dem `$`, und in `farbe$(` stehen dort zwei Nicht-Wortzeichen — der Treffer bleibt
+ * aus. Beide Regex-Fassungen liefern `false`, der Token-Vergleich `true`. Ein Name ist
+ * ohnehin ein Bezeichner und kein Muster; ihn als Muster zu behandeln war der Fehler,
+ * nicht das fehlende Escape.
+ */
 function grundFuerBefund(farbe: string, namen: readonly string[]): string | null {
+  const bezeichner = new Set(farbe.match(BEZEICHNER) ?? []);
   for (const name of namen) {
-    if (new RegExp(`\\b${name}\\b`).test(farbe)) return `liest \`${name}\``;
+    if (bezeichner.has(name)) return `liest \`${name}\``;
   }
   // `[, , wert]`, nicht `[, wert]`: Gruppe 1 ist das Anführungszeichen, Gruppe 2 der
   // Inhalt. Die kürzere Schreibweise verglich den Quote gegen den Wire-Topf, fand nie
@@ -1156,6 +1175,32 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
         '/src/pages/EigenerName.tsx': [
           'const STATUS_META: Record<TierStatus, { label: string; color: string }> = {};',
           '<Tag color={STATUS_META[t.status].color}>{STATUS_META[t.status].label}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+  });
+
+  it('vergleicht Bezeichner, nicht Muster — ein Alias mit `$` ist kein Endanker', () => {
+    // Im Codex-Review gefunden. `import { rollenFarbe as farbe$ }` ist gültiges
+    // JavaScript; aus dem Namen eine Regex zu bauen machte aus dem `$` einen Endanker,
+    // und der Guard blieb grün über einer verbotenen Darstellung.
+    const dollar = tagBefunde({
+      '/src/pages/Dollar.tsx': [
+        "import { rollenFarbe as farbe$ } from '../theme/statusFarben';",
+        '<Tag color={farbe$(rolle, token)}>x</Tag>',
+      ].join('\n'),
+    });
+    expect(dollar).toHaveLength(1);
+    expect(dollar[0]).toContain('liest `farbe$`');
+
+    // Die Gegenprobe zur Zerlegung: der Vergleich bleibt AM GANZEN Bezeichner. Ein
+    // Alias, der bloss Präfix eines fremden Namens ist, darf nicht melden — sonst
+    // tauschte der Fix den verschluckten Befund gegen einen Fehlalarm.
+    expect(
+      tagBefunde({
+        '/src/pages/Praefix.tsx': [
+          "import { rollenFarbe as farbe } from '../theme/statusFarben';",
+          '<Tag color={farbeVonWoanders(x)}>x</Tag>',
         ].join('\n'),
       }),
     ).toEqual([]);
