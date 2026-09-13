@@ -57,6 +57,27 @@ describe('besetzungDarstellung', () => {
       besetzungDarstellung(zeile({ personal_id: undefined, personal_noch_disponiert: false }))
         .label,
     ).toBe('Müller · nicht mehr disponiert');
+    // Gegenfall: bei den anderen Arten ist das Flag bedeutungslos, auch wenn es false trägt.
+    expect(
+      besetzungDarstellung(
+        zeile({
+          besetzung_art: 'extern',
+          personal_id: undefined,
+          name: 'Dr. Weber',
+          personal_noch_disponiert: false,
+        }),
+      ).label,
+    ).not.toContain('nicht mehr disponiert');
+    expect(
+      besetzungDarstellung(
+        zeile({
+          besetzung_art: 'rueckwaertig',
+          personal_id: undefined,
+          name: 'Leitstelle',
+          personal_noch_disponiert: false,
+        }),
+      ).label,
+    ).not.toContain('nicht mehr disponiert');
   });
 });
 
