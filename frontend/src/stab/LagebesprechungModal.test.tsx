@@ -204,6 +204,32 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
     expect(gesendet[0]).toEqual({ entschluss: 'Lage unverändert', abgehalten_at: wireAb(0) });
   });
 
+  /**
+   * I3: `stab` wird live invalidiert, die Maske friert beim ÖFFNEN ein (LFH-303). Neu gerendert
+   * wird mit einem NEUEN Element — dasselbe Element-Objekt liesse React den Teilbaum
+   * überspringen, und der Test wäre ohne jedes Einfrieren grün.
+   */
+  it('friert den Termin beim Öffnen ein: ein live geänderter Stand ändert weder Feld noch Body', async () => {
+    const routen = (daten: Stab) => (
+      <Routes>
+        <Route path="/einsaetze/:id/stab" element={<Harness daten={daten} />} />
+      </Routes>
+    );
+    const { rerender } = renderMitProviders(
+      routen(stab({ naechste_lagebesprechung_at: wireAb(45) })),
+      { route: '/einsaetze/1/stab' },
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
+
+    rerender(routen(stab({ naechste_lagebesprechung_at: wireAb(90) })));
+    expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe(
+      dayjs(JETZT).add(45, 'minute').format(ZEITFORMAT),
+    );
+    await absenden(dialog);
+    // Fremd geändert (Regel 2 in `abschlussBody`): der unberührte Termin geht nicht mit.
+    expect(Object.keys(gesendet[0])).not.toContain('naechste_at');
+  });
+
   it('„kein Termin" → naechste_at ist null', async () => {
     const dialog = await zeige(stab({ naechste_lagebesprechung_at: wireAb(45) }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'kein Termin' }));
