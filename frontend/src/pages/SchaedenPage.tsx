@@ -24,6 +24,7 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { flaeche } from '../theme/tokens';
+import { einsatzStatus } from '../theme/statusFarben';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
@@ -271,11 +272,7 @@ export default function SchaedenPage() {
       titel={
         <Space>
           Schäden
-          {/* BEFUND wie in `PersonalPage`/`FahrzeugePage`: `EinsatzStatus` hat keine
-              Statusrolle in `theme/statusFarben.ts` (Spec §1.3 listet acht Vertrags-Enums,
-              dieses ist keins davon). Der Tag bleibt deshalb auf antd-Farbnamen und rohem
-              Enum-Wert stehen — erfunden wird hier nichts. */}
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       breadcrumb={

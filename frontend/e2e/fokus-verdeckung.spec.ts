@@ -148,11 +148,19 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
    * einmal mit mehr als fünf Wiederholungen gefahren, greift die Blätterung und die
    * Untergrenze bleibt trotzdem erfüllt (Seitengröße 50 ≥ 9).
    */
-  const zeilenzahl = await page.locator('tr.ant-table-row').count();
-  expect(
-    zeilenzahl,
-    'Vorbedingung: mindestens 8 gesäte Zeilen + Harness-Admin',
-  ).toBeGreaterThanOrEqual(9);
+  // `expect.poll` statt `count()`: Letzteres ist die EINZIGE Abfrage dieser Datei ohne
+  // Nachwartung, und `waitForLoadState('networkidle')` davor ist zu früh, wenn die Seite
+  // ihre erste Datenanfrage erst NACH dem 500-ms-Ruhefenster stellt — Assets fertig,
+  // 500 ms still, „idle", dann montiert React und holt erst jetzt `/api/benutzer`. Auf
+  // zwei geteilten Kernen mit zwei Playwright-Workern ist das erreichbar: in CI zweimal
+  // rot mit „Received: 0" (LFH-358, PR #59), lokal 3/3 grün. Die Aussage bleibt wortgleich
+  // — die UNTERGRENZE gegen die geteilte Temp-DB, siehe der Absatz darüber —, sie bekommt
+  // nur die Wiederholung, die jede andere Zeile dieses Specs schon hat.
+  await expect
+    .poll(() => page.locator('tr.ant-table-row').count(), {
+      message: 'Vorbedingung: mindestens 8 gesäte Zeilen + Harness-Admin',
+    })
+    .toBeGreaterThanOrEqual(9);
 
   // ── VORBEDINGUNGEN. Ohne sie ist „0 verdeckte Ziele" trivial wahr.
   const kopf = page.locator('.ant-table-sticky-holder');

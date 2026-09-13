@@ -872,16 +872,36 @@ Alltag wichtigsten:
   aus `useViewport`, nicht die Stilfunktion: eine reine Funktion, die selbst einen Hook ruft,
   wäre kein Prüfobjekt mehr.
 - **Ein Status gehört nicht in die Seite, die ihn zufällig zuerst brauchte**
-  (LFH-345 · C10, M14). `EINSATZ_STATUS` liegt jetzt in `einsatz/einsatzStatus.ts` neben
-  `einsatzart.ts`; vorher war es eine modul-lokale Konstante in `EinsaetzePage`, und der
-  zweite Leser (`EinsatzdatenPage`) hatte sie **nicht** — dort stand der rohe Wire-Wert im
-  Titel-Tag. Das ist die Sorte Abweichung, die niemandem auffällt: beide Seiten sahen für
-  sich plausibel aus, und „aktiv" ist zufällig auch ein deutsches Wort. Der Eintrag trägt den
-  Vertragstyp `StatusDarstellung` aus `theme/statusFarben.ts` (damit ist `label` Pflichtfeld
-  — zweiter Kanal, WCAG 1.4.1), liegt aber **nicht** in dieser Datei: deren Abdeckungsguard
-  zählt die Maps gegen eine Literal-Liste **und** `toHaveLength(10)`; ein elfter Eintrag wäre
-  eine Änderung am Vertrag und an seinem Guard, also eine eigene Entscheidung statt eines
-  Nebenprodukts.
+  (LFH-345 · C10, M14) — **und seit LFH-358 auch nicht neben den Vertrag.** Die Karte war
+  erst eine modul-lokale Konstante in `EinsaetzePage`; der zweite Leser
+  (`EinsatzdatenPage`) hatte sie **nicht** und zeigte den rohen Wire-Wert im Titel-Tag. Das
+  ist die Sorte Abweichung, die niemandem auffällt: beide Seiten sahen für sich plausibel
+  aus, und „aktiv" ist zufällig auch ein deutsches Wort. C10 hat sie nach
+  `einsatz/einsatzStatus.ts` gezogen, aber bewusst NICHT in `theme/statusFarben.ts` — dort
+  zählte der Abdeckungsguard gegen ein `toHaveLength`, ein Eintrag mehr wäre eine
+  Vertragsänderung gewesen und damit eine eigene Entscheidung.
+  **LFH-358 ist diese Entscheidung, und sie fiel andersherum:** die Karte heißt jetzt
+  `einsatzStatus` und steht IM Vertrag (`theme/statusFarben.ts`), zusammen mit
+  `dringlichkeit` (vormals `DRINGLICHKEIT_ZEICHEN` in `lage-dashboard/lagebild.ts`), die
+  mit derselben Begründung draußen lag. `einsatz/einsatzStatus.ts` gibt es nicht mehr — wer
+  den Import sucht, nimmt `theme/statusFarben.ts`.
+  **Der Grund ist der Wächter selbst:** `statusFarben.test.ts` leitet die geprüfte Map-Liste
+  aus den Exporten des Moduls ab, „damit eine zehnte Map nicht still durchrutscht". Eine
+  Karte mit dem Vertragstyp **außerhalb der Datei** läuft an genau diesem Wächter vorbei —
+  der Präzedenzfall untergräbt also die Aussage, die er schützen soll. Gemessen war das
+  keine Theorie: während `einsatzStatus` draußen stand, malten **zehn** Seitenköpfe weiter
+  `<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>`,
+  also denselben Befund, den M14 an einer Seite einzeln behoben hatte.
+  **Die Zahl im Abdeckungstest ist jetzt 15, und sie zählt „Vertragskarten", nicht
+  „Vertrags-Enums"**: `dringlichkeit` ist über eine `Statusrolle` geschlüsselt und
+  beschriftet die Stufe selbst, nicht eine Domänen-Achse. Eine sechzehnte Karte bleibt eine
+  eigene Entscheidung — das ändert LFH-358 nicht, es trifft die Entscheidung nur einmal.
+  **Zwei Guards halten beide Grenzen maschinell** (`theme/statusVertrag.guard.test.ts`):
+  kein `Record<…, StatusDarstellung>` außerhalb `statusFarben.ts` — **die Datei, nicht das
+  Verzeichnis**, denn ein Geschwistermodul exportiert nichts über sie und liefe am
+  Abdeckungstest genauso vorbei —, und kein `<Tag color={…}>`, das ein Vertrags-Enum
+  einfärbt; dafür ist `components/StatusTag.tsx` da. Blinde Flecken stehen mit gemessener
+  Fundstelle im Kopfkommentar; eine Schuldmenge gibt es bewusst nicht.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET** (LFH-346 · C11). Die
   Anlegen-Knöpfe der elf Stammdaten-Sektionen sind in den `aktionen`-Slot von `AdminPage`
   gewandert, der Speichern-Knopf der Einsatz-Defaults im selben Ticket **heraus** in eine
@@ -1389,6 +1409,20 @@ Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `p
   --workspace` (Schritt 4) das bin-Target ohnehin mitbaut — e2e ist hier also faktisch
   immer dabei (+~30 s). Der Guard schützt die Fälle daneben: verkürzte Läufe, einzeln
   von Hand aufgerufene Schritte.
+  **Schritt 7 baut seit LFH-356 auch den Prod-Bundle** (`prod_bundle_bereitstellen`), und zwar
+  nur bei Bedarf: fehlt `frontend/dist/sw.js` oder ist eine Quelle neuer, läuft `pnpm build`
+  (~26 s lokal, ~1 min auf 2 vCPU). Grund ist `e2e/lagekarte-offline-precache.spec.ts`: einen
+  **Service Worker gibt es nur im Build** — `vite-plugin-pwa` ist ohne `devOptions` im
+  Dev-Server gar nicht aktiv, und sein Dev-SW wäre kein Precache der gehashten Assets, also
+  eine Attrappe. Ohne den Build überspringt sich der Spec laut, und ein Nachweis, der nie
+  läuft, ist keiner. **Ausgeliefert wird der Bundle vom e2e-Backend**, nicht von
+  `vite preview`: `src/static_files.rs` liest `frontend/dist` im Debug-Build zur Laufzeit vom
+  Dateisystem, das Backend läuft ohnehin, und damit ist die Seite same-origin mit der API —
+  kein zweiter Webserver, kein Preview-Proxy. In der geteilten CI baut jeder der vier Shards
+  (welcher den Spec fährt, steht vorher nicht fest); sie laufen parallel, der Aufschlag ist
+  einmal ~1 min. Bewusst **kein** dist-Artefakt zwischen den Jobs — das wäre ein Schritt, den
+  nur die CI kennt, und damit die Drift, gegen die LFH-522 den Workflow auf dieses Skript
+  zurückgeführt hat.
 - **Kein `| tail` um Gate-Kommandos** — das maskiert den Exit-Code, und eine rote Suite
   sieht dann grün aus.
 - **Ein Release entsteht nicht mehr je Merge, sondern je Arbeitsschub.** Der Release-Job

@@ -42,8 +42,9 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
+import { einsatzStatus, statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import { abstand, flaeche } from '../theme/tokens';
+import StatusTag from '../components/StatusTag';
 
 /**
  * Statusanzeige eines disponierten Einsatzpersonals — und zugleich die GRENZE des
@@ -484,11 +485,7 @@ export default function PersonalPage() {
       titel={
         <Space>
           Personal
-          {/* BEFUND wie in `FahrzeugePage`: `EinsatzStatus` hat keine Statusrolle in
-              `theme/statusFarben.ts` (Spec §1.3 listet acht Vertrags-Enums, dieses ist
-              keins davon). Der Tag bleibt deshalb auf antd-Farbnamen und rohem Enum-Wert
-              stehen — erfunden wird hier nichts (Spec §5 Befund 7). */}
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       breadcrumb={
