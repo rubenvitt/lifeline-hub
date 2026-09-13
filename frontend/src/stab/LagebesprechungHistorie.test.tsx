@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
@@ -53,6 +54,48 @@ describe('LagebesprechungHistorie', () => {
     // Snapshot: Nr. 2 trug einen Termin, Nr. 1 keinen.
     expect(within(zwei).queryByText(/kein Termin/)).toBeNull();
     expect(within(eins).getByText(/kein Termin/)).toBeInTheDocument();
+  });
+
+  /** Titel „Nr. n · …" der Zeilen — innerhalb oder ausserhalb des Expanders. */
+  const titel = (imExpander: boolean) =>
+    screen
+      .getAllByRole('listitem')
+      .filter((li) => (li.closest('.ant-collapse') != null) === imExpander)
+      .map((li) => within(li).getByRole('heading', { level: 4 }).textContent);
+
+  /**
+   * I4 (Ruling 11): die Historie steht ÜBER der Besetzung. Ab dem vierten Eintrag wächst sie
+   * nicht mehr in der Höhe — ein Live-Abschluss ändert nur die Zahl im Expander-Titel.
+   */
+  it('zeigt die drei jüngsten; die älteren liegen eingeklappt im Expander mit Anzahl', async () => {
+    zeige(() =>
+      HttpResponse.json([eintrag(5), eintrag(4), eintrag(3), eintrag(2), eintrag(1)]),
+    );
+    const expander = await screen.findByRole('button', {
+      name: /Frühere Lagebesprechungen \(2\)/,
+    });
+    expect(expander).toHaveAttribute('aria-expanded', 'false');
+    expect(titel(false)).toEqual([
+      expect.stringMatching(/^Nr\. 5 · /),
+      expect.stringMatching(/^Nr\. 4 · /),
+      expect.stringMatching(/^Nr\. 3 · /),
+    ]);
+    expect(titel(true)).toEqual([]);
+
+    await userEvent.click(expander);
+    await waitFor(() =>
+      expect(titel(true)).toEqual([
+        expect.stringMatching(/^Nr\. 2 · /),
+        expect.stringMatching(/^Nr\. 1 · /),
+      ]),
+    );
+    expect(titel(false)).toHaveLength(3);
+  });
+
+  it('drei Einträge → kein Expander (Gegenfall)', async () => {
+    zeige(() => HttpResponse.json([eintrag(3), eintrag(2), eintrag(1)]));
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(3));
+    expect(screen.queryByRole('button', { name: /Frühere Lagebesprechungen/ })).toBeNull();
   });
 
   it('leer: sagt es beim Wort, ohne Fehler zu behaupten', async () => {
