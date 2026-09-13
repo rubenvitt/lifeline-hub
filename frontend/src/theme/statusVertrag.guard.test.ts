@@ -418,11 +418,22 @@ function traegtVertragstyp(ausdruck: string): boolean {
  * versagt. Ein Prädikat am Ende komponiert trivial, eine sechste Stufe nicht.
  *
  * Nötig, weil {@link ohneKommentare} Zeichenketten ABSICHTLICH stehen lässt — der
- * Tag-Guard braucht ihren Inhalt, dort stecken die Wire-Werte. Für die KARTEN ist das
- * falsch herum: `const beispiel = 'Record<X, StatusDarstellung>'` ist Text, keine
- * Deklaration, und ihn zu melden wäre ein Fehlalarm (im Codex-Review gefunden). Im
- * Bestand kommt er nicht vor — die vier Fundstellen mit `Record<` in Anführungszeichen
- * liegen alle in KOMMENTAREN und fallen schon vorher weg.
+ * Tag-Guard braucht ihren INHALT, dort stecken die Wire-Werte. Für den ANFANG einer
+ * Deklaration oder Auszeichnung ist das falsch herum: `const beispiel =
+ * 'Record<X, StatusDarstellung>'` und `const beispiel = '<Tag color={…}>'` sind Text,
+ * und sie zu melden wäre ein Fehlalarm (beide im Codex-Review gefunden, der zweite als
+ * Hinweis darauf, dass ich die Klasse zuerst nur halb geschlossen hatte).
+ *
+ * BEIDE Guards filtern deshalb die POSITION ihrer Marke, nicht deren Inhalt: `Record<`
+ * bzw. `<Tag`. Die Attribute dahinter bleiben lesbar — sonst verlöre der Wire-Wert-Fühler
+ * genau das, wofür es ihn gibt.
+ *
+ * Im Bestand kommt keiner der beiden Fälle vor. Die Fundstellen mit `Record<` bzw. `<Tag`
+ * hinter einem Anführungszeichen liegen entweder in KOMMENTAREN (fallen vorher weg) oder
+ * HINTER einer auf derselben Zeile geschlossenen Zeichenkette — etwa
+ * `stammdaten/SprechgruppenTab.tsx:94`, wo das zweite `<Tag>` dem `"green"` des ersten
+ * folgt. Genau deshalb überspringt die Schleife geschlossene Zeichenketten, statt beim
+ * ersten Anführungszeichen aufzugeben.
  *
  * Dieselbe Zurückhaltung wie in {@link stringEnde}: nur was auf seiner Zeile schliesst,
  * gilt als Zeichenkette.
@@ -921,11 +932,19 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
     if (!ausserhalbDesVertrags(pfad)) continue;
     const inhalt = ohneKommentare(roh).join('\n');
     const namen = vertragsNamenIn(inhalt);
+    const zeilen = inhalt.split('\n');
     for (const element of tagNamenIn(inhalt)) {
       const marke = `<${element}`;
       for (let i = inhalt.indexOf(marke); i !== -1; i = inhalt.indexOf(marke, i + marke.length)) {
         // `<Tagline` o. ä. — der Name muss hier enden.
         if (!/[\s/>]/.test(inhalt[i + marke.length] ?? '')) continue;
+        // Und derselbe Filter wie bei den Karten: ein `<Tag …>` IN einer Zeichenkette ist
+        // Text, keine Auszeichnung. Gefiltert wird die Position der MARKE, nicht ihr
+        // Inhalt — die Wire-Werte stecken in den Attributen und müssen lesbar bleiben.
+        const davor = inhalt.slice(0, i).split('\n');
+        if (inZeichenkette(zeilen[davor.length - 1] ?? '', davor[davor.length - 1].length)) {
+          continue;
+        }
         const ende = tagEnde(inhalt, i);
         if (ende === -1) continue;
         const tag = inhalt.slice(i, ende + 1);
@@ -1151,6 +1170,35 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
           "import * as sf from '../theme/statusFarben';",
           '<Tag color={sf.rollenFarbe(sf.warnstufeKarte[s].rolle, t)}>x</Tag>',
         ].join('\n'),
+      }),
+    ).toHaveLength(1);
+  });
+
+  it('liest ein `<Tag>` IN einer Zeichenkette nicht als Auszeichnung', () => {
+    // Die zweite Hälfte derselben Klasse — im Codex-Review gefunden, nachdem ich sie für
+    // die Karten geschlossen hatte. Fehlalarme zählen in beiden Guards gleich.
+    expect(
+      tagBefunde({
+        '/src/pages/Doku.tsx':
+          "const beispiel = \"<Tag color={s === 'aktiv' ? 'green' : 'default'}>\";",
+      }),
+    ).toEqual([]);
+
+    // Gegenprobe 1: dieselbe Auszeichnung als echtes JSX wird gemeldet.
+    expect(
+      tagBefunde({
+        '/src/pages/Echt3.tsx': "<Tag color={s === 'aktiv' ? 'green' : 'default'}>{s}</Tag>",
+      }),
+    ).toHaveLength(1);
+
+    // Gegenprobe 2, und die ist die wichtigere: ein Tag HINTER einer geschlossenen
+    // Zeichenkette derselben Zeile ist echt — so steht es im Bestand
+    // (`stammdaten/SprechgruppenTab.tsx:94`). Ein Filter, der beim ersten
+    // Anführungszeichen aufgäbe, machte den halben Bestand unsichtbar.
+    expect(
+      tagBefunde({
+        '/src/pages/Nachbar.tsx':
+          "{sg.aktiv ? <Tag color=\"green\">Aktiv</Tag> : <Tag color={s === 'aktiv' ? 'x' : 'y'}>b</Tag>}",
       }),
     ).toHaveLength(1);
   });
