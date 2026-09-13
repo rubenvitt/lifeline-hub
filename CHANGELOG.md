@@ -1,3 +1,34 @@
+## [1.0.0-alpha.17](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.16...v1.0.0-alpha.17) (2026-09-13)
+
+### Features
+
+* **stab:** API-Client, Typen und stabPfad (LFH-542) ([5cb917d](https://github.com/rubenvitt/lifeline-hub/commit/5cb917d1472685639d3b77f1e652ef65f73330f6))
+* **stab:** Countdown und Abschluss-Logik der Lagebesprechung (LFH-543) ([f5e0941](https://github.com/rubenvitt/lifeline-hub/commit/f5e09418db680e5e2e313ecfc4814a70a3979e0c))
+* **stab:** Lagebesprechung auf der Stab-Seite, Kopfaktion und ?neu=1 (LFH-543) ([b06bf29](https://github.com/rubenvitt/lifeline-hub/commit/b06bf2937bb37ca8258e1002f0dc2d234b0ca28e))
+* **stab:** Lagebesprechungs-API und Query-Sub-Key (LFH-543) ([90db4b8](https://github.com/rubenvitt/lifeline-hub/commit/90db4b8dea8c1a95b35a85b8ef9ee544ee60dcc3))
+* **stab:** Maske „Besetzung ändern“ mit Ad-hoc-Anlage (LFH-542) ([7842097](https://github.com/rubenvitt/lifeline-hub/commit/78420975da57175e94e82c9da1f63777cbe4e71d))
+* **stab:** Maske Lagebesprechung abschließen mit Toast-Deeplink (LFH-543) ([40e673e](https://github.com/rubenvitt/lifeline-hub/commit/40e673e1520de302de293a610b254958de0fe360))
+* **stab:** Sachgebiete und Besetzungslogik mit Wertgleichheits-Riegel (LFH-542) ([ca547b5](https://github.com/rubenvitt/lifeline-hub/commit/ca547b5df2ff4cb26e7d3e41bc923c77f6d41e37))
+* **stab:** Schnellaktion Lagebesprechung abschließen in der Kommandopalette (LFH-543) ([5e6d9c7](https://github.com/rubenvitt/lifeline-hub/commit/5e6d9c762784e6dfad93ce9f9b028e9cfc842e27))
+* **stab:** Stab-Seite mit Besetzung S1–S6, Modul freigeschaltet (LFH-542) ([763aa9a](https://github.com/rubenvitt/lifeline-hub/commit/763aa9a8fe11addae00758e4c618c84c4964730f))
+* **stab:** Stand und Historie der Lagebesprechung (LFH-543) ([8fa5ce3](https://github.com/rubenvitt/lifeline-hub/commit/8fa5ce34dad13a54f3ca893967b32152882298b1))
+* **stab:** Werkzeug-Filter und Trefffläche der Zeilenziele (LFH-542) ([4059328](https://github.com/rubenvitt/lifeline-hub/commit/4059328c1efd3097bb8c7ad7c54906e6e7047292))
+
+### Bug Fixes
+
+* **stab:** „Besetzung ändern“ erst mit geladenen Daten (LFH-542) ([77bed81](https://github.com/rubenvitt/lifeline-hub/commit/77bed811c3f1d19cbfbf38751cfc60af33772497))
+* **stab:** Abschluss aendert nur den Termin, den die Maske gesehen hat (LFH-543) ([9a5cbf0](https://github.com/rubenvitt/lifeline-hub/commit/9a5cbf0fae7a773c7fb9a4583fc07971b817ccab))
+* **stab:** Countdown unter einer Minute lesbar (LFH-543) ([beef654](https://github.com/rubenvitt/lifeline-hub/commit/beef654eef30a38e79dd4fb139b7d74aea42011a))
+* **stab:** gleichnamige Personen über die Funktion unterscheidbar (LFH-542) ([c8c5666](https://github.com/rubenvitt/lifeline-hub/commit/c8c5666670cd0fc0149e5bb46ed24fb7ac777f60))
+* **stab:** Historie unterscheidet leer und gescheitert über die Länge (LFH-543) ([d7188b2](https://github.com/rubenvitt/lifeline-hub/commit/d7188b2cc753052944f79a1c7ebe83fdfdc53283))
+* **stab:** Historie zeigt drei Eintraege, der Rest im Inline-Expander (LFH-543) ([c2a9470](https://github.com/rubenvitt/lifeline-hub/commit/c2a9470eee3f93b1c50e94d389c6c2851bbee7f0))
+* **stab:** Maske steht nach Rechteverlust nicht wieder auf, Sperrgruende getestet (LFH-543) ([6b1b09e](https://github.com/rubenvitt/lifeline-hub/commit/6b1b09e09ef9b55d87dc1f5365ef94c298b07989))
+* **stab:** Maske vergleicht gegen den Stand beim Öffnen (LFH-542) ([3d05e47](https://github.com/rubenvitt/lifeline-hub/commit/3d05e472709601ca92fb1778dfa724457e6e0ca0))
+* **stab:** Request-Body nach API-Konvention benennen (LFH-542) ([4cabfa4](https://github.com/rubenvitt/lifeline-hub/commit/4cabfa455178ea375ef96aca43e1e4698c34ea6e))
+* **stab:** Schnellwahl rechnet vom spaeteren von Zeitpunkt und jetzt (LFH-543) ([c3d3ec3](https://github.com/rubenvitt/lifeline-hub/commit/c3d3ec3074e6ecd35772f08cda6ad64ed9741921))
+* **stab:** stabPfad-Kommentar behauptet kein Verhalten vor ST5 (LFH-542) ([9b553c6](https://github.com/rubenvitt/lifeline-hub/commit/9b553c694ec7a115a572b0bd558eae14c1d32d2f))
+* **stab:** Typen der Besetzung an die Laufzeit angleichen (LFH-542) ([b0c7b34](https://github.com/rubenvitt/lifeline-hub/commit/b0c7b34fe8400f6c34c60707c5e0a85d2aff8f1b))
+
 ## [1.0.0-alpha.16](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.15...v1.0.0-alpha.16) (2026-09-13)
 
 ### Bug Fixes
