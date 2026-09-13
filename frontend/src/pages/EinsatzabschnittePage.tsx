@@ -51,6 +51,8 @@ import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
+import StatusTag from '../components/StatusTag';
+import { einsatzStatus } from '../theme/statusFarben';
 
 function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -306,7 +308,7 @@ export default function EinsatzabschnittePage() {
             <Typography.Title level={3} style={{ margin: 0 }}>
               Einsatzabschnitte
             </Typography.Title>
-            <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
           </Space>
           <Datenstand
             dataUpdatedAt={gemeinsamerDatenstand(

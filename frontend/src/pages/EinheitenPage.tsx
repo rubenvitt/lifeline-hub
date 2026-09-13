@@ -38,6 +38,8 @@ import Datenstand from '../components/Datenstand';
 import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ErfassungsModal } from '../components/Erfassung';
+import StatusTag from '../components/StatusTag';
+import { einsatzStatus } from '../theme/statusFarben';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LFH-339 · C4).
@@ -243,7 +245,7 @@ export default function EinheitenPage() {
             <Typography.Title level={3} style={{ margin: 0 }}>
               Einheiten
             </Typography.Title>
-            <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
           </Space>
           <Datenstand dataUpdatedAt={einheitenQuery.dataUpdatedAt} />
         </Space>

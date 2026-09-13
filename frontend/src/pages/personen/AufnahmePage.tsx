@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Form, Space, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Form, Space } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -20,6 +20,8 @@ import AufnahmeFelder, { type AufnahmeEingabe } from '../../personen/AufnahmeFel
 import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
 import { parseRouteId, personenPfad, uhsDetailPfad } from '../../routing/deeplinks';
 import { flaeche } from '../../theme/tokens';
+import StatusTag from '../../components/StatusTag';
+import { einsatzStatus } from '../../theme/statusFarben';
 
 /**
  * Vollseiten-Aufnahme für Personen (LFH-340 · C5).
@@ -156,7 +158,7 @@ export default function AufnahmePage() {
       titel={
         <Space>
           Aufnahme
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       beschreibung={
