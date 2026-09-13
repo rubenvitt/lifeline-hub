@@ -1,3 +1,10 @@
+## [1.0.0-alpha.16](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.15...v1.0.0-alpha.16) (2026-09-13)
+
+### Bug Fixes
+
+* **auth:** totp-rs 6 API-Migration ([653766c](https://github.com/rubenvitt/lifeline-hub/commit/653766cf2e08c9e93cd464c9918bb702a22b6a84))
+* **navigation:** „Zuletzt"-Gruppe aus dem Modul-Panel entfernt ([ee05197](https://github.com/rubenvitt/lifeline-hub/commit/ee051979251d240fda72ac561054cfc3ce9af92a))
+
 ## [1.0.0-alpha.15](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.14...v1.0.0-alpha.15) (2026-09-13)
 
 ### Features
