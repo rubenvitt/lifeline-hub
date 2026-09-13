@@ -1425,6 +1425,25 @@ describe('StabPage', () => {
     });
   });
 
+  it('behauptet während des Ladens keine Besetzung', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      // Antwort bleibt aus: der Abruf steht dauerhaft auf „lädt".
+      http.get('/api/einsaetze/1/stab', () => new Promise<never>(() => {})),
+      http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/stab" element={<StabPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/stab' },
+    );
+    const sektion = await besetzungsSektion();
+    expect(within(sektion).getAllByRole('heading', { level: 4 })).toHaveLength(6);
+    expect(within(sektion).queryByText('nicht vergeben')).toBeNull();
+  });
+
   it('Fehler ist nicht leer: ein gescheiterter Abruf behauptet keine sechs leeren Zeilen', async () => {
     rendere({ stabStatus: 500 });
     expect(await screen.findByText('Führungsorganisation konnte nicht geladen werden')).toBeInTheDocument();
@@ -1598,7 +1617,10 @@ export default function StabPage() {
                       title={
                         <Space wrap>
                           {`${s.kuerzel} · ${s.label}`}
-                          <StatusTag darstellung={besetzungDarstellung(zeile)} />
+                          {/* Solange nichts angekommen ist, wird nichts über die Besetzung
+                              behauptet (LFH-331 · B3/D4) — „nicht vergeben" vor dem Laden wäre
+                              eine Aussage über eine Menge, die noch gar nicht da ist. */}
+                          {stabQuery.data && <StatusTag darstellung={besetzungDarstellung(zeile)} />}
                         </Space>
                       }
                       description={
