@@ -109,7 +109,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 # LFH-43: TOTP-Zweitfaktor (Increment 5, MFA). "otpauth" für die otpauth://-URL-Erzeugung
 # (QR-Code-Enrollment), "gen_secret" für kryptografisch zufällige Secret-Erzeugung.
-totp-rs = { version = "5", features = ["otpauth", "gen_secret"] }
+totp-rs = { version = "6", features = ["otpauth", "gen_secret"] }
 
 [dev-dependencies]
 # LFH-275 Task 3: Passkey-Storage-Tests brauchen echte `Passkey`-Werte, aber eine komplette
