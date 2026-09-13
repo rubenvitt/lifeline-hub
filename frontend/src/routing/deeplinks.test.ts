@@ -183,7 +183,7 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('stabPfad ohne Optionen', () => {
     expect(stabPfad(E)).toBe('/einsaetze/5/stab');
   });
-  it('stabPfad mit neu fokussiert den Abschluss (?neu=1)', () => {
+  it('stabPfad mit neu hängt ?neu=1 an', () => {
     expect(stabPfad(E, { neu: true })).toBe('/einsaetze/5/stab?neu=1');
     expect(stabPfad(E, { neu: false })).toBe('/einsaetze/5/stab');
   });
