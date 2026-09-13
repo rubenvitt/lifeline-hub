@@ -102,7 +102,8 @@ describe('lagebesprechungZustand', () => {
  * Vitest setzt KEIN `TZ` (`vite.config.ts`, test-Block): in einer UTC-Umgebung ist ein lokaler
  * Parse (`dayjs(s)` statt `dayjs.utc(s)`) vom richtigen nicht zu unterscheiden. Die tragende
  * Zeile ist deshalb der Vergleich gegen den ABSOLUTEN Zeitpunkt (Muster `etb/filterZeit.test.ts`);
- * auf einer Maschine in Europe/Berlin wird ein lokaler Parse hier rot.
+ * auf einer Maschine in Europe/Berlin wird ein lokaler Parse hier rot. Im Gate ist das
+ * zugesichert: `scripts/check-all.sh` setzt `TZ=Europe/Berlin` (Ruling 2, LFH-543-Ledger).
  */
 describe('lagebesprechungZustand an den Sommerzeitgrenzen', () => {
   it.each([
