@@ -1013,27 +1013,38 @@ function vertragsNamenIn(inhalt: string): readonly string[] {
  * blieb gruen ueber genau dem Bestandsbefund, gegen den er gebaut ist. Drei andere
  * Scanner dieser Datei beachten die Maskierung laengst; dieser war der Ausreisser.
  *
- * Bewusst ohne Sonderbehandlung der Template-Substitution: gesucht wird ein WERT, und
- * `` `${x}` `` traegt keinen. Ein Stueck Text vor oder nach der Substitution wird
- * mitgelesen — das kann hoechstens einen Treffer mehr liefern, nie einen weniger.
+ * Die Template-Substitution wird DURCHSTIEGEN, und die erste Fassung tat das nicht —
+ * mit einer Begruendung, die schlicht falsch war („mitlesen kann hoechstens einen
+ * Treffer mehr liefern, nie einen weniger"). Das Gegenteil stimmt: der ganze Bereich
+ * zwischen den Backticks wurde als EIN Literal verbraucht, die Literale DARIN nie
+ * besucht. `` `${s.status === 'aktiv' ? 'green' : 'default'}` `` lieferte damit kein
+ * `aktiv`, und der Guard blieb gruen ueber genau der Darstellung, gegen die er gebaut
+ * ist (im Codex-Review gefunden). Der Text AUSSERHALB der Substitution bleibt dabei ein
+ * Literal — beides zusammen, sonst tauscht der Fix die eine Luecke gegen die andere.
  */
-function literalInhalte(text: string): string[] {
+function literalInhalte(text: string, von = 0, bis = text.length): string[] {
   const inhalte: string[] = [];
-  for (let i = 0; i < text.length; i++) {
+  for (let i = von; i < bis; i++) {
     const z = text[i];
     if (z !== '"' && z !== "'" && z !== '`') continue;
     let inhalt = '';
     let j = i + 1;
-    for (; j < text.length; j++) {
+    for (; j < bis; j++) {
       if (text[j] === '\\') {
         inhalt += text[j + 1] ?? '';
         j++;
         continue;
       }
+      if (z === '`' && text[j] === '$' && text[j + 1] === '{') {
+        const zu = klammerZu(text, j + 1, bis);
+        inhalte.push(...literalInhalte(text, j + 2, zu));
+        j = zu;
+        continue;
+      }
       if (text[j] === z) break;
       inhalt += text[j];
     }
-    if (j >= text.length) break; // unabgeschlossen — der Rest ist kein Literal
+    if (j >= bis) break; // unabgeschlossen — der Rest ist kein Literal
     inhalte.push(inhalt);
     i = j;
   }
@@ -1456,6 +1467,28 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     });
     expect(maskiert).toHaveLength(1);
     expect(maskiert[0]).toContain('vergleicht Wire-Wert `aktiv`');
+  });
+
+  it('steigt beim Wire-Scan in eine Template-Substitution hinab', () => {
+    // Im Codex-Review gefunden, und es widerlegt meine eigene Begruendung eine Runde
+    // zuvor: ich hatte geschrieben, das Mitlesen einer Substitution koenne "hoechstens
+    // einen Treffer mehr liefern, nie einen weniger". Falsch — der ganze Bereich
+    // zwischen den Backticks wird als EIN Literal verbraucht, die Literale DARIN werden
+    // nie besucht, und der Wire-Wert geht verloren.
+    const vorlage = tagBefunde({
+      '/src/pages/WireVorlage.tsx':
+        "<Tag color={`${s.status === 'aktiv' ? 'green' : 'default'}`}>{x}</Tag>",
+    });
+    expect(vorlage).toHaveLength(1);
+    expect(vorlage[0]).toContain('vergleicht Wire-Wert `aktiv`');
+
+    // Gegenprobe: der Text AUSSERHALB der Substitution bleibt ein Literal und wird
+    // weiterhin gelesen — sonst tauschte der Fix die eine Luecke gegen die andere.
+    const drumherum = tagBefunde({
+      '/src/pages/WireText.tsx': '<Tag color={`aktiv`}>{x}</Tag>',
+    });
+    expect(drumherum).toHaveLength(1);
+    expect(drumherum[0]).toContain('vergleicht Wire-Wert `aktiv`');
   });
 
   it('sieht Vertragsnamen NICHT in Zeichenketten — der Wire-Test dagegen schon', () => {
