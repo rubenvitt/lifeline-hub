@@ -68,9 +68,7 @@ describe('LagebesprechungHistorie', () => {
    * nicht mehr in der Höhe — ein Live-Abschluss ändert nur die Zahl im Expander-Titel.
    */
   it('zeigt die drei jüngsten; die älteren liegen eingeklappt im Expander mit Anzahl', async () => {
-    zeige(() =>
-      HttpResponse.json([eintrag(5), eintrag(4), eintrag(3), eintrag(2), eintrag(1)]),
-    );
+    zeige(() => HttpResponse.json([eintrag(5), eintrag(4), eintrag(3), eintrag(2), eintrag(1)]));
     const expander = await screen.findByRole('button', {
       name: /Frühere Lagebesprechungen \(2\)/,
     });
