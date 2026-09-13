@@ -106,15 +106,17 @@ export function modulListenStil(token: { marginXS: number; marginSM: number }): 
   };
 }
 
+/**
+ * KEINE „Zuletzt"-Gruppe mehr (entfernt 13.09.2026, war LFH-337 · H12). Sie war in der
+ * Bedienung nicht zu verstehen, und das folgte aus ihrer eigenen Filterung: der zuletzt
+ * gewählte Eintrag ist per Konstruktion das aktuelle Modul und fiel damit immer heraus,
+ * die offene Kategorie ebenso — wer innerhalb einer Kategorie arbeitete, sah die Gruppe
+ * nie, beim Kategoriewechsel erschien sie mit Einträgen, die niemand vorhersagen konnte,
+ * in derselben Knopfgestalt wie die Liste darunter. Der Speicher (`zuletztModule.ts`)
+ * bleibt: die Kommandopalette trägt ihre Gruppe „Zuletzt besucht" daraus.
+ */
 interface Props extends ListeProps {
   titel: string;
-  /**
-   * Bereits aufgelöste, sichtbare und freigegebene Module der „Zuletzt"-Abkürzung
-   * (LFH-337 · H12). Kommt fertig herein statt als Schlüsselliste: die Auflösung
-   * braucht Registry, Overrides und Benutzer, und die hat der Rahmen ohnehin schon —
-   * eine zweite Auflösung hier wäre eine zweite Wahrheit über „freigegeben".
-   */
-  zuletztModule?: ModulEintrag[];
 }
 
 /**
@@ -138,13 +140,8 @@ export function ModulListe({
 }: ListeProps) {
   const { token } = theme.useToken();
   // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben immer sichtbar).
-  //
-  // BLEIBT STEHEN, obwohl die „Zuletzt"-Liste seit der Fix-Welle (LFH-337 · B3) schon
-  // gefiltert hereinkommt: `ModulListe` bedient DREI Aufrufer, und nur einer davon ist
-  // vorgefiltert. Die Kategorielisten — im Panel darunter und im `ModulAkkordeon` —
-  // kommen roh aus `moduleNachKategorie`. Den Filter hier zu entfernen hieße, ihn an
-  // zwei andere Stellen zu kopieren; doppeltes `istModulSichtbar` ist dagegen
-  // idempotent, also Redundanz und kein Fehler.
+  // Beide Aufrufer — das Panel und das `ModulAkkordeon` — reichen die Kategorieliste
+  // roh aus `moduleNachKategorie` herein; der Filter gehört deshalb hierher.
   const sichtbareModule = module.filter((m) => istModulSichtbar(m, overrides));
   return (
     <div style={modulListenStil(token)}>
@@ -242,7 +239,7 @@ export function ModulListe({
 }
 
 /** Liste der Module einer Kategorie im inline-Rahmen (Ebene 2). */
-export default function ModulPanel({ titel, zuletztModule, ...liste }: Props) {
+export default function ModulPanel({ titel, ...liste }: Props) {
   const { token } = theme.useToken();
   const ueberschrift: CSSProperties = {
     fontSize: 12,
@@ -258,18 +255,6 @@ export default function ModulPanel({ titel, zuletztModule, ...liste }: Props) {
       data-lfh="modul-panel"
       style={{ width: 220, padding: 12, borderRight: `1px solid ${token.colorBorderSecondary}` }}
     >
-      {/* Die Abkürzung steht ÜBER der Kategorie, nicht darunter: sie soll den Weg
-          verkürzen, und ein Ziel unterhalb der vollständigen Liste verkürzt nichts.
-          Ganz weg, wenn nichts gemerkt ist — eine leere Überschrift belegte Platz im
-          220-px-Panel und verspräche eine Abkürzung, die es nicht gibt. */}
-      {zuletztModule && zuletztModule.length > 0 && (
-        <div style={{ marginBottom: token.marginSM }}>
-          <Typography.Text type="secondary" style={ueberschrift}>
-            Zuletzt
-          </Typography.Text>
-          <ModulListe {...liste} module={zuletztModule} />
-        </div>
-      )}
       <Typography.Text type="secondary" style={ueberschrift}>
         {titel}
       </Typography.Text>
