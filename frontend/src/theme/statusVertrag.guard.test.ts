@@ -409,10 +409,44 @@ function traegtVertragstyp(ausdruck: string): boolean {
   return false;
 }
 
+/**
+ * Liegt `spalte` INNERHALB einer Zeichenkette dieser Zeile?
+ *
+ * Ein FILTER auf den Fund, keine weitere Umformung der Eingabe — und das ist Absicht:
+ * die Kette in diesem Guard (Kommentare strippen → `Record<` finden → Klammern
+ * bilanzieren → zerlegen → abschälen) hat in diesem PR schon zweimal an ihren Nahtstellen
+ * versagt. Ein Prädikat am Ende komponiert trivial, eine sechste Stufe nicht.
+ *
+ * Nötig, weil {@link ohneKommentare} Zeichenketten ABSICHTLICH stehen lässt — der
+ * Tag-Guard braucht ihren Inhalt, dort stecken die Wire-Werte. Für die KARTEN ist das
+ * falsch herum: `const beispiel = 'Record<X, StatusDarstellung>'` ist Text, keine
+ * Deklaration, und ihn zu melden wäre ein Fehlalarm (im Codex-Review gefunden). Im
+ * Bestand kommt er nicht vor — die vier Fundstellen mit `Record<` in Anführungszeichen
+ * liegen alle in KOMMENTAREN und fallen schon vorher weg.
+ *
+ * Dieselbe Zurückhaltung wie in {@link stringEnde}: nur was auf seiner Zeile schliesst,
+ * gilt als Zeichenkette.
+ */
+function inZeichenkette(zeile: string, spalte: number): boolean {
+  for (let i = 0; i < spalte; i++) {
+    const z = zeile[i];
+    if (z !== '"' && z !== "'" && z !== '`') continue;
+    const zu = stringEnde(zeile, i);
+    if (zu === -1) continue;
+    if (spalte < zu) return true;
+    i = zu;
+  }
+  return false;
+}
+
 /** Stellen, an denen ein `Record<…>` den Vertragstyp als WERT trägt (Index des `Record`). */
 export function kartenStellen(text: string): number[] {
   const treffer: number[] = [];
+  const zeilen = text.split('\n');
   for (let i = text.indexOf('Record<'); i !== -1; i = text.indexOf('Record<', i + 7)) {
+    const davor = text.slice(0, i).split('\n');
+    const zeile = zeilen[davor.length - 1] ?? '';
+    if (inZeichenkette(zeile, davor[davor.length - 1].length)) continue;
     const args = typargumente(text, i + 'Record'.length);
     if (!args || args.length < 2) continue;
     // Der letzte Punkt-Abschnitt, damit ein Namensraum-Import (`Record<X,
@@ -565,6 +599,28 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
         ].join('\n'),
       }),
     ).toEqual([]);
+  });
+
+  it('liest keine Zeichenkette als Deklaration', () => {
+    // Im Codex-Review gefunden: `ohneKommentare` lässt Zeichenketten ABSICHTLICH stehen,
+    // weil der Tag-Guard ihren Inhalt braucht. Für die Karten ist das falsch herum.
+    expect(
+      kartenBefunde({
+        '/src/pages/Text.ts': "const beispiel = 'Record<X, StatusDarstellung>';",
+      }),
+    ).toEqual([]);
+    // Gegenprobe: dieselbe Zeile OHNE Anführungszeichen wird gemeldet — sonst hätte der
+    // Filter die Aussage mit weggenommen statt nur den Fehlalarm.
+    expect(
+      kartenBefunde({ '/src/pages/Echt2.ts': 'const k: Record<X, StatusDarstellung> = {};' }),
+    ).toHaveLength(1);
+    // Und eine Zeichenkette VOR einer echten Deklaration darf die nicht verdecken.
+    expect(
+      kartenBefunde({
+        '/src/pages/Beides3.ts':
+          "const t = 'Record<X, StatusDarstellung>'; const k: Record<Y, StatusDarstellung> = {};",
+      }),
+    ).toHaveLength(1);
   });
 
   it('lässt sich von einem Funktionstyp nicht aus dem Tritt bringen', () => {
