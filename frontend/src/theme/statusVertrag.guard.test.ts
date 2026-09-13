@@ -1004,7 +1004,41 @@ function vertragsNamenIn(inhalt: string): readonly string[] {
   return [...namen];
 }
 
-const LITERAL = /(['"`])([^'"`]*)\1/g;
+/**
+ * Die INHALTE der Zeichenketten-Literale eines Ausdrucks, Maskierung beachtet.
+ *
+ * Vormals ein Regex (`/(['"`])([^'"`]*)\1/g`) — das kannte kein `\\'` und verschob nach
+ * einem maskierten Anfuehrungszeichen alle folgenden Literalgrenzen um eins (im
+ * Codex-Review gefunden). Der Wire-Wert dahinter wurde dann nie gefunden, und der Guard
+ * blieb gruen ueber genau dem Bestandsbefund, gegen den er gebaut ist. Drei andere
+ * Scanner dieser Datei beachten die Maskierung laengst; dieser war der Ausreisser.
+ *
+ * Bewusst ohne Sonderbehandlung der Template-Substitution: gesucht wird ein WERT, und
+ * `` `${x}` `` traegt keinen. Ein Stueck Text vor oder nach der Substitution wird
+ * mitgelesen — das kann hoechstens einen Treffer mehr liefern, nie einen weniger.
+ */
+function literalInhalte(text: string): string[] {
+  const inhalte: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const z = text[i];
+    if (z !== '"' && z !== "'" && z !== '`') continue;
+    let inhalt = '';
+    let j = i + 1;
+    for (; j < text.length; j++) {
+      if (text[j] === '\\') {
+        inhalt += text[j + 1] ?? '';
+        j++;
+        continue;
+      }
+      if (text[j] === z) break;
+      inhalt += text[j];
+    }
+    if (j >= text.length) break; // unabgeschlossen — der Rest ist kein Literal
+    inhalte.push(inhalt);
+    i = j;
+  }
+  return inhalte;
+}
 
 /**
  * Die lokalen Namen von antds `Tag` in dieser Datei — `Tag` selbst plus Umbenennungen
@@ -1238,7 +1272,7 @@ function grundFuerBefund(farbe: string, namen: readonly string[]): string | null
   // Inhalt. Die kürzere Schreibweise verglich den Quote gegen den Wire-Topf, fand nie
   // etwas — und der Bestands-Scan war dadurch still halb blind (gemessen: beide
   // Mutationsproben rot, der echte Baum trotzdem grün).
-  for (const [, , wert] of farbe.matchAll(LITERAL)) {
+  for (const wert of literalInhalte(farbe)) {
     if (WIRE_WERTE.has(wert)) return `vergleicht Wire-Wert \`${wert}\``;
   }
   return null;
@@ -1408,6 +1442,20 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
         ].join('\n'),
       }),
     ).toEqual([]);
+  });
+
+  it('liest Wire-Werte auch hinter einem maskierten Anfuehrungszeichen', () => {
+    // Im Codex-Review gefunden: das Literal-Regex kannte keine Maskierung, waehrend drei
+    // andere Scanner derselben Datei sie laengst beruecksichtigen. Ein `\\'` mitten im
+    // Ausdruck verschob damit alle folgenden Literalgrenzen um eins — `aktiv` wurde nie
+    // gefunden, und der Guard blieb gruen ueber genau dem Bestandsbefund, gegen den er
+    // gebaut ist.
+    const maskiert = tagBefunde({
+      '/src/pages/Maskiert.tsx':
+        "<Tag color={label === 'it\\'s' && s.status === 'aktiv' ? 'green' : 'default'}>{x}</Tag>",
+    });
+    expect(maskiert).toHaveLength(1);
+    expect(maskiert[0]).toContain('vergleicht Wire-Wert `aktiv`');
   });
 
   it('sieht Vertragsnamen NICHT in Zeichenketten — der Wire-Test dagegen schon', () => {
