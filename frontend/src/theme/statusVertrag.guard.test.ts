@@ -462,6 +462,17 @@ function inZeichenkette(zeile: string, spalte: number): boolean {
   for (let i = 0; i < spalte; i++) {
     const z = zeile[i];
     if (z !== '"' && z !== "'" && z !== '`') continue;
+    // Ein Anfuehrungszeichen DIREKT hinter einem Bezeichnerzeichen oeffnet keine
+    // Zeichenkette — in JavaScript gibt es diese Stellung nicht. In JSX-Prosa dagegen
+    // schon: `<div>geht's <Tag color={s === 'aktiv' ? …}` paarte das Apostroph mit dem
+    // Oeffner vor `aktiv`, und die Marke `<Tag` lag damit scheinbar in einer
+    // Zeichenkette (im Codex-Review gefunden). Gegengerechnet an Vergleich, Klammer,
+    // Argument, Array, Konkatenation und Objektwert: dort steht davor immer ein
+    // Leerzeichen oder ein Satzzeichen.
+    // HEURISTIK, keine Herleitung: ein Apostroph am ANFANG eines JSX-Textknotens
+    // (`<div>'tis …`) steht hinter einem `>` und gilt weiterhin als Oeffner. Ihn zu
+    // erkennen hiesse, JSX zu parsen — dieselbe Grenze wie die drei im Dateikopf.
+    if (/[A-Za-z0-9_$]/.test(zeile[i - 1] ?? '')) continue;
     const zu = stringEnde(zeile, i);
     if (zu === -1) continue;
     if (spalte < zu) return true;
@@ -1680,6 +1691,27 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
           "import { dringlichkeit } from '../theme/statusFarben';",
           '<Tag color={fremd.dringlichkeit}>{y}</Tag>',
         ].join('\n'),
+      }),
+    ).toEqual([]);
+  });
+
+  it('haelt ein Apostroph im JSX-Text nicht fuer den Anfang einer Zeichenkette', () => {
+    // Im Codex-Review gefunden: `stringEnde` paarte das Apostroph in „geht's" mit dem
+    // oeffnenden Anfuehrungszeichen vor `aktiv`. Die Marke `<Tag` lag damit scheinbar
+    // IN einer Zeichenkette und wurde uebersprungen — ein echter Befund verschwand.
+    const prosa = tagBefunde({
+      '/src/pages/Prosa.tsx':
+        "<div>geht's <Tag color={s.status === 'aktiv' ? 'green' : 'default'} /></div>",
+    });
+    expect(prosa).toHaveLength(1);
+    expect(prosa[0]).toContain('vergleicht Wire-Wert `aktiv`');
+
+    // Gegenprobe: eine ECHTE Zeichenkette schirmt weiterhin ab. Ohne sie waere der Fix
+    // von „Filter abgeschaltet" nicht zu unterscheiden.
+    expect(
+      tagBefunde({
+        '/src/pages/Doku2.tsx':
+          "const beispiel = \"<Tag color={s === 'aktiv' ? 'green' : 'default'}>\";",
       }),
     ).toEqual([]);
   });
