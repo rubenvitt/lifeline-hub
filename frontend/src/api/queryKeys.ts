@@ -248,6 +248,9 @@ export const einsatzKeys = {
 
   // Stab (LFH-46): Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,
+  /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
+  stabLagebesprechungen: (einsatzId: number) =>
+    [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,
 
   // Bereitstellungsraum
   br: (einsatzId: number) => [EINSATZ_KEYS.br, einsatzId] as const,

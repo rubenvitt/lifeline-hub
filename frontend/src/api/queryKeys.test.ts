@@ -166,6 +166,9 @@ describe('einsatzKeys (Factory-Output)', () => {
       'geschaedigt',
       2,
     ]);
+    // LFH-543: Sub-Key UNTER dem Stab-Prefix — das `stab`-Ereignis invalidiert ihn mit.
+    // Als Literal gepinnt: ein geänderter Key bricht nichts, er trifft still ein anderes Fach.
+    expect(einsatzKeys.stabLagebesprechungen(1)).toEqual(['einsatz-stab', 1, 'lagebesprechungen']);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // Die gerundeten Koordinaten sind Teil des Keys — Cache-Trefferquote hängt daran.
     expect(einsatzKeys.ortVorschau(1, 52.123, 13.456, 'uhs:5')).toEqual([
