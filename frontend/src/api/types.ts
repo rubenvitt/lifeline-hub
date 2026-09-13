@@ -344,6 +344,19 @@ export interface BesetzungBody {
   bezeichnung?: string;
 }
 
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/stab/lagebesprechungen`, FE-lokal.
+ *
+ * `naechste_at` ist DREIWERTIG (`src/routes/stab.rs:193-194, 233-237`): Schlüssel fehlt =
+ * Termin unverändert · `null` = löschen · Wert = setzen. Ein leerer String löscht STILL
+ * (`support::trimme_tri`) — Aufrufer schicken nie `''`. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
+ */
+export interface LagebesprechungAbschlussBody {
+  entschluss: string;
+  abgehalten_at?: string;
+  naechste_at?: string | null;
+}
+
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
 
