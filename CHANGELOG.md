@@ -1,3 +1,9 @@
+## [1.0.0-alpha.12](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.11...v1.0.0-alpha.12) (2026-09-13)
+
+### Bug Fixes
+
+* **lagekarte:** Zeichnen-Steuerung nicht mehr von der Zeitachse verdeckt ([837f48b](https://github.com/rubenvitt/lifeline-hub/commit/837f48b05afea6d9ecbc18112b824b75e7556654))
+
 ## [1.0.0-alpha.11](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.10...v1.0.0-alpha.11) (2026-09-13)
 
 ### Features
