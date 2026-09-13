@@ -447,9 +447,7 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
    * fällt aus der Abkürzung (LFH-391 · C4, Arbeitspunkt 3 — der zweite Konsument der
    * aktuellen Route).
    *
-   * Dieselbe Regel, die der Navigationsrahmen seit LFH-337 · H12 fährt
-   * (`loeseZuletztModule`, Ausschluss `key`): ein Sprung auf die Seite, auf der man steht,
-   * ist keine Abkürzung — und bei genau drei Plätzen kostet er den nützlichsten. Der Fall
+   * Ein Sprung auf die Seite, auf der man steht, ist keine Abkürzung — und bei genau drei Plätzen kostet er den nützlichsten. Der Fall
    * ist der NORMALFALL und nicht die Ausnahme: `merkeModulBesuch` schreibt bei jeder
    * bewussten Modulwahl, der jüngste Eintrag ist also fast immer die aktuelle Seite.
    *

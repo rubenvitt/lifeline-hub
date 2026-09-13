@@ -47,8 +47,9 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
   await expect(dialog).toBeVisible();
   // Name UND Vorname liegen eingeklappt unter „Weitere Angaben": das Feldbudget (LFH-332 · B4)
   // hält vier sichtbare Felder, und seit LFH-340 · C5 belegt die Sichtungskategorie einen
-  // davon — sichtbar sind Sichtung, Geschlecht, Alter und Antreffort. Der Zugangsname trägt
-  // das Pfeil-Icon mit („collapsed Weitere Angaben"), deshalb ein Teiltreffer statt exact.
+  // davon — sichtbar sind Sichtung, Geschlecht, Alter und Antreffort. Teiltreffer statt exact:
+  // bis antd 6.5.2 trug der Zugangsname das Pfeil-Icon mit („collapsed Weitere Angaben"),
+  // seit antd 6.6 ist der Pfeil `aria-hidden`; der Teiltreffer hält beide Fassungen.
   await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
   await dialog.getByLabel('Name', { exact: true }).fill('Mustermann');
   await dialog.getByLabel('Vorname', { exact: true }).fill('Max');

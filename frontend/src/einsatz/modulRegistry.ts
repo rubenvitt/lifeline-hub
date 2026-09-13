@@ -419,7 +419,8 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  *
  * `status === 'fertig' && istModulSichtbar(...) && !istModulGesperrt(...)` stand vorher
  * viermal wörtlich da: in `erstesFreigegebenesModul` hier, in der „Zuletzt"-Ableitung des
- * Rahmens und zweimal in `command-palette/befehle.ts`. Vier Kopien einer Bedingung driften
+ * Rahmens (seit 13.09.2026 mit der Panel-Gruppe entfernt) und zweimal in
+ * `command-palette/befehle.ts`. Vier Kopien einer Bedingung driften
  * genau an der Stelle auseinander, die niemand testet.
  *
  * SEIT LFH-391 · A1b sind es DREI Stellen in `command-palette/befehle.ts`: der
@@ -477,8 +478,8 @@ export function aufloeseStandardModul(
  * einer anderen Kategorie. Die Verweigerung ist die richtige Antwort, der Aufrufer
  * entscheidet dann, nur das Panel zu öffnen.
  *
- * Freigabe fragt {@link istModulFreigegeben} — dieselbe Funktion wie die Kommandopalette
- * und die „Zuletzt"-Auflösung. Registry-Reihenfolge ist die Rangfolge — sie ist im Bestand
+ * Freigabe fragt {@link istModulFreigegeben} — dieselbe Funktion wie die Kommandopalette.
+ * Registry-Reihenfolge ist die Rangfolge — sie ist im Bestand
  * bewusst gepflegt (Kommentar `// Führung` u. a.).
  */
 export function erstesFreigegebenesModul(

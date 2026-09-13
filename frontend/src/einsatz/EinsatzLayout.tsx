@@ -20,7 +20,7 @@ import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
-import { loeseZuletztModule, merkeModulBesuch } from './zuletztModule';
+import { merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
@@ -139,8 +139,6 @@ export default function EinsatzLayout() {
     setOffeneKategorie(aktiveKategorie);
   }, [aktiveKategorie]);
 
-  const aktuellerModulKey = aktuellesModul?.key;
-
   // Wird der Schirm breit, steht der Rahmen wieder inline — ein gemerktes „Drawer
   // offen" darf dann nicht auf die Rückkehr zum Handschirm warten. `breit` ist ein
   // Primitiv, damit ist die Dependency-Regel strukturell erfüllt.
@@ -213,7 +211,8 @@ export default function EinsatzLayout() {
    *
    * DIESER SPRUNG WIRD NICHT GEMERKT (Fix-Welle, Befund B4). Das Ziel hat niemand
    * ausgewählt, es ist nur das erste freigegebene Modul der Kategorie — bei drei Plätzen
-   * und sechs Kategorien überschrieben drei Rail-Klicks sonst die ganze „Zuletzt"-Liste.
+   * und sechs Kategorien überschrieben drei Rail-Klicks sonst die ganze „Zuletzt"-Liste
+   * (heute die Gruppe „Zuletzt besucht" der Kommandopalette).
    * Die Aufzeichnung sitzt deshalb in `onModulKlick`, dem Weg der bewussten Wahl.
    */
   function onKategorieKlick(key: KategorieKey) {
@@ -241,7 +240,8 @@ export default function EinsatzLayout() {
 
   /**
    * Modulklick — der Weg, auf dem der „Zuletzt"-Speicher gefüllt wird. Panel UND
-   * Drawer-Akkordeon laufen hier durch.
+   * Drawer-Akkordeon laufen hier durch. Gelesen wird der Speicher nur noch von der
+   * Kommandopalette; die Panel-Gruppe „Zuletzt" ist entfernt (Begründung an `ModulPanel`).
    *
    * GEMERKT WIRD, WAS JEMAND GEWÄHLT HAT (LFH-337 · Fix-Welle, Befund B4). Bis dahin hing
    * die Aufzeichnung an einem Effekt auf den Routenwechsel. Seit der Rail-Klick eine echte
@@ -263,19 +263,6 @@ export default function EinsatzLayout() {
     navigate(einsatzModulPfad(einsatzId, modulZielRoute(modul)));
     setNavOffen(false);
   }
-
-  /**
-   * Die Auflösung selbst wohnt in `zuletztModule.ts` (Fix-Welle, Befund B3) — samt der
-   * Begründung, warum das aktuelle Modul und die offene Kategorie ausgeschlossen sind.
-   *
-   * Kein `useMemo`: die Liste hat höchstens drei Einträge, und der Speicher muss bei
-   * JEDEM Render gelesen werden — er ist kein React-Zustand, eine Memoisierung über den
-   * Modulschlüssel zeigte nach einem Modulwechsel noch den vorigen Stand.
-   */
-  const zuletztModule = loeseZuletztModule(einsatzId, benutzer, modulOverrides, {
-    key: aktuellerModulKey,
-    kategorie: offeneKategorie,
-  });
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -433,7 +420,6 @@ export default function EinsatzLayout() {
             benutzer={benutzer}
             overrides={modulOverrides}
             zaehler={modulZaehler}
-            zuletztModule={zuletztModule}
             aktiverModulKey={aktuellesModul?.key ?? null}
             onModulKlick={onModulKlick}
           />

@@ -329,10 +329,10 @@ describe('LageberichtDetailPage', () => {
     await screen.findByLabelText('Auftrag');
     const koepfe = await screen.findAllByRole('tab');
     expect(koepfe).toHaveLength(8);
-    // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke.
-    expect(
-      screen.getByRole('tab', { name: /^expanded Auftrag$|^collapsed Auftrag$/ }),
-    ).toBeInTheDocument();
+    // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke. Exakter Name:
+    // seit antd 6.6 ist der Aufklapp-Pfeil `aria-hidden` und stellt dem Namen kein
+    // „expanded "/„collapsed " mehr voran (bis 6.5.2 schon, `Collapse.js`/`renderExpandIcon`).
+    expect(screen.getByRole('tab', { name: /^Auftrag$/ })).toBeInTheDocument();
     expect(
       screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
     ).toBeInTheDocument();
