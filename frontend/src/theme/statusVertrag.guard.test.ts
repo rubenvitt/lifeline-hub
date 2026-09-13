@@ -1053,14 +1053,24 @@ function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<s
   const wurzeln = new Set<string>();
   const qualifiziert = new Set<string>();
   const treffer = [...ausdruck.matchAll(BEZEICHNER)];
+  // Ob der Bezeichner an Position i selbst eine Wurzel ist — gebraucht eine Runde
+  // später, um `theme.sf.x` von `sf.x` zu unterscheiden.
+  const istWurzel: boolean[] = [];
   for (let i = 0; i < treffer.length; i++) {
     const stelle = treffer[i].index ?? 0;
     if (!ausdruck.slice(0, stelle).trimEnd().endsWith('.')) {
+      istWurzel[i] = true;
       wurzeln.add(treffer[i][0]);
       continue;
     }
+    istWurzel[i] = false;
     const vorher = treffer[i - 1];
-    if (!vorher) continue;
+    // Nur ein Paar, dessen linke Seite die WURZEL der Kette ist (im Codex-Review
+    // gefunden): in `theme.sf.dringlichkeit` heisst das mittlere Glied zufällig wie der
+    // Namensraum, die Kette beginnt aber bei `theme` — `sf` ist dort eine fremde
+    // Eigenschaft, kein Import. Ohne diese Bedingung meldete der Guard den Ausdruck als
+    // Vertragszugriff.
+    if (!vorher || !istWurzel[i - 1]) continue;
     const dazwischen = ausdruck.slice((vorher.index ?? 0) + vorher[0].length, stelle);
     if (/^\s*\??\.\s*$/.test(dazwischen)) {
       qualifiziert.add(`${vorher[0]}.${treffer[i][0]}`);
@@ -1379,6 +1389,19 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     });
     expect(ueberAlias).toHaveLength(1);
     expect(ueberAlias[0]).toContain('liest `sf.dringlichkeit`');
+
+    // Der Alias muss die WURZEL der Kette sein, nicht irgendein Glied darin: in
+    // `theme.sf.dringlichkeit` heisst das mittlere Glied zufaellig wie der Namensraum,
+    // die Kette beginnt aber bei `theme`. Im Codex-Review gefunden, als Fehler in genau
+    // diesem Fix.
+    expect(
+      tagBefunde({
+        '/src/pages/Kette.tsx': [
+          "import * as sf from '../theme/statusFarben';",
+          '<Tag color={theme.sf.dringlichkeit}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
 
     // Und die andere Haelfte derselben Trennung: ein DIREKT importierter Name zaehlt als
     // Wurzel, nicht als fremde Eigenschaft. Ohne diese Zusicherung koennte der Vergleich
