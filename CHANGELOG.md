@@ -1,3 +1,9 @@
+## [1.0.0-alpha.14](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.13...v1.0.0-alpha.14) (2026-09-13)
+
+### Bug Fixes
+
+* **lfh-356:** Kachel-Parsen wirklich prüfen, Netz-Rennen schließen ([8607794](https://github.com/rubenvitt/lifeline-hub/commit/8607794cb2d624220cdc7c0ccb1b424e1372c740))
+
 ## [1.0.0-alpha.13](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.12...v1.0.0-alpha.13) (2026-09-13)
 
 ### Bug Fixes
