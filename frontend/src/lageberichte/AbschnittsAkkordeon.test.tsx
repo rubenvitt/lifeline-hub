@@ -33,18 +33,20 @@ describe('AbschnittsAkkordeon', () => {
 
   it('markiert leere Abschnitte im Klartext, nicht nur farbig (WCAG 1.4.1)', () => {
     renderAkkordeon(new Set(['auftrag']));
-    // Namen per Regex ans ENDE gebunden: antds Aufklapp-Pfeil trägt selbst `role="img"`
-    // mit `aria-label="expanded"`/`"collapsed"` und steht am Anfang des Namens (gemessen:
-    // „expanded Auftrag"). Das ist antds eigene Zustandsansage, nicht unsere Marke.
+    // Namen per Regex ans ENDE gebunden. Bis antd 6.5.2 trug der Aufklapp-Pfeil
+    // `aria-label="expanded"`/`"collapsed"` und stand am Anfang des Namens („expanded
+    // Auftrag"); seit antd 6.6 ist er ohne `collapsible="header"|"icon"` `aria-hidden`
+    // (`antd/es/collapse/Collapse.js`, `renderExpandIcon`). Zustand trägt `aria-expanded`.
     expect(screen.getByRole('tab', { name: /Auftrag$/ })).toBeInTheDocument();
     expect(
       screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
     ).toBeInTheDocument();
-    // UNSERE Ikonen sind dekorativ — kein eigenes Vorleseziel je Zeile. Der einzige `img`
-    // je Kopfzeile ist antds Pfeil.
+    // UNSERE Ikonen sind dekorativ — kein eigenes Vorleseziel je Zeile. Seit antd 6.6 ist
+    // auch der Pfeil verborgen, eine Kopfzeile trägt also GAR KEIN zugängliches `img`: fiele
+    // unsere `aria-hidden`-Hülle weg, stünde hier wieder eins (vorher: genau eins, der Pfeil).
     expect(screen.queryByRole('img', { name: /check-circle|minus-circle/ })).toBeNull();
     for (const tab of screen.getAllByRole('tab'))
-      expect(within(tab).getAllByRole('img')).toHaveLength(1);
+      expect(within(tab).queryAllByRole('img')).toHaveLength(0);
   });
 
   it('hält genau EINEN Abschnitt offen, rendert aber alle Editoren (forceRender)', () => {
