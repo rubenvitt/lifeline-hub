@@ -78,7 +78,7 @@ describe('BesetzungModal', () => {
     const onSchliessen = rendere(undefined);
     await screen.findByRole('button', { name: 'Übernehmen' });
     await waehle('Besetzung', 'disponierte Person');
-    await waehle('Person', 'Schulz');
+    await waehle('Person', 'Schulz · Sanitäter');
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
     expect(puts).toEqual([{ besetzung_art: 'personal', personal_id: 99 }]);
@@ -150,7 +150,7 @@ describe('BesetzungModal', () => {
       oeffneLeerDannFremdGesetzt(onSchliessen);
       await screen.findByRole('button', { name: 'Übernehmen' });
       await waehle('Besetzung', 'disponierte Person');
-      await waehle('Person', 'Schulz');
+      await waehle('Person', 'Schulz · Sanitäter');
       await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
       await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
       expect(puts).toEqual([{ besetzung_art: 'personal', personal_id: 99 }]);

@@ -65,7 +65,11 @@ export default function BesetzungModal({
     const mitAngelegt =
       angelegt && !liste.some((p) => p.id === angelegt.id) ? [...liste, angelegt] : liste;
     return [
-      ...mitAngelegt.map((p) => ({ value: p.id, label: p.name })),
+      // Gleichnamige Personen bleiben über die Funktion unterscheidbar.
+      ...mitAngelegt.map((p) => ({
+        value: p.id,
+        label: p.funktion ? `${p.name} · ${p.funktion}` : p.name,
+      })),
       { value: ADHOC, label: 'Ad-hoc-Person anlegen …' },
     ];
   }, [personalQuery.data, angelegt]);
