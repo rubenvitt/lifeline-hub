@@ -28,8 +28,15 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
     queryFn: () => ladeLagebesprechungen(einsatzId),
   });
 
-  // Fehler ≠ leer (LFH-331 · B3).
-  if (query.isError && !query.data) {
+  // Fehler ≠ leer (LFH-331 · B3), entschieden über die LÄNGE, nicht den Wahrheitswert: `[]` ist
+  // truthy. Nach einer leeren ersten Antwort stünde „Stand veraltet" sonst über „Noch keine
+  // Lagebesprechung abgeschlossen" — eine Aussage über eine Menge, die nach dem gescheiterten
+  // Abruf niemand kennt (Muster `pages/MaterialPage.tsx`).
+  const anzahl = query.data?.length ?? 0;
+  const gescheitert = query.isError && anzahl === 0;
+  const standVeraltet = query.isError && anzahl > 0;
+
+  if (gescheitert) {
     return (
       <SeitenFehler
         text="Frühere Lagebesprechungen konnten nicht geladen werden"
@@ -41,9 +48,7 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
 
   return (
     <>
-      {query.isError && query.data && (
-        <SeitenStandVeraltet onWiederholen={() => void query.refetch()} />
-      )}
+      {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void query.refetch()} />}
       <Liste
         dataSource={query.data}
         rowKey={(l) => l.id}

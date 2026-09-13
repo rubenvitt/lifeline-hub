@@ -1,6 +1,8 @@
+import type { QueryClient } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import LagebesprechungHistorie from './LagebesprechungHistorie';
@@ -18,9 +20,22 @@ const eintrag = (lfd_nr: number, over: object = {}) => ({
 });
 const LEER = 'Noch keine Lagebesprechung abgeschlossen';
 
+const FEHLER = 'Frühere Lagebesprechungen konnten nicht geladen werden';
+const VERALTET = /Angezeigter Stand konnte nicht aktualisiert werden/;
+
 function zeige(antwort: () => Response | Promise<Response>) {
   server.use(http.get('/api/einsaetze/1/stab/lagebesprechungen', antwort));
-  renderMitProviders(<LagebesprechungHistorie einsatzId={1} />);
+  return renderMitProviders(<LagebesprechungHistorie einsatzId={1} />);
+}
+
+/** Stellt den Handler auf 500 um und lädt über den Client des Renders neu. */
+async function neuladenScheitert(client: QueryClient) {
+  server.use(
+    http.get('/api/einsaetze/1/stab/lagebesprechungen', () =>
+      HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+    ),
+  );
+  await act(() => client.invalidateQueries({ queryKey: einsatzKeys.stabLagebesprechungen(1) }));
 }
 
 describe('LagebesprechungHistorie', () => {
@@ -52,6 +67,31 @@ describe('LagebesprechungHistorie', () => {
       await screen.findByText('Frühere Lagebesprechungen konnten nicht geladen werden'),
     ).toBeInTheDocument();
     expect(screen.queryByText(LEER)).toBeNull();
+  });
+
+  /**
+   * Fehler ≠ leer auch NACH einer ersten Antwort (LFH-331 · B3): `[]` ist truthy. Eine Prüfung
+   * auf den Wahrheitswert der Daten zeigte hier „Stand veraltet" über dem Leer-Text — eine
+   * Aussage über eine Menge, die nach dem gescheiterten Abruf niemand kennt.
+   */
+  it('leer geladen, dann scheitert das Neuladen → Fehler, kein Leer-Text', async () => {
+    const { client } = zeige(() => HttpResponse.json([]));
+    expect(await screen.findByText(LEER)).toBeInTheDocument();
+
+    await neuladenScheitert(client);
+    expect(await screen.findByText(FEHLER)).toBeInTheDocument();
+    expect(screen.queryByText(LEER)).toBeNull();
+    expect(screen.queryByText(VERALTET)).toBeNull();
+  });
+
+  it('befüllt geladen, dann scheitert das Neuladen → Stand veraltet, Zeilen bleiben (Gegenfall)', async () => {
+    const { client } = zeige(() => HttpResponse.json([eintrag(2), eintrag(1)]));
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+
+    await neuladenScheitert(client);
+    expect(await screen.findByText(VERALTET)).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByText(FEHLER)).toBeNull();
   });
 
   it('behauptet während des Ladens weder leer noch Fehler', async () => {
