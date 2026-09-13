@@ -6,6 +6,7 @@ import { neuerQueryClient } from '../../test/utils';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import type { GeoJsonGeometry } from './geo';
 import { useKartenInteraktion } from './useKartenInteraktion';
+import { einsatzKeys } from '../../api/queryKeys';
 
 // API-Client der freien Zeichen mocken (LFH-170 Etappe 3): der Hook ruft ihn bei Platzieren/
 // Ändern/Löschen; hier nur die Aufrufe prüfen (kein Netz).
@@ -528,6 +529,49 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
   it('ist Vorgabe AN', () => {
     const { result } = rendere();
     expect(result.current.zoneSerie).toBe(true);
+  });
+
+  // Codex-Review zu LFH-357 (P2): das Anlegen einer `gefahrengebiet`-Zone legt SERVERSEITIG
+  // eine neue Gefahrengebiet-Gruppe an (`lage_zone/repo.rs:anlegen_tx` → `gebiet_anlegen`).
+  // Invalidiert der Klick nur die Zonen, trägt die frische Zone eine `gefahrengebiet_id`, die
+  // in der veralteten Gebiets-Liste fehlt — der Nachschlag geht ins Leere und die Karte
+  // beschriftet sie „Warnstufe: unbekannt", bis irgendein fremder Refetch kommt. Der
+  // SSE-Fan-out räumt beides ab (`lage_zone` → zonen + gefahrengebiete); genau deshalb fällt
+  // es nur auf, wenn der Live-Strom hängt. Die Änder- und Lösch-Pfade desselben Hooks
+  // invalidieren längst beides — hier fehlte die Symmetrie.
+  it('invalidiert nach dem Anlegen AUCH die Gefahrengebiete, nicht nur die Zonen', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const client = neuerQueryClient();
+    const spion = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          einsatz: undefined,
+          darfSchreiben: true,
+          alleVerortet: [],
+          fehler: vi.fn(),
+          erfolg: vi.fn(),
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    bisZurBestaetigung(result);
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+
+    const schluessel = () =>
+      spion.mock.calls.map((c) => JSON.stringify((c[0] as { queryKey: unknown }).queryKey));
+    // Vorbedingung: die Zonen-Invalidierung wird von diesem Spion überhaupt gesehen — sonst
+    // wäre die eigentliche Aussage unten trivial unerfüllbar und der Test bewiese nichts.
+    await waitFor(() => expect(schluessel()).toContain(JSON.stringify(einsatzKeys.zonen(1))));
+    // Die tragende Aussage.
+    await waitFor(() =>
+      expect(schluessel()).toContain(JSON.stringify(einsatzKeys.gefahrengebiete(1))),
+    );
   });
 
   it('nach erfolgreichem Speichern ist derselbe Zonen-Typ erneut scharf UND der Nonce gestiegen', async () => {

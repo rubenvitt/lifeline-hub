@@ -39,6 +39,31 @@ wird ungewählt, gewählt und mit Hover geprüft; Alpha wird mitgerechnet, unbel
 Bild-/Opacity-Kompositionen werden abgelehnt. Kein zusätzlicher mobiler Status-Slot ist
 Teil dieser Farbentscheidung.
 
+**Auf der Karte trägt die Warnstufe der TEXT, nicht die Farbe** (LFH-357). `warnstufeKarte`
+bildet fünf Stufen auf zwei unterscheidbare Rollen ab (`achtung`: niedrig/mittel · `alarm`:
+keine/hoch/akut). A2 hielt das für gedeckt („wer die fünf Stufen unterscheiden muss, nutzt
+`label` oder `form`") — auf der Kartenfläche stand aber keiner der beiden Kanäle:
+`kartenLayer.ts` beschriftete die Zone mit ihrem **Namen**, und `form` trägt gemessen **drei**
+Zeichen (`FORM_ZEICHEN`) für fünf Stufen, kann die Auflösung also gar nicht herstellen — es
+bleibt deshalb an keinem Vertragseintrag gesetzt, statt der Vollständigkeit halber gesetzt zu
+werden. Träger ist die reine, exportierte `zonenBeschriftung` (`pages/lagekarte/zonenStil.ts`):
+„Warnstufe: <label>" unter dem Zonennamen, `label` ausschliesslich aus `warnstufeKarte` — wer
+das Wort dort ändert, ändert die Kartenbeschriftung mit. Zonen ohne Warnstufe behalten ihren
+Namen unverändert. **Ein fehlender Nachschlag heisst „Warnstufe: unbekannt", nicht „keine"**:
+das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`, NICHT an der Gefahrengebiete-Query
+— die Zone wird also gezeichnet, während die Gebiete noch laden oder ihr Abruf gescheitert ist.
+Die **Farbe** rundet dort vorsichtshalber auf `keine` (Alarm, unverändert), der **Text** nicht;
+`zonenBeschriftung` hat dafür drei Zustände statt zwei. **„Warnstufe: keine" heisst „keine Stufe
+gesetzt", nicht „unbewertet"**:
+`src/gefahr/repo.rs` rechnet die höchste Stufe über ein Severity-`MAX`, in dem `'keine'`
+denselben Rang **0** bekommt wie gar keine Bewertung — die beiden Fälle sind aus den Daten
+nicht trennbar, ein Wort, das sie trennt, behauptet zu viel. Die rote Fläche bleibt davon
+unberührt; sie ist die Vorsichtsentscheidung aus `gefahrengebietStil`. **Nicht zugesichert ist
+der Kollisionsfall:** `zonen-label` fährt ohne `text-allow-overlap`, ein gedrängtes Label kann
+ausfallen — dann trägt wieder nur die Farbe. Wer das schliessen will, braucht einen
+**graphischen** Kanal (Linienform je Stufe; `line-dasharray` ist in maplibre-gl 6.8.0 gemessen
+`cross-faded-data-driven`, also feature-abhängig setzbar) und eine eigene Entscheidung dafür.
+
 Die UI-Form richtet sich nach Umfang/Interaktion des Inhalts (LFH-19):
 
 - **Vollseite / eigene Route** (`/einsaetze/:einsatzId/<modul>/:id`) → umfangreiche

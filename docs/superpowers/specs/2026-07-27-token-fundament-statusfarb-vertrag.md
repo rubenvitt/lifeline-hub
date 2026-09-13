@@ -212,6 +212,58 @@ Die ~20 außerhalb des Task-Auftrags (`personen/personMeta.ts`, `pages/schaeden/
 `taktischesZeichen.ts` u. a.) bleiben **draußen** — sie hineinzuziehen wäre der Bestands-Sweep,
 den der Task zweimal ausdrücklich verbietet. Inventar und Zielticket in §5.
 
+**Nachtrag LFH-357 (2026-09-12): die Auflösungs-Begründung oben war auf der Kartenfläche
+falsch — korrigiert, nicht umformuliert.**
+
+Diese Spec (und der Doc-Kommentar, den sie erzeugt hat) verteidigte den Auflösungsverlust bei
+`warnstufeKarte` mit: *„wer die fünf Stufen unterscheiden muss, nutzt `label` (immer vorhanden)
+oder `form`."* Gegen HEAD nachgemessen hielt auf der Lagekarte **keine der beiden Hälften**:
+
+| Behauptung | Gemessener Zustand |
+|---|---|
+| `label` ist „immer vorhanden" | `pages/lagekarte/kartenLayer.ts:83` setzte `label: z.label ?? ''` — das ist der **Zonenname**. `ZoneStil` hatte kein Feld für Text oder Form. |
+| `form` steht als dritter Kanal bereit | In **keinem** Vertragseintrag gesetzt — und grundsätzlich untauglich: `FORM_ZEICHEN` (`components/StatusTag.tsx`) kennt **drei** Zeichen für **fünf** Stufen. |
+
+Operative Folge: `niedrig` und `mittel` sahen auf der Karte identisch aus, ebenso `hoch`,
+`akut` und ein Gebiet ohne gesetzte Stufe. Die Rechtfertigung stützte sich damit auf eine
+Mitigation, die es an dieser Fläche nicht gab.
+
+**Gegangen ist Weg 2 des Tickets (Warnstufe in den Zonen-Labeltext), und zwar weil Weg 1 die
+Zusicherung nicht einlösen kann:** `form` trägt drei Werte, die AK verlangt fünf
+unterscheidbare Stufen. `form` bleibt deshalb ungesetzt — ein dritter Kanal, der die Auflösung
+gar nicht herstellt, wird nicht gesetzt, bloss weil er existiert. Träger ist die reine,
+exportierte `zonenBeschriftung` in `pages/lagekarte/zonenStil.ts`; sie setzt
+„Warnstufe: \<label\>" unter den Zonennamen und liest `label` **aus `warnstufeKarte`**, nicht
+aus einem eigenen Literal. Zonen ohne Warnstufe (jede andere Zonenart) behalten ihren Namen
+unverändert.
+
+**Der Wortlaut `Warnstufe: keine` ist eine Messung, keine Verlegenheit.** „unbewertet" wäre die
+naheliegende Formulierung und wäre falsch: `src/gefahr/repo.rs` bildet die höchste Warnstufe
+über ein Severity-`MAX`, in dem `'keine'` auf denselben Rang **0** fällt wie *gar keine
+Bewertung*. Die Abfrage kann „nichts gesetzt" und „lauter `keine`-Zellen" nicht trennen; ein
+Wort, das die Unterscheidung behauptet, behauptet mehr als die Daten hergeben. Die rote Fläche
+bleibt davon unberührt — sie ist die Vorsichtsentscheidung von `gefahrengebietStil`, und der
+Text sagt jetzt dazu, worauf sie sich stützt.
+
+**Ein fehlender Nachschlag ist ein dritter Zustand, kein gerundeter `keine`** (Codex-Review zu
+LFH-357, P1). `ladt` in `useLagekarteDaten` hängt an `einsatz`/`config` und **nicht** an der
+Gefahrengebiete-Query: die Karte zeichnet Zonen also, während die Gebiete noch laden oder ihr
+Abruf gescheitert ist, und `gebietWarnstufe.get(...)` geht ins Leere. Für die **Farbe** ist der
+Fallback auf `keine` dort richtig und bleibt (Alarm — vorsichtshalber). Für den **Text** nicht:
+„Warnstufe: keine" wäre eine Behauptung über Daten, die es gerade nicht gibt — exakt der
+Maßstab, mit dem der Absatz darüber „unbewertet" verwirft. `zonenBeschriftung` nimmt deshalb
+`Warnstufe | 'unbekannt' | null` und schreibt „Warnstufe: unbekannt". Beide Hälften gehören als
+Paar geprüft: ohne die Farb-Zusicherung bliebe ein Fix, der die Fläche mit entfärbt, grün.
+
+**Was damit NICHT zugesichert ist:** MapLibre lässt Symbol-Labels bei Kollision weg
+(`zonen-label` fährt ohne `text-allow-overlap`). Steht ein Zonenlabel dicht an einem anderen,
+kann der Text ausfallen — dann trägt wieder nur die Farbe. Das ist der Bestand seit es die
+Zonenbeschriftung gibt und mit Weg 2 nicht schlechter geworden; wer es schliessen will,
+braucht einen **graphischen** Kanal (Linienform je Stufe — `line-dasharray` ist in
+maplibre-gl 6.8.0 gemessen `cross-faded-data-driven`, also feature-abhängig setzbar). Das ist
+eine eigene Entscheidung mit eigener Messung, kein Nebenprodukt dieses Fixes.
+
+
 ---
 
 ### 1.4 · Prüfliste Einsatztauglichkeit: **bindet A2 formal nicht — wird für `EinsaetzePage` trotzdem angelegt**
