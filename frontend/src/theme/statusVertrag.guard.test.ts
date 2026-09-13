@@ -1038,6 +1038,82 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
 const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
 
 /**
+ * Index der zu `auf` gehörenden schliessenden Klammer, oder `bis`. Überspringt
+ * Zeichenketten, damit eine Klammer IM String die Bilanz nicht verschiebt — dieselbe
+ * Vorsichtsmassnahme wie in {@link klammerEnde}.
+ */
+function klammerZu(text: string, auf: number, bis: number): number {
+  let tiefe = 0;
+  let anfuehrung: string | null = null;
+  for (let i = auf; i < bis; i++) {
+    const z = text[i];
+    if (anfuehrung) {
+      if (z === '\\') i++;
+      else if (z === anfuehrung) anfuehrung = null;
+      continue;
+    }
+    if (z === '"' || z === "'" || z === '`') anfuehrung = z;
+    else if (z === '{') tiefe++;
+    else if (z === '}' && --tiefe === 0) return i;
+  }
+  return bis;
+}
+
+/** Markiert die Zeichenketten in `[von, bis)` als unfrei. Rekursiv, weil eine
+ *  Template-Substitution wieder Code enthält — und darin wieder Zeichenketten. */
+function markiereZeichenketten(text: string, von: number, bis: number, frei: boolean[]): void {
+  let anfuehrung: string | null = null;
+  for (let i = von; i < bis; i++) {
+    const z = text[i];
+    if (!anfuehrung) {
+      if (z === '"' || z === "'" || z === '`') {
+        anfuehrung = z;
+        frei[i] = false;
+      }
+      continue;
+    }
+    frei[i] = false;
+    if (z === '\\') {
+      if (i + 1 < bis) frei[i + 1] = false;
+      i++;
+      continue;
+    }
+    if (anfuehrung === '`' && z === '$' && text[i + 1] === '{') {
+      frei[i + 1] = false;
+      const zu = klammerZu(text, i + 1, bis);
+      markiereZeichenketten(text, i + 2, zu, frei);
+      frei[zu] = false;
+      i = zu;
+      continue;
+    }
+    if (z === anfuehrung) anfuehrung = null;
+  }
+}
+
+/**
+ * Für jede Stelle: steht sie ausserhalb einer Zeichenkette?
+ *
+ * Der Namensvergleich darf Zeichenketten NICHT sehen (im Codex-Review gefunden):
+ * `mode === 'dringlichkeit' ? 'blue' : 'default'` liest den Vertrag nicht, es vergleicht
+ * einen Modusnamen — der Bezeichner steht als Wort in einem Literal. Der Wire-Wert-Test
+ * eine Funktion weiter unten braucht dieselben Literale dagegen zwingend; die beiden
+ * Hälften von {@link grundFuerBefund} sehen den Ausdruck deshalb bewusst verschieden,
+ * und das ist keine Ungenauigkeit, sondern der Unterschied zwischen „liest eine
+ * Bindung" und „vergleicht einen Wert".
+ *
+ * Die Template-Substitution ist der Grund für die Rekursion: in
+ * `` `${dringlichkeit[s].rolle}` `` ist der Inhalt Code und muss sichtbar bleiben, in
+ * `` `Text ${x ? 'dringlichkeit' : y}` `` steckt darin wieder eine Zeichenkette. Eine
+ * Maske, die den ganzen Backtick-Bereich ausblendet, hätte den Fehlalarm gegen einen
+ * Bypass getauscht.
+ */
+function freieStellen(text: string): boolean[] {
+  const frei = new Array<boolean>(text.length).fill(true);
+  markiereZeichenketten(text, 0, text.length, frei);
+  return frei;
+}
+
+/**
  * Die Zugriffe eines Ausdrucks, getrennt nach WURZEL und QUALIFIZIERT.
  *
  * Eine Wurzel steht für sich (`farbe(…)`, `dringlichkeit`), eine Eigenschaft hinter
@@ -1052,7 +1128,8 @@ const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
 function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<string> } {
   const wurzeln = new Set<string>();
   const qualifiziert = new Set<string>();
-  const treffer = [...ausdruck.matchAll(BEZEICHNER)];
+  const frei = freieStellen(ausdruck);
+  const treffer = [...ausdruck.matchAll(BEZEICHNER)].filter((m) => frei[m.index ?? 0]);
   // Ob der Bezeichner an Position i selbst eine Wurzel ist — gebraucht eine Runde
   // später, um `theme.sf.x` von `sf.x` zu unterscheiden.
   const istWurzel: boolean[] = [];
@@ -1273,6 +1350,61 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
         '/src/pages/Praefix.tsx': [
           "import { rollenFarbe as farbe } from '../theme/statusFarben';",
           '<Tag color={farbeVonWoanders(x)}>x</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+  });
+
+  it('sieht Vertragsnamen NICHT in Zeichenketten — der Wire-Test dagegen schon', () => {
+    // Im Codex-Review gefunden. Die beiden Hälften von `grundFuerBefund` sehen den
+    // Ausdruck bewusst verschieden: „liest eine Bindung" darf Literale nicht sehen,
+    // „vergleicht einen Wert" braucht sie zwingend.
+    expect(
+      tagBefunde({
+        '/src/pages/Wort.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          "<Tag color={mode === 'dringlichkeit' ? 'blue' : 'default'}>{y}</Tag>",
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+
+    // Gegenprobe 1: derselbe Name als echter Zugriff bleibt ein Befund.
+    expect(
+      tagBefunde({
+        '/src/pages/Echt3.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          '<Tag color={dringlichkeit[s].rolle}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toHaveLength(1);
+
+    // Gegenprobe 2, die tragende: der WIRE-Wert-Test liest weiter aus Literalen —
+    // sonst hätte die Maske den Bestandsbefund dieses PR mit abgeschaltet.
+    const wire = tagBefunde({
+      '/src/pages/Wire2.tsx':
+        "<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{x}</Tag>",
+    });
+    expect(wire).toHaveLength(1);
+    expect(wire[0]).toContain('vergleicht Wire-Wert `aktiv`');
+
+    // Gegenprobe 3: eine Template-Substitution ist Code und bleibt sichtbar — eine
+    // Maske über den ganzen Backtick-Bereich hätte den Fehlalarm gegen einen Bypass
+    // getauscht.
+    expect(
+      tagBefunde({
+        '/src/pages/Vorlage.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          '<Tag color={`${dringlichkeit[s].rolle}`}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toHaveLength(1);
+
+    // Gegenprobe 4: und eine Zeichenkette IN der Substitution ist wieder Text.
+    expect(
+      tagBefunde({
+        '/src/pages/VorlageText.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          "<Tag color={`${x ? 'dringlichkeit' : y}`}>{y}</Tag>",
         ].join('\n'),
       }),
     ).toEqual([]);
