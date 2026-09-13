@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Space, Tabs, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Space, Tabs } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +32,8 @@ import {
   personErfassungsQuittungEntfernen,
   personErfassungsQuittungenLaden,
 } from '../offline/queue';
+import StatusTag from '../components/StatusTag';
+import { einsatzStatus } from '../theme/statusFarben';
 
 /** Sicht-Tabs: 'alle' = kein Filter; 'patienten' = SK-Achse; sonst Status-Filter. */
 type Sicht = PersonenSicht;
@@ -460,10 +462,7 @@ export default function PersonenPage() {
       titel={
         <Space>
           Personen
-          {/* BEFUND wie in `PersonalPage`/`SchaedenPage`: `EinsatzStatus` hat keine
-              Statusrolle in `theme/statusFarben.ts`. Der Tag bleibt deshalb auf
-              antd-Farbnamen und rohem Enum-Wert stehen. */}
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       breadcrumb={

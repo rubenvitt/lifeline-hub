@@ -13,7 +13,7 @@
  *
  * Eine Konstante statt elf Formulierungen: eine abweichende Fassung fällt niemandem auf,
  * weil jede Sektion für sich plausibel aussieht — genau die Sorte Drift, die LFH-345 · M14
- * am `EINSATZ_STATUS` gemessen hat.
+ * am Einsatz-Status gemessen hat.
  */
 export const STAMMDATEN_RECHTE_TEXT =
   'Nur Benutzer mit der Systemrolle „Admin“ dürfen die Stammdaten ändern — die Werte stehen hier zum Nachlesen.';

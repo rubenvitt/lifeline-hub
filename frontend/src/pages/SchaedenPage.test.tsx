@@ -237,7 +237,10 @@ describe('SchaedenPage', () => {
     expect(await screen.findByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 4, name: /Schäden/ })).toBeInTheDocument();
     expect(screen.getAllByRole('heading')).toHaveLength(1);
-    expect(screen.getByText('aktiv')).toBeInTheDocument();
+    // „Aktiv", nicht „aktiv": der Kopf zeigt seit LFH-358 die BESCHRIFTUNG aus dem
+    // Statusfarb-Vertrag über `StatusTag`, nicht mehr den rohen Wire-Wert in einem
+    // handgemalten `<Tag color="green">`.
+    expect(screen.getByText('Aktiv')).toBeInTheDocument();
   });
 
   it('weist Beobachter im Kopf auf die fehlende Schreibberechtigung hin', async () => {
