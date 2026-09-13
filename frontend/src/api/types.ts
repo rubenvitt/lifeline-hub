@@ -326,6 +326,24 @@ export type BefehlStatus = S['BefehlStatus'];
 export type BefehlAbschnitt = S['BefehlAbschnitt'];
 export type BefehlAnzeige = S['BefehlAnzeige'];
 
+// ============================== LFH-46 Stab (S1–S6) ==============================
+export type Stab = S['StabAnzeige'];
+export type Stabsfunktion = S['StabsfunktionAnzeige'];
+export type Lagebesprechung = S['LagebesprechungAnzeige'];
+export type Sachgebiet = S['Sachgebiet'];
+export type BesetzungArt = S['BesetzungArt'];
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.
+ * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422
+ * (`src/routes/stab.rs:80-118`) — Aufrufer schicken NUR das Feld, das die Art verlangt.
+ */
+export interface BesetzungSetzen {
+  besetzung_art: BesetzungArt;
+  personal_id?: number;
+  bezeichnung?: string;
+}
+
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
 

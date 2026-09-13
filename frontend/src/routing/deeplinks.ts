@@ -184,6 +184,16 @@ export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): s
 }
 
 /**
+ * Stab-Modul (LFH-46). `?neu=1` fokussiert den Abschluss der Lagebesprechung (ST5, LFH-543);
+ * die Seite räumt den Parameter nach dem Lesen (apply-then-clean wie ETB/Schäden).
+ */
+export function stabPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'stab'), {
+    neu: opts.neu ? 1 : undefined,
+  });
+}
+
+/**
  * Erlaubte Werte des ETB-Typfilters.
  *
  * Ein **exhaustiver Record**, kein Array: fehlt hier eine Variante von `EtbTyp`, bricht

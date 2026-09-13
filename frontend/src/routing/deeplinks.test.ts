@@ -19,6 +19,7 @@ import {
   personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
+  stabPfad,
   etbPfad,
   parseEtbFilter,
   personalPfad,
@@ -178,6 +179,13 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('schaedenPfad mit ?neu=1', () => {
     expect(schaedenPfad(E, { neu: true })).toBe('/einsaetze/5/schaeden?neu=1');
+  });
+  it('stabPfad ohne Optionen', () => {
+    expect(stabPfad(E)).toBe('/einsaetze/5/stab');
+  });
+  it('stabPfad mit neu fokussiert den Abschluss (?neu=1)', () => {
+    expect(stabPfad(E, { neu: true })).toBe('/einsaetze/5/stab?neu=1');
+    expect(stabPfad(E, { neu: false })).toBe('/einsaetze/5/stab');
   });
   it('etbPfad mit ?eintrag=', () => {
     expect(etbPfad(E, { eintrag: 7 })).toBe('/einsaetze/5/etb?eintrag=7');
