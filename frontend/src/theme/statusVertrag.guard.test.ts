@@ -69,6 +69,16 @@
  *     `<antd.Tag color=…>`). {@link tagNamenIn} löst die Umbenennung beim benannten
  *     Import auf, nicht die Qualifizierung im JSX-Namen. Im Bestand kommt weder das eine
  *     noch das andere vor (gemessen).
+ *   • **Eine Stellung, in der ein Bezeichner NICHT gelesen wird, die hier nicht
+ *     aufgezählt ist.** Erfasst sind heute: Eigenschaft hinter einem Punkt, Objekt-
+ *     Schlüssel (`name:`), Methoden-Kurzform (`name() {}`, auch mit `get`/`set`/`async`)
+ *     und Bezeichner in Zeichenketten. Die Liste ist im Review dreimal nacheinander
+ *     gewachsen, und sie ist erkennbar nicht abgeschlossen — JavaScript hat weitere
+ *     Bindungsstellen (Destrukturierungsmuster, Label, Parameternamen), die in einem
+ *     `color`-Ausdruck heute niemand schreibt. Jede weitere Variante ist eine Kante
+ *     mehr an einem Scanner, der die Frage „liest dieser Ausdruck jene Bindung?"
+ *     grundsätzlich nur schätzen kann. Das ist der eigentliche Grund für das
+ *     AST-Folgeticket, nicht bloß Aufräumen.
  *   • **Ein Vertragsname, der über EINE ZWEITE Datei umbenannt weitergereicht wird**:
  *     `personen/personMeta.ts:31` exportiert `personStatus as STATUS_META` weiter.
  *     {@link vertragsNamenIn} löst die Umbenennung beim DIREKTEN Import auf, folgt aber
@@ -1225,6 +1235,26 @@ function freieStellen(text: string): boolean[] {
 }
 
 /**
+ * Die innerste zum Zeitpunkt `stelle` offene Klammer (`{`, `(`, `[`) oder `null`.
+ * Zeichenketten werden uebersprungen — `frei` sagt, welche Stellen Code sind.
+ */
+function offeneKlammer(ausdruck: string, stelle: number, frei: boolean[]): string | null {
+  const stapel: string[] = [];
+  for (let i = 0; i < stelle; i++) {
+    if (!frei[i]) continue;
+    const z = ausdruck[i];
+    // Die AEUSSERSTE `{` ist der JSX-Ausdruckscontainer der `color`-Prop, kein
+    // Objekt-Literal — `farbAusdruck` liefert den Ausdruck samt Klammern. Ohne diese
+    // Unterscheidung sah `{farbe(wk[s].rolle, token)}` wie eine Methoden-Kurzform aus
+    // und zwei Bestandszusicherungen fielen (beim Bauen gemessen).
+    if (z === '{') stapel.push(i === 0 ? 'jsx' : '{');
+    else if (z === '(' || z === '[') stapel.push(z);
+    else if (z === '}' || z === ')' || z === ']') stapel.pop();
+  }
+  return stapel[stapel.length - 1] ?? null;
+}
+
+/**
  * Die Zugriffe eines Ausdrucks, getrennt nach WURZEL und QUALIFIZIERT.
  *
  * Eine Wurzel steht für sich (`farbe(…)`, `dringlichkeit`), eine Eigenschaft hinter
@@ -1256,7 +1286,19 @@ function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<s
       // zusaetzlich hinter `{` oder `,`, ein Ternaer-Zweig hinter `?`.
       const davor = ausdruck.slice(0, stelle).trimEnd();
       const danach = ausdruck.slice(stelle + treffer[i][0].length).trimStart();
-      const istSchluessel = danach.startsWith(':') && (davor.endsWith('{') || davor.endsWith(','));
+      // Die METHODEN-Kurzform (`{ dringlichkeit() {…} }`, auch mit `get`/`set`/`async`
+      // davor) ist ebenfalls ein Schluessel. „Folgt ein `(`" allein reicht dafuer nicht
+      // und oeffnete einen Bypass: `waehle(a, dringlichkeit())` sieht genauso aus, ist
+      // aber ein AUFRUF und liest die Bindung. Unterschieden wird an der innersten
+      // offenen Klammer — `{` ist ein Objekt-Literal, `(` eine Argumentliste. Ein
+      // BERECHNETER Schluessel (`{ [dringlichkeit]: x }`) steht in `[` und liest die
+      // Bindung ebenfalls.
+      const imObjekt = offeneKlammer(ausdruck, stelle, frei) === '{';
+      const nachModifikator = /(?:^|[{,])\s*(?:get|set|async)$/.test(davor);
+      const istSchluessel =
+        imObjekt &&
+        (danach.startsWith(':') || danach.startsWith('(')) &&
+        (davor.endsWith('{') || davor.endsWith(',') || nachModifikator);
       if (istSchluessel) {
         istWurzel[i] = false;
         continue;
@@ -1740,6 +1782,50 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
       ].join('\n'),
     });
     expect(frage).toHaveLength(1);
+  });
+
+  it('kennt auch die Methoden-Kurzform als Schluessel — ohne den Aufruf zu verlieren', () => {
+    // Im Codex-Review gefunden. Die naheliegende Abhilfe („folgt ein `(`") oeffnet einen
+    // BYPASS: `waehle(a, dringlichkeit())` sieht genauso aus, ist aber ein Aufruf und
+    // liest die Bindung. Unterschieden wird an der innersten offenen Klammer — `{` ist
+    // ein Objekt-Literal, `(` eine Argumentliste.
+    expect(
+      tagBefunde({
+        '/src/pages/Methode.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          '<Tag color={waehle({ dringlichkeit() { return eigeneFarbe; } })}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+
+    // Auch mit Modifikator davor.
+    expect(
+      tagBefunde({
+        '/src/pages/Getter.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          '<Tag color={waehle({ get dringlichkeit() { return eigeneFarbe; } })}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+
+    // DIE GEGENPROBE, ohne die der Fix eine Luecke waere: derselbe Text in einer
+    // Argumentliste ist ein Aufruf und bleibt ein Befund.
+    const aufruf = tagBefunde({
+      '/src/pages/Aufruf2.tsx': [
+        "import { dringlichkeit } from '../theme/statusFarben';",
+        '<Tag color={waehle(a, dringlichkeit())}>{y}</Tag>',
+      ].join('\n'),
+    });
+    expect(aufruf).toHaveLength(1);
+
+    // Und der BERECHNETE Schluessel liest die Bindung sehr wohl.
+    const berechnet = tagBefunde({
+      '/src/pages/Berechnet.tsx': [
+        "import { dringlichkeit } from '../theme/statusFarben';",
+        '<Tag color={waehle({ [dringlichkeit]: x })}>{y}</Tag>',
+      ].join('\n'),
+    });
+    expect(berechnet).toHaveLength(1);
   });
 
   it('haelt ein Apostroph im JSX-Text nicht fuer den Anfang einer Zeichenkette', () => {
