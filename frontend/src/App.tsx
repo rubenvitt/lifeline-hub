@@ -35,6 +35,7 @@ import LageDashboardPage from './pages/lage-dashboard/LageDashboardPage';
 import TierePage from './pages/TierePage';
 import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
+import StabPage from './pages/StabPage';
 import SchaedenDetailPage from './pages/SchaedenDetailPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
 import AufnahmePage from './pages/personen/AufnahmePage';
@@ -90,6 +91,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   personal: <PersonalPage />,
   einheiten: <EinheitenPage />,
   einsatzabschnitte: <EinsatzabschnittePage />,
+  stab: <StabPage />,
   personen: <PersonenPage />,
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
   bereitstellungsraeume: <BereitstellungsraeumeDefault />,
