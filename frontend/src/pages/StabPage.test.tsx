@@ -154,6 +154,7 @@ describe('StabPage', () => {
     const sektion = await besetzungsSektion();
     expect(within(sektion).getAllByRole('heading', { level: 4 })).toHaveLength(6);
     expect(within(sektion).queryByText('nicht vergeben')).toBeNull();
+    expect(within(sektion).queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
   });
 
   it('Fehler ist nicht leer: ein gescheiterter Abruf behauptet keine sechs leeren Zeilen', async () => {

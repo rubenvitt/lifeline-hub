@@ -122,7 +122,10 @@ export default function StabPage() {
                 return (
                   <ListenEintrag
                     actions={
-                      darfSchreiben
+                      // Erst mit Daten: vor dem Laden belegte die Maske „nicht vergeben" vor —
+                      // dieselbe Mengenaussage, die der Tag unterdrückt (Ruling 1). Die Tastatur
+                      // erreicht den Knopf auch unter dem Ladeindikator.
+                      darfSchreiben && stabQuery.data
                         ? [
                             <Button
                               key="aendern"
