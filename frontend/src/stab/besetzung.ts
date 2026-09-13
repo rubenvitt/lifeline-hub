@@ -1,4 +1,4 @@
-import type { BesetzungArt, BesetzungSetzen, Sachgebiet, Stab, Stabsfunktion } from '../api/types';
+import type { BesetzungArt, BesetzungBody, Sachgebiet, Stab, Stabsfunktion } from '../api/types';
 import type { StatusDarstellung } from '../theme/statusFarben';
 
 /** „Nicht vergeben" ist KEIN Datensatz (keine Zeile vom Server), aber eine Wahl in der Maske. */
@@ -67,7 +67,7 @@ export function besetzungFormWerte(zeile: Stabsfunktion | undefined): BesetzungF
 }
 
 export type BesetzungAktion =
-  { typ: 'keine' } | { typ: 'entfernen' } | { typ: 'setzen'; daten: BesetzungSetzen };
+  { typ: 'keine' } | { typ: 'entfernen' } | { typ: 'setzen'; daten: BesetzungBody };
 
 /**
  * Was die Maske beim Übernehmen schickt — mit Wertgleichheits-Riegel.

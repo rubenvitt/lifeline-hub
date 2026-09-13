@@ -1,5 +1,5 @@
 import { apiGet, apiSend } from './client';
-import type { BesetzungSetzen, Sachgebiet, Stab } from './types';
+import type { BesetzungBody, Sachgebiet, Stab } from './types';
 
 /** Führungsorganisation eines Einsatzes (LFH-46). `besetzung` trägt nur belegte Zeilen. */
 export function ladeStab(einsatzId: number): Promise<Stab> {
@@ -9,7 +9,7 @@ export function ladeStab(einsatzId: number): Promise<Stab> {
 export function setzeBesetzung(
   einsatzId: number,
   sachgebiet: Sachgebiet,
-  daten: BesetzungSetzen,
+  daten: BesetzungBody,
 ): Promise<Stab> {
   return apiSend<Stab>(`/api/einsaetze/${einsatzId}/stab/besetzung/${sachgebiet}`, 'PUT', daten);
 }

@@ -338,7 +338,7 @@ export type BesetzungArt = S['BesetzungArt'];
  * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422
  * (`src/routes/stab.rs:80-118`) — Aufrufer schicken NUR das Feld, das die Art verlangt.
  */
-export interface BesetzungSetzen {
+export interface BesetzungBody {
   besetzung_art: BesetzungArt;
   personal_id?: number;
   bezeichnung?: string;
