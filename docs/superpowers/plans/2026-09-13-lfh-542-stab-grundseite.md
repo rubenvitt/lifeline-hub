@@ -228,7 +228,7 @@ describe('SACHGEBIETE', () => {
   });
 
   it('S5 hat im Bestand kein Werkzeug (Spec 2.2: 0 Treffer im Repo)', () => {
-    expect(SACHGEBIETE[4].werkzeuge).toEqual([]);
+    expect(SACHGEBIETE.find((s) => s.sachgebiet === 's5')!.werkzeuge).toEqual([]);
   });
 });
 ```
@@ -1577,7 +1577,12 @@ export default function StabPage() {
           ]}
         />
       }
-      hinweis={<RechteHinweis sichtbar={!darfSchreiben} text={besetzungRechteText(einsatz.status)} />}
+      // Bedingt übergeben, nicht über `sichtbar` allein: `EinsatzSeite` rendert den Slot, sobald
+      // er truthy ist — ein JSX-Element ist das immer, auch wenn es `null` zurückgibt, und
+      // hinterliesse mit Schreibrecht ein leeres `div` mit Aussenabstand (Muster `SchaedenPage`).
+      hinweis={
+        !darfSchreiben && <RechteHinweis sichtbar text={besetzungRechteText(einsatz.status)} />
+      }
     >
       <SektionHeader titel="Besetzung S1–S6" />
       <section aria-label="Besetzung S1–S6">
