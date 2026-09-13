@@ -1,6 +1,6 @@
 import { Button, Collapse, DatePicker, Form, Input, Space } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { useState } from 'react';
 import { einsatzKeys } from '../api/queryKeys';
 import { schliesseLagebesprechungAb } from '../api/stab';
@@ -12,12 +12,15 @@ import {
   abschlussBody,
   abschlussVorbelegung,
   eigeneLagebesprechung,
+  naechsteNachBesprechung,
   type AbschlussFormWerte,
 } from './lagebesprechungAbschluss';
 
 /** Teilmenge der geteilten Schnellwahl (Spec 10: +30/+60/+120; die Zahlen sind `[abgeleitet]`). */
 const SCHNELLWAHL = schnellwahlAuswahl([30, 60, 120]);
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
+const NAECHSTE_ZU_FRUEH =
+  'Die nächste Lagebesprechung muss nach dem Zeitpunkt der Besprechung liegen';
 
 interface LagebesprechungModalProps {
   einsatzId: number;
@@ -76,7 +79,11 @@ export default function LagebesprechungModal({
       erfassenText="Abschließen"
       laeuft={mutation.isPending}
       onErfassen={async (werte) => {
-        await mutation.mutateAsync(abschlussBody(werte, vorbelegung, dayjs()));
+        // `stab` ist hier die LIVE-Prop, nicht die eingefrorene Vorbelegung: nur so erkennt
+        // `abschlussBody` einen inzwischen fremd gesetzten oder gelöschten Termin (Ruling 10).
+        await mutation.mutateAsync(
+          abschlussBody(werte, vorbelegung, dayjs(), stab.naechste_lagebesprechung_at),
+        );
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
@@ -91,6 +98,17 @@ export default function LagebesprechungModal({
       <Form.Item
         label="Nächste Lagebesprechung"
         name="naechste"
+        // Clientseitiger Spiegel des 422; hängt am Zeitpunkt, deshalb `dependencies` — ein
+        // nachträglich verschobener Zeitpunkt prüft den Termin neu. Ein leeres Feld ist zulässig.
+        dependencies={['abgehalten']}
+        rules={[
+          ({ getFieldValue }) => ({
+            validator: (_, wert: Dayjs | null | undefined) =>
+              naechsteNachBesprechung(wert, getFieldValue('abgehalten'), dayjs())
+                ? Promise.resolve()
+                : Promise.reject(new Error(NAECHSTE_ZU_FRUEH)),
+          }),
+        ]}
         // Die Schnellwahl ist eine Vorbelegung DESSELBEN Wertes, kein eigenes Feld — sie steht
         // im selben `Form.Item`, das Budget bleibt bei zwei. Echte `Button` ohne `size`: sie
         // erben `controlHeight` aus der Dichte-Staffel.

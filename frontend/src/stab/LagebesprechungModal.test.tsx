@@ -101,12 +101,18 @@ function zeige(daten: Stab = stab()) {
   return screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
 }
 
-/** Eingabe eines Feldes über seine Beschriftung — unabhängig vom `for`-Weg des DatePickers. */
-function feld(dialog: HTMLElement, label: string): HTMLInputElement {
-  const item = [...dialog.querySelectorAll('.ant-form-item')].find(
+/** Das `.ant-form-item` eines Feldes über seine Beschriftung. */
+function feldItem(dialog: HTMLElement, label: string): HTMLElement {
+  const item = [...dialog.querySelectorAll<HTMLElement>('.ant-form-item')].find(
     (i) => i.querySelector('.ant-form-item-label')?.textContent === label,
   );
-  const eingabe = item?.querySelector<HTMLInputElement>('input, textarea');
+  if (!item) throw new Error(`Feld „${label}" nicht gefunden`);
+  return item;
+}
+
+/** Eingabe eines Feldes über seine Beschriftung — unabhängig vom `for`-Weg des DatePickers. */
+function feld(dialog: HTMLElement, label: string): HTMLInputElement {
+  const eingabe = feldItem(dialog, label).querySelector<HTMLInputElement>('input, textarea');
   if (!eingabe) throw new Error(`Feld „${label}" nicht gefunden`);
   return eingabe;
 }
@@ -205,7 +211,7 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
     expect(gesendet[0]).toHaveProperty('naechste_at', null);
   });
 
-  it('ohne Vorbelegung leer gelassen → null, nicht weggelassen', async () => {
+  it('vergangener Termin, leer gelassen → null, nicht weggelassen (Ruling 1)', async () => {
     const dialog = await zeige(stab({ naechste_lagebesprechung_at: wireAb(-5) }));
     await absenden(dialog);
     expect(gesendet[0]).toHaveProperty('naechste_at', null);
@@ -227,6 +233,44 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: '+1 h' }));
     await absenden(dialog);
     expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(0), naechste_at: wireAb(60) });
+  });
+});
+
+describe('LagebesprechungModal · Termin nach dem Zeitpunkt (Spiegel des 422)', () => {
+  const ZU_FRUEH = 'Die nächste Lagebesprechung muss nach dem Zeitpunkt der Besprechung liegen';
+
+  async function setzeTermin(dialog: HTMLElement, minuten: number) {
+    const u = userEvent.setup();
+    const eingabe = feld(dialog, 'Nächste Lagebesprechung');
+    await u.click(eingabe);
+    await u.clear(eingabe);
+    await u.type(eingabe, `${dayjs(JETZT).add(minuten, 'minute').format(ZEITFORMAT)}{Enter}`);
+  }
+  const abschliessen = (dialog: HTMLElement) =>
+    userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+
+  it('Termin vor dem Zeitpunkt → Meldung AM Feld, kein POST', async () => {
+    const dialog = await zeige();
+    await setzeTermin(dialog, -30);
+    await userEvent.type(feld(dialog, 'Entschluss'), 'Lage unverändert');
+    await abschliessen(dialog);
+
+    const item = feldItem(dialog, 'Nächste Lagebesprechung');
+    await waitFor(() =>
+      expect(item.querySelector('.ant-form-item-explain-error')).toHaveTextContent(ZU_FRUEH),
+    );
+    expect(gesendet).toHaveLength(0);
+  });
+
+  it('Termin nach dem Zeitpunkt → genau ein POST, ohne Meldung (Gegenfall)', async () => {
+    const dialog = await zeige();
+    await setzeTermin(dialog, 30);
+    await userEvent.type(feld(dialog, 'Entschluss'), 'Lage unverändert');
+    await abschliessen(dialog);
+
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toHaveProperty('naechste_at', wireAb(30));
+    expect(screen.queryByText(ZU_FRUEH)).toBeNull();
   });
 });
 
