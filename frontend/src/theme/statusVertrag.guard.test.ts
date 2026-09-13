@@ -922,10 +922,16 @@ const VERTRAGS_NAMEN: readonly string[] = [
  */
 function vertragsNamenIn(inhalt: string): readonly string[] {
   const namen = new Set<string>();
-  // Namensraum-Import: dann sind alle Vertragsnamen als `x.name` erreichbar, und die
-  // Wortgrenze im Vergleich unten trifft sie auch qualifiziert.
-  if (/import\s+\*\s+as\s+[A-Za-z_$][\w$]*\s+from\s*['"][^'"]*statusFarben['"]/.test(inhalt)) {
-    for (const name of VERTRAGS_NAMEN) namen.add(name);
+  // Namensraum-Import: erreichbar sind die Vertragsnamen dann NUR über den Alias, und
+  // genau so kommen sie in den Topf — als `sf.dringlichkeit`, nicht als nackter Name
+  // (im Codex-Review gefunden). Die nackte Fassung meldete jede fremde Eigenschaft
+  // gleichen Namens: `<Tag color={own.dringlichkeit}>` in einer Datei, die `sf`
+  // irgendwo sonst benutzt, liest den Vertrag nicht — und wurde trotzdem gemeldet.
+  const raum = /import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s*['"][^'"]*statusFarben['"]/.exec(
+    inhalt,
+  );
+  if (raum) {
+    for (const name of VERTRAGS_NAMEN) namen.add(`${raum[1]}.${name}`);
   }
   // `[^'"]*statusFarben`, NICHT `theme/statusFarben`: ein Geschwistermodul schreibt
   // `from './statusFarben'` — ohne Verzeichnis im Pfad. Dass die Geschwister im Schnitt
@@ -1009,6 +1015,38 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
 const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
 
 /**
+ * Die Zugriffe eines Ausdrucks, getrennt nach WURZEL und QUALIFIZIERT.
+ *
+ * Eine Wurzel steht für sich (`farbe(…)`, `dringlichkeit`), eine Eigenschaft hinter
+ * einem Punkt gehört ihrem Objekt (`sf.dringlichkeit`). Die Trennung ist der Grund,
+ * warum ein Name im Topf überhaupt etwas AUSSAGT: ein direkt importierter Name wird
+ * gelesen, wenn er als Wurzel auftaucht — als Eigenschaft eines fremden Objekts ist er
+ * ein anderer Wert, der bloss gleich heisst. Bei einem Namensraum-Import ist es genau
+ * umgekehrt: dort trägt erst der Alias davor die Aussage.
+ *
+ * Optionales Verketten (`sf?.dringlichkeit`) zählt als derselbe Zugriff.
+ */
+function zugriffe(ausdruck: string): { wurzeln: Set<string>; qualifiziert: Set<string> } {
+  const wurzeln = new Set<string>();
+  const qualifiziert = new Set<string>();
+  const treffer = [...ausdruck.matchAll(BEZEICHNER)];
+  for (let i = 0; i < treffer.length; i++) {
+    const stelle = treffer[i].index ?? 0;
+    if (!ausdruck.slice(0, stelle).trimEnd().endsWith('.')) {
+      wurzeln.add(treffer[i][0]);
+      continue;
+    }
+    const vorher = treffer[i - 1];
+    if (!vorher) continue;
+    const dazwischen = ausdruck.slice((vorher.index ?? 0) + vorher[0].length, stelle);
+    if (/^\s*\??\.\s*$/.test(dazwischen)) {
+      qualifiziert.add(`${vorher[0]}.${treffer[i][0]}`);
+    }
+  }
+  return { wurzeln, qualifiziert };
+}
+
+/**
  * Warum dieser `color`-Ausdruck ein Befund ist — oder `null`. Der Grund steht in der
  * Meldung, weil die zwei Fälle verschiedene Abhilfen haben.
  *
@@ -1026,9 +1064,10 @@ const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
  * nicht das fehlende Escape.
  */
 function grundFuerBefund(farbe: string, namen: readonly string[]): string | null {
-  const bezeichner = new Set(farbe.match(BEZEICHNER) ?? []);
+  const { wurzeln, qualifiziert } = zugriffe(farbe);
   for (const name of namen) {
-    if (bezeichner.has(name)) return `liest \`${name}\``;
+    const trifft = name.includes('.') ? qualifiziert.has(name) : wurzeln.has(name);
+    if (trifft) return `liest \`${name}\``;
   }
   // `[, , wert]`, nicht `[, wert]`: Gruppe 1 ist das Anführungszeichen, Gruppe 2 der
   // Inhalt. Die kürzere Schreibweise verglich den Quote gegen den Wire-Topf, fand nie
@@ -1262,6 +1301,43 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
         ].join('\n'),
       }),
     ).toHaveLength(1);
+  });
+
+  it('erreicht einen Namensraum nur über seinen Alias — nicht über den nackten Namen', () => {
+    // Im Codex-Review gefunden. Der Zweig legte bei einem `import * as sf` ALLE
+    // Vertragsnamen nackt in den Topf; eine fremde Eigenschaft gleichen Namens wurde
+    // damit gemeldet, obwohl der Ausdruck `sf` gar nicht liest.
+    expect(
+      tagBefunde({
+        '/src/pages/Fremdfeld.tsx': [
+          "import * as sf from '../theme/statusFarben';",
+          'const x = sf.rollenFarbe;',
+          '<Tag color={own.dringlichkeit}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
+
+    // Die Gegenprobe, und sie traegt: derselbe Name ÜBER den Alias bleibt ein Befund.
+    const ueberAlias = tagBefunde({
+      '/src/pages/UeberAlias.tsx': [
+        "import * as sf from '../theme/statusFarben';",
+        '<Tag color={sf.dringlichkeit[s].rolle}>{y}</Tag>',
+      ].join('\n'),
+    });
+    expect(ueberAlias).toHaveLength(1);
+    expect(ueberAlias[0]).toContain('liest `sf.dringlichkeit`');
+
+    // Und die andere Haelfte derselben Trennung: ein DIREKT importierter Name zaehlt als
+    // Wurzel, nicht als fremde Eigenschaft. Ohne diese Zusicherung koennte der Vergleich
+    // still auf „ueberall wo der Name vorkommt" zurueckfallen.
+    expect(
+      tagBefunde({
+        '/src/pages/AlsFeld.tsx': [
+          "import { dringlichkeit } from '../theme/statusFarben';",
+          '<Tag color={fremd.dringlichkeit}>{y}</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
   });
 
   it('liest ein `<Tag>` IN einer Zeichenkette nicht als Auszeichnung', () => {
