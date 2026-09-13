@@ -25,8 +25,16 @@ export interface AutoPlatzhalter {
  * bzw. dem Einsatz befüllt werden. Single Source of Truth für Engine UND Admin-UI.
  */
 export const AUTO_PLATZHALTER: AutoPlatzhalter[] = [
-  { name: 'datum', beschreibung: 'Aktuelles Datum (TT.MM.JJJJ)', wert: () => dayjs().format('DD.MM.YYYY') },
-  { name: 'uhrzeit', beschreibung: 'Aktuelle Uhrzeit (HH:MM)', wert: () => dayjs().format('HH:mm') },
+  {
+    name: 'datum',
+    beschreibung: 'Aktuelles Datum (TT.MM.JJJJ)',
+    wert: () => dayjs().format('DD.MM.YYYY'),
+  },
+  {
+    name: 'uhrzeit',
+    beschreibung: 'Aktuelle Uhrzeit (HH:MM)',
+    wert: () => dayjs().format('HH:mm'),
+  },
   { name: 'einsatzort', beschreibung: 'Einsatzort', wert: (e) => e.einsatzort },
   { name: 'stichwort', beschreibung: 'Stichwort', wert: (e) => e.stichwort },
   { name: 'einsatz', beschreibung: 'Einsatzbezeichnung', wert: (e) => e.bezeichnung },

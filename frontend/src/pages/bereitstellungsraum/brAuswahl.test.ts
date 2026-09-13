@@ -2,11 +2,23 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { waehleDefaultBr, merkeLetztenBr, liesLetztenBr } from './brAuswahl';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 
-function br(id: number, status: BrStatus, over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {
+function br(
+  id: number,
+  status: BrStatus,
+  over: Partial<Bereitstellungsraum> = {},
+): Bereitstellungsraum {
   return {
-    id, einsatz_id: 1, abschnitt_id: null, bezeichnung: `BR ${id}`,
-    standort: null, notiz: null, status,
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1,
+    id,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    bezeichnung: `BR ${id}`,
+    standort: null,
+    notiz: null,
+    status,
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
     storniert_at: null,
     ...over,
   };

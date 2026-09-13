@@ -8,7 +8,15 @@ describe('MetaChip', () => {
   it('Text-Feld: Editor offen, Enter committet den Wert', async () => {
     const onCommit = vi.fn();
     renderMitProviders(
-      <MetaChip feld="von" editing wert={undefined} onCommit={onCommit} onCancel={vi.fn()} onRemove={vi.fn()} onEdit={vi.fn()} />,
+      <MetaChip
+        feld="von"
+        editing
+        wert={undefined}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
     );
     const input = screen.getByLabelText('Von');
     await userEvent.type(input, 'ELW 1{Enter}');
@@ -17,7 +25,15 @@ describe('MetaChip', () => {
 
   it('geschlossen: zeigt Label+Wert', () => {
     renderMitProviders(
-      <MetaChip feld="meldeweg" editing={false} wert="funk" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={vi.fn()} onEdit={vi.fn()} />,
+      <MetaChip
+        feld="meldeweg"
+        editing={false}
+        wert="funk"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
     );
     expect(screen.getByText(/Meldeweg/)).toBeInTheDocument();
     expect(screen.getByText(/Funk/)).toBeInTheDocument();
@@ -37,7 +53,15 @@ describe('MetaChip', () => {
    */
   it('geschlossen: das Aktionsmenü trägt das Feld im Namen', () => {
     renderMitProviders(
-      <MetaChip feld="von" editing={false} wert="ELW 1" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={vi.fn()} onEdit={vi.fn()} />,
+      <MetaChip
+        feld="von"
+        editing={false}
+        wert="ELW 1"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
     );
     expect(screen.getByRole('button', { name: 'Aktionen zu Von' })).toBeInTheDocument();
     // Das alte Kreuz ist ERSETZT, nicht ergänzt: bliebe es stehen, wäre das 10-px-Ziel
@@ -56,7 +80,15 @@ describe('MetaChip', () => {
     const onRemove = vi.fn();
     const onEdit = vi.fn();
     renderMitProviders(
-      <MetaChip feld="meldeweg" editing={false} wert="funk" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={onRemove} onEdit={onEdit} />,
+      <MetaChip
+        feld="meldeweg"
+        editing={false}
+        wert="funk"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={onRemove}
+        onEdit={onEdit}
+      />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Meldeweg' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Entfernen' }));
@@ -83,7 +115,15 @@ describe('MetaChip', () => {
     const onEdit = vi.fn();
     const onRemove = vi.fn();
     renderMitProviders(
-      <MetaChip feld="von" editing={false} wert="ELW 1" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={onRemove} onEdit={onEdit} />,
+      <MetaChip
+        feld="von"
+        editing={false}
+        wert="ELW 1"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={onRemove}
+        onEdit={onEdit}
+      />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
     await userEvent.click(await screen.findByRole('menu'));
@@ -94,7 +134,15 @@ describe('MetaChip', () => {
   it('Menü „Bearbeiten" ruft onEdit', async () => {
     const onEdit = vi.fn();
     renderMitProviders(
-      <MetaChip feld="von" editing={false} wert="ELW 1" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={vi.fn()} onEdit={onEdit} />,
+      <MetaChip
+        feld="von"
+        editing={false}
+        wert="ELW 1"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={onEdit}
+      />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Bearbeiten' }));
@@ -112,7 +160,15 @@ describe('MetaChip', () => {
   it('Klick auf den Chip-Rumpf bleibt der Schnellweg zum Bearbeiten', async () => {
     const onEdit = vi.fn();
     renderMitProviders(
-      <MetaChip feld="von" editing={false} wert="ELW 1" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={vi.fn()} onEdit={onEdit} />,
+      <MetaChip
+        feld="von"
+        editing={false}
+        wert="ELW 1"
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={onEdit}
+      />,
     );
     await userEvent.click(screen.getByText(/ELW 1/));
     expect(onEdit).toHaveBeenCalledWith('von');
@@ -121,7 +177,15 @@ describe('MetaChip', () => {
   it('Escape im Editor ruft onCancel', async () => {
     const onCancel = vi.fn();
     renderMitProviders(
-      <MetaChip feld="von" editing wert={undefined} onCommit={vi.fn()} onCancel={onCancel} onRemove={vi.fn()} onEdit={vi.fn()} />,
+      <MetaChip
+        feld="von"
+        editing
+        wert={undefined}
+        onCommit={vi.fn()}
+        onCancel={onCancel}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
     );
     await userEvent.type(screen.getByLabelText('Von'), '{Escape}');
     expect(onCancel).toHaveBeenCalledWith('von');
@@ -165,9 +229,10 @@ describe('MetaChip', () => {
     // Der echte klickbare Eintrag ist `.ant-select-item-option` (der role="option"-Knoten
     // ist nur das a11y-Spiegelelement und reagiert nicht auf Klicks).
     const eintrag = await screen.findByText(
-      (_, el) => typeof el?.className === 'string'
-        && el.className.includes('ant-select-item-option-content')
-        && el.textContent === 'Florian 1',
+      (_, el) =>
+        typeof el?.className === 'string' &&
+        el.className.includes('ant-select-item-option-content') &&
+        el.textContent === 'Florian 1',
     );
     await userEvent.click(eintrag);
     expect(onCommit).toHaveBeenCalledWith('von', 'Florian 1');

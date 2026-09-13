@@ -1,7 +1,13 @@
 import type {
-  Einsatzart, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
-  EinsatzEinstellungen, EinstellungenUpdate,
-  ModulOverride, ModulOverrides, ModulOverrideUpdate,
+  Einsatzart,
+  EinsatzAnzeige,
+  EinsatzRolle,
+  MitgliedAnzeige,
+  EinsatzEinstellungen,
+  EinstellungenUpdate,
+  ModulOverride,
+  ModulOverrides,
+  ModulOverrideUpdate,
 } from './types';
 import { apiGet, apiSend } from './client';
 

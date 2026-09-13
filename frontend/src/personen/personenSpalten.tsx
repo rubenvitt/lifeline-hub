@@ -85,7 +85,9 @@ export const personenSpalten = spaltenFuer<Person>()([
     suchText: (p) => registrierAnzeige(p.registrier_nr),
     // KEIN Anker hier: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden
     // Zweigen. Ein `<a>` im `render` ergäbe verschachtelte Links.
-    render: (_, p) => <Typography.Text strong>{registrierAnzeige(p.registrier_nr)}</Typography.Text>,
+    render: (_, p) => (
+      <Typography.Text strong>{registrierAnzeige(p.registrier_nr)}</Typography.Text>
+    ),
   },
   {
     title: 'Status',

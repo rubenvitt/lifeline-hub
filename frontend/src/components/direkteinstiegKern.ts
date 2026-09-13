@@ -34,13 +34,19 @@ export function letzteAuswahlSpeicher(praefix: string) {
   const schluessel = (einsatzId: number) => `${praefix}:letzteAuswahl:${einsatzId}`;
   return {
     merke(einsatzId: number, id: number): void {
-      try { localStorage.setItem(schluessel(einsatzId), String(id)); } catch { /* ohne Persistenz weiter */ }
+      try {
+        localStorage.setItem(schluessel(einsatzId), String(id));
+      } catch {
+        /* ohne Persistenz weiter */
+      }
     },
     lies(einsatzId: number): number | null {
       try {
         const wert = localStorage.getItem(schluessel(einsatzId));
         return wert ? Number(wert) : null;
-      } catch { return null; }
+      } catch {
+        return null;
+      }
     },
   };
 }

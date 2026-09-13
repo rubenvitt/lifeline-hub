@@ -5,9 +5,19 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import {
-  CHAT_SEITENGROESSE, bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, ladeAnhaengeHoch, legeKanalAn,
-  listeKanaele, listeNachrichten, loescheBezug, loescheNachricht, markiereKanalGelesen,
-  sendeNachricht, setzeBezug,
+  CHAT_SEITENGROESSE,
+  bearbeiteNachricht,
+  heraufstufenZuAuftrag,
+  heraufstufenZuEtb,
+  ladeAnhaengeHoch,
+  legeKanalAn,
+  listeKanaele,
+  listeNachrichten,
+  loescheBezug,
+  loescheNachricht,
+  markiereKanalGelesen,
+  sendeNachricht,
+  setzeBezug,
 } from '../api/chat';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
@@ -29,9 +39,21 @@ import HeraufstufenAuftragModal from '../chat/HeraufstufenAuftragModal';
 import BearbeitenModal from '../chat/BearbeitenModal';
 import BezugDialog from '../chat/BezugDialog';
 import {
-  auftragInfo, auftragLabel, bezugLabel as loeseBezugLabel, lageberichtInfo, lageberichtLabel,
-  meldungInfo, meldungLabel, personInfo, personLabel, schadenInfo, schadenLabel, uhsInfo, uhsLabel,
-  type BezugKurzinfo, type BezugOptionen,
+  auftragInfo,
+  auftragLabel,
+  bezugLabel as loeseBezugLabel,
+  lageberichtInfo,
+  lageberichtLabel,
+  meldungInfo,
+  meldungLabel,
+  personInfo,
+  personLabel,
+  schadenInfo,
+  schadenLabel,
+  uhsInfo,
+  uhsLabel,
+  type BezugKurzinfo,
+  type BezugOptionen,
 } from '../chat/bezug';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useViewport } from '../components/useViewport';
@@ -117,10 +139,13 @@ export default function ChatPage() {
    * Der Callback-Ref feuert dagegen in dem Moment, in dem der Knoten wirklich
    * eingehängt wird.
    */
-  const wurzelRef = useCallback((el: HTMLDivElement | null) => {
-    wurzel.current = el;
-    if (el) messen();
-  }, [messen]);
+  const wurzelRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wurzel.current = el;
+      if (el) messen();
+    },
+    [messen],
+  );
 
   useEffect(() => {
     window.addEventListener('resize', messen);
@@ -146,30 +171,26 @@ export default function ChatPage() {
   });
 
   const kanaele = kanaeleQuery.data ?? [];
-  const ausgewaehlterKanal = kanalAuswahl?.einsatzId === einsatzId
-    ? kanalAuswahl.kanalId
-    : null;
+  const ausgewaehlterKanal = kanalAuswahl?.einsatzId === einsatzId ? kanalAuswahl.kanalId : null;
   // Beim Routewechsel darf die Kanal-ID des vorherigen Einsatzes nicht einmal für
   // einen Zwischen-Render in die neue URL geraten. Erst die erfolgreich geladene,
   // aktuelle Kanalliste darf eine explizite Auswahl oder ihren ersten Kanal freigeben.
   const kanalId = kanaeleQuery.isSuccess
     ? kanaele.some((kanal) => kanal.id === ausgewaehlterKanal)
       ? ausgewaehlterKanal
-      : kanaele[0]?.id ?? null
+      : (kanaele[0]?.id ?? null)
     : null;
-  const heraufstufen = heraufstufenAuswahl?.einsatzId === einsatzId
-    ? heraufstufenAuswahl.nachricht
-    : null;
-  const heraufstufenAuftrag = heraufstufenAuftragAuswahl?.einsatzId === einsatzId
-    ? heraufstufenAuftragAuswahl.nachricht
-    : null;
-  const bearbeiten = bearbeitenAuswahl?.einsatzId === einsatzId
-    ? bearbeitenAuswahl.nachricht
-    : null;
-  const bezugNachricht = bezugAuswahl?.einsatzId === einsatzId
-    ? bezugAuswahl.nachricht
-    : null;
-  const ungelesenImAktivenKanal = kanaele.find((kanal) => kanal.id === kanalId)?.ungelesen_anzahl ?? 0;
+  const heraufstufen =
+    heraufstufenAuswahl?.einsatzId === einsatzId ? heraufstufenAuswahl.nachricht : null;
+  const heraufstufenAuftrag =
+    heraufstufenAuftragAuswahl?.einsatzId === einsatzId
+      ? heraufstufenAuftragAuswahl.nachricht
+      : null;
+  const bearbeiten =
+    bearbeitenAuswahl?.einsatzId === einsatzId ? bearbeitenAuswahl.nachricht : null;
+  const bezugNachricht = bezugAuswahl?.einsatzId === einsatzId ? bezugAuswahl.nachricht : null;
+  const ungelesenImAktivenKanal =
+    kanaele.find((kanal) => kanal.id === kanalId)?.ungelesen_anzahl ?? 0;
 
   const nachrichtenQuery = useInfiniteQuery({
     queryKey: einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId),
@@ -189,10 +210,14 @@ export default function ChatPage() {
   // `dataUpdatedAt` erneut an und markiert den gerade sichtbaren Kanal wieder gelesen.
   useEffect(() => {
     if (
-      !dokumentSichtbar || document.visibilityState !== 'visible' ||
-      kanalId === null || ungelesenImAktivenKanal === 0 ||
-      !nachrichtenQuery.isSuccess || nachrichtenQuery.dataUpdatedAt === 0
-    ) return;
+      !dokumentSichtbar ||
+      document.visibilityState !== 'visible' ||
+      kanalId === null ||
+      ungelesenImAktivenKanal === 0 ||
+      !nachrichtenQuery.isSuccess ||
+      nachrichtenQuery.dataUpdatedAt === 0
+    )
+      return;
     let aktiv = true;
     void markiereKanalGelesen(einsatzId, kanalId)
       .then(() => {
@@ -202,7 +227,9 @@ export default function ChatPage() {
         // Die Kanalliste behält ihren ungelesenen Stand und macht den Fehlschlag damit sichtbar;
         // keine störende Toast-Schleife bei jedem Live-Refetch.
       });
-    return () => { aktiv = false; };
+    return () => {
+      aktiv = false;
+    };
   }, [
     einsatzId,
     dokumentSichtbar,
@@ -224,22 +251,34 @@ export default function ChatPage() {
   const typAktiv = (t: BezugTyp) => bezugDialogOffen || referenzierteTypen.has(t);
 
   const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId), queryFn: () => listeSchaeden(einsatzId), enabled: typAktiv('schaden'),
+    queryKey: einsatzKeys.schaeden(einsatzId),
+    queryFn: () => listeSchaeden(einsatzId),
+    enabled: typAktiv('schaden'),
   });
   const uhsQuery = useQuery({
-    queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId), enabled: typAktiv('uhs'),
+    queryKey: einsatzKeys.uhs(einsatzId),
+    queryFn: () => listeUhs(einsatzId),
+    enabled: typAktiv('uhs'),
   });
   const personenQuery = useQuery({
-    queryKey: einsatzKeys.personen(einsatzId), queryFn: () => listePersonen(einsatzId), enabled: typAktiv('person'),
+    queryKey: einsatzKeys.personen(einsatzId),
+    queryFn: () => listePersonen(einsatzId),
+    enabled: typAktiv('person'),
   });
   const lageberichteQuery = useQuery({
-    queryKey: einsatzKeys.lageberichte(einsatzId), queryFn: () => listeLageberichte(einsatzId), enabled: typAktiv('lagebericht'),
+    queryKey: einsatzKeys.lageberichte(einsatzId),
+    queryFn: () => listeLageberichte(einsatzId),
+    enabled: typAktiv('lagebericht'),
   });
   const meldungenQuery = useQuery({
-    queryKey: einsatzKeys.meldungen(einsatzId), queryFn: () => listeMeldungen(einsatzId), enabled: typAktiv('meldung'),
+    queryKey: einsatzKeys.meldungen(einsatzId),
+    queryFn: () => listeMeldungen(einsatzId),
+    enabled: typAktiv('meldung'),
   });
   const auftraegeQuery = useQuery({
-    queryKey: einsatzKeys.auftraege(einsatzId), queryFn: () => listeAuftraege(einsatzId), enabled: typAktiv('auftrag'),
+    queryKey: einsatzKeys.auftraege(einsatzId),
+    queryFn: () => listeAuftraege(einsatzId),
+    enabled: typAktiv('auftrag'),
   });
 
   const fehler = (e: unknown) =>
@@ -252,7 +291,12 @@ export default function ChatPage() {
     // resultierenden anhang_ids senden.
     mutationFn: async ({ text, dateien }: { text: string; dateien: File[] }) => {
       const anhaenge = dateien.length > 0 ? await ladeAnhaengeHoch(einsatzId, dateien) : [];
-      return sendeNachricht(einsatzId, kanalId as number, text, anhaenge.map((a) => a.id));
+      return sendeNachricht(
+        einsatzId,
+        kanalId as number,
+        text,
+        anhaenge.map((a) => a.id),
+      );
     },
     onSuccess: () => {
       invalidiereNachrichten();
@@ -267,7 +311,8 @@ export default function ChatPage() {
     onError: fehler,
   });
   const bearbeitenMutation = useMutation({
-    mutationFn: ({ id: nid, text }: { id: number; text: string }) => bearbeiteNachricht(einsatzId, nid, text),
+    mutationFn: ({ id: nid, text }: { id: number; text: string }) =>
+      bearbeiteNachricht(einsatzId, nid, text),
     onSuccess: () => {
       invalidiereNachrichten();
       setBearbeitenAuswahl(null);
@@ -344,7 +389,10 @@ export default function ChatPage() {
     schaden: (schaedenQuery.data ?? []).map((s) => ({ value: s.id, label: schadenLabel(s) })),
     uhs: (uhsQuery.data ?? []).map((u) => ({ value: u.id, label: uhsLabel(u) })),
     person: (personenQuery.data ?? []).map((p) => ({ value: p.id, label: personLabel(p) })),
-    lagebericht: (lageberichteQuery.data ?? []).map((l) => ({ value: l.id, label: lageberichtLabel(l) })),
+    lagebericht: (lageberichteQuery.data ?? []).map((l) => ({
+      value: l.id,
+      label: lageberichtLabel(l),
+    })),
     meldung: (meldungenQuery.data ?? []).map((m) => ({ value: m.id, label: meldungLabel(m) })),
     auftrag: (auftraegeQuery.data ?? []).map((a) => ({ value: a.id, label: auftragLabel(a) })),
   };
@@ -353,12 +401,30 @@ export default function ChatPage() {
   // `null`, wenn nicht (mehr) verfügbar → Tag bleibt ohne Popover.
   const bezugInfo = (typ: BezugTyp, zielId: number): BezugKurzinfo | null => {
     switch (typ) {
-      case 'schaden': { const o = schaedenQuery.data?.find((x) => x.id === zielId); return o ? schadenInfo(o) : null; }
-      case 'uhs': { const o = uhsQuery.data?.find((x) => x.id === zielId); return o ? uhsInfo(o) : null; }
-      case 'person': { const o = personenQuery.data?.find((x) => x.id === zielId); return o ? personInfo(o) : null; }
-      case 'lagebericht': { const o = lageberichteQuery.data?.find((x) => x.id === zielId); return o ? lageberichtInfo(o) : null; }
-      case 'meldung': { const o = meldungenQuery.data?.find((x) => x.id === zielId); return o ? meldungInfo(o) : null; }
-      case 'auftrag': { const o = auftraegeQuery.data?.find((x) => x.id === zielId); return o ? auftragInfo(o) : null; }
+      case 'schaden': {
+        const o = schaedenQuery.data?.find((x) => x.id === zielId);
+        return o ? schadenInfo(o) : null;
+      }
+      case 'uhs': {
+        const o = uhsQuery.data?.find((x) => x.id === zielId);
+        return o ? uhsInfo(o) : null;
+      }
+      case 'person': {
+        const o = personenQuery.data?.find((x) => x.id === zielId);
+        return o ? personInfo(o) : null;
+      }
+      case 'lagebericht': {
+        const o = lageberichteQuery.data?.find((x) => x.id === zielId);
+        return o ? lageberichtInfo(o) : null;
+      }
+      case 'meldung': {
+        const o = meldungenQuery.data?.find((x) => x.id === zielId);
+        return o ? meldungInfo(o) : null;
+      }
+      case 'auftrag': {
+        const o = auftraegeQuery.data?.find((x) => x.id === zielId);
+        return o ? auftragInfo(o) : null;
+      }
     }
   };
 
@@ -372,11 +438,15 @@ export default function ChatPage() {
           { title: 'Chat' },
         ]}
       />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>Chat</Typography.Title>
-      <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
-        kanaeleQuery.dataUpdatedAt,
-        nachrichtenQuery.dataUpdatedAt,
-      )} />
+      <Typography.Title level={3} style={{ marginTop: 0 }}>
+        Chat
+      </Typography.Title>
+      <Datenstand
+        dataUpdatedAt={gemeinsamerDatenstand(
+          kanaeleQuery.dataUpdatedAt,
+          nachrichtenQuery.dataUpdatedAt,
+        )}
+      />
       {/* Unter `md` steht die Kanalauswahl als waagerechte Leiste ÜBER dem Strom,
           statt als Spalte daneben — auf 390 px bliebe für den Strom sonst nichts
           übrig. Sie wird bedingt gerendert und nicht bloß ausgeblendet: sonst
@@ -391,7 +461,11 @@ export default function ChatPage() {
             options={sortiereKanaele(kanaele).map((k) => ({
               value: k.id,
               // Ungelesen-Punkt am Etikett — dieselbe Auskunft wie in der Spalte.
-              label: <Badge dot={k.ungelesen_anzahl > 0} status="processing" offset={[6, 0]}>{k.name}</Badge>,
+              label: (
+                <Badge dot={k.ungelesen_anzahl > 0} status="processing" offset={[6, 0]}>
+                  {k.name}
+                </Badge>
+              ),
             }))}
           />
         </div>
@@ -408,10 +482,12 @@ export default function ChatPage() {
             <KanalListe
               kanaele={kanaele}
               aktiverKanalId={kanalId}
-              onWechsel={(neuerKanalId) => setKanalAuswahl({
-                einsatzId,
-                kanalId: neuerKanalId,
-              })}
+              onWechsel={(neuerKanalId) =>
+                setKanalAuswahl({
+                  einsatzId,
+                  kanalId: neuerKanalId,
+                })
+              }
               darfSchreiben={darfSchreiben}
               onKanalAnlegen={(name, beschreibung) => kanalMutation.mutate({ name, beschreibung })}
             />
@@ -427,8 +503,12 @@ export default function ChatPage() {
           style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}
         >
           {nachrichtenQuery.isError && (
-            <Alert type="error" showIcon style={{ marginBottom: 12 }}
-              title="Nachrichten konnten nicht geladen werden" />
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: 12 }}
+              title="Nachrichten konnten nicht geladen werden"
+            />
           )}
           {nachrichtenQuery.hasNextPage && (
             <div style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -454,10 +534,12 @@ export default function ChatPage() {
             onBearbeiten={(n) => setBearbeitenAuswahl({ einsatzId, nachricht: n })}
             onLoeschen={(n) => loeschenMutation.mutate(n.id)}
             onHeraufstufen={(n) => setHeraufstufenAuswahl({ einsatzId, nachricht: n })}
-            onHeraufstufenAuftrag={(n) => setHeraufstufenAuftragAuswahl({
-              einsatzId,
-              nachricht: n,
-            })}
+            onHeraufstufenAuftrag={(n) =>
+              setHeraufstufenAuftragAuswahl({
+                einsatzId,
+                nachricht: n,
+              })
+            }
             onBezugSetzen={(n) => setBezugAuswahl({ einsatzId, nachricht: n })}
             onBezugLoeschen={(n) => bezugLoeschenMutation.mutate(n.id)}
             bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
@@ -520,9 +602,11 @@ export default function ChatPage() {
         onAbbrechen={() => setHeraufstufenAuftragAuswahl(null)}
         // mutateAsync: die Erfassungshülle im Formular darf die Felder nur leeren,
         // wenn der Auftrag wirklich angekommen ist (LFH-332/B4).
-        onAnlegen={(daten) => (heraufstufenAuftrag
-          ? heraufstufenAuftragMutation.mutateAsync({ nid: heraufstufenAuftrag.id, daten })
-          : Promise.reject(new Error('Keine Quellnachricht')))}
+        onAnlegen={(daten) =>
+          heraufstufenAuftrag
+            ? heraufstufenAuftragMutation.mutateAsync({ nid: heraufstufenAuftrag.id, daten })
+            : Promise.reject(new Error('Keine Quellnachricht'))
+        }
       />
     </div>
   );

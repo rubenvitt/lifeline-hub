@@ -22,9 +22,7 @@ describe('useFunkrufnamen', () => {
           { id: 2, funkrufname: 'RTW 1', opta: null },
         ]),
       ),
-      http.get('/api/einsaetze/1/einheiten', () =>
-        HttpResponse.json([{ id: 9, name: 'Zug 1' }]),
-      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([{ id: 9, name: 'Zug 1' }])),
     );
     const { result } = renderHook(() => useFunkrufnamen(1), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.length).toBeGreaterThan(0));
@@ -41,9 +39,7 @@ describe('useFunkrufnamen', () => {
           { id: 2, funkrufname: 'Anton', opta: null },
         ]),
       ),
-      http.get('/api/einsaetze/1/einheiten', () =>
-        HttpResponse.json([{ id: 9, name: 'Anton' }]),
-      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([{ id: 9, name: 'Anton' }])),
     );
     const { result } = renderHook(() => useFunkrufnamen(1), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.length).toBeGreaterThan(0));

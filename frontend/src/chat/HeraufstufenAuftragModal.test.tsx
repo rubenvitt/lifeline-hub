@@ -7,10 +7,21 @@ import type { ChatNachricht } from '../api/types';
 
 function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
   return {
-    id: 5, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'Max',
-    inhalt: 'Tank 5000 anfordern', erstellt_at: '2026-06-10 10:00:00',
-    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
-    bezug_typ: null, bezug_id: null, anhaenge: [], ...over,
+    id: 5,
+    einsatz_id: 7,
+    kanal_id: 1,
+    autor_id: 1,
+    autor_name: 'Max',
+    inhalt: 'Tank 5000 anfordern',
+    erstellt_at: '2026-06-10 10:00:00',
+    bearbeitet_at: null,
+    geloescht_at: null,
+    etb_eintrag_id: null,
+    auftrag_id: null,
+    bezug_typ: null,
+    bezug_id: null,
+    anhaenge: [],
+    ...over,
   };
 }
 
@@ -19,17 +30,25 @@ describe('HeraufstufenAuftragModal', () => {
     const onAnlegen = vi.fn();
     renderMitProviders(
       <HeraufstufenAuftragModal
-        offen nachricht={nachricht()} abschnitte={[]} einheiten={[]} senden={false}
-        onAbbrechen={vi.fn()} onAnlegen={onAnlegen} />,
+        offen
+        nachricht={nachricht()}
+        abschnitte={[]}
+        einheiten={[]}
+        senden={false}
+        onAbbrechen={vi.fn()}
+        onAnlegen={onAnlegen}
+      />,
     );
     // Chat-Text ist als Auftragstext vorbelegt (LFH-101).
     expect(screen.getByLabelText('Auftrag / Was')).toHaveValue('Tank 5000 anfordern');
 
     await userEvent.type(screen.getByLabelText('Empfänger'), 'S4{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
-    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
-      auftrag_text: 'Tank 5000 anfordern',
-      empfaenger: [expect.objectContaining({ empfaenger_typ: 'funktion', funktion_text: 'S4' })],
-    }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auftrag_text: 'Tank 5000 anfordern',
+        empfaenger: [expect.objectContaining({ empfaenger_typ: 'funktion', funktion_text: 'S4' })],
+      }),
+    );
   });
 });

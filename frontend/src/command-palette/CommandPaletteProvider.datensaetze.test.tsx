@@ -28,11 +28,29 @@ vi.mock('./useBefehle', () => ({ useBefehle: () => [] }));
 const EINSATZ = 1;
 
 const nutzer = {
-  id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'EL',
+  benutzername: 'el',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+  aktiv: true,
+  erstellt_at: '',
+  totp_aktiviert: false,
 };
-const PERSON = { id: 7, einsatz_id: EINSATZ, registrier_nr: 42, status: 'betroffen', name: 'Müller' };
-const SCHADEN = { id: 8, einsatz_id: EINSATZ, registrier_nr: 42, typ: 'sachschaden', ort: 'Hauptstr' };
+const PERSON = {
+  id: 7,
+  einsatz_id: EINSATZ,
+  registrier_nr: 42,
+  status: 'betroffen',
+  name: 'Müller',
+};
+const SCHADEN = {
+  id: 8,
+  einsatz_id: EINSATZ,
+  registrier_nr: 42,
+  typ: 'sachschaden',
+  ort: 'Hauptstr',
+};
 const FAHRZEUG = { id: 3, einsatz_id: EINSATZ, funkrufname: 'Florian 1' };
 const ETB = { id: 12, lfd_nr: 42, inhalt: 'Lage erkundet', typ: 'lage' };
 
@@ -64,7 +82,9 @@ function Ort() {
 
 function zeigePalette(route = `/einsaetze/${EINSATZ}/schaeden`) {
   return renderMitProviders(
-    <CommandPaletteProvider><Ort /></CommandPaletteProvider>,
+    <CommandPaletteProvider>
+      <Ort />
+    </CommandPaletteProvider>,
     { route },
   );
 }
@@ -84,7 +104,11 @@ describe('Kommandopalette · Datensätze finden (LFH-391 · C3)', () => {
 
     await suche(u, '42');
 
-    const zeile = await screen.findByRole('option', { name: /Personen · R-042 · Müller/ }, { timeout: 3000 });
+    const zeile = await screen.findByRole(
+      'option',
+      { name: /Personen · R-042 · Müller/ },
+      { timeout: 3000 },
+    );
     await u.click(zeile);
 
     // Literal-Pin auf den Builder-Ausgang (Bestandskonvention `befehle.test.ts`): ein
@@ -137,15 +161,20 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
 
     await suche(u, '42');
 
-    expect(await screen.findByRole('option', { name: /Personen · R-042 · Müller/ }, { timeout: 3000 }))
-      .toBeInTheDocument();
+    expect(
+      await screen.findByRole('option', { name: /Personen · R-042 · Müller/ }, { timeout: 3000 }),
+    ).toBeInTheDocument();
   });
 
   it('unterdrückt den Personen-Treffer, wenn das Personen-Modul ausgeblendet ist', async () => {
     overrides = {
       personen: {
-        einsatz_id: EINSATZ, modul_key: 'personen', sichtbar: false,
-        benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        einsatz_id: EINSATZ,
+        modul_key: 'personen',
+        sichtbar: false,
+        benoetigte_rolle: null,
+        geaendert_at: null,
+        geaendert_von: null,
       },
     };
     const u = userEvent.setup();
@@ -185,18 +214,23 @@ describe('Kommandopalette · Rangvorteil des Moduls, in dem man steht (LFH-391 �
 
     await suche(u, 'florian');
     await screen.findByRole('option', { name: /Personal · Florian 1/ }, { timeout: 3000 });
-    return screen.getAllByRole('option')
+    return screen
+      .getAllByRole('option')
       .map((o) => o.textContent ?? '')
       .filter((t) => t.includes('Florian 1'));
   }
 
   it('stellt das Fahrzeug voran, wenn die Palette im Fahrzeug-Modul geöffnet wird', async () => {
-    expect(await florianZeilen(`/einsaetze/${EINSATZ}/fahrzeuge`))
-      .toEqual(['Fahrzeuge · Florian 1', 'Personal · Florian 1']);
+    expect(await florianZeilen(`/einsaetze/${EINSATZ}/fahrzeuge`)).toEqual([
+      'Fahrzeuge · Florian 1',
+      'Personal · Florian 1',
+    ]);
   });
 
   it('stellt die Kraft voran, wenn die Palette im Personal-Modul geöffnet wird', async () => {
-    expect(await florianZeilen(`/einsaetze/${EINSATZ}/personal`))
-      .toEqual(['Personal · Florian 1', 'Fahrzeuge · Florian 1']);
+    expect(await florianZeilen(`/einsaetze/${EINSATZ}/personal`)).toEqual([
+      'Personal · Florian 1',
+      'Fahrzeuge · Florian 1',
+    ]);
   });
 });

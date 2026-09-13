@@ -36,7 +36,13 @@ function Harness({ bestand }: { bestand?: OnlineQuelle | null }) {
   const [aktuell, setAktuell] = useState<OnlineQuelle | null>(bestand ?? null);
   return (
     <>
-      <button type="button" onClick={() => { setAktuell(null); setOffen(true); }}>
+      <button
+        type="button"
+        onClick={() => {
+          setAktuell(null);
+          setOffen(true);
+        }}
+      >
         Wieder öffnen
       </button>
       <OnlineQuelleFormModal
@@ -111,9 +117,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
       }),
     );
     const nutzer = userEvent.setup();
-    renderMitProviders(
-      <Harness bestand={{ ...quelle, sortier: 2, aktiv: false, proxy: false }} />,
-    );
+    renderMitProviders(<Harness bestand={{ ...quelle, sortier: 2, aktiv: false, proxy: false }} />);
     const name = await screen.findByLabelText('Name');
     await nutzer.clear(name);
     await nutzer.type(name, 'OSM Standard');

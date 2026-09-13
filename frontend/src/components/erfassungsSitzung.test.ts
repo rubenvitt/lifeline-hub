@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  liesErfassungsSitzungswert,
-  schreibeErfassungsSitzungswert,
-} from './erfassungsSitzung';
+import { liesErfassungsSitzungswert, schreibeErfassungsSitzungswert } from './erfassungsSitzung';
 
 const PERSON_1_ORT = 'lfh:erfassung:1:person:antreff_ort';
 
@@ -51,12 +48,21 @@ describe('erfassungsSitzung', () => {
   });
 
   it('fängt werfende Lese- und Schreibzugriffe ab', () => {
-    mitSessionStorage({
-      getItem: () => { throw new Error('SecurityError'); },
-      setItem: () => { throw new Error('SecurityError'); },
-    }, () => {
-      expect(() => schreibeErfassungsSitzungswert(1, 'person', 'antreff_ort', 'Ort')).not.toThrow();
-      expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBeUndefined();
-    });
+    mitSessionStorage(
+      {
+        getItem: () => {
+          throw new Error('SecurityError');
+        },
+        setItem: () => {
+          throw new Error('SecurityError');
+        },
+      },
+      () => {
+        expect(() =>
+          schreibeErfassungsSitzungswert(1, 'person', 'antreff_ort', 'Ort'),
+        ).not.toThrow();
+        expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBeUndefined();
+      },
+    );
   });
 });

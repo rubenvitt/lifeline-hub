@@ -6,7 +6,11 @@ import SektionHeader from './SektionHeader';
 describe('SektionHeader', () => {
   it('rendert Titel, Beschreibung, Extra und Children', () => {
     renderMitProviders(
-      <SektionHeader titel="Anzeige" beschreibung="Darstellungs-Defaults" extra={<button>Extra</button>}>
+      <SektionHeader
+        titel="Anzeige"
+        beschreibung="Darstellungs-Defaults"
+        extra={<button>Extra</button>}
+      >
         <div>Inhalt</div>
       </SektionHeader>,
     );

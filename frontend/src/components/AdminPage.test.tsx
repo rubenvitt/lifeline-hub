@@ -31,7 +31,10 @@ describe('AdminPage', () => {
     function Harness() {
       const [form] = Form.useForm();
       return (
-        <AdminPage titel="Titel" aktionen={<Button onClick={() => form.submit()}>Speichern</Button>}>
+        <AdminPage
+          titel="Titel"
+          aktionen={<Button onClick={() => form.submit()}>Speichern</Button>}
+        >
           <Form form={form} onFinish={onFinish}>
             <Form.Item name="feld" initialValue="wert">
               <Input aria-label="feld" />

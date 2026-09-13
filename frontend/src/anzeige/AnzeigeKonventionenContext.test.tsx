@@ -24,15 +24,30 @@ function Sonde() {
 /** Vollständiges EinsatzEinstellungen-Mock; `partial` überschreibt gezielt einzelne Felder. */
 function einstellungenMock(partial: Partial<EinsatzEinstellungen> = {}): EinsatzEinstellungen {
   return {
-    einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+    einsatz_id: 1,
+    standard_modul: null,
+    basemap_modus: null,
+    karten_zoom_start: null,
     fachebenen_sichtbar: null,
-    zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
-    etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null,
-    meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null,
-    meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null,
-    auto_etb_eintraege: null, retention_dauer_tage: null,
-    etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false,
-    geaendert_at: null, geaendert_von: null,
+    zeitzone: null,
+    zeitformat: null,
+    einheiten: null,
+    koordinatenformat: null,
+    etb_nummer_praefix: null,
+    etb_nummer_start: null,
+    meldung_nummer_praefix: null,
+    meldung_nummer_start: null,
+    auftrag_nummer_praefix: null,
+    auftrag_nummer_start: null,
+    meldung_bestaetigung_frist_min: null,
+    auftrag_quittierung_frist_min: null,
+    auto_etb_eintraege: null,
+    retention_dauer_tage: null,
+    etb_nummer_eingefroren: false,
+    meldung_nummer_eingefroren: false,
+    auftrag_nummer_eingefroren: false,
+    geaendert_at: null,
+    geaendert_von: null,
     org_defaults: orgDefaultsMock(),
     ...partial,
   };
@@ -42,11 +57,20 @@ function einstellungenMock(partial: Partial<EinsatzEinstellungen> = {}): Einsatz
 function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellungen {
   return {
     org_id: 1,
-    zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
-    retention_dauer_tage: null, etb_nummer_praefix: null, meldung_nummer_praefix: null,
-    auftrag_nummer_praefix: null, meldung_bestaetigung_frist_min: null,
-    auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, geocoder_url: null,
-    geaendert_at: null, geaendert_von: null,
+    zeitzone: null,
+    zeitformat: null,
+    einheiten: null,
+    koordinatenformat: null,
+    retention_dauer_tage: null,
+    etb_nummer_praefix: null,
+    meldung_nummer_praefix: null,
+    auftrag_nummer_praefix: null,
+    meldung_bestaetigung_frist_min: null,
+    auftrag_quittierung_frist_min: null,
+    auto_etb_eintraege: null,
+    geocoder_url: null,
+    geaendert_at: null,
+    geaendert_von: null,
     ...partial,
   };
 }
@@ -63,10 +87,30 @@ describe('useAnzeigeKonventionen', () => {
 
   it('bindet die geladenen Einstellungen an die Formatter', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
-      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      einsatz_id: 1,
+      standard_modul: null,
+      basemap_modus: null,
+      karten_zoom_start: null,
       fachebenen_sichtbar: null,
-      zeitzone: 'Europe/Berlin', zeitformat: '12h', einheiten: 'metrisch', koordinatenformat: 'mgrs',
-      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+      zeitzone: 'Europe/Berlin',
+      zeitformat: '12h',
+      einheiten: 'metrisch',
+      koordinatenformat: 'mgrs',
+      etb_nummer_praefix: null,
+      etb_nummer_start: null,
+      meldung_nummer_praefix: null,
+      meldung_nummer_start: null,
+      auftrag_nummer_praefix: null,
+      auftrag_nummer_start: null,
+      meldung_bestaetigung_frist_min: null,
+      auftrag_quittierung_frist_min: null,
+      auto_etb_eintraege: null,
+      etb_nummer_eingefroren: false,
+      meldung_nummer_eingefroren: false,
+      auftrag_nummer_eingefroren: false,
+      retention_dauer_tage: null,
+      geaendert_at: null,
+      geaendert_von: null,
       org_defaults: { org_id: 1 },
     });
 
@@ -76,9 +120,7 @@ describe('useAnzeigeKonventionen', () => {
       </EinsatzAnzeigeProvider>,
     );
 
-    await waitFor(() =>
-      expect(screen.getByTestId('koord').textContent).toBe('31U ES 77019 61520'),
-    );
+    await waitFor(() => expect(screen.getByTestId('koord').textContent).toBe('31U ES 77019 61520'));
     // 09:00 UTC → Berlin 11:00, 12h-Format.
     expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
     expect(screen.getByTestId('format').textContent).toBe('mgrs');
@@ -86,10 +128,30 @@ describe('useAnzeigeKonventionen', () => {
 
   it('fällt bei fehlenden Werten auf Defaults zurück (Alt-Verhalten)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
-      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      einsatz_id: 1,
+      standard_modul: null,
+      basemap_modus: null,
+      karten_zoom_start: null,
       fachebenen_sichtbar: null,
-      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
-      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+      zeitzone: null,
+      zeitformat: null,
+      einheiten: null,
+      koordinatenformat: null,
+      etb_nummer_praefix: null,
+      etb_nummer_start: null,
+      meldung_nummer_praefix: null,
+      meldung_nummer_start: null,
+      auftrag_nummer_praefix: null,
+      auftrag_nummer_start: null,
+      meldung_bestaetigung_frist_min: null,
+      auftrag_quittierung_frist_min: null,
+      auto_etb_eintraege: null,
+      etb_nummer_eingefroren: false,
+      meldung_nummer_eingefroren: false,
+      auftrag_nummer_eingefroren: false,
+      retention_dauer_tage: null,
+      geaendert_at: null,
+      geaendert_von: null,
       org_defaults: { org_id: 1 },
     });
 
@@ -106,10 +168,30 @@ describe('useAnzeigeKonventionen', () => {
 
   it('Override übersteuert das geladene Koordinatenformat in formatKoordinate', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
-      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      einsatz_id: 1,
+      standard_modul: null,
+      basemap_modus: null,
+      karten_zoom_start: null,
       fachebenen_sichtbar: null,
-      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: 'wgs84',
-      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+      zeitzone: null,
+      zeitformat: null,
+      einheiten: null,
+      koordinatenformat: 'wgs84',
+      etb_nummer_praefix: null,
+      etb_nummer_start: null,
+      meldung_nummer_praefix: null,
+      meldung_nummer_start: null,
+      auftrag_nummer_praefix: null,
+      auftrag_nummer_start: null,
+      meldung_bestaetigung_frist_min: null,
+      auftrag_quittierung_frist_min: null,
+      auto_etb_eintraege: null,
+      etb_nummer_eingefroren: false,
+      meldung_nummer_eingefroren: false,
+      auftrag_nummer_eingefroren: false,
+      retention_dauer_tage: null,
+      geaendert_at: null,
+      geaendert_von: null,
       org_defaults: { org_id: 1 },
     });
 
@@ -120,15 +202,13 @@ describe('useAnzeigeKonventionen', () => {
     );
 
     // Warte bis wgs84 geladen ist.
-    await waitFor(() =>
-      expect(screen.getByTestId('koord').textContent).toBe('51.10000, 4.10000'),
-    );
+    await waitFor(() => expect(screen.getByTestId('koord').textContent).toBe('51.10000, 4.10000'));
 
     // Override auf DMS setzen — Anzeige muss reaktiv wechseln.
     act(() => setzeOverride('dms'));
 
     await waitFor(() =>
-      expect(screen.getByTestId('koord').textContent).toBe("51°06'00\"N 004°06'00\"E"),
+      expect(screen.getByTestId('koord').textContent).toBe('51°06\'00"N 004°06\'00"E'),
     );
   });
 
@@ -147,9 +227,7 @@ describe('useAnzeigeKonventionen', () => {
     );
 
     // Kein Einsatz-Override → der globale Org-Default (mgrs) greift in der Anzeige.
-    await waitFor(() =>
-      expect(screen.getByTestId('koord').textContent).toBe('31U ES 77019 61520'),
-    );
+    await waitFor(() => expect(screen.getByTestId('koord').textContent).toBe('31U ES 77019 61520'));
     expect(screen.getByTestId('format').textContent).toBe('mgrs');
   });
 
@@ -180,7 +258,9 @@ describe('useAnzeigeKonventionen', () => {
         zeitformat: null,
         einheiten: null,
         org_defaults: orgDefaultsMock({
-          zeitzone: 'Europe/Berlin', zeitformat: '12h', einheiten: 'imperial',
+          zeitzone: 'Europe/Berlin',
+          zeitformat: '12h',
+          einheiten: 'imperial',
         }),
       }),
     );
@@ -194,9 +274,7 @@ describe('useAnzeigeKonventionen', () => {
     // 09:00 UTC → Berlin 11:00 taktisch (161430-Schema, 12h wird ignoriert); 5000 m → imperial;
     // beides aus dem Org-Default. Auf die Distanz warten: sie diskriminiert das Laden zuverlässig
     // (die taktische Zeit ist 12h-unabhängig und kann zufällig dem Lokalzeit-Default gleichen).
-    await waitFor(() =>
-      expect(screen.getByTestId('distanz').textContent).toBe('3.11 mi'),
-    );
+    await waitFor(() => expect(screen.getByTestId('distanz').textContent).toBe('3.11 mi'));
     expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
   });
 });

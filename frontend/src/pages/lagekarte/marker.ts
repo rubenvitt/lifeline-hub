@@ -1,11 +1,35 @@
 import type { GlobalToken } from 'antd';
 import { rollenFarbe } from '../../theme/statusFarben';
-import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FreiesZeichen, FuehrungskraftKarte, LageMeldung, Schaden, Uhs } from '../../api/types';
-import { baueTzProps, einsatzortTz, grundzeichenAkzeptiert, schadenTz, uhsTz, type TzProps } from './taktischesZeichen';
+import type {
+  Einheit,
+  EinsatzAnzeige,
+  EinsatzFahrzeug,
+  FreiesZeichen,
+  FuehrungskraftKarte,
+  LageMeldung,
+  Schaden,
+  Uhs,
+} from '../../api/types';
+import {
+  baueTzProps,
+  einsatzortTz,
+  grundzeichenAkzeptiert,
+  schadenTz,
+  uhsTz,
+  type TzProps,
+} from './taktischesZeichen';
 import type { GeoJsonGeometry } from './geo';
 
 export type MarkerTyp =
-  | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'lagemeldung' | 'freies_zeichen';
+  | 'einsatzort'
+  | 'uhs'
+  | 'schaden'
+  | 'einheit'
+  | 'fahrzeug'
+  | 'fuehrung'
+  | 'abschnitt'
+  | 'lagemeldung'
+  | 'freies_zeichen';
 
 export interface KarteMarker {
   /** Stabil & eindeutig über alle Typen: 'einsatzort' | 'uhs-<id>' | 'schaden-<id>'. */
@@ -132,7 +156,12 @@ export function baueLageMeldungMarker(lagemeldungen: LageMeldung[]): KarteMarker
       lon: l.lon,
       label: `Meldung #${l.meldung_lfd_nr}`,
       farbe: LAGEMELDUNG_FARBE,
-      lageMeldung: { meldungId: l.meldung_id, meldungLfdNr: l.meldung_lfd_nr, absender: l.meldung_absender, inhalt: l.text },
+      lageMeldung: {
+        meldungId: l.meldung_id,
+        meldungLfdNr: l.meldung_lfd_nr,
+        absender: l.meldung_absender,
+        inhalt: l.text,
+      },
     });
   }
   return verortet;
@@ -146,11 +175,16 @@ const FREIES_ZEICHEN_FARBE = '#333333';
  *  rendert (via {@link grundzeichenAkzeptiert}) — sonst divergierte der Icon-Dedup-Key und ein
  *  Phantom-Overlay entstünde. Gilt auch für die Farbe (nur farb-akzeptierende Grundzeichen). */
 export function baueFreiesZeichenTz(
-  z: Pick<FreiesZeichen, 'grundzeichen' | 'organisation' | 'fachaufgabe' | 'symbol' | 'einheit' | 'funktion' | 'farbe'>,
+  z: Pick<
+    FreiesZeichen,
+    'grundzeichen' | 'organisation' | 'fachaufgabe' | 'symbol' | 'einheit' | 'funktion' | 'farbe'
+  >,
 ): TzProps {
   const gz = z.grundzeichen;
-  const nimm = (overlay: Parameters<typeof grundzeichenAkzeptiert>[1], wert: string | null | undefined) =>
-    wert != null && grundzeichenAkzeptiert(gz, overlay) ? wert : undefined;
+  const nimm = (
+    overlay: Parameters<typeof grundzeichenAkzeptiert>[1],
+    wert: string | null | undefined,
+  ) => (wert != null && grundzeichenAkzeptiert(gz, overlay) ? wert : undefined);
   return {
     grundzeichen: gz,
     organisation: nimm('organisation', z.organisation),
@@ -184,42 +218,88 @@ export interface TaktischeQuelle {
 }
 
 /** Leitet taktische Marker (Einheit/Fahrzeug/Führung) + Nicht-verortet-Liste ab. */
-export function baueTaktischeMarker(
-  q: TaktischeQuelle,
-): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
+export function baueTaktischeMarker(q: TaktischeQuelle): {
+  verortet: KarteMarker[];
+  nichtVerortet: NichtVerortet[];
+} {
   const verortet: KarteMarker[] = [];
   const nichtVerortet: NichtVerortet[] = [];
   const add = (
-    typ: 'einheit' | 'fahrzeug' | 'fuehrung', id: number, label: string,
-    lat: number | null | undefined, lon: number | null | undefined, tz: TzProps, statusFarbe?: string | null,
+    typ: 'einheit' | 'fahrzeug' | 'fuehrung',
+    id: number,
+    label: string,
+    lat: number | null | undefined,
+    lon: number | null | undefined,
+    tz: TzProps,
+    statusFarbe?: string | null,
   ) => {
     if (lat != null && lon != null) {
-      verortet.push({ schluessel: `${typ}-${id}`, typ, id, lat, lon, label, farbe: '#555', tz, statusFarbe });
+      verortet.push({
+        schluessel: `${typ}-${id}`,
+        typ,
+        id,
+        lat,
+        lon,
+        label,
+        farbe: '#555',
+        tz,
+        statusFarbe,
+      });
     } else {
       nichtVerortet.push({ typ, id, label });
     }
   };
   for (const e of q.einheiten) {
-    add('einheit', e.id, e.name, e.lat, e.lon,
-      baueTzProps({ objekttyp: 'einheit', einheitTypLabel: e.typ_label, fachaufgabe: e.tz_fachaufgabe,
-        organisation: e.tz_organisation, orgDefault: q.orgDefault }));
+    add(
+      'einheit',
+      e.id,
+      e.name,
+      e.lat,
+      e.lon,
+      baueTzProps({
+        objekttyp: 'einheit',
+        einheitTypLabel: e.typ_label,
+        fachaufgabe: e.tz_fachaufgabe,
+        organisation: e.tz_organisation,
+        orgDefault: q.orgDefault,
+      }),
+    );
   }
   for (const f of q.fahrzeuge) {
-    add('fahrzeug', f.id, f.funkrufname, f.lat, f.lon,
+    add(
+      'fahrzeug',
+      f.id,
+      f.funkrufname,
+      f.lat,
+      f.lon,
       baueTzProps({
-        objekttyp: 'fahrzeug', fachaufgabe: f.tz_fachaufgabe, organisation: f.tz_organisation,
-        orgDefault: q.orgDefault, fahrzeugtyp: f.fahrzeugtyp, opta: f.opta,
+        objekttyp: 'fahrzeug',
+        fachaufgabe: f.tz_fachaufgabe,
+        organisation: f.tz_organisation,
+        orgDefault: q.orgDefault,
+        fahrzeugtyp: f.fahrzeugtyp,
+        opta: f.opta,
         traegerorganisation: f.traegerorganisation,
       }),
-      f.status_farbe);
+      f.status_farbe,
+    );
   }
   for (const p of q.fuehrungskraefte) {
-    add('fuehrung', p.id, p.name, p.lat, p.lon,
+    add(
+      'fuehrung',
+      p.id,
+      p.name,
+      p.lat,
+      p.lon,
       baueTzProps({
-        objekttyp: 'fuehrung', fachaufgabe: p.tz_fachaufgabe, organisation: p.tz_organisation,
-        orgDefault: q.orgDefault, funktion: p.funktion,
+        objekttyp: 'fuehrung',
+        fachaufgabe: p.tz_fachaufgabe,
+        organisation: p.tz_organisation,
+        orgDefault: q.orgDefault,
+        funktion: p.funktion,
         istFuehrungskraft: p.ist_einheitsfuehrer || p.ist_abschnittsleiter,
-      }));
+      }),
+    );
   }
   return { verortet, nichtVerortet };
 }

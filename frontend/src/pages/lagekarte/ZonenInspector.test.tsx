@@ -54,27 +54,27 @@ function renderInspector(opts: {
     ansichten: [],
   } satisfies Omit<ZonenInspectorProps, 'zone'>;
   const ergebnis = renderMitProviders(
-    <ZonenInspector
-      zone={opts.zone ?? basisZone}
-      {...gemeinsameProps}
-    />,
+    <ZonenInspector zone={opts.zone ?? basisZone} {...gemeinsameProps} />,
   );
   return {
     onAendern,
     onLoeschen,
     onMatrixOeffnen,
     ...ergebnis,
-    rerenderZone: (zone: LageZone) => ergebnis.rerender(
-      <ZonenInspector zone={zone} {...gemeinsameProps} />,
-    ),
+    rerenderZone: (zone: LageZone) =>
+      ergebnis.rerender(<ZonenInspector zone={zone} {...gemeinsameProps} />),
   };
 }
 
 describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
   it('hält Eingaben kontrolliert und quittiert den laufenden Speichervorgang sichtbar', async () => {
     let freigeben: (() => void) | undefined;
-    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() =>
-      new Promise<void>((resolve) => { freigeben = resolve; }));
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(
+      () =>
+        new Promise<void>((resolve) => {
+          freigeben = resolve;
+        }),
+    );
     renderInspector({ onAendern });
 
     const label = screen.getByRole('textbox', { name: 'Label' });
@@ -86,7 +86,9 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
     expect(screen.getByText('speichert …')).toBeInTheDocument();
     expect(label).toBeDisabled();
 
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     expect(await screen.findByText('gespeichert')).toBeInTheDocument();
     expect(label).toBeEnabled();
   });
@@ -167,7 +169,15 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     geometrie_typ: 'Polygon',
     geometrie: JSON.stringify({
       type: 'Polygon',
-      coordinates: [[[8, 50], [8.02, 50], [8.02, 50.02], [8, 50.02], [8, 50]]],
+      coordinates: [
+        [
+          [8, 50],
+          [8.02, 50],
+          [8.02, 50.02],
+          [8, 50.02],
+          [8, 50],
+        ],
+      ],
     }),
     gefahrengebiet_id: null,
   };
@@ -175,7 +185,13 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     ...basisZone,
     typ: 'absperrgrenze',
     geometrie_typ: 'LineString',
-    geometrie: JSON.stringify({ type: 'LineString', coordinates: [[8, 50], [8, 51]] }),
+    geometrie: JSON.stringify({
+      type: 'LineString',
+      coordinates: [
+        [8, 50],
+        [8, 51],
+      ],
+    }),
     gefahrengebiet_id: null,
   };
 
@@ -200,7 +216,15 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
       ...basisZone,
       geometrie: JSON.stringify({
         type: 'Polygon',
-        coordinates: [[[8, 50], [8.01, 50], [8.01, 50.01], [8, 50.01], [8, 50]]],
+        coordinates: [
+          [
+            [8, 50],
+            [8.01, 50],
+            [8.01, 50.01],
+            [8, 50.01],
+            [8, 50],
+          ],
+        ],
       }),
     };
     const g: Gefahrengebiet = { ...gebiet, hoechste_warnstufe: 'hoch', zonen_ids: [1, 2, 3] };
@@ -310,8 +334,12 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
 
   it('trägt eine nach dem Wechsel eintreffende Quittung von A nicht an B', async () => {
     let freigeben: (() => void) | undefined;
-    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() =>
-      new Promise<void>((resolve) => { freigeben = resolve; }));
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(
+      () =>
+        new Promise<void>((resolve) => {
+          freigeben = resolve;
+        }),
+    );
     const { rerenderZone } = renderInspector({ zone: zoneA, onAendern });
 
     const label = screen.getByRole('textbox', { name: 'Label' });
@@ -324,7 +352,9 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
 
     // Der Lauf von A löst erst JETZT auf — ohne invalidierten Zähler stünde an Zone B
     // „gespeichert" für einen Vorgang, der nie zu ihr gehörte.
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     expect(screen.queryByText('gespeichert')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Label' })).toHaveValue('Bravo');
   });
@@ -335,8 +365,12 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     // Effekt hängt (label/notiz/farbe), und `zoneAendern` wartet die Invalidierung ab —
     // ein Increment vor dem Riegel ließe „gespeichert" also nie mehr erscheinen.
     let freigeben: (() => void) | undefined;
-    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() =>
-      new Promise<void>((resolve) => { freigeben = resolve; }));
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(
+      () =>
+        new Promise<void>((resolve) => {
+          freigeben = resolve;
+        }),
+    );
     const { rerenderZone } = renderInspector({ zone: zoneA, onAendern });
 
     const label = screen.getByRole('textbox', { name: 'Label' });
@@ -347,7 +381,9 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     // Gleiche id, geänderte Werte — genau das, was der eigene Refetch liefert.
     rerenderZone({ ...zoneA, label: 'AlphaX' });
 
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     expect(await screen.findByText('gespeichert')).toBeInTheDocument();
   });
 

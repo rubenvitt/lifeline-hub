@@ -43,13 +43,19 @@ describe('FeldLabel', () => {
     // also schwarze Beschriftung auf dunklem Grund. Ein harter Wert liefert in beiden
     // Modi denselben String — genau das schlägt hier fehl.
     const hell = renderMitModus(
-      <FeldLabel text="Modus" htmlFor="m"><input id="m" type="text" /></FeldLabel>, false,
+      <FeldLabel text="Modus" htmlFor="m">
+        <input id="m" type="text" />
+      </FeldLabel>,
+      false,
     );
     const farbeHell = screen.getByText('Modus').style.color;
     hell.unmount();
 
     renderMitModus(
-      <FeldLabel text="Modus" htmlFor="m"><input id="m" type="text" /></FeldLabel>, true,
+      <FeldLabel text="Modus" htmlFor="m">
+        <input id="m" type="text" />
+      </FeldLabel>,
+      true,
     );
     const farbeDunkel = screen.getByText('Modus').style.color;
 

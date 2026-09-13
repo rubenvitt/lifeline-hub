@@ -14,7 +14,11 @@ dayjs.extend(utc);
 describe('METADATEN_FELDER', () => {
   it('enthält genau die fünf Metadatenfelder in Anzeigereihenfolge', () => {
     expect(METADATEN_FELDER.map((f) => f.feld)).toEqual<MetaFeld[]>([
-      'ereigniszeit', 'von', 'an', 'meldeweg', 'veranlassung',
+      'ereigniszeit',
+      'von',
+      'an',
+      'meldeweg',
+      'veranlassung',
     ]);
   });
 
@@ -34,7 +38,11 @@ describe('erkenneSlashTrigger', () => {
 
   it('aktiv, wenn / nach Whitespace steht', () => {
     const text = 'Pumpe läuft /zei';
-    expect(erkenneSlashTrigger(text, text.length)).toEqual({ aktiv: true, filter: 'zei', start: 12 });
+    expect(erkenneSlashTrigger(text, text.length)).toEqual({
+      aktiv: true,
+      filter: 'zei',
+      start: 12,
+    });
   });
 
   it('inaktiv bei / mitten im Wort (z.B. 2/9)', () => {
@@ -67,7 +75,13 @@ describe('filterSlashEintraege', () => {
 
   it('ohne Filter: alle Felder + alle Bausteine', () => {
     const r = filterSlashEintraege('', bausteine, []);
-    expect(r.felder.map((e) => e.key)).toEqual(['ereigniszeit', 'von', 'an', 'meldeweg', 'veranlassung']);
+    expect(r.felder.map((e) => e.key)).toEqual([
+      'ereigniszeit',
+      'von',
+      'an',
+      'meldeweg',
+      'veranlassung',
+    ]);
     expect(r.bausteine.map((e) => e.label)).toEqual(['Lagemeldung', 'Bereitstellung']);
   });
 
@@ -93,7 +107,11 @@ describe('baueEintrag', () => {
 
   it('Standardmeldung: typ + inhalt, ereigniszeit = jetzt (SQLite-UTC), leere Metadaten weggelassen', () => {
     const e = baueEintrag({ inhalt: 'Pumpe läuft', typ: 'meldung', metadaten: {}, jetztIso });
-    expect(e).toMatchObject({ typ: 'meldung', inhalt: 'Pumpe läuft', ereigniszeit: '2026-06-10 12:00:00' });
+    expect(e).toMatchObject({
+      typ: 'meldung',
+      inhalt: 'Pumpe läuft',
+      ereigniszeit: '2026-06-10 12:00:00',
+    });
     expect(e.erfasst_lokal_at).toBe(jetztIso);
     expect(e.von).toBeUndefined();
     expect(e.berichtigt_eintrag_id).toBeUndefined();
@@ -104,25 +122,42 @@ describe('baueEintrag', () => {
       inhalt: 'Lage',
       typ: 'lage',
       metadaten: {
-        von: 'ELW 1', an: 'Abschnitt 2', meldeweg: 'funk', veranlassung: 'RTW nachfordern',
+        von: 'ELW 1',
+        an: 'Abschnitt 2',
+        meldeweg: 'funk',
+        veranlassung: 'RTW nachfordern',
         ereigniszeit: dayjs.utc('2026-06-10 09:30:00'),
       },
       jetztIso,
     });
     expect(e).toMatchObject({
-      von: 'ELW 1', an: 'Abschnitt 2', meldeweg: 'funk', veranlassung: 'RTW nachfordern',
+      von: 'ELW 1',
+      an: 'Abschnitt 2',
+      meldeweg: 'funk',
+      veranlassung: 'RTW nachfordern',
       ereigniszeit: '2026-06-10 09:30:00',
     });
   });
 
   it('Berichtigung: typ=berichtigung + berichtigt_eintrag_id', () => {
-    const e = baueEintrag({ inhalt: 'Korrektur', typ: 'meldung', metadaten: {}, berichtigungZuId: 5, jetztIso });
+    const e = baueEintrag({
+      inhalt: 'Korrektur',
+      typ: 'meldung',
+      metadaten: {},
+      berichtigungZuId: 5,
+      jetztIso,
+    });
     expect(e.typ).toBe('berichtigung');
     expect(e.berichtigt_eintrag_id).toBe(5);
   });
 
   it('leere Metadaten-Strings werden zu undefined', () => {
-    const e = baueEintrag({ inhalt: 'Pumpe läuft', typ: 'meldung', metadaten: { von: '', an: '' }, jetztIso });
+    const e = baueEintrag({
+      inhalt: 'Pumpe läuft',
+      typ: 'meldung',
+      metadaten: { von: '', an: '' },
+      jetztIso,
+    });
     expect(e.von).toBeUndefined();
     expect(e.an).toBeUndefined();
   });

@@ -3,7 +3,9 @@ import { bezugLabel, type BezugOptionen } from './bezug';
 
 const optionen: BezugOptionen = {
   schaden: [{ value: 3, label: 'S-003 · sachschaden · B5' }],
-  uhs: [], person: [], lagebericht: [],
+  uhs: [],
+  person: [],
+  lagebericht: [],
   meldung: [{ value: 7, label: '#7 · Leitstelle' }],
   auftrag: [],
 };

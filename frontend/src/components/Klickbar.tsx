@@ -1,6 +1,9 @@
 import type { HTMLAttributes, KeyboardEventHandler, MouseEventHandler, ReactNode } from 'react';
 
-type KlickbareZeileProps = Omit<HTMLAttributes<HTMLDivElement>, 'onClick' | 'onKeyDown' | 'role' | 'tabIndex'> & {
+type KlickbareZeileProps = Omit<
+  HTMLAttributes<HTMLDivElement>,
+  'onClick' | 'onKeyDown' | 'role' | 'tabIndex'
+> & {
   children: ReactNode;
   onAktivieren: () => void;
 };
@@ -35,7 +38,11 @@ export function aufTaste(aktion: () => void): KeyboardEventHandler<HTMLElement> 
   };
 }
 
-function stammtAusInteraktivemKind(ereignis: Parameters<MouseEventHandler<HTMLElement>>[0] | Parameters<KeyboardEventHandler<HTMLElement>>[0]) {
+function stammtAusInteraktivemKind(
+  ereignis:
+    | Parameters<MouseEventHandler<HTMLElement>>[0]
+    | Parameters<KeyboardEventHandler<HTMLElement>>[0],
+) {
   const ziel = ereignis.target;
   if (!(ziel instanceof Element) || ziel === ereignis.currentTarget) return false;
   const interaktivesElement = ziel.closest(INTERAKTIVE_KINDELEMENTE);

@@ -1,25 +1,35 @@
-import { App, Breadcrumb, Button, Flex, Form, Input, Space, Spin, Tag, Typography, theme } from 'antd';
+import {
+  App,
+  Breadcrumb,
+  Button,
+  Flex,
+  Form,
+  Input,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+  theme,
+} from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, befehlDetailPfad, auftraegePfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import {
-  aktualisiereBefehl,
-  gibBefehlFrei,
-  ladeBefehl,
-  schreibeBefehlFort,
-} from '../api/befehle';
+import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
 import type { BefehlAbschnitt, BefehlAnzeige } from '../api/types';
 import { vorlage } from '../befehle/vorlagen';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
+import FreigabeDialog from '../entwurf/FreigabeDialog';
+import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useViewport } from '../components/useViewport';
 import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
@@ -55,9 +65,11 @@ import './befehlAktionsleiste.css';
 function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
   if (!leiste) return;
   const wurzel = document.documentElement;
-  const aktualisiere = () => wurzel.style.setProperty(
-    '--lfh-befehl-fokusabstand', `${leiste.getBoundingClientRect().height + abstand}px`,
-  );
+  const aktualisiere = () =>
+    wurzel.style.setProperty(
+      '--lfh-befehl-fokusabstand',
+      `${leiste.getBoundingClientRect().height + abstand}px`,
+    );
   aktualisiere();
   const beobachter = new ResizeObserver(aktualisiere);
   beobachter.observe(leiste);
@@ -81,7 +93,7 @@ function BefehlDetail() {
   const { benutzer } = useAuth();
   const befehlId = Number(befehlIdParam);
   const idGueltig = parseRouteId(befehlIdParam) != null;
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const { token } = theme.useToken();
   const { abBreite } = useViewport();
   // Unterhalb des Führungs-Tablets kleben die Aktionen am unteren Rand statt im Kopf
@@ -104,7 +116,9 @@ function BefehlDetail() {
   const aktiv = useRef(true);
   useEffect(() => {
     aktiv.current = true;
-    return () => { aktiv.current = false; };
+    return () => {
+      aktiv.current = false;
+    };
   }, []);
 
   const einsatzQuery = useQuery({
@@ -161,31 +175,45 @@ function BefehlDetail() {
       return werte;
     },
     speichern,
-    onFehler: fehler,
     onGespeichert: invalidate,
   });
 
+  /**
+   * Ein Klick, ein PATCH (LFH-495). Der Klick blurrt zuerst das Feld, der Blur-Autosave ist
+   * also schon unterwegs — `speichereJetzt` hängt sich an ihn an, statt einen zweiten PATCH
+   * mit identischem Inhalt zu schicken. Quittung, Zeitstempel und `invalidate` liegen im
+   * Hook und laufen genau einmal je PATCH; hier bleibt nur der Erfolgs-Toast.
+   *
+   * KEIN `onError` (LFH-494, Fortschreibung von C10/H14): `speichereJetzt` legt den Grund
+   * selbst in `speicherFehler` ab, der Alert steht unten auf der Seite. Ein Toast daneben
+   * zeigte zwei Wahrheiten — einen stehenden Alert und eine Meldung, die nach drei
+   * Sekunden geht.
+   */
   const speichernMutation = useMutation({
-    mutationFn: async (werte: Record<string, string>) => {
-      const quittieren = schutz.quittungVorbereiten();
-      await speichern(werte);
-      return quittieren;
-    },
-    onSuccess: (quittieren) => {
-      quittieren();
-      invalidate();
-      message.success('Entwurf gespeichert');
-    },
-    onError: fehler,
+    mutationFn: (werte: Record<string, string>) => schutz.speichereJetzt(werte),
+    onSuccess: () => message.success('Entwurf gespeichert'),
   });
 
+  /**
+   * Die validierten Werte des Freigabe-Versuchs — und zugleich der Auf-Zu-Zustand des
+   * Dialogs (`!== null` heisst offen). Ein zweites `offen`-Flag daneben könnte von ihnen
+   * abweichen; so kann der Dialog nicht ohne die Werte stehen, mit denen er gespeichert
+   * werden soll.
+   */
+  const [freigabeWerte, setFreigabeWerte] = useState<Record<string, string> | null>(null);
+
+  /**
+   * KEIN `onError` (LFH-535, dieselbe Begründung wie an `speichernMutation`): der Grund
+   * steht als `freigebenMutation.error` im Bestätigungsdialog, der bei Ablehnung offen
+   * bleibt. Ein Toast daneben zeigte zwei Wahrheiten — einen stehenden Alert und eine
+   * Meldung, die nach drei Sekunden geht.
+   */
   const freigebenMutation = useMutation({
     mutationFn: () => gibBefehlFrei(einsatzId, befehlId),
     onSuccess: () => {
       invalidate();
       message.success('Befehl freigegeben');
     },
-    onError: fehler,
   });
 
   const fortschreibenMutation = useMutation({
@@ -225,30 +253,46 @@ function BefehlDetail() {
     } catch {
       return; // Validierungsfehler werden am Formular angezeigt.
     }
-    modal.confirm({
-      title: 'Befehl freigeben?',
-      content:
-        'Die Freigabe ist endgültig und unveränderlich: Der Befehl wird als ETB-Eintrag gesnapshottet. Korrekturen sind danach nur per Fortschreibung möglich.',
-      okText: 'Freigeben',
-      cancelText: 'Abbrechen',
-      onOk: async () => {
-        // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
-        // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
-        // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
-        const quittieren = schutz.quittungVorbereiten();
-        try {
-          await speichern(werte);
-        } catch (e) {
-          fehler(e);
-          throw e; // Dialog offen lassen, Freigabe nicht auslösen.
-        }
-        // Sonst bliebe der Merker nach der endgültigen Freigabe stehen und der Browser
-        // fragte beim Neuladen nach Änderungen an einem Befehl, der nicht mehr editierbar
-        // ist (Review LFH-348).
-        quittieren();
-        await freigebenMutation.mutateAsync();
-      },
-    });
+    // Ein frisch geöffneter Dialog zeigt keinen alten Grund: react-query hält `error` bis
+    // zum nächsten `mutate()`, ein Abbrechen-und-neu-Öffnen trüge ihn sonst herein.
+    freigebenMutation.reset();
+    setFreigabeWerte(werte);
+  };
+
+  /**
+   * KEIN eigener `sendetRef`-Riegel wie in `Erfassung.tsx`/`OtpEingabe.tsx` — und das ist
+   * gemessen, nicht angenommen: antds `Button` sperrt seinen Klick selbst, solange
+   * `loading` steht (`antd/es/button/Button.js:190`, `if (innerLoading || mergedDisabled)
+   * { e.preventDefault(); return; }`). Dort greift der Riegel, weil ein Tastenkürzel am
+   * Wurzel-Element den Knopf UMGEHT; hier ist der Knopf der einzige Weg hierher, und
+   * `laeuft` hängt an ihm. Ein zweiter Riegel daneben liesse sich in jsdom von antds
+   * eigenem nicht unterscheiden — also eine Zusicherung, die kein Test rot machen kann.
+   */
+  const freigabeAusfuehren = async () => {
+    if (freigabeWerte === null) return;
+    // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
+    // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
+    // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
+    // Über denselben Weg wie der Knopf (LFH-495): läuft der Blur-Autosave noch, wird
+    // er abgewartet statt gedoppelt. Der Hook quittiert bei Erfolg selbst — sonst
+    // bliebe der Merker nach der endgültigen Freigabe stehen und der Browser fragte
+    // beim Neuladen nach Änderungen an einem Befehl, der nicht mehr editierbar ist
+    // (Review LFH-348).
+    try {
+      await schutz.speichereJetzt(freigabeWerte);
+    } catch {
+      // KEIN Toast mehr (LFH-535): der Grund steht als `schutz.speicherFehler` IM Dialog,
+      // der offen bleibt. Bis LFH-494 war der Toast der einzige Kanal über der Maske —
+      // mit dem Grund im Dialog wäre er die zweite Wahrheit, die drei Sekunden später geht.
+      // Der Seiten-Alert bleibt daneben stehen: er überlebt das Schliessen des Dialogs.
+      return;
+    }
+    try {
+      await freigebenMutation.mutateAsync();
+    } catch {
+      return; // Grund steht als `freigebenMutation.error` im Dialog; er bleibt offen.
+    }
+    setFreigabeWerte(null);
   };
 
   /**
@@ -282,7 +326,10 @@ function BefehlDetail() {
           <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
         )}
         {!istEntwurf && darfSchreiben && (
-          <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>
+          <Button
+            onClick={() => fortschreibenMutation.mutate()}
+            loading={fortschreibenMutation.isPending}
+          >
             Fortschreiben
           </Button>
         )}
@@ -295,10 +342,23 @@ function BefehlDetail() {
                 ? 'ungespeicherte Änderungen'
                 : schutz.zuletztGespeichert && `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
             </Typography.Text>
+            {/* `loading` NUR am expliziten Pfad, NICHT an `speichertGerade` (LFH-495,
+                gemessen): antds Ladezustand hängt ein `<span role="img" aria-label="loading">`
+                in den Knopf, der zugängliche Name wird dadurch zu „loading Entwurf
+                speichern" — bei `speichertGerade` also bei JEDEM stillen Autosave, alle
+                30 Sekunden und bei jedem verlassenen Feld. Ein Hintergrundvorgang, der den
+                Namen eines Bedienelements umbenennt, ist genau die Alarmquelle, die der
+                Autosave nicht sein soll (und `BefehlDetailPage.test.tsx` fand es sofort:
+                „Unable to find … name 'Entwurf speichern'"). Der Riegel gegen den
+                Doppel-PATCH liegt im Hook, nicht an diesem `loading`. */}
             <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
               Entwurf speichern
             </Button>
-            <Button type="primary" onClick={freigabeBestaetigen} loading={freigebenMutation.isPending}>
+            <Button
+              type="primary"
+              onClick={freigabeBestaetigen}
+              loading={freigebenMutation.isPending}
+            >
               Freigeben
             </Button>
           </>
@@ -311,7 +371,13 @@ function BefehlDetail() {
     <div className="befehl-print-root">
       <EntwurfNavigationSchutz
         ungespeichert={schutz.ungespeichert && istEntwurf && darfSchreiben}
-        speichert={schutz.autosaveLaeuft || speichernMutation.isPending}
+        // EINE Quelle (LFH-495): `speichertGerade` deckt Autosave UND Knopf ab, seit beide
+        // durch denselben Riegel laufen. `speichernMutation.isPending` daneben wäre eine
+        // zweite Wahrheit über denselben Vorgang.
+        speichert={schutz.speichertGerade}
+        // Der Grund gehört IN den Dialog: hinter seiner Maske ist die Seite unbedienbar,
+        // der Alert bei `data-lfh`-Kopf wäre dort unsichtbar (LFH-494, Review-Befund).
+        speicherFehler={schutz.speicherFehler}
         speichern={async () => {
           try {
             await form.validateFields();
@@ -320,6 +386,22 @@ function BefehlDetail() {
           }
           schutz.autosaveJetzt();
         }}
+      />
+      <FreigabeDialog
+        offen={freigabeWerte !== null}
+        titel="Befehl freigeben?"
+        warnung="Die Freigabe ist endgültig und unveränderlich: Der Befehl wird als ETB-Eintrag gesnapshottet. Korrekturen sind danach nur per Fortschreibung möglich."
+        speicherFehler={schutz.speicherFehler}
+        freigabeFehler={freigebenMutation.error}
+        // `speichertGerade` deckt den Vorlauf ab — auch dann, wenn der Klick sich an einen
+        // noch laufenden Blur-Autosave anhängt (LFH-495). Das ist hier RICHTIG und nicht
+        // die Falle von `speichernMutation`: die benennt der Ladezustand um („loading
+        // Entwurf speichern"), dieser Knopf existiert dagegen nur, solange der Dialog
+        // offen steht — ein Hintergrund-Autosave ohne Bezug zu diesem Klick kann es
+        // hier nicht geben, der Vorlauf IST der Vorgang, auf den der Dialog wartet.
+        laeuft={schutz.speichertGerade || freigebenMutation.isPending}
+        onAbbrechen={() => setFreigabeWerte(null)}
+        onFreigeben={() => void freigabeAusfuehren()}
       />
       <Breadcrumb
         className="befehl-no-print"
@@ -369,6 +451,19 @@ function BefehlDetail() {
         {!verankert && aktionen}
       </Flex>
 
+      {/*
+        Der Grund eines gescheiterten Speicherns — nicht im `aktionen`-Block (LFH-494):
+        der wandert je Breite zwischen Kopf und verankerter Leiste, der Alert soll aber in
+        jeder Breite an derselben Stelle über dem Inhalt stehen. `befehl-no-print`, weil ein
+        „Nicht gespeichert"-Banner im ausgedruckten Befehl eine Aussage mit Aussenwirkung
+        wäre, die den Druck nicht betrifft.
+      */}
+      {schutz.speicherFehler != null && (
+        <div className="befehl-no-print" style={{ marginBottom: token.marginSM }}>
+          <SpeicherFehler fehler={schutz.speicherFehler} />
+        </div>
+      )}
+
       {/* Taktische DTG in der Anzeigezone (LFH-350 · H60): `zeitstand` ist ein UTC-Wirestring
           ohne Zonenkennung und stand roh ausgegeben um den Zonenversatz falsch. */}
       <Typography.Paragraph type="secondary">
@@ -394,6 +489,15 @@ function BefehlDetail() {
               <MarkdownEditor layout="split" variante="dokument" autoSize={{ minRows: 8 }} />
             </Form.Item>
           ))}
+          {/* Einstiegsfokus in den ersten leeren Abschnitt (LFH-495). Als LETZTES Kind, damit
+              beim Mount-Effekt alle Felder im DOM stehen; Begründungen in `Einstiegsfokus`. */}
+          <Einstiegsfokus
+            form={form}
+            feld={einstiegsAbschnitt(
+              (v?.abschnitte ?? []).map((a) => a.schluessel),
+              (schluessel) => befehl.abschnitte.find((x) => x.schluessel === schluessel)?.text,
+            )}
+          />
         </Form>
       ) : (
         <div className="befehl-druck">
@@ -402,9 +506,11 @@ function BefehlDetail() {
             return (
               <section key={a.schluessel} style={{ marginBottom: 16 }}>
                 <Typography.Title level={5}>{a.label}</Typography.Title>
-                {text.trim()
-                  ? <Markdown variante="dokument">{text}</Markdown>
-                  : <Typography.Paragraph>—</Typography.Paragraph>}
+                {text.trim() ? (
+                  <Markdown variante="dokument">{text}</Markdown>
+                ) : (
+                  <Typography.Paragraph>—</Typography.Paragraph>
+                )}
               </section>
             );
           })}

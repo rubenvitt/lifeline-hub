@@ -36,6 +36,8 @@ export function abschnittStaerken(
   const menge = nachfahrenInkl(abschnitte, abschnittId);
   return {
     eigene: summiereStaerke(einheiten.filter((e) => e.abschnitt_id === abschnittId)),
-    inklUnter: summiereStaerke(einheiten.filter((e) => e.abschnitt_id != null && menge.has(e.abschnitt_id))),
+    inklUnter: summiereStaerke(
+      einheiten.filter((e) => e.abschnitt_id != null && menge.has(e.abschnitt_id)),
+    ),
   };
 }

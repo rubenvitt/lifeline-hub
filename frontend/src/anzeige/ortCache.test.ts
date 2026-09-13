@@ -5,8 +5,8 @@ describe('ortCache', () => {
   afterEach(() => leereOrtCache());
 
   it('rundet den Key auf 3 Nachkommastellen (~100 m)', () => {
-    expect(ortKeyVon(51.16040, 10.45140)).toBe('51.160,10.451');
-    expect(ortKeyVon(51.16042, 10.45138)).toBe(ortKeyVon(51.16040, 10.45140));
+    expect(ortKeyVon(51.1604, 10.4514)).toBe('51.160,10.451');
+    expect(ortKeyVon(51.16042, 10.45138)).toBe(ortKeyVon(51.1604, 10.4514));
   });
 
   it('set→get-Roundtrip; Miss → null', async () => {

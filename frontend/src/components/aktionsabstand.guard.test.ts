@@ -276,7 +276,9 @@ export function reihenIn(quelltext: string): Reihe[] {
     if (tag.endsWith('/>')) continue;
     offen.push({
       zeile: text.slice(0, start).split('\n').length,
-      weit: WEIT.some((w) => new RegExp(`\\bsize\\s*=\\s*(?:["']${w}["']|\\{\\s*["']${w}["']\\s*\\})`).test(tag)),
+      weit: WEIT.some((w) =>
+        new RegExp(`\\bsize\\s*=\\s*(?:["']${w}["']|\\{\\s*["']${w}["']\\s*\\})`).test(tag),
+      ),
       knoepfe: 0,
       destruktiv: false,
     });
@@ -350,7 +352,8 @@ describe('Abstands-Guard (LFH-363 · B5c)', () => {
   });
 
   it('lässt sie in Ruhe, sobald der Abstand steht', () => {
-    const quelle = '<Space size="middle"><Button>Bearbeiten</Button><Button danger>Weg</Button></Space>';
+    const quelle =
+      '<Space size="middle"><Button>Bearbeiten</Button><Button danger>Weg</Button></Space>';
     expect(befunde({ x: quelle })).toEqual([]);
   });
 
@@ -359,14 +362,18 @@ describe('Abstands-Guard (LFH-363 · B5c)', () => {
   });
 
   it('zählt je unmittelbar umschließendem Space, nicht über die Schachtelung hinweg', () => {
-    const quelle = ['<Space>', '<span>x</span>', '<Space><Button danger>Weg</Button></Space>', '</Space>'].join(
-      '\n',
-    );
+    const quelle = [
+      '<Space>',
+      '<span>x</span>',
+      '<Space><Button danger>Weg</Button></Space>',
+      '</Space>',
+    ].join('\n');
     expect(reihenIn(quelle)).toEqual([]);
   });
 
   it('findet die Nachbarschaft auch hinter einer Pfeilfunktion — deren > beendet das Tag nicht', () => {
-    const quelle = '<Space><Button onClick={() => tu()}>Los</Button><Button danger>Weg</Button></Space>';
+    const quelle =
+      '<Space><Button onClick={() => tu()}>Los</Button><Button danger>Weg</Button></Space>';
     expect(reihenIn(quelle)).toHaveLength(1);
   });
 

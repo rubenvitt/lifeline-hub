@@ -21,8 +21,9 @@ configure({ asyncUtilTimeout: 5000 });
 
 // Signalisiert React, dass wir in einer act-fähigen Umgebung testen — entfernt die
 // „not configured to support act(...)"-Warnung und deckt echte act-Verletzungen auf.
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 // jsdom unter Node 26 liefert kein window.localStorage — minimaler In-Memory-Polyfill,
 // damit Komponenten/Hilfen mit Persistenz (z. B. zuletzt gewählte Karte/UHS) testbar sind.
@@ -79,16 +80,32 @@ installiereMatchMedia();
 if (globalThis.localStorage == null) {
   class InMemoryStorage implements Storage {
     private map = new Map<string, string>();
-    get length() { return this.map.size; }
-    clear() { this.map.clear(); }
-    getItem(key: string) { return this.map.has(key) ? this.map.get(key)! : null; }
-    key(index: number) { return Array.from(this.map.keys())[index] ?? null; }
-    removeItem(key: string) { this.map.delete(key); }
-    setItem(key: string, value: string) { this.map.set(key, String(value)); }
+    get length() {
+      return this.map.size;
+    }
+    clear() {
+      this.map.clear();
+    }
+    getItem(key: string) {
+      return this.map.has(key) ? this.map.get(key)! : null;
+    }
+    key(index: number) {
+      return Array.from(this.map.keys())[index] ?? null;
+    }
+    removeItem(key: string) {
+      this.map.delete(key);
+    }
+    setItem(key: string, value: string) {
+      this.map.set(key, String(value));
+    }
   }
   const storage = new InMemoryStorage();
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
-  if (globalThis.window) Object.defineProperty(globalThis.window, 'localStorage', { configurable: true, value: storage });
+  if (globalThis.window)
+    Object.defineProperty(globalThis.window, 'localStorage', {
+      configurable: true,
+      value: storage,
+    });
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));

@@ -19,7 +19,11 @@ interface SektionHeaderProps {
  * gesetzten Typography-Margin-Resets; Abstände aus `theme.useToken()`.
  */
 export default function SektionHeader({
-  titel, beschreibung, extra, dataUpdatedAt, children,
+  titel,
+  beschreibung,
+  extra,
+  dataUpdatedAt,
+  children,
 }: SektionHeaderProps) {
   const { token } = theme.useToken();
   return (
@@ -38,7 +42,10 @@ export default function SektionHeader({
         {extra}
       </div>
       {beschreibung && (
-        <Typography.Paragraph type="secondary" style={{ marginTop: token.marginXXS, marginBottom: 0 }}>
+        <Typography.Paragraph
+          type="secondary"
+          style={{ marginTop: token.marginXXS, marginBottom: 0 }}
+        >
           {beschreibung}
         </Typography.Paragraph>
       )}

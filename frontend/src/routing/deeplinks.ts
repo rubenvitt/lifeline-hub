@@ -284,7 +284,10 @@ export function fahrzeugePfad(einsatzId: number, opts: { fahrzeug?: number } = {
   return mitQuery(einsatzModulPfad(einsatzId, 'fahrzeuge'), { fahrzeug: opts.fahrzeug });
 }
 
-export function einsatzabschnittePfad(einsatzId: number, opts: { abschnitt?: number } = {}): string {
+export function einsatzabschnittePfad(
+  einsatzId: number,
+  opts: { abschnitt?: number } = {},
+): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'einsatzabschnitte'), { abschnitt: opts.abschnitt });
 }
 

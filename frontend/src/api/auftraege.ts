@@ -23,7 +23,11 @@ export function legeAuftragAn(einsatzId: number, daten: NeuerAuftrag): Promise<A
 }
 
 /** Quittierung pro Empfänger (LFH-90). */
-export function quittiereEmpfaenger(einsatzId: number, auftragId: number, empfaengerId: number): Promise<Auftrag> {
+export function quittiereEmpfaenger(
+  einsatzId: number,
+  auftragId: number,
+  empfaengerId: number,
+): Promise<Auftrag> {
   return apiSend<Auftrag>(
     `/api/einsaetze/${einsatzId}/auftraege/${auftragId}/empfaenger/${empfaengerId}/quittieren`,
     'POST',

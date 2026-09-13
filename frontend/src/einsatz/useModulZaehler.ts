@@ -5,7 +5,12 @@ import { listeKanaele } from '../api/chat';
 import { listeMeldungen } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
-  Auftrag, BenutzerAnzeige, ChatKanal, Erinnerung, Meldung, ModulOverrides,
+  Auftrag,
+  BenutzerAnzeige,
+  ChatKanal,
+  Erinnerung,
+  Meldung,
+  ModulOverrides,
 } from '../api/types';
 import { AUFTRAG_STATUS, istAbgeschlossen } from '../kommunikation';
 import {
@@ -37,7 +42,9 @@ export function berechneMeldungsZaehler(
   meldungen: Array<Pick<Meldung, 'ist_offen' | 'status'>>,
 ): ModulZaehlerWert {
   const offen = meldungen.filter((meldung) => meldung.ist_offen).length;
-  const ungesehen = meldungen.filter((meldung) => meldung.ist_offen && meldung.status === 'neu').length;
+  const ungesehen = meldungen.filter(
+    (meldung) => meldung.ist_offen && meldung.status === 'neu',
+  ).length;
   return {
     wert: offen,
     beschreibung: `${plural(offen, 'offene Meldung', 'offene Meldungen')}, davon ${plural(ungesehen, 'ungesehen', 'ungesehen')}`,
@@ -47,12 +54,13 @@ export function berechneMeldungsZaehler(
 export function berechneAuftragsZaehler(
   auftraege: Array<Pick<Auftrag, 'bearbeitungsstatus' | 'ist_ueberfaellig'>>,
 ): ModulZaehlerWert {
-  const offen = auftraege.filter((auftrag) =>
-    !istAbgeschlossen(AUFTRAG_STATUS[auftrag.bearbeitungsstatus]?.phase ?? 'offen'),
+  const offen = auftraege.filter(
+    (auftrag) => !istAbgeschlossen(AUFTRAG_STATUS[auftrag.bearbeitungsstatus]?.phase ?? 'offen'),
   ).length;
-  const ueberfaellig = auftraege.filter((auftrag) =>
-    auftrag.ist_ueberfaellig &&
-    !istAbgeschlossen(AUFTRAG_STATUS[auftrag.bearbeitungsstatus]?.phase ?? 'offen'),
+  const ueberfaellig = auftraege.filter(
+    (auftrag) =>
+      auftrag.ist_ueberfaellig &&
+      !istAbgeschlossen(AUFTRAG_STATUS[auftrag.bearbeitungsstatus]?.phase ?? 'offen'),
   ).length;
   return {
     wert: offen,
@@ -63,17 +71,23 @@ export function berechneAuftragsZaehler(
 export function berechneErinnerungsZaehler(
   erinnerungen: Array<Pick<Erinnerung, 'ist_faellig' | 'status'>>,
 ): ModulZaehlerWert {
-  const faellig = erinnerungen.filter((erinnerung) =>
-    erinnerung.ist_faellig && erinnerung.status === 'offen',
+  const faellig = erinnerungen.filter(
+    (erinnerung) => erinnerung.ist_faellig && erinnerung.status === 'offen',
   ).length;
-  return { wert: faellig, beschreibung: plural(faellig, 'fällige Erinnerung', 'fällige Erinnerungen') };
+  return {
+    wert: faellig,
+    beschreibung: plural(faellig, 'fällige Erinnerung', 'fällige Erinnerungen'),
+  };
 }
 
 export function berechneChatZaehler(
   kanaele: Array<Pick<ChatKanal, 'ungelesen_anzahl'>>,
 ): ModulZaehlerWert {
   const ungelesen = kanaele.reduce((summe, kanal) => summe + kanal.ungelesen_anzahl, 0);
-  return { wert: ungelesen, beschreibung: plural(ungelesen, 'ungelesene Chat-Nachricht', 'ungelesene Chat-Nachrichten') };
+  return {
+    wert: ungelesen,
+    beschreibung: plural(ungelesen, 'ungelesene Chat-Nachricht', 'ungelesene Chat-Nachrichten'),
+  };
 }
 
 /**
@@ -96,7 +110,8 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   const gueltigerEinsatz = Number.isFinite(einsatzId);
   const meldungenAktiv = gueltigerEinsatz && darfZaehlerLaden('meldungen', benutzer, overrides);
   const auftraegeAktiv = gueltigerEinsatz && darfZaehlerLaden('auftraege', benutzer, overrides);
-  const erinnerungenAktiv = gueltigerEinsatz && darfZaehlerLaden('erinnerungen', benutzer, overrides);
+  const erinnerungenAktiv =
+    gueltigerEinsatz && darfZaehlerLaden('erinnerungen', benutzer, overrides);
   const chatAktiv = gueltigerEinsatz && darfZaehlerLaden('chat', benutzer, overrides);
 
   const meldungen = useQuery({
@@ -121,15 +136,14 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   });
 
   return {
-    meldungen: meldungenAktiv && meldungen.isSuccess
-      ? berechneMeldungsZaehler(meldungen.data)
-      : undefined,
-    auftraege: auftraegeAktiv && auftraege.isSuccess
-      ? berechneAuftragsZaehler(auftraege.data)
-      : undefined,
-    erinnerungen: erinnerungenAktiv && erinnerungen.isSuccess
-      ? berechneErinnerungsZaehler(erinnerungen.data)
-      : undefined,
+    meldungen:
+      meldungenAktiv && meldungen.isSuccess ? berechneMeldungsZaehler(meldungen.data) : undefined,
+    auftraege:
+      auftraegeAktiv && auftraege.isSuccess ? berechneAuftragsZaehler(auftraege.data) : undefined,
+    erinnerungen:
+      erinnerungenAktiv && erinnerungen.isSuccess
+        ? berechneErinnerungsZaehler(erinnerungen.data)
+        : undefined,
     chat: chatAktiv && chat.isSuccess ? berechneChatZaehler(chat.data) : undefined,
   };
 }

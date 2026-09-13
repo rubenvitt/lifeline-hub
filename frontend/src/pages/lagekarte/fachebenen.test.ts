@@ -1,9 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig, KRITIS_MIN_ZOOM, rasterBbox, mergeFeatures } from './fachebenen';
+import {
+  FACHEBENEN,
+  fachebeneKeys,
+  istBboxAbhaengig,
+  KRITIS_MIN_ZOOM,
+  rasterBbox,
+  mergeFeatures,
+} from './fachebenen';
 
 // Minimaler Feature-Builder für die Merge-Tests.
-const feat = (lon: number, lat: number) =>
-  ({ type: 'Feature' as const, geometry: { type: 'Point', coordinates: [lon, lat] }, properties: {} });
+const feat = (lon: number, lat: number) => ({
+  type: 'Feature' as const,
+  geometry: { type: 'Point', coordinates: [lon, lat] },
+  properties: {},
+});
 
 describe('Fachebenen-Registry', () => {
   it('enthält die vier v1-Quellen', () => {

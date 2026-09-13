@@ -11,9 +11,21 @@ import { App as AntApp } from 'antd';
 
 function uhs(id: number, status: UhsStatus): Uhs {
   return {
-    id, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-    bezeichnung: `UHS ${id}`, standort: null, notiz: null, lat: null, lon: null, status,
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+    id,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    typ: 'behandlungsplatz',
+    bezeichnung: `UHS ${id}`,
+    standort: null,
+    notiz: null,
+    lat: null,
+    lon: null,
+    status,
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
   };
 }
 
@@ -23,7 +35,9 @@ function LocationProbe() {
 }
 
 function renderSwitcher() {
-  server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([uhs(3, 'aktiv'), uhs(9, 'geplant')])));
+  server.use(
+    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([uhs(3, 'aktiv'), uhs(9, 'geplant')])),
+  );
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
     <QueryClientProvider client={qc}>
@@ -33,7 +47,7 @@ function renderSwitcher() {
           <LocationProbe />
         </MemoryRouter>
       </AntApp>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 

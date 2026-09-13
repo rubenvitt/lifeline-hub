@@ -3,13 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
-import {
-  MemoryRouter,
-  Routes,
-  Route,
-  useLocation,
-  useNavigate,
-} from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AlarmZentrale from './AlarmZentrale';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
@@ -24,22 +18,31 @@ function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
     <>
       {mitSteuerung && (
         <>
-          <button type="button" onClick={() => navigate('/einsaetze/2/start')}>Einsatz wechseln</button>
-          <button type="button" onClick={() => setSichtbar(false)}>Alarm-Zentrale ausblenden</button>
+          <button type="button" onClick={() => navigate('/einsaetze/2/start')}>
+            Einsatz wechseln
+          </button>
+          <button type="button" onClick={() => setSichtbar(false)}>
+            Alarm-Zentrale ausblenden
+          </button>
           <button
             type="button"
-            onClick={() => notification.info({
-              key: 'fremde-notification',
-              title: 'Fremde Notification',
-              duration: 0,
-            })}
+            onClick={() =>
+              notification.info({
+                key: 'fremde-notification',
+                title: 'Fremde Notification',
+                duration: 0,
+              })
+            }
           >
             Fremde Notification öffnen
           </button>
         </>
       )}
       {sichtbar && <AlarmZentrale />}
-      <output data-testid="route">{location.pathname}{location.search}</output>
+      <output data-testid="route">
+        {location.pathname}
+        {location.search}
+      </output>
     </>
   );
 }
@@ -88,13 +91,23 @@ function stubAudioReady() {
     currentTime: 0,
     resume: vi.fn(async () => {}),
     createOscillator: vi.fn(() => ({
-      type: '', frequency: { value: 0 }, connect: vi.fn(), start: vi.fn(), stop: vi.fn(),
+      type: '',
+      frequency: { value: 0 },
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
     })),
     createGain: vi.fn(() => ({
-      gain: { value: 0, setValueAtTime: vi.fn() }, connect: vi.fn(),
+      gain: { value: 0, setValueAtTime: vi.fn() },
+      connect: vi.fn(),
     })),
   };
-  vi.stubGlobal('AudioContext', vi.fn(function () { return ctx; }));
+  vi.stubGlobal(
+    'AudioContext',
+    vi.fn(function () {
+      return ctx;
+    }),
+  );
 }
 
 function stubNotification(permission: NotificationPermission) {
@@ -121,19 +134,33 @@ afterEach(() => {
 describe('AlarmZentrale', () => {
   it('zeigt einen Toast bei window-Event lfh:sofortmeldung', async () => {
     renderAlarm();
-    act(() => { window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 3 } })); });
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 3 } }));
+    });
     await waitFor(() => expect(screen.getByText('Sofortmeldung eingegangen')).toBeInTheDocument());
   });
 
   it('zeigt einen Erinnerungs-Toast bei lfh:erinnerung-alarm ohne Bezug', async () => {
     renderAlarm();
-    act(() => { window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', { detail: { erinnerung_id: 5, bezug_typ: null, bezug_id: null } })); });
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:erinnerung-alarm', {
+          detail: { erinnerung_id: 5, bezug_typ: null, bezug_id: null },
+        }),
+      );
+    });
     await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
   });
 
   it('zeigt einen Auftrags-Toast bei lfh:erinnerung-alarm mit bezug_typ=auftrag', async () => {
     renderAlarm();
-    act(() => { window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', { detail: { erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 } })); });
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:erinnerung-alarm', {
+          detail: { erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 },
+        }),
+      );
+    });
     await waitFor(() => expect(screen.getByText('Auftrag überfällig')).toBeInTheDocument());
   });
 
@@ -156,8 +183,9 @@ describe('AlarmZentrale', () => {
     expect(aus).toHaveTextContent('Desktop aus');
     await userEvent.click(aus);
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: erlaubt' }))
-        .toHaveTextContent('Desktop erlaubt');
+      expect(
+        screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: erlaubt' }),
+      ).toHaveTextContent('Desktop erlaubt');
     });
     expect(NotificationMock.requestPermission).toHaveBeenCalledOnce();
   });
@@ -165,8 +193,9 @@ describe('AlarmZentrale', () => {
   it('zeigt Browser-Blockade dauerhaft an', () => {
     stubNotification('denied');
     renderAlarm();
-    expect(screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }))
-      .toHaveTextContent('Desktop blockiert');
+    expect(
+      screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
+    ).toHaveTextContent('Desktop blockiert');
   });
 
   it('bündelt beim vierten Sofort-Ereignis die drei vorherigen und behält das neueste einzeln', async () => {
@@ -232,9 +261,11 @@ describe('AlarmZentrale', () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     act(() => {
       for (let id = 1; id <= 4; id += 1) {
-        window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: id, bezug_typ: 'auftrag', bezug_id: id },
-        }));
+        window.dispatchEvent(
+          new CustomEvent('lfh:erinnerung-alarm', {
+            detail: { erinnerung_id: id, bezug_typ: 'auftrag', bezug_id: id },
+          }),
+        );
       }
     });
 
@@ -249,9 +280,11 @@ describe('AlarmZentrale', () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     act(() => {
       for (let id = 1; id <= 4; id += 1) {
-        window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', {
-          detail: { erinnerung_id: id, bezug_typ: null, bezug_id: null },
-        }));
+        window.dispatchEvent(
+          new CustomEvent('lfh:erinnerung-alarm', {
+            detail: { erinnerung_id: id, bezug_typ: null, bezug_id: null },
+          }),
+        );
       }
     });
 
@@ -266,12 +299,16 @@ describe('AlarmZentrale', () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     act(() => {
       window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 1 } }));
-      window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', {
-        detail: { erinnerung_id: 2, bezug_typ: 'auftrag', bezug_id: 2 },
-      }));
-      window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', {
-        detail: { erinnerung_id: 3, bezug_typ: null, bezug_id: null },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('lfh:erinnerung-alarm', {
+          detail: { erinnerung_id: 2, bezug_typ: 'auftrag', bezug_id: 2 },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent('lfh:erinnerung-alarm', {
+          detail: { erinnerung_id: 3, bezug_typ: null, bezug_id: null },
+        }),
+      );
       window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 4 } }));
     });
 

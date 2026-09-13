@@ -26,8 +26,20 @@ const PROVIDER_LISTE = [
 
 function alsAdmin() {
   vi.mocked(useAuth).mockReturnValue({
-    benutzer: { id: 1, system_rolle: 'admin', org_rolle: 'keine', anzeigename: 'Admin', benutzername: 'admin', aktiv: true, erstellt_at: '', totp_aktiviert: false },
-    laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+    benutzer: {
+      id: 1,
+      system_rolle: 'admin',
+      org_rolle: 'keine',
+      anzeigename: 'Admin',
+      benutzername: 'admin',
+      aktiv: true,
+      erstellt_at: '',
+      totp_aktiviert: false,
+    },
+    laedt: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    aktualisiere: vi.fn(),
   } as never);
 }
 
@@ -42,7 +54,9 @@ describe('Anmeldeverfahren', () => {
 
   it('listet die konfigurierten Auth-Provider', async () => {
     renderMitProviders(<Anmeldeverfahren />);
-    expect(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passwort' })).toBeInTheDocument();
   });
 
@@ -68,7 +82,9 @@ describe('Anmeldeverfahren', () => {
 
   it('sperrt den passwort-Provider (garantierter Admin-Weg)', async () => {
     renderMitProviders(<Anmeldeverfahren />);
-    expect(await screen.findByRole('switch', { name: 'Anmeldeverfahren: Passwort' })).toBeDisabled();
+    expect(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: Passwort' }),
+    ).toBeDisabled();
   });
 
   // Die Ablehnung steht seit LFH-345/C10 an der SEITE, nicht in der Toast-Queue (H14):
@@ -80,7 +96,9 @@ describe('Anmeldeverfahren', () => {
     vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, meldung));
 
     renderMitProviders(<Anmeldeverfahren />);
-    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await userEvent.click(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    );
 
     const treffer = await screen.findByText(meldung);
     expect(treffer.closest('.ant-message')).toBeNull();
@@ -90,7 +108,9 @@ describe('Anmeldeverfahren', () => {
     vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, 'Letzter Login-Weg'));
 
     renderMitProviders(<Anmeldeverfahren />);
-    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await userEvent.click(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    );
 
     await waitFor(() => {
       const markiert = document.querySelectorAll('[data-provider-zeile][data-fehler="true"]');
@@ -112,9 +132,13 @@ describe('Anmeldeverfahren', () => {
     vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, 'Letzter Login-Weg'));
 
     renderMitProviders(<Anmeldeverfahren />);
-    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await userEvent.click(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    );
     await waitFor(() =>
-      expect(document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]')).not.toBeNull(),
+      expect(
+        document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]'),
+      ).not.toBeNull(),
     );
 
     await userEvent.click(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passkey' }));
@@ -132,15 +156,21 @@ describe('Anmeldeverfahren', () => {
     vi.mocked(providerSchalten).mockRejectedValueOnce(new ApiError(409, 'Letzter Login-Weg'));
 
     renderMitProviders(<Anmeldeverfahren />);
-    await userEvent.click(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }));
+    await userEvent.click(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    );
     await waitFor(() =>
-      expect(document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]')).not.toBeNull(),
+      expect(
+        document.querySelector('[data-provider-zeile="oidc"][data-fehler="true"]'),
+      ).not.toBeNull(),
     );
 
     await userEvent.click(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passkey' }));
 
     await waitFor(() =>
-      expect(document.querySelectorAll('[data-provider-zeile][data-fehler="true"]')).toHaveLength(0),
+      expect(document.querySelectorAll('[data-provider-zeile][data-fehler="true"]')).toHaveLength(
+        0,
+      ),
     );
   });
 
@@ -153,12 +183,26 @@ describe('Anmeldeverfahren', () => {
 
   it('ist read-only für Nicht-Admins (fuehrungskraft)', async () => {
     vi.mocked(useAuth).mockReturnValue({
-      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
-      laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+      benutzer: {
+        id: 2,
+        system_rolle: 'keiner',
+        org_rolle: 'fuehrungskraft',
+        anzeigename: 'FK',
+        benutzername: 'fk',
+        aktiv: true,
+        erstellt_at: '',
+        totp_aktiviert: false,
+      },
+      laedt: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      aktualisiere: vi.fn(),
     } as never);
 
     renderMitProviders(<Anmeldeverfahren />);
-    expect(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' })).toBeDisabled();
+    expect(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    ).toBeDisabled();
   });
 });
 
@@ -182,8 +226,20 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
 
   it('nennt der Fuehrungskraft den Grund je Zeile, nicht nur die Ausgrauung', async () => {
     vi.mocked(useAuth).mockReturnValue({
-      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
-      laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+      benutzer: {
+        id: 2,
+        system_rolle: 'keiner',
+        org_rolle: 'fuehrungskraft',
+        anzeigename: 'FK',
+        benutzername: 'fk',
+        aktiv: true,
+        erstellt_at: '',
+        totp_aktiviert: false,
+      },
+      laedt: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      aktualisiere: vi.fn(),
     } as never);
 
     renderMitProviders(<Anmeldeverfahren />);
@@ -233,7 +289,9 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
     // Die Falle fuer spaeter: wer das `aria-label` als "doppelt" entfernt, bekommt STILL
     // einen anderen Accessible Name — 'PocketID' statt 'Anmeldeverfahren: PocketID'.
     renderMitProviders(<Anmeldeverfahren />);
-    expect(await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    ).toBeInTheDocument();
   });
 });
 

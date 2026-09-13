@@ -37,19 +37,39 @@ beforeEach(async () => {
 });
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 const einsatz = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: 'THW', status: 'aktiv',
-  begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: 'THW',
+  status: 'aktiv',
+  begonnen_at: '2026-05-23 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
   meine_rolle: 'einsatzleitung',
 };
 const eintrag = {
-  id: 1, lfd_nr: 1, typ: 'meldung', inhalt: 'Erste Meldung', von: null, an: null,
-  meldeweg: null, veranlassung: null, erfasser_id: 1, erfasser_name: 'Admin',
-  ereigniszeit: '2026-05-23 10:00:00', received_at: '2026-05-23 10:00:01',
-  erfasst_lokal_at: null, berichtigt_eintrag_id: null,
+  id: 1,
+  lfd_nr: 1,
+  typ: 'meldung',
+  inhalt: 'Erste Meldung',
+  von: null,
+  an: null,
+  meldeweg: null,
+  veranlassung: null,
+  erfasser_id: 1,
+  erfasser_name: 'Admin',
+  ereigniszeit: '2026-05-23 10:00:00',
+  received_at: '2026-05-23 10:00:01',
+  erfasst_lokal_at: null,
+  berichtigt_eintrag_id: null,
 };
 
 /**
@@ -107,60 +127,93 @@ function setup(route = '/einsaetze/7/etb') {
 
 describe('EtbPage', () => {
   it.each(['2099-09-09 15:17:43', null])(
-    'LFH-463: lädt beim Öffnen den inzwischen geänderten Termin frisch (%s)', async (termin) => {
+    'LFH-463: lädt beim Öffnen den inzwischen geänderten Termin frisch (%s)',
+    async (termin) => {
       setupMSW();
-      server.use(http.get('/api/einsaetze/7', () => HttpResponse.json({
-        ...einsatz, naechste_lagebesprechung_at: '2099-09-09 13:17:43',
-      })));
+      server.use(
+        http.get('/api/einsaetze/7', () =>
+          HttpResponse.json({
+            ...einsatz,
+            naechste_lagebesprechung_at: '2099-09-09 13:17:43',
+          }),
+        ),
+      );
       renderMitProviders(
-        <AuthProvider><Routes><Route path="/einsaetze/:id/etb" element={<EtbPage />} /></Routes></AuthProvider>,
+        <AuthProvider>
+          <Routes>
+            <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+          </Routes>
+        </AuthProvider>,
         { route: '/einsaetze/7/etb' },
       );
       await screen.findByText('Erste Meldung');
       let freigeben!: () => void;
-      const antwort = new Promise<void>((resolve) => { freigeben = resolve; });
+      const antwort = new Promise<void>((resolve) => {
+        freigeben = resolve;
+      });
       let abrufe = 0;
-      server.use(http.get('/api/einsaetze/7', async () => {
-        abrufe++;
-        await antwort;
-        return HttpResponse.json({ ...einsatz, naechste_lagebesprechung_at: termin });
-      }));
+      server.use(
+        http.get('/api/einsaetze/7', async () => {
+          abrufe++;
+          await antwort;
+          return HttpResponse.json({ ...einsatz, naechste_lagebesprechung_at: termin });
+        }),
+      );
       let gesendet: Record<string, unknown> | undefined;
-      server.use(http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
-        gesendet = await request.json() as Record<string, unknown>;
-        return HttpResponse.json({ id: 1 });
-      }));
+      server.use(
+        http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+          gesendet = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({ id: 1 });
+        }),
+      );
       const user = userEvent.setup();
       try {
         await waehleZeilenaktion(user, 'Wiedervorlage');
-        expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'Nächste Lagebesprechung' }),
+        ).not.toBeInTheDocument();
         await waitFor(() => expect(abrufe).toBe(1));
       } finally {
         freigeben();
       }
       if (termin) {
         await user.click(await screen.findByRole('button', { name: 'Nächste Lagebesprechung' }));
-        await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Anlegen' }));
+        await user.click(
+          within(screen.getByRole('dialog')).getByRole('button', { name: 'Anlegen' }),
+        );
         await waitFor(() => expect(gesendet?.faellig_at).toBe(termin));
       } else {
         await waitFor(() => expect(screen.getByRole('button', { name: '+30 min' })).toBeEnabled());
-        expect(screen.queryByRole('button', { name: 'Nächste Lagebesprechung' })).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'Nächste Lagebesprechung' }),
+        ).not.toBeInTheDocument();
       }
     },
   );
 
   it('LFH-463: reicht den Einsatztermin an die Wiedervorlage weiter', async () => {
     setupMSW();
-    server.use(http.get('/api/einsaetze/7', () => HttpResponse.json({
-      ...einsatz, naechste_lagebesprechung_at: '2099-09-09 13:17:43',
-    })));
+    server.use(
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({
+          ...einsatz,
+          naechste_lagebesprechung_at: '2099-09-09 13:17:43',
+        }),
+      ),
+    );
     let gesendet: Record<string, unknown> | undefined;
-    server.use(http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
-      gesendet = await request.json() as Record<string, unknown>;
-      return HttpResponse.json({ id: 1 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
     renderMitProviders(
-      <AuthProvider><Routes><Route path="/einsaetze/:id/etb" element={<EtbPage />} /></Routes></AuthProvider>,
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+      </AuthProvider>,
       { route: '/einsaetze/7/etb' },
     );
     const user = userEvent.setup();
@@ -171,37 +224,46 @@ describe('EtbPage', () => {
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2099-09-09 13:17:43'));
   });
 
-  it.each([null, 'Alte Leitung'])('LFH-461 Review: erster Entwurf wartet auf laufenden Detail-Refetch (Cache: %s)', async (meine_fuehrungsstelle) => {
-    setupMSW();
-    const client = neuerQueryClient();
-    client.setQueryData(einsatzKeys.einsatz(7), { ...einsatz, meine_fuehrungsstelle });
-    let freigeben!: () => void;
-    const antwort = new Promise<void>((resolve) => { freigeben = resolve; });
-    server.use(http.get('/api/einsaetze/7', async () => {
-      await antwort;
-      return HttpResponse.json({ ...einsatz, meine_fuehrungsstelle: 'Neue Leitung' });
-    }));
-    // Entspricht der nach dem Stellen-Speichern gestarteten Invalidierung.
-    await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
-    renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/etb" element={<EtbPage />} /></Routes>,
-      { client, route: '/einsaetze/7/etb' },
-    );
-    try {
-      await screen.findByText('Erste Meldung');
-      expect.soft(screen.queryByPlaceholderText(/Inhalt/)).not.toBeInTheDocument();
-      expect.soft(screen.queryByRole('button', { name: /add|hinzu/i })).not.toBeInTheDocument();
-    } finally {
-      freigeben();
-    }
-    expect(await screen.findByText('An: Neue Leitung')).toBeInTheDocument();
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meine Eingabe');
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
-    await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
-    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Meine Eingabe');
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-  });
+  it.each([null, 'Alte Leitung'])(
+    'LFH-461 Review: erster Entwurf wartet auf laufenden Detail-Refetch (Cache: %s)',
+    async (meine_fuehrungsstelle) => {
+      setupMSW();
+      const client = neuerQueryClient();
+      client.setQueryData(einsatzKeys.einsatz(7), { ...einsatz, meine_fuehrungsstelle });
+      let freigeben!: () => void;
+      const antwort = new Promise<void>((resolve) => {
+        freigeben = resolve;
+      });
+      server.use(
+        http.get('/api/einsaetze/7', async () => {
+          await antwort;
+          return HttpResponse.json({ ...einsatz, meine_fuehrungsstelle: 'Neue Leitung' });
+        }),
+      );
+      // Entspricht der nach dem Stellen-Speichern gestarteten Invalidierung.
+      await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>,
+        { client, route: '/einsaetze/7/etb' },
+      );
+      try {
+        await screen.findByText('Erste Meldung');
+        expect.soft(screen.queryByPlaceholderText(/Inhalt/)).not.toBeInTheDocument();
+        expect.soft(screen.queryByRole('button', { name: /add|hinzu/i })).not.toBeInTheDocument();
+      } finally {
+        freigeben();
+      }
+      expect(await screen.findByText('An: Neue Leitung')).toBeInTheDocument();
+      await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meine Eingabe');
+      await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
+      await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
+      expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Meine Eingabe');
+      expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+    },
+  );
 
   it('zeigt Einsatz-Bezeichnung und ETB-Einträge', async () => {
     setup();
@@ -221,24 +283,33 @@ describe('EtbPage', () => {
     expect(await screen.findByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
-  it.each([1024, 1366])('hebt per ?eintrag=<id> bei %i px hervor und räumt den Param (LFH-25)', async (breite) => {
-    setzeViewportBreite(breite);
-    const { container } = setup('/einsaetze/7/etb?eintrag=1');
-    await screen.findByText('Erste Meldung');
-    await waitFor(() =>
-      // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix (`eintrag-<id>`) —
-      // die Queue-`id` eines gepufferten Eintrags kollidierte sonst mit der DB-`id`.
-      expect(container.querySelector(breite < 1200
-        ? '[data-zeile="eintrag-1"]' : '[data-row-key="eintrag-1"]')).toHaveClass('zeile-hervorgehoben'),
-    );
-    // Adressier-Param wird nach dem Anwenden geräumt (apply-then-clean).
-    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
-  });
+  it.each([1024, 1366])(
+    'hebt per ?eintrag=<id> bei %i px hervor und räumt den Param (LFH-25)',
+    async (breite) => {
+      setzeViewportBreite(breite);
+      const { container } = setup('/einsaetze/7/etb?eintrag=1');
+      await screen.findByText('Erste Meldung');
+      await waitFor(() =>
+        // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix (`eintrag-<id>`) —
+        // die Queue-`id` eines gepufferten Eintrags kollidierte sonst mit der DB-`id`.
+        expect(
+          container.querySelector(
+            breite < 1200 ? '[data-zeile="eintrag-1"]' : '[data-row-key="eintrag-1"]',
+          ),
+        ).toHaveClass('zeile-hervorgehoben'),
+      );
+      // Adressier-Param wird nach dem Anwenden geräumt (apply-then-clean).
+      await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+    },
+  );
 
   it('lädt ältere Seiten nach, bis der ?eintrag=<id> gefunden ist (laden-bis-gefunden)', async () => {
     setzeViewportBreite(1366);
     const seite1 = Array.from({ length: 100 }, (_, i) => ({
-      ...eintrag, id: 101 + i, lfd_nr: 200 - i, inhalt: `Eintrag ${101 + i}`,
+      ...eintrag,
+      id: 101 + i,
+      lfd_nr: 200 - i,
+      inhalt: `Eintrag ${101 + i}`,
     }));
     const ziel = { ...eintrag, id: 5, lfd_nr: 1, inhalt: 'Ziel-Eintrag' };
     server.use(
@@ -264,7 +335,9 @@ describe('EtbPage', () => {
     // Der Ziel-Eintrag liegt erst auf Seite 2 → muss automatisch nachgeladen werden.
     expect(await screen.findByText('Ziel-Eintrag')).toBeInTheDocument();
     await waitFor(() =>
-      expect(container.querySelector('[data-row-key="eintrag-5"]')).toHaveClass('zeile-hervorgehoben'),
+      expect(container.querySelector('[data-row-key="eintrag-5"]')).toHaveClass(
+        'zeile-hervorgehoben',
+      ),
     );
   });
 
@@ -334,7 +407,10 @@ describe('EtbPage', () => {
     server.use(
       http.post('/api/einsaetze/7/etb', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Neuer Eintrag X' }, { status: 201 });
+        return HttpResponse.json(
+          { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Neuer Eintrag X' },
+          { status: 201 },
+        );
       }),
     );
     setup();
@@ -382,13 +458,9 @@ describe('EtbPage', () => {
   it('verarbeitet ?neu=1 und entfernt den Param', async () => {
     setup('/einsaetze/7/etb?neu=1');
     // Erfassungszeile ist bei Schreibrecht (aktiv + einsatzleitung) vorhanden.
-    await waitFor(() =>
-      expect(document.querySelector('.etb-erfassung-sticky')).toBeTruthy(),
-    );
+    await waitFor(() => expect(document.querySelector('.etb-erfassung-sticky')).toBeTruthy());
     // Der ?neu=1-Handler muss den Param aus der URL entfernen.
-    await waitFor(() =>
-      expect(screen.getByTestId('ort-suche').textContent).not.toContain('neu'),
-    );
+    await waitFor(() => expect(screen.getByTestId('ort-suche').textContent).not.toContain('neu'));
   });
 });
 
@@ -437,9 +509,13 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
 
   it('zeigt bei gescheitertem ETB-Abruf den Fehler und behauptet keine leere Menge', async () => {
     setupMit([
-      http.get('/api/einsaetze/7/etb', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/einsaetze/7/etb', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
     ]);
-    expect(await screen.findByText('ETB-Einträge konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('ETB-Einträge konnten nicht geladen werden'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText(LEER_TITEL)).not.toBeInTheDocument();
   });
@@ -455,14 +531,18 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       http.get('/api/auth/me', () =>
         HttpResponse.json({ ...admin, system_rolle: 'keiner', anzeigename: 'Beobachter' }),
       ),
-      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' })),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
+      ),
       http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
     ]);
     expect(await screen.findByText(LEER_TITEL)).toBeInTheDocument();
     // Die Erfassungsleiste wird für Lesende gar nicht gerendert — ein Fokussprung dorthin
     // zeigte auf einen Knoten, den es nicht gibt.
     expect(document.querySelector('.etb-erfassung-sticky')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Ersten Eintrag erfassen' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Ersten Eintrag erfassen' }),
+    ).not.toBeInTheDocument();
   });
 
   it('unterscheidet leer-mit-Filter und setzt beim Zurücksetzen auch das Eingabefeld zurück', async () => {
@@ -498,7 +578,10 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     expect(await screen.findByText('Kein Eintrag passt zum Filter')).toBeInTheDocument();
 
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Backspace',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(suche, ereignis);
 
@@ -511,7 +594,10 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     const neueSuche = screen.getByPlaceholderText('Volltextsuche');
     expect(neueSuche).not.toBe(suche);
     const ausserhalb = new KeyboardEvent('keydown', {
-      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Backspace',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(document.body, ausserhalb);
 
@@ -533,7 +619,10 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     const schnellerfassung = screen.getByPlaceholderText(/Inhalt/);
     schnellerfassung.focus();
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Backspace',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     fireEvent(schnellerfassung, ereignis);
 
@@ -578,8 +667,7 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       ]);
       await screen.findByText('Erste Meldung');
       await userEvent.type(screen.getByPlaceholderText('Volltextsuche'), 'zzz');
-      await waitFor(() =>
-        expect(screen.getByTestId('ort-suche')).toHaveTextContent('q=zzz'));
+      await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('q=zzz'));
     });
 
     it('räumt beim Zurücksetzen die URL, nicht nur den Seitenzustand', async () => {
@@ -612,7 +700,8 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       await screen.findByText('Erste Meldung');
       // `eintrag` wird nach dem Sprung geräumt, der Filter NICHT mitgerissen.
       await waitFor(() =>
-        expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('eintrag='));
+        expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('eintrag='),
+      );
       expect(screen.getByTestId('ort-suche')).toHaveTextContent('typ=meldung');
       // Und `eintrag` ist nie in den Abruf geraten — es ist eine Sprungmarke,
       // kein Filter.

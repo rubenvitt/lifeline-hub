@@ -40,7 +40,7 @@ export function createZeichnung(
   const gesetztePunkte = new Set<string>();
   let fertigZaehler = 0;
 
-  const mindestPunkte = () => aktiverModus === 'linie' ? 2 : 3;
+  const mindestPunkte = () => (aktiverModus === 'linie' ? 2 : 3);
 
   // TerraDraw veröffentlicht keine Anzahl der FEST gesetzten Punkte. Der Snapshot enthält
   // während des Zeichnens zusätzlich den beweglichen Vorschaupunkt und wäre deshalb schon

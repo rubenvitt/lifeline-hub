@@ -5,7 +5,13 @@ import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import type { NeuerEintrag } from '../api/etb';
-import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
+import type {
+  EinsatzAnzeige,
+  EtbBaustein,
+  EtbEintragAnzeige,
+  EtbTyp,
+  MeldeWeg,
+} from '../api/types';
 import { ERFASSBARE_TYPEN } from './typFarben';
 import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
@@ -15,8 +21,12 @@ import { useFunkrufnamen } from './funkrufnamen';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
-  baueEintrag, erkenneSlashTrigger, METADATEN_FELDER,
-  type MetadatenWerte, type MetaFeld, type SlashEintrag,
+  baueEintrag,
+  erkenneSlashTrigger,
+  METADATEN_FELDER,
+  type MetadatenWerte,
+  type MetaFeld,
+  type SlashEintrag,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 
@@ -40,7 +50,8 @@ interface Props {
 }
 
 const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }));
-const ENTER_HINWEIS = 'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
+const ENTER_HINWEIS =
+  'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
 
 /**
  * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen
@@ -49,8 +60,8 @@ const ENTER_HINWEIS = 'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit 
  * drei kennt und die Auswahl sonst geraten werden müsste.
  */
 const UEBERNAHME_ERKLAERUNG =
-  'Von, An und Meldeweg bleiben nach dem Erfassen für den nächsten Eintrag stehen. '
-  + 'Inhalt, Veranlassung und Ereigniszeit werden immer geleert.';
+  'Von, An und Meldeweg bleiben nach dem Erfassen für den nächsten Eintrag stehen. ' +
+  'Inhalt, Veranlassung und Ereigniszeit werden immer geleert.';
 
 /**
  * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
@@ -63,13 +74,22 @@ const UEBERNAHME_ERKLAERUNG =
  * Die Funktion ist der einzige Ort, der diese Auswahl trifft; `EtbEntwurfsTabs` reicht
  * denselben Filter über die Remount-Grenze.
  */
-export function nurUebernahme(quelle: Pick<MetadatenWerte, 'von' | 'an' | 'meldeweg'>): MetadatenWerte {
+export function nurUebernahme(
+  quelle: Pick<MetadatenWerte, 'von' | 'an' | 'meldeweg'>,
+): MetadatenWerte {
   return { von: quelle.von, an: quelle.an, meldeweg: quelle.meldeweg };
 }
 
 export default function Schnellerfassung({
-  erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz, initialWerte, onWerteChange,
-  werteBehalten = false, onWerteBehaltenChange,
+  erfassen,
+  berichtigungZu,
+  onBerichtigungAbbrechen,
+  bausteine,
+  einsatz,
+  initialWerte,
+  onWerteChange,
+  werteBehalten = false,
+  onWerteBehaltenChange,
 }: Props) {
   const navigate = useNavigate();
   const { token } = theme.useToken();
@@ -81,12 +101,12 @@ export default function Schnellerfassung({
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
   // Nur beim ersten Mount ohne Entwurf vorbelegen. Auch ein bewusst leeres
   // Entwurfsfeld gewinnt; Berichtigungen übernehmen ausschließlich das Original.
-  const [metadaten, setMetadaten] = useState<MetadatenWerte>(() =>
-    initialWerte?.metadaten ?? (
-      !berichtigungZu && einsatz.meine_fuehrungsstelle?.trim()
+  const [metadaten, setMetadaten] = useState<MetadatenWerte>(
+    () =>
+      initialWerte?.metadaten ??
+      (!berichtigungZu && einsatz.meine_fuehrungsstelle?.trim()
         ? { an: einsatz.meine_fuehrungsstelle.trim() }
-        : {}
-    ),
+        : {}),
   );
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
   const [sendet, setSendet] = useState(false);
@@ -140,7 +160,7 @@ export default function Schnellerfassung({
     if (!menuOffen) return;
     function beiZeigerAb(ereignis: PointerEvent) {
       const ziel = ereignis.target;
-      const el = ziel instanceof Element ? ziel : (ziel as Node | null)?.parentElement ?? null;
+      const el = ziel instanceof Element ? ziel : ((ziel as Node | null)?.parentElement ?? null);
       if (el?.closest('[data-slash-menu]')) return;
       if (el && feldKnopfRef.current?.contains(el)) return;
       setMenuOffen(false);
@@ -227,11 +247,12 @@ export default function Schnellerfassung({
       e.preventDefault();
       return;
     }
-    const istSendeTaste = e.key === 'Enter'
-      && !e.repeat
-      && !e.shiftKey
-      && !e.altKey
-      && (e.ctrlKey || e.metaKey || (inhalt.trim() !== '' && !inhalt.includes('\n')));
+    const istSendeTaste =
+      e.key === 'Enter' &&
+      !e.repeat &&
+      !e.shiftKey &&
+      !e.altKey &&
+      (e.ctrlKey || e.metaKey || (inhalt.trim() !== '' && !inhalt.includes('\n')));
     if (istSendeTaste && editFeld == null) {
       e.preventDefault();
       void absenden();
@@ -243,7 +264,9 @@ export default function Schnellerfassung({
     setSendet(true);
     try {
       const eintrag = baueEintrag({
-        inhalt, typ, metadaten,
+        inhalt,
+        typ,
+        metadaten,
         berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
         jetztIso: new Date().toISOString(),
       });
@@ -254,7 +277,8 @@ export default function Schnellerfassung({
       // Schalter). Greift für Aufrufer OHNE Remount; `EtbEntwurfsTabs` remountet und setzt
       // dieselben Felder über `initialWerte` wieder ein.
       setMetadaten((m) => (uebernahmeAktiv ? nurUebernahme(m) : {}));
-      setEditFeld(null); setMenuOffen(false);
+      setEditFeld(null);
+      setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
       fokusInsFeld();
     } finally {
@@ -266,7 +290,9 @@ export default function Schnellerfassung({
     <Card className="etb-erfassung-card">
       {berichtigungZu && (
         <Alert
-          type="warning" showIcon style={{ marginBottom: 12 }}
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
           title={`Berichtigung zu #${berichtigungZu.lfd_nr}`}
           action={<Button onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
         />
@@ -306,7 +332,10 @@ export default function Schnellerfassung({
             wert={metadaten[feld]}
             optionen={feld === 'von' || feld === 'an' ? funkrufnamen : undefined}
             onCommit={commitFeld}
-            onCancel={() => { setEditFeld(null); fokusInsFeld(); }}
+            onCancel={() => {
+              setEditFeld(null);
+              fokusInsFeld();
+            }}
             onRemove={(f) => setMetadaten((m) => ({ ...m, [f]: undefined }))}
             onEdit={(f) => setEditFeld(f)}
           />
@@ -319,7 +348,10 @@ export default function Schnellerfassung({
             wert={undefined}
             optionen={editFeld === 'von' || editFeld === 'an' ? funkrufnamen : undefined}
             onCommit={commitFeld}
-            onCancel={() => { setEditFeld(null); fokusInsFeld(); }}
+            onCancel={() => {
+              setEditFeld(null);
+              fokusInsFeld();
+            }}
             onRemove={() => setEditFeld(null)}
             onEdit={() => {}}
           />
@@ -328,7 +360,11 @@ export default function Schnellerfassung({
           ref={feldKnopfRef}
           type="dashed"
           icon={<PlusOutlined />}
-          onClick={() => { setMenuFilter(''); setTriggerStart(-1); setMenuOffen((o) => !o); }}
+          onClick={() => {
+            setMenuFilter('');
+            setTriggerStart(-1);
+            setMenuOffen((o) => !o);
+          }}
         >
           Feld
         </Button>
@@ -342,7 +378,10 @@ export default function Schnellerfassung({
       {zeigeSchalter && (
         <div style={{ marginTop: 12 }}>
           <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-            <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
+            <Checkbox
+              checked={werteBehalten}
+              onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
+            >
               <Typography.Text type="secondary">Werte behalten</Typography.Text>
             </Checkbox>
           </Tooltip>
@@ -359,11 +398,22 @@ export default function Schnellerfassung({
           zweimal. `wrap`, weil der Satz auf 390 px sonst die Knöpfe hinausschiebt. */}
       <Space align="center" wrap style={{ marginTop: 12, width: '100%' }}>
         {!berichtigungZu && (
-          <Select value={typ} style={{ minWidth: 150 }} options={TYP_OPTIONEN} onChange={(v) => setTyp(v)} />
+          <Select
+            value={typ}
+            style={{ minWidth: 150 }}
+            options={TYP_OPTIONEN}
+            onChange={(v) => setTyp(v)}
+          />
         )}
-        <Button type="primary" loading={sendet} onClick={() => void absenden()}>Erfassen</Button>
+        <Button type="primary" loading={sendet} onClick={() => void absenden()}>
+          Erfassen
+        </Button>
         {!berichtigungZu && typ === 'lage' && (
-          <Button type="link" style={{ paddingLeft: 0 }} onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
+          <Button
+            type="link"
+            style={{ paddingLeft: 0 }}
+            onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}
+          >
             Als strukturierten Lagebericht erfassen →
           </Button>
         )}

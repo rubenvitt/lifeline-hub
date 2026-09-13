@@ -1,10 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { clusterTypProperties, donutSegmente, baueClusterDonut, CLUSTER_TYP_FARBE } from './clusterDonut';
+import {
+  clusterTypProperties,
+  donutSegmente,
+  baueClusterDonut,
+  CLUSTER_TYP_FARBE,
+} from './clusterDonut';
 
 describe('clusterTypProperties', () => {
   it('liefert für jeden clusterbaren Typ eine Summen-Aggregation c_<typ>', () => {
     const props = clusterTypProperties();
-    for (const t of ['fahrzeug', 'einheit', 'fuehrung', 'abschnitt', 'uhs', 'schaden', 'lagemeldung']) {
+    for (const t of [
+      'fahrzeug',
+      'einheit',
+      'fuehrung',
+      'abschnitt',
+      'uhs',
+      'schaden',
+      'lagemeldung',
+    ]) {
       expect(props[`c_${t}`]).toBeDefined();
       // ['+', ['case', ['==', ['get','typ'], t], 1, 0]]
       expect(JSON.stringify(props[`c_${t}`])).toContain(t);

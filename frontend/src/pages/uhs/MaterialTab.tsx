@@ -47,23 +47,31 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const loesenMut = useMutation({
-    mutationFn: (emId: number) =>
-      aktualisiereDisposition(einsatzId, emId, { uhs_id: null }),
-    onSuccess: () => { message.success('Material gelöst'); invalidate(); },
+    mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: null }),
+    onSuccess: () => {
+      message.success('Material gelöst');
+      invalidate();
+    },
     onError: fehler,
   });
 
   const zuordnenMut = useMutation({
-    mutationFn: (emId: number) =>
-      aktualisiereDisposition(einsatzId, emId, { uhs_id: uhs.id }),
-    onSuccess: () => { message.success('Material zugeordnet'); invalidate(); },
+    mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: uhs.id }),
+    onSuccess: () => {
+      message.success('Material zugeordnet');
+      invalidate();
+    },
     onError: fehler,
   });
 
   const columns = [
     { title: 'Bezeichnung', dataIndex: 'bezeichnung', key: 'bezeichnung' },
-    { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie',
-      render: (v: string | null) => v ?? '—' },
+    {
+      title: 'Kategorie',
+      dataIndex: 'kategorie',
+      key: 'kategorie',
+      render: (v: string | null) => v ?? '—',
+    },
     { title: 'Menge', dataIndex: 'menge', key: 'menge' },
     {
       title: 'Status',
@@ -79,7 +87,8 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
       ),
     },
     {
-      title: 'Aktion', key: 'aktion',
+      title: 'Aktion',
+      key: 'aktion',
       render: (_: unknown, em: EinsatzMaterial) =>
         // KEINE Rückfrage — entschieden in LFH-378/B5l nach der Trennlinie aus LFH-363:
         // umkehrbar bekommt `danger` und Abstand, aber KEINE zusätzliche Reibung; die
@@ -115,10 +124,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
     <Space orientation="vertical" style={{ width: '100%' }}>
       <Datenstand dataUpdatedAt={materialQuery.dataUpdatedAt} />
       {!schreibgeschuetzt && (
-        <Button
-          onClick={() => setZuordnenOffen(true)}
-          disabled={freiVerortbar.length === 0}
-        >
+        <Button onClick={() => setZuordnenOffen(true)} disabled={freiVerortbar.length === 0}>
           Material zuordnen
         </Button>
       )}

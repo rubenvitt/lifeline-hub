@@ -69,11 +69,15 @@ async function zurSchadensliste(page: Page, name: string): Promise<string> {
 async function fokusImOffenenMenue(page: Page): Promise<boolean> {
   return page.evaluate(() => {
     const overlay = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden)');
-    return overlay != null && document.activeElement != null && overlay.contains(document.activeElement);
+    return (
+      overlay != null && document.activeElement != null && overlay.contains(document.activeElement)
+    );
   });
 }
 
-test('öffnet auf 390 px per sichtbarem Trigger, fokussiert die Palette und navigiert per Enter (AK1–AK3)', async ({ page }) => {
+test('öffnet auf 390 px per sichtbarem Trigger, fokussiert die Palette und navigiert per Enter (AK1–AK3)', async ({
+  page,
+}) => {
   await anmelden(page);
   const id = await einsatzAnlegen(page, `E2E Palette ${Date.now()}`);
   await page.setViewportSize(SCHMAL);
@@ -81,19 +85,27 @@ test('öffnet auf 390 px per sichtbarem Trigger, fokussiert die Palette und navi
 
   const trigger = page.getByRole('button', { name: 'Suchen' });
   const kasten = (await trigger.boundingBox())!;
-  expect(Math.min(kasten.width, kasten.height), 'Trefffläche des Such-Triggers').toBeGreaterThanOrEqual(48);
+  expect(
+    Math.min(kasten.width, kasten.height),
+    'Trefffläche des Such-Triggers',
+  ).toBeGreaterThanOrEqual(48);
   await trigger.click();
   await expect(paletteInput(page)).toBeFocused();
 
   await paletteInput(page).fill('lagekarte');
-  await expect(page.getByRole('option', { name: /Lagekarte/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('option', { name: /Lagekarte/ })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await page.keyboard.press('Enter');
 
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
   await expect(paletteInput(page)).toBeHidden();
 });
 
-test('öffnet global mit CMD+K und schließt mit ESC ohne Seiteneffekt (AK1, AK4)', async ({ page }) => {
+test('öffnet global mit CMD+K und schließt mit ESC ohne Seiteneffekt (AK1, AK4)', async ({
+  page,
+}) => {
   await anmelden(page); // landet auf /einsaetze (kein Einsatz-Kontext)
 
   await page.keyboard.press('Meta+k');
@@ -104,7 +116,9 @@ test('öffnet global mit CMD+K und schließt mit ESC ohne Seiteneffekt (AK1, AK4
   await expect(page).toHaveURL(/\/einsaetze$/);
 });
 
-test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Palette, Drawer bleibt bedienbar (AK6)', async ({ page }) => {
+test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Palette, Drawer bleibt bedienbar (AK6)', async ({
+  page,
+}) => {
   await anmelden(page);
   const id = await einsatzAnlegen(page, `E2E Drawer ${Date.now()}`);
   await page.setViewportSize(SCHMAL);
@@ -146,7 +160,9 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
 });
 
-test('Schnellaktion „Neue Person" navigiert und öffnet die Schnellerfassung (Schnellaktionen)', async ({ page }) => {
+test('Schnellaktion „Neue Person" navigiert und öffnet die Schnellerfassung (Schnellaktionen)', async ({
+  page,
+}) => {
   await anmelden(page);
   const id = await einsatzAnlegen(page, `E2E Aktion ${Date.now()}`);
   await zumModul(page, id, 'etb');
@@ -160,7 +176,9 @@ test('Schnellaktion „Neue Person" navigiert und öffnet die Schnellerfassung (
   await expect(page.getByRole('dialog', { name: 'Schnellerfassung' })).toBeVisible();
 });
 
-test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)', async ({ page }) => {
+test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)', async ({
+  page,
+}) => {
   await anmelden(page);
 
   await page.keyboard.press('Control+k');
@@ -191,7 +209,9 @@ test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)',
  */
 const AKTION = { exact: true } as const;
 
-test('über den sichtbaren Trigger geöffnet, zeigt die Palette die Seitenaktion „Neue Zeile" (Aktionen)', async ({ page }) => {
+test('über den sichtbaren Trigger geöffnet, zeigt die Palette die Seitenaktion „Neue Zeile" (Aktionen)', async ({
+  page,
+}) => {
   await zurSchadensliste(page, `E2E Trigger ${Date.now()}`);
 
   // Der Klick nimmt den Fokus aus JEDER registrierten Wurzel — genau das war vor dem
@@ -211,7 +231,9 @@ test('über den sichtbaren Trigger geöffnet, zeigt die Palette die Seitenaktion
   await expect(page.getByRole('option', { name: 'Spalten', ...AKTION })).toHaveCount(0);
 });
 
-test('mit Fokus in der Werkzeugzeile stehen „Spalten" und „Neue Zeile" zusammen (Ebenen-Kette)', async ({ page }) => {
+test('mit Fokus in der Werkzeugzeile stehen „Spalten" und „Neue Zeile" zusammen (Ebenen-Kette)', async ({
+  page,
+}) => {
   await zurSchadensliste(page, `E2E Kette ${Date.now()}`);
 
   // Fokus IN die Werkzeugzeile, danach per Tastenweg öffnen: nur so bleibt die Kette
@@ -227,7 +249,9 @@ test('mit Fokus in der Werkzeugzeile stehen „Spalten" und „Neue Zeile" zusam
   await expect(page.getByRole('option', { name: 'Neue Zeile', ...AKTION })).toBeVisible();
 });
 
-test('„Spalten" öffnet die Spaltenwahl UND legt den Fokus hinein (Fokus-Rennen)', async ({ page }) => {
+test('„Spalten" öffnet die Spaltenwahl UND legt den Fokus hinein (Fokus-Rennen)', async ({
+  page,
+}) => {
   await zurSchadensliste(page, `E2E Fokus ${Date.now()}`);
 
   await schadenSuche(page).click();

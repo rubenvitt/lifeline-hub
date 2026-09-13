@@ -14,12 +14,16 @@ export type GeoJsonGeometry = GeoJsonPolygon | GeoJsonLineString;
 export function polygonZentroid(poly: GeoJsonPolygon): [number, number] | null {
   const ring = poly.coordinates?.[0];
   if (!ring || ring.length < 4) return null; // mind. 3 Punkte + Schluss
-  let a = 0, cx = 0, cy = 0;
+  let a = 0,
+    cx = 0,
+    cy = 0;
   for (let i = 0; i < ring.length - 1; i++) {
     const [x0, y0] = ring[i];
     const [x1, y1] = ring[i + 1];
     const f = x0 * y1 - x1 * y0;
-    a += f; cx += (x0 + x1) * f; cy += (y0 + y1) * f;
+    a += f;
+    cx += (x0 + x1) * f;
+    cy += (y0 + y1) * f;
   }
   if (a === 0) {
     // entartet (kollinear) → Mittel der Stützpunkte
@@ -90,8 +94,10 @@ function shoelaceProjiziertM2(ring: number[][], refLat: number): number {
   for (let i = 0; i < ring.length - 1; i++) {
     const [lonA, latA] = ring[i];
     const [lonB, latB] = ring[i + 1];
-    const xA = lonA * M_PRO_GRAD * cos, yA = latA * M_PRO_GRAD;
-    const xB = lonB * M_PRO_GRAD * cos, yB = latB * M_PRO_GRAD;
+    const xA = lonA * M_PRO_GRAD * cos,
+      yA = latA * M_PRO_GRAD;
+    const xB = lonB * M_PRO_GRAD * cos,
+      yB = latB * M_PRO_GRAD;
     a += xA * yB - xB * yA;
   }
   return a / 2;
@@ -161,7 +167,8 @@ export function geoKennzahlen(geom: LoseGeometrie | null | undefined): GeoKennza
       return { flaecheM2: polygonFlaecheM2(poly), umfangM: polygonUmfangM(poly) };
     }
     case 'MultiPolygon': {
-      let flaecheM2 = 0, umfangM = 0;
+      let flaecheM2 = 0,
+        umfangM = 0;
       for (const ringe of geom.coordinates as number[][][][]) {
         flaecheM2 += ringeFlaecheM2(ringe);
         const aussen = ringe?.[0];
@@ -186,10 +193,7 @@ function imRing(ring: number[][], p: PunktLngLat): boolean {
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i];
     const [xj, yj] = ring[j];
-    if (
-      yi > p.lat !== yj > p.lat &&
-      p.lng < ((xj - xi) * (p.lat - yi)) / (yj - yi) + xi
-    ) {
+    if (yi > p.lat !== yj > p.lat && p.lng < ((xj - xi) * (p.lat - yi)) / (yj - yi) + xi) {
       drin = !drin;
     }
   }
@@ -228,7 +232,10 @@ type FeatureCollectionLike = { features: { geometry?: LoseGeometrie | null }[] }
  * aber vom obersten gerenderten Feature. Dann können Kennzahlen und Text divergieren. Robusterer
  * Weg (Follow-up): Match über eine stabile Feature-ID des Klick-Features statt First-Point-in-Polygon.
  */
-export function findeGeometrieAn(p: PunktLngLat, collection: FeatureCollectionLike): LoseGeometrie | null {
+export function findeGeometrieAn(
+  p: PunktLngLat,
+  collection: FeatureCollectionLike,
+): LoseGeometrie | null {
   for (const f of collection.features) {
     const g = f?.geometry;
     if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon') && punktInPolygon(p, g)) return g;

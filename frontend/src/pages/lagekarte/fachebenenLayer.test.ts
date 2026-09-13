@@ -66,4 +66,3 @@ describe('kategorieLabel', () => {
     expect(kategorieLabel('unbekannt')).toBe('unbekannt');
   });
 });
-

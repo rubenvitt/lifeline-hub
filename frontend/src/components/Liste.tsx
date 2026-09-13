@@ -162,7 +162,13 @@ interface ListenEintragAnzeigeProps extends ListenEintragBasisProps {
 
 type ListenEintragProps = ListenEintragAuswahlProps | ListenEintragAnzeigeProps;
 
-export function ListenEintrag({ children, actions, onClick, style, className }: ListenEintragProps) {
+export function ListenEintrag({
+  children,
+  actions,
+  onClick,
+  style,
+  className,
+}: ListenEintragProps) {
   const { token } = useToken();
   const { size, bordered } = useContext(ListeContext);
 
@@ -227,7 +233,9 @@ export function ListenEintrag({ children, actions, onClick, style, className }: 
   );
 
   return onClick ? (
-    <KlickbareZeile {...eintragProps} onAktivieren={onClick}>{inhalt}</KlickbareZeile>
+    <KlickbareZeile {...eintragProps} onAktivieren={onClick}>
+      {inhalt}
+    </KlickbareZeile>
   ) : (
     <div {...eintragProps}>{inhalt}</div>
   );

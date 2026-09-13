@@ -43,7 +43,5 @@ export default function ModulStub({ modul }: { modul: ModulEintrag }) {
     const zielRoute = aufloeseStandardModul(data?.standard_modul);
     rueckweg = { pfad: einsatzModulPfad(einsatzId, zielRoute), label: rueckwegLabel(zielRoute) };
   }
-  return (
-    <Platzhalter titel={modul.label} beschreibung={modul.beschreibung} rueckweg={rueckweg} />
-  );
+  return <Platzhalter titel={modul.label} beschreibung={modul.beschreibung} rueckweg={rueckweg} />;
 }

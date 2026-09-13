@@ -11,8 +11,13 @@ import StichworteTab from './StichworteTab';
 // der Sidebar-Umstellung entfällt — StichworteTab hatte keinen eigenen Test).
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
@@ -114,7 +119,9 @@ describe('StichworteTab', () => {
     await waitFor(() =>
       expect(within(erste).getByRole('button', { name: /Löschen/ })).toHaveClass('ant-btn-loading'),
     );
-    expect(within(zweite).getByRole('button', { name: 'Löschen' })).not.toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Löschen' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
   });
 
   it('die Leitspalte sortiert numerisch, ohne die Serverreihenfolge zu verdrängen', async () => {

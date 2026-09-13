@@ -5,7 +5,14 @@ import * as maplibregl from 'maplibre-gl';
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import type { Ecke, Ecken } from '../../api/kartenbilder';
 import { setzeBildGeometrie } from './bildLayer';
-import { zentroid, skaliereUmAnker, skaliereKante, rotiereUmZentroid, type Kante, type Punkt } from './bildGeometrie';
+import {
+  zentroid,
+  skaliereUmAnker,
+  skaliereKante,
+  rotiereUmZentroid,
+  type Kante,
+  type Punkt,
+} from './bildGeometrie';
 
 type Vier = [Punkt, Punkt, Punkt, Punkt];
 
@@ -101,13 +108,19 @@ export function erzeugeBildHandles(
     const len = Math.hypot(dx, dy) || 1;
     dx /= len;
     dy /= len;
-    const ll = map.unproject([topMid[0] + dx * DREHGRIFF_ABSTAND_PX, topMid[1] + dy * DREHGRIFF_ABSTAND_PX]);
+    const ll = map.unproject([
+      topMid[0] + dx * DREHGRIFF_ABSTAND_PX,
+      topMid[1] + dy * DREHGRIFF_ABSTAND_PX,
+    ]);
     return [ll.lng, ll.lat];
   }
 
   // Eck-Indizes der vier Kanten (für die Kantengriff-Position = Kantenmitte).
   const KANTEN_PUNKTE: Record<Kante, [number, number]> = {
-    oben: [0, 1], rechts: [1, 2], unten: [2, 3], links: [3, 0],
+    oben: [0, 1],
+    rechts: [1, 2],
+    unten: [2, 3],
+    links: [3, 0],
   };
   function kantenMitte(e: Ecken, kante: Kante): [number, number] {
     const [i, j] = KANTEN_PUNKTE[kante];

@@ -8,8 +8,13 @@ import OrganisationTab from './OrganisationTab';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 
 function renderTab() {
@@ -97,6 +102,8 @@ describe('OrganisationTab', () => {
 
     scheitern = false;
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(screen.queryByText('Organisation gesperrt')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('Organisation gesperrt')).not.toBeInTheDocument(),
+    );
   });
 });

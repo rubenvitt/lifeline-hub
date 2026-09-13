@@ -4,7 +4,9 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 vi.mock('terra-draw-maplibre-gl-adapter', () => ({
   TerraDrawMapLibreGLAdapter: class {
     map: MapLibreMap;
-    constructor({ map }: { map: MapLibreMap }) { this.map = map; }
+    constructor({ map }: { map: MapLibreMap }) {
+      this.map = map;
+    }
   },
 }));
 
@@ -28,21 +30,47 @@ vi.mock('terra-draw', () => ({
       if (event === 'finish') this.finish = handler;
     }
 
-    start() { this.enabled = true; }
-    stop() { this.enabled = false; }
+    start() {
+      this.enabled = true;
+    }
+    stop() {
+      this.enabled = false;
+    }
     clear() {}
-    setMode(mode: string) { this.mode = mode; }
+    setMode(mode: string) {
+      this.mode = mode;
+    }
     getSnapshot() {
       if (this.mode === 'linestring') {
-        return [{
-          id: 1,
-          geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] },
-        }];
+        return [
+          {
+            id: 1,
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [0, 0],
+                [1, 1],
+              ],
+            },
+          },
+        ];
       }
-      return [{
-        id: 1,
-        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
-      }];
+      return [
+        {
+          id: 1,
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+                [0, 0],
+              ],
+            ],
+          },
+        },
+      ];
     }
   },
 }));

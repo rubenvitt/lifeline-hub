@@ -3,7 +3,12 @@
 // Response-Typen ändern sich über die Rust-Structs + `pnpm gen:types` (schreibt types.generated.ts
 // aus src/api/openapi.json). FE-lokale Typen (Eingabe-Bodies, Record-Maps) sind unten markiert.
 import type {
-  EinheitId, FachaufgabeId, FunktionId, GrundzeichenId, OrganisationId, SymbolId,
+  EinheitId,
+  FachaufgabeId,
+  FunktionId,
+  GrundzeichenId,
+  OrganisationId,
+  SymbolId,
 } from 'taktische-zeichen-react';
 import type { components } from './types.generated';
 

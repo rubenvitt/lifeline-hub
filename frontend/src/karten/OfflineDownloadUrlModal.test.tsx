@@ -27,8 +27,16 @@ function Harness({ onClose }: { onClose?: () => void }) {
   const [offen, setOffen] = useState(true);
   return (
     <>
-      <button type="button" onClick={() => setOffen(true)}>Wieder öffnen</button>
-      <OfflineDownloadUrlModal offen={offen} onClose={() => { setOffen(false); onClose?.(); }} />
+      <button type="button" onClick={() => setOffen(true)}>
+        Wieder öffnen
+      </button>
+      <OfflineDownloadUrlModal
+        offen={offen}
+        onClose={() => {
+          setOffen(false);
+          onClose?.();
+        }}
+      />
     </>
   );
 }

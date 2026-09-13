@@ -9,22 +9,39 @@ import type { OnlineQuelle } from '../api/onlineQuellen';
 import OnlineQuellenVerwaltung from './OnlineQuellenVerwaltung';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-06-26 10:00:00',
 };
 // AdminLayout lässt admin ODER fuehrungskraft auf die Seite; nur admin darf schreiben.
 const fuehrungskraft = {
-  ...admin, id: 2, anzeigename: 'Eva', system_rolle: 'keiner', org_rolle: 'fuehrungskraft',
+  ...admin,
+  id: 2,
+  anzeigename: 'Eva',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
 };
 
 const quelle: OnlineQuelle = {
-  id: 1, name: 'OpenStreetMap', url: 'https://tile.osm.org/{z}/{x}/{y}.png',
-  typ: 'raster', attribution: '© OSM-Mitwirkende', sortier: 0, aktiv: true, proxy: false,
+  id: 1,
+  name: 'OpenStreetMap',
+  url: 'https://tile.osm.org/{z}/{x}/{y}.png',
+  typ: 'raster',
+  attribution: '© OSM-Mitwirkende',
+  sortier: 0,
+  aktiv: true,
+  proxy: false,
 };
 
 const katalogEintrag = {
-  name: 'OpenFreeMap Liberty', url: 'https://tiles.openfreemap.org/styles/liberty',
-  typ: 'vektor' as const, attribution: '© OpenFreeMap',
+  name: 'OpenFreeMap Liberty',
+  url: 'https://tiles.openfreemap.org/styles/liberty',
+  typ: 'vektor' as const,
+  attribution: '© OpenFreeMap',
 };
 
 function mockBasis(benutzer: typeof admin, quellen: OnlineQuelle[] = [quelle]) {
@@ -60,8 +77,14 @@ describe('OnlineQuellenVerwaltung', () => {
   // ein — deshalb überall die Verengung auf `tr.ant-table-row`.
 
   const zweiteQuelle: OnlineQuelle = {
-    ...quelle, id: 2, name: 'Basemap.de', url: 'https://basemap.de/style.json',
-    typ: 'vektor', attribution: '© GeoBasis-DE', sortier: 1, aktiv: false,
+    ...quelle,
+    id: 2,
+    name: 'Basemap.de',
+    url: 'https://basemap.de/style.json',
+    typ: 'vektor',
+    attribution: '© GeoBasis-DE',
+    sortier: 1,
+    aktiv: false,
   };
 
   it('sortiert nach Name und engt per Suche ein', async () => {
@@ -81,7 +104,10 @@ describe('OnlineQuellenVerwaltung', () => {
     await userEvent.click(screen.getByRole('columnheader', { name: /Name/ }));
     await waitFor(() => expect(namen()).toEqual(['Basemap.de', 'OpenStreetMap']));
 
-    await userEvent.type(screen.getByPlaceholderText('Name, URL oder Attribution'), 'OpenStreetMap');
+    await userEvent.type(
+      screen.getByPlaceholderText('Name, URL oder Attribution'),
+      'OpenStreetMap',
+    );
     await waitFor(() => expect(namen()).toEqual(['OpenStreetMap']));
   });
 
@@ -156,7 +182,9 @@ describe('OnlineQuellenVerwaltung', () => {
     render();
     await screen.findByText('OpenStreetMap');
     expect(screen.queryByRole('button', { name: 'Quelle hinzufügen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Aus Katalog hinzufügen' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Aus Katalog hinzufügen' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
@@ -178,7 +206,9 @@ describe('OnlineQuellenVerwaltung', () => {
       ),
     );
     render();
-    expect(await screen.findByText('Online-Quellen konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Online-Quellen konnten nicht geladen werden'),
+    ).toBeInTheDocument();
     // Die Detailzeile kommt aus dem `{error}`-Body des Backends — nur eine `ApiError` trägt
     // eine Meldung, die vor einem Menschen bestehen kann. Ohne diese Zusicherung belegte der
     // Test nur die Überschrift, und der Wegfall der Ursache bliebe unbemerkt.
@@ -215,7 +245,9 @@ describe('OnlineQuellenVerwaltung', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Erneut abrufen' }));
 
     expect(await screen.findByText('OpenStreetMap')).toBeInTheDocument();
-    expect(screen.queryByText('Online-Quellen konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Online-Quellen konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   it('Katalog-Flow: „Aus Katalog hinzufügen" → Eintrag → POST mit korrektem Body', async () => {
@@ -301,9 +333,10 @@ describe('OnlineQuellenVerwaltung', () => {
     // typ-Select öffnen und echten Options-Knoten wählen (Portal liegt außerhalb des Dialogs).
     await userEvent.click(within(dialog).getByRole('combobox'));
     const option = await screen.findByText(
-      (_, el) => typeof el?.className === 'string'
-        && el.className.includes('ant-select-item-option-content')
-        && el.textContent === 'Raster (XYZ-Kacheln)',
+      (_, el) =>
+        typeof el?.className === 'string' &&
+        el.className.includes('ant-select-item-option-content') &&
+        el.textContent === 'Raster (XYZ-Kacheln)',
     );
     await userEvent.click(option);
 
@@ -334,7 +367,10 @@ describe('OnlineQuellenVerwaltung', () => {
 
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Name'), 'MapTiler');
-    await userEvent.type(within(dialog).getByLabelText('URL'), 'https://api.maptiler.com/maps/streets/style.json');
+    await userEvent.type(
+      within(dialog).getByLabelText('URL'),
+      'https://api.maptiler.com/maps/streets/style.json',
+    );
     await userEvent.type(within(dialog).getByLabelText('Attribution'), '© MapTiler');
 
     // Default ist an (LFH-190); den „Über Server proxen"-Switch gezielt AUSschalten
@@ -342,8 +378,9 @@ describe('OnlineQuellenVerwaltung', () => {
     // Der Schalter liegt seit LFH-346 · A8 unter „Weitere Angaben" und ist ohne
     // `forceRender` bis zum Aufklappen gar nicht im Baum — deshalb der Klick davor.
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    const proxyItem = (await within(dialog).findByText('Über Server proxen'))
-      .closest('.ant-form-item');
+    const proxyItem = (await within(dialog).findByText('Über Server proxen')).closest(
+      '.ant-form-item',
+    );
     await userEvent.click(within(proxyItem as HTMLElement).getByRole('switch'));
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));

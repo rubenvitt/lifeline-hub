@@ -13,20 +13,39 @@ import EinstiegSwitcher from '../../components/EinstiegSwitcher';
 const STATUS_RANG: Record<UhsStatus, number> = { aktiv: 0, geplant: 1, aufgeloest: 2 };
 
 /** Header-Switcher im UHS-Detail — UHS-Belegung von `EinstiegSwitcher`. */
-export default function UhsSwitcher({ einsatzId, aktuelleUhs }: { einsatzId: number; aktuelleUhs: Uhs }) {
+export default function UhsSwitcher({
+  einsatzId,
+  aktuelleUhs,
+}: {
+  einsatzId: number;
+  aktuelleUhs: Uhs;
+}) {
   const navigate = useNavigate();
   const [anlegen, setAnlegen] = useState(false);
-  const { data: liste = [] } = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
+  const { data: liste = [] } = useQuery({
+    queryKey: einsatzKeys.uhs(einsatzId),
+    queryFn: () => listeUhs(einsatzId),
+  });
   return (
     <>
       <EinstiegSwitcher
         aktuell={aktuelleUhs}
-        eintraege={liste.map((u) => ({ id: u.id, bezeichnung: u.bezeichnung, darstellung: uhsStatus[u.status], rang: STATUS_RANG[u.status] }))}
+        eintraege={liste.map((u) => ({
+          id: u.id,
+          bezeichnung: u.bezeichnung,
+          darstellung: uhsStatus[u.status],
+          rang: STATUS_RANG[u.status],
+        }))}
         onWechsel={(uhsId) => navigate(uhsDetailPfad(einsatzId, uhsId))}
         neuLabel="+ Neue UHS"
         onNeu={() => setAnlegen(true)}
       />
-      <UhsAnlegenDrawer einsatzId={einsatzId} open={anlegen} onClose={() => setAnlegen(false)} onAngelegt={(uhs) => navigate(uhsDetailPfad(einsatzId, uhs.id))} />
+      <UhsAnlegenDrawer
+        einsatzId={einsatzId}
+        open={anlegen}
+        onClose={() => setAnlegen(false)}
+        onAngelegt={(uhs) => navigate(uhsDetailPfad(einsatzId, uhs.id))}
+      />
     </>
   );
 }

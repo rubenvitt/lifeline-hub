@@ -12,9 +12,17 @@ import { einsatzKeys } from '../api/queryKeys';
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
 vi.mock('../api/einsaetze', () => ({
-  ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
+  ladeEinsatz: vi.fn().mockResolvedValue({
+    id: 1,
+    bezeichnung: 'Lage',
+    status: 'aktiv',
+    meine_rolle: 'einsatzleitung',
+  }),
 }));
-vi.mock('../api/befehle', () => ({ listeBefehle: vi.fn().mockResolvedValue([]), legeBefehlAn: vi.fn() }));
+vi.mock('../api/befehle', () => ({
+  listeBefehle: vi.fn().mockResolvedValue([]),
+  legeBefehlAn: vi.fn(),
+}));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
@@ -32,13 +40,52 @@ vi.mock('../api/auftraege', () => ({
 }));
 
 const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
-  id: 1, einsatz_id: 1, auftrag_text: 'Deich sichern', absicht: null, lage: null, ort: null,
-  zeit: null, mittel: null, verbindung: null, sicherheit: null, prioritaet: 'normal', richtung: 'intern',
-  frist_at: null, erteilt_at: '2026-06-11 09:00:00', in_arbeit_at: null, vollzugsmeldung: null,
-  abgenommen_at: null, abgenommen_von_id: null, etb_anordnung_id: 5, quell_etb_eintrag_id: null, erstellt_von_id: 1,
-  erstellt_at: '2026-06-11 09:00:00', vollzug_status: 'offen', vollzogen_at: null, vollzogen_von_id: null,
-  empfaenger_anzahl: 1, quittiert_anzahl: 0, ist_ueberfaellig: false, bearbeitungsstatus: 'offen',
-  empfaenger: [{ id: 1, auftrag_id: 1, empfaenger_typ: 'funktion', abschnitt_id: null, einheit_id: null, person_id: null, fahrzeug_id: null, funktion_text: 'EA Nord', extern_kategorie: null, extern_bezeichnung: null, snap_anzeige: 'EA Nord', quittiert_at: null, quittiert_von_id: null }],
+  id: 1,
+  einsatz_id: 1,
+  auftrag_text: 'Deich sichern',
+  absicht: null,
+  lage: null,
+  ort: null,
+  zeit: null,
+  mittel: null,
+  verbindung: null,
+  sicherheit: null,
+  prioritaet: 'normal',
+  richtung: 'intern',
+  frist_at: null,
+  erteilt_at: '2026-06-11 09:00:00',
+  in_arbeit_at: null,
+  vollzugsmeldung: null,
+  abgenommen_at: null,
+  abgenommen_von_id: null,
+  etb_anordnung_id: 5,
+  quell_etb_eintrag_id: null,
+  erstellt_von_id: 1,
+  erstellt_at: '2026-06-11 09:00:00',
+  vollzug_status: 'offen',
+  vollzogen_at: null,
+  vollzogen_von_id: null,
+  empfaenger_anzahl: 1,
+  quittiert_anzahl: 0,
+  ist_ueberfaellig: false,
+  bearbeitungsstatus: 'offen',
+  empfaenger: [
+    {
+      id: 1,
+      auftrag_id: 1,
+      empfaenger_typ: 'funktion',
+      abschnitt_id: null,
+      einheit_id: null,
+      person_id: null,
+      fahrzeug_id: null,
+      funktion_text: 'EA Nord',
+      extern_kategorie: null,
+      extern_bezeichnung: null,
+      snap_anzeige: 'EA Nord',
+      quittiert_at: null,
+      quittiert_von_id: null,
+    },
+  ],
   ...over,
 });
 
@@ -54,7 +101,9 @@ function renderPage(route = '/einsaetze/1/auftraege') {
       <AntApp>
         <MemoryRouter initialEntries={[route]}>
           <LocationProbe />
-          <Routes><Route path="/einsaetze/:id/auftraege" element={<AuftraegePage />} /></Routes>
+          <Routes>
+            <Route path="/einsaetze/:id/auftraege" element={<AuftraegePage />} />
+          </Routes>
         </MemoryRouter>
       </AntApp>
     </QueryClientProvider>,
@@ -63,7 +112,10 @@ function renderPage(route = '/einsaetze/1/auftraege') {
 }
 
 describe('AuftraegePage', () => {
-  beforeEach(() => { vi.clearAllMocks(); listeAuftraege.mockResolvedValue([auftrag()]); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listeAuftraege.mockResolvedValue([auftrag()]);
+  });
 
   it('zeigt Aufträge mit Quittierungs-Stand', async () => {
     renderPage();
@@ -73,7 +125,9 @@ describe('AuftraegePage', () => {
   });
 
   it('markiert überfällige Aufträge', async () => {
-    listeAuftraege.mockResolvedValue([auftrag({ ist_ueberfaellig: true, frist_at: '2026-06-11 08:00:00' })]);
+    listeAuftraege.mockResolvedValue([
+      auftrag({ ist_ueberfaellig: true, frist_at: '2026-06-11 08:00:00' }),
+    ]);
     renderPage();
     await screen.findByText('Deich sichern');
     // Auftrags-Tag „Überfällig" (exakt) + Gruppen-Überschrift „Überfällig (1)".
@@ -94,17 +148,27 @@ describe('AuftraegePage', () => {
     // Robust statt index-abhängig: die "Auftrag / Was"-TextArea trägt aria-label.
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
-    await waitFor(() => expect(legeAuftragAn).toHaveBeenCalledWith(1, expect.objectContaining({
-      auftrag_text: 'Erkunden',
-      empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
-    })));
+    await waitFor(() =>
+      expect(legeAuftragAn).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          auftrag_text: 'Erkunden',
+          empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
+        }),
+      ),
+    );
   });
 
   it('filtert Aufträge nach Richtung extern (LFH-87)', async () => {
     renderPage();
     await screen.findByText('Deich sichern');
     await userEvent.click(screen.getByText('Extern'));
-    await waitFor(() => expect(listeAuftraege).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
+    await waitFor(() =>
+      expect(listeAuftraege).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ richtung: 'extern' }),
+      ),
+    );
   });
 
   it('sendet das Befehlsschema-Feld „Zeit/Wann" mit', async () => {
@@ -122,10 +186,15 @@ describe('AuftraegePage', () => {
     await userEvent.click(screen.getByText(/Befehlsschema/));
     await userEvent.type(await screen.findByLabelText('Zeit / Wann'), 'sofort');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
-    await waitFor(() => expect(legeAuftragAn).toHaveBeenCalledWith(1, expect.objectContaining({
-      auftrag_text: 'Erkunden',
-      zeit: 'sofort',
-    })));
+    await waitFor(() =>
+      expect(legeAuftragAn).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          auftrag_text: 'Erkunden',
+          zeit: 'sofort',
+        }),
+      ),
+    );
   });
 
   it('zeigt gefüllte Befehlsschema-Details aufklappbar (Read-back)', async () => {
@@ -150,7 +219,12 @@ describe('AuftraegePage', () => {
 
   it('quittiert optimistisch in allen gefilterten Caches und rollt einen Fehler zurück', async () => {
     let ablehnen: ((grund: Error) => void) | undefined;
-    quittiereEmpfaenger.mockImplementation(() => new Promise((_resolve, reject) => { ablehnen = reject; }));
+    quittiereEmpfaenger.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          ablehnen = reject;
+        }),
+    );
     const { client } = renderPage();
     await screen.findByText('Deich sichern');
     const zweiterKey = einsatzKeys.auftraegeListe(1, 'extern', 'alle');
@@ -164,20 +238,28 @@ describe('AuftraegePage', () => {
 
     expect(await screen.findByText('1 Empfänger · 1/1 quittiert')).toBeInTheDocument();
     expect(client.getQueryData<Auftrag[]>(zweiterKey)?.[0].quittiert_anzahl).toBe(1);
-    const laufendeQuittierung = screen.getByRole('button', { name: 'Empfang für EA Nord quittieren' });
+    const laufendeQuittierung = screen.getByRole('button', {
+      name: 'Empfang für EA Nord quittieren',
+    });
     expect(laufendeQuittierung).toBeDisabled();
     expect(laufendeQuittierung).toHaveClass('ant-btn-loading');
 
     act(() => {
-      client.setQueryData<Auftrag[]>(zweiterKey, (aktuell) => aktuell?.map((eintrag) =>
-        eintrag.id === 2 ? { ...eintrag, auftrag_text: 'Extern geändert' } : eintrag));
+      client.setQueryData<Auftrag[]>(zweiterKey, (aktuell) =>
+        aktuell?.map((eintrag) =>
+          eintrag.id === 2 ? { ...eintrag, auftrag_text: 'Extern geändert' } : eintrag,
+        ),
+      );
     });
 
-    await act(async () => { ablehnen?.(new Error('abgelehnt')); });
+    await act(async () => {
+      ablehnen?.(new Error('abgelehnt'));
+    });
     expect(await screen.findByText('1 Empfänger · 0/1 quittiert')).toBeInTheDocument();
     expect(client.getQueryData<Auftrag[]>(zweiterKey)?.[0].quittiert_anzahl).toBe(0);
-    expect(client.getQueryData<Auftrag[]>(zweiterKey)?.find((eintrag) => eintrag.id === 2)?.auftrag_text)
-      .toBe('Extern geändert');
+    expect(
+      client.getQueryData<Auftrag[]>(zweiterKey)?.find((eintrag) => eintrag.id === 2)?.auftrag_text,
+    ).toBe('Extern geändert');
   });
 
   // LFH-364/B5d: die Quittungs-Aktion liegt in einer EIGENEN Zeile (Weg (a)), der
@@ -186,19 +268,31 @@ describe('AuftraegePage', () => {
   // bereits quittierter Empfänger gar keine Aktion mehr trägt.
   it('trennt die Quittungs-Aktionen mehrerer Empfänger über den zugänglichen Namen', async () => {
     const empf = (id: number, anzeige: string, quittiert: string | null) => ({
-      id, auftrag_id: 1, empfaenger_typ: 'funktion' as const, abschnitt_id: null, einheit_id: null,
-      person_id: null, fahrzeug_id: null, funktion_text: anzeige, extern_kategorie: null,
-      extern_bezeichnung: null, snap_anzeige: anzeige, quittiert_at: quittiert, quittiert_von_id: null,
+      id,
+      auftrag_id: 1,
+      empfaenger_typ: 'funktion' as const,
+      abschnitt_id: null,
+      einheit_id: null,
+      person_id: null,
+      fahrzeug_id: null,
+      funktion_text: anzeige,
+      extern_kategorie: null,
+      extern_bezeichnung: null,
+      snap_anzeige: anzeige,
+      quittiert_at: quittiert,
+      quittiert_von_id: null,
     });
-    listeAuftraege.mockResolvedValue([auftrag({
-      empfaenger_anzahl: 3,
-      quittiert_anzahl: 1,
-      empfaenger: [
-        empf(1, 'EA Nord', null),
-        empf(2, 'EA Süd', null),
-        empf(3, 'EA West', '2026-06-11 10:00:00'),
-      ],
-    })]);
+    listeAuftraege.mockResolvedValue([
+      auftrag({
+        empfaenger_anzahl: 3,
+        quittiert_anzahl: 1,
+        empfaenger: [
+          empf(1, 'EA Nord', null),
+          empf(2, 'EA Süd', null),
+          empf(3, 'EA West', '2026-06-11 10:00:00'),
+        ],
+      }),
+    ]);
     quittiereEmpfaenger.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
@@ -224,7 +318,10 @@ describe('AuftraegePage', () => {
 
   it('nennt offene Empfänger auch ohne Schreibrecht, nur ohne Quittungs-Knopf', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValueOnce({
-      id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
     renderPage();
     await screen.findByText('Deich sichern');
@@ -240,10 +337,15 @@ describe('AuftraegePage', () => {
     await screen.findByText('Deich sichern');
     // Aktions-Button öffnet das Modal; der Bestätigen-Button liegt im Dialog.
     await userEvent.click(screen.getByRole('button', { name: 'Vollzug melden' }));
-    await userEvent.type(screen.getByPlaceholderText('Rückmeldung zur Erledigung'), 'Deich gehalten');
+    await userEvent.type(
+      screen.getByPlaceholderText('Rückmeldung zur Erledigung'),
+      'Deich gehalten',
+    );
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollzug melden' }));
-    await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'vollzogen', 'Deich gehalten'));
+    await waitFor(() =>
+      expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'vollzogen', 'Deich gehalten'),
+    );
   });
 
   it('trennt Offen/Abgeschlossen clientseitig (Read-back in Abgeschlossen)', async () => {
@@ -252,8 +354,11 @@ describe('AuftraegePage', () => {
     listeAuftraege.mockResolvedValue([
       auftrag({ id: 1, auftrag_text: 'Offener Auftrag', bearbeitungsstatus: 'offen' }),
       auftrag({
-        id: 2, auftrag_text: 'Fertiger Auftrag', bearbeitungsstatus: 'abgenommen',
-        vollzogen_at: '2026-06-11 10:00:00', abgenommen_at: '2026-06-11 11:00:00',
+        id: 2,
+        auftrag_text: 'Fertiger Auftrag',
+        bearbeitungsstatus: 'abgenommen',
+        vollzogen_at: '2026-06-11 10:00:00',
+        abgenommen_at: '2026-06-11 11:00:00',
         vollzugsmeldung: 'Deich gehalten',
       }),
     ]);
@@ -261,7 +366,11 @@ describe('AuftraegePage', () => {
     await screen.findByText('Offener Auftrag');
     // Default = Offen-Ansicht: nur der offene Auftrag, kein Server-Status-Filter.
     expect(screen.queryByText('Fertiger Auftrag')).not.toBeInTheDocument();
-    expect(listeAuftraege).toHaveBeenCalledWith(1, { richtung: undefined, abschnittId: undefined, einheitId: undefined });
+    expect(listeAuftraege).toHaveBeenCalledWith(1, {
+      richtung: undefined,
+      abschnittId: undefined,
+      einheitId: undefined,
+    });
     // In die Abgeschlossen-Ansicht wechseln (Segmented-Label enthält den Count).
     await userEvent.click(screen.getByText(/^Abgeschlossen/));
     expect(await screen.findByText('Fertiger Auftrag')).toBeInTheDocument();
@@ -312,7 +421,10 @@ describe('AuftraegePage', () => {
   it('Beobachter sieht Aufträge, aber keine Schreib-Aktionen', async () => {
     // Einmaliger Override: clearAllMocks setzt nur Call-Records, nicht Implementierungen zurück.
     vi.mocked(ladeEinsatz).mockResolvedValueOnce({
-      id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
     renderPage();
     expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
@@ -331,7 +443,9 @@ describe('AuftraegePage', () => {
     expect(karte).toBeTruthy();
     await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
     // Nicht-Ziel-Karte bleibt unmarkiert.
-    expect(container.querySelector('[data-auftrag-id="1"]')).not.toHaveAttribute('data-hervorgehoben');
+    expect(container.querySelector('[data-auftrag-id="1"]')).not.toHaveAttribute(
+      'data-hervorgehoben',
+    );
     // apply-then-clean: der Selektions-Param ist aus der URL geräumt.
     await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
   });
@@ -340,14 +454,22 @@ describe('AuftraegePage', () => {
     listeAuftraege.mockResolvedValue([
       auftrag({ id: 1, auftrag_text: 'Offener Auftrag', bearbeitungsstatus: 'offen' }),
       auftrag({
-        id: 8, auftrag_text: 'Fertiger Auftrag', bearbeitungsstatus: 'abgenommen',
-        vollzogen_at: '2026-06-11 10:00:00', abgenommen_at: '2026-06-11 11:00:00',
+        id: 8,
+        auftrag_text: 'Fertiger Auftrag',
+        bearbeitungsstatus: 'abgenommen',
+        vollzogen_at: '2026-06-11 10:00:00',
+        abgenommen_at: '2026-06-11 11:00:00',
       }),
     ]);
     const { container } = renderPage('/einsaetze/1/auftraege?auftrag=8');
     // Ohne Umschaltung wäre der abgenommene Auftrag in der Default-Offen-Ansicht unsichtbar.
     expect(await screen.findByText('Fertiger Auftrag')).toBeInTheDocument();
-    await waitFor(() => expect(container.querySelector('[data-auftrag-id="8"]')).toHaveAttribute('data-hervorgehoben', 'true'));
+    await waitFor(() =>
+      expect(container.querySelector('[data-auftrag-id="8"]')).toHaveAttribute(
+        'data-hervorgehoben',
+        'true',
+      ),
+    );
   });
 
   it('Tab-Wechsel zu Befehle zeigt BefehlListe mit „Befehl erteilen"-Button', async () => {

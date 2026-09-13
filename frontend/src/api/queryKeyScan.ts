@@ -96,7 +96,10 @@ function schluesselKontext(arr: ts.ArrayLiteralExpression): FundArt | undefined 
   const eltern = arr.parent;
   if (!eltern) return undefined;
   if (ts.isPropertyAssignment(eltern) && eltern.initializer === arr) {
-    const name = ts.isIdentifier(eltern.name) || ts.isStringLiteralLike(eltern.name) ? eltern.name.text : undefined;
+    const name =
+      ts.isIdentifier(eltern.name) || ts.isStringLiteralLike(eltern.name)
+        ? eltern.name.text
+        : undefined;
     if (name && SCHLUESSEL_PROPS.has(name)) return name as FundArt;
   }
   if (ts.isCallExpression(eltern) && eltern.arguments[0] === arr) {
@@ -217,7 +220,12 @@ export function scanneQueryKeys(pfad: string, quelltext: string): Fund[] {
       if (idx !== undefined) {
         const arg = knoten.arguments[idx];
         if (arg && ts.isStringLiteralLike(arg)) {
-          funde.push({ pfad, zeile: zeileVon(knoten), prefix: arg.text, art: 'schluessel-helfer-arg' });
+          funde.push({
+            pfad,
+            zeile: zeileVon(knoten),
+            prefix: arg.text,
+            art: 'schluessel-helfer-arg',
+          });
         }
       }
     }

@@ -1,14 +1,17 @@
 import { Tag, Tooltip } from 'antd';
 import { formatZeit } from './zeit';
 
-const ERKLAERUNG =
-  'Quittiert = empfangen/zur Kenntnis genommen — sagt nichts über die Erledigung.';
+const ERKLAERUNG = 'Quittiert = empfangen/zur Kenntnis genommen — sagt nichts über die Erledigung.';
 
 /**
  * Orthogonale Kenntnisnahme-Achse (LFH-112): NICHT Teil der Status-Phase.
  * Grünes Tag „✓ Quittiert" (optional von wem/wann), sonst graues „Quittung offen".
  */
-export default function QuittungIndikator({ quittiert, von, am }: {
+export default function QuittungIndikator({
+  quittiert,
+  von,
+  am,
+}: {
   quittiert: boolean;
   von?: string | null;
   am?: string | null;
@@ -24,7 +27,8 @@ export default function QuittungIndikator({ quittiert, von, am }: {
   return (
     <Tooltip title={ERKLAERUNG}>
       <Tag color="success">
-        ✓ Quittiert{von ? ` von ${von}` : ''}{zeit ? ` ${zeit}` : ''}
+        ✓ Quittiert{von ? ` von ${von}` : ''}
+        {zeit ? ` ${zeit}` : ''}
       </Tag>
     </Tooltip>
   );

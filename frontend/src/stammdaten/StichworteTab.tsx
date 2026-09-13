@@ -92,7 +92,10 @@ export default function StichworteTab() {
                 {/* Der Lauf gehört GENAU der gelöschten Zeile (LFH-346 · A1): am blanken
                     `isPending` drehte der Spinner in JEDER Zeile und behauptete Fortschritt
                     an fremden Datensätzen. `variables` ist hier die nackte id. */}
-                <Button danger loading={loeschenMutation.isPending && loeschenMutation.variables === v.id}>
+                <Button
+                  danger
+                  loading={loeschenMutation.isPending && loeschenMutation.variables === v.id}
+                >
                   Löschen
                 </Button>
               </Popconfirm>
@@ -107,13 +110,13 @@ export default function StichworteTab() {
       titel="Einsatz-Stichworte"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         SchnellAnlegen-Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
         einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
       <Typography.Paragraph type="secondary">
-        Vorschläge für die Stichwort-Combobox im Einsatzdaten-Modul. Freie Eingabe bleibt im
-        Einsatz unabhängig davon möglich.
+        Vorschläge für die Stichwort-Combobox im Einsatzdaten-Modul. Freie Eingabe bleibt im Einsatz
+        unabhängig davon möglich.
       </Typography.Paragraph>
 
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden

@@ -14,7 +14,12 @@
  * vergessene Abkürzung ist kein Grund, den Einsatz-Rahmen abstürzen zu lassen.
  */
 
-import { istModulFreigegeben, modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegistry';
+import {
+  istModulFreigegeben,
+  modulRegistry,
+  type KategorieKey,
+  type ModulEintrag,
+} from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 /** Höchstzahl gemerkter Module. Drei ist die Zahl aus dem Ticket: genug für einen
@@ -90,7 +95,10 @@ export function loeseZuletztModule(
   return leseZuletztModule(einsatzId)
     .filter((key) => key !== ausser.key)
     .map((key) => modulRegistry.find((m) => m.key === key))
-    .filter((m): m is ModulEintrag => m !== undefined
-      && m.kategorie !== ausser.kategorie
-      && istModulFreigegeben(m, benutzer, overrides));
+    .filter(
+      (m): m is ModulEintrag =>
+        m !== undefined &&
+        m.kategorie !== ausser.kategorie &&
+        istModulFreigegeben(m, benutzer, overrides),
+    );
 }

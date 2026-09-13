@@ -47,10 +47,13 @@ describe('benutzergebundene Offline-Queue (LFH-334)', () => {
       daten: { name: 'Muster', status: 'vermisst', client_id: 'person-a' },
     });
 
-    expect((await queueLaden(BENUTZER_A, 7)).map((wert) => wert.eintrag.client_id))
-      .toEqual(['a-7']);
-    expect((await queueAlleLaden(BENUTZER_A)).map((wert) => wert.eintrag.client_id))
-      .toEqual(['a-7', 'a-8']);
+    expect((await queueLaden(BENUTZER_A, 7)).map((wert) => wert.eintrag.client_id)).toEqual([
+      'a-7',
+    ]);
+    expect((await queueAlleLaden(BENUTZER_A)).map((wert) => wert.eintrag.client_id)).toEqual([
+      'a-7',
+      'a-8',
+    ]);
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toEqual({
       ausstehend: 2,
       abgelehnt: 0,

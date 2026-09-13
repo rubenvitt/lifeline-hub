@@ -22,18 +22,26 @@ export function sorgeFuerBildLayer(map: MapLibreMap, ov: BildOverlay, beforeId?:
     map.addSource(sid, {
       type: 'image',
       url: ov.blobUrl,
-      coordinates: ov.ecken as unknown as [[number, number], [number, number], [number, number], [number, number]],
+      coordinates: ov.ecken as unknown as [
+        [number, number],
+        [number, number],
+        [number, number],
+        [number, number],
+      ],
     } as never);
   }
   const lid = bildLayerId(ov.id);
   if (!map.getLayer(lid)) {
     const vorAnker = beforeId && map.getLayer(beforeId) ? beforeId : undefined;
-    map.addLayer({
-      id: lid,
-      type: 'raster',
-      source: sid,
-      paint: { 'raster-opacity': opacityWert(ov), 'raster-fade-duration': 0 },
-    }, vorAnker);
+    map.addLayer(
+      {
+        id: lid,
+        type: 'raster',
+        source: sid,
+        paint: { 'raster-opacity': opacityWert(ov), 'raster-fade-duration': 0 },
+      },
+      vorAnker,
+    );
   } else {
     map.setPaintProperty(lid, 'raster-opacity', opacityWert(ov));
   }
@@ -41,10 +49,17 @@ export function sorgeFuerBildLayer(map: MapLibreMap, ov: BildOverlay, beforeId?:
 
 export function setzeBildGeometrie(map: MapLibreMap, id: number, ecken: Ecken) {
   const s = map.getSource(bildSourceId(id)) as ImageSource | undefined;
-  s?.setCoordinates(ecken as unknown as [[number, number], [number, number], [number, number], [number, number]]);
+  s?.setCoordinates(
+    ecken as unknown as [[number, number], [number, number], [number, number], [number, number]],
+  );
 }
 
-export function setzeBildOpazitaet(map: MapLibreMap, id: number, opazitaet: number, sichtbar: boolean) {
+export function setzeBildOpazitaet(
+  map: MapLibreMap,
+  id: number,
+  opazitaet: number,
+  sichtbar: boolean,
+) {
   const lid = bildLayerId(id);
   if (map.getLayer(lid)) {
     map.setPaintProperty(lid, 'raster-opacity', sichtbar ? opazitaet / 100 : 0);

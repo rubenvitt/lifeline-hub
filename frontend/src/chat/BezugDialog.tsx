@@ -22,7 +22,12 @@ interface Props {
 /** Dialog zum nachträglichen Setzen/Ändern des polymorphen Sachbezugs (LFH-103):
  *  Typ wählen, dann ein Objekt dieses Typs. Muster: HeraufstufenModal. */
 export default function BezugDialog({
-  offen, nachricht, optionen, senden, onAbbrechen, onBestaetigen,
+  offen,
+  nachricht,
+  optionen,
+  senden,
+  onAbbrechen,
+  onBestaetigen,
 }: Props) {
   const [form] = Form.useForm<FormWerte>();
   const typ = Form.useWatch('typ', form);
@@ -63,7 +68,11 @@ export default function BezugDialog({
             onChange={() => form.setFieldsValue({ ziel_id: undefined })}
           />
         </Form.Item>
-        <Form.Item label="Objekt" name="ziel_id" rules={[{ required: true, message: 'Objekt wählen' }]}>
+        <Form.Item
+          label="Objekt"
+          name="ziel_id"
+          rules={[{ required: true, message: 'Objekt wählen' }]}
+        >
           <Select
             options={objektOptionen}
             disabled={!typ}

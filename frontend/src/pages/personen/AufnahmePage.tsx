@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Form, Space, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Form, Space } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -20,6 +20,8 @@ import AufnahmeFelder, { type AufnahmeEingabe } from '../../personen/AufnahmeFel
 import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
 import { parseRouteId, personenPfad, uhsDetailPfad } from '../../routing/deeplinks';
 import { flaeche } from '../../theme/tokens';
+import StatusTag from '../../components/StatusTag';
+import { einsatzStatus } from '../../theme/statusFarben';
 
 /**
  * Vollseiten-Aufnahme für Personen (LFH-340 · C5).
@@ -113,8 +115,10 @@ export default function AufnahmePage() {
         setQuittung('Offline vorgemerkt — Registriernummer folgt nach der Übertragung.');
       } else {
         const person = ergebnis.daten;
-        const zusatz = uhsAuftrag && person.aktuelle_uhs_id === uhsAuftrag
-          && person.aktueller_platz_id === null ? ' · im Wartebereich' : '';
+        const zusatz =
+          uhsAuftrag && person.aktuelle_uhs_id === uhsAuftrag && person.aktueller_platz_id === null
+            ? ' · im Wartebereich'
+            : '';
         if (uhsAuftrag) {
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsAuftrag) });
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
@@ -154,7 +158,7 @@ export default function AufnahmePage() {
       titel={
         <Space>
           Aufnahme
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       beschreibung={
@@ -174,9 +178,11 @@ export default function AufnahmePage() {
               // läuft. Der UHS-NAME wird hier bewusst nicht geladen: das bräuchte eine
               // zusätzliche Query nur für einen Breadcrumb-Titel; die Rückverlinkung
               // allein beantwortet die Frage aus dem Brief.
-              title: uhsAuftrag
-                ? <Link to={uhsDetailPfad(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
-                : <Link to={personenPfad(einsatzId)}>Personen</Link>,
+              title: uhsAuftrag ? (
+                <Link to={uhsDetailPfad(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
+              ) : (
+                <Link to={personenPfad(einsatzId)}>Personen</Link>
+              ),
             },
             { title: 'Aufnahme' },
           ]}

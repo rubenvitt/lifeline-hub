@@ -11,21 +11,25 @@ describe('tzIconKey', () => {
   });
 
   it('unterscheidet sich bei abweichender farbe', () => {
-    expect(tzIconKey({ grundzeichen: 'gefahr', farbe: '#f5222d' }))
-      .not.toBe(tzIconKey({ grundzeichen: 'gefahr', farbe: '#faad14' }));
+    expect(tzIconKey({ grundzeichen: 'gefahr', farbe: '#f5222d' })).not.toBe(
+      tzIconKey({ grundzeichen: 'gefahr', farbe: '#faad14' }),
+    );
   });
 
   it('unterscheidet sich bei symbol/fachaufgabe/organisation/einheit', () => {
     const base = { grundzeichen: 'stelle' } as const;
-    expect(tzIconKey({ ...base, symbol: 'sammeln' }))
-      .not.toBe(tzIconKey({ ...base, symbol: 'sammelplatz-betroffene' }));
+    expect(tzIconKey({ ...base, symbol: 'sammeln' })).not.toBe(
+      tzIconKey({ ...base, symbol: 'sammelplatz-betroffene' }),
+    );
     expect(tzIconKey({ ...base, fachaufgabe: 'fuehrung' })).not.toBe(tzIconKey(base));
-    expect(tzIconKey({ grundzeichen: 'taktische-formation', einheit: 'zug' }))
-      .not.toBe(tzIconKey({ grundzeichen: 'taktische-formation', einheit: 'gruppe' }));
+    expect(tzIconKey({ grundzeichen: 'taktische-formation', einheit: 'zug' })).not.toBe(
+      tzIconKey({ grundzeichen: 'taktische-formation', einheit: 'gruppe' }),
+    );
   });
 
   it('unterscheidet sich bei funktion (LFH-172, sonst Icon-Dedup-Kollision)', () => {
-    expect(tzIconKey({ grundzeichen: 'person', funktion: 'fuehrungskraft' }))
-      .not.toBe(tzIconKey({ grundzeichen: 'person' }));
+    expect(tzIconKey({ grundzeichen: 'person', funktion: 'fuehrungskraft' })).not.toBe(
+      tzIconKey({ grundzeichen: 'person' }),
+    );
   });
 });

@@ -22,7 +22,10 @@ export default function UnfallhilfsstellenPage() {
   const { benutzer } = useAuth();
   // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const uhsQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
@@ -43,10 +46,17 @@ export default function UnfallhilfsstellenPage() {
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, schreibgeschuetzt]);
 
   const spalten: TableColumnsType<Uhs> = [
-    { title: 'Bezeichnung', dataIndex: 'bezeichnung', render: (b: string, u) =>
-        <Link to={uhsDetailPfad(einsatzId, u.id)}>{b}</Link> },
+    {
+      title: 'Bezeichnung',
+      dataIndex: 'bezeichnung',
+      render: (b: string, u) => <Link to={uhsDetailPfad(einsatzId, u.id)}>{b}</Link>,
+    },
     { title: 'Typ', dataIndex: 'typ', render: (t: UhsTyp) => uhsTyp[t].label },
-    { title: 'Status', dataIndex: 'status', render: (s: UhsStatus) => <StatusTag darstellung={uhsStatus[s]} /> },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      render: (s: UhsStatus) => <StatusTag darstellung={uhsStatus[s]} />,
+    },
     { title: 'Standort', dataIndex: 'standort', render: (s: string | null) => s ?? '—' },
   ];
 
@@ -92,14 +102,18 @@ export default function UnfallhilfsstellenPage() {
       titel="Unfallhilfsstellen"
       dataUpdatedAt={uhsQuery.dataUpdatedAt}
       breadcrumb={
-        <Breadcrumb items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
-          { title: 'Unfallhilfsstellen' },
-        ]} />
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
+            { title: 'Unfallhilfsstellen' },
+          ]}
+        />
       }
       aktionen={
-        <Button type="primary" disabled={schreibgeschuetzt} onClick={() => setAnlegen(true)}>Neu</Button>
+        <Button type="primary" disabled={schreibgeschuetzt} onClick={() => setAnlegen(true)}>
+          Neu
+        </Button>
       }
       // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette, LFH-391 · B5)
       // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber (dort `disabled`).

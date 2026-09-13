@@ -26,7 +26,12 @@ export function verschiebeEcken(ecken: Ecken, dLng: number, dLat: number): Ecken
  *  `maus` ist die aktuelle Zeigerposition. Der Faktor ist die Projektion des
  *  Vektors anker→maus auf die Diagonale anker→griff (so folgt der Griff der Maus
  *  entlang der Diagonale, ohne das Rechteck zu scheren). */
-export function skaliereUmAnker(ecken: Vier, griffIndex: number, maus: Punkt, minFaktor = 0.05): Vier {
+export function skaliereUmAnker(
+  ecken: Vier,
+  griffIndex: number,
+  maus: Punkt,
+  minFaktor = 0.05,
+): Vier {
   const anker = ecken[(griffIndex + 2) % 4];
   const griff = ecken[griffIndex];
   const dx = griff[0] - anker[0];
@@ -36,7 +41,9 @@ export function skaliereUmAnker(ecken: Vier, griffIndex: number, maus: Punkt, mi
   const mx = maus[0] - anker[0];
   const my = maus[1] - anker[1];
   const s = Math.max((mx * dx + my * dy) / len2, minFaktor);
-  return ecken.map(([x, y]) => [anker[0] + s * (x - anker[0]), anker[1] + s * (y - anker[1])] as Punkt) as Vier;
+  return ecken.map(
+    ([x, y]) => [anker[0] + s * (x - anker[0]), anker[1] + s * (y - anker[1])] as Punkt,
+  ) as Vier;
 }
 
 export type Kante = 'oben' | 'rechts' | 'unten' | 'links';
@@ -103,5 +110,10 @@ export function eckenInitialPixel(centerPx: Punkt, breitePx: number, ar: number)
 
 /** Achsenparallele Ecken aus Bounds (Fallback, wenn die Karte noch nicht bereit ist). */
 export function eckenAusBounds(west: number, sued: number, ost: number, nord: number): Ecken {
-  return [[west, nord], [ost, nord], [ost, sued], [west, sued]];
+  return [
+    [west, nord],
+    [ost, nord],
+    [ost, sued],
+    [west, sued],
+  ];
 }

@@ -67,7 +67,8 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       montiert.current &&
       aktiverScope.current.key === scopeKey &&
       aktiverScope.current.generation === generation
-    ) setAusstehendStand({ scope: scopeKey, werte: geladen });
+    )
+      setAusstehendStand({ scope: scopeKey, werte: geladen });
   }, [benutzerId, einsatzId, scopeKey]);
 
   const ladeAbgelehnt = useCallback(async () => {
@@ -82,7 +83,8 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       montiert.current &&
       aktiverScope.current.key === scopeKey &&
       aktiverScope.current.generation === generation
-    ) setAbgelehntStand({ scope: scopeKey, werte: geladen });
+    )
+      setAbgelehntStand({ scope: scopeKey, werte: geladen });
   }, [benutzerId, einsatzId, scopeKey]);
 
   useEffect(() => {
@@ -100,11 +102,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
   }, [ladeAusstehend, ladeAbgelehnt]);
 
   const flush = useCallback(async () => {
-    if (
-      benutzerId == null ||
-      !navigator.onLine ||
-      aktiverScope.current.key !== scopeKey
-    ) return;
+    if (benutzerId == null || !navigator.onLine || aktiverScope.current.key !== scopeKey) return;
     const generation = aktiverScope.current.generation;
     const durchlauf = async () => {
       const darfFortsetzen = () =>
@@ -136,11 +134,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
           }
           // Fachliche Ablehnung → aus der Queue nehmen, aber persistent als abgelehnt
           // ablegen (nicht still in flüchtigem State verlieren).
-          await queueAblehnen(
-            benutzerId,
-            a,
-            e instanceof ApiError ? e.message : 'Abgelehnt',
-          );
+          await queueAblehnen(benutzerId, a, e instanceof ApiError ? e.message : 'Abgelehnt');
         }
       }
       if (!darfFortsetzen()) return;

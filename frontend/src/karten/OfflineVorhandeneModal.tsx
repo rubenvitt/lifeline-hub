@@ -61,7 +61,13 @@ export default function OfflineVorhandeneModal({
   });
 
   return (
-    <Modal open={offen} title="Gebaute Region übernehmen" footer={null} onCancel={onClose} destroyOnHidden>
+    <Modal
+      open={offen}
+      title="Gebaute Region übernehmen"
+      footer={null}
+      onCancel={onClose}
+      destroyOnHidden
+    >
       <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
         Übernimmt eine bereits im Karten-Verzeichnis liegende MBTiles-Datei (z. B. selbst mit
         karten-build erzeugt) als Offline-Karte — ohne Download/Hosting. Danach aktivierbar.

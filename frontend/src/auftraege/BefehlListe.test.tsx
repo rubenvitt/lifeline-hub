@@ -60,16 +60,34 @@ const BASIS = {
  */
 const KETTE = [
   {
-    ...BASIS, id: 4, titel: 'EA 2. Zug', vorlage: 'befehl_ea_zmw', version: 1,
-    status: 'freigegeben', zeitstand: '2026-06-02 09:00:00', vorgaenger_id: null,
+    ...BASIS,
+    id: 4,
+    titel: 'EA 2. Zug',
+    vorlage: 'befehl_ea_zmw',
+    version: 1,
+    status: 'freigegeben',
+    zeitstand: '2026-06-02 09:00:00',
+    vorgaenger_id: null,
   },
   {
-    ...BASIS, id: 7, titel: 'Befehl A', vorlage: 'befehl_lad', version: 1,
-    status: 'freigegeben', zeitstand: '2026-06-02 10:00:00', vorgaenger_id: null,
+    ...BASIS,
+    id: 7,
+    titel: 'Befehl A',
+    vorlage: 'befehl_lad',
+    version: 1,
+    status: 'freigegeben',
+    zeitstand: '2026-06-02 10:00:00',
+    vorgaenger_id: null,
   },
   {
-    ...BASIS, id: 9, titel: 'Befehl A', vorlage: 'befehl_lad', version: 2,
-    status: 'entwurf', zeitstand: '2026-06-02 12:00:00', vorgaenger_id: 7,
+    ...BASIS,
+    id: 9,
+    titel: 'Befehl A',
+    vorlage: 'befehl_lad',
+    version: 2,
+    status: 'entwurf',
+    zeitstand: '2026-06-02 12:00:00',
+    vorgaenger_id: 7,
   },
 ];
 
@@ -126,7 +144,11 @@ describe('BefehlListe', () => {
     // Gruppenachse führend, INNERHALB der Gruppe absteigend nach Zeitstand
     // (`standardSortierung`). Nur an der aufsteigenden Fixture belegt das etwas: 7 (10:00)
     // muss vor 4 (09:00) stehen, obwohl 4 zuerst geliefert wird.
-    expect(within(sicht).getAllByRole('link').map((l) => l.getAttribute('href'))).toEqual([
+    expect(
+      within(sicht)
+        .getAllByRole('link')
+        .map((l) => l.getAttribute('href')),
+    ).toEqual([
       '/einsaetze/1/auftraege/befehle/9',
       '/einsaetze/1/auftraege/befehle/7',
       '/einsaetze/1/auftraege/befehle/4',
@@ -213,7 +235,9 @@ function renderMitZone() {
   );
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   qc.setQueryData(einsatzKeys.einstellungen(1), {
-    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+    einsatz_id: 1,
+    zeitzone: 'Europe/Berlin',
+    org_defaults: { org_id: 1 },
   });
   return render(
     <QueryClientProvider client={qc}>
@@ -230,10 +254,18 @@ function renderMitZone() {
 
 describe('BefehlListe — Fassungszeile (LFH-350 · H60)', () => {
   it('zeigt den Zeitstand als taktische DTG in der Anzeigezone, nicht roh', async () => {
-    vi.mocked(befehleApi.listeBefehle).mockResolvedValue(
-      [{ ...BASIS, id: 4, titel: 'Befehl A', vorlage: 'befehl_lad', version: 1,
-         status: 'freigegeben', zeitstand: '2026-07-25 12:00:00', vorgaenger_id: null }] as never,
-    );
+    vi.mocked(befehleApi.listeBefehle).mockResolvedValue([
+      {
+        ...BASIS,
+        id: 4,
+        titel: 'Befehl A',
+        vorlage: 'befehl_lad',
+        version: 1,
+        status: 'freigegeben',
+        zeitstand: '2026-07-25 12:00:00',
+        vorgaenger_id: null,
+      },
+    ] as never);
     renderMitZone();
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
     expect(await screen.findByText('v1 · 251400JUL2026 · EL')).toBeInTheDocument();

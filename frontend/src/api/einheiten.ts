@@ -35,15 +35,27 @@ export interface PositionPatch {
 }
 
 /** L‑2: Verortet eine Einheit auf der Lagekarte. */
-export function verorteEinheit(einsatzId: number, einheitId: number, daten: PositionPatch): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${einheitId}/position`, 'PATCH', daten);
+export function verorteEinheit(
+  einsatzId: number,
+  einheitId: number,
+  daten: PositionPatch,
+): Promise<Einheit> {
+  return apiSend<Einheit>(
+    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/position`,
+    'PATCH',
+    daten,
+  );
 }
 
 export function bildeEinheit(einsatzId: number, daten: EinheitEingabe): Promise<Einheit> {
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten`, 'POST', daten);
 }
 
-export function aktualisiereEinheit(einsatzId: number, eid: number, daten: EinheitEingabe): Promise<Einheit> {
+export function aktualisiereEinheit(
+  einsatzId: number,
+  eid: number,
+  daten: EinheitEingabe,
+): Promise<Einheit> {
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', daten);
 }
 

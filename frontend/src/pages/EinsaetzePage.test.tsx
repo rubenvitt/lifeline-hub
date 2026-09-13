@@ -141,9 +141,7 @@ describe('EinsaetzePage', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByLabelText('Bezeichnung')),
-    );
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Bezeichnung')));
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd{Enter}');
 
     await waitFor(() => expect(screen.getByText('Workspace-7')).toBeInTheDocument());
@@ -203,10 +201,12 @@ describe('EinsaetzePage', () => {
     const user = userEvent.setup();
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
-      http.get('/api/einsaetze', () => HttpResponse.json([
-        einsatz(),
-        einsatz({ id: 8, bezeichnung: 'Sturmtief Abschluss', status: 'abgeschlossen' }),
-      ])),
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json([
+          einsatz(),
+          einsatz({ id: 8, bezeichnung: 'Sturmtief Abschluss', status: 'abgeschlossen' }),
+        ]),
+      ),
       http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
     );
     renderMitProviders(
@@ -248,7 +248,11 @@ describe('EinsaetzePage', () => {
     );
 
     const link = await screen.findByRole('link', { name: 'Hochwasser Nord' });
-    const modifierKlick = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
+    const modifierKlick = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+    });
     fireEvent(link, modifierKlick);
 
     expect(modifierKlick.defaultPrevented).toBe(false);
@@ -347,10 +351,17 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
 
   const e = (over: Partial<EinsatzAnzeige>): EinsatzAnzeige =>
     ({
-      id: 1, bezeichnung: 'Hochwasser Musterstadt', stichwort: 'TH Hochwasser',
-      status: 'aktiv', einsatzart: 'realeinsatz', begonnen_at: '2026-06-08 06:12:00',
-      angelegt_at: '2026-06-08 06:12:00', einsatzort: 'Musterstadt, Deichweg 3',
-      org_id: 1, org_name: 'THW Musterstadt', meine_rolle: 'einsatzleitung',
+      id: 1,
+      bezeichnung: 'Hochwasser Musterstadt',
+      stichwort: 'TH Hochwasser',
+      status: 'aktiv',
+      einsatzart: 'realeinsatz',
+      begonnen_at: '2026-06-08 06:12:00',
+      angelegt_at: '2026-06-08 06:12:00',
+      einsatzort: 'Musterstadt, Deichweg 3',
+      org_id: 1,
+      org_name: 'THW Musterstadt',
+      meine_rolle: 'einsatzleitung',
       ...over,
     }) as EinsatzAnzeige;
 
@@ -380,8 +391,8 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
     mockEinsaetze([e({ einsatzart: 'uebung' })]);
     render();
-    // Grossgeschrieben seit LFH-345 · C10 (M14): die Map liegt jetzt in
-    // `einsatz/einsatzStatus.ts` und trägt eine BESCHRIFTUNG statt des Wire-Werts.
+    // Grossgeschrieben seit LFH-345 · C10 (M14): die Map trägt eine BESCHRIFTUNG statt
+    // des Wire-Werts; seit LFH-358 steht sie im Vertrag (`theme/statusFarben.ts`).
     // Vorher stand hier 'aktiv' — also der Enum-Schlüssel, der nur zufällig lesbar war.
     expect(await screen.findByText('Aktiv')).toBeInTheDocument();
     expect(screen.getByText('Übung')).toBeInTheDocument();

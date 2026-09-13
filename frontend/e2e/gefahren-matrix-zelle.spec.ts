@@ -25,7 +25,10 @@ async function anmelden(page: Page) {
 }
 
 test('jede Matrix-Zelle misst auf dem Tablet mindestens 44 px', async ({ page }) => {
-  await page.addInitScript(([k, v]) => window.localStorage.setItem(k, v), [DICHTE, 'komfortabel'] as const);
+  await page.addInitScript(([k, v]) => window.localStorage.setItem(k, v), [
+    DICHTE,
+    'komfortabel',
+  ] as const);
   await anmelden(page);
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
   await page.getByLabel('Bezeichnung').fill('C12 Matrix');
@@ -43,7 +46,15 @@ test('jede Matrix-Zelle misst auf dem Tablet mindestens 44 px', async ({ page })
       geometrie_typ: 'Polygon',
       geometrie: JSON.stringify({
         type: 'Polygon',
-        coordinates: [[[10.0, 50.0], [10.01, 50.0], [10.01, 50.01], [10.0, 50.01], [10.0, 50.0]]],
+        coordinates: [
+          [
+            [10.0, 50.0],
+            [10.01, 50.0],
+            [10.01, 50.01],
+            [10.0, 50.01],
+            [10.0, 50.0],
+          ],
+        ],
       }),
       label: 'C12 Gebiet',
     },

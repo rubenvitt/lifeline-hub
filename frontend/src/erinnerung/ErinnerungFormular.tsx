@@ -60,7 +60,13 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true }: P
   const formular = (
     <ErfassungsFormular<FormWerte>
       form={form}
-      initialValues={{ titel: '', beschreibung: '', faellig: dayjs(), intervall: null, empfaenger: '' }}
+      initialValues={{
+        titel: '',
+        beschreibung: '',
+        faellig: dayjs(),
+        intervall: null,
+        empfaenger: '',
+      }}
       onErfassen={absenden}
       // Das Inline-Formular schliesst sich nach dem Anlegen NICHT — Zuklappen ist
       // ausdrückliche Nutzeraktion über den Kopf-Umschalter oder das Kreuz an der
@@ -93,7 +99,12 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true }: P
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="intervall" label="Intervall (Min, optional)">
-            <InputNumber aria-label="Intervall" min={1} placeholder="30" style={{ width: '100%' }} />
+            <InputNumber
+              aria-label="Intervall"
+              min={1}
+              placeholder="30"
+              style={{ width: '100%' }}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -104,5 +115,9 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true }: P
   );
 
   if (!card) return formular;
-  return <Card size="small" title="Neue Erinnerung">{formular}</Card>;
+  return (
+    <Card size="small" title="Neue Erinnerung">
+      {formular}
+    </Card>
+  );
 }

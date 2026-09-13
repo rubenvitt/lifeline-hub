@@ -12,20 +12,33 @@ import {
 import type { KarteServerConfig, OfflineRegion, OnlineStyle } from '../../api/karte';
 
 const vektorView: OnlineStyle = {
-  name: 'A', url: 'https://tiles.example/style.json', typ: 'vektor', attribution: '© A',
+  name: 'A',
+  url: 'https://tiles.example/style.json',
+  typ: 'vektor',
+  attribution: '© A',
 };
 const rasterView: OnlineStyle = {
-  name: 'Top', url: 'https://x/{z}/{y}/{x}.png', typ: 'raster', attribution: '© BKG',
+  name: 'Top',
+  url: 'https://x/{z}/{y}/{x}.png',
+  typ: 'raster',
+  attribution: '© BKG',
 };
 
 const ODBL = '© OpenStreetMap contributors (ODbL)';
 /** Eine Offline-Region im Config-Vertrag (LFH-188), region-adressiert.
  *  `maxzoom` ist seit LFH-265 Pflicht im generierten Schema; 14 = Regional-Pack-Voll-Detail. */
-function region(karte_id: number, format: OnlineStyle['typ'] = 'vektor', maxzoom = 14): OfflineRegion {
+function region(
+  karte_id: number,
+  format: OnlineStyle['typ'] = 'vektor',
+  maxzoom = 14,
+): OfflineRegion {
   return {
-    karte_id, name: `R${karte_id}`,
+    karte_id,
+    name: `R${karte_id}`,
     tiles_url: `/api/karte/offline/${karte_id}/tiles/{z}/{x}/{y}?v=abc`,
-    attribution: ODBL, format, maxzoom,
+    attribution: ODBL,
+    format,
+    maxzoom,
   };
 }
 
@@ -38,13 +51,20 @@ const beides: KarteServerConfig = {
   karten_bau_verfuegbar: false,
 };
 const nurOffline: KarteServerConfig = {
-  online_styles: [], offline_verfuegbar: true,
+  online_styles: [],
+  offline_verfuegbar: true,
   offline_tiles_url: '/api/karte/offline/5/tiles/{z}/{x}/{y}?v=abc',
-  offline_attribution: ODBL, offline_regionen: [region(5)], karten_bau_verfuegbar: false,
+  offline_attribution: ODBL,
+  offline_regionen: [region(5)],
+  karten_bau_verfuegbar: false,
 };
 const leer: KarteServerConfig = {
-  online_styles: [], offline_verfuegbar: false, offline_tiles_url: null, offline_attribution: null,
-  offline_regionen: [], karten_bau_verfuegbar: false,
+  online_styles: [],
+  offline_verfuegbar: false,
+  offline_tiles_url: null,
+  offline_attribution: null,
+  offline_regionen: [],
+  karten_bau_verfuegbar: false,
 };
 
 describe('basemapStil', () => {
@@ -70,7 +90,10 @@ describe('basemapStil', () => {
 
   it('baueOnlineStyle: relative Vektor-Proxy-URL wird gegen die Origin absolutiert (LFH-182)', () => {
     const proxyView: OnlineStyle = {
-      name: 'P', url: '/api/karte/proxy/1/style.json', typ: 'vektor', attribution: null,
+      name: 'P',
+      url: '/api/karte/proxy/1/style.json',
+      typ: 'vektor',
+      attribution: null,
     };
     expect(baueOnlineStyle(proxyView)).toBe(
       new URL('/api/karte/proxy/1/style.json', window.location.origin).href,
@@ -79,7 +102,10 @@ describe('basemapStil', () => {
 
   it('baueOnlineStyle: relatives Raster-Proxy-Template bleibt relatives tiles[0] (LFH-182)', () => {
     const proxyRaster: OnlineStyle = {
-      name: 'P', url: '/api/karte/proxy/1/raster/{z}/{x}/{y}', typ: 'raster', attribution: null,
+      name: 'P',
+      url: '/api/karte/proxy/1/raster/{z}/{x}/{y}',
+      typ: 'raster',
+      attribution: null,
     };
     const s = baueOnlineStyle(proxyRaster) as {
       sources: Record<string, { tiles: string[] }>;
@@ -90,7 +116,9 @@ describe('basemapStil', () => {
   it('baueOnlineStyle: Raster verpackt das Template in einen Raster-Style', () => {
     const s = baueOnlineStyle(rasterView);
     expect(typeof s).toBe('object');
-    const style = s as { sources: Record<string, { type: string; tiles: string[]; tileSize: number }> };
+    const style = s as {
+      sources: Record<string, { type: string; tiles: string[]; tileSize: number }>;
+    };
     const src = style.sources.raster;
     expect(src.type).toBe('raster');
     expect(src.tiles).toEqual(['https://x/{z}/{y}/{x}.png']); // verbatim, NICHT normalisiert
@@ -100,7 +128,9 @@ describe('basemapStil', () => {
   });
 
   it('online-Modus mit View liefert dessen Style', () => {
-    expect(baueBasemapStyle('online', 'light', beides, vektorView)).toBe('https://tiles.example/style.json');
+    expect(baueBasemapStyle('online', 'light', beides, vektorView)).toBe(
+      'https://tiles.example/style.json',
+    );
   });
 
   it('online ohne View → Blind-Fallback', () => {
@@ -117,7 +147,9 @@ describe('basemapStil', () => {
     expect(vektor.sources['basemap-5'].type).toBe('vector');
     // Raster-Region (selten/legacy) → über den Kompat-Pfad ein Raster-Style mit dem Template VERBATIM.
     const rasterConfig: KarteServerConfig = {
-      ...nurOffline, offline_format: 'raster', offline_regionen: [region(5, 'raster')],
+      ...nurOffline,
+      offline_format: 'raster',
+      offline_regionen: [region(5, 'raster')],
     };
     const raster = baueBasemapStyle('offline', 'light', rasterConfig, undefined) as {
       sources: Record<string, { type: string; tiles: string[] }>;
@@ -148,9 +180,12 @@ describe('basemapStil', () => {
     // die LEERE Liste, nicht das fehlende Feld (so dokumentiert das Backend das Feld auch).
     // Der geprüfte Code-Pfad ist unverändert derselbe — `vektorRegionen.length === 0` → Kompat.
     const alt: KarteServerConfig = {
-      online_styles: [], offline_verfuegbar: true, offline_regionen: [],
+      online_styles: [],
+      offline_verfuegbar: true,
+      offline_regionen: [],
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
-      offline_attribution: ODBL, karten_bau_verfuegbar: false,
+      offline_attribution: ODBL,
+      karten_bau_verfuegbar: false,
     };
     const s = baueBasemapStyle('offline', 'light', alt, undefined) as {
       sources: Record<string, { type: string; tiles: string[] }>;
@@ -187,16 +222,20 @@ describe('basemapStil', () => {
 
   it('aktuelleAttribution: mehrere Regionen dedupliziert (nicht N-fach, LFH-188)', () => {
     // Zwei Regionen mit identischer ODbL-Attribution → genau eine Anzeige.
-    const zweiGleich: KarteServerConfig = { ...nurOffline, offline_regionen: [region(1), region(2)] };
+    const zweiGleich: KarteServerConfig = {
+      ...nurOffline,
+      offline_regionen: [region(1), region(2)],
+    };
     expect(aktuelleAttribution('offline', undefined, zweiGleich)).toBe(ODBL);
     // Unterschiedliche Attributionen → beide, mit Trenner.
     const zweiVerschieden: KarteServerConfig = {
       ...nurOffline,
       offline_regionen: [region(1), { ...region(2), attribution: '© Andere Quelle' }],
     };
-    expect(aktuelleAttribution('offline', undefined, zweiVerschieden)).toBe(`${ODBL} · © Andere Quelle`);
+    expect(aktuelleAttribution('offline', undefined, zweiVerschieden)).toBe(
+      `${ODBL} · © Andere Quelle`,
+    );
   });
-
 });
 
 describe('offlineStyle (Shortbread, Multi-Region)', () => {
@@ -205,7 +244,12 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
     glyphs: string;
     sprite: string;
     sources: Record<string, { type: string; tiles: string[] }>;
-    layers: Array<{ id: string; type: string; 'source-layer'?: string; layout?: Record<string, unknown> }>;
+    layers: Array<{
+      id: string;
+      type: string;
+      'source-layer'?: string;
+      layout?: Record<string, unknown>;
+    }>;
   };
   it('nutzt lokale Glyphs/Sprite (offline)', () => {
     expect(style.glyphs).toBe('/api/karte/offline/fonts/{fontstack}/{range}.pbf');
@@ -250,9 +294,21 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
       style.layers.map((l) => l['source-layer']).filter((s): s is string => !!s),
     );
     for (const erwartet of [
-      'ocean', 'land', 'water_polygons', 'water_lines', 'buildings', 'streets',
-      'bridges', 'sites', 'boundaries', 'dam_polygons', 'dam_lines',
-      'pier_polygons', 'pier_lines', 'ferries', 'street_polygons',
+      'ocean',
+      'land',
+      'water_polygons',
+      'water_lines',
+      'buildings',
+      'streets',
+      'bridges',
+      'sites',
+      'boundaries',
+      'dam_polygons',
+      'dam_lines',
+      'pier_polygons',
+      'pier_lines',
+      'ferries',
+      'street_polygons',
     ]) {
       expect(sourceLayers.has(erwartet)).toBe(true);
     }
@@ -267,7 +323,14 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
     // FE-seitige `?? 14`-Fallback ist entfallen. Geprüft wird jetzt die Durchreichung pro Region:
     // jede Source bekommt ihren eigenen Wert, nicht einen global gleichen.
     const s = offlineStyle('light', [
-      { karte_id: 0, name: 'Welt-Übersicht', tiles_url: '/api/karte/offline/welt/tiles/{z}/{x}/{y}?v=w', attribution: 'ODbL', format: 'vektor', maxzoom: 6 },
+      {
+        karte_id: 0,
+        name: 'Welt-Übersicht',
+        tiles_url: '/api/karte/offline/welt/tiles/{z}/{x}/{y}?v=w',
+        attribution: 'ODbL',
+        format: 'vektor',
+        maxzoom: 6,
+      },
       region(7),
     ]) as { sources: Record<string, { maxzoom: number }> };
     expect(s.sources['basemap-0'].maxzoom).toBe(6);

@@ -29,8 +29,13 @@ import SprechgruppenTab from './SprechgruppenTab';
  * treffen. Ein zwölfter Tab ohne Hinweis fiele hier auf, in elf Einzeltests nicht.
  */
 const nichtAdmin = {
-  id: 2, anzeigename: 'Führungskraft', benutzername: 'fk', system_rolle: 'keiner',
-  org_rolle: 'fuehrung', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 2,
+  anzeigename: 'Führungskraft',
+  benutzername: 'fk',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrung',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const admin = { ...nichtAdmin, id: 1, anzeigename: 'Admin', system_rolle: 'admin' };
 
@@ -103,31 +108,37 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
    * Tab, der wieder versteckt, fällt jetzt hier auf: `getByRole` wirft, wenn der Knopf
    * fehlt, `toBeDisabled` schlägt fehl, wenn er offen steht.
    */
-  it.each(SEKTIONEN)('$name zeigt die Primäraktion GESPERRT statt versteckt', async ({ Komp, aktion }) => {
-    handler(nichtAdmin);
-    renderMitProviders(<Komp />);
-    // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
-    await screen.findByText(STAMMDATEN_RECHTE_TEXT);
-    // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der
-    // elf Primäraktionen aber im INHALT — auf den Hinweis zu warten sichert für die also
-    // strenggenommen nichts zu. `waitFor` maskiert dabei nichts: ein Knopf, der nie
-    // gesperrt wird, läuft in die Zeitüberschreitung statt grün zu werden.
-    await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeDisabled());
-  });
+  it.each(SEKTIONEN)(
+    '$name zeigt die Primäraktion GESPERRT statt versteckt',
+    async ({ Komp, aktion }) => {
+      handler(nichtAdmin);
+      renderMitProviders(<Komp />);
+      // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
+      await screen.findByText(STAMMDATEN_RECHTE_TEXT);
+      // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der
+      // elf Primäraktionen aber im INHALT — auf den Hinweis zu warten sichert für die also
+      // strenggenommen nichts zu. `waitFor` maskiert dabei nichts: ein Knopf, der nie
+      // gesperrt wird, läuft in die Zeitüberschreitung statt grün zu werden.
+      await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeDisabled());
+    },
+  );
 
   /**
    * Die Gegenaussage. Ohne sie bliebe ein Hinweis, der IMMER steht, unentdeckt — und ein
    * Alert, der auch dem Admin erklärt, er dürfe nichts, wäre schlimmer als gar keiner.
    */
-  it.each(SEKTIONEN)('$name zeigt dem Admin KEINEN Rechte-Hinweis', async ({ name, Komp, aktion }) => {
-    handler(admin);
-    renderMitProviders(<Komp />);
-    // Erst auf den gerenderten Seitenkopf warten — ein `queryBy` vor dem ersten Anstrich
-    // wäre trivial `null` und belegte nichts.
-    expect(await screen.findByRole('heading', { level: 4, name })).toBeInTheDocument();
-    expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
-    // Die Gegenaussage zur Sperre. Ohne sie bliebe eine fest verdrahtete `disabled`-Angabe
-    // unentdeckt: elf `toBeDisabled` wären dann grün, und die Seite unbedienbar.
-    await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeEnabled());
-  });
+  it.each(SEKTIONEN)(
+    '$name zeigt dem Admin KEINEN Rechte-Hinweis',
+    async ({ name, Komp, aktion }) => {
+      handler(admin);
+      renderMitProviders(<Komp />);
+      // Erst auf den gerenderten Seitenkopf warten — ein `queryBy` vor dem ersten Anstrich
+      // wäre trivial `null` und belegte nichts.
+      expect(await screen.findByRole('heading', { level: 4, name })).toBeInTheDocument();
+      expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
+      // Die Gegenaussage zur Sperre. Ohne sie bliebe eine fest verdrahtete `disabled`-Angabe
+      // unentdeckt: elf `toBeDisabled` wären dann grün, und die Seite unbedienbar.
+      await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeEnabled());
+    },
+  );
 });

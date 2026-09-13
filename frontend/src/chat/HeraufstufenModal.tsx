@@ -24,7 +24,13 @@ interface Props {
   onBestaetigen: (typ: EtbTyp, inhalt: string) => void;
 }
 
-export default function HeraufstufenModal({ offen, nachricht, senden, onAbbrechen, onBestaetigen }: Props) {
+export default function HeraufstufenModal({
+  offen,
+  nachricht,
+  senden,
+  onAbbrechen,
+  onBestaetigen,
+}: Props) {
   const [form] = Form.useForm<FormWerte>();
 
   // Bei jedem Öffnen den aktuellen Nachrichtentext vorbefüllen.
@@ -52,7 +58,11 @@ export default function HeraufstufenModal({ offen, nachricht, senden, onAbbreche
         <Form.Item label="ETB-Typ" name="typ" rules={[{ required: true }]}>
           <Select options={TYP_OPTIONEN} />
         </Form.Item>
-        <Form.Item label="Text" name="inhalt" rules={[{ required: true, whitespace: true, message: 'Text erforderlich' }]}>
+        <Form.Item
+          label="Text"
+          name="inhalt"
+          rules={[{ required: true, whitespace: true, message: 'Text erforderlich' }]}
+        >
           <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} />
         </Form.Item>
       </Form>

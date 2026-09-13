@@ -24,7 +24,9 @@ describe('EtbFilterleiste', () => {
     const onChange = vi.fn<(w: EtbFilterWerte) => void>();
     render(<EtbFilterleiste onChange={onChange} />);
     await userEvent.type(screen.getByPlaceholderText('Volltextsuche'), 'pumpe');
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ q: 'pumpe' })));
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ q: 'pumpe' })),
+    );
   });
 
   /**
@@ -130,7 +132,6 @@ describe('EtbFilterleiste', () => {
     const onChange = vi.fn<(w: EtbFilterWerte) => void>();
     render(<EtbFilterleiste onChange={onChange} startWerte={{ typ: 'meldung' }} />);
     await userEvent.type(screen.getByPlaceholderText('Volltextsuche'), 'x');
-    await waitFor(() =>
-      expect(onChange).toHaveBeenLastCalledWith({ typ: 'meldung', q: 'x' }));
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ typ: 'meldung', q: 'x' }));
   });
 });

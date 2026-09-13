@@ -16,25 +16,57 @@ import { alsOrtszeit } from '../etb/filterZeit';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 
 const admin = {
-  id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-02 10:00:00',
+  id: 1,
+  anzeigename: 'A',
+  benutzername: 'a',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-06-02 10:00:00',
 };
 
 const einsatz: EinsatzAnzeige = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-06-02 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-06-02 09:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung', org_id: 1, org_name: 'Orga',
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-06-02 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-06-02 09:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
+  org_id: 1,
+  org_name: 'Orga',
+  meine_sachgebiete: [],
 };
 
 const bericht: LageberichtAnzeige = {
-  id: 11, einsatz_id: 7, vorlage: 'freitext', titel: 'Lage 10:00', zeitstand: '2026-06-02 10:00:00',
-  status: 'entwurf', abschnitte: [{ schluessel: 'text', text: 'Inhalt' }], version: 1,
-  vorgaenger_id: null, ersteller_id: 1, ersteller_name: 'A', erstellt_at: '2026-06-02 10:00:00',
-  aktualisiert_at: '2026-06-02 10:00:00', freigegeben_von_id: null, freigegeben_von_name: null,
-  freigegeben_at: null, etb_eintrag_id: null,
+  id: 11,
+  einsatz_id: 7,
+  vorlage: 'freitext',
+  titel: 'Lage 10:00',
+  zeitstand: '2026-06-02 10:00:00',
+  status: 'entwurf',
+  abschnitte: [{ schluessel: 'text', text: 'Inhalt' }],
+  version: 1,
+  vorgaenger_id: null,
+  ersteller_id: 1,
+  ersteller_name: 'A',
+  erstellt_at: '2026-06-02 10:00:00',
+  aktualisiert_at: '2026-06-02 10:00:00',
+  freigegeben_von_id: null,
+  freigegeben_von_name: null,
+  freigegeben_at: null,
+  etb_eintrag_id: null,
 };
 
 /**
@@ -51,11 +83,23 @@ const bericht: LageberichtAnzeige = {
  */
 const KETTE: LageberichtAnzeige[] = [
   {
-    ...bericht, id: 14, titel: 'Vortrag Nachmittag', vorlage: 'lagebericht', version: 1,
-    status: 'freigegeben', zeitstand: '2026-06-02 09:00:00',
+    ...bericht,
+    id: 14,
+    titel: 'Vortrag Nachmittag',
+    vorlage: 'lagebericht',
+    version: 1,
+    status: 'freigegeben',
+    zeitstand: '2026-06-02 09:00:00',
   },
   { ...bericht, id: 11, version: 1, status: 'freigegeben', zeitstand: '2026-06-02 10:00:00' },
-  { ...bericht, id: 13, version: 2, status: 'entwurf', zeitstand: '2026-06-02 12:00:00', vorgaenger_id: 11 },
+  {
+    ...bericht,
+    id: 13,
+    version: 2,
+    status: 'entwurf',
+    zeitstand: '2026-06-02 12:00:00',
+    vorgaenger_id: 11,
+  },
 ];
 
 function setup(berichte: LageberichtAnzeige[] = [bericht]) {
@@ -75,7 +119,10 @@ function setup(berichte: LageberichtAnzeige[] = [bericht]) {
 }
 
 const lagebericht7Abschnitte: LageberichtAnzeige = {
-  ...bericht, id: 12, vorlage: 'lagebericht', titel: 'Lagevortrag',
+  ...bericht,
+  id: 12,
+  vorlage: 'lagebericht',
+  titel: 'Lagevortrag',
   abschnitte: [
     { schluessel: 'auftrag', text: '' },
     { schluessel: 'gefahren_schadenlage', text: '' },
@@ -88,10 +135,29 @@ const lagebericht7Abschnitte: LageberichtAnzeige = {
 };
 
 function setupDetail(lb: LageberichtAnzeige) {
+  let stand = lb;
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get(`/api/einsaetze/7/lageberichte/${lb.id}`, () => HttpResponse.json(lb)),
+    http.get(`/api/einsaetze/7/lageberichte/${lb.id}`, () => HttpResponse.json(stand)),
+    /*
+     * Erfolgreicher PATCH als Grundrauschen: mehrere dieser Tests tippen und verlassen ein
+     * Feld, was den Blur-Autosave auslöst. Ohne Handler scheitert der Request, und seit
+     * LFH-494 steht der Grund dann als sichtbares „Nicht gespeichert" in der Seite statt in
+     * einem Toast — Rauschen, das eine spätere Fehlersuche kostet. Wer einen FEHLSCHLAG
+     * braucht, nimmt `setupLebend` bzw. einen eigenen Handler.
+     *
+     * Der Handler SPIEGELT den Body und gibt nicht `lb` zurück — das ist gemessen nötig:
+     * nach erfolgreichem Autosave fällt der Merker, und der auf die Invalidierung folgende
+     * Refetch schreibt den Serverstand zurück ins Formular. Ein Handler, der den alten
+     * Stand liefert, modellierte einen Server, der nichts speichert, und löschte das eben
+     * Getippte wieder aus dem Feld (zwei Bestandstests dieser Datei wurden davon rot).
+     */
+    http.patch(`/api/einsaetze/7/lageberichte/${lb.id}`, async ({ request }) => {
+      const body = (await request.json()) as Partial<LageberichtAnzeige>;
+      stand = { ...stand, ...body };
+      return HttpResponse.json(stand);
+    }),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -177,8 +243,11 @@ describe('LageberichtDetailPage', () => {
 
   it('freigegebener Bericht ist read-only mit ETB-Link und Fortschreiben', async () => {
     setupDetail({
-      ...lagebericht7Abschnitte, status: 'freigegeben', etb_eintrag_id: 99,
-      freigegeben_von_name: 'A', freigegeben_at: '2026-06-02 11:00:00',
+      ...lagebericht7Abschnitte,
+      status: 'freigegeben',
+      etb_eintrag_id: 99,
+      freigegeben_von_name: 'A',
+      freigegeben_at: '2026-06-02 11:00:00',
     });
     expect(await screen.findByRole('button', { name: /Fortschreiben/i })).toBeInTheDocument();
     expect(screen.queryByLabelText('Auftrag')).not.toBeInTheDocument();
@@ -191,11 +260,18 @@ describe('LageberichtDetailPage', () => {
   });
 
   it('Freigeben öffnet einen Bestätigungsdialog', async () => {
-    setupDetail({ ...lagebericht7Abschnitte, abschnitte: [
-      { schluessel: 'auftrag', text: 'X' }, { schluessel: 'gefahren_schadenlage', text: '' },
-      { schluessel: 'eigene_lage', text: '' }, { schluessel: 'lageentwicklung', text: '' },
-      { schluessel: 'fuehrungsprobleme', text: '' }, { schluessel: 'antraege_vorschlaege', text: '' },
-      { schluessel: 'zusammenfassung', text: '' }] });
+    setupDetail({
+      ...lagebericht7Abschnitte,
+      abschnitte: [
+        { schluessel: 'auftrag', text: 'X' },
+        { schluessel: 'gefahren_schadenlage', text: '' },
+        { schluessel: 'eigene_lage', text: '' },
+        { schluessel: 'lageentwicklung', text: '' },
+        { schluessel: 'fuehrungsprobleme', text: '' },
+        { schluessel: 'antraege_vorschlaege', text: '' },
+        { schluessel: 'zusammenfassung', text: '' },
+      ],
+    });
     await screen.findByRole('button', { name: /Freigeben/i });
     await userEvent.click(screen.getByRole('button', { name: /Freigeben/i }));
     expect(await screen.findByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
@@ -210,7 +286,9 @@ describe('LageberichtDetailPage', () => {
     expect(screen.queryByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeNull();
     // Der Umschalter ist eine Einstellung in eigener Zeile, keine Aktion in der Knopfreihe.
     await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
-    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+    ).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
     // "## Schwerpunkt" darf NICHT als sichtbarer Text (außerhalb der Textarea) erscheinen
@@ -226,12 +304,16 @@ describe('LageberichtDetailPage', () => {
     await userEvent.type(auftragFeld, '## Schwerpunkt');
     const abschnitt = auftragFeld.closest('.ant-collapse-item') as HTMLElement;
     await userEvent.click(within(abschnitt).getByRole('button', { name: /Vorschau/ }));
-    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+    ).toBeInTheDocument();
   });
 
   it('Abschnittsnavigation listet alle acht Abschnitte, markiert leere und hält EINEN offen (H62)', async () => {
     const acht: LageberichtAnzeige = {
-      ...lagebericht7Abschnitte, id: 15, vorlage: 'lagebeurteilung',
+      ...lagebericht7Abschnitte,
+      id: 15,
+      vorlage: 'lagebeurteilung',
       abschnitte: [
         { schluessel: 'auftrag', text: 'Hochwasser' },
         { schluessel: 'anlass', text: '' },
@@ -248,8 +330,12 @@ describe('LageberichtDetailPage', () => {
     const koepfe = await screen.findAllByRole('tab');
     expect(koepfe).toHaveLength(8);
     // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke.
-    expect(screen.getByRole('tab', { name: /^expanded Auftrag$|^collapsed Auftrag$/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: /^expanded Auftrag$|^collapsed Auftrag$/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
+    ).toBeInTheDocument();
     expect(koepfe.filter((k) => k.getAttribute('aria-expanded') === 'true')).toHaveLength(1);
     // Die Marke folgt dem Tippen: leeren Abschnitt befüllen → „(leer)" verschwindet.
     await userEvent.click(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }));
@@ -276,7 +362,9 @@ describe('LageberichtDetailPage', () => {
       ],
     });
     // Markdown-Überschrift (h2) muss als Heading gerendert sein, nicht als Rohtext "## Schwerpunkt"
-    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+    ).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen, nicht als Rohtext "- Punkt A"
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
     // Leerer Abschnitt zeigt den Fallback "—"
@@ -288,6 +376,45 @@ describe('LageberichtDetailPage', () => {
 });
 
 /**
+ * Detailseite mit nachschiebbarem Serverstand: der Handler liest aus einer Variablen.
+ *
+ * Auf MODULEBENE, weil drei Describe-Blöcke davon leben (Verlustschutz H63, Speicherfehler
+ * LFH-494, Einstiegsfokus LFH-495) — eine Kopie je Block wäre drei Fixtures für denselben
+ * Aufbau, und die erste Abweichung fiele niemandem auf.
+ */
+function setupLebend(start: LageberichtAnzeige) {
+  let stand = start;
+  const patches: Record<string, unknown>[] = [];
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(stand)),
+    http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, async ({ request }) => {
+      patches.push((await request.json()) as Record<string, unknown>);
+      return HttpResponse.json(stand);
+    }),
+  );
+  const r = renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route: `/einsaetze/7/lageberichte/${start.id}` },
+  );
+  return {
+    patches,
+    /** Fremde Änderung: neuer Serverstand + Invalidierung wie über den Live-Stream. */
+    fremdeAenderung: async (neu: LageberichtAnzeige) => {
+      stand = neu;
+      await act(async () => {
+        await r.client.invalidateQueries({ queryKey: einsatzKeys.lagebericht(7, start.id) });
+      });
+    },
+  };
+}
+
+/**
  * Verlustschutz am Lageberichtsentwurf (LFH-348 · C13, Befund H63).
  *
  * Der reale Fremdschreib-Pfad: dieser Bericht ändert sich serverseitig (zweiter Tab, anderes
@@ -297,45 +424,14 @@ describe('LageberichtDetailPage', () => {
  * Test hier einen geänderten Stand nach, nicht bloß eine Invalidierung.
  */
 describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)', () => {
-  /** Serverstand nachschiebbar: der Handler liest aus einer Variablen. */
-  function setupLebend(start: LageberichtAnzeige) {
-    let stand = start;
-    const patches: Record<string, unknown>[] = [];
-    server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(stand)),
-      http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, async ({ request }) => {
-        patches.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json(stand);
-      }),
-    );
-    const r = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
-        </Routes>
-      </AuthProvider>,
-      { route: `/einsaetze/7/lageberichte/${start.id}` },
-    );
-    return {
-      patches,
-      /** Fremde Änderung: neuer Serverstand + Invalidierung wie über den Live-Stream. */
-      fremdeAenderung: async (neu: LageberichtAnzeige) => {
-        stand = neu;
-        await act(async () => {
-          await r.client.invalidateQueries({ queryKey: einsatzKeys.lagebericht(7, start.id) });
-        });
-      },
-    };
-  }
-
   it('überschreibt getippten Text NICHT, wenn der Bericht serverseitig geändert wurde', async () => {
     const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
     const auftrag = await screen.findByLabelText('Auftrag');
     await userEvent.type(auftrag, 'Meine Fassung');
     await fremdeAenderung({
-      ...lagebericht7Abschnitte, titel: 'Fremde Fassung', aktualisiert_at: '2026-06-02 12:00:00',
+      ...lagebericht7Abschnitte,
+      titel: 'Fremde Fassung',
+      aktualisiert_at: '2026-06-02 12:00:00',
     });
     // ZUERST warten, bis der neue Stand nachweislich ANGEKOMMEN ist: die Überschrift kommt
     // aus der Query, nicht aus dem Formular — der unabhängige Zeuge. Ohne ihn bestünde die
@@ -348,8 +444,13 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
     const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
     await screen.findByLabelText('Auftrag');
     await fremdeAenderung({
-      ...lagebericht7Abschnitte, titel: 'Neu vom Server', aktualisiert_at: '2026-06-02 12:00:00',
-      abschnitte: [{ schluessel: 'auftrag', text: 'Fremder Text' }, ...lagebericht7Abschnitte.abschnitte.slice(1)],
+      ...lagebericht7Abschnitte,
+      titel: 'Neu vom Server',
+      aktualisiert_at: '2026-06-02 12:00:00',
+      abschnitte: [
+        { schluessel: 'auftrag', text: 'Fremder Text' },
+        ...lagebericht7Abschnitte.abschnitte.slice(1),
+      ],
     });
     await screen.findByRole('heading', { name: 'Neu vom Server' });
     expect(screen.getByLabelText('Auftrag')).toHaveValue('Fremder Text');
@@ -357,19 +458,30 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
 
   it('lädt beim Wechsel der Bericht-ID neu, auch wenn im alten Bericht etwas offen war', async () => {
     const zweiter: LageberichtAnzeige = {
-      ...lagebericht7Abschnitte, id: 13, titel: 'Zweiter Bericht',
-      abschnitte: [{ schluessel: 'auftrag', text: 'Text 13' }, ...lagebericht7Abschnitte.abschnitte.slice(1)],
+      ...lagebericht7Abschnitte,
+      id: 13,
+      titel: 'Zweiter Bericht',
+      abschnitte: [
+        { schluessel: 'auftrag', text: 'Text 13' },
+        ...lagebericht7Abschnitte.abschnitte.slice(1),
+      ],
     };
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(lagebericht7Abschnitte)),
       http.get('/api/einsaetze/7/lageberichte/13', () => HttpResponse.json(zweiter)),
-      http.patch('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(lagebericht7Abschnitte)),
+      http.patch('/api/einsaetze/7/lageberichte/12', () =>
+        HttpResponse.json(lagebericht7Abschnitte),
+      ),
     );
     function Weiter() {
       const navigate = useNavigate();
-      return <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>weiter</button>;
+      return (
+        <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>
+          weiter
+        </button>
+      );
     }
     renderMitProviders(
       <AuthProvider>
@@ -394,7 +506,9 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
     expect(patches).toHaveLength(0);
     await userEvent.tab();
     await waitFor(() => expect(patches).toHaveLength(1));
-    expect(patches[0].abschnitte).toEqual(expect.arrayContaining([{ schluessel: 'auftrag', text: 'x' }]));
+    expect(patches[0].abschnitte).toEqual(
+      expect.arrayContaining([{ schluessel: 'auftrag', text: 'x' }]),
+    );
     expect(await screen.findByText(/zuletzt gespeichert \d{2}:\d{2}/)).toBeInTheDocument();
   });
 
@@ -424,7 +538,259 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
   });
 });
 
+/**
+ * ── SPEICHERFEHLER IN DER SEITE (LFH-494, Nachzug C13/N2) ──────────────────────
+ *
+ * Fortschreibung von C10/H14 auf die Entwurfsseiten. Der Grund eines gescheiterten
+ * Autosave stand ausschliesslich in einem `message.error` und war nach rund drei Sekunden
+ * weg; sichtbar blieb „ungespeicherte Änderungen" — das WAS ohne das WARUM.
+ *
+ * Beide Aussagen gehören als Paar hierher, und die zweite ist die schärfere: ein Alert, der
+ * NIE geht, ist so falsch wie einer, der zu früh geht. `.ant-message`-Abgrenzung wie in den
+ * C10-Tests — antds Toast rendert INNERHALB des RTL-Containers, ein blosses `findByText`
+ * bliebe mit zurückgedrehtem Umbau grün.
+ *
+ * Ausgelöst wird über `onBlur`, nicht über die 30-s-Frist: die Frist steht im Hook-Test
+ * (`entwurf/useEntwurfVerlustschutz.test.tsx`), und Fake-Timer vertragen sich nicht mit
+ * `userEvent.type`.
+ */
+/**
+ * ── EINSTIEGSFOKUS (LFH-495, Nachzug C13/N3) ───────────────────────────────────
+ *
+ * Beide Entwurfsseiten hatten keinen; die Bedienentscheidung ist der ERSTE LEERE Abschnitt
+ * (Begründung in `entwurf/Einstiegsfokus.tsx`). Die Mechanik des Fokussierens steht in
+ * `entwurf/Einstiegsfokus.test.tsx`; hier steht, was die SEITE daraus macht — der offene
+ * Abschnitt des Akkordeons folgt derselben Wahl, sonst stünde der Cursor in einem
+ * zugeklappten Editor.
+ */
+describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
+  /** Die ersten zwei Abschnitte befüllt: der Einstieg ist damit der DRITTE. */
+  const teilweiseBefuellt: LageberichtAnzeige = {
+    ...lagebericht7Abschnitte,
+    abschnitte: lagebericht7Abschnitte.abschnitte.map((a, i) => ({
+      ...a,
+      text: i < 2 ? `Stand ${i}` : '',
+    })),
+  };
+
+  const offeneKopfzeile = () =>
+    screen.getAllByRole('tab').filter((b) => b.getAttribute('aria-expanded') === 'true');
+
+  it('klappt den ersten LEEREN Abschnitt auf und setzt den Fokus hinein', async () => {
+    setupLebend(teilweiseBefuellt);
+    // Der fortgeschriebene Bericht trägt „Auftrag" und „Gefahren-/Schadenlage" schon —
+    // weitergearbeitet wird an „Eigene Lage".
+    await waitFor(() => expect(offeneKopfzeile()).toHaveLength(1));
+    expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage (leer)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Eigene Lage')).toHaveFocus();
+  });
+
+  it('nimmt am LEEREN Bericht den ersten Abschnitt (Gegenaussage)', async () => {
+    // Ohne diese Hälfte wäre „öffnet immer den dritten" vom richtigen nicht zu unterscheiden.
+    setupLebend(lagebericht7Abschnitte);
+    await waitFor(() => expect(offeneKopfzeile()).toHaveLength(1));
+    expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Auftrag')).toHaveFocus();
+  });
+
+  it('lässt den offenen Abschnitt beim Befüllen NICHT weiterwandern', async () => {
+    // Die scharfe Aussage: der Einstieg wird EINMAL je Bericht bestimmt. Wäre er eine
+    // lebende Ableitung, klappte das Akkordeon beim ersten Autosave auf „Lageentwicklung"
+    // weiter — unter dem Cursor der Person, die gerade schreibt.
+    const { fremdeAenderung, patches } = setupLebend(teilweiseBefuellt);
+    const feld = await screen.findByLabelText('Eigene Lage');
+    await userEvent.type(feld, 'jetzt befüllt');
+    await userEvent.tab();
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await fremdeAenderung({
+      ...teilweiseBefuellt,
+      abschnitte: teilweiseBefuellt.abschnitte.map((a) =>
+        a.schluessel === 'eigene_lage' ? { ...a, text: 'jetzt befüllt' } : a,
+      ),
+    });
+    expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage')).toBeInTheDocument();
+  });
+
+  it('setzt offenen Abschnitt und Vorschau-Schalter beim Wechsel auf einen anderen Bericht zurück', async () => {
+    // Die dritte Hook-Zusicherung aus dem Ticket: `key={lbId}` ist der Reset. Beide
+    // Zustände gehören zu EINEM Bericht — ein mitgeschleppter offener Abschnitt zeigte am
+    // nächsten Bericht einen Abschnitt, den niemand gewählt hat.
+    const zweiter: LageberichtAnzeige = {
+      ...lagebericht7Abschnitte,
+      id: 13,
+      titel: 'Zweiter Bericht',
+    };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/lageberichte/12', () => HttpResponse.json(teilweiseBefuellt)),
+      http.get('/api/einsaetze/7/lageberichte/13', () => HttpResponse.json(zweiter)),
+    );
+    function Weiter() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/einsaetze/7/lageberichte/13')}>
+          weiter
+        </button>
+      );
+    }
+    renderMitProviders(
+      <AuthProvider>
+        <Weiter />
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/lageberichte/12' },
+    );
+    // Von Hand einen ANDEREN Abschnitt wählen und die Vorschau einschalten.
+    await userEvent.click(await screen.findByText('Zusammenfassung (leer)'));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
+    await waitFor(() =>
+      expect(within(offeneKopfzeile()[0]).getByText('Zusammenfassung (leer)')).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).toBeChecked();
+
+    await userEvent.click(screen.getByRole('button', { name: 'weiter' }));
+    await screen.findByRole('heading', { name: 'Zweiter Bericht' });
+    // Der zweite Bericht ist ganz leer → Einstieg ist „Auftrag", nicht die alte Wahl.
+    await waitFor(() =>
+      expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
+  });
+});
+
+describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
+  function setupMitPatch(start: LageberichtAnzeige) {
+    const zustand = { scheitert: true };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get(`/api/einsaetze/7/lageberichte/${start.id}`, () => HttpResponse.json(start)),
+      http.patch(`/api/einsaetze/7/lageberichte/${start.id}`, () =>
+        zustand.scheitert
+          ? HttpResponse.json({ error: 'Zeitstand liegt in der Zukunft' }, { status: 422 })
+          : HttpResponse.json(start),
+      ),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: `/einsaetze/7/lageberichte/${start.id}` },
+    );
+    return zustand;
+  }
+
+  it('lässt den Grund eines gescheiterten Autosave in der Seite stehen, nicht nur im Toast', async () => {
+    setupMitPatch(lagebericht7Abschnitte);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, 'x');
+    await userEvent.tab();
+
+    const treffer = await screen.findByText('Zeitstand liegt in der Zukunft');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(screen.getByText('Nicht gespeichert')).toBeInTheDocument();
+    // Der Merker bleibt — der Grund ergänzt ihn, er ersetzt ihn nicht.
+    expect(screen.getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+  });
+
+  it('räumt den Grund beim nächsten gelungenen Speichern (Gegenaussage)', async () => {
+    const zustand = setupMitPatch(lagebericht7Abschnitte);
+    const titel = await screen.findByLabelText('Titel');
+    await userEvent.type(titel, 'x');
+    await userEvent.tab();
+    expect(await screen.findByText('Zeitstand liegt in der Zukunft')).toBeInTheDocument();
+
+    zustand.scheitert = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Zeitstand liegt in der Zukunft')).not.toBeInTheDocument(),
+    );
+  });
+});
+
 describe('LageberichtePage', () => {
+  it('zeigt den Grund eines gescheiterten Anlegens im Dialog, nicht nur im Toast (LFH-494)', async () => {
+    // Die Erfassungs-Hülle lässt die Werte bei Ablehnung stehen (B4/LFH-332) — bis dahin
+    // aber ohne Grund: der Dialog sah nach dem Verschwinden des Toasts unverändert aus.
+    // Dieser Pfad läuft weiter über `mutation.error` und räumt beim nächsten Absenden;
+    // anders als beim Autosave drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
+      ),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    const treffer = await screen.findByText('Titel bereits vergeben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    // Der Dialog steht weiter offen und hat die Werte behalten.
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
+    expect((screen.getByLabelText('Titel') as HTMLInputElement).value).toMatch(
+      /^Lageüberblick \d{4}$/,
+    );
+  });
+
+  it('ersetzt den Grund beim nächsten Absenden, statt ihn zu stapeln (Gegenaussage)', async () => {
+    /*
+     * Die zutreffende Hälfte des AK für DIESEN Pfad: hier räumt react-query beim Übergang
+     * nach `pending`, weil ein Mensch den Knopf drückt. Der Autosave der Entwurfsseiten
+     * räumt dagegen erst bei Erfolg — dort wiederholt eine Frist von selbst.
+     *
+     * Gemessen wird mit einem ZWEITEN Fehlschlag und anderem Wortlaut, nicht mit einem
+     * Erfolg: antds Modal räumt sein DOM erst nach der Schliess-Transition (`afterClose`),
+     * und die läuft in jsdom nie — der alte Knoten stünde nach dem Schliessen weiterhin im
+     * Dokument, und die Abwesenheits-Zusicherung wäre unfälschbar rot. Mit offenem Dialog
+     * misst der Fall genau das, was er behauptet: der Grund wird ERSETZT.
+     */
+    let zweiter = false;
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json(
+          { error: zweiter ? 'Vorlage unbekannt' : 'Titel bereits vergeben' },
+          { status: 409 },
+        ),
+      ),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Titel bereits vergeben')).toBeInTheDocument();
+
+    zweiter = true;
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Vorlage unbekannt')).toBeInTheDocument();
+    expect(screen.queryByText('Titel bereits vergeben')).not.toBeInTheDocument();
+  });
+
+  it('trägt beim erneuten Öffnen keinen Grund aus dem vorigen Versuch', async () => {
+    // Derselbe Store-überlebt-das-Schliessen-Fall wie beim Titelvorschlag: ohne `reset()`
+    // stünde der Fehler des letzten Anlegeversuchs über einem frischen, leeren Formular.
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
+      ),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Titel bereits vergeben')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: /Neuer Bericht/i }));
+    await screen.findByLabelText('Titel');
+    expect(screen.queryByText('Titel bereits vergeben')).not.toBeInTheDocument();
+  });
+
   it('zeigt die Berichte des Einsatzes', async () => {
     setup();
     expect(await screen.findByText('Lage 10:00')).toBeInTheDocument();
@@ -458,7 +824,10 @@ describe('LageberichtePage', () => {
     expect(links.map((l) => l.getAttribute('href'))).toEqual(['/einsaetze/7/lageberichte/13']);
     // Kein zweiter Anker im Titel-Link: der Link entsteht in `karte.titel.ziel`.
     links.forEach((l) => expect(l.querySelector('a')).toBeNull());
-    expect(screen.getByRole('link', { name: 'v1' })).toHaveAttribute('href', '/einsaetze/7/lageberichte/11');
+    expect(screen.getByRole('link', { name: 'v1' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/lageberichte/11',
+    );
     expect(sicht).toHaveTextContent('v2');
     expect(sicht).toHaveTextContent(/Vorgänger:\s*v1/);
     // Die Vorlage steht je KETTE einmal, nicht je Fassung.
@@ -473,7 +842,9 @@ describe('LageberichtePage', () => {
 
     // Gruppenachse führend; der freigegebene Kopf 14 steht in seiner Gruppe.
     expect(
-      within(sicht).getAllByRole('link').map((l) => l.getAttribute('href')),
+      within(sicht)
+        .getAllByRole('link')
+        .map((l) => l.getAttribute('href')),
     ).toEqual([
       '/einsaetze/7/lageberichte/13',
       '/einsaetze/7/lageberichte/11',
@@ -509,7 +880,9 @@ describe('LageberichtePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     await userEvent.click(screen.getByRole('button', { name: /Neuer Bericht/i }));
     const zweites = await screen.findByLabelText('Titel');
-    await waitFor(() => expect((zweites as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/));
+    await waitFor(() =>
+      expect((zweites as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/),
+    );
   });
 
   it('schickt Vorlage und Titel; ein leerer Zeitstand wird nicht mitgeschickt', async () => {
@@ -556,7 +929,9 @@ describe('LageberichtePage', () => {
 
   it('trägt Überschrift und Kennzahlenzeile', async () => {
     setup(KETTE);
-    expect(await screen.findByRole('heading', { name: 'Lageberichte', level: 3 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Lageberichte', level: 3 }),
+    ).toBeInTheDocument();
     expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
   });
 });
@@ -590,7 +965,9 @@ function setupMitZone(berichte: LageberichtAnzeige[]) {
   // Query-Key-Registry). Hier hinge die Zone dann still wieder am MSW-Refetch.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(einsatzKeys.einstellungen(7), {
-    einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+    einsatz_id: 7,
+    zeitzone: 'Europe/Berlin',
+    org_defaults: { org_id: 1 },
   });
   return renderMitProviders(
     <AuthProvider>

@@ -1,17 +1,60 @@
-import { App, Button, Card, Dropdown, Form, Input, InputNumber, Space, Tabs, Tag, Tooltip, Typography, theme } from 'antd';
+import {
+  App,
+  Button,
+  Card,
+  Dropdown,
+  Form,
+  Input,
+  InputNumber,
+  Space,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+  theme,
+} from 'antd';
 import { Select } from '../../components/Select';
 import {
-  CarOutlined, CheckCircleOutlined, DeleteOutlined, LockOutlined, LogoutOutlined,
-  RollbackOutlined, SyncOutlined, ToolOutlined, UserAddOutlined,
+  CarOutlined,
+  CheckCircleOutlined,
+  DeleteOutlined,
+  LockOutlined,
+  LogoutOutlined,
+  RollbackOutlined,
+  SyncOutlined,
+  ToolOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
-import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  PointerSensor,
+} from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import {
-  aenderePersonBelegung, aktualisierePlatz, legePlaetzeAn, setzePlatzVerfuegbarkeit, stornierePlatz,
+  aenderePersonBelegung,
+  aktualisierePlatz,
+  legePlaetzeAn,
+  setzePlatzVerfuegbarkeit,
+  stornierePlatz,
 } from '../../api/einsatzUhs';
 import { erfasseVerbleib, listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
-import type { Person, PlatzTyp, UhsDetail, UhsPlatz, VerbleibArt, Verfuegbarkeit } from '../../api/types';
+import type {
+  Person,
+  PlatzTyp,
+  UhsDetail,
+  UhsPlatz,
+  VerbleibArt,
+  Verfuegbarkeit,
+} from '../../api/types';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
@@ -32,8 +75,7 @@ const PLATZ_KARTE_RAND = 2;
 const PLATZ_KARTE_POLSTER = 6;
 
 /** Innenbreite der Aktionszeile: 140 − 2×2 Rand − 2×6 Polsterung = 124 px. */
-const AKTIONSZEILE_BREITE =
-  PLATZ_KARTE_BREITE - 2 * PLATZ_KARTE_RAND - 2 * PLATZ_KARTE_POLSTER;
+const AKTIONSZEILE_BREITE = PLATZ_KARTE_BREITE - 2 * PLATZ_KARTE_RAND - 2 * PLATZ_KARTE_POLSTER;
 
 /** Voll ausgebaute Zeile: Transport, zurückweisen, „als frei", Platzaktionen. */
 const AKTIONEN_MAX = 4;
@@ -129,17 +171,44 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
   // absolut positionierte, belegte Karte unabhängig von der Namenslänge eine stabile
   // Höhe behält und nicht in die darunterliegende Karte hineinwächst (Layout-Bruch).
   const style: React.CSSProperties = kompakt
-    ? { margin: 2, maxWidth: 124, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+    ? {
+        margin: 2,
+        maxWidth: 124,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }
     : { margin: 2 };
-  return <Tag color="default" style={style} data-testid={testId} title={kompakt ? personLabel(person) : undefined}>{personLabel(person)}</Tag>;
+  return (
+    <Tag
+      color="default"
+      style={style}
+      data-testid={testId}
+      title={kompakt ? personLabel(person) : undefined}
+    >
+      {personLabel(person)}
+    </Tag>
+  );
 }
 
-function PersonenkarteDrag({ person, disabled, kompakt, onOeffnen }: { person: Person; disabled: boolean; kompakt?: boolean; onOeffnen?: (personId: number) => void }) {
+function PersonenkarteDrag({
+  person,
+  disabled,
+  kompakt,
+  onOeffnen,
+}: {
+  person: Person;
+  disabled: boolean;
+  kompakt?: boolean;
+  onOeffnen?: (personId: number) => void;
+}) {
   // Kein Inline-`transform`: die gezogene Karte rendert als DragOverlay (Portal, s. u.).
   // Würde der Originalknoten hier transformiert, vergrößerte er die scroll-bare Region
   // seiner overflow:auto-Spalte → wachsende Scrollbar (Regression LFH-58-Folgebug).
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `person-${person.id}`, data: { kind: 'person', personId: person.id }, disabled,
+    id: `person-${person.id}`,
+    data: { kind: 'person', personId: person.id },
+    disabled,
   });
   // Klick (ohne 5px-Bewegung → kein Drag, s. PointerSensor) öffnet den Detail-Drawer.
   // `onClick` koexistiert mit den Drag-Listenern: ein echter Drag unterdrückt den nativen
@@ -187,17 +256,41 @@ interface PlatzKarteProps {
   onZurueckInWartebereich?: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen, onZuweisen, onZurueckInWartebereich }: PlatzKarteProps) {
+function PlatzKarte({
+  platz,
+  belegtVon,
+  schreibgeschuetzt,
+  belegungLaeuft,
+  bearbeitbar,
+  onVerfuegbarkeit,
+  onAustritt,
+  onTransport,
+  onStorno,
+  onOeffnen,
+  onZuweisen,
+  onZurueckInWartebereich,
+}: PlatzKarteProps) {
   // Platz-Karte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus —
   // Drag-Source (Layout verschieben). Mit @dnd-kit beides am selben Knoten.
-  const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
-    id: `platz-${platz.id}`, data: { kind: 'platz', platzId: platz.id }, disabled: !bearbeitbar,
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    transform,
+  } = useDraggable({
+    id: `platz-${platz.id}`,
+    data: { kind: 'platz', platzId: platz.id },
+    disabled: !bearbeitbar,
   });
   const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `drop-platz-${platz.id}`, data: { kind: 'platz', platzId: platz.id, uhsId: platz.uhs_id },
+    id: `drop-platz-${platz.id}`,
+    data: { kind: 'platz', platzId: platz.id, uhsId: platz.uhs_id },
   });
   const { token } = theme.useToken();
-  const setRef = (n: HTMLDivElement | null) => { setDragRef(n); setDropRef(n); };
+  const setRef = (n: HTMLDivElement | null) => {
+    setDragRef(n);
+    setDropRef(n);
+  };
   // Klick-Ersatzweg für den Drag (LFH-367/B5g): die ganze Karte nimmt einen Patienten an
   // — 140 × 116 px statt einer Geste, die auf dem Führungs-Tablet nicht verlässlich
   // ausführbar war. Bedingungen, jede aus einem eigenen Grund:
@@ -241,7 +334,11 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearb
     // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
     // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
     // Theme-Tokens statt fixer Hex-Werte, damit die Karten im Dark Mode mitziehen.
-    background: isOver ? token.colorPrimaryBg : belegtVon ? token.colorInfoBg : token.colorBgContainer,
+    background: isOver
+      ? token.colorPrimaryBg
+      : belegtVon
+        ? token.colorInfoBg
+        : token.colorBgContainer,
     padding: PLATZ_KARTE_POLSTER,
     borderRadius: 4,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
@@ -261,7 +358,17 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearb
   // Aktionszeile ist an SCHRITT_Y gedeckelt (Rechnung im Dateikopf).
   const menu = {
     items: [
-      ...(zuweisbar ? [{ key: 'zuweisen', label: 'Patient zuweisen', icon: <UserAddOutlined />, disabled: zuweisenGesperrt }, { type: 'divider' as const }] : []),
+      ...(zuweisbar
+        ? [
+            {
+              key: 'zuweisen',
+              label: 'Patient zuweisen',
+              icon: <UserAddOutlined />,
+              disabled: zuweisenGesperrt,
+            },
+            { type: 'divider' as const },
+          ]
+        : []),
       // Rückweg in den Wartebereich (LFH-341 · H40): der Drag auf `drop-inbox` ist unter
       // `lg` strukturell weg — das Droppable liegt in einem anderen Reiter, und die Tabs
       // tragen `destroyOnHidden` (Begründung am Reiter-Zweig unten; ohne die Prop bliebe
@@ -273,10 +380,22 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearb
       // ist im Menü-Item nicht vorgesehen; die Tests greifen deshalb per TEILSTRING, nie
       // per exaktem Namen — dieselbe Regel wie bei der Aktionsbündelung.
       ...(onZurueckInWartebereich
-        ? [{ key: 'wartebereich', label: 'Zurück in den Wartebereich', icon: <RollbackOutlined />, disabled: zuweisenGesperrt }]
+        ? [
+            {
+              key: 'wartebereich',
+              label: 'Zurück in den Wartebereich',
+              icon: <RollbackOutlined />,
+              disabled: zuweisenGesperrt,
+            },
+          ]
         : []),
       ...verfItems,
-      ...(bearbeitbar ? [{ type: 'divider' as const }, { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }] : []),
+      ...(bearbeitbar
+        ? [
+            { type: 'divider' as const },
+            { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true },
+          ]
+        : []),
     ],
     autoFocus: true,
     // Das Dropdown rendert im Portal, sein Klick steigt aber im KOMPONENTEN-Baum auf und
@@ -314,8 +433,13 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearb
         strong
         title={platz.bezeichnung}
         style={{
-          display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
-          overflow: 'hidden', lineHeight: '15px', fontSize: 13, maxHeight: 30,
+          display: '-webkit-box',
+          WebkitBoxOrient: 'vertical',
+          WebkitLineClamp: 2,
+          overflow: 'hidden',
+          lineHeight: '15px',
+          fontSize: 13,
+          maxHeight: 30,
         }}
       >
         {platz.bezeichnung}
@@ -334,7 +458,14 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearb
           mehr: Quelle (Platz) und Ziel (`drop-inbox`) liegen dann in verschiedenen
           Reitern, das Droppable ist nicht im Baum. */}
       <div style={{ height: 24, overflow: 'hidden' }}>
-        {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || belegungLaeuft || bearbeitbar} kompakt onOeffnen={onOeffnen} />}
+        {belegtVon && (
+          <PersonenkarteDrag
+            person={belegtVon}
+            disabled={schreibgeschuetzt || belegungLaeuft || bearbeitbar}
+            kompakt
+            onOeffnen={onOeffnen}
+          />
+        )}
       </div>
       {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons (kein Menü); feste Höhe.
           DER `click`-RIEGEL DER KARTE SITZT HIER — einmal am Container statt an jedem
@@ -398,7 +529,14 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearb
             {/* Zeilenkennung im Namen (LFH-378-Folgeauflösung): n Plätze lieferten mit
                 bloßem „Platzaktionen" n gleichnamige Knöpfe — CLAUDE.md verlangt den
                 Bezug auf den Datensatz, für Neues UND ohnehin Angefasstes. */}
-            <Button size="small" type="text" aria-label={`Platzaktionen zu ${platz.bezeichnung}`} onPointerDown={(e) => e.stopPropagation()}>…</Button>
+            <Button
+              size="small"
+              type="text"
+              aria-label={`Platzaktionen zu ${platz.bezeichnung}`}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              …
+            </Button>
           </Dropdown>
         )}
       </div>
@@ -408,7 +546,14 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, belegungLaeuft, bearb
 
 /** Schmale Personen-Liste als Spalten-Karte (links: Eingang/Wartebereich). */
 function PersonenSpalte({
-  titel, personen, schreibgeschuetzt, belegungLaeuft, droppableId, leerText, onOeffnen, onVerbleib,
+  titel,
+  personen,
+  schreibgeschuetzt,
+  belegungLaeuft,
+  droppableId,
+  leerText,
+  onOeffnen,
+  onVerbleib,
 }: {
   titel: string;
   personen: Person[];
@@ -440,7 +585,11 @@ function PersonenSpalte({
   onVerbleib?: (person: Person) => void;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
-  const drop = useDroppable({ id: droppableId ?? `nodrop-${titel}`, data: { kind: 'inbox' }, disabled: !droppableId });
+  const drop = useDroppable({
+    id: droppableId ?? `nodrop-${titel}`,
+    data: { kind: 'inbox' },
+    disabled: !droppableId,
+  });
   const { token } = theme.useToken();
   return (
     <Card
@@ -452,7 +601,11 @@ function PersonenSpalte({
       <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
         {personen.map((p) => (
           <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <PersonenkarteDrag person={p} disabled={schreibgeschuetzt || belegungLaeuft} onOeffnen={onOeffnen} />
+            <PersonenkarteDrag
+              person={p}
+              disabled={schreibgeschuetzt || belegungLaeuft}
+              onOeffnen={onOeffnen}
+            />
             {onVerbleib && (
               <Tooltip title="Verbleib / Entlassung erfassen">
                 {/* GESCHWISTERKNOTEN der Drag-Karte, nicht ihr Kind: so hängt der Auslöser
@@ -471,7 +624,11 @@ function PersonenSpalte({
                 <Button
                   type="text"
                   aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
-                  icon={<span aria-hidden="true"><CarOutlined /></span>}
+                  icon={
+                    <span aria-hidden="true">
+                      <CarOutlined />
+                    </span>
+                  }
                   onClick={() => onVerbleib(p)}
                 />
               </Tooltip>
@@ -486,7 +643,17 @@ function PersonenSpalte({
 
 /** Rechte Spalte: aus DIESER UHS heraus auf Transport gebrachte Personen.
  *  Drop-Target: eine belegte Person hierher ziehen öffnet den Transport-Abschluss-Screen. */
-function TransportSpalte({ personen, schreibgeschuetzt, belegungLaeuft, onOeffnen }: { personen: Person[]; schreibgeschuetzt: boolean; belegungLaeuft: boolean; onOeffnen: (personId: number) => void }) {
+function TransportSpalte({
+  personen,
+  schreibgeschuetzt,
+  belegungLaeuft,
+  onOeffnen,
+}: {
+  personen: Person[];
+  schreibgeschuetzt: boolean;
+  belegungLaeuft: boolean;
+  onOeffnen: (personId: number) => void;
+}) {
   // Das Drop-Target ruht während einer laufenden Belegung. NICHT, weil es dieselbe Mutation
   // anstieße — `kind: 'transport'` führt in `onDragEnd` auf `setTransportPerson`, also auf
   // `erfasseVerbleib` und einen anderen Endpunkt. Sondern weil es derselbe GESTENWEG ist:
@@ -494,7 +661,11 @@ function TransportSpalte({ personen, schreibgeschuetzt, belegungLaeuft, onOeffne
   // aufnahmebereites Ziel ohne mögliche Quelle wäre eine Einladung ins Leere.
   // Bedienelemente hängt `belegungLaeuft` NICHT ab (LFH-457).
   const gesperrt = schreibgeschuetzt || belegungLaeuft;
-  const drop = useDroppable({ id: 'drop-transport', data: { kind: 'transport' }, disabled: gesperrt });
+  const drop = useDroppable({
+    id: 'drop-transport',
+    data: { kind: 'transport' },
+    disabled: gesperrt,
+  });
   const { token } = theme.useToken();
   return (
     <Card
@@ -504,15 +675,25 @@ function TransportSpalte({ personen, schreibgeschuetzt, belegungLaeuft, onOeffne
       style={{ background: !gesperrt && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
       <div ref={gesperrt ? undefined : drop.setNodeRef} style={{ minHeight: 48 }}>
-      {personen.map((p) => (
-        <div key={p.id} style={{ marginBottom: 6 }}>
-          <Tag color="orange" style={{ margin: 0, cursor: 'pointer' }} onClick={() => onOeffnen(p.id)}>{personLabel(p)}</Tag>
-          {p.aktueller_verbleib && (
-            <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>{p.aktueller_verbleib}</Typography.Text></div>
-          )}
-        </div>
-      ))}
-      {personen.length === 0 && <Typography.Text type="secondary">keine</Typography.Text>}
+        {personen.map((p) => (
+          <div key={p.id} style={{ marginBottom: 6 }}>
+            <Tag
+              color="orange"
+              style={{ margin: 0, cursor: 'pointer' }}
+              onClick={() => onOeffnen(p.id)}
+            >
+              {personLabel(p)}
+            </Tag>
+            {p.aktueller_verbleib && (
+              <div>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {p.aktueller_verbleib}
+                </Typography.Text>
+              </div>
+            )}
+          </div>
+        ))}
+        {personen.length === 0 && <Typography.Text type="secondary">keine</Typography.Text>}
       </div>
     </Card>
   );
@@ -525,14 +706,23 @@ type VerbleibWerte = { art: VerbleibArt; ziel?: string; transportmittel?: string
 type ZuweisenWerte = { personId: number };
 
 export default function Grundriss({
-  einsatzId, uhs, schreibgeschuetzt,
-}: { einsatzId: number; uhs: UhsDetail; schreibgeschuetzt: boolean }) {
+  einsatzId,
+  uhs,
+  schreibgeschuetzt,
+}: {
+  einsatzId: number;
+  uhs: UhsDetail;
+  schreibgeschuetzt: boolean;
+}) {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = theme.useToken();
   // Sensors: PointerSensor mit 5px-Aktivierungsdistanz (sonst klickt jeder Click den Drag aus),
   // KeyboardSensor für Tests/Accessibility.
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
   // Breakpoint-Weiche (LFH-341 · H40): ab `lg` wie bisher nebeneinander, darunter drei
   // Reiter. Details am Rahmen-`div` im JSX unten.
   const { abBreite } = useViewport();
@@ -609,7 +799,8 @@ export default function Grundriss({
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) }),
     ]);
   }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const layoutMut = useMutation({
     mutationFn: ({ pid, pos_x, pos_y }: { pid: number; pos_x: number; pos_y: number }) =>
@@ -617,20 +808,32 @@ export default function Grundriss({
     onMutate: async (v) => {
       const queryKey = einsatzKeys.uhsDetail(einsatzId, uhs.id);
       await qc.cancelQueries({ queryKey });
-      const vorher = qc.getQueryData<UhsDetail>(queryKey)?.plaetze.find((platz) => platz.id === v.pid);
-      qc.setQueryData<UhsDetail>(queryKey, (alt) => alt ? {
-        ...alt,
-        plaetze: alt.plaetze.map((platz) => platz.id === v.pid
-          ? { ...platz, pos_x: v.pos_x, pos_y: v.pos_y }
-          : platz),
-      } : alt);
+      const vorher = qc
+        .getQueryData<UhsDetail>(queryKey)
+        ?.plaetze.find((platz) => platz.id === v.pid);
+      qc.setQueryData<UhsDetail>(queryKey, (alt) =>
+        alt
+          ? {
+              ...alt,
+              plaetze: alt.plaetze.map((platz) =>
+                platz.id === v.pid ? { ...platz, pos_x: v.pos_x, pos_y: v.pos_y } : platz,
+              ),
+            }
+          : alt,
+      );
       return { vorher };
     },
     onSuccess: (serverStand) => {
-      qc.setQueryData<UhsDetail>(einsatzKeys.uhsDetail(einsatzId, uhs.id), (alt) => alt ? {
-        ...alt,
-        plaetze: alt.plaetze.map((platz) => platz.id === serverStand.id ? serverStand : platz),
-      } : alt);
+      qc.setQueryData<UhsDetail>(einsatzKeys.uhsDetail(einsatzId, uhs.id), (alt) =>
+        alt
+          ? {
+              ...alt,
+              plaetze: alt.plaetze.map((platz) =>
+                platz.id === serverStand.id ? serverStand : platz,
+              ),
+            }
+          : alt,
+      );
     },
     onError: (e, variablen, kontext) => {
       const vorher = kontext?.vorher;
@@ -640,13 +843,15 @@ export default function Grundriss({
           const aktuell = alt.plaetze.find((platz) => platz.id === variablen.pid);
           // Ein inzwischen neuerer Stand derselben Karte darf nicht vom alten Fehler
           // zurueckgerollt werden. Andere Plaetze werden grundsaetzlich nie angefasst.
-          if (!aktuell || aktuell.pos_x !== variablen.pos_x || aktuell.pos_y !== variablen.pos_y) return alt;
+          if (!aktuell || aktuell.pos_x !== variablen.pos_x || aktuell.pos_y !== variablen.pos_y)
+            return alt;
           return {
             ...alt,
             plaetze: alt.plaetze.map((platz) =>
               platz.id === variablen.pid
                 ? { ...platz, pos_x: vorher.pos_x, pos_y: vorher.pos_y }
-                : platz),
+                : platz,
+            ),
           };
         });
       }
@@ -663,65 +868,102 @@ export default function Grundriss({
     onMutate: async (v) => {
       const queryKey = einsatzKeys.personen(einsatzId);
       await qc.cancelQueries({ queryKey });
-      const vorher = qc.getQueryData<Person[]>(queryKey)?.find((person) => person.id === v.personId);
-      qc.setQueryData<Person[]>(queryKey, (alt) => alt?.map((person) => person.id === v.personId
-        ? { ...person, aktuelle_uhs_id: uhs.id, aktueller_platz_id: v.platzId }
-        : person));
+      const vorher = qc
+        .getQueryData<Person[]>(queryKey)
+        ?.find((person) => person.id === v.personId);
+      qc.setQueryData<Person[]>(queryKey, (alt) =>
+        alt?.map((person) =>
+          person.id === v.personId
+            ? { ...person, aktuelle_uhs_id: uhs.id, aktueller_platz_id: v.platzId }
+            : person,
+        ),
+      );
       return { vorher };
     },
     onSuccess: (serverStand) => {
-      qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) => alt?.map((person) =>
-        person.id === serverStand.person_id
-          ? { ...person, aktuelle_uhs_id: serverStand.uhs_id, aktueller_platz_id: serverStand.platz_id }
-          : person));
+      qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) =>
+        alt?.map((person) =>
+          person.id === serverStand.person_id
+            ? {
+                ...person,
+                aktuelle_uhs_id: serverStand.uhs_id,
+                aktueller_platz_id: serverStand.platz_id,
+              }
+            : person,
+        ),
+      );
     },
     onError: (e, variablen, kontext) => {
       const vorher = kontext?.vorher;
       if (vorher) {
-        qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) => alt?.map((person) => {
-          if (person.id !== variablen.personId) return person;
-          // Nur den eigenen optimistischen Stand rueckgaengig machen. Hat ein neuerer
-          // Server-/Live-Stand die Person bereits weiterbewegt, bleibt dieser erhalten.
-          if (person.aktuelle_uhs_id !== uhs.id || person.aktueller_platz_id !== variablen.platzId) {
-            return person;
-          }
-          return {
-            ...person,
-            aktuelle_uhs_id: vorher.aktuelle_uhs_id,
-            aktueller_platz_id: vorher.aktueller_platz_id,
-          };
-        }));
+        qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) =>
+          alt?.map((person) => {
+            if (person.id !== variablen.personId) return person;
+            // Nur den eigenen optimistischen Stand rueckgaengig machen. Hat ein neuerer
+            // Server-/Live-Stand die Person bereits weiterbewegt, bleibt dieser erhalten.
+            if (
+              person.aktuelle_uhs_id !== uhs.id ||
+              person.aktueller_platz_id !== variablen.platzId
+            ) {
+              return person;
+            }
+            return {
+              ...person,
+              aktuelle_uhs_id: vorher.aktuelle_uhs_id,
+              aktueller_platz_id: vorher.aktueller_platz_id,
+            };
+          }),
+        );
       }
       fehler(e);
     },
     onSettled: invalidate,
   });
   const austrittMut = useMutation({
-    mutationFn: (personId: number) => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
-    onSuccess: () => invalidate(), onError: fehler,
+    mutationFn: (personId: number) =>
+      aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
+    onSuccess: () => invalidate(),
+    onError: fehler,
   });
   // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben — wie in der
   // Patienten-Ansicht). Der Server trägt die Person dabei aus der UHS aus (Auto-Austritt);
   // bei Transport wandert sie rechts in „Auf Transport gebracht". status=abtransportiert
   // nur bei Transport (sonst null) — gleiche Semantik wie PersonenPage.
   const transportMut = useMutation({
-    mutationFn: ({ personId, art, ziel, transportmittel, notiz }: VerbleibWerte & { personId: number }) =>
+    mutationFn: ({
+      personId,
+      art,
+      ziel,
+      transportmittel,
+      notiz,
+    }: VerbleibWerte & { personId: number }) =>
       erfasseVerbleib(einsatzId, personId, {
-        art, ziel: ziel ?? null, transportmittel: transportmittel ?? null,
-        status: art === 'transport' ? 'abtransportiert' : null, notiz: notiz ?? null,
+        art,
+        ziel: ziel ?? null,
+        transportmittel: transportmittel ?? null,
+        status: art === 'transport' ? 'abtransportiert' : null,
+        notiz: notiz ?? null,
       }),
     // Schliessen und Leeren macht die Erfassungshülle (onFertig bzw. ihr eigener Reset).
-    onSuccess: () => { message.success('Verbleib erfasst'); invalidate(); },
+    onSuccess: () => {
+      message.success('Verbleib erfasst');
+      invalidate();
+    },
     onError: fehler,
   });
   const verfMut = useMutation({
     mutationFn: ({ platzId, verf }: { platzId: number; verf: Verfuegbarkeit }) =>
       setzePlatzVerfuegbarkeit(einsatzId, uhs.id, platzId, verf, null),
-    onSuccess: () => invalidate(), onError: fehler,
+    onSuccess: () => invalidate(),
+    onError: fehler,
   });
   const stornoMut = useMutation({
     mutationFn: (platzId: number) => stornierePlatz(einsatzId, uhs.id, platzId),
-    onSuccess: () => { message.success('Platz gelöscht'); invalidate(); }, onError: fehler,
+    onSuccess: () => {
+      message.success('Platz gelöscht');
+      invalidate();
+    },
+    onError: fehler,
   });
 
   function onDragStart(event: DragStartEvent) {
@@ -739,7 +981,8 @@ export default function Grundriss({
   function onDragEnd(event: DragEndEvent) {
     setAktivePersonId(null);
     const { active, over, delta } = event;
-    const data = active.data.current as { kind: string; personId?: number; platzId?: number } | undefined;
+    const data = active.data.current as
+      { kind: string; personId?: number; platzId?: number } | undefined;
     if (!data) return;
     // Platz-Verschiebung: braucht kein Drop-Target — Layout-Fläche ist keine Droppable.
     // delta reicht; auf >= 0 clampen, damit die Karte nicht off-screen landen kann.
@@ -769,7 +1012,8 @@ export default function Grundriss({
     }
   }
 
-  const aktivePerson = aktivePersonId != null ? personen.find((p) => p.id === aktivePersonId) : undefined;
+  const aktivePerson =
+    aktivePersonId != null ? personen.find((p) => p.id === aktivePersonId) : undefined;
 
   // Die drei Bereiche stehen EINMAL. Zwei Zweige mit je eigener Kopie wären zwei
   // Wahrheiten über dieselbe Spalte — und die Droppable-IDs kämen doppelt vor, sobald
@@ -780,7 +1024,14 @@ export default function Grundriss({
     // `overflow: auto`, hier scrollt also der Finger (LFH-341 · C6).
     <div
       data-testid="warteliste-scroll"
-      style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'auto', height: '100%' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        minHeight: 0,
+        overflow: 'auto',
+        height: '100%',
+      }}
     >
       {/* `onVerbleib` an BEIDEN Listen, nicht nur am Wartebereich: die Lücke ist an beiden
           dieselbe (nachgemessen im Abschluss-Review) — `onDragEnd` nahm `kind: 'transport'`
@@ -811,25 +1062,43 @@ export default function Grundriss({
 
   const flaeche = (
     <div style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 8,
+          gap: 8,
+        }}
+      >
         <Typography.Text strong>Unfallhilfsstelle</Typography.Text>
-        {!schreibgeschuetzt && (
-          uhs.status === 'geplant'
-            ? <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
-            : (
-              <Space>
-                <Button
-                  type={platzBearbeitung ? 'primary' : 'text'}
-                  onClick={() => setPlatzBearbeitung((v) => !v)}
-                >
-                  {platzBearbeitung ? 'Bearbeiten beenden' : 'Plätze bearbeiten'}
-                </Button>
-                {platzEditAktiv && <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />}
-              </Space>
-            )
-        )}
+        {!schreibgeschuetzt &&
+          (uhs.status === 'geplant' ? (
+            <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
+          ) : (
+            <Space>
+              <Button
+                type={platzBearbeitung ? 'primary' : 'text'}
+                onClick={() => setPlatzBearbeitung((v) => !v)}
+              >
+                {platzBearbeitung ? 'Bearbeiten beenden' : 'Plätze bearbeiten'}
+              </Button>
+              {platzEditAktiv && (
+                <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />
+              )}
+            </Space>
+          ))}
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', border: `1px dashed ${token.colorBorder}`, background: token.colorBgLayout, borderRadius: 4 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+          border: `1px dashed ${token.colorBorder}`,
+          background: token.colorBgLayout,
+          borderRadius: 4,
+        }}
+      >
         <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
           {uhs.plaetze.map((p) => {
             const belegt = belegtAn(p.id);
@@ -842,8 +1111,14 @@ export default function Grundriss({
                 belegungLaeuft={belegMut.isPending}
                 bearbeitbar={platzEditAktiv && !layoutMut.isPending}
                 onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
-                onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
-                onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
+                onAustritt={() => {
+                  const b = belegtAn(p.id);
+                  if (b) austrittMut.mutate(b.id);
+                }}
+                onTransport={() => {
+                  const b = belegtAn(p.id);
+                  if (b) setTransportPerson(b);
+                }}
                 onStorno={() => stornoMut.mutate(p.id)}
                 onOeffnen={setDetailPersonId}
                 onZuweisen={() => {
@@ -852,7 +1127,9 @@ export default function Grundriss({
                   // Hauptaktion. Die Hülle kennt keinen Weg, ihn zu unterdrücken,
                   // und sie dafür umzubauen träfe alle ihre Aufrufer.
                   if (zuweisbarePersonen.length === 0) {
-                    message.info('Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.');
+                    message.info(
+                      'Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.',
+                    );
                     return;
                   }
                   setZuweisenPlatz(p);
@@ -902,11 +1179,23 @@ export default function Grundriss({
   );
 
   return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
+    >
       {breit ? (
         <div
           data-testid="grundriss-rahmen"
-          style={{ display: 'flex', flexDirection: 'row', gap: 12, height: '100%', minHeight: 0, alignItems: 'stretch' }}
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: 12,
+            height: '100%',
+            minHeight: 0,
+            alignItems: 'stretch',
+          }}
         >
           {/* LINKS: Eingang / Wartebereich */}
           <div style={{ width: 240, flexShrink: 0, minHeight: 0 }}>{wartebereich}</div>
@@ -943,7 +1232,13 @@ export default function Grundriss({
          */
         <div
           data-testid="grundriss-rahmen"
-          style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', minHeight: 0 }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            height: '100%',
+            minHeight: 0,
+          }}
         >
           <Tabs
             defaultActiveKey="flaeche"
@@ -976,7 +1271,11 @@ export default function Grundriss({
           verschiebt damit den Fokus. */}
       <ErfassungsModal<VerbleibWerte>
         offen={transportPerson != null}
-        titel={transportPerson ? `Verbleib erfassen — ${personLabel(transportPerson)}` : 'Verbleib erfassen'}
+        titel={
+          transportPerson
+            ? `Verbleib erfassen — ${personLabel(transportPerson)}`
+            : 'Verbleib erfassen'
+        }
         form={transportForm}
         initialValues={{ art: 'transport' }}
         laeuft={transportMut.isPending}
@@ -989,17 +1288,25 @@ export default function Grundriss({
         onFertig={() => setTransportPerson(null)}
         onAbbrechen={() => setTransportPerson(null)}
       >
-        <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
-        <Form.Item label="Art" name="art" rules={[{ required: true }]}>
-          <Select options={[
-            { value: 'transport', label: 'Transport' },
-            { value: 'entlassung', label: 'Entlassung vor Ort' },
-            { value: 'vor_ort', label: 'verbleibt vor Ort' },
-            { value: 'verstorben', label: 'Verbleib des Leichnams' },
-          ]} />
+        <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel">
+          <Input />
         </Form.Item>
-        <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
-        <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+        <Form.Item label="Art" name="art" rules={[{ required: true }]}>
+          <Select
+            options={[
+              { value: 'transport', label: 'Transport' },
+              { value: 'entlassung', label: 'Entlassung vor Ort' },
+              { value: 'vor_ort', label: 'verbleibt vor Ort' },
+              { value: 'verstorben', label: 'Verbleib des Leichnams' },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Notiz" name="notiz">
+          <Input.TextArea rows={2} />
+        </Form.Item>
       </ErfassungsModal>
 
       {/* Klick-Zuweisungsweg (LFH-367/B5g): der Ersatz für das Ziehen auf den Platz.
@@ -1008,7 +1315,9 @@ export default function Grundriss({
           ist je Vorgang ein anderer, ein „und nächste" hätte kein sinnvolles Nächstes. */}
       <ErfassungsModal<ZuweisenWerte>
         offen={zuweisenPlatz != null}
-        titel={zuweisenPlatz ? `Patient zuweisen — ${zuweisenPlatz.bezeichnung}` : 'Patient zuweisen'}
+        titel={
+          zuweisenPlatz ? `Patient zuweisen — ${zuweisenPlatz.bezeichnung}` : 'Patient zuweisen'
+        }
         form={zuweisenForm}
         laeuft={belegMut.isPending}
         onErfassen={async (werte) => {
@@ -1029,7 +1338,11 @@ export default function Grundriss({
       </ErfassungsModal>
 
       {/* Schlanker Detail-Drawer beim Klick auf eine Patientenkarte (nur ansehen). */}
-      <PersonDetailDrawer einsatzId={einsatzId} personId={detailPersonId} onClose={() => setDetailPersonId(null)} />
+      <PersonDetailDrawer
+        einsatzId={einsatzId}
+        personId={detailPersonId}
+        onClose={() => setDetailPersonId(null)}
+      />
     </DndContext>
   );
 }
@@ -1046,7 +1359,17 @@ const PLATZ_TYPEN: { value: PlatzTyp; label: string }[] = [
 
 // LFH-16: Plätze nach Typ + Menge anlegen — Bezeichnungen vergibt der Server
 // automatisch fortlaufend („Bett 1", „Bett 2", …), keine manuelle Namensvergabe.
-function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: number; uhsId: number; onSuccess: () => void; primaer?: boolean }) {
+function NeuerPlatzKnopf({
+  einsatzId,
+  uhsId,
+  onSuccess,
+  primaer,
+}: {
+  einsatzId: number;
+  uhsId: number;
+  onSuccess: () => void;
+  primaer?: boolean;
+}) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const [typ, setTyp] = useState<PlatzTyp>('bett');
@@ -1054,13 +1377,22 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
   const mut = useMutation({
     mutationFn: () => legePlaetzeAn(einsatzId, uhsId, { typ, menge }),
     onSuccess: (plaetze) => {
-      message.success(plaetze.length === 1 ? 'Platz angelegt' : `${plaetze.length} Plätze angelegt`);
-      setMenge(1); setOpen(false); onSuccess();
+      message.success(
+        plaetze.length === 1 ? 'Platz angelegt' : `${plaetze.length} Plätze angelegt`,
+      );
+      setMenge(1);
+      setOpen(false);
+      onSuccess();
     },
-    onError: (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
+    onError: (e: unknown) =>
+      message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
   if (!open) {
-    return <Button type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>Plätze anlegen</Button>;
+    return (
+      <Button type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>
+        Plätze anlegen
+      </Button>
+    );
   }
   return (
     <Space align="center" wrap>
@@ -1078,7 +1410,9 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
         onChange={(v) => setMenge(v ?? 1)}
         aria-label="Menge"
       />
-      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
+      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>
+        Anlegen
+      </Button>
       <Button onClick={() => setOpen(false)}>Abbrechen</Button>
     </Space>
   );

@@ -1,5 +1,11 @@
 import {
-  App, Button, Form, Input, InputNumber, Popconfirm, Space,
+  App,
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Space,
   type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
@@ -13,8 +19,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import {
-  aktualisiereQualifikation, deaktiviereQualifikation, legeQualifikationAn,
-  listeQualifikationen, type QualifikationEingabe,
+  aktualisiereQualifikation,
+  deaktiviereQualifikation,
+  legeQualifikationAn,
+  listeQualifikationen,
+  type QualifikationEingabe,
 } from '../api/qualifikationen';
 import type { Qualifikation } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
@@ -41,7 +50,10 @@ export default function QualifikationenTab() {
 
   const speichern = useMutation({
     mutationFn: ({ id, werte }: { id: number; werte: FormWerte }) => {
-      const daten: QualifikationEingabe = { label: werte.label.trim(), sortier: werte.sortier ?? 0 };
+      const daten: QualifikationEingabe = {
+        label: werte.label.trim(),
+        sortier: werte.sortier ?? 0,
+      };
       return aktualisiereQualifikation(id, daten);
     },
     // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
@@ -69,7 +81,8 @@ export default function QualifikationenTab() {
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereQualifikation(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
   // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
@@ -121,7 +134,7 @@ export default function QualifikationenTab() {
       titel="Qualifikationen"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-    {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
+      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
         SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
         zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
         einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}

@@ -30,7 +30,13 @@ describe('FachebenenInspector', () => {
     render(
       <FachebenenInspector
         quelle="pegelonline"
-        properties={{ titel: 'KÖLN', gewaesser: 'RHEIN', wert: 320, einheit: 'cm', zustand: 'high' }}
+        properties={{
+          titel: 'KÖLN',
+          gewaesser: 'RHEIN',
+          wert: 320,
+          einheit: 'cm',
+          zustand: 'high',
+        }}
         onSchliessen={() => {}}
       />,
     );
@@ -55,7 +61,12 @@ describe('FachebenenInspector', () => {
     render(
       <FachebenenInspector
         quelle="kritis"
-        properties={{ titel: 'Uniklinik', kategorie: 'krankenhaus', adresse: 'Hauptstr. 1, 50667 Köln', telefon: '0221-1' }}
+        properties={{
+          titel: 'Uniklinik',
+          kategorie: 'krankenhaus',
+          adresse: 'Hauptstr. 1, 50667 Köln',
+          telefon: '0221-1',
+        }}
         onSchliessen={() => {}}
       />,
     );
@@ -92,14 +103,28 @@ describe('FachebenenInspector', () => {
   it('Schließen-Button ruft Callback', async () => {
     const onSchliessen = vi.fn();
     const { default: userEvent } = await import('@testing-library/user-event');
-    render(<FachebenenInspector quelle="kritis" properties={{ titel: 'X' }} onSchliessen={onSchliessen} />);
+    render(
+      <FachebenenInspector
+        quelle="kritis"
+        properties={{ titel: 'X' }}
+        onSchliessen={onSchliessen}
+      />,
+    );
     await userEvent.setup().click(screen.getByRole('button', { name: 'Schließen' }));
     expect(onSchliessen).toHaveBeenCalledOnce();
   });
 });
 
 describe('FachebenenInspector — Fläche (LFH-146)', () => {
-  const box = [[[8, 50], [8.1, 50], [8.1, 50.1], [8, 50.1], [8, 50]]];
+  const box = [
+    [
+      [8, 50],
+      [8.1, 50],
+      [8.1, 50.1],
+      [8, 50.1],
+      [8, 50],
+    ],
+  ];
 
   it('Warnung mit Polygon-Geometrie zeigt Fläche und Umfang', () => {
     render(

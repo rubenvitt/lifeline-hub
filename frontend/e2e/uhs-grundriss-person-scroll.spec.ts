@@ -84,7 +84,9 @@ function dropZone(page: Page, titel: string): Locator {
 
 // Neu: eine belegte Person ist ziehbar → in den Transport-Bereich rechts ziehen öffnet
 // den Transport-Abschluss-Screen (ändert Patientendaten, daher Modal statt Sofortbuchung).
-test('UHS Grundriss: belegte Person in den Transport-Bereich ziehen öffnet den Abschluss-Screen', async ({ page }) => {
+test('UHS Grundriss: belegte Person in den Transport-Bereich ziehen öffnet den Abschluss-Screen', async ({
+  page,
+}) => {
   const personName = await setupBelegterPlatz(page);
   await ziehe(page, page.getByText(personName).first(), dropZone(page, 'Auf Transport gebracht'));
   // Der Abschluss-Screen ist der „Verbleib erfassen"-Dialog (Titel enthält den Personennamen,
@@ -94,7 +96,9 @@ test('UHS Grundriss: belegte Person in den Transport-Bereich ziehen öffnet den 
 
 // Neu: eine belegte Person in den Wartebereich (links) ziehen → verlässt den Platz,
 // bleibt aber in der UHS (Belegung ohne Platz).
-test('UHS Grundriss: belegte Person in den Wartebereich ziehen räumt den Platz', async ({ page }) => {
+test('UHS Grundriss: belegte Person in den Wartebereich ziehen räumt den Platz', async ({
+  page,
+}) => {
   const personName = await setupBelegterPlatz(page);
   await ziehe(page, page.getByText(personName).first(), dropZone(page, 'Wartebereich (Eingang)'));
   // Platz nicht mehr belegt …
@@ -109,7 +113,9 @@ test('UHS Grundriss: belegte Person in den Wartebereich ziehen räumt den Platz'
 // Aufbereitung) neben kurzen/leeren Karten und prüft: (a) alle Karten gleich hoch,
 // (b) keine Karte höher als der Raster-Zeilenabstand (120px), (c) keine Aktions-Icons
 // werden durch overflow:hidden abgeschnitten.
-test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch/Tags egal)', async ({ page }) => {
+test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch/Tags egal)', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzName = `E2E UHS Uniform ${Date.now()}`;
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
@@ -191,7 +197,8 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   // Bedingung tritt nie ein (LFH-385).
   await expect(async () => {
     await bp2.locator('button[aria-label^="Platzaktionen"]').click({ timeout: 5_000 });
-    await page.getByRole('menuitem', { name: 'als in Aufbereitung markieren' })
+    await page
+      .getByRole('menuitem', { name: 'als in Aufbereitung markieren' })
       .click({ timeout: 2_000 });
   }).toPass({ timeout: 20_000, intervals: [500, 1_000, 2_000] });
   await expect(bp2.getByText('aufbereitung')).toBeVisible();
@@ -201,7 +208,9 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
     karten.map((c) => {
       const r = c.getBoundingClientRect();
       const btns = Array.from(c.querySelectorAll('button'));
-      const maxBtnBottom = btns.length ? Math.max(...btns.map((b) => b.getBoundingClientRect().bottom)) : r.bottom;
+      const maxBtnBottom = btns.length
+        ? Math.max(...btns.map((b) => b.getBoundingClientRect().bottom))
+        : r.bottom;
       return { h: Math.round(r.height), overflow: Math.round(maxBtnBottom - r.bottom) };
     }),
   );
@@ -214,7 +223,9 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
 });
 
 /** scrollWidth/clientWidth des nächsten scroll-baren Vorfahren einer Karte. */
-async function scrollAhneMasse(karte: Locator): Promise<{ scrollWidth: number; clientWidth: number }> {
+async function scrollAhneMasse(
+  karte: Locator,
+): Promise<{ scrollWidth: number; clientWidth: number }> {
   return karte.evaluate((el) => {
     let n: HTMLElement | null = el as HTMLElement;
     while (n) {
@@ -234,7 +245,9 @@ async function scrollAhneMasse(karte: Locator): Promise<{ scrollWidth: number; c
 // Drag-Distanz dynamisch wächst. Fix: Person-Drag rendert via DragOverlay (Portal),
 // der Originalknoten bewegt sich nicht mehr. Dieser Test misst die Scroll-Region des
 // Spalten-Containers WÄHREND der Drag noch aktiv ist (gedrückte Maus).
-test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spalte', async ({ page }) => {
+test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spalte', async ({
+  page,
+}) => {
   await anmelden(page);
 
   // Einsatz anlegen.
@@ -299,7 +312,9 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
 // Aktionen (Menü statt Buttons), nur EIN Status-Tag bei belegt+frei, einzeiliges Label
 // mit Ellipsis → stabile, namenslängen-unabhängige Höhe. Test misst die reale Layout-Höhe
 // einer belegten Karte (langer Name als Stresstest) und prüft die Nicht-Überlappung.
-test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (kein Overlap)', async ({ page }) => {
+test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (kein Overlap)', async ({
+  page,
+}) => {
   await anmelden(page);
 
   const einsatzName = `E2E UHS Overlap ${Date.now()}`;
@@ -346,7 +361,9 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   const zielBox = await bett1Text.boundingBox();
   await page.mouse.move(pBox!.x + pBox!.width / 2, pBox!.y + pBox!.height / 2);
   await page.mouse.down();
-  await page.mouse.move(zielBox!.x + zielBox!.width / 2, zielBox!.y + zielBox!.height / 2, { steps: 16 });
+  await page.mouse.move(zielBox!.x + zielBox!.width / 2, zielBox!.y + zielBox!.height / 2, {
+    steps: 16,
+  });
   await page.mouse.up();
 
   // Belegung bestätigt (Karte zeigt „belegt").
@@ -369,7 +386,9 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
 // Gegenprobe: Der DragOverlay (Portal) darf die dnd-kit-Kollisionserkennung NICHT
 // brechen — ein Person→Platz-Drop muss weiterhin die Belegung auslösen. Der Overlay
 // ist rein visuell; `over` wird aus dem (translatierten) Original-Rect berechnet.
-test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin aus', async ({ page }) => {
+test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin aus', async ({
+  page,
+}) => {
   await anmelden(page);
 
   const einsatzName = `E2E UHS PersonDrop ${Date.now()}`;
@@ -417,7 +436,9 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   expect(zielBox).not.toBeNull();
   await page.mouse.move(pBox!.x + pBox!.width / 2, pBox!.y + pBox!.height / 2);
   await page.mouse.down();
-  await page.mouse.move(zielBox!.x + zielBox!.width / 2, zielBox!.y + zielBox!.height / 2, { steps: 16 });
+  await page.mouse.move(zielBox!.x + zielBox!.width / 2, zielBox!.y + zielBox!.height / 2, {
+    steps: 16,
+  });
   await page.mouse.up();
 
   // Kernassertion: der Drop traf den PLATZ (platz_id gesetzt), nicht versehentlich die

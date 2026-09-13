@@ -25,7 +25,9 @@ describe('offlinefähige Fachschreibvorgänge (LFH-334)', () => {
   it('merkt eine vermisste Person offline atomar mit stabiler client_id vor', async () => {
     online(false);
     const ergebnis = await erfassePersonOfflineFaehig(11, 7, {
-      name: 'Muster', status: 'vermisst', client_id: 'person-1',
+      name: 'Muster',
+      status: 'vermisst',
+      client_id: 'person-1',
     });
     expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'person-1' });
     expect(legePersonAn).not.toHaveBeenCalled();
@@ -41,12 +43,15 @@ describe('offlinefähige Fachschreibvorgänge (LFH-334)', () => {
 
   it('reiht einen normalisierten Netzfehler ein, fachliche 4xx aber nicht', async () => {
     vi.mocked(legePersonAn).mockRejectedValueOnce(new NetzFehler());
-    await expect(erfassePersonOfflineFaehig(11, 7, { client_id: 'person-2' }))
-      .resolves.toEqual({ zustand: 'vorgemerkt', client_id: 'person-2' });
+    await expect(erfassePersonOfflineFaehig(11, 7, { client_id: 'person-2' })).resolves.toEqual({
+      zustand: 'vorgemerkt',
+      client_id: 'person-2',
+    });
 
     vi.mocked(legePersonAn).mockRejectedValueOnce(new ApiError(422, 'Ungültig'));
-    await expect(erfassePersonOfflineFaehig(11, 7, { client_id: 'person-3' }))
-      .rejects.toMatchObject({ status: 422 });
+    await expect(
+      erfassePersonOfflineFaehig(11, 7, { client_id: 'person-3' }),
+    ).rejects.toMatchObject({ status: 422 });
     expect(await schreibaktionenLaden(11, 7)).toHaveLength(1);
     expect(legePersonAn).toHaveBeenNthCalledWith(
       1,
@@ -66,8 +71,11 @@ describe('offlinefähige Fachschreibvorgänge (LFH-334)', () => {
     const meldung = { id: 9, lfd_nr: 47 } as Awaited<ReturnType<typeof legeMeldungAn>>;
     vi.mocked(legeMeldungAn).mockResolvedValue(meldung);
     const ergebnis = await erfasseMeldungOfflineFaehig(11, 7, {
-      absender: 'ELW', meldeweg: 'funk', inhalt: 'Lage',
-      ereigniszeit: '2026-08-06 12:00:00', client_id: 'meldung-1',
+      absender: 'ELW',
+      meldeweg: 'funk',
+      inhalt: 'Lage',
+      ereigniszeit: '2026-08-06 12:00:00',
+      client_id: 'meldung-1',
     });
     expect(ergebnis).toEqual({ zustand: 'gesendet', daten: meldung });
     expect(legeMeldungAn).toHaveBeenCalledWith(

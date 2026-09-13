@@ -19,11 +19,26 @@ export interface MetaFeldDef {
 
 /** Anzeige-/Tab-Reihenfolge der Felder im /-Menü und in der Chip-Leiste. */
 export const METADATEN_FELDER: MetaFeldDef[] = [
-  { feld: 'ereigniszeit', label: 'Ereigniszeit', trigger: ['zeit', 'ereigniszeit', 'uhrzeit'], editor: 'zeit' },
+  {
+    feld: 'ereigniszeit',
+    label: 'Ereigniszeit',
+    trigger: ['zeit', 'ereigniszeit', 'uhrzeit'],
+    editor: 'zeit',
+  },
   { feld: 'von', label: 'Von', trigger: ['von', 'absender'], editor: 'text' },
   { feld: 'an', label: 'An', trigger: ['an', 'empfaenger', 'empfänger'], editor: 'text' },
-  { feld: 'meldeweg', label: 'Meldeweg', trigger: ['meldeweg', 'weg', 'funk', 'telefon'], editor: 'meldeweg' },
-  { feld: 'veranlassung', label: 'Veranlassung', trigger: ['veranlassung', 'massnahme', 'maßnahme'], editor: 'text' },
+  {
+    feld: 'meldeweg',
+    label: 'Meldeweg',
+    trigger: ['meldeweg', 'weg', 'funk', 'telefon'],
+    editor: 'meldeweg',
+  },
+  {
+    feld: 'veranlassung',
+    label: 'Veranlassung',
+    trigger: ['veranlassung', 'massnahme', 'maßnahme'],
+    editor: 'text',
+  },
 ];
 
 /** Vom Nutzer gesetzte Metadaten (vor dem Merge in NeuerEintrag). */
@@ -86,7 +101,8 @@ export function filterSlashEintraege(
 ): SlashTreffer {
   const f = filter.trim().toLowerCase();
   const felder: SlashEintrag[] = METADATEN_FELDER.filter(
-    (def) => f === '' || def.trigger.some((t) => t.includes(f)) || def.label.toLowerCase().includes(f),
+    (def) =>
+      f === '' || def.trigger.some((t) => t.includes(f)) || def.label.toLowerCase().includes(f),
   ).map((def) => ({
     art: 'feld',
     key: def.feld,
@@ -110,7 +126,13 @@ export interface EintragArgs {
   jetztIso: string;
 }
 
-export function baueEintrag({ inhalt, typ, metadaten, berichtigungZuId, jetztIso }: EintragArgs): NeuerEintrag {
+export function baueEintrag({
+  inhalt,
+  typ,
+  metadaten,
+  berichtigungZuId,
+  jetztIso,
+}: EintragArgs): NeuerEintrag {
   return {
     typ: berichtigungZuId != null ? 'berichtigung' : typ,
     inhalt,
@@ -118,7 +140,9 @@ export function baueEintrag({ inhalt, typ, metadaten, berichtigungZuId, jetztIso
     an: metadaten.an || undefined,
     meldeweg: metadaten.meldeweg || undefined,
     veranlassung: metadaten.veranlassung || undefined,
-    ereigniszeit: (metadaten.ereigniszeit ?? dayjs.utc(jetztIso)).utc().format('YYYY-MM-DD HH:mm:ss'),
+    ereigniszeit: (metadaten.ereigniszeit ?? dayjs.utc(jetztIso))
+      .utc()
+      .format('YYYY-MM-DD HH:mm:ss'),
     erfasst_lokal_at: jetztIso,
     berichtigt_eintrag_id: berichtigungZuId,
   };

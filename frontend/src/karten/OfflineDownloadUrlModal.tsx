@@ -66,9 +66,9 @@ export default function OfflineDownloadUrlModal({
         style={{ marginBottom: 16 }}
         title="MBTiles im Shortbread-Schema"
         description={
-          'Die URL muss auf eine herunterladbare .mbtiles-Datei (Shortbread-Schema) zeigen — nur '
-          + 'https, keine internen Adressen. Wird in der Prep-Phase (mit Netz) geladen und im Feld '
-          + 'offline ausgeliefert.'
+          'Die URL muss auf eine herunterladbare .mbtiles-Datei (Shortbread-Schema) zeigen — nur ' +
+          'https, keine internen Adressen. Wird in der Prep-Phase (mit Netz) geladen und im Feld ' +
+          'offline ausgeliefert.'
         }
       />
       <Form.Item

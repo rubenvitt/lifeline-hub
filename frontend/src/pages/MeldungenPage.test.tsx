@@ -14,9 +14,20 @@ import { server } from '../test/server';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
-  ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
+  ladeEinsatz: vi.fn().mockResolvedValue({
+    id: 1,
+    bezeichnung: 'Lage',
+    status: 'aktiv',
+    meine_rolle: 'einsatzleitung',
+  }),
   ladeMitglieder: vi.fn().mockResolvedValue([
-    { benutzer_id: 2, anzeigename: 'Sani Schmidt', benutzername: 'sani', einsatz_rolle: 'fuehrungspersonal', zugewiesen_at: '' },
+    {
+      benutzer_id: 2,
+      anzeigename: 'Sani Schmidt',
+      benutzername: 'sani',
+      einsatz_rolle: 'fuehrungspersonal',
+      zugewiesen_at: '',
+    },
   ]),
 }));
 
@@ -41,15 +52,38 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolv
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
-  id: 1, einsatz_id: 1, lfd_nr: 1, absender: 'Florian Nord 1', empfaenger: 'ELW 1',
-  meldeweg: 'funk', inhalt: 'Deich instabil', meldungsart: 'sofortmeldung', prioritaet: 'normal', richtung: 'intern',
-  status: 'neu', bearbeiter_id: null, bearbeiter_name: null, lagerelevant: false,
-  ereigniszeit: '2026-06-12 09:00:00', eingang_at: '2026-06-12 09:05:00',
-  etb_meldung_id: 7, auftrag_id: null, erfasst_von_id: 1, erstellt_at: '2026-06-12 09:05:00',
-  lage_meldung_id: null, ist_offen: true, erledigt_at: null,
-  bestaetigung_pflicht: false, bestaetigung_frist_at: null, eskaliert: false,
-  bestaetigt_at: null, bestaetigt_von_id: null, bestaetigt_von_name: null,
-  ist_bestaetigt: false, ist_ueberfaellig: false, ...over,
+  id: 1,
+  einsatz_id: 1,
+  lfd_nr: 1,
+  absender: 'Florian Nord 1',
+  empfaenger: 'ELW 1',
+  meldeweg: 'funk',
+  inhalt: 'Deich instabil',
+  meldungsart: 'sofortmeldung',
+  prioritaet: 'normal',
+  richtung: 'intern',
+  status: 'neu',
+  bearbeiter_id: null,
+  bearbeiter_name: null,
+  lagerelevant: false,
+  ereigniszeit: '2026-06-12 09:00:00',
+  eingang_at: '2026-06-12 09:05:00',
+  etb_meldung_id: 7,
+  auftrag_id: null,
+  erfasst_von_id: 1,
+  erstellt_at: '2026-06-12 09:05:00',
+  lage_meldung_id: null,
+  ist_offen: true,
+  erledigt_at: null,
+  bestaetigung_pflicht: false,
+  bestaetigung_frist_at: null,
+  eskaliert: false,
+  bestaetigt_at: null,
+  bestaetigt_von_id: null,
+  bestaetigt_von_name: null,
+  ist_bestaetigt: false,
+  ist_ueberfaellig: false,
+  ...over,
 });
 
 /**
@@ -61,8 +95,9 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
  */
 async function oeffneAktionsmenue(lfdNr = 1): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Meldung ${lfdNr}` }));
-  const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')]
-    .filter((d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none');
+  const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+    (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+  );
   expect(offen).toHaveLength(1);
   const menue = offen[0].querySelector<HTMLElement>('[role="menu"]');
   if (!menue) throw new Error(`Das Aktionsmenü zu Meldung ${lfdNr} ließ sich nicht öffnen`);
@@ -75,15 +110,19 @@ function LocationProbe() {
 }
 
 function renderPage(route = '/einsaetze/1/meldungen') {
-  server.use(http.get('/api/auth/me', () => HttpResponse.json({
-    id: 1,
-    anzeigename: 'Leitung',
-    benutzername: 'leitung',
-    system_rolle: 'keiner',
-    org_rolle: 'keine',
-    aktiv: true,
-    erstellt_at: '2026-08-06 10:00:00',
-  })));
+  server.use(
+    http.get('/api/auth/me', () =>
+      HttpResponse.json({
+        id: 1,
+        anzeigename: 'Leitung',
+        benutzername: 'leitung',
+        system_rolle: 'keiner',
+        org_rolle: 'keine',
+        aktiv: true,
+        erstellt_at: '2026-08-06 10:00:00',
+      }),
+    ),
+  );
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -91,7 +130,9 @@ function renderPage(route = '/einsaetze/1/meldungen') {
         <AuthProvider>
           <MemoryRouter initialEntries={[route]}>
             <LocationProbe />
-            <Routes><Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} /></Routes>
+            <Routes>
+              <Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} />
+            </Routes>
           </MemoryRouter>
         </AuthProvider>
       </AntApp>
@@ -125,15 +166,21 @@ describe('MeldungenPage', () => {
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
     // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({
-        absender: 'RTW 2', inhalt: 'Eingetroffen', meldeweg: 'funk',
-      }),
-      { offlineQueueBenutzerId: 1 },
-    ));
+    await waitFor(() =>
+      expect(legeMeldungAn).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          absender: 'RTW 2',
+          inhalt: 'Eingetroffen',
+          meldeweg: 'funk',
+        }),
+        { offlineQueueBenutzerId: 1 },
+      ),
+    );
     // Ereigniszeit wird immer mitgesendet (Pflicht, leer ⇒ jetzt).
-    expect(legeMeldungAn.mock.calls[0][1].ereigniszeit).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(legeMeldungAn.mock.calls[0][1].ereigniszeit).toMatch(
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+    );
   });
 
   it('merkt den vollständigen Wortlaut offline sichtbar vor', async () => {
@@ -179,10 +226,16 @@ describe('MeldungenPage', () => {
     // Read-back; die Quittungs-Achse (bestaetigt_at) bleibt daneben bestehen.
     listeMeldungen.mockResolvedValue([
       meldung({
-        id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false,
+        id: 2,
+        lfd_nr: 2,
+        absender: 'RTW 9',
+        status: 'erledigt',
+        ist_offen: false,
         erledigt_at: '2026-06-12 09:30:00',
-        bestaetigung_pflicht: true, ist_bestaetigt: true,
-        bestaetigt_at: '2026-06-12 09:06:00', bestaetigt_von_name: 'Leit',
+        bestaetigung_pflicht: true,
+        ist_bestaetigt: true,
+        bestaetigt_at: '2026-06-12 09:06:00',
+        bestaetigt_von_name: 'Leit',
       }),
     ]);
     renderPage();
@@ -197,7 +250,12 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await userEvent.click(screen.getByText('Extern'));
-    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
+    await waitFor(() =>
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ richtung: 'extern' }),
+      ),
+    );
   });
 
   it('hält beim Filterwechsel die vorherige Liste samt Zählern, bis die neue da ist (LFH-351)', async () => {
@@ -207,12 +265,20 @@ describe('MeldungenPage', () => {
     let antworte: (m: Meldung[]) => void = () => {};
     listeMeldungen.mockImplementation((_id: number, f: { richtung?: string }) =>
       f.richtung === 'extern'
-        ? new Promise<Meldung[]>((resolve) => { antworte = resolve; })
-        : Promise.resolve([meldung()]));
+        ? new Promise<Meldung[]>((resolve) => {
+            antworte = resolve;
+          })
+        : Promise.resolve([meldung()]),
+    );
     renderPage();
     await screen.findByText('Florian Nord 1');
     await userEvent.click(screen.getByText('Extern'));
-    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
+    await waitFor(() =>
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ richtung: 'extern' }),
+      ),
+    );
     // Während der Request läuft: alte Liste und Zähler stehen, kein Leerzustand.
     expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
     expect(screen.getByText('1 offen · 0 abgeschlossen')).toBeInTheDocument();
@@ -225,7 +291,10 @@ describe('MeldungenPage', () => {
 
   it('Beobachter sieht Posteingang, aber keine Erfassung', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValueOnce({
-      id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
     renderPage();
     expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
@@ -259,7 +328,10 @@ describe('MeldungenPage', () => {
 
   it('Beobachter sieht keine Status-Aktionen', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValueOnce({
-      id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
     renderPage();
     await screen.findByText('Florian Nord 1');
@@ -276,7 +348,9 @@ describe('MeldungenPage', () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }));
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
+    );
     // Modal öffnet sich; ohne Koordinate direkt übergeben.
     await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
@@ -291,7 +365,9 @@ describe('MeldungenPage', () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }));
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
+    );
     // Seit der formatbewussten Eingabe (KoordinatenEingabe) ein einzelnes Feld:
     // im WGS84-Default wird "lat, lon" getippt.
     await userEvent.type(await screen.findByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
@@ -314,11 +390,15 @@ describe('MeldungenPage', () => {
     // belegt zugleich, dass das Menü überhaupt aufging.
     const menue = await oeffneAktionsmenue();
     expect(within(menue).getAllByRole('menuitem').length).toBeGreaterThan(0);
-    expect(within(menue).queryByRole('menuitem', { name: /An Lage übergeben/ })).not.toBeInTheDocument();
+    expect(
+      within(menue).queryByRole('menuitem', { name: /An Lage übergeben/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('weist einer Meldung einen Bearbeiter zu', async () => {
-    weiseBearbeiterZu.mockResolvedValue(meldung({ bearbeiter_id: 2, bearbeiter_name: 'Sani Schmidt' }));
+    weiseBearbeiterZu.mockResolvedValue(
+      meldung({ bearbeiter_id: 2, bearbeiter_name: 'Sani Schmidt' }),
+    );
     renderPage();
     await screen.findByText('Florian Nord 1');
     // antd Select über combobox-Rolle+Name öffnen, dann echten Options-Knoten klicken (Commit über onChange).
@@ -331,9 +411,16 @@ describe('MeldungenPage', () => {
 
   it('zeigt überfällige Sofortmeldung hervorgehoben und bestätigt sie', async () => {
     listeMeldungen.mockResolvedValue([
-      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: false, ist_ueberfaellig: true, prioritaet: 'sofort' }),
+      meldung({
+        bestaetigung_pflicht: true,
+        ist_bestaetigt: false,
+        ist_ueberfaellig: true,
+        prioritaet: 'sofort',
+      }),
     ]);
-    bestaetigeMeldung.mockResolvedValue(meldung({ bestaetigung_pflicht: true, ist_bestaetigt: true }));
+    bestaetigeMeldung.mockResolvedValue(
+      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: true }),
+    );
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText(/Bestätigung überfällig/)).toBeInTheDocument();
@@ -346,7 +433,13 @@ describe('MeldungenPage', () => {
 
   it('zeigt eskalierte (auch ohne ist_ueberfaellig) Sofortmeldung als (eskaliert)', async () => {
     listeMeldungen.mockResolvedValue([
-      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: false, ist_ueberfaellig: false, eskaliert: true, prioritaet: 'sofort' }),
+      meldung({
+        bestaetigung_pflicht: true,
+        ist_bestaetigt: false,
+        ist_ueberfaellig: false,
+        eskaliert: true,
+        prioritaet: 'sofort',
+      }),
     ]);
     renderPage();
     await screen.findByText('Florian Nord 1');
@@ -355,7 +448,12 @@ describe('MeldungenPage', () => {
 
   it('zeigt bestätigte Sofortmeldung ohne Bestätigen-Aktion', async () => {
     listeMeldungen.mockResolvedValue([
-      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: true, bestaetigt_at: '2026-06-12 09:06:00', bestaetigt_von_name: 'Leit' }),
+      meldung({
+        bestaetigung_pflicht: true,
+        ist_bestaetigt: true,
+        bestaetigt_at: '2026-06-12 09:06:00',
+        bestaetigt_von_name: 'Leit',
+      }),
     ]);
     renderPage();
     await screen.findByText('Florian Nord 1');
@@ -364,7 +462,9 @@ describe('MeldungenPage', () => {
     expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
     // „Bestätigen" ist nach LFH-372/B5k ein sichtbarer Knopf und gehört in KEIN Menü —
     // die zweite Hälfte belegt, dass die Aktion nicht bloss dorthin gewandert ist.
-    expect(within(await oeffneAktionsmenue()).queryByRole('menuitem', { name: /Bestätigen/ })).not.toBeInTheDocument();
+    expect(
+      within(await oeffneAktionsmenue()).queryByRole('menuitem', { name: /Bestätigen/ }),
+    ).not.toBeInTheDocument();
   });
 
   // --- LFH-113: Meldung→Auftrag ---
@@ -373,7 +473,9 @@ describe('MeldungenPage', () => {
     erteileAuftragAusMeldung.mockResolvedValue(meldung({ auftrag_id: 42 }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /Auftrag erteilen/ }));
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /Auftrag erteilen/ }),
+    );
     // Auftragstext ist mit „Absender: Inhalt" vorbelegt (Meldungsvorblendung).
     const textfeld = await screen.findByLabelText('Auftrag / Was');
     expect(textfeld).toHaveValue('Florian Nord 1: Deich instabil');
@@ -382,9 +484,13 @@ describe('MeldungenPage', () => {
     // Submit-Button des Formulars heißt ebenfalls „Auftrag erteilen".
     const buttons = await screen.findAllByRole('button', { name: 'Auftrag erteilen' });
     await userEvent.click(buttons[buttons.length - 1]);
-    await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalledWith(
-      1, 1, expect.objectContaining({ auftrag_text: 'Florian Nord 1: Deich instabil' }),
-    ));
+    await waitFor(() =>
+      expect(erteileAuftragAusMeldung).toHaveBeenCalledWith(
+        1,
+        1,
+        expect.objectContaining({ auftrag_text: 'Florian Nord 1: Deich instabil' }),
+      ),
+    );
   });
 
   it('zeigt bei verknüpfter Meldung einen Backlink zum Auftrag statt der Erteilen-Aktion', async () => {
@@ -399,7 +505,9 @@ describe('MeldungenPage', () => {
     // Kartenkörper, in dem die Aktion ohnehin nie mehr steht (LFH-372/B5k).
     const menue = await oeffneAktionsmenue();
     expect(within(menue).getAllByRole('menuitem').length).toBeGreaterThan(0);
-    expect(within(menue).queryByRole('menuitem', { name: /Auftrag erteilen/ })).not.toBeInTheDocument();
+    expect(
+      within(menue).queryByRole('menuitem', { name: /Auftrag erteilen/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('Fast-Path-Button erfasst Sofortmeldung mit Bestätigungspflicht', async () => {
@@ -413,13 +521,17 @@ describe('MeldungenPage', () => {
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'MANV');
     // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
-    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({
-        meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true,
-      }),
-      { offlineQueueBenutzerId: 1 },
-    ));
+    await waitFor(() =>
+      expect(legeMeldungAn).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          meldungsart: 'sofortmeldung',
+          prioritaet: 'sofort',
+          bestaetigung_pflicht: true,
+        }),
+        { offlineQueueBenutzerId: 1 },
+      ),
+    );
   });
 
   // --- LFH-332/B4: Serienerfassung im Inline-Formular ---
@@ -466,7 +578,9 @@ describe('MeldungenPage', () => {
     // Das Kreuz an der Card trägt als einziges ein aria-label — der Kopf-Umschalter
     // heisst gleich, hat seinen Namen aber aus dem Text.
     await userEvent.click(screen.getByLabelText('Formular schließen'));
-    await waitFor(() => expect(screen.queryByLabelText('Inhalt / Wortlaut')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Inhalt / Wortlaut')).not.toBeInTheDocument(),
+    );
   });
 
   it('lässt den Wortlaut stehen, wenn das Anlegen fehlschlägt', async () => {
@@ -492,7 +606,9 @@ describe('MeldungenPage', () => {
     const karte = container.querySelector('[data-meldung-id="5"]');
     expect(karte).toBeTruthy();
     await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
-    expect(container.querySelector('[data-meldung-id="1"]')).not.toHaveAttribute('data-hervorgehoben');
+    expect(container.querySelector('[data-meldung-id="1"]')).not.toHaveAttribute(
+      'data-hervorgehoben',
+    );
     // apply-then-clean: der Selektions-Param ist aus der URL geräumt.
     await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
   });
@@ -500,12 +616,24 @@ describe('MeldungenPage', () => {
   it('?meldung=<id> einer erledigten Meldung schaltet auf die Abgeschlossen-Ansicht', async () => {
     listeMeldungen.mockResolvedValue([
       meldung({ id: 1, inhalt: 'Offene Meldung', status: 'neu', ist_offen: true }),
-      meldung({ id: 9, lfd_nr: 9, inhalt: 'Erledigte Meldung', status: 'erledigt', ist_offen: false, erledigt_at: '2026-06-12 12:00:00' }),
+      meldung({
+        id: 9,
+        lfd_nr: 9,
+        inhalt: 'Erledigte Meldung',
+        status: 'erledigt',
+        ist_offen: false,
+        erledigt_at: '2026-06-12 12:00:00',
+      }),
     ]);
     const { container } = renderPage('/einsaetze/1/meldungen?meldung=9');
     // Ohne Umschaltung wäre die erledigte Meldung in der Default-Offen-Ansicht unsichtbar.
     expect(await screen.findByText('Erledigte Meldung')).toBeInTheDocument();
-    await waitFor(() => expect(container.querySelector('[data-meldung-id="9"]')).toHaveAttribute('data-hervorgehoben', 'true'));
+    await waitFor(() =>
+      expect(container.querySelector('[data-meldung-id="9"]')).toHaveAttribute(
+        'data-hervorgehoben',
+        'true',
+      ),
+    );
   });
 
   /**

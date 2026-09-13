@@ -15,11 +15,16 @@
  * `kommunikation/phase.ts` namentlich verbietet — und träfe acht Konsumenten in vier
  * Modulen samt `unbearbeitet`-Zweikanal (C8/H47). Das bleibt ein eigenes Ticket.
  *
- * Die Linie ist nicht neu: `einsatz/einsatzStatus.ts` trägt den Vertragstyp
- * `StatusDarstellung` und liegt trotzdem bewusst außerhalb von `statusFarben.ts` — mit
- * derselben Begründung (dessen Abdeckungsguard zählt gegen ein `toHaveLength`, ein
- * Eintrag mehr ist eine Vertragsänderung, kein Nebenprodukt). Dies ist die zweite
- * Anwendung, nicht eine Ausrede für diesen einen Fall.
+ * NACHTRAG LFH-358, und er dreht die halbe Begründung um: dieser Absatz berief sich auf
+ * `einsatz/einsatzStatus.ts` als Präzedenz („trägt den Vertragstyp und liegt trotzdem
+ * außerhalb, weil der Abdeckungsguard gegen ein `toHaveLength` zählt"). Diese Präzedenz
+ * gibt es nicht mehr — LFH-358 hat die Vertragsänderung vorgenommen, den Eintrag geholt
+ * und zwei Guards gegen eine Wiederholung gesetzt (`theme/statusVertrag.guard.test.ts`).
+ * Die Entscheidung HIER steht trotzdem, aber auf ihrem eigenen Grund: `PHASE_META` trägt
+ * `StatusDarstellung` gar nicht (`Record<KommPhase, { color, label }>`), der Umzug wäre
+ * also kein Heben, sondern eine Umschreibung — samt acht Konsumenten in vier Modulen.
+ * Der Kartenguard erfasst sie aus demselben Grund nicht; das ist kein Schlupfloch,
+ * sondern die Grenze zwischen „steht im Vertrag" und „gehört in den Vertrag".
  *
  * WAS DIE UMSTELLUNG FARBLICH BEWIRKT — gemessen, nicht per Analogie behauptet: `PHASE_META`
  * führt antds STATUS-Farben (`default`/`processing`/`success`/`error`), keine Presets.
@@ -86,7 +91,9 @@ describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
     // `[^>]*` statt `\s+`: `<Tag style={{…}} color="green">` matchte sonst nicht, und
     // Prettier sortiert JSX-Attribute nicht um. Beide Reihenfolgen kommen im Bestand vor
     // (`meldungen/MeldungKarte.tsx` color-first, `erinnerung/ErinnerungKarte.tsx` style-first).
-    expect(gruppe, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(/<Tag(?=[\s>])[^>]*\scolor=/);
+    expect(gruppe, `${datei}: kein handgeschriebenes Tag-Preset`).not.toMatch(
+      /<Tag(?=[\s>])[^>]*\scolor=/,
+    );
     // Der Schnitt hat wirklich die Gruppe erwischt — sonst prüfte die Zeile darüber
     // eine leere Zeichenkette gegen eine Abwesenheit und wäre immer grün. Zugleich die
     // Gegenprobe gegen das bloße Entfernen der Etikettengruppe.
@@ -98,7 +105,9 @@ describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
     // „Freigegeben" als Literal ist die belastbare Gegenprobe; „Entwurf" trägt daneben
     // die Knopfbeschriftung „Entwurf speichern" und taugt dafür nicht.
     // Alle drei Quote-Stile: `toContain("'…'")` liefe an `"Freigegeben"` vorbei.
-    expect(gruppe, `${datei}: Statuslabel nicht abgeschrieben`).not.toMatch(/['"`]Freigegeben['"`]/);
+    expect(gruppe, `${datei}: Statuslabel nicht abgeschrieben`).not.toMatch(
+      /['"`]Freigegeben['"`]/,
+    );
     expect(gruppe, `${datei}: liest die Achse`).toContain(zugriff);
     const badges = gruppe.match(/<StatusBadge/g) ?? [];
     expect(badges, `${datei}: genau ein Statusetikett im Kopf`).toHaveLength(1);

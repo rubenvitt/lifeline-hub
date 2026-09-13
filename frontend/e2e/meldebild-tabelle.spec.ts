@@ -432,7 +432,9 @@ test('Druckpfad der Kräfteübersicht: die Neutralisierer WIRKEN, und keine Spal
  * Kennzahlen auf 0, die Materialachse rendert gar keine Statuszeile — der Kopf wäre schmal
  * durch Nichtstun, und die Messung grün ohne Aussage.
  */
-test('Monitoring-Kopf der Kräfteübersicht bricht um statt waagerecht zu scrollen', async ({ page }) => {
+test('Monitoring-Kopf der Kräfteübersicht bricht um statt waagerecht zu scrollen', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `LFH-338 Kopf ${Date.now()}`);

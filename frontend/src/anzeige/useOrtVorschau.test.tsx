@@ -93,13 +93,15 @@ describe('useOrtVorschau', () => {
     await setzeOrt(ortKeyVon(48.1, 11.6), 'Aus Local-Store');
     server.use(
       http.get('/api/einsaetze/1/ort-vorschau', () =>
-        HttpResponse.json({ peilung: { distanz_m: 100, richtung: 'N', bezug_label: 'X' }, ortsname: null }),
+        HttpResponse.json({
+          peilung: { distanz_m: 100, richtung: 'N', bezug_label: 'X' },
+          ortsname: null,
+        }),
       ),
     );
-    const { result } = renderHook(
-      () => useOrtVorschau(1, { lat: 48.1, lon: 11.6 }, undefined, 0),
-      { wrapper: wrapper() },
-    );
+    const { result } = renderHook(() => useOrtVorschau(1, { lat: 48.1, lon: 11.6 }, undefined, 0), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.data?.ortsname).toBe('Aus Local-Store'));
     expect(result.current.data?.peilung?.richtung).toBe('N');
   });

@@ -13,7 +13,13 @@ import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { SeitenLeer } from '../components/SeitenZustand';
 import Datenstand from '../components/Datenstand';
 import { meldungenPfad } from '../routing/deeplinks';
-import { ZEITFENSTER, imZeitfenster, tagesEtikett, tagesSchluessel, type Zeitfenster } from '../lagemeldungen/zeitachse';
+import {
+  ZEITFENSTER,
+  imZeitfenster,
+  tagesEtikett,
+  tagesSchluessel,
+  type Zeitfenster,
+} from '../lagemeldungen/zeitachse';
 
 /**
  * Lagerelevante Meldungen als Kartensicht (LFH-348 · C13, Befund M85) — die zwölfte
@@ -33,7 +39,10 @@ export default function LagemeldungenPage() {
   const einsatzId = Number(id);
   const { konventionen } = useAnzeigeKonventionen();
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const lageQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
@@ -55,7 +64,8 @@ export default function LagemeldungenPage() {
           sortWert: (l) => l.erstellt_at,
           filter: {
             werte: ZEITFENSTER,
-            trifft: (l, w) => imZeitfenster(l.erstellt_at, w as Zeitfenster, undefined, konventionen),
+            trifft: (l, w) =>
+              imZeitfenster(l.erstellt_at, w as Zeitfenster, undefined, konventionen),
           },
           render: (_t, l) => <ZeitAnzeige wert={l.erstellt_at} format="kurz" />,
         },
@@ -68,7 +78,9 @@ export default function LagemeldungenPage() {
           render: (_t, l) => (
             <>
               {'Herkunft: '}
-              <Link to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>Meldung #{l.meldung_lfd_nr}</Link>
+              <Link to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
+                Meldung #{l.meldung_lfd_nr}
+              </Link>
               {` von ${l.meldung_absender}`}
             </>
           ),
@@ -85,7 +97,12 @@ export default function LagemeldungenPage() {
           },
           render: (_t, l) =>
             l.lat != null && l.lon != null ? (
-              <KoordinatenAnzeige lat={l.lat} lon={l.lon} einsatzId={l.einsatz_id} exclude={`lagemeldung:${l.id}`} />
+              <KoordinatenAnzeige
+                lat={l.lat}
+                lon={l.lon}
+                einsatzId={l.einsatz_id}
+                exclude={`lagemeldung:${l.id}`}
+              />
             ) : null,
         },
       ]),
@@ -93,7 +110,11 @@ export default function LagemeldungenPage() {
   );
 
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -102,19 +123,31 @@ export default function LagemeldungenPage() {
   const eintraege = lageQuery.data ?? [];
   // Tagesgruppen jüngster zuerst — die feste Reihenfolge aus den Daten, weil das Primitiv
   // unbekannte Gruppen sonst in Antreffreihenfolge der SERVERliste anhängt.
-  const tage = [...new Set(eintraege.map((l) => tagesSchluessel(l.erstellt_at, konventionen)))].sort().reverse();
+  const tage = [...new Set(eintraege.map((l) => tagesSchluessel(l.erstellt_at, konventionen)))]
+    .sort()
+    .reverse();
 
   return (
     <div>
-      <Breadcrumb style={{ marginBottom: 12 }} items={[
-        { title: <Link to="/einsaetze">Einsätze</Link> },
-        { title: einsatz.bezeichnung },
-        { title: 'Lagemeldungen' },
-      ]} />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>Lagerelevante Meldungen</Typography.Title>
+      <Breadcrumb
+        style={{ marginBottom: 12 }}
+        items={[
+          { title: <Link to="/einsaetze">Einsätze</Link> },
+          { title: einsatz.bezeichnung },
+          { title: 'Lagemeldungen' },
+        ]}
+      />
+      <Typography.Title level={3} style={{ marginTop: 0 }}>
+        Lagerelevante Meldungen
+      </Typography.Title>
       <Datenstand dataUpdatedAt={lageQuery.dataUpdatedAt} />
       {lageQuery.isError && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Lageobjekte konnten nicht geladen werden" />
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="Lageobjekte konnten nicht geladen werden"
+        />
       )}
       {/* KEINE Primäraktion (LFH-331 · B3): eine Lagemeldung entsteht nicht hier, sondern
           dadurch, dass jemand anderswo eine Meldung als lagerelevant übergibt. Ein Knopf

@@ -121,8 +121,14 @@ async function messeUeberlauf(page: Page) {
         .filter((el) => !im(el, '.ant-layout-header') && !im(el, '.ant-layout-content'))
         .slice(0, 6)
         .map(benenne),
-      kopfzeile: zuBreit.filter((el) => im(el, '.ant-layout-header')).slice(0, 3).map(benenne),
-      inhalt: zuBreit.filter((el) => im(el, '.ant-layout-content')).slice(0, 3).map(benenne),
+      kopfzeile: zuBreit
+        .filter((el) => im(el, '.ant-layout-header'))
+        .slice(0, 3)
+        .map(benenne),
+      inhalt: zuBreit
+        .filter((el) => im(el, '.ant-layout-content'))
+        .slice(0, 3)
+        .map(benenne),
     };
   });
 }
@@ -214,10 +220,9 @@ test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', 
   // Der Drawer selbst darf die Seite nicht breiter machen — das war die
   // Entscheidung gegen Rail + Modul-Spalte im Drawer.
   const offen = await messeUeberlauf(page);
-  expect(
-    offen.rahmen,
-    `Der offene Drawer erzeugt Überlauf:\n${offen.rahmen.join('\n')}`,
-  ).toEqual([]);
+  expect(offen.rahmen, `Der offene Drawer erzeugt Überlauf:\n${offen.rahmen.join('\n')}`).toEqual(
+    [],
+  );
   meldeFremdenUeberlauf('Drawer offen', offen);
   // Auf das TOKEN-Maß geprüft, nicht bloß auf „passt in den Schirm": antds
   // Vorgabebreite (378) läge ebenfalls unter 390, ein ignoriertes Breitenmaß
@@ -300,10 +305,9 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
   // misst das Rauschen und nicht die Aussage. Die Aussage selbst bleibt scharf: gefragt
   // ist, WELCHE Box das Maß trägt, und ein halbes Pixel unterscheidet 280 weiterhin von
   // der um die Polsterung schmaleren Inhaltsbox wie von antds Vorgabe 378.
-  expect(
-    koerper.width,
-    `Körper liegt im Panel (gemessen ${koerper.width})`,
-  ).toBeLessThanOrEqual(DRAWER_BREITE + SUBPIXEL);
+  expect(koerper.width, `Körper liegt im Panel (gemessen ${koerper.width})`).toBeLessThanOrEqual(
+    DRAWER_BREITE + SUBPIXEL,
+  );
 });
 
 /**

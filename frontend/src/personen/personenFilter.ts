@@ -16,12 +16,7 @@ import type { Person } from '../api/types';
 
 /** Sicht-Reiter: 'alle' und 'patienten' filtern nicht; sonst Status-Filter. */
 export type PersonenSicht =
-  | 'erfasst'
-  | 'vermisst'
-  | 'betroffen'
-  | 'patienten'
-  | 'verstorben'
-  | 'alle';
+  'erfasst' | 'vermisst' | 'betroffen' | 'patienten' | 'verstorben' | 'alle';
 
 /**
  * Zeilenmenge eines Sicht-Reiters.

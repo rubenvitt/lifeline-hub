@@ -1,5 +1,12 @@
 import {
-  App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Typography,
+  App,
+  Button,
+  Dropdown,
+  Popconfirm,
+  Progress,
+  Space,
+  Tag,
+  Typography,
   type TableColumnsType,
 } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -82,7 +89,10 @@ export default function OfflineKartenVerwaltung() {
       query.state.data?.some((j) => AKTIVE_BAU_STATUS.includes(j.status.status)) ? 2000 : false,
   });
   const aktiveBauten = useMemo(
-    () => (bauStatusQuery.data ?? []).filter((j: BauJob) => AKTIVE_BAU_STATUS.includes(j.status.status)),
+    () =>
+      (bauStatusQuery.data ?? []).filter((j: BauJob) =>
+        AKTIVE_BAU_STATUS.includes(j.status.status),
+      ),
     [bauStatusQuery.data],
   );
 
@@ -125,7 +135,8 @@ export default function OfflineKartenVerwaltung() {
       invalidiereKarte(qc);
       message.success('Update lädt — wird nach Abschluss automatisch aktiviert');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktualisieren fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Aktualisieren fehlgeschlagen'),
   });
   // „Neu laden" = In-Place-Hot-Swap (B3) der AKTIVEN Karte: Update in DIESELBE Zeile/Datei. Die
   // alte Datei bleibt bis zum atomaren Swap aktiv+ausgeliefert (downtime-frei, stabile id). Nur für
@@ -140,7 +151,9 @@ export default function OfflineKartenVerwaltung() {
       }),
     onSuccess: () => {
       invalidiereKarte(qc);
-      message.success('Aktualisierung lädt — die Karte bleibt aktiv und wird nach Abschluss getauscht');
+      message.success(
+        'Aktualisierung lädt — die Karte bleibt aktiv und wird nach Abschluss getauscht',
+      );
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Neu laden fehlgeschlagen'),
   });
@@ -331,14 +344,10 @@ export default function OfflineKartenVerwaltung() {
                         Neu laden
                       </Button>
                     ) : (
-                      <Button onClick={() => aktualisierenMutation.mutate(k)}>
-                        Aktualisieren
-                      </Button>
+                      <Button onClick={() => aktualisierenMutation.mutate(k)}>Aktualisieren</Button>
                     ))}
                   {laeuft && (
-                    <Button onClick={() => abbrechenMutation.mutate(k.id)}>
-                      Abbrechen
-                    </Button>
+                    <Button onClick={() => abbrechenMutation.mutate(k.id)}>Abbrechen</Button>
                   )}
                   {!laeuft && (
                     <Popconfirm
@@ -347,9 +356,7 @@ export default function OfflineKartenVerwaltung() {
                       okButtonProps={{ danger: true }}
                       onConfirm={() => loeschenMutation.mutate(k.id)}
                     >
-                      <Button danger>
-                        Löschen
-                      </Button>
+                      <Button danger>Löschen</Button>
                     </Popconfirm>
                   )}
                 </Space>
@@ -373,7 +380,11 @@ export default function OfflineKartenVerwaltung() {
             menu={{
               items: [
                 { key: 'url', label: 'Per URL herunterladen', onClick: () => setUrlOffen(true) },
-                { key: 'lokal', label: 'Gebaute Region übernehmen', onClick: () => setVorhandenOffen(true) },
+                {
+                  key: 'lokal',
+                  label: 'Gebaute Region übernehmen',
+                  onClick: () => setVorhandenOffen(true),
+                },
               ],
             }}
           >

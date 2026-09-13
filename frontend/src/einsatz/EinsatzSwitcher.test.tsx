@@ -9,9 +9,15 @@ import EinsatzSwitcher from './EinsatzSwitcher';
 
 function einsatz(over: Partial<Record<string, unknown>> = {}) {
   return {
-    id: 7, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv',
-    begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null,
-    abgeschlossen_von: null, meine_rolle: 'einsatzleitung', ...over,
+    id: 7,
+    bezeichnung: 'Hochwasser',
+    stichwort: null,
+    status: 'aktiv',
+    begonnen_at: '2026-05-23 09:00:00',
+    abgeschlossen_at: null,
+    abgeschlossen_von: null,
+    meine_rolle: 'einsatzleitung',
+    ...over,
   };
 }
 

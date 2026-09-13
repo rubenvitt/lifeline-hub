@@ -18,12 +18,23 @@ describe('Lagebericht-Vorlagen', () => {
 
   it('Schlüssel decken sich mit den Backend-Schlüsseln (Drift-Schutz)', () => {
     expect(vorlage('lagebericht')?.abschnitte.map((a) => a.schluessel)).toEqual([
-      'auftrag', 'gefahren_schadenlage', 'eigene_lage', 'lageentwicklung',
-      'fuehrungsprobleme', 'antraege_vorschlaege', 'zusammenfassung',
+      'auftrag',
+      'gefahren_schadenlage',
+      'eigene_lage',
+      'lageentwicklung',
+      'fuehrungsprobleme',
+      'antraege_vorschlaege',
+      'zusammenfassung',
     ]);
     expect(vorlage('lagebeurteilung')?.abschnitte.map((a) => a.schluessel)).toEqual([
-      'auftrag', 'anlass', 'beurteilung_schadenlage', 'beurteilung_eigene_lage',
-      'gemeinsame_elemente', 'entschlussvorschlaege', 'abwaegen', 'vorschlag_beste',
+      'auftrag',
+      'anlass',
+      'beurteilung_schadenlage',
+      'beurteilung_eigene_lage',
+      'gemeinsame_elemente',
+      'entschlussvorschlaege',
+      'abwaegen',
+      'vorschlag_beste',
     ]);
     expect(vorlage('freitext')?.abschnitte.map((a) => a.schluessel)).toEqual(['text']);
   });

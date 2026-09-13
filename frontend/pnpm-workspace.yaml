@@ -2,18 +2,62 @@ allowBuilds:
   esbuild: true
   msw: true
 
+# ═══════════════════════════════════════════════════════════════════════════════════
+# DIES IST DAS FRONTEND-GEGENSTÜCK ZU .cargo/audit.toml (LFH-354).
+#
+# Die Frage, die LFH-354 offen vorfand: die Rust-Seite hat mit .cargo/audit.toml einen
+# benannten Ort für bewertete Advisories — die Frontend-Seite hatte keinen, und damit war
+# nicht aufgeschrieben, was mit einem GHSA passiert, für den es keinen Upgrade-Pfad gibt.
+# Entschieden ist: DER BLOCK `overrides` UNTEN IST DIESER ORT, und die Regel lautet —
+#
+#   1. JEDER `high`-FUND BRICHT DAS GATE. Es gibt keine Ignorier-Liste, mit der man ein
+#      Advisory stumm stellt. Ein Fund wird BEHOBEN: entweder hebt der Direktabhängige die
+#      Version, oder — wenn die Kette keinen Weg hergibt — steht hier ein Override mit der
+#      erzwungenen sicheren Mindestversion UND seiner Begründung. Der Unterschied zur
+#      Rust-Seite ist keine Nachlässigkeit, sondern die Lage: bei npm kann man eine
+#      transitive Version erzwingen, bei Cargo nicht, und genau deshalb braucht die Rust-
+#      Seite ein Ignorier-Werkzeug und diese hier keines.
+#
+#   2. `moderate`/`low` MELDEN, BRECHEN ABER NICHT (`--audit-level=high` in
+#      scripts/check-deps.sh). Das ist die bewusste Schwelle, nicht ein Versehen: das
+#      Frontend-Werkzeug erzeugt genug Dauerrauschen, um ein Gate unbenutzbar zu machen,
+#      und ein Gate, das dauerrot ist, wird abgeschaltet statt befolgt.
+#
+#   3. KEIN LEERER `auditConfig.ignoreGhsas`-BLOCK „für später". pnpm brächte ihn mit,
+#      aber eine Ausnahmeliste ohne Eintrag ist eine Zusicherung, die nichts zusichert —
+#      dieselbe Linie, aus der CLAUDE.md „ein Eintrag ohne Verstoß gilt selbst als Verstoß"
+#      zieht. Wer den ersten echten Fall hat — ein `high`-Advisory, das WEDER über einen
+#      Override noch über ein Upgrade erreichbar ist —, führt den Block dann ein, mit dem
+#      Eintrag, der ihn nötig macht, und nach dem Muster von .cargo/audit.toml: warum kein
+#      Upgrade möglich ist, warum das Risiko in DIESEM Code nicht trägt, und woran man
+#      merkt, dass sich das ändert.
+#
+# Was ein Override hier braucht (jeder unten hält es vor): die GHSA-Nummer, die Kette, über
+# die das Paket hereinkommt, warum kein Direktabhängiger es heben kann, und ob es Bau- oder
+# Laufzeit ist. Und BEIDE Grenzen werden gepflegt — der Bereich UND die Zielversion; dass
+# ein Advisory sich unter einem festgenagelten Ziel wegbewegt, ist unten dreimal passiert
+# (nanoid, fast-uri, js-yaml).
+# ═══════════════════════════════════════════════════════════════════════════════════
+
 # Transitive Advisory-Fixes mit erzwungenen sicheren Mindestversionen.
 # Ab pnpm 10 werden Overrides hier gelesen, NICHT mehr aus package.json ("pnpm"-Feld
 # wird ignoriert — pnpm warnt darüber nur, es bricht nicht).
 overrides:
   # GHSA-5p4m-2wfm-xmqj (high): quadratische CPU bei !!omap-Auflösung.
   # @redocly/openapi-core pinnt js-yaml exakt auf 4.2.0, openapi-typescript ist bereits
-  # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.1 ist
+  # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.1 war
   # ein Same-Major-Update (Minor+Patch); verifiziert durch check-typ-codegen.sh, das
   # diese Toolchain fährt (openapi.json → types.generated.ts).
-  # Bewusst `^4.3.1` und nicht `>=4.3.1`: letzteres zog js-yaml 5.2.1 herein — einen
+  # Bewusst `^4.3.2` und nicht `>=4.3.2`: letzteres zog js-yaml 5.2.1 herein — einen
   # Major-Sprung mit Breaking Changes in eine Abhängigkeit, die wir gar nicht selbst rufen.
-  js-yaml@>=4.0.0 <4.3.1: ^4.3.1
+  #
+  # NACHGEZOGEN 2026-09-09 (LFH-522-Gate-Lauf): DRITTES MAL DASSELBE MUSTER (siehe nanoid
+  # und fast-uri unten) — das Advisory ist gewandert, der Override nicht. Aus
+  # GHSA-5p4m-2wfm-xmqj ist zusätzlich GHSA-2883-xcg3-v3hh geworden (maxTotalMergeKeys
+  # begrenzt die CPU bei LEEREN Merge-Quellen nicht), die Schwelle steht jetzt bei 4.3.2.
+  # Der Override hob weiterhin korrekt auf 4.3.1 — nur reichte das Ziel nicht mehr, und
+  # `pnpm audit` brach Schritt 6. BEIDE Grenzen sind nachgezogen: Obergrenze UND Zielversion.
+  js-yaml@>=4.0.0 <4.3.2: ^4.3.2
 
   # GHSA-7p8r-x3mc-p8w7 (high): Host-Confusion über einen Backslash als Authority-Trenner.
   # Kette: vite-plugin-pwa → workbox-build → ajv (bzw.

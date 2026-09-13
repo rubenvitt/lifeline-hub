@@ -19,30 +19,56 @@ import { fahrzeugDetailPfad } from './stammdatenDetail';
  */
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 const fahrzeug = {
-  id: 7, funkrufname: 'Florian 1', fahrzeugtyp: 'LF 20', traegerorganisation: 'FF Musterstadt',
-  kennzeichen: 'XX-AB 1', opta: 'FL MUS 01', standort: 'Wache Mitte', fms_issi: '12345',
-  sondersignal: true, tragenkapazitaet: 2,
+  id: 7,
+  funkrufname: 'Florian 1',
+  fahrzeugtyp: 'LF 20',
+  traegerorganisation: 'FF Musterstadt',
+  kennzeichen: 'XX-AB 1',
+  opta: 'FL MUS 01',
+  standort: 'Wache Mitte',
+  fms_issi: '12345',
+  sondersignal: true,
+  tragenkapazitaet: 2,
   staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
-  bemerkung: 'Reserve', dienststatus: 'in_dienst', angelegt_at: '2026-05-26 10:00:00',
+  bemerkung: 'Reserve',
+  dienststatus: 'in_dienst',
+  angelegt_at: '2026-05-26 10:00:00',
 };
 
 /** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
 const fahrzeugZwei = {
-  ...fahrzeug, id: 8, funkrufname: 'Florian 2', opta: 'FL MUS 08', bemerkung: 'Zweiter',
+  ...fahrzeug,
+  id: 8,
+  funkrufname: 'Florian 2',
+  opta: 'FL MUS 08',
+  bemerkung: 'Zweiter',
 };
 
-function handler(benutzer = admin, fahrzeuge: unknown[] = [fahrzeug], onPatch: (b: unknown) => void = () => {}) {
+function handler(
+  benutzer = admin,
+  fahrzeuge: unknown[] = [fahrzeug],
+  onPatch: (b: unknown) => void = () => {},
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
     http.get('/api/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/fahrzeug-vorschlaege', () =>
-      HttpResponse.json({ fahrzeugtyp: ['LF 20'], traegerorganisation: ['FF Musterstadt'], standort: ['Wache Mitte'] }),
+      HttpResponse.json({
+        fahrzeugtyp: ['LF 20'],
+        traegerorganisation: ['FF Musterstadt'],
+        standort: ['Wache Mitte'],
+      }),
     ),
     http.patch('/api/fahrzeuge/7', async ({ request }) => {
       onPatch(await request.json());

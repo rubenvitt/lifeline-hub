@@ -21,12 +21,18 @@ export const ZEITFENSTER: readonly { readonly text: string; readonly value: Zeit
 ];
 
 /** Gruppenschlüssel: das Datum in der Anzeigezone, `YYYY-MM-DD` — sortierbar als Text. */
-export function tagesSchluessel(utc: string, konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN): string {
+export function tagesSchluessel(
+  utc: string,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
   return inZone(utc, konv).format('YYYY-MM-DD');
 }
 
 /** „Jetzt" in der Anzeigezone — dieselbe Zone, in der `tagesSchluessel` den Tag bestimmt. */
-export function jetztInZone(konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN, jetzt: Dayjs = dayjs()): Dayjs {
+export function jetztInZone(
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  jetzt: Dayjs = dayjs(),
+): Dayjs {
   if (!konv.zeitzone) return jetzt;
   try {
     return jetzt.tz(konv.zeitzone);

@@ -36,9 +36,7 @@ export function webauthnRegistrierungStarten(): Promise<WebauthnCreationChalleng
  *  `navigator.credentials.create` (hier: `startRegistration()` aus `@simplewebauthn/browser`).
  *  Antwort ist `201 Created` ohne Json-Body (s. `apiSend` in `client.ts`: leerer Body →
  *  `undefined`). */
-export function webauthnRegistrierungAbschliessen(
-  cred: RegistrationResponseJSON,
-): Promise<void> {
+export function webauthnRegistrierungAbschliessen(cred: RegistrationResponseJSON): Promise<void> {
   return apiSend<void>('/api/auth/webauthn/register/finish', 'POST', cred);
 }
 

@@ -33,22 +33,36 @@ vi.mock('../einsatz/modulRegistry', async (importOriginal) => {
   return {
     ...echt,
     modulRegistry: echt.modulRegistry.map((m: ModulEintrag) =>
-      (m.key === 'personen' ? { ...m, status: 'wip' as const } : m)),
+      m.key === 'personen' ? { ...m, status: 'wip' as const } : m,
+    ),
   };
 });
 
 const fuehrungskraft: BenutzerAnzeige = {
-  id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'EL',
+  benutzername: 'el',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+  aktiv: true,
+  erstellt_at: '',
+  totp_aktiviert: false,
 };
 
 /** Wie in `befehle.test.ts` — bewusst lokal gehalten: eine geteilte Fixture zöge diese
  *  Datei samt ihrem Registry-Stub in den Importgraph der anderen. */
 function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
   return {
-    einsatzId: 5, benutzer: fuehrungskraft, einsaetze: [], overrides: undefined,
+    einsatzId: 5,
+    benutzer: fuehrungskraft,
+    einsaetze: [],
+    overrides: undefined,
     darfSchreibenImEinsatz: true,
-    navigate: vi.fn(), setThemeModus: vi.fn(), setDichte: vi.fn(), setKoordinaten: vi.fn(), logout: vi.fn(),
+    navigate: vi.fn(),
+    setThemeModus: vi.fn(),
+    setDichte: vi.fn(),
+    setKoordinaten: vi.fn(),
+    logout: vi.fn(),
     ...over,
   };
 }
@@ -75,8 +89,10 @@ describe('baueBefehle — Schnellaktionen folgen der Leseachse', () => {
   /** Gegenaussage zur Negativaussage: es fällt nicht alles weg, der Filter trifft genau das
    *  gestubbte Modul — und die Reihenfolge der übrigen drei bleibt die der Tabelle. */
   it('lässt die Schnellaktionen der fertigen Module stehen', () => {
-    expect(baueBefehle(kontext()).map((x) => x.id).filter((id) => id.startsWith('aktion:'))).toEqual(
-      ['aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden'],
-    );
+    expect(
+      baueBefehle(kontext())
+        .map((x) => x.id)
+        .filter((id) => id.startsWith('aktion:')),
+    ).toEqual(['aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden']);
   });
 });

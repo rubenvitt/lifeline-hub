@@ -39,13 +39,18 @@ const fahrzeug: Fahrzeug = {
   angelegt_at: '2026-05-26 10:00:00',
 };
 
-const vorschlaege = { fahrzeugtyp: ['LF 20'], traegerorganisation: ['FF Musterstadt'], standort: ['Wache Mitte'] };
+const vorschlaege = {
+  fahrzeugtyp: ['LF 20'],
+  traegerorganisation: ['FF Musterstadt'],
+  standort: ['Wache Mitte'],
+};
 
 function handler(onSend: (body: unknown) => void = () => {}, status = 200) {
   server.use(
     http.post('/api/fahrzeuge', async ({ request }) => {
       onSend(await request.json());
-      if (status !== 200) return HttpResponse.json({ error: 'Funkrufname bereits vergeben' }, { status });
+      if (status !== 200)
+        return HttpResponse.json({ error: 'Funkrufname bereits vergeben' }, { status });
       return HttpResponse.json({ ...fahrzeug, id: 9 });
     }),
     http.patch('/api/fahrzeuge/1', async ({ request }) => {
@@ -66,14 +71,23 @@ function Harness({ bestand, onClose }: { bestand?: Fahrzeug | null; onClose?: ()
   const [aktuell, setAktuell] = useState<Fahrzeug | null>(bestand ?? null);
   return (
     <>
-      <button type="button" onClick={() => { setAktuell(null); setOffen(true); }}>
+      <button
+        type="button"
+        onClick={() => {
+          setAktuell(null);
+          setOffen(true);
+        }}
+      >
         Wieder öffnen
       </button>
       <FahrzeugFormModal
         offen={offen}
         fahrzeug={aktuell}
         vorschlaege={vorschlaege}
-        onClose={() => { setOffen(false); onClose?.(); }}
+        onClose={() => {
+          setOffen(false);
+          onClose?.();
+        }}
       />
     </>
   );
@@ -232,8 +246,13 @@ describe('FahrzeugFormModal — Schnellerfassung (LFH-346/A7)', () => {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
     for (const label of [
-      'OPTA', 'Standort', 'FMS-ISSI', 'Sonder-/Wegerecht', 'Tragenkapazität',
-      'Soll-Stärke (alle drei oder keiner)', 'Bemerkung',
+      'OPTA',
+      'Standort',
+      'FMS-ISSI',
+      'Sonder-/Wegerecht',
+      'Tragenkapazität',
+      'Soll-Stärke (alle drei oder keiner)',
+      'Bemerkung',
     ]) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
@@ -260,7 +279,10 @@ describe('FahrzeugFormModal — Schnellerfassung (LFH-346/A7)', () => {
 
     await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
     expect(Object.keys(gesendet.mock.calls[0][0] as object).sort()).toEqual([
-      'fahrzeugtyp', 'funkrufname', 'kennzeichen', 'traegerorganisation',
+      'fahrzeugtyp',
+      'funkrufname',
+      'kennzeichen',
+      'traegerorganisation',
     ]);
   });
 

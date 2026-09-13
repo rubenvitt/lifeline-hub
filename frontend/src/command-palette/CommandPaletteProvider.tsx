@@ -1,5 +1,13 @@
 // frontend/src/command-palette/CommandPaletteProvider.tsx
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useBefehle } from './useBefehle';
@@ -46,7 +54,10 @@ const PaletteContext = createContext<PaletteWert | null>(null);
 export function verschmelzeAktionen(ketteVonTiefNachFlach: TastaturAktionen[]): TastaturAktionen {
   const verschmolzen: TastaturAktionen = {};
   for (const ebene of ketteVonTiefNachFlach) {
-    for (const [id, callback] of Object.entries(ebene) as [keyof TastaturAktionen, (() => void) | undefined][]) {
+    for (const [id, callback] of Object.entries(ebene) as [
+      keyof TastaturAktionen,
+      (() => void) | undefined,
+    ][]) {
       if (!callback || verschmolzen[id]) continue;
       verschmolzen[id] = callback;
     }
@@ -112,7 +123,10 @@ function flachsteEbene(ebenen: Map<symbol, TastaturEbene>): TastaturEbene[] {
     // wird ohne Umsortieren. Der Gleichstands-Test pinnt deshalb das ERGEBNIS („die zuerst
     // registrierte gewinnt"), nicht diesen Zweig; er steht trotzdem hier, damit die Regel
     // nicht an einer ungeschriebenen Eigenschaft der Map hängt.
-    if (tiefe < kleinsteTiefe || (tiefe === kleinsteTiefe && ebene.reihenfolge < (flachste?.reihenfolge ?? Infinity))) {
+    if (
+      tiefe < kleinsteTiefe ||
+      (tiefe === kleinsteTiefe && ebene.reihenfolge < (flachste?.reihenfolge ?? Infinity))
+    ) {
       flachste = ebene;
       kleinsteTiefe = tiefe;
     }
@@ -184,28 +198,31 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     aktiveKetteRef.current = enthaltend.map((x) => x.ebene);
   }, []);
 
-  const registriereTastaturEbene = useCallback((ebene: Omit<TastaturEbene, 'id' | 'reihenfolge'>) => {
-    const id = Symbol(ebene.name);
-    const registriert: TastaturEbene = {
-      ...ebene,
-      id,
-      reihenfolge: naechsteReihenfolgeRef.current++,
-    };
-    ebenenRef.current.set(id, registriert);
-    waehleEbene(document.activeElement);
-    return () => {
-      ebenenRef.current.delete(id);
-      if (aktiveKetteRef.current.some((e) => e.id === id)) {
-        aktiveKetteRef.current = [];
-        waehleEbene(document.activeElement);
-      }
-      // FILTERN, nicht leeren: die gemerkte Kette trägt mehrere Ebenen, und eine
-      // abgemeldete darf die übrigen nicht mitnehmen. (Mit einer einzelnen Ebene war
-      // „nullen" dasselbe wie „filtern" — bei einer Kette ist es ein Datenverlust.)
-      vorPaletteKetteRef.current = vorPaletteKetteRef.current.filter((e) => e.id !== id);
-      if (offenRef.current) meldeTastaturAktionenAenderung();
-    };
-  }, [meldeTastaturAktionenAenderung, waehleEbene]);
+  const registriereTastaturEbene = useCallback(
+    (ebene: Omit<TastaturEbene, 'id' | 'reihenfolge'>) => {
+      const id = Symbol(ebene.name);
+      const registriert: TastaturEbene = {
+        ...ebene,
+        id,
+        reihenfolge: naechsteReihenfolgeRef.current++,
+      };
+      ebenenRef.current.set(id, registriert);
+      waehleEbene(document.activeElement);
+      return () => {
+        ebenenRef.current.delete(id);
+        if (aktiveKetteRef.current.some((e) => e.id === id)) {
+          aktiveKetteRef.current = [];
+          waehleEbene(document.activeElement);
+        }
+        // FILTERN, nicht leeren: die gemerkte Kette trägt mehrere Ebenen, und eine
+        // abgemeldete darf die übrigen nicht mitnehmen. (Mit einer einzelnen Ebene war
+        // „nullen" dasselbe wie „filtern" — bei einer Kette ist es ein Datenverlust.)
+        vorPaletteKetteRef.current = vorPaletteKetteRef.current.filter((e) => e.id !== id);
+        if (offenRef.current) meldeTastaturAktionenAenderung();
+      };
+    },
+    [meldeTastaturAktionenAenderung, waehleEbene],
+  );
 
   useEffect(() => {
     function aufFokus(e: FocusEvent) {
@@ -218,7 +235,12 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function aufTaste(e: KeyboardEvent) {
       if (e.defaultPrevented || e.repeat || e.isComposing) return;
-      if (!e.shiftKey && !e.altKey && (e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+      if (
+        !e.shiftKey &&
+        !e.altKey &&
+        (e.metaKey || e.ctrlKey) &&
+        (e.key === 'k' || e.key === 'K')
+      ) {
         e.preventDefault();
         toggle();
         return;
@@ -275,9 +297,10 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   // ist ein bewusster Griff auf eine sichtbar beschriftete Aktion, ein globales
   // Tastenkürzel ist es nicht. Läge der Fallback in der Auswahl, feuerte Strg+S das
   // `speichern` einer Maske, die der Fokus längst verlassen hat.
-  const paletteKette = vorPaletteKetteRef.current.length > 0
-    ? vorPaletteKetteRef.current
-    : flachsteEbene(ebenenRef.current);
+  const paletteKette =
+    vorPaletteKetteRef.current.length > 0
+      ? vorPaletteKetteRef.current
+      : flachsteEbene(ebenenRef.current);
   const ketteAktionen = () => verschmelzeAktionen(paletteKette.map((e) => e.aktionen()));
   const aktiveAktionen: TastaturAktionen = {};
   for (const id of Object.keys(ketteAktionen()) as (keyof TastaturAktionen)[]) {
@@ -348,11 +371,19 @@ function PaletteHost({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
-  const [stand, setStand] = useState<{ modus: PaletteModus; rest: string }>({ modus: 'alles', rest: '' });
+  const [stand, setStand] = useState<{ modus: PaletteModus; rest: string }>({
+    modus: 'alles',
+    rest: '',
+  });
 
   // Identitätsstabil, weil beide in `useMemo`-Dependencies der Hooks darunter stehen: ein
   // je Render frisch gebautes Paar machte deren Memoisierung wirkungslos.
-  const gehZu = useCallback((pfad: string) => { navigate(pfad); }, [navigate]);
+  const gehZu = useCallback(
+    (pfad: string) => {
+      navigate(pfad);
+    },
+    [navigate],
+  );
   const melde = useCallback((modus: PaletteModus, rest: string) => {
     // Gleicher Stand → gleiches Objekt: die Frist läuft auch beim blossen Öffnen einmal ab
     // und meldete sonst je Palettenöffnung ein neues, inhaltsgleiches Objekt.
@@ -383,7 +414,10 @@ function PaletteHost({
 
 export function useCommandPalette(): PaletteWert {
   const w = useContext(PaletteContext);
-  if (!w) throw new Error('useCommandPalette muss innerhalb von <CommandPaletteProvider> verwendet werden');
+  if (!w)
+    throw new Error(
+      'useCommandPalette muss innerhalb von <CommandPaletteProvider> verwendet werden',
+    );
   return w;
 }
 

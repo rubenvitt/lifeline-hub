@@ -44,7 +44,10 @@ export function zuWerte(e: EtbEntwurf): EntwurfWerte {
   };
 }
 
-export type EntwurfPatch = Pick<EtbEntwurf, 'inhalt' | 'typ' | 'von' | 'an' | 'meldeweg' | 'veranlassung' | 'ereigniszeit'>;
+export type EntwurfPatch = Pick<
+  EtbEntwurf,
+  'inhalt' | 'typ' | 'von' | 'an' | 'meldeweg' | 'veranlassung' | 'ereigniszeit'
+>;
 
 export function werteZuPatch(w: EntwurfWerte): EntwurfPatch {
   const m = w.metadaten;
@@ -62,7 +65,10 @@ export function werteZuPatch(w: EntwurfWerte): EntwurfPatch {
 const LABEL_MAX = 30;
 
 export function entwurfLabel(e: EtbEntwurf): string {
-  const ersteZeile = e.inhalt.split('\n').map((z) => z.trim()).find((z) => z.length > 0);
+  const ersteZeile = e.inhalt
+    .split('\n')
+    .map((z) => z.trim())
+    .find((z) => z.length > 0);
   if (!ersteZeile) return 'Neuer Eintrag';
   return ersteZeile.length > LABEL_MAX ? `${ersteZeile.slice(0, LABEL_MAX)} …` : ersteZeile;
 }

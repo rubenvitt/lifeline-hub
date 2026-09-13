@@ -21,7 +21,12 @@ function initialText(m: Meldung | null): string {
  *  Meldungsinhalt vorbelegt — gespiegelt von der Chat-Heraufstufung (HeraufstufenAuftragModal).
  *  `destroyOnHidden` remountet das Formular bei jedem Öffnen, sodass `initialText` frisch greift. */
 export default function AuftragErteilenModal({
-  meldung, abschnitte, einheiten, senden, onAbbrechen, onAnlegen,
+  meldung,
+  abschnitte,
+  einheiten,
+  senden,
+  onAbbrechen,
+  onAnlegen,
 }: Props) {
   return (
     <Modal
@@ -38,15 +43,17 @@ export default function AuftragErteilenModal({
         abschnitte={abschnitte}
         einheiten={einheiten}
         initialText={initialText(meldung)}
-        zitat={meldung && (
-          // Read-only Wortlaut der Quellmeldung (LFH-343 · C8, Befund H49). Der
-          // vorbelegte Auftragstext ist bearbeitbar und wird beim Formulieren
-          // überschrieben — dann fehlte ohne dieses Zitat der Urtext, auf den sich
-          // der Auftrag bezieht.
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-            <Typography.Text strong>{meldung.absender}:</Typography.Text> {meldung.inhalt}
-          </Typography.Paragraph>
-        )}
+        zitat={
+          meldung && (
+            // Read-only Wortlaut der Quellmeldung (LFH-343 · C8, Befund H49). Der
+            // vorbelegte Auftragstext ist bearbeitbar und wird beim Formulieren
+            // überschrieben — dann fehlte ohne dieses Zitat der Urtext, auf den sich
+            // der Auftrag bezieht.
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+              <Typography.Text strong>{meldung.absender}:</Typography.Text> {meldung.inhalt}
+            </Typography.Paragraph>
+          )
+        }
         onAnlegen={onAnlegen}
       />
     </Modal>

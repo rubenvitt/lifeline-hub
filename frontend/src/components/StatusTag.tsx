@@ -68,8 +68,12 @@ export default function StatusTag({ darstellung, title, farbe: ueberschrieben }:
           aria-hidden="true"
           data-lfh="mandantenfarbe"
           style={{
-            display: 'inline-block', width: '0.5em', height: '0.5em', borderRadius: '50%',
-            backgroundColor: mandantenfarbe, marginInlineEnd: token.marginXXS,
+            display: 'inline-block',
+            width: '0.5em',
+            height: '0.5em',
+            borderRadius: '50%',
+            backgroundColor: mandantenfarbe,
+            marginInlineEnd: token.marginXXS,
           }}
         />
       )}

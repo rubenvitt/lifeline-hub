@@ -24,12 +24,18 @@ async function vorbereiten(page: Page) {
   return { api, liste, detail };
 }
 
-test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor der Navigation', async ({ page }) => {
+test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor der Navigation', async ({
+  page,
+}) => {
   const { api, liste, detail } = await vorbereiten(page);
   let fehler = true;
   await page.route(`**${api}`, async (route) => {
     if (route.request().method() === 'PATCH' && fehler) {
-      await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Speichern vorübergehend nicht möglich"}' });
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"Speichern vorübergehend nicht möglich"}',
+      });
     } else await route.continue();
   });
   await page.goto(detail);
@@ -48,7 +54,9 @@ test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor d
   expect((await gespeichert.json()).titel).toBe('Gesicherte neue Fassung');
 });
 
-test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten Versuch aus', async ({ page }) => {
+test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten Versuch aus', async ({
+  page,
+}) => {
   const { api, liste, detail } = await vorbereiten(page);
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.goto(liste);
@@ -58,7 +66,11 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
   // Ein abgelehnter PATCH hält die Fassung reproduzierbar offen; keine Zeitannahme.
   await page.route(`**${api}`, async (route) => {
     if (route.request().method() === 'PATCH') {
-      await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Offline"}' });
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: '{"error":"Offline"}',
+      });
     } else await route.continue();
   });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -67,7 +79,15 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
   const dialog = page.getByRole('dialog', { name: 'Ungespeicherte Änderungen' });
   await expect(dialog).toBeVisible();
   for (const name of ['Verwerfen', 'Bleiben', 'Speichern und weiter']) {
-    const knopf = dialog.getByRole('button', { name, exact: true });
+    // KEIN `exact: true` an diesem Namen: antds `loading` hängt ein
+    // `role="img" aria-label="loading"` in den Knopf, und damit ändert sich sein
+    // ZUGÄNGLICHER Name, während der Textinhalt gleich bleibt (in jsdom gemessen:
+    // 0 exakte Treffer). „Speichern und weiter" trägt `loading={speichert}`, und genau
+    // in diesem Augenblick läuft der Blur-Autosave — in CI einmal rot mit
+    // „element(s) not found", während die zwei Geschwister ohne `loading` gefunden
+    // wurden (LFH-358, PR #59). Der erste Test dieser Datei schützt sich gegen denselben
+    // Zustand bereits über `not.toHaveClass(/ant-btn-loading/)`.
+    const knopf = dialog.getByRole('button', { name: new RegExp(`${name}$`) });
     await expect(knopf).toBeVisible();
     // Modal-Zoom animiert zunächst die gesamte Trefffläche mit; erst den Endzustand messen.
     await expect.poll(async () => (await knopf.boundingBox())!.height).toBeGreaterThanOrEqual(72);

@@ -62,7 +62,9 @@ describe('normalisierePatch — Formular-Lesart (undefined = geleert = löschen)
   });
 
   it('LÖSCHEN via geleertes Select: undefined wird zu explizitem null', () => {
-    expect(JSON.stringify(normalisierePatch({ geschlecht: undefined }))).toBe('{"geschlecht":null}');
+    expect(JSON.stringify(normalisierePatch({ geschlecht: undefined }))).toBe(
+      '{"geschlecht":null}',
+    );
   });
 
   it('LÖSCHEN via geleertes Textfeld: "" und reiner Leerraum werden zu explizitem null', () => {
@@ -79,7 +81,9 @@ describe('normalisierePatch — Formular-Lesart (undefined = geleert = löschen)
 
   it('unterscheidet alle drei Zustände in EINEM Body', () => {
     // Der eigentliche Tri-State-Beweis: gesetzt, geleert und abwesend nebeneinander.
-    const wire = JSON.parse(JSON.stringify(normalisierePatch({ gesetzt: 'A', geleert: undefined })));
+    const wire = JSON.parse(
+      JSON.stringify(normalisierePatch({ gesetzt: 'A', geleert: undefined })),
+    );
     expect(wire.gesetzt).toBe('A');
     expect(wire.geleert).toBeNull();
     expect(Object.keys(wire)).toEqual(['gesetzt', 'geleert']);

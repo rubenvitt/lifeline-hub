@@ -122,14 +122,22 @@ export default function AnzeigeEinstellungen() {
           <Select allowClear placeholder="Metrisch (Fallback)" options={EINHEITEN_OPTIONEN} />
         </Form.Item>
         <Form.Item label="Koordinatenformat" name="koordinatenformat">
-          <Select allowClear placeholder="WGS84 dezimal (Fallback)" options={KOORDINATEN_OPTIONEN} />
+          <Select
+            allowClear
+            placeholder="WGS84 dezimal (Fallback)"
+            options={KOORDINATEN_OPTIONEN}
+          />
         </Form.Item>
         <Form.Item
           label="Geocoder-URL"
           name="geocoder_url"
           tooltip="Nominatim-kompatible Basis-URL für die Ort-Vorschau (Reverse-Geocoding). Leer = öffentlicher Nominatim. Die Einsatz-Koordinate wird an diesen Dienst gesendet — für Produktivlast/Datenschutz eigenen Geocoder hinterlegen."
         >
-          <Input placeholder="https://nominatim.openstreetmap.org (Default)" allowClear style={{ width: '100%' }} />
+          <Input
+            placeholder="https://nominatim.openstreetmap.org (Default)"
+            allowClear
+            style={{ width: '100%' }}
+          />
         </Form.Item>
       </Form>
     </AdminPage>

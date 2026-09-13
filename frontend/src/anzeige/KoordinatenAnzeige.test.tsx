@@ -28,6 +28,8 @@ describe('KoordinatenAnzeige', () => {
     );
     renderMitProviders(<KoordinatenAnzeige lat={51.5} lon={10.25} einsatzId={1} />);
     expect(screen.getByText('51.50000, 10.25000')).toBeInTheDocument();
-    expect(await screen.findByText(/Hauptstr\. 5, Musterstadt · 1[.,]20 km NO von Einsatzort/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Hauptstr\. 5, Musterstadt · 1[.,]20 km NO von Einsatzort/),
+    ).toBeInTheDocument();
   });
 });

@@ -14,7 +14,11 @@ export interface NachforderungListeProps {
 /** Kartenboard der Nachforderungen (LFH-112). Reicht alle Props an die einzelne
  *  NachforderungKarte durch; Darstellung/Logik liegen vollständig in der Karte. */
 export default function NachforderungListe({
-  nachforderungen, ansicht = 'offen', darfSchreiben, onStatus, onAblehnen,
+  nachforderungen,
+  ansicht = 'offen',
+  darfSchreiben,
+  onStatus,
+  onAblehnen,
 }: NachforderungListeProps) {
   if (nachforderungen.length === 0) return <SeitenLeer titel="Keine Nachforderungen" />;
   return (

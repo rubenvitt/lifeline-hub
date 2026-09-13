@@ -6,7 +6,10 @@ export function listeFreieZeichen(einsatzId: number): Promise<FreiesZeichen[]> {
   return apiGet<FreiesZeichen[]>(`/api/einsaetze/${einsatzId}/freie-zeichen`);
 }
 
-export function legeFreiesZeichenAn(einsatzId: number, daten: NeuesFreiesZeichen): Promise<FreiesZeichen> {
+export function legeFreiesZeichenAn(
+  einsatzId: number,
+  daten: NeuesFreiesZeichen,
+): Promise<FreiesZeichen> {
   return apiSend<FreiesZeichen>(`/api/einsaetze/${einsatzId}/freie-zeichen`, 'POST', daten);
 }
 

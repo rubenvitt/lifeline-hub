@@ -44,8 +44,20 @@ const VOLL = {
 
 function alsAdmin() {
   vi.mocked(useAuth).mockReturnValue({
-    benutzer: { id: 1, system_rolle: 'admin', org_rolle: 'keine', anzeigename: 'Admin', benutzername: 'admin', aktiv: true, erstellt_at: '', totp_aktiviert: false },
-    laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+    benutzer: {
+      id: 1,
+      system_rolle: 'admin',
+      org_rolle: 'keine',
+      anzeigename: 'Admin',
+      benutzername: 'admin',
+      aktiv: true,
+      erstellt_at: '',
+      totp_aktiviert: false,
+    },
+    laedt: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    aktualisiere: vi.fn(),
   } as never);
 }
 
@@ -125,8 +137,20 @@ describe('EinsatzDefaults', () => {
   // nicht zu unterscheiden.
   it('ist read-only für Nicht-Admins (fuehrungskraft): Speichern-Button gesperrt, Felder disabled', async () => {
     vi.mocked(useAuth).mockReturnValue({
-      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
-      laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+      benutzer: {
+        id: 2,
+        system_rolle: 'keiner',
+        org_rolle: 'fuehrungskraft',
+        anzeigename: 'FK',
+        benutzername: 'fk',
+        aktiv: true,
+        erstellt_at: '',
+        totp_aktiviert: false,
+      },
+      laedt: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      aktualisiere: vi.fn(),
     } as never);
 
     renderMitProviders(<EinsatzDefaults />);
@@ -192,8 +216,20 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
   it('erklaert der Fuehrungskraft den Grund UND laesst den Knopf stehen', async () => {
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
     vi.mocked(useAuth).mockReturnValue({
-      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
-      laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn(),
+      benutzer: {
+        id: 2,
+        system_rolle: 'keiner',
+        org_rolle: 'fuehrungskraft',
+        anzeigename: 'FK',
+        benutzername: 'fk',
+        aktiv: true,
+        erstellt_at: '',
+        totp_aktiviert: false,
+      },
+      laedt: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      aktualisiere: vi.fn(),
     } as never);
 
     renderMitProviders(<EinsatzDefaults />);

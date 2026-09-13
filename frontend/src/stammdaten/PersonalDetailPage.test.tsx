@@ -15,29 +15,53 @@ import { personalDetailPfad } from './stammdatenDetail';
  */
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 const person = {
-  id: 5, name: 'Thomas Müller', personalnummer: 'P-42', traegerorganisation: 'DRK Musterstadt',
-  telefon: '0170 1234567', staerke_position: 'fuehrer', benutzer_id: null, bemerkung: 'Springer',
-  dienststatus: 'in_dienst', qualifikationen: [{ id: 1, label: 'Sanitäter' }],
+  id: 5,
+  name: 'Thomas Müller',
+  personalnummer: 'P-42',
+  traegerorganisation: 'DRK Musterstadt',
+  telefon: '0170 1234567',
+  staerke_position: 'fuehrer',
+  benutzer_id: null,
+  bemerkung: 'Springer',
+  dienststatus: 'in_dienst',
+  qualifikationen: [{ id: 1, label: 'Sanitäter' }],
   angelegt_at: '2026-05-26 09:00:00',
 };
 
 /** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
 const personZwei = {
-  ...person, id: 6, name: 'Anna Schmidt', telefon: '0160 7654321', bemerkung: 'Zweite',
+  ...person,
+  id: 6,
+  name: 'Anna Schmidt',
+  telefon: '0160 7654321',
+  bemerkung: 'Zweite',
 };
 
-function handler(benutzer = admin, personal: unknown[] = [person], onPatch: (b: unknown) => void = () => {}) {
+function handler(
+  benutzer = admin,
+  personal: unknown[] = [person],
+  onPatch: (b: unknown) => void = () => {},
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
     http.get('/api/personal', () => HttpResponse.json(personal)),
-    http.get('/api/personal-vorschlaege', () => HttpResponse.json({ traegerorganisation: ['DRK Musterstadt'] })),
-    http.get('/api/qualifikationen', () => HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }])),
+    http.get('/api/personal-vorschlaege', () =>
+      HttpResponse.json({ traegerorganisation: ['DRK Musterstadt'] }),
+    ),
+    http.get('/api/qualifikationen', () =>
+      HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }]),
+    ),
     http.get('/api/benutzer', () => HttpResponse.json([])),
     http.patch('/api/personal/5', async ({ request }) => {
       onPatch(await request.json());

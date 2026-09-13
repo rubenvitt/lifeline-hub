@@ -35,7 +35,9 @@ export function OrtZeile({
   const teile: string[] = [];
   if (data.ortsname) teile.push(data.ortsname);
   if (data.peilung) {
-    teile.push(`${formatDistanz(data.peilung.distanz_m)} ${data.peilung.richtung} von ${data.peilung.bezug_label}`);
+    teile.push(
+      `${formatDistanz(data.peilung.distanz_m)} ${data.peilung.richtung} von ${data.peilung.bezug_label}`,
+    );
   }
   if (teile.length === 0) return null;
 

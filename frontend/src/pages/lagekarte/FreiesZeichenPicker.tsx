@@ -22,7 +22,11 @@ export interface FreiesZeichenPickerProps {
  *  {@link grundzeichenAkzeptiert}-Gating und der FreiesZeichenUpdate-Feldname. */
 type OverlayKey = 'organisation' | 'fachaufgabe' | 'symbol' | 'einheit' | 'funktion';
 
-const OVERLAYS: { key: OverlayKey; label: string; katalog: readonly { id: string; label: string }[] }[] = [
+const OVERLAYS: {
+  key: OverlayKey;
+  label: string;
+  katalog: readonly { id: string; label: string }[];
+}[] = [
   { key: 'organisation', label: 'Organisation', katalog: organisationen },
   { key: 'fachaufgabe', label: 'Fachaufgabe', katalog: fachaufgaben },
   { key: 'symbol', label: 'Symbol', katalog: symbole },
@@ -95,7 +99,8 @@ export default function FreiesZeichenPicker({ wert, onChange }: FreiesZeichenPic
         type="color"
         defaultValue={wert.farbe ?? NEUTRALE_FARBE}
         onBlur={(e) => {
-          if (e.target.value !== (wert.farbe ?? NEUTRALE_FARBE)) onChange({ ...wert, farbe: e.target.value });
+          if (e.target.value !== (wert.farbe ?? NEUTRALE_FARBE))
+            onChange({ ...wert, farbe: e.target.value });
         }}
       />
 

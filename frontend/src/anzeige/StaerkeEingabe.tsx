@@ -22,7 +22,9 @@ function koerziere(f: Feld, uf: Feld, m: Feld): Staerke | null {
 
 function gleich(a: Staerke | null, b: Staerke | null): boolean {
   if (a == null || b == null) return a == null && b == null;
-  return a.fuehrer === b.fuehrer && a.unterfuehrer === b.unterfuehrer && a.mannschaft === b.mannschaft;
+  return (
+    a.fuehrer === b.fuehrer && a.unterfuehrer === b.unterfuehrer && a.mannschaft === b.mannschaft
+  );
 }
 
 const SPALTE: React.CSSProperties = { display: 'inline-flex', flexDirection: 'column' };
@@ -63,21 +65,50 @@ export default function StaerkeEingabe({ value, onChange, disabled }: Props) {
   return (
     <Space align="end" size={token.marginSM} wrap>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>Führer</Typography.Text>
-        <InputNumber min={0} value={f} disabled={disabled} aria-label="Führer" placeholder="F"
-          onChange={(v) => melde(v, uf, m)} style={{ width: 88 }} />
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Führer
+        </Typography.Text>
+        <InputNumber
+          min={0}
+          value={f}
+          disabled={disabled}
+          aria-label="Führer"
+          placeholder="F"
+          onChange={(v) => melde(v, uf, m)}
+          style={{ width: 88 }}
+        />
       </span>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>Unterführer</Typography.Text>
-        <InputNumber min={0} value={uf} disabled={disabled} aria-label="Unterführer" placeholder="UF"
-          onChange={(v) => melde(f, v, m)} style={{ width: 88 }} />
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Unterführer
+        </Typography.Text>
+        <InputNumber
+          min={0}
+          value={uf}
+          disabled={disabled}
+          aria-label="Unterführer"
+          placeholder="UF"
+          onChange={(v) => melde(f, v, m)}
+          style={{ width: 88 }}
+        />
       </span>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>Mannschaft</Typography.Text>
-        <InputNumber min={0} value={m} disabled={disabled} aria-label="Mannschaft" placeholder="M"
-          onChange={(v) => melde(f, uf, v)} style={{ width: 88 }} />
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Mannschaft
+        </Typography.Text>
+        <InputNumber
+          min={0}
+          value={m}
+          disabled={disabled}
+          aria-label="Mannschaft"
+          placeholder="M"
+          onChange={(v) => melde(f, uf, v)}
+          style={{ width: 88 }}
+        />
       </span>
-      <Typography.Text type="secondary" style={{ paddingBottom: 4 }}>= {begonnen ? gesamt : '—'}</Typography.Text>
+      <Typography.Text type="secondary" style={{ paddingBottom: 4 }}>
+        = {begonnen ? gesamt : '—'}
+      </Typography.Text>
     </Space>
   );
 }

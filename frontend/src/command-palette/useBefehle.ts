@@ -49,7 +49,10 @@ export function useBefehle(
    */
   const aktuellerModulKey = modulAusPfad(pathname)?.key ?? null;
 
-  const { data: einsaetze = [] } = useQuery({ queryKey: globalKeys.einsaetze(), queryFn: listeEinsaetze });
+  const { data: einsaetze = [] } = useQuery({
+    queryKey: globalKeys.einsaetze(),
+    queryFn: listeEinsaetze,
+  });
   const { data: overrides } = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId!),
@@ -99,27 +102,49 @@ export function useBefehle(
   );
 
   return useMemo(
-    () => baueBefehle({
-      einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
-      zuletztModulKeys,
-      aktuellerModulKey,
-      merkeModulBesuch: merkeBesuch,
-      zuletztBefehlIds: gedaechtnis.ids,
-      merkeBefehl: gedaechtnis.merke,
-      navigate: (p) => navigate(p),
-      setThemeModus: setModus,
-      setDichte,
-      setKoordinaten: setzeOverride,
-      logout: () => { void logout(); },
-      tastaturAktionen,
-      userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
-    }),
+    () =>
+      baueBefehle({
+        einsatzId,
+        benutzer,
+        einsaetze,
+        overrides,
+        darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
+        zuletztModulKeys,
+        aktuellerModulKey,
+        merkeModulBesuch: merkeBesuch,
+        zuletztBefehlIds: gedaechtnis.ids,
+        merkeBefehl: gedaechtnis.merke,
+        navigate: (p) => navigate(p),
+        setThemeModus: setModus,
+        setDichte,
+        setKoordinaten: setzeOverride,
+        logout: () => {
+          void logout();
+        },
+        tastaturAktionen,
+        userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+      }),
     // `setDichte` gehört hier hinein und ist dafür identitätsstabil (useCallback im
     // Provider) — das aus `useDichte()` zurückgegebene Objekt dagegen NICHT: es ist
     // je Aufruf frisch und würde die Liste bei jedem Render neu bauen.
     // `gedaechtnis` als GANZES in der Dependency-Liste: das Objekt ist beim Aufrufer
     // memoisiert (`useZuletztBefehle`), seine beiden Felder einzeln zu listen brächte
     // nichts ausser einer zweiten Stelle, an der eines vergessen werden kann.
-    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout, tastaturAktionen, zuletztModulKeys, aktuellerModulKey, merkeBesuch, gedaechtnis],
+    [
+      einsatzId,
+      benutzer,
+      einsaetze,
+      overrides,
+      darfSchreibenImEinsatz,
+      navigate,
+      setModus,
+      setDichte,
+      logout,
+      tastaturAktionen,
+      zuletztModulKeys,
+      aktuellerModulKey,
+      merkeBesuch,
+      gedaechtnis,
+    ],
   );
 }

@@ -144,9 +144,7 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
   // ohne „die fixierte hält" bewiese das Wandern nichts über die Fixierung.
   // Gemessen (relativ zum Bildlaufcontainer): nicht-fixiert 103 → −103 px, also um
   // die vollen 206 px gewandert; fixiert 0 → 0 px.
-  expect(xNach.nichtFix, 'nicht-fixierte Zelle muss mitwandern').toBeLessThan(
-    xVor.nichtFix - 100,
-  );
+  expect(xNach.nichtFix, 'nicht-fixierte Zelle muss mitwandern').toBeLessThan(xVor.nichtFix - 100);
   expect(
     Math.abs(xNach.fix - xVor.fix),
     `fixierte Spalte hält ihre x-Position (${xVor.fix} → ${xNach.fix})`,

@@ -24,7 +24,9 @@ describe('markerToUrl (LFH-25) — Inspector-Deeplinks je Marker-Typ', () => {
     expect(markerToUrl(m({ typ: 'fuehrung', id: 8 }), E)).toBe('/einsaetze/7/personal?personal=8');
   });
   it('abschnitt → Abschnitte-Liste mit ?abschnitt=', () => {
-    expect(markerToUrl(m({ typ: 'abschnitt', id: 2 }), E)).toBe('/einsaetze/7/einsatzabschnitte?abschnitt=2');
+    expect(markerToUrl(m({ typ: 'abschnitt', id: 2 }), E)).toBe(
+      '/einsaetze/7/einsatzabschnitte?abschnitt=2',
+    );
   });
   it('lagemeldung → Quell-Meldung (?meldung=meldungId, NICHT marker.id)', () => {
     const marker = m({

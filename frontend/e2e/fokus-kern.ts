@@ -43,7 +43,10 @@ export interface Verdeckungsbefund {
  * sie kann ein Durchlauf an der Tabelle vorbeilaufen oder gar keinen fixierten Knoten
  * vorfinden, und „0 verdeckte Ziele" wäre in beiden Fällen trivial wahr.
  */
-export async function pruefeFokusVerdeckung(page: Page, schritte: number): Promise<Verdeckungsbefund> {
+export async function pruefeFokusVerdeckung(
+  page: Page,
+  schritte: number,
+): Promise<Verdeckungsbefund> {
   const verdeckt: string[] = [];
   let stoppsInTabelle = 0;
   let stoppsGesamt = 0;
@@ -58,7 +61,8 @@ export async function pruefeFokusVerdeckung(page: Page, schritte: number): Promi
         return null;
       }
       // Der innere Combobox-/Zahleneingabe-Input ist kleiner als das sichtbare Fokusziel.
-      const ziel = fokus.closest('.ant-select, .ant-input-number, .ant-input-affix-wrapper') ?? fokus;
+      const ziel =
+        fokus.closest('.ant-select, .ant-input-number, .ant-input-affix-wrapper') ?? fokus;
       const zr = ziel.getBoundingClientRect();
       if (zr.width === 0 || zr.height === 0) {
         return { beschreibung: null, inTabelle: false, kandidaten: 0, kennung: null };
@@ -109,5 +113,11 @@ export async function pruefeFokusVerdeckung(page: Page, schritte: number): Promi
     if (schritt.kennung) besuchteZiele.add(schritt.kennung);
   }
 
-  return { verdeckt, stoppsInTabelle, stoppsGesamt, fixierteKandidaten, besuchteZiele: [...besuchteZiele] };
+  return {
+    verdeckt,
+    stoppsInTabelle,
+    stoppsGesamt,
+    fixierteKandidaten,
+    besuchteZiele: [...besuchteZiele],
+  };
 }

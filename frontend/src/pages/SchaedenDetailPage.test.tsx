@@ -1,47 +1,87 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
+import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import SchaedenDetailPage from './SchaedenDetailPage';
 
 class FakeEventSource {
-  url: string; closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {} removeEventListener() {} close() { this.closed = true; }
+  url: string;
+  closed = false;
+  constructor(url: string) {
+    this.url = url;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+  close() {
+    this.closed = true;
+  }
 }
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): so prüft der Beobachter-Test die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
-const nutzer = { id: 1, anzeigename: 'Nutzer', system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
+const nutzer = {
+  id: 1,
+  anzeigename: 'Nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+};
 const einsatzAktiv = {
-  id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung',
-  org_id: 5, org_name: 'DRK Musterstadt',
+  id: 1,
+  bezeichnung: 'Lage',
+  status: 'aktiv',
+  meine_rolle: 'einsatzleitung',
+  org_id: 5,
+  org_name: 'DRK Musterstadt',
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 
 // Quellen der Geschädigt-Combobox (laden beim Öffnen des Edit-Formulars).
 const einePerson = {
-  id: 42, einsatz_id: 1, registrier_nr: 7, status: 'betroffen', name: 'Meier', vorname: 'Anna',
+  id: 42,
+  einsatz_id: 1,
+  registrier_nr: 7,
+  status: 'betroffen',
+  name: 'Meier',
+  vorname: 'Anna',
 };
 
 function basisSchaden(overrides: Record<string, unknown> = {}) {
   return {
-    id: 10, einsatz_id: 1, registrier_nr: 1, status: 'offen', typ: 'sachschaden',
-    ausmass: 'gering', ort: 'Hauptstr. 17', beschreibung: 'Umgestürzter Baum',
-    lat: null, lon: null,
-    geschaedigt_person_id: null, geschaedigt_personal_id: null, geschaedigt_organisation_id: null,
+    id: 10,
+    einsatz_id: 1,
+    registrier_nr: 1,
+    status: 'offen',
+    typ: 'sachschaden',
+    ausmass: 'gering',
+    ort: 'Hauptstr. 17',
+    beschreibung: 'Umgestürzter Baum',
+    lat: null,
+    lon: null,
+    geschaedigt_person_id: null,
+    geschaedigt_personal_id: null,
+    geschaedigt_organisation_id: null,
     geschaedigt_kontakt: null,
-    uebergeben_an: null, uebergeben_at: null, abschluss_grund: null, abschluss_at: null,
-    erfasst_at: '2026-05-29 10:00:00', erfasst_von: 1, geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1,
-    storniert_at: null, storniert_von: null,
-    geschaedigt_registrier_nr: null, geschaedigt_storniert_at: null,
-    geschaedigt_personal_name: null, geschaedigt_organisation_name: null,
+    uebergeben_an: null,
+    uebergeben_at: null,
+    abschluss_grund: null,
+    abschluss_at: null,
+    erfasst_at: '2026-05-29 10:00:00',
+    erfasst_von: 1,
+    geaendert_at: '2026-05-29 10:00:00',
+    geaendert_von: 1,
+    storniert_at: null,
+    storniert_von: null,
+    geschaedigt_registrier_nr: null,
+    geschaedigt_storniert_at: null,
+    geschaedigt_personal_name: null,
+    geschaedigt_organisation_name: null,
     ...overrides,
   };
 }
@@ -94,7 +134,8 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     // `searchParams.get()` und bekommt den Doppelpunkt zurück — der Round-Trip ist in
     // `routing/deeplinks.test.ts` gepinnt.
     expect(screen.getByRole('link', { name: 'Auf Karte verorten' })).toHaveAttribute(
-      'href', '/einsaetze/1/lagekarte?platzieren=schaden%3A10',
+      'href',
+      '/einsaetze/1/lagekarte?platzieren=schaden%3A10',
     );
   });
 
@@ -146,6 +187,37 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');
   });
 
+  it('hält die Baseline fest, wenn die Detail-Query bei offener Maske refetcht (LFH-303)', async () => {
+    // Auslöser im Betrieb: Fensterwechsel bei `staleTime` 10 s und TanStacks Vorgabe
+    // `refetchOnWindowFocus: true`. Der Hintergrund-Refetch legt den FREMDEN, neueren
+    // Stand in den Cache; ginge der als Baseline raus, verglich der Server ihn mit sich
+    // selbst und die fremde Änderung wäre still überschrieben (LFH-241/F10 ausgehebelt).
+    let stand: Record<string, unknown> = basisSchaden();
+    let body: Record<string, unknown> | null = null;
+    const { client } = render(einsatzAktiv, basisSchaden(), [
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisSchaden());
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+
+    stand = basisSchaden({ geaendert_at: '2026-05-29 12:30:00', ort: 'Fremde Straße' });
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) });
+    });
+    await vi.waitFor(() =>
+      expect(
+        client.getQueryData<{ geaendert_at: string }>(einsatzKeys.schaden(1, 10))?.geaendert_at,
+      ).toBe('2026-05-29 12:30:00'),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body).not.toBeNull());
+    expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');
+  });
+
   it('zeigt bei 409 den Konfliktdialog; „Überschreiben" sendet ohne Baseline (LFH-300/F10)', async () => {
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, basisSchaden(), [
@@ -174,7 +246,10 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     render(einsatzAktiv, basisSchaden(), [
       http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json({ error: 'Stornierter Schaden kann nicht geändert werden' }, { status: 409 });
+        return HttpResponse.json(
+          { error: 'Stornierter Schaden kann nicht geändert werden' },
+          { status: 409 },
+        );
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
@@ -184,7 +259,9 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     // Die echte Servermeldung erscheint — das belegt, dass der else-Zweig (`fehler`) lief und
     // NICHT erneut der Konfliktdialog. Ohne den `!v.overwrite`-Zweig ginge stattdessen ein
     // zweiter Dialog auf und diese Meldung käme nie.
-    expect(await screen.findByText('Stornierter Schaden kann nicht geändert werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Stornierter Schaden kann nicht geändert werden'),
+    ).toBeInTheDocument();
   });
 
   it('Beobachter sieht keinen Bearbeiten-Button', async () => {
@@ -215,7 +292,10 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   });
 
   it('Edit: Geschädigt leeren sendet alle vier Felder als null', async () => {
-    const mitGeschaedigt = basisSchaden({ geschaedigt_person_id: 42, geschaedigt_registrier_nr: 7 });
+    const mitGeschaedigt = basisSchaden({
+      geschaedigt_person_id: 42,
+      geschaedigt_registrier_nr: 7,
+    });
     let body: Record<string, unknown> = {};
     const { container } = render(einsatzAktiv, mitGeschaedigt, [
       http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
@@ -246,7 +326,10 @@ describe('SchaedenDetailPage — Stammdaten', () => {
   it('Stornieren bestätigt per Popconfirm, ruft DELETE und navigiert zur Liste', async () => {
     let geloescht = false;
     render(einsatzAktiv, basisSchaden(), [
-      http.delete('/api/einsaetze/1/schaeden/10', () => { geloescht = true; return new HttpResponse(null, { status: 204 }); }),
+      http.delete('/api/einsaetze/1/schaeden/10', () => {
+        geloescht = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
     // Popconfirm-Bestätigung trägt denselben okText → der zweite „Stornieren"-Button.
@@ -263,7 +346,9 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     render(einsatzAktiv, basisSchaden(), [
       http.post('/api/einsaetze/1/schaeden/10/uebergeben', async ({ request }) => {
         body = (await request.json()) as { uebergeben_an?: string };
-        return HttpResponse.json(basisSchaden({ status: 'uebergeben', uebergeben_an: body.uebergeben_an }));
+        return HttpResponse.json(
+          basisSchaden({ status: 'uebergeben', uebergeben_an: body.uebergeben_an }),
+        );
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
@@ -281,7 +366,9 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     render(einsatzAktiv, basisSchaden(), [
       http.post('/api/einsaetze/1/schaeden/10/abschliessen', async ({ request }) => {
         body = (await request.json()) as { abschluss_grund?: string };
-        return HttpResponse.json(basisSchaden({ status: 'abgeschlossen', abschluss_grund: body.abschluss_grund }));
+        return HttpResponse.json(
+          basisSchaden({ status: 'abgeschlossen', abschluss_grund: body.abschluss_grund }),
+        );
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
@@ -290,7 +377,9 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     expect(await screen.findByText('Grund ist Pflicht')).toBeInTheDocument();
     expect(body.abschluss_grund).toBeUndefined();
     await userEvent.click(within(dialog).getByRole('combobox'));
-    const option = (await screen.findAllByText('behoben')).find((el) => el.closest('.ant-select-item-option'));
+    const option = (await screen.findAllByText('behoben')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
     await userEvent.click(option!);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
     await vi.waitFor(() => expect(body.abschluss_grund).toBe('behoben'));
@@ -311,7 +400,9 @@ describe('SchaedenDetailPage — Robustheit', () => {
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
     render(einsatzAktiv, basisSchaden(), [
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/einsaetze/1/schaeden/10', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
     ]);
     expect(await screen.findByText('Schaden konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();

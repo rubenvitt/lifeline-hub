@@ -11,35 +11,82 @@ import { AuthProvider } from '../auth/AuthContext';
 import PersonalPage from './PersonalPage';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 
 function einsatz(overrides: Record<string, unknown> = {}) {
   return {
-    id: 7, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv', begonnen_at: '2026-05-26 09:00:00',
-    abgeschlossen_at: null, abgeschlossen_von: null, einsatzart: 'realeinsatz', einsatznummer_intern: null,
-    angelegt_at: '2026-05-26 09:00:00', leitstellen_nr: null, einsatzort: null, einsatzort_lat: null,
-    einsatzort_lon: null, meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung', ...overrides,
+    id: 7,
+    bezeichnung: 'Hochwasser',
+    stichwort: null,
+    status: 'aktiv',
+    begonnen_at: '2026-05-26 09:00:00',
+    abgeschlossen_at: null,
+    abgeschlossen_von: null,
+    einsatzart: 'realeinsatz',
+    einsatznummer_intern: null,
+    angelegt_at: '2026-05-26 09:00:00',
+    leitstellen_nr: null,
+    einsatzort: null,
+    einsatzort_lat: null,
+    einsatzort_lon: null,
+    meldende_stelle: null,
+    sachverhalt: null,
+    anzahl_betroffene_initial: null,
+    meine_rolle: 'einsatzleitung',
+    ...overrides,
   };
 }
 
 // LFH-139: Struktur-Listen für die Auflösung einheit_id/fahrzeug_id → Klartext-Label.
 const einheiten = [
-  { id: 3, name: 'Zugtrupp', abschnitt_id: null, ueber_einheit_id: null, typ_label: null, fuehrer_name: null, soll: null },
+  {
+    id: 3,
+    name: 'Zugtrupp',
+    abschnitt_id: null,
+    ueber_einheit_id: null,
+    typ_label: null,
+    fuehrer_name: null,
+    soll: null,
+  },
 ];
 const fahrzeuge = [
-  { id: 8, funkrufname: 'Florian 1', kennzeichen: 'FW-1234', fahrzeugtyp: 'ELW', einheit_id: 3, status_kategorie: null, status_label: null },
+  {
+    id: 8,
+    funkrufname: 'Florian 1',
+    kennzeichen: 'FW-1234',
+    fahrzeugtyp: 'ELW',
+    einheit_id: 3,
+    status_kategorie: null,
+    status_label: null,
+  },
 ];
 
 const disponiert = [
   {
-    id: 10, einsatz_id: 7, personal_id: 5, ist_adhoc: false, name: 'Thomas Müller',
-    funktion: 'Sanitäter, Gruppenführer', traegerorganisation: 'DRK', staerke_position: 'fuehrer',
-    status_id: 2, status_label: 'alarmiert', status_kategorie: 'gebunden', status_farbe: null,
-    bemerkung: null, disponiert_at: '2026-05-26 09:10:00', disponiert_von: 1,
-    einheit_id: 3, fahrzeug_id: 8,
+    id: 10,
+    einsatz_id: 7,
+    personal_id: 5,
+    ist_adhoc: false,
+    name: 'Thomas Müller',
+    funktion: 'Sanitäter, Gruppenführer',
+    traegerorganisation: 'DRK',
+    staerke_position: 'fuehrer',
+    status_id: 2,
+    status_label: 'alarmiert',
+    status_kategorie: 'gebunden',
+    status_farbe: null,
+    bemerkung: null,
+    disponiert_at: '2026-05-26 09:10:00',
+    disponiert_von: 1,
+    einheit_id: 3,
+    fahrzeug_id: 8,
   },
 ];
 
@@ -50,10 +97,12 @@ function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[]
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personalDaten)),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
-    http.get('/api/personal-status', () => HttpResponse.json([
-      { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
-      { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
-    ])),
+    http.get('/api/personal-status', () =>
+      HttpResponse.json([
+        { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+        { id: 3, label: 'einsatzbereit', kategorie: 'verfuegbar', farbe: null, sortier: 30 },
+      ]),
+    ),
     http.get('/api/personal', () => HttpResponse.json([])), // Pool (nur_im_dienst)
   );
   return renderMitProviders(
@@ -96,7 +145,9 @@ describe('PersonalPage', () => {
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
 
     expect(within(zeile).getAllByRole('combobox')).toHaveLength(1);
-    expect(within(zeile).getByRole('button', { name: 'Status von Thomas Müller ändern' })).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('button', { name: 'Status von Thomas Müller ändern' }),
+    ).toBeInTheDocument();
   });
 
   /**
@@ -121,11 +172,15 @@ describe('PersonalPage', () => {
 
   it('setzt den Status zeilengenau optimistisch und rollt eine Serverablehnung zurück', async () => {
     let freigeben: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
-    server.use(http.patch('/api/einsaetze/7/personal/10', async () => {
-      await gate;
-      return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
-    }));
+    const gate = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
+    server.use(
+      http.patch('/api/einsaetze/7/personal/10', async () => {
+        await gate;
+        return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
+      }),
+    );
     const zweitePerson = { ...disponiert[0], id: 11, personal_id: 6, name: 'Erika Muster' };
     const { container, client } = render(einsatz(), [disponiert[0], zweitePerson]);
     await screen.findByText('Thomas Müller');
@@ -138,34 +193,48 @@ describe('PersonalPage', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: /einsatzbereit/ }));
 
     await waitFor(() => {
-      expect(client.getQueryData<typeof disponiert>(einsatzKeys.personal(7))?.[0].status_id).toBe(3);
+      expect(client.getQueryData<typeof disponiert>(einsatzKeys.personal(7))?.[0].status_id).toBe(
+        3,
+      );
     });
     // Der neue Wert steht VOR der Server-Antwort in der ANSICHT, nicht bloß im Cache.
     expect(zeile.textContent).toContain('einsatzbereit');
     expect(within(zeile).getByRole('button', { name: /Status von Thomas Müller/ })).toBeDisabled();
     expect(
-      within(container.querySelector('[data-row-key="11"]') as HTMLElement)
-        .getByRole('button', { name: /Status von Erika Muster/ }),
+      within(container.querySelector('[data-row-key="11"]') as HTMLElement).getByRole('button', {
+        name: /Status von Erika Muster/,
+      }),
     ).toBeDisabled();
 
     let refetchFreigeben: (() => void) | undefined;
-    const refetchGate = new Promise<void>((resolve) => { refetchFreigeben = resolve; });
-    server.use(http.get('/api/einsaetze/7/personal', async () => {
-      await refetchGate;
-      return HttpResponse.json([{ ...disponiert[0], name: 'Extern geändert' }, zweitePerson]);
-    }));
+    const refetchGate = new Promise<void>((resolve) => {
+      refetchFreigeben = resolve;
+    });
+    server.use(
+      http.get('/api/einsaetze/7/personal', async () => {
+        await refetchGate;
+        return HttpResponse.json([{ ...disponiert[0], name: 'Extern geändert' }, zweitePerson]);
+      }),
+    );
     act(() => {
       client.setQueryData<typeof disponiert>(einsatzKeys.personal(7), (aktuell) =>
-        aktuell?.map((eintrag) => eintrag.id === 10 ? { ...eintrag, name: 'Extern geändert' } : eintrag));
+        aktuell?.map((eintrag) =>
+          eintrag.id === 10 ? { ...eintrag, name: 'Extern geändert' } : eintrag,
+        ),
+      );
     });
 
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
     await waitFor(() => {
       const stand = client.getQueryData<typeof disponiert>(einsatzKeys.personal(7));
       expect(stand?.find((eintrag) => eintrag.id === 10)?.status_id).toBe(2);
       expect(stand?.find((eintrag) => eintrag.id === 10)?.name).toBe('Extern geändert');
     });
-    await act(async () => { refetchFreigeben?.(); });
+    await act(async () => {
+      refetchFreigeben?.();
+    });
   });
 
   it('hebt per ?personal=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
@@ -175,9 +244,11 @@ describe('PersonalPage', () => {
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
       http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
-      http.get('/api/personal-status', () => HttpResponse.json([
-        { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
-      ])),
+      http.get('/api/personal-status', () =>
+        HttpResponse.json([
+          { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+        ]),
+      ),
       http.get('/api/personal', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
@@ -219,9 +290,11 @@ describe('PersonalPage', () => {
         http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
         http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
         http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
-        http.get('/api/personal-status', () => HttpResponse.json([
-          { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
-        ])),
+        http.get('/api/personal-status', () =>
+          HttpResponse.json([
+            { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+          ]),
+        ),
         http.get('/api/personal', () => HttpResponse.json([])),
       );
       const { container } = renderMitProviders(
@@ -233,7 +306,10 @@ describe('PersonalPage', () => {
         { route: '/einsaetze/7/personal?personal=10' },
       );
       await screen.findByText('Thomas Müller');
-      expect(container.querySelector('.ant-table'), 'Gegenprobe: hier steht keine Tabelle').toBeNull();
+      expect(
+        container.querySelector('.ant-table'),
+        'Gegenprobe: hier steht keine Tabelle',
+      ).toBeNull();
       await waitFor(() =>
         expect(
           container.querySelector('[data-lfh="datensicht-karte"].zeile-hervorgehoben'),
@@ -254,7 +330,13 @@ describe('PersonalPage', () => {
   });
 
   it('Beobachter / abgeschlossen: reine Ansicht', async () => {
-    render(einsatz({ status: 'abgeschlossen', abgeschlossen_at: '2026-05-26 12:00:00', meine_rolle: 'beobachter' }));
+    render(
+      einsatz({
+        status: 'abgeschlossen',
+        abgeschlossen_at: '2026-05-26 12:00:00',
+        meine_rolle: 'beobachter',
+      }),
+    );
     await screen.findByText('Thomas Müller');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Person' })).not.toBeInTheDocument();
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
@@ -304,13 +386,27 @@ describe('PersonalPage', () => {
   });
 
   it('stellt nicht zugeordnete Kräfte in Fahrzeug- und Einheit-Spalte als „—" dar (LFH-139)', async () => {
-    const unzugeordnet = [{
-      id: 11, einsatz_id: 7, personal_id: 6, ist_adhoc: false, name: 'Erika Mustermann',
-      funktion: 'Helferin', traegerorganisation: 'THW', staerke_position: 'mannschaft',
-      status_id: 2, status_label: 'alarmiert', status_kategorie: 'gebunden', status_farbe: null,
-      bemerkung: 'x', disponiert_at: '2026-05-26 09:10:00', disponiert_von: 1,
-      einheit_id: null, fahrzeug_id: null,
-    }];
+    const unzugeordnet = [
+      {
+        id: 11,
+        einsatz_id: 7,
+        personal_id: 6,
+        ist_adhoc: false,
+        name: 'Erika Mustermann',
+        funktion: 'Helferin',
+        traegerorganisation: 'THW',
+        staerke_position: 'mannschaft',
+        status_id: 2,
+        status_label: 'alarmiert',
+        status_kategorie: 'gebunden',
+        status_farbe: null,
+        bemerkung: 'x',
+        disponiert_at: '2026-05-26 09:10:00',
+        disponiert_von: 1,
+        einheit_id: null,
+        fahrzeug_id: null,
+      },
+    ];
     const { container } = render(einsatz(), unzugeordnet);
     await screen.findByText('Erika Mustermann');
 
@@ -335,8 +431,15 @@ describe('PersonalPage', () => {
 
   const epGebunden = disponiert[0];
   const epVerfuegbar = {
-    ...disponiert[0], id: 12, personal_id: 6, name: 'Zora Zebra', staerke_position: 'mannschaft',
-    status_label: 'einsatzbereit', status_kategorie: 'verfuegbar', einheit_id: null, fahrzeug_id: null,
+    ...disponiert[0],
+    id: 12,
+    personal_id: 6,
+    name: 'Zora Zebra',
+    staerke_position: 'mannschaft',
+    status_label: 'einsatzbereit',
+    status_kategorie: 'verfuegbar',
+    einheit_id: null,
+    fahrzeug_id: null,
   };
   const zeilenFolge = (container: HTMLElement) =>
     [...container.querySelectorAll('tr.ant-table-row')].map((r) => r.getAttribute('data-row-key'));
@@ -355,13 +458,17 @@ describe('PersonalPage', () => {
      */
     const { container } = render(einsatz());
     await screen.findByText('Thomas Müller');
-    expect(screen.queryByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' }),
+    ).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    expect(within(zeile).getByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' })).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
   });
 
@@ -463,7 +570,10 @@ describe('PersonalPage', () => {
 function zelleNachKopf(container: HTMLElement, zeile: HTMLElement, kopf: string): HTMLElement {
   const koepfe = [...container.querySelectorAll('th.ant-table-cell')].map((th) => th.textContent);
   const index = koepfe.indexOf(kopf);
-  expect(index, `Spaltenkopf „${kopf}" nicht gefunden (gefunden: ${koepfe.join(', ')})`).toBeGreaterThanOrEqual(0);
+  expect(
+    index,
+    `Spaltenkopf „${kopf}" nicht gefunden (gefunden: ${koepfe.join(', ')})`,
+  ).toBeGreaterThanOrEqual(0);
   const zellen = zeile.querySelectorAll('td');
   expect(zellen.length, 'Zeile hat weniger Zellen als Spaltenköpfe').toBeGreaterThan(index);
   return zellen[index] as HTMLElement;
@@ -488,9 +598,11 @@ describe('PersonalPage · Datenzustände', () => {
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
-    http.get('/api/personal-status', () => HttpResponse.json([
-      { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
-    ])),
+    http.get('/api/personal-status', () =>
+      HttpResponse.json([
+        { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+      ]),
+    ),
     http.get('/api/personal', () => HttpResponse.json([])),
   ];
 
@@ -533,10 +645,14 @@ describe('PersonalPage · Datenzustände', () => {
    * gemessen wäre die Zusicherung mehrdeutig und im schlimmsten Fall trivial grün.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
-    const { client } = zeige(http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)));
+    const { client } = zeige(
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
+    );
     await screen.findByText('Thomas Müller');
 
-    server.use(http.get('/api/einsaetze/7/personal', () => new HttpResponse(null, { status: 500 })));
+    server.use(
+      http.get('/api/einsaetze/7/personal', () => new HttpResponse(null, { status: 500 })),
+    );
     await client.refetchQueries({ queryKey: einsatzKeys.personal(7) });
 
     expect(
@@ -544,13 +660,17 @@ describe('PersonalPage · Datenzustände', () => {
     ).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
     expect(screen.getByText('Thomas Müller')).toBeInTheDocument();
-    expect(screen.queryByText('Disponiertes Personal konnte nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Disponiertes Personal konnte nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   it('gescheiterter Statuskatalog: Banner über der Tabelle', async () => {
     zeige(http.get('/api/personal-status', () => new HttpResponse(null, { status: 500 })));
     expect(
-      await screen.findByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+      await screen.findByText(
+        'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -558,15 +678,21 @@ describe('PersonalPage · Datenzustände', () => {
     zeige();
     await screen.findByText('Noch kein Personal disponiert');
     expect(
-      screen.queryByText('Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich'),
+      screen.queryByText(
+        'Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich',
+      ),
     ).not.toBeInTheDocument();
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Personen"', async () => {
-    const { container } = zeige(http.get('/api/personal', () => new HttpResponse(null, { status: 500 })));
+    const { container } = zeige(
+      http.get('/api/personal', () => new HttpResponse(null, { status: 500 })),
+    );
     await screen.findByText('Noch kein Personal disponiert');
     await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
-    expect(await screen.findByText('Personalliste konnte nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Personalliste konnte nicht geladen werden'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Keine freien Personen')).not.toBeInTheDocument();
   });
 
@@ -653,11 +779,14 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     await nutzer.click(imDialog().getByRole('combobox'));
     // Der klickbare Eintrag ist `.ant-select-item-option-content`; der `role="option"`-Knoten
     // ist nur das a11y-Spiegelelement und reagiert nicht auf Klicks (Repo-Muster, MetaChip).
-    await nutzer.click(await screen.findByText(
-      (_, el) => typeof el?.className === 'string'
-        && el.className.includes('ant-select-item-option-content')
-        && el.textContent === 'Führer',
-    ));
+    await nutzer.click(
+      await screen.findByText(
+        (_, el) =>
+          typeof el?.className === 'string' &&
+          el.className.includes('ant-select-item-option-content') &&
+          el.textContent === 'Führer',
+      ),
+    );
     await nutzer.click(imDialog().getByRole('button', { name: 'Speichern und nächste' }));
 
     await waitFor(() => expect(gesendet).toHaveLength(1));
@@ -673,7 +802,8 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     expect(await imDialog().findByText('Erfasst: 1')).toBeInTheDocument();
     // Übernahme greift, der Name ist frei, der Fokus steht wieder im ersten Feld.
     await waitFor(() =>
-      expect(imDialog().getByLabelText('Trägerorganisation')).toHaveValue('KV Musterstadt'));
+      expect(imDialog().getByLabelText('Trägerorganisation')).toHaveValue('KV Musterstadt'),
+    );
     expect(imDialog().getByLabelText('Name')).toHaveValue('');
     await waitFor(() => expect(document.activeElement).toBe(imDialog().getByLabelText('Name')));
 
@@ -697,7 +827,8 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     render(einsatz());
     server.use(
       http.post('/api/einsaetze/7/personal', () =>
-        HttpResponse.json({ error: 'Name bereits disponiert' }, { status: 409 })),
+        HttpResponse.json({ error: 'Name bereits disponiert' }, { status: 409 }),
+      ),
     );
     await screen.findByText('Thomas Müller');
     await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Person' }));
@@ -718,8 +849,9 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
  * fokussiert.
  */
 async function oeffnePersonalAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')]
-    .find((s) => s.textContent?.includes(platzhalter));
+  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
+    s.textContent?.includes(platzhalter),
+  );
   expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
   await userEvent.click(within(feld!).getByRole('combobox'));
 }

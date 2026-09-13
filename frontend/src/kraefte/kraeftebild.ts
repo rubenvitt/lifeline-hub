@@ -367,7 +367,8 @@ export interface FilterWerte {
 
 export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
   const s = f.suche.trim().toLowerCase();
-  const treffer = (txt: (string | null | undefined)[]) => !s || txt.some((t) => t?.toLowerCase().includes(s));
+  const treffer = (txt: (string | null | undefined)[]) =>
+    !s || txt.some((t) => t?.toLowerCase().includes(s));
   // v1-Annahme: Untereinheiten tragen die `abschnitt_id` ihrer Elterneinheit. Sonst würden
   // Kräfte einer Untereinheit ohne eigene `abschnitt_id` beim Abschnitts-Filter herausfallen
   // (echtes Sub-Section-roll-in ist v2).
@@ -376,15 +377,34 @@ export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
   const abschnittOk = (einheit_id: number | null | undefined) =>
     f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id));
   const traegerOk = (traeger: string | null | undefined) => !f.traeger || traeger === f.traeger;
-  const passt = (einheit_id: number | null | undefined, traeger: string | null | undefined, kat: StatusKategorie | null | undefined, txt: (string | null | undefined)[]) =>
-    abschnittOk(einheit_id) && traegerOk(traeger) && (!f.kategorie || kat === f.kategorie) && treffer(txt);
+  const passt = (
+    einheit_id: number | null | undefined,
+    traeger: string | null | undefined,
+    kat: StatusKategorie | null | undefined,
+    txt: (string | null | undefined)[],
+  ) =>
+    abschnittOk(einheit_id) &&
+    traegerOk(traeger) &&
+    (!f.kategorie || kat === f.kategorie) &&
+    treffer(txt);
   return {
-    abschnitte: f.abschnittId == null ? roh.abschnitte : roh.abschnitte.filter((a) => a.id === f.abschnittId),
+    abschnitte:
+      f.abschnittId == null ? roh.abschnitte : roh.abschnitte.filter((a) => a.id === f.abschnittId),
     einheiten: roh.einheiten.filter(einheitErlaubt),
-    personal: roh.personal.filter((x) => passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [x.name, x.funktion])),
-    fahrzeuge: roh.fahrzeuge.filter((x) => passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [x.funkrufname, x.fahrzeugtyp])),
+    personal: roh.personal.filter((x) =>
+      passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [x.name, x.funktion]),
+    ),
+    fahrzeuge: roh.fahrzeuge.filter((x) =>
+      passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [
+        x.funkrufname,
+        x.fahrzeugtyp,
+      ]),
+    ),
     // Material hat keine `status_kategorie` (eigene Achse) → NICHT der Kategorie-Filterung unterwerfen.
-    material: roh.material.filter((x) => abschnittOk(x.einheit_id) && traegerOk(x.traegerorganisation) && treffer([x.bezeichnung])),
+    material: roh.material.filter(
+      (x) =>
+        abschnittOk(x.einheit_id) && traegerOk(x.traegerorganisation) && treffer([x.bezeichnung]),
+    ),
   };
 }
 
@@ -423,22 +443,30 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
   } else if (zeile.art === 'einheit') {
     const einzug = '  '.repeat(Math.max(0, tiefe - 1));
     const detail = zeile.detail ? ` (${zeile.detail})` : '';
-    zeilen.push(`${einzug}- **${zeile.bezeichnung}**${detail} — Stärke: ${staerkeText(zeile.staerke)}`);
+    zeilen.push(
+      `${einzug}- **${zeile.bezeichnung}**${detail} — Stärke: ${staerkeText(zeile.staerke)}`,
+    );
   } else {
     // mittel
     const einzug = '  '.repeat(Math.max(0, tiefe - 1));
     if (zeile.mittelArt === 'person') {
       const detail = zeile.detail ? ` (${zeile.detail})` : '';
       const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
-      zeilen.push(`${einzug}  - ${MITTEL_MARKE.person} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
+      zeilen.push(
+        `${einzug}  - ${MITTEL_MARKE.person} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`,
+      );
     } else if (zeile.mittelArt === 'fahrzeug') {
       const detail = zeile.detail ? ` (${zeile.detail})` : '';
       const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
-      zeilen.push(`${einzug}  - ${MITTEL_MARKE.fahrzeug} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
+      zeilen.push(
+        `${einzug}  - ${MITTEL_MARKE.fahrzeug} ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`,
+      );
     } else {
       const menge = zeile.menge != null ? ` ×${zeile.menge}` : '';
       const status = zeile.statusLabel ?? '';
-      zeilen.push(`${einzug}  - ${MITTEL_MARKE.material} ${zeile.bezeichnung}${menge}${status ? ` [${status}]` : ''}`);
+      zeilen.push(
+        `${einzug}  - ${MITTEL_MARKE.material} ${zeile.bezeichnung}${menge}${status ? ` [${status}]` : ''}`,
+      );
     }
   }
 
@@ -468,15 +496,21 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
   zeilen.push('## Lagebild gesamt');
   zeilen.push('');
   zeilen.push(`**Gesamtstärke (F/UF/M//Ges):** ${staerkeText(v.staerke)}`);
-  zeilen.push(`**Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, n.v.: ${v.fahrzeugStatus.nicht_verfuegbar})`);
+  zeilen.push(
+    `**Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, n.v.: ${v.fahrzeugStatus.nicht_verfuegbar})`,
+  );
   zeilen.push(`**Material (Positionen):** ${v.anzahlMaterialPositionen}`);
   if (v.anzahlMaterialPositionen > 0) {
     const matTeile: string[] = [];
-    if (v.materialStatus.einsatzbereit > 0) matTeile.push(`einsatzbereit: ${v.materialStatus.einsatzbereit}`);
-    if (v.materialStatus.im_einsatz > 0) matTeile.push(`im Einsatz: ${v.materialStatus.im_einsatz}`);
+    if (v.materialStatus.einsatzbereit > 0)
+      matTeile.push(`einsatzbereit: ${v.materialStatus.einsatzbereit}`);
+    if (v.materialStatus.im_einsatz > 0)
+      matTeile.push(`im Einsatz: ${v.materialStatus.im_einsatz}`);
     if (v.materialStatus.defekt > 0) matTeile.push(`defekt: ${v.materialStatus.defekt}`);
-    if (v.materialStatus.verbraucht > 0) matTeile.push(`verbraucht: ${v.materialStatus.verbraucht}`);
-    if (v.materialStatus.desinfektion_noetig > 0) matTeile.push(`Desinfektion nötig: ${v.materialStatus.desinfektion_noetig}`);
+    if (v.materialStatus.verbraucht > 0)
+      matTeile.push(`verbraucht: ${v.materialStatus.verbraucht}`);
+    if (v.materialStatus.desinfektion_noetig > 0)
+      matTeile.push(`Desinfektion nötig: ${v.materialStatus.desinfektion_noetig}`);
     if (matTeile.length > 0) zeilen.push(`  (${matTeile.join(', ')})`);
   }
   zeilen.push('');

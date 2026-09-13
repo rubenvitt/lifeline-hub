@@ -1,14 +1,26 @@
 // frontend/src/command-palette/datensaetze.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import {
-  baueDatensatzTreffer, etbVolltextMoeglich, sichtbareDatensaetze, zahlAusSuche,
+  baueDatensatzTreffer,
+  etbVolltextMoeglich,
+  sichtbareDatensaetze,
+  zahlAusSuche,
   type DatensatzKontext,
 } from './datensaetze';
 import { filtereBefehle, ordneTreffer, praefixStufe, type Treffer } from './fuzzy';
 import type { Befehl, PaletteModus } from './typen';
 import type {
-  Auftrag, BenutzerAnzeige, Einheit, EinsatzFahrzeug, EinsatzPersonal, EtbEintragAnzeige,
-  Meldung, ModulOverride, Person, Schaden, Uhs,
+  Auftrag,
+  BenutzerAnzeige,
+  Einheit,
+  EinsatzFahrzeug,
+  EinsatzPersonal,
+  EtbEintragAnzeige,
+  Meldung,
+  ModulOverride,
+  Person,
+  Schaden,
+  Uhs,
 } from '../api/types';
 
 /**
@@ -19,9 +31,24 @@ import type {
  * Typcheck an der PRODUKTIVSEITE fest — dort steht der echte Typ ohne Cast.
  */
 const person = (o: Partial<Person>): Person =>
-  ({ id: 1, einsatz_id: 5, registrier_nr: 1, status: 'erfasst', name: null, vorname: null, ...o }) as Person;
+  ({
+    id: 1,
+    einsatz_id: 5,
+    registrier_nr: 1,
+    status: 'erfasst',
+    name: null,
+    vorname: null,
+    ...o,
+  }) as Person;
 const schaden = (o: Partial<Schaden>): Schaden =>
-  ({ id: 1, einsatz_id: 5, registrier_nr: 1, typ: 'sachschaden', ort: 'Hauptstr', ...o }) as Schaden;
+  ({
+    id: 1,
+    einsatz_id: 5,
+    registrier_nr: 1,
+    typ: 'sachschaden',
+    ort: 'Hauptstr',
+    ...o,
+  }) as Schaden;
 const uhs = (o: Partial<Uhs>): Uhs =>
   ({ id: 1, einsatz_id: 5, bezeichnung: 'BHP 1', typ: 'behandlungsplatz', ...o }) as Uhs;
 const meldung = (o: Partial<Meldung>): Meldung =>
@@ -38,22 +65,40 @@ const etb = (o: Partial<EtbEintragAnzeige>): EtbEintragAnzeige =>
   ({ id: 1, lfd_nr: 1, inhalt: 'Lage erkundet', typ: 'lage', ...o }) as EtbEintragAnzeige;
 
 const fuehrungskraft: BenutzerAnzeige = {
-  id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
+  id: 1,
+  anzeigename: 'EL',
+  benutzername: 'el',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+  aktiv: true,
+  erstellt_at: '',
+  totp_aktiviert: false,
 };
 
 /** Vollständiges ModulOverride bauen (Bauform `befehle.test.ts:19`). */
 function ueberschreibung(felder: Partial<ModulOverride>): ModulOverride {
   return {
-    einsatz_id: 5, modul_key: 'personen', sichtbar: true, benoetigte_rolle: null,
-    geaendert_at: null, geaendert_von: null, ...felder,
+    einsatz_id: 5,
+    modul_key: 'personen',
+    sichtbar: true,
+    benoetigte_rolle: null,
+    geaendert_at: null,
+    geaendert_von: null,
+    ...felder,
   };
 }
 
 function kontext(over: Partial<DatensatzKontext> = {}): DatensatzKontext {
   return {
-    einsatzId: 5, suche: '', modus: 'alles', benutzer: fuehrungskraft, overrides: undefined,
-    aktuellerModulKey: null, navigate: vi.fn(), quellen: {}, ...over,
+    einsatzId: 5,
+    suche: '',
+    modus: 'alles',
+    benutzer: fuehrungskraft,
+    overrides: undefined,
+    aktuellerModulKey: null,
+    navigate: vi.fn(),
+    quellen: {},
+    ...over,
   };
 }
 
@@ -90,7 +135,10 @@ describe('zahlAusSuche', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
   it('findet eine Person über die Registriernummer und navigiert auf personDetailPfad', () => {
-    const k = kontext({ suche: '42', quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })] } });
+    const k = kontext({
+      suche: '42',
+      quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })] },
+    });
     const t = baueDatensatzTreffer(k);
     expect(ids(t)).toEqual(['datensatz:personen:7']);
     t[0].befehl.ausfuehren();
@@ -102,12 +150,17 @@ describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
   it('findet dieselbe Person über R-042, 042 und 42', () => {
     const quellen = { personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })] };
     for (const suche of ['R-042', '042', '42']) {
-      expect(ids(baueDatensatzTreffer(kontext({ suche, quellen })))).toEqual(['datensatz:personen:7']);
+      expect(ids(baueDatensatzTreffer(kontext({ suche, quellen })))).toEqual([
+        'datensatz:personen:7',
+      ]);
     }
   });
 
   it('findet ein Fahrzeug über den Funkrufnamen und navigiert auf fahrzeugePfad', () => {
-    const k = kontext({ suche: 'florian', quellen: { fahrzeuge: [fahrzeug({ id: 7, funkrufname: 'Florian 1' })] } });
+    const k = kontext({
+      suche: 'florian',
+      quellen: { fahrzeuge: [fahrzeug({ id: 7, funkrufname: 'Florian 1' })] },
+    });
     const t = baueDatensatzTreffer(k);
     expect(ids(t)).toEqual(['datensatz:fahrzeuge:7']);
     t[0].befehl.ausfuehren();
@@ -132,10 +185,26 @@ describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
    */
   it.each([
     ['schaeden', { schaeden: [schaden({ id: 7, registrier_nr: 42 })] }, '/einsaetze/5/schaeden/7'],
-    ['unfallhilfsstellen', { uhs: [uhs({ id: 7, bezeichnung: 'BHP 42' })] }, '/einsaetze/5/unfallhilfsstellen/7'],
-    ['meldungen', { meldungen: [meldung({ id: 7, lfd_nr: 42 })] }, '/einsaetze/5/meldungen?meldung=7'],
-    ['auftraege', { auftraege: [auftrag({ id: 7, lfd_nr: 42 })] }, '/einsaetze/5/auftraege?auftrag=7'],
-    ['personal', { personal: [personal({ id: 7, name: 'Nr 42' })] }, '/einsaetze/5/personal?personal=7'],
+    [
+      'unfallhilfsstellen',
+      { uhs: [uhs({ id: 7, bezeichnung: 'BHP 42' })] },
+      '/einsaetze/5/unfallhilfsstellen/7',
+    ],
+    [
+      'meldungen',
+      { meldungen: [meldung({ id: 7, lfd_nr: 42 })] },
+      '/einsaetze/5/meldungen?meldung=7',
+    ],
+    [
+      'auftraege',
+      { auftraege: [auftrag({ id: 7, lfd_nr: 42 })] },
+      '/einsaetze/5/auftraege?auftrag=7',
+    ],
+    [
+      'personal',
+      { personal: [personal({ id: 7, name: 'Nr 42' })] },
+      '/einsaetze/5/personal?personal=7',
+    ],
     ['einheiten', { einheiten: [einheit({ id: 7, name: 'SEG 42' })] }, '/einsaetze/5/einheiten/7'],
   ])('führt %s auf den Builder aus routing/deeplinks.ts', (_modul, quellen, ziel) => {
     const k = kontext({ suche: '42', quellen });
@@ -162,18 +231,25 @@ describe('baueDatensatzTreffer — Rangfolge', () => {
    */
   it('stellt einen Nummerntreffer vor einen Fuzzy-Treffer, der ein Wort mit der Zahl trägt', () => {
     const einsatzBefehl: Befehl = {
-      id: 'einsatz:9', gruppe: 'einsaetze', label: 'Einsatz 42', ausfuehren: () => {},
+      id: 'einsatz:9',
+      gruppe: 'einsaetze',
+      label: 'Einsatz 42',
+      ausfuehren: () => {},
     };
     const rauschen = filtereBefehle([einsatzBefehl], '42');
     expect(rauschen, 'Fuse findet den Einsatz — sonst prüft der Test nichts').toHaveLength(1);
 
-    const nummer = baueDatensatzTreffer(kontext({
-      suche: '42', quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })] },
-    }));
+    const nummer = baueDatensatzTreffer(
+      kontext({
+        suche: '42',
+        quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })] },
+      }),
+    );
     expect(nummer[0].stufe, 'Nummerntreffer tragen die beste Stufe').toBe(0);
 
-    expect(ordneTreffer([...rauschen, ...nummer], '42').map((b) => b.id)[0])
-      .toBe('datensatz:personen:7');
+    expect(ordneTreffer([...rauschen, ...nummer], '42').map((b) => b.id)[0]).toBe(
+      'datensatz:personen:7',
+    );
   });
 
   /**
@@ -189,16 +265,25 @@ describe('baueDatensatzTreffer — Rangfolge', () => {
    * Modul auf Stufe 0 und gewänne in jeder Fassung — der Test wäre nicht rot zu bekommen.
    */
   it('lässt den Modulbefehl vorn, wenn die Suche den Modulnamen trifft', () => {
-    const modul: Befehl = { id: 'modul:personen', gruppe: 'module', label: 'Personen', ausfuehren: () => {} };
+    const modul: Befehl = {
+      id: 'modul:personen',
+      gruppe: 'module',
+      label: 'Personen',
+      ausfuehren: () => {},
+    };
     const modulTreffer = filtereBefehle([modul], 'person');
     expect(modulTreffer).toHaveLength(1);
-    const datensatz = baueDatensatzTreffer(kontext({
-      suche: 'person', quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Personendorf' })] },
-    }));
+    const datensatz = baueDatensatzTreffer(
+      kontext({
+        suche: 'person',
+        quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Personendorf' })] },
+      }),
+    );
     expect(datensatz, 'der Datensatz wird gefunden — sonst prüft der Test nichts').toHaveLength(1);
 
-    expect(ordneTreffer([...datensatz, ...modulTreffer], 'person').map((b) => b.id)[0])
-      .toBe('modul:personen');
+    expect(ordneTreffer([...datensatz, ...modulTreffer], 'person').map((b) => b.id)[0]).toBe(
+      'modul:personen',
+    );
   });
 
   /**
@@ -220,18 +305,30 @@ describe('baueDatensatzTreffer — Rangfolge', () => {
    * Test wäre auch ohne die Score-Achse grün.
    */
   it('lässt den Modulbefehl vorn, wenn ein Datensatzlabel dasselbe Präfix trägt', () => {
-    const modul: Befehl = { id: 'modul:einheiten', gruppe: 'module', label: 'Einheiten', ausfuehren: () => {} };
+    const modul: Befehl = {
+      id: 'modul:einheiten',
+      gruppe: 'module',
+      label: 'Einheiten',
+      ausfuehren: () => {},
+    };
     const modulTreffer = filtereBefehle([modul], 'einheit');
     expect(modulTreffer, 'Fuse findet das Modul — sonst prüft der Test nichts').toHaveLength(1);
     expect(praefixStufe(modul, 'einheit'), 'der Modultreffer steht auf Stufe 1').toBe(1);
 
-    const datensatz = baueDatensatzTreffer(kontext({
-      suche: 'einheit', quellen: { einheiten: [einheit({ id: 3, name: 'Einheit Nord' })] },
-    }));
-    expect(datensatz[0]?.stufe, 'GLEICHE Stufe — sonst entschiede die Stufe und nicht der Score').toBe(1);
+    const datensatz = baueDatensatzTreffer(
+      kontext({
+        suche: 'einheit',
+        quellen: { einheiten: [einheit({ id: 3, name: 'Einheit Nord' })] },
+      }),
+    );
+    expect(
+      datensatz[0]?.stufe,
+      'GLEICHE Stufe — sonst entschiede die Stufe und nicht der Score',
+    ).toBe(1);
 
-    expect(ordneTreffer([...datensatz, ...modulTreffer], 'einheit').map((b) => b.id)[0])
-      .toBe('modul:einheiten');
+    expect(ordneTreffer([...datensatz, ...modulTreffer], 'einheit').map((b) => b.id)[0]).toBe(
+      'modul:einheiten',
+    );
   });
 
   /**
@@ -241,14 +338,23 @@ describe('baueDatensatzTreffer — Rangfolge', () => {
    * wenn die Regel den exakten Nummerntreffer mit erschlüge.
    */
   it('hält den Nummerntreffer vor dem bewerteten Modultreffer', () => {
-    const modul: Befehl = { id: 'modul:personen', gruppe: 'module', label: 'Personen 42', ausfuehren: () => {} };
+    const modul: Befehl = {
+      id: 'modul:personen',
+      gruppe: 'module',
+      label: 'Personen 42',
+      ausfuehren: () => {},
+    };
     const modulTreffer = filtereBefehle([modul], '42');
     expect(modulTreffer, 'Fuse findet das Modul — sonst prüft der Test nichts').toHaveLength(1);
-    const nummer = baueDatensatzTreffer(kontext({
-      suche: '42', quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })] },
-    }));
-    expect(ordneTreffer([...modulTreffer, ...nummer], '42').map((b) => b.id)[0])
-      .toBe('datensatz:personen:7');
+    const nummer = baueDatensatzTreffer(
+      kontext({
+        suche: '42',
+        quellen: { personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })] },
+      }),
+    );
+    expect(ordneTreffer([...modulTreffer, ...nummer], '42').map((b) => b.id)[0]).toBe(
+      'datensatz:personen:7',
+    );
   });
 });
 
@@ -274,16 +380,34 @@ describe('baueDatensatzTreffer — Heimvorteil des aktuellen Moduls', () => {
    */
   it('stellt bei gleicher Stufe den Treffer aus dem Modul voran, in dem man steht', () => {
     const gleich = baueDatensatzTreffer(kontext({ suche: 'florian', quellen: gleichnamig }));
-    expect(gleich.map((t) => t.stufe), 'GLEICHE Stufe — sonst entschiede sie und nicht die Herkunft')
-      .toEqual([1, 1]);
+    expect(
+      gleich.map((t) => t.stufe),
+      'GLEICHE Stufe — sonst entschiede sie und nicht die Herkunft',
+    ).toEqual([1, 1]);
 
-    expect(ids(baueDatensatzTreffer(kontext({
-      suche: 'florian', quellen: gleichnamig, aktuellerModulKey: 'personal',
-    })))).toEqual(['datensatz:personal:8', 'datensatz:fahrzeuge:7']);
+    expect(
+      ids(
+        baueDatensatzTreffer(
+          kontext({
+            suche: 'florian',
+            quellen: gleichnamig,
+            aktuellerModulKey: 'personal',
+          }),
+        ),
+      ),
+    ).toEqual(['datensatz:personal:8', 'datensatz:fahrzeuge:7']);
 
-    expect(ids(baueDatensatzTreffer(kontext({
-      suche: 'florian', quellen: gleichnamig, aktuellerModulKey: 'fahrzeuge',
-    })))).toEqual(['datensatz:fahrzeuge:7', 'datensatz:personal:8']);
+    expect(
+      ids(
+        baueDatensatzTreffer(
+          kontext({
+            suche: 'florian',
+            quellen: gleichnamig,
+            aktuellerModulKey: 'fahrzeuge',
+          }),
+        ),
+      ),
+    ).toEqual(['datensatz:fahrzeuge:7', 'datensatz:personal:8']);
   });
 
   /**
@@ -300,13 +424,19 @@ describe('baueDatensatzTreffer — Heimvorteil des aktuellen Moduls', () => {
       personen: [person({ id: 3, registrier_nr: 3, name: 'Florian' })],
       fahrzeuge: [fahrzeug({ id: 7, funkrufname: 'Florian 1' })],
     };
-    const t = baueDatensatzTreffer(kontext({
-      suche: 'florian', quellen, aktuellerModulKey: 'personen',
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'florian',
+        quellen,
+        aktuellerModulKey: 'personen',
+      }),
+    );
     // Als MENGE geprüft, nicht als Folge: sonst schlüge diese Zeile bei einem umsortierten
     // Ergebnis zuerst an und verdeckte die Aussage, um die es geht.
-    expect(new Set(t.map((x) => x.stufe)), 'ungleiche Stufen — sonst prüft der Test nichts')
-      .toEqual(new Set([1, 2]));
+    expect(
+      new Set(t.map((x) => x.stufe)),
+      'ungleiche Stufen — sonst prüft der Test nichts',
+    ).toEqual(new Set([1, 2]));
     expect(ids(t)).toEqual(['datensatz:fahrzeuge:7', 'datensatz:personen:3']);
   });
 
@@ -321,11 +451,21 @@ describe('baueDatensatzTreffer — Heimvorteil des aktuellen Moduls', () => {
       personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })],
       meldungen: [meldung({ id: 9, lfd_nr: 42, absender: 'Leitstelle' })],
     };
-    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen }))))
-      .toEqual(['datensatz:personen:7', 'datensatz:meldungen:9']);
-    expect(ids(baueDatensatzTreffer(kontext({
-      suche: '42', quellen, aktuellerModulKey: 'meldungen',
-    })))).toEqual(['datensatz:meldungen:9', 'datensatz:personen:7']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen })))).toEqual([
+      'datensatz:personen:7',
+      'datensatz:meldungen:9',
+    ]);
+    expect(
+      ids(
+        baueDatensatzTreffer(
+          kontext({
+            suche: '42',
+            quellen,
+            aktuellerModulKey: 'meldungen',
+          }),
+        ),
+      ),
+    ).toEqual(['datensatz:meldungen:9', 'datensatz:personen:7']);
   });
 
   /**
@@ -340,18 +480,24 @@ describe('baueDatensatzTreffer — Heimvorteil des aktuellen Moduls', () => {
   it('rettet den Treffer des aktuellen Moduls über den Gesamtdeckel', () => {
     const quellen = {
       uhs: Array.from({ length: 5 }, (_, i) => uhs({ id: 40 + i, bezeichnung: 'Nord' })),
-      fahrzeuge: Array.from({ length: 5 }, (_, i) => fahrzeug({ id: 60 + i, funkrufname: 'Nord 1' })),
+      fahrzeuge: Array.from({ length: 5 }, (_, i) =>
+        fahrzeug({ id: 60 + i, funkrufname: 'Nord 1' }),
+      ),
       // Kein Label ist mit dem Suchwort IDENTISCH — sonst stünde es auf Stufe 0 und die
       // Aussage hinge an der Stufe statt an der Herkunft.
       personal: Array.from({ length: 5 }, (_, i) => personal({ id: 80 + i, name: 'Nord 3' })),
       einheiten: [einheit({ id: 99, name: 'Nord 2' })],
     };
     const ohne = baueDatensatzTreffer(kontext({ suche: 'nord', quellen }));
-    expect(new Set(ohne.map((t) => t.stufe)), 'alle sechzehn auf derselben Stufe').toEqual(new Set([1]));
+    expect(new Set(ohne.map((t) => t.stufe)), 'alle sechzehn auf derselben Stufe').toEqual(
+      new Set([1]),
+    );
     expect(ohne, 'der Gesamtdeckel bleibt bei fünfzehn').toHaveLength(15);
     expect(ids(ohne)).not.toContain('datensatz:einheiten:99');
 
-    const mit = baueDatensatzTreffer(kontext({ suche: 'nord', quellen, aktuellerModulKey: 'einheiten' }));
+    const mit = baueDatensatzTreffer(
+      kontext({ suche: 'nord', quellen, aktuellerModulKey: 'einheiten' }),
+    );
     expect(mit).toHaveLength(15);
     expect(ids(mit)[0]).toBe('datensatz:einheiten:99');
   });
@@ -367,17 +513,26 @@ describe('baueDatensatzTreffer — Heimvorteil des aktuellen Moduls', () => {
    * jeden Datensatz-Treffer UNBEWERTET.
    */
   it('lässt den Modulbefehl vorn, auch wenn man in diesem Modul steht', () => {
-    const modul: Befehl = { id: 'modul:einheiten', gruppe: 'module', label: 'Einheiten', ausfuehren: () => {} };
+    const modul: Befehl = {
+      id: 'modul:einheiten',
+      gruppe: 'module',
+      label: 'Einheiten',
+      ausfuehren: () => {},
+    };
     const modulTreffer = filtereBefehle([modul], 'einheit');
     expect(modulTreffer, 'Fuse findet das Modul — sonst prüft der Test nichts').toHaveLength(1);
-    const datensatz = baueDatensatzTreffer(kontext({
-      suche: 'einheit', quellen: { einheiten: [einheit({ id: 3, name: 'Einheit Nord' })] },
-      aktuellerModulKey: 'einheiten',
-    }));
+    const datensatz = baueDatensatzTreffer(
+      kontext({
+        suche: 'einheit',
+        quellen: { einheiten: [einheit({ id: 3, name: 'Einheit Nord' })] },
+        aktuellerModulKey: 'einheiten',
+      }),
+    );
     expect(datensatz[0]?.stufe, 'GLEICHE Stufe wie der Modultreffer').toBe(1);
 
-    expect(ordneTreffer([...datensatz, ...modulTreffer], 'einheit').map((b) => b.id)[0])
-      .toBe('modul:einheiten');
+    expect(ordneTreffer([...datensatz, ...modulTreffer], 'einheit').map((b) => b.id)[0]).toBe(
+      'modul:einheiten',
+    );
   });
 });
 
@@ -389,11 +544,17 @@ describe('baueDatensatzTreffer — Sortenbindung und Nullbarkeit', () => {
       personen: [person({ id: 7, registrier_nr: 42 })],
       schaeden: [schaden({ id: 8, registrier_nr: 42 })],
     };
-    expect(ids(baueDatensatzTreffer(kontext({ suche: 'R-042', quellen })))).toEqual(['datensatz:personen:7']);
-    expect(ids(baueDatensatzTreffer(kontext({ suche: 'S-042', quellen })))).toEqual(['datensatz:schaeden:8']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: 'R-042', quellen })))).toEqual([
+      'datensatz:personen:7',
+    ]);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: 'S-042', quellen })))).toEqual([
+      'datensatz:schaeden:8',
+    ]);
     // Ohne Sortenbuchstaben zählt die Zahl allein — beide Sorten stehen dann da.
-    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen }))).sort())
-      .toEqual(['datensatz:personen:7', 'datensatz:schaeden:8']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen }))).sort()).toEqual([
+      'datensatz:personen:7',
+      'datensatz:schaeden:8',
+    ]);
   });
 
   /**
@@ -402,9 +563,12 @@ describe('baueDatensatzTreffer — Sortenbindung und Nullbarkeit', () => {
    * die WIEDERVERWENDUNG statt einer zweiten Label-Wahrheit.
    */
   it('hält eine Person ohne Namen über ihre Nummer auffindbar', () => {
-    const t = baueDatensatzTreffer(kontext({
-      suche: '42', quellen: { personen: [person({ id: 7, registrier_nr: 42, name: null, vorname: null })] },
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: '42',
+        quellen: { personen: [person({ id: 7, registrier_nr: 42, name: null, vorname: null })] },
+      }),
+    );
     expect(labels(t)).toEqual(['Personen · R-042']);
   });
 
@@ -412,7 +576,9 @@ describe('baueDatensatzTreffer — Sortenbindung und Nullbarkeit', () => {
   it('lässt einen Auftrag ohne lfd. Nr. aus dem Zahlenzweig fallen', () => {
     const mitNr = { auftraege: [auftrag({ id: 7, lfd_nr: 42 })] };
     const ohneNr = { auftraege: [auftrag({ id: 7, lfd_nr: null })] };
-    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen: mitNr })))).toEqual(['datensatz:auftraege:7']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen: mitNr })))).toEqual([
+      'datensatz:auftraege:7',
+    ]);
     expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen: ohneNr })))).toEqual([]);
   });
 });
@@ -431,9 +597,14 @@ describe('baueDatensatzTreffer — Sortenbindung und Nullbarkeit', () => {
  */
 describe('baueDatensatzTreffer — Auftragszeile', () => {
   it('setzt die lfd. Nr. vor den Auftragstext', () => {
-    const t = baueDatensatzTreffer(kontext({
-      suche: '42', quellen: { auftraege: [auftrag({ id: 7, lfd_nr: 42, auftrag_text: 'Abschnitt erkunden' })] },
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: '42',
+        quellen: {
+          auftraege: [auftrag({ id: 7, lfd_nr: 42, auftrag_text: 'Abschnitt erkunden' })],
+        },
+      }),
+    );
     expect(labels(t)).toEqual(['Aufträge/Befehle · #42 · Abschnitt erkunden']);
   });
 
@@ -445,15 +616,21 @@ describe('baueDatensatzTreffer — Auftragszeile', () => {
       ],
     };
     const l = labels(baueDatensatzTreffer(kontext({ suche: 'lage melden', quellen })));
-    expect(l).toEqual(['Aufträge/Befehle · #12 · Lage melden', 'Aufträge/Befehle · #13 · Lage melden']);
+    expect(l).toEqual([
+      'Aufträge/Befehle · #12 · Lage melden',
+      'Aufträge/Befehle · #13 · Lage melden',
+    ]);
   });
 
   /** `AuftragAnzeige.lfd_nr` ist NULLBAR — die Zeile bleibt ohne Nummernteil brauchbar,
    *  statt ein „#null" zu tragen. */
   it('lässt einen Auftrag ohne lfd. Nr. ohne Nummernteil stehen', () => {
-    const t = baueDatensatzTreffer(kontext({
-      suche: 'lage', quellen: { auftraege: [auftrag({ id: 7, lfd_nr: null, auftrag_text: 'Lage melden' })] },
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'lage',
+        quellen: { auftraege: [auftrag({ id: 7, lfd_nr: null, auftrag_text: 'Lage melden' })] },
+      }),
+    );
     expect(labels(t)).toEqual(['Aufträge/Befehle · Lage melden']);
   });
 });
@@ -463,7 +640,9 @@ describe('baueDatensatzTreffer — Rechte', () => {
   /** PAAR: „kein Treffer" allein wäre trivial grün, auch wenn der Riegel ALLES verwürfe. */
   it('zeigt Personen-Treffer, solange das Modul freigegeben ist', () => {
     const quellen = { personen: [person({ id: 7, registrier_nr: 42 })] };
-    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen })))).toEqual(['datensatz:personen:7']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen })))).toEqual([
+      'datensatz:personen:7',
+    ]);
   });
   it('unterdrückt Personen-Treffer, wenn das Personen-Modul ausgeblendet ist', () => {
     const quellen = {
@@ -472,7 +651,9 @@ describe('baueDatensatzTreffer — Rechte', () => {
     };
     const overrides = { personen: ueberschreibung({ modul_key: 'personen', sichtbar: false }) };
     // Der Schaden bleibt — der Riegel wirkt je Modul, nicht global.
-    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen, overrides })))).toEqual(['datensatz:schaeden:8']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen, overrides })))).toEqual([
+      'datensatz:schaeden:8',
+    ]);
   });
 });
 
@@ -482,7 +663,9 @@ describe('baueDatensatzTreffer — Textzweig und ETB', () => {
     const quellen = {
       personal: [personal({ id: 7, name: 'Müller' }), personal({ id: 8, name: 'Schmidt' })],
     };
-    expect(ids(baueDatensatzTreffer(kontext({ suche: 'MÜLL', quellen })))).toEqual(['datensatz:personal:7']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: 'MÜLL', quellen })))).toEqual([
+      'datensatz:personal:7',
+    ]);
   });
 
   /**
@@ -491,10 +674,21 @@ describe('baueDatensatzTreffer — Textzweig und ETB', () => {
    * gar nicht im Label steht — der Grund, warum diese Quelle getrennt hereinkommt.
    */
   it('nimmt serverseitig bestätigte ETB-Volltexttreffer ohne zweiten lokalen Filter', () => {
-    const t = baueDatensatzTreffer(kontext({
-      suche: 'brandschutz',
-      quellen: { etbText: [etb({ id: 12, lfd_nr: 99, inhalt: 'Lage erkundet', veranlassung: 'Brandschutz gestellt' })] },
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'brandschutz',
+        quellen: {
+          etbText: [
+            etb({
+              id: 12,
+              lfd_nr: 99,
+              inhalt: 'Lage erkundet',
+              veranlassung: 'Brandschutz gestellt',
+            }),
+          ],
+        },
+      }),
+    );
     expect(ids(t)).toEqual(['datensatz:etb:12']);
   });
 
@@ -510,7 +704,9 @@ describe('baueDatensatzTreffer — Textzweig und ETB', () => {
 
   it('führt einen ETB-Eintrag, der in beiden Zweigen steckt, nur einmal', () => {
     const eintrag = etb({ id: 12, lfd_nr: 99 });
-    const t = baueDatensatzTreffer(kontext({ suche: '99', quellen: { etbNummer: [eintrag], etbText: [eintrag] } }));
+    const t = baueDatensatzTreffer(
+      kontext({ suche: '99', quellen: { etbNummer: [eintrag], etbText: [eintrag] } }),
+    );
     expect(ids(t)).toEqual(['datensatz:etb:12']);
   });
 });
@@ -518,8 +714,12 @@ describe('baueDatensatzTreffer — Textzweig und ETB', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
   it('deckelt auf fünf Treffer je Entität', () => {
-    const personen = Array.from({ length: 9 }, (_, i) => person({ id: i + 1, registrier_nr: i + 1, name: `Müller ${i}` }));
-    expect(baueDatensatzTreffer(kontext({ suche: 'müller', quellen: { personen } }))).toHaveLength(5);
+    const personen = Array.from({ length: 9 }, (_, i) =>
+      person({ id: i + 1, registrier_nr: i + 1, name: `Müller ${i}` }),
+    );
+    expect(baueDatensatzTreffer(kontext({ suche: 'müller', quellen: { personen } }))).toHaveLength(
+      5,
+    );
   });
 
   /**
@@ -529,13 +729,22 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
    * Quelle an erster Stelle wäre die Aussage nicht zu verlieren gewesen.
    */
   it('deckelt die Gesamtmenge, ohne den Nummerntreffer zu verlieren', () => {
-    const personen = Array.from({ length: 9 }, (_, i) => person({ id: i + 1, registrier_nr: 10 + i, name: 'Nord 4' }));
-    const schaeden = Array.from({ length: 9 }, (_, i) => schaden({ id: 40 + i, registrier_nr: 40 + i, ort: 'Nord 4' }));
-    const uhsListe = Array.from({ length: 9 }, (_, i) => uhs({ id: 60 + i, bezeichnung: 'Nord 4' }));
+    const personen = Array.from({ length: 9 }, (_, i) =>
+      person({ id: i + 1, registrier_nr: 10 + i, name: 'Nord 4' }),
+    );
+    const schaeden = Array.from({ length: 9 }, (_, i) =>
+      schaden({ id: 40 + i, registrier_nr: 40 + i, ort: 'Nord 4' }),
+    );
+    const uhsListe = Array.from({ length: 9 }, (_, i) =>
+      uhs({ id: 60 + i, bezeichnung: 'Nord 4' }),
+    );
     const meldungen = [meldung({ id: 90, lfd_nr: 4, absender: 'Zentrale' })];
-    const t = baueDatensatzTreffer(kontext({
-      suche: '4', quellen: { personen, schaeden, uhs: uhsListe, meldungen },
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: '4',
+        quellen: { personen, schaeden, uhs: uhsListe, meldungen },
+      }),
+    );
     expect(t).toHaveLength(15);
     expect(ids(t)).toContain('datensatz:meldungen:90');
   });
@@ -553,7 +762,9 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
    */
   it('nimmt beim Deckel je Quelle die bessere Stufe, nicht die Listenreihenfolge', () => {
     const personen = [
-      ...Array.from({ length: 5 }, (_, i) => person({ id: i + 1, registrier_nr: i + 1, name: 'Obermeier' })),
+      ...Array.from({ length: 5 }, (_, i) =>
+        person({ id: i + 1, registrier_nr: i + 1, name: 'Obermeier' }),
+      ),
       person({ id: 6, registrier_nr: 6, name: 'Meier' }),
     ];
     const t = baueDatensatzTreffer(kontext({ suche: 'mei', quellen: { personen } }));
@@ -570,13 +781,22 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
    * Quellentabelle aber erst nach den dreien und erschien deshalb gar nicht.
    */
   it('deckelt die Gesamtmenge nach Stufe, nicht nach Quellenreihenfolge', () => {
-    const personen = Array.from({ length: 5 }, (_, i) => person({ id: i + 1, registrier_nr: i + 1, name: 'Nordwind' }));
-    const schaeden = Array.from({ length: 5 }, (_, i) => schaden({ id: 20 + i, registrier_nr: 20 + i, ort: 'Nordstr' }));
-    const uhsListe = Array.from({ length: 5 }, (_, i) => uhs({ id: 40 + i, bezeichnung: 'BHP Nordplatz' }));
+    const personen = Array.from({ length: 5 }, (_, i) =>
+      person({ id: i + 1, registrier_nr: i + 1, name: 'Nordwind' }),
+    );
+    const schaeden = Array.from({ length: 5 }, (_, i) =>
+      schaden({ id: 20 + i, registrier_nr: 20 + i, ort: 'Nordstr' }),
+    );
+    const uhsListe = Array.from({ length: 5 }, (_, i) =>
+      uhs({ id: 40 + i, bezeichnung: 'BHP Nordplatz' }),
+    );
     const fahrzeuge = [fahrzeug({ id: 60, funkrufname: 'Nord 1' })];
-    const t = baueDatensatzTreffer(kontext({
-      suche: 'nord', quellen: { personen, schaeden, uhs: uhsListe, fahrzeuge },
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'nord',
+        quellen: { personen, schaeden, uhs: uhsListe, fahrzeuge },
+      }),
+    );
     expect(t, 'der Gesamtdeckel bleibt bei fünfzehn').toHaveLength(15);
     expect(ids(t)[0]).toBe('datensatz:fahrzeuge:60');
   });
@@ -592,15 +812,21 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
       'Meldungen (eingehend) · #42 · Leitstelle',
       'Personen · R-042 · Müller',
     ]);
-    expect(labels(baueDatensatzTreffer(kontext({ suche: 'bhp', quellen }))))
-      .toEqual(['Unfallhilfsstellen · BHP Nord (behandlungsplatz)']);
+    expect(labels(baueDatensatzTreffer(kontext({ suche: 'bhp', quellen })))).toEqual([
+      'Unfallhilfsstellen · BHP Nord (behandlungsplatz)',
+    ]);
   });
 
   it('legt jeden Treffer in die Gruppe datensaetze', () => {
-    const t = baueDatensatzTreffer(kontext({
-      suche: '42',
-      quellen: { personen: [person({ id: 7, registrier_nr: 42 })], schaeden: [schaden({ id: 8, registrier_nr: 42 })] },
-    }));
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: '42',
+        quellen: {
+          personen: [person({ id: 7, registrier_nr: 42 })],
+          schaeden: [schaden({ id: 8, registrier_nr: 42 })],
+        },
+      }),
+    );
     expect(t.map((x) => x.befehl.gruppe)).toEqual(['datensaetze', 'datensaetze']);
   });
 
@@ -648,16 +874,23 @@ describe('baueDatensatzTreffer — Präfixmodi (LFH-391 · C3)', () => {
   };
 
   it('liefert unter „@" Person, Fahrzeug, Personal und Einheit', () => {
-    const t = baueDatensatzTreffer(kontext({ modus: 'kraefte', suche: 'nord', quellen: alleQuellen }));
+    const t = baueDatensatzTreffer(
+      kontext({ modus: 'kraefte', suche: 'nord', quellen: alleQuellen }),
+    );
     expect(ids(t).sort()).toEqual([
-      'datensatz:einheiten:5', 'datensatz:fahrzeuge:3', 'datensatz:personal:4', 'datensatz:personen:7',
+      'datensatz:einheiten:5',
+      'datensatz:fahrzeuge:3',
+      'datensatz:personal:4',
+      'datensatz:personen:7',
     ]);
   });
 
   /** Die negative Hälfte — und sie ist die tragende: ohne sie wäre auch ein Modus grün,
    *  der gar nicht filtert (unpräfigiert liefert dieselbe Menge und mehr). */
   it('liefert unter „@" keinen Schaden, keine Meldung, keine Unfallhilfsstelle, keinen Auftrag und keinen ETB-Eintrag', () => {
-    const t = baueDatensatzTreffer(kontext({ modus: 'kraefte', suche: 'nord', quellen: alleQuellen }));
+    const t = baueDatensatzTreffer(
+      kontext({ modus: 'kraefte', suche: 'nord', quellen: alleQuellen }),
+    );
     expect(ids(t).filter((id) => !/personen|fahrzeuge|personal|einheiten/.test(id))).toEqual([]);
     // Gegenprobe im selben Lauf: ohne Präfix stehen sie sehr wohl da.
     const ohne = ids(baueDatensatzTreffer(kontext({ suche: 'nord', quellen: alleQuellen })));
@@ -680,18 +913,22 @@ describe('baueDatensatzTreffer — Präfixmodi (LFH-391 · C3)', () => {
       personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })],
       etbNummer: [etb({ id: 12, lfd_nr: 42 })],
     };
-    expect(ids(baueDatensatzTreffer(kontext({ modus: 'etb', suche: '42', quellen }))))
-      .toEqual(['datensatz:etb:12']);
+    expect(ids(baueDatensatzTreffer(kontext({ modus: 'etb', suche: '42', quellen })))).toEqual([
+      'datensatz:etb:12',
+    ]);
     // Gegenprobe: ohne Präfix findet dieselbe Zahl beide.
-    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen }))).sort())
-      .toEqual(['datensatz:etb:12', 'datensatz:personen:7']);
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen }))).sort()).toEqual([
+      'datensatz:etb:12',
+      'datensatz:personen:7',
+    ]);
   });
 
   /** Der `>`-Modus zeigt per Definition nur Aktionen — dort gibt es keine Datensatzzeile,
    *  auch nicht aus einem warmen Cache. */
   it('liefert im Aktionen-Modus gar nichts', () => {
-    expect(baueDatensatzTreffer(kontext({ modus: 'aktionen', suche: 'nord', quellen: alleQuellen })))
-      .toEqual([]);
+    expect(
+      baueDatensatzTreffer(kontext({ modus: 'aktionen', suche: 'nord', quellen: alleQuellen })),
+    ).toEqual([]);
   });
 });
 
@@ -768,7 +1005,8 @@ describe('sichtbareDatensaetze', () => {
   it('verwirft den ETB-Nachläufer ohne alphanumerisches Token, die übrigen Quellen nicht', () => {
     expect(sichtbar([person7, etb12], 'alles', '??')).toEqual(['datensatz:personen:7']);
     expect(sichtbar([person7, etb12], 'alles', 'no')).toEqual([
-      'datensatz:personen:7', 'datensatz:etb:12',
+      'datensatz:personen:7',
+      'datensatz:etb:12',
     ]);
   });
 });

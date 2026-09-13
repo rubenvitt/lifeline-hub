@@ -58,7 +58,9 @@ describe('AmpelZelle', () => {
       <AmpelZelle bezeichnung="Personal" verteilung={verteilung({ gebunden: 4 })} />,
     );
     expect(container.querySelectorAll('.lfh-feld')).toHaveLength(4);
-    expect(within(screen.getByRole('group', { name: 'Personal' })).getByText('4')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('group', { name: 'Personal' })).getByText('4'),
+    ).toBeInTheDocument();
   });
 
   it('eine 0 bekommt KEINE Stufenklasse, ein Wert > 0 die seiner Kategorie', () => {
@@ -74,9 +76,7 @@ describe('AmpelZelle', () => {
   });
 
   it('rendert bei fehlender Verteilung NICHTS — mittel-Zeilen haben keine', () => {
-    const { container } = render(
-      <AmpelZelle bezeichnung="Personal" verteilung={null} />,
-    );
+    const { container } = render(<AmpelZelle bezeichnung="Personal" verteilung={null} />);
     expect(container.querySelector('.lfh-feld')).toBeNull();
     expect(screen.queryByRole('group')).toBeNull();
   });

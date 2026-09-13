@@ -157,10 +157,15 @@ describe('personenKarte', () => {
     // DIREKTER Aufruf, kein console-Spion: `pruefeKartenplan` fängt genau das
     // `const K`-Widening, das der Typ nicht sehen kann, wenn eine Spaltenliste annotiert
     // statt durch `spaltenFuer` geführt wird.
-    expect(pruefeKartenplan({ spalten: personenSpalten, karte: personenKarte(1) }, 'Personen')).toEqual([]);
+    expect(
+      pruefeKartenplan({ spalten: personenSpalten, karte: personenKarte(1) }, 'Personen'),
+    ).toEqual([]);
     expect(
       pruefeKartenplan(
-        { spalten: [...personenSpalten, ...abgleichSpalten([], () => {})], karte: personenKarte(1) },
+        {
+          spalten: [...personenSpalten, ...abgleichSpalten([], () => {})],
+          karte: personenKarte(1),
+        },
         'Personen',
       ),
     ).toEqual([]);
@@ -202,7 +207,10 @@ describe('personenKarte', () => {
     // Gegenprobe zur Zusicherung oben: ohne sie wäre `toEqual([])` auch bei einem
     // wirkungslosen `pruefeKartenplan` grün.
     const befunde = pruefeKartenplan(
-      { spalten: personenSpalten, karte: { art: 'plan', titel: { spalte: 'reg' }, sekundaer: ['seitt' as 'seit'] } },
+      {
+        spalten: personenSpalten,
+        karte: { art: 'plan', titel: { spalte: 'reg' }, sekundaer: ['seitt' as 'seit'] },
+      },
       'Personen',
     );
     expect(befunde).toHaveLength(1);

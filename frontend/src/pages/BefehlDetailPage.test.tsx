@@ -11,6 +11,7 @@ import * as einsaetzeApi from '../api/einsaetze';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
+import { ApiError } from '../api/client';
 
 vi.mock('../api/befehle');
 vi.mock('../api/einsaetze');
@@ -19,11 +20,14 @@ const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'e
 
 function renderAt(bid: number | string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = createMemoryRouter([
-    { path: '/einsaetze', element: <div>EINSATZ-LISTE</div> },
-    { path: '/einsaetze/:id/auftraege', element: <div>AUFTRAEGE-LISTE</div> },
-    { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
-  ], { initialEntries: ['/einsaetze/1/auftraege', `/einsaetze/1/auftraege/befehle/${bid}`] });
+  const router = createMemoryRouter(
+    [
+      { path: '/einsaetze', element: <div>EINSATZ-LISTE</div> },
+      { path: '/einsaetze/:id/auftraege', element: <div>AUFTRAEGE-LISTE</div> },
+      { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
+    ],
+    { initialEntries: ['/einsaetze/1/auftraege', `/einsaetze/1/auftraege/befehle/${bid}`] },
+  );
   const ergebnis = render(
     <QueryClientProvider client={qc}>
       <AntApp>
@@ -58,7 +62,8 @@ function renderAt(bid: number | string) {
        * Test war ohne diese Zeile grün, bevor es einen Riegel gab).
        */
       await waitFor(() =>
-        expect(vi.mocked(befehleApi.ladeBefehl).mock.calls.length).toBeGreaterThan(vorher));
+        expect(vi.mocked(befehleApi.ladeBefehl).mock.calls.length).toBeGreaterThan(vorher),
+      );
     },
   };
 }
@@ -69,13 +74,66 @@ beforeEach(() => {
 
 function befehl(status: 'entwurf' | 'freigegeben') {
   return {
-    id: 7, einsatz_id: 1, vorlage: 'befehl_ladef', titel: 'Befehl 1',
-    zeitstand: '2026-06-02 10:00:00', status, abschnitte: [],
-    version: 1, vorgaenger_id: null, ersteller_id: 1, ersteller_name: 'EL',
-    erstellt_at: '', aktualisiert_at: '', freigegeben_von_id: null,
-    freigegeben_von_name: null, freigegeben_at: null, etb_eintrag_id: status === 'freigegeben' ? 5 : null,
+    id: 7,
+    einsatz_id: 1,
+    vorlage: 'befehl_ladef',
+    titel: 'Befehl 1',
+    zeitstand: '2026-06-02 10:00:00',
+    status,
+    abschnitte: [],
+    version: 1,
+    vorgaenger_id: null,
+    ersteller_id: 1,
+    ersteller_name: 'EL',
+    erstellt_at: '',
+    aktualisiert_at: '',
+    freigegeben_von_id: null,
+    freigegeben_von_name: null,
+    freigegeben_at: null,
+    etb_eintrag_id: status === 'freigegeben' ? 5 : null,
   };
 }
+
+/**
+ * ── EINSTIEGSFOKUS (LFH-495, Nachzug C13/N3) ───────────────────────────────────
+ *
+ * Die Bedienentscheidung ist der ERSTE LEERE Abschnitt; Mechanik und Begründungen stehen in
+ * `entwurf/Einstiegsfokus.tsx` samt eigenem Test. Hier steht, dass die SEITE das Ziel aus dem
+ * SERVERSTAND ableitet und nicht aus den Formularwerten — die sind beim Mount noch leer, der
+ * Sync-Effekt füllt sie erst danach. Eine Ableitung aus dem Formular träfe deshalb immer den
+ * ersten Abschnitt und wäre von der richtigen Wahl nicht zu unterscheiden.
+ *
+ * Anders als im Lagebericht gibt es hier kein Akkordeon: alle fünf Editoren stehen gestapelt,
+ * der Fokus scrollt die Seite bis zu seinem Ziel (die verankerte Aktionsleiste hält es über
+ * `scroll-padding-block-end` frei, LFH-465).
+ */
+describe('BefehlDetailPage — Einstiegsfokus (LFH-495)', () => {
+  it('fokussiert den ersten LEEREN Abschnitt des Serverstands', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('entwurf'),
+      abschnitte: [
+        { schluessel: 'lage', text: 'Allgemeine Lage steht' },
+        { schluessel: 'auftrag', text: 'Auftrag steht' },
+        { schluessel: 'durchfuehrung', text: '' },
+      ],
+    } as never);
+    renderAt(7);
+    expect(await screen.findByLabelText('Durchführung')).toHaveFocus();
+  });
+
+  it('fokussiert am leeren Befehl den ersten Abschnitt (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    expect(await screen.findByLabelText('Lage')).toHaveFocus();
+  });
+
+  it('fokussiert im FREIGEGEBENEN Befehl nichts — es gibt kein Formular', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    await screen.findByRole('heading', { name: 'Befehl 1' });
+    expect(document.body).toHaveFocus();
+  });
+});
 
 describe('BefehlDetailPage', () => {
   it('zeigt im Entwurf editierbare Felder mit Hilfetext', async () => {
@@ -266,16 +324,26 @@ describe('BefehlDetailPage — Verlustschutz (LFH-342 · C7, Befund N18)', () =>
 function renderMitZone(bid: number) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   qc.setQueryData(einsatzKeys.einstellungen(1), {
-    einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 },
+    einsatz_id: 1,
+    zeitzone: 'Europe/Berlin',
+    org_defaults: { org_id: 1 },
   });
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
           <EinsatzAnzeigeProvider einsatzId={1}>
-            <RouterProvider router={createMemoryRouter([
-              { path: '/einsaetze/:id/auftraege/befehle/:befehlId', element: <BefehlDetailPage /> },
-            ], { initialEntries: [`/einsaetze/1/auftraege/befehle/${bid}`] })} />
+            <RouterProvider
+              router={createMemoryRouter(
+                [
+                  {
+                    path: '/einsaetze/:id/auftraege/befehle/:befehlId',
+                    element: <BefehlDetailPage />,
+                  },
+                ],
+                { initialEntries: [`/einsaetze/1/auftraege/befehle/${bid}`] },
+              )}
+            />
           </EinsatzAnzeigeProvider>
         </AuthProvider>
       </AntApp>
@@ -285,12 +353,15 @@ function renderMitZone(bid: number) {
 
 describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
   it('zeigt die taktische DTG in der Anzeigezone, nicht den rohen UTC-Wirestring', async () => {
-    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue(
-      { einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } } as never,
-    );
-    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(
-      { ...befehl('freigegeben'), zeitstand: '2026-07-25 12:00:00' } as never,
-    );
+    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1,
+      zeitzone: 'Europe/Berlin',
+      org_defaults: { org_id: 1 },
+    } as never);
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('freigegeben'),
+      zeitstand: '2026-07-25 12:00:00',
+    } as never);
     renderMitZone(7);
 
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
@@ -298,7 +369,6 @@ describe('BefehlDetailPage — Zeitstand (LFH-350 · H60)', () => {
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });
-
 
 describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
   beforeEach(() => {
@@ -310,11 +380,27 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
   function halteSpeichernAn() {
     let resolve!: (wert: never) => void;
     let reject!: (fehler: Error) => void;
-    vi.mocked(befehleApi.aktualisiereBefehl).mockImplementation(() =>
-      new Promise((ja, nein) => { resolve = ja; reject = nein; }));
+    vi.mocked(befehleApi.aktualisiereBefehl).mockImplementation(
+      () =>
+        new Promise((ja, nein) => {
+          resolve = ja;
+          reject = nein;
+        }),
+    );
     return {
-      erfolg: () => act(async () => { resolve(befehl('entwurf') as never); }),
-      fehler: () => act(async () => { reject(new Error('Netz unterbrochen')); }),
+      erfolg: () =>
+        act(async () => {
+          resolve(befehl('entwurf') as never);
+        }),
+      fehler: () =>
+        act(async () => {
+          reject(new Error('Netz unterbrochen'));
+        }),
+      /** Wie `fehler`, aber mit einem bestimmten Grund — der Wortlaut trägt die Aussage. */
+      ablehnen: (e: Error) =>
+        act(async () => {
+          reject(e);
+        }),
     };
   }
 
@@ -365,11 +451,56 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
     await userEvent.click(weiter);
     await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(2));
-    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(1, 7,
-      expect.objectContaining({ titel: 'Befehl 1 neu' }));
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(
+      1,
+      7,
+      expect.objectContaining({ titel: 'Befehl 1 neu' }),
+    );
     expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
     await erneut.erfolg();
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+  });
+
+  /**
+   * Der Grund muss IM Dialog stehen, nicht auf der Seite dahinter (LFH-494, Review-Befund).
+   *
+   * Der Blocker-Dialog trägt `mask={{ closable: false }}`: alles hinter ihm ist abgedunkelt
+   * und unbedienbar. Solange der Fehler über `message.error` lief, war genau das der Kanal,
+   * der über einem offenen Modal funktioniert — beim Umbau auf den Seiten-Alert wäre diese
+   * eine Stelle sonst ohne jede Rückmeldung geblieben: `loading` fällt, der Dialog steht
+   * unverändert da. Das ist die H14-Diagnose, die dieses Ticket schliesst, an einem Pfad
+   * wieder aufgemacht. Anders als im Freigabe-Flow kann die Seite hier nicht „beides"
+   * melden — `autosaveJetzt()` liefert `void`, es gibt nichts zum Awaiten.
+   */
+  it('zeigt den Grund eines gescheiterten „Speichern und weiter" IM Dialog', async () => {
+    const save = halteSpeichernAn();
+    renderAt(7);
+    const dialog = await oeffneBlocker();
+    await save.fehler();
+    const erneut = halteSpeichernAn();
+    const weiter = dialog.getByRole('button', { name: /Speichern und weiter/ });
+    await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
+    await userEvent.click(weiter);
+    await erneut.ablehnen(new ApiError(503, 'Speichern vorübergehend nicht möglich'));
+
+    expect(await dialog.findByText('Speichern vorübergehend nicht möglich')).toBeInTheDocument();
+    expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
+  });
+
+  it('räumt den Grund im Dialog, sobald das Speichern gelingt, und geht weiter (Gegenaussage)', async () => {
+    const save = halteSpeichernAn();
+    renderAt(7);
+    const dialog = await oeffneBlocker();
+    await save.ablehnen(new ApiError(503, 'Speichern vorübergehend nicht möglich'));
+    expect(await dialog.findByText('Speichern vorübergehend nicht möglich')).toBeInTheDocument();
+
+    const erneut = halteSpeichernAn();
+    const weiter = dialog.getByRole('button', { name: /Speichern und weiter/ });
+    await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
+    await userEvent.click(weiter);
+    await erneut.erfolg();
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+    expect(screen.queryByText('Speichern vorübergehend nicht möglich')).toBeNull();
   });
 
   it('schützt auch Browser-Zurück und lässt eine neue Fassung nach älterem PATCH offen', async () => {
@@ -379,7 +510,9 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     await userEvent.type(titel, ' a');
     await userEvent.tab();
     await userEvent.type(titel, ' b');
-    await act(async () => { await router.navigate(-1); });
+    await act(async () => {
+      await router.navigate(-1);
+    });
     await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await save.erfolg();
     expect(screen.queryByText('AUFTRAEGE-LISTE')).toBeNull();
@@ -395,7 +528,9 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     fireEvent.submit(titel.closest('form')!);
     await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1));
     await userEvent.type(titel, ' b');
-    await act(async () => { await router.navigate('/einsaetze/1/auftraege'); });
+    await act(async () => {
+      await router.navigate('/einsaetze/1/auftraege');
+    });
     await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await save.erfolg();
     expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/7');
@@ -415,8 +550,11 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
     expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1);
     await save.erfolg();
     await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(2));
-    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(1, 7,
-      expect.objectContaining({ titel: 'Befehl 1 a b' }));
+    expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(
+      1,
+      7,
+      expect.objectContaining({ titel: 'Befehl 1 a b' }),
+    );
     expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/7');
     await save.erfolg();
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
@@ -441,19 +579,24 @@ describe('BefehlDetailPage — Router-Blocker (LFH-462)', () => {
   it('lässt Query-/Hash-Wechsel im selben Editor ohne Dialog zu', async () => {
     const { router } = renderAt(7);
     await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
-    await act(async () => { await router.navigate('?ansicht=test#lage'); });
+    await act(async () => {
+      await router.navigate('?ansicht=test#lage');
+    });
     expect(screen.getByLabelText('Titel')).toHaveValue('Befehl 1 neu');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(router.state.location.hash).toBe('#lage');
   });
 
-  it.each(['entwurf', 'freigegeben'] as const)('lässt die unveränderte Fassung %s direkt gehen', async (status) => {
-    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl(status) as never);
-    renderAt(7);
-    await userEvent.click(await screen.findByRole('link', { name: 'Aufträge/Befehle' }));
-    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
+  it.each(['entwurf', 'freigegeben'] as const)(
+    'lässt die unveränderte Fassung %s direkt gehen',
+    async (status) => {
+      vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl(status) as never);
+      renderAt(7);
+      await userEvent.click(await screen.findByRole('link', { name: 'Aufträge/Befehle' }));
+      expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    },
+  );
 
   it('verlangt beim ausdrücklichen Speichern einen gültigen Titel', async () => {
     halteSpeichernAn();
@@ -528,10 +671,186 @@ describe('BefehlDetailPage — verankerte Aktionsleiste (LFH-465)', () => {
    * stehenbliebe, während die Knöpfe unten kleben, wäre auf 390 px aus dem Bild gescrollt,
    * genau während man tippt.
    */
-  it.each([390, 1024])('trägt den Autosave-Beleg bei %ipx im selben Block wie die Knöpfe', async (breite) => {
-    setzeViewportBreite(breite);
+  it.each([390, 1024])(
+    'trägt den Autosave-Beleg bei %ipx im selben Block wie die Knöpfe',
+    async (breite) => {
+      setzeViewportBreite(breite);
+      renderAt(7);
+      await userEvent.type(await screen.findByLabelText('Titel'), ' x');
+      expect(within(aktionsblock()!).getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+    },
+  );
+});
+
+/**
+ * ── SPEICHERFEHLER IN DER SEITE (LFH-494, Nachzug C13/N2) ──────────────────────
+ *
+ * Der Zwilling der Probe in `LageberichtePage.test.tsx`. Beide Entwurfsseiten teilen sich
+ * den Verlustschutz-Hook — wer nur eine umstellt, öffnet die Divergenz wieder, die C13 mit
+ * dem gemeinsamen Hook geschlossen hat.
+ *
+ * Die `.ant-message`-Abgrenzung trägt die Aussage: antds Toast rendert INNERHALB des
+ * RTL-Containers, ein blosses `findByText` bliebe mit zurückgedrehtem Umbau grün.
+ */
+describe('BefehlDetailPage — Speicherfehler in der Seite (LFH-494)', () => {
+  it('lässt den Grund eines gescheiterten Autosave in der Seite stehen, nicht nur im Toast', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
+      new ApiError(503, 'Dienst nicht erreichbar'),
+    );
     renderAt(7);
-    await userEvent.type(await screen.findByLabelText('Titel'), ' x');
-    expect(within(aktionsblock()!).getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+    await userEvent.type(await screen.findByLabelText('Titel'), 'x');
+    await userEvent.tab();
+
+    const treffer = await screen.findByText('Dienst nicht erreichbar');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(screen.getByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(screen.getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+  });
+
+  it('räumt den Grund beim nächsten gelungenen Speichern (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl)
+      .mockRejectedValueOnce(new ApiError(503, 'Dienst nicht erreichbar'))
+      .mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    await userEvent.type(await screen.findByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    expect(await screen.findByText('Dienst nicht erreichbar')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Dienst nicht erreichbar')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('behandelt das Verlassen des Editors nicht als Speicherfehler', async () => {
+    // `speichern` bricht noch nicht gestartete Aufträge mit einem `AbortError` ab. Ein
+    // Alert dafür behauptete einen Verlust, den es nicht gab — und stünde auf der Seite,
+    // die man gerade verlassen hat.
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
+      new DOMException('Editor verlassen', 'AbortError'),
+    );
+    renderAt(7);
+    await userEvent.type(await screen.findByLabelText('Titel'), 'x');
+    await userEvent.tab();
+    await act(async () => {});
+    expect(screen.queryByText('Nicht gespeichert')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ── GESCHEITERTE FREIGABE (LFH-535, Nachzug N5 aus LFH-348 · C13) ──────────────
+ *
+ * Dieselbe H14-Diagnose wie beim Speichern, nur am Zustandsübergang: schlägt
+ * `POST …/freigeben` fehl, bleibt der Bestätigungsdialog stehen — und solange der Grund
+ * nur im Toast stand, war er nach rund drei Sekunden weg und der unveränderte Dialog von
+ * „nichts passiert" nicht zu unterscheiden. Der Dialog trägt `mask={{ closable: false }}`,
+ * ein Seiten-Alert dahinter wäre unsichtbar.
+ *
+ * Die Zusicherung hat zwei Hälften, und die zweite trägt sie: der Grund steht IM Dialog
+ * UND nicht in der Message-Queue. Ohne `closest('.ant-message')` bliebe der Test grün,
+ * wenn der Toast zurückkäme.
+ */
+describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
+  beforeEach(() => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
+    // Die Suite fährt ohne `clearMocks`: der Zähler liefe sonst über die Tests dieser
+    // Datei weiter, und „nicht aufgerufen" wäre nach dem ersten Test nie wieder grün
+    // (gemessen: 2 Aufrufe aus den Tests darüber).
+    vi.mocked(befehleApi.gibBefehlFrei).mockClear();
+  });
+
+  async function oeffneFreigabe() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Freigeben' }));
+    return screen.findByRole('dialog', { name: 'Befehl freigeben?' });
+  }
+
+  /**
+   * Die Message-Queue nach diesem Wortlaut absuchen — die Hälfte der Zusicherung, die den
+   * Umbau trägt.
+   *
+   * `within(dialog).findByText(...)` allein belegt sie NICHT: käme der Toast zurück,
+   * stünde der Wortlaut an ZWEI Stellen, und die Abfrage im Dialog fände ihren Alert
+   * weiter. Ein `getAllByText(...)`-Zähler taugt ebenfalls nicht überall — beim
+   * gescheiterten Speicher-Vorlauf steht der Grund zu Recht doppelt (Dialog UND
+   * Seiten-Alert, der das Schliessen überlebt). Gezählt wird deshalb genau die Queue.
+   */
+  function toastsMit(wortlaut: string) {
+    return [...document.querySelectorAll('.ant-message')].filter((n) =>
+      n.textContent?.includes(wortlaut),
+    );
+  }
+
+  it('zeigt den Grund IM Dialog statt im Toast und lässt ihn offen', async () => {
+    vi.mocked(befehleApi.gibBefehlFrei).mockRejectedValue(
+      new ApiError(422, 'Abschnitt „Auftrag" ist leer'),
+    );
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    const treffer = await within(dialog).findByText('Abschnitt „Auftrag" ist leer');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(toastsMit('Abschnitt „Auftrag" ist leer')).toHaveLength(0);
+    expect(within(dialog).getByText('Freigabe fehlgeschlagen')).toBeInTheDocument();
+    // „Offen" heisst in jsdom „nicht in der Verlassen-Bewegung": antds Modal räumt seinen
+    // Knoten erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`
+    // (gemessen, `MaterialPage.test.tsx:556`). `queryByRole('dialog')` wäre hier blind.
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+  });
+
+  it('schliesst den Dialog bei gelungener Freigabe und quittiert per Toast (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.gibBefehlFrei).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    expect(await screen.findByText('Befehl freigegeben')).toBeInTheDocument();
+  });
+
+  /**
+   * Der Speicher-Vorlauf ist die ERSTE Fehlerquelle des Flows: `/freigeben` prüft den
+   * persistierten Stand. Scheitert er, darf die Freigabe gar nicht erst laufen — und der
+   * Grund trägt eine andere Überschrift, weil er der Person etwas anderes sagt.
+   */
+  it('hält die Freigabe zurück, wenn schon der Speicher-Vorlauf scheitert', async () => {
+    vi.mocked(befehleApi.aktualisiereBefehl).mockRejectedValue(
+      new ApiError(503, 'Dienst nicht erreichbar'),
+    );
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+
+    const treffer = await within(dialog).findByText('Dienst nicht erreichbar');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    expect(toastsMit('Dienst nicht erreichbar')).toHaveLength(0);
+    expect(within(dialog).getByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(befehleApi.gibBefehlFrei).not.toHaveBeenCalled();
+  });
+
+  /**
+   * react-query hält `error` bis zum nächsten `mutate()`. Ohne `reset()` beim Öffnen trüge
+   * ein abgebrochener Versuch seinen Grund in den nächsten, frisch geöffneten Dialog —
+   * eine Meldung über etwas, das gerade gar nicht passiert ist.
+   */
+  it('öffnet nach Abbrechen ohne den Grund des vorigen Versuchs', async () => {
+    vi.mocked(befehleApi.gibBefehlFrei).mockRejectedValue(
+      new ApiError(422, 'Abschnitt „Auftrag" ist leer'),
+    );
+    renderAt(7);
+    const dialog = await oeffneFreigabe();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
+    await within(dialog).findByText('Abschnitt „Auftrag" ist leer');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    await userEvent.click(screen.getByRole('button', { name: 'Freigeben' }));
+
+    await waitFor(() => expect(dialog).not.toHaveClass('ant-zoom-leave'));
+    expect(within(dialog).queryByText('Abschnitt „Auftrag" ist leer')).toBeNull();
   });
 });

@@ -1,20 +1,45 @@
 // frontend/src/command-palette/datensaetze.ts
 import {
-  auftragLabel, kuerze, meldungLabel, personLabel, schadenLabel, uhsLabel,
+  auftragLabel,
+  kuerze,
+  meldungLabel,
+  personLabel,
+  schadenLabel,
+  uhsLabel,
 } from '../chat/bezug';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
 import {
-  auftraegePfad, einheitDetailPfad, etbPfad, fahrzeugePfad, meldungenPfad, personDetailPfad,
-  personalPfad, schadenDetailPfad, uhsDetailPfad,
+  auftraegePfad,
+  einheitDetailPfad,
+  etbPfad,
+  fahrzeugePfad,
+  meldungenPfad,
+  personDetailPfad,
+  personalPfad,
+  schadenDetailPfad,
+  uhsDetailPfad,
 } from '../routing/deeplinks';
 import { textStufe, UNBEWERTET, type Treffer } from './fuzzy';
 import {
-  DATENSATZ_MINDESTZEICHEN, PALETTE_MODI, QUELLE_MODUL,
-  type Befehl, type DatensatzQuelle, type PaletteModus,
+  DATENSATZ_MINDESTZEICHEN,
+  PALETTE_MODI,
+  QUELLE_MODUL,
+  type Befehl,
+  type DatensatzQuelle,
+  type PaletteModus,
 } from './typen';
 import type {
-  Auftrag, BenutzerAnzeige, Einheit, EinsatzFahrzeug, EinsatzPersonal, EtbEintragAnzeige,
-  Meldung, ModulOverrides, Person, Schaden, Uhs,
+  Auftrag,
+  BenutzerAnzeige,
+  Einheit,
+  EinsatzFahrzeug,
+  EinsatzPersonal,
+  EtbEintragAnzeige,
+  Meldung,
+  ModulOverrides,
+  Person,
+  Schaden,
+  Uhs,
 } from '../api/types';
 
 /**
@@ -208,12 +233,19 @@ function quellen(k: DatensatzKontext): Quelle[] {
   const q = k.quellen;
   const e = k.einsatzId;
   return [
-    baueQuelle('personen', 'beide', q.personen, e, {
-      id: (p) => p.id,
-      nummer: (p) => p.registrier_nr,
-      label: personLabel,
-      ziel: (id, p) => personDetailPfad(id, p.id),
-    }, { sorte: 'person' }),
+    baueQuelle(
+      'personen',
+      'beide',
+      q.personen,
+      e,
+      {
+        id: (p) => p.id,
+        nummer: (p) => p.registrier_nr,
+        label: personLabel,
+        ziel: (id, p) => personDetailPfad(id, p.id),
+      },
+      { sorte: 'person' },
+    ),
     // Zwei ETB-Quellen, zwei Verträge — siehe `DatensatzQuellen`. Der Cursorzweig steht
     // zuerst, damit ein Eintrag, den beide Abfragen liefern, als NUMMERNtreffer gilt.
     baueQuelle('etbNummer', 'zahl', q.etbNummer, e, {
@@ -222,17 +254,31 @@ function quellen(k: DatensatzKontext): Quelle[] {
       label: etbLabel,
       ziel: (id, x) => etbPfad(id, { eintrag: x.id }),
     }),
-    baueQuelle('etbText', 'text', q.etbText, e, {
-      id: (x) => x.id,
-      label: etbLabel,
-      ziel: (id, x) => etbPfad(id, { eintrag: x.id }),
-    }, { serverGefiltert: true }),
-    baueQuelle('schaeden', 'beide', q.schaeden, e, {
-      id: (s) => s.id,
-      nummer: (s) => s.registrier_nr,
-      label: schadenLabel,
-      ziel: (id, s) => schadenDetailPfad(id, s.id),
-    }, { sorte: 'schaden' }),
+    baueQuelle(
+      'etbText',
+      'text',
+      q.etbText,
+      e,
+      {
+        id: (x) => x.id,
+        label: etbLabel,
+        ziel: (id, x) => etbPfad(id, { eintrag: x.id }),
+      },
+      { serverGefiltert: true },
+    ),
+    baueQuelle(
+      'schaeden',
+      'beide',
+      q.schaeden,
+      e,
+      {
+        id: (s) => s.id,
+        nummer: (s) => s.registrier_nr,
+        label: schadenLabel,
+        ziel: (id, s) => schadenDetailPfad(id, s.id),
+      },
+      { sorte: 'schaden' },
+    ),
     baueQuelle('uhs', 'text', q.uhs, e, {
       id: (u) => u.id,
       label: uhsLabel,
@@ -351,7 +397,13 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
   /** Nummerntreffer mit ihren Ordnungsachsen — gedeckelt werden sie nie, geordnet schon. */
   const nummerRoh: { treffer: Treffer; heim: 0 | 1; quelle: number; index: number }[] = [];
   /** Alle Texttreffer UNGEDECKELT — gedeckelt wird erst nach dem Ordnen, siehe unten. */
-  const roh: { treffer: Treffer; heim: 0 | 1; quelle: number; stufe: 0 | 1 | 2 | 3; index: number }[] = [];
+  const roh: {
+    treffer: Treffer;
+    heim: 0 | 1;
+    quelle: number;
+    stufe: 0 | 1 | 2 | 3;
+    index: number;
+  }[] = [];
 
   const alsTreffer = (kand: Kandidat, stufe: 0 | 1 | 2 | 3): Treffer => {
     gesehen.add(schluessel(kand));
@@ -368,7 +420,12 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
         // Stufe 0 — die Suche IST die Kennung. Aus dem Label liesse sie sich nicht ablesen
         // (dort steht 'Personen · R-042 · Müller'), und ein Fuzzy-Treffer auf Stufe 2
         // stünde sonst VOR dem exakten Nummerntreffer. Siehe `Treffer.stufe`.
-        nummerRoh.push({ treffer: alsTreffer(kand, 0), heim: heim(kand), quelle: qi, index: nummerRoh.length });
+        nummerRoh.push({
+          treffer: alsTreffer(kand, 0),
+          heim: heim(kand),
+          quelle: qi,
+          index: nummerRoh.length,
+        });
       }
     }
   }
@@ -386,7 +443,13 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
       // ganze Liste stünde damit auf der Stufe der Modulseite und über allem, was wirklich
       // so heisst. Die Herkunft ist Beschriftung, keine Suchachse.
       const stufe = textStufe(kand.basisLabel, suche);
-      roh.push({ treffer: alsTreffer(kand, stufe), heim: heim(kand), quelle: qi, stufe, index: roh.length });
+      roh.push({
+        treffer: alsTreffer(kand, stufe),
+        heim: heim(kand),
+        quelle: qi,
+        stufe,
+        index: roh.length,
+      });
     }
   }
 
@@ -407,7 +470,9 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
   // Modul „Einheiten" steht und einen Einheitennamen tippt, bekam den Treffer bei drei
   // randvollen Quellen davor gar nicht zu sehen. Eine Umsortierung NACH dem Deckeln könnte
   // das nicht heilen — deshalb sitzt er im Schlüssel und nicht dahinter.
-  roh.sort((a, b) => a.stufe - b.stufe || a.heim - b.heim || a.quelle - b.quelle || a.index - b.index);
+  roh.sort(
+    (a, b) => a.stufe - b.stufe || a.heim - b.heim || a.quelle - b.quelle || a.index - b.index,
+  );
 
   // Nummerntreffer werden NIE weggedeckelt: sie sind eine exakte Gleichheit auf einer
   // eindeutigen Kennung, ihre Zahl ist strukturell klein (höchstens eine je Quelle). Geordnet

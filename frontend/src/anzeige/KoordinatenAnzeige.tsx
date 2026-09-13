@@ -25,7 +25,13 @@ export default function KoordinatenAnzeige({
     <Space orientation="vertical" size={0}>
       <Typography.Text>{formatKoordinate(lat, lon)}</Typography.Text>
       {einsatzId != null && (
-        <OrtZeile einsatzId={einsatzId} koord={{ lat, lon }} exclude={exclude} debounceMs={0} maxZeilen={maxOrtZeilen} />
+        <OrtZeile
+          einsatzId={einsatzId}
+          koord={{ lat, lon }}
+          exclude={exclude}
+          debounceMs={0}
+          maxZeilen={maxOrtZeilen}
+        />
       )}
     </Space>
   );

@@ -85,8 +85,16 @@ export function baueSpiderFc(
     const o = offsets[i];
     const ll = projektor.unproject({ x: c.x + o.x, y: c.y + o.y });
     const pos: [number, number] = [ll.lng, ll.lat];
-    leafFeatures.push({ type: 'Feature', properties: { ...p }, geometry: { type: 'Point', coordinates: pos } });
-    legFeatures.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [anker, pos] } });
+    leafFeatures.push({
+      type: 'Feature',
+      properties: { ...p },
+      geometry: { type: 'Point', coordinates: pos },
+    });
+    legFeatures.push({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: [anker, pos] },
+    });
   });
   return {
     leaves: { type: 'FeatureCollection', features: leafFeatures },

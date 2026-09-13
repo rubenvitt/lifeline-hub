@@ -201,10 +201,10 @@ describe('Dichte-Staffel — CSS und TS tragen dieselben Stufen (LFH-328 · A2)'
     // Verglichen wird auf DATEI-Ebene und dedupliziert: ein Zeilennummern-Pin
     // bräche bei jeder Einrückung, und zwei Treffer in derselben Datei (Setzen
     // plus Aufräumen) sind kein Verstoß.
-    const quellen = import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', eager: true }) as Record<
-      string,
-      { default: string }
-    >;
+    const quellen = import.meta.glob('/src/**/*.{ts,tsx}', {
+      query: '?raw',
+      eager: true,
+    }) as Record<string, { default: string }>;
     const setzer = Object.entries(quellen)
       .filter(([pfad]) => !/\.test\.[jt]sx?$/.test(pfad))
       .flatMap(([pfad, modul]) =>
@@ -261,9 +261,7 @@ function medienblock(mindestbreite: number): Record<string, string> {
   const auf = css.indexOf('{', treffer.index);
   const zu = css.indexOf('\n}', auf);
   const werte: Record<string, string> = {};
-  for (const [, name, wert] of css
-    .slice(auf + 1, zu)
-    .matchAll(/(--lfh-[\w-]+):\s*([^;]+);/g)) {
+  for (const [, name, wert] of css.slice(auf + 1, zu).matchAll(/(--lfh-[\w-]+):\s*([^;]+);/g)) {
     werte[name] = wert.trim();
   }
   return werte;

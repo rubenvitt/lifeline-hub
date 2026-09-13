@@ -8,8 +8,13 @@ import { AuthProvider } from '../auth/AuthContext';
 import EinheitTypenTab from './EinheitTypenTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
@@ -80,9 +85,7 @@ describe('EinheitTypenTab', () => {
     await screen.findByText('Zug');
     // `waitFor`, weil der Knopf beim ersten Anstrich noch ungesperrt sein kann: das
     // Recht kommt aus `auth/me` und trifft eine Runde nach der Tabelle ein.
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Typ anlegen' })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Typ anlegen' })).toBeDisabled());
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deaktivieren' })).not.toBeInTheDocument();
   });
@@ -138,13 +141,15 @@ describe('EinheitTypenTab', () => {
     await userEvent.type(screen.getByLabelText('Neuer Einheitstyp'), 'Gruppe{Enter}');
 
     await waitFor(() =>
-      expect(ruempfe).toEqual([{
-        label: 'Gruppe',
-        soll_fuehrer: null,
-        soll_unterfuehrer: null,
-        soll_mannschaft: null,
-        sortier: 0,
-      }]),
+      expect(ruempfe).toEqual([
+        {
+          label: 'Gruppe',
+          soll_fuehrer: null,
+          soll_unterfuehrer: null,
+          soll_mannschaft: null,
+          sortier: 0,
+        },
+      ]),
     );
   });
 
@@ -181,7 +186,9 @@ describe('EinheitTypenTab', () => {
     const dialog = await screen.findByRole('dialog');
 
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
-    expect(within(dialog).getByRole('button', { name: 'Speichern' }).closest('form')).not.toBeNull();
+    expect(
+      within(dialog).getByRole('button', { name: 'Speichern' }).closest('form'),
+    ).not.toBeNull();
   });
 
   /**
@@ -206,7 +213,8 @@ describe('EinheitTypenTab', () => {
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
       http.patch('/api/einheit-typen/1', () =>
-        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 })),
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
+      ),
     );
     render(admin);
     await screen.findByText('Zug');

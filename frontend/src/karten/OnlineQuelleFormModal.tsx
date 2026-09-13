@@ -151,9 +151,9 @@ export default function OnlineQuelleFormModal({
         label="URL"
         name="url"
         tooltip={
-          'Bei schlüsselbasierten Anbietern (z. B. MapTiler, Stadia) die volle URL '
-          + 'inklusive Schlüssel eintragen — mit eingeschaltetem Proxy bleibt er '
-          + 'server-seitig und erscheint nie im Browser (LFH-182).'
+          'Bei schlüsselbasierten Anbietern (z. B. MapTiler, Stadia) die volle URL ' +
+          'inklusive Schlüssel eintragen — mit eingeschaltetem Proxy bleibt er ' +
+          'server-seitig und erscheint nie im Browser (LFH-182).'
         }
         rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
       >
@@ -173,46 +173,48 @@ export default function OnlineQuelleFormModal({
       <Collapse
         ghost
         style={{ marginInline: -8 }}
-        items={[{
-          key: 'weitere',
-          label: 'Weitere Angaben',
-          children: (
-            <>
-              <Form.Item
-                label="Sortierung"
-                name="sortier"
-                tooltip="Reihenfolge im Basemap-Switcher (kleiner = weiter oben)."
-              >
-                <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
-              </Form.Item>
-              <Form.Item
-                label="Aktiv"
-                name="aktiv"
-                valuePropName="checked"
-                tooltip="Nur aktive Quellen erscheinen im Basemap-Switcher der Lagekarte."
-              >
-                <Switch />
-              </Form.Item>
-              {/* Der Tooltip trägt, was bis LFH-346 · A8 als Alert über dem ganzen
+        items={[
+          {
+            key: 'weitere',
+            label: 'Weitere Angaben',
+            children: (
+              <>
+                <Form.Item
+                  label="Sortierung"
+                  name="sortier"
+                  tooltip="Reihenfolge im Basemap-Switcher (kleiner = weiter oben)."
+                >
+                  <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
+                </Form.Item>
+                <Form.Item
+                  label="Aktiv"
+                  name="aktiv"
+                  valuePropName="checked"
+                  tooltip="Nur aktive Quellen erscheinen im Basemap-Switcher der Lagekarte."
+                >
+                  <Switch />
+                </Form.Item>
+                {/* Der Tooltip trägt, was bis LFH-346 · A8 als Alert über dem ganzen
                   Formular stand: ein Alert erklärt einen Zustand der Seite, ein
                   Tooltip erklärt ein Feld. */}
-              <Form.Item
-                label="Über Server proxen"
-                name="proxy"
-                valuePropName="checked"
-                tooltip={
-                  'Standard an (empfohlen): Der Server holt Style, Tiles, Sprite und Glyphs, '
-                  + 'hält Schlüssel server-seitig und speichert die Antworten zwischen — '
-                  + 'gleiche Kacheln treffen den Anbieter nur einmal (LFH-182/190). '
-                  + 'Abschalten nur, wenn der Anbieter Proxying oder Caching untersagt '
-                  + '(z. B. OSM-Standard-Tiles); dann läuft die URL direkt im Browser.'
-                }
-              >
-                <Switch />
-              </Form.Item>
-            </>
-          ),
-        }]}
+                <Form.Item
+                  label="Über Server proxen"
+                  name="proxy"
+                  valuePropName="checked"
+                  tooltip={
+                    'Standard an (empfohlen): Der Server holt Style, Tiles, Sprite und Glyphs, ' +
+                    'hält Schlüssel server-seitig und speichert die Antworten zwischen — ' +
+                    'gleiche Kacheln treffen den Anbieter nur einmal (LFH-182/190). ' +
+                    'Abschalten nur, wenn der Anbieter Proxying oder Caching untersagt ' +
+                    '(z. B. OSM-Standard-Tiles); dann läuft die URL direkt im Browser.'
+                  }
+                >
+                  <Switch />
+                </Form.Item>
+              </>
+            ),
+          },
+        ]}
       />
     </ErfassungsModal>
   );

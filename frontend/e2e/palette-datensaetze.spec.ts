@@ -190,11 +190,16 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
   let letztePerson = { registrier_nr: 0 };
   for (let i = 1; i <= ziel.lfd_nr; i += 1) {
     const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, { data: {} });
-    expect(antwort.ok(), `Seeding Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+    expect(
+      antwort.ok(),
+      `Seeding Person: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
     letztePerson = await antwort.json();
   }
   const zahl = ziel.lfd_nr;
-  expect(letztePerson.registrier_nr, 'die Person trägt dieselbe Zahl wie der ETB-Eintrag').toBe(zahl);
+  expect(letztePerson.registrier_nr, 'die Person trägt dieselbe Zahl wie der ETB-Eintrag').toBe(
+    zahl,
+  );
   const personKennung = `R-${String(zahl).padStart(3, '0')}`;
 
   // Genau so viele jüngere Einträge, dass der Zieleintrag aus der ersten Seite fällt.
@@ -208,9 +213,7 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
    * `EtbPage` ältere Seiten NACHLÄDT, bis der Eintrag da ist. Wäre der Zieleintrag schon
    * auf der ersten Seite, bliebe der Test grün, ohne den Nachladeweg je zu betreten.
    */
-  const ersteSeite = await page.request.get(
-    `/api/einsaetze/${einsatzId}/etb?limit=${ETB_SEITE}`,
-  );
+  const ersteSeite = await page.request.get(`/api/einsaetze/${einsatzId}/etb?limit=${ETB_SEITE}`);
   expect(ersteSeite.ok(), await ersteSeite.text()).toBeTruthy();
   const ids = ((await ersteSeite.json()) as { id: number }[]).map((e) => e.id);
   expect(ids, 'der Zieleintrag liegt hinter der ersten Seite').not.toContain(ziel.id);
@@ -222,7 +225,9 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
   const etbTreffer = page.getByRole('option', {
     name: new RegExp(`ETB · #${zahl} · ${ZIELTEXT}`),
   });
-  const personTreffer = page.getByRole('option', { name: new RegExp(`Personen · ${personKennung}`) });
+  const personTreffer = page.getByRole('option', {
+    name: new RegExp(`Personen · ${personKennung}`),
+  });
 
   /*
    * ERST OHNE PRÄFIX — die Hälfte, die die Bindung überhaupt prüfbar macht: dieselbe Zahl

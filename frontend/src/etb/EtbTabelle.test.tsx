@@ -23,8 +23,10 @@ beforeEach(() => setzeViewportBreite(1366));
  * gepufferte Zeile braucht, gibt `zeilen` direkt.
  */
 function renderTabelle(
-  props: Omit<Partial<TabellenProps>, 'zeilen'>
-    & { eintraege?: EtbEintragAnzeige[]; zeilen?: readonly EtbZeile[] },
+  props: Omit<Partial<TabellenProps>, 'zeilen'> & {
+    eintraege?: EtbEintragAnzeige[];
+    zeilen?: readonly EtbZeile[];
+  },
 ) {
   const { eintraege, zeilen, ...rest } = props;
   return render(
@@ -40,7 +42,9 @@ function renderTabelle(
 
 function ausstehend(over: Partial<AusstehenderEintrag> = {}): AusstehenderEintrag {
   return {
-    id: 1, benutzer_id: 1, einsatz_id: 1,
+    id: 1,
+    benutzer_id: 1,
+    einsatz_id: 1,
     eintrag: { typ: 'meldung', inhalt: 'Noch nicht gesendet' },
     erstellt_at: '2026-05-23 10:05:00',
     ...over,
@@ -113,7 +117,9 @@ describe('EtbTabelle', () => {
    */
   it('beschriftet nachgetragene Einträge mit dem Wort „Nachtrag"', () => {
     renderTabelle({
-      eintraege: [eintrag({ ereigniszeit: '2026-05-23 09:00:00', received_at: '2026-05-23 10:00:00' })],
+      eintraege: [
+        eintrag({ ereigniszeit: '2026-05-23 09:00:00', received_at: '2026-05-23 10:00:00' }),
+      ],
     });
     expect(screen.getByRole('cell', { name: /Nachtrag/ })).toBeInTheDocument();
     expect(screen.queryByText('⧖')).not.toBeInTheDocument();
@@ -161,7 +167,8 @@ describe('EtbTabelle', () => {
   it('zeigt einen Deeplink-Badge auf den gekoppelten Befehl (LFH-25)', () => {
     renderTabelle({ eintraege: [eintrag({ id: 5, befehl_id: 42 })] });
     expect(screen.getByRole('link', { name: /Befehl/ })).toHaveAttribute(
-      'href', '/einsaetze/1/auftraege/befehle/42',
+      'href',
+      '/einsaetze/1/auftraege/befehle/42',
     );
   });
 
@@ -169,7 +176,9 @@ describe('EtbTabelle', () => {
     const { container } = renderTabelle({ eintraege: [eintrag({ id: 9 })], highlightId: 9 });
     // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix — die Queue-`id` eines
     // gepufferten Eintrags kollidierte sonst mit der DB-`id`.
-    expect(container.querySelector('[data-row-key="eintrag-9"]')).toHaveClass('zeile-hervorgehoben');
+    expect(container.querySelector('[data-row-key="eintrag-9"]')).toHaveClass(
+      'zeile-hervorgehoben',
+    );
   });
 });
 
@@ -455,9 +464,13 @@ describe('EtbTabelle – gepufferte Einträge (LFH-342 · C7, Befund M82)', () =
     expect(screen.getByText('abgelehnt')).toBeInTheDocument();
     // Kein Menü: eine Ablehnung verlangt eine Entscheidung, und beide Wege stehen da.
     await userEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
-    expect(onErneutSenden).toHaveBeenCalledWith(expect.objectContaining({ grund: 'Einsatz abgeschlossen' }));
+    expect(onErneutSenden).toHaveBeenCalledWith(
+      expect.objectContaining({ grund: 'Einsatz abgeschlossen' }),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
-    expect(onVerwerfen).toHaveBeenCalledWith(expect.objectContaining({ grund: 'Einsatz abgeschlossen' }));
+    expect(onVerwerfen).toHaveBeenCalledWith(
+      expect.objectContaining({ grund: 'Einsatz abgeschlossen' }),
+    );
   });
 
   /**
@@ -478,5 +491,69 @@ describe('EtbTabelle – gepufferte Einträge (LFH-342 · C7, Befund M82)', () =
       </MemoryRouter>,
     );
     expect(screen.getByText('Noch nicht gesendet')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Der Meldungstext fließt (LFH-523).
+ *
+ * DER BEFUND, gemessen auf `origin/main` 17aed41c: ein normal umbrechbarer Meldungstext mit
+ * 209 Zeichen bleibt im Tabellenzweig EINZEILIG und verbreitert ihn — im Handschuhmodus
+ * 1484 px Text gegen 936 px Sicht, 1122 px innerer Überlauf bei 1280 px und 1036 px bei
+ * 1366 px. Der Kartenzweig derselben Daten bricht denselben Text um; der Tabelle fehlte der
+ * Deckel, gegen den sie hätte umbrechen können.
+ *
+ * WAS HIER PRÜFBAR IST, IST DIE RECHNUNG — nicht ihre Wirkung: `vite.config.ts` fährt
+ * `css: false`, jsdom rechnet kein Layout, alle Breiten sind 0. Dass der Text im Browser
+ * wirklich umbricht und der innere Überlauf verschwindet, misst
+ * `e2e/etb-chronologie.spec.ts`. Hier steht die Zusicherung, dass die Chronologie das
+ * Opt-in überhaupt SETZT und mit welcher Zahl — ohne sie wäre der Browsertest der einzige
+ * Ort, an dem ein Rückbau auffiele.
+ */
+describe('EtbTabelle — Fließender Meldungstext (LFH-523)', () => {
+  function tabellenBreite(): string {
+    const tabelle = document.querySelector<HTMLTableElement>('.ant-table-body table');
+    expect(tabelle, 'Tabellenzweig nicht gerendert').not.toBeNull();
+    return tabelle!.style.width;
+  }
+
+  const LANG =
+    'Im Kellergeschoss des Anwesens Musterweg 3 steht das Wasser rund achtzig Zentimeter ' +
+    'hoch. Die Heizungsanlage ist betroffen, der Hausanschlusskasten noch trocken. ' +
+    'Eigentümer vor Ort, Zugang über die Hofseite möglich.';
+
+  it('deckelt die Tabellenbreite, statt sie vom längsten Text treiben zu lassen', () => {
+    setzeViewportBreite(1366);
+    renderTabelle({ eintraege: [eintrag({ inhalt: LANG })], onBerichtigen: () => {} });
+
+    // 88 (Nr.) + 180 (Zeit) + 130 (Typ) + 320 (Inhalt) + 96 (Aktionen). Von→An und
+    // Erfasser tragen `abBreite: 'xxl'` und sind bei 1366 px zu Recht draußen.
+    // Als Literal hingeschrieben: aus den Spalten zurückgerechnet prüfte die Zeile die
+    // Rechnung gegen sich selbst.
+    expect(tabellenBreite()).toBe('814px');
+  });
+
+  it('nimmt die Nebenspalten mit in den Deckel, sobald sie sichtbar sind', () => {
+    // Ab `xxl` stehen Von→An (160) und Erfasser (120) wieder da — der Deckel wächst mit,
+    // sonst bliebe dem Text bei breitem Schirm weniger als die Rechnung verspricht.
+    setzeViewportBreite(1600);
+    renderTabelle({ eintraege: [eintrag({ inhalt: LANG })], onBerichtigen: () => {} });
+    expect(tabellenBreite()).toBe('1094px');
+  });
+
+  it('lässt die Aktionsspalte aus dem Deckel, wenn die Seite keine Aktion mitgibt', () => {
+    // Ein Leser ohne Schreibrecht bekommt keine Aktionsspalte (Bestandsweiche) — und dann
+    // auch nicht ihre 96 px im Deckel. Ein fester Deckel verschenkte hier Textbreite.
+    setzeViewportBreite(1366);
+    renderTabelle({ eintraege: [eintrag({ inhalt: LANG })] });
+    expect(tabellenBreite()).toBe('718px');
+  });
+
+  it('hält den Deckel unter der schmalsten Fläche, auf der die Tabelle überhaupt steht', () => {
+    // Die Chronologie wechselt bei `xl` (1200 px) auf Karten. Bei 1200 px Viewport blieben
+    // gemessen rund 856 px Contentbreite (1280 px Viewport → 936 px Sicht). Läge der Deckel
+    // DARÜBER, bliebe genau der Überlauf stehen, gegen den dieses Ticket gebaut ist —
+    // die Tabelle scrollte dann wieder in sich, nur mit anderer Zahl.
+    expect(814).toBeLessThanOrEqual(856);
   });
 });

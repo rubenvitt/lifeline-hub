@@ -82,7 +82,15 @@ describe('MarkdownEditor', () => {
 describe('MarkdownEditor – toggle-Variante', () => {
   it('zeigt Eingabe; Vorschau-Toggle blendet formatierten Markdown ein', async () => {
     function Wrap() {
-      return <MarkdownEditor layout="toggle" variante="kompakt" placeholder="Inhalt …" value="**fett**" onChange={() => {}} />;
+      return (
+        <MarkdownEditor
+          layout="toggle"
+          variante="kompakt"
+          placeholder="Inhalt …"
+          value="**fett**"
+          onChange={() => {}}
+        />
+      );
     }
     const { container } = renderMitProviders(<Wrap />);
     expect(container.querySelector('.markdown strong')).toBeNull();
@@ -117,7 +125,13 @@ describe('MarkdownEditor – toggle-Variante', () => {
   it('reicht onKeyDown durch', async () => {
     const onKeyDown = vi.fn();
     renderMitProviders(
-      <MarkdownEditor layout="toggle" placeholder="Inhalt …" value="" onChange={() => {}} onKeyDown={onKeyDown} />,
+      <MarkdownEditor
+        layout="toggle"
+        placeholder="Inhalt …"
+        value=""
+        onChange={() => {}}
+        onKeyDown={onKeyDown}
+      />,
     );
     await userEvent.type(screen.getByPlaceholderText('Inhalt …'), '/');
     expect(onKeyDown).toHaveBeenCalled();

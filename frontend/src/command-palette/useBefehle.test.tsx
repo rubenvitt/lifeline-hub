@@ -8,19 +8,48 @@ import { neuerQueryClient } from '../test/utils';
 import { useBefehle } from './useBefehle';
 
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({ benutzer: { id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner', org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '' }, laedt: false, login: vi.fn(), logout: vi.fn() }),
+  useAuth: () => ({
+    benutzer: {
+      id: 1,
+      anzeigename: 'EL',
+      benutzername: 'el',
+      system_rolle: 'keiner',
+      org_rolle: 'fuehrungskraft',
+      aktiv: true,
+      erstellt_at: '',
+    },
+    laedt: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
 }));
 vi.mock('../api/einsaetze', () => ({
   listeEinsaetze: vi.fn(() => Promise.resolve([])),
   ladeModulOverrides: vi.fn(() => Promise.resolve({})),
-  ladeEinsatz: vi.fn(() => Promise.resolve({
-    id: 5, bezeichnung: 'Test-Einsatz', stichwort: null, status: 'aktiv',
-    begonnen_at: '', abgeschlossen_at: null, abgeschlossen_von: null,
-    einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '',
-    leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-    meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung', org_id: 1, org_name: 'KV',
-  })),
+  ladeEinsatz: vi.fn(() =>
+    Promise.resolve({
+      id: 5,
+      bezeichnung: 'Test-Einsatz',
+      stichwort: null,
+      status: 'aktiv',
+      begonnen_at: '',
+      abgeschlossen_at: null,
+      abgeschlossen_von: null,
+      einsatzart: 'realeinsatz',
+      einsatznummer_intern: null,
+      angelegt_at: '',
+      leitstellen_nr: null,
+      einsatzort: null,
+      einsatzort_lat: null,
+      einsatzort_lon: null,
+      meldende_stelle: null,
+      sachverhalt: null,
+      anzahl_betroffene_initial: null,
+      meine_rolle: 'einsatzleitung',
+      org_id: 1,
+      org_name: 'KV',
+    }),
+  ),
 }));
 
 function wrapper(route: string) {

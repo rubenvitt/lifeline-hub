@@ -154,14 +154,17 @@ export function spieleAlarmTon(stufe: AlarmStufe): void {
 
     // Resume ist asynchron. Erst NACH dem Promise erneut auf `state` prüfen — ein
     // aufgelöstes Promise allein belegt nicht, dass die Autoplay-Sperre gefallen ist.
-    void context.resume().then(() => {
-      if (context.state !== 'running') {
-        meldeStatus('blockiert');
-        return;
-      }
-      meldeStatus('bereit');
-      starteTon(context, stufe);
-    }).catch(() => meldeStatus('blockiert'));
+    void context
+      .resume()
+      .then(() => {
+        if (context.state !== 'running') {
+          meldeStatus('blockiert');
+          return;
+        }
+        meldeStatus('bereit');
+        starteTon(context, stufe);
+      })
+      .catch(() => meldeStatus('blockiert'));
   } catch {
     meldeStatus('blockiert');
   }

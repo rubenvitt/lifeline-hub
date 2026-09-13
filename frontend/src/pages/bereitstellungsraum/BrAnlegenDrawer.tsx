@@ -1,9 +1,6 @@
 import { App, Drawer, Form, Input } from 'antd';
 import { useCallback, useEffect, useRef } from 'react';
-import {
-  ErfassungsFormular,
-  type ErfassungsFormularSteuerung,
-} from '../../components/Erfassung';
+import { ErfassungsFormular, type ErfassungsFormularSteuerung } from '../../components/Erfassung';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
 import { ApiError } from '../../api/client';

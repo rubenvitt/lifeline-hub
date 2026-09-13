@@ -7,9 +7,11 @@ describe('summiereStaerke', () => {
   });
 
   it('summiert je Achse über ist_kumuliert', () => {
-    expect(summiereStaerke([
-      { ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 } },
-      { ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 5 } },
-    ])).toEqual({ fuehrer: 1, unterfuehrer: 3, mannschaft: 8 });
+    expect(
+      summiereStaerke([
+        { ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 3 } },
+        { ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 5 } },
+      ]),
+    ).toEqual({ fuehrer: 1, unterfuehrer: 3, mannschaft: 8 });
   });
 });

@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
-  filtereBefehle, filtereNachModus, modiMitPraefix, ohneOrdnungsdubletten, ordneTreffer, parsePraefix,
-  praefixStufe, textStufe, UNBEWERTET, type Treffer,
+  filtereBefehle,
+  filtereNachModus,
+  modiMitPraefix,
+  ohneOrdnungsdubletten,
+  ordneTreffer,
+  parsePraefix,
+  praefixStufe,
+  textStufe,
+  UNBEWERTET,
+  type Treffer,
 } from './fuzzy';
 import type { Befehl, PaletteModus } from './typen';
 
@@ -11,7 +19,11 @@ const b = (
   schlagworte?: string[],
   gruppe: Befehl['gruppe'] = 'module',
 ): Befehl => ({
-  id, gruppe, label, schlagworte, ausfuehren: () => {},
+  id,
+  gruppe,
+  label,
+  schlagworte,
+  ausfuehren: () => {},
 });
 const liste: Befehl[] = [
   b('modul:etb', 'ETB', ['tagebuch']),
@@ -29,7 +41,12 @@ const liste: Befehl[] = [
  */
 const rangKorpus: Befehl[] = [
   b('modul:etb', 'ETB', ['tagebuch'], 'module'),
-  b('aktion:personen', 'Neue Person erfassen', ['registrieren', 'vermisst', 'betroffen', 'patient'], 'schnellaktionen'),
+  b(
+    'aktion:personen',
+    'Neue Person erfassen',
+    ['registrieren', 'vermisst', 'betroffen', 'patient'],
+    'schnellaktionen',
+  ),
 ];
 
 describe('filtereBefehle', () => {
@@ -84,7 +101,10 @@ describe('filtereBefehle', () => {
   it('kommt bei langem Label nahe an 1 heran, bleibt aber strikt darunter', () => {
     const rauschen = Array.from({ length: 400 }, (_, i) => `wort${i}`).join(' ');
     const treffer = filtereBefehle([b('lang', `${rauschen} etb`)], 'etp');
-    expect(treffer, 'Fuse findet das Label trotz Tippfehler — sonst prüft der Test nichts').toHaveLength(1);
+    expect(
+      treffer,
+      'Fuse findet das Label trotz Tippfehler — sonst prüft der Test nichts',
+    ).toHaveLength(1);
     expect(treffer[0].score).toBeGreaterThan(0.9);
     expect(treffer[0].score).toBeLessThan(UNBEWERTET);
   });
@@ -224,7 +244,10 @@ describe('parsePraefix', () => {
       ['>>', 'aktionen', '>'],
     ];
     for (const [eingabe, modus, rest] of faelle) {
-      expect(parsePraefix(eingabe), `parsePraefix(${JSON.stringify(eingabe)})`).toEqual({ modus, rest });
+      expect(parsePraefix(eingabe), `parsePraefix(${JSON.stringify(eingabe)})`).toEqual({
+        modus,
+        rest,
+      });
     }
   });
 
@@ -259,7 +282,8 @@ const modusKorpus: Befehl[] = [
 describe('filtereNachModus', () => {
   it('lässt im Modus „aktionen" genau die zwei Aktionsgruppen stehen', () => {
     expect(filtereNachModus(modusKorpus, 'aktionen').map((x) => x.id)).toEqual([
-      'aktion:speichern', 'schnell:person',
+      'aktion:speichern',
+      'schnell:person',
     ]);
   });
 
@@ -267,7 +291,10 @@ describe('filtereNachModus', () => {
    *  der IMMER auf zwei Gruppen kürzt. */
   it('lässt im Modus „alles" die Liste unverändert', () => {
     expect(filtereNachModus(modusKorpus, 'alles').map((x) => x.id)).toEqual([
-      'aktion:speichern', 'schnell:person', 'modul:personen', 'einstellung:dunkel',
+      'aktion:speichern',
+      'schnell:person',
+      'modul:personen',
+      'einstellung:dunkel',
     ]);
   });
 });

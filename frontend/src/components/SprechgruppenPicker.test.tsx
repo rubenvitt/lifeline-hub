@@ -14,12 +14,24 @@ import { listeEinsatzSprechgruppen, legeEinsatzSprechgruppeAn } from '../api/spr
 
 const MOCK_LISTE: Sprechgruppe[] = [
   {
-    id: 1, einsatz_id: null, einsatz_lokal: false, bezeichnung: '412',
-    betriebsart: 'TMO', hinweis: null, aktiv: true, sortier: 1,
+    id: 1,
+    einsatz_id: null,
+    einsatz_lokal: false,
+    bezeichnung: '412',
+    betriebsart: 'TMO',
+    hinweis: null,
+    aktiv: true,
+    sortier: 1,
   },
   {
-    id: 2, einsatz_id: null, einsatz_lokal: false, bezeichnung: 'DMO 31',
-    betriebsart: 'DMO', hinweis: null, aktiv: true, sortier: 2,
+    id: 2,
+    einsatz_id: null,
+    einsatz_lokal: false,
+    bezeichnung: 'DMO 31',
+    betriebsart: 'DMO',
+    hinweis: null,
+    aktiv: true,
+    sortier: 2,
   },
 ];
 
@@ -58,8 +70,14 @@ describe('SprechgruppenPicker', () => {
   it('legt eine einsatz-lokale Sprechgruppe an und hakt sie an (ohne Form-Submit/Reload)', async () => {
     vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
     const neueSprechgruppe: Sprechgruppe = {
-      id: 9, einsatz_id: 5, einsatz_lokal: true, bezeichnung: 'Sonder 1',
-      betriebsart: 'DMO', hinweis: null, aktiv: true, sortier: 10,
+      id: 9,
+      einsatz_id: 5,
+      einsatz_lokal: true,
+      bezeichnung: 'Sonder 1',
+      betriebsart: 'DMO',
+      hinweis: null,
+      aktiv: true,
+      sortier: 10,
     };
     vi.mocked(legeEinsatzSprechgruppeAn).mockResolvedValue(neueSprechgruppe);
 
@@ -67,7 +85,9 @@ describe('SprechgruppenPicker', () => {
     renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={onChange} />);
 
     // Inline-Anlegen aufklappen
-    await userEvent.click(await screen.findByRole('button', { name: /neue sprechgruppe anlegen/i }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: /neue sprechgruppe anlegen/i }),
+    );
 
     // Bezeichnung eingeben
     await userEvent.type(screen.getByLabelText('Neue Bezeichnung'), 'Sonder 1');
@@ -85,7 +105,10 @@ describe('SprechgruppenPicker', () => {
     await userEvent.click(screen.getByRole('button', { name: /^anlegen$/i }));
 
     await vi.waitFor(() => {
-      expect(legeEinsatzSprechgruppeAn).toHaveBeenCalledWith(5, { bezeichnung: 'Sonder 1', betriebsart: 'DMO' });
+      expect(legeEinsatzSprechgruppeAn).toHaveBeenCalledWith(5, {
+        bezeichnung: 'Sonder 1',
+        betriebsart: 'DMO',
+      });
       expect(onChange).toHaveBeenCalledWith(expect.arrayContaining([9]));
     });
   });

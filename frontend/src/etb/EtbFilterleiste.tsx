@@ -61,9 +61,12 @@ export default function EtbFilterleiste({ onChange, startWerte }: Props) {
   // Eine offene Frist beim Abbau löschen: die Leiste wird per `key` neu aufgesetzt
   // („Filter zurücksetzen"), und ein Nachläufer meldete danach den alten Suchbegriff
   // an eine Seite, die gerade geräumt hat.
-  useEffect(() => () => {
-    if (frist.current) clearTimeout(frist.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (frist.current) clearTimeout(frist.current);
+    },
+    [],
+  );
 
   function aktualisiere(teil: Partial<EtbFilterWerte>, verzoegert = false) {
     const neu = { ...werte, ...teil };

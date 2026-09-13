@@ -12,9 +12,16 @@ import TierePage from './TierePage';
 import type { Tier } from '../api/types';
 
 class FakeEventSource {
-  url: string; closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {} removeEventListener() {} close() { this.closed = true; }
+  url: string;
+  closed = false;
+  constructor(url: string) {
+    this.url = url;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+  close() {
+    this.closed = true;
+  }
 }
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -25,29 +32,71 @@ afterEach(() => vi.unstubAllGlobals());
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
 const nutzer = {
-  id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-29 10:00:00',
+  id: 1,
+  anzeigename: 'Nutzer',
+  benutzername: 'nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-29 10:00:00',
 };
 const einsatzAktiv = {
-  id: 1, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-29 08:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-05-29 08:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+  id: 1,
+  bezeichnung: 'Hochwasser',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-29 08:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-05-29 08:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
   meine_rolle: 'einsatzleitung',
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 
 const tierBasis: Tier = {
-  id: 10, einsatz_id: 1, registrier_nr: 1, status: 'aktiv', spezies: 'hund',
-  rasse_beschreibung: 'Schäferhund', rufname: 'Rex', geschlecht: 'maennlich',
-  alter_geschaetzt: 3, farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
-  halter_person_id: null, halter_kontakt: null, antreff_ort: 'Weide', notiz: null,
-  abschluss_grund: null, abschluss_ziel: null,
-  erfasst_at: '2026-05-29 09:00:00', erfasst_von: 1, geaendert_at: '2026-05-29 09:00:00',
-  geaendert_von: 1, storniert_at: null, halter_registrier_nr: null, halter_storniert_at: null,
+  id: 10,
+  einsatz_id: 1,
+  registrier_nr: 1,
+  status: 'aktiv',
+  spezies: 'hund',
+  rasse_beschreibung: 'Schäferhund',
+  rufname: 'Rex',
+  geschlecht: 'maennlich',
+  alter_geschaetzt: 3,
+  farbe_beschreibung: null,
+  kennzeichnung: null,
+  groesse_gewicht: null,
+  halter_person_id: null,
+  halter_kontakt: null,
+  antreff_ort: 'Weide',
+  notiz: null,
+  abschluss_grund: null,
+  abschluss_ziel: null,
+  erfasst_at: '2026-05-29 09:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-29 09:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
+  halter_registrier_nr: null,
+  halter_storniert_at: null,
 };
-const tierVermisst: Tier = { ...tierBasis, id: 11, registrier_nr: 2, status: 'vermisst', spezies: 'katze', rufname: 'Mimi' };
+const tierVermisst: Tier = {
+  ...tierBasis,
+  id: 11,
+  registrier_nr: 2,
+  status: 'vermisst',
+  spezies: 'katze',
+  rufname: 'Mimi',
+};
 
 /**
  * Zeilenfolge der T-Nummern in Dokumentordnung. Die FOLGE ist die belastbare Behauptung —
@@ -75,16 +124,19 @@ function regFolge(): string[] {
  * Namen zu schicken hält den Helfer über einen jsdom-Wechsel hinweg heil.
  */
 async function warteBisDialogWeg(timeout?: number) {
-  await waitFor(() => {
-    const modal = document.querySelector<HTMLElement>('.ant-modal');
-    if (modal) {
-      fireEvent.animationEnd(modal);
-      modal.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
-    }
-    // Am FELD gemessen, nicht an der Dialogrolle: `destroyOnHidden` ist die Zusicherung,
-    // dass ein geschlossener Dialog keine Felder stehen lässt.
-    expect(screen.queryByLabelText('Rufname')).not.toBeInTheDocument();
-  }, timeout != null ? { timeout } : undefined);
+  await waitFor(
+    () => {
+      const modal = document.querySelector<HTMLElement>('.ant-modal');
+      if (modal) {
+        fireEvent.animationEnd(modal);
+        modal.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+      }
+      // Am FELD gemessen, nicht an der Dialogrolle: `destroyOnHidden` ist die Zusicherung,
+      // dass ein geschlossener Dialog keine Felder stehen lässt.
+      expect(screen.queryByLabelText('Rufname')).not.toBeInTheDocument();
+    },
+    timeout != null ? { timeout } : undefined,
+  );
 }
 
 function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[]) {
@@ -143,12 +195,31 @@ describe('TierePage', () => {
      * Wechsel sichtbar da, WEIL sie passt — und nicht, weil das Feld geleert wurde. „Mimi"
      * trifft deshalb genau eine der drei Zeilen, und alle drei tragen eine eigene Rasse.
      */
-    const mimi: Tier = { ...tierBasis, id: 70, registrier_nr: 4, status: 'vermisst',
-      spezies: 'katze', rufname: 'Mimi', rasse_beschreibung: 'Perser' };
-    const bello: Tier = { ...tierBasis, id: 71, registrier_nr: 5, status: 'vermisst',
-      rufname: 'Bello', rasse_beschreibung: 'Dackel' };
-    const rex: Tier = { ...tierBasis, id: 72, registrier_nr: 6, status: 'aktiv',
-      rufname: 'Rex', rasse_beschreibung: 'Schäferhund' };
+    const mimi: Tier = {
+      ...tierBasis,
+      id: 70,
+      registrier_nr: 4,
+      status: 'vermisst',
+      spezies: 'katze',
+      rufname: 'Mimi',
+      rasse_beschreibung: 'Perser',
+    };
+    const bello: Tier = {
+      ...tierBasis,
+      id: 71,
+      registrier_nr: 5,
+      status: 'vermisst',
+      rufname: 'Bello',
+      rasse_beschreibung: 'Dackel',
+    };
+    const rex: Tier = {
+      ...tierBasis,
+      id: 72,
+      registrier_nr: 6,
+      status: 'aktiv',
+      rufname: 'Rex',
+      rasse_beschreibung: 'Schäferhund',
+    };
     render(einsatzAktiv, [mimi, bello, rex]);
     await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
     expect(await screen.findByText('Bello')).toBeInTheDocument();
@@ -168,7 +239,10 @@ describe('TierePage', () => {
   });
 
   it('filtert nach Spezies', async () => {
-    render(einsatzAktiv, [tierBasis, { ...tierBasis, id: 12, registrier_nr: 3, spezies: 'katze', rufname: 'Felix' }]);
+    render(einsatzAktiv, [
+      tierBasis,
+      { ...tierBasis, id: 12, registrier_nr: 3, spezies: 'katze', rufname: 'Felix' },
+    ]);
     await screen.findByText('Rex');
     // Namensfilter, nicht „die einzige Combobox der Seite": die Werkzeugzeile von
     // `Datensicht` kann ein zweites Combobox-artiges Element mitbringen (Spaltenschalter,
@@ -176,7 +250,9 @@ describe('TierePage', () => {
     // nichts zu tun hat.
     await userEvent.click(screen.getByRole('combobox', { name: 'Spezies' }));
     // Tabellenzelle und Dropdown-Option tragen beide "Katze" → auf die Option im Dropdown zielen.
-    const katzeOption = (await screen.findAllByText('Katze')).find((el) => el.closest('.ant-select-item-option'));
+    const katzeOption = (await screen.findAllByText('Katze')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
     expect(katzeOption).toBeTruthy();
     await userEvent.click(katzeOption!);
     expect(await screen.findByText('Felix')).toBeInTheDocument();
@@ -210,10 +286,12 @@ describe('TierePage', () => {
 
   it('Schnellerfassung schickt status=aktiv + spezies', async () => {
     let body: { spezies?: string; status?: string } = {};
-    server.use(http.post('/api/einsaetze/1/tiere', async ({ request }) => {
-      body = await request.json() as { spezies?: string; status?: string };
-      return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+        body = (await request.json()) as { spezies?: string; status?: string };
+        return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+      }),
+    );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -223,10 +301,12 @@ describe('TierePage', () => {
 
   it('Vermisst-Meldung schickt status=vermisst', async () => {
     let body: { status?: string } = {};
-    server.use(http.post('/api/einsaetze/1/tiere', async ({ request }) => {
-      body = await request.json() as { status?: string };
-      return HttpResponse.json({ ...tierBasis, id: 99, status: 'vermisst' }, { status: 201 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+        body = (await request.json()) as { status?: string };
+        return HttpResponse.json({ ...tierBasis, id: 99, status: 'vermisst' }, { status: 201 });
+      }),
+    );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -247,10 +327,12 @@ describe('TierePage', () => {
     let veralteteRefetches = 0;
     // Replikations-/Refetch-Lücke simulieren: direkt nach dem POST kennt der GET das neue
     // Tier noch nicht. Die Antwortzeile muss trotzdem stehen bleiben.
-    server.use(http.get('/api/einsaetze/1/tiere', () => {
-      veralteteRefetches += 1;
-      return HttpResponse.json([]);
-    }));
+    server.use(
+      http.get('/api/einsaetze/1/tiere', () => {
+        veralteteRefetches += 1;
+        return HttpResponse.json([]);
+      }),
+    );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -280,8 +362,12 @@ describe('TierePage', () => {
     };
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
-    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
-    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
+    const postStart = new Promise<void>((resolve) => {
+      postGestartet = resolve;
+    });
+    const antwortGate = new Promise<void>((resolve) => {
+      antwortFreigeben = resolve;
+    });
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
@@ -289,7 +375,8 @@ describe('TierePage', () => {
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
       http.get('/api/einsaetze/:einsatzId/tiere', ({ params }) =>
-        HttpResponse.json(params.einsatzId === '2' ? [tierB] : [])),
+        HttpResponse.json(params.einsatzId === '2' ? [tierB] : []),
+      ),
       http.post('/api/einsaetze/1/tiere', async () => {
         postGestartet();
         await antwortGate;
@@ -299,7 +386,15 @@ describe('TierePage', () => {
     const { container } = renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/einsaetze/:id/tiere" element={<><EinsatzWechsel /><TierePage /></>} />
+          <Route
+            path="/einsaetze/:id/tiere"
+            element={
+              <>
+                <EinsatzWechsel />
+                <TierePage />
+              </>
+            }
+          />
         </Routes>
       </AuthProvider>,
       { route: '/einsaetze/1/tiere' },
@@ -311,7 +406,9 @@ describe('TierePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     expect(await screen.findByText('Tier B')).toBeInTheDocument();
 
-    await act(async () => { antwortFreigeben(); });
+    await act(async () => {
+      antwortFreigeben();
+    });
     await waitFor(() => expect(screen.queryByText('Tier A')).not.toBeInTheDocument());
     expect(screen.getByText('Tier B')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Aktiv' })).toHaveAttribute('aria-selected', 'true');
@@ -336,10 +433,12 @@ describe('TierePage', () => {
 
   it('Enter im Rufnamen sendet ab — mit dem Status aus dem Modus', async () => {
     let body: { rufname?: string | null; status?: string } = {};
-    server.use(http.post('/api/einsaetze/1/tiere', async ({ request }) => {
-      body = await request.json() as { rufname?: string | null; status?: string };
-      return HttpResponse.json({ ...tierBasis, id: 99, status: 'vermisst' }, { status: 201 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+        body = (await request.json()) as { rufname?: string | null; status?: string };
+        return HttpResponse.json({ ...tierBasis, id: 99, status: 'vermisst' }, { status: 201 });
+      }),
+    );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await screen.findByRole('dialog');
@@ -356,12 +455,19 @@ describe('TierePage', () => {
   });
 
   it('„Speichern und nächste" hält den Dialog offen und nimmt Spezies und Antreffort mit', async () => {
-    type Wortlaut = { spezies?: string; status?: string; antreff_ort?: string | null; rufname?: string | null };
+    type Wortlaut = {
+      spezies?: string;
+      status?: string;
+      antreff_ort?: string | null;
+      rufname?: string | null;
+    };
     const wortlaute: Wortlaut[] = [];
-    server.use(http.post('/api/einsaetze/1/tiere', async ({ request }) => {
-      wortlaute.push(await request.json() as Wortlaut);
-      return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+        wortlaute.push((await request.json()) as Wortlaut);
+        return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+      }),
+    );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await screen.findByRole('dialog');
@@ -371,7 +477,9 @@ describe('TierePage', () => {
     // Spezies WEG vom Startwert 'hund' stellen — sonst wäre 'hund' nach dem Zurücksetzen
     // auch ohne Übernahme wieder da, und der zweite Wortlaut bewiese nichts.
     await userEvent.click(within(dialog).getByRole('combobox'));
-    const katze = (await screen.findAllByText('Katze')).find((el) => el.closest('.ant-select-item-option'));
+    const katze = (await screen.findAllByText('Katze')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
     expect(katze).toBeTruthy();
     await userEvent.click(katze!);
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Nord');
@@ -379,9 +487,9 @@ describe('TierePage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(wortlaute).toHaveLength(1));
-    await waitFor(() => expect(
-      sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort'),
-    ).toBe('Sammelstelle Nord'));
+    await waitFor(() =>
+      expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBe('Sammelstelle Nord'),
+    );
 
     /**
      * Der Dialog bleibt stehen — und die Gegenprobe steckt IM Anstoss.
@@ -416,10 +524,12 @@ describe('TierePage', () => {
 
   it('merkt einen erfolgreichen Antreffort für das Wiederöffnen dieser Tiermaske', async () => {
     let versuche = 0;
-    server.use(http.post('/api/einsaetze/1/tiere', () => {
-      versuche += 1;
-      return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/tiere', () => {
+        versuche += 1;
+        return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+      }),
+    );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Tier-Sammelstelle');
@@ -428,16 +538,20 @@ describe('TierePage', () => {
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
-    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tier-Sammelstelle'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Antreffort')).toHaveValue('Tier-Sammelstelle'),
+    );
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
   it('speichert den Antreffort bei einem fehlgeschlagenen Tier nicht', async () => {
     let versuche = 0;
-    server.use(http.post('/api/einsaetze/1/tiere', () => {
-      versuche += 1;
-      return HttpResponse.json({ error: 'Tier abgelehnt' }, { status: 500 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/tiere', () => {
+        versuche += 1;
+        return HttpResponse.json({ error: 'Tier abgelehnt' }, { status: 500 });
+      }),
+    );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Fehlerort Tier');
@@ -451,18 +565,27 @@ describe('TierePage', () => {
   it('speichert den Antreffort nach Schließen während des POST nicht', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
-    const postStart = new Promise<void>((resolve) => { postGestartet = resolve; });
-    const antwortGate = new Promise<void>((resolve) => { antwortFreigeben = resolve; });
-    server.use(http.post('/api/einsaetze/1/tiere', async () => {
-      postGestartet();
-      await antwortGate;
-      return HttpResponse.json({
-        ...tierBasis,
-        id: 99,
-        registrier_nr: 99,
-        rufname: 'Abbruch-Tier',
-      }, { status: 201 });
-    }));
+    const postStart = new Promise<void>((resolve) => {
+      postGestartet = resolve;
+    });
+    const antwortGate = new Promise<void>((resolve) => {
+      antwortFreigeben = resolve;
+    });
+    server.use(
+      http.post('/api/einsaetze/1/tiere', async () => {
+        postGestartet();
+        await antwortGate;
+        return HttpResponse.json(
+          {
+            ...tierBasis,
+            id: 99,
+            registrier_nr: 99,
+            rufname: 'Abbruch-Tier',
+          },
+          { status: 201 },
+        );
+      }),
+    );
     render(einsatzAktiv, []);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
@@ -471,7 +594,9 @@ describe('TierePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-    await act(async () => { antwortFreigeben(); });
+    await act(async () => {
+      antwortFreigeben();
+    });
     await screen.findByText('Abbruch-Tier');
 
     expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBeNull();
@@ -482,10 +607,12 @@ describe('TierePage', () => {
     sessionStorage.setItem('lfh:erfassung:1:person:antreff_ort', 'Falsche Maske');
     sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager Nord');
     let versuche = 0;
-    server.use(http.post('/api/einsaetze/1/tiere', () => {
-      versuche += 1;
-      return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
-    }));
+    server.use(
+      http.post('/api/einsaetze/1/tiere', () => {
+        versuche += 1;
+        return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+      }),
+    );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
 
@@ -510,7 +637,15 @@ describe('TierePage', () => {
     renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/einsaetze/:id/tiere" element={<><EinsatzWechsel /><TierePage /></>} />
+          <Route
+            path="/einsaetze/:id/tiere"
+            element={
+              <>
+                <EinsatzWechsel />
+                <TierePage />
+              </>
+            }
+          />
         </Routes>
       </AuthProvider>,
       { route: '/einsaetze/1/tiere' },
@@ -520,7 +655,9 @@ describe('TierePage', () => {
     await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager A'));
     const dialogA = screen.getByRole('dialog');
     await userEvent.click(within(dialogA).getByRole('combobox'));
-    const katze = (await screen.findAllByText('Katze')).find((el) => el.closest('.ant-select-item-option'));
+    const katze = (await screen.findAllByText('Katze')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
     expect(katze).toBeTruthy();
     await userEvent.click(katze!);
     await userEvent.type(within(dialogA).getByLabelText('Rufname'), 'Nur Einsatz A');
@@ -530,7 +667,9 @@ describe('TierePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
 
     const dialogB = await screen.findByRole('dialog');
-    await waitFor(() => expect(within(dialogB).getByLabelText('Antreffort')).toHaveValue('Tierlager B'));
+    await waitFor(() =>
+      expect(within(dialogB).getByLabelText('Antreffort')).toHaveValue('Tierlager B'),
+    );
     expect(within(dialogB).getByTitle('Hund')).toBeInTheDocument();
     expect(within(dialogB).getByLabelText('Rufname')).toHaveValue('');
     expect(within(dialogB).getByLabelText('Notiz')).toHaveValue('');
@@ -586,7 +725,13 @@ describe('TierePage', () => {
     const drei = [
       { ...tierBasis, id: 30, registrier_nr: 1, rufname: 'Alt', erfasst_at: '2026-05-29 07:00:00' },
       { ...tierBasis, id: 31, registrier_nr: 2, rufname: 'Neu', erfasst_at: '2026-05-29 12:00:00' },
-      { ...tierBasis, id: 32, registrier_nr: 3, rufname: 'Mitte', erfasst_at: '2026-05-29 09:00:00' },
+      {
+        ...tierBasis,
+        id: 32,
+        registrier_nr: 3,
+        rufname: 'Mitte',
+        erfasst_at: '2026-05-29 09:00:00',
+      },
     ];
     render(einsatzAktiv, drei);
     await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
@@ -634,7 +779,12 @@ describe('TierePage', () => {
   });
 
   it('zeigt die Halter-R-Nr und „storniert" aus den Join-Feldern', async () => {
-    const mitHalter: Tier = { ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7, halter_storniert_at: '2026-05-29 11:00:00' };
+    const mitHalter: Tier = {
+      ...tierBasis,
+      halter_person_id: 5,
+      halter_registrier_nr: 7,
+      halter_storniert_at: '2026-05-29 11:00:00',
+    };
     render(einsatzAktiv, [mitHalter]);
     expect(await screen.findByText(/Halter \(storniert\): R-007/)).toBeInTheDocument();
   });

@@ -42,10 +42,14 @@ vi.mock('../command-palette/useBefehle', () => ({
 class FakeEventSource {
   url: string;
   closed = false;
-  constructor(url: string) { this.url = url; }
+  constructor(url: string) {
+    this.url = url;
+  }
   addEventListener() {}
   removeEventListener() {}
-  close() { this.closed = true; }
+  close() {
+    this.closed = true;
+  }
 }
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -53,24 +57,51 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const nutzer = { id: 1, anzeigename: 'Nutzer', system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
+const nutzer = {
+  id: 1,
+  anzeigename: 'Nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+};
 const einsatzAktiv = {
-  id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung',
-  org_id: 5, org_name: 'DRK Musterstadt',
+  id: 1,
+  bezeichnung: 'Lage',
+  status: 'aktiv',
+  meine_rolle: 'einsatzleitung',
+  org_id: 5,
+  org_name: 'DRK Musterstadt',
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 
 const einSchaden = {
-  id: 10, einsatz_id: 1, registrier_nr: 1, status: 'offen', typ: 'sachschaden',
-  ausmass: 'gering', ort: 'Hauptstr. 17', beschreibung: '',
-  lat: null, lon: null,
-  geschaedigt_person_id: null, geschaedigt_personal_id: null, geschaedigt_organisation_id: null,
+  id: 10,
+  einsatz_id: 1,
+  registrier_nr: 1,
+  status: 'offen',
+  typ: 'sachschaden',
+  ausmass: 'gering',
+  ort: 'Hauptstr. 17',
+  beschreibung: '',
+  lat: null,
+  lon: null,
+  geschaedigt_person_id: null,
+  geschaedigt_personal_id: null,
+  geschaedigt_organisation_id: null,
   geschaedigt_kontakt: null,
-  uebergeben_an: null, uebergeben_at: null, abschluss_grund: null, abschluss_at: null,
-  erfasst_at: '2026-05-29 10:00:00', erfasst_von: 1, geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1,
-  storniert_at: null, storniert_von: null,
-  geschaedigt_registrier_nr: null, geschaedigt_storniert_at: null,
-  geschaedigt_personal_name: null, geschaedigt_organisation_name: null,
+  uebergeben_an: null,
+  uebergeben_at: null,
+  abschluss_grund: null,
+  abschluss_at: null,
+  erfasst_at: '2026-05-29 10:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-29 10:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
+  storniert_von: null,
+  geschaedigt_registrier_nr: null,
+  geschaedigt_storniert_at: null,
+  geschaedigt_personal_name: null,
+  geschaedigt_organisation_name: null,
 };
 
 function render(einsatzObj: object) {

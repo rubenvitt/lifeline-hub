@@ -117,7 +117,10 @@ export default function EinsatzVerhalten() {
           ).map((nk) => (
             // Präfix und Startwert eines Kreises gehören zusammen und bleiben deshalb auch
             // im Zweispalter EIN Rasterfeld — getrennt stünden sie in verschiedenen Spalten.
-            <div key={nk.key} style={{ display: 'flex', gap: token.margin, alignItems: 'flex-start' }}>
+            <div
+              key={nk.key}
+              style={{ display: 'flex', gap: token.margin, alignItems: 'flex-start' }}
+            >
               <Form.Item
                 label={`Präfix ${nk.label}`}
                 name={`${nk.key}_nummer_praefix`}
@@ -159,7 +162,12 @@ export default function EinsatzVerhalten() {
             tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = projektweiter Standard."
             extra={orgHinweisWert(orgDefaults?.meldung_bestaetigung_frist_min, 'Min.')}
           >
-            <InputNumber min={1} max={10080} style={{ width: '100%', maxWidth: 200 }} placeholder="Standard" />
+            <InputNumber
+              min={1}
+              max={10080}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="Standard"
+            />
           </Form.Item>
           <Form.Item
             label="Default-Quittierfrist Aufträge (Minuten)"
@@ -167,7 +175,12 @@ export default function EinsatzVerhalten() {
             tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = keine automatische Frist."
             extra={orgHinweisWert(orgDefaults?.auftrag_quittierung_frist_min, 'Min.')}
           >
-            <InputNumber min={1} max={10080} style={{ width: '100%', maxWidth: 200 }} placeholder="keine" />
+            <InputNumber
+              min={1}
+              max={10080}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="keine"
+            />
           </Form.Item>
           <Form.Item
             label="Automatische ETB-Einträge"

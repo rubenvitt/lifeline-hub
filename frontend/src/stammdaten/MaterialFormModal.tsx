@@ -132,19 +132,25 @@ export default function MaterialFormModal({
       <Collapse
         ghost
         style={{ marginInline: -8 }}
-        items={[{
-          key: 'weitere',
-          label: 'Weitere Angaben',
-          children: (
-            <>
-              <Form.Item label="Trägerorganisation" name="traegerorganisation"><Input /></Form.Item>
-              <Form.Item label="Standort" name="standort">
-                <Input placeholder="z. B. Lagerhalle 2" />
-              </Form.Item>
-              <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
-            </>
-          ),
-        }]}
+        items={[
+          {
+            key: 'weitere',
+            label: 'Weitere Angaben',
+            children: (
+              <>
+                <Form.Item label="Trägerorganisation" name="traegerorganisation">
+                  <Input />
+                </Form.Item>
+                <Form.Item label="Standort" name="standort">
+                  <Input placeholder="z. B. Lagerhalle 2" />
+                </Form.Item>
+                <Form.Item label="Bemerkung" name="bemerkung">
+                  <Input.TextArea rows={2} />
+                </Form.Item>
+              </>
+            ),
+          },
+        ]}
       />
     </ErfassungsModal>
   );

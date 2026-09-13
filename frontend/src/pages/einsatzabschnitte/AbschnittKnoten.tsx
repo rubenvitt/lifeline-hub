@@ -45,11 +45,16 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
         }}
       />
       <span>{abschnitt.name}</span>
-      <Tag color="blue"><StaerkeAnzeige wert={staerke} /></Tag>
+      <Tag color="blue">
+        <StaerkeAnzeige wert={staerke} />
+      </Tag>
       <span style={{ color: token.colorTextSecondary }}>{anzahlEinheiten} Einh.</span>
       {abschnitt.leiter_name && (
         <span style={{ color: token.colorTextSecondary }}>
-          <span aria-hidden="true"><UserOutlined /></span> {abschnitt.leiter_name}
+          <span aria-hidden="true">
+            <UserOutlined />
+          </span>{' '}
+          {abschnitt.leiter_name}
         </span>
       )}
       {abschnitt.erreichbarkeit && (

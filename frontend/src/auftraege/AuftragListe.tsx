@@ -22,8 +22,17 @@ export interface AuftragListeProps {
 /** Kartenboard der Aufträge/Befehle (LFH-112). Reicht alle Props an die einzelne
  *  AuftragKarte durch; Darstellung/Logik liegen vollständig in der Karte. */
 export default function AuftragListe({
-  auftraege, ansicht = 'offen', einsatzId, darfSchreiben, highlightId,
-  quittierungLaeuft, quittierungZiel, onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
+  auftraege,
+  ansicht = 'offen',
+  einsatzId,
+  darfSchreiben,
+  highlightId,
+  quittierungLaeuft,
+  quittierungZiel,
+  onQuittieren,
+  onInArbeit,
+  onVollzugMelden,
+  onAbnehmen,
 }: AuftragListeProps) {
   if (auftraege.length === 0) return <SeitenLeer titel="Keine Aufträge" />;
   return (

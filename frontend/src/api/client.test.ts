@@ -91,9 +91,14 @@ describe('apiSend', () => {
       }),
     );
 
-    await apiSend('/api/offline-ding', 'POST', { name: 'Welt' }, {
-      offlineQueueBenutzerId: 17,
-    });
+    await apiSend(
+      '/api/offline-ding',
+      'POST',
+      { name: 'Welt' },
+      {
+        offlineQueueBenutzerId: 17,
+      },
+    );
 
     expect(header).toBe('17');
   });

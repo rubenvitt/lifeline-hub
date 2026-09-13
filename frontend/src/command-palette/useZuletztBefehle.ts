@@ -4,7 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthOptional } from '../auth/AuthContext';
 import { ladeBenutzerEinstellungen, setzeBenutzerEinstellung } from '../api/benutzerEinstellungen';
 import { globalKeys } from '../api/queryKeys';
-import { SCHLUESSEL_ZULETZT_BEFEHLE, leseZuletztBefehle, naechsteZuletztBefehle } from './zuletztBefehle';
+import {
+  SCHLUESSEL_ZULETZT_BEFEHLE,
+  leseZuletztBefehle,
+  naechsteZuletztBefehle,
+} from './zuletztBefehle';
 import type { BenutzerEinstellungen } from '../api/types';
 
 export interface BefehlsGedaechtnis {
@@ -98,37 +102,40 @@ export function useZuletztBefehle(): BefehlsGedaechtnis {
    * Stand des Renders, in dem sie gebaut wurde, und die Palette hält ihn über ihre ganze
    * Öffnung fest.
    */
-  const merke = useCallback((id: string) => {
-    // Ohne Sitzung gibt es kein Fach, in das geschrieben werden könnte — und ein GET liefe
-    // in den 401-Seam aus `queryClient.ts` („Sitzung abgelaufen" ohne Anlass).
-    if (benutzerId == null) return;
-    void (async () => {
-      if (client.getQueryData<BenutzerEinstellungen>(key) === undefined) {
-        try {
-          await client.ensureQueryData({
-            queryKey: key,
-            queryFn: ladeBenutzerEinstellungen,
-            staleTime: Infinity,
-          });
-        } catch {
-          return;
+  const merke = useCallback(
+    (id: string) => {
+      // Ohne Sitzung gibt es kein Fach, in das geschrieben werden könnte — und ein GET liefe
+      // in den 401-Seam aus `queryClient.ts` („Sitzung abgelaufen" ohne Anlass).
+      if (benutzerId == null) return;
+      void (async () => {
+        if (client.getQueryData<BenutzerEinstellungen>(key) === undefined) {
+          try {
+            await client.ensureQueryData({
+              queryKey: key,
+              queryFn: ladeBenutzerEinstellungen,
+              staleTime: Infinity,
+            });
+          } catch {
+            return;
+          }
         }
-      }
-      const stand = client.getQueryData<BenutzerEinstellungen>(key);
-      if (stand === undefined) return;
-      const wert = JSON.stringify(naechsteZuletztBefehle(leseZuletztBefehle(stand), id));
-      client.setQueryData<BenutzerEinstellungen>(key, (alt) => ({
-        ...alt,
-        eintraege: { ...alt?.eintraege, [SCHLUESSEL_ZULETZT_BEFEHLE]: wert },
-      }));
-      // Die ANTWORT wird verworfen, obwohl sie den vollen Stand trägt: zwei rasch
-      // aufeinanderfolgende Ausführungen quittieren in unbestimmter Reihenfolge, und die
-      // spätere Antwort auf den früheren Schreibvorgang setzte die Liste zurück.
-      // Ein Fehlschlag kostet einen Gedächtniseintrag, keine Daten — und es gibt keine
-      // Fläche, auf der er stünde: die Palette ist zu diesem Zeitpunkt bereits geschlossen.
-      void setzeBenutzerEinstellung(SCHLUESSEL_ZULETZT_BEFEHLE, wert).catch(() => {});
-    })();
-  }, [benutzerId, client, key]);
+        const stand = client.getQueryData<BenutzerEinstellungen>(key);
+        if (stand === undefined) return;
+        const wert = JSON.stringify(naechsteZuletztBefehle(leseZuletztBefehle(stand), id));
+        client.setQueryData<BenutzerEinstellungen>(key, (alt) => ({
+          ...alt,
+          eintraege: { ...alt?.eintraege, [SCHLUESSEL_ZULETZT_BEFEHLE]: wert },
+        }));
+        // Die ANTWORT wird verworfen, obwohl sie den vollen Stand trägt: zwei rasch
+        // aufeinanderfolgende Ausführungen quittieren in unbestimmter Reihenfolge, und die
+        // spätere Antwort auf den früheren Schreibvorgang setzte die Liste zurück.
+        // Ein Fehlschlag kostet einen Gedächtniseintrag, keine Daten — und es gibt keine
+        // Fläche, auf der er stünde: die Palette ist zu diesem Zeitpunkt bereits geschlossen.
+        void setzeBenutzerEinstellung(SCHLUESSEL_ZULETZT_BEFEHLE, wert).catch(() => {});
+      })();
+    },
+    [benutzerId, client, key],
+  );
 
   return useMemo(() => ({ ids, merke }), [ids, merke]);
 }

@@ -30,11 +30,29 @@ export const VORLAGEN: VorlageDef[] = [
     schluessel: 'befehl_ladef',
     label: 'Befehl LADEF (erweitert, SKK)',
     abschnitte: [
-      { schluessel: 'lage', label: 'Lage', hilfetext: 'a. Allgemeine Lage · b. Schadenlage · c. Eigene Lage' },
+      {
+        schluessel: 'lage',
+        label: 'Lage',
+        hilfetext: 'a. Allgemeine Lage · b. Schadenlage · c. Eigene Lage',
+      },
       { schluessel: 'auftrag', label: 'Auftrag', hilfetext: 'Erhaltener Auftrag' },
-      { schluessel: 'durchfuehrung', label: 'Durchführung', hilfetext: 'a. Eigene Absicht · b. Einzelaufträge · c. Zusammenarbeit/Koordinierung · d. Zeitangaben · e. Schutzmaßnahmen' },
-      { schluessel: 'einsatzunterstuetzung', label: 'Einsatzunterstützung', hilfetext: 'Verpflegung · Betriebsstoffe · Materialerhaltung · Medizinische Versorgung' },
-      { schluessel: 'fuehrung_kommunikation', label: 'Führung und Kommunikation', hilfetext: 'Kommunikationsverbindungen & Meldewesen · Meldeköpfe · Befehlsstellen · Standort der/des Führenden' },
+      {
+        schluessel: 'durchfuehrung',
+        label: 'Durchführung',
+        hilfetext:
+          'a. Eigene Absicht · b. Einzelaufträge · c. Zusammenarbeit/Koordinierung · d. Zeitangaben · e. Schutzmaßnahmen',
+      },
+      {
+        schluessel: 'einsatzunterstuetzung',
+        label: 'Einsatzunterstützung',
+        hilfetext: 'Verpflegung · Betriebsstoffe · Materialerhaltung · Medizinische Versorgung',
+      },
+      {
+        schluessel: 'fuehrung_kommunikation',
+        label: 'Führung und Kommunikation',
+        hilfetext:
+          'Kommunikationsverbindungen & Meldewesen · Meldeköpfe · Befehlsstellen · Standort der/des Führenden',
+      },
     ],
   },
   {

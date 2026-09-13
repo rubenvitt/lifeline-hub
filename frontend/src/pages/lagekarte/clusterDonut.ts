@@ -8,18 +8,27 @@ type ClusterTyp = Exclude<MarkerTyp, 'einsatzort'>;
  * eines Clusters auf einen Blick.
  */
 export const CLUSTER_TYP_FARBE: Record<ClusterTyp, string> = {
-  fahrzeug: '#64748b',   // slate
-  einheit: '#16a34a',    // grün
-  fuehrung: '#7c3aed',   // violett
-  abschnitt: '#0d9488',  // teal
-  uhs: '#2563eb',        // blau
-  schaden: '#ea580c',    // orange
+  fahrzeug: '#64748b', // slate
+  einheit: '#16a34a', // grün
+  fuehrung: '#7c3aed', // violett
+  abschnitt: '#0d9488', // teal
+  uhs: '#2563eb', // blau
+  schaden: '#ea580c', // orange
   lagemeldung: '#d48806', // amber
   freies_zeichen: '#4f46e5', // indigo
 };
 
 // Stabile Segment-Reihenfolge im Donut (Kräfte → Infrastruktur → Meldungen).
-const TYP_REIHENFOLGE: ClusterTyp[] = ['fahrzeug', 'einheit', 'fuehrung', 'abschnitt', 'uhs', 'schaden', 'lagemeldung', 'freies_zeichen'];
+const TYP_REIHENFOLGE: ClusterTyp[] = [
+  'fahrzeug',
+  'einheit',
+  'fuehrung',
+  'abschnitt',
+  'uhs',
+  'schaden',
+  'lagemeldung',
+  'freies_zeichen',
+];
 
 /**
  * `clusterProperties`-Spec für die GeoJSON-Source: pro Typ eine Summe (Anzahl im Cluster).
@@ -75,18 +84,31 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
 
   const ring = document.createElement('div');
   ring.style.cssText = [
-    `width:${size}px`, `height:${size}px`, 'border-radius:50%', 'cursor:pointer',
-    'display:flex', 'align-items:center', 'justify-content:center',
+    `width:${size}px`,
+    `height:${size}px`,
+    'border-radius:50%',
+    'cursor:pointer',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
     'box-shadow:0 4px 14px rgba(15,23,42,.28),0 1px 3px rgba(15,23,42,.22)',
     `background:${stops.length ? `conic-gradient(${stops.join(',')})` : '#94a3b8'}`,
   ].join(';');
 
   const kern = document.createElement('div');
   kern.style.cssText = [
-    `width:${innen}px`, `height:${innen}px`, 'border-radius:50%', 'background:#fff',
-    'display:flex', 'align-items:center', 'justify-content:center',
-    'font-family:-apple-system,Segoe UI,Roboto,sans-serif', 'font-weight:700',
-    `font-size:${Math.round(12 + Math.min(6, gesamt / 15))}px`, 'color:#0f172a', 'letter-spacing:-.3px',
+    `width:${innen}px`,
+    `height:${innen}px`,
+    'border-radius:50%',
+    'background:#fff',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'font-family:-apple-system,Segoe UI,Roboto,sans-serif',
+    'font-weight:700',
+    `font-size:${Math.round(12 + Math.min(6, gesamt / 15))}px`,
+    'color:#0f172a',
+    'letter-spacing:-.3px',
   ].join(';');
   kern.textContent = zahlLabel(gesamt);
 

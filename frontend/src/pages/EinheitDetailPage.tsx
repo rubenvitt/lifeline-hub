@@ -1,4 +1,17 @@
-import { App, Breadcrumb, Button, Card, Form, Input, Popconfirm, Space, Tag, TreeSelect, Typography, theme } from 'antd';
+import {
+  App,
+  Breadcrumb,
+  Button,
+  Card,
+  Form,
+  Input,
+  Popconfirm,
+  Space,
+  Tag,
+  TreeSelect,
+  Typography,
+  theme,
+} from 'antd';
 import { Select } from '../components/Select';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useEffect, useMemo } from 'react';
@@ -12,8 +25,14 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { gibMaterialFrei, listeEinsatzMaterial, ordneMaterialZu } from '../api/einsatzMaterial';
 import {
-  aktualisiereEinheit, gibFahrzeugFrei, gibPersonalFrei, listeEinheiten, loeseEinheitAuf,
-  ordneFahrzeugZu, ordnePersonalZu, type EinheitEingabe,
+  aktualisiereEinheit,
+  gibFahrzeugFrei,
+  gibPersonalFrei,
+  listeEinheiten,
+  loeseEinheitAuf,
+  ordneFahrzeugZu,
+  ordnePersonalZu,
+  type EinheitEingabe,
 } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -21,13 +40,18 @@ import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
-import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
+import FunkErreichbarkeit, {
+  KOMMUNIKATIONSMITTEL_OPTIONEN,
+} from '../components/FunkErreichbarkeit';
 import SektionHeader from '../components/SektionHeader';
 import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
 import { leerZuNull } from '../api/patchTriState';
 import { einheitenPfad, parseRouteId } from '../routing/deeplinks';
 import {
-  nichtGefundenInhalt, SeitenFehler, SeitenLeer, SeitenSkeleton,
+  nichtGefundenInhalt,
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
 } from '../components/SeitenZustand';
 import './EinheitDetailPage.css';
 
@@ -37,9 +61,11 @@ import './EinheitDetailPage.css';
 function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
   const formular = leiste?.closest('form');
   if (!leiste || !formular) return;
-  const aktualisiere = () => formular.style.setProperty(
-    '--lfh-einheit-fokusabstand', `${leiste.getBoundingClientRect().height + abstand}px`,
-  );
+  const aktualisiere = () =>
+    formular.style.setProperty(
+      '--lfh-einheit-fokusabstand',
+      `${leiste.getBoundingClientRect().height + abstand}px`,
+    );
   aktualisiere();
   const beobachter = new ResizeObserver(aktualisiere);
   beobachter.observe(leiste);
@@ -133,16 +159,20 @@ export default function EinheitDetailPage() {
   });
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
   const abschnitteQuery = useQuery({
-    queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId),
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
   });
   const personalQuery = useQuery({
-    queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId),
+    queryKey: einsatzKeys.personal(einsatzId),
+    queryFn: () => listeEinsatzPersonal(einsatzId),
   });
   const fahrzeugeQuery = useQuery({
-    queryKey: einsatzKeys.fahrzeuge(einsatzId), queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
   const materialQuery = useQuery({
-    queryKey: einsatzKeys.material(einsatzId), queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryKey: einsatzKeys.material(einsatzId),
+    queryFn: () => listeEinsatzMaterial(einsatzId),
   });
 
   function invalidate() {
@@ -152,7 +182,8 @@ export default function EinheitDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const aktuell = einheiten.find((e) => e.id === einheitId) ?? null;
@@ -175,39 +206,51 @@ export default function EinheitDetailPage() {
       };
       return aktualisiereEinheit(einsatzId, einheitId, daten);
     },
-    onSuccess: () => { invalidate(); message.success('Gespeichert'); },
+    onSuccess: () => {
+      invalidate();
+      message.success('Gespeichert');
+    },
     onError: fehler,
   });
 
   const aufloesen = useMutation({
     mutationFn: () => loeseEinheitAuf(einsatzId, einheitId),
     // Zurück zur Gliederung: die Einheit, auf die diese Route zeigt, gibt es nicht mehr.
-    onSuccess: () => { invalidate(); void navigate(einheitenPfad(einsatzId)); },
+    onSuccess: () => {
+      invalidate();
+      void navigate(einheitenPfad(einsatzId));
+    },
     onError: fehler,
   });
   const personalZu = useMutation({
     mutationFn: (epId: number) => ordnePersonalZu(einsatzId, einheitId, epId),
-    onSuccess: invalidate, onError: fehler,
+    onSuccess: invalidate,
+    onError: fehler,
   });
   const personalFrei = useMutation({
     mutationFn: (epId: number) => gibPersonalFrei(einsatzId, einheitId, epId),
-    onSuccess: invalidate, onError: fehler,
+    onSuccess: invalidate,
+    onError: fehler,
   });
   const fahrzeugZu = useMutation({
     mutationFn: (efId: number) => ordneFahrzeugZu(einsatzId, einheitId, efId),
-    onSuccess: invalidate, onError: fehler,
+    onSuccess: invalidate,
+    onError: fehler,
   });
   const fahrzeugFrei = useMutation({
     mutationFn: (efId: number) => gibFahrzeugFrei(einsatzId, einheitId, efId),
-    onSuccess: invalidate, onError: fehler,
+    onSuccess: invalidate,
+    onError: fehler,
   });
   const materialZu = useMutation({
     mutationFn: (emId: number) => ordneMaterialZu(einsatzId, einheitId, emId),
-    onSuccess: invalidate, onError: fehler,
+    onSuccess: invalidate,
+    onError: fehler,
   });
   const materialFrei = useMutation({
     mutationFn: (emId: number) => gibMaterialFrei(einsatzId, einheitId, emId),
-    onSuccess: invalidate, onError: fehler,
+    onSuccess: invalidate,
+    onError: fehler,
   });
   const fuehrerSetzen = useMutation({
     // Baut den PATCH-Body bewusst aus dem Server-Stand (`aktuell`), nicht aus dem
@@ -216,20 +259,30 @@ export default function EinheitDetailPage() {
     mutationFn: (epId: number | null) => {
       const e = aktuell!;
       return aktualisiereEinheit(einsatzId, e.id, {
-        name: e.name, typ_id: e.typ_id, abschnitt_id: e.abschnitt_id, ueber_einheit_id: e.ueber_einheit_id,
-        fuehrer_id: epId, soll_fuehrer: e.soll?.fuehrer ?? null, soll_unterfuehrer: e.soll?.unterfuehrer ?? null,
-        soll_mannschaft: e.soll?.mannschaft ?? null, bemerkung: e.bemerkung,
+        name: e.name,
+        typ_id: e.typ_id,
+        abschnitt_id: e.abschnitt_id,
+        ueber_einheit_id: e.ueber_einheit_id,
+        fuehrer_id: epId,
+        soll_fuehrer: e.soll?.fuehrer ?? null,
+        soll_unterfuehrer: e.soll?.unterfuehrer ?? null,
+        soll_mannschaft: e.soll?.mannschaft ?? null,
+        bemerkung: e.bemerkung,
       });
     },
-    onSuccess: invalidate, onError: fehler,
+    onSuccess: invalidate,
+    onError: fehler,
   });
 
   // Formular mit den Kopfdaten füllen, sobald sie da sind bzw. sich ändern.
   useEffect(() => {
     if (aktuell) {
       form.setFieldsValue({
-        name: aktuell.name, typ_id: aktuell.typ_id ?? undefined, abschnitt_id: aktuell.abschnitt_id ?? undefined,
-        ueber_einheit_id: aktuell.ueber_einheit_id ?? undefined, soll: aktuell.soll,
+        name: aktuell.name,
+        typ_id: aktuell.typ_id ?? undefined,
+        abschnitt_id: aktuell.abschnitt_id ?? undefined,
+        ueber_einheit_id: aktuell.ueber_einheit_id ?? undefined,
+        soll: aktuell.soll,
         bemerkung: aktuell.bemerkung ?? undefined,
         sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
         kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
@@ -283,7 +336,10 @@ export default function EinheitDetailPage() {
   const parentOptionen = einheiten
     .filter((e) => !verbotenAlsParent.has(e.id))
     .map((e) => ({ value: e.id, title: e.name }));
-  const abschnittOptionen = (abschnitteQuery.data ?? []).map((a) => ({ value: a.id, title: a.name }));
+  const abschnittOptionen = (abschnitteQuery.data ?? []).map((a) => ({
+    value: a.id,
+    title: a.name,
+  }));
 
   // Frei-Pool: disponierte Kräfte ohne Einheit.
   const freiesPersonal = (personalQuery.data ?? []).filter((p) => p.einheit_id == null);
@@ -296,26 +352,37 @@ export default function EinheitDetailPage() {
    * Menge, und das Auswahlfeld behauptete „Keine freien Personen" — eine Aussage über den
    * Bestand, die niemand geprüft hat.
    */
-  const personalInhalt = nichtGefundenInhalt(personalQuery, {
-    allgemein: 'Kräfte konnten nicht geladen werden',
-  }) ?? 'Keine freien Personen';
-  const fahrzeugInhalt = nichtGefundenInhalt(fahrzeugeQuery, {
-    allgemein: 'Fahrzeuge konnten nicht geladen werden',
-  }) ?? 'Keine freien Fahrzeuge';
-  const materialInhalt = nichtGefundenInhalt(materialQuery, {
-    allgemein: 'Material konnte nicht geladen werden',
-  }) ?? 'Kein freies Material';
+  const personalInhalt =
+    nichtGefundenInhalt(personalQuery, {
+      allgemein: 'Kräfte konnten nicht geladen werden',
+    }) ?? 'Keine freien Personen';
+  const fahrzeugInhalt =
+    nichtGefundenInhalt(fahrzeugeQuery, {
+      allgemein: 'Fahrzeuge konnten nicht geladen werden',
+    }) ?? 'Keine freien Fahrzeuge';
+  const materialInhalt =
+    nichtGefundenInhalt(materialQuery, {
+      allgemein: 'Material konnte nicht geladen werden',
+    }) ?? 'Kein freies Material';
 
   /** Eine Zuordnungszeile — Bezeichnung links, Aktionen rechts. */
-  const zuordnungsZeile = (schluessel: string | number, inhalt: React.ReactNode, aktionen: React.ReactNode) => (
+  const zuordnungsZeile = (
+    schluessel: string | number,
+    inhalt: React.ReactNode,
+    aktionen: React.ReactNode,
+  ) => (
     <div
       key={schluessel}
       style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        gap: token.margin, flexWrap: 'wrap',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: token.margin,
+        flexWrap: 'wrap',
         // Bedienziel-Boden aus der Dichteachse (LFH-365): eine handgebaute Zeile schuldet
         // `minHeight` PLUS Polsterung — die Polsterung allein trägt den Boden nicht.
-        minHeight: token.controlHeight, paddingBlock: token.paddingXXS,
+        minHeight: token.controlHeight,
+        paddingBlock: token.paddingXXS,
       }}
     >
       {inhalt}
@@ -337,11 +404,18 @@ export default function EinheitDetailPage() {
 
       <Space orientation="vertical" size={0} style={{ marginBottom: token.margin }}>
         <Space align="center" wrap>
-          <Typography.Title level={3} style={{ margin: 0 }}>{aktuell.name}</Typography.Title>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            {aktuell.name}
+          </Typography.Title>
           {aktuell.typ_label && <Tag>{aktuell.typ_label}</Tag>}
           <Tag color="blue">
             <StaerkeAnzeige wert={aktuell.ist} />
-            {aktuell.soll ? <> / Soll <StaerkeAnzeige wert={aktuell.soll} /></> : null}
+            {aktuell.soll ? (
+              <>
+                {' '}
+                / Soll <StaerkeAnzeige wert={aktuell.soll} />
+              </>
+            ) : null}
           </Tag>
         </Space>
         {/* Der ÄLTESTE erfolgreiche Stand über alle hier dargestellten Bestände — nicht
@@ -349,34 +423,51 @@ export default function EinheitDetailPage() {
             nebeneinander; ein Datenstand, der nur die frischeste Quelle nennt, behauptete
             Aktualität für Zahlen, die älter sind. Die Zusicherung ist mit der Ansicht von
             der Listenseite hierher gezogen (LFH-339 · C4). */}
-        <Datenstand dataUpdatedAt={gemeinsamerDatenstand(
-          einheitenQuery.dataUpdatedAt,
-          abschnitteQuery.dataUpdatedAt,
-          personalQuery.dataUpdatedAt,
-          fahrzeugeQuery.dataUpdatedAt,
-          materialQuery.dataUpdatedAt,
-        )} />
+        <Datenstand
+          dataUpdatedAt={gemeinsamerDatenstand(
+            einheitenQuery.dataUpdatedAt,
+            abschnitteQuery.dataUpdatedAt,
+            personalQuery.dataUpdatedAt,
+            fahrzeugeQuery.dataUpdatedAt,
+            materialQuery.dataUpdatedAt,
+          )}
+        />
       </Space>
 
       <Card size="small" style={{ marginBottom: token.margin }}>
-        <Form<KopfWerte> className="lfh-einheit-kopfdaten" form={form} layout="vertical" disabled={!darfSchreiben} onFinish={(w) => speichern.mutate(w)}>
+        <Form<KopfWerte>
+          className="lfh-einheit-kopfdaten"
+          form={form}
+          layout="vertical"
+          disabled={!darfSchreiben}
+          onFinish={(w) => speichern.mutate(w)}
+        >
           <SektionHeader titel="Kopfdaten" />
-          <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
+          <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+            <Input />
+          </Form.Item>
           <Form.Item label="Typ" name="typ_id">
             {/* Der Typkatalog ist die einzige Fremdquelle dieses Formulars. Fällt er aus,
                 stünde hier ein Auswahlfeld ohne Einträge — die Typzuordnung wäre unmöglich,
                 und zwar lautlos. Der Ausfall steht deshalb im Feld selbst. */}
-            <Select allowClear placeholder="Typ wählen"
+            <Select
+              allowClear
+              placeholder="Typ wählen"
               notFoundContent={nichtGefundenInhalt(typenQuery, {
                 allgemein: 'Einheitentypen konnten nicht geladen werden',
               })}
-              options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))} />
+              options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
+            />
           </Form.Item>
           <Form.Item label="Abschnitt" name="abschnitt_id">
-            <TreeSelect allowClear placeholder="Abschnitt zuordnen" treeData={abschnittOptionen}
+            <TreeSelect
+              allowClear
+              placeholder="Abschnitt zuordnen"
+              treeData={abschnittOptionen}
               notFoundContent={nichtGefundenInhalt(abschnitteQuery, {
                 allgemein: 'Abschnitte konnten nicht geladen werden',
-              })} />
+              })}
+            />
           </Form.Item>
           <Form.Item label="Über-Einheit" name="ueber_einheit_id">
             <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
@@ -390,9 +481,12 @@ export default function EinheitDetailPage() {
             extra="Entweder alle drei Werte angeben oder alle leer lassen — teilweise gefüllt wird nicht übernommen."
           >
             <Space align="end" wrap>
-              <Form.Item name="soll" noStyle><StaerkeEingabe /></Form.Item>
+              <Form.Item name="soll" noStyle>
+                <StaerkeEingabe />
+              </Form.Item>
               <span style={{ color: token.colorTextSecondary }}>
-                Ist: <StaerkeAnzeige wert={aktuell.ist} /> · kumuliert: <StaerkeAnzeige wert={aktuell.ist_kumuliert} />
+                Ist: <StaerkeAnzeige wert={aktuell.ist} /> · kumuliert:{' '}
+                <StaerkeAnzeige wert={aktuell.ist_kumuliert} />
               </span>
             </Space>
           </Form.Item>
@@ -402,12 +496,18 @@ export default function EinheitDetailPage() {
             <SprechgruppenPicker einsatzId={einsatzId} />
           </Form.Item>
           <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
-            <Select allowClear placeholder="Digitalfunk / Mobil / Festnetz" options={KOMMUNIKATIONSMITTEL_OPTIONEN} />
+            <Select
+              allowClear
+              placeholder="Digitalfunk / Mobil / Festnetz"
+              options={KOMMUNIKATIONSMITTEL_OPTIONEN}
+            />
           </Form.Item>
           <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
             <Input placeholder="z. B. 0151 23456" allowClear />
           </Form.Item>
-          <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item label="Bemerkung" name="bemerkung">
+            <Input.TextArea rows={2} />
+          </Form.Item>
 
           <FunkErreichbarkeit
             sprechgruppen={aktuell.sprechgruppen}
@@ -430,21 +530,27 @@ export default function EinheitDetailPage() {
             <div
               ref={(el) => beobachteAktionsleiste(el, token.marginSM)}
               style={{
-                position: 'sticky', bottom: 0, zIndex: 1,
+                position: 'sticky',
+                bottom: 0,
+                zIndex: 1,
                 background: token.colorBgContainer,
                 paddingBlock: token.paddingSM,
                 borderTop: `1px solid ${token.colorBorderSecondary}`,
               }}
             >
               <Space size="middle" wrap>
-                <Button type="primary" htmlType="submit" loading={speichern.isPending}>Speichern</Button>
+                <Button type="primary" htmlType="submit" loading={speichern.isPending}>
+                  Speichern
+                </Button>
                 <Popconfirm
                   title="Einheit auflösen?"
                   description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
                   okButtonProps={{ danger: true }}
                   onConfirm={() => aufloesen.mutate()}
                 >
-                  <Button danger loading={aufloesen.isPending}>Auflösen</Button>
+                  <Button danger loading={aufloesen.isPending}>
+                    Auflösen
+                  </Button>
                 </Popconfirm>
               </Space>
             </div>
@@ -453,70 +559,116 @@ export default function EinheitDetailPage() {
       </Card>
 
       {/**
-        * ── DIE DREI ZUORDNUNGEN LIEGEN AUSSERHALB DES FORMULARS ─────────────────────────
-        *
-        * Das ist der Kern von Befund M26. Jede Handlung hier wirkt SOFORT — es gibt nichts
-        * zu speichern. Innerhalb des `<Form>` standen sie unter einem Speichern-Knopf, der
-        * sie nicht betrifft: zweierlei Bedienlogik unter einer Überschrift, von aussen
-        * nicht unterscheidbar. Der Hinweis in jedem `SektionHeader` sagt es zusätzlich in
-        * Worten, weil die Trennung allein durch Position eine Vermutung bliebe.
-        */}
+       * ── DIE DREI ZUORDNUNGEN LIEGEN AUSSERHALB DES FORMULARS ─────────────────────────
+       *
+       * Das ist der Kern von Befund M26. Jede Handlung hier wirkt SOFORT — es gibt nichts
+       * zu speichern. Innerhalb des `<Form>` standen sie unter einem Speichern-Knopf, der
+       * sie nicht betrifft: zweierlei Bedienlogik unter einer Überschrift, von aussen
+       * nicht unterscheidbar. Der Hinweis in jedem `SektionHeader` sagt es zusätzlich in
+       * Worten, weil die Trennung allein durch Position eine Vermutung bliebe.
+       */}
       <Card size="small" style={{ marginBottom: token.margin }}>
-        <SektionHeader titel="Personal" beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern." />
+        <SektionHeader
+          titel="Personal"
+          beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern."
+        />
         {aktuell.personal_mitglieder.map((m) =>
           zuordnungsZeile(
             m.ep_id,
             <span>
-              {m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}
-              {m.ist_fuehrer && <Tag color="gold" style={{ marginLeft: token.marginXXS }}>Einheitsführer</Tag>}
+              {m.name}
+              {m.staerke_position ? ` (${m.staerke_position})` : ''}
+              {m.ist_fuehrer && (
+                <Tag color="gold" style={{ marginLeft: token.marginXXS }}>
+                  Einheitsführer
+                </Tag>
+              )}
             </span>,
             darfSchreiben && (
               <Space size="middle" wrap>
-                {!m.ist_fuehrer && <Button onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Einheitsführer</Button>}
-                <Button danger onClick={() => personalFrei.mutate(m.ep_id)}>Entfernen</Button>
+                {!m.ist_fuehrer && (
+                  <Button onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Einheitsführer</Button>
+                )}
+                <Button danger onClick={() => personalFrei.mutate(m.ep_id)}>
+                  Entfernen
+                </Button>
               </Space>
             ),
           ),
         )}
         {darfSchreiben && (
-          <Select style={{ width: '100%', marginTop: token.marginSM }} placeholder="Person zuordnen …" value={null}
+          <Select
+            style={{ width: '100%', marginTop: token.marginSM }}
+            placeholder="Person zuordnen …"
+            value={null}
             notFoundContent={personalInhalt}
             options={freiesPersonal.map((p) => ({ value: p.id, label: p.name }))}
-            onSelect={(epId) => personalZu.mutate(Number(epId))} />
+            onSelect={(epId) => personalZu.mutate(Number(epId))}
+          />
         )}
       </Card>
 
       <Card size="small" style={{ marginBottom: token.margin }}>
-        <SektionHeader titel="Fahrzeuge" beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern." />
+        <SektionHeader
+          titel="Fahrzeuge"
+          beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern."
+        />
         {aktuell.fahrzeug_mitglieder.map((m) =>
           zuordnungsZeile(
             m.ef_id,
-            <span>{m.funkrufname}{m.fahrzeugtyp ? ` (${m.fahrzeugtyp})` : ''}</span>,
-            darfSchreiben && <Button danger onClick={() => fahrzeugFrei.mutate(m.ef_id)}>Entfernen</Button>,
+            <span>
+              {m.funkrufname}
+              {m.fahrzeugtyp ? ` (${m.fahrzeugtyp})` : ''}
+            </span>,
+            darfSchreiben && (
+              <Button danger onClick={() => fahrzeugFrei.mutate(m.ef_id)}>
+                Entfernen
+              </Button>
+            ),
           ),
         )}
         {darfSchreiben && (
-          <Select style={{ width: '100%', marginTop: token.marginSM }} placeholder="Fahrzeug zuordnen …" value={null}
+          <Select
+            style={{ width: '100%', marginTop: token.marginSM }}
+            placeholder="Fahrzeug zuordnen …"
+            value={null}
             notFoundContent={fahrzeugInhalt}
             options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
-            onSelect={(efId) => fahrzeugZu.mutate(Number(efId))} />
+            onSelect={(efId) => fahrzeugZu.mutate(Number(efId))}
+          />
         )}
       </Card>
 
       <Card size="small">
-        <SektionHeader titel="Material" beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern." />
+        <SektionHeader
+          titel="Material"
+          beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern."
+        />
         {aktuell.material_mitglieder.map((m) =>
           zuordnungsZeile(
             m.em_id,
-            <span>{m.bezeichnung} ×{m.menge}</span>,
-            darfSchreiben && <Button danger onClick={() => materialFrei.mutate(m.em_id)}>Entfernen</Button>,
+            <span>
+              {m.bezeichnung} ×{m.menge}
+            </span>,
+            darfSchreiben && (
+              <Button danger onClick={() => materialFrei.mutate(m.em_id)}>
+                Entfernen
+              </Button>
+            ),
           ),
         )}
         {darfSchreiben && (
-          <Select style={{ width: '100%', marginTop: token.marginSM }} placeholder="Material zuordnen …" value={null}
+          <Select
+            style={{ width: '100%', marginTop: token.marginSM }}
+            placeholder="Material zuordnen …"
+            value={null}
             notFoundContent={materialInhalt}
-            options={freiesMaterial.map((m) => ({ value: m.id, label: `${m.bezeichnung} ×${m.menge}` }))}
-            onSelect={(emId) => materialZu.mutate(Number(emId))} />
+            options={freiesMaterial.map((m) => ({
+              value: m.id,
+              label: `${m.bezeichnung} ×${m.menge}`,
+            }))}
+            onSelect={(emId) => materialZu.mutate(Number(emId))}
+          />
         )}
       </Card>
     </div>

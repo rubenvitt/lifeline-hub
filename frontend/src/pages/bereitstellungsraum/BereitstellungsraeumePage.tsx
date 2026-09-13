@@ -1,7 +1,4 @@
-import {
-  Breadcrumb, Button,
-  type TableColumnsType,
-} from 'antd';
+import { Breadcrumb, Button, type TableColumnsType } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -14,7 +11,12 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
-import { SeitenFehler, SeitenLeer, SeitenSkeleton, SeitenStandVeraltet } from '../../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../../components/SeitenZustand';
 import { brStatus } from '../../theme/statusFarben';
 import { flaeche } from '../../theme/tokens';
 import KatalogTabelle from '../../components/KatalogTabelle';
@@ -104,11 +106,13 @@ export default function BereitstellungsraeumePage() {
       dataUpdatedAt={brQuery.dataUpdatedAt}
       breite={flaeche.seiteBreit}
       breadcrumb={
-        <Breadcrumb items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
-          { title: 'Bereitstellungsräume' },
-        ]} />
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
+            { title: 'Bereitstellungsräume' },
+          ]}
+        />
       }
       aktionen={
         <Button type="primary" disabled={schreibgeschuetzt} onClick={() => setAnlegen(true)}>
@@ -143,7 +147,11 @@ export default function BereitstellungsraeumePage() {
             <SeitenLeer
               titel="Noch keine Bereitstellungsräume erfasst"
               hinweis="Lege einen Bereitstellungsraum an, um Kräfte zu sammeln."
-              aktion={schreibgeschuetzt ? undefined : { label: 'Ersten BR anlegen', onClick: () => setAnlegen(true) }}
+              aktion={
+                schreibgeschuetzt
+                  ? undefined
+                  : { label: 'Ersten BR anlegen', onClick: () => setAnlegen(true) }
+              }
             />
           )}
           {(sichtbar.length > 0 || brQuery.isLoading) && (

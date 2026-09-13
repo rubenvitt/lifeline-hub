@@ -74,7 +74,6 @@ export default function PersonalDetailPage() {
 
   const person = id == null ? undefined : personalQuery.data?.find((p) => p.id === id);
 
-
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => aktualisierePerson(id!, zuEingabe(werte)),
     onSuccess: () => {
@@ -185,7 +184,9 @@ export default function PersonalDetailPage() {
               </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
-              <Form.Item label="Personalnummer" name="personalnummer"><Input /></Form.Item>
+              <Form.Item label="Personalnummer" name="personalnummer">
+                <Input />
+              </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
               <Form.Item label="Trägerorganisation" name="traegerorganisation">
@@ -205,7 +206,9 @@ export default function PersonalDetailPage() {
           <SektionHeader titel="Erreichbarkeit & Konto" />
           <Row gutter={token.margin}>
             <Col xs={24} lg={12}>
-              <Form.Item label="Telefon" name="telefon"><Input /></Form.Item>
+              <Form.Item label="Telefon" name="telefon">
+                <Input />
+              </Form.Item>
             </Col>
             <Col xs={24} lg={12}>
               <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
@@ -234,7 +237,9 @@ export default function PersonalDetailPage() {
           </Row>
 
           <SektionHeader titel="Bemerkung" />
-          <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item label="Bemerkung" name="bemerkung">
+            <Input.TextArea rows={3} />
+          </Form.Item>
 
           <div style={speicherLeisteStil(token)}>
             <Button type="primary" htmlType="submit" loading={speichern.isPending}>

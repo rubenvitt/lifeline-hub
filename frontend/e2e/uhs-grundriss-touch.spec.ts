@@ -104,7 +104,10 @@ async function setupPatientUndPlatz(page: Page, fuellPersonen = 0): Promise<Aufb
   const stempel = Date.now();
 
   const einsatz = await seede<{ id: number }>(
-    page, '/api/einsaetze', { bezeichnung: `E2E UHS Touch ${stempel}` }, 'Einsatz',
+    page,
+    '/api/einsaetze',
+    { bezeichnung: `E2E UHS Touch ${stempel}` },
+    'Einsatz',
   );
   const einsatzId = einsatz.id;
 
@@ -121,9 +124,19 @@ async function setupPatientUndPlatz(page: Page, fuellPersonen = 0): Promise<Aufb
     'UHS',
   );
   const uhsId = uhs.id;
-  await seede(page, `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/bulk`, { typ: 'bett', menge: 1 }, 'Plätze');
+  await seede(
+    page,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/bulk`,
+    { typ: 'bett', menge: 1 },
+    'Plätze',
+  );
   // Erst „aktiv" nimmt die UHS Patienten auf — eine geplante lehnt die Belegung fachlich ab.
-  await seede(page, `/api/einsaetze/${einsatzId}/uhs/${uhsId}/status`, { status: 'aktiv' }, 'UHS-Status');
+  await seede(
+    page,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/status`,
+    { status: 'aktiv' },
+    'UHS-Status',
+  );
 
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen/${uhsId}`);
   await expect(page.getByText('Bett 1')).toBeVisible();
@@ -143,10 +156,18 @@ function bett1(page: Page): Locator {
 async function starteTouchDrag(quelle: Locator, zielMitte: { x: number; y: number }) {
   await quelle.evaluate(async (el, ziel) => {
     // Doppeltes rAF zwischen den Schritten — s. Dateikopf: ohne das bleibt `over` null.
-    const frame = () => new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(fertig)));
+    const frame = () =>
+      new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(fertig)));
     const opt = (x: number, y: number) => ({
-      pointerId: 1, pointerType: 'touch', isPrimary: true, button: 0, buttons: 1,
-      clientX: x, clientY: y, bubbles: true, cancelable: true,
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientX: x,
+      clientY: y,
+      bubbles: true,
+      cancelable: true,
     });
     const r = el.getBoundingClientRect();
     const x0 = r.x + r.width / 2;
@@ -155,7 +176,9 @@ async function starteTouchDrag(quelle: Locator, zielMitte: { x: number; y: numbe
     const y1 = ziel.y;
     el.dispatchEvent(new PointerEvent('pointerdown', opt(x0, y0)));
     for (let i = 1; i <= 10; i++) {
-      document.dispatchEvent(new PointerEvent('pointermove', opt(x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * i) / 10)));
+      document.dispatchEvent(
+        new PointerEvent('pointermove', opt(x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * i) / 10)),
+      );
       await frame();
     }
   }, zielMitte);
@@ -168,15 +191,25 @@ async function ziehePerTouch(page: Page, quelle: Locator, ziel: Locator) {
   const mitte = { x: kasten!.x + kasten!.width / 2, y: kasten!.y + kasten!.height / 2 };
   await starteTouchDrag(quelle, mitte);
   await page.evaluate((m) => {
-    document.dispatchEvent(new PointerEvent('pointerup', {
-      pointerId: 1, pointerType: 'touch', isPrimary: true, button: 0,
-      clientX: m.x, clientY: m.y, bubbles: true, cancelable: true,
-    }));
+    document.dispatchEvent(
+      new PointerEvent('pointerup', {
+        pointerId: 1,
+        pointerType: 'touch',
+        isPrimary: true,
+        button: 0,
+        clientX: m.x,
+        clientY: m.y,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   }, mitte);
 }
 
 test.describe('UHS-Grundriss unter Touch', () => {
-  test('Führungs-Tablet (1024 px): Touch-Drag auf einen Platz — und die Karte steht VOR der Server-Antwort dort', async ({ page }) => {
+  test('Führungs-Tablet (1024 px): Touch-Drag auf einen Platz — und die Karte steht VOR der Server-Antwort dort', async ({
+    page,
+  }) => {
     await page.setViewportSize(TABLET);
     const { personName } = await setupPatientUndPlatz(page);
 
@@ -216,13 +249,17 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
     // Optimistisch: die Karte steht am Ziel, bevor der Server die Anfrage überhaupt gesehen hat.
     await expect(platz).toContainText(personName, { timeout: 1200 });
-    expect(anfrageDurchgelassen, 'die Karte stand da, BEVOR der Server die Anfrage sah').toBe(false);
+    expect(anfrageDurchgelassen, 'die Karte stand da, BEVOR der Server die Anfrage sah').toBe(
+      false,
+    );
 
     // Und nachdem der Server bestätigt hat, bleibt sie dort.
     await expect(platz).toContainText('belegt');
   });
 
-  test('Führungs-Tablet: eine abgelehnte Zuordnung rollt die Karte auf den Ausgangsplatz zurück', async ({ page }) => {
+  test('Führungs-Tablet: eine abgelehnte Zuordnung rollt die Karte auf den Ausgangsplatz zurück', async ({
+    page,
+  }) => {
     await page.setViewportSize(TABLET);
     const { personName } = await setupPatientUndPlatz(page);
 
@@ -274,9 +311,17 @@ test.describe('UHS-Grundriss unter Touch', () => {
     // sie müssen unter der Bremse oben liegen. Gemessen — mit der Vorgabefrist (10 s) blieb
     // dieser Test grün, obwohl das Rückrollen in `onError` gelöscht war: die Zusicherung
     // wartete die Bremse einfach aus und prüfte dann die Nachladung.
-    await expect(platz, 'nach der Ablehnung nicht mehr am Zielplatz').not.toContainText(personName, { timeout: 2500 });
-    await expect(warteliste.getByText(personName), 'zurück am Ausgangsort').toBeVisible({ timeout: 2500 });
-    expect(nachladungDurchgelassen, 'die Nachladung stand noch — nur das Rückrollen kann es gewesen sein').toBe(false);
+    await expect(platz, 'nach der Ablehnung nicht mehr am Zielplatz').not.toContainText(
+      personName,
+      { timeout: 2500 },
+    );
+    await expect(warteliste.getByText(personName), 'zurück am Ausgangsort').toBeVisible({
+      timeout: 2500,
+    });
+    expect(
+      nachladungDurchgelassen,
+      'die Nachladung stand noch — nur das Rückrollen kann es gewesen sein',
+    ).toBe(false);
   });
 
   test('Führungs-Tablet: die Warteliste scrollt bei ANGEHALTENEM Drag weiter', async ({ page }) => {
@@ -286,12 +331,17 @@ test.describe('UHS-Grundriss unter Touch', () => {
     const { personName } = await setupPatientUndPlatz(page, 40);
 
     const spalte = page.getByTestId('warteliste-scroll');
-    const masse = await spalte.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+    const masse = await spalte.evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    }));
     expect(
       masse.scrollHeight,
       `Vorbedingung: die Warteliste muss überhaupt scrollbar sein (${masse.scrollHeight} vs. ${masse.clientHeight})`,
     ).toBeGreaterThan(masse.clientHeight + 10);
-    await spalte.evaluate((el) => { el.scrollTop = 0; });
+    await spalte.evaluate((el) => {
+      el.scrollTop = 0;
+    });
 
     // Das AK verlangt den Scroll WÄHREND des Drags. Ein Scrolltest ohne laufenden Drag
     // prüft etwas anderes — und `touchAction !== 'none'` allein halten die beiden
@@ -340,8 +390,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
     // wäre damit von der Anlagereihenfolge abhängig statt von der Aussage. Die Mutationsprobe
     // deckt das nicht auf — sie trifft nur das obere Ende der Kette.
     const gesperrt = await spalte.evaluate((container, name) => {
-      const start = Array.from(container.querySelectorAll<HTMLElement>('.ant-tag'))
-        .find((tag) => tag.textContent?.includes(name));
+      const start = Array.from(container.querySelectorAll<HTMLElement>('.ant-tag')).find((tag) =>
+        tag.textContent?.includes(name),
+      );
       if (!start) throw new Error(`gezogene Karte „${name}" steht nicht in der Warteliste`);
       const treffer: string[] = [];
       let n: HTMLElement | null = start;
@@ -359,7 +410,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
     //     vertrauenswürdig auslösen kann. Davor stehen die Gegenproben zu den beiden
     //     Fallen oben — ohne sie wäre nicht zu unterscheiden, ob das Rad gescrollt hat
     //     oder der Auto-Scroller, und ob überhaupt die Liste gemeint war.
-    expect(await spalte.evaluate((el) => el.scrollTop), 'vor dem Rad steht die Liste still').toBe(0);
+    expect(await spalte.evaluate((el) => el.scrollTop), 'vor dem Rad steht die Liste still').toBe(
+      0,
+    );
     const overlayKasten = (await page.getByTestId('drag-overlay').boundingBox())!;
     expect(
       radPunkt.y < overlayKasten.y || radPunkt.y > overlayKasten.y + overlayKasten.height,
@@ -375,7 +428,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(page.getByTestId('drag-overlay')).toHaveCount(0);
   });
 
-  test('Mobil (390 px): gestapelte Reiter, kein Querlauf — und der Klickweg weist zu und zurück', async ({ page }) => {
+  test('Mobil (390 px): gestapelte Reiter, kein Querlauf — und der Klickweg weist zu und zurück', async ({
+    page,
+  }) => {
     await page.setViewportSize(HANDSCHIRM);
     const { personName } = await setupPatientUndPlatz(page);
 
@@ -390,10 +445,16 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(page.getByRole('tab', { name: 'Fläche' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Wartebereich' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Transport' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Fläche' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Fläche' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     // Die Gegenprobe zur Reiter-Weiche: mit `destroyOnHidden` steht der Wartebereich
     // WIRKLICH nicht im Baum — genau deshalb ist ein Drag hier keine Geste mehr.
-    await expect(page.getByTestId('warteliste-scroll'), 'kein zweiter, verborgener Zweig').toHaveCount(0);
+    await expect(
+      page.getByTestId('warteliste-scroll'),
+      'kein zweiter, verborgener Zweig',
+    ).toHaveCount(0);
 
     // AK 1: der Klickweg aus B5g, hier per echtem Touch-Tap. Getippt wird auf den TITEL
     // der Karte: die Aktionszeile darunter riegelt `click` ab (sie muss, sonst öffnete

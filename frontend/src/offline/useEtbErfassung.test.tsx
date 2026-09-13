@@ -12,7 +12,11 @@ import { queueEinreihen, queueLaden, queueLeerenFuerTests } from './queue';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 import { useEtbErfassung } from './useEtbErfassung';
 
-const eintrag: NeuerEintrag = { typ: 'meldung', inhalt: 'x', erfasst_lokal_at: '2026-05-23T10:00:00Z' };
+const eintrag: NeuerEintrag = {
+  typ: 'meldung',
+  inhalt: 'x',
+  erfasst_lokal_at: '2026-05-23T10:00:00Z',
+};
 
 function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={neuerQueryClient()}>{children}</QueryClientProvider>;
@@ -187,7 +191,10 @@ describe('useEtbErfassung', () => {
     });
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
     await waitFor(() => expect(result.current.abgelehnt).toHaveLength(1));
-    expect(result.current.abgelehnt[0]).toMatchObject({ grund: 'Ungültig', eintrag: { inhalt: 'x' } });
+    expect(result.current.abgelehnt[0]).toMatchObject({
+      grund: 'Ungültig',
+      eintrag: { inhalt: 'x' },
+    });
 
     // Reload: neuer Hook-Mount lädt abgelehnt aus IndexedDB (nicht flüchtig).
     unmount();
@@ -222,12 +229,12 @@ describe('useEtbErfassung', () => {
 
   it('wartet auf navigator.locks und lädt danach den aktuellen Queue-Stand (F03)', async () => {
     let lockFreigeben!: () => void;
-    const request = vi.fn((
-      _name: string,
-      cb: (lock: Lock) => Promise<void>,
-    ) => new Promise<void>((resolve, reject) => {
-      lockFreigeben = () => void cb({} as Lock).then(resolve, reject);
-    }));
+    const request = vi.fn(
+      (_name: string, cb: (lock: Lock) => Promise<void>) =>
+        new Promise<void>((resolve, reject) => {
+          lockFreigeben = () => void cb({} as Lock).then(resolve, reject);
+        }),
+    );
     Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
     try {
       let posts = 0;
@@ -255,30 +262,32 @@ describe('useEtbErfassung', () => {
   it('bricht einen alten Flush nach Benutzerwechsel noch im wartenden Web Lock ab', async () => {
     const freigaben: Array<() => void> = [];
     let ersterCallbackBeendet = false;
-    const request = vi.fn((
-      _name: string,
-      cb: (lock: Lock) => Promise<void>,
-    ) => new Promise<void>((resolve, reject) => {
-      const index = freigaben.length;
-      freigaben.push(() => {
-        void cb({} as Lock).then(() => {
-          if (index === 0) ersterCallbackBeendet = true;
-          resolve();
-        }, reject);
-      });
-    }));
+    const request = vi.fn(
+      (_name: string, cb: (lock: Lock) => Promise<void>) =>
+        new Promise<void>((resolve, reject) => {
+          const index = freigaben.length;
+          freigaben.push(() => {
+            void cb({} as Lock).then(() => {
+              if (index === 0) ersterCallbackBeendet = true;
+              resolve();
+            }, reject);
+          });
+        }),
+    );
     Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
     try {
       let posts = 0;
-      server.use(http.post('/api/einsaetze/9/etb', () => {
-        posts += 1;
-        return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
-      }));
-      await queueEinreihen(11, 9, { ...eintrag, client_id: 'benutzer-a' });
-      const { rerender } = renderHook(
-        ({ benutzerId }) => useEtbErfassung(9, benutzerId),
-        { wrapper, initialProps: { benutzerId: 11 } },
+      server.use(
+        http.post('/api/einsaetze/9/etb', () => {
+          posts += 1;
+          return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+        }),
       );
+      await queueEinreihen(11, 9, { ...eintrag, client_id: 'benutzer-a' });
+      const { rerender } = renderHook(({ benutzerId }) => useEtbErfassung(9, benutzerId), {
+        wrapper,
+        initialProps: { benutzerId: 11 },
+      });
       await waitFor(() => expect(request).toHaveBeenCalledOnce());
 
       rerender({ benutzerId: 22 });
@@ -298,30 +307,32 @@ describe('useEtbErfassung', () => {
   it('leert bei Einsatzwechsel sofort die Sicht und bricht das alte Lock generationstreu ab', async () => {
     const freigaben: Array<() => void> = [];
     let ersterCallbackBeendet = false;
-    const request = vi.fn((
-      _name: string,
-      cb: (lock: Lock) => Promise<void>,
-    ) => new Promise<void>((resolve, reject) => {
-      const index = freigaben.length;
-      freigaben.push(() => {
-        void cb({} as Lock).then(() => {
-          if (index === 0) ersterCallbackBeendet = true;
-          resolve();
-        }, reject);
-      });
-    }));
+    const request = vi.fn(
+      (_name: string, cb: (lock: Lock) => Promise<void>) =>
+        new Promise<void>((resolve, reject) => {
+          const index = freigaben.length;
+          freigaben.push(() => {
+            void cb({} as Lock).then(() => {
+              if (index === 0) ersterCallbackBeendet = true;
+              resolve();
+            }, reject);
+          });
+        }),
+    );
     Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
     try {
       let posts = 0;
-      server.use(http.post('/api/einsaetze/9/etb', () => {
-        posts += 1;
-        return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
-      }));
-      await queueEinreihen(11, 9, { ...eintrag, client_id: 'einsatz-neun' });
-      const { result, rerender } = renderHook(
-        ({ einsatzId }) => useEtbErfassung(einsatzId, 11),
-        { wrapper, initialProps: { einsatzId: 9 } },
+      server.use(
+        http.post('/api/einsaetze/9/etb', () => {
+          posts += 1;
+          return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+        }),
       );
+      await queueEinreihen(11, 9, { ...eintrag, client_id: 'einsatz-neun' });
+      const { result, rerender } = renderHook(({ einsatzId }) => useEtbErfassung(einsatzId, 11), {
+        wrapper,
+        initialProps: { einsatzId: 9 },
+      });
       await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
       await waitFor(() => expect(request).toHaveBeenCalledOnce());
 

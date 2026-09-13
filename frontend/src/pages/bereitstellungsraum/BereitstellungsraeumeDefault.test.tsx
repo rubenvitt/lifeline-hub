@@ -12,9 +12,18 @@ import { App as AntApp } from 'antd';
 
 function br(id: number, status: BrStatus): Bereitstellungsraum {
   return {
-    id, einsatz_id: 1, abschnitt_id: null,
-    bezeichnung: `BR ${id}`, standort: null, notiz: null, status,
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+    id,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    bezeichnung: `BR ${id}`,
+    standort: null,
+    notiz: null,
+    status,
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
   };
 }
 
@@ -25,13 +34,17 @@ function DetailStub() {
 }
 
 function renderDefault(client?: QueryClient) {
-  const qc = client ?? new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const qc =
+    client ?? new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <MemoryRouter initialEntries={['/einsaetze/1/bereitstellungsraeume']}>
           <Routes>
-            <Route path="/einsaetze/:id/bereitstellungsraeume" element={<BereitstellungsraeumeDefault />} />
+            <Route
+              path="/einsaetze/:id/bereitstellungsraeume"
+              element={<BereitstellungsraeumeDefault />}
+            />
             <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<DetailStub />} />
           </Routes>
         </MemoryRouter>
@@ -45,26 +58,32 @@ describe('BereitstellungsraeumeDefault', () => {
   beforeEach(() => localStorage.clear());
 
   it('leitet auf den ältesten aktiven BR um, wenn keiner zuletzt ausgewählt ist', async () => {
-    server.use(http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([
-      br(7, 'aktiv'), br(3, 'aktiv'), br(9, 'geplant'),
-    ])));
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json([br(7, 'aktiv'), br(3, 'aktiv'), br(9, 'geplant')]),
+      ),
+    );
     renderDefault();
     expect(await screen.findByText('DETAIL-3')).toBeInTheDocument();
   });
 
   it('bevorzugt den zuletzt ausgewählten BR — auch vor einem aktiven', async () => {
     merkeLetztenBr(1, 9);
-    server.use(http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([
-      br(3, 'aktiv'), br(9, 'geplant'),
-    ])));
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json([br(3, 'aktiv'), br(9, 'geplant')]),
+      ),
+    );
     renderDefault();
     expect(await screen.findByText('DETAIL-9')).toBeInTheDocument();
   });
 
   it('leitet auf den zuletzt angelegten BR um, wenn keiner aktiv ist', async () => {
-    server.use(http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([
-      br(2, 'geplant'), br(7, 'aufgeloest'), br(4, 'geplant'),
-    ])));
+    server.use(
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json([br(2, 'geplant'), br(7, 'aufgeloest'), br(4, 'geplant')]),
+      ),
+    );
     renderDefault();
     expect(await screen.findByText('DETAIL-7')).toBeInTheDocument();
   });
@@ -83,7 +102,12 @@ describe('BereitstellungsraeumeDefault', () => {
    * über die Weiche bleibt und nicht über die Schreibweise des Strings.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
-    server.use(http.get('/api/einsaetze/1/bereitstellungsraeume', () => new HttpResponse(null, { status: 500 })));
+    server.use(
+      http.get(
+        '/api/einsaetze/1/bereitstellungsraeume',
+        () => new HttpResponse(null, { status: 500 }),
+      ),
+    );
     renderDefault();
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Bereitstellungsräume erfasst')).not.toBeInTheDocument();

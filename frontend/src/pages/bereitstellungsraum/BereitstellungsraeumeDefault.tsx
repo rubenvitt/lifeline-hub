@@ -11,7 +11,10 @@ import { liesLetztenBr, waehleDefaultBr } from './brAuswahl';
 export default function BereitstellungsraeumeDefault() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const brQuery = useQuery({ queryKey: einsatzKeys.br(einsatzId), queryFn: () => listeBr(einsatzId) });
+  const brQuery = useQuery({
+    queryKey: einsatzKeys.br(einsatzId),
+    queryFn: () => listeBr(einsatzId),
+  });
   return (
     <Direkteinstieg
       query={brQuery}

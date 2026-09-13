@@ -24,7 +24,11 @@ interface SprechgruppenPickerProps {
  * antd-`<Form>` (Abschnitt/Einheit) gerendert — ein innerer Submit würde das äußere
  * Formular nativ abschicken (Seiten-Reload). Anlegen läuft daher rein über `onClick`.
  */
-export default function SprechgruppenPicker({ einsatzId, value = [], onChange }: SprechgruppenPickerProps) {
+export default function SprechgruppenPicker({
+  einsatzId,
+  value = [],
+  onChange,
+}: SprechgruppenPickerProps) {
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const qc = useQueryClient();
@@ -37,9 +41,12 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
 
-  const labelVon = (s: Sprechgruppe) => (s.einsatz_lokal ? `${s.bezeichnung} (lokal)` : s.bezeichnung);
+  const labelVon = (s: Sprechgruppe) =>
+    s.einsatz_lokal ? `${s.bezeichnung} (lokal)` : s.bezeichnung;
   const optionenFuer = (ba: Betriebsart) =>
-    sprechgruppen.filter((s) => s.betriebsart === ba).map((s) => ({ value: s.id, label: labelVon(s) }));
+    sprechgruppen
+      .filter((s) => s.betriebsart === ba)
+      .map((s) => ({ value: s.id, label: labelVon(s) }));
   const gruppen = [
     { label: 'TMO', title: 'TMO', options: optionenFuer('TMO') },
     { label: 'DMO', title: 'DMO', options: optionenFuer('DMO') },
@@ -118,7 +125,12 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
               { value: 'DMO', label: 'DMO' },
             ]}
           />
-          <Button type="primary" onClick={anlegen} loading={mutation.isPending} disabled={!kannAnlegen}>
+          <Button
+            type="primary"
+            onClick={anlegen}
+            loading={mutation.isPending}
+            disabled={!kannAnlegen}
+          >
             Anlegen
           </Button>
           <Button

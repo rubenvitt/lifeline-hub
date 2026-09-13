@@ -72,7 +72,9 @@ async function vonAussenSenden(page: Page, einsatzId: string, kanal: number, tex
 async function stromFuellen(page: Page, anzahl: number) {
   const eingabe = page.getByPlaceholder('Nachricht…');
   for (let i = 1; i <= anzahl; i += 1) {
-    await eingabe.fill(`Probe ${i} — Deichabschnitt Nord meldet Lage unverändert, Kräfte im Einsatz.`);
+    await eingabe.fill(
+      `Probe ${i} — Deichabschnitt Nord meldet Lage unverändert, Kräfte im Einsatz.`,
+    );
     await page.getByRole('button', { name: 'Senden' }).click();
     await expect(page.getByText(`Probe ${i} —`, { exact: false })).toBeVisible();
   }
@@ -146,7 +148,9 @@ test('Chat: der Kanalwechsel räumt Merker und Zähler', async ({ page }) => {
 
   // Zweiter Kanal per API — der Anlege-Weg der Oberfläche gehört zu KanalListe und
   // ist hier nicht die Aussage.
-  await page.request.post(`/api/einsaetze/${einsatzId}/chat/kanaele`, { data: { name: 'Zweiter' } });
+  await page.request.post(`/api/einsaetze/${einsatzId}/chat/kanaele`, {
+    data: { name: 'Zweiter' },
+  });
   await page.reload();
   const leiste = page.getByTestId('kanal-leiste');
   await expect(leiste.getByText('Zweiter')).toBeVisible();
@@ -179,8 +183,11 @@ test('Chat: der Kanalwechsel räumt Merker und Zähler', async ({ page }) => {
   await expect(page.getByText('Probe 12 —', { exact: false }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /neue Nachricht/ })).toHaveCount(0);
   await expect
-    .poll(() => page.getByTestId('nachrichten-strom')
-      .evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
+    .poll(() =>
+      page
+        .getByTestId('nachrichten-strom')
+        .evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop),
+    )
     .toBeLessThanOrEqual(24);
 });
 

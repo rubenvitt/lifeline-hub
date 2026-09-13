@@ -78,7 +78,8 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     },
-    onError: (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e: unknown) =>
+      message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
 
   /**
@@ -127,10 +128,24 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       uebernahme={['ort']}
     >
       <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
-        <Select options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({ value: t, label: TYP_LABEL[t] }))} />
+        <Select
+          options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
+            value: t,
+            label: TYP_LABEL[t],
+          }))}
+        />
       </Form.Item>
-      <Form.Item label="Ausmaß" name="ausmass" rules={[{ required: true, message: 'Ausmaß ist Pflicht' }]}>
-        <Select options={(Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({ value: a, label: AUSMASS_META[a].label }))} />
+      <Form.Item
+        label="Ausmaß"
+        name="ausmass"
+        rules={[{ required: true, message: 'Ausmaß ist Pflicht' }]}
+      >
+        <Select
+          options={(Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({
+            value: a,
+            label: AUSMASS_META[a].label,
+          }))}
+        />
       </Form.Item>
       <Form.Item label="Ort" name="ort" rules={[{ required: true, message: 'Ort ist Pflicht' }]}>
         <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />
@@ -139,23 +154,27 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
         <Input.TextArea rows={2} />
       </Form.Item>
       <Collapse
-        items={[{
-          key: 'weitere',
-          label: 'Weitere Angaben',
-          children: <>
-            <Form.Item label="Geschädigt">
-              <GeschaedigtPicker
-                einsatzId={einsatzId}
-                orgName={orgName}
-                value={geschaedigt}
-                onChange={setGeschaedigt}
-              />
-            </Form.Item>
-            <Form.Item label="Koordinate" name="koordinaten">
-              <KoordinatenEingabe />
-            </Form.Item>
-          </>,
-        }]}
+        items={[
+          {
+            key: 'weitere',
+            label: 'Weitere Angaben',
+            children: (
+              <>
+                <Form.Item label="Geschädigt">
+                  <GeschaedigtPicker
+                    einsatzId={einsatzId}
+                    orgName={orgName}
+                    value={geschaedigt}
+                    onChange={setGeschaedigt}
+                  />
+                </Form.Item>
+                <Form.Item label="Koordinate" name="koordinaten">
+                  <KoordinatenEingabe />
+                </Form.Item>
+              </>
+            ),
+          },
+        ]}
       />
     </ErfassungsModal>
   );

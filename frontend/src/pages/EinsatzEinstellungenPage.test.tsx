@@ -94,7 +94,9 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
     // mit „Allgemein" markiert, und der Bedienende hielte den Link für kaputt.
     rendern('/einsaetze/1/einstellungen/aufbewahrung');
 
-    expect(await screen.findByRole('tab', { name: 'Aufbewahrung', selected: true })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('tab', { name: 'Aufbewahrung', selected: true }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Sektionsinhalt Aufbewahrung')).toBeInTheDocument();
   });
 

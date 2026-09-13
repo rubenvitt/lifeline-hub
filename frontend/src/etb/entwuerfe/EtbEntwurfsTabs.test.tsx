@@ -11,7 +11,13 @@ import { renderMitProviders } from '../../test/utils';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './entwurfStore';
 import EtbEntwurfsTabs from './EtbEntwurfsTabs';
 
-const einsatz = { id: 7, bezeichnung: 'Test', stichwort: null, leitstellen_nr: null, einsatzort: null } as unknown as EinsatzAnzeige;
+const einsatz = {
+  id: 7,
+  bezeichnung: 'Test',
+  stichwort: null,
+  leitstellen_nr: null,
+  einsatzort: null,
+} as unknown as EinsatzAnzeige;
 
 beforeEach(async () => {
   await entwuerfeLeerenFuerTests();
@@ -46,7 +52,10 @@ function MitSchalter(p: React.ComponentProps<typeof EtbEntwurfsTabs>) {
 
 describe('EtbEntwurfsTabs', () => {
   it('LFH-461: Folgeentwurf ohne Werte behalten bleibt auch nach Remount ohne An', async () => {
-    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' }, werteBehalten: false });
+    const p = props({
+      einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
+      werteBehalten: false,
+    });
     const ersteAnsicht = renderMitProviders(<EtbEntwurfsTabs {...p} />);
     expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
@@ -81,26 +90,46 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
     expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
     await userEvent.click(ersterTab);
-    rerender(<EtbEntwurfsTabs {...p} einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Andere Leitung' }} />);
+    rerender(
+      <EtbEntwurfsTabs
+        {...p}
+        einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Andere Leitung' }}
+      />,
+    );
     expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
   });
 
-  it.each([true, false])('LFH-461: nach Absenden entscheidet Werte behalten (%s)', async (behalten) => {
-    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' }, werteBehalten: behalten });
-    renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Erste Meldung{Enter}');
-    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-    if (behalten) expect(screen.getByText('An: Florian Leitung')).toBeInTheDocument();
-    else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-  });
+  it.each([true, false])(
+    'LFH-461: nach Absenden entscheidet Werte behalten (%s)',
+    async (behalten) => {
+      const p = props({
+        einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
+        werteBehalten: behalten,
+      });
+      renderMitProviders(<EtbEntwurfsTabs {...p} />);
+      expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
+      await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Erste Meldung{Enter}');
+      await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+      if (behalten) expect(screen.getByText('An: Florian Leitung')).toBeInTheDocument();
+      else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+    },
+  );
 
   it('LFH-461: Wertübernahme befüllt keinen bereits vorhandenen Entwurf mit bewusst leerem An', async () => {
-    const basis = { einsatz_id: 7, typ: 'meldung' as const, erstellt_at: '2026-06-22T10:00:00Z', geaendert_at: '2026-06-22T10:00:00Z' };
+    const basis = {
+      einsatz_id: 7,
+      typ: 'meldung' as const,
+      erstellt_at: '2026-06-22T10:00:00Z',
+      geaendert_at: '2026-06-22T10:00:00Z',
+    };
     await entwurfSpeichern({ ...basis, id: 'a', inhalt: 'Erster', an: 'Florian Leitung' });
     await entwurfSpeichern({ ...basis, id: 'b', inhalt: 'Zweiter' });
     localStorage.setItem('etb-entwurf-aktiv-7', 'a');
-    renderMitProviders(<EtbEntwurfsTabs {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Standard' } })} />);
+    renderMitProviders(
+      <EtbEntwurfsTabs
+        {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Standard' } })}
+      />,
+    );
     expect(await screen.findByDisplayValue('Erster')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByDisplayValue('Zweiter')).toBeInTheDocument();
@@ -155,9 +184,15 @@ describe('EtbEntwurfsTabs', () => {
     // da es erwartetes Verhalten ist (Entwurf bleibt, Schließen wird nicht aufgerufen).
     const originalOnUnhandledRejection = process.listeners('unhandledRejection').slice();
     process.removeAllListeners('unhandledRejection');
-    process.once('unhandledRejection', () => { /* erwartet */ });
+    process.once('unhandledRejection', () => {
+      /* erwartet */
+    });
 
-    const p = props({ erfassen: vi.fn<(e: NeuerEintrag) => Promise<void>>().mockRejectedValue(new Error('abgelehnt')) });
+    const p = props({
+      erfassen: vi
+        .fn<(e: NeuerEintrag) => Promise<void>>()
+        .mockRejectedValue(new Error('abgelehnt')),
+    });
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Bleibt{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
@@ -203,8 +238,10 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.type(feld, '{Enter}');
 
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0])
-      .toMatchObject({ an: 'Florian 1', meldeweg: 'funk' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      an: 'Florian 1',
+      meldeweg: 'funk',
+    });
 
     // Der leere Inhalt beweist, dass wir den NEUEN Entwurf sehen: die alte Instanz ist
     // beim Schließen des Tabs unmountet worden und hat ihr Feld nie geleert.
@@ -223,8 +260,11 @@ describe('EtbEntwurfsTabs', () => {
     // …und sie werden beim nächsten Eintrag ohne erneutes Tippen mitgesendet.
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Zweite Meldung{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[1][0])
-      .toMatchObject({ inhalt: 'Zweite Meldung', an: 'Florian 1', meldeweg: 'funk' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[1][0]).toMatchObject({
+      inhalt: 'Zweite Meldung',
+      an: 'Florian 1',
+      meldeweg: 'funk',
+    });
   });
 
   it('lässt den nächsten Entwurf leer, wenn der Schalter aus ist', async () => {
@@ -239,8 +279,10 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.type(feld, '{Enter}');
 
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0])
-      .toMatchObject({ an: 'Florian 1', meldeweg: 'funk' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      an: 'Florian 1',
+      meldeweg: 'funk',
+    });
 
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
     expect(screen.queryByText('An: Florian 1')).toBeNull();
@@ -254,6 +296,8 @@ describe('EtbEntwurfsTabs', () => {
     await screen.findByPlaceholderText(/Inhalt/);
     // Antd rendert auch die Remove-Buttons mit role="tab"; nur Tab-Btn-Elemente zählen.
     await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
-    await waitFor(() => expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2));
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
+    );
   });
 });

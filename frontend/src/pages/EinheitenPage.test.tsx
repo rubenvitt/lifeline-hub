@@ -10,36 +10,86 @@ import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
 
 const tmoSprechgruppe = {
-  id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
-  betriebsart: 'TMO' as const, hinweis: null, aktiv: true, sortier: 0,
+  id: 7,
+  einsatz_id: 1,
+  einsatz_lokal: false,
+  bezeichnung: '412_F_DRK',
+  betriebsart: 'TMO' as const,
+  hinweis: null,
+  aktiv: true,
+  sortier: 0,
 };
 const dmoSprechgruppe = {
-  id: 8, einsatz_id: 1, einsatz_lokal: false, bezeichnung: 'DMO 31',
-  betriebsart: 'DMO' as const, hinweis: null, aktiv: true, sortier: 1,
+  id: 8,
+  einsatz_id: 1,
+  einsatz_lokal: false,
+  bezeichnung: 'DMO 31',
+  betriebsart: 'DMO' as const,
+  hinweis: null,
+  aktiv: true,
+  sortier: 1,
 };
 
 const einsatz = {
-  id: 1, bezeichnung: 'Lage', stichwort: null, status: 'aktiv', begonnen_at: '', abgeschlossen_at: null,
-  abgeschlossen_von: null, einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null, meldende_stelle: null,
-  sachverhalt: null, anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung',
+  id: 1,
+  bezeichnung: 'Lage',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
 };
 const einheiten = [
   {
-    id: 10, einsatz_id: 1, abschnitt_id: null, abschnitt_name: null, ueber_einheit_id: null,
-    typ_id: 1, typ_label: 'Zug', name: '1. Zug', fuehrer_id: null, fuehrer_name: null, bemerkung: null, sortier: 0,
-    soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
-    ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 }, personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
+    id: 10,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    abschnitt_name: null,
+    ueber_einheit_id: null,
+    typ_id: 1,
+    typ_label: 'Zug',
+    name: '1. Zug',
+    fuehrer_id: null,
+    fuehrer_name: null,
+    bemerkung: null,
+    sortier: 0,
+    soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
+    ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+    ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+    personal_mitglieder: [],
+    fahrzeug_mitglieder: [],
+    material_mitglieder: [],
     sprechgruppen: [tmoSprechgruppe],
   },
 ];
 
-function handlers(rolle = 'einsatzleitung', status = 'aktiv', sprechgruppen: unknown[] = [tmoSprechgruppe, dmoSprechgruppe]) {
+function handlers(
+  rolle = 'einsatzleitung',
+  status = 'aktiv',
+  sprechgruppen: unknown[] = [tmoSprechgruppe, dmoSprechgruppe],
+) {
   return [
-    http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, meine_rolle: rolle, status })),
+    http.get('/api/einsaetze/1', () =>
+      HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
+    ),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/einheit-typen', () => HttpResponse.json([{ id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 }])),
+    http.get('/api/einheit-typen', () =>
+      HttpResponse.json([
+        { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
+      ]),
+    ),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
@@ -61,7 +111,11 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
       handler: http.post('/api/einsaetze/1/einheiten', async ({ request }) => {
         const body = await request.json();
         angelegt.push(body);
-        return HttpResponse.json({ ...einheiten[0], id: 99, name: (body as { name: string }).name });
+        return HttpResponse.json({
+          ...einheiten[0],
+          id: 99,
+          name: (body as { name: string }).name,
+        });
       }),
     };
   }
@@ -70,7 +124,9 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     const { angelegt, handler } = bildenHandler();
     server.use(...handlers(), handler);
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
@@ -82,7 +138,9 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     const { angelegt, handler } = bildenHandler();
     server.use(...handlers(), handler);
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
@@ -112,7 +170,9 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     const { angelegt, handler } = bildenHandler();
     server.use(...handlers(), handler);
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
@@ -131,7 +191,9 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     const { angelegt, handler } = bildenHandler();
     server.use(...handlers(), handler);
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
@@ -159,7 +221,9 @@ describe('EinheitenPage', () => {
   it('verlinkt die Kräfteübersicht über der Tabelle', async () => {
     server.use(...handlers());
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
     const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
@@ -169,7 +233,9 @@ describe('EinheitenPage', () => {
   it('zeigt den Einheiten-Baum mit Name und Soll/Ist', async () => {
     server.use(...handlers());
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
     expect(await screen.findByText('1. Zug')).toBeInTheDocument();
@@ -193,14 +259,16 @@ describe('EinheitenPage', () => {
     client.setQueryData(einsatzKeys.einheiten(1), einheiten, { updatedAt: einheitenStand });
 
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten', client },
     );
 
     expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
-    expect(screen.getByLabelText(
-      `Datenstand ${formatiereDatenstand(einheitenStand)}`,
-    )).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(`Datenstand ${formatiereDatenstand(einheitenStand)}`),
+    ).toBeInTheDocument();
   });
 
   it('leitet den Bestands-Deeplink ?einheit=<id> auf die Item-Route weiter', async () => {
@@ -239,7 +307,9 @@ describe('EinheitenPage', () => {
   it('zeigt „Einheit bilden" bei Schreibrecht', async () => {
     server.use(...handlers());
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
     expect(await screen.findByRole('button', { name: 'Einheit bilden' })).toBeInTheDocument();
@@ -248,7 +318,9 @@ describe('EinheitenPage', () => {
   it('versteckt Aktionen für Beobachter', async () => {
     server.use(...handlers('beobachter', 'aktiv'));
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
     await screen.findByText('1. Zug');
@@ -256,7 +328,6 @@ describe('EinheitenPage', () => {
       expect(screen.queryByRole('button', { name: 'Einheit bilden' })).not.toBeInTheDocument(),
     );
   });
-
 });
 
 /**
@@ -277,7 +348,9 @@ describe('EinheitenPage · Datenzustände', () => {
     // gewinnt — andersherum schluckte der grüne Boden jede Abweichung.
     server.use(...abweichungen, ...handlers());
     return renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
   }
@@ -295,7 +368,9 @@ describe('EinheitenPage · Datenzustände', () => {
   });
 
   it('leere Gliederung: Leertext mit genau EINER Primäraktion und KEINEM Fehler', async () => {
-    const { container } = zeige(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])));
+    const { container } = zeige(
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    );
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
     /**
@@ -305,8 +380,9 @@ describe('EinheitenPage · Datenzustände', () => {
      * eigene Knöpfe beisteuert; ein Primitiv mit eingebautem Knopf machte die Zahl
      * mehrdeutig.
      */
-    const karte = [...container.querySelectorAll<HTMLElement>('.ant-card')]
-      .find((k) => k.textContent?.includes('Noch keine Einheiten'));
+    const karte = [...container.querySelectorAll<HTMLElement>('.ant-card')].find((k) =>
+      k.textContent?.includes('Noch keine Einheiten'),
+    );
     expect(karte, 'die Gliederungs-Karte muss den Leertext tragen').toBeTruthy();
     expect(within(karte!).getByRole('button', { name: 'Einheit bilden' })).toBeInTheDocument();
     expect(within(karte!).getAllByRole('button')).toHaveLength(1);
@@ -325,7 +401,9 @@ describe('EinheitenPage · Datenzustände', () => {
     const { client } = zeige();
     await screen.findByText('1. Zug');
 
-    server.use(http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })));
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
+    );
     await client.refetchQueries({ queryKey: einsatzKeys.einheiten(1) });
 
     expect(
@@ -345,16 +423,17 @@ describe('EinheitenPage · Datenzustände', () => {
    * weil der Seitenrahmen während `einsatzQuery` gar nichts von der Gliederung rendert.
    */
   it('WÄHREND des Ladens behauptet nichts, dass keine Einheiten da sind', async () => {
-    zeige(http.get('/api/einsaetze/1/einheiten', async () => {
-      await delay(300);
-      return HttpResponse.json([]);
-    }));
+    zeige(
+      http.get('/api/einsaetze/1/einheiten', async () => {
+        await delay(300);
+        return HttpResponse.json([]);
+      }),
+    );
     await screen.findByRole('heading', { name: 'Einheiten' });
     expect(screen.queryByText('Noch keine Einheiten')).not.toBeInTheDocument();
     // Partnerhälfte, gleiches Literal: nach dem Abruf steht die Aussage da.
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
   });
-
 });
 
 // Der Helfer `oeffneEinheitenAuswahl` ist mit den Zuordnungs-Tests auf

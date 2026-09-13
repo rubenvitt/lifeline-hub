@@ -6,7 +6,11 @@ import { useEffect } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
-import { parseRouteId, personenAufnahmePfad, unfallhilfsstellenListePfad } from '../../routing/deeplinks';
+import {
+  parseRouteId,
+  personenAufnahmePfad,
+  unfallhilfsstellenListePfad,
+} from '../../routing/deeplinks';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -34,7 +38,10 @@ export default function UhsDetailPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const detailQuery = useQuery({
     queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId),
     queryFn: () => ladeUhs(einsatzId, uhsId),
@@ -52,16 +59,23 @@ export default function UhsDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = (e: unknown) =>
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const statusMut = useMutation({
     mutationFn: (status: UhsStatus) => setzeUhsStatus(einsatzId, uhsId, status),
-    onSuccess: () => { message.success('Status gewechselt'); invalidate(); },
+    onSuccess: () => {
+      message.success('Status gewechselt');
+      invalidate();
+    },
     onError: fehler,
   });
   const stornoMut = useMutation({
     mutationFn: () => storniereUhs(einsatzId, uhsId),
-    onSuccess: () => { message.success('UHS storniert'); invalidate(); },
+    onSuccess: () => {
+      message.success('UHS storniert');
+      invalidate();
+    },
     onError: fehler,
   });
 
@@ -70,7 +84,11 @@ export default function UhsDetailPage() {
     return <Navigate to={listenPfad} replace />;
   }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
   }
   if (einsatzQuery.error || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -111,12 +129,14 @@ export default function UhsDetailPage() {
          zweite Bauform für dieselbe Sache. */
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       breadcrumb={
-        <Breadcrumb items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
-          { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
-          { title: uhs.bezeichnung },
-        ]} />
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
+            { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
+            { title: uhs.bezeichnung },
+          ]}
+        />
       }
       aktionen={
         <Space wrap size="middle">
@@ -138,10 +158,18 @@ export default function UhsDetailPage() {
           )}
           {!schreibgeschuetzt && uhs.status === 'geplant' && (
             <>
-              <Button type="primary" onClick={() => statusMut.mutate('aktiv')} loading={statusMut.isPending}>
+              <Button
+                type="primary"
+                onClick={() => statusMut.mutate('aktiv')}
+                loading={statusMut.isPending}
+              >
                 In Betrieb nehmen
               </Button>
-              <Popconfirm title="UHS stornieren?" onConfirm={() => stornoMut.mutate()} okButtonProps={{ danger: true }}>
+              <Popconfirm
+                title="UHS stornieren?"
+                onConfirm={() => stornoMut.mutate()}
+                okButtonProps={{ danger: true }}
+              >
                 <Button danger>Stornieren</Button>
               </Popconfirm>
             </>
@@ -174,7 +202,9 @@ export default function UhsDetailPage() {
           {
             key: 'material',
             label: 'Material',
-            children: <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
+            children: (
+              <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+            ),
           },
           {
             key: 'bewegungen',

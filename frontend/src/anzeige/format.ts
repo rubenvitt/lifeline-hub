@@ -57,7 +57,20 @@ export function inZone(utcStr: string, konv: AnzeigeKonventionen) {
  * dayjs' `MMM`-Token liefert das nicht (de-Locale → "Jan."/"Juli", en → gemischt,
  * nie großgeschrieben-punktlos), daher ein eigenes Array, indexiert über `.month()` (0–11).
  */
-const MONATE_DE = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
+const MONATE_DE = [
+  'JAN',
+  'FEB',
+  'MÄR',
+  'APR',
+  'MAI',
+  'JUN',
+  'JUL',
+  'AUG',
+  'SEP',
+  'OKT',
+  'NOV',
+  'DEZ',
+];
 
 /**
  * Taktische Uhrzeit als vierstellige Gruppe „1430" (LFH-141). BOS-Konvention ist inhärent

@@ -75,7 +75,9 @@ describe('SeitenFehler', () => {
       />,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Schaden 7 gehört zu einem anderen Einsatz');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Schaden 7 gehört zu einem anderen Einsatz',
+    );
   });
 
   it('zeigt ohne `ursache` nur den Text', () => {
@@ -97,10 +99,15 @@ describe('SeitenLeer', () => {
 
   it('zeigt den Hinweis unter dem Titel, wenn einer gesetzt ist', () => {
     renderMitProviders(
-      <SeitenLeer titel="Noch keine Einträge" hinweis="Erfassen Sie den ersten oben in der Eingabezeile." />,
+      <SeitenLeer
+        titel="Noch keine Einträge"
+        hinweis="Erfassen Sie den ersten oben in der Eingabezeile."
+      />,
     );
 
-    expect(screen.getByText('Erfassen Sie den ersten oben in der Eingabezeile.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Erfassen Sie den ersten oben in der Eingabezeile.'),
+    ).toBeInTheDocument();
   });
 
   it('bleibt ohne Aktion knopflos', () => {
@@ -115,7 +122,10 @@ describe('SeitenLeer', () => {
     // eindeutig dem Slot zuzuordnen — deshalb ist das hier eine Aussage über den
     // Bauplan, nicht bloß über diesen Aufruf.
     renderMitProviders(
-      <SeitenLeer titel="Noch keine Personen" aktion={{ label: 'Person aufnehmen', onClick: vi.fn() }} />,
+      <SeitenLeer
+        titel="Noch keine Personen"
+        aktion={{ label: 'Person aufnehmen', onClick: vi.fn() }}
+      />,
     );
 
     expect(screen.getAllByRole('button')).toHaveLength(1);
@@ -124,7 +134,10 @@ describe('SeitenLeer', () => {
   it('feuert `onClick` der Aktion', async () => {
     const anlegen = vi.fn();
     renderMitProviders(
-      <SeitenLeer titel="Noch keine Unfallhilfsstellen erfasst" aktion={{ label: 'Erste UHS anlegen', onClick: anlegen }} />,
+      <SeitenLeer
+        titel="Noch keine Unfallhilfsstellen erfasst"
+        aktion={{ label: 'Erste UHS anlegen', onClick: anlegen }}
+      />,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Erste UHS anlegen' }));
@@ -137,7 +150,12 @@ describe('SeitenLeer', () => {
       <Routes>
         <Route
           path="/"
-          element={<SeitenLeer titel="Noch keine Personen" aktion={{ label: 'Person aufnehmen', pfad: '/ziel' }} />}
+          element={
+            <SeitenLeer
+              titel="Noch keine Personen"
+              aktion={{ label: 'Person aufnehmen', pfad: '/ziel' }}
+            />
+          }
         />
         <Route path="/ziel" element={<p>Aufnahmemaske</p>} />
       </Routes>,
@@ -169,7 +187,9 @@ describe('SeitenSackgasse', () => {
 
     expect(screen.getByText('Einsatz konnte nicht geladen werden')).toBeInTheDocument();
     expect(
-      screen.getByText('Er existiert nicht, ist nicht freigegeben oder die Verbindung ist gestört.'),
+      screen.getByText(
+        'Er existiert nicht, ist nicht freigegeben oder die Verbindung ist gestört.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -200,7 +220,10 @@ describe('SeitenSackgasse', () => {
 
   it('zeigt die Meldung einer `ApiError` als Untertitel, wo kein Hinweis gesetzt ist', () => {
     renderMitProviders(
-      <SeitenSackgasse titel="Einsatz konnte nicht geladen werden" ursache={new ApiError(403, 'Kein Zugriff auf diesen Einsatz')} />,
+      <SeitenSackgasse
+        titel="Einsatz konnte nicht geladen werden"
+        ursache={new ApiError(403, 'Kein Zugriff auf diesen Einsatz')}
+      />,
     );
 
     expect(screen.getByText('Kein Zugriff auf diesen Einsatz')).toBeInTheDocument();
@@ -240,17 +263,23 @@ describe('nichtGefundenInhalt', () => {
   it('nennt den 403-Fall beim Namen, wo ein Aufrufer einen kennt', () => {
     const query = { isError: true, error: new ApiError(403, 'verboten') };
 
-    expect(nichtGefundenInhalt(query, { kein403: 'Benutzerliste nur für Admins', allgemein: 'Benutzerliste nicht verfügbar' })).toBe(
-      'Benutzerliste nur für Admins',
-    );
+    expect(
+      nichtGefundenInhalt(query, {
+        kein403: 'Benutzerliste nur für Admins',
+        allgemein: 'Benutzerliste nicht verfügbar',
+      }),
+    ).toBe('Benutzerliste nur für Admins');
   });
 
   it('fällt bei jedem anderen Fehler auf die allgemeine Meldung zurück', () => {
     const query = { isError: true, error: new ApiError(500, 'kaputt') };
 
-    expect(nichtGefundenInhalt(query, { kein403: 'Benutzerliste nur für Admins', allgemein: 'Benutzerliste nicht verfügbar' })).toBe(
-      'Benutzerliste nicht verfügbar',
-    );
+    expect(
+      nichtGefundenInhalt(query, {
+        kein403: 'Benutzerliste nur für Admins',
+        allgemein: 'Benutzerliste nicht verfügbar',
+      }),
+    ).toBe('Benutzerliste nicht verfügbar');
   });
 
   it('meldet auch einen 403 allgemein, wo der Aufrufer keinen 403-Text gibt', () => {
@@ -265,7 +294,9 @@ describe('nichtGefundenInhalt', () => {
   });
 
   it('gibt ohne Fehler `undefined` zurück — antds eigener Leertext bleibt stehen', () => {
-    expect(nichtGefundenInhalt({ isError: false, error: null }, { allgemein: 'egal' })).toBeUndefined();
+    expect(
+      nichtGefundenInhalt({ isError: false, error: null }, { allgemein: 'egal' }),
+    ).toBeUndefined();
   });
 });
 

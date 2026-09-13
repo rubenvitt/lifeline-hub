@@ -120,8 +120,7 @@ export default function Anmeldeverfahren() {
             const feldId = `anmeldeverfahren-${p.id}`;
             // Nur die abgelehnte Zeile wird markiert (H14). `variables` trägt die Zeile,
             // an der die Mutation zuletzt gescheitert ist.
-            const hatFehler =
-              schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
+            const hatFehler = schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
             return (
               <div
                 key={p.id}

@@ -9,30 +9,61 @@ import type { BauJob, OfflineKarte, OfflineKatalogEintrag } from '../api/offline
 import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-06-26 10:00:00',
 };
 const fuehrungskraft = {
-  ...admin, id: 2, anzeigename: 'Eva', system_rolle: 'keiner', org_rolle: 'fuehrungskraft',
+  ...admin,
+  id: 2,
+  anzeigename: 'Eva',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
 };
 
 const karte: OfflineKarte = {
-  id: 1, name: 'Deutschland – Bremen', pfad: 'karte-1.mbtiles',
-  quell_url: 'https://example.test/de_bremen.mbtiles', lizenz: '© OpenStreetMap contributors (ODbL)',
-  kachel_schema: 'shortbread', format: 'pbf', groesse: 44040192, sha256: 'abc', download_at: '2026-06-26 11:00:00',
+  id: 1,
+  name: 'Deutschland – Bremen',
+  pfad: 'karte-1.mbtiles',
+  quell_url: 'https://example.test/de_bremen.mbtiles',
+  lizenz: '© OpenStreetMap contributors (ODbL)',
+  kachel_schema: 'shortbread',
+  format: 'pbf',
+  groesse: 44040192,
+  sha256: 'abc',
+  download_at: '2026-06-26 11:00:00',
   // LFH-265: `update_verfuegbar` ist Pflichtfeld — das Backend berechnet es für jede Zeile.
-  status: 'bereit', aktiv_basemap: false, sortier: 0, update_verfuegbar: false,
+  status: 'bereit',
+  aktiv_basemap: false,
+  sortier: 0,
+  update_verfuegbar: false,
 };
 
 const karteLaedt: OfflineKarte = {
-  ...karte, id: 2, name: 'Deutschland – Bayern', status: 'laedt',
-  groesse: null, sha256: null, download_at: null, aktiv_basemap: false, pfad: '',
+  ...karte,
+  id: 2,
+  name: 'Deutschland – Bayern',
+  status: 'laedt',
+  groesse: null,
+  sha256: null,
+  download_at: null,
+  aktiv_basemap: false,
+  pfad: '',
 };
 
 const katalogEintrag = {
-  name: 'Deutschland – Bremen', url: 'https://example.test/de_bremen.mbtiles', region: 'DE/Bremen',
-  groesse: 44040192, lizenz: '© OpenStreetMap contributors (ODbL)', kachel_schema: 'shortbread',
-  quelle: 'Project N.O.M.A.D.', sha256: 'cafef00d',
+  name: 'Deutschland – Bremen',
+  url: 'https://example.test/de_bremen.mbtiles',
+  region: 'DE/Bremen',
+  groesse: 44040192,
+  lizenz: '© OpenStreetMap contributors (ODbL)',
+  kachel_schema: 'shortbread',
+  quelle: 'Project N.O.M.A.D.',
+  sha256: 'cafef00d',
 };
 
 function mockBasis(
@@ -87,12 +118,22 @@ describe('OfflineKartenVerwaltung', () => {
 
   /** Kleiner als die Vorgabe (42,0 MB) und alphabetisch davor — beide Achsen sind messbar. */
   const kleineKarte: OfflineKarte = {
-    ...karte, id: 3, name: 'Deutschland – Bayern', groesse: 9_500_000, pfad: 'karte-3.mbtiles',
+    ...karte,
+    id: 3,
+    name: 'Deutschland – Bayern',
+    groesse: 9_500_000,
+    pfad: 'karte-3.mbtiles',
   };
   /** Registriert, aber noch nicht geladen: `groesse: null` heißt UNBEKANNT, nicht null Bytes. */
   const ohneGroesse: OfflineKarte = {
-    ...karte, id: 4, name: 'Deutschland – Saarland', groesse: null, status: 'registriert',
-    pfad: '', sha256: null, download_at: null,
+    ...karte,
+    id: 4,
+    name: 'Deutschland – Saarland',
+    groesse: null,
+    status: 'registriert',
+    pfad: '',
+    sha256: null,
+    download_at: null,
   };
 
   it('sortiert nach Größe und engt per Suche ein', async () => {
@@ -108,7 +149,9 @@ describe('OfflineKartenVerwaltung', () => {
     // Vorgabe steht bewusst weder nach Größe noch alphabetisch, sonst wäre die Zusicherung
     // stumpf und ein versehentliches `defaultSortOrder` bliebe unbemerkt.
     expect(namen()).toEqual([
-      'Deutschland – Bremen', 'Deutschland – Bayern', 'Deutschland – Saarland',
+      'Deutschland – Bremen',
+      'Deutschland – Bayern',
+      'Deutschland – Saarland',
     ]);
 
     // Aufsteigend nach Bytes: 9,5 MB vor 42,0 MB. Über die formatierte Zeichenkette
@@ -122,7 +165,9 @@ describe('OfflineKartenVerwaltung', () => {
     await userEvent.click(screen.getByRole('columnheader', { name: /Größe/ }));
     await waitFor(() =>
       expect(namen()).toEqual([
-        'Deutschland – Saarland', 'Deutschland – Bayern', 'Deutschland – Bremen',
+        'Deutschland – Saarland',
+        'Deutschland – Bayern',
+        'Deutschland – Bremen',
       ]),
     );
 
@@ -215,7 +260,9 @@ describe('OfflineKartenVerwaltung', () => {
     );
     render();
     await userEvent.click(await screen.findByRole('button', { name: /Erweitert/ }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Gebaute Region übernehmen' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Gebaute Region übernehmen' }),
+    );
     // Default-Name aus dem Dateinamen abgeleitet (osm.-Präfix + Datum entfernt).
     expect(await screen.findByDisplayValue('bremen')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
@@ -229,7 +276,9 @@ describe('OfflineKartenVerwaltung', () => {
     mockBasis(fuehrungskraft);
     render();
     await screen.findByText('Deutschland – Bremen');
-    expect(screen.queryByRole('button', { name: 'Region aufs Gerät bringen' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Region aufs Gerät bringen' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aktivieren' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
   });
@@ -253,12 +302,14 @@ describe('OfflineKartenVerwaltung', () => {
   });
 
   it('Update verfügbar: zeigt Hinweis + Datenstand + Aktualisieren-Button', async () => {
-    mockBasis(admin, [{
-      ...karte,
-      quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
-      update_verfuegbar: true,
-      katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
-    }]);
+    mockBasis(admin, [
+      {
+        ...karte,
+        quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
+        update_verfuegbar: true,
+        katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
+      },
+    ]);
     render();
     await screen.findByText('Deutschland – Bremen');
     expect(screen.getByText('Update verfügbar')).toBeInTheDocument();
@@ -268,13 +319,15 @@ describe('OfflineKartenVerwaltung', () => {
 
   it('Aktualisieren lädt die neuere Katalog-URL (One-Click: Pin + ersetzt_karte_id)', async () => {
     let postBody: unknown = null;
-    mockBasis(admin, [{
-      ...karte,
-      quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
-      update_verfuegbar: true,
-      katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
-      katalog_sha256: 'cafef00d',
-    }]);
+    mockBasis(admin, [
+      {
+        ...karte,
+        quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
+        update_verfuegbar: true,
+        katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
+        katalog_sha256: 'cafef00d',
+      },
+    ]);
     server.use(
       http.post('/api/karte/offline-karten/download', async ({ request }) => {
         postBody = await request.json();
@@ -295,14 +348,16 @@ describe('OfflineKartenVerwaltung', () => {
 
   it('aktive Karte mit Update: In-Place „Neu laden" statt „Aktualisieren" (POST /{id}/neu-laden)', async () => {
     let postBody: unknown = null;
-    mockBasis(admin, [{
-      ...karte,
-      aktiv_basemap: true,
-      quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
-      update_verfuegbar: true,
-      katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
-      katalog_sha256: 'cafef00d',
-    }]);
+    mockBasis(admin, [
+      {
+        ...karte,
+        aktiv_basemap: true,
+        quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
+        update_verfuegbar: true,
+        katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
+        katalog_sha256: 'cafef00d',
+      },
+    ]);
     server.use(
       http.post('/api/karte/offline-karten/1/neu-laden', async ({ request }) => {
         postBody = await request.json();
@@ -322,12 +377,19 @@ describe('OfflineKartenVerwaltung', () => {
   });
 
   it('In-Place-Reload: aktive „bereit"-Zeile zeigt Balken + „aktualisiert", nur Abbrechen (laeuft-Guard)', async () => {
-    mockBasis(admin, [{
-      ...karte, aktiv_basemap: true, status: 'bereit', geladen: 22020096, gesamt: 44040192,
-      // update_verfuegbar+katalog_url gesetzt, damit die Abwesenheit von „Neu laden" den laeuft-Guard
-      // der Aktionen-Spalte prüft (nicht bloß fehlende Update-Felder → sonst wäre die Assertion vakuum).
-      update_verfuegbar: true, katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
-    }]);
+    mockBasis(admin, [
+      {
+        ...karte,
+        aktiv_basemap: true,
+        status: 'bereit',
+        geladen: 22020096,
+        gesamt: 44040192,
+        // update_verfuegbar+katalog_url gesetzt, damit die Abwesenheit von „Neu laden" den laeuft-Guard
+        // der Aktionen-Spalte prüft (nicht bloß fehlende Update-Felder → sonst wäre die Assertion vakuum).
+        update_verfuegbar: true,
+        katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
+      },
+    ]);
     render();
     await screen.findByText('Deutschland – Bremen');
     // Zeile bleibt „bereit"+aktiv, zeigt aber Reload-Fortschritt (50 %) + Label „aktualisiert".
@@ -398,7 +460,9 @@ describe('OfflineKartenVerwaltung', () => {
       ),
     );
     render();
-    expect(await screen.findByText('Offline-Karten konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Offline-Karten konnten nicht geladen werden'),
+    ).toBeInTheDocument();
     // Die Detailzeile stammt aus dem `{error}`-Body des Backends und ist genau die, die die
     // abgelöste Handrolle zeigte. Ohne sie belegte der Test nur die Überschrift.
     expect(screen.getByText('Kartenregistry nicht erreichbar')).toBeInTheDocument();
@@ -433,7 +497,9 @@ describe('OfflineKartenVerwaltung', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Erneut abrufen' }));
 
     expect(await screen.findByText('Deutschland – Bremen')).toBeInTheDocument();
-    expect(screen.queryByText('Offline-Karten konnten nicht geladen werden')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Offline-Karten konnten nicht geladen werden'),
+    ).not.toBeInTheDocument();
   });
 
   it('Bau-Status-Zeile: zeigt aktive Bau-Jobs (verschachtelter status.status) über der Tabelle', async () => {

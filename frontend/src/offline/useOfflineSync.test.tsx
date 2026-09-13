@@ -8,10 +8,7 @@ import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person } from '../api/types';
-import {
-  SITZUNG_ABGELAUFEN,
-  sitzungsMeldungZuruecksetzen,
-} from '../auth/sitzungsEvent';
+import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 import {
   OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
   type OfflineSchreibaktionGesendet,
@@ -65,31 +62,39 @@ beforeEach(async () => {
 describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
   it('sendet ETB, Person und Meldung ohne geöffnete Fachseite', async () => {
     await queueEinreihen(BENUTZER_A, 7, {
-      typ: 'meldung', inhalt: 'ETB', client_id: 'etb-1',
+      typ: 'meldung',
+      inhalt: 'ETB',
+      client_id: 'etb-1',
     });
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { status: 'vermisst', client_id: 'person-1' },
+      art: 'person',
+      daten: { status: 'vermisst', client_id: 'person-1' },
     });
     await schreibaktionEinreihen(BENUTZER_A, 7, {
       art: 'meldung',
       daten: {
-        absender: 'ELW', meldeweg: 'funk', inhalt: 'Lage',
-        ereigniszeit: '2026-08-06 12:00:00', client_id: 'meldung-1',
+        absender: 'ELW',
+        meldeweg: 'funk',
+        inhalt: 'Lage',
+        ereigniszeit: '2026-08-06 12:00:00',
+        client_id: 'meldung-1',
       },
     });
 
     renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
-    await waitFor(async () => expect(await queueZaehlerLaden(BENUTZER_A, 7)).toEqual({
-      ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0,
-    }));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toEqual({
+        ausstehend: 0,
+        abgelehnt: 0,
+        nicht_zugeordnet: 0,
+      }),
+    );
     expect(erfasseEtb).toHaveBeenCalledOnce();
     expect(legePersonAn).toHaveBeenCalledOnce();
     expect(legeMeldungAn).toHaveBeenCalledOnce();
-    expect(erfasseEtb).toHaveBeenCalledWith(
-      7,
-      expect.objectContaining({ client_id: 'etb-1' }),
-      { offlineQueueBenutzerId: BENUTZER_A },
-    );
+    expect(erfasseEtb).toHaveBeenCalledWith(7, expect.objectContaining({ client_id: 'etb-1' }), {
+      offlineQueueBenutzerId: BENUTZER_A,
+    });
     expect(legePersonAn).toHaveBeenCalledWith(
       7,
       expect.objectContaining({ client_id: 'person-1' }),
@@ -105,95 +110,115 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
   it('macht fachliche Ablehnung sichtbar statt endlos zu wiederholen', async () => {
     vi.mocked(legePersonAn).mockRejectedValue(new ApiError(422, 'Status unzulässig'));
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { client_id: 'person-2' },
+      art: 'person',
+      daten: { client_id: 'person-2' },
     });
     renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
-    await waitFor(async () => expect(await queueZaehlerLaden(BENUTZER_A, 7)).toEqual({
-      ausstehend: 0, abgelehnt: 1, nicht_zugeordnet: 0,
-    }));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toEqual({
+        ausstehend: 0,
+        abgelehnt: 1,
+        nicht_zugeordnet: 0,
+      }),
+    );
     expect(legePersonAn).toHaveBeenCalledOnce();
   });
 
   it('sendet nach einem Benutzerwechsel ausschließlich die neue Identität', async () => {
     online(false);
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { name: 'A', client_id: 'person-a' },
+      art: 'person',
+      daten: { name: 'A', client_id: 'person-a' },
     });
     await schreibaktionEinreihen(BENUTZER_B, 7, {
-      art: 'person', daten: { name: 'B', client_id: 'person-b' },
+      art: 'person',
+      daten: { name: 'B', client_id: 'person-b' },
     });
     const { Wrapper } = wrapperFuer();
-    const { rerender } = renderHook(
-      ({ benutzerId }) => useOfflineSync(benutzerId),
-      { wrapper: Wrapper, initialProps: { benutzerId: BENUTZER_A } },
-    );
+    const { rerender } = renderHook(({ benutzerId }) => useOfflineSync(benutzerId), {
+      wrapper: Wrapper,
+      initialProps: { benutzerId: BENUTZER_A },
+    });
 
     rerender({ benutzerId: BENUTZER_B });
     online(true);
     window.dispatchEvent(new Event('online'));
 
-    await waitFor(async () => expect(await queueZaehlerLaden(BENUTZER_B, 7)).toMatchObject({
-      ausstehend: 0,
-    }));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_B, 7)).toMatchObject({
+        ausstehend: 0,
+      }),
+    );
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1 });
     expect(legePersonAn).toHaveBeenCalledTimes(1);
-    expect(legePersonAn).toHaveBeenCalledWith(
-      7,
-      expect.objectContaining({ name: 'B' }),
-      { offlineQueueBenutzerId: BENUTZER_B },
-    );
+    expect(legePersonAn).toHaveBeenCalledWith(7, expect.objectContaining({ name: 'B' }), {
+      offlineQueueBenutzerId: BENUTZER_B,
+    });
   });
 
   it('holt einen während des Flushs eingereihten Datensatz im Dirty-Nachlauf ab', async () => {
     let erstenAufloesen!: (person: Person) => void;
     vi.mocked(legePersonAn)
-      .mockImplementationOnce(() => new Promise((resolve) => { erstenAufloesen = resolve; }))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            erstenAufloesen = resolve;
+          }),
+      )
       .mockResolvedValueOnce({ id: 2 } as Person);
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { name: 'Erste', client_id: 'person-1' },
+      art: 'person',
+      daten: { name: 'Erste', client_id: 'person-1' },
     });
     renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
     await waitFor(() => expect(legePersonAn).toHaveBeenCalledOnce());
 
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { name: 'Zweite', client_id: 'person-2' },
+      art: 'person',
+      daten: { name: 'Zweite', client_id: 'person-2' },
     });
     erstenAufloesen({ id: 1 } as Person);
 
     await waitFor(() => expect(legePersonAn).toHaveBeenCalledTimes(2));
-    await waitFor(async () => expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
-      ausstehend: 0,
-    }));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+        ausstehend: 0,
+      }),
+    );
   });
 
   it('wartet auf Web Locks und liest die Queue erst nach Lock-Erhalt neu', async () => {
     let lockFreigeben!: () => void;
-    const request = vi.fn((
-      _name: string,
-      callback: (lock: Lock) => Promise<boolean>,
-    ) => new Promise<boolean>((resolve, reject) => {
-      lockFreigeben = () => void callback({} as Lock).then(resolve, reject);
-    }));
+    const request = vi.fn(
+      (_name: string, callback: (lock: Lock) => Promise<boolean>) =>
+        new Promise<boolean>((resolve, reject) => {
+          lockFreigeben = () => void callback({} as Lock).then(resolve, reject);
+        }),
+    );
     Object.defineProperty(navigator, 'locks', {
       configurable: true,
       value: { request } as unknown as LockManager,
     });
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { name: 'Vor Lock', client_id: 'person-lock-1' },
+      art: 'person',
+      daten: { name: 'Vor Lock', client_id: 'person-lock-1' },
     });
     renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
     await waitFor(() => expect(request).toHaveBeenCalledOnce());
     expect(request.mock.calls[0]).toHaveLength(2);
 
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { name: 'Im Lock-Warten', client_id: 'person-lock-2' },
+      art: 'person',
+      daten: { name: 'Im Lock-Warten', client_id: 'person-lock-2' },
     });
     lockFreigeben();
 
     await waitFor(() => expect(legePersonAn).toHaveBeenCalledTimes(2));
-    await waitFor(async () => expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
-      ausstehend: 0,
-    }));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+        ausstehend: 0,
+      }),
+    );
     expect(request).toHaveBeenCalledOnce();
   });
 
@@ -203,20 +228,24 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
       return { id: 8 } as Person;
     });
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { client_id: 'transient' },
+      art: 'person',
+      daten: { client_id: 'transient' },
     });
     await schreibaktionEinreihen(BENUTZER_A, 8, {
-      art: 'person', daten: { client_id: 'erfolgreich' },
+      art: 'person',
+      daten: { client_id: 'erfolgreich' },
     });
     const { unmount } = renderHook(() => useOfflineSync(BENUTZER_A), {
       wrapper: wrapperFuer().Wrapper,
     });
 
-    await waitFor(() => expect(legePersonAn).toHaveBeenCalledWith(
-      8,
-      expect.objectContaining({ client_id: 'erfolgreich' }),
-      { offlineQueueBenutzerId: BENUTZER_A },
-    ));
+    await waitFor(() =>
+      expect(legePersonAn).toHaveBeenCalledWith(
+        8,
+        expect.objectContaining({ client_id: 'erfolgreich' }),
+        { offlineQueueBenutzerId: BENUTZER_A },
+      ),
+    );
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1 });
     expect(await queueZaehlerLaden(BENUTZER_A, 8)).toMatchObject({ ausstehend: 0 });
     unmount();
@@ -227,7 +256,8 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
       new ApiError(412, 'Offline-Queue gehört zu einem anderen Benutzer'),
     );
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { name: 'Alter Tab', client_id: 'stale-tab-1' },
+      art: 'person',
+      daten: { name: 'Alter Tab', client_id: 'stale-tab-1' },
     });
 
     sitzungsMeldungZuruecksetzen();
@@ -265,16 +295,19 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
     };
     window.addEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, listener);
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { client_id: 'korrelation-1' },
+      art: 'person',
+      daten: { client_id: 'korrelation-1' },
     });
 
     renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
     await waitFor(() => expect(ereignisse).toHaveLength(1));
-    expect(client.getQueryData<Person[]>(einsatzKeys.personen(7)))
-      .toEqual([vorhanden, gesendet]);
+    expect(client.getQueryData<Person[]>(einsatzKeys.personen(7))).toEqual([vorhanden, gesendet]);
     expect(client.getQueryState(einsatzKeys.personen(7))?.isInvalidated).toBe(true);
     expect(ereignisse[0]).toMatchObject({
-      art: 'person', benutzerId: BENUTZER_A, einsatzId: 7, clientId: 'korrelation-1',
+      art: 'person',
+      benutzerId: BENUTZER_A,
+      einsatzId: 7,
+      clientId: 'korrelation-1',
       daten: gesendet,
     });
     window.removeEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, listener);
@@ -286,13 +319,18 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
     client.setQueryData(einsatzKeys.uhsDetail(7, 9), {});
     vi.mocked(legePersonAn).mockResolvedValue({ id: 42, aktuelle_uhs_id: 9 } as Person);
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { client_id: 'uhs-replay', uhs_id: 9 },
+      art: 'person',
+      daten: { client_id: 'uhs-replay', uhs_id: 9 },
     });
     renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
-    await waitFor(() => expect(client.getQueryState(einsatzKeys.uhsDetail(7, 9))?.isInvalidated).toBe(true));
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.uhsDetail(7, 9))?.isInvalidated).toBe(true),
+    );
     expect(client.getQueryState(einsatzKeys.uhs(7))?.isInvalidated).toBe(true);
     expect(legePersonAn).toHaveBeenCalledExactlyOnceWith(
-      7, { client_id: 'uhs-replay', uhs_id: 9 }, { offlineQueueBenutzerId: BENUTZER_A },
+      7,
+      { client_id: 'uhs-replay', uhs_id: 9 },
+      { offlineQueueBenutzerId: BENUTZER_A },
     );
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0 });
   });
@@ -301,7 +339,8 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
     const { client, Wrapper } = wrapperFuer();
     vi.mocked(legePersonAn).mockResolvedValue({ id: 42 } as Person);
     await schreibaktionEinreihen(BENUTZER_A, 7, {
-      art: 'person', daten: { client_id: 'ohne-cache' },
+      art: 'person',
+      daten: { client_id: 'ohne-cache' },
     });
     renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
 

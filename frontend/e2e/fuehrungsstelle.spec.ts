@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 import { einsatzdatenPfad, etbPfad } from '../src/routing/deeplinks';
 
 for (const breite of [1280, 390]) {
-  test(`LFH-461: Führungsstelle pflegen und ETB-Entwurf respektieren (${breite}px)`, async ({ page }, testInfo) => {
+  test(`LFH-461: Führungsstelle pflegen und ETB-Entwurf respektieren (${breite}px)`, async ({
+    page,
+  }, testInfo) => {
     await page.setViewportSize({ width: breite, height: 900 });
     await page.goto('/login');
     await page.getByLabel('Benutzername').fill('admin');
@@ -11,7 +13,9 @@ for (const breite of [1280, 390]) {
     await expect(page).toHaveURL(/\/einsaetze/);
     const ich = await (await page.request.get('/api/auth/me')).json();
     const anlegen = async (name: string) => {
-      const response = await page.request.post('/api/einsaetze', { data: { bezeichnung: `${name} ${Date.now()}` } });
+      const response = await page.request.post('/api/einsaetze', {
+        data: { bezeichnung: `${name} ${Date.now()}` },
+      });
       expect(response.ok()).toBeTruthy();
       return (await response.json()).id as number;
     };
@@ -19,19 +23,33 @@ for (const breite of [1280, 390]) {
     const b = await anlegen('Führungsstelle B');
 
     await page.goto(einsatzdatenPfad(a));
-    await page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` }).click();
+    await page
+      .getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` })
+      .click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true })).toBeFocused();
-    expect(await dialog.getByRole('button', { name: 'Speichern', exact: true })
-      .evaluate((knopf) => knopf.closest('form') !== null)).toBe(true);
+    await expect(
+      dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }),
+    ).toBeFocused();
+    expect(
+      await dialog
+        .getByRole('button', { name: 'Speichern', exact: true })
+        .evaluate((knopf) => knopf.closest('form') !== null),
+    ).toBe(true);
     await dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }).fill('Florian A');
-    await page.screenshot({ path: testInfo.outputPath('fuehrungsstelle-pflegen.png'), animations: 'disabled' });
+    await page.screenshot({
+      path: testInfo.outputPath('fuehrungsstelle-pflegen.png'),
+      animations: 'disabled',
+    });
     // LFH-461 Review: der Detail-Refetch nach dem Speichern kommt erst an,
     // nachdem über die SPA-Navigation das ETB mit seinem alten Cache geöffnet ist.
     let freigeben!: () => void;
-    const antwort = new Promise<void>((resolve) => { freigeben = resolve; });
+    const antwort = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
     let angefragt!: () => void;
-    const anfrage = new Promise<void>((resolve) => { angefragt = resolve; });
+    const anfrage = new Promise<void>((resolve) => {
+      angefragt = resolve;
+    });
     const detailRoute = `**/api/einsaetze/${a}`;
     await page.route(detailRoute, async (route) => {
       angefragt();
@@ -41,9 +59,12 @@ for (const breite of [1280, 390]) {
     try {
       await dialog.getByRole('textbox', { name: 'Führungsstelle', exact: true }).press('Enter');
       await expect(dialog).not.toBeVisible();
-      await expect(page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` })).toHaveText('Florian A');
+      await expect(
+        page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` }),
+      ).toHaveText('Florian A');
       await anfrage;
-      if (breite < 992) await page.getByRole('button', { name: 'Navigation öffnen', exact: true }).click();
+      if (breite < 992)
+        await page.getByRole('button', { name: 'Navigation öffnen', exact: true }).click();
       await page.getByRole('button', { name: 'Erfassung', exact: true }).click();
       await page.getByRole('button', { name: 'ETB', exact: true }).click();
       await expect(page).toHaveURL(etbPfad(a));
@@ -67,7 +88,10 @@ for (const breite of [1280, 390]) {
     await page.reload();
     await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('Entwurf ohne Empfänger');
     await expect(page.getByRole('button', { name: 'Aktionen zu An', exact: true })).toHaveCount(0);
-    await page.screenshot({ path: testInfo.outputPath('etb-entwurf-ohne-an.png'), animations: 'disabled' });
+    await page.screenshot({
+      path: testInfo.outputPath('etb-entwurf-ohne-an.png'),
+      animations: 'disabled',
+    });
 
     await page.goto(etbPfad(b));
     await expect(page.getByPlaceholder('Inhalt …')).toBeVisible();

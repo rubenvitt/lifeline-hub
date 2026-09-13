@@ -17,10 +17,38 @@ export interface FachebeneDef {
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
-  nina: { key: 'nina', label: 'Amtliche Warnungen (NINA)', farbe: '#cf1322', geometrieTyp: 'polygon', pollMs: 90_000, bboxAbhaengig: false },
-  dwd: { key: 'dwd', label: 'Wetterwarnungen (DWD)', farbe: '#d48806', geometrieTyp: 'polygon', pollMs: 300_000, bboxAbhaengig: false },
-  pegelonline: { key: 'pegelonline', label: 'Pegel / Hochwasser', farbe: '#096dd9', geometrieTyp: 'punkt', pollMs: 300_000, bboxAbhaengig: false },
-  kritis: { key: 'kritis', label: 'KRITIS / sensible Objekte', farbe: '#531dab', geometrieTyp: 'punkt', pollMs: 0, bboxAbhaengig: true },
+  nina: {
+    key: 'nina',
+    label: 'Amtliche Warnungen (NINA)',
+    farbe: '#cf1322',
+    geometrieTyp: 'polygon',
+    pollMs: 90_000,
+    bboxAbhaengig: false,
+  },
+  dwd: {
+    key: 'dwd',
+    label: 'Wetterwarnungen (DWD)',
+    farbe: '#d48806',
+    geometrieTyp: 'polygon',
+    pollMs: 300_000,
+    bboxAbhaengig: false,
+  },
+  pegelonline: {
+    key: 'pegelonline',
+    label: 'Pegel / Hochwasser',
+    farbe: '#096dd9',
+    geometrieTyp: 'punkt',
+    pollMs: 300_000,
+    bboxAbhaengig: false,
+  },
+  kritis: {
+    key: 'kritis',
+    label: 'KRITIS / sensible Objekte',
+    farbe: '#531dab',
+    geometrieTyp: 'punkt',
+    pollMs: 0,
+    bboxAbhaengig: true,
+  },
 };
 
 /** Anzeige-Reihenfolge im Panel. */
@@ -53,7 +81,11 @@ export function rasterBbox(bbox: string, grid = 0.05): string {
  * (älteste zuerst entfernt). So bleiben einmal geladene KRITIS-Objekte sichtbar, auch wenn
  * man wegzoomt oder das Gebiet wechselt. Mutiert `sammlung`; true bei Änderung.
  */
-export function mergeFeatures(sammlung: Map<string, Feature>, neue: Feature[], max: number): boolean {
+export function mergeFeatures(
+  sammlung: Map<string, Feature>,
+  neue: Feature[],
+  max: number,
+): boolean {
   let geaendert = false;
   for (const f of neue) {
     const key = JSON.stringify(f.geometry?.coordinates ?? null);

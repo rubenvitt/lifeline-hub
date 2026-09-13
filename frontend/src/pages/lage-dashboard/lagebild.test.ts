@@ -8,16 +8,27 @@ const BERLIN = { zeitzone: 'Europe/Berlin' };
 
 const m = (over: Partial<Meldung>): Meldung =>
   ({
-    id: 1, lfd_nr: 1, absender: 'Trupp 1', inhalt: 'Deich instabil',
-    ereigniszeit: '2026-06-11 09:00:00', status: 'neu', ist_offen: true,
-    ist_ueberfaellig: false, prioritaet: 'normal',
+    id: 1,
+    lfd_nr: 1,
+    absender: 'Trupp 1',
+    inhalt: 'Deich instabil',
+    ereigniszeit: '2026-06-11 09:00:00',
+    status: 'neu',
+    ist_offen: true,
+    ist_ueberfaellig: false,
+    prioritaet: 'normal',
     ...over,
   }) as Meldung;
 
 const a = (over: Partial<Auftrag>): Auftrag =>
   ({
-    id: 1, lfd_nr: 1, auftrag_text: 'Deich sichern', frist_at: null,
-    bearbeitungsstatus: 'offen', ist_ueberfaellig: false, prioritaet: 'normal',
+    id: 1,
+    lfd_nr: 1,
+    auftrag_text: 'Deich sichern',
+    frist_at: null,
+    bearbeitungsstatus: 'offen',
+    ist_ueberfaellig: false,
+    prioritaet: 'normal',
     ...over,
   }) as Auftrag;
 
@@ -55,7 +66,11 @@ describe('meldungszeilen', () => {
       BERLIN,
     );
     expect(z).toMatchObject({
-      id: 7, lfdNr: 42, zeit: '11:00', absender: 'ELW 1', text: 'Strom weg',
+      id: 7,
+      lfdNr: 42,
+      zeit: '11:00',
+      absender: 'ELW 1',
+      text: 'Strom weg',
     });
   });
 
@@ -63,7 +78,9 @@ describe('meldungszeilen', () => {
   // Ziffern per Regex heraus — die Meldung stand dann zwei Stunden in der
   // Vergangenheit, ohne dass irgendwo ein Fehler auftrat.
   it('zeigt die Ereigniszeit in der Anzeigezone, nicht in UTC', () => {
-    expect(meldungszeilen([m({ ereigniszeit: '2026-06-11 09:00:00' })], BERLIN)[0].zeit).toBe('11:00');
+    expect(meldungszeilen([m({ ereigniszeit: '2026-06-11 09:00:00' })], BERLIN)[0].zeit).toBe(
+      '11:00',
+    );
   });
 
   it('stuft überfällig als Alarm, neu als Achtung, sonst normal', () => {
@@ -117,10 +134,24 @@ describe('auftragszeilen', () => {
     // Systemzeit 12:00 Berlin am 11.06. — derselbe Tag wie die Frist unten.
     vi.setSystemTime(new Date('2026-06-11T10:00:00Z'));
     const [z] = auftragszeilen(
-      [a({ id: 9, lfd_nr: 5, auftrag_text: 'Pumpe setzen', frist_at: '2026-06-11 14:30:00', ist_ueberfaellig: true })],
+      [
+        a({
+          id: 9,
+          lfd_nr: 5,
+          auftrag_text: 'Pumpe setzen',
+          frist_at: '2026-06-11 14:30:00',
+          ist_ueberfaellig: true,
+        }),
+      ],
       BERLIN,
     );
-    expect(z).toMatchObject({ id: 9, lfdNr: 5, text: 'Pumpe setzen', frist: '16:30', stufe: 'alarm' });
+    expect(z).toMatchObject({
+      id: 9,
+      lfdNr: 5,
+      text: 'Pumpe setzen',
+      frist: '16:30',
+      stufe: 'alarm',
+    });
   });
 
   // Eine Frist morgen früh sieht in reiner HH:mm optisch aus wie eine in 20 Minuten —
@@ -128,10 +159,7 @@ describe('auftragszeilen', () => {
   it('stellt bei einer Frist an einem anderen Tag den Tag voran', () => {
     // Systemzeit 08:00 Berlin am 12.06. — ein Tag nach der Frist unten.
     vi.setSystemTime(new Date('2026-06-12T06:00:00Z'));
-    const [z] = auftragszeilen(
-      [a({ id: 9, lfd_nr: 5, frist_at: '2026-06-11 14:30:00' })],
-      BERLIN,
-    );
+    const [z] = auftragszeilen([a({ id: 9, lfd_nr: 5, frist_at: '2026-06-11 14:30:00' })], BERLIN);
     expect(z.frist).toBe('11. 16:30');
   });
 
@@ -186,7 +214,9 @@ describe('lageauszug', () => {
   });
 
   it('liefert null, wenn jeder Abschnitt leer ist', () => {
-    expect(lageauszug(bericht('lagebericht', [{ schluessel: 'eigene_lage', text: '' }]))).toBeNull();
+    expect(
+      lageauszug(bericht('lagebericht', [{ schluessel: 'eigene_lage', text: '' }])),
+    ).toBeNull();
   });
 
   it('liefert null ohne Bericht', () => {

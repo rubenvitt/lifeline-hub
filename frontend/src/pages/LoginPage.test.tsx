@@ -347,7 +347,9 @@ describe('LoginPage', () => {
 
     it('lässt während der Passkey-Ceremony nur den Passkey-Button laden, nicht „Anmelden"', async () => {
       setzeSecureContext(true);
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(
         http.get('/api/auth/providers', () =>
@@ -385,7 +387,9 @@ describe('LoginPage', () => {
 
     it('zeigt KEINEN Passkey-Button ohne Secure Context, auch bei aktivem webauthn-Provider', async () => {
       setzeSecureContext(false);
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json(webauthnProvider)));
 
@@ -403,7 +407,9 @@ describe('LoginPage', () => {
 
     it('zeigt KEINEN Passkey-Button ohne aktiven webauthn-Provider (aber Secure Context)', async () => {
       setzeSecureContext(true);
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(
         http.get('/api/auth/providers', () =>
@@ -535,7 +541,14 @@ describe('LoginPage', () => {
           aufrufe += 1;
           // Verzoegert, damit der Klick den LAUFENDEN Absendevorgang trifft — ein sofort
           // aufloesender Handler liesse den Riegel schon wieder gefallen sein.
-          await new Promise((r) => setTimeout(r, 50));
+          //
+          // 50 ms reichten dafuer NICHT auf fremder Hardware (gemessen, LFH-522): unter der
+          // Coverage-Instrumentierung auf zwei CI-Kernen braucht `userEvent.click` laenger
+          // als die Frist, der erste Vorgang war dann fertig, der Klick loeste einen zweiten
+          // Aufruf aus — `expected 2 to be 1`, ohne dass sich Code geaendert haette. Die
+          // Frist ist deshalb grosszuegig; sie kostet nichts, weil der Test ohnehin auf den
+          // Absendevorgang wartet.
+          await new Promise((r) => setTimeout(r, 2000));
           return HttpResponse.json(adminBody);
         }),
       );
@@ -572,10 +585,14 @@ describe('LoginPage', () => {
     });
 
     it('richtet die Code-Eingabe auf Ziffern aus (inputMode, one-time-code, maxLength)', async () => {
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-      server.use(http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })));
+      server.use(
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+      );
 
       renderMitProviders(
         <AuthProvider>
@@ -629,10 +646,14 @@ describe('LoginPage', () => {
     });
 
     it('führt aus der Recovery-Eingabe zurück zur Code-Eingabe', async () => {
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-      server.use(http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })));
+      server.use(
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+      );
 
       renderMitProviders(
         <AuthProvider>
@@ -657,7 +678,9 @@ describe('LoginPage', () => {
     });
 
     it('meldet einen normalen (Nicht-MFA) Login unverändert direkt an — keine Code-Eingabe', async () => {
-      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
       server.use(http.post('/api/auth/login', () => HttpResponse.json(adminBody)));

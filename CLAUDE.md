@@ -39,6 +39,31 @@ wird ungewählt, gewählt und mit Hover geprüft; Alpha wird mitgerechnet, unbel
 Bild-/Opacity-Kompositionen werden abgelehnt. Kein zusätzlicher mobiler Status-Slot ist
 Teil dieser Farbentscheidung.
 
+**Auf der Karte trägt die Warnstufe der TEXT, nicht die Farbe** (LFH-357). `warnstufeKarte`
+bildet fünf Stufen auf zwei unterscheidbare Rollen ab (`achtung`: niedrig/mittel · `alarm`:
+keine/hoch/akut). A2 hielt das für gedeckt („wer die fünf Stufen unterscheiden muss, nutzt
+`label` oder `form`") — auf der Kartenfläche stand aber keiner der beiden Kanäle:
+`kartenLayer.ts` beschriftete die Zone mit ihrem **Namen**, und `form` trägt gemessen **drei**
+Zeichen (`FORM_ZEICHEN`) für fünf Stufen, kann die Auflösung also gar nicht herstellen — es
+bleibt deshalb an keinem Vertragseintrag gesetzt, statt der Vollständigkeit halber gesetzt zu
+werden. Träger ist die reine, exportierte `zonenBeschriftung` (`pages/lagekarte/zonenStil.ts`):
+„Warnstufe: <label>" unter dem Zonennamen, `label` ausschliesslich aus `warnstufeKarte` — wer
+das Wort dort ändert, ändert die Kartenbeschriftung mit. Zonen ohne Warnstufe behalten ihren
+Namen unverändert. **Ein fehlender Nachschlag heisst „Warnstufe: unbekannt", nicht „keine"**:
+das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`, NICHT an der Gefahrengebiete-Query
+— die Zone wird also gezeichnet, während die Gebiete noch laden oder ihr Abruf gescheitert ist.
+Die **Farbe** rundet dort vorsichtshalber auf `keine` (Alarm, unverändert), der **Text** nicht;
+`zonenBeschriftung` hat dafür drei Zustände statt zwei. **„Warnstufe: keine" heisst „keine Stufe
+gesetzt", nicht „unbewertet"**:
+`src/gefahr/repo.rs` rechnet die höchste Stufe über ein Severity-`MAX`, in dem `'keine'`
+denselben Rang **0** bekommt wie gar keine Bewertung — die beiden Fälle sind aus den Daten
+nicht trennbar, ein Wort, das sie trennt, behauptet zu viel. Die rote Fläche bleibt davon
+unberührt; sie ist die Vorsichtsentscheidung aus `gefahrengebietStil`. **Nicht zugesichert ist
+der Kollisionsfall:** `zonen-label` fährt ohne `text-allow-overlap`, ein gedrängtes Label kann
+ausfallen — dann trägt wieder nur die Farbe. Wer das schliessen will, braucht einen
+**graphischen** Kanal (Linienform je Stufe; `line-dasharray` ist in maplibre-gl 6.8.0 gemessen
+`cross-faded-data-driven`, also feature-abhängig setzbar) und eine eigene Entscheidung dafür.
+
 Die UI-Form richtet sich nach Umfang/Interaktion des Inhalts (LFH-19):
 
 - **Vollseite / eigene Route** (`/einsaetze/:einsatzId/<modul>/:id`) → umfangreiche
@@ -69,8 +94,36 @@ nach Browsermessung `xl` (1200 px): darunter Ereigniskarten, darüber Tabelle.
 `lg` würde den gemessenen 1024-px-Engpass nicht beheben. Der optionale Einsatztermin
 `naechste_lagebesprechung_at` wird in den Einsatzdaten gepflegt und als absolute
 Wiedervorlage-Schnellwahl angeboten, wenn er bekannt und zukünftig ist. Kein
-berechneter Rhythmus. Prüfbelege und der getrennte Langtextbefund LFH-523 stehen in
+berechneter Rhythmus. Prüfbelege stehen in
 `docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`.
+
+**Eine Spalte darf fließen, und nur dann rechnet die Tabelle nicht mehr mit dem längsten
+Text** (LFH-523). `KatalogTabelle` rendert mit `scroll={{ x: 'max-content' }}` — die
+Tabellenbreite ist damit **inhaltsgetrieben**, und eine Spalte ohne `width` trägt ihre volle
+`max-content`-Breite bei. Ein normal umbrechbarer Meldungstext mit 209 Zeichen blieb deshalb
+einzeilig und verbreiterte die Tabelle, während der Kartenzweig derselben Daten ihn umbrach.
+Der **Rumpf scrollt dabei nicht** — der Überlauf steckt im Scrollcontainer der Tabelle, und
+ein Test auf `document.body.scrollWidth` allein ist gegen diesen Befund blind (er war auf
+altem Stand grün, während der Text 1122 px weit aus der Sicht ragte). Die Abhilfe ist ein
+**Opt-in**: trägt genau EINE Spalte `mindestBreite` und haben alle übrigen eine Zahlbreite,
+setzt das Primitiv `Σ(width) + mindestBreite` als `scroll.x`; `min-width: 100%` bleibt daneben
+stehen. Ohne den Haken ändert sich an den achtzehn Katalogtabellen nichts.
+**Die ≥50-%-Zusicherung aus C7 ist davon nicht berührt, und das folgt aus der Rechnung statt
+aus einer Messung:** liegt die Zahl unter der Containerbreite, ist die *benutzte* Breite in
+beiden Fassungen dieselbe und die `auto`-Layoutrechnung verteilt identisch — auseinander gehen
+sie erst, wenn `max-content` den Container übersteigt.
+**Die Zahl wird gegen die SCHMALSTE Fläche gewählt**, auf der die Tabelle überhaupt steht
+(ETB: 320 px, weil bei 1200 px Viewport rund 856 px Contentbreite bleiben und die vier festen
+Spalten 494 px belegen). Eine größere Zahl holte den Überlauf zurück.
+**Die gemessene Falle ist das Tabellenlayout:** `@rc-component/table` entscheidet
+`if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'` — dieses Primitiv
+fixiert Spalte 0 immer, eine Zahl kippt das Layout also still auf `fixed`, wo eine
+Spaltenbreite **bindend statt bevorzugt** ist und die 96 px der Aktionsspalte den 72-px-Knopf
+der Handschuhstufe anschnitten. `tableLayout="auto"` wird deshalb **nur im Zahlfall**
+mitgesetzt. Wer den Haken an eine zweite Spalte hängt oder einer Nachbarspalte die Zahlbreite
+nimmt, bekommt das Bestandsverhalten plus DEV-Warnung zurück — ein Opt-in, das still nichts
+tut, wäre von einem kaputten nicht zu unterscheiden. Herleitung und Prüfspur:
+`docs/superpowers/specs/2026-09-11-lfh-523-etb-langtext-umbruch.md`.
 
 **Die erste eingelöste Karten-Ausnahme ist die ETB-Chronologie** (LFH-342/C7,
 `etb/EtbTabelle.tsx`). Sie zeigt, woran die Formfrage wirklich hängt, und korrigiert dabei ein
@@ -97,6 +150,35 @@ Zähler kann also nicht lügen. Gemessen wird das in Playwright gegen die **Cont
 gegen die Tabellenbreite: `KatalogTabelle` rendert mit `width: max-content`, bei langem Inhalt
 wächst die Tabelle über den Container und ein Verhältnis Spalte-zu-Tabelle würde kleiner,
 obwohl der Text mehr Platz hat.
+
+**Zwei schwebende Bänder an einem Rand werden gestapelt, nicht gestaffelt** (LFH-355,
+`pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
+Zeitachsen-/Snapshot-Leiste (`bottom: 12`, volle Breite) lagen beide absolut auf `zIndex: 5`
+über der Lagekarte. Bei Gleichstand gewinnt die spätere DOM-Position — die Leiste verdeckte
+im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, also ausgeklappt)
+„Abschließen"/„Abbrechen" vollständig; aus dem Zeichenmodus kam man nur über Tastatur oder
+Reload heraus. Der Fix ist **ein gemeinsamer, absolut positionierter Rahmen mit den Bändern
+als Flow-Geschwistern in einer Spalte**, nicht ein höherer `zIndex`: der hätte den Klick
+zurückgeholt und die Überdeckung gelassen, nur andersherum. Zwei Elemente im normalen Fluss
+können sich nicht überlagern — das folgt aus dem Layout statt aus einer Zahl, und deshalb
+gilt es bei jeder Breite. Die Bänder geben dafür ihre **eigene Positionierung ab** und nehmen
+`bandStil('voll' | 'mitte' | 'links')`; wer einem von ihnen `position: 'absolute'`
+zurückgibt, nimmt es aus dem Fluss und holt den Bug mit (drei Vitest-Guards, per
+Mutationsprobe belegt). Der Rahmen trägt `pointerEvents: 'none'`, jedes Band `'auto'` — ohne
+diese Gegenzeile schluckte der Leerraum zwischen den Bändern jedes Ziehen auf der Karte,
+mit nur der einen Hälfte wäre ein Band sichtbar und tot.
+**`toBeVisible()` ist in Playwright kein Beleg für Klickbarkeit** — auf dem verdeckten Knopf
+war es grün, während der Klick in den 30-s-Timeout lief („`<div>` intercepts pointer
+events"). Diese Falle ist **generisch für die e2e-Suite**, nicht auf diese Stelle beschränkt:
+wer eine Bedienbarkeit zusichern will, klickt. Und ein e2e-Test, der eine Überdeckung
+**umgeht** (hier: die Zeitachse einklappen, um an die Knöpfe zu kommen), lässt genau den
+Zustand ungetestet, den der Nutzer antrifft — die Umgehung gehört mit dem Fix weg, die
+Vorbedingung („die Leiste steht ausgeklappt da") bleibt stehen, sonst wird die Messung
+still wertlos statt rot. Gemessen wird in `e2e/lagekarte-smoke.spec.ts` mit echten
+Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px**, und das ist eine Aussage
+statt einer Lücke: die Lagekarten-Sidebar ist fest 300 px breit, dort bliebe für die
+Kartenfläche nichts übrig — eine eigene Frage (Sidebar-Responsivität), kein Teil dieser
+Stapelentscheidung.
 
 **Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
 mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem
@@ -232,10 +314,18 @@ Alltag wichtigsten:
   sind so im Browser belegt (`e2e/datensicht-schmal.spec.ts`, 30 / 48 / 72) — das ist kein
   Restposten, sondern der Beleg, dass in einer Zelle ohne `nowrap`-Kopf die eine Angabe trägt.
   Die Regel zielt auf den Kartenkopf, nicht auf das Primitiv. **Der Gate-3-Nachweis je Route liegt in
-  `e2e/gate3-trefflaeche.spec.ts`** (Lage-Dashboard, Einsatzauswahl); eine neue Route mit
+  `e2e/gate3-trefflaeche.spec.ts`** (Lage-Dashboard, Einsatzauswahl, Einheiten-Detailroute
+  und seit LFH-516 der **Einsatz-Navigationsrahmen**: Rail, Modul-Panel, beide Kopfzeilen,
+  Kommandopalette und der Drawer-Zweig auf 390 px); eine neue Route mit
   handgebauten Bedienzielen bekommt dort ihren Test — Böden als Literale, Mengen über
   `alleHaltenStufe` mit gesäter Mindestzahl, und die Mutationsprobe „Stufe festgenagelt →
-  rot", die das Ticket verlangt. Der Boden ist die **Trefffläche, nicht der ganze
+  rot", die das Ticket verlangt. **Ein Boden ist nicht immer die Staffel**: der Rahmen trägt
+  vier Verträge nebeneinander (30/48/72 · `Math.max(48, controlHeight)` an Rail, Hamburger,
+  schmalem Suchzugang und den Drawer-Modulzeilen · `Math.max(40, …)` am Benutzermenü · zwei
+  feste 48er im Drawer, gemessen in LFH-516 und als LFH-537 benannt). Wer eine Fläche
+  aufnimmt, schreibt ihren Boden als eigenes Literal hin, statt sie unter die Staffel zu
+  zwingen — `kompakt` prüfte sonst 30, wo der Code 48 garantiert, und die Zusicherung wäre
+  schwächer als der Bestand. Der Boden ist die **Trefffläche, nicht der ganze
   Zugang**: ein `ListenEintrag` mit `onClick` bleibt ein nacktes `<div>` ohne `role`/`tabIndex`,
   und die klickbare Zeile als Ganzes ist B7/LFH-335 zugeordnet. **Kein Guard sieht diese Fälle** — ein
   Pixel-Padding ist keine Größen-Prop —, die Zusicherung muss also von Hand kommen. Prüfbar ist der
@@ -655,6 +745,52 @@ Alltag wichtigsten:
   grün, während „die Meldung steht außerhalb von `.ant-message`" und „sie geht beim nächsten
   Absenden" rot wurden. Ein Test, der nicht rot werden kann, behauptet eine Deckung, die er
   nicht hat — die beiden tragenden Aussagen stehen deshalb an seiner Stelle.
+- **Ein gescheiterter Zustandsübergang meldet sich dort, wo die Person steht** (LFH-535,
+  Nachzug N5 aus LFH-348 · C13). Dieselbe H14-Diagnose wie beim Speichern, nur am
+  Übergang: schlägt `POST …/freigeben` fehl, hält antd das Bestätigungs-Modal **offen** —
+  und solange der Grund nur im Toast stand, war er nach rund drei Sekunden weg und der
+  unveränderte Dialog von „nichts passiert" nicht zu unterscheiden. Der Seiten-Alert taugt
+  hier **nicht**: der Dialog trägt `mask={{ closable: false }}`, alles dahinter ist
+  abgedunkelt. Der Grund steht deshalb **IM Dialog**, Bauform `EntwurfNavigationSchutz`
+  (LFH-494).
+  **Träger ist `entwurf/FreigabeDialog.tsx`, eine geteilte Komponente — nicht zwei
+  Copy-Paste-Dialoge**: die Entscheidung gilt für beide Zwillingsseiten gemeinsam, sonst
+  entsteht wieder die Divergenz, die C13 mit dem geteilten Verlustschutz-Hook geschlossen
+  hat. Damit fällt `modal.confirm` an beiden Seiten weg, und zwar aus einem gemessenen
+  Grund: dessen `content` wird beim **Aufruf** eingefroren, ein
+  `<SpeicherFehler fehler={mutation.error}>` darin rendert nicht nach und müsste per
+  `instanz.update({ content })` von Hand nachgeschoben werden — ein zweiter
+  Anzeigemechanismus neben dem, den LFH-494 schon gebaut hat.
+  **Der Flow hat ZWEI Fehlerquellen und zwei Überschriften**: der Speicher-Vorlauf
+  („Nicht gespeichert") und der Übergang selbst („Freigabe fehlgeschlagen") sagen der
+  Person Verschiedenes darüber, was ihr Entwurf jetzt **ist**. Die Wahl liegt als reine,
+  exportierte `freigabeGrund`-Funktion daneben; **Vorrang hat der Speicherfehler**, und
+  das ist die Reihenfolge, nicht Geschmack: scheitert der Vorlauf, läuft die Freigabe gar
+  nicht erst, ein dann noch stehender Freigabe-Grund stammt aus einem **früheren** Versuch.
+  Umgekehrt kann der Speicherfehler nicht veralten — er fällt bei jedem gelungenen
+  Speichern. Aus demselben Grund ruft das Öffnen `freigebenMutation.reset()`: react-query
+  hält `error` bis zum nächsten `mutate()`, ein Abbrechen-und-neu-Öffnen trüge den alten
+  Grund sonst in einen frischen Dialog.
+  **Die Toasts sind BEIDE weg, auch der im Speicher-Vorlauf.** Bis LFH-494 war er der
+  einzige Kanal über der Maske; mit dem Grund im Dialog wäre er die zweite Wahrheit, die
+  drei Sekunden später geht. Der Seiten-Alert bleibt daneben stehen — er überlebt das
+  Schliessen. Der **Erfolg** bleibt beim Toast: er quittiert eine abgeschlossene Handlung,
+  und der Dialog, in dem er stünde, ist dann zu. `fortschreibenMutation` ist **nicht**
+  betroffen: sie läuft ohne Dialog, dort ist der Toast die richtige Form.
+  **Zwei gemessene Testfallen dabei:** (1) `within(dialog).findByText(…)` allein belegt die
+  Zusicherung **nicht** — käme der Toast zurück, stünde der Wortlaut an zwei Stellen und
+  die Abfrage im Dialog fände ihren Alert weiter; gezählt wird deshalb die Message-Queue
+  selbst (`.ant-message`). Ein `getAllByText`-Zähler taugt ebenfalls nicht überall: beim
+  gescheiterten Vorlauf steht der Grund zu Recht doppelt (Dialog **und** Seiten-Alert).
+  (2) `toBeVisible()`/`queryByRole('dialog')` sind für „offen/zu" blind — antds Modal räumt
+  seinen Knoten erst am Ende der Zoom-Animation ab, und jsdom feuert kein `transitionend`;
+  geprüft wird `ant-zoom-leave` (Konvention aus `MaterialPage.test.tsx`).
+  **Kein eigener `sendetRef`-Riegel am OK-Knopf**, anders als in `Erfassung.tsx`: antds
+  `Button` sperrt seinen Klick selbst, solange `loading` steht (gemessen,
+  `antd/es/button/Button.js`), und der Knopf ist hier der **einzige** Weg in die
+  Absende-Funktion — dort greift der Riegel, weil ein Tastenkürzel den Knopf umgeht. Ein
+  zweiter Riegel daneben liesse sich in jsdom von antds eigenem nicht unterscheiden, wäre
+  also eine Zusicherung, die kein Test rot machen kann.
 - **Fehlende Berechtigung wird erklärt, nicht stumm weggeschaltet** (LFH-345 · C10, M16). Ein
   `RechteHinweis` (`Alert type="info"`) über dem Block nennt den Grund, und **der
   Speichern-Knopf verschwindet nicht mehr** — er steht gesperrt da. „Ausgegraut" allein ist
@@ -736,16 +872,36 @@ Alltag wichtigsten:
   aus `useViewport`, nicht die Stilfunktion: eine reine Funktion, die selbst einen Hook ruft,
   wäre kein Prüfobjekt mehr.
 - **Ein Status gehört nicht in die Seite, die ihn zufällig zuerst brauchte**
-  (LFH-345 · C10, M14). `EINSATZ_STATUS` liegt jetzt in `einsatz/einsatzStatus.ts` neben
-  `einsatzart.ts`; vorher war es eine modul-lokale Konstante in `EinsaetzePage`, und der
-  zweite Leser (`EinsatzdatenPage`) hatte sie **nicht** — dort stand der rohe Wire-Wert im
-  Titel-Tag. Das ist die Sorte Abweichung, die niemandem auffällt: beide Seiten sahen für
-  sich plausibel aus, und „aktiv" ist zufällig auch ein deutsches Wort. Der Eintrag trägt den
-  Vertragstyp `StatusDarstellung` aus `theme/statusFarben.ts` (damit ist `label` Pflichtfeld
-  — zweiter Kanal, WCAG 1.4.1), liegt aber **nicht** in dieser Datei: deren Abdeckungsguard
-  zählt die Maps gegen eine Literal-Liste **und** `toHaveLength(10)`; ein elfter Eintrag wäre
-  eine Änderung am Vertrag und an seinem Guard, also eine eigene Entscheidung statt eines
-  Nebenprodukts.
+  (LFH-345 · C10, M14) — **und seit LFH-358 auch nicht neben den Vertrag.** Die Karte war
+  erst eine modul-lokale Konstante in `EinsaetzePage`; der zweite Leser
+  (`EinsatzdatenPage`) hatte sie **nicht** und zeigte den rohen Wire-Wert im Titel-Tag. Das
+  ist die Sorte Abweichung, die niemandem auffällt: beide Seiten sahen für sich plausibel
+  aus, und „aktiv" ist zufällig auch ein deutsches Wort. C10 hat sie nach
+  `einsatz/einsatzStatus.ts` gezogen, aber bewusst NICHT in `theme/statusFarben.ts` — dort
+  zählte der Abdeckungsguard gegen ein `toHaveLength`, ein Eintrag mehr wäre eine
+  Vertragsänderung gewesen und damit eine eigene Entscheidung.
+  **LFH-358 ist diese Entscheidung, und sie fiel andersherum:** die Karte heißt jetzt
+  `einsatzStatus` und steht IM Vertrag (`theme/statusFarben.ts`), zusammen mit
+  `dringlichkeit` (vormals `DRINGLICHKEIT_ZEICHEN` in `lage-dashboard/lagebild.ts`), die
+  mit derselben Begründung draußen lag. `einsatz/einsatzStatus.ts` gibt es nicht mehr — wer
+  den Import sucht, nimmt `theme/statusFarben.ts`.
+  **Der Grund ist der Wächter selbst:** `statusFarben.test.ts` leitet die geprüfte Map-Liste
+  aus den Exporten des Moduls ab, „damit eine zehnte Map nicht still durchrutscht". Eine
+  Karte mit dem Vertragstyp **außerhalb der Datei** läuft an genau diesem Wächter vorbei —
+  der Präzedenzfall untergräbt also die Aussage, die er schützen soll. Gemessen war das
+  keine Theorie: während `einsatzStatus` draußen stand, malten **zehn** Seitenköpfe weiter
+  `<Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>`,
+  also denselben Befund, den M14 an einer Seite einzeln behoben hatte.
+  **Die Zahl im Abdeckungstest ist jetzt 15, und sie zählt „Vertragskarten", nicht
+  „Vertrags-Enums"**: `dringlichkeit` ist über eine `Statusrolle` geschlüsselt und
+  beschriftet die Stufe selbst, nicht eine Domänen-Achse. Eine sechzehnte Karte bleibt eine
+  eigene Entscheidung — das ändert LFH-358 nicht, es trifft die Entscheidung nur einmal.
+  **Zwei Guards halten beide Grenzen maschinell** (`theme/statusVertrag.guard.test.ts`):
+  kein `Record<…, StatusDarstellung>` außerhalb `statusFarben.ts` — **die Datei, nicht das
+  Verzeichnis**, denn ein Geschwistermodul exportiert nichts über sie und liefe am
+  Abdeckungstest genauso vorbei —, und kein `<Tag color={…}>`, das ein Vertrags-Enum
+  einfärbt; dafür ist `components/StatusTag.tsx` da. Blinde Flecken stehen mit gemessener
+  Fundstelle im Kopfkommentar; eine Schuldmenge gibt es bewusst nicht.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET** (LFH-346 · C11). Die
   Anlegen-Knöpfe der elf Stammdaten-Sektionen sind in den `aktionen`-Slot von `AdminPage`
   gewandert, der Speichern-Knopf der Einsatz-Defaults im selben Ticket **heraus** in eine
@@ -844,6 +1000,87 @@ Alltag wichtigsten:
   Nachfolger, nicht `vorgaenger_id == null`), die Lagemeldungen sind die **zwölfte**
   `Datensicht`-Konsumentin; ihre Tagesgrenze liegt in der Anzeigezone
   (`lagemeldungen/zeitachse.ts`), nicht in UTC.
+- **Ein Klick auf „Entwurf speichern" ist EIN PATCH** (LFH-495, Nachzug zu C13/N3+N4). Der
+  Klick ist zwei Ereignisse: er nimmt dem Feld zuerst den Fokus — `onBlur` startet den
+  Autosave —, und erst danach kommt `click` mit `form.submit()`. Bis dahin sperrte `laeuftRef`
+  nur Autosave gegen Autosave; der explizite Pfad lief daneben und schickte denselben Inhalt
+  ein zweites Mal, samt zweitem SSE-Ereignis und zweiter Invalidierung. **`speichereJetzt` ist
+  jetzt die EINZIGE Pforte** für ein Speichern ausserhalb der Uhr; `quittungVorbereiten`,
+  `quittiereGespeichert` und `meldeSpeicherfehler` sind **entfernt und nicht bloss ungenutzt**
+  — aus ihnen war der zweite Pfad zusammengesetzt, und die Begründung ist dieselbe wie bei
+  `onFehler` in LFH-494.
+  **„Anhängen" allein ist ein Rennen, nicht der Riegel** (gemessen): zwischen `mousedown` und
+  `click` liegen Millisekunden, ein schneller PATCH ist da längst zurück und die Dublette ging
+  doch raus. Vor dem Anhängen steht deshalb die Frage, ob dieser Stand **schon gesichert** ist
+  (`gesichertRef`). Dessen Start auf `-1` ist Teil des Vertrags: „nichts geändert" und „nichts
+  gesendet" sind zwei Zustände, und mit `0` verlöre ein unberührter Entwurf den PATCH des
+  Freigabe-Vorlaufs — `/freigeben` prüft den **persistierten** Stand, nicht den Editor-Inhalt.
+  **Der Riegel sperrt die Dublette, nicht den Fortschritt:** ein Blur mit NEUEREM Stand
+  bekommt weiter seinen eigenen PATCH. Die strengere Fassung („es läuft etwas, also nichts
+  senden") verschluckte den Fall „erst manuell speichern, dann weitertippen, dann die Seite
+  verlassen" und färbte den Reihenfolge-Test des Befehls sofort rot.
+  **`speichertGerade` (vormals `autosaveLaeuft`) deckt beide Pfade ab** und ist damit die
+  einzige Quelle am Navigations-Blocker. **Nicht** als `loading` am Speichern-Knopf, obwohl
+  das Ticket es vorschlug: antds Ladezustand hängt ein `role="img" aria-label="loading"` in
+  den Knopf und benennt ihn bei JEDEM stillen Autosave zu „loading Entwurf speichern" um —
+  ein Hintergrundvorgang, der ein Bedienelement umbenennt. Der Riegel liegt im Hook, nicht an
+  einem `loading`.
+- **Der Einstiegsfokus eines Entwurfs sitzt im ersten LEEREN Abschnitt** (LFH-495; das Ticket
+  liess die Bedienentscheidung offen), sonst im ersten. Ein fortgeschriebener Bericht trägt
+  die Abschnitte des Vorgängers befüllt — der erste leere ist die Stelle, an der die Arbeit
+  weitergeht; der Titel ist beim Anlegen UND beim Fortschreiben schon gesetzt und wäre der
+  falsche Kandidat. Der Lagebericht klappt denselben Abschnitt auf, sonst stünde der Cursor
+  in einem zugeklappten Editor. Träger ist `entwurf/Einstiegsfokus.tsx` (reine, exportierte
+  Wahlfunktion). Vier Festlegungen, alle gemessen: es ist eine **Komponente im
+  Formularzweig**, kein Effekt in der Seite (beide Seiten zeigen erst einen `<Spin>`, ein
+  `useEffect(…, [])` oben liefe, während es das Feld noch nicht gibt, und käme nie wieder);
+  ein **Effekt**, kein `requestAnimationFrame` (Lektion aus `Erfassung.tsx`); das Ziel wird
+  **am Mount eingefroren** und im Lagebericht **während des Renderns** abgeleitet — per Effekt
+  kam es eine Runde zu spät und der Fokus landete auf `<body>`, der Riegel gegen die
+  Renderschleife ist das Objekt, weil `feld` `null` sein darf; und es wird **kein Fokus
+  gestohlen**, der schon woanders liegt. Das Ziel kommt aus dem **Serverstand**, nicht aus den
+  Formularwerten — die sind beim Mount noch leer.
+- **`Form.useWatch([], form)` kostet die Kaskade, nicht die Marke** (LFH-495 · N4, dreimal
+  gemessen bei 1366 × 768, `e2e/lagebericht-tippen.spec.ts`, Anschlag bis Bild): Median 36 ms,
+  **p90 73 ms**, schlechtester 138 ms — gegen 17/30/72 ms am Befehlsentwurf, der dieselben
+  Editoren **ohne** `useWatch` trägt. Beide im Ticket vorgeschlagenen Eingriffe wären
+  wirkungslos gewesen: **„auf die Abschnittspfade einschränken"** geht nicht (der Hook nimmt
+  EINEN Pfad, die Abschnittszahl steht erst zur Laufzeit fest) und würde nichts sparen — die
+  Abschnittspfade sind genau das, was sich beim Tippen ändert; **„die Leer-Marke entprellen"**
+  trifft das Ergebnis, während den Render der **Hook** auslöst. Wirksam ist, die Kaskade zu
+  unterbinden: `AbschnittsAkkordeon` ist `memo`, `befuellt` läuft über ein **Primitiv**
+  (`befuellungsKette`) und der `editor` über `useCallback`. Der Elternteil rendert weiter je
+  Anschlag (Kopfzeile, Etiketten — billig), die acht Editoren mit ihrer `autoSize`-Nachmessung
+  nicht mehr: **p90 43–48 ms**. Die Sperre trägt nur, solange ALLE vier Props
+  identitätsstabil sind — eine inline `editor`-Prop genügt, um sie aufzuheben, und sie macht
+  sonst nichts kaputt.
+  **Das Gate dafür ist deterministisch und steht NICHT in der e2e-Suite** (gemessen im ersten
+  CI-Lauf dieses Tests): ein p90-Deckel von 60 ms war auf dem GitHub-Runner (2 vCPU, zwei
+  Playwright-Worker auf zwei Kernen) mit **83,4 ms** und im Wiederholversuch **62,5 ms** rot,
+  obwohl die Memoisierung drin ist. Auch das Verhältnis zur Kontrolle trennt nicht: 2,56 und
+  1,74 gegen 2,35 im unmemoisierten Zustand — die Bereiche überlappen. Ein absoluter
+  Millisekunden-Deckel für Eingabelatenz ist auf geteilten zwei Kernen ein Würfel, und ein rot
+  geborenes Gate wird abgeschaltet statt befolgt. Die Zusicherung zählt deshalb in Vitest die
+  Aufrufe der `editor`-Render-Prop (`AbschnittsAkkordeon.test.tsx`): bei unveränderten Props
+  rendert der Teilbaum nicht neu, ohne Uhr und hardwareunabhängig. **Beim Schreiben dieses
+  Tests ist die Falle, `rerender` DASSELBE Element-Objekt zu geben** — React überspringt den
+  Teilbaum dann von sich aus (Bailout auf die Element-Referenz), und der Test ist auch ohne
+  `memo` grün (per Mutationsprobe gemessen); es braucht je Render ein neues Element mit
+  gleichen Prop-*Identitäten*. Der e2e-Spec bleibt die **Messung** samt
+  Struktur-Vorbedingungen und schreibt die Zahlen in Log und Annotation; die RAIL-Deckel dort
+  gelten nur mit `PW_LATENZ=1` auf ruhiger Hardware. **Offen und benannt:** der schlechteste Anschlag liegt
+  unverändert bei 120–130 ms und damit über der RAIL-Grenze von 100 ms — die Memoisierung hat
+  ihn nicht bewegt, er hängt also nicht an `useWatch` (Verdacht: `autoSize`-Neumessung beim
+  Zeilenumbruch, die auch die Kontrolle auf 58–77 ms hebt). Eigene Untersuchung, kein
+  Nebenprodukt dieses Nachzugs.
+- **`kettenKoepfe` lässt keinen Bericht fallen** (LFH-495). Bei einem VOLLSTÄNDIGEN Zyklus
+  (`11 → 13 → 11`, ein Datenfehler) hat jedes Glied einen Nachfolger, es gibt also keinen
+  Kopf — die Funktion lieferte dafür eine leere Liste, und die Berichte verschwanden lautlos
+  aus der Übersicht (`ketten.test.ts` pinnte das). Was nach dem ersten Durchgang in keiner
+  Kette liegt, wird **hinten** angehängt, mit gefolgter Kette statt als nackte Einzelköpfe:
+  der Zyklus bricht ohnehin ab, und so bleibt die Verwandtschaft sichtbar statt als n
+  gleichnamige Karten nebeneinander — das Bild, gegen das N23 gebaut wurde. Die
+  Listenreihenfolge der echten Köpfe bleibt; ein Datenfehler sortiert die Sicht nicht um.
 - **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
   („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
   EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
@@ -1101,14 +1338,52 @@ Errors (LFH-168). Sie werden **behoben, nicht ignoriert** — und zwar an der Wu
 
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 
-Es gibt weiterhin **kein CI**. Die Durchsetzungsinstanz ist lokal:
+**Seit LFH-522 läuft das Gate auch in der CI** (`.github/workflows/ci.yml`) — und zwar,
+indem der Workflow `scripts/check-all.sh` **unverändert** aufruft. Die Reihenfolge bleibt
+damit: das Skript ist die Wahrheit, die CI ist nur ein zweiter Ort, an dem es läuft. Wer
+einen Schritt ergänzt, ergänzt ihn im Skript; ein Workflow, der seine Schritte selbst
+zusammenstellt, driftet vom lokalen Lauf ab, und dann prüft niemand mehr dasselbe.
+Lokal bleibt es der Weg vor dem Merge:
 
 ```bash
 ./scripts/check-all.sh     # alle Gates, vor dem Merge
 ```
 
-Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-codegen.sh`
-(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e`.
+Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `pnpm lint` →
+`check-typ-codegen.sh` (enthält `tsc`) → `cargo test --workspace` → Vitest →
+`check-deps.sh` → `pnpm e2e` → `release-ruhefenster.test.sh` → `check-deps.test.sh`.
+
+- **Schritt 1 prüft zwei Sprachen, nicht eine** (LFH-354). `prettier --check` liegt **in**
+  `check-fmt.sh` statt in einem eigenen Schritt: es ist dieselbe Frage wie bei rustfmt
+  („weicht die Formatierung von der Baseline ab?"), kostet Sekunden, und ein neuer Schritt
+  hätte `check-all.sh` umnummeriert, ohne etwas anderes zu fragen. Prettier lief bis dahin
+  in **keinem** Gate-Schritt, obwohl es seit jeher devDependency ist; die Folge war keine
+  Warnung, sondern ein stiller Aufschlag auf fremde Diffs — beim LFH-352-Merge zwei
+  Bestandsdateien mit rund 250 Zeilen Diff, token-genau gegengeprüft reine Formatierung.
+  **Das Gate steht nur, weil der einmalige Sweep davor lag** (564 von 787 Dateien wichen ab)
+  — ein rot geborenes Gate wird abgeschaltet statt befolgt.
+  **Prettier ist dabei nicht idempotent, und das ist gemessen:** nach dem ersten `--write`
+  wichen sechs Dateien weiterhin ab, weil eine Methodenkette wie
+  `vi.fn().mockResolvedValue({…})` im zweiten Lauf anders umbricht als im ersten. Ein Gate
+  prüft einen **Fixpunkt**; wer nach einem einzelnen `--write` noch rot ist, lässt es ein
+  zweites Mal laufen, statt die Datei von Hand zu biegen.
+  **Was der Sweep nicht anfassen durfte, steht in `frontend/.prettierignore`** — und die drei
+  generierten Dateien dort sind kein Geschmack: `openapi.json` und `types.generated.ts`
+  entstehen in `check-typ-codegen.sh` (Schritte 1+2) und werden dort in Schritt 3 per
+  `git diff --exit-code` geprüft. Formatiert committet, schriebe der Generator sie bei jedem
+  Lauf unformatiert zurück — das Typ-Gate wäre dauerhaft rot, während das Formatier-Gate das
+  Gegenteil verlangte. Zwei Gates, die einander brechen. Wer eine Datei ergänzt, begründet
+  sie dort; ein Einzelfall-Fix an der Datei selbst ist der falsche Ort.
+  **Eine `.git-blame-ignore-revs` braucht so ein Sweep NICHT — und das ist gemessen, nicht
+  angenommen.** Die naheliegende Sorge („564 Dateien Formatierung entwerten `git blame`
+  fürs ganze Frontend") trifft nicht zu: über 80 Dateien mit zusammen 14 100 Zeilen
+  beansprucht der Sweep-Commit im Blame genau **18 Zeilen**, und `blame.ignoreRevsFile`
+  ändert daran **nichts** — es sind die Zeilen, die Prettier durch einen Umbruch neu
+  erzeugt hat und die deshalb gar keinen Vorgänger haben, auf den git sie umhängen könnte.
+  Den Rest ordnet gits eigene Verschiebungserkennung von selbst dem Ursprungs-Commit zu.
+  Eine Ignore-Datei wäre hier also ein Artefakt ohne Wirkung, das eine Zusicherung behauptet,
+  die es nicht einlöst. Wer den nächsten Sweep fährt, misst nach, statt die Datei vorsorglich
+  anzulegen.
 
 - **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
   `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
@@ -1134,12 +1409,95 @@ Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-co
   --workspace` (Schritt 4) das bin-Target ohnehin mitbaut — e2e ist hier also faktisch
   immer dabei (+~30 s). Der Guard schützt die Fälle daneben: verkürzte Läufe, einzeln
   von Hand aufgerufene Schritte.
+  **Schritt 7 baut seit LFH-356 auch den Prod-Bundle** (`prod_bundle_bereitstellen`), und zwar
+  nur bei Bedarf: fehlt `frontend/dist/sw.js` oder ist eine Quelle neuer, läuft `pnpm build`
+  (~26 s lokal, ~1 min auf 2 vCPU). Grund ist `e2e/lagekarte-offline-precache.spec.ts`: einen
+  **Service Worker gibt es nur im Build** — `vite-plugin-pwa` ist ohne `devOptions` im
+  Dev-Server gar nicht aktiv, und sein Dev-SW wäre kein Precache der gehashten Assets, also
+  eine Attrappe. Ohne den Build überspringt sich der Spec laut, und ein Nachweis, der nie
+  läuft, ist keiner. **Ausgeliefert wird der Bundle vom e2e-Backend**, nicht von
+  `vite preview`: `src/static_files.rs` liest `frontend/dist` im Debug-Build zur Laufzeit vom
+  Dateisystem, das Backend läuft ohnehin, und damit ist die Seite same-origin mit der API —
+  kein zweiter Webserver, kein Preview-Proxy. In der geteilten CI baut jeder der vier Shards
+  (welcher den Spec fährt, steht vorher nicht fest); sie laufen parallel, der Aufschlag ist
+  einmal ~1 min. Bewusst **kein** dist-Artefakt zwischen den Jobs — das wäre ein Schritt, den
+  nur die CI kennt, und damit die Drift, gegen die LFH-522 den Workflow auf dieses Skript
+  zurückgeführt hat.
 - **Kein `| tail` um Gate-Kommandos** — das maskiert den Exit-Code, und eine rote Suite
   sieht dann grün aus.
+- **Ein Release entsteht nicht mehr je Merge, sondern je Arbeitsschub.** Der Release-Job
+  hängt weiter am grünen Push-Gate, tritt davor aber selbst zurück, wenn auf dem Kanal
+  schon ein neuerer Commit liegt — dessen Lauf macht das eine Sammel-Release, und die
+  Notizen enthalten die übersprungenen Commits mit. Dazu ein Ruhefenster von 15 Minuten
+  auf den jüngsten Commit für den Fall, dass das Gate schneller ist als der Abstand
+  zwischen zwei Merges. Träger ist `scripts/release-ruhefenster.sh` (Aufruf in
+  `release.yml`, Begründung im Dateikopf), Schritt 8 des Gates ist sein Selbsttest.
+  **Ein übersprungener Release-Job ist der Normalfall, kein Fehlerbild.**
+  **`chore(release):`-Commits zählen dabei nicht als „neuer Commit"** — sie sind der
+  Versions-Commit von semantic-release und danach HEAD des Kanals; ein naiver Vergleich
+  „HEAD == mein Commit?" liesse ab dem ersten Release JEDEN Lauf zurücktreten, und es
+  entstünde nie wieder eine Version. Dasselbe gilt für den Zeitstempel, an dem das
+  Ruhefenster rechnet: zwei Stellen, zwei Tests (Fall 3 und 6 im Selbsttest).
+  Wer das Fenster vergrössert, hebt den Job-Timeout in `release.yml` mit und bedenkt, dass
+  Push-Läufe desselben Kanals in EINER Nebenläufigkeitsgruppe stehen — ein wartender
+  Release hält den nächsten Gate-Lauf auf.
 
 `scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
 `cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories
 stehen mit Begründung in `.cargo/audit.toml` — was dort **nicht** steht, bricht den Build.
+
+**Die beiden Hälften haben BEIDE einen benannten Ort, und es sind nicht dieselben**
+(LFH-354). Rust: `.cargo/audit.toml`, eine Ignorier-Liste mit Begründung je Eintrag.
+Frontend: der **`overrides`-Block in `frontend/pnpm-workspace.yaml`** — dort steht die
+erzwungene sichere Mindestversion samt Kette und Begründung, und **eine Ignorier-Liste gibt
+es bewusst nicht**. Der Unterschied ist keine Nachlässigkeit, sondern die Lage: bei npm lässt
+sich eine transitive Version erzwingen, bei Cargo nicht. Genau deshalb braucht die Rust-Seite
+ein Werkzeug zum Stummschalten und die Frontend-Seite keines — **jeder `high`-Fund bricht und
+wird behoben**, `moderate`/`low` melden nur (`--audit-level=high`, sonst wäre das Gate durch
+Dev-Tooling-Rauschen dauerrot).
+**Ein leerer `auditConfig.ignoreGhsas`-Block „für später" gehört NICHT angelegt**, obwohl
+pnpm ihn mitbrächte: eine Ausnahmeliste ohne Eintrag sichert nichts zu — dieselbe Linie wie
+„ein Eintrag ohne Verstoß gilt selbst als Verstoß" bei der Dichte-Schuldmenge. Wer den ersten
+echten Fall hat — ein `high`-Advisory, das WEDER über einen Override noch über ein Upgrade
+erreichbar ist —, führt den Block **mit** diesem Eintrag ein, nach dem Muster von
+`.cargo/audit.toml`: warum kein Upgrade möglich ist, warum das Risiko in diesem Code nicht
+trägt, und woran man merkt, dass sich das ändert.
+**Bei einem Override werden BEIDE Grenzen gepflegt**, der Bereich und die Zielversion: dass
+ein Advisory sich unter einem festgenagelten Ziel wegbewegt und das Gate ohne eine Zeile
+Codeänderung rot wird, ist im Bestand dreimal passiert (`nanoid`, `fast-uri`, `js-yaml`).
+
+**Das Advisory-Gate prüft das Lockfile, nicht den lokalen Installationszustand**
+(LFH-316). Der Befund war zwei Arbeitsbäume desselben Commits mit zwei Antworten — der
+lang gewachsene Haupt-Checkout gab Entwarnung, der frische Worktree meldete zwei Funde.
+Ein falsch-grünes Sicherheits-Gate ist schlechter als gar keines: es erzeugt begründetes
+Vertrauen. Der Frontend-Audit läuft deshalb in einem Wegwerf-Verzeichnis **ausserhalb des
+Arbeitsbaums**, in dem ausschliesslich `package.json`, `pnpm-lock.yaml` und
+`pnpm-workspace.yaml` liegen; `node_modules` kann das Ergebnis nicht mehr erreichen.
+**Die Ursache aus dem Ticket ist dabei korrigiert, nicht übernommen** — gemessen an
+pnpm 11.10.0 liest `pnpm audit` die *wanted lockfile*
+(`plugin-commands-audit/lib/audit.js` ruft `readWantedLockfile`), und ein nachgebautes
+stale `node_modules` ändert die Antwort heute **nicht**. Genau darauf ruhte die
+Zusicherung aber, und nichts pinnte sie: die Hilfe desselben Aufrufs sagt „Checks for
+known security issues with the **installed** packages", und `frontend/mise.toml` führt
+pnpm als `latest`. Eine Eigenschaft, die man sich von einer Bibliotheksversion leiht, ist
+keine Zusicherung — der Umbau stellt sie strukturell her.
+**Zwei Dinge gehören dazu, sonst kippt das falsche Grün nur die Seite:**
+`pnpm-workspace.yaml` **muss** mitkopiert werden (dort stehen seit pnpm 10 die Overrides —
+ohne sie liefe das Gate falsch ROT, und ein grundlos rotes Gate wird abgeschaltet), und
+die Kopierliste trägt einen **Riegel gegen ihre eigene Veralterung**: bekommt das Frontend
+echte Workspace-Pakete, fehlen deren `package.json` im Wegwerf-Verzeichnis und der
+Audit-Baum wäre still unvollständig — das Skript bricht deshalb laut ab, sobald das
+Lockfile einen Importer neben `.` führt. Der **Node-Pin** (`node@26.7.0`) steht jetzt auch
+hier, nicht nur in `check-all.sh`: er ist dieselbe Hälfte der Frage, auf welcher Maschine
+das Gate dasselbe sagt.
+**Schritt 9 ist der Selbsttest dazu** (`scripts/check-deps.test.sh`, im `schnell`-Bündel,
+ohne Netz, ~1 s). Er misst **nicht**, was der Audit findet — das hängt an der
+Advisory-Datenbank und ändert sich über Nacht —, sondern worauf er schaut und ob sein
+Urteil durchschlägt. Die tragenden Aussagen sind die **negativen**: „der Audit sieht
+`node_modules` NICHT" und „ein Fund bricht das Gate". „Er sieht das Lockfile" allein wäre
+auch dann grün, wenn er nebenher den halben Arbeitsbaum sähe. Per Mutationsprobe belegt:
+der Audit zurück auf `-C "$FE"` färbt drei Aussagen rot, der entfernte Importer-Riegel
+zwei, die fehlende `pnpm-workspace.yaml` eine.
 
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 
@@ -1151,7 +1509,7 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
 
 - **Nach einer Backend-Typänderung** (Struct-/Enum-/Feld-Änderung an einem Response-DTO):
   `scripts/check-typ-codegen.sh` laufen lassen und die regenerierten `openapi.json` +
-  `types.generated.ts` **mitcommitten**. Das Skript ist das Drift-Gate (kein CI): es emittiert
+  `types.generated.ts` **mitcommitten**. Das Skript ist das Drift-Gate: es emittiert
   die Spec, regeneriert die TS, bricht per `git diff --exit-code`, wenn etwas nicht committet
   ist, und fährt `tsc`. Ein Feld-Rename bricht damit Build/Test statt still zur Laufzeit.
 - **Enum-Werte:** Domänen-Enums tragen wire-korrektes `#[serde(rename…)]`; `String`-Felder,
@@ -1197,7 +1555,15 @@ Adresse + clamd weg/Timeout → **fail-closed 503** (Default) bzw. `--clamav-fai
 still). Der reine No-op-/Fehlkonfig-Stub (`#[cfg(not(feature = "clamav"))]`) läuft nur unter
 **`cargo test --no-default-features`** — wer `src/anhang/mod.rs`/`clamd_scan` anfasst, sollte
 beide fahren. Der Scan-Wiring-Test (`tests/karte_hintergrundbild_scan.rs`) übt gegen
-`127.0.0.1:1` (ECONNREFUSED) in BEIDEN Builds den fail-closed-503-Pfad. Es gibt kein CI.
+`127.0.0.1:1` (ECONNREFUSED) in BEIDEN Builds den fail-closed-503-Pfad. Die CI fährt nur
+den Default-Build; `--no-default-features` bleibt Handarbeit an dieser Datei.
+
+**Der `unix:`-Zweig ist plattformgetrennt** (LFH-522): `clamav_client::tokio::Socket` ist in
+der Crate mit `#[cfg(unix)]` gated, weshalb `clamd_verbinden` in zwei cfg-Varianten vorliegt.
+Ohne diese Trennung ist das gesamte Crate für `x86_64-pc-windows-gnu` nicht übersetzbar
+(E0422) — gemessen, nicht vermutet. Unter Windows bleibt TCP; eine dort konfigurierte
+`unix:`-Adresse endet als `ScannerNichtErreichbar` mit lauter Warnung, also in derselben
+fail-open/closed-Entscheidung wie jeder andere Ausfall.
 
 ## Backend — Statuscode-Konvention (LFH-267/F22)
 
@@ -1243,6 +1609,37 @@ Die Unterscheidung ist im Frontend heute nur **Heuristik**, kein Vertrag: `istKo
 409 in einer Route mit CAS-Dialog einführt, muss diesen Zweig mitziehen** — sonst läuft die
 Seite wieder in „Überschreiben?"-Schleifen. Ein maschinenlesbarer Fehler-Code im `{error}`-Body
 wäre die saubere Lösung und ist bewusst vertagt.
+
+**Die Baseline wird beim ÖFFNEN der Maske eingefroren, nicht beim Absenden gelesen**
+(LFH-303). Träger ist `components/useEditSitzung.ts`; `PersonenDetailPage`,
+`TiereDetailPage` und `SchaedenDetailPage` — die drei Seiten mit CAS-Dialog — konsumieren
+es. Gelesen aus den Live-Query-Daten hebelte `basis: t.geaendert_at` das Lock aus, das es
+setzen sollte: der QueryClient fährt `staleTime: 10_000` und lässt TanStacks Vorgaben
+`refetchOnWindowFocus`/`refetchOnReconnect` (beide `true`) stehen. Wer während offener
+Maske das Fenster wechselt und nach mehr als zehn Sekunden zurückkommt, hat den **fremden,
+neueren** Stand im Cache; der ging als Baseline raus, der Server verglich ihn mit sich
+selbst, die Prüfung passte — und die fremde Änderung war still überschrieben. Also genau
+der Lost-Update, gegen den F10 gebaut wurde, nur mit Fensterwechsel als Auslöser.
+**`refetchOnWindowFocus` abzuschalten wäre die kleinere Lösung gewesen**: der
+Fensterwechsel ist nur einer der Auslöser ohne Nutzeranlass — ein Netzwechsel
+(`refetchOnReconnect`) und jede `invalidateQueries` auf den Detail-Key tun dasselbe. Ein
+Flag schlösse einen Auslöser, der eingefrorene Stand schließt die Klasse.
+**Der Riegel gegen erneutes Driften ist ein Typ, kein Scanner**: `basis` ist eine
+`CasBasis` (gebrandeter `string`), und die entsteht ausschließlich in `useEditSitzung`. Ein
+`basis: t.geaendert_at` bricht damit den **Typcheck** — per Mutationsprobe belegt
+(`TS2322: Type 'string' is not assignable to type 'CasBasis'`). Ein Regex-Guard hätte die
+Schreibweise `const b = t.geaendert_at` nicht gesehen. Nach `string` bleibt `CasBasis`
+zuweisbar, die API-Funktionen und `patchBody` ändern sich also nicht.
+**Zwei gemessene Fallen daran:** `starte` nimmt den **Datensatz**, nicht den Zeitstempel —
+so ist eine fremde Zeichenkette als Basis nicht bloß verboten, sondern nicht formulierbar;
+und es befüllt das Formular gleich mit, weil nur ein gemeinsamer Aufruf belegt, dass Werte
+und Basis aus einem Snapshot stammen. Ein Test dafür braucht ein **gemountetes**
+`<Form form={form}>`: eine `Form.useForm()`-Instanz ohne angehängtes Formularelement
+verwirft `setFieldsValue` still (rc-field-form warnt nur auf der Konsole), die Zusicherung
+„das Formular ist befüllt" wäre dort nicht widerlegbar, weil sie immer scheiterte.
+**`UhsDetailPage` ist nicht betroffen** — sie hat gar keine Bearbeiten-Maske; der einzige
+UHS-PATCH ist das lat/lon-Setzen der Lagekarte und schreibt bewusst ohne Lock. Bekommt die
+UHS eine Maske, nimmt sie dasselbe Primitiv.
 
 **Die Konvention gilt in jeder Schicht**, nicht nur in `src/routes/`. Die ~89
 `AppError::Validation`-Stellen in `repo`/`parse`/`config` wurden bewusst **nicht** auditiert

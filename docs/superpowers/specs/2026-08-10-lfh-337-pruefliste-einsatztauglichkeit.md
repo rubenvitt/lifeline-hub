@@ -25,7 +25,7 @@ oder kritischen Aktionen — mehrere Zeilen sind deshalb ehrlich `nicht anwendba
 | # | Kriterium | Verdikt | Begründung |
 |---|---|---|---|
 | 1 | **Treffläche** — Boden ≥ 24 × 24 CSS px oder 24-px-Umkreis frei; zeitkritische Aktion ≥ 48 × 48 px mit ≥ 8 px Abstand. | **erfüllt** | Die Rail trägt den Boden über die reine, exportierte Funktion `railZielStil` mit `Math.max(48, token.controlHeight)` — direkt als Rückgabewert gepinnt in `IconRail.test.tsx` (`hoehe('kompakt')` = 48, `hoehe('komfortabel')` = 48, `hoehe('handschuh')` = 72), kein Rendering nötig, da die Funktion pur ist. `CommandPaletteTrigger.tsx` trägt unter `lg` einen festen 48-px-Boden (Test „bleibt unter lg eine benannte 48-px-Icon-Trefflaeche"). Modul-Panel-Zeilen (inkl. der neuen „Zuletzt"-Zeile, die dieselbe `ModulListe` nutzt) erben den Boden unverändert aus LFH-329/365. |
-| 2 | **Handschuh-Modus** vorhanden und geprüft — Zeilenhöhe ≥ 72 px, Abstand ≥ 16 px. | **offen → LFH-516** (<https://app.clickup.com/t/123zgec121u>) | Der Mechanismus ist vorhanden und in Vitest gepinnt (siehe Zeile 1: `hoehe('handschuh')` = 72, Padding `16px 8px`). Im Browser ist er für diese Route nicht gemessen: `e2e/trefflaeche-tablet.spec.ts` grenzt sich ausdrücklich gegen die IconRail ab („Alle drei sind an ihrer Fundstelle ausdrücklich als Trefffläche und NICHT als Dichte-Angabe festgeschrieben"), `e2e/nav-schmal.spec.ts` misst nur die 48-px-Stufe auf schmalem Schirm, kein Test in beiden Dateien setzt `handschuh`-Dichte. Dieselbe Lücke, die LFH-336 für Lage-Dashboard/Einsatzliste unter LFH-396 führte. **Korrektur (05.09.2026, beim Schließen von LFH-396):** eine frühere Fassung verwies auch diese Zeile auf LFH-396 — das Ticket ist aber auf zwei Routen und fünf benannte Ziele gescopt, sein Spec `e2e/gate3-trefflaeche.spec.ts` deckt keine Fläche des Navigationsrahmens; ein Zielticket, das den Posten nicht kennt, ist ein toter Verweis. Rail, Panel, Kopfzeilen und Palette liegen deshalb als eigener Nachzug in LFH-516. Zusätzlicher Befund dazu unten unter „Offene Nachzüge". |
+| 2 | **Handschuh-Modus** vorhanden und geprüft — Zeilenhöhe ≥ 72 px, Abstand ≥ 16 px. | **erfüllt** (LFH-516, 11.09.2026) | Im Browser gemessen in `frontend/e2e/gate3-trefflaeche.spec.ts`, drei neue Tests über **alle drei** Dichtestufen mit `boundingBox()` als Untergrenze und Böden als Literale: „Navigationsrahmen inline" (Rail 51,8 / 59,8 / **72**, Modul-Panel-Zeile 32 / 48 / **72**, Einsatz-Wechsler, beide Alarm-Knöpfe und der Suchzugang je 30 / 48 / **72**, Benutzermenü 40 / 48 / **72**, Palettenzeile 36 / 58 / **86**), „Globale Kopfzeile" (Logo 34 / 48 / **72**, Verwaltungs-Link, Suchzugang je 30 / 48 / **72**, Benutzermenü 40 / 48 / **72**) und „Navigations-Drawer auf 390 px" (Hamburger beide Achsen 48 / 48 / **72**, Suchzugang schmal und Modulzeile je 48 / 48 / **72**). Mutationsprobe gefahren, Protokoll im Kopfkommentar des Specs. **Eine Teil-Ausnahme, gemessen statt übergangen** (AK4 des Tickets): Akkordeon-Kopf und Drawer-Schließer bleiben mit einem nackten `minHeight: 48` auch in Handschuh-Dichte bei **48** — sie sind mitgemessen (gegen `BODEN.fest48`, eine Untergrenze, die den Fix nicht blockiert) und liegen als **LFH-537** (<https://app.clickup.com/t/123zgec2c09>). **Historie:** eine frühere Fassung verwies diese Zeile auf LFH-396 — das Ticket ist aber auf zwei Routen und fünf benannte Ziele gescopt und kannte den Navigationsrahmen nie; beim Schließen von LFH-396 (05.09.2026) wurde der Posten deshalb nach LFH-516 umgehängt und dort eingelöst. |
 | 3 | **Rückmeldung vor der Serverantwort** — sichtbar ≤ 100 ms; Kommandoreaktion ≤ 2 s; > 15 s nur mit Fortschrittsmeldung. | **nicht anwendbar** | Rail-Klick, Panel-Klick, Kopfzeilen-Klick und Paletten-Öffnen sind reine Client-Navigationen (`react-router`) ohne Serverantwort im Bedienpfad selbst — es gibt keine Wartezeit, die eine Rückmeldung bräuchte. |
 | 4 | **Kritische Aktion hat eine zweite Handlung** — Storno, Abschluss, Löschen, Alarmierung: je 1 zusätzliche Bestätigung. | **nicht anwendbar** | Der Navigationsrahmen führt keine kritische oder irreversible Aktion aus — er navigiert und merkt Besuche (`localStorage`). |
 | 5 | **Kontrast in beiden Modi** — Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1, nie < 4,5 : 1; Zustände, Rahmen, Fokusring ≥ 3 : 1. | **offen → Zielticket** (neu anzulegen) | Der gesperrte Link nutzt `farbenDunkel.schwach` = 5,30 : 1 gegen den Kopfzeilengrund `#001529` (Rechnung unten bei AK6/Nachweis). Das erreicht die Nacht-/Minimalschwelle (≥ 5 : 1, nie < 4,5 : 1), **verfehlt aber die Tag-Schwelle (≥ 7 : 1) deutlich**. Ein erster Entwurf dieser Zeile trug „erfüllt" mit der Begründung, die Kopfzeile bleibe in beiden App-Farbmodi dunkel (`farbenDunkel`, nicht der moduswechselnde Token) — das hält der Prüfung nicht stand: die Tag-Schwelle existiert wegen der **Umgebungshelligkeit** (Fükw bei Tageslicht gelesen), nicht wegen des gewählten Farbtokens. Eine dauerhaft dunkle Fläche wird tagsüber trotzdem bei Tageslicht gelesen. **Offene Frage fürs Zielticket:** Gilt für eine app-modus-unabhängig dunkle Fläche wie die Kopfzeile die Tag- oder die Nacht-Schwelle aus Kriterium 5? Falls Tag: `farbenDunkel.schwach` (5,30 : 1) reicht dann nicht — es bräuchte einen helleren Wert, der trotzdem als „gesperrt" von der weißen aktiven Beschriftung unterscheidbar bleibt. **Kein Rückbau von Task 2:** 5,30 : 1 ist gegenüber dem abgelösten `rgba(255,255,255,0.35)` (≈ 3,17 : 1) eine klare Verbesserung und liegt über der harten Untergrenze 4,5 : 1 — die Umsetzung ist nicht falsch, die Schwellenfrage ist ungeklärt. Der Rail-Aktivzustand nutzt unverändert `farbenDunkel.bedien` (8,67 : 1, aus LFH-328/A2 gemessen, in `IconRail.test.tsx` per Rollenvergleich gepinnt) — diese Zahl liegt über beiden Schwellen und ist von der offenen Frage nicht betroffen. |
@@ -40,15 +40,17 @@ oder kritischen Aktionen — mehrere Zeilen sind deshalb ehrlich `nicht anwendba
 | 14 | **Tabellenseite vollständig** — fixierte Kopfzeile, fixierte menschenlesbare Identifierspalte, umschaltbarer Spaltensatz mit Zähler ausgeblendeter Spalten, keine Auflösung in Karten, wo verglichen wird. | **nicht anwendbar** | Keine `<Table>` im Navigationsrahmen (`grep -rn "<Table"` über die fünf Kerndateien → 0 Treffer; ein loses `grep "Table"` liefert zwei Fehltreffer aus „Führungs-**Tablet**" in Kommentaren, kein Komponenten-Treffer). Ohne Tabelle entfallen Kopfzeile, Identifierspalte, Spaltenschalter und die Vergleichsfrage („wo verglichen wird") gemeinsam — der Navigationsrahmen ist Navigation, kein Vergleichsinstrument. |
 | 15 | **Erfassungsmaske vollständig** — Defaults vorbelegt, sichtbar und einzeln überschreibbar, „Speichern und nächsten anlegen" mit gehaltenem Kontext, Sammelliste mit Ändern/Entfernen je Zeile, Labels über dem Feld, volle Tastaturbedienung. | **nicht anwendbar** | Keine Erfassungsmaske im Navigationsrahmen; das Suchfeld der Befehlspalette ist ein Filter über bestehende Befehle/Module, kein Datenerfassungsformular — es legt nichts an, hat keine Defaults, kein „Speichern und nächsten" und keine Sammelliste im Sinne des Kriteriums. |
 
-**Verteilung:** 5 erfüllt (1, 7, 11, 12, 13), 3 offen (2, 5, 8 — je mit Zielticket, zwei
-davon bestehend), 7 nicht anwendbar (3, 4, 6, 9, 10, 14, 15).
+**Verteilung** (Stand 11.09.2026, nach LFH-516): 6 erfüllt (1, **2**, 7, 11, 12, 13),
+2 offen (5, 8 — je mit Zielticket), 7 nicht anwendbar (3, 4, 6, 9, 10, 14, 15).
+Bis zum 11.09.2026 stand Kriterium 2 als dritter offener Punkt.
 
 Eine Prüfliste, die hier 15-mal „erfüllt" behauptet hätte, wäre unglaubwürdig — der
 Navigationsrahmen berührt naturgemäß nur einen Teil der 15 Kriterien inhaltlich (keine
-Tabellen, Formulare, Alarme, kritischen Aktionen), und selbst innerhalb der berührten
-Kriterien bleiben zwei echte Lücken: Kriterium 2 (kein Browser-Test in
-Handschuh-Dichte) und Kriterium 5 (die Kontrastschwelle für eine app-modus-unabhängig
-dunkle Fläche ist selbst ungeklärt, nicht nur ihr Nachweis).
+Tabellen, Formulare, Alarme, kritischen Aktionen). Von den zwei echten Lücken innerhalb
+der berührten Kriterien ist eine geschlossen: Kriterium 2 (der Browser-Test in
+Handschuh-Dichte) liegt seit LFH-516 gemessen vor. Offen bleibt Kriterium 5 — dort ist
+die Kontrastschwelle für eine app-modus-unabhängig dunkle Fläche selbst ungeklärt, nicht
+nur ihr Nachweis; das ist eine Entscheidungs-, keine Messlücke.
 
 ## AK-Korrekturen
 
@@ -233,18 +235,25 @@ Tickets werden können.
    (`git log -S` zeigt ältere Commits wie `8b216b4c`/`7d764ea0`) und sind kein
    LFH-337-Befund — nur die fünf oben genannten sind in diesem Branch neu entstanden.
 7. **`e2e/trefflaeche-tablet.spec.ts`s Ausschlussbegründung für die Rail ist seit
-   Task 3 sachlich überholt.** Der Datei-Kopfkommentar (Zeile ~35) nennt
-   `IconRail.tsx:43-45` als Beispiel für eine „bewusst FESTE" 48-px-Trefffläche, die dem
-   Handschuh-Test deshalb absichtlich nicht folgt. Seit Commit `5c5d4298` (Task 3) trägt
-   `railZielStil` aber `Math.max(48, token.controlHeight)` — die Rail folgt der
-   Dichte-Staffel und wächst in Handschuh-Dichte auf 72 px (siehe Kriterium 1 oben,
-   Vitest-Beleg). Der Kommentar beschreibt damit nicht mehr den aktuellen Code, und es
-   fehlt weiterhin ein Browser-Test, der die jetzt dichte-folgende Rail in
-   Handschuh-Dichte tatsächlich auf 72 px misst (derselbe Befund wie Kriterium 2 oben).
-   Zielticket-Kandidat: Kommentar korrigieren UND die Rail in den nächsten
-   Gate-3-Handschuh-Test aufnehmen — beides gehört unter **LFH-516**
-   (<https://app.clickup.com/t/123zgec121u>; bis 05.09.2026 stand hier LFH-396, das den
-   Navigationsrahmen nie im Scope hatte).
+   Task 3 sachlich überholt.** — **erledigt in LFH-516 (11.09.2026).** Der
+   Datei-Kopfkommentar nannte `IconRail.tsx:43-45` als Beispiel für eine „bewusst FESTE"
+   48-px-Trefffläche, die dem Handschuh-Test deshalb absichtlich nicht folgt; seit Commit
+   `5c5d4298` (Task 3) trägt `railZielStil` aber `Math.max(48, token.controlHeight)`.
+
+   Die Rail selbst war schon vorher aus der Liste herausgenommen und wird in Abschnitt (b)
+   desselben Specs mitgemessen. LFH-516 hat den **zweiten, noch offenen Teil** desselben
+   Befunds erledigt: die Liste nannte weiterhin den **Hamburger** und pauschal „die
+   Drawer-Trefffläche in `ModulAkkordeon.tsx:44`" als feste 48er — im Browser widerlegt,
+   beide rechnen `Math.max(48, controlHeight)` und messen auf 390 px 48 / 48 / **72**
+   (`gate3-trefflaeche.spec.ts`, Test „Navigations-Drawer auf 390 px"). Der Kopfkommentar
+   nennt jetzt je Stelle, WAS sie rechnet, statt sie bloß auszunehmen; fest sind allein
+   Akkordeon-Kopf und Drawer-Schließer → **LFH-537**
+   (<https://app.clickup.com/t/123zgec2c09>).
+
+   Der zweite Halbsatz des Befunds — „es fehlt ein Browser-Test, der die jetzt
+   dichte-folgende Rail in Handschuh-Dichte tatsächlich auf 72 px misst" — ist mit
+   Kriterium 2 oben eingelöst (gemessen: 51,8 / 59,8 / **72**).
+   (Bis 05.09.2026 stand hier LFH-396, das den Navigationsrahmen nie im Scope hatte.)
 
 **Commit-Message-Sprache (zur Vollständigkeit, nicht als offener Punkt).** Die
 Commit-Messages der Tasks 1–5 tragen ASCII-Transliteration statt Umlauten

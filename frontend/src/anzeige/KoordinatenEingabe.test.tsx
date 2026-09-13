@@ -79,9 +79,7 @@ describe('KoordinatenEingabe', () => {
   });
 
   it('interner Fehler überschreibt externen status (error hat Vorrang vor warning)', () => {
-    const { container } = render(
-      <KoordinatenEingabe value={null} onChange={() => {}} />,
-    );
+    const { container } = render(<KoordinatenEingabe value={null} onChange={() => {}} />);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'quatsch' } });
     expect(container.querySelector('.ant-input-status-error')).not.toBeNull();
   });
@@ -126,6 +124,8 @@ describe('KoordinatenEingabe', () => {
     renderMitProviders(
       <KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} einsatzId={1} />,
     );
-    expect(await screen.findByText(/Hauptstr\. 5, Musterstadt · 1[.,]20 km NO von Einsatzort/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Hauptstr\. 5, Musterstadt · 1[.,]20 km NO von Einsatzort/),
+    ).toBeInTheDocument();
   });
 });

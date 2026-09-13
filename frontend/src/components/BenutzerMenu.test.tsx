@@ -40,8 +40,13 @@ const ANZEIGENAME = 'Chef Dienst';
 const INITIALEN = 'CD';
 
 const benutzer = {
-  id: 1, anzeigename: ANZEIGENAME, benutzername: 'chef', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: ANZEIGENAME,
+  benutzername: 'chef',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 
 function zeige() {

@@ -41,7 +41,10 @@ export function legeOnlineQuelleAn(body: OnlineQuelleBody): Promise<OnlineQuelle
   return apiSend<OnlineQuelle>('/api/karte/online-quellen', 'POST', body);
 }
 
-export function aktualisiereOnlineQuelle(id: number, body: OnlineQuelleBody): Promise<OnlineQuelle> {
+export function aktualisiereOnlineQuelle(
+  id: number,
+  body: OnlineQuelleBody,
+): Promise<OnlineQuelle> {
   return apiSend<OnlineQuelle>(`/api/karte/online-quellen/${id}`, 'PATCH', body);
 }
 

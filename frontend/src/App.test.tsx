@@ -11,14 +11,61 @@ import { http, HttpResponse } from 'msw';
 import { server } from './test/server';
 import { SITZUNG_ABGELAUFEN } from './auth/sitzungsEvent';
 
+/**
+ * LFH-541: Die Routing-Tests hängen nicht mehr am `stab`-Eintrag der echten Registry.
+ *
+ * Drei Stellen prüften hier „🚧 Stab" — zwei davon nur als Barriere („die Seite steht"), eine
+ * als echte Zusicherung („eine WIP-Route rendert den Stub"). Alle drei brachen nicht an der
+ * Statusachse, sondern an `MODUL_ELEMENTE`: `App.tsx` wählt den Stub über die **Abwesenheit**
+ * eines Elements (`MODUL_ELEMENTE[m.key] ?? <ModulStub …>`), nicht über `status === 'wip'`.
+ * Mit der Freischaltung von `stab` (LFH-46/ST4) bekommt es ein Element — und die drei Tests
+ * hätten still die echte Seite geprüft statt den Stub.
+ *
+ * Deshalb ein synthetisches WIP-Modul: es hat keinen `MODUL_ELEMENTE`-Eintrag und kann keinen
+ * bekommen, die Zusicherung ist damit dauerhaft. Anders als bei `ModulStub.test.tsx` greift der
+ * Registry-Stub hier, weil `App.tsx` `modulRegistry` als benannten Import liest — nicht als
+ * Default-Argument im eigenen Modul-Scope.
+ *
+ * Gestubbt wird NUR die Datentabelle; die Freigabefunktionen bleiben die echten, sonst prüfte
+ * der Test seine eigene Attrappe (Muster `command-palette/befehle.modulstatus.test.ts`).
+ */
+vi.mock('./einsatz/modulRegistry', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('./einsatz/modulRegistry')>();
+  return {
+    ...echt,
+    modulRegistry: [
+      ...echt.modulRegistry,
+      {
+        key: 'wip-probe',
+        kategorie: 'fuehrung',
+        label: 'WIP-Probe',
+        icon: () => null,
+        route: 'wip-probe',
+        status: 'wip',
+        beschreibung: 'Platzhalter-Beschreibung für den Stellvertreter-Test.',
+      },
+    ],
+  };
+});
+
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 const einsatz = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null,
-  abgeschlossen_von: null, meine_rolle: 'einsatzleitung',
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-23 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  meine_rolle: 'einsatzleitung',
 };
 
 afterEach(() => vi.restoreAllMocks());
@@ -26,13 +73,18 @@ afterEach(() => vi.restoreAllMocks());
 function renderApp(route: string) {
   const client = neuerQueryClient();
   const router = createMemoryRouter(appRouten, { initialEntries: [route] });
-  return { router, ...render(
-    <QueryClientProvider client={client}>
-      <ConfigProvider>
-        <AntApp><RouterProvider router={router} /></AntApp>
-      </ConfigProvider>
-    </QueryClientProvider>,
-  ) };
+  return {
+    router,
+    ...render(
+      <QueryClientProvider client={client}>
+        <ConfigProvider>
+          <AntApp>
+            <RouterProvider router={router} />
+          </AntApp>
+        </ConfigProvider>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 describe('App-Routing', () => {
@@ -49,16 +101,20 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
-    const ziel = '/einsaetze/7/stab?ansicht=detail#lage';
+    const ziel = '/einsaetze/7/wip-probe?ansicht=detail#lage';
     const { router } = renderApp(ziel);
     await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
     await userEvent.type(screen.getByLabelText('Passwort'), 'test-passwort');
     await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
-    await screen.findByText(/🚧 Stab/);
+    await screen.findByText(/🚧 WIP-Probe/);
     expect(router.state.location).toMatchObject({
-      pathname: '/einsaetze/7/stab', search: '?ansicht=detail', hash: '#lage',
+      pathname: '/einsaetze/7/wip-probe',
+      search: '?ansicht=detail',
+      hash: '#lage',
     });
-    await act(async () => { await router.navigate('/einsaetze'); });
+    await act(async () => {
+      await router.navigate('/einsaetze');
+    });
     expect(await screen.findByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
     expect(pruefungen).toBe(1);
   });
@@ -72,9 +128,11 @@ describe('App-Routing', () => {
     );
     const { router } = renderApp('/einsaetze');
     await screen.findByRole('button', { name: 'Neuer Einsatz' });
-    const ziel = '/einsaetze/7/stab?ansicht=detail#lage';
-    await act(async () => { await router.navigate(ziel); });
-    await screen.findByText(/🚧 Stab/);
+    const ziel = '/einsaetze/7/wip-probe?ansicht=detail#lage';
+    await act(async () => {
+      await router.navigate(ziel);
+    });
+    await screen.findByText(/🚧 WIP-Probe/);
     act(() => window.dispatchEvent(new Event(SITZUNG_ABGELAUFEN)));
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(router.state.location.state).toMatchObject({ von: ziel });
@@ -150,8 +208,8 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
-    renderApp('/einsaetze/7/stab');
-    await waitFor(() => expect(screen.getByText(/🚧 Stab/)).toBeInTheDocument());
+    renderApp('/einsaetze/7/wip-probe');
+    await waitFor(() => expect(screen.getByText(/🚧 WIP-Probe/)).toBeInTheDocument());
   });
 
   it('gefahren-Route rendert die Gefahrenmatrix statt auf die Lagekarte umzuleiten', async () => {
@@ -159,7 +217,11 @@ describe('App-Routing', () => {
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/gefahrengebiete', () => HttpResponse.json([{ id: 1, einsatz_id: 7, label: 'Nord', zonen_ids: [], hoechste_warnstufe: 'keine' }])),
+      http.get('/api/einsaetze/7/gefahrengebiete', () =>
+        HttpResponse.json([
+          { id: 1, einsatz_id: 7, label: 'Nord', zonen_ids: [], hoechste_warnstufe: 'keine' },
+        ]),
+      ),
       http.get('/api/einsaetze/7/gefahrengebiete/1/matrix', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7/gefahren');
@@ -182,7 +244,12 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/einstellungen', () =>
-        HttpResponse.json({ einsatz_id: 7, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false }),
+        HttpResponse.json({
+          einsatz_id: 7,
+          etb_nummer_eingefroren: false,
+          meldung_nummer_eingefroren: false,
+          auftrag_nummer_eingefroren: false,
+        }),
       ),
     );
   }

@@ -16,7 +16,10 @@ export function listeEinsatzFahrzeuge(einsatzId: number): Promise<EinsatzFahrzeu
   return apiGet<EinsatzFahrzeug[]>(`/api/einsaetze/${einsatzId}/fahrzeuge`);
 }
 
-export function disponiereFahrzeug(einsatzId: number, fahrzeugId: number): Promise<EinsatzFahrzeug> {
+export function disponiereFahrzeug(
+  einsatzId: number,
+  fahrzeugId: number,
+): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge`, 'POST', {
     fahrzeug_id: fahrzeugId,
   });
@@ -39,8 +42,16 @@ export function entferneDisposition(einsatzId: number, efId: number): Promise<vo
 }
 
 /** L‑2: Verortet ein Einsatzfahrzeug auf der Lagekarte. */
-export function verorteFahrzeug(einsatzId: number, efId: number, daten: PositionPatch): Promise<EinsatzFahrzeug> {
-  return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/position`, 'PATCH', daten);
+export function verorteFahrzeug(
+  einsatzId: number,
+  efId: number,
+  daten: PositionPatch,
+): Promise<EinsatzFahrzeug> {
+  return apiSend<EinsatzFahrzeug>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/position`,
+    'PATCH',
+    daten,
+  );
 }
 
 /** LFH-9: Ordnet eine Kraft (einsatz_personal.id) einem Fahrzeug als Besatzung zu. */

@@ -60,7 +60,10 @@ function regeln(): Regel[] {
 
 /** Einzelselektoren einer Gruppe (`a, b` → `['a','b']`) — `:has(a, b)` gibt es hier nicht. */
 function einzeln(regel: Regel): string[] {
-  return regel.selektor.split(',').map((s) => s.trim()).filter(Boolean);
+  return regel.selektor
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function versteckt(regel: Regel): boolean {
@@ -83,10 +86,9 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
   it('scopt jede Regel auf den Druckbereich', () => {
     for (const r of regeln()) {
       for (const s of einzeln(r)) {
-        expect(
-          /^(body\b|\.lagebericht-)/.test(s),
-          `ungescopter Selektor in ${DATEI}: ${s}`,
-        ).toBe(true);
+        expect(/^(body\b|\.lagebericht-)/.test(s), `ungescopter Selektor in ${DATEI}: ${s}`).toBe(
+          true,
+        );
       }
     }
   });
@@ -138,7 +140,9 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
     // `display:none` von rc-motion, ein wieder zugeklappter die Klasse
     // `ant-collapse-panel-hidden`; gemeinsam ist beiden `-panel-inactive`.
     const treffer = regeln().filter((r) => r.selektor.includes('.ant-collapse-panel-inactive'));
-    expect(treffer, 'ohne diese Regel druckt der Entwurf einen von acht Abschnitten').toHaveLength(1);
+    expect(treffer, 'ohne diese Regel druckt der Entwurf einen von acht Abschnitten').toHaveLength(
+      1,
+    );
     expect(treffer[0].koerper).toMatch(/display:\s*block/);
     // Ohne `!important` gewinnt der Inline-Stil des nie geöffneten Abschnitts.
     expect(treffer[0].koerper).toContain('!important');
@@ -156,7 +160,9 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
 
   it('behaelt die Bestandszusicherungen des Druckbereichs', () => {
     const bestand = regeln();
-    expect(bestand.some((r) => r.selektor.includes('.lagebericht-no-print') && versteckt(r))).toBe(true);
+    expect(bestand.some((r) => r.selektor.includes('.lagebericht-no-print') && versteckt(r))).toBe(
+      true,
+    );
     expect(bestand.some((r) => r.selektor.includes('.lagebericht-druck .markdown'))).toBe(true);
   });
 });

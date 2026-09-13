@@ -137,10 +137,10 @@ async function anlegen(page: Page, einsatzId: string, pfad: string, data: unknow
  * übersieht, misst dreimal dieselbe Stufe und ist dreifach grün.
  */
 async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate(
-    ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
-    [DICHTE_SCHLUESSEL, dichte] as const,
-  );
+  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+    DICHTE_SCHLUESSEL,
+    dichte,
+  ] as const);
   await page.reload();
   // KEIN `networkidle` hier: die Zusicherung darunter IST die stärkere Bedingung und
   // wiederholt von sich aus, bis sie greift. `networkidle` wartet dagegen auf ein

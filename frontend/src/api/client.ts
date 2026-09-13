@@ -69,9 +69,7 @@ function netzFehlerWerfen(e: unknown): never {
   // aus demselben Realm wie `Error`; der standardisierte `name` ist hier verlässlicher
   // als ein `instanceof DOMException`-/`Error`-Test.
   const name =
-    typeof e === 'object' && e !== null && 'name' in e
-      ? (e as { name?: unknown }).name
-      : undefined;
+    typeof e === 'object' && e !== null && 'name' in e ? (e as { name?: unknown }).name : undefined;
   if (e instanceof TypeError || name === 'AbortError' || name === 'TimeoutError') {
     throw new NetzFehler();
   }

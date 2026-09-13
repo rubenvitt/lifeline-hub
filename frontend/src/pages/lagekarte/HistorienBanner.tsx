@@ -28,9 +28,7 @@ export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: Hist
       action={
         /* Ohne Größen-Prop: der Rückweg aus dem schreibgeschützten Stand ist die einzige
            Bedienung des Banners und erbt seine Trefffläche aus `controlHeight` (LFH-366). */
-        <Button onClick={onZurueckAktuell}>
-          Aktuell
-        </Button>
+        <Button onClick={onZurueckAktuell}>Aktuell</Button>
       }
       style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 5 }}
     />

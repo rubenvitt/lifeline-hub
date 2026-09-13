@@ -35,7 +35,13 @@ function Harness({ bestand }: { bestand?: EtbBaustein | null }) {
   const [aktuell, setAktuell] = useState<EtbBaustein | null>(bestand ?? null);
   return (
     <>
-      <button type="button" onClick={() => { setAktuell(null); setOffen(true); }}>
+      <button
+        type="button"
+        onClick={() => {
+          setAktuell(null);
+          setOffen(true);
+        }}
+      >
         Wieder öffnen
       </button>
       <EtbBausteinFormModal offen={offen} baustein={aktuell} onClose={() => setOffen(false)} />

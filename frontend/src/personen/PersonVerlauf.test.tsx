@@ -8,14 +8,33 @@ import type { PersonDetail } from '../api/types';
 // und Detailseite. Zeitstempel taktisch (ZeitAnzeige/DTG), nie roher Wire-String.
 
 const basis = {
-  id: 10, einsatz_id: 1, registrier_nr: 1, status: 'erfasst',
-  name: 'Mustermann', vorname: 'Max', geschlecht: 'maennlich', geburtsdatum: null,
-  alter_geschaetzt: 40, herkunft_adresse: null, antreff_ort: null, melder_kontakt: null,
-  notiz: null, erfasst_at: '2026-05-27 09:00:00', erfasst_von: 1,
-  geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1, storniert_at: null,
-  aktuelle_sichtung: null, aktuelle_sichtung_at: null, aktueller_verbleib: null,
-  aktuelle_uhs_id: null, aktueller_platz_id: null,
-  sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
+  id: 10,
+  einsatz_id: 1,
+  registrier_nr: 1,
+  status: 'erfasst',
+  name: 'Mustermann',
+  vorname: 'Max',
+  geschlecht: 'maennlich',
+  geburtsdatum: null,
+  alter_geschaetzt: 40,
+  herkunft_adresse: null,
+  antreff_ort: null,
+  melder_kontakt: null,
+  notiz: null,
+  erfasst_at: '2026-05-27 09:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-27 09:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
+  aktuelle_sichtung: null,
+  aktuelle_sichtung_at: null,
+  aktueller_verbleib: null,
+  aktuelle_uhs_id: null,
+  aktueller_platz_id: null,
+  sichtungen: [],
+  notizen: [],
+  verbleib: [],
+  abgleiche: [],
 } as PersonDetail;
 
 const person: PersonDetail = {
@@ -23,27 +42,45 @@ const person: PersonDetail = {
   aktuelle_sichtung: 'sk2',
   sichtungen: [
     {
-      id: 1, einsatz_id: 1, person_id: 10, kategorie: 'sk2',
-      gesichtet_at: '2026-05-27 09:10:00', gesichtet_von: 1, notiz: 'Beinbruch',
+      id: 1,
+      einsatz_id: 1,
+      person_id: 10,
+      kategorie: 'sk2',
+      gesichtet_at: '2026-05-27 09:10:00',
+      gesichtet_von: 1,
+      notiz: 'Beinbruch',
     },
   ],
   notizen: [
     {
-      id: 2, einsatz_id: 1, person_id: 10, text: 'Schmerzmittel gegeben',
-      erfasst_at: '2026-05-27 09:20:00', erfasst_von: 1,
+      id: 2,
+      einsatz_id: 1,
+      person_id: 10,
+      text: 'Schmerzmittel gegeben',
+      erfasst_at: '2026-05-27 09:20:00',
+      erfasst_von: 1,
     },
   ],
   verbleib: [
     {
-      id: 3, einsatz_id: 1, person_id: 10, art: 'transport',
-      ziel: 'Klinikum Nord', transportmittel: 'RTW 1',
-      zeitpunkt_at: '2026-05-27 09:30:00', erfasst_von: 1,
+      id: 3,
+      einsatz_id: 1,
+      person_id: 10,
+      art: 'transport',
+      ziel: 'Klinikum Nord',
+      transportmittel: 'RTW 1',
+      zeitpunkt_at: '2026-05-27 09:30:00',
+      erfasst_von: 1,
     },
   ],
 };
 
 function renderVerlauf(p: PersonDetail) {
-  return render(<ConfigProvider><PersonVerlauf person={p} /></ConfigProvider>);
+  return render(
+    <ConfigProvider>
+      <PersonVerlauf person={p} />
+    </ConfigProvider>,
+  );
 }
 
 describe('PersonVerlauf', () => {

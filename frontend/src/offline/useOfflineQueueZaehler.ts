@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  OFFLINE_QUEUE_EVENT,
-  queueZaehlerLaden,
-  type OfflineQueueZaehler,
-} from './queue';
+import { OFFLINE_QUEUE_EVENT, queueZaehlerLaden, type OfflineQueueZaehler } from './queue';
 
 const LEER: OfflineQueueZaehler = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
 

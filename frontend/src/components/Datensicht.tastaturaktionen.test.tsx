@@ -200,27 +200,30 @@ describe('Datensicht · Spaltenmenü über einen Zweigwechsel', () => {
   it.each([
     { tabelleAb: 'md', breit: 1024, schmal: 390 },
     { tabelleAb: 'xl', breit: 1280, schmal: 1199 },
-  ] as const)('bleibt beim Wechsel über $tabelleAb geschlossen', async ({ tabelleAb, breit, schmal }) => {
-    const u = userEvent.setup();
-    setzeViewportBreite(breit);
-    renderBasis(rendere(ZWEI_SPALTEN, 'auto', tabelleAb));
+  ] as const)(
+    'bleibt beim Wechsel über $tabelleAb geschlossen',
+    async ({ tabelleAb, breit, schmal }) => {
+      const u = userEvent.setup();
+      setzeViewportBreite(breit);
+      renderBasis(rendere(ZWEI_SPALTEN, 'auto', tabelleAb));
 
-    await u.click(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' }));
-    await waitFor(() => expect(offenesSpaltenMenue()).not.toBeNull());
+      await u.click(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' }));
+      await waitFor(() => expect(offenesSpaltenMenue()).not.toBeNull());
 
-    // Fensterwechsel ZUR LAUFZEIT: der Stub feuert das `change`-Ereignis, das antds
-    // Beobachter als einziges liest — eine bloß gesetzte Breite erreicht ihn nicht mehr.
-    await act(async () => {
-      expect(sendeBreitenAenderung(schmal)).toBeGreaterThan(0);
-    });
-    expect(screen.queryByRole('button', { name: /^Spalten/ })).toBeNull();
+      // Fensterwechsel ZUR LAUFZEIT: der Stub feuert das `change`-Ereignis, das antds
+      // Beobachter als einziges liest — eine bloß gesetzte Breite erreicht ihn nicht mehr.
+      await act(async () => {
+        expect(sendeBreitenAenderung(schmal)).toBeGreaterThan(0);
+      });
+      expect(screen.queryByRole('button', { name: /^Spalten/ })).toBeNull();
 
-    await act(async () => {
-      sendeBreitenAenderung(breit);
-    });
-    expect(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' })).toBeInTheDocument();
-    expect(offenesSpaltenMenue()).toBeNull();
-  });
+      await act(async () => {
+        sendeBreitenAenderung(breit);
+      });
+      expect(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' })).toBeInTheDocument();
+      expect(offenesSpaltenMenue()).toBeNull();
+    },
+  );
 
   it('bleibt zu, wenn die Spaltengarnitur zwischendurch nichts Wählbares hat', async () => {
     const u = userEvent.setup();

@@ -24,7 +24,12 @@ vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
  *  `LocationProbe`) — `window.location` ist unter einem `MemoryRouter` falsch. */
 function LocationProbe() {
   const loc = useLocation();
-  return <span data-testid="pfad">{loc.pathname}{loc.search}</span>;
+  return (
+    <span data-testid="pfad">
+      {loc.pathname}
+      {loc.search}
+    </span>
+  );
 }
 
 function aktuellerPfad() {
@@ -40,7 +45,10 @@ function renderBei(route: string) {
           <MemoryRouter initialEntries={[route]}>
             <LocationProbe />
             <Routes>
-              <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<div>UHS-LISTE</div>} />
+              <Route
+                path="/einsaetze/:id/unfallhilfsstellen/liste"
+                element={<div>UHS-LISTE</div>}
+              />
               <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
             </Routes>
           </MemoryRouter>
@@ -63,7 +71,15 @@ describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () =
   // verletztensammelstelle/sonstige). Solange die Meta-Zeile den Wert roh ausgab, fiel das
   // nicht auf; seit dem Umzug auf `uhsTyp[uhs.typ].label` (LFH-341 · C6) wäre das ein
   // `undefined.label`-Absturz. Korrigiert auf einen echten Typ.
-  const uhs = { id: 9, einsatz_id: 1, bezeichnung: 'UHS Nord', typ: 'patientenablage', status: 'aktiv', standort: 'Halle 1', notiz: null };
+  const uhs = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    typ: 'patientenablage',
+    status: 'aktiv',
+    standort: 'Halle 1',
+    notiz: null,
+  };
 
   it('zeigt Material/Bewegungen als Tabs (kein Drawer) und schaltet zwischen ihnen', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
@@ -87,13 +103,21 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
   // Schreibberechtigt (aktiv + Einsatzleitung) — sonst rendert keiner der Statuswechsel-Knöpfe,
   // und die Primäraktions-Zählung im Kopf hätte keinen Fall, den sie prüfen könnte.
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
-  const uhsBasis = { id: 9, einsatz_id: 1, bezeichnung: 'UHS Nord', standort: 'Halle 1', notiz: null };
+  const uhsBasis = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    standort: 'Halle 1',
+    notiz: null,
+  };
 
   it('zeigt den UHS-Typ als Beschriftung, nicht als Wire-Wert', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(
-      { ...uhsBasis, typ: 'patientenablage', status: 'aktiv' } as Awaited<ReturnType<typeof ladeUhs>>,
-    );
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      typ: 'patientenablage',
+      status: 'aktiv',
+    } as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     expect(await screen.findByText(/Patientenablage/)).toBeInTheDocument();
@@ -102,9 +126,11 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
 
   it('trägt den Seitenkopf des Moduls, nicht einen eigenen', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(
-      { ...uhsBasis, typ: 'patientenablage', status: 'aktiv' } as Awaited<ReturnType<typeof ladeUhs>>,
-    );
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      typ: 'patientenablage',
+      status: 'aktiv',
+    } as Awaited<ReturnType<typeof ladeUhs>>);
     const { container } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
     await screen.findByText('GRUNDRISS');
 
@@ -125,9 +151,11 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
       // aufnehmen" ist ab jetzt die Primäraktion einer aktiven UHS, siehe die Tests unten.
       { status: 'aktiv', primaer: 1 },
     ] as const) {
-      vi.mocked(ladeUhs).mockResolvedValue(
-        { ...uhsBasis, typ: 'patientenablage', status } as Awaited<ReturnType<typeof ladeUhs>>,
-      );
+      vi.mocked(ladeUhs).mockResolvedValue({
+        ...uhsBasis,
+        typ: 'patientenablage',
+        status,
+      } as Awaited<ReturnType<typeof ladeUhs>>);
       const { container, unmount } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
       await screen.findByText('GRUNDRISS');
 
@@ -143,13 +171,22 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
 
 describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)', () => {
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
-  const uhsBasis = { id: 9, einsatz_id: 1, bezeichnung: 'UHS Nord', standort: 'Halle 1', notiz: null };
+  const uhsBasis = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    standort: 'Halle 1',
+    notiz: null,
+  };
 
   it('bietet „Patient aufnehmen" und schickt in die Aufnahme mit UHS-Auftrag', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(
-      { ...uhsBasis, id: 7, typ: 'patientenablage', status: 'aktiv' } as Awaited<ReturnType<typeof ladeUhs>>,
-    );
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      id: 7,
+      typ: 'patientenablage',
+      status: 'aktiv',
+    } as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/7');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Patient aufnehmen' }));
@@ -163,9 +200,12 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
     // Primäraktion. Ohne diese Gegenaussage wäre „genau eine Primäraktion" in Task 2
     // eine Zählung ohne Fall, der sie verletzen könnte.
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(
-      { ...uhsBasis, id: 8, typ: 'patientenablage', status: 'geplant' } as Awaited<ReturnType<typeof ladeUhs>>,
-    );
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      id: 8,
+      typ: 'patientenablage',
+      status: 'geplant',
+    } as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/8'); // Status geplant
 
     expect(await screen.findByRole('button', { name: 'In Betrieb nehmen' })).toBeInTheDocument();
@@ -175,12 +215,15 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
   it('bietet die Aufnahme ohne Schreibrecht gar nicht erst an', async () => {
     // Der Weg endet in einem POST; ein 403 nach dem Ausfüllen der Maske wäre die
     // spaeteste denkbare Absage.
-    vi.mocked(ladeEinsatz).mockResolvedValue(
-      { ...einsatz, meine_rolle: 'beobachter' } as Awaited<ReturnType<typeof ladeEinsatz>>,
-    );
-    vi.mocked(ladeUhs).mockResolvedValue(
-      { ...uhsBasis, id: 7, typ: 'patientenablage', status: 'aktiv' } as Awaited<ReturnType<typeof ladeUhs>>,
-    );
+    vi.mocked(ladeEinsatz).mockResolvedValue({ ...einsatz, meine_rolle: 'beobachter' } as Awaited<
+      ReturnType<typeof ladeEinsatz>
+    >);
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      id: 7,
+      typ: 'patientenablage',
+      status: 'aktiv',
+    } as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/7');
 
     // Seite ist da — Grundriss ist in dieser Datei gemockt (kein „Bett" im DOM).

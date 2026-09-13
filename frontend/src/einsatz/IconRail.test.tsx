@@ -12,9 +12,7 @@ import { kategorien } from './modulRegistry';
  *  den die Komponente im selben Render-Pfad sieht. */
 function TokenSonde() {
   const { token } = theme.useToken();
-  return (
-    <div data-testid="token" data-bedien={token.colorPrimary} data-alarm={token.colorError} />
-  );
+  return <div data-testid="token" data-bedien={token.colorPrimary} data-alarm={token.colorError} />;
 }
 
 describe('IconRail', () => {
@@ -114,8 +112,7 @@ describe('IconRail · Dichte', () => {
     paddingSM: dichten[s].abstand.sm,
     fontSizeSM: 12,
   });
-  const hoehe = (s: keyof typeof dichten) =>
-    railZielStil(tokenFuer(s), { aktiv: false }).minHeight;
+  const hoehe = (s: keyof typeof dichten) => railZielStil(tokenFuer(s), { aktiv: false }).minHeight;
 
   it('hält den A1-Boden von 48 px in JEDER Stufe', () => {
     // Der Kern des Pakets: `Math.max`, nicht `??`. Mit `??` stände in der kompakten

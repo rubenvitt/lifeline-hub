@@ -14,7 +14,13 @@ interface Props {
   onBestaetigen: (inhalt: string) => void;
 }
 
-export default function BearbeitenModal({ offen, nachricht, senden, onAbbrechen, onBestaetigen }: Props) {
+export default function BearbeitenModal({
+  offen,
+  nachricht,
+  senden,
+  onAbbrechen,
+  onBestaetigen,
+}: Props) {
   const [form] = Form.useForm<FormWerte>();
 
   // Bei jedem Öffnen den aktuellen Nachrichtentext vorbefüllen.
@@ -39,7 +45,11 @@ export default function BearbeitenModal({ offen, nachricht, senden, onAbbrechen,
         layout="vertical"
         onFinish={(w) => onBestaetigen(w.inhalt.trim())}
       >
-        <Form.Item label="Text" name="inhalt" rules={[{ required: true, whitespace: true, message: 'Text erforderlich' }]}>
+        <Form.Item
+          label="Text"
+          name="inhalt"
+          rules={[{ required: true, whitespace: true, message: 'Text erforderlich' }]}
+        >
           <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} />
         </Form.Item>
       </Form>

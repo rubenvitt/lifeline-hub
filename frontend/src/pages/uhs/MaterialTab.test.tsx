@@ -41,19 +41,47 @@ import MaterialTab from './MaterialTab';
 const uhs = { id: 3, einsatz_id: 1, plaetze: [], belegungen: [] } as unknown as UhsDetail;
 
 const basis = {
-  einsatz_id: 1, material_id: 5, einheit_id: null, ist_adhoc: false,
-  kategorie: 'Betreuung', bestandsnummer: null, traegerorganisation: null,
-  status: 'einsatzbereit', bemerkung: null,
-  disponiert_at: '2026-07-30 09:00:00', disponiert_von: 1,
+  einsatz_id: 1,
+  material_id: 5,
+  einheit_id: null,
+  ist_adhoc: false,
+  kategorie: 'Betreuung',
+  bestandsnummer: null,
+  traegerorganisation: null,
+  status: 'einsatzbereit',
+  bemerkung: null,
+  disponiert_at: '2026-07-30 09:00:00',
+  disponiert_von: 1,
 };
 
 /** Frei verortbar (uhs_id === null) → steht im Auswahlfeld der Erfassungsmaske. */
-const frei = { ...basis, id: 10, bezeichnung: 'Wolldecke', menge: 50, uhs_id: null } as unknown as EinsatzMaterial;
-const freiZwei = { ...basis, id: 11, bezeichnung: 'Zeltbahn', menge: 4, uhs_id: null } as unknown as EinsatzMaterial;
+const frei = {
+  ...basis,
+  id: 10,
+  bezeichnung: 'Wolldecke',
+  menge: 50,
+  uhs_id: null,
+} as unknown as EinsatzMaterial;
+const freiZwei = {
+  ...basis,
+  id: 11,
+  bezeichnung: 'Zeltbahn',
+  menge: 4,
+  uhs_id: null,
+} as unknown as EinsatzMaterial;
 /** Dieser UHS zugeordnet → steht in der Tabelle. */
-const verortet = { ...basis, id: 12, bezeichnung: 'Trage', menge: 2, uhs_id: 3 } as unknown as EinsatzMaterial;
+const verortet = {
+  ...basis,
+  id: 12,
+  bezeichnung: 'Trage',
+  menge: 2,
+  uhs_id: 3,
+} as unknown as EinsatzMaterial;
 
-interface Patch { emId: number; body: unknown }
+interface Patch {
+  emId: number;
+  body: unknown;
+}
 
 /**
  * Rendert den Reiter und gibt die aufgezeichneten PATCHes zurück. Kein `vi.fn()` als
@@ -206,9 +234,13 @@ describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-3
   it('nimmt keinen zweiten Klick an, solange der PATCH läuft', async () => {
     const user = userEvent.setup();
     let freigeben!: () => void;
-    const versprechen = new Promise<void>((r) => { freigeben = r; });
-    const { patches } = render([verortet, { ...verortet, id: 13, bezeichnung: 'Decke' }],
-      false, { freigeben, versprechen });
+    const versprechen = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    const { patches } = render([verortet, { ...verortet, id: 13, bezeichnung: 'Decke' }], false, {
+      freigeben,
+      versprechen,
+    });
     await screen.findByText('Trage');
     const [ersteZeile, zweiteZeile] = screen.getAllByRole('button', { name: 'Lösen' });
 
@@ -248,11 +280,20 @@ describe('MaterialTab · Statusspalte (LFH-341 · C6)', () => {
 
   it('lässt in keiner Statuszelle einen Unterstrich stehen', async () => {
     const alleStatus: MaterialStatus[] = [
-      'einsatzbereit', 'im_einsatz', 'defekt', 'verbraucht', 'desinfektion_noetig',
+      'einsatzbereit',
+      'im_einsatz',
+      'defekt',
+      'verbraucht',
+      'desinfektion_noetig',
     ];
-    render(alleStatus.map((status, i) => ({
-      ...verortet, id: 20 + i, bezeichnung: `Material ${i}`, status,
-    })));
+    render(
+      alleStatus.map((status, i) => ({
+        ...verortet,
+        id: 20 + i,
+        bezeichnung: `Material ${i}`,
+        status,
+      })),
+    );
 
     // Gegen die ZELLEN, nicht gegen den ganzen Baum: ein Unterstrich in einer
     // Bezeichnung oder einem Testid wäre kein Befund und färbte den Test grundlos rot.

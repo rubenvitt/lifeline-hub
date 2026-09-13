@@ -24,8 +24,12 @@ import { globalKeys } from '../api/queryKeys';
 /** Bau-Status, während derer gepollt wird (2 s). */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
 const BAU_PHASE_LABEL: Record<BauStatus, string> = {
-  queued: 'wartet', building: 'baut', uploading: 'lädt hoch', publishing: 'veröffentlicht',
-  done: 'fertig', failed: 'Fehler',
+  queued: 'wartet',
+  building: 'baut',
+  uploading: 'lädt hoch',
+  publishing: 'veröffentlicht',
+  done: 'fertig',
+  failed: 'Fehler',
 };
 
 /** Eine normalisierte Zeile im Picker: eine kuratierte Region, angereichert um Katalog-/Geräte-Status. */
@@ -113,8 +117,12 @@ export default function OfflineRegionPicker({
   const download = useMutation({
     mutationFn: (e: OfflineKatalogEintrag) =>
       starteOfflineDownload({
-        name: e.name, url: e.url, lizenz: e.lizenz, kachel_schema: e.kachel_schema,
-        groesse_erwartet: e.groesse, sha256_erwartet: e.sha256 ?? undefined,
+        name: e.name,
+        url: e.url,
+        lizenz: e.lizenz,
+        kachel_schema: e.kachel_schema,
+        groesse_erwartet: e.groesse,
+        sha256_erwartet: e.sha256 ?? undefined,
       }),
     onSuccess: () => {
       invalidiereKarte(qc);
@@ -130,7 +138,8 @@ export default function OfflineRegionPicker({
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('bau-status') });
       message.success('Bau gestartet — die Region wird danach automatisch geladen');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Bau konnte nicht gestartet werden'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Bau konnte nicht gestartet werden'),
   });
 
   // Verkettung: ein Bau-Job einer verketteten Region erreicht „done“ → frischen Katalog holen (TTL
@@ -139,7 +148,9 @@ export default function OfflineRegionPicker({
     if (verkettung.size === 0) return;
     const entfernen = (slug: string) =>
       setVerkettung((prev) => {
-        const next = new Map(prev); next.delete(slug); return next;
+        const next = new Map(prev);
+        next.delete(slug);
+        return next;
       });
     for (const [slug, name] of verkettung) {
       const job = neuesterJob(bauJobs, slug);
@@ -159,7 +170,9 @@ export default function OfflineRegionPicker({
           .finally(() => entfernen(slug));
       } else if (job.status.status === 'failed') {
         verarbeitet.current.add(job.id);
-        message.error(`${name}: Bau fehlgeschlagen${job.status.fehler ? ` (${job.status.fehler})` : ''}`);
+        message.error(
+          `${name}: Bau fehlgeschlagen${job.status.fehler ? ` (${job.status.fehler})` : ''}`,
+        );
         entfernen(slug);
       }
     }
@@ -175,21 +188,31 @@ export default function OfflineRegionPicker({
     const katalogFuer = (name: string) => katalog.find((e) => e.name === name);
     if (bauVerfuegbar) {
       return (regionenQuery.data ?? []).map((r: BaubareRegion) => ({
-        key: r.slug, name: r.name, region: r.region, gruppe: r.gruppe, slug: r.slug,
-        katalog: katalogFuer(r.name), karte: karteFuer(r.name),
+        key: r.slug,
+        name: r.name,
+        region: r.region,
+        gruppe: r.gruppe,
+        slug: r.slug,
+        katalog: katalogFuer(r.name),
+        karte: karteFuer(r.name),
       }));
     }
     return katalog.map((e) => ({
-      key: e.name, name: e.name, region: e.region, gruppe: e.gruppe ?? 'Weitere',
-      katalog: e, karte: karteFuer(e.name),
+      key: e.name,
+      name: e.name,
+      region: e.region,
+      gruppe: e.gruppe ?? 'Weitere',
+      katalog: e,
+      karte: karteFuer(e.name),
     }));
   }, [bauVerfuegbar, regionenQuery.data, katalog, karten]);
 
   const gruppen = useMemo(
-    () => zeilen.reduce<Record<string, RegionZeile[]>>((acc, z) => {
-      (acc[z.gruppe] ??= []).push(z);
-      return acc;
-    }, {}),
+    () =>
+      zeilen.reduce<Record<string, RegionZeile[]>>((acc, z) => {
+        (acc[z.gruppe] ??= []).push(z);
+        return acc;
+      }, {}),
     [zeilen],
   );
 
@@ -204,7 +227,11 @@ export default function OfflineRegionPicker({
       (job != null && AKTIVE_BAU_STATUS.includes(job.status.status));
     if (baut) {
       const phase = job ? BAU_PHASE_LABEL[job.status.status] : 'baut';
-      return <Tag icon={<Spin size="small" style={{ marginInlineEnd: 4 }} />} color="processing">Baut… {phase}</Tag>;
+      return (
+        <Tag icon={<Spin size="small" style={{ marginInlineEnd: 4 }} />} color="processing">
+          Baut… {phase}
+        </Tag>
+      );
     }
     // 2) Auf dem Gerät (gleicher Name, brauchbar)?
     const k = z.karte;
@@ -222,7 +249,11 @@ export default function OfflineRegionPicker({
     // 3) Lieferbar (gebaut + gehostet) → direkt laden.
     if (z.katalog) {
       return (
-        <Button type="link" loading={download.isPending} onClick={() => download.mutate(z.katalog!)}>
+        <Button
+          type="link"
+          loading={download.isPending}
+          onClick={() => download.mutate(z.katalog!)}
+        >
           Laden{z.katalog.groesse ? ` (${formatGroesse(z.katalog.groesse)})` : ''}
         </Button>
       );
@@ -243,26 +274,40 @@ export default function OfflineRegionPicker({
     // 5) Nicht gebaut und kein Bau möglich.
     return (
       <Tooltip title="Diese Region ist noch nicht gebaut; der zentrale Karten-Dienst ist nicht konfiguriert.">
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>Nicht verfügbar</Typography.Text>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Nicht verfügbar
+        </Typography.Text>
       </Tooltip>
     );
   };
 
   return (
-    <Modal open={offen} title="Region aufs Gerät bringen" footer={null} onCancel={onClose} destroyOnHidden width={560}>
+    <Modal
+      open={offen}
+      title="Region aufs Gerät bringen"
+      footer={null}
+      onCancel={onClose}
+      destroyOnHidden
+      width={560}
+    >
       <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
         Wähle eine Region — sie wird (falls nötig) zuerst gebaut und danach automatisch aufs Gerät
-        geladen; danach ist sie ganz ohne Netz nutzbar. Mehrere Regionen erscheinen gemeinsam auf der
-        Lagekarte. Quelle: Eigenbau (Planetiler-Shortbread), Pflicht-Attribution offline sichtbar.
+        geladen; danach ist sie ganz ohne Netz nutzbar. Mehrere Regionen erscheinen gemeinsam auf
+        der Lagekarte. Quelle: Eigenbau (Planetiler-Shortbread), Pflicht-Attribution offline
+        sichtbar.
       </Typography.Paragraph>
       {ladend ? (
-        <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
+        <div style={{ textAlign: 'center', padding: 24 }}>
+          <Spin />
+        </div>
       ) : leer ? (
         <Typography.Text type="secondary">Keine Regionen verfügbar</Typography.Text>
       ) : (
         Object.entries(gruppen).map(([gruppe, items]) => (
           <div key={gruppe} style={{ marginBottom: 8 }}>
-            <Typography.Title level={5} style={{ marginBottom: 4 }}>{gruppe}</Typography.Title>
+            <Typography.Title level={5} style={{ marginBottom: 4 }}>
+              {gruppe}
+            </Typography.Title>
             <Liste
               dataSource={items}
               renderItem={(z) => (
@@ -270,7 +315,9 @@ export default function OfflineRegionPicker({
                   <ListenEintragMeta
                     title={z.name}
                     description={
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>{z.region}</Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {z.region}
+                      </Typography.Text>
                     }
                   />
                 </ListenEintrag>

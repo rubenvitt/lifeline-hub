@@ -37,22 +37,43 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
 
   useEffect(() => setAktiv(0), [filter, offen]);
 
-  useImperativeHandle(ref, () => ({
-    handleKey(key) {
-      if (!offen) return false;
-      if (key === 'Escape') { onSchliessen(); return true; }
-      if (flach.length === 0) {
-        // Enter bei leerem Menü ("Kein Treffer") konsumieren und schließen,
-        // damit der Container den Eintrag nicht versehentlich absendet.
-        if (key === 'Enter') { onSchliessen(); return true; }
+  useImperativeHandle(
+    ref,
+    () => ({
+      handleKey(key) {
+        if (!offen) return false;
+        if (key === 'Escape') {
+          onSchliessen();
+          return true;
+        }
+        if (flach.length === 0) {
+          // Enter bei leerem Menü ("Kein Treffer") konsumieren und schließen,
+          // damit der Container den Eintrag nicht versehentlich absendet.
+          if (key === 'Enter') {
+            onSchliessen();
+            return true;
+          }
+          return false;
+        }
+        if (key === 'ArrowDown') {
+          setAktiv((i) => (i + 1) % flach.length);
+          return true;
+        }
+        if (key === 'ArrowUp') {
+          setAktiv((i) => (i - 1 + flach.length) % flach.length);
+          return true;
+        }
+        if (key === 'Enter') {
+          const e = flach[aktiv];
+          if (!e) return false;
+          onWahl(e);
+          return true;
+        }
         return false;
-      }
-      if (key === 'ArrowDown') { setAktiv((i) => (i + 1) % flach.length); return true; }
-      if (key === 'ArrowUp') { setAktiv((i) => (i - 1 + flach.length) % flach.length); return true; }
-      if (key === 'Enter') { const e = flach[aktiv]; if (!e) return false; onWahl(e); return true; }
-      return false;
-    },
-  }), [offen, flach, aktiv, onWahl, onSchliessen]);
+      },
+    }),
+    [offen, flach, aktiv, onWahl, onSchliessen],
+  );
 
   if (!offen) return null;
 
@@ -67,7 +88,11 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
         */}
         <Typography.Text
           type="secondary"
-          style={{ fontSize: 11, padding: `${token.paddingXS}px ${token.padding}px`, display: 'block' }}
+          style={{
+            fontSize: 11,
+            padding: `${token.paddingXS}px ${token.padding}px`,
+            display: 'block',
+          }}
         >
           {titel}
         </Typography.Text>
@@ -78,7 +103,10 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
               key={`${e.art}-${e.key}`}
               role="option"
               aria-selected={idx === aktiv}
-              onMouseDown={(ev) => { ev.preventDefault(); onWahl(e); }}
+              onMouseDown={(ev) => {
+                ev.preventDefault();
+                onWahl(e);
+              }}
               /*
                * Die Zeile ist ein Bedienziel und folgt deshalb der Dichte-Staffel
                * (LFH-365 · B5e). Zwei getrennte Angaben, weil sie zwei Dinge sind:
@@ -106,7 +134,8 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
                 background: idx === aktiv ? token.controlItemBgActive : undefined,
               }}
             >
-              {e.label}{e.gesetzt ? ' ✓' : ''}
+              {e.label}
+              {e.gesetzt ? ' ✓' : ''}
             </div>
           );
         })}
@@ -122,10 +151,17 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
       // eine Test-Kennung stützen, die jederzeit wegfallen darf.
       data-slash-menu=""
       style={{
-        position: 'absolute', zIndex: 10, minWidth: 240, marginTop: 4,
-        background: token.colorBgElevated, color: token.colorText,
-        border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG,
-        boxShadow: token.boxShadowSecondary, maxHeight: 280, overflow: 'auto',
+        position: 'absolute',
+        zIndex: 10,
+        minWidth: 240,
+        marginTop: 4,
+        background: token.colorBgElevated,
+        color: token.colorText,
+        border: `1px solid ${token.colorBorderSecondary}`,
+        borderRadius: token.borderRadiusLG,
+        boxShadow: token.boxShadowSecondary,
+        maxHeight: 280,
+        overflow: 'auto',
       }}
     >
       {flach.length === 0 ? (

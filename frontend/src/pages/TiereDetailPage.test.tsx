@@ -1,18 +1,26 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
+import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
 
 class FakeEventSource {
-  url: string; closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {} removeEventListener() {} close() { this.closed = true; }
+  url: string;
+  closed = false;
+  constructor(url: string) {
+    this.url = url;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+  close() {
+    this.closed = true;
+  }
 }
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
@@ -20,15 +28,32 @@ afterEach(() => vi.unstubAllGlobals());
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
 const nutzer = {
-  id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-29 10:00:00',
+  id: 1,
+  anzeigename: 'Nutzer',
+  benutzername: 'nutzer',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-29 10:00:00',
 };
 const einsatzAktiv = {
-  id: 1, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-29 08:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
-  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-05-29 08:00:00',
-  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
-  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+  id: 1,
+  bezeichnung: 'Hochwasser',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-29 08:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  einsatzart: 'realeinsatz',
+  einsatznummer_intern: null,
+  angelegt_at: '2026-05-29 08:00:00',
+  leitstellen_nr: null,
+  einsatzort: null,
+  einsatzort_lat: null,
+  einsatzort_lon: null,
+  meldende_stelle: null,
+  sachverhalt: null,
+  anzahl_betroffene_initial: null,
   meine_rolle: 'einsatzleitung',
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
@@ -36,17 +61,40 @@ const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 // Quelle der Halter-Combobox (lädt beim Öffnen des Edit-Formulars). Minimalobjekt — der
 // HalterPicker liest nur id/registrier_nr/name/vorname.
 const einePerson = {
-  id: 5, einsatz_id: 1, registrier_nr: 7, status: 'betroffen', name: 'Meier', vorname: 'Anna',
+  id: 5,
+  einsatz_id: 1,
+  registrier_nr: 7,
+  status: 'betroffen',
+  name: 'Meier',
+  vorname: 'Anna',
 };
 
 const tierBasis: Tier = {
-  id: 10, einsatz_id: 1, registrier_nr: 1, status: 'aktiv', spezies: 'hund',
-  rasse_beschreibung: 'Schäferhund', rufname: 'Rex', geschlecht: 'maennlich',
-  alter_geschaetzt: 3, farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
-  halter_person_id: null, halter_kontakt: null, antreff_ort: 'Weide', notiz: null,
-  abschluss_grund: null, abschluss_ziel: null,
-  erfasst_at: '2026-05-29 09:00:00', erfasst_von: 1, geaendert_at: '2026-05-29 09:00:00',
-  geaendert_von: 1, storniert_at: null, halter_registrier_nr: null, halter_storniert_at: null,
+  id: 10,
+  einsatz_id: 1,
+  registrier_nr: 1,
+  status: 'aktiv',
+  spezies: 'hund',
+  rasse_beschreibung: 'Schäferhund',
+  rufname: 'Rex',
+  geschlecht: 'maennlich',
+  alter_geschaetzt: 3,
+  farbe_beschreibung: null,
+  kennzeichnung: null,
+  groesse_gewicht: null,
+  halter_person_id: null,
+  halter_kontakt: null,
+  antreff_ort: 'Weide',
+  notiz: null,
+  abschluss_grund: null,
+  abschluss_ziel: null,
+  erfasst_at: '2026-05-29 09:00:00',
+  erfasst_von: 1,
+  geaendert_at: '2026-05-29 09:00:00',
+  geaendert_von: 1,
+  storniert_at: null,
+  halter_registrier_nr: null,
+  halter_storniert_at: null,
 };
 
 function render(
@@ -89,7 +137,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } | null = null;
     render(einsatzAktiv, tierBasis, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
-        body = await request.json() as NonNullable<typeof body>;
+        body = (await request.json()) as NonNullable<typeof body>;
         return HttpResponse.json({ ...tierBasis });
       }),
     ]);
@@ -109,6 +157,38 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body).not.toBeNull());
+    expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
+  });
+
+  it('hält die Baseline fest, wenn die Detail-Query bei offener Maske refetcht (LFH-303)', async () => {
+    // Der Auslöser im Betrieb ist ein Fensterwechsel: `staleTime` ist 10 s, TanStacks
+    // `refetchOnWindowFocus` steht auf der Vorgabe `true`. Kommt der Bearbeiter zurück,
+    // refetcht die Detail-Query im Hintergrund und der FREMDE, neuere Stand steht im
+    // Cache. Ginge der als Baseline raus, verglich der Server ihn mit sich selbst — die
+    // CAS-Prüfung passte, und die fremde Änderung wäre still überschrieben.
+    let stand: Tier = tierBasis;
+    let body: Record<string, unknown> | null = null;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+
+    stand = { ...tierBasis, geaendert_at: '2026-05-29 11:30:00', rufname: 'Fremd' };
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) });
+    });
+    await vi.waitFor(() =>
+      expect(client.getQueryData<Tier>(einsatzKeys.tier(1, 10))?.geaendert_at).toBe(
+        '2026-05-29 11:30:00',
+      ),
+    );
+
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
@@ -143,7 +223,10 @@ describe('TiereDetailPage — Stammdaten', () => {
     render(einsatzAktiv, tierBasis, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json({ error: 'Storniertes Tier kann nicht geändert werden' }, { status: 409 });
+        return HttpResponse.json(
+          { error: 'Storniertes Tier kann nicht geändert werden' },
+          { status: 409 },
+        );
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
@@ -153,7 +236,9 @@ describe('TiereDetailPage — Stammdaten', () => {
     // Die echte Servermeldung erscheint — das belegt, dass der else-Zweig (`fehler`) lief und
     // NICHT erneut der Konfliktdialog. Ohne den `!v.overwrite`-Zweig ginge stattdessen ein
     // zweiter Dialog auf und diese Meldung käme nie.
-    expect(await screen.findByText('Storniertes Tier kann nicht geändert werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Storniertes Tier kann nicht geändert werden'),
+    ).toBeInTheDocument();
   });
 
   it('Beobachter sieht keinen Bearbeiten-Button', async () => {
@@ -173,7 +258,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
     render(einsatzAktiv, tierBasis, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
-        body = await request.json() as typeof body;
+        body = (await request.json()) as typeof body;
         return HttpResponse.json({ ...tierBasis });
       }),
     ]);
@@ -194,7 +279,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
     render(einsatzAktiv, tierBasis, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
-        body = await request.json() as typeof body;
+        body = (await request.json()) as typeof body;
         return HttpResponse.json({ ...tierBasis });
       }),
     ]);
@@ -214,11 +299,16 @@ describe('TiereDetailPage — Stammdaten', () => {
 
   it('Edit: Halter leeren sendet halter_person_id und halter_kontakt als null', async () => {
     // Start mit FK-Halter, Combobox leeren → beide Felder explizit null.
-    const mitHalter: Tier = { ...tierBasis, geschlecht: null, halter_person_id: 5, halter_registrier_nr: 7 };
+    const mitHalter: Tier = {
+      ...tierBasis,
+      geschlecht: null,
+      halter_person_id: 5,
+      halter_registrier_nr: 7,
+    };
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
     const { container } = render(einsatzAktiv, mitHalter, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
-        body = await request.json() as typeof body;
+        body = (await request.json()) as typeof body;
         return HttpResponse.json({ ...mitHalter });
       }),
     ]);
@@ -237,7 +327,10 @@ describe('TiereDetailPage — Stammdaten', () => {
   it('Stornieren bestätigt per Popconfirm, ruft DELETE und navigiert zur Liste', async () => {
     let geloescht = false;
     render(einsatzAktiv, tierBasis, [
-      http.delete('/api/einsaetze/1/tiere/10', () => { geloescht = true; return new HttpResponse(null, { status: 204 }); }),
+      http.delete('/api/einsaetze/1/tiere/10', () => {
+        geloescht = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
     await userEvent.click(await screen.findByRole('button', { name: 'OK' })); // Popconfirm bestätigen
@@ -249,8 +342,10 @@ describe('TiereDetailPage — Stammdaten', () => {
 describe('TiereDetailPage — Status/Abschluss', () => {
   it('zeigt den Abschluss-Block bei abgeschlossen', async () => {
     const abgeschlossen: Tier = {
-      ...tierBasis, status: 'abgeschlossen',
-      abschluss_grund: 'uebergabe_tierarzt', abschluss_ziel: 'Tierarzt Müller',
+      ...tierBasis,
+      status: 'abgeschlossen',
+      abschluss_grund: 'uebergabe_tierarzt',
+      abschluss_ziel: 'Tierarzt Müller',
     };
     render(einsatzAktiv, abgeschlossen);
     expect(await screen.findByText('Übergabe an Tierarzt')).toBeInTheDocument();
@@ -261,7 +356,7 @@ describe('TiereDetailPage — Status/Abschluss', () => {
     let body: { status?: string } = {};
     render(einsatzAktiv, tierBasis, [
       http.post('/api/einsaetze/1/tiere/10/status', async ({ request }) => {
-        body = await request.json() as { status?: string };
+        body = (await request.json()) as { status?: string };
         return HttpResponse.json({ ...tierBasis, status: 'vermisst' });
       }),
     ]);
@@ -273,8 +368,12 @@ describe('TiereDetailPage — Status/Abschluss', () => {
     let body: { status?: string; abschluss_grund?: string } = {};
     render(einsatzAktiv, tierBasis, [
       http.post('/api/einsaetze/1/tiere/10/status', async ({ request }) => {
-        body = await request.json() as { status?: string; abschluss_grund?: string };
-        return HttpResponse.json({ ...tierBasis, status: 'abgeschlossen', abschluss_grund: 'freilauf' });
+        body = (await request.json()) as { status?: string; abschluss_grund?: string };
+        return HttpResponse.json({
+          ...tierBasis,
+          status: 'abgeschlossen',
+          abschluss_grund: 'freilauf',
+        });
       }),
     ]);
     // Header-Button „Abschließen" öffnet das Modal (vor dem Öffnen gibt es nur diesen einen).
@@ -302,7 +401,9 @@ describe('TiereDetailPage — Robustheit', () => {
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/einsaetze/1/tiere/10', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
     ]);
     expect(await screen.findByText('Tier konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();

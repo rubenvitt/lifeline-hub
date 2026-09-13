@@ -141,15 +141,15 @@ export default function EinsatzSeite({
     <>
       {breadcrumb && <div style={{ marginBottom: token.marginXS }}>{breadcrumb}</div>}
       {/**
-        * `wrap` ist keine Kosmetik (LFH-339 · C4, gemessen). Ohne es steht der
-        * Aktionsblock unbedingt neben dem Titel, und ein einziger Knopf mit langer
-        * Beschriftung sprengt den Schirm: auf `/fahrzeuge` bei 390 px lief die Seite bis
-        * 505 px, der innerste sprengende Knoten war „Ad-hoc-Fahrzeug".
-        *
-        * `minWidth: 0` an beiden Kindern, weil ein Flex-Kind per Vorgabe `min-width: auto`
-        * hat und damit NICHT unter seine Inhaltsbreite schrumpft — ohne das bringt `wrap`
-        * allein nichts, sobald ein Kind für sich schon zu breit ist.
-        */}
+       * `wrap` ist keine Kosmetik (LFH-339 · C4, gemessen). Ohne es steht der
+       * Aktionsblock unbedingt neben dem Titel, und ein einziger Knopf mit langer
+       * Beschriftung sprengt den Schirm: auf `/fahrzeuge` bei 390 px lief die Seite bis
+       * 505 px, der innerste sprengende Knoten war „Ad-hoc-Fahrzeug".
+       *
+       * `minWidth: 0` an beiden Kindern, weil ein Flex-Kind per Vorgabe `min-width: auto`
+       * hat und damit NICHT unter seine Inhaltsbreite schrumpft — ohne das bringt `wrap`
+       * allein nichts, sobald ein Kind für sich schon zu breit ist.
+       */}
       <Flex
         wrap
         justify="space-between"
@@ -166,7 +166,11 @@ export default function EinsatzSeite({
           <Typography.Title level={4} style={{ margin: 0 }}>
             {titel}
           </Typography.Title>
-          {beschreibung && <div><Typography.Text type="secondary">{beschreibung}</Typography.Text></div>}
+          {beschreibung && (
+            <div>
+              <Typography.Text type="secondary">{beschreibung}</Typography.Text>
+            </div>
+          )}
           <Datenstand dataUpdatedAt={dataUpdatedAt} />
         </div>
         {/* Die Marke macht die Zusicherung von außen prüfbar (LFH-340 · C5): „genau eine
@@ -186,9 +190,13 @@ export default function EinsatzSeite({
 
   return (
     <div ref={seitenWurzel} style={{ maxWidth: breite, margin: '0 auto' }}>
-      {fensterInhalt != null
-        ? <FensterRahmen kopf={kopf} mindestHoehe={fensterInhalt.mindestHoehe}>{fensterInhalt.inhalt}</FensterRahmen>
-        : kopf}
+      {fensterInhalt != null ? (
+        <FensterRahmen kopf={kopf} mindestHoehe={fensterInhalt.mindestHoehe}>
+          {fensterInhalt.inhalt}
+        </FensterRahmen>
+      ) : (
+        kopf
+      )}
       {children}
     </div>
   );

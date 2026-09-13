@@ -9,18 +9,28 @@ function aktivKey(einsatzId: number): string {
   return `etb-entwurf-aktiv-${einsatzId}`;
 }
 
-function leererEntwurf(einsatzId: number, metadaten: MetadatenWerte = {}, vorbelegungGeprueft = false): EtbEntwurf {
+function leererEntwurf(
+  einsatzId: number,
+  metadaten: MetadatenWerte = {},
+  vorbelegungGeprueft = false,
+): EtbEntwurf {
   const jetzt = new Date().toISOString();
   return {
-    id: crypto.randomUUID(), einsatz_id: einsatzId,
+    id: crypto.randomUUID(),
+    einsatz_id: einsatzId,
     ...werteZuPatch({ inhalt: '', typ: 'meldung', metadaten }),
     ...(vorbelegungGeprueft ? { an_vorbelegung_geprueft: true as const } : {}),
-    erstellt_at: jetzt, geaendert_at: jetzt,
+    erstellt_at: jetzt,
+    geaendert_at: jetzt,
   };
 }
 
 /** Der Aufrufer montiert je Einsatz neu (key=einsatzId). */
-export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | null, kontextLaedt = false) {
+export function useEtbEntwuerfe(
+  einsatzId: number,
+  fuehrungsstelle?: string | null,
+  kontextLaedt = false,
+) {
   // Erst beim Initialisieren festhalten: beim Mount kann noch ein alter Einsatz aus
   // dem Query-Cache vorliegen. Spätere Refetches dürfen den Entwurf nicht neu laden.
   const anfangsEmpfaenger = useRef<string | undefined>(undefined);
@@ -42,7 +52,11 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
       initialisiert.current = true;
       anfangsEmpfaenger.current = fuehrungsstelle?.trim();
       if (geladen.length === 0) {
-        const leer = leererEntwurf(einsatzId, anfangsEmpfaenger.current ? { an: anfangsEmpfaenger.current } : {}, !!anfangsEmpfaenger.current);
+        const leer = leererEntwurf(
+          einsatzId,
+          anfangsEmpfaenger.current ? { an: anfangsEmpfaenger.current } : {},
+          !!anfangsEmpfaenger.current,
+        );
         setEntwuerfe([leer]);
         setAktiverId(leer.id);
         return;
@@ -52,7 +66,9 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
       const gueltig = gemerkt && geladen.some((e) => e.id === gemerkt);
       setAktiverId(gueltig ? gemerkt! : geladen[0].id);
     })();
-    return () => { abgebrochen = true; };
+    return () => {
+      abgebrochen = true;
+    };
   }, [einsatzId, fuehrungsstelle, kontextLaedt]);
 
   // Bewusst leere Zustände nach Entfernen/Absenden/+ bleiben erhalten. Unberührte
@@ -69,16 +85,22 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
     }
   }, [entwuerfe]);
 
-  const aktivenSetzen = useCallback((id: string) => {
-    setAktiverId(id);
-    localStorage.setItem(aktivKey(einsatzId), id);
-  }, [einsatzId]);
+  const aktivenSetzen = useCallback(
+    (id: string) => {
+      setAktiverId(id);
+      localStorage.setItem(aktivKey(einsatzId), id);
+    },
+    [einsatzId],
+  );
 
-  const neuerEntwurf = useCallback((metadaten: MetadatenWerte = {}) => {
-    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
-    setEntwuerfe((prev) => [...prev, leer]);
-    aktivenSetzen(leer.id);
-  }, [einsatzId, aktivenSetzen]);
+  const neuerEntwurf = useCallback(
+    (metadaten: MetadatenWerte = {}) => {
+      const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
+      setEntwuerfe((prev) => [...prev, leer]);
+      aktivenSetzen(leer.id);
+    },
+    [einsatzId, aktivenSetzen],
+  );
 
   const entwurfAktualisieren = useCallback((id: string, werte: EntwurfWerte) => {
     const patch = werteZuPatch(werte);
@@ -98,31 +120,41 @@ export function useEtbEntwuerfe(einsatzId: number, fuehrungsstelle?: string | nu
     }
   }, []);
 
-  const entwurfSchliessen = useCallback(async (id: string, metadaten: MetadatenWerte = {}) => {
-    await entwurfEntfernen(id);
-    // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode
-    // (Dev-Server / e2e) werden Updater doppelt invoked — eine IM Updater erzeugte
-    // crypto.randomUUID-Id divergierte sonst zwischen entwuerfe und aktiverId, sodass der
-    // neue leere Tab keinen aktiven Inhalt mehr rendert (LFH-214). Beide Setter bleiben
-    // FUNKTIONAL (lesen prev = frisch committeter State) und sind damit immun gegen
-    // Zustandsänderungen während des vorausgehenden await (neuer Tab / paralleles
-    // Schließen) und chainen korrekt — ein Closure-Snapshot überschriebe den aktuellen
-    // State und ließe einen Zombie-Tab zurück.
-    const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
-    let naechsteListe: EtbEntwurf[] = [];
-    setEntwuerfe((prev) => {
-      const rest = prev.filter((e) => e.id !== id);
-      naechsteListe = rest.length === 0 ? [leer] : rest;
-      return naechsteListe;
-    });
-    setAktiverId((aktuell) => {
-      if (aktuell !== id) return aktuell; // nicht-aktiven Tab geschlossen → aktiven behalten
-      // aktiven Tab geschlossen → auf den letzten der neuen Liste wechseln.
-      const naechster = naechsteListe[naechsteListe.length - 1].id;
-      localStorage.setItem(aktivKey(einsatzId), naechster);
-      return naechster;
-    });
-  }, [einsatzId]);
+  const entwurfSchliessen = useCallback(
+    async (id: string, metadaten: MetadatenWerte = {}) => {
+      await entwurfEntfernen(id);
+      // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode
+      // (Dev-Server / e2e) werden Updater doppelt invoked — eine IM Updater erzeugte
+      // crypto.randomUUID-Id divergierte sonst zwischen entwuerfe und aktiverId, sodass der
+      // neue leere Tab keinen aktiven Inhalt mehr rendert (LFH-214). Beide Setter bleiben
+      // FUNKTIONAL (lesen prev = frisch committeter State) und sind damit immun gegen
+      // Zustandsänderungen während des vorausgehenden await (neuer Tab / paralleles
+      // Schließen) und chainen korrekt — ein Closure-Snapshot überschriebe den aktuellen
+      // State und ließe einen Zombie-Tab zurück.
+      const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
+      let naechsteListe: EtbEntwurf[] = [];
+      setEntwuerfe((prev) => {
+        const rest = prev.filter((e) => e.id !== id);
+        naechsteListe = rest.length === 0 ? [leer] : rest;
+        return naechsteListe;
+      });
+      setAktiverId((aktuell) => {
+        if (aktuell !== id) return aktuell; // nicht-aktiven Tab geschlossen → aktiven behalten
+        // aktiven Tab geschlossen → auf den letzten der neuen Liste wechseln.
+        const naechster = naechsteListe[naechsteListe.length - 1].id;
+        localStorage.setItem(aktivKey(einsatzId), naechster);
+        return naechster;
+      });
+    },
+    [einsatzId],
+  );
 
-  return { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen };
+  return {
+    entwuerfe,
+    aktiverId,
+    neuerEntwurf,
+    entwurfSchliessen,
+    entwurfAktualisieren,
+    aktivenSetzen,
+  };
 }

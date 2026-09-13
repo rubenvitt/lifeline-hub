@@ -8,8 +8,13 @@ import { AuthProvider } from '../auth/AuthContext';
 import SprechgruppenTab from './SprechgruppenTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
@@ -35,8 +40,22 @@ const sprechgruppe = {
  * und machte die Zusicherung stumpf. `hinweis: null` hält die Zeilen frei von Zufallstreffern.
  */
 const aktivPaar = [
-  { ...sprechgruppe, id: 1, bezeichnung: '412_F_DRK', betriebsart: 'TMO', hinweis: null, aktiv: true },
-  { ...sprechgruppe, id: 2, bezeichnung: '208_D_DRK', betriebsart: 'DMO', hinweis: null, aktiv: false },
+  {
+    ...sprechgruppe,
+    id: 1,
+    bezeichnung: '412_F_DRK',
+    betriebsart: 'TMO',
+    hinweis: null,
+    aktiv: true,
+  },
+  {
+    ...sprechgruppe,
+    id: 2,
+    bezeichnung: '208_D_DRK',
+    betriebsart: 'DMO',
+    hinweis: null,
+    aktiv: false,
+  },
 ];
 
 /** Die Leitspalte aller Datenzeilen — der Kopf ist ein eigenes `<table>`, siehe KatalogTabelle. */

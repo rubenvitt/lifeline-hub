@@ -21,12 +21,25 @@ interface Props {
 
 /** Kopf-Switcher eines Orts-Moduls: aktueller Datensatz + Wechsel + Neuanlage
  *  (LFH-347 · M56, aus `pages/uhs/UhsSwitcher.tsx`). */
-export default function EinstiegSwitcher({ aktuell, eintraege, onWechsel, neuLabel, onNeu }: Props) {
-  const sortiert = [...eintraege].sort((a, b) => a.rang - b.rang || a.bezeichnung.localeCompare(b.bezeichnung, 'de'));
+export default function EinstiegSwitcher({
+  aktuell,
+  eintraege,
+  onWechsel,
+  neuLabel,
+  onNeu,
+}: Props) {
+  const sortiert = [...eintraege].sort(
+    (a, b) => a.rang - b.rang || a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
+  );
   const items: MenuProps['items'] = [
     ...sortiert.map((e) => ({
       key: `eintrag-${e.id}`,
-      label: <Space>{e.bezeichnung}<StatusTag darstellung={e.darstellung} /></Space>,
+      label: (
+        <Space>
+          {e.bezeichnung}
+          <StatusTag darstellung={e.darstellung} />
+        </Space>
+      ),
     })),
     { type: 'divider' as const },
     { key: 'neu', label: neuLabel },

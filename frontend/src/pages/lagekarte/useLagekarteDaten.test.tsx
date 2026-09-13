@@ -10,7 +10,13 @@ import { gefahrengebietStil } from './zonenStil';
 
 // darfSchreiben wird im Snapshot-Modus hart auf false gefahren → benutzer egal.
 vi.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ benutzer: null, laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn() }),
+  useAuth: () => ({
+    benutzer: null,
+    laedt: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    aktualisiere: vi.fn(),
+  }),
 }));
 
 const ladeLageSnapshot = vi.fn();
@@ -30,7 +36,7 @@ function wrapper() {
 /** Minimal-Snapshot-Dokument: eine Gefahrengebiet-Zone (EINGEFRORENE Warnstufe) + eine verortete
  *  Einheit OHNE eigene Org (org-scoped tz_organisation=null) → prüft den org_default-Freeze.
  *  `stand_at` bewusst im ECHTEN naiven UTC-Wire-Format (ohne 'T'/'Z'), wie das Backend liefert. */
-function dokument(warnstufe: string) {
+function dokument(warnstufe: string, ohneGebiete = false) {
   const stand = '2026-07-24 08:00:00';
   return {
     id: 9,
@@ -48,7 +54,15 @@ function dokument(warnstufe: string) {
       uhs: [],
       schaeden: [],
       einheiten: [
-        { id: 1, name: 'Zug 1', typ_label: 'Zug', lat: 50.1, lon: 8.6, tz_fachaufgabe: null, tz_organisation: null },
+        {
+          id: 1,
+          name: 'Zug 1',
+          typ_label: 'Zug',
+          lat: 50.1,
+          lon: 8.6,
+          tz_fachaufgabe: null,
+          tz_organisation: null,
+        },
       ],
       fahrzeuge: [],
       fuehrungskraefte: [],
@@ -63,14 +77,21 @@ function dokument(warnstufe: string) {
           gefahrengebiet_id: 7,
           geometrie: JSON.stringify({
             type: 'Polygon',
-            coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]],
+            coordinates: [
+              [
+                [8.6, 50.1],
+                [8.7, 50.1],
+                [8.7, 50.2],
+                [8.6, 50.1],
+              ],
+            ],
           }),
           farbe: null,
           label: null,
           ansicht_id: null,
         },
       ],
-      gefahrengebiete: [{ id: 7, hoechste_warnstufe: warnstufe }],
+      gefahrengebiete: ohneGebiete ? [] : [{ id: 7, hoechste_warnstufe: warnstufe }],
     },
   };
 }
@@ -82,9 +103,14 @@ describe('useLagekarteDaten Standquelle', () => {
     // Deferred Promise: die Pending-Phase explizit festnageln — sonst greift waitFor(false) sofort
     // und die `istSnapshot ? snapQuery.isLoading`-Regel bliebe ungetestet (Review-Fix #5).
     let aufloesen!: (v: unknown) => void;
-    ladeLageSnapshot.mockReturnValue(new Promise((r) => { aufloesen = r; }));
+    ladeLageSnapshot.mockReturnValue(
+      new Promise((r) => {
+        aufloesen = r;
+      }),
+    );
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     // Solange das Dokument nicht da ist, MUSS ladt true sein (die disabled Live-Queries melden
@@ -101,7 +127,8 @@ describe('useLagekarteDaten Standquelle', () => {
   it('speist die Gefahrengebiet-Warnstufe aus dem eingefrorenen Dokument, nicht aus Live', async () => {
     ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
@@ -118,10 +145,51 @@ describe('useLagekarteDaten Standquelle', () => {
     expect(result.current.zonenFeatures[0].stil).not.toEqual(gefahrengebietStil('keine', token));
   });
 
+  // LFH-357: die Stufe muss auf der Kartenfläche ANKOMMEN. `stil` allein kann sie nicht tragen —
+  // `niedrig`/`mittel` fallen auf dieselbe Rolle, `keine`/`hoch`/`akut` ebenso. Der Text ist der
+  // zweite Kanal, und diese Zusicherung prüft die VERDRAHTUNG: dass der Hook ihn setzt.
+  it('trägt die Warnstufe in die Zonenbeschriftung, nicht nur in die Farbe', async () => {
+    ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
+    // Die Zone im Dokument hat keinen eigenen Namen (`label: null`) — übrig bleibt die Stufe.
+    // Erwartung als LITERAL, nicht über `zonenBeschriftung`: sonst stünden beide Seiten auf
+    // derselben Quelle und eine verbogene Beschriftung bliebe grün.
+    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: mittel');
+    // Gegenprobe gegen die Nachbarin auf DERSELBEN Farbe — sie muss am Text auseinandergehen.
+    expect(result.current.zonenFeatures[0].label).not.toBe('Warnstufe: niedrig');
+  });
+
+  // Codex-Review zu LFH-357 (P1): das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`,
+  // NICHT an der Gefahrengebiete-Query — die Zone wird also gezeichnet, während der Nachschlag
+  // noch leer ist (Ladefenster) oder leer bleibt (gescheiterter Abruf). Der Farb-Fallback auf
+  // `keine` ist dort richtig und bleibt; der TEXT darf die Stufe nicht behaupten.
+  it('sagt `unbekannt`, wenn der Gebiets-Nachschlag ins Leere geht — die Farbe bleibt Alarm', async () => {
+    ladeLageSnapshot.mockResolvedValue(dokument('mittel', true));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
+    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: unbekannt');
+    // Die zweite Hälfte der Zusicherung: der vorsichtshalber rote Fallback ist NICHT
+    // mitgewandert. Ohne sie beliesse ein Fix, der die Fläche entfärbt, den Test grün.
+    const { result: tk } = renderHook(() => theme.useToken(), { wrapper: wrapper() });
+    expect(result.current.zonenFeatures[0].stil).toEqual(
+      gefahrengebietStil('keine', tk.current.token),
+    );
+  });
+
   it('speist den org_default aus dem Dokument in die Marker-TZ, nicht aus Live (Review-Fix #4)', async () => {
     ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.alleVerortet.length).toBeGreaterThan(0));
@@ -146,7 +214,9 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
     // einem „alles, was rot ist"-Sammelsurium: nur die zwei stehen in der Meldung. Wäre der
     // Render-Kontext im Katalog, käme die Liste hier auf fünf Einträge.
     server.use(
-      http.get('/api/einsaetze/5', () => HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' })),
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
       http.get('/api/einsaetze/5/uhs', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/zonen', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
@@ -163,20 +233,34 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/karte/fuehrungskraefte',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
     );
-    const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }),
-      { wrapper: wrapper() },
-    );
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toHaveLength(2));
     expect(result.current.fehlerhafteQuellen).toEqual(['Unfallhilfsstellen', 'Zonen']);
   });
 
   it('ist bei vollständigem Abruf leer', async () => {
     server.use(
-      http.get('/api/einsaetze/5', () => HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' })),
-      http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
-      http.get('/api/karte/config', () => HttpResponse.json({ online_styles: [], offline_verfuegbar: false, offline_tiles_url: null, offline_attribution: null, offline_regionen: [], karten_bau_verfuegbar: false })),
-      http.get('/api/einsaetze/5/einstellungen', () => HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } })),
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
+      ),
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/schaeden',
@@ -190,10 +274,9 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/karte/fuehrungskraefte',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
     );
-    const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }),
-      { wrapper: wrapper() },
-    );
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.ladt).toBe(false));
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
@@ -204,7 +287,8 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
     // nur das Dokument treffen.
     ladeLageSnapshot.mockRejectedValue(new Error('weg'));
     const { result } = renderHook(
-      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Gesicherter Stand']));

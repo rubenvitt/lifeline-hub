@@ -34,12 +34,7 @@ describe('GeoKennzahlen', () => {
   });
 
   it('rendert den Zusatz-Slot auch ohne Geo-Kennzahlen', () => {
-    render(
-      <GeoKennzahlen
-        kennzahlen={null}
-        zusatz={<KennzahlZeile label="Zonen" wert="3" />}
-      />,
-    );
+    render(<GeoKennzahlen kennzahlen={null} zusatz={<KennzahlZeile label="Zonen" wert="3" />} />);
     expect(screen.getByText('Zonen')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
   });

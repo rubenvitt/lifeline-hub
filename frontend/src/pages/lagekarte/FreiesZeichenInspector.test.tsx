@@ -23,12 +23,14 @@ const basis: FreiesZeichen = {
   geaendert_at: '',
 };
 
-function renderInspector(opts: {
-  zeichen?: FreiesZeichen;
-  darfSchreiben?: boolean;
-  onAendern?: FreiesZeichenInspectorProps['onAendern'];
-  onLoeschen?: FreiesZeichenInspectorProps['onLoeschen'];
-} = {}) {
+function renderInspector(
+  opts: {
+    zeichen?: FreiesZeichen;
+    darfSchreiben?: boolean;
+    onAendern?: FreiesZeichenInspectorProps['onAendern'];
+    onLoeschen?: FreiesZeichenInspectorProps['onLoeschen'];
+  } = {},
+) {
   const onAendern = opts.onAendern ?? vi.fn<FreiesZeichenInspectorProps['onAendern']>();
   const onLoeschen = opts.onLoeschen ?? vi.fn<FreiesZeichenInspectorProps['onLoeschen']>();
   renderMitProviders(
@@ -72,7 +74,11 @@ describe('FreiesZeichenInspector', () => {
     await userEvent.click(opt[opt.length - 1]);
     await waitFor(() =>
       expect(onAendern).toHaveBeenCalledWith(
-        expect.objectContaining({ grundzeichen: 'taktische-formation', organisation: 'thw', label: 'Zug 1' }),
+        expect.objectContaining({
+          grundzeichen: 'taktische-formation',
+          organisation: 'thw',
+          label: 'Zug 1',
+        }),
       ),
     );
   });

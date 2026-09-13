@@ -26,7 +26,9 @@ async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
 }
 
-test('ungültige Detail-ID leitet im Browser auf die Modul-Liste um (NaN-Guard)', async ({ page }) => {
+test('ungültige Detail-ID leitet im Browser auf die Modul-Liste um (NaN-Guard)', async ({
+  page,
+}) => {
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
   await page.goto(`/einsaetze/${eid}/personen/abc`);
@@ -58,6 +60,7 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
 
   // Deeplink auf den Eintrag → Highlight-Klasse muss am <tr> erscheinen.
   await page.goto(`/einsaetze/${eid}/etb?eintrag=${eintragId}`);
-  await expect(page.locator(`tr[data-row-key="${zeilenSchluessel}"]`))
-    .toHaveClass(/zeile-hervorgehoben/);
+  await expect(page.locator(`tr[data-row-key="${zeilenSchluessel}"]`)).toHaveClass(
+    /zeile-hervorgehoben/,
+  );
 });

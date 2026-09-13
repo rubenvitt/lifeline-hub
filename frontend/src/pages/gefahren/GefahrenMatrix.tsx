@@ -9,11 +9,17 @@ import { flaechenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
 
-interface ZeilenDaten { typ: Gefahrentyp; label: string; }
+interface ZeilenDaten {
+  typ: Gefahrentyp;
+  label: string;
+}
 
 /** Welche Zelle der Detail-Dialog meint. Bewusst die Kennung statt des Datensatzes —
  *  Begründung am Zustand in {@link GefahrenMatrix}. */
-interface Zellkennung { typ: Gefahrentyp; objekt: Schutzobjekt; }
+interface Zellkennung {
+  typ: Gefahrentyp;
+  objekt: Schutzobjekt;
+}
 
 /** Symbol + Kurzform je Schutzobjekt. Der Kopf trug vorher das volle Wort und war mit
  *  ~85 px nie breitenbestimmend — die Zelle ist es. Das Symbol ist deshalb Gewinn an
@@ -61,7 +67,11 @@ export interface GefahrenMatrixProps {
 /** Das 13×5-Raster eines Gefahrengebiets. Einziger Konsument ist `GefahrenPage`;
  *  der frühere Hinweis auf einen „Karten-Drawer" beschrieb keinen. */
 export default function GefahrenMatrix({
-  matrix, darfSchreiben, laufendeZelle, onSetzen, onDetailsSpeichern,
+  matrix,
+  darfSchreiben,
+  laufendeZelle,
+  onSetzen,
+  onDetailsSpeichern,
 }: GefahrenMatrixProps) {
   const { token } = theme.useToken();
   /**
@@ -112,7 +122,10 @@ export default function GefahrenMatrix({
             // unterscheiden. Kein Knopf — ein deaktivierter Auslöser gibt vor, es gäbe
             // hier eine Entscheidung.
             return (
-              <Typography.Text type="secondary" aria-label={`${zeile.label} × ${obj.label}: nicht anwendbar`}>
+              <Typography.Text
+                type="secondary"
+                aria-label={`${zeile.label} × ${obj.label}: nicht anwendbar`}
+              >
                 n. a.
               </Typography.Text>
             );
@@ -125,7 +138,9 @@ export default function GefahrenMatrix({
               key: w.wert,
               label: `${warnstufeFlaeche[w.wert].kuerzel} · ${w.label}`,
             })),
-            ...(zelle ? [{ type: 'divider' as const }, { key: 'details', label: 'Details …' }] : []),
+            ...(zelle
+              ? [{ type: 'divider' as const }, { key: 'details', label: 'Details …' }]
+              : []),
           ];
           return (
             <Dropdown
@@ -141,7 +156,10 @@ export default function GefahrenMatrix({
                 // und das Synthetic Event des Portals steigt nicht in einen klickbaren
                 // Elternteil (Muster und Falle aus LFH-365).
                 onClick: ({ key }) => {
-                  if (key === 'details') { setDetailKennung({ typ: zeile.typ, objekt: obj.wert }); return; }
+                  if (key === 'details') {
+                    setDetailKennung({ typ: zeile.typ, objekt: obj.wert });
+                    return;
+                  }
                   onSetzen({
                     gefahrentyp: zeile.typ,
                     schutzobjekt: obj.wert,
@@ -175,14 +193,14 @@ export default function GefahrenMatrix({
   // Je Render frisch aus `matrix` abgeleitet — DAS ist die Zusicherung, die die
   // Kennung im Zustand erkauft. Ein Nachladen erreicht den offenen Dialog damit.
   const detailZelle = detailKennung
-    ? zelleVon(detailKennung.typ, detailKennung.objekt) ?? null
+    ? (zelleVon(detailKennung.typ, detailKennung.objekt) ?? null)
     : null;
   const detailSchluessel = detailKennung
     ? zellSchluessel(detailKennung.typ, detailKennung.objekt)
     : null;
   const detailTitel = detailKennung
-    ? `${GEFAHRENTYPEN.find((g) => g.wert === detailKennung.typ)?.label ?? detailKennung.typ}`
-      + ` × ${SCHUTZOBJEKTE.find((s) => s.wert === detailKennung.objekt)?.label ?? detailKennung.objekt}`
+    ? `${GEFAHRENTYPEN.find((g) => g.wert === detailKennung.typ)?.label ?? detailKennung.typ}` +
+      ` × ${SCHUTZOBJEKTE.find((s) => s.wert === detailKennung.objekt)?.label ?? detailKennung.objekt}`
     : '';
 
   return (

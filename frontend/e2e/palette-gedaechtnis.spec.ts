@@ -45,7 +45,9 @@ async function oeffnePalette(page: Page) {
   await expect(paletteInput(page)).toBeVisible();
 }
 
-test('merkt einen ausgeführten Befehl am Benutzer und zeigt ihn nach dem Neuladen zuoberst', async ({ page }) => {
+test('merkt einen ausgeführten Befehl am Benutzer und zeigt ihn nach dem Neuladen zuoberst', async ({
+  page,
+}) => {
   const ersterStand = standGeladen(page);
   await anmelden(page);
   // AUF DIE ANTWORT WARTEN, statt sofort zu öffnen — und das ist keine Test-Bequemlichkeit,
@@ -59,11 +61,15 @@ test('merkt einen ausgeführten Befehl am Benutzer und zeigt ihn nach dem Neulad
   // Palette-Fällen, „die Gruppe ist da" allein wäre also keine Aussage über DIESEN Befehl.
   await oeffnePalette(page);
   await expect(page.getByRole('option', { name: 'Profil', exact: true })).toBeVisible();
-  await expect(gedaechtnis(page).getByRole('option', { name: 'Profil', exact: true })).toHaveCount(0);
+  await expect(gedaechtnis(page).getByRole('option', { name: 'Profil', exact: true })).toHaveCount(
+    0,
+  );
 
   // Ausführen — die Palette schliesst sich dabei selbst, VOR der Ausführung. Genau deshalb
   // hängt der Schreibweg am Provider und nicht an ihr.
-  const geschrieben = page.waitForResponse((r) => r.url().includes(FACH) && r.request().method() === 'PUT');
+  const geschrieben = page.waitForResponse(
+    (r) => r.url().includes(FACH) && r.request().method() === 'PUT',
+  );
   await page.getByRole('option', { name: 'Profil', exact: true }).click();
   await expect(page).toHaveURL(/\/profil/);
   await expect(paletteInput(page)).toBeHidden();
@@ -75,12 +81,16 @@ test('merkt einen ausgeführten Befehl am Benutzer und zeigt ihn nach dem Neulad
   await zweiterStand;
   await oeffnePalette(page);
 
-  await expect(gedaechtnis(page).getByRole('option', { name: 'Profil', exact: true })).toBeVisible();
+  await expect(
+    gedaechtnis(page).getByRole('option', { name: 'Profil', exact: true }),
+  ).toBeVisible();
 
   // ZUOBERST heisst: erste Gruppe im Kasten. Die Startansicht ist kuratiert (LFH-337 · M11),
   // und das Gedächtnis ist der Grund, aus dem sie diese Reihenfolge hat.
-  await expect(page.getByRole('listbox').getByRole('group').first())
-    .toHaveAttribute('aria-label', 'Zuletzt ausgeführt');
+  await expect(page.getByRole('listbox').getByRole('group').first()).toHaveAttribute(
+    'aria-label',
+    'Zuletzt ausgeführt',
+  );
 
   // Bei AKTIVER Suche entfällt die Gruppe — der Befehl steht dann genau einmal in der
   // flachen Trefferliste, nicht zweimal mit gleichem Label und gleichem Ziel.

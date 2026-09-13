@@ -69,8 +69,7 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
 const dateien = lieseQuellen(SRC);
 
 /** Die zehn A0-Rollenwerte aus `farbenHell`/`farbenDunkel` (Gate 5 aus A1, wortgleich). */
-const ROLLENWERT =
-  /#(b02318|ff7a7f|f5b942|5cc48d|1c6640|7a5200|1a5fa0|6fb4ec|a8071a|e04552)/i;
+const ROLLENWERT = /#(b02318|ff7a7f|f5b942|5cc48d|1c6640|7a5200|1a5fa0|6fb4ec|a8071a|e04552)/i;
 
 /**
  * Blendet Kommentarinhalt aus und behält die Zeilenzahl bei (Index = Zeile − 1).
@@ -138,7 +137,12 @@ describe('Gate-5-Guard (LFH-328): kein A0-Farbwert außerhalb src/theme/', () =>
 
   it('blendet Kommentar-Erwähnungen aus, auch als Fortsetzungszeile im Block', () => {
     const sichtbar = ohneKommentare(
-      ['/* Zeile eins', '   erwähnt #a8071a mitten im Block', '   und endet hier */', 'echt: #a8071a;'].join('\n'),
+      [
+        '/* Zeile eins',
+        '   erwähnt #a8071a mitten im Block',
+        '   und endet hier */',
+        'echt: #a8071a;',
+      ].join('\n'),
     );
     expect(sichtbar.filter((z) => ROLLENWERT.test(z))).toEqual(['echt: #a8071a;']);
   });

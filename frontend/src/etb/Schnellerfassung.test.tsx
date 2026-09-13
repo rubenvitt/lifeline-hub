@@ -22,22 +22,44 @@ beforeEach(() => {
   );
 });
 
-const einsatz = { id: 7, bezeichnung: 'Test', stichwort: null, leitstellen_nr: null, einsatzort: null } as unknown as EinsatzAnzeige;
+const einsatz = {
+  id: 7,
+  bezeichnung: 'Test',
+  stichwort: null,
+  leitstellen_nr: null,
+  einsatzort: null,
+} as unknown as EinsatzAnzeige;
 
 function original(): EtbEintragAnzeige {
   return {
-    id: 5, lfd_nr: 5, typ: 'meldung', inhalt: 'Original', von: null, an: null,
-    meldeweg: null, veranlassung: null, erfasser_id: 1, erfasser_name: 'Max',
-    ereigniszeit: '2026-05-23 10:00:00', received_at: '2026-05-23 10:00:01',
-    erfasst_lokal_at: null, berichtigt_eintrag_id: null,
-    lagebericht_id: null, auftrag_id: null, befehl_id: null,
+    id: 5,
+    lfd_nr: 5,
+    typ: 'meldung',
+    inhalt: 'Original',
+    von: null,
+    an: null,
+    meldeweg: null,
+    veranlassung: null,
+    erfasser_id: 1,
+    erfasser_name: 'Max',
+    ereigniszeit: '2026-05-23 10:00:00',
+    received_at: '2026-05-23 10:00:01',
+    erfasst_lokal_at: null,
+    berichtigt_eintrag_id: null,
+    lagebericht_id: null,
+    auftrag_id: null,
+    befehl_id: null,
   };
 }
 
 function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}) {
   return {
     erfassen: vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined),
-    berichtigungZu: null, onBerichtigungAbbrechen: vi.fn(), bausteine: [] as EtbBaustein[], einsatz, ...over,
+    berichtigungZu: null,
+    onBerichtigungAbbrechen: vi.fn(),
+    bausteine: [] as EtbBaustein[],
+    einsatz,
+    ...over,
   };
 }
 
@@ -48,9 +70,7 @@ function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}
 describe('TextAreaRef – Caret-Pfad', () => {
   it('resizableTextArea.textArea ist eine HTMLTextAreaElement-Instanz', () => {
     const ref = createRef<TextAreaRef>();
-    renderMitProviders(
-      <MarkdownEditor layout="toggle" value="" onChange={() => {}} ref={ref} />,
-    );
+    renderMitProviders(<MarkdownEditor layout="toggle" value="" onChange={() => {}} ref={ref} />);
     expect(ref.current?.resizableTextArea?.textArea).toBeInstanceOf(HTMLTextAreaElement);
   });
 
@@ -79,22 +99,33 @@ describe('Schnellerfassung', () => {
     expect(screen.getByText('An: Florian Leitung')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
-    rerender(<Schnellerfassung {...p} einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Neue Leitung' }} />);
+    rerender(
+      <Schnellerfassung {...p} einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Neue Leitung' }} />,
+    );
     expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
   });
 
-  it.each(['Eigener Empfänger', undefined])('LFH-461: vorhandener Entwurf gewinnt auch mit leerem An (%s)', (an) => {
-    renderMitProviders(<Schnellerfassung {...props({
-      einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
-      initialWerte: { inhalt: 'Entwurf', typ: 'meldung', metadaten: { an } },
-    })} />);
-    expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
-    if (an) expect(screen.getByText('An: Eigener Empfänger')).toBeInTheDocument();
-    else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-  });
+  it.each(['Eigener Empfänger', undefined])(
+    'LFH-461: vorhandener Entwurf gewinnt auch mit leerem An (%s)',
+    (an) => {
+      renderMitProviders(
+        <Schnellerfassung
+          {...props({
+            einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
+            initialWerte: { inhalt: 'Entwurf', typ: 'meldung', metadaten: { an } },
+          })}
+        />,
+      );
+      expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
+      if (an) expect(screen.getByText('An: Eigener Empfänger')).toBeInTheDocument();
+      else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+    },
+  );
 
   it.each([undefined, null, '   '])('LFH-461: ohne gesetzte Stelle kein An-Chip (%s)', (stelle) => {
-    renderMitProviders(<Schnellerfassung {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: stelle } })} />);
+    renderMitProviders(
+      <Schnellerfassung {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: stelle } })} />,
+    );
     expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
   });
 
@@ -113,7 +144,10 @@ describe('Schnellerfassung', () => {
   it('Shift+Enter sendet nicht (Zeilenumbruch)', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Zeile1{Shift>}{Enter}{/Shift}Zeile2');
+    await userEvent.type(
+      screen.getByPlaceholderText(/Inhalt/),
+      'Zeile1{Shift>}{Enter}{/Shift}Zeile2',
+    );
     expect(p.erfassen).not.toHaveBeenCalled();
   });
 
@@ -133,7 +167,9 @@ describe('Schnellerfassung', () => {
     const feld = screen.getByPlaceholderText(/Inhalt/);
     if (inhalt) await userEvent.type(feld, inhalt);
     let nichtVerhindert = false;
-    await act(async () => { nichtVerhindert = fireEvent.keyDown(feld, { key: 'Enter' }); });
+    await act(async () => {
+      nichtVerhindert = fireEvent.keyDown(feld, { key: 'Enter' });
+    });
     expect(nichtVerhindert).toBe(true);
     expect(p.erfassen).not.toHaveBeenCalled();
   });
@@ -153,7 +189,10 @@ describe('Schnellerfassung', () => {
   ])('%s+Enter sendet auch mehrzeiligen Inhalt', async (_modifikator, tastaturfolge) => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), `Zeile 1{Shift>}{Enter}{/Shift}Zeile 2${tastaturfolge}`);
+    await userEvent.type(
+      screen.getByPlaceholderText(/Inhalt/),
+      `Zeile 1{Shift>}{Enter}{/Shift}Zeile 2${tastaturfolge}`,
+    );
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
@@ -185,7 +224,10 @@ describe('Schnellerfassung', () => {
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Bereits lokal behandelt');
     const ereignis = new KeyboardEvent('keydown', {
-      key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true,
+      key: 'Enter',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
     });
     ereignis.preventDefault();
 
@@ -226,7 +268,9 @@ describe('Schnellerfassung', () => {
     await userEvent.type(chipInput, 'ELW 1{Enter}');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ von: 'ELW 1' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'ELW 1',
+    });
   });
 
   it('bietet disponierte Funkrufnamen als Absender-Vorschlag (Freitext bleibt Fallback)', async () => {
@@ -245,14 +289,17 @@ describe('Schnellerfassung', () => {
     await userEvent.type(chip, 'Florian');
     // Klick auf den Vorschlag committet sofort via AutoComplete onSelect → onCommit.
     const vorschlag = await screen.findByText(
-      (_, el) => typeof el?.className === 'string'
-        && el.className.includes('ant-select-item-option-content')
-        && el.textContent === 'Florian 1',
+      (_, el) =>
+        typeof el?.className === 'string' &&
+        el.className.includes('ant-select-item-option-content') &&
+        el.textContent === 'Florian 1',
     );
     await userEvent.click(vorschlag);
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ von: 'Florian 1' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'Florian 1',
+    });
   });
 
   it('bietet disponierte Funkrufnamen auch als Empfänger-Vorschlag (an)', async () => {
@@ -271,14 +318,17 @@ describe('Schnellerfassung', () => {
     await userEvent.type(chip, 'Florian');
     // Klick auf den Vorschlag committet sofort via AutoComplete onSelect → onCommit.
     const vorschlag = await screen.findByText(
-      (_, el) => typeof el?.className === 'string'
-        && el.className.includes('ant-select-item-option-content')
-        && el.textContent === 'Florian 1',
+      (_, el) =>
+        typeof el?.className === 'string' &&
+        el.className.includes('ant-select-item-option-content') &&
+        el.textContent === 'Florian 1',
     );
     await userEvent.click(vorschlag);
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ an: 'Florian 1' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      an: 'Florian 1',
+    });
   });
 
   it('Enter bei offenem Menü sendet nicht', async () => {
@@ -374,11 +424,22 @@ describe('Schnellerfassung', () => {
     expect(screen.getByText(/Berichtigung zu #5/)).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Korrektur{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ typ: 'berichtigung', berichtigt_eintrag_id: 5 });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'berichtigung',
+      berichtigt_eintrag_id: 5,
+    });
   });
 
   it('Berichtigungsmodus: Feld per / setzbar und mitgesendet, aber keine Bausteine im Menü', async () => {
-    const baustein: EtbBaustein = { id: 1, label: 'Lagemeldung', typ: 'meldung', inhalt: 'X', meldeweg: null, veranlassung: null, sortier: 0 };
+    const baustein: EtbBaustein = {
+      id: 1,
+      label: 'Lagemeldung',
+      typ: 'meldung',
+      inhalt: 'X',
+      meldeweg: null,
+      veranlassung: null,
+      sortier: 0,
+    };
     const p = props({ berichtigungZu: original(), bausteine: [baustein] });
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
@@ -389,27 +450,45 @@ describe('Schnellerfassung', () => {
     await userEvent.type(await screen.findByLabelText('Von'), 'ELW 1{Enter}');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ typ: 'berichtigung', berichtigt_eintrag_id: 5, von: 'ELW 1' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'berichtigung',
+      berichtigt_eintrag_id: 5,
+      von: 'ELW 1',
+    });
   });
 
   it('Baustein über / setzt den Inhalt', async () => {
-    const baustein: EtbBaustein = { id: 1, label: 'Bereitstellung', typ: 'meldung', inhalt: 'Bereitstellungsraum bezogen', meldeweg: null, veranlassung: null, sortier: 0 };
+    const baustein: EtbBaustein = {
+      id: 1,
+      label: 'Bereitstellung',
+      typ: 'meldung',
+      inhalt: 'Bereitstellungsraum bezogen',
+      meldeweg: null,
+      veranlassung: null,
+      sortier: 0,
+    };
     const p = props({ bausteine: [baustein] });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '/bereit');
     await userEvent.click(await screen.findByText('Bereitstellung'));
-    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Bereitstellungsraum bezogen'));
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Bereitstellungsraum bezogen'),
+    );
   });
 
   it('zeigt bei Typ „Lage" den Sprung in den strukturierten Lagebericht', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     // Standardtyp ist 'meldung' → kein Button
-    expect(screen.queryByRole('button', { name: /strukturierten Lagebericht/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
+    ).not.toBeInTheDocument();
     // Typ auf 'Lage' umstellen
     await userEvent.click(screen.getByRole('combobox'));
     await userEvent.click(await screen.findByText('Lage'));
-    expect(await screen.findByRole('button', { name: /strukturierten Lagebericht/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -434,7 +513,11 @@ describe('Schnellerfassung – Wertübernahme', () => {
   });
 
   it('zeigt den Schalter nicht im Berichtigungsmodus', () => {
-    const p = props({ berichtigungZu: original(), werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+    const p = props({
+      berichtigungZu: original(),
+      werteBehalten: true,
+      onWerteBehaltenChange: vi.fn(),
+    });
     renderMitProviders(<Schnellerfassung {...p} />);
     expect(screen.getByText(/Berichtigung zu #5/)).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Werte behalten' })).toBeNull();
@@ -459,8 +542,10 @@ describe('Schnellerfassung – Wertübernahme', () => {
     await setzeTextfeld(feld, 'veranlassung', 'Veranlassung', 'Nachforderung');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0])
-      .toMatchObject({ von: 'ELW 1', veranlassung: 'Nachforderung' });
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'ELW 1',
+      veranlassung: 'Nachforderung',
+    });
     expect(feld).toHaveValue('');
     // Von überlebt (Wiederholfeld), Veranlassung nicht (je Eintrag verschieden).
     expect(await screen.findByText('Von: ELW 1')).toBeInTheDocument();
@@ -480,7 +565,11 @@ describe('Schnellerfassung – Wertübernahme', () => {
   });
 
   it('leert im Berichtigungsmodus alles, obwohl der Aufrufer den Schalter an hat', async () => {
-    const p = props({ berichtigungZu: original(), werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+    const p = props({
+      berichtigungZu: original(),
+      werteBehalten: true,
+      onWerteBehaltenChange: vi.fn(),
+    });
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Korrektur');
@@ -501,7 +590,10 @@ describe('Schnellerfassung – Entwurf-Anbindung', () => {
 
   it('feuert onWerteChange NICHT beim Mount', () => {
     const onWerteChange = vi.fn();
-    const p = props({ initialWerte: { inhalt: 'Vorbefüllt', typ: 'meldung', metadaten: {} }, onWerteChange });
+    const p = props({
+      initialWerte: { inhalt: 'Vorbefüllt', typ: 'meldung', metadaten: {} },
+      onWerteChange,
+    });
     renderMitProviders(<Schnellerfassung {...p} />);
     expect(onWerteChange).not.toHaveBeenCalled();
   });
@@ -512,7 +604,9 @@ describe('Schnellerfassung – Entwurf-Anbindung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Hi');
     await waitFor(() => expect(onWerteChange).toHaveBeenCalled());
-    const letzter = onWerteChange.mock.calls[onWerteChange.mock.calls.length - 1][0] as EntwurfWerte;
+    const letzter = onWerteChange.mock.calls[
+      onWerteChange.mock.calls.length - 1
+    ][0] as EntwurfWerte;
     expect(letzter.inhalt).toBe('Hi');
   });
 });

@@ -1,8 +1,12 @@
 import { useMemo } from 'react';
 import type { KarteServerConfig } from '../../api/karte';
 import {
-  baueBasemapStyle, aktuelleAttribution, loeseKartenTheme,
-  type BasemapModus, type KartenTheme, type KartenThemeWahl,
+  baueBasemapStyle,
+  aktuelleAttribution,
+  loeseKartenTheme,
+  type BasemapModus,
+  type KartenTheme,
+  type KartenThemeWahl,
 } from './basemapStil';
 
 interface BasemapArgs {
@@ -22,7 +26,13 @@ interface BasemapArgs {
  * die Wahrheit. Die Fachebenen-Attribution wird bewusst NICHT hier gemergt (Grenze zu
  * useFachebenen) — die Page komponiert `basisAttribution` mit `fachebenenAttribution`.
  */
-export function useBasemap({ basemap, onlineStilName, kartenTheme, config, effektiv }: BasemapArgs) {
+export function useBasemap({
+  basemap,
+  onlineStilName,
+  kartenTheme,
+  config,
+  effektiv,
+}: BasemapArgs) {
   const onlineStil = useMemo(() => {
     const liste = config?.online_styles ?? [];
     return liste.find((s) => s.name === onlineStilName) ?? liste[0];

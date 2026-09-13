@@ -230,7 +230,28 @@ async fn clamd_scan(_addr: &str, _daten: &[u8]) -> ScanErgebnis {
 /// `ScannerNichtErreichbar` (die fail-open/closed-Entscheidung trifft [`entscheide`]).
 #[cfg(feature = "clamav")]
 async fn clamd_scan(addr: &str, daten: &[u8]) -> ScanErgebnis {
-    let antwort = if let Some(pfad) = addr.strip_prefix("unix:") {
+    let antwort = clamd_verbinden(addr, daten).await;
+    match antwort {
+        Ok(bytes) => klassifiziere_antwort(&bytes),
+        Err(e) => {
+            tracing::warn!("clamd nicht erreichbar / Scan fehlgeschlagen: {e}");
+            ScanErgebnis::ScannerNichtErreichbar
+        }
+    }
+}
+
+/// Verbindet je nach Adressform zu clamd. **Der `unix:`-Zweig existiert nur unter Unix**
+/// (LFH-522): `clamav_client::tokio::Socket` ist in der Crate mit `#[cfg(unix)]` gated, weil
+/// Unix-Domain-Sockets kein Windows-Konzept sind. Ohne diese Trennung ist das gesamte Crate
+/// auf `x86_64-pc-windows-gnu` nicht übersetzbar (E0422) — gemessen beim Cross-Build-Spike.
+///
+/// Unter Windows bleibt der TCP-Zweig; eine dort konfigurierte `unix:`-Adresse landet als
+/// gewöhnlicher Verbindungsfehler bei `ScannerNichtErreichbar` und damit in derselben
+/// fail-open/closed-Entscheidung wie jeder andere Ausfall — kein neuer Fehlerpfad, aber eine
+/// laute Warnung, weil die Konfiguration auf dieser Plattform nie funktionieren kann.
+#[cfg(all(feature = "clamav", unix))]
+async fn clamd_verbinden(addr: &str, daten: &[u8]) -> clamav_client::IoResult {
+    if let Some(pfad) = addr.strip_prefix("unix:") {
         clamav_client::tokio::scan_buffer(
             daten,
             clamav_client::tokio::Socket { socket_path: pfad },
@@ -244,14 +265,24 @@ async fn clamd_scan(addr: &str, daten: &[u8]) -> ScanErgebnis {
             None,
         )
         .await
-    };
-    match antwort {
-        Ok(bytes) => klassifiziere_antwort(&bytes),
-        Err(e) => {
-            tracing::warn!("clamd nicht erreichbar / Scan fehlgeschlagen: {e}");
-            ScanErgebnis::ScannerNichtErreichbar
-        }
     }
+}
+
+#[cfg(all(feature = "clamav", not(unix)))]
+async fn clamd_verbinden(addr: &str, daten: &[u8]) -> clamav_client::IoResult {
+    if addr.starts_with("unix:") {
+        tracing::warn!(
+            "clamd-Adresse '{addr}' verlangt einen Unix-Socket — auf dieser Plattform nicht \
+             verfügbar. Der Scan gilt als nicht erreichbar; für Windows eine TCP-Adresse \
+             (host:port) konfigurieren."
+        );
+    }
+    clamav_client::tokio::scan_buffer(
+        daten,
+        clamav_client::tokio::Tcp { host_address: addr },
+        None,
+    )
+    .await
 }
 
 /// Übersetzt eine clamd-INSTREAM-Antwort in ein [`ScanErgebnis`]. clamd endet mit

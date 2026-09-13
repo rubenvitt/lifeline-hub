@@ -22,7 +22,6 @@ import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { formatZeitKurz } from '../anzeige/format';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
-import { EINSATZ_STATUS } from '../einsatz/einsatzStatus';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { useAuth } from '../auth/AuthContext';
@@ -34,6 +33,7 @@ import SektionHeader from '../components/SektionHeader';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import { abstand, flaeche } from '../theme/tokens';
+import { einsatzStatus } from '../theme/statusFarben';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache. Der Import steht
 // bewusst HIER und nicht nur transitiv über `SeitenZustand`/`EinsatzSeite`: ohne
 // ihn wären die Balken 0 px hoch, und jsdom rechnet kein Layout — der Ausfall
@@ -247,7 +247,7 @@ export default function EinsaetzePage() {
     >
       <Space orientation="vertical">
         <Space wrap>
-          <StatusTag darstellung={EINSATZ_STATUS[e.status]} />
+          <StatusTag darstellung={einsatzStatus[e.status]} />
           <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
           {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
         </Space>
@@ -376,7 +376,9 @@ export default function EinsaetzePage() {
         erfassenText="Anlegen"
         laeuft={anlegen.isPending}
         initialValues={{ einsatzart: 'realeinsatz' as Einsatzart, begonnen_at: dayjs() }}
-        onErfassen={async (w) => { await anlegen.mutateAsync(w); }}
+        onErfassen={async (w) => {
+          await anlegen.mutateAsync(w);
+        }}
         onFertig={() => setDialogOffen(false)}
         onAbbrechen={() => setDialogOffen(false)}
       >

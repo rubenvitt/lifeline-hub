@@ -70,7 +70,11 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       invalAlle(EINSATZ_STREAM_EVENTS.meldung);
       spieleAlarmTon('alarm');
       let detail: unknown = {};
-      try { detail = JSON.parse(ev.data); } catch { /* Payload optional */ }
+      try {
+        detail = JSON.parse(ev.data);
+      } catch {
+        /* Payload optional */
+      }
       window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail }));
     };
     listeners.push(['sofortmeldung', onSofort as EventListener]);
@@ -88,7 +92,11 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         bezug_typ?: 'auftrag' | 'meldung' | 'etb' | null;
         bezug_id?: number | null;
       } = {};
-      try { detail = JSON.parse(ev.data); } catch { /* Payload optional */ }
+      try {
+        detail = JSON.parse(ev.data);
+      } catch {
+        /* Payload optional */
+      }
       // Nur scheduler-gefeuerte Fälligkeit alarmiert: die CRUD-Route (routes/erinnerung.rs) sendet
       // dasselbe `erinnerung`-Event mit nur {einsatz_id} als Listen-Refresh — ohne erinnerung_id.
       // Die Registry-Invalidierung von einsatz-erinnerungen (separater Listener) trägt diesen Fall.
@@ -139,7 +147,8 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         return;
       }
       tote.close();
-      const wartezeit = RECONNECT_BACKOFF_MS[Math.min(backoffStufe, RECONNECT_BACKOFF_MS.length - 1)];
+      const wartezeit =
+        RECONNECT_BACKOFF_MS[Math.min(backoffStufe, RECONNECT_BACKOFF_MS.length - 1)];
       backoffStufe += 1;
       backoffTimer = setTimeout(() => {
         if (!abgebrochen) verbinde();

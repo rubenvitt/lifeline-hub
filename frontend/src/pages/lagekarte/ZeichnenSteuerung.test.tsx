@@ -27,8 +27,15 @@ describe('ZeichnenSteuerung', () => {
   it('rendert nichts, wenn inaktiv', () => {
     const { container } = render(
       <App>
-        <ZeichnenSteuerung aktiv={false} titel="x" phase="zeichnen"
-          onAbschliessen={vi.fn()} onAbbrechen={vi.fn()} onSpeichern={vi.fn()} onVerwerfen={vi.fn()} />
+        <ZeichnenSteuerung
+          aktiv={false}
+          titel="x"
+          phase="zeichnen"
+          onAbschliessen={vi.fn()}
+          onAbbrechen={vi.fn()}
+          onSpeichern={vi.fn()}
+          onVerwerfen={vi.fn()}
+        />
       </App>,
     );
     expect(container.textContent).not.toContain('Abschließen');
@@ -117,5 +124,33 @@ describe('ZeichnenSteuerung — Serienmodus (LFH-332)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Fertig' }));
     expect(onFertig).toHaveBeenCalledTimes(1);
     expect(p.onAbbrechen).not.toHaveBeenCalled();
+  });
+});
+
+describe('ZeichnenSteuerung — Platz im KartenFuss (LFH-355)', () => {
+  it('positioniert sich nicht selbst, sondern hängt als mittiges Band im Fuß-Rahmen', () => {
+    const { container } = render(
+      <App>
+        <ZeichnenSteuerung
+          aktiv
+          titel="Gefahrengebiet · Fläche"
+          phase="zeichnen"
+          onAbschliessen={vi.fn()}
+          onAbbrechen={vi.fn()}
+          onSpeichern={vi.fn()}
+          onVerwerfen={vi.fn()}
+        />
+      </App>,
+    );
+    const karte = container.querySelector('.ant-card') as HTMLElement;
+    // Die tragende Aussage ist die ABWESENHEIT: mit `position: absolute` läge die Karte
+    // wieder aus dem Fluss und die später gerenderte SnapshotLeiste verdeckte ihre Knöpfe
+    // (gemessen als Playwright-Timeout „intercepts pointer events", während `toBeVisible()`
+    // grün blieb). Ein niedriger `zIndex` liesse sich vortäuschen, ein fehlendes
+    // `position` nicht.
+    expect(karte.style.position).toBe('');
+    expect(karte.style.zIndex).toBe('');
+    expect(karte.style.alignSelf).toBe('center');
+    expect(karte.style.pointerEvents).toBe('auto');
   });
 });

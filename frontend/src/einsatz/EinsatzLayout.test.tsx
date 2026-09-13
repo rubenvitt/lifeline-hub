@@ -23,8 +23,13 @@ vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 const EINGEKLAPPT = 'lfh:nav:eingeklappt';
 
 const admin = {
-  id: 1, anzeigename: 'Chef', benutzername: 'chef', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Chef',
+  benutzername: 'chef',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 /**
  * Ein Benutzer OHNE Admin-Bypass — `istModulGesperrt` lässt Admins grundsätzlich frei
@@ -33,13 +38,23 @@ const admin = {
  * braucht es einen Benutzer, an dem die Sperre tatsächlich greifen kann.
  */
 const mitarbeiterOhneRolle = {
-  id: 2, anzeigename: 'Helfer', benutzername: 'helfer', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 2,
+  anzeigename: 'Helfer',
+  benutzername: 'helfer',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 const einsatz = {
-  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: null, status: 'aktiv',
-  begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null,
-  abgeschlossen_von: null, meine_rolle: 'einsatzleitung',
+  id: 7,
+  bezeichnung: 'Hochwasser Nord',
+  stichwort: null,
+  status: 'aktiv',
+  begonnen_at: '2026-05-23 09:00:00',
+  abgeschlossen_at: null,
+  abgeschlossen_von: null,
+  meine_rolle: 'einsatzleitung',
 };
 
 /**
@@ -210,8 +225,12 @@ describe('EinsatzLayout', () => {
     it('verschwindet, wenn es per Override ausgeblendet ist', async () => {
       setup({
         lagekarte: {
-          einsatz_id: 7, modul_key: 'lagekarte', sichtbar: false,
-          benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+          einsatz_id: 7,
+          modul_key: 'lagekarte',
+          sichtbar: false,
+          benoetigte_rolle: null,
+          geaendert_at: null,
+          geaendert_von: null,
         },
       });
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
@@ -222,8 +241,12 @@ describe('EinsatzLayout', () => {
       setup(
         {
           lagekarte: {
-            einsatz_id: 7, modul_key: 'lagekarte', sichtbar: true,
-            benoetigte_rolle: 'fuehrungskraft', geaendert_at: null, geaendert_von: null,
+            einsatz_id: 7,
+            modul_key: 'lagekarte',
+            sichtbar: true,
+            benoetigte_rolle: 'fuehrungskraft',
+            geaendert_at: null,
+            geaendert_von: null,
           },
         },
         {},
@@ -239,8 +262,12 @@ describe('EinsatzLayout', () => {
     // /etb offen. ETB bleibt sichtbar, Personen verschwindet aus der Nav.
     setup({
       personen: {
-        einsatz_id: 7, modul_key: 'personen', sichtbar: false,
-        benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+        einsatz_id: 7,
+        modul_key: 'personen',
+        sichtbar: false,
+        benoetigte_rolle: null,
+        geaendert_at: null,
+        geaendert_von: null,
       },
     });
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
@@ -260,7 +287,9 @@ describe('EinsatzLayout', () => {
     // Verbindung pro Einsatz, unabhängig von der offenen Modul-Seite (HTTP/1.1-6-Limit).
     const urls: string[] = [];
     class FakeEventSource {
-      constructor(url: string) { urls.push(url); }
+      constructor(url: string) {
+        urls.push(url);
+      }
       addEventListener() {}
       removeEventListener() {}
       close() {}
@@ -567,9 +596,7 @@ describe('EinsatzLayout', () => {
       expect(alarm).toHaveTextContent('Ton blockiert');
       // Und die Einzelknöpfe der breiten Bauform stehen hier NICHT mehr — ohne
       // diese Hälfte wäre „ein Ziel" auch von drei Zielen erfüllt.
-      expect(
-        screen.queryByRole('button', { name: 'Alarmton durch Klick entsperren' }),
-      ).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Alarmton durch Klick entsperren' })).toBeNull();
     });
 
     it('trägt unter lg KEINEN Trenner — das 390-px-Budget hält ihn nicht (gemessen)', async () => {
@@ -708,11 +735,24 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // Aufklappen — ein Sprung ins Leere wäre schlechter als keiner (Kommentar an
     // `onKategorieKlick`).
     const lageVersteckt = Object.fromEntries(
-      ['lage-dashboard', 'lagekarte', 'lageberichte', 'kraefteuebersicht', 'gefahrenzonen', 'lagemeldungen']
-        .map((key) => [key, {
-          einsatz_id: 7, modul_key: key, sichtbar: false,
-          benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
-        }]),
+      [
+        'lage-dashboard',
+        'lagekarte',
+        'lageberichte',
+        'kraefteuebersicht',
+        'gefahrenzonen',
+        'lagemeldungen',
+      ].map((key) => [
+        key,
+        {
+          einsatz_id: 7,
+          modul_key: key,
+          sichtbar: false,
+          benoetigte_rolle: null,
+          geaendert_at: null,
+          geaendert_von: null,
+        },
+      ]),
     );
     setup(lageVersteckt);
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());

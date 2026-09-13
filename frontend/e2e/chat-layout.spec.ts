@@ -43,7 +43,9 @@ async function ueberstand(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 }
 
-test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absenden', async ({ page }) => {
+test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absenden', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Chat ${Date.now()}`);
 
@@ -57,7 +59,9 @@ test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absen
   // die Oberfläche gesendet statt per API: geprüft werden soll das Layout NACH
   // dem Absenden, und genau dieser Weg erzeugt es.
   for (let i = 1; i <= 12; i += 1) {
-    await eingabe.fill(`Probe ${i} — Deichabschnitt Nord meldet Lage unverändert, Kräfte im Einsatz.`);
+    await eingabe.fill(
+      `Probe ${i} — Deichabschnitt Nord meldet Lage unverändert, Kräfte im Einsatz.`,
+    );
     await page.getByRole('button', { name: 'Senden' }).click();
     await expect(page.getByText(`Probe ${i} —`, { exact: false })).toBeVisible();
   }
@@ -68,7 +72,9 @@ test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absen
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 });
 
-test('Chat: unter md trägt eine Segmented-Leiste die Kanäle, nicht die Seitenspalte', async ({ page }) => {
+test('Chat: unter md trägt eine Segmented-Leiste die Kanäle, nicht die Seitenspalte', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Chat Kanäle ${Date.now()}`);
 

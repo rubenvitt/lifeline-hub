@@ -8,8 +8,7 @@ import type { NeueMeldung, Person } from '../api/types';
 export const OFFLINE_QUEUE_EVENT = 'lfh:offline-queue-geaendert';
 
 export type OfflineSchreibaktion =
-  | { art: 'person'; daten: PersonAnlegenEingabe }
-  | { art: 'meldung'; daten: NeueMeldung };
+  { art: 'person'; daten: PersonAnlegenEingabe } | { art: 'meldung'; daten: NeueMeldung };
 
 export interface AusstehendeSchreibaktion {
   id?: number;
@@ -26,10 +25,7 @@ export interface AbgelehnteSchreibaktion extends AusstehendeSchreibaktion {
   abgelehnt_at: string;
 }
 
-export type PersonErfassungsSicht = Extract<
-  Person['status'],
-  'erfasst' | 'vermisst' | 'betroffen'
->;
+export type PersonErfassungsSicht = Extract<Person['status'], 'erfasst' | 'vermisst' | 'betroffen'>;
 
 /** Dauerhafte Erfolgsquittung einer offline vorgemerkten Person. Sie wird erst
  * nach erfolgreichem Server-Replay zusammen mit dem Entfernen der Pending-Zeile
@@ -152,38 +148,32 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
         }
         if (oldVersion < 4) {
           tx.objectStore('ausstehend').createIndex('by-benutzer', 'benutzer_id');
-          tx.objectStore('ausstehend').createIndex(
-            'by-benutzer-einsatz',
-            ['benutzer_id', 'einsatz_id'],
-          );
-          tx.objectStore('abgelehnt').createIndex('by-benutzer', 'benutzer_id');
-          tx.objectStore('abgelehnt').createIndex(
-            'by-benutzer-einsatz',
-            ['benutzer_id', 'einsatz_id'],
-          );
-          tx.objectStore('schreibaktionen').createIndex('by-benutzer', 'benutzer_id');
-          tx.objectStore('schreibaktionen').createIndex(
-            'by-benutzer-einsatz',
-            ['benutzer_id', 'einsatz_id'],
-          );
-          tx.objectStore('schreibaktionenAbgelehnt').createIndex(
-            'by-benutzer',
+          tx.objectStore('ausstehend').createIndex('by-benutzer-einsatz', [
             'benutzer_id',
-          );
-          tx.objectStore('schreibaktionenAbgelehnt').createIndex(
-            'by-benutzer-einsatz',
-            ['benutzer_id', 'einsatz_id'],
-          );
+            'einsatz_id',
+          ]);
+          tx.objectStore('abgelehnt').createIndex('by-benutzer', 'benutzer_id');
+          tx.objectStore('abgelehnt').createIndex('by-benutzer-einsatz', [
+            'benutzer_id',
+            'einsatz_id',
+          ]);
+          tx.objectStore('schreibaktionen').createIndex('by-benutzer', 'benutzer_id');
+          tx.objectStore('schreibaktionen').createIndex('by-benutzer-einsatz', [
+            'benutzer_id',
+            'einsatz_id',
+          ]);
+          tx.objectStore('schreibaktionenAbgelehnt').createIndex('by-benutzer', 'benutzer_id');
+          tx.objectStore('schreibaktionenAbgelehnt').createIndex('by-benutzer-einsatz', [
+            'benutzer_id',
+            'einsatz_id',
+          ]);
         }
         if (oldVersion < 5) {
           const quittungen = d.createObjectStore('personErfassungsQuittungen', {
             keyPath: ['benutzer_id', 'einsatz_id', 'client_id'],
           });
           quittungen.createIndex('by-benutzer', 'benutzer_id');
-          quittungen.createIndex(
-            'by-benutzer-einsatz',
-            ['benutzer_id', 'einsatz_id'],
-          );
+          quittungen.createIndex('by-benutzer-einsatz', ['benutzer_id', 'einsatz_id']);
         }
       },
     });
@@ -195,8 +185,10 @@ function meldeQueueAenderung(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(OFFLINE_QUEUE_EVENT));
 }
 
-const benutzerEinsatz = (benutzerId: number, einsatzId: number): [number, number] =>
-  [benutzerId, einsatzId];
+const benutzerEinsatz = (benutzerId: number, einsatzId: number): [number, number] => [
+  benutzerId,
+  einsatzId,
+];
 
 export async function queueEinreihen(
   benutzerId: number,
@@ -279,13 +271,14 @@ export async function abgelehntLaden(
   einsatzId?: number,
 ): Promise<AbgelehnterEintrag[]> {
   const d = await db();
-  const alle = einsatzId == null
-    ? await d.getAllFromIndex('abgelehnt', 'by-benutzer', benutzerId)
-    : await d.getAllFromIndex(
-        'abgelehnt',
-        'by-benutzer-einsatz',
-        benutzerEinsatz(benutzerId, einsatzId),
-      );
+  const alle =
+    einsatzId == null
+      ? await d.getAllFromIndex('abgelehnt', 'by-benutzer', benutzerId)
+      : await d.getAllFromIndex(
+          'abgelehnt',
+          'by-benutzer-einsatz',
+          benutzerEinsatz(benutzerId, einsatzId),
+        );
   return alle.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
 }
 
@@ -301,10 +294,7 @@ export async function abgelehntEntfernen(benutzerId: number, id: number): Promis
 }
 
 /** Legt einen bewusst erneut versuchten ETB-Eintrag atomar zurück in die Pending-Queue. */
-export async function abgelehntWiederholen(
-  benutzerId: number,
-  id: number,
-): Promise<boolean> {
+export async function abgelehntWiederholen(benutzerId: number, id: number): Promise<boolean> {
   const d = await db();
   const tx = d.transaction(['abgelehnt', 'ausstehend'], 'readwrite');
   const abgelehnt = await tx.objectStore('abgelehnt').get(id);
@@ -327,8 +317,9 @@ export async function abgelehntWiederholen(
 /** Alle ausstehenden ETB-Einträge, einsatzübergreifend. Für den globalen Flush. */
 export async function queueAlleLaden(benutzerId: number): Promise<AusstehenderEintrag[]> {
   const d = await db();
-  return (await d.getAllFromIndex('ausstehend', 'by-benutzer', benutzerId)).sort((a, b) =>
-    a.erstellt_at.localeCompare(b.erstellt_at) || (a.id ?? 0) - (b.id ?? 0));
+  return (await d.getAllFromIndex('ausstehend', 'by-benutzer', benutzerId)).sort(
+    (a, b) => a.erstellt_at.localeCompare(b.erstellt_at) || (a.id ?? 0) - (b.id ?? 0),
+  );
 }
 
 export async function schreibaktionEinreihen(
@@ -351,21 +342,20 @@ export async function schreibaktionenLaden(
   einsatzId?: number,
 ): Promise<AusstehendeSchreibaktion[]> {
   const d = await db();
-  const alle = einsatzId == null
-    ? await d.getAllFromIndex('schreibaktionen', 'by-benutzer', benutzerId)
-    : await d.getAllFromIndex(
-        'schreibaktionen',
-        'by-benutzer-einsatz',
-        benutzerEinsatz(benutzerId, einsatzId),
-      );
-  return alle.sort((a, b) =>
-    a.erstellt_at.localeCompare(b.erstellt_at) || (a.id ?? 0) - (b.id ?? 0));
+  const alle =
+    einsatzId == null
+      ? await d.getAllFromIndex('schreibaktionen', 'by-benutzer', benutzerId)
+      : await d.getAllFromIndex(
+          'schreibaktionen',
+          'by-benutzer-einsatz',
+          benutzerEinsatz(benutzerId, einsatzId),
+        );
+  return alle.sort(
+    (a, b) => a.erstellt_at.localeCompare(b.erstellt_at) || (a.id ?? 0) - (b.id ?? 0),
+  );
 }
 
-export async function schreibaktionEntfernen(
-  benutzerId: number,
-  id: number,
-): Promise<boolean> {
+export async function schreibaktionEntfernen(benutzerId: number, id: number): Promise<boolean> {
   const d = await db();
   const tx = d.transaction('schreibaktionen', 'readwrite');
   const eintrag = await tx.store.get(id);
@@ -385,23 +375,13 @@ export async function schreibaktionPersonAbschliessen(
   eintrag: AusstehendeSchreibaktion,
   person: Person,
 ): Promise<PersonErfassungsQuittung | null> {
-  if (
-    eintrag.id == null ||
-    eintrag.benutzer_id !== benutzerId ||
-    eintrag.aktion.art !== 'person'
-  ) return null;
+  if (eintrag.id == null || eintrag.benutzer_id !== benutzerId || eintrag.aktion.art !== 'person')
+    return null;
 
   const d = await db();
-  const tx = d.transaction(
-    ['schreibaktionen', 'personErfassungsQuittungen'],
-    'readwrite',
-  );
+  const tx = d.transaction(['schreibaktionen', 'personErfassungsQuittungen'], 'readwrite');
   const aktuell = await tx.objectStore('schreibaktionen').get(eintrag.id);
-  if (
-    !aktuell ||
-    aktuell.benutzer_id !== benutzerId ||
-    aktuell.aktion.art !== 'person'
-  ) {
+  if (!aktuell || aktuell.benutzer_id !== benutzerId || aktuell.aktion.art !== 'person') {
     await tx.done;
     return null;
   }
@@ -409,8 +389,8 @@ export async function schreibaktionPersonAbschliessen(
   // Aktuelle Einreihungen besitzen immer eine client_id. Der deterministische
   // Fallback hält jedoch auch eine bereits existierende Alt-Zeile verlustfrei,
   // statt sie nach erfolgreicher Server-Antwort in einer Replay-Schleife zu lassen.
-  const clientId = aktuell.aktion.daten.client_id ??
-    `legacy-person-${aktuell.id ?? eintrag.id}-${person.id}`;
+  const clientId =
+    aktuell.aktion.daten.client_id ?? `legacy-person-${aktuell.id ?? eintrag.id}-${person.id}`;
   const quittung: PersonErfassungsQuittung = {
     benutzer_id: benutzerId,
     einsatz_id: aktuell.einsatz_id,
@@ -438,8 +418,9 @@ export async function personErfassungsQuittungenLaden(
     'by-benutzer-einsatz',
     benutzerEinsatz(benutzerId, einsatzId),
   );
-  return alle.sort((a, b) =>
-    a.erstellt_at.localeCompare(b.erstellt_at) || a.client_id.localeCompare(b.client_id));
+  return alle.sort(
+    (a, b) => a.erstellt_at.localeCompare(b.erstellt_at) || a.client_id.localeCompare(b.client_id),
+  );
 }
 
 /** Quittiert eine bereits in der Personen-UI dargestellte Erfolgsquittung.
@@ -491,15 +472,17 @@ export async function schreibaktionenAbgelehntLaden(
   einsatzId?: number,
 ): Promise<AbgelehnteSchreibaktion[]> {
   const d = await db();
-  const alle = einsatzId == null
-    ? await d.getAllFromIndex('schreibaktionenAbgelehnt', 'by-benutzer', benutzerId)
-    : await d.getAllFromIndex(
-        'schreibaktionenAbgelehnt',
-        'by-benutzer-einsatz',
-        benutzerEinsatz(benutzerId, einsatzId),
-      );
-  return alle.sort((a, b) =>
-    a.abgelehnt_at.localeCompare(b.abgelehnt_at) || (a.id ?? 0) - (b.id ?? 0));
+  const alle =
+    einsatzId == null
+      ? await d.getAllFromIndex('schreibaktionenAbgelehnt', 'by-benutzer', benutzerId)
+      : await d.getAllFromIndex(
+          'schreibaktionenAbgelehnt',
+          'by-benutzer-einsatz',
+          benutzerEinsatz(benutzerId, einsatzId),
+        );
+  return alle.sort(
+    (a, b) => a.abgelehnt_at.localeCompare(b.abgelehnt_at) || (a.id ?? 0) - (b.id ?? 0),
+  );
 }
 
 export async function schreibaktionAbgelehntVerwerfen(
@@ -564,9 +547,9 @@ export async function queueNichtZugeordnetZaehlen(): Promise<number> {
     d.getAll('schreibaktionen'),
     d.getAll('schreibaktionenAbgelehnt'),
   ]);
-  return [...etbOffen, ...etbAbgelehnt, ...aktionenOffen, ...aktionenAbgelehnt]
-    .filter(ohneBenutzerbindung)
-    .length;
+  return [...etbOffen, ...etbAbgelehnt, ...aktionenOffen, ...aktionenAbgelehnt].filter(
+    ohneBenutzerbindung,
+  ).length;
 }
 
 /** Verwirft alle nicht attribuierbaren Alt-Daten in einer Transaktion. Eine
@@ -597,35 +580,36 @@ export async function queueZaehlerLaden(
   einsatzId?: number,
 ): Promise<OfflineQueueZaehler> {
   const d = await db();
-  const [etbOffen, etbAbgelehnt, aktionenOffen, aktionenAbgelehnt] = einsatzId == null
-    ? await Promise.all([
-        d.getAllKeysFromIndex('ausstehend', 'by-benutzer', benutzerId),
-        d.getAllKeysFromIndex('abgelehnt', 'by-benutzer', benutzerId),
-        d.getAllKeysFromIndex('schreibaktionen', 'by-benutzer', benutzerId),
-        d.getAllKeysFromIndex('schreibaktionenAbgelehnt', 'by-benutzer', benutzerId),
-      ])
-    : await Promise.all([
-        d.getAllKeysFromIndex(
-          'ausstehend',
-          'by-benutzer-einsatz',
-          benutzerEinsatz(benutzerId, einsatzId),
-        ),
-        d.getAllKeysFromIndex(
-          'abgelehnt',
-          'by-benutzer-einsatz',
-          benutzerEinsatz(benutzerId, einsatzId),
-        ),
-        d.getAllKeysFromIndex(
-          'schreibaktionen',
-          'by-benutzer-einsatz',
-          benutzerEinsatz(benutzerId, einsatzId),
-        ),
-        d.getAllKeysFromIndex(
-          'schreibaktionenAbgelehnt',
-          'by-benutzer-einsatz',
-          benutzerEinsatz(benutzerId, einsatzId),
-        ),
-      ]);
+  const [etbOffen, etbAbgelehnt, aktionenOffen, aktionenAbgelehnt] =
+    einsatzId == null
+      ? await Promise.all([
+          d.getAllKeysFromIndex('ausstehend', 'by-benutzer', benutzerId),
+          d.getAllKeysFromIndex('abgelehnt', 'by-benutzer', benutzerId),
+          d.getAllKeysFromIndex('schreibaktionen', 'by-benutzer', benutzerId),
+          d.getAllKeysFromIndex('schreibaktionenAbgelehnt', 'by-benutzer', benutzerId),
+        ])
+      : await Promise.all([
+          d.getAllKeysFromIndex(
+            'ausstehend',
+            'by-benutzer-einsatz',
+            benutzerEinsatz(benutzerId, einsatzId),
+          ),
+          d.getAllKeysFromIndex(
+            'abgelehnt',
+            'by-benutzer-einsatz',
+            benutzerEinsatz(benutzerId, einsatzId),
+          ),
+          d.getAllKeysFromIndex(
+            'schreibaktionen',
+            'by-benutzer-einsatz',
+            benutzerEinsatz(benutzerId, einsatzId),
+          ),
+          d.getAllKeysFromIndex(
+            'schreibaktionenAbgelehnt',
+            'by-benutzer-einsatz',
+            benutzerEinsatz(benutzerId, einsatzId),
+          ),
+        ]);
   // Der Legacy-Zähler ist absichtlich global. Eine einsatzbezogene Anzahl würde
   // bereits Metadaten einer nicht attribuierbaren früheren Sitzung offenlegen.
   const nichtZugeordnet = await queueNichtZugeordnetZaehlen();

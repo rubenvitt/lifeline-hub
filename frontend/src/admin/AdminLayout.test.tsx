@@ -10,18 +10,33 @@ import AdminLayout from './AdminLayout';
 import { adminBenutzerPfad, defaultAdminPfad, ersteSektionPfad } from './adminNav';
 
 const fuehrungskraft = {
-  id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 2,
+  anzeigename: 'Eva',
+  benutzername: 'eva',
+  system_rolle: 'keiner',
+  org_rolle: 'fuehrungskraft',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 
 const admin = {
-  id: 1, anzeigename: 'Chef', benutzername: 'chef', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 1,
+  anzeigename: 'Chef',
+  benutzername: 'chef',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 
 const sonstiger = {
-  id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  id: 3,
+  anzeigename: 'Max',
+  benutzername: 'max',
+  system_rolle: 'keiner',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-23 10:00:00',
 };
 
 /** Zeigt den aktuellen Pfad — Landepunkt der Sektions-/Redirect-Routen. */
@@ -39,8 +54,14 @@ function setup(me: Record<string, unknown>, route = defaultAdminPfad()) {
         <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
-          <Route path="stammdaten" element={<Navigate to={ersteSektionPfad('stammdaten')} replace />} />
-          <Route path="einstellungen" element={<Navigate to={ersteSektionPfad('einstellungen')} replace />} />
+          <Route
+            path="stammdaten"
+            element={<Navigate to={ersteSektionPfad('stammdaten')} replace />}
+          />
+          <Route
+            path="einstellungen"
+            element={<Navigate to={ersteSektionPfad('einstellungen')} replace />}
+          />
           <Route path="karten" element={<Navigate to={ersteSektionPfad('karten')} replace />} />
           <Route path=":gruppe/:sektion" element={<Pfad />} />
           {/* Die A7-Detailrouten NAMENTLICH wie in `App.tsx` — ein generisches

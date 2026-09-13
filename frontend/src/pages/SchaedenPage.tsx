@@ -11,13 +11,20 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import type { Ausmass, Schaden, SchadenTyp } from '../api/types';
-import { AUSMASS_META, STATUS_META, TYP_LABEL, filterSchaeden, geschaedigtAnzeige } from './schaeden/schadenHelfer';
+import {
+  AUSMASS_META,
+  STATUS_META,
+  TYP_LABEL,
+  filterSchaeden,
+  geschaedigtAnzeige,
+} from './schaeden/schadenHelfer';
 import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { flaeche } from '../theme/tokens';
+import { einsatzStatus } from '../theme/statusFarben';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
@@ -52,14 +59,19 @@ const schaedenSpalten = (einsatzId: number) =>
       sortWert: (s) => s.registrier_nr,
       suchText: (s) => schadenRegistrierAnzeige(s.registrier_nr),
       // KEIN Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
-      render: (_, s) => <Typography.Text strong>{schadenRegistrierAnzeige(s.registrier_nr)}</Typography.Text>,
+      render: (_, s) => (
+        <Typography.Text strong>{schadenRegistrierAnzeige(s.registrier_nr)}</Typography.Text>
+      ),
     },
     {
       title: 'Typ',
       key: 'typ',
       sortWert: (s) => TYP_LABEL[s.typ],
       filter: {
-        werte: (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({ text: TYP_LABEL[t], value: t })),
+        werte: (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
+          text: TYP_LABEL[t],
+          value: t,
+        })),
         trifft: (s, wert) => s.typ === wert,
       },
       render: (_, s) => <Tag>{TYP_LABEL[s.typ]}</Tag>,
@@ -71,7 +83,10 @@ const schaedenSpalten = (einsatzId: number) =>
       // wäre alphabetisch g-g-k und damit zufällig fast richtig, „mittel" fiele ans Ende.
       sortWert: (s) => (Object.keys(AUSMASS_META) as Ausmass[]).indexOf(s.ausmass),
       filter: {
-        werte: (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({ text: AUSMASS_META[a].label, value: a })),
+        werte: (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({
+          text: AUSMASS_META[a].label,
+          value: a,
+        })),
         trifft: (s, wert) => s.ausmass === wert,
       },
       render: (_, s) => <StatusTag darstellung={AUSMASS_META[s.ausmass]} />,
@@ -91,10 +106,14 @@ const schaedenSpalten = (einsatzId: number) =>
       title: 'Status',
       key: 'status',
       render: (_, s) => (
-        <StatusTag darstellung={{
-          ...STATUS_META[s.status],
-          label: STATUS_META[s.status].label + (s.status === 'uebergeben' && s.uebergeben_an ? ` (${s.uebergeben_an})` : ''),
-        }} />
+        <StatusTag
+          darstellung={{
+            ...STATUS_META[s.status],
+            label:
+              STATUS_META[s.status].label +
+              (s.status === 'uebergeben' && s.uebergeben_an ? ` (${s.uebergeben_an})` : ''),
+          }}
+        />
       ),
     },
     {
@@ -151,7 +170,8 @@ const schaedenSpalten = (einsatzId: number) =>
       title: 'Geschädigt',
       key: 'geschaedigt',
       abBreite: 'lg',
-      suchText: (s) => s.geschaedigt_personal_name ?? s.geschaedigt_organisation_name ?? s.geschaedigt_kontakt,
+      suchText: (s) =>
+        s.geschaedigt_personal_name ?? s.geschaedigt_organisation_name ?? s.geschaedigt_kontakt,
       render: (_, s) => geschaedigtAnzeige(s, einsatzId),
     },
   ]);
@@ -177,7 +197,10 @@ export default function SchaedenPage() {
 
   // Schaden-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
   // im EinsatzLayout, `schaden`-Event → 'einsatz-schaeden') live gehalten — LFH-206.
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
   const schaedenQuery = useQuery({
     queryKey: einsatzKeys.schaeden(einsatzId),
     queryFn: () => listeSchaeden(einsatzId),
@@ -249,11 +272,7 @@ export default function SchaedenPage() {
       titel={
         <Space>
           Schäden
-          {/* BEFUND wie in `PersonalPage`/`FahrzeugePage`: `EinsatzStatus` hat keine
-              Statusrolle in `theme/statusFarben.ts` (Spec §1.3 listet acht Vertrags-Enums,
-              dieses ist keins davon). Der Tag bleibt deshalb auf antd-Farbnamen und rohem
-              Enum-Wert stehen — erfunden wird hier nichts. */}
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
       breadcrumb={
@@ -276,7 +295,8 @@ export default function SchaedenPage() {
       // — mit DEMSELBEN Rechte-Riegel wie der Knopf darüber.
       neueZeile={darfSchreiben ? () => setErfassenOffen(true) : undefined}
       hinweis={
-        !darfSchreiben && einsatz.status !== 'aktiv' && (
+        !darfSchreiben &&
+        einsatz.status !== 'aktiv' && (
           <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
         )
       }
@@ -295,7 +315,9 @@ export default function SchaedenPage() {
         />
       ) : (
         <>
-          {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void schaedenQuery.refetch()} />}
+          {standVeraltet && (
+            <SeitenStandVeraltet onWiederholen={() => void schaedenQuery.refetch()} />
+          )}
 
           <Datensicht
             /**

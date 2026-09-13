@@ -1,6 +1,10 @@
 import type {
-  Bereitstellungsraum, BrDetail, BrBelegung,
-  BrStatus, ObjektTyp, BrBelegungsArt,
+  Bereitstellungsraum,
+  BrDetail,
+  BrBelegung,
+  BrStatus,
+  ObjektTyp,
+  BrBelegungsArt,
 } from './types';
 import { apiGet, apiSend } from './client';
 
@@ -72,10 +76,7 @@ export function setzeBrStatus(
 }
 
 export function storniereBr(einsatzId: number, brId: number): Promise<void> {
-  return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`,
-    'DELETE',
-  );
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`, 'DELETE');
 }
 
 export interface BrBelegungEingabe {

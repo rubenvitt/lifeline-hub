@@ -31,7 +31,9 @@ describe('taktische Zeit-Varianten', () => {
   it('taktischeDtgVoll = DDHHmm + dt. Monatskürzel + Jahr (161430JUL2026)', () => {
     expect(taktischeDtgVoll(wire, { zeitzone: 'Europe/Berlin' })).toBe('161430JUL2026');
     // Umlaut-Monat: März → MÄR
-    expect(taktischeDtgVoll('2026-03-01 06:00:00', { zeitzone: 'Europe/Berlin' })).toBe('010700MÄR2026');
+    expect(taktischeDtgVoll('2026-03-01 06:00:00', { zeitzone: 'Europe/Berlin' })).toBe(
+      '010700MÄR2026',
+    );
   });
   it('leer/null → leerer String', () => {
     expect(taktischeUhrzeit(null)).toBe('');
@@ -57,7 +59,9 @@ describe('formatZeit (taktische DTG)', () => {
 
   it('ignoriert das 12h-Setting — taktisch ist immer 24h', () => {
     const wire = '2026-06-11 15:00:00'; // 15:00 UTC → 17:00 Berlin
-    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' })).toBe('111700JUN2026');
+    expect(formatZeit(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' })).toBe(
+      '111700JUN2026',
+    );
   });
 
   it('leer/null → leerer String', () => {
@@ -92,27 +96,27 @@ describe('formatKoordinate', () => {
   });
 
   it('MGRS-Konvention → MGRS-String', () => {
-    expect(formatKoordinate(51.1, 4.1, { koordinatenformat: 'mgrs' })).toBe(
-      '31U ES 77019 61520',
-    );
+    expect(formatKoordinate(51.1, 4.1, { koordinatenformat: 'mgrs' })).toBe('31U ES 77019 61520');
   });
 
   it('UTM-Konvention → Zone/Band + gerundete Ostung/Nordung', () => {
-    expect(formatKoordinate(51.1, 4.1, { koordinatenformat: 'utm' })).toBe(
-      '31U 577020 5661521',
-    );
+    expect(formatKoordinate(51.1, 4.1, { koordinatenformat: 'utm' })).toBe('31U 577020 5661521');
   });
 
   it('formatiert dms über die Konvention', () => {
-    expect(formatKoordinate(51.5, 10.25, { koordinatenformat: 'dms' })).toBe('51°30\'00"N 010°15\'00"E');
+    expect(formatKoordinate(51.5, 10.25, { koordinatenformat: 'dms' })).toBe(
+      '51°30\'00"N 010°15\'00"E',
+    );
   });
 
   it('formatiert gk über die Konvention', () => {
-    expect(formatKoordinate(48.782, 9.177, { koordinatenformat: 'gk' })).toMatch(/^R 35\d{5} {2}H 5\d{6}$/);
+    expect(formatKoordinate(48.782, 9.177, { koordinatenformat: 'gk' })).toMatch(
+      /^R 35\d{5} {2}H 5\d{6}$/,
+    );
   });
 
   it('WGS84-Default bleibt byte-exakt', () => {
-    expect(formatKoordinate(51.16040, 10.45140)).toBe('51.16040, 10.45140');
+    expect(formatKoordinate(51.1604, 10.4514)).toBe('51.16040, 10.45140');
   });
 });
 
@@ -143,7 +147,9 @@ describe('formatUhrzeitMitTag', () => {
   it('stellt den Tag voran, wenn der Zeitpunkt nicht heute liegt (in der Anzeigezone)', () => {
     // Systemzeit 08:00 Berlin am 12.06. — ein Tag nach dem Wirestring unten.
     vi.setSystemTime(new Date('2026-06-12T06:00:00Z'));
-    expect(formatUhrzeitMitTag('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe('11. 11:00');
+    expect(formatUhrzeitMitTag('2026-06-11 09:00:00', { zeitzone: 'Europe/Berlin' })).toBe(
+      '11. 11:00',
+    );
   });
 
   it('liefert den Leerstrich, wenn nichts da ist', () => {

@@ -27,7 +27,13 @@ interface Props {
 type StellenZiel = MitgliedAnzeige & { einsatzId: number };
 type StellenWerte = { fuehrungsstelle: string };
 
-function FuehrungsstelleModal({ mitglied, speichern, schliessen, laeuft, fehler }: {
+function FuehrungsstelleModal({
+  mitglied,
+  speichern,
+  schliessen,
+  laeuft,
+  fehler,
+}: {
   mitglied: StellenZiel;
   speichern: (werte: StellenWerte) => Promise<unknown>;
   schliessen: () => void;
@@ -47,7 +53,11 @@ function FuehrungsstelleModal({ mitglied, speichern, schliessen, laeuft, fehler 
       erfassenText="Speichern"
       laeuft={laeuft}
     >
-      <Form.Item name="fuehrungsstelle" label="Führungsstelle" extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt. Leer lassen entfernt die Vorbelegung.">
+      <Form.Item
+        name="fuehrungsstelle"
+        label="Führungsstelle"
+        extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt. Leer lassen entfernt die Vorbelegung."
+      >
         <Input maxLength={200} disabled={laeuft} />
       </Form.Item>
       {fehler && <Alert type="error" title={fehler.message} showIcon />}
@@ -71,7 +81,11 @@ function FuehrungsstelleModal({ mitglied, speichern, schliessen, laeuft, fehler 
  * die ist unten zu einem `minWidth` geworden. Das ist die Anpassung, die der Befund
  * verlangt; die Kartenform wäre eine Formänderung ohne Not.
  */
-export default function MitgliederAbschnitt({ einsatzId, darfVerwalten, darfFuehrungsstelleVerwalten }: Props) {
+export default function MitgliederAbschnitt({
+  einsatzId,
+  darfVerwalten,
+  darfFuehrungsstelleVerwalten,
+}: Props) {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [neuerBenutzer, setNeuerBenutzer] = useState<number | undefined>();
@@ -88,7 +102,13 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten, darfFueh
   });
 
   const stelleSpeichern = async ({ fuehrungsstelle }: StellenWerte) => {
-    if (!stelleZiel || stelleZiel.einsatzId !== einsatzId || !darfFuehrungsstelleVerwalten || stelleSetzen.isPending) return;
+    if (
+      !stelleZiel ||
+      stelleZiel.einsatzId !== einsatzId ||
+      !darfFuehrungsstelleVerwalten ||
+      stelleSetzen.isPending
+    )
+      return;
     const wert = fuehrungsstelle.trim() || null;
     if (wert === (stelleZiel.fuehrungsstelle ?? null)) return;
     await stelleSetzen.mutateAsync({ mitglied: stelleZiel, wert });
@@ -128,19 +148,22 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten, darfFueh
     {
       title: 'Führungsstelle',
       key: 'fuehrungsstelle',
-      render: (_, m) => darfFuehrungsstelleVerwalten ? (
-        <Button
-          type="link"
-          disabled={stelleSetzen.isPending}
-          aria-label={`Führungsstelle für ${m.anzeigename} bearbeiten`}
-          onClick={() => {
-            stelleSetzen.reset();
-            setStelleZiel({ ...m, einsatzId });
-          }}
-        >
-          {m.fuehrungsstelle || 'Führungsstelle festlegen'}
-        </Button>
-      ) : (m.fuehrungsstelle || '—'),
+      render: (_, m) =>
+        darfFuehrungsstelleVerwalten ? (
+          <Button
+            type="link"
+            disabled={stelleSetzen.isPending}
+            aria-label={`Führungsstelle für ${m.anzeigename} bearbeiten`}
+            onClick={() => {
+              stelleSetzen.reset();
+              setStelleZiel({ ...m, einsatzId });
+            }}
+          >
+            {m.fuehrungsstelle || 'Führungsstelle festlegen'}
+          </Button>
+        ) : (
+          m.fuehrungsstelle || '—'
+        ),
     },
     {
       title: 'Rolle',
@@ -200,13 +223,19 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten, darfFueh
                   : undefined
             }
           />
-          <Select value={neueRolle} style={{ width: 170 }} options={ROLLEN} onChange={setNeueRolle} />
+          <Select
+            value={neueRolle}
+            style={{ width: 170 }}
+            options={ROLLEN}
+            onChange={setNeueRolle}
+          />
           <Button
             type="primary"
             disabled={neuerBenutzer == null}
             loading={setzen.isPending}
             onClick={() =>
-              neuerBenutzer != null && setzen.mutate({ benutzerId: neuerBenutzer, rolle: neueRolle })
+              neuerBenutzer != null &&
+              setzen.mutate({ benutzerId: neuerBenutzer, rolle: neueRolle })
             }
           >
             Hinzufügen
@@ -221,16 +250,18 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten, darfFueh
         columns={spalten}
         dataSource={mitglieder}
       />
-      {stelleZiel !== null && stelleZiel.einsatzId === einsatzId && darfFuehrungsstelleVerwalten && (
-        <FuehrungsstelleModal
-          key={`${stelleZiel.einsatzId}:${stelleZiel.benutzer_id}`}
-          mitglied={stelleZiel}
-          speichern={stelleSpeichern}
-          schliessen={() => setStelleZiel((aktuell) => aktuell === stelleZiel ? null : aktuell)}
-          laeuft={stelleSetzen.isPending}
-          fehler={stelleSetzen.error}
-        />
-      )}
+      {stelleZiel !== null &&
+        stelleZiel.einsatzId === einsatzId &&
+        darfFuehrungsstelleVerwalten && (
+          <FuehrungsstelleModal
+            key={`${stelleZiel.einsatzId}:${stelleZiel.benutzer_id}`}
+            mitglied={stelleZiel}
+            speichern={stelleSpeichern}
+            schliessen={() => setStelleZiel((aktuell) => (aktuell === stelleZiel ? null : aktuell))}
+            laeuft={stelleSetzen.isPending}
+            fehler={stelleSetzen.error}
+          />
+        )}
     </section>
   );
 }

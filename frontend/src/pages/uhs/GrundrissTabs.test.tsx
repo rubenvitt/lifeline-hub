@@ -27,28 +27,69 @@ vi.mock('../../api/einsatzPerson', async (importOriginal) => {
 
 function person(over: Partial<Person>): Person {
   return {
-    id: 1, einsatz_id: 1, registrier_nr: 42, status: 'betroffen', name: null, vorname: null,
-    geschlecht: null, geburtsdatum: null, alter_geschaetzt: null, herkunft_adresse: null,
-    antreff_ort: null, melder_kontakt: null, notiz: null, erfasst_at: 'x', erfasst_von: 1,
-    geaendert_at: 'x', geaendert_von: 1, storniert_at: null, aktuelle_sichtung: null,
-    aktuelle_sichtung_at: null, aktueller_verbleib: null, aktuelle_uhs_id: null,
-    aktueller_platz_id: null, ...over,
+    id: 1,
+    einsatz_id: 1,
+    registrier_nr: 42,
+    status: 'betroffen',
+    name: null,
+    vorname: null,
+    geschlecht: null,
+    geburtsdatum: null,
+    alter_geschaetzt: null,
+    herkunft_adresse: null,
+    antreff_ort: null,
+    melder_kontakt: null,
+    notiz: null,
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
+    aktuelle_sichtung: null,
+    aktuelle_sichtung_at: null,
+    aktueller_verbleib: null,
+    aktuelle_uhs_id: null,
+    aktueller_platz_id: null,
+    ...over,
   };
 }
 
 function platz(over: Partial<UhsPlatz>): UhsPlatz {
   return {
-    id: 10, uhs_id: 1, typ: 'bett', bezeichnung: 'Bett 1', pos_x: 10, pos_y: 10,
-    verfuegbarkeit: 'frei', reserviert_fuer_person_id: null, storniert_at: null, ...over,
+    id: 10,
+    uhs_id: 1,
+    typ: 'bett',
+    bezeichnung: 'Bett 1',
+    pos_x: 10,
+    pos_y: 10,
+    verfuegbarkeit: 'frei',
+    reserviert_fuer_person_id: null,
+    storniert_at: null,
+    ...over,
   };
 }
 
 function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
   return {
-    id: 1, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz', bezeichnung: 'BHP 50',
-    standort: null, notiz: null, lat: null, lon: null, status: 'aktiv',
-    erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
-    plaetze: [], belegungen: [], material: [], ...over,
+    id: 1,
+    einsatz_id: 1,
+    abschnitt_id: null,
+    typ: 'behandlungsplatz',
+    bezeichnung: 'BHP 50',
+    standort: null,
+    notiz: null,
+    lat: null,
+    lon: null,
+    status: 'aktiv',
+    erfasst_at: 'x',
+    erfasst_von: 1,
+    geaendert_at: 'x',
+    geaendert_von: 1,
+    storniert_at: null,
+    plaetze: [],
+    belegungen: [],
+    material: [],
+    ...over,
   };
 }
 
@@ -60,7 +101,9 @@ function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
  *  ist: ein zweites offenes Portal wäre ein echter Befund (z. B. ein Leck über `unmount()`
  *  hinweg), keine Testschwäche, die sich stillschweigend wegfiltern ließe. */
 function offenesMenue(): HTMLElement {
-  const treffer = document.querySelectorAll('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  const treffer = document.querySelectorAll(
+    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+  );
   if (treffer.length !== 1) {
     throw new Error(`erwartet genau EIN offenes Dropdown-Menü, gefunden: ${treffer.length}`);
   }
@@ -74,14 +117,34 @@ function offenesMenue(): HTMLElement {
 // liste (`person.aktueller_platz_id`), nie über ein Feld an der UHS selbst — deshalb gibt
 // es hier bewusst NUR eine `uhs`-Fixture, keine zweite „mit belegtem Platz".
 const nichtAufgenommenPerson = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
-const wartebereichPerson = person({ id: 6, registrier_nr: 6, aktuelle_uhs_id: 1, aktueller_platz_id: null });
-const transportPerson = person({
-  id: 9, registrier_nr: 9, aktuelle_uhs_id: null, aktueller_verbleib: 'Transport → KH Mitte',
+const wartebereichPerson = person({
+  id: 6,
+  registrier_nr: 6,
+  aktuelle_uhs_id: 1,
+  aktueller_platz_id: null,
 });
-const belegendePerson = person({ id: 42, registrier_nr: 42, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+const transportPerson = person({
+  id: 9,
+  registrier_nr: 9,
+  aktuelle_uhs_id: null,
+  aktueller_verbleib: 'Transport → KH Mitte',
+});
+const belegendePerson = person({
+  id: 42,
+  registrier_nr: 42,
+  aktuelle_uhs_id: 1,
+  aktueller_platz_id: 10,
+});
 const transportBelegung = {
-  id: 1, einsatz_id: 1, person_id: 9, uhs_id: 1, platz_id: null,
-  art: 'austritt' as const, notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+  id: 1,
+  einsatz_id: 1,
+  person_id: 9,
+  uhs_id: 1,
+  platz_id: null,
+  art: 'austritt' as const,
+  notiz: null,
+  zeitpunkt_at: 'x',
+  erfasst_von: 1,
 };
 
 const uhs = uhsDetail({
@@ -92,8 +155,17 @@ const uhs = uhsDetail({
 // Zwei Personenlisten, EXPLIZIT ausgewählt je Test — keine Ableitung über einen
 // Referenzvergleich auf `uhs` (die früher hier stand): der Unterschied „Bett 1 belegt
 // oder nicht" lebt allein in dieser Liste.
-const personenOhneBelegung: Person[] = [nichtAufgenommenPerson, wartebereichPerson, transportPerson];
-const personenMitBelegung: Person[] = [belegendePerson, nichtAufgenommenPerson, wartebereichPerson, transportPerson];
+const personenOhneBelegung: Person[] = [
+  nichtAufgenommenPerson,
+  wartebereichPerson,
+  transportPerson,
+];
+const personenMitBelegung: Person[] = [
+  belegendePerson,
+  nichtAufgenommenPerson,
+  wartebereichPerson,
+  transportPerson,
+];
 
 describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
   it('stellt ab lg alle drei Bereiche nebeneinander, ohne Reiter', async () => {
@@ -122,7 +194,10 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
 
     const reiter = await screen.findByRole('tablist');
-    expect(within(reiter).getByRole('tab', { name: 'Fläche' })).toHaveAttribute('aria-selected', 'true');
+    expect(within(reiter).getByRole('tab', { name: 'Fläche' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(within(reiter).getByRole('tab', { name: 'Wartebereich' })).toBeInTheDocument();
     expect(within(reiter).getByRole('tab', { name: 'Transport' })).toBeInTheDocument();
   });
@@ -150,7 +225,8 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     // ausgeschlossen. Der Rückklick ist die Stelle, an der die Aussage kippt.
     await userEvent.click(screen.getByRole('tab', { name: 'Fläche' }));
     await waitFor(() =>
-      expect(screen.queryByText('Wartebereich (Eingang)')).not.toBeInTheDocument());
+      expect(screen.queryByText('Wartebereich (Eingang)')).not.toBeInTheDocument(),
+    );
   });
 
   it('bietet den Rückweg in den Wartebereich als Menüeintrag — auf beiden Breiten', async () => {
@@ -180,8 +256,15 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenMitBelegung);
     vi.mocked(aenderePersonBelegung).mockResolvedValue({
-      id: 1, einsatz_id: 1, person_id: 42, uhs_id: 1, platz_id: null,
-      art: 'wechsel', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+      id: 1,
+      einsatz_id: 1,
+      person_id: 42,
+      uhs_id: 1,
+      platz_id: null,
+      art: 'wechsel',
+      notiz: null,
+      zeitpunkt_at: 'x',
+      erfasst_von: 1,
     });
     setzeViewportBreite(800);
     renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
@@ -189,14 +272,20 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
     const menue = offenesMenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }));
+    await userEvent.click(
+      within(menue).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
+    );
 
     // `art: 'wechsel'`, weil die Person bereits an dieser UHS liegt — das rechnet
     // `belegMut` selbst aus, und genau deshalb geht der Eintrag durch die Mutation
     // statt an ihr vorbei.
-    await waitFor(() => expect(aenderePersonBelegung).toHaveBeenCalledWith(1, 42, {
-      art: 'wechsel', uhs_id: 1, platz_id: null,
-    }));
+    await waitFor(() =>
+      expect(aenderePersonBelegung).toHaveBeenCalledWith(1, 42, {
+        art: 'wechsel',
+        uhs_id: 1,
+        platz_id: null,
+      }),
+    );
   });
 
   it('zeigt den Rückweg optimistisch als freien Platz und rollt eine Serverablehnung zurück', async () => {
@@ -222,19 +311,27 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     // ZWISCHEN Klick und Antwort beobachtbar. Mit einer sofort abgelehnten Zusage bliebe
     // die Karte ohne `onMutate` die ganze Zeit „belegt", und der Test belegte nichts.
     let ablehnen: (grund: unknown) => void = () => {};
-    vi.mocked(aenderePersonBelegung).mockReturnValue(new Promise((_res, rej) => { ablehnen = rej; }));
+    vi.mocked(aenderePersonBelegung).mockReturnValue(
+      new Promise((_res, rej) => {
+        ablehnen = rej;
+      }),
+    );
     setzeViewportBreite(800);
     renderMitProviders(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />);
     await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
     expect(await screen.findByText('belegt')).toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
-    await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }));
+    await userEvent.click(
+      within(offenesMenue()).getByRole('menuitem', { name: /Zurück in den Wartebereich/ }),
+    );
 
     // Optimistisch: der Platz zeigt sich schon frei, bevor die Zusage entschieden ist.
     await waitFor(() => expect(screen.queryByText('belegt')).not.toBeInTheDocument());
 
-    await act(async () => { ablehnen(new ApiError(422, 'abgelehnt')); });
+    await act(async () => {
+      ablehnen(new ApiError(422, 'abgelehnt'));
+    });
 
     // Rollback: die Ablehnung stellt den Ausgangszustand wieder her.
     expect(await screen.findByText('belegt')).toBeInTheDocument();
@@ -273,7 +370,8 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
       const { unmount } = renderMitProviders(
         <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />,
       );
-      if (breite < 992) await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
+      if (breite < 992)
+        await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
 
       // Beide Listen, je eigener Auslöser mit ZEILENKENNUNG im Namen — n Zeilen dürfen
       // nicht n gleichnamige Knöpfe liefern. Ein blosses `getAllByRole` mit Zählung
@@ -304,14 +402,14 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen — R-006 · unbekannt' }),
+      await screen.findByRole('button', {
+        name: 'Verbleib / Entlassung erfassen — R-006 · unbekannt',
+      }),
     );
 
     // Der Titel trägt die Person — das ist der Beleg, dass `setTransportPerson` mit DIESER
     // Zeile gerufen wurde und nicht bloss irgendein Dialog aufging.
-    expect(
-      await screen.findByText('Verbleib erfassen — R-006 · unbekannt'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Verbleib erfassen — R-006 · unbekannt')).toBeInTheDocument();
   });
 
   it('rendert den Verbleib-Auslöser ohne Schreibrecht gar nicht erst', async () => {
@@ -326,7 +424,9 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     // (Mutationsprobe), weil zum Prüfzeitpunkt schlicht noch keine Zeile im Baum stand.
     expect(await screen.findByText('R-006 · unbekannt')).toBeInTheDocument();
     // … und trägt trotzdem keinen Auslöser. GAR NICHT gerendert, nicht deaktiviert.
-    expect(screen.queryByRole('button', { name: /Verbleib \/ Entlassung erfassen/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Verbleib \/ Entlassung erfassen/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('setzt an keiner Seitenspalte mehr eine feste Breite, wenn gestapelt wird', async () => {

@@ -16,7 +16,13 @@ interface Props {
  *  mit dem Nachrichtentext vorbelegt. `destroyOnHidden` remountet das Formular bei jedem
  *  Öffnen, sodass `initialText` frisch greift. */
 export default function HeraufstufenAuftragModal({
-  offen, nachricht, abschnitte, einheiten, senden, onAbbrechen, onAnlegen,
+  offen,
+  nachricht,
+  abschnitte,
+  einheiten,
+  senden,
+  onAbbrechen,
+  onAnlegen,
 }: Props) {
   return (
     <Modal
@@ -33,14 +39,16 @@ export default function HeraufstufenAuftragModal({
         abschnitte={abschnitte}
         einheiten={einheiten}
         initialText={nachricht?.inhalt ?? ''}
-        zitat={nachricht && (
-          // Read-only Wortlaut der Quellnachricht (LFH-343 · C8, Befund H49) —
-          // dieselbe Begründung wie im Meldungs-Zwilling: der vorbelegte
-          // Auftragstext wird beim Formulieren überschrieben.
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-            <Typography.Text strong>{nachricht.autor_name}:</Typography.Text> {nachricht.inhalt}
-          </Typography.Paragraph>
-        )}
+        zitat={
+          nachricht && (
+            // Read-only Wortlaut der Quellnachricht (LFH-343 · C8, Befund H49) —
+            // dieselbe Begründung wie im Meldungs-Zwilling: der vorbelegte
+            // Auftragstext wird beim Formulieren überschrieben.
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+              <Typography.Text strong>{nachricht.autor_name}:</Typography.Text> {nachricht.inhalt}
+            </Typography.Paragraph>
+          )
+        }
         onAnlegen={onAnlegen}
       />
     </Modal>

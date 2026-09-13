@@ -12,7 +12,14 @@ const uhs = {
   einsatz_id: 1,
   plaetze: [],
   belegungen: [
-    { id: 1, person_id: 10, art: 'eintritt', platz_id: null, notiz: null, zeitpunkt_at: '2026-06-23 10:00:00' },
+    {
+      id: 1,
+      person_id: 10,
+      art: 'eintritt',
+      platz_id: null,
+      notiz: null,
+      zeitpunkt_at: '2026-06-23 10:00:00',
+    },
   ],
 } as unknown as UhsDetail;
 
@@ -55,9 +62,30 @@ const uhsDreiZeilen = {
   einsatz_id: 1,
   plaetze: [],
   belegungen: [
-    { id: 2, person_id: 11, art: 'wechsel', platz_id: null, notiz: null, zeitpunkt_at: '2026-06-23 09:00:00' },
-    { id: 3, person_id: 12, art: 'austritt', platz_id: null, notiz: 'Transportziel Klinik', zeitpunkt_at: '2026-06-23 11:00:00' },
-    { id: 1, person_id: 10, art: 'eintritt', platz_id: null, notiz: null, zeitpunkt_at: '2026-06-23 08:00:00' },
+    {
+      id: 2,
+      person_id: 11,
+      art: 'wechsel',
+      platz_id: null,
+      notiz: null,
+      zeitpunkt_at: '2026-06-23 09:00:00',
+    },
+    {
+      id: 3,
+      person_id: 12,
+      art: 'austritt',
+      platz_id: null,
+      notiz: 'Transportziel Klinik',
+      zeitpunkt_at: '2026-06-23 11:00:00',
+    },
+    {
+      id: 1,
+      person_id: 10,
+      art: 'eintritt',
+      platz_id: null,
+      notiz: null,
+      zeitpunkt_at: '2026-06-23 08:00:00',
+    },
   ],
 } as unknown as UhsDetail;
 

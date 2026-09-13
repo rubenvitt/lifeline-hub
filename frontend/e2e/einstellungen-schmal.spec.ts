@@ -208,10 +208,10 @@ for (const { dichte, soll } of STAFFEL) {
       // Eine GESPEICHERTE Wahl gewinnt gegen die Zeigerart (LFH-361) — nur so ist die
       // Handschuh-Stufe erreichbar. `ThemeModeProvider` liest den Speicher beim Montieren,
       // ein Setzen ohne Neuladen bliebe folgenlos.
-      await page.evaluate(
-        ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
-        [DICHTE_SCHLUESSEL, dichte] as const,
-      );
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
       await page.reload();
     }
 

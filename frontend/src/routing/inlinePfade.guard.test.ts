@@ -32,8 +32,9 @@ function dateien(pfad: string): string[] {
 
 describe('Einsatzpfade im Navigationsrahmen', () => {
   it('baut keinen Pfad als Inline-Template-Literal', () => {
-    const treffer = WURZELN.flatMap(dateien)
-      .filter((datei) => VERBOTEN.test(readFileSync(datei, 'utf8')));
+    const treffer = WURZELN.flatMap(dateien).filter((datei) =>
+      VERBOTEN.test(readFileSync(datei, 'utf8')),
+    );
     expect(treffer, 'Builder aus routing/deeplinks.ts benutzen').toEqual([]);
   });
 });

@@ -28,7 +28,8 @@ export default function EtbBausteineTab() {
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBaustein(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
   const spalten: KatalogSpalte<EtbBaustein>[] = [
@@ -109,7 +110,12 @@ export default function EtbBausteineTab() {
             key: 'aktionen',
             render: (_, b: EtbBaustein) => (
               <Space size="middle">
-                <Button onClick={() => { setBearbeite(b); setModalOffen(true); }}>
+                <Button
+                  onClick={() => {
+                    setBearbeite(b);
+                    setModalOffen(true);
+                  }}
+                >
                   Bearbeiten
                 </Button>
                 <Popconfirm
@@ -136,7 +142,14 @@ export default function EtbBausteineTab() {
            wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
            Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
            deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
-        <Button type="primary" disabled={!istAdmin} onClick={() => { setBearbeite(null); setModalOffen(true); }}>
+        <Button
+          type="primary"
+          disabled={!istAdmin}
+          onClick={() => {
+            setBearbeite(null);
+            setModalOffen(true);
+          }}
+        >
           Baustein anlegen
         </Button>
       }
@@ -169,7 +182,11 @@ export default function EtbBausteineTab() {
           locale={{ emptyText: 'Keine Bausteine' }}
         />
       )}
-      <EtbBausteinFormModal offen={modalOffen} baustein={bearbeite} onClose={() => setModalOffen(false)} />
+      <EtbBausteinFormModal
+        offen={modalOffen}
+        baustein={bearbeite}
+        onClose={() => setModalOffen(false)}
+      />
     </AdminPage>
   );
 }

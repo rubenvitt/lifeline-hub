@@ -20,7 +20,12 @@ const ALLE = 0;
  * oder auf eine konkrete Ansicht verschieben. Bei nur einer Ansicht entfällt die Zuordnung
  * (nichts zu wählen). Geteilt von Zonen-/Zeichen-/Bild-Inspektor.
  */
-export default function AnsichtZuordnung({ ansichten, wert, disabled, onChange }: AnsichtZuordnungProps) {
+export default function AnsichtZuordnung({
+  ansichten,
+  wert,
+  disabled,
+  onChange,
+}: AnsichtZuordnungProps) {
   const { token } = theme.useToken();
   // Drei Aufrufstellen, die nebeneinander stehen können → id je Instanz, kein Literal.
   const id = useId();

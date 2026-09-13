@@ -51,10 +51,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
 
   const personen = personenQuery.data ?? KEINE_PERSONEN;
   const personenById = useMemo(() => new Map(personen.map((p) => [p.id, p])), [personen]);
-  const plaetzeById = useMemo(
-    () => new Map(uhs.plaetze.map((pl) => [pl.id, pl])),
-    [uhs.plaetze],
-  );
+  const plaetzeById = useMemo(() => new Map(uhs.plaetze.map((pl) => [pl.id, pl])), [uhs.plaetze]);
 
   /**
    * Die Spaltenliste läuft durch `spaltenFuer<T>()` und wird NICHT annotiert: eine
@@ -144,7 +141,9 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
      * `zeilenKlasse`/`werkzeuge`/`onZeileKlick`.
      */
     <>
-      <Datenstand dataUpdatedAt={gemeinsamerDatenstand(dataUpdatedAt, personenQuery.dataUpdatedAt)} />
+      <Datenstand
+        dataUpdatedAt={gemeinsamerDatenstand(dataUpdatedAt, personenQuery.dataUpdatedAt)}
+      />
       <Datensicht
         bezeichnung="Bewegungen"
         spalten={spalten}

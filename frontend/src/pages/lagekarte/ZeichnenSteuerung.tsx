@@ -1,4 +1,5 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
+import { bandStil } from './KartenFuss';
 
 export type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
 
@@ -47,9 +48,15 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // die letzte Gelegenheit, sie vor dem Speichern zu widerrufen.
   const serienZeile = props.onSerieWechsel && (
     <Space>
-      <Switch checked={!!props.serie} onChange={props.onSerieWechsel} aria-label="Weitere zeichnen" />
+      <Switch
+        checked={!!props.serie}
+        onChange={props.onSerieWechsel}
+        aria-label="Weitere zeichnen"
+      />
       <Typography.Text>Weitere zeichnen</Typography.Text>
-      {gespeichert > 0 && <Typography.Text type="secondary">{gespeichert} gespeichert</Typography.Text>}
+      {gespeichert > 0 && (
+        <Typography.Text type="secondary">{gespeichert} gespeichert</Typography.Text>
+      )}
     </Space>
   );
   // Ein Knopf, zwei Wahrheiten (wie in der Sidebar): „Abbrechen" verwirft nur einen Entwurf.
@@ -65,11 +72,11 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
     <Card
       size="small"
       style={{
-        position: 'absolute',
-        left: '50%',
-        bottom: 16,
-        transform: 'translateX(-50%)',
-        zIndex: 5,
+        // Positionierung gehört dem `KartenFuss` (LFH-355), nicht dieser Karte: sie lag
+        // hier absolut auf `zIndex: 5` und wurde von der gleich hohen, später gerenderten
+        // SnapshotLeiste verdeckt. Als Flow-Band in der Fuß-Spalte kann das nicht wieder
+        // passieren — wer ihr `position: 'absolute'` zurückgibt, holt den Bug mit.
+        ...bandStil('mitte'),
         boxShadow: token.boxShadowSecondary,
         minWidth: 320,
       }}
@@ -78,15 +85,15 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         <Typography.Text strong>{props.titel}</Typography.Text>
         {bestaetigen ? (
           <>
-            <Typography.Text type="secondary">
-              Entwurf prüfen und speichern.
-            </Typography.Text>
+            <Typography.Text type="secondary">Entwurf prüfen und speichern.</Typography.Text>
             {serienZeile}
             <Space>
               <Button type="primary" loading={props.speichernLaeuft} onClick={props.onSpeichern}>
                 Speichern
               </Button>
-              <Button disabled={props.speichernLaeuft} onClick={props.onVerwerfen}>Verwerfen</Button>
+              <Button disabled={props.speichernLaeuft} onClick={props.onVerwerfen}>
+                Verwerfen
+              </Button>
             </Space>
           </>
         ) : (
@@ -96,7 +103,11 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
             </Typography.Text>
             {serienZeile}
             <Space>
-              <Button type="primary" disabled={props.abschliessenMoeglich === false} onClick={props.onAbschliessen}>
+              <Button
+                type="primary"
+                disabled={props.abschliessenMoeglich === false}
+                onClick={props.onAbschliessen}
+              >
                 Abschließen
               </Button>
               {beenden}

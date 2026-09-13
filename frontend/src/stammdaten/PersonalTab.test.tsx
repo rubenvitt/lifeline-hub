@@ -8,16 +8,28 @@ import { AuthProvider } from '../auth/AuthContext';
 import PersonalTab from './PersonalTab';
 
 const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-26 10:00:00',
+  id: 1,
+  anzeigename: 'Admin',
+  benutzername: 'admin',
+  system_rolle: 'admin',
+  org_rolle: 'keine',
+  aktiv: true,
+  erstellt_at: '2026-05-26 10:00:00',
 };
 const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 const personal = [
   {
-    id: 1, benutzer_id: null, name: 'Thomas Müller', personalnummer: '4711',
-    traegerorganisation: 'DRK', telefon: null, staerke_position: 'fuehrer',
-    bemerkung: null, dienststatus: 'in_dienst', angelegt_at: '2026-05-26 10:00:00',
+    id: 1,
+    benutzer_id: null,
+    name: 'Thomas Müller',
+    personalnummer: '4711',
+    traegerorganisation: 'DRK',
+    telefon: null,
+    staerke_position: 'fuehrer',
+    bemerkung: null,
+    dienststatus: 'in_dienst',
+    angelegt_at: '2026-05-26 10:00:00',
     qualifikationen: [{ id: 1, label: 'Sanitäter' }],
   },
 ];
@@ -38,9 +50,14 @@ const personal = [
 const zweiPersonen = [
   personal[0],
   {
-    ...personal[0], id: 2, name: 'Ömer Berg', personalnummer: '0815',
-    traegerorganisation: 'THW', staerke_position: 'mannschaft',
-    dienststatus: 'ausser_dienst', qualifikationen: [],
+    ...personal[0],
+    id: 2,
+    name: 'Ömer Berg',
+    personalnummer: '0815',
+    traegerorganisation: 'THW',
+    staerke_position: 'mannschaft',
+    dienststatus: 'ausser_dienst',
+    qualifikationen: [],
   },
 ];
 
@@ -71,8 +88,12 @@ function render(benutzer: typeof admin, liste: unknown[] = personal) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
     http.get('/api/personal', () => HttpResponse.json(liste)),
-    http.get('/api/personal-vorschlaege', () => HttpResponse.json({ traegerorganisation: ['DRK'] })),
-    http.get('/api/qualifikationen', () => HttpResponse.json([{ id: 1, label: 'Sanitäter', sortier: 10 }])),
+    http.get('/api/personal-vorschlaege', () =>
+      HttpResponse.json({ traegerorganisation: ['DRK'] }),
+    ),
+    http.get('/api/qualifikationen', () =>
+      HttpResponse.json([{ id: 1, label: 'Sanitäter', sortier: 10 }]),
+    ),
     http.get('/api/benutzer', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -118,7 +139,9 @@ describe('PersonalTab', () => {
   it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
     const gerufen: string[] = [];
     let freigeben: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { freigeben = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      freigeben = resolve;
+    });
     server.use(
       http.post('/api/personal/:id/ausser-dienst', async ({ params }) => {
         gerufen.push(`ausser-dienst/${params.id}`);
@@ -144,16 +167,22 @@ describe('PersonalTab', () => {
 
     // Die eigene Zeile ist gesperrt und zeigt den Lauf …
     expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
-    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass('ant-btn-loading');
+    expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toHaveClass(
+      'ant-btn-loading',
+    );
     expect(within(erste).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
     // … die FREMDE Zeile bleibt bedienbar.
     expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
     expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).toBeEnabled();
-    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass('ant-btn-loading');
+    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
 
     await userEvent.click(within(zweite).getByRole('button', { name: 'Wieder in Dienst' }));
     await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1', 'in-dienst/2']));
-    await act(async () => { freigeben?.(); });
+    await act(async () => {
+      freigeben?.();
+    });
   });
 
   /**

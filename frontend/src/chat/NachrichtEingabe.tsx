@@ -41,7 +41,9 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
             }
           }}
         />
-        <Button type="primary" loading={senden} onClick={absenden}>Senden</Button>
+        <Button type="primary" loading={senden} onClick={absenden}>
+          Senden
+        </Button>
       </Space.Compact>
       <Upload
         multiple
@@ -50,7 +52,9 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
         onChange={({ fileList }) => setDateien(fileList)}
         style={{ marginTop: 8 }}
       >
-        <Button type="text" icon={<PaperClipOutlined />}>Anhang</Button>
+        <Button type="text" icon={<PaperClipOutlined />}>
+          Anhang
+        </Button>
       </Upload>
     </div>
   );

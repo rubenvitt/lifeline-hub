@@ -76,7 +76,12 @@ describe('speichereOrgEinstellungen', () => {
     server.use(
       http.put('/api/org-einstellungen', async ({ request }) => {
         empfangenerBody = await request.json();
-        return HttpResponse.json({ ...update, geaendert_at: '2026-06-19 12:00:00', geaendert_von: 1, auto_etb_eintraege: null });
+        return HttpResponse.json({
+          ...update,
+          geaendert_at: '2026-06-19 12:00:00',
+          geaendert_von: 1,
+          auto_etb_eintraege: null,
+        });
       }),
     );
     const result = await speichereOrgEinstellungen(update);
@@ -103,7 +108,12 @@ describe('speichereOrgEinstellungen', () => {
     server.use(
       http.put('/api/org-einstellungen', async ({ request }) => {
         empfangenerBody = await request.json();
-        return HttpResponse.json({ ...update, auto_etb_eintraege: 0, geaendert_at: null, geaendert_von: null });
+        return HttpResponse.json({
+          ...update,
+          auto_etb_eintraege: 0,
+          geaendert_at: null,
+          geaendert_von: null,
+        });
       }),
     );
     await speichereOrgEinstellungen(update);
@@ -154,7 +164,10 @@ describe('setzeOrgModulEinstellung', () => {
 
   it('gibt void zurück (204 No Content)', async () => {
     server.use(
-      http.put('/api/org-modul-einstellungen/:modulKey', () => new HttpResponse(null, { status: 204 })),
+      http.put(
+        '/api/org-modul-einstellungen/:modulKey',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
     );
     const result = await setzeOrgModulEinstellung('etb', 'admin');
     expect(result).toBeUndefined();

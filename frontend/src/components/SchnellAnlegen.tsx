@@ -92,7 +92,11 @@ interface SchnellAnlegenProps {
  * Erfolg ist das Feld leer und traegt wieder den Fokus.
  */
 export default function SchnellAnlegen({
-  beschriftung, platzhalter, knopfText = 'Anlegen', onAnlegen, laeuft = false,
+  beschriftung,
+  platzhalter,
+  knopfText = 'Anlegen',
+  onAnlegen,
+  laeuft = false,
   gesperrt = false,
 }: SchnellAnlegenProps) {
   const { token } = theme.useToken();

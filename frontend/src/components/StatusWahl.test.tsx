@@ -13,7 +13,11 @@ const gebunden: StatusDarstellung = { rolle: 'achtung', label: '4 – Am Einsatz
 const OPTIONEN: StatusOption<number>[] = [
   { wert: 1, label: '1 – Frei auf Funk', darstellung: frei },
   { wert: 4, label: '4 – Am Einsatzort', darstellung: gebunden },
-  { wert: 6, label: '6 – Nicht einsatzbereit', darstellung: { rolle: 'alarm', label: '6 – Nicht einsatzbereit' } },
+  {
+    wert: 6,
+    label: '6 – Nicht einsatzbereit',
+    darstellung: { rolle: 'alarm', label: '6 – Nicht einsatzbereit' },
+  },
 ];
 
 const KENNUNG = 'Florian 44/1';
@@ -57,7 +61,9 @@ describe('StatusWahl', () => {
     // Teilstring statt exaktem Namen: ein Icon im Eintrag brächte ein eigenes `aria-label`
     // mit, das in den zugänglichen Namen einflösse (gemessen in LFH-366).
     for (const o of OPTIONEN) {
-      expect(within(menue).getByRole('menuitem', { name: new RegExp(o.label) })).toBeInTheDocument();
+      expect(
+        within(menue).getByRole('menuitem', { name: new RegExp(o.label) }),
+      ).toBeInTheDocument();
     }
   });
 
@@ -114,9 +120,9 @@ describe('StatusWahl', () => {
     const menue = await oeffneMenue();
     const gewaehlt = within(menue).getByRole('menuitem', { name: /Am Einsatzort/ });
     expect(gewaehlt.className).toMatch(/ant-dropdown-menu-item-selected/);
-    expect(
-      within(menue).getByRole('menuitem', { name: /Frei auf Funk/ }).className,
-    ).not.toMatch(/ant-dropdown-menu-item-selected/);
+    expect(within(menue).getByRole('menuitem', { name: /Frei auf Funk/ }).className).not.toMatch(
+      /ant-dropdown-menu-item-selected/,
+    );
   });
 
   it('sperrt den Auslöser, solange geschrieben wird', () => {

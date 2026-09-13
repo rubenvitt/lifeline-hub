@@ -16,7 +16,10 @@ import { forward as mgrsForward, toPoint as mgrsToPoint } from 'mgrs';
 import type { Koordinatenformat } from '../api/types';
 import './proj4Setup';
 
-export interface LatLon { lat: number; lon: number; }
+export interface LatLon {
+  lat: number;
+  lon: number;
+}
 
 export class KoordinatenParseFehler extends Error {
   constructor(text: string, system: Koordinatenformat) {
@@ -42,14 +45,20 @@ function parseWgs84(text: string): LatLon {
 }
 
 function dmsTeil(wert: number, istBreite: boolean): string {
-  const hemi = istBreite ? (wert >= 0 ? 'N' : 'S') : (wert >= 0 ? 'E' : 'W');
+  const hemi = istBreite ? (wert >= 0 ? 'N' : 'S') : wert >= 0 ? 'E' : 'W';
   const abs = Math.abs(wert);
   let grad = Math.floor(abs);
   const restMin = (abs - grad) * 60;
   let min = Math.floor(restMin);
   let sek = Math.round((restMin - min) * 60);
-  if (sek === 60) { sek = 0; min += 1; }
-  if (min === 60) { min = 0; grad += 1; }
+  if (sek === 60) {
+    sek = 0;
+    min += 1;
+  }
+  if (min === 60) {
+    min = 0;
+    grad += 1;
+  }
   const g = String(grad).padStart(istBreite ? 2 : 3, '0');
   return `${g}°${String(min).padStart(2, '0')}'${String(sek).padStart(2, '0')}"${hemi}`;
 }
@@ -132,10 +141,14 @@ function parseGk(text: string): LatLon {
 export function formatiere(lat: number, lon: number, system: Koordinatenformat): string {
   try {
     switch (system) {
-      case 'dms': return formatiereDms(lat, lon);
-      case 'utm': return formatiereUtm(lat, lon);
-      case 'mgrs': return formatiereMgrs(lat, lon);
-      case 'gk': return formatiereGk(lat, lon);
+      case 'dms':
+        return formatiereDms(lat, lon);
+      case 'utm':
+        return formatiereUtm(lat, lon);
+      case 'mgrs':
+        return formatiereMgrs(lat, lon);
+      case 'gk':
+        return formatiereGk(lat, lon);
       case 'wgs84':
       default:
         return formatiereWgs84(lat, lon);
@@ -151,10 +164,14 @@ export function formatiere(lat: number, lon: number, system: Koordinatenformat):
 export function parse(text: string, system: Koordinatenformat): LatLon {
   try {
     switch (system) {
-      case 'dms': return parseDms(text);
-      case 'utm': return parseUtm(text);
-      case 'mgrs': return parseMgrs(text);
-      case 'gk': return parseGk(text);
+      case 'dms':
+        return parseDms(text);
+      case 'utm':
+        return parseUtm(text);
+      case 'mgrs':
+        return parseMgrs(text);
+      case 'gk':
+        return parseGk(text);
       case 'wgs84':
       default:
         return parseWgs84(text);
@@ -163,4 +180,3 @@ export function parse(text: string, system: Koordinatenformat): LatLon {
     throw new KoordinatenParseFehler(text, system);
   }
 }
-
