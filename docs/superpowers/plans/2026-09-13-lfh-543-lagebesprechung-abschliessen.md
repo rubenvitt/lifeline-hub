@@ -48,7 +48,7 @@
 | `frontend/src/etb/WiedervorlageModal.tsx` (Modify) | nutzt die geteilte Tabelle und Rechnung |
 | `frontend/src/stab/lagebesprechungZustand.ts` (Create) | `terminZeitpunkt`, `dauerText`, `lagebesprechungZustand` |
 | `frontend/src/stab/lagebesprechungAbschluss.ts` (Create) | Formwerte-Typ, Vorbelegung, Tri-State-Body, Zuordnung der Antwort, Kürzung |
-| `frontend/src/api/types.ts` (Modify) | FE-lokaler Body `LagebesprechungAbschluss` |
+| `frontend/src/api/types.ts` (Modify) | FE-lokaler Body `LagebesprechungAbschlussBody` |
 | `frontend/src/api/stab.ts` (Modify) | `ladeLagebesprechungen`, `schliesseLagebesprechungAb` |
 | `frontend/src/api/queryKeys.ts` (Modify) | `einsatzKeys.stabLagebesprechungen` |
 | `frontend/src/stab/abschlussToast.tsx` (Create) | Erfolgs-Toast mit ETB-Deeplink |
@@ -257,15 +257,15 @@ Der Body-Typ steht hier und nicht in Task 3, weil `abschlussBody` ihn liefert �
 **Interfaces:**
 - Consumes: `Stab`, `Lagebesprechung` aus `api/types` (Bestand `:330-332`); `StatusDarstellung` aus `theme/statusFarben` (`:94`); `alsBackendZeit(d: Dayjs): string` aus `etb/filterZeit` (`:22`).
 - Produces:
-  - `interface LagebesprechungAbschluss { entschluss: string; abgehalten_at?: string; naechste_at?: string | null }` aus `api/types`
+  - `interface LagebesprechungAbschlussBody { entschluss: string; abgehalten_at?: string; naechste_at?: string | null }` aus `api/types`
   - `terminZeitpunkt(wire: string | null | undefined): Dayjs | null`
   - `dauerText(minuten: number): string`
   - `lagebesprechungZustand(terminWire: string | null | undefined, jetzt: Dayjs): StatusDarstellung`
   - `interface AbschlussFormWerte { entschluss: string; naechste?: Dayjs | null; abgehalten?: Dayjs | null }`
   - `interface AbschlussVorbelegung { naechste: Dayjs | null; abgehalten: Dayjs }`
   - `abschlussVorbelegung(terminWire: string | null | undefined, jetzt: Dayjs): AbschlussVorbelegung`
-  - `abschlussBody(werte: AbschlussFormWerte, vorbelegung: AbschlussVorbelegung, jetzt: Dayjs): LagebesprechungAbschluss`
-  - `eigeneLagebesprechung(antwort: Stab, gesendet: LagebesprechungAbschluss): Lagebesprechung | undefined`
+  - `abschlussBody(werte: AbschlussFormWerte, vorbelegung: AbschlussVorbelegung, jetzt: Dayjs): LagebesprechungAbschlussBody`
+  - `eigeneLagebesprechung(antwort: Stab, gesendet: LagebesprechungAbschlussBody): Lagebesprechung | undefined`
   - `kuerzeEntschluss(text: string, max?: number): string`
 
 - [ ] **Step 1: Body-Typ anlegen**
@@ -280,7 +280,7 @@ In `frontend/src/api/types.ts` direkt nach dem Interface `BesetzungBody`:
  * Termin unverändert · `null` = löschen · Wert = setzen. Ein leerer String löscht STILL
  * (`support::trimme_tri`) — Aufrufer schicken nie `''`. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
  */
-export interface LagebesprechungAbschluss {
+export interface LagebesprechungAbschlussBody {
   entschluss: string;
   abgehalten_at?: string;
   naechste_at?: string | null;
@@ -415,7 +415,7 @@ describe('lagebesprechungZustand an den Sommerzeitgrenzen', () => {
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import type { Lagebesprechung, LagebesprechungAbschluss, Stab } from '../api/types';
+import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
 import {
   abschlussBody,
   abschlussVorbelegung,
@@ -500,7 +500,7 @@ describe('abschlussBody — Tri-State von naechste_at', () => {
 });
 
 describe('eigeneLagebesprechung', () => {
-  const gesendet: LagebesprechungAbschluss = {
+  const gesendet: LagebesprechungAbschlussBody = {
     entschluss: 'Lage unverändert',
     abgehalten_at: '2026-09-13 10:00:00',
     naechste_at: null,
@@ -621,7 +621,7 @@ export function lagebesprechungZustand(
 
 ```ts
 import type { Dayjs } from 'dayjs';
-import type { Lagebesprechung, LagebesprechungAbschluss, Stab } from '../api/types';
+import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
 import { alsBackendZeit } from '../etb/filterZeit';
 import { terminZeitpunkt } from './lagebesprechungZustand';
 
@@ -654,7 +654,7 @@ export function abschlussVorbelegung(
 }
 
 /**
- * Formwerte → POST-Body. `naechste_at` ist dreiwertig (`api/types.ts`, `LagebesprechungAbschluss`):
+ * Formwerte → POST-Body. `naechste_at` ist dreiwertig (`api/types.ts`, `LagebesprechungAbschlussBody`):
  *
  * - vorbelegter Termin UNVERÄNDERT → Schlüssel fehlt (der Server lässt ihn stehen);
  * - leeres Feld → `null` (löschen), auch ohne Vorbelegung — siehe Offener Punkt 1 im Plan;
@@ -667,8 +667,8 @@ export function abschlussBody(
   werte: AbschlussFormWerte,
   vorbelegung: AbschlussVorbelegung,
   jetzt: Dayjs,
-): LagebesprechungAbschluss {
-  const body: LagebesprechungAbschluss = {
+): LagebesprechungAbschlussBody {
+  const body: LagebesprechungAbschlussBody = {
     entschluss: werte.entschluss.trim(),
     abgehalten_at: alsBackendZeit(werte.abgehalten ?? jetzt),
   };
@@ -689,7 +689,7 @@ export function abschlussBody(
  */
 export function eigeneLagebesprechung(
   antwort: Stab,
-  gesendet: LagebesprechungAbschluss,
+  gesendet: LagebesprechungAbschlussBody,
 ): Lagebesprechung | undefined {
   const letzte = antwort.letzte_lagebesprechung;
   if (!letzte) return undefined;
@@ -731,10 +731,10 @@ git commit -m "feat(stab): Countdown und Abschluss-Logik der Lagebesprechung (LF
 - Test: `frontend/src/api/queryKeys.test.ts` (nach dem `schaedenGeschaedigt`-Pin, `:163-168`)
 
 **Interfaces:**
-- Consumes: `Lagebesprechung`, `LagebesprechungAbschluss`, `Stab` aus `api/types` (Task 2); `apiGet`, `apiSend` aus `api/client` (`:79`, `:110`).
+- Consumes: `Lagebesprechung`, `LagebesprechungAbschlussBody`, `Stab` aus `api/types` (Task 2); `apiGet`, `apiSend` aus `api/client` (`:79`, `:110`).
 - Produces:
   - `ladeLagebesprechungen(einsatzId: number): Promise<Lagebesprechung[]>`
-  - `schliesseLagebesprechungAb(einsatzId: number, daten: LagebesprechungAbschluss): Promise<Stab>`
+  - `schliesseLagebesprechungAb(einsatzId: number, daten: LagebesprechungAbschlussBody): Promise<Stab>`
   - `einsatzKeys.stabLagebesprechungen(einsatzId: number): readonly ['einsatz-stab', number, 'lagebesprechungen']`
 
 - [ ] **Step 1: Failing tests schreiben**
@@ -811,7 +811,7 @@ Expected: FAIL — `schliesseLagebesprechungAb`/`ladeLagebesprechungen` sind kei
 `frontend/src/api/stab.ts` — Import-Zeile ersetzen durch
 
 ```ts
-import type { BesetzungBody, Lagebesprechung, LagebesprechungAbschluss, Sachgebiet, Stab } from './types';
+import type { BesetzungBody, Lagebesprechung, LagebesprechungAbschlussBody, Sachgebiet, Stab } from './types';
 ```
 
 und am Dateiende anfügen:
@@ -829,7 +829,7 @@ export function ladeLagebesprechungen(einsatzId: number): Promise<Lagebesprechun
  */
 export function schliesseLagebesprechungAb(
   einsatzId: number,
-  daten: LagebesprechungAbschluss,
+  daten: LagebesprechungAbschlussBody,
 ): Promise<Stab> {
   return apiSend<Stab>(`/api/einsaetze/${einsatzId}/stab/lagebesprechungen`, 'POST', daten);
 }
@@ -1235,7 +1235,7 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import { einsatzKeys } from '../api/queryKeys';
 import { schliesseLagebesprechungAb } from '../api/stab';
-import type { Lagebesprechung, LagebesprechungAbschluss, Stab } from '../api/types';
+import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { schnellwahlAuswahl, schnellwahlTermin } from '../components/terminSchnellwahl';
@@ -1288,7 +1288,7 @@ export default function LagebesprechungModal({
   const [form] = Form.useForm<AbschlussFormWerte>();
 
   const mutation = useMutation({
-    mutationFn: (body: LagebesprechungAbschluss) => schliesseLagebesprechungAb(einsatzId, body),
+    mutationFn: (body: LagebesprechungAbschlussBody) => schliesseLagebesprechungAb(einsatzId, body),
     onSuccess: (antwort, body) => {
       // Der Prefix trifft auch die Historie (Sub-Key). `einsatz` ist Hygiene: die
       // Einsatzdaten-Seite zeigt denselben Termin und steht im NICHT_LIVE-Fach (Spec Entsch. 11).
@@ -2736,7 +2736,7 @@ git commit -m "feat(stab): Schnellaktion Lagebesprechung abschließen in der Kom
 
 **Placeholder-Scan:** keine „TBD"/„später"/„analog Task N"; jede Code-Stufe vollständig; jede „kein/nie"-Aussage hat ihren Gegenfall im selben Test oder im Nachbartest derselben Datei (Ausnahme mit Verweis: „ohne Toast" im Stand-Test, Gegenfall in `LagebesprechungModal.test.tsx`).
 
-**Typkonsistenz:** `LagebesprechungAbschluss` (Task 2) → `abschlussBody` (Task 2) → `schliesseLagebesprechungAb` (Task 3) → `mutationFn` (Task 4). `AbschlussVorbelegung.naechste` in Task 2 und Task 4 identisch. `eigeneLagebesprechung(antwort, body)` → `onAbgeschlossen(eigene)` → `zeigeAbschlussToast(api, { einsatzId, eigene, navigate })` in Task 4 und Task 6 identisch. `einsatzKeys.stabLagebesprechungen` in Task 3 und Task 5 identisch. `besetzungRechteText` behält Name und Signatur.
+**Typkonsistenz:** `LagebesprechungAbschlussBody` (Task 2) → `abschlussBody` (Task 2) → `schliesseLagebesprechungAb` (Task 3) → `mutationFn` (Task 4). `AbschlussVorbelegung.naechste` in Task 2 und Task 4 identisch. `eigeneLagebesprechung(antwort, body)` → `onAbgeschlossen(eigene)` → `zeigeAbschlussToast(api, { einsatzId, eigene, navigate })` in Task 4 und Task 6 identisch. `einsatzKeys.stabLagebesprechungen` in Task 3 und Task 5 identisch. `besetzungRechteText` behält Name und Signatur.
 
 **Nicht in ST5:** Lücken-Kennzahlen und S2-Kennzahl (ST6/LFH-544, nutzt `lagebesprechungZustand` mit), Vorschläge (ST7), Prüfliste Einsatztauglichkeit, e2e und Gate-3 inklusive Klick auf den Toast unter dem Daten-Router (ST9/LFH-547).
 
