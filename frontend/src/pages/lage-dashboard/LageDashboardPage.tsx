@@ -38,13 +38,8 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
-import {
-  baueLagebild,
-  DRINGLICHKEIT_ZEICHEN,
-  dtgJetzt,
-  type Datenzustand,
-  type Dringlichkeit,
-} from './lagebild';
+import { baueLagebild, dtgJetzt, type Datenzustand } from './lagebild';
+import { dringlichkeit, type Dringlichkeit } from '../../theme/statusFarben';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import '../../theme/sprache.css';
 
@@ -116,7 +111,7 @@ function Plakette({ stufe, children }: { stufe: Dringlichkeit; children: React.R
 /**
  * Der Dringlichkeitsmarker einer Kurzlisten-Zeile — mit zweitem Kanal (LFH-395).
  *
- * Die Form kommt aus {@link DRINGLICHKEIT_ZEICHEN}, die Farbe aus der
+ * Die Form kommt aus {@link dringlichkeit}, die Farbe aus der
  * Stufenklasse; `sprache.css` hält beide Achsen getrennt.
  *
  * Er ist NICHT mehr `aria-hidden`: als einziger Träger der Dringlichkeit wäre
@@ -127,7 +122,7 @@ function Plakette({ stufe, children }: { stufe: Dringlichkeit; children: React.R
  * hätte nichts zu sagen.
  */
 function Zeichen({ stufe }: { stufe: Dringlichkeit }) {
-  const { form, label } = DRINGLICHKEIT_ZEICHEN[stufe];
+  const { form, label } = dringlichkeit[stufe];
   return (
     <span
       className={`lfh-zeichen lfh-zeichen--${form} lfh-zeichen--${stufe}`}

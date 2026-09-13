@@ -44,7 +44,8 @@ import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
-import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
+import { einsatzStatus, materialStatus, type StatusDarstellung } from '../theme/statusFarben';
+import StatusTag from '../components/StatusTag';
 
 /**
  * ── DIE FARBFRAGE IST ENTSCHIEDEN (LFH-341 · C6) ─────────────────────────────────────
@@ -440,7 +441,7 @@ export default function MaterialPage() {
           <Typography.Title level={3} style={{ margin: 0 }}>
             Material
           </Typography.Title>
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
           <Datenstand dataUpdatedAt={emQuery.dataUpdatedAt} />
         </Space>
         {darfSchreiben && (
