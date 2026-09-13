@@ -11,7 +11,8 @@ import {
  * Prüfliste von LFH-336 · C1, Kriterium 2), die Einheiten-Detailroute (LFH-446,
  * Nachzug zu LFH-339 · Kriterium 2), der Einsatz-NAVIGATIONSRAHMEN (LFH-516,
  * Nachzug zu LFH-337 · C2, Kriterium 2) sowie Kräfteübersicht und Verdichtungszeile
- * (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 2).
+ * (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 2) und die Stab-Route (LFH-542, Nachzug zu
+ * LFH-46, Kriterium 2).
  *
  * DIE DATEI TRÄGT VIER ROUTEN, DEN NAVIGATIONSRAHMEN UND EINEN SATZ HELFER. Das ist die
  * Gestalt, die der LFH-446-Plan ausdrücklich vorsah („vorhandene STAFFEL, stelleDichte,
@@ -1076,6 +1077,153 @@ test('Verdichtungszeile: der Kräfteübersicht-Link folgt der Dichte-Staffel 30 
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);
 
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Link ${hoehe}`);
+  }
+
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Stab (LFH-542, Nachzug zu LFH-46 · Kriterium 2) ──────────────────────────────────
+//
+// DIE FÜNFTE ROUTE dieser Datei (`/einsaetze/:id/stab`), mit denselben Helfern. Anlass war
+// der Review an PR #62: das Modul wurde als fertig markiert und trägt handgebaute Links, aber
+// keinen Gate-3-Nachweis im Browser. Vitest belegt für `stabZeilenzielStil` nur den
+// Inline-Style über zwei Stufen (`stab/zeilenziel.test.ts`) — nicht, dass ein `<Link>` in
+// einer `Descriptions`-Zelle oder einer `Liste`-Beschreibung die Höhe im Layout ERREICHT.
+//
+// ── WAS GEMESSEN WIRD ───────────────────────────────────────────────────────────────
+//
+//  - die ETB-Links (`stabZeilenzielStil`): Zeile „Letzte" in `LagebesprechungStand` und je
+//    ein Link pro sichtbarem Historien-Eintrag (`LagebesprechungHistorie`, SICHTBAR = 3).
+//    Gesät werden ZWEI Lagebesprechungen → genau DREI Links (Letzte Nr. 2 + Historie Nr. 2
+//    und Nr. 1). Mit einer allein stünden zwei gleichnamige Links da, und die Schleife über
+//    die Historie wäre nicht als Schleife belegt.
+//  - die Werkzeug-Links (`stabZeilenzielStil`) in `role="group"` „Werkzeuge S…". Die Menge
+//    kommt nicht aus dem Seeding, sondern aus `stab/sachgebiete.ts`: 3 + 3 + 3 + 3 + 0 + 2 =
+//    14 Registry-Schlüssel, alle mit `status: 'fertig'`, als `admin` ohne Overrides alle
+//    freigegeben — also 14 Links in FÜNF Gruppen (S5 hat keine Werkzeuge und damit keine
+//    Gruppe). Die Zahl steht exakt, nicht als weiche Untergrenze (Muster Mehr-Knopf oben):
+//    fällt ein Modul aus der Freigabe, soll das hier auffallen statt still weniger zu messen.
+//  - die sechs Knöpfe „Besetzung ändern" (antd `Button`, nur mit Schreibrecht und Stand).
+//  - die Kopfaktion „Lagebesprechung abschließen" im Slot `seitenkopf-aktionen`.
+//
+// DER BODEN IST FÜR ALLE VIER DIE STAFFEL 30 / 48 / 72. Für die Links, weil sie allein an
+// `token.controlHeight` hängen; für die antd-Knöpfe, weil der Bestand einen plain `Button`
+// genau so misst (Einheit: „Speichern"/„Auflösen", Kräfteübersicht: „Filter zurücksetzen") —
+// er erbt `controlHeight` vom `ConfigProvider`, einen eigenen Boden gibt es dort nicht.
+//
+// DIE LOCATOR SIND GESCOPT: die Werkzeug-Links über ihre Gruppen (sonst zögen Breadcrumb,
+// ETB-Links und Kopfzeilen-Links in die Zusicherung), die ETB-Links über ihre Sektion und
+// ihren Namensanfang, die Kopfaktion über den Slot.
+//
+// ── MUTATIONSPROBE (Akzeptanzkriterium), am 13.09.2026 ──────────────────────────────
+//
+// Anders als die Proben oben nicht an `stelleDichte`, sondern an der QUELLE der Staffel:
+// in `stab/zeilenziel.ts` `minHeight: token.controlHeight` → `minHeight: 30` (die Polsterung
+// blieb stehen und wächst weiter mit der Stufe). Danach zurückgedreht, `git diff` leer.
+//  - voller Durchlauf: rot in `komfortabel` an der ersten Messung — „ETB-Link (komfortabel)
+//    #1 (gemessen 45px hoch, Soll ≥ 48)". `kompakt` blieb grün (35,5 über 30).
+//  - temporäre Kopie mit `STAFFEL` nur `handschuh`: rot — „ETB-Link (handschuh) #1
+//    (gemessen 55px hoch, Soll ≥ 72)".
+// Die Polsterung allein trägt den Boden also nicht (LFH-365), und der Spec misst die Staffel,
+// nicht sich selbst.
+//
+// ── MESSWERTE DES ERSTEN GRÜNEN LAUFS (13.09.2026, kompakt / komfortabel / handschuh) ──
+//
+//  ETB-Link 35,5 / 48 / 72 · Werkzeug-Link 35,5 / 48 / 72 · „Besetzung ändern" 30 / 48 / 72
+//  · Kopfaktion 30 / 48 / 72. Kein Ziel unter dem Boden. Der Kompaktwert der Links liegt
+//  über 30, weil die Polsterung auf beiden Achsen liegt — Untergrenze, keine Gleichheit.
+
+/** Zwei abgeschlossene Lagebesprechungen → Stand „Letzte" + zwei Historien-Einträge. */
+const STAB_ETB_LINKS = 3;
+/** 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`. */
+const STAB_WERKZEUG_LINKS = 14;
+/** S5 trägt keine Werkzeuge und rendert deshalb keine Gruppe. */
+const STAB_WERKZEUG_GRUPPEN = 5;
+/** Sechs feste Sachgebietszeilen, je ein Knopf. */
+const STAB_BESETZUNG_KNOEPFE = 6;
+
+test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  // Drei Stufen mit je einem Neuladen und 24 gemessenen Knoten je Stufe.
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung`);
+
+  // Ohne abgeschlossene Lagebesprechung steht in „Letzte" nur „noch keine" und die Historie ist
+  // leer — es gäbe keinen einzigen ETB-Link zu messen. `entschluss` ist das einzige Pflichtfeld
+  // (`routes/stab.rs`, `LagebesprechungAbschluss`); fehlt `abgehalten_at`, gilt „jetzt".
+  for (const nr of [1, 2]) {
+    await anlegen(
+      page,
+      einsatzId,
+      'stab/lagebesprechungen',
+      { entschluss: `Lage unverändert, Maßnahmen fortführen (${nr})` },
+      `Lagebesprechung ${nr}`,
+    );
+  }
+
+  const gemessen: string[] = [];
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab`);
+    await stelleDichte(page, dichte);
+
+    // Anker: beide Sektionen stehen, der Stand ist geladen (sonst Skeleton ohne Links) und die
+    // Historie trägt ihre zwei Einträge — ohne diese Wache misst der Rest einen Ladezustand.
+    const lage = page.getByRole('region', { name: 'Lagebesprechung', exact: true });
+    const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
+    await expect(lage).toHaveCount(1);
+    await expect(besetzung).toHaveCount(1);
+    const etbLinks = lage.getByRole('link', { name: /^ETB-Eintrag zu Lagebesprechung Nr\. \d+$/ });
+    await expect(etbLinks).toHaveCount(STAB_ETB_LINKS);
+    await expect(
+      lage.getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 1', exact: true }),
+    ).toHaveCount(1);
+
+    // (1) ETB-Links. Sie müssen auch ins ETB zeigen — ein Ziel der richtigen Größe am falschen
+    //     Ort bestünde die Höhenmessung ebenso.
+    const etb = await alleHaltenStufe(etbLinks, soll, `ETB-Link (${dichte})`, STAB_ETB_LINKS);
+    await expect(etbLinks.first()).toHaveAttribute(
+      'href',
+      new RegExp(`^/einsaetze/${einsatzId}/etb\\?eintrag=\\d+$`),
+    );
+
+    // (2) Werkzeug-Links, über ihre Gruppen gescopt.
+    const gruppen = besetzung.getByRole('group', { name: /^Werkzeuge S\d$/ });
+    await expect(gruppen).toHaveCount(STAB_WERKZEUG_GRUPPEN);
+    const werkzeugLinks = gruppen.getByRole('link');
+    await expect(werkzeugLinks).toHaveCount(STAB_WERKZEUG_LINKS);
+    const werkzeug = await alleHaltenStufe(
+      werkzeugLinks,
+      soll,
+      `Werkzeug-Link (${dichte})`,
+      STAB_WERKZEUG_LINKS,
+    );
+
+    // (3) „Besetzung ändern" — der zugängliche Name trägt die Zeilenkennung.
+    const aendern = besetzung.getByRole('button', { name: /^Besetzung ändern – S\d / });
+    await expect(aendern).toHaveCount(STAB_BESETZUNG_KNOEPFE);
+    const knopf = await alleHaltenStufe(
+      aendern,
+      soll,
+      `„Besetzung ändern" (${dichte})`,
+      STAB_BESETZUNG_KNOEPFE,
+    );
+
+    // (4) Die Kopfaktion. Erst FREIGEGEBEN, dann gemessen: gesperrt stünde sie ebenso hoch da,
+    //     und die Messung sagte nichts über das Ziel, das jemand tatsächlich bedient.
+    const kopfaktion = page
+      .locator('[data-lfh="seitenkopf-aktionen"]')
+      .getByRole('button', { name: 'Lagebesprechung abschließen', exact: true });
+    await expect(kopfaktion).toBeEnabled();
+    const kopf = await haeltStufe(kopfaktion, soll, `Kopfaktion (${dichte})`);
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Werkzeug-Link ${werkzeug}, ` +
+        `Besetzung ändern ${knopf}, Kopfaktion ${kopf}`,
+    );
   }
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
