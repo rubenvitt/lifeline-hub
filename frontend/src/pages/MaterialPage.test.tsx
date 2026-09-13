@@ -532,8 +532,9 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const dialog = await oeffneAdhoc();
     const vorher = sichtbareFelder(dialog);
 
-    // Der Zugangsname trägt das Zustandssymbol mit („collapsed Weitere Angaben"), deshalb
-    // Teiltreffer statt genauem Namen.
+    // Teiltreffer statt genauem Namen: bis antd 6.5.2 trug der Zugangsname das
+    // Zustandssymbol mit („collapsed Weitere Angaben"); seit antd 6.6 ist der Pfeil
+    // `aria-hidden`. Der Teiltreffer hält beide Fassungen.
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
 
     await waitFor(() => expect(sichtbareFelder(dialog)).toBe(vorher + 1));
