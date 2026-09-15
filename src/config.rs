@@ -287,7 +287,7 @@ pub struct Config {
     pub clamav_timeout_secs: u64,
 
     /// **Dev-Escape, schwächt den SSRF-Schutz:** erlaubt Karten-Downloads von
-    /// Loopback-Adressen (lokaler MinIO-Object-Store, auch über http). Default AUS.
+    /// Loopback-Adressen (lokaler Dev-Object-Store, auch über http). Default AUS.
     /// Gilt für den gesamten Download-Pfad einschließlich des öffentlichen Style-/
     /// Tile-Proxys — nur lokal setzen, niemals in einer erreichbaren Umgebung.
     /// Ein aktiver Escape wird beim Serverstart mit einer Warnung protokolliert

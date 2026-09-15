@@ -34,7 +34,7 @@ Diese verschieben eine Vertrauensgrenze und werden beim Serverstart mit
 
 | Variable | Flag | Wirkung |
 |---|---|---|
-| `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK` | `--download-allow-loopback` | **Schwächt den SSRF-Schutz.** Erlaubt Karten-Downloads zu Loopback-Adressen, auch über http — und zwar auf dem gesamten Download-Pfad einschließlich des öffentlichen Style-/Tile-Proxys. Reiner Dev-Schalter für einen lokalen Object-Store (MinIO). Gehört in keine erreichbare Umgebung. |
+| `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK` | `--download-allow-loopback` | **Schwächt den SSRF-Schutz.** Erlaubt Karten-Downloads zu Loopback-Adressen, auch über http — und zwar auf dem gesamten Download-Pfad einschließlich des öffentlichen Style-/Tile-Proxys. Reiner Dev-Schalter für einen lokalen Object-Store (Garage, siehe `compose.yml`). Gehört in keine erreichbare Umgebung. |
 | `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL` | `--offline-katalog-manifest-url` | **Verbiegt die Trust-Quelle** des Offline-Karten-Katalogs: bestimmt, welchem Manifest — und damit welchen Kartendaten — das System vertraut. Ohne Angabe gilt der einkompilierte Pin (LFH-199). |
 
 Geheimnisse, die nie ins Log dürfen (im `Debug` maskiert):
@@ -70,6 +70,6 @@ und genau diese Drift hat den OIDC-Ausfall verursacht.
 ## Weitere Variablen im Repo
 
 `KS_*` und `AWS_*` konfigurieren **nicht** das Backend, sondern den separaten
-`karten-service` und dessen S3-/MinIO-Anbindung (eigene Config im Crate
+`karten-service` und dessen S3-Anbindung (eigene Config im Crate
 `karten-service`). Sie stehen in derselben `.env` und leaken deshalb genauso —
 für das Backend sind sie ohne Bedeutung.

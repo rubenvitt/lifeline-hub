@@ -16,7 +16,7 @@
 # diese Drift hat den OIDC-Ausfall verursacht. Stattdessen wird nach Präfix geräumt.
 
 # Präfixe aller Variablen, die aus der lokalen Dev-Umgebung stammen können:
-# LIFELINE_* (Backend), KS_*/AWS_* (karten-service + dessen S3-/MinIO-Anbindung).
+# LIFELINE_* (Backend), KS_*/AWS_* (karten-service + dessen S3-Anbindung).
 DEV_ENV_PRAEFIXE='^(LIFELINE|KS|AWS)_'
 
 # Führt das übergebene Kommando ohne die lokalen Dev-Variablen aus.
