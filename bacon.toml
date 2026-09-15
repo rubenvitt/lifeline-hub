@@ -27,7 +27,7 @@ kill = ["pkill", "-TERM", "-P"]
 
 # karten-service (Komponente A, LFH-201) mit Auto-Reload — analog zu `serve`.
 # Start: `bacon karten-service` bzw. `mise run karten-service`. Braucht die KS_*/AWS_*-Envs
-# (kommen aus der .env via mise) und ein laufendes MinIO (`mise run minio`).
+# (kommen aus der .env via mise) und einen laufenden Object-Store (`mise run garage`).
 [jobs.karten-service]
 command = ["cargo", "run", "-p", "karten-service", "--", "serve"]
 # Nur das Service-Crate beobachten (nicht das Backend-src) — sonst würde jede Backend-Änderung

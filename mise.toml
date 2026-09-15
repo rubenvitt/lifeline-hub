@@ -8,7 +8,7 @@
 #   mise run clean            # target/, node_modules, dist(→.gitkeep), .pnpm-store, karten-build/out
 #   mise run clean:karten     # heruntergeladene Offline-Karten in karten/ (~7 G, Neu-Download nötig)
 #   mise run clean:db         # lokale SQLite-Dev-DB (lifeline.db*) + TLS-Cert-Cache
-#   mise run clean:docker     # lokales MinIO (Container + Volume + Netz, lfh-*)
+#   mise run clean:docker     # lokaler Object-Store (Container + Volumes + Netz, lfh-*)
 #   mise run clean:all        # alles obige (Build + Karten + DB + Docker) — EIN confirm
 #   mise run clean:worktrees  # merged/verwaiste Worktrees unter .claude|.claire/worktrees (Dry-Run;
 #                             #   FORCE=1 mise run clean:worktrees führt aus)
@@ -64,13 +64,32 @@ description = "Lokale SQLite-Dev-DB + TLS-Cert-Cache löschen (Seed-Daten gehen 
 confirm = { message = "Löscht lifeline.db* (lokale Dev-DB inkl. Seed-Daten) + lifeline-tls-*.pem. Fortfahren?", default = "no" }
 run = [{ task = "_clean:db" }]
 
-# ── Lokales MinIO (Docker) ─────────────────────────────────────────────────────────
+# ── Lokaler Object-Store: Garage (Docker) ──────────────────────────────────────────
 # Steht hier und nicht in der (gitignorten) mise.local.toml: alle Werte stehen in
-# compose.yml, der Task braucht weder .env noch Geheimnisse. Damit funktioniert
-# `mise run minio` auf einem frischen Klon — bacon.toml:30 verweist darauf.
-[tasks.minio]
-description = "Lokales MinIO (S3 für karten-service) starten + Bucket 'maps' anlegen"
-run = "docker compose up -d --wait minio && docker compose run --rm minio-init"
+# compose.yml/garage.toml, der Task braucht weder .env noch Geheimnisse. Damit
+# funktioniert `mise run garage` auf einem frischen Klon — bacon.toml:30 verweist darauf.
+[tasks.garage]
+description = "Lokalen Garage-Object-Store (S3 für karten-service) starten + Bucket 'maps' bereitstellen"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+docker compose up -d --wait garage
+# Beide Schritte sind idempotent (gemessen: zweiter Lauf exit 0) — der Task darf
+# beliebig oft laufen. Sie laufen per `exec` IM laufenden Container statt als eigener
+# Init-Service: das Garage-Image bringt keine Shell mit, und die CLI erreicht den
+# Knoten über dessen RPC-Socket, den ein Fremdcontainer nicht ohne Weiteres hat.
+# `--default-bucket` legt Bucket und Schlüssel an, setzt das Website-Flag aber NICHT
+# (gemessen: „Website access: false") — der erste Schritt bleibt deshalb nötig.
+docker compose exec -T garage /garage bucket website --allow maps
+# Globaler Alias 'localhost': Garage bedient den unsignierten Lesepfad Host-basiert,
+# nicht über den Pfad (gemessen: /maps/<key> am Web-Endpunkt → 404). Der Alias macht
+# das Bucket unter http://localhost:3902/<key> erreichbar und hält den Hostnamen bei
+# exakt 'localhost' — nur so passiert die URL den SSRF-Riegel in
+# src/karte/download.rs: `host_ist_loopback` vergleicht den Hostnamen und löst
+# bewusst kein DNS auf, ein 'maps.web.garage.localhost' fiele durch.
+docker compose exec -T garage /garage bucket alias maps localhost
+echo "✓ Garage läuft: S3 :3900 (signiert) · öffentlich http://localhost:3902/<key>"
+'''
 
 [tasks."_clean:docker"]
 hide = true
@@ -78,21 +97,22 @@ run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 docker compose down -v --remove-orphans >/dev/null 2>&1 || true
-# Nachlese für Bestände, die noch vor compose.yml von Hand angelegt wurden.
-docker rm -f lfh-minio >/dev/null 2>&1 || true
-docker volume rm lfh-minio-data >/dev/null 2>&1 || true
+# Nachlese für Bestände, die noch vor compose.yml von Hand angelegt wurden, und für
+# das abgelöste MinIO (Container/Volume hießen lfh-minio bzw. lfh-minio-data).
+for c in lfh-garage lfh-minio; do docker rm -f "$c" >/dev/null 2>&1 || true; done
+for v in lfh-garage-meta lfh-garage-data lfh-minio-data; do docker volume rm "$v" >/dev/null 2>&1 || true; done
 docker network rm lfh-dev >/dev/null 2>&1 || true
-echo "✓ MinIO-Container/-Volume/-Netz (lfh-*) entfernt ('mise run minio' baut neu auf)."
+echo "✓ Object-Store-Container/-Volumes/-Netz (lfh-*) entfernt ('mise run garage' baut neu auf)."
 '''
 [tasks."clean:docker"]
-description = "Lokales MinIO entfernen: Container lfh-minio + Volume lfh-minio-data + Netz lfh-dev"
-confirm = { message = "Entfernt MinIO-Container/-Volume/-Netz (lfh-*). Bucket-Uploads gehen verloren. Fortfahren?", default = "no" }
+description = "Lokalen Object-Store entfernen: Container lfh-garage + Volumes lfh-garage-* + Netz lfh-dev"
+confirm = { message = "Entfernt Object-Store-Container/-Volumes/-Netz (lfh-*). Bucket-Uploads gehen verloren. Fortfahren?", default = "no" }
 run = [{ task = "_clean:docker" }]
 
 # ── Voll-Nuke: alles außer Worktrees (die haben eigene Plan-first-Semantik) ─────────
 [tasks."clean:all"]
 description = "Voll-Nuke: Build-Artefakte + Karten + Dev-DB + Docker (EIN confirm). Worktrees NICHT — siehe clean:worktrees"
-confirm = { message = "VOLL-NUKE: target/node_modules, Karten (~7 G), Dev-DB und MinIO werden gelöscht. Alles neu aufzubauen. Fortfahren?", default = "no" }
+confirm = { message = "VOLL-NUKE: target/node_modules, Karten (~7 G), Dev-DB und der Object-Store werden gelöscht. Alles neu aufzubauen. Fortfahren?", default = "no" }
 run = [
   { task = "clean" },
   { task = "_clean:karten" },

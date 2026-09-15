@@ -184,7 +184,7 @@ pub fn url_ist_sicher(url: &Url) -> Result<(), String> {
 }
 
 /// Opt-in Dev-Escape `--download-allow-loopback` / `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK`:
-/// erlaubt Downloads von Loopback-Adressen (lokaler MinIO-Object-Store, auch http).
+/// erlaubt Downloads von Loopback-Adressen (lokaler Dev-Object-Store, auch http).
 /// Default AUS → Produktion bleibt streng (https + kein-intern).
 ///
 /// Seit LFH-239/F18 aus der beim Start gesetzten [`crate::karte::KarteConfig`] statt bei
@@ -444,7 +444,7 @@ mod tests {
     #[test]
     fn dev_loopback_flag_erlaubt_nur_loopback() {
         let u = |s: &str| Url::parse(s).unwrap();
-        // Dev-Flag AN: loopback-http (lokaler MinIO-Object-Store) erlaubt.
+        // Dev-Flag AN: loopback-http (lokaler Dev-Object-Store) erlaubt.
         assert!(url_ist_sicher_mit(&u("http://127.0.0.1:9000/maps/x.mbtiles"), true).is_ok());
         assert!(url_ist_sicher_mit(&u("http://localhost:9000/maps/x.mbtiles"), true).is_ok());
         assert!(url_ist_sicher_mit(&u("http://[::1]:9000/maps/x.mbtiles"), true).is_ok());
@@ -458,6 +458,28 @@ mod tests {
         assert!(url_ist_sicher_mit(&u("http://127.0.0.1.evil.com/x.mbtiles"), true).is_err());
         // Öffentliches https bleibt unabhängig vom Flag erlaubt.
         assert!(url_ist_sicher_mit(&u("https://8.8.8.8/x.mbtiles"), true).is_ok());
+    }
+
+    /// Pinnt die Einschränkung, aus der die Gestalt der lokalen Dev-URL folgt:
+    /// `host_ist_loopback` vergleicht den HOSTNAMEN und löst bewusst kein DNS auf
+    /// (Defense-in-Depth, siehe `url_ist_sicher`). Ein Name UNTERHALB von `.localhost`
+    /// ist damit kein Loopback — obwohl RFC 6761 ihn genau dafür reserviert und der
+    /// System-Resolver ihn auf 127.0.0.1 abbildet.
+    ///
+    /// Praktische Folge: Garages unsignierter Lesepfad ordnet Anfragen über den
+    /// Host-Namen zu, `http://maps.web.garage.localhost:3902/<key>` fiele hier durch
+    /// (und zwar auf „nur https erlaubt"). Deshalb gibt `mise run garage` dem Bucket
+    /// den globalen Alias `localhost` — nur so bleibt der Hostname exakt `localhost`.
+    /// Wer den Alias entfernt, macht den Kartendownload im Dev-Stack unbrauchbar.
+    #[test]
+    fn subdomain_von_localhost_ist_kein_loopback() {
+        let u = |s: &str| Url::parse(s).unwrap();
+        assert!(
+            url_ist_sicher_mit(&u("http://maps.web.garage.localhost:3902/x.mbtiles"), true)
+                .is_err()
+        );
+        // Die Gestalt, die der Alias herstellt, passiert dagegen.
+        assert!(url_ist_sicher_mit(&u("http://localhost:3902/x.mbtiles"), true).is_ok());
     }
 
     #[test]

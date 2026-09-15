@@ -1,5 +1,5 @@
-# Lokale Dev-Infrastruktur: S3-kompatibles Object-Storage (MinIO) für den
-# `karten-service` (Komponente A, LFH-204). Start über `mise run minio`,
+# Lokale Dev-Infrastruktur: S3-kompatibles Object-Storage (Garage) für den
+# `karten-service` (Komponente A, LFH-204). Start über `mise run garage`,
 # Abriss über `mise run clean:docker`.
 #
 # Bewusst NUR Entwicklungs-Infrastruktur. lifeline-hub selbst läuft ohne
@@ -7,62 +7,81 @@
 # docs/ops/lfh-204-karten-service-ops-runbook.md. Diese Datei ersetzt nichts
 # davon, sie stellt nur das lokale Gegenstück zum produktiven S3/R2-Bucket.
 #
-# Zugangsdaten sind absichtlich die MinIO-Vorgabewerte: das Bucket trägt
+# Zugangsdaten sind absichtlich feste Dev-Vorgaben: das Bucket trägt
 # ausschließlich öffentliche ODbL-Kartendaten, und die passenden AWS_*-Werte
 # stehen in der (gitignorten) .env.
+#
+# Warum Garage und nicht mehr MinIO: `minio/minio` und `minio/mc` sind von
+# Docker Hub entfernt worden (die Hub-API antwortet für beide mit
+# „object not found"), ein `docker compose up` lief damit in „pull access
+# denied". Garage deckt denselben Bedarf mit EINEM Service ab — der frühere
+# `minio-init`-Service samt zweitem Image entfällt, weil `--single-node` das
+# Cluster-Layout und `--default-bucket` Schlüssel und Bucket selbst anlegen.
+#
+# Passend dazu gehören in die (gitignorte) .env — eine .env aus der MinIO-Zeit
+# zeigt auf Port 9000 und läuft nach dem Wechsel ins Leere:
+#
+#   KS_STORAGE_BUCKET=maps
+#   KS_BASE_URL=http://localhost:3902
+#   LIFELINE_OFFLINE_KATALOG_MANIFEST_URL=http://localhost:3902/offline-katalog-manifest.json
+#   LIFELINE_DOWNLOAD_ALLOW_LOOPBACK=true
+#   AWS_ACCESS_KEY_ID=GKlifelinehubdevlocal000000000000
+#   AWS_SECRET_ACCESS_KEY=0000000000000000000000000000000000000000000000000000000000000000
+#   AWS_ENDPOINT=http://127.0.0.1:3900
+#   AWS_REGION=garage
+#   AWS_ALLOW_HTTP=true
+#
+# KS_BASE_URL trägt bewusst `localhost` (nicht 127.0.0.1) und KEIN `/maps`:
+# der Lesepfad wird Host-basiert zugeordnet, den passenden Bucket-Alias setzt
+# `mise run garage`. Begründung dort und in src/karte/download.rs.
+#
+# ACHTUNG: `docker compose up` allein genügt NICHT. Website-Flag und Bucket-Alias
+# — ohne die der unsignierte Lesepfad mit 404 antwortet — setzt ausschließlich
+# `mise run garage`. Beides liegt in den Metadaten und überlebt Neustarts; nach
+# `docker compose down -v` (oder auf einem frischen Klon) muss der Task laufen.
+# Das ist der Unterschied zum abgelösten MinIO, dessen Init ein compose-Service war:
+# das Garage-Image bringt keine Shell mit, und seine CLI erreicht den Knoten nur
+# über dessen RPC-Socket — ein Fremdcontainer hat den nicht.
 
 name: lfh
 
 services:
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: lfh-minio
-    command: server /data --console-address ':9001'
+  garage:
+    # v2.3.0 brachte `--single-node`/`--default-bucket`; darunter wäre die
+    # `garage layout assign`/`apply`-Zeremonie von Hand nötig.
+    image: dxflrs/garage:v2.4.1
+    container_name: lfh-garage
+    command: ['/garage', 'server', '--single-node', '--default-bucket']
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      GARAGE_DEFAULT_ACCESS_KEY: GKlifelinehubdevlocal000000000000
+      GARAGE_DEFAULT_SECRET_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      GARAGE_DEFAULT_BUCKET: maps
     ports:
-      - '9000:9000' # S3-API
-      - '9001:9001' # Web-Console
+      - '3900:3900' # S3-API — signiert, Schreibpfad des karten-service
+      - '3902:3902' # Web-Endpunkt — unsigniert, Lesepfad des Backends
     volumes:
-      - lfh-minio-data:/data
+      - ./garage.toml:/etc/garage.toml:ro
+      - lfh-garage-meta:/var/lib/garage/meta
+      - lfh-garage-data:/var/lib/garage/data
     restart: unless-stopped
     healthcheck:
-      # curl und mc liegen beide im MinIO-Image (geprüft).
-      test: ['CMD', 'curl', '-fsS', 'http://localhost:9000/minio/health/live']
+      # Das Image bringt WEDER Shell NOCH curl mit (gemessen: `exec: "sh":
+      # executable file not found`) — anders als das frühere MinIO-Image, dessen
+      # Healthcheck curl rief. Der Test ruft deshalb die Binary direkt; ein
+      # CMD-SHELL-Einzeiler oder ein HTTP-Check per curl liefe ins Leere.
+      test: ['CMD', '/garage', 'status']
       interval: 2s
       timeout: 3s
       retries: 30
       start_period: 3s
 
-  # Legt das Bucket an und macht es öffentlich lesbar; läuft einmal und endet.
-  # Ersetzt die frühere `until mc alias set …; do sleep 1; done`-Warteschleife —
-  # das Warten übernimmt `depends_on: service_healthy`.
-  #
-  # Läuft über `docker compose run --rm minio-init`, NICHT über `up`: ein Service,
-  # der sich beendet, lässt `up --wait` mit Exit 1 aussteigen, obwohl er sauber
-  # mit 0 endete (gemessen). `run` liefert dagegen den echten Exit-Code des
-  # Kommandos und erzwingt einen frischen Lauf. Deshalb auch kein
-  # `container_name` (mit `run` nicht zulässig) und ein Profil, damit ein blankes
-  # `docker compose up` ihn nicht mitzieht.
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-07-21T05-28-08Z
-    profiles: ['init']
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: /bin/sh
-    # Beide Schritte sind idempotent — der Task darf beliebig oft laufen.
-    command: >
-      -c "mc alias set l http://minio:9000 minioadmin minioadmin &&
-          mc mb --ignore-existing l/maps &&
-          mc anonymous set download l/maps"
-    restart: 'no'
-
 volumes:
-  lfh-minio-data:
-    # Fester Name, damit `mise run clean:docker` ihn ohne Projektpräfix trifft.
-    name: lfh-minio-data
+  # Feste Namen, damit `mise run clean:docker` sie ohne Projektpräfix trifft.
+  # Garage trennt Metadaten (Bucket-/Schlüsselverwaltung) von den Nutzdaten.
+  lfh-garage-meta:
+    name: lfh-garage-meta
+  lfh-garage-data:
+    name: lfh-garage-data
 
 networks:
   default:

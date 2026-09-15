@@ -98,7 +98,7 @@ pub fn merge_offline_katalog(
 
 /// Ein Remote-Katalog-Eintrag ist nur auslieferbar, wenn vollständig gepinnt: 64-stelliger
 /// lowercase-hex-sha256, sichere URL (https — ODER http nur für Loopback wie einen lokalen
-/// Dev-Object-Store/MinIO), kein TODO-Platzhalter, Größe > 0, Lizenz gesetzt.
+/// Dev-Object-Store), kein TODO-Platzhalter, Größe > 0, Lizenz gesetzt.
 pub fn remote_eintrag_ist_gueltig(e: &OfflineKatalogEintrag) -> bool {
     matches!(&e.sha256, Some(h)
         if h.len() == 64 && h.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()))

@@ -1,0 +1,43 @@
+# Konfiguration des lokalen Garage-Object-Store (reine Dev-Infrastruktur, siehe
+# compose.yml). Start über `mise run garage`, Abriss über `mise run clean:docker`.
+#
+# Garage verlangt diese Datei auch im Einknoten-Betrieb — anders als MinIO, das
+# ohne Konfigurationsdatei auskam. Sie ist deshalb eingecheckt und nicht generiert:
+# ein frischer Klon soll `mise run garage` ohne Vorarbeit fahren können.
+#
+# Die Werte sind absichtlich feste Dev-Vorgaben: der Bucket trägt ausschließlich
+# öffentliche ODbL-Kartendaten, und die passenden AWS_*-Werte stehen in der
+# (gitignorten) .env.
+
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+
+# sqlite statt lmdb: kleinster Fußabdruck, für einen einzelnen Dev-Knoten genug.
+db_engine = "sqlite"
+
+# Ein Knoten, keine Replikation. Das Cluster-Layout weist `--single-node` (ab
+# Garage v2.3.0, siehe compose.yml) beim ersten Start selbst zu — die sonst
+# nötige `garage layout assign`/`layout apply`-Zeremonie entfällt damit.
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+# Fester Wert statt Zufallsgeheimnis: der Knoten spricht ausschließlich mit sich
+# selbst, und ein bei jedem Start wechselndes Geheimnis machte das Volume unbrauchbar.
+rpc_secret = "0000000000000000000000000000000000000000000000000000000000000001"
+
+[s3_api]
+# Signierter Schreibpfad — hier lädt der karten-service die Region-Packs hoch
+# (object_store/AmazonS3Builder, path-style über AWS_ENDPOINT aus der .env).
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
+
+[s3_web]
+# Unsignierter öffentlicher Lesepfad — hier holt das lifeline-hub-Backend die
+# Karten. Bewusst ein EIGENER Endpunkt: Garage bedient anonyme Zugriffe
+# ausschließlich hier, am S3-Endpunkt antwortet ein unsignierter GET mit 403
+# (gemessen). Die Zuordnung Anfrage → Bucket läuft über den Host-Namen, nicht
+# über den Pfad; welchen Namen der Bucket dafür trägt, setzt `mise run garage`.
+bind_addr = "[::]:3902"
+root_domain = ".web.garage.localhost"
+index = "index.html"
