@@ -228,6 +228,15 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
       'src',
       'https://b.example/2.jpg',
     );
+
+    // Und zurück auf A: auch der Rückweg beginnt mit einem frischen Versuch. Ein Merker, der
+    // nur die zuletzt gescheiterte URL vergleicht, bliebe hier auf „nicht abrufbar" stehen,
+    // obwohl die Verbindung inzwischen wieder da sein kann.
+    rerender(<FachebenenInspector {...props('https://a.example/1.jpg')} />);
+    expect(screen.getByRole('img', { name: /Webcam-Standbild/ })).toHaveAttribute(
+      'src',
+      'https://a.example/1.jpg',
+    );
   });
 
   it('Autobahn: eine nicht-http(s)-Bild-/Link-URL wird weder als Bild noch als Link gerendert', () => {

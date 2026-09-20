@@ -251,18 +251,48 @@ function HochwasserInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
-function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
+/**
+ * Standbild einer BAB-Webcam. Eigene Komponente, damit der Aufrufer sie über `key={bild}`
+ * strukturell zurücksetzen kann: der Fehlerzustand gehört zu GENAU DIESEM Bild, nicht zum
+ * Panel. Ein Merker im Panel überlebte den Wechsel auf eine andere Kamera — und ein Merker,
+ * der nur die zuletzt gescheiterte URL vergleicht, überlebte den Weg A → B → **A**: bei der
+ * Rückkehr stünde weiter „nicht abrufbar", ohne es noch einmal zu versuchen, obwohl die
+ * Verbindung inzwischen wieder da sein kann. Mit dem `key` stellt sich die Frage nicht.
+ *
+ * Das Bild kommt NICHT über den Backend-Proxy, sondern direkt vom Betreiber (die Quelle
+ * liefert nur die URL). Ohne Internet am Gerät — der Normalfall, für den die Lagekarte
+ * offline-fähig ist — lädt es also nicht. Ein kaputtes Bildsymbol wäre in einer
+ * Führungsoberfläche die schlechteste Antwort: es sagt nicht, WAS fehlt.
+ */
+function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }) {
   const { token } = theme.useToken();
-  // Das Standbild kommt NICHT über den Backend-Proxy, sondern direkt vom Betreiber (die
-  // Quelle liefert nur die URL). Ohne Internet am Client — der Normalfall, für den die
-  // Lagekarte offline-fähig ist — lädt es also nicht. Ein kaputtes Bildsymbol wäre in einer
-  // Führungsoberfläche die schlechteste Antwort: es sagt nicht, WAS fehlt.
-  //
-  // Gemerkt wird die URL, die gescheitert ist, NICHT ein Flag: der Inspector tauscht beim
-  // Klick auf ein anderes Feature nur die Props, die Komponenteninstanz bleibt stehen. Ein
-  // `boolean` überlebte den Wechsel und verschluckte das Standbild der nächsten Kamera, ohne
-  // sie je zu laden. Der Vergleich mit der aktuellen URL setzt sich von selbst zurück.
-  const [fehlerBei, setFehlerBei] = useState<string | null>(null);
+  const [fehler, setFehler] = useState(false);
+  if (fehler) {
+    return (
+      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+        Standbild nicht abrufbar — es kommt direkt vom Kamera-Betreiber und braucht eine
+        Internetverbindung am Gerät.
+      </Typography.Paragraph>
+    );
+  }
+  return (
+    /* Bewusst ohne feste Höhe — die Betreiber liefern verschiedene Seitenverhältnisse, ein
+       erzwungenes Maß schnitte den Fahrbahnrand ab. */
+    <img
+      src={bild}
+      alt={titel ? `Webcam-Standbild: ${titel}` : 'Webcam-Standbild'}
+      onError={() => setFehler(true)}
+      style={{
+        width: '100%',
+        display: 'block',
+        marginBottom: token.marginXS,
+        borderRadius: token.borderRadius,
+      }}
+    />
+  );
+}
+
+function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   const kategorie = s(p.kategorie);
   const bild = nurWeb(s(p.bild));
   const link = nurWeb(s(p.link));
@@ -276,27 +306,9 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
         </Tag>
       )}
       {/* Das Standbild IST der Zweck der Webcam-Kategorie (LFH-80): visuelle Lagebestätigung
-          an der BAB. Bewusst ohne feste Höhe — die Betreiber liefern verschiedene
-          Seitenverhältnisse, ein erzwungenes Maß schnitte den Fahrbahnrand ab. */}
-      {bild && fehlerBei !== bild && (
-        <img
-          src={bild}
-          alt={titel ? `Webcam-Standbild: ${titel}` : 'Webcam-Standbild'}
-          onError={() => setFehlerBei(bild)}
-          style={{
-            width: '100%',
-            display: 'block',
-            marginBottom: token.marginXS,
-            borderRadius: token.borderRadius,
-          }}
-        />
-      )}
-      {bild && fehlerBei === bild && (
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
-          Standbild nicht abrufbar — es kommt direkt vom Kamera-Betreiber und braucht eine
-          Internetverbindung am Gerät.
-        </Typography.Paragraph>
-      )}
+          an der BAB. Der `key` bindet den Fehlerzustand an die URL — ein Wechsel der Kamera
+          (auch hin und zurück) beginnt mit einem frischen Versuch. */}
+      {bild && <WebcamStandbild key={bild} bild={bild} titel={titel} />}
       <Descriptions column={1}>
         {s(p.strasse) && <Descriptions.Item label="Autobahn">{s(p.strasse)}</Descriptions.Item>}
         {s(p.richtung) && <Descriptions.Item label="Richtung">{s(p.richtung)}</Descriptions.Item>}
