@@ -514,6 +514,28 @@ pub(crate) fn autobahn_antwort(
     ))
 }
 
+/// Nach einem GESCHEITERTEN Lauf wird nicht sofort neu versucht. Ohne diese Sperre trommelt
+/// eine anhaltende Störung die Quelle: die Ebene meldet `offline`, das Frontend pollt
+/// deshalb im Aufwärmtakt (20 s), und jeder Poll stiesse einen neuen Fächer mit 333 Abrufen
+/// an — gegen einen Anbieter, der ohnehin gerade nicht kann. Fünf Minuten sind kurz genug,
+/// dass eine Erholung zeitnah ankommt, und lang genug, dass aus dem Takt kein Dauerfeuer wird.
+const AUTOBAHN_ABKUEHLUNG: Duration = Duration::from_secs(300);
+
+/// Zeitpunkt des letzten GESCHEITERTEN Laufs; `None` heisst „kein Fehlschlag offen".
+/// `std::sync::Mutex`, nie über ein `await` gehalten (wie `inflight`).
+static AUTOBAHN_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+/// Darf ein neuer Fächer starten? Rein und ohne Uhr prüfbar (die Zeitspanne kommt von aussen).
+pub(crate) fn autobahn_darf_starten(
+    seit_fehlschlag: Option<Duration>,
+    abkuehlung: Duration,
+) -> bool {
+    match seit_fehlschlag {
+        None => true,
+        Some(vergangen) => vergangen >= abkuehlung,
+    }
+}
+
 /// Entscheidung je Cache-Zustand — rein und ohne Netz prüfbar. Die Fälle sind dieselben wie
 /// in [`liefere_mit_swr`], **mit einer Ausnahme, die der ganze Grund für diese Funktion ist**:
 /// der KALTE Fall wartet nicht.
@@ -556,15 +578,27 @@ pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> Fachebene
     if weg == AutobahnWeg::Frisch {
         return eintrag.expect("Frisch entsteht nur aus einem Eintrag").0;
     }
-    // Nur EIN Lauf gleichzeitig (wie der stale-Zweig von `liefere_mit_swr`). Der Schlüssel
-    // wird erst freigegeben, wenn die Aufgabe durch ist — ein Poll währenddessen stößt
-    // nichts Zweites an, was bei 333 Abrufen je Lauf der ganze Punkt ist.
-    if s.inflight.lock().unwrap().insert("autobahn".to_string()) {
+    // Zwei Riegel vor dem Lauf. ERSTENS die Abkühlung nach einem Fehlschlag — ohne sie
+    // stiesse jeder Aufwärm-Poll einen neuen Fächer an, solange die Quelle gestört ist.
+    let seit_fehlschlag = AUTOBAHN_FEHLSCHLAG.lock().unwrap().map(|t| t.elapsed());
+    let darf = autobahn_darf_starten(seit_fehlschlag, AUTOBAHN_ABKUEHLUNG);
+    // ZWEITENS nur EIN Lauf gleichzeitig (wie der stale-Zweig von `liefere_mit_swr`). Der
+    // Schlüssel wird erst freigegeben, wenn die Aufgabe durch ist — ein Poll währenddessen
+    // stösst nichts Zweites an, was bei 333 Abrufen je Lauf der ganze Punkt ist.
+    if darf && s.inflight.lock().unwrap().insert("autobahn".to_string()) {
         let (client, pool2, inflight) = (s.client.clone(), pool.clone(), s.inflight.clone());
         tokio::spawn(async move {
-            erneuere_autobahn(client, pool2).await;
+            let ergebnis = erneuere_autobahn(client, pool2).await;
+            // Erst den Ausgang vermerken, dann freigeben: andersherum könnte ein Poll
+            // dazwischen den Schlüssel greifen und lospreschen, bevor die Sperre steht.
+            *AUTOBAHN_FEHLSCHLAG.lock().unwrap() = match ergebnis {
+                Some(_) => None,
+                None => Some(std::time::Instant::now()),
+            };
             inflight.lock().unwrap().remove("autobahn");
         });
+    } else if !darf {
+        tracing::debug!("Autobahn: Abkühlung nach Fehlschlag läuft — kein neuer Fächer");
     }
     match eintrag {
         Some((a, _)) => a, // veralteter Stand ist besser als keiner
@@ -801,6 +835,23 @@ mod autobahn_strassen_tests {
         // Genau auf der TTL gilt als veraltet — dieselbe Grenze wie in `liefere_mit_swr`
         // (`alter < ttl`), damit beide Ebenen-Sorten dasselbe Alter als frisch ansehen.
         assert_eq!(autobahn_weg(Some(600), ttl), AutobahnWeg::AltUndErneuern);
+    }
+
+    /// Ohne Abkühlung trommelt eine anhaltende Störung die Quelle: die Ebene meldet
+    /// `offline`, das Frontend pollt deshalb im 20-s-Aufwärmtakt, und jeder Poll stiesse
+    /// einen neuen Fächer mit 333 Abrufen an — gegen einen Anbieter, der gerade nicht kann.
+    #[test]
+    fn nach_fehlschlag_wird_nicht_sofort_neu_gestartet() {
+        let ab = Duration::from_secs(300);
+        // Kein Fehlschlag offen → freie Fahrt.
+        assert!(autobahn_darf_starten(None, ab));
+        // Frischer Fehlschlag → gesperrt.
+        assert!(!autobahn_darf_starten(Some(Duration::from_secs(0)), ab));
+        assert!(!autobahn_darf_starten(Some(Duration::from_secs(299)), ab));
+        // Abgelaufen → wieder erlaubt; auf der Grenze schon, sonst bliebe die Ebene bei
+        // exakt gleichem Takt für immer gesperrt.
+        assert!(autobahn_darf_starten(Some(ab), ab));
+        assert!(autobahn_darf_starten(Some(Duration::from_secs(301)), ab));
     }
 
     /// Die zweite Hälfte der Einzelspur: wer auf den Vorgänger gewartet hat, bekommt dessen
