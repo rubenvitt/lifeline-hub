@@ -163,7 +163,11 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         // Rohdaten für die KRITIS-Akkumulation (der Akku selbst geht via kritisAkku ein).
         kritisRoh: byKey.kritis.data,
         // Status der Autobahn-Ebene für den Aufwärm-Takt (siehe `refetchInterval` oben).
-        autobahnStatusRoh: byKey.autobahn.data?.status,
+        // `isError` gehört dazu wie in der Statuszeile darüber: react-query HÄLT bei einem
+        // gescheiterten Refetch die vorigen `data` — ohne den Zweig meldete die Ableitung
+        // weiter `ok`, während die Ebene oben schon `offline` anzeigt, und der Takt bliebe
+        // zehn Minuten lang der reguläre statt des Aufwärm-Takts.
+        autobahnStatusRoh: byKey.autobahn.isError ? 'offline' : byKey.autobahn.data?.status,
       };
     },
   });

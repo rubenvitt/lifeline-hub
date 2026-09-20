@@ -4,8 +4,14 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { neuerQueryClient } from '../../test/utils';
-import type { FachebeneAntwort, FachebeneQuelle, FeatureCollection } from '../../api/fachebenen';
+import {
+  ladeFachebene,
+  type FachebeneAntwort,
+  type FachebeneQuelle,
+  type FeatureCollection,
+} from '../../api/fachebenen';
 import { useFachebenen } from './useFachebenen';
+import { FACHEBENEN } from './fachebenen';
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
 import { hochwasserRadius } from './hochwasserStil';
 
@@ -239,6 +245,40 @@ describe('useFachebenen', () => {
       ).toHaveLength(3),
     );
     expect(result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')).toBeUndefined();
+  });
+
+  it('fällt nach einem gescheiterten Refetch auf den Aufwärm-Takt zurück (LFH-80)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    const original = lade.getMockImplementation()!;
+    let rufe = 0;
+    lade.mockImplementation((quelle, bbox) => {
+      if (quelle !== 'autobahn') return original(quelle, bbox);
+      rufe += 1;
+      // Erster Lauf trägt, jeder weitere scheitert — der Fall „Backend kurz weg".
+      return rufe === 1 ? original(quelle, bbox) : Promise.reject(new Error('Netz weg'));
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { result } = rendere();
+      act(() => result.current.onFachebeneToggle('autobahn', true));
+      await waitFor(() => expect(result.current.fachebenenStatus.autobahn).toBe('ok'));
+
+      // Nach dem Erfolg läuft der reguläre Takt; der Lauf danach scheitert.
+      await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.pollMs + 1_000));
+      await waitFor(() => expect(result.current.fachebenenStatus.autobahn).toBe('offline'));
+      const nachFehlschlag = rufe;
+
+      // Die tragende Aussage: react-query HÄLT nach einem gescheiterten Refetch die
+      // vorigen `data` — ohne `isError` in der Takt-Ableitung stünde dort weiter `ok`,
+      // die Ebene bliebe auf 600 s und zeigte zehn Minuten lang nichts, obwohl das
+      // Backend längst wieder da wäre. Hier muss innerhalb des Aufwärm-Takts ein
+      // weiterer Versuch laufen.
+      await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.aufwaermPollMs! + 1_000));
+      expect(rufe).toBeGreaterThan(nachFehlschlag);
+    } finally {
+      vi.useRealTimers();
+      lade.mockImplementation(original);
+    }
   });
 
   it('meldet kritisZoomZuKlein unterhalb des Mindest-Zooms', () => {
