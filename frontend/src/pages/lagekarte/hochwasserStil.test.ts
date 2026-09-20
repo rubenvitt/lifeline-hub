@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
-import {
-  faerbeHochwasser,
-  hochwasserRadius,
-  hochwasserDarstellung,
-} from './hochwasserStil';
+import { faerbeHochwasser, hochwasserRadius, hochwasserDarstellung } from './hochwasserStil';
 import { antdToken, farbenDunkel, farbenHell, type Farbrollen } from '../../theme/tokens';
 import type { FeatureCollection } from '../../api/fachebenen';
 
