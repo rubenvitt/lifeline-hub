@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import { defaultFachebenenSichtbar } from './fachebenenAuswahl';
 import Sidebar, { bedienzielStil, loeschDialogBild } from './Sidebar';
 import type { SidebarProps } from './Sidebar';
 import { dichten } from '../../theme/tokens';
@@ -56,7 +55,18 @@ const basisProps: SidebarProps = {
   ansichtDirty: false,
   ansichtSpeichert: false,
   onAnsichtSpeichern: vi.fn(),
-  fachebenenSichtbar: defaultFachebenenSichtbar(),
+  // BEWUSST ausgeschrieben statt `defaultFachebenenSichtbar()`: eine neue Fachebene soll
+  // hier den Typcheck brechen und damit jemanden zwingen, die Sidebar anzusehen. (LFH-80
+  // ist genau so aufgelaufen — der Import von `defaultFachebenenSichtbar` ist deshalb
+  // wieder weg.)
+  fachebenenSichtbar: {
+    nina: false,
+    dwd: false,
+    pegelonline: false,
+    hochwasser: false,
+    kritis: false,
+    autobahn: false,
+  },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
   // Neue Bild-Props

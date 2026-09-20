@@ -7,6 +7,7 @@ import { neuerQueryClient } from '../../test/utils';
 import type { FachebeneAntwort, FachebeneQuelle, FeatureCollection } from '../../api/fachebenen';
 import { useFachebenen } from './useFachebenen';
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
+import { hochwasserRadius } from './hochwasserStil';
 
 // Fixtures via vi.hoisted, damit sowohl die (hochgezogene) vi.mock-Factory als auch
 // die Assertions dieselben Feature-Sammlungen sehen.
@@ -19,11 +20,28 @@ const fx = vi.hoisted(() => {
       properties: {},
     })),
   });
+  // Zwei Pegel mit verschiedener Meldeklasse — die Ebene muss sie unterscheidbar machen.
+  const hochwasser: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [8, 50] },
+        properties: { titel: 'Alarmpegel', klasse: 'gross' },
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [9, 51] },
+        properties: { titel: 'Ruhiger Pegel', klasse: 'kein_hochwasser' },
+      },
+    ],
+  };
   return {
     fc,
     nina: fc([[9, 50]]),
     kritisA: fc([[10, 51]]),
     kritisB: fc([[11, 52]]),
+    hochwasser,
     // Bewusst DREI Punkte: die Menge unterscheidet die Autobahn-Ebene von jeder anderen
     // Fixture — ein vertauschter `combine`-Index fiele sonst nicht auf.
     autobahn: fc([
@@ -54,6 +72,14 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           attribution: 'Autobahn GmbH des Bundes',
           stand: null,
           features: fx.autobahn,
+        });
+      if (quelle === 'hochwasser')
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: '© LHP',
+          stand: null,
+          features: fx.hochwasser,
         });
       if (quelle === 'kritis')
         return Promise.resolve({
@@ -148,6 +174,40 @@ describe('useFachebenen', () => {
     // replaceEqualDeep in query-core → identische Referenz bei unveränderten Daten,
     // sonst würde der Kartenflaeche-fachebenen-Effekt pro Frame neu feuern.
     expect(result.current.aktiveFachebenen).toBe(vorher);
+  });
+
+  it('färbt und staffelt die Hochwasserpegel nach ihrer Meldeklasse (LFH-77)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('hochwasser', true));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'hochwasser')?.daten.features,
+      ).toHaveLength(2),
+    );
+    const features = result.current.aktiveFachebenen.find((f) => f.def.key === 'hochwasser')!.daten
+      .features;
+    const [alarm, ruhig] = features;
+    // Ohne diesen Schritt kämen die Rohdaten durch und die Karte zeichnete 2000 gleich
+    // große Punkte in der Ebenenfarbe — die Meldeklasse wäre unsichtbar.
+    expect(alarm.properties.radius).toBe(hochwasserRadius('gross'));
+    expect(ruhig.properties.radius).toBe(hochwasserRadius('kein_hochwasser'));
+    expect(alarm.properties.farbe).not.toBe(ruhig.properties.farbe);
+    // Die Bestandsproperties überleben die Einfärbung (der Inspector liest `titel`).
+    expect(alarm.properties.titel).toBe('Alarmpegel');
+  });
+
+  it('lässt die übrigen Ebenen unangetastet — nur Hochwasser wird eingefärbt', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('nina', true));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'nina')?.daten.features,
+      ).toHaveLength(1),
+    );
+    const nina = result.current.aktiveFachebenen.find((f) => f.def.key === 'nina')!.daten
+      .features[0];
+    expect(nina.properties.farbe).toBeUndefined();
+    expect(nina.properties.radius).toBeUndefined();
   });
 
   it('aktiviert autobahn → eigene Daten und Pflicht-Attribution (LFH-80)', async () => {

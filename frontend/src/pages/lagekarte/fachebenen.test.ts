@@ -16,8 +16,23 @@ const feat = (lon: number, lat: number) => ({
 });
 
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen plus die BAB-Lage (LFH-80)', () => {
-    expect(fachebeneKeys()).toEqual(['nina', 'dwd', 'pegelonline', 'kritis', 'autobahn']);
+  it('enthält die vier v1-Quellen, die Hochwasserebene und die BAB-Lage', () => {
+    // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline`,
+    // weil es dieselbe Frage beantwortet: dort der rohe Wasserstand, hier die amtliche
+    // Bewertung (LFH-77). `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
+    expect(fachebeneKeys()).toEqual([
+      'nina',
+      'dwd',
+      'pegelonline',
+      'hochwasser',
+      'kritis',
+      'autobahn',
+    ]);
+  });
+  it('führt die Hochwasserebene als Punktebene mit Hintergrund-Polling', () => {
+    expect(FACHEBENEN.hochwasser.geometrieTyp).toBe('punkt');
+    expect(FACHEBENEN.hochwasser.bboxAbhaengig).toBe(false);
+    expect(FACHEBENEN.hochwasser.pollMs).toBeGreaterThan(0);
   });
   it('markiert nur kritis als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);

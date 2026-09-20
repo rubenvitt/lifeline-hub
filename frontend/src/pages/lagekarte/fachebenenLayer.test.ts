@@ -11,15 +11,20 @@ import { FACHEBENEN } from './fachebenen';
 function fakeMap() {
   const sources = new Set<string>();
   const layers = new Set<string>();
+  const specs = new Map<string, { paint?: Record<string, unknown> }>();
   return {
     getSource: vi.fn((id: string) => (sources.has(id) ? {} : undefined)),
     addSource: vi.fn((id: string) => sources.add(id)),
     getLayer: vi.fn((id: string) => (layers.has(id) ? {} : undefined)),
-    addLayer: vi.fn((l: { id: string }) => layers.add(l.id)),
+    addLayer: vi.fn((l: { id: string; paint?: Record<string, unknown> }) => {
+      layers.add(l.id);
+      specs.set(l.id, l);
+    }),
     removeLayer: vi.fn((id: string) => layers.delete(id)),
     removeSource: vi.fn((id: string) => sources.delete(id)),
     _sources: sources,
     _layers: layers,
+    _specs: specs,
   };
 }
 
@@ -41,6 +46,23 @@ describe('fachebenenLayer', () => {
     const m = fakeMap();
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never);
     expect(m._layers.has('fachebene-pegelonline-circle')).toBe(true);
+  });
+
+  it('lässt das Feature über Farbe und Radius bestimmen, mit der Ebenenfarbe als Rückfall', () => {
+    // Die Hochwasserebene (LFH-77) staffelt beides je Pegelklasse und backt die Werte in
+    // die Properties (`hochwasserStil.ts`). Ein fester `circle-color`/`circle-radius`
+    // würde diese Werte stillschweigend verwerfen — die Ebene sähe einfarbig aus, ohne
+    // dass irgendwo etwas rot wird. Ebenen ohne die Properties fallen auf ihre Farbe
+    // zurück, deshalb steht der Rückfall hier mit in der Zusicherung.
+    const m = fakeMap();
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never);
+    const paint = m._specs.get('fachebene-pegelonline-circle')?.paint;
+    expect(paint?.['circle-color']).toEqual([
+      'coalesce',
+      ['get', 'farbe'],
+      FACHEBENEN.pegelonline.farbe,
+    ]);
+    expect(paint?.['circle-radius']).toEqual(['coalesce', ['get', 'radius'], 5]);
   });
 
   it('entfernt Layer + Source', () => {

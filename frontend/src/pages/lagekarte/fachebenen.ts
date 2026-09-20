@@ -48,11 +48,24 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 300_000,
     bboxAbhaengig: false,
   },
+  hochwasser: {
+    key: 'hochwasser',
+    label: 'Hochwasser-Meldeklassen (LHP)',
+    // Die Ebenenfarbe ist nur der Rückfall für Panel-Punkt und Inspector-Akzent — auf der
+    // Karte trägt jedes Feature seine eigene Rollenfarbe je Meldeklasse
+    // (`hochwasserStil.ts`). Bewusst nicht das Blau von `pegelonline`: die beiden Ebenen
+    // stehen nebeneinander und sind im Panel sonst nicht auseinanderzuhalten.
+    farbe: '#08979c',
+    geometrieTyp: 'punkt',
+    pollMs: 300_000,
+    bboxAbhaengig: false,
+  },
   autobahn: {
     key: 'autobahn',
     label: 'Autobahn-Lage (BAB)',
-    // Eigener Ton neben Rot/Orange/Blau/Violett der vier Bestandsebenen.
-    farbe: '#08979c',
+    // Eigener Ton neben Rot/Orange/Blau/Türkis/Violett der fünf Bestandsebenen. NICHT das
+    // `#08979c` von `hochwasser` — die beiden stünden im Panel untereinander.
+    farbe: '#c41d7f',
     geometrieTyp: 'punkt',
     // = serverseitige TTL (600 s). Die Ebene aggregiert 111 Autobahnen × 3 Dienste;
     // häufiger abzufragen belastet die Quelle, ohne frischer zu werden.
@@ -72,7 +85,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'kritis', 'autobahn'];
+  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis', 'autobahn'];
 }
 
 export function istBboxAbhaengig(key: FachebeneQuelle): boolean {

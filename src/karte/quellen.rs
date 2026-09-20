@@ -5,7 +5,8 @@
 use crate::error::AppError;
 use crate::karte::cache;
 use crate::karte::normalisierung::{
-    kombiniere_nina, normalisiere_autobahn, normalisiere_overpass, normalisiere_pegelonline,
+    kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_overpass,
+    normalisiere_pegelonline,
 };
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use crate::karte::FachebenenState;
@@ -77,6 +78,15 @@ pub(crate) async fn hole_json(
         return Err(format!("HTTP {}", resp.status()));
     }
     resp.json().await.map_err(|e| e.to_string())
+}
+
+/// Holt eine URL und liefert den Rumpf als Text (für Quellen, deren Antwort kein JSON ist).
+async fn hole_text(client: &reqwest::Client, url: &str) -> Result<String, String> {
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    resp.text().await.map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------- DWD
@@ -305,6 +315,119 @@ async fn erneuere_kritis(
     }
     tracing::warn!("Overpass nicht erreichbar (alle Endpunkte) — KRITIS aus Cache/leer");
     None
+}
+
+// ------------------------------------------------------- HOCHWASSER (LHP, LFH-77)
+
+/// Marke, hinter der das Länderübergreifende Hochwasserportal seinen Sitzungs-Token in die
+/// Startseite schreibt: `addLagePegel(884284296001)`. Die schließende Klammer gehört zur
+/// Marke — `addLagePegelInteractive(` ist ein anderer Aufruf derselben Datei und bekommt
+/// seine `ki` als Variable; ohne die Klammer läse man dort das Wort `ki` als Token.
+const LHP_KI_MARKE: &str = "addLagePegel(";
+
+const HOCHWASSER_ATTRIB: &str = "Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder";
+const HOCHWASSER_TTL: Duration = Duration::from_secs(300);
+const LHP_START: &str = "https://www.hochwasserzentralen.de/";
+const LHP_LAGEPEGEL: &str = "https://www.hochwasserzentralen.de/webservices/get_lagepegel.php";
+
+pub async fn fetch_hochwasser(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    let (client, pool2) = (s.client.clone(), pool.clone());
+    liefere_mit_swr(
+        pool,
+        &s.inflight,
+        "hochwasser",
+        HOCHWASSER_TTL,
+        || FachebeneAntwort::offline("hochwasser", HOCHWASSER_ATTRIB),
+        move || erneuere_hochwasser(client, pool2),
+    )
+    .await
+}
+
+/// Zweistufig wie NINA, aber aus einem anderen Grund: Stufe 1 holt nicht Daten, sondern den
+/// Sitzungs-Token (`ki`) aus der Startseite, den Stufe 2 mitschicken MUSS. Beide Stufen
+/// laufen nur beim Cache-Refresh (TTL 300 s), nicht je Anfrage — zwei Zugriffe pro
+/// Aktualisierung auf ein Behördenportal sind das Budget, nicht zwei pro Nutzer.
+async fn erneuere_hochwasser(
+    client: reqwest::Client,
+    pool: SqlitePool,
+) -> Option<FachebeneAntwort> {
+    let html = match hole_text(&client, LHP_START).await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!("LHP-Startseite nicht erreichbar: {e}");
+            return None;
+        }
+    };
+    let Some(ki) = extrahiere_ki(&html) else {
+        // Kein Netzfehler, sondern ein Formatbruch: die Seite wurde umgebaut. Laut, aber
+        // nicht fatal — die Ebene fällt auf „offline" zurück.
+        tracing::warn!(
+            "LHP-Startseite ohne `{LHP_KI_MARKE}…)`-Marke — Sitzungs-Token nicht lesbar"
+        );
+        return None;
+    };
+    let rumpf = format!("ki={ki}&pegelname=1"); // beide Werte sind ASCII-sicher (Ziffern/Literal)
+    let roh = match client
+        .post(LHP_LAGEPEGEL)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(rumpf)
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => match r.text().await {
+            // Ein ABGELAUFENER/ungültiger Token liefert HTTP 200 mit LEEREM Rumpf (gemessen).
+            // Ohne diese eigene Meldung landet der Fall als „JSON kaputt" im Log und die
+            // nächste Fehlersuche beginnt wieder bei null.
+            Ok(t) if t.trim().is_empty() => {
+                tracing::warn!("LHP-Pegelabruf lieferte leeren Rumpf — `ki` ungültig/abgelaufen");
+                return None;
+            }
+            Ok(t) => match serde_json::from_str::<serde_json::Value>(&t) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!("LHP-Pegelabruf: JSON nicht lesbar: {e}");
+                    return None;
+                }
+            },
+            Err(e) => {
+                tracing::warn!("LHP-Pegelabruf: Rumpf nicht lesbar: {e}");
+                return None;
+            }
+        },
+        Ok(r) => {
+            tracing::warn!("LHP-Pegelabruf HTTP {}", r.status());
+            return None;
+        }
+        Err(e) => {
+            tracing::warn!("LHP-Pegelabruf fehlgeschlagen: {e}");
+            return None;
+        }
+    };
+    let a = FachebeneAntwort::ok(
+        "hochwasser",
+        HOCHWASSER_ATTRIB,
+        None,
+        normalisiere_hochwasser(&roh),
+    );
+    cache::setze(&pool, "hochwasser", &a).await;
+    Some(a)
+}
+
+/// Zieht den `ki`-Token aus dem Quelltext der LHP-Startseite.
+///
+/// WARUM ÜBERHAUPT: die Webservices des Portals antworten NUR mit einem gültigen, vom
+/// Server ausgegebenen `ki`. Gemessen (20.09.2026): ohne Parameter, mit erfundener Zahl
+/// oder mit einem Token aus einem anderen Aufruf liefert `get_lagepegel.php`
+/// **HTTP 200 mit leerem Body**; mit dem frisch aus der Startseite gelesenen Token
+/// ~138 KB. Der Token ist also nicht ableitbar, er wird gelesen.
+fn extrahiere_ki(html: &str) -> Option<String> {
+    // Bis zur ersten Fundstelle mit ZIFFERN-Argument laufen, nicht bloß bis zur ersten
+    // Fundstelle: dieselbe Marke trägt auch die Funktionsdefinition (`addLagePegel(ki)`).
+    html.match_indices(LHP_KI_MARKE).find_map(|(i, _)| {
+        let rest = &html[i + LHP_KI_MARKE.len()..];
+        let token = &rest[..rest.find(')')?];
+        (!token.is_empty() && token.bytes().all(|b| b.is_ascii_digit())).then(|| token.to_string())
+    })
 }
 
 // ----------------------------------------------------------------------- AUTOBAHN
@@ -567,5 +690,50 @@ mod swr_tests {
         .await;
         assert_eq!(a.quelle, "alt"); // sofort der alte Stand
         assert_eq!(calls.load(Ordering::SeqCst), 1); // Refresh wurde angestoßen
+    }
+}
+
+#[cfg(test)]
+mod lhp_ki_tests {
+    use super::*;
+
+    #[test]
+    fn extrahiert_ki_aus_seitenquelltext() {
+        let html = "<script>addLaender(456404797936)\naddLagePegel(884284296001)</script>";
+        assert_eq!(extrahiere_ki(html), Some("884284296001".to_string()));
+    }
+
+    #[test]
+    fn nimmt_die_erste_fundstelle() {
+        let html = "addLagePegel(111111111111) addLagePegel(222222222222)";
+        assert_eq!(extrahiere_ki(html), Some("111111111111".to_string()));
+    }
+
+    #[test]
+    fn ueberspringt_eine_fundstelle_mit_nicht_numerischem_argument() {
+        // Die Funktion wird in `lage-index.js` DEFINIERT (`function addLagePegel(ki)`) und
+        // im Seitenrumpf mit dem Token AUFGERUFEN. Zöge jemand das Skript inline, stünde die
+        // Definition vor dem Aufruf — bei Abbruch an der ersten Fundstelle ginge die Ebene
+        // offline, obwohl der Token zwei Zeilen tiefer steht.
+        let html = "function addLagePegel(ki) { /* … */ }\naddLagePegel(884284296001)";
+        assert_eq!(extrahiere_ki(html), Some("884284296001".to_string()));
+    }
+
+    #[test]
+    fn greift_nicht_nach_addlagepegelinteractive() {
+        // `lage-basics.js` kennt BEIDE Namen; der Interactive-Aufruf bekommt seine ki
+        // als Variable, nicht als Literal — ein unverankertes Muster nähme hier `ki`.
+        let html = "function x(){ addLagePegelInteractive(ki, datetime); }";
+        assert_eq!(extrahiere_ki(html), None);
+    }
+
+    #[test]
+    fn ohne_fundstelle_ist_none() {
+        assert_eq!(extrahiere_ki("<html><body>Wartung</body></html>"), None);
+    }
+
+    #[test]
+    fn nicht_numerisches_argument_ist_none() {
+        assert_eq!(extrahiere_ki("addLagePegel(ki)"), None);
     }
 }

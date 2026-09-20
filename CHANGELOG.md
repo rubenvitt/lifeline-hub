@@ -1,3 +1,13 @@
+## [1.0.0-alpha.18](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.17...v1.0.0-alpha.18) (2026-09-20)
+
+### Features
+
+* **lagekarte:** Fachebene Hochwasser-Meldeklassen (LHP) (LFH-77) ([c2c7942](https://github.com/rubenvitt/lifeline-hub/commit/c2c7942c8c5048891c2fcac6404c9493bb9aeb91))
+
+### Bug Fixes
+
+* **lagekarte:** Review-Korrekturen an der Hochwasser-Fachebene (LFH-77) ([1de1f35](https://github.com/rubenvitt/lifeline-hub/commit/1de1f3536b05e25e11832d869eb7fc703626543f))
+
 ## [1.0.0-alpha.17](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.16...v1.0.0-alpha.17) (2026-09-13)
 
 ### Features

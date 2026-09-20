@@ -57,6 +57,10 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     nina: o.nina === true,
     dwd: o.dwd === true,
     pegelonline: o.pegelonline === true,
+    // Ein vor LFH-77 gespeicherter Stand kennt den Schlüssel nicht — `=== true` liest das
+    // als „aus", nicht als `undefined`. Genau deshalb steht hier eine Aufzählung und kein
+    // Spread über das gespeicherte Objekt.
+    hochwasser: o.hochwasser === true,
     kritis: o.kritis === true,
     autobahn: o.autobahn === true,
   };
