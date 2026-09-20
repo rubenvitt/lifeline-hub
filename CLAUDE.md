@@ -9,6 +9,65 @@ Task-Board des Projekts, das **Feedbackboard** (`901523554969`) sammelt Feedback
 Tasks werden selbstständig über den ClickUp-MCP angelegt — wie und wann beschreibt der
 Skill `clickup-task-anlegen`.
 
+## Planung und Ausführung — OpenSpec und Superpowers (LFH-588)
+
+**Zwei Quellen, und die Grenze läuft nicht dort, wo die Namen sie vermuten lassen.**
+**OpenSpec** (`/opsx:*`) besitzt den **Änderungszyklus**: klären, entwerfen, Spec und
+Aufgabenschnitt schreiben, die Aufgabenliste abarbeiten, archivieren. **Superpowers**
+(`superpowers:*`) besitzt die **Arbeitsdisziplin**: Worktree, Debugging, TDD, Verifikation,
+Review, Branch-Abschluss. Die beiden schließen einander nicht aus, sie greifen ineinander.
+
+**Die *planning boundary* gilt für fünf der sechs Workflows, nicht für alle** — gemessen,
+nicht vermutet: `explore`, `propose`, `update`, `sync` und `archive` fassen keinen
+Projektcode an (`openspec-propose/SKILL.md`: „This workflow creates planning artifacts only
+… Do not edit project code"). **`/opsx:apply` dagegen setzt um** — „Implement tasks from an
+OpenSpec change" (`openspec-apply-change/SKILL.md`), und das Wort `boundary` kommt dort kein
+einziges Mal vor.
+
+Von neun Dispatches der Entwicklungs-Skills haben drei ein OpenSpec-Gegenstück — **zwei aus
+der Planung und eines aus der Ausführung**:
+
+| Dispatch | Ziel | Art |
+|---|---|---|
+| `superpowers:brainstorming` | `/opsx:explore` | Planung |
+| `superpowers:writing-plans` | `/opsx:propose` | Planung |
+| `superpowers:executing-plans` | `/opsx:apply` | **Ausführung** |
+
+Die sechs übrigen bleiben bei Superpowers: `using-git-worktrees`, `systematic-debugging`,
+`test-driven-development`, `verification-before-completion`, `requesting-code-review`,
+`finishing-a-development-branch`. **OpenSpec löst Superpowers nicht ab.**
+
+**`/opsx:apply` bringt keine eigene Arbeitsdisziplin mit.** Weder TDD noch Review stehen in
+seinem Skill (gegriffen: null Treffer). Es läuft die Aufgabenliste ab; *wie* eine einzelne
+Aufgabe entsteht, sagt unverändert `superpowers:test-driven-development`, und vor jeder
+„fertig"-Aussage stehen weiterhin `verification-before-completion` und
+`requesting-code-review`. Wer `/opsx:apply` als Ersatz dafür liest, verliert die Zusicherung,
+ohne dass ein Test rot wird.
+
+**Zwischen Plan und Umsetzung steht ein Pflicht-Checkpoint.** `/opsx:propose` hält nach den
+Artefakten an: „Wait for a new user request after the artifacts are presented; then start the
+apply workflow." Der Stopp ist das erwartete Verhalten und **kein Fehlschlag** — Artefakte
+vorlegen, Freigabe abwarten, dann `ready for development` und `/opsx:apply`.
+
+**Vier Ablageorte, keine Überschneidung** — wer das verwechselt, erzeugt zwei Wahrheiten:
+
+| Ort | Inhalt | Status |
+|---|---|---|
+| `openspec/changes/<name>/` | Planungsartefakte einer laufenden Änderung | lebend, hier landet Neues |
+| `openspec/changes/archive/` | abgeschlossene Änderungen nach `/opsx:archive` | lebend |
+| `openspec/specs/` | Fähigkeits-Specs mit SHALL/MUST; beschrieben von `/opsx:sync` und `/opsx:archive` | lebend |
+| `docs/superpowers/` | Herleitungen, Entwürfe und **Messprotokolle** abgeschlossener Arbeit | **eingefrorenes Archiv** |
+
+`docs/superpowers/` wird **nicht** nach OpenSpec migriert, und das ist gemessen statt vermutet:
+der Baum trägt 95 Specs plus Pläne, und ihre Gliederung ist die eines Beweisstücks, nicht eines
+Requirements — Stichprobe LFH-523: `Befund / Entscheidung / Die gemessene Falle / Prüfspur / Was
+ausdrücklich nicht behauptet wird`. Eine Prüfspur, die belegt, dass `@rc-component/table` bei
+einer Zahlbreite still auf `fixed` kippt, ist **kein** SHALL-Satz; `openspec/specs/` hat dafür
+keinen Platz. Dazu kommen **13 tragende Verweise** aus CLAUDE.md und AGENTS.md („Prüfbelege
+stehen in …", „Herleitung und Prüfspur: …") — die brechen beim Verschieben **still**: kein roter
+Test, kein Fehlerbild, nur ein toter Pfad in einer Begründung. Wer den Baum doch anfasst, greppt
+die Verweise zuerst.
+
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
 **Farbachse der Betroffenen-Module (LFH-455):** Personenstatus, Schadensstatus und
