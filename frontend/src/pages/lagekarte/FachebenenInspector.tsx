@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Descriptions, Tag, Typography, theme } from 'antd';
+import { Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
@@ -257,7 +257,12 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   // Quelle liefert nur die URL). Ohne Internet am Client — der Normalfall, für den die
   // Lagekarte offline-fähig ist — lädt es also nicht. Ein kaputtes Bildsymbol wäre in einer
   // Führungsoberfläche die schlechteste Antwort: es sagt nicht, WAS fehlt.
-  const [bildFehler, setBildFehler] = useState(false);
+  //
+  // Gemerkt wird die URL, die gescheitert ist, NICHT ein Flag: der Inspector tauscht beim
+  // Klick auf ein anderes Feature nur die Props, die Komponenteninstanz bleibt stehen. Ein
+  // `boolean` überlebte den Wechsel und verschluckte das Standbild der nächsten Kamera, ohne
+  // sie je zu laden. Der Vergleich mit der aktuellen URL setzt sich von selbst zurück.
+  const [fehlerBei, setFehlerBei] = useState<string | null>(null);
   const kategorie = s(p.kategorie);
   const bild = nurWeb(s(p.bild));
   const link = nurWeb(s(p.link));
@@ -273,11 +278,11 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
       {/* Das Standbild IST der Zweck der Webcam-Kategorie (LFH-80): visuelle Lagebestätigung
           an der BAB. Bewusst ohne feste Höhe — die Betreiber liefern verschiedene
           Seitenverhältnisse, ein erzwungenes Maß schnitte den Fahrbahnrand ab. */}
-      {bild && !bildFehler && (
+      {bild && fehlerBei !== bild && (
         <img
           src={bild}
           alt={titel ? `Webcam-Standbild: ${titel}` : 'Webcam-Standbild'}
-          onError={() => setBildFehler(true)}
+          onError={() => setFehlerBei(bild)}
           style={{
             width: '100%',
             display: 'block',
@@ -286,7 +291,7 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           }}
         />
       )}
-      {bild && bildFehler && (
+      {bild && fehlerBei === bild && (
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
           Standbild nicht abrufbar — es kommt direkt vom Kamera-Betreiber und braucht eine
           Internetverbindung am Gerät.
@@ -312,12 +317,25 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           {beschreibung}
         </Typography.Paragraph>
       )}
+      {/* Eigenständige AKTION, nicht ein Anker im Fließtext — und damit ein Bedienziel, das
+          die Dichtestaffel halten muss (30/48/72). Bewusst ein antd-`Button type="link"`
+          statt eines nackten `<a>` mit handgesetzter `minHeight`: so erbt es `controlHeight`
+          vom `ConfigProvider` und schuldet nicht die zwei Angaben aus LFH-365. Dieselbe
+          Begründung wie beim Platzhalter in `BemerkungZelle` (LFH-369). Die
+          `telefon`/`website`-Anker im KRITIS-Zweig bleiben nackt: die stehen als WERT in einer
+          `Descriptions`-Zeile, nicht als Aktion auf eigener Zeile. */}
       {link && (
-        <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
-          <a href={link} target="_blank" rel="noreferrer noopener">
+        <div style={{ marginTop: 8 }}>
+          <Button
+            type="link"
+            href={link}
+            target="_blank"
+            rel="noreferrer noopener"
+            style={{ paddingInline: 0 }}
+          >
             Livebild beim Betreiber öffnen
-          </a>
-        </Typography.Paragraph>
+          </Button>
+        </div>
       )}
     </>
   );

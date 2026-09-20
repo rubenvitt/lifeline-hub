@@ -201,9 +201,32 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.getByText('Webcam')).toBeInTheDocument();
     expect(screen.getByText('Blickrichtung Dortmund')).toBeInTheDocument();
     expect(screen.getByText('NRW')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Livebild/ })).toHaveAttribute(
-      'href',
-      'https://www.blitzvideoserver.de/player.html',
+    const livebild = screen.getByRole('link', { name: /Livebild/ });
+    expect(livebild).toHaveAttribute('href', 'https://www.blitzvideoserver.de/player.html');
+    // Eigenständige Aktion ⇒ Bedienziel. Geprüft wird die STRUKTUR, aus der die Höhe folgt:
+    // ein antd-Knopf erbt `controlHeight` vom `ConfigProvider` (30/48/72), ein nackter `<a>`
+    // bliebe auf Zeilenhöhe. Ein Pixelmaß taugt hier nicht — jsdom rechnet kein Layout, und
+    // `test/utils.tsx` rendert ein ConfigProvider OHNE Theme (CLAUDE.md, Erfassungs-Norm).
+    expect(livebild).toHaveClass('ant-btn');
+  });
+
+  it('Autobahn/Webcam: ein zweites Feature bekommt sein Standbild, auch nach einem Fehler', () => {
+    // Der Inspector tauscht beim Klick auf ein anderes Feature nur die Props — die
+    // Komponenteninstanz bleibt stehen. Ein Fehler-`boolean` überlebte den Wechsel und
+    // verschluckte das nächste Standbild, ohne es je zu laden.
+    const props = (bild: string) => ({
+      quelle: 'autobahn' as const,
+      properties: { titel: 'A1 | X', kategorie: 'webcam', bild },
+      onSchliessen: () => {},
+    });
+    const { rerender } = render(<FachebenenInspector {...props('https://a.example/1.jpg')} />);
+    fireEvent.error(screen.getByRole('img', { name: /Webcam-Standbild/ }));
+    expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
+
+    rerender(<FachebenenInspector {...props('https://b.example/2.jpg')} />);
+    expect(screen.getByRole('img', { name: /Webcam-Standbild/ })).toHaveAttribute(
+      'src',
+      'https://b.example/2.jpg',
     );
   });
 

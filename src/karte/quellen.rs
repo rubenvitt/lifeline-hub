@@ -474,6 +474,32 @@ pub(crate) fn autobahn_strassen(roh: &Value) -> Vec<String> {
     namen
 }
 
+/// Ergebnis eines Fächer-Laufs → speicherbare Antwort, oder `None`, wenn der Lauf zu
+/// löchrig war. Rein und damit ohne Netz prüfbar — und zwar **an der Stelle, an der die
+/// Entscheidung wirkt**: wer hier `None` bekommt, schreibt nichts in den Cache und lässt den
+/// bisherigen Stand stehen. Eine Schwelle, die nur als eigene Prädikatsfunktion getestet
+/// wird, kann an der Aufrufstelle entfallen, ohne dass ein Test rot wird.
+///
+/// Die Schwelle ist die **Hälfte**, und das ist eine Abwägung, keine Messung: ein bis zwei
+/// Ausfälle je Lauf sind normal (Drosselung) und dürfen den Lauf nicht verwerfen — sonst
+/// veraltete die Ebene dauerhaft. Fällt dagegen mehr als die Hälfte aus, ist ein
+/// gespeicherter Teilstand schlechter als der bisherige: er sieht vollständig aus, ist es
+/// aber nicht, und niemand sieht ihm das an.
+pub(crate) fn autobahn_antwort(
+    gesamt: usize,
+    roh: &[(String, String, Value)],
+) -> Option<FachebeneAntwort> {
+    if roh.is_empty() || roh.len() * 2 <= gesamt {
+        return None;
+    }
+    Some(FachebeneAntwort::ok(
+        "autobahn",
+        AUTOBAHN_ATTRIB,
+        None,
+        normalisiere_autobahn(roh),
+    ))
+}
+
 pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let (client, pool2) = (s.client.clone(), pool.clone());
     liefere_mit_swr(
@@ -559,12 +585,19 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
     } else if fehlend > 0 {
         tracing::debug!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
     }
-    let a = FachebeneAntwort::ok(
-        "autobahn",
-        AUTOBAHN_ATTRIB,
-        None,
-        normalisiere_autobahn(&roh),
-    );
+    // Ein zu löchriger Lauf wird VERWORFEN statt gespeichert. Ohne diesen Riegel schriebe ein
+    // Totalausfall der Dienste (Streckenliste antwortet, alle 333 Teilabrufe nicht) eine
+    // Antwort mit null Features in den Cache und überschriebe damit den gesunden Stand — die
+    // Ebene meldete zehn Minuten lang „keine Daten", statt den alten Stand weiterzureichen.
+    // Genau diese Zusicherung ist der Zweck des SWR-Caches; `None` lässt ihn stehen.
+    let Some(a) = autobahn_antwort(gesamt, &roh) else {
+        tracing::warn!(
+            "Autobahn: nur {} von {gesamt} Teilabrufen beantwortet — Lauf verworfen, \
+             bisheriger Cache-Stand bleibt",
+            roh.len()
+        );
+        return None;
+    };
     cache::setze(&pool, "autobahn", &a).await;
     Some(a)
 }
@@ -594,6 +627,50 @@ mod autobahn_strassen_tests {
     fn fehlender_oder_kaputter_schluessel_liefert_leer() {
         assert!(autobahn_strassen(&json!({})).is_empty());
         assert!(autobahn_strassen(&json!({ "roads": "A1" })).is_empty());
+    }
+
+    /// Ein Eintrag, wie ihn der Fächer liefert.
+    fn treffer(strasse: &str) -> (String, String, Value) {
+        (
+            strasse.to_string(),
+            "closure".to_string(),
+            json!({ "closure": [
+                { "title": "X", "coordinate": { "lat": 51.0, "long": 7.0 } }
+            ]}),
+        )
+    }
+
+    /// Der übliche Lauf (1–2 Ausfälle von 333) muss durchgehen — sonst veraltete die Ebene
+    /// dauerhaft, weil sie sich nie wieder speichern dürfte.
+    #[test]
+    fn normaler_lauf_mit_wenigen_ausfaellen_wird_gespeichert() {
+        let roh: Vec<_> = (0..331).map(|i| treffer(&format!("A{i}"))).collect();
+        let a = autobahn_antwort(333, &roh).expect("331 von 333 ist brauchbar");
+        assert_eq!(a.quelle, "autobahn");
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
+        assert_eq!(a.attribution, "Autobahn GmbH des Bundes");
+    }
+
+    /// Die tragende Aussage, und zwar als NEGATIVE: aus einem Totalausfall entsteht gar keine
+    /// Antwort. Gäbe es hier eine, überschriebe sie den gesunden Cache-Stand mit null
+    /// Features, und die Ebene meldete zehn Minuten lang „keine Daten".
+    #[test]
+    fn totalausfall_und_zu_loechriger_lauf_liefern_keine_antwort() {
+        assert!(autobahn_antwort(333, &[]).is_none());
+        let haelfte: Vec<_> = (0..5).map(|i| treffer(&format!("A{i}"))).collect();
+        assert!(
+            autobahn_antwort(10, &haelfte).is_none(),
+            "genau die Hälfte reicht nicht — die Schwelle ist ein echtes „mehr als\""
+        );
+        let knapp_drueber: Vec<_> = (0..6).map(|i| treffer(&format!("A{i}"))).collect();
+        assert!(autobahn_antwort(10, &knapp_drueber).is_some());
+    }
+
+    /// Randfall ohne eigene Bedeutung im Betrieb (eine leere Streckenliste bricht schon in
+    /// `erneuere_autobahn` ab), aber ohne ihn trüge `roh.is_empty()` die Aussage allein.
+    #[test]
+    fn leerer_gesamtlauf_liefert_keine_antwort() {
+        assert!(autobahn_antwort(0, &[]).is_none());
     }
 }
 
