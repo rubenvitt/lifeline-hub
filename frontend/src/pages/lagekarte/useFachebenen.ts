@@ -7,7 +7,13 @@ import {
   type FachebeneStatus,
   type FeatureCollection,
 } from '../../api/fachebenen';
-import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, mergeFeatures } from './fachebenen';
+import {
+  autobahnTakt,
+  FACHEBENEN,
+  fachebeneKeys,
+  KRITIS_MIN_ZOOM,
+  mergeFeatures,
+} from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import { faerbeHochwasser } from './hochwasserStil';
 import type { AktiveFachebene } from './kartenLayer';
@@ -39,6 +45,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   // hier gelesen und in die Features gebacken.
   const { token } = theme.useToken();
   const [kritisBbox, setKritisBbox] = useState<string | null>(null);
+  // Zuletzt gesehener Status der Autobahn-Ebene — steuert ihren Poll-Takt (Aufwärmphase).
+  const [autobahnStatus, setAutobahnStatus] = useState<FachebeneStatus | undefined>(undefined);
   // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis für KRITIS.
   const [kartenZoom, setKartenZoom] = useState<number | null>(null);
 
@@ -96,7 +104,17 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         queryKey: globalKeys.fachebene('autobahn'),
         queryFn: () => ladeFachebene('autobahn'),
         enabled: fachebenenSichtbar.autobahn,
-        refetchInterval: FACHEBENEN.autobahn.pollMs,
+        // Takt hängt am zuletzt gesehenen Status: der erste Lauf der Ebene hängt
+        // serverseitig an keinem Request (er dauert ~25 s und liefe sonst in die
+        // 15-s-Schranke von `apiGet`). Bis er durch ist, meldet die Ebene `offline` — mit
+        // dem regulären 600-s-Takt sähe der Bediener zehn Minuten lang nichts, obwohl die
+        // Daten nach ~30 s bereitstehen.
+        //
+        // Bewusst über einen State statt über die Callback-Form von `refetchInterval`: die
+        // Callback-Form lässt die Typinferenz dieses `useQueries`-Tupels kollabieren (alle
+        // sechs Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
+        // Typen). Gemessen, nicht vermutet — der Versuch steht im Verlauf dieses Tickets.
+        refetchInterval: autobahnTakt(autobahnStatus),
       },
     ],
     // combine wird von react-query memoisiert + strukturell geteilt → stabile Ableitungen.
@@ -144,6 +162,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         fachebenenAttribution,
         // Rohdaten für die KRITIS-Akkumulation (der Akku selbst geht via kritisAkku ein).
         kritisRoh: byKey.kritis.data,
+        // Status der Autobahn-Ebene für den Aufwärm-Takt (siehe `refetchInterval` oben).
+        autobahnStatusRoh: byKey.autobahn.data?.status,
       };
     },
   });
@@ -158,6 +178,11 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       });
     }
   }, [kombiniert.kritisRoh]);
+
+  // Setzen mit demselben Wert ist in React ein No-op → keine Renderschleife.
+  useEffect(() => {
+    setAutobahnStatus(kombiniert.autobahnStatusRoh);
+  }, [kombiniert.autobahnStatusRoh]);
 
   const kritisZoomZuKlein =
     fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM;

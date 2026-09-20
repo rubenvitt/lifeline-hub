@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  autobahnTakt,
   FACHEBENEN,
   fachebeneKeys,
   istBboxAbhaengig,
@@ -46,6 +47,23 @@ describe('Fachebenen-Registry', () => {
     // unerreichbar und fällt sonst niemandem auf.
     expect([...fachebeneKeys()].sort()).toEqual(Object.keys(FACHEBENEN).sort());
   });
+  it('taktet die Autobahn-Ebene kurz, solange sie aufwärmt (LFH-80)', () => {
+    // Der erste Lauf hängt serverseitig an keinem Request; bis er durch ist, meldet die
+    // Ebene `offline`. Mit dem regulären 600-s-Takt sähe der Bediener zehn Minuten lang
+    // nichts, obwohl die Daten nach ~30 s bereitstehen.
+    const kurz = FACHEBENEN.autobahn.aufwaermPollMs!;
+    const lang = FACHEBENEN.autobahn.pollMs;
+    expect(kurz).toBeLessThan(lang);
+    expect(autobahnTakt(undefined)).toBe(kurz);
+    expect(autobahnTakt('offline')).toBe(kurz);
+
+    // Und die Gegenaussage, die die Regel erst scharf macht: ein ERREICHTER Zustand fällt
+    // auf den regulären Takt zurück. `leer` gehört dazu — „Quelle erreichbar, gerade nichts
+    // zu melden" ist ein gültiges Ende, kurz zu takten brächte dort nichts.
+    expect(autobahnTakt('ok')).toBe(lang);
+    expect(autobahnTakt('leer')).toBe(lang);
+  });
+
   it('nur die Autobahn-Ebene nennt einen einschränkenden Geltungsbereich', () => {
     // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung.
     // Die Gegenaussage trägt sie mit: stünde der Satz an jeder Ebene, sagte er nichts.

@@ -514,17 +514,62 @@ pub(crate) fn autobahn_antwort(
     ))
 }
 
+/// Entscheidung je Cache-Zustand — rein und ohne Netz prüfbar. Die Fälle sind dieselben wie
+/// in [`liefere_mit_swr`], **mit einer Ausnahme, die der ganze Grund für diese Funktion ist**:
+/// der KALTE Fall wartet nicht.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum AutobahnWeg {
+    /// Frischer Cache → unverändert ausliefern, nichts anstoßen.
+    Frisch,
+    /// Veraltet → alten Stand ausliefern, im Hintergrund erneuern.
+    AltUndErneuern,
+    /// Gar nichts da → sofort `offline` antworten, im Hintergrund erstmalig füllen.
+    LeerUndErneuern,
+}
+
+pub(crate) fn autobahn_weg(eintrag_alter: Option<i64>, ttl: Duration) -> AutobahnWeg {
+    match eintrag_alter {
+        Some(alter) if alter < ttl.as_secs() as i64 => AutobahnWeg::Frisch,
+        Some(_) => AutobahnWeg::AltUndErneuern,
+        None => AutobahnWeg::LeerUndErneuern,
+    }
+}
+
+/// Die Autobahn-Ebene benutzt [`liefere_mit_swr`] **nicht**, und das ist der Kern ihrer
+/// Besonderheit: dessen kalter Zweig wartet auf `erneuere()`, und genau das geht hier nicht.
+///
+/// Gemessen: ein voller Fächer dauert ~25 s. Dagegen stehen ZWEI Schranken, die beide vor ihm
+/// feuern würden — `apiGet` im Frontend bricht nach 15 s ab (`api/client.ts`), und
+/// [`crate::zulassung::REQUEST_BUDGET`] kappt den Handler nach 60 s mit einem 503. Die
+/// Schranke in `zulassung.rs` trägt sogar die Begründung, die Routen mit ausgehendem Aufruf
+/// hätten „deutlich kürzere" eigene Timeouts und feuerten „immer zuerst" — ein blockierender
+/// 25-s-Fächer bricht genau diese Zusage. Das erste Einschalten der Ebene liefe damit
+/// zuverlässig in einen Netzfehler statt in Daten.
+///
+/// Deshalb hängt der teure Lauf an KEINEM Request: er läuft als eigene Aufgabe, und die
+/// Anfrage ist sofort beantwortet. Der Preis ist eine Aufwärmphase, in der die Ebene
+/// `offline` meldet, obwohl sie gerade erst lädt; das Frontend pollt währenddessen kurz
+/// getaktet (`FACHEBENEN.autobahn.aufwaermPollMs`) und hat den ersten Stand nach ~30 s.
 pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
-    let (client, pool2) = (s.client.clone(), pool.clone());
-    liefere_mit_swr(
-        pool,
-        &s.inflight,
-        "autobahn",
-        AUTOBAHN_TTL,
-        || FachebeneAntwort::offline("autobahn", AUTOBAHN_ATTRIB),
-        move || erneuere_autobahn(client, pool2),
-    )
-    .await
+    let eintrag = cache::eintrag(pool, "autobahn").await;
+    let weg = autobahn_weg(eintrag.as_ref().map(|(_, alter)| *alter), AUTOBAHN_TTL);
+    if weg == AutobahnWeg::Frisch {
+        return eintrag.expect("Frisch entsteht nur aus einem Eintrag").0;
+    }
+    // Nur EIN Lauf gleichzeitig (wie der stale-Zweig von `liefere_mit_swr`). Der Schlüssel
+    // wird erst freigegeben, wenn die Aufgabe durch ist — ein Poll währenddessen stößt
+    // nichts Zweites an, was bei 333 Abrufen je Lauf der ganze Punkt ist.
+    if s.inflight.lock().unwrap().insert("autobahn".to_string()) {
+        let (client, pool2, inflight) = (s.client.clone(), pool.clone(), s.inflight.clone());
+        tokio::spawn(async move {
+            erneuere_autobahn(client, pool2).await;
+            inflight.lock().unwrap().remove("autobahn");
+        });
+    }
+    match eintrag {
+        Some((a, _)) => a, // veralteter Stand ist besser als keiner
+        None => FachebeneAntwort::offline("autobahn", AUTOBAHN_ATTRIB),
+    }
 }
 
 /// Einzelspur für den Fächer. `liefere_mit_swr` entkoppelt nur die HINTERGRUND-Erneuerung
@@ -740,6 +785,22 @@ mod autobahn_strassen_tests {
         );
         let knapp_drueber: Vec<_> = (0..6).map(|i| treffer(&format!("A{i}"))).collect();
         assert!(autobahn_antwort(10, &knapp_drueber).is_some());
+    }
+
+    /// Die drei Cache-Zustände. Die tragende Aussage ist die dritte: ein KALTER Cache führt
+    /// zu `LeerUndErneuern`, also zu einer sofortigen Antwort plus Hintergrundlauf — und
+    /// NICHT zu Warten. Ein wartender kalter Pfad liefe in die 15-s-Schranke von `apiGet`
+    /// und in das 60-s-`REQUEST_BUDGET` der Zulassung; das erste Einschalten der Ebene
+    /// endete zuverlässig im Netzfehler statt in Daten.
+    #[test]
+    fn kalter_cache_wartet_nicht() {
+        let ttl = Duration::from_secs(600);
+        assert_eq!(autobahn_weg(None, ttl), AutobahnWeg::LeerUndErneuern);
+        assert_eq!(autobahn_weg(Some(599), ttl), AutobahnWeg::Frisch);
+        assert_eq!(autobahn_weg(Some(601), ttl), AutobahnWeg::AltUndErneuern);
+        // Genau auf der TTL gilt als veraltet — dieselbe Grenze wie in `liefere_mit_swr`
+        // (`alter < ttl`), damit beide Ebenen-Sorten dasselbe Alter als frisch ansehen.
+        assert_eq!(autobahn_weg(Some(600), ttl), AutobahnWeg::AltUndErneuern);
     }
 
     /// Die zweite Hälfte der Einzelspur: wer auf den Vorgänger gewartet hat, bekommt dessen

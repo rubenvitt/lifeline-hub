@@ -1,4 +1,4 @@
-import type { FachebeneQuelle, FeatureCollection } from '../../api/fachebenen';
+import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -21,6 +21,13 @@ export interface FachebeneDef {
    * flächendeckend hält, plant einen Anmarschweg auf einer Grundlage, die es nicht gibt.
    */
   geltung?: string;
+  /**
+   * Takt, solange die Ebene noch KEINEN brauchbaren Stand hat (LFH-80). Nur für Quellen,
+   * deren erster Lauf serverseitig im Hintergrund läuft und die deshalb kurz `offline`
+   * melden, obwohl sie gerade füllen. Ohne den kurzen Takt wartete der Bediener bis zum
+   * nächsten regulären Poll — bei 600 s also zehn Minuten auf Daten, die nach ~30 s da sind.
+   */
+  aufwaermPollMs?: number;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -71,6 +78,11 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // häufiger abzufragen belastet die Quelle, ohne frischer zu werden.
     pollMs: 600_000,
     bboxAbhaengig: false,
+    // Der erste Lauf hängt an keinem Request (siehe `fetch_autobahn`), die Ebene meldet
+    // währenddessen `offline`. 20 s ist kurz genug, dass die Aufwärmphase nicht auffällt,
+    // und lang genug, dass ein dauerhaft gestörter Anbieter nicht getrommelt wird — der
+    // Abruf ist dann eine winzige Leer-Antwort aus dem Backend, kein neuer Fächer.
+    aufwaermPollMs: 20_000,
     geltung: 'nur Bundesautobahnen — keine Kreis-, Land- oder Ortsstraßen',
   },
   kritis: {
@@ -86,6 +98,20 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
   return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis', 'autobahn'];
+}
+
+/**
+ * Poll-Takt der Autobahn-Ebene nach ihrem zuletzt gesehenen Status. Rein und exportiert,
+ * damit die Aufwärm-Regel ohne Render prüfbar ist.
+ *
+ * `undefined` (noch nichts geladen) und `offline` gelten als „wärmt noch auf". `leer` NICHT:
+ * das heisst „Quelle erreichbar, gerade nichts zu melden" — ein gültiger Endzustand, den
+ * kurz zu takten nichts brächte.
+ */
+export function autobahnTakt(status: FachebeneStatus | undefined): number {
+  const def = FACHEBENEN.autobahn;
+  const waermtAuf = status === undefined || status === 'offline';
+  return waermtAuf ? (def.aufwaermPollMs ?? def.pollMs) : def.pollMs;
 }
 
 export function istBboxAbhaengig(key: FachebeneQuelle): boolean {
