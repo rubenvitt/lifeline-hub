@@ -41,6 +41,18 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 300_000,
     bboxAbhaengig: false,
   },
+  hochwasser: {
+    key: 'hochwasser',
+    label: 'Hochwasser-Meldeklassen (LHP)',
+    // Die Ebenenfarbe ist nur der Rückfall für Panel-Punkt und Inspector-Akzent — auf der
+    // Karte trägt jedes Feature seine eigene Rollenfarbe je Meldeklasse
+    // (`hochwasserStil.ts`). Bewusst nicht das Blau von `pegelonline`: die beiden Ebenen
+    // stehen nebeneinander und sind im Panel sonst nicht auseinanderzuhalten.
+    farbe: '#08979c',
+    geometrieTyp: 'punkt',
+    pollMs: 300_000,
+    bboxAbhaengig: false,
+  },
   kritis: {
     key: 'kritis',
     label: 'KRITIS / sensible Objekte',
@@ -53,7 +65,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'kritis'];
+  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis'];
 }
 
 export function istBboxAbhaengig(key: FachebeneQuelle): boolean {

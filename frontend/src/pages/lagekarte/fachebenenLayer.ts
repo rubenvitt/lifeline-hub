@@ -40,8 +40,12 @@ export function sorgeFuerFachebeneLayer(
         type: 'circle',
         source: src,
         paint: {
-          'circle-radius': 5,
-          'circle-color': def.farbe,
+          // Ein Feature darf Durchmesser und Farbe selbst mitbringen (LFH-77:
+          // `hochwasserStil.ts` staffelt beides nach Pegelklasse und backt die im
+          // aktiven Modus aufgelösten Tokenwerte ein). Ohne Eigenangabe gilt die
+          // Ebenenfarbe — NINA/DWD/PEGELONLINE/KRITIS bleiben damit unverändert.
+          'circle-radius': ['coalesce', ['get', 'radius'], 5],
+          'circle-color': ['coalesce', ['get', 'farbe'], def.farbe],
           'circle-stroke-color': '#fff',
           'circle-stroke-width': 1.5,
         },

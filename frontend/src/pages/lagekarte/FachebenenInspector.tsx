@@ -2,9 +2,11 @@ import { Descriptions, Tag, Typography, theme } from 'antd';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
+import StatusTag from '../../components/StatusTag';
 import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
+import { hochwasserDarstellung } from './hochwasserStil';
 import KartenDetailCard from './KartenDetailCard';
 
 export interface FachebenenInspectorProps {
@@ -223,6 +225,26 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+/**
+ * LHP-Pegel (LFH-77). Trägt genau das, was `get_lagepegel.php` liefert: Name, Nummer und
+ * Meldeklasse. Der Wasserstand in Zentimetern steht bewusst NICHT hier — er käme aus
+ * `get_infospegel.php`, einem Einzelabruf je Pegel gegen einen Token-gesicherten Endpunkt
+ * (siehe `docs/fachebenen-quellen.md`). Wer die Zahl braucht, schaltet die
+ * PEGELONLINE-Ebene daneben ein; genau diese Arbeitsteilung ist der Zweck der Ebene.
+ */
+function HochwasserInhalt({ p }: { p: Record<string, unknown> }) {
+  return (
+    <>
+      <div style={{ marginBottom: 8 }}>
+        <StatusTag darstellung={hochwasserDarstellung(p.klasse)} />
+      </div>
+      <Descriptions column={1}>
+        {s(p.pgnr) && <Descriptions.Item label="Pegelnummer">{s(p.pgnr)}</Descriptions.Item>}
+      </Descriptions>
+    </>
+  );
+}
+
 /** Detailpanel für ein angeklicktes Fachebenen-Objekt (read-only externe Daten). */
 export default function FachebenenInspector({
   quelle,
@@ -258,6 +280,8 @@ export default function FachebenenInspector({
         <WarnungInhalt p={p} />
       ) : quelle === 'pegelonline' ? (
         <PegelInhalt p={p} />
+      ) : quelle === 'hochwasser' ? (
+        <HochwasserInhalt p={p} />
       ) : (
         <KritisInhalt p={p} />
       )}

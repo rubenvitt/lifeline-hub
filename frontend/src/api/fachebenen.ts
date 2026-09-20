@@ -21,7 +21,30 @@ export type FeatureCollection = S['GeoJsonFeatureCollection'];
 export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/karte/fachebenen/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
-export type FachebeneQuelle = 'dwd' | 'pegelonline' | 'nina' | 'kritis';
+export type FachebeneQuelle = 'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser';
+
+/**
+ * Hochwasserklasse eines LHP-Pegels (LFH-77), wie sie in den Feature-Properties der
+ * `hochwasser`-Ebene unter `klasse` steht.
+ *
+ * FE-LOKAL wie {@link FachebeneQuelle}, und aus demselben Grund nicht generiert:
+ * Fachebenen-Properties sind backendseitig `HashMap<String, Value>` — ein registriertes
+ * Rust-Enum stünde als Waise im OpenAPI-Schema, auf die nichts zeigt. Die Wire-Wörter
+ * sind deshalb auf BEIDEN Seiten gepinnt: hier in `fachebenen.test.ts`, drüben in
+ * `karte::normalisierung::hochwasser_tests`.
+ *
+ * Klassenlehre des Portals (`js/lage-basics.js`): keine Daten/veraltet · kein Hochwasser ·
+ * kleines · mittleres · großes · sehr großes Hochwasser; `unklassifiziert` sind Pegel,
+ * die gar keine Meldeklassen führen.
+ */
+export type HochwasserKlasse =
+  | 'keine_daten'
+  | 'kein_hochwasser'
+  | 'klein'
+  | 'mittel'
+  | 'gross'
+  | 'sehr_gross'
+  | 'unklassifiziert';
 
 /** Lädt eine Fachebene. `bbox` (west,sued,ost,nord) ist nur für `kritis` nötig. */
 export function ladeFachebene(quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> {

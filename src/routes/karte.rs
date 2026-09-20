@@ -523,6 +523,7 @@ pub async fn fachebenen(
         "dwd" => quellen::fetch_dwd(&state.fachebenen, cache_pool).await,
         "pegelonline" => quellen::fetch_pegelonline(&state.fachebenen, cache_pool).await,
         "nina" => quellen::fetch_nina(&state.fachebenen, cache_pool).await,
+        "hochwasser" => quellen::fetch_hochwasser(&state.fachebenen, cache_pool).await,
         "kritis" => {
             let bbox =
                 bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;

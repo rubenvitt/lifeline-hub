@@ -300,7 +300,8 @@ export const einsatzKeys = {
  *
  * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 23 Prefixe sind gar nicht
  * mandantenbezogen — `admin-karte` und `karte-config` sind instanzweit (eine Kartenkonfiguration
- * pro Installation), `fachebene` bezeichnet externe Fremdquellen (NINA/DWD/PEGELONLINE/KRITIS).
+ * pro Installation), `fachebene` bezeichnet externe Fremdquellen
+ * (NINA/DWD/PEGELONLINE/HOCHWASSER/KRITIS).
  * `ORG_KEYS` wäre dort ein Fehlname, und ein Fehlname in einer Registry, die genau deshalb
  * existiert, damit man Keys nicht mehr raten muss, ist teuer.
  *

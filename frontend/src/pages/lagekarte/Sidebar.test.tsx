@@ -55,7 +55,15 @@ const basisProps: SidebarProps = {
   ansichtDirty: false,
   ansichtSpeichert: false,
   onAnsichtSpeichern: vi.fn(),
-  fachebenenSichtbar: { nina: false, dwd: false, pegelonline: false, kritis: false },
+  // BEWUSST ausgeschrieben statt `defaultFachebenenSichtbar()`: eine neue Fachebene soll
+  // hier den Typcheck brechen und damit jemanden zwingen, die Sidebar anzusehen.
+  fachebenenSichtbar: {
+    nina: false,
+    dwd: false,
+    pegelonline: false,
+    hochwasser: false,
+    kritis: false,
+  },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
   // Neue Bild-Props

@@ -30,7 +30,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle fünfzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle sechzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
@@ -41,6 +41,7 @@ describe('Statusfarb-Vertrag', () => {
       'dringlichkeit',
       'einsatzStatus',
       'etbTyp',
+      'hochwasserKlasse',
       'materialStatus',
       'personStatus',
       'schadenAusmass',
@@ -157,7 +158,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(15);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(16);
   });
 });
 
@@ -268,5 +269,41 @@ describe('dringlichkeit (LFH-395, hierher mit LFH-358)', () => {
     expect(new Set(formen).size).toBe(formen.length);
     expect(formen).not.toContain(undefined);
     expect(sf.dringlichkeit.alarm.label).toBe('dringend');
+  });
+});
+
+describe('hochwasserKlasse (LFH-77)', () => {
+  it('deckt die sieben Klassen des LHP ab', () => {
+    // LITERAL, nicht aus `HOCHWASSER_KLASSEN` abgeleitet: sonst prüfte die Liste sich selbst.
+    expect(Object.keys(sf.hochwasserKlasse).sort()).toEqual([
+      'gross',
+      'kein_hochwasser',
+      'keine_daten',
+      'klein',
+      'mittel',
+      'sehr_gross',
+      'unklassifiziert',
+    ]);
+  });
+
+  it('staffelt die vier Meldeklassen über achtung und alarm', () => {
+    expect(sf.hochwasserKlasse.klein.rolle).toBe('achtung');
+    expect(sf.hochwasserKlasse.mittel.rolle).toBe('achtung');
+    expect(sf.hochwasserKlasse.gross.rolle).toBe('alarm');
+    expect(sf.hochwasserKlasse.sehr_gross.rolle).toBe('alarm');
+  });
+
+  it('hält „kein Hochwasser" von „keine Aussage" getrennt', () => {
+    // `normal` heißt: gemessen und unauffällig. `neutral` heißt: dieser Pegel sagt nichts
+    // über Hochwasser — ob mangels Daten oder mangels Meldeklassen, ist operativ dasselbe.
+    expect(sf.hochwasserKlasse.kein_hochwasser.rolle).toBe('normal');
+    expect(sf.hochwasserKlasse.keine_daten.rolle).toBe('neutral');
+    expect(sf.hochwasserKlasse.unklassifiziert.rolle).toBe('neutral');
+  });
+
+  it('unterscheidet die beiden neutralen Klassen im Wort — die Farbe kann es nicht', () => {
+    expect(sf.hochwasserKlasse.keine_daten.label).not.toBe(
+      sf.hochwasserKlasse.unklassifiziert.label,
+    );
   });
 });
