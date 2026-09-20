@@ -419,14 +419,13 @@ async fn erneuere_hochwasser(
 /// **HTTP 200 mit leerem Body**; mit dem frisch aus der Startseite gelesenen Token
 /// ~138 KB. Der Token ist also nicht ableitbar, er wird gelesen.
 fn extrahiere_ki(html: &str) -> Option<String> {
-    let start = html.find(LHP_KI_MARKE)? + LHP_KI_MARKE.len();
-    let rest = &html[start..];
-    let ende = rest.find(')')?;
-    let token = &rest[..ende];
-    if token.is_empty() || !token.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
-    }
-    Some(token.to_string())
+    // Bis zur ersten Fundstelle mit ZIFFERN-Argument laufen, nicht bloß bis zur ersten
+    // Fundstelle: dieselbe Marke trägt auch die Funktionsdefinition (`addLagePegel(ki)`).
+    html.match_indices(LHP_KI_MARKE).find_map(|(i, _)| {
+        let rest = &html[i + LHP_KI_MARKE.len()..];
+        let token = &rest[..rest.find(')')?];
+        (!token.is_empty() && token.bytes().all(|b| b.is_ascii_digit())).then(|| token.to_string())
+    })
 }
 
 #[cfg(test)]
@@ -539,6 +538,16 @@ mod lhp_ki_tests {
     fn nimmt_die_erste_fundstelle() {
         let html = "addLagePegel(111111111111) addLagePegel(222222222222)";
         assert_eq!(extrahiere_ki(html), Some("111111111111".to_string()));
+    }
+
+    #[test]
+    fn ueberspringt_eine_fundstelle_mit_nicht_numerischem_argument() {
+        // Die Funktion wird in `lage-index.js` DEFINIERT (`function addLagePegel(ki)`) und
+        // im Seitenrumpf mit dem Token AUFGERUFEN. Zöge jemand das Skript inline, stünde die
+        // Definition vor dem Aufruf — bei Abbruch an der ersten Fundstelle ginge die Ebene
+        // offline, obwohl der Token zwei Zeilen tiefer steht.
+        let html = "function addLagePegel(ki) { /* … */ }\naddLagePegel(884284296001)";
+        assert_eq!(extrahiere_ki(html), Some("884284296001".to_string()));
     }
 
     #[test]

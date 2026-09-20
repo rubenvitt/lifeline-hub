@@ -582,6 +582,17 @@ mod hochwasser_tests {
     }
 
     #[test]
+    fn hochwasser_output_passt_auf_den_geojson_anker() {
+        // `typen.rs` verspricht für `GeoJsonFeatureCollection`, der Anker sei „belegt durch
+        // die `from_value`-Tests in `karte::normalisierung`" — jeder Normalisierer hält
+        // diesen Teil des Versprechens selbst.
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
+            normalisiere_hochwasser(&roh()),
+        )
+        .expect("Anker beschreibt die reale LHP-Form");
+    }
+
+    #[test]
     fn fremde_antwort_ergibt_leere_collection() {
         let fc = normalisiere_hochwasser(&json!({ "fehler": "Wartung" }));
         assert_eq!(fc["type"], "FeatureCollection");

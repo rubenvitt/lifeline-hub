@@ -336,6 +336,14 @@ export const warnstufeKarte: Record<Warnstufe, StatusDarstellung> = {
  * Die Werte sind hier KOPIERT, nicht importiert: `theme/` darf nicht von `pages/`
  * abhängen. Die Gegenrichtung — `lagebild.ts` liest von hier — ist der Zielzustand.
  */
+export const warnstufeKennzahl: Record<Warnstufe, StatusDarstellung> = {
+  keine: { rolle: 'normal', label: 'keine' },
+  niedrig: { rolle: 'normal', label: 'niedrig' },
+  mittel: { rolle: 'achtung', label: 'mittel' },
+  hoch: { rolle: 'alarm', label: 'hoch' },
+  akut: { rolle: 'alarm', label: 'akut' },
+};
+
 /**
  * Hochwasserklasse eines LHP-Pegels auf der Lagekarte (LFH-77).
  *
@@ -354,9 +362,13 @@ export const warnstufeKarte: Record<Warnstufe, StatusDarstellung> = {
  *
  * DER ZWEITE KANAL AUF DER KARTE IST DER PUNKTDURCHMESSER, nicht nur der Text: ein
  * Kreis trägt keine Beschriftung. `pages/lagekarte/hochwasserStil.ts` staffelt den
- * Radius, und eine gemeldete Klasse ist dort sichtbar größer als eine nicht gemeldete —
- * dieselbe Lesart, die das Portal selbst fährt (`getRadiusPegel`). Das Wort steht im
- * Inspector.
+ * Radius, und eine gemeldete Klasse ist dort sichtbar größer als eine nicht gemeldete.
+ * Die feine Staffelung ÜBER die vier Meldeklassen ist dabei eine eigene Entscheidung und
+ * NICHT die des Portals: dessen `getRadiusPegel` (`js/lage-basics.js`) kennt bei Zoom ≥ 8
+ * nur drei Größen — unklassifiziert 4, `-1`/`0` 6, und jede Klasse 1–4 einheitlich 7. Das
+ * Portal trennt also gemeldet von nicht gemeldet und sonst nichts; hier muss der Radius
+ * mehr leisten, weil die Rollenverengung vier Klassen auf zwei Farben legt. Das Wort
+ * steht im Inspector.
  */
 export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
   keine_daten: { rolle: 'neutral', label: 'keine Daten' },
@@ -366,14 +378,6 @@ export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
   mittel: { rolle: 'achtung', label: 'mittleres Hochwasser' },
   gross: { rolle: 'alarm', label: 'großes Hochwasser' },
   sehr_gross: { rolle: 'alarm', label: 'sehr großes Hochwasser' },
-};
-
-export const warnstufeKennzahl: Record<Warnstufe, StatusDarstellung> = {
-  keine: { rolle: 'normal', label: 'keine' },
-  niedrig: { rolle: 'normal', label: 'niedrig' },
-  mittel: { rolle: 'achtung', label: 'mittel' },
-  hoch: { rolle: 'alarm', label: 'hoch' },
-  akut: { rolle: 'alarm', label: 'akut' },
 };
 
 /**

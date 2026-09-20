@@ -97,7 +97,6 @@ const KATEGORIE_LABEL: Record<string, string> = {
   kritis: 'KRITIS-Objekt',
   warnung: 'Amtliche Warnung',
   pegel: 'Pegel',
-  hochwasser: 'Pegel (Meldeklasse)',
 };
 
 /** Lesbares Label für eine normalisierte Kategorie (Fallback: Rohwert). */

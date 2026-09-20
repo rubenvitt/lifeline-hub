@@ -3,7 +3,6 @@ import { theme } from 'antd';
 import {
   faerbeHochwasser,
   hochwasserRadius,
-  HOCHWASSER_KLASSEN,
   hochwasserDarstellung,
 } from './hochwasserStil';
 import { antdToken, farbenDunkel, farbenHell, type Farbrollen } from '../../theme/tokens';
@@ -28,23 +27,6 @@ function fc(klassen: (string | undefined)[]): FeatureCollection {
     })),
   } as FeatureCollection;
 }
-
-describe('HOCHWASSER_KLASSEN', () => {
-  it('pinnt die Wire-Wörter des Backends', () => {
-    // Byte-Pin gegen HANDGESCHRIEBENE Literale — die Gegenseite steht in
-    // `karte::normalisierung::hochwasser_klasse`. Ein stilles Auseinanderlaufen färbte
-    // sonst nichts rot: eine unbekannte Klasse fällt hier bloß auf den Fallback.
-    expect([...HOCHWASSER_KLASSEN].sort()).toEqual([
-      'gross',
-      'kein_hochwasser',
-      'keine_daten',
-      'klein',
-      'mittel',
-      'sehr_gross',
-      'unklassifiziert',
-    ]);
-  });
-});
 
 describe('hochwasserRadius', () => {
   it('macht jede gemeldete Klasse größer als jede nicht gemeldete', () => {

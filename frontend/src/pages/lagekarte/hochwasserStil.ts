@@ -14,8 +14,14 @@ import type { FeatureCollection, HochwasserKlasse } from '../../api/fachebenen';
  *
  * DER RADIUS IST NICHT SCHMUCK. Ein Kreis trägt keine Beschriftung; ohne ihn
  * unterschiede die Ebene ihre sieben Klassen allein über drei Rollenfarben (WCAG 1.4.1).
- * Die Staffelung ist die Lesart des Portals selbst (`js/lage-basics.js:getRadiusPegel`):
- * gemeldetes Hochwasser sticht heraus, ein stummer Pegel bleibt ein kleiner Punkt.
+ *
+ * Die GROBE Trennung — gemeldetes Hochwasser sticht heraus, ein stummer Pegel bleibt ein
+ * kleiner Punkt — ist die Lesart des Portals (`js/lage-basics.js:getRadiusPegel` vergibt
+ * bei Zoom ≥ 8: unklassifiziert 4, `-1`/`0` 6, Klassen 1–4 einheitlich 7). Die feine
+ * Staffelung innerhalb der vier Meldeklassen ist es NICHT — sie ist hier hinzugefügt,
+ * weil `hochwasserKlasse` vier Klassen auf zwei Rollenfarben legt und der Radius die
+ * Auflösung zurückholt, die die Farbe verliert. Wer sie wieder einebnet, nimmt der Karte
+ * den Unterschied zwischen `klein` und `mittel` bzw. `gross` und `sehr_gross` ganz.
  */
 const RADIUS: Record<HochwasserKlasse, number> = {
   keine_daten: 3,
@@ -28,14 +34,15 @@ const RADIUS: Record<HochwasserKlasse, number> = {
 };
 
 /**
- * Alle Klassen des Wire-Vertrags. AUS DEM VERTRAG ABGELEITET, nicht danebengeschrieben:
- * `hochwasserKlasse` ist ein `Record<HochwasserKlasse, …>` und damit vollständig — eine
- * eigene Literalliste könnte eine Klasse verlieren, ohne dass der Typcheck etwas merkt.
- * Die Wörter selbst sind in `hochwasserStil.test.ts` gegen Literale gepinnt.
+ * Unbekannter/fehlender Wert → „keine Daten": die Ebene erfindet keine Meldeklasse.
+ *
+ * Dieser Rückfall ist STILL — eine Wire-Drift ergäbe eine flächendeckend graue Ebene,
+ * ohne dass etwas rot wird. Er darf das sein, weil ein *geändertes* Wort auf keiner der
+ * beiden Seiten unbemerkt bleibt: Rust pinnt seine Literale in
+ * `karte::normalisierung::hochwasser_tests::bildet_die_hochwasserklassen_ab`, das
+ * Frontend seine in `theme/statusFarben.test.ts`. Ungedeckt bleibt allein eine NEUE
+ * Klasse, die nur eine Seite bekommt — wer eine einführt, fasst beide Pins an.
  */
-export const HOCHWASSER_KLASSEN = Object.keys(hochwasserKlasse) as HochwasserKlasse[];
-
-/** Unbekannter/fehlender Wert → „keine Daten": die Ebene erfindet keine Meldeklasse. */
 function alsKlasse(roh: unknown): HochwasserKlasse {
   return typeof roh === 'string' && roh in hochwasserKlasse
     ? (roh as HochwasserKlasse)
