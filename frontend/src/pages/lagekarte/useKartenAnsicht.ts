@@ -14,7 +14,7 @@ import { waehleInitialeBasemap, type GespeicherteBasemap } from './basemapAuswah
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
 import type { LayerSichtbar } from './Sidebar';
 
-const FACHEBENE_KEYS = ['nina', 'dwd', 'pegelonline', 'kritis'] as const;
+const FACHEBENE_KEYS = ['nina', 'dwd', 'pegelonline', 'kritis', 'autobahn'] as const;
 const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'einsatzort',
   'uhs',
@@ -58,6 +58,7 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     dwd: o.dwd === true,
     pegelonline: o.pegelonline === true,
     kritis: o.kritis === true,
+    autobahn: o.autobahn === true,
   };
 }
 

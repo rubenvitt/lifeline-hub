@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Descriptions, Tag, Typography, theme } from 'antd';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
@@ -29,6 +30,12 @@ function pick(p: Record<string, unknown>, ...keys: string[]): string | null {
     if (v) return v;
   }
   return null;
+}
+
+/** Nur http(s) zulassen. Die Werte kommen aus fremden Quellen (OSM-Tags, Autobahn-API);
+ *  ein `javascript:`-URI in `href`/`src` wäre XSS. */
+function nurWeb(v: string | null): string | null {
+  return v && /^https?:\/\//i.test(v) ? v : null;
 }
 
 /** ISO-Zeit hübsch (de-DE), Fallback auf Rohwert. */
@@ -186,8 +193,7 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   const kategorie = s(p.kategorie);
   const telefon = s(p.telefon);
   const websiteRoh = s(p.website);
-  // Nur http(s) als Link zulassen (OSM-Tag ist untrusted → javascript:-URI wäre XSS).
-  const website = websiteRoh && /^https?:\/\//i.test(websiteRoh) ? websiteRoh : null;
+  const website = nurWeb(websiteRoh);
   const notaufnahme = s(p.notaufnahme);
   return (
     <>
@@ -219,6 +225,78 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
         )}
         {notaufnahme && <Descriptions.Item label="Notaufnahme">{notaufnahme}</Descriptions.Item>}
       </Descriptions>
+    </>
+  );
+}
+
+function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
+  // Das Standbild kommt NICHT über den Backend-Proxy, sondern direkt vom Betreiber (die
+  // Quelle liefert nur die URL). Ohne Internet am Client — der Normalfall, für den die
+  // Lagekarte offline-fähig ist — lädt es also nicht. Ein kaputtes Bildsymbol wäre in einer
+  // Führungsoberfläche die schlechteste Antwort: es sagt nicht, WAS fehlt.
+  const [bildFehler, setBildFehler] = useState(false);
+  const kategorie = s(p.kategorie);
+  const bild = nurWeb(s(p.bild));
+  const link = nurWeb(s(p.link));
+  const beschreibung = s(p.beschreibung);
+  const titel = s(p.titel);
+  return (
+    <>
+      {kategorie && (
+        <Tag color="cyan" style={{ marginBottom: 8 }}>
+          {kategorieLabel(kategorie)}
+        </Tag>
+      )}
+      {/* Das Standbild IST der Zweck der Webcam-Kategorie (LFH-80): visuelle Lagebestätigung
+          an der BAB. Bewusst ohne feste Höhe — die Betreiber liefern verschiedene
+          Seitenverhältnisse, ein erzwungenes Maß schnitte den Fahrbahnrand ab. */}
+      {bild && !bildFehler && (
+        <img
+          src={bild}
+          alt={titel ? `Webcam-Standbild: ${titel}` : 'Webcam-Standbild'}
+          onError={() => setBildFehler(true)}
+          style={{
+            width: '100%',
+            display: 'block',
+            marginBottom: token.marginXS,
+            borderRadius: token.borderRadius,
+          }}
+        />
+      )}
+      {bild && bildFehler && (
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+          Standbild nicht abrufbar — es kommt direkt vom Kamera-Betreiber und braucht eine
+          Internetverbindung am Gerät.
+        </Typography.Paragraph>
+      )}
+      <Descriptions column={1}>
+        {s(p.strasse) && <Descriptions.Item label="Autobahn">{s(p.strasse)}</Descriptions.Item>}
+        {s(p.richtung) && <Descriptions.Item label="Richtung">{s(p.richtung)}</Descriptions.Item>}
+        {fmtZeit(s(p.beginn)) && (
+          <Descriptions.Item label="Beginn">{fmtZeit(s(p.beginn))}</Descriptions.Item>
+        )}
+        {s(p.betreiber) && (
+          <Descriptions.Item label="Betreiber">{s(p.betreiber)}</Descriptions.Item>
+        )}
+      </Descriptions>
+      {/* Die Quelle liefert `description` als Zeilen-Array; der Normalisierer fügt sie mit
+          \n zusammen. `pre-line` hält diese Gliederung — ohne sie steht „Länge: 1.36 km
+          Max. 80 km/h Maximale Durchfahrtsbreite: 3.25 m" in einem Zug. */}
+      {beschreibung && (
+        <Typography.Paragraph
+          style={{ marginTop: 8, marginBottom: 0, fontSize: 13, whiteSpace: 'pre-line' }}
+        >
+          {beschreibung}
+        </Typography.Paragraph>
+      )}
+      {link && (
+        <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
+          <a href={link} target="_blank" rel="noreferrer noopener">
+            Livebild beim Betreiber öffnen
+          </a>
+        </Typography.Paragraph>
+      )}
     </>
   );
 }
@@ -258,6 +336,8 @@ export default function FachebenenInspector({
         <WarnungInhalt p={p} />
       ) : quelle === 'pegelonline' ? (
         <PegelInhalt p={p} />
+      ) : quelle === 'autobahn' ? (
+        <AutobahnInhalt p={p} />
       ) : (
         <KritisInhalt p={p} />
       )}

@@ -21,7 +21,7 @@ export type FeatureCollection = S['GeoJsonFeatureCollection'];
 export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/karte/fachebenen/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
-export type FachebeneQuelle = 'dwd' | 'pegelonline' | 'nina' | 'kritis';
+export type FachebeneQuelle = 'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'autobahn';
 
 /** Lädt eine Fachebene. `bbox` (west,sued,ost,nord) ist nur für `kritis` nötig. */
 export function ladeFachebene(quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> {

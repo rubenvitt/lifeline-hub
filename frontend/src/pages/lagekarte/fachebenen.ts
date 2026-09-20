@@ -14,6 +14,13 @@ export interface FachebeneDef {
   pollMs: number;
   /** True → braucht Karten-Viewport-bbox (kein Hintergrund-Polling, Refetch bei moveend). */
   bboxAbhaengig: boolean;
+  /**
+   * Dauerhaft sichtbarer Geltungsbereich der Quelle — bewusst als TEXT unter dem Label und
+   * nicht als Tooltip (LFH-80): eine Reichweiten-Einschränkung, die man nur beim Hovern
+   * sieht, ist auf einem Touch-Führungsgerät gar nicht zu sehen, und wer die Ebene für
+   * flächendeckend hält, plant einen Anmarschweg auf einer Grundlage, die es nicht gibt.
+   */
+  geltung?: string;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -41,6 +48,18 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 300_000,
     bboxAbhaengig: false,
   },
+  autobahn: {
+    key: 'autobahn',
+    label: 'Autobahn-Lage (BAB)',
+    // Eigener Ton neben Rot/Orange/Blau/Violett der vier Bestandsebenen.
+    farbe: '#08979c',
+    geometrieTyp: 'punkt',
+    // = serverseitige TTL (600 s). Die Ebene aggregiert 111 Autobahnen × 3 Dienste;
+    // häufiger abzufragen belastet die Quelle, ohne frischer zu werden.
+    pollMs: 600_000,
+    bboxAbhaengig: false,
+    geltung: 'nur Bundesautobahnen — keine Kreis-, Land- oder Ortsstraßen',
+  },
   kritis: {
     key: 'kritis',
     label: 'KRITIS / sensible Objekte',
@@ -53,7 +72,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'kritis'];
+  return ['nina', 'dwd', 'pegelonline', 'kritis', 'autobahn'];
 }
 
 export function istBboxAbhaengig(key: FachebeneQuelle): boolean {

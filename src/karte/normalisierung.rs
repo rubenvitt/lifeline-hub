@@ -404,3 +404,305 @@ mod pegelonline_tests {
         .expect("Anker beschreibt die leere FeatureCollection");
     }
 }
+
+// ----------------------------------------------------------------------- AUTOBAHN
+
+/// Dienstpfad der Autobahn-API → Kategorie dieser Fachebene. Der Antwort-Schlüssel ist bei
+/// allen drei Diensten gleich dem Pfadsegment (`{"webcam":[…]}`, `{"roadworks":[…]}`,
+/// `{"closure":[…]}` — gemessen), deshalb trägt `dienst` beides.
+fn autobahn_kategorie(dienst: &str) -> Option<&'static str> {
+    match dienst {
+        "webcam" => Some("webcam"),
+        "roadworks" => Some("baustelle"),
+        "closure" => Some("sperrung"),
+        _ => None,
+    }
+}
+
+fn autobahn_label(kategorie: &str) -> &'static str {
+    match kategorie {
+        "webcam" => "Webcam",
+        "baustelle" => "Baustelle",
+        "sperrung" => "Sperrung",
+        _ => "BAB-Lage",
+    }
+}
+
+/// Eine Koordinate der Autobahn-API. Sie kommt je nach Dienst als **Zahl** (gemessen bei
+/// `roadworks`/`closure`) oder als **String** (so das Beispiel der bundesAPI-Spec bei
+/// `webcam`) — beide Formen müssen tragen, sonst fällt ein ganzer Dienst still weg.
+fn autobahn_zahl(v: Option<&Value>) -> Option<f64> {
+    match v? {
+        Value::Number(n) => n.as_f64(),
+        Value::String(s) => s.trim().parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+/// `description` ist ein Array von Zeilen mit Leerzeilen als Absatztrenner. Leere Zeilen
+/// fallen weg, der Rest wird zu einem Block; nichts Verwertbares → None.
+fn autobahn_beschreibung(item: &Value) -> Option<String> {
+    let zeilen: Vec<&str> = item
+        .get("description")?
+        .as_array()?
+        .iter()
+        .filter_map(|z| z.as_str())
+        .map(|z| z.trim())
+        .filter(|z| !z.is_empty())
+        .collect();
+    if zeilen.is_empty() {
+        None
+    } else {
+        Some(zeilen.join("\n"))
+    }
+}
+
+/// Autobahn-App-API → GeoJSON-Punkte. Eingabe ist je Eintrag `(strasse, dienst, antwort)`,
+/// wobei `antwort` die rohe Dienst-Antwort ist (`{"<dienst>": [ … ]}`).
+///
+/// Zwei bewusste Verengungen, beide gemessen (LFH-80):
+/// * **`future == true` fällt weg.** Die API führt auch noch nicht begonnene Maßnahmen
+///   (3171 Baustellen gesamt gegen 1882 laufende am 20.09.2026). Für Anfahrt und
+///   Lageaufklärung zählt der Ist-Zustand; eine Baustelle in drei Wochen ist Rauschen.
+/// * **`isBlocked` wird NICHT übernommen.** Über alle 1950 laufenden Baustellen und
+///   Sperrungen stand es ausnahmslos auf `"false"` — das Feld trägt keine Information,
+///   und ein Merkmal, das immer „nein" sagt, führt am Einsatzplatz in die Irre.
+///
+/// Die **Geometrie der Quelle (`geometry`, LineString) wird bewusst verworfen**: der
+/// Ticket-Zuschnitt sind Punkte, und die Linienzüge verdreifachen die Nutzlast.
+pub fn normalisiere_autobahn(roh: &[(String, String, Value)]) -> Value {
+    let mut features: Vec<Value> = Vec::new();
+    for (strasse, dienst, antwort) in roh {
+        let Some(kategorie) = autobahn_kategorie(dienst) else {
+            continue;
+        };
+        let Some(items) = antwort.get(dienst).and_then(|v| v.as_array()) else {
+            continue;
+        };
+        for item in items {
+            if item.get("future").and_then(|f| f.as_bool()) == Some(true) {
+                continue;
+            }
+            let koord = item.get("coordinate");
+            let (Some(lon), Some(lat)) = (
+                autobahn_zahl(koord.and_then(|c| c.get("long"))),
+                autobahn_zahl(koord.and_then(|c| c.get("lat"))),
+            ) else {
+                continue;
+            };
+            let s = |k: &str| {
+                item.get(k)
+                    .and_then(|v| v.as_str())
+                    .map(|v| v.trim())
+                    .filter(|v| !v.is_empty())
+            };
+            let titel = s("title").unwrap_or_else(|| autobahn_label(kategorie));
+            features.push(json!({
+                "type": "Feature",
+                "geometry": { "type": "Point", "coordinates": [lon, lat] },
+                "properties": {
+                    "titel": titel,
+                    "kategorie": kategorie,
+                    "strasse": strasse,
+                    "richtung": s("subtitle"),
+                    "beschreibung": autobahn_beschreibung(item),
+                    "beginn": s("startTimestamp"),
+                    "bild": s("imageurl"),
+                    "link": s("linkurl"),
+                    "betreiber": s("operator"),
+                    "id": s("identifier")
+                }
+            }));
+        }
+    }
+    json!({ "type": "FeatureCollection", "features": features })
+}
+
+#[cfg(test)]
+mod autobahn_tests {
+    use super::*;
+
+    fn dienst(name: &str, items: Value) -> (String, String, Value) {
+        ("A1".to_string(), name.to_string(), json!({ name: items }))
+    }
+
+    #[test]
+    fn baustelle_wird_punkt_mit_strasse_und_richtung() {
+        let roh = [dienst(
+            "roadworks",
+            json!([{
+                "title": "A1 | Saarbrücken-Von-der-Heydt - Riegelsberg",
+                "subtitle": " Saarbrücken -> Trier",
+                "coordinate": { "lat": 49.2756, "long": 6.9623 },
+                "description": ["Länge: 1.36 km", "", "Max. 80 km/h"],
+                "identifier": "2026-047955",
+                "future": false
+            }]),
+        )];
+        let fc = normalisiere_autobahn(&roh);
+        let f = &fc["features"][0];
+        assert_eq!(f["geometry"]["type"], "Point");
+        assert_eq!(f["geometry"]["coordinates"][0], 6.9623);
+        assert_eq!(f["geometry"]["coordinates"][1], 49.2756);
+        assert_eq!(f["properties"]["kategorie"], "baustelle");
+        assert_eq!(f["properties"]["strasse"], "A1");
+        // subtitle wird getrimmt — die API liefert ihn mit führendem Leerzeichen.
+        assert_eq!(f["properties"]["richtung"], "Saarbrücken -> Trier");
+        // Leerzeilen des description-Arrays fallen weg, der Rest wird ein Block.
+        assert_eq!(
+            f["properties"]["beschreibung"],
+            "Länge: 1.36 km\nMax. 80 km/h"
+        );
+    }
+
+    #[test]
+    fn closure_wird_sperrung_und_webcam_bleibt_webcam() {
+        let roh = [
+            dienst(
+                "closure",
+                json!([{ "title": "A1 | Kamen", "coordinate": { "lat": 51.5, "long": 7.6 } }]),
+            ),
+            dienst(
+                "webcam",
+                json!([{ "title": "A1 | AK Köln-Nord", "coordinate": { "lat": 50.98, "long": 6.86 } }]),
+            ),
+        ];
+        let fc = normalisiere_autobahn(&roh);
+        let k: Vec<&str> = fc["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["properties"]["kategorie"].as_str().unwrap())
+            .collect();
+        assert_eq!(k, vec!["sperrung", "webcam"]);
+    }
+
+    /// Die Bild-URL der Webcam ist der Zweck dieser Ebene (LFH-80) — sie muss als Property
+    /// ankommen, samt Betreiber und Videolink.
+    #[test]
+    fn webcam_traegt_bild_link_und_betreiber() {
+        let roh = [dienst(
+            "webcam",
+            json!([{
+                "title": "A1 | ID005 AK Köln-Nord",
+                "subtitle": "Blickrichtung Dortmund",
+                "coordinate": { "lat": "50.987423", "long": "6.861151" },
+                "operator": "NRW",
+                "imageurl": "https://www.verkehr.nrw/webcams/10108109881648294854.jpg",
+                "linkurl": "https://www.blitzvideoserver.de/player.html?x=1"
+            }]),
+        )];
+        let p = &normalisiere_autobahn(&roh)["features"][0]["properties"];
+        assert_eq!(
+            p["bild"],
+            "https://www.verkehr.nrw/webcams/10108109881648294854.jpg"
+        );
+        assert_eq!(p["link"], "https://www.blitzvideoserver.de/player.html?x=1");
+        assert_eq!(p["betreiber"], "NRW");
+    }
+
+    /// Gemessene Falle: `coordinate` kommt bei `roadworks`/`closure` als ZAHL, im
+    /// Spec-Beispiel der Webcams als STRING. Trägt nur eine Form, fällt ein ganzer Dienst
+    /// still weg — ohne Fehler, ohne roten Test, nur ohne Features.
+    #[test]
+    fn koordinate_traegt_als_zahl_und_als_string() {
+        let als_zahl = [dienst(
+            "closure",
+            json!([{ "coordinate": { "lat": 51.5, "long": 7.6 } }]),
+        )];
+        let als_string = [dienst(
+            "webcam",
+            json!([{ "coordinate": { "lat": "51.5", "long": "7.6" } }]),
+        )];
+        for roh in [als_zahl, als_string] {
+            let f = &normalisiere_autobahn(&roh)["features"][0];
+            assert_eq!(f["geometry"]["coordinates"][0], 7.6);
+            assert_eq!(f["geometry"]["coordinates"][1], 51.5);
+        }
+    }
+
+    /// Noch nicht begonnene Maßnahmen sind für Anfahrt/Lageaufklärung Rauschen.
+    #[test]
+    fn future_eintraege_fallen_weg() {
+        let roh = [dienst(
+            "roadworks",
+            json!([
+                { "title": "läuft", "coordinate": { "lat": 51.0, "long": 7.0 }, "future": false },
+                { "title": "später", "coordinate": { "lat": 51.1, "long": 7.1 }, "future": true }
+            ]),
+        )];
+        let fc = normalisiere_autobahn(&roh);
+        assert_eq!(fc["features"].as_array().unwrap().len(), 1);
+        assert_eq!(fc["features"][0]["properties"]["titel"], "läuft");
+    }
+
+    /// `isBlocked` stand über alle 1950 gemessenen laufenden Einträge auf `"false"` — ein
+    /// Merkmal ohne Information gehört nicht in die Karte. Die Gegenaussage ist die
+    /// schärfere: sie fällt auf, wenn jemand das Feld „der Vollständigkeit halber" nachzieht.
+    #[test]
+    fn is_blocked_wird_nicht_uebernommen() {
+        let roh = [dienst(
+            "closure",
+            json!([{ "coordinate": { "lat": 51.0, "long": 7.0 }, "isBlocked": "false" }]),
+        )];
+        let p = &normalisiere_autobahn(&roh)["features"][0]["properties"];
+        assert!(
+            p.get("gesperrt").is_none() && p.get("isBlocked").is_none(),
+            "isBlocked trägt keine Information (gemessen) und darf nicht erscheinen"
+        );
+    }
+
+    #[test]
+    fn eintrag_ohne_koordinate_wird_uebersprungen() {
+        let roh = [dienst("roadworks", json!([{ "title": "ohne Ort" }]))];
+        assert_eq!(
+            normalisiere_autobahn(&roh)["features"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
+    }
+
+    #[test]
+    fn unbekannter_dienst_und_fehlender_schluessel_liefern_nichts() {
+        let fremd = ("A1".to_string(), "parking_lorry".to_string(), json!({}));
+        let leer = ("A1".to_string(), "closure".to_string(), json!({}));
+        assert_eq!(
+            normalisiere_autobahn(&[fremd, leer])["features"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
+    }
+
+    #[test]
+    fn titel_faellt_auf_die_kategorie_zurueck() {
+        let roh = [dienst(
+            "webcam",
+            json!([{ "coordinate": { "lat": 51.0, "long": 7.0 } }]),
+        )];
+        assert_eq!(
+            normalisiere_autobahn(&roh)["features"][0]["properties"]["titel"],
+            "Webcam"
+        );
+    }
+
+    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    #[test]
+    fn autobahn_output_passt_auf_den_geojson_anker() {
+        let roh = [dienst(
+            "roadworks",
+            json!([{
+                "title": "A1 | X", "subtitle": " Nord -> Süd",
+                "coordinate": { "lat": 51.0, "long": 7.0 },
+                "description": ["Länge: 1 km"], "identifier": "x"
+            }]),
+        )];
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
+            normalisiere_autobahn(&roh),
+        )
+        .expect("Anker beschreibt die reale Autobahn-Form");
+    }
+}

@@ -5,11 +5,12 @@
 use crate::error::AppError;
 use crate::karte::cache;
 use crate::karte::normalisierung::{
-    kombiniere_nina, normalisiere_overpass, normalisiere_pegelonline,
+    kombiniere_nina, normalisiere_autobahn, normalisiere_overpass, normalisiere_pegelonline,
 };
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use futures::stream::{self, StreamExt};
+use serde_json::Value;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 use std::future::Future;
@@ -304,6 +305,173 @@ async fn erneuere_kritis(
     }
     tracing::warn!("Overpass nicht erreichbar (alle Endpunkte) — KRITIS aus Cache/leer");
     None
+}
+
+// ----------------------------------------------------------------------- AUTOBAHN
+
+const AUTOBAHN_ATTRIB: &str = "Autobahn GmbH des Bundes";
+/// 10 min. Baustellen und Sperrungen sind mehrstündige bis mehrtägige Ereignisse; was sich
+/// bewegt, ist ihr `future`-Übergang. Kürzer zu takten holt keine frischeren Daten, kostet
+/// aber je Runde 334 Abrufe gegen eine fremde Behörden-API.
+const AUTOBAHN_TTL: Duration = Duration::from_secs(600);
+const AUTOBAHN_BASIS: &str = "https://verkehr.autobahn.de/o/autobahn/";
+/// Die drei für Anfahrt und Lageaufklärung belegten Dienste (LFH-80). `warning`,
+/// `parking_lorry`, `electric_charging_station` sind bewusst NICHT dabei: sie tragen zum
+/// Ticket-Zweck nichts bei und kosteten je 111 weitere Abrufe pro Runde.
+const AUTOBAHN_DIENSTE: [&str; 3] = ["webcam", "roadworks", "closure"];
+/// Gemessen (20.09.2026): bei 8 gleichzeitigen Abrufen scheitern 1–2 der 334, bei 16 bereits
+/// 30 — die Quelle drosselt. Mehr Parallelität macht den Lauf also nicht schneller, sondern
+/// löchriger.
+const AUTOBAHN_PARALLEL: usize = 8;
+/// Gesamtdeckel über den Fächer. Das Client-Timeout (8 s) gilt je Abruf; ohne diesen Deckel
+/// stünde der kalte, BLOCKIERENDE Pfad im schlechtesten Fall bei 334/8 × 8 s ≈ 5,5 min.
+/// Gemessener Normallauf: ~25 s.
+const AUTOBAHN_BUDGET: Duration = Duration::from_secs(60);
+
+/// `{"roads":["A1","A2",…]}` → saubere Liste. Drei Dinge passieren hier, alle gemessen:
+/// getrimmt (die Liste führt am 20.09.2026 `"A60 "` mit Leerzeichen — der Abruf darauf
+/// liefert 0 Einträge, während `"A60"` 18 hat), entdoppelt (ebendeshalb), und **auf
+/// alphanumerisch gefiltert**: der Wert kommt aus einer fremden Quelle und landet in einem
+/// URL-PFAD — ein `../` darin zeigte auf einen anderen Endpunkt desselben Hosts.
+pub(crate) fn autobahn_strassen(roh: &Value) -> Vec<String> {
+    let mut namen: Vec<String> = roh
+        .get("roads")
+        .and_then(|r| r.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .map(str::trim)
+                .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_alphanumeric()))
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+    namen.sort();
+    namen.dedup();
+    namen
+}
+
+pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    let (client, pool2) = (s.client.clone(), pool.clone());
+    liefere_mit_swr(
+        pool,
+        &s.inflight,
+        "autobahn",
+        AUTOBAHN_TTL,
+        || FachebeneAntwort::offline("autobahn", AUTOBAHN_ATTRIB),
+        move || erneuere_autobahn(client, pool2),
+    )
+    .await
+}
+
+async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
+    let liste = match hole_json(&client, AUTOBAHN_BASIS).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("Autobahn-Streckenliste nicht abrufbar: {e}");
+            return None;
+        }
+    };
+    let strassen = autobahn_strassen(&liste);
+    if strassen.is_empty() {
+        tracing::warn!("Autobahn-Streckenliste leer oder unlesbar");
+        return None;
+    }
+    // Aussortiertes sichtbar machen: heute ist das genau die Dublette `"A60 "`. Führte die
+    // Quelle eines Tages Namen mit Leer- oder Sonderzeichen ein, fielen sie durch den
+    // Pfad-Filter — das soll im Log stehen und nicht still passieren.
+    let roh_anzahl = liste
+        .get("roads")
+        .and_then(|r| r.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+    if roh_anzahl > strassen.len() {
+        tracing::debug!(
+            "Autobahn: {} von {roh_anzahl} Streckennamen aussortiert (Dublette oder nicht \
+             alphanumerisch)",
+            roh_anzahl - strassen.len()
+        );
+    }
+    let jobs: Vec<(String, String)> = strassen
+        .iter()
+        .flat_map(|s| {
+            AUTOBAHN_DIENSTE
+                .iter()
+                .map(move |d| (s.clone(), d.to_string()))
+        })
+        .collect();
+    let gesamt = jobs.len();
+    // Einzelne Abrufe dürfen scheitern (Drosselung, leerer Body) — die übrigen Strecken
+    // bleiben. Dieselbe Toleranz wie bei den NINA-Einzelgeometrien.
+    let faecher = stream::iter(jobs)
+        .map(|(strasse, dienst)| {
+            let client = client.clone();
+            let url = format!("{AUTOBAHN_BASIS}{strasse}/services/{dienst}");
+            async move {
+                match hole_json(&client, &url).await {
+                    Ok(v) => Some((strasse, dienst, v)),
+                    Err(e) => {
+                        tracing::debug!("Autobahn {strasse}/{dienst} fehlgeschlagen: {e}");
+                        None
+                    }
+                }
+            }
+        })
+        .buffer_unordered(AUTOBAHN_PARALLEL)
+        .collect::<Vec<_>>();
+    let roh: Vec<(String, String, Value)> =
+        match tokio::time::timeout(AUTOBAHN_BUDGET, faecher).await {
+            Ok(v) => v.into_iter().flatten().collect(),
+            Err(_) => {
+                tracing::warn!("Autobahn-Abruf über {AUTOBAHN_BUDGET:?} hinaus — Cache/leer");
+                return None;
+            }
+        };
+    // Ein bis zwei Ausfälle je Lauf sind der gemessene Normalfall (Drosselung) und dürfen
+    // das Log nicht alle 10 min mit einer Warnung fluten — sonst gewöhnt man sich sie ab und
+    // übersieht den Tag, an dem die Quelle wirklich wegbricht. Erst ab einem Zehntel laut.
+    let fehlend = gesamt - roh.len();
+    if fehlend * 10 > gesamt {
+        tracing::warn!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
+    } else if fehlend > 0 {
+        tracing::debug!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
+    }
+    let a = FachebeneAntwort::ok(
+        "autobahn",
+        AUTOBAHN_ATTRIB,
+        None,
+        normalisiere_autobahn(&roh),
+    );
+    cache::setze(&pool, "autobahn", &a).await;
+    Some(a)
+}
+
+#[cfg(test)]
+mod autobahn_strassen_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn trimmt_entdoppelt_und_sortiert() {
+        // "A60 " mit Leerzeichen steht so in der echten Liste (gemessen) und ist dieselbe
+        // Strecke wie "A60" — ohne Trim+Dedup liefe ein Abruf ins Leere.
+        let l = autobahn_strassen(&json!({ "roads": ["A3", "A60 ", "A60", "A1"] }));
+        assert_eq!(l, vec!["A1", "A3", "A60"]);
+    }
+
+    #[test]
+    fn verwirft_pfad_trennende_und_leere_namen() {
+        // Der Name landet in einem URL-Pfad; alles außer [A-Za-z0-9] fliegt raus.
+        let l =
+            autobahn_strassen(&json!({ "roads": ["A1", "../details/webcam", "", "A/2", "A 3"] }));
+        assert_eq!(l, vec!["A1"]);
+    }
+
+    #[test]
+    fn fehlender_oder_kaputter_schluessel_liefert_leer() {
+        assert!(autobahn_strassen(&json!({})).is_empty());
+        assert!(autobahn_strassen(&json!({ "roads": "A1" })).is_empty());
+    }
 }
 
 #[cfg(test)]

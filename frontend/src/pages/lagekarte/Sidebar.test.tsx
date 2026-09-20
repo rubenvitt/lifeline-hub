@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
+import { defaultFachebenenSichtbar } from './fachebenenAuswahl';
 import Sidebar, { bedienzielStil, loeschDialogBild } from './Sidebar';
 import type { SidebarProps } from './Sidebar';
 import { dichten } from '../../theme/tokens';
@@ -55,7 +56,7 @@ const basisProps: SidebarProps = {
   ansichtDirty: false,
   ansichtSpeichert: false,
   onAnsichtSpeichern: vi.fn(),
-  fachebenenSichtbar: { nina: false, dwd: false, pegelonline: false, kritis: false },
+  fachebenenSichtbar: defaultFachebenenSichtbar(),
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
   // Neue Bild-Props
@@ -369,6 +370,28 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(toggle).toBeTruthy();
     fireEvent.click(toggle as Element);
     expect(onLayerToggle).toHaveBeenCalledWith('freies_zeichen', false);
+  });
+
+  it('nennt den Geltungsbereich der Autobahn-Ebene als sichtbare Zeile (LFH-80)', () => {
+    renderMitProviders(<Sidebar {...basisProps} />);
+    // AK „Limitation (nur BAB) im UI transparent": der Satz steht DA, nicht erst beim Hovern —
+    // auf einem Führungs-Tablet gäbe es kein Hovern.
+    expect(screen.getByText(/nur Bundesautobahnen/i)).toBeVisible();
+    // Gegenaussage: keine der Bestandsebenen behauptet plötzlich eine Einschränkung.
+    expect(screen.getByText('Autobahn-Lage (BAB)')).toBeInTheDocument();
+    expect(screen.getAllByText(/nur Bundesautobahnen/i)).toHaveLength(1);
+  });
+
+  it('schaltet die Autobahn-Ebene über ihren eigenen Schalter (LFH-80)', () => {
+    const onFachebeneToggle = vi.fn();
+    renderMitProviders(<Sidebar {...basisProps} onFachebeneToggle={onFachebeneToggle} />);
+    const toggle = screen
+      .getByText('Autobahn-Lage (BAB)')
+      .closest('.ant-space')
+      ?.querySelector('button[role="switch"]');
+    expect(toggle).toBeTruthy();
+    fireEvent.click(toggle as Element);
+    expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
   });
 
   it('öffnet den Zeichen-Picker und startet das Platzieren mit der Entwurfs-Spec (LFH-170)', () => {

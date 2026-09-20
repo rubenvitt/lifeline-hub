@@ -461,6 +461,55 @@ async fn fachebenen_unbekannte_quelle_ist_400() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
+/// Die Autobahn-Ebene (LFH-80) ist eine BEKANNTE Quelle — der Aggregator darf sie nicht
+/// als Tippfehler abweisen. Geprüft wird hermetisch über den Cache: ein vorgelegter
+/// Eintrag beantwortet die Anfrage, ohne dass 334 Abrufe gegen die echte Autobahn-API
+/// laufen. Ein Test, der die Quelle live zöge, hinge ~25 s am Netz und wäre in der CI
+/// eine Wackelstelle statt einer Aussage.
+#[tokio::test]
+async fn fachebenen_autobahn_liefert_gecachte_antwort() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let dir = lifeline_hub::db::test_karten_dir();
+    let cache = lifeline_hub::cache_db::cache_pool(&dir).await.unwrap();
+    let gecacht = FachebeneAntwort::ok(
+        "autobahn",
+        "Autobahn GmbH des Bundes",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [
+            { "type": "Feature",
+              "geometry": { "type": "Point", "coordinates": [6.86, 50.98] },
+              "properties": { "titel": "A1 | AK Köln-Nord", "kategorie": "webcam" } }
+        ]}),
+    );
+    lifeline_hub::karte::cache::setze(&cache, "autobahn", &gecacht).await;
+
+    let app = build_router(AppState {
+        pool: pool().await,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+        karten_dir: dir,
+    });
+    let res = anfrage(&app, "GET", "/api/karte/fachebenen/autobahn", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(v["quelle"], "autobahn");
+    assert_eq!(v["status"], "ok");
+    // Die Pflicht-Attribution des Tickets geht unverändert an den Client.
+    assert_eq!(v["attribution"], "Autobahn GmbH des Bundes");
+    assert_eq!(
+        v["features"]["features"][0]["properties"]["kategorie"],
+        "webcam"
+    );
+}
+
+/// Gegenprobe zur Zeile darüber: ohne `bbox` ist NUR kritis ein 400 — die Autobahn-Ebene
+/// ist nicht bbox-abhängig. Ohne dieses Paar bliebe der Test oben auch dann grün, wenn die
+/// Quelle versehentlich in den bbox-Zweig geriete.
 #[tokio::test]
 async fn fachebenen_kritis_ohne_bbox_ist_400() {
     let app = app_mit_pool(pool().await);

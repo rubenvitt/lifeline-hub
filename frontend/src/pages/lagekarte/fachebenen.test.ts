@@ -16,12 +16,27 @@ const feat = (lon: number, lat: number) => ({
 });
 
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen', () => {
-    expect(fachebeneKeys()).toEqual(['nina', 'dwd', 'pegelonline', 'kritis']);
+  it('enthält die vier v1-Quellen plus die BAB-Lage (LFH-80)', () => {
+    expect(fachebeneKeys()).toEqual(['nina', 'dwd', 'pegelonline', 'kritis', 'autobahn']);
   });
   it('markiert nur kritis als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
     expect(istBboxAbhaengig('dwd')).toBe(false);
+    // Die Autobahn-Ebene aggregiert das ganze Netz serverseitig — sie darf NICHT in den
+    // bbox-Zweig geraten, sonst bliebe sie ohne Viewport-Meldung dauerhaft leer.
+    expect(istBboxAbhaengig('autobahn')).toBe(false);
+  });
+  it('jeder fachebeneKeys()-Eintrag hat auch eine Definition (und umgekehrt)', () => {
+    // Beide Richtungen: ein Key ohne Def stürzt beim Rendern ab, eine Def ohne Key ist
+    // unerreichbar und fällt sonst niemandem auf.
+    expect([...fachebeneKeys()].sort()).toEqual(Object.keys(FACHEBENEN).sort());
+  });
+  it('nur die Autobahn-Ebene nennt einen einschränkenden Geltungsbereich', () => {
+    // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung.
+    // Die Gegenaussage trägt sie mit: stünde der Satz an jeder Ebene, sagte er nichts.
+    expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
+    const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
+    expect(mitGeltung).toEqual(['autobahn']);
   });
   it('jede Ebene hat Label, Farbe, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {

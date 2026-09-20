@@ -21,11 +21,11 @@ interface FachebenenArgs {
 }
 
 /**
- * Fachebenen-Leg der Lagekarte: die vier externen Daten-Queries und ihre Ableitungen.
+ * Fachebenen-Leg der Lagekarte: die fünf externen Daten-Queries und ihre Ableitungen.
  * Die Sichtbarkeit hält seit LFH-319 `useKartenAnsicht` (geteilte Ansicht) — dieser Hook
  * bekommt sie als Prop und bietet nur den Toggle; kein eigener State/keine Persistenz.
  *
- * Die vier Queries laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
+ * Die fünf Queries laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
  * kombinierte Ergebnis (structural sharing via replaceEqualDeep), sodass die Ableitungen
  * (aktiveFachebenen/status/laedt/attribution) OHNE manuelle Dep-Listen und OHNE
  * `eslint-disable react-hooks/exhaustive-deps` stabil bleiben — das inline gebaute,
@@ -44,8 +44,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     features: [],
   });
 
-  // Vier Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys()
-  // (nina, dwd, pegelonline, kritis). KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
+  // Fünf Fachebenen-Queries als EIN useQueries + combine. Die Reihenfolge der Einträge MUSS
+  // zu `fachebeneKeys()` passen (nina, dwd, pegelonline, kritis, autobahn) — `combine` greift
+  // sie positionsweise ab. KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
   // keepPreviousData, 6-h-staleTime/gcTime) im eigenen Config-Eintrag; kein refetchInterval.
   const kombiniert = useQueries({
     queries: [
@@ -78,6 +79,12 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         staleTime: 6 * 60 * 60_000,
         gcTime: 6 * 60 * 60_000,
       },
+      {
+        queryKey: globalKeys.fachebene('autobahn'),
+        queryFn: () => ladeFachebene('autobahn'),
+        enabled: fachebenenSichtbar.autobahn,
+        refetchInterval: FACHEBENEN.autobahn.pollMs,
+      },
     ],
     // combine wird von react-query memoisiert + strukturell geteilt → stabile Ableitungen.
     combine: (ergebnisse) => {
@@ -86,6 +93,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         dwd: ergebnisse[1],
         pegelonline: ergebnisse[2],
         kritis: ergebnisse[3],
+        autobahn: ergebnisse[4],
       } as const;
       const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()

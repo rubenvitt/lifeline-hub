@@ -19,7 +19,19 @@ const fx = vi.hoisted(() => {
       properties: {},
     })),
   });
-  return { fc, nina: fc([[9, 50]]), kritisA: fc([[10, 51]]), kritisB: fc([[11, 52]]) };
+  return {
+    fc,
+    nina: fc([[9, 50]]),
+    kritisA: fc([[10, 51]]),
+    kritisB: fc([[11, 52]]),
+    // Bewusst DREI Punkte: die Menge unterscheidet die Autobahn-Ebene von jeder anderen
+    // Fixture — ein vertauschter `combine`-Index fiele sonst nicht auf.
+    autobahn: fc([
+      [6.86, 50.98],
+      [7.67, 51.57],
+      [6.96, 49.27],
+    ]),
+  };
 });
 
 vi.mock('../../api/fachebenen', async (importOriginal) => {
@@ -34,6 +46,14 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           attribution: '© NINA',
           stand: null,
           features: fx.nina,
+        });
+      if (quelle === 'autobahn')
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: 'Autobahn GmbH des Bundes',
+          stand: null,
+          features: fx.autobahn,
         });
       if (quelle === 'kritis')
         return Promise.resolve({
@@ -128,6 +148,37 @@ describe('useFachebenen', () => {
     // replaceEqualDeep in query-core → identische Referenz bei unveränderten Daten,
     // sonst würde der Kartenflaeche-fachebenen-Effekt pro Frame neu feuern.
     expect(result.current.aktiveFachebenen).toBe(vorher);
+  });
+
+  it('aktiviert autobahn → eigene Daten und Pflicht-Attribution (LFH-80)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('autobahn', true));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn')?.daten.features,
+      ).toHaveLength(3),
+    );
+    // Die Zuordnung Query→Ebene läuft in `combine` über POSITIONEN. Ein verschobener Index
+    // wäre kein Fehler, sondern eine stille Verwechslung: die Ebene zeigte fremde Daten.
+    // Deshalb gegen die konkrete Koordinate prüfen, nicht bloß gegen die Anzahl.
+    const ab = result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn');
+    expect(ab?.daten.features[0].geometry?.coordinates).toEqual([6.86, 50.98]);
+    expect(result.current.fachebenenStatus.autobahn).toBe('ok');
+    // AK „Quellennennung korrekt".
+    expect(result.current.fachebenenAttribution).toContain('Autobahn GmbH des Bundes');
+  });
+
+  it('autobahn braucht keine bbox — sie lädt schon durch das Einschalten (LFH-80)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('autobahn', true));
+    // Gegenstück zu KRITIS, das ohne `setKritisBbox` dauerhaft leer bliebe. Geriete die
+    // Autobahn-Ebene in den bbox-Zweig, stünde hier 0 statt 3.
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn')?.daten.features,
+      ).toHaveLength(3),
+    );
+    expect(result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')).toBeUndefined();
   });
 
   it('meldet kritisZoomZuKlein unterhalb des Mindest-Zooms', () => {

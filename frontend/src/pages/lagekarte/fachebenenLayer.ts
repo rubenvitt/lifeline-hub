@@ -93,6 +93,9 @@ const KATEGORIE_LABEL: Record<string, string> = {
   kritis: 'KRITIS-Objekt',
   warnung: 'Amtliche Warnung',
   pegel: 'Pegel',
+  webcam: 'Webcam',
+  baustelle: 'Baustelle',
+  sperrung: 'Sperrung',
 };
 
 /** Lesbares Label für eine normalisierte Kategorie (Fallback: Rohwert). */
