@@ -99,8 +99,9 @@ Trade-offs und **lass den User entscheiden**. Sonst kurzer Plan-Abriss und weite
 **Wähle den Modus selbst** und nenne dem User die Wahl + Begründung (er darf overriden):
 
 - **Sequenziell-interaktiv (Default, sicher):** Subtasks nacheinander. Pro Subtask rufst du
-  **`dev-clickup-ausfuehren`** auf — das routet in die interaktiven superpowers-Skills
-  (TDD/Debugging/…) im Main-Loop und führt den Board-Status pro Subtask mit. Wähle das,
+  **`dev-clickup-ausfuehren`** auf — das routet im Main-Loop in die Arbeitsdisziplin von
+  Superpowers (TDD/Debugging/…) und in den OpenSpec-Änderungszyklus (`/opsx:explore`,
+  `/opsx:propose`, `/opsx:apply`) und führt den Board-Status pro Subtask mit. Wähle das,
   wenn Subtasks **gemeinsame Files** berühren, voneinander abhängen, oder während der
   Umsetzung interaktive Entscheidungen zu erwarten sind.
 - **Autonom / „automode":** nur wenn die Subtasks **nachweislich unabhängig** sind

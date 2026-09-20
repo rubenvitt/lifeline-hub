@@ -9,8 +9,21 @@ description: Per-single-(sub)task execution layer for the Lifeline-Hub ClickUp E
 
 Einen Task vom **Entwicklungsboard** (`901523554968`) umsetzen. Dieser Skill macht wenige
 **eigene Entscheidungen** — Workspace (Branch/Worktree), Komplexitäts-Routing und das
-**Mitführen des Board-Status** — und delegiert alles andere an die passenden
-superpowers-Skills. Nichts davon reimplementieren.
+**Mitführen des Board-Status** — und delegiert alles andere weiter. Nichts davon
+reimplementieren.
+
+**Zwei Quellen, die ineinandergreifen:** **OpenSpec** (`/opsx:*`) besitzt den
+**Änderungszyklus** — klären, entwerfen, Spec und Aufgabenschnitt, Aufgabenliste abarbeiten,
+archivieren. **Superpowers** (`superpowers:*`) besitzt die **Arbeitsdisziplin** — Worktree,
+Debugging, TDD, Verifikation, Review, Branch-Abschluss.
+
+Die *planning boundary* gilt für **fünf** der sechs OpenSpec-Workflows (`explore`, `propose`,
+`update`, `sync`, `archive`): sie fassen keinen Projektcode an. **`/opsx:apply` ist die
+Ausnahme** — es setzt um („Implement tasks from an OpenSpec change"). Es bringt dabei aber
+**keine eigene Arbeitsdisziplin** mit: weder TDD noch Review stehen in seinem Skill. *Wie*
+eine einzelne Aufgabe entsteht, sagt weiterhin `superpowers:test-driven-development`, und vor
+„fertig" stehen unverändert Schritt 4 unten. Wer `/opsx:apply` als Ersatz dafür liest,
+verliert die Zusicherung, ohne dass ein Test rot wird.
 
 ## Wann benutzen
 
@@ -88,10 +101,27 @@ Start in den jeweiligen **Board-Status** wechseln (raus aus `backlog`):
 | Komplexität | Skill | Board-Status |
 |---|---|---|
 | Trivial (Typo, Text/Copy-Change) | Direkt, kein Sub-Skill | `in development` |
-| Anforderung unklar | **`superpowers:brainstorming`** zuerst | `scoping` → danach `in design`/`in development` |
+| Anforderung unklar | **`/opsx:explore`** zuerst | `scoping` → danach `in design`/`in development` |
 | Bug, Ursache unklar | **`superpowers:systematic-debugging`** | `in development` |
 | Feature/Bugfix, klare Spec | **`superpowers:test-driven-development`** | `in development` |
-| Multi-Step / mehrere Files | **`superpowers:writing-plans`** → **`superpowers:executing-plans`** | `in design` → `ready for development` → `in development` |
+| Multi-Step / mehrere Files | **`/opsx:propose`** → ⟨Checkpoint⟩ → **`/opsx:apply`** | `in design` → `ready for development` → `in development` |
+
+**Der Checkpoint in der letzten Zeile ist Pflicht, kein Stilmittel.** `/opsx:propose` trägt
+die *planning boundary*: es erzeugt `proposal.md`, Delta-Spec, `design.md` und `tasks.md`
+und **hält dann an** — „Do not start implementation in the same response, even if the initial
+request asks for it. Wait for a new user request after the artifacts are presented; then
+start the apply workflow." Der Stopp ist das erwartete Verhalten und **kein Fehler**: nicht
+umgehen, nicht im selben Zug weiterimplementieren. Die Artefakte dem Menschen vorlegen und
+auf `in design` stehen bleiben; **erst mit seiner Freigabe** auf `ready for development`, dann
+`/opsx:apply` und `in development`. (Dieselbe Reihenfolge wie in `dev-clickup-orchestrieren`,
+Phase 2: „nach Plan-Freigabe `ready for development`".)
+
+`/opsx:apply` arbeitet die `tasks.md` ab — die **Art zu arbeiten** bleibt davon unberührt:
+Aufgaben mit klarer Spec entstehen weiter per `superpowers:test-driven-development`, und
+Schritt 4 gilt unverändert.
+
+Die Planungsartefakte landen in **`openspec/changes/<name>/`**. `docs/superpowers/plans/`
+ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 
 ## Schritt 4: Abschluss
 
