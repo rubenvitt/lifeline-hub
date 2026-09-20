@@ -69,6 +69,16 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   lang nichts, obwohl die Daten längst da sind. **Die Aufwärmphase meldet also `offline`,
   obwohl die Quelle gerade geladen wird**; ein eigener Zwischenzustand dafür wäre eine
   Erweiterung des Fachebenen-Vertrags und ist bewusst nicht gebaut.
+- **Nach einem gescheiterten Lauf ruht die Ebene fünf Minuten** (`AUTOBAHN_ABKUEHLUNG`).
+  Ohne diese Sperre trommelte gerade der Aufwärmtakt eine ohnehin gestörte Quelle im
+  Halbminutentakt mit je 333 Abrufen. Der Poll bleibt, er kostet dann eine winzige
+  Leer-Antwort aus dem Backend statt eines Fächers. **Als Fehlschlag zählen zwei Türen, nicht
+  eine:** die Quelle antwortet nicht (oder zu löchrig), **und** der Cache lässt sich nicht
+  beschreiben (SQLite busy, Platte voll, read-only). Die zweite ist leicht zu übersehen, weil
+  der Lauf selbst geglückt ist — sein Ergebnis IST aber der Cache-Eintrag, und ohne ihn
+  beginnt derselbe Kreislauf. `cache::setze` meldet einen Schreibfehler deshalb zurück,
+  statt ihn nur zu loggen; die fünf anderen Ebenen dürfen ihn weiter ignorieren, weil sie
+  ihre Antwort im selben Request weiterreichen.
 - **Geltungsbereich Autobahn:** ausschließlich Bundesautobahnen. Das steht als sichtbare Zeile
   unter dem Ebenen-Label in der Lagekarten-Leiste (nicht als Tooltip — ein Führungs-Tablet
   hat kein Hovern). Innerorts-, Kreis- und Landstraßensperrungen deckt die Quelle **nicht** ab;

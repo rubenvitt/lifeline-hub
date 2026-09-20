@@ -2,8 +2,9 @@
 //! Schlüssel: `quelle` bzw. `quelle:<raster-bbox>`. Überlebt Backend-Neustarts.
 //!
 //! Cache-Fehler (DB-Lese-/Schreibfehler) sind NICHT fatal: Lesen → behandelt als Miss,
-//! Schreiben → nur geloggt. Eine erfolgreiche externe Abfrage darf nie an einem
-//! Cache-Schreibfehler scheitern.
+//! Schreiben → geloggt UND gemeldet. Eine erfolgreiche externe Abfrage darf nie an einem
+//! Cache-Schreibfehler scheitern — wohl aber muss ein Aufrufer, dessen einziges Ergebnis
+//! der Eintrag IST, erfahren, dass er nicht steht (siehe `setze`).
 
 use crate::karte::typen::FachebeneAntwort;
 use sqlx::SqlitePool;
@@ -75,12 +76,23 @@ pub async fn stale(pool: &SqlitePool, schluessel: &str) -> Option<FachebeneAntwo
 }
 
 /// Eintrag speichern (Upsert) und dabei überalterte Einträge wegräumen.
-pub async fn setze(pool: &SqlitePool, schluessel: &str, antwort: &FachebeneAntwort) {
+///
+/// Liefert `true`, wenn der Eintrag danach TATSÄCHLICH steht. Die meisten Ebenen dürfen das
+/// ignorieren: sie reichen ihre frische Antwort im selben Request ans Frontend weiter, ein
+/// misslungener Schreibvorgang kostet dort nur einen erneuten Abruf beim nächsten Poll.
+/// Für die Autobahn-Ebene ist es dagegen tragend — ihr Fächer hängt an keinem Request, sein
+/// EINZIGES Ergebnis ist dieser Eintrag (siehe `quellen::erneuere_autobahn`).
+///
+/// Bewusst **ohne** `#[must_use]`: fünf der sechs Aufrufer ignorieren den Wert zu Recht, und
+/// ein Gate, das an fünf Stellen mit `let _ =` stummgeschaltet wird, sichert nichts zu.
+///
+/// Ein gescheitertes Prune zählt NICHT als Fehlschlag — der Eintrag steht dann bereits.
+pub async fn setze(pool: &SqlitePool, schluessel: &str, antwort: &FachebeneAntwort) -> bool {
     let json = match serde_json::to_string(antwort) {
         Ok(j) => j,
         Err(e) => {
             tracing::warn!("Fachebenen-Cache: Serialisierung fehlgeschlagen: {e}");
-            return;
+            return false;
         }
     };
     if let Err(e) = sqlx::query(
@@ -95,7 +107,7 @@ pub async fn setze(pool: &SqlitePool, schluessel: &str, antwort: &FachebeneAntwo
     .await
     {
         tracing::warn!("Fachebenen-Cache: Schreibfehler: {e}");
-        return;
+        return false;
     }
     // Prune-on-Write: überalterte Einträge entfernen (begrenzt die Tabelle dauerhaft).
     if let Err(e) =
@@ -106,6 +118,7 @@ pub async fn setze(pool: &SqlitePool, schluessel: &str, antwort: &FachebeneAntwo
     {
         tracing::warn!("Fachebenen-Cache: Prune fehlgeschlagen: {e}");
     }
+    true
 }
 
 #[cfg(test)]
@@ -154,6 +167,28 @@ mod tests {
         let pool = crate::db::test_pool().await;
         assert!(frisch(&pool, "x", 60).await.is_none());
         assert!(stale(&pool, "x").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn geglueckter_schreibvorgang_wird_gemeldet() {
+        let pool = crate::db::test_pool().await;
+        assert!(setze(&pool, "dwd", &antwort()).await);
+    }
+
+    #[tokio::test]
+    async fn schreibfehler_wird_gemeldet_statt_nur_geloggt() {
+        // Ohne Tabelle scheitert das INSERT — der Stellvertreter für „SQLite busy /
+        // Platte voll / read-only". Der Rückgabewert ist die einzige Spur, an der ein
+        // Aufrufer das bemerken kann; nur geloggt sah ein misslungener Schreibvorgang für
+        // ihn wie ein geglückter aus. `erneuere_autobahn` hängt genau daran: dort ist der
+        // Eintrag das EINZIGE Ergebnis des Laufs, und ein stillschweigend verworfener
+        // Schreibvorgang liesse den Aufwärm-Takt alle 20 s einen neuen Fächer anstossen.
+        let pool = crate::db::test_pool().await;
+        sqlx::query("DROP TABLE fachebenen_cache")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!setze(&pool, "dwd", &antwort()).await);
     }
 
     #[tokio::test]

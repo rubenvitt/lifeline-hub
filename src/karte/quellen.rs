@@ -715,7 +715,18 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
         );
         return None;
     };
-    cache::setze(&pool, "autobahn", &a).await;
+    // Ein misslungener Schreibvorgang ist hier ein FEHLSCHLAG, nicht eine Randnotiz: dieser
+    // Lauf hängt an keinem Request, sein einziges Ergebnis IST der Cache-Eintrag. Meldete
+    // `setze` den Fehler nur ins Log und der Lauf trotzdem Erfolg, fiele die Abkühlung, der
+    // Cache bliebe leer — und der nächste Aufwärm-Poll 20 s später stiesse den nächsten
+    // Fächer mit 333 Abrufen an, dauerhaft. Das ist derselbe Schaden wie beim Quell-Ausfall,
+    // nur durch die Tür, die die Abkühlung nicht abdeckt (SQLite busy, Platte voll,
+    // read-only). Die fünf anderen Ebenen dürfen den Wert weiter ignorieren: sie reichen
+    // ihre Antwort im selben Request weiter, für sie ist der Cache eine Beschleunigung.
+    if !cache::setze(&pool, "autobahn", &a).await {
+        tracing::warn!("Autobahn: Lauf nicht speicherbar — gilt als Fehlschlag, Abkühlung greift");
+        return None;
+    }
     Some(a)
 }
 
