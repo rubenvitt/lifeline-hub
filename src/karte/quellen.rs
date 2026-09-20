@@ -15,7 +15,7 @@ use serde_json::Value;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 /// SWR-Kern: entscheidet anhand des Cache-Eintrags, ob sofort (frisch), sofort+Hintergrund-
@@ -474,11 +474,24 @@ pub(crate) fn autobahn_strassen(roh: &Value) -> Vec<String> {
     namen
 }
 
+/// Trägt dieser Teilabruf überhaupt eine Dienst-Liste? HTTP 200 mit gültigem JSON heisst
+/// NICHT, dass Daten drinstehen: ein `{}` oder ein Fehlerumschlag des Portals parst
+/// anstandslos. Ohne diese Prüfung zählte so eine Antwort als beantwortet, der
+/// Normalisierer überspränge sie still — und 333 davon ergäben eine „vollständige" Antwort
+/// mit null Features.
+fn autobahn_nutzlast(eintrag: &(String, String, Value)) -> bool {
+    let (_, dienst, antwort) = eintrag;
+    antwort.get(dienst).is_some_and(Value::is_array)
+}
+
 /// Ergebnis eines Fächer-Laufs → speicherbare Antwort, oder `None`, wenn der Lauf zu
 /// löchrig war. Rein und damit ohne Netz prüfbar — und zwar **an der Stelle, an der die
 /// Entscheidung wirkt**: wer hier `None` bekommt, schreibt nichts in den Cache und lässt den
 /// bisherigen Stand stehen. Eine Schwelle, die nur als eigene Prädikatsfunktion getestet
 /// wird, kann an der Aufrufstelle entfallen, ohne dass ein Test rot wird.
+///
+/// Gezählt wird, was eine **Dienst-Liste trägt**, nicht was ein HTTP 200 erwidert hat —
+/// sonst hinge die Schwelle an der Zustellung statt am Inhalt.
 ///
 /// Die Schwelle ist die **Hälfte**, und das ist eine Abwägung, keine Messung: ein bis zwei
 /// Ausfälle je Lauf sind normal (Drosselung) und dürfen den Lauf nicht verwerfen — sonst
@@ -489,7 +502,8 @@ pub(crate) fn autobahn_antwort(
     gesamt: usize,
     roh: &[(String, String, Value)],
 ) -> Option<FachebeneAntwort> {
-    if roh.is_empty() || roh.len() * 2 <= gesamt {
+    let brauchbar = roh.iter().filter(|e| autobahn_nutzlast(e)).count();
+    if brauchbar == 0 || brauchbar * 2 <= gesamt {
         return None;
     }
     Some(FachebeneAntwort::ok(
@@ -513,7 +527,31 @@ pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> Fachebene
     .await
 }
 
+/// Einzelspur für den Fächer. `liefere_mit_swr` entkoppelt nur die HINTERGRUND-Erneuerung
+/// (veralteter Cache) über `inflight`; sein **kalter** Zweig wartet direkt auf `erneuere()`
+/// und kennt keinen Riegel. Bei einer Ebene mit EINEM Abruf ist das belanglos — hier
+/// startete jeder Bediener, der die Ebene bei leerem Cache einschaltet, seine eigenen 333
+/// Abrufe. Schon zwei gleichzeitig ergäben die 16er-Nebenläufigkeit, bei der die Quelle
+/// gemessen drosselt; eine Anfangswelle vervielfachte das weiter.
+///
+/// Bewusst hier statt im geteilten `liefere_mit_swr`: dessen kalter Zweig trägt fünf weitere
+/// Ebenen, für die der Riegel nichts verbessert und deren Verhalten sich ändern würde.
+static AUTOBAHN_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+
 async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
+    // Wer wartet, fetcht danach NICHT blind nach: der Vorgänger hat den Cache in aller Regel
+    // gerade gefüllt. Der Wartende bekommt damit DATEN statt `offline` — das ist der
+    // Unterschied zu einem Riegel, der den Zweiten einfach abweist.
+    let _spur = AUTOBAHN_EINZELSPUR
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await;
+    if let Some((a, alter)) = cache::eintrag(&pool, "autobahn").await {
+        if alter < AUTOBAHN_TTL.as_secs() as i64 {
+            tracing::debug!("Autobahn: Lauf übersprungen, Vorgänger hat frisch gefüllt");
+            return Some(a);
+        }
+    }
     let liste = match hole_json(&client, AUTOBAHN_BASIS).await {
         Ok(v) => v,
         Err(e) => {
@@ -651,6 +689,44 @@ mod autobahn_strassen_tests {
         assert_eq!(a.attribution, "Autobahn GmbH des Bundes");
     }
 
+    /// Ein Eintrag, der zugestellt wurde, aber KEINE Dienst-Liste trägt: HTTP 200 mit
+    /// gültigem JSON, wie es ein Portal in Wartung erwidert.
+    fn leere_nutzlast(strasse: &str) -> (String, String, Value) {
+        (strasse.to_string(), "closure".to_string(), json!({}))
+    }
+
+    /// Der zweite Weg in denselben Schaden: die Abrufe GELINGEN alle, tragen aber keine
+    /// Liste. Zählte die Schwelle die Zustellung statt den Inhalt, ginge ein Lauf mit 333
+    /// leeren Nutzlasten als vollständig durch und überschriebe den gesunden Cache mit null
+    /// Features — genau das Bild, gegen das die Schwelle existiert.
+    #[test]
+    fn zugestellte_aber_leere_nutzlasten_zaehlen_nicht_als_antwort() {
+        let roh: Vec<_> = (0..333).map(|i| leere_nutzlast(&format!("A{i}"))).collect();
+        assert!(autobahn_antwort(333, &roh).is_none());
+
+        // Und die Gegenprobe: dieselbe Menge mit echten Listen geht durch. Ohne sie wäre der
+        // Test auch von einer Schwelle erfüllt, die grundsätzlich alles ablehnt.
+        let echt: Vec<_> = (0..333).map(|i| treffer(&format!("A{i}"))).collect();
+        assert!(autobahn_antwort(333, &echt).is_some());
+    }
+
+    /// Eine LEERE Dienst-Liste (`{"closure": []}`) ist eine gültige Antwort — „auf dieser
+    /// Strecke ist gerade nichts" — und muss mitzählen. Sonst verwürfe ein ruhiger Tag den
+    /// ganzen Lauf.
+    #[test]
+    fn leere_aber_vorhandene_dienstliste_zaehlt_mit() {
+        let ruhig: Vec<(String, String, Value)> = (0..333)
+            .map(|i| {
+                (
+                    format!("A{i}"),
+                    "closure".to_string(),
+                    json!({ "closure": [] }),
+                )
+            })
+            .collect();
+        assert!(autobahn_antwort(333, &ruhig).is_some());
+    }
+
     /// Die tragende Aussage, und zwar als NEGATIVE: aus einem Totalausfall entsteht gar keine
     /// Antwort. Gäbe es hier eine, überschriebe sie den gesunden Cache-Stand mit null
     /// Features, und die Ebene meldete zehn Minuten lang „keine Daten".
@@ -664,6 +740,41 @@ mod autobahn_strassen_tests {
         );
         let knapp_drueber: Vec<_> = (0..6).map(|i| treffer(&format!("A{i}"))).collect();
         assert!(autobahn_antwort(10, &knapp_drueber).is_some());
+    }
+
+    /// Die zweite Hälfte der Einzelspur: wer auf den Vorgänger gewartet hat, bekommt dessen
+    /// frischen Stand — und fetcht NICHT blind hinterher. Belegt über einen Client, der
+    /// nirgendwo hinkommt (Port 1, ECONNREFUSED): kommt trotzdem eine Antwort zurück, kann
+    /// sie nur aus dem Cache stammen. Ohne die Nachschau liefe der Wartende in die
+    /// Streckenliste, scheiterte und lieferte `None` — also 333 Abrufe umsonst und
+    /// `offline` für den Bediener.
+    ///
+    /// Die erste Hälfte (der Riegel selbst) ist bewusst NICHT getestet: zwei echte Fächer
+    /// gegeneinander laufen zu lassen hiesse, 666 Abrufe gegen eine fremde Behörden-API zu
+    /// schicken, und ein Test mit Netz wäre ohnehin eine Wackelstelle statt einer Aussage.
+    #[tokio::test]
+    async fn wartender_bekommt_den_frischen_stand_ohne_eigenen_abruf() {
+        let pool = crate::db::test_pool().await;
+        let vorgaenger = FachebeneAntwort::ok(
+            "autobahn",
+            AUTOBAHN_ATTRIB,
+            None,
+            json!({ "type": "FeatureCollection", "features": [
+                { "type": "Feature",
+                  "geometry": { "type": "Point", "coordinates": [7.0, 51.0] },
+                  "properties": { "titel": "A1 | X", "kategorie": "sperrung" } }
+            ]}),
+        );
+        cache::setze(&pool, "autobahn", &vorgaenger).await;
+
+        let nirgendwo = reqwest::Client::builder()
+            .timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let a = erneuere_autobahn(nirgendwo, pool)
+            .await
+            .expect("frischer Cache-Stand wird durchgereicht, ohne die Quelle anzufassen");
+        assert_eq!(a.features["features"][0]["properties"]["titel"], "A1 | X");
     }
 
     /// Randfall ohne eigene Bedeutung im Betrieb (eine leere Streckenliste bricht schon in
