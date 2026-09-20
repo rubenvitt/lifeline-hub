@@ -468,6 +468,53 @@ async fn fachebenen_kritis_ohne_bbox_ist_400() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
+/// Die Hochwasser-Ebene (LFH-77) muss im Quellen-`match` der Route stehen — sonst
+/// antwortet sie „Unbekannte Quelle" (400), obwohl Adapter und Frontend-Eintrag da sind.
+///
+/// Der Fachebenen-Cache wird VORHER gefüllt: `liefere_mit_swr` liefert einen frischen
+/// Eintrag ohne jeden Netzzugriff. So pinnt der Test zugleich den Cache-Schlüssel und
+/// bleibt netzunabhängig — ein Test, der die echte LHP-Seite abruft, wäre beim ersten
+/// Ausfall des Portals rot, ohne dass etwas am Code falsch wäre.
+#[tokio::test]
+async fn fachebenen_hochwasser_wird_bedient() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = build_router(AppState {
+        pool: pool().await,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+        karten_dir: karten_dir.clone(),
+    });
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let gesetzt = FachebeneAntwort::ok(
+        "hochwasser",
+        "Testattribution",
+        None,
+        serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "geometry": { "type": "Point", "coordinates": [8.0, 50.0] },
+                "properties": { "titel": "Testpegel", "klasse": "gross" }
+            }]
+        }),
+    );
+    lifeline_hub::karte::cache::setze(&cache_pool, "hochwasser", &gesetzt).await;
+
+    let res = anfrage(&app, "GET", "/api/karte/fachebenen/hochwasser", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["quelle"], "hochwasser");
+    assert_eq!(v["status"], "ok");
+    assert_eq!(v["features"]["features"].as_array().unwrap().len(), 1);
+}
+
 // ===== Admin-CRUD: Online-Quellen =====
 
 #[tokio::test]

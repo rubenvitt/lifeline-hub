@@ -26,6 +26,33 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('Meiden Sie überflutete Bereiche.')).toBeInTheDocument();
   });
 
+  it('Hochwasser: Meldeklasse im Wortlaut, Pegelname und Pegelnummer (LFH-77)', () => {
+    render(
+      <FachebenenInspector
+        quelle="hochwasser"
+        properties={{ titel: 'Wittenberge / Elbe', pgnr: 'BB_503050', klasse: 'gross' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Wittenberge / Elbe')).toBeInTheDocument();
+    // Das WORT ist der zweite Kanal (WCAG 1.4.1): auf der Karte trennt nur Farbe und
+    // Punktgröße die Klassen, hier muss dastehen, welche es ist.
+    expect(screen.getByText('großes Hochwasser')).toBeInTheDocument();
+    expect(screen.getByText('BB_503050')).toBeInTheDocument();
+  });
+
+  it('Hochwasser: ein Pegel ohne Meldeklassen sagt das, statt einen Rohwert zu zeigen', () => {
+    render(
+      <FachebenenInspector
+        quelle="hochwasser"
+        properties={{ titel: 'Irgendwo / Bach', pgnr: 'XX_1', klasse: 'unklassifiziert' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('ohne Meldeklassen')).toBeInTheDocument();
+    expect(screen.queryByText('unklassifiziert')).not.toBeInTheDocument();
+  });
+
   it('Pegel: Wasserstand mit Einheit, Zustand-Tag (high→Hoch), Gewässer', () => {
     render(
       <FachebenenInspector

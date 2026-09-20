@@ -5,6 +5,7 @@ import { renderMitProviders } from '../../test/utils';
 import Sidebar, { bedienzielStil, loeschDialogBild } from './Sidebar';
 import type { SidebarProps } from './Sidebar';
 import { dichten } from '../../theme/tokens';
+import { defaultFachebenenSichtbar } from './fachebenenAuswahl';
 
 const basisProps: SidebarProps = {
   einsatzId: 1,
@@ -55,7 +56,7 @@ const basisProps: SidebarProps = {
   ansichtDirty: false,
   ansichtSpeichert: false,
   onAnsichtSpeichern: vi.fn(),
-  fachebenenSichtbar: { nina: false, dwd: false, pegelonline: false, kritis: false },
+  fachebenenSichtbar: defaultFachebenenSichtbar(),
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
   // Neue Bild-Props

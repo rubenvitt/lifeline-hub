@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { theme } from 'antd';
 import { keepPreviousData, useQueries } from '@tanstack/react-query';
 import {
   ladeFachebene,
@@ -8,6 +9,7 @@ import {
 } from '../../api/fachebenen';
 import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, mergeFeatures } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
+import { faerbeHochwasser } from './hochwasserStil';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
 
@@ -21,17 +23,21 @@ interface FachebenenArgs {
 }
 
 /**
- * Fachebenen-Leg der Lagekarte: die vier externen Daten-Queries und ihre Ableitungen.
+ * Fachebenen-Leg der Lagekarte: die fünf externen Daten-Queries und ihre Ableitungen.
  * Die Sichtbarkeit hält seit LFH-319 `useKartenAnsicht` (geteilte Ansicht) — dieser Hook
  * bekommt sie als Prop und bietet nur den Toggle; kein eigener State/keine Persistenz.
  *
- * Die vier Queries laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
+ * Die Queries laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
  * kombinierte Ergebnis (structural sharing via replaceEqualDeep), sodass die Ableitungen
  * (aktiveFachebenen/status/laedt/attribution) OHNE manuelle Dep-Listen und OHNE
  * `eslint-disable react-hooks/exhaustive-deps` stabil bleiben — das inline gebaute,
  * pro Render instabile `fachebenenQueries`-Record (und die vier Disables) entfällt damit.
  */
 export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
+  // Die Hochwasserebene färbt je Pegel nach Meldeklasse und braucht dafür den aufgelösten
+  // Modus-Token — die Kartenstil-Module haben den bewusst nicht (LFH-328/A2), also wird er
+  // hier gelesen und in die Features gebacken.
+  const { token } = theme.useToken();
   const [kritisBbox, setKritisBbox] = useState<string | null>(null);
   // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis für KRITIS.
   const [kartenZoom, setKartenZoom] = useState<number | null>(null);
@@ -44,8 +50,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     features: [],
   });
 
-  // Vier Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys()
-  // (nina, dwd, pegelonline, kritis). KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
+  // Fünf Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys()
+  // (nina, dwd, pegelonline, hochwasser, kritis) — `byKey` unten hängt an DIESER Reihenfolge.
+  // KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
   // keepPreviousData, 6-h-staleTime/gcTime) im eigenen Config-Eintrag; kein refetchInterval.
   const kombiniert = useQueries({
     queries: [
@@ -68,6 +75,12 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         refetchInterval: FACHEBENEN.pegelonline.pollMs,
       },
       {
+        queryKey: globalKeys.fachebene('hochwasser'),
+        queryFn: () => ladeFachebene('hochwasser'),
+        enabled: fachebenenSichtbar.hochwasser,
+        refetchInterval: FACHEBENEN.hochwasser.pollMs,
+      },
+      {
         queryKey: globalKeys.fachebeneKritis(kritisBbox),
         queryFn: () => ladeFachebene('kritis', kritisBbox!),
         enabled: fachebenenSichtbar.kritis && !!kritisBbox,
@@ -85,14 +98,18 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         nina: ergebnisse[0],
         dwd: ergebnisse[1],
         pegelonline: ergebnisse[2],
-        kritis: ergebnisse[3],
+        hochwasser: ergebnisse[3],
+        kritis: ergebnisse[4],
       } as const;
       const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
         .filter((k) => fachebenenSichtbar[k])
         .map((k) => {
-          // KRITIS aus der akkumulierten Sammlung; übrige Quellen direkt aus der Query.
-          const daten = k === 'kritis' ? kritisAkku : (byKey[k].data?.features ?? leereFc);
+          // KRITIS aus der akkumulierten Sammlung; Hochwasser mit eingebackener Farbe und
+          // Punktgröße je Meldeklasse; übrige Quellen direkt aus der Query.
+          const roh = byKey[k].data?.features ?? leereFc;
+          const daten =
+            k === 'kritis' ? kritisAkku : k === 'hochwasser' ? faerbeHochwasser(roh, token) : roh;
           return { def: FACHEBENEN[k], daten };
         });
 

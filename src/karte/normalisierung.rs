@@ -122,6 +122,87 @@ pub fn kombiniere_nina(map_data: &Value, geometrien: &[(String, Value)]) -> Valu
     json!({ "type": "FeatureCollection", "features": features })
 }
 
+/// Hochwasserklasse des LHP als Wire-Wert.
+///
+/// Die Klassenlehre stammt aus dem Portal selbst (`js/lage-basics.js`, Kopfkommentar von
+/// `getColorLagePegel`): `-1` keine Daten/veraltet · `0` kein Hochwasser · `1` kleines ·
+/// `2` mittleres · `3` großes · `4` sehr großes Hochwasser. `UNK = 1` kennzeichnet einen
+/// Pegel, der GAR KEINE Meldeklassen führt — ohne Daten (`HW = -1`) bleibt aber „keine
+/// Daten" die stärkere Aussage, sonst sähe ein veralteter Pegel aus wie ein bloß
+/// unklassifizierter.
+///
+/// Diese Zeichenketten sind der Wire-Vertrag zu `frontend/src/api/fachebenen.ts`
+/// (`HochwasserKlasse`) und dort byte-gepinnt. Sie stehen in KEINEM OpenAPI-Schema:
+/// Fachebenen-Properties sind `HashMap<String, Value>`, ein registriertes Enum wäre eine
+/// Waise, auf die nichts zeigt. Deshalb sind die Literale hier UND dort gepinnt.
+fn hochwasser_klasse(hw: Option<&str>, unklassifiziert: bool) -> &'static str {
+    match hw {
+        Some("-1") => "keine_daten",
+        _ if unklassifiziert => "unklassifiziert",
+        Some("0") => "kein_hochwasser",
+        Some("1") => "klein",
+        Some("2") => "mittel",
+        Some("3") => "gross",
+        Some("4") => "sehr_gross",
+        // Klassifizierter Pegel ohne Klasse: „keine Daten" statt einer erfundenen Stufe.
+        _ => "keine_daten",
+    }
+}
+
+/// LHP `get_lagepegel.php` (Struct-of-Arrays) → GeoJSON-Punkte je Pegel.
+///
+/// Die Antwort ist KEINE Liste von Objekten, sondern sechs gleich lange Arrays
+/// (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`), die über den Index zusammengehören.
+/// LAT/LON kommen als Zeichenketten und werden hier zu Zahlen — ein String-Paar ist
+/// kein gültiges GeoJSON, und MapLibre zeichnet es kommentarlos nicht.
+pub fn normalisiere_hochwasser(roh: &Value) -> Value {
+    let spalte = |name: &str| roh.get(name).and_then(|v| v.as_array());
+    let (Some(pgnr), Some(lat), Some(lon)) = (spalte("PGNR"), spalte("LAT"), spalte("LON")) else {
+        return json!({ "type": "FeatureCollection", "features": [] });
+    };
+    let name = spalte("PGNAME");
+    let hw = spalte("HW");
+    let unk = spalte("UNK");
+    // Nur so weit laufen, wie ALLE Pflichtspalten reichen — eine verkürzte Spalte darf
+    // keine Zeile an die falschen Koordinaten heften.
+    let n = pgnr.len().min(lat.len()).min(lon.len());
+    let zahl = |v: Option<&Value>| -> Option<f64> {
+        match v? {
+            Value::Number(z) => z.as_f64(),
+            Value::String(s) => s.trim().parse::<f64>().ok(),
+            _ => None,
+        }
+    };
+    let text = |sp: Option<&Vec<Value>>, i: usize| -> Option<String> {
+        sp?.get(i).and_then(|v| v.as_str()).map(str::to_string)
+    };
+    let features: Vec<Value> = (0..n)
+        .filter_map(|i| {
+            let (lon, lat) = (zahl(lon.get(i))?, zahl(lat.get(i))?);
+            let nummer = pgnr.get(i).and_then(|v| v.as_str()).unwrap_or_default();
+            let titel = text(name, i)
+                .filter(|t| !t.trim().is_empty())
+                .unwrap_or_else(|| format!("Pegel {nummer}"));
+            let unklassifiziert = text(unk, i).as_deref() == Some("1");
+            let klasse = hochwasser_klasse(
+                hw.and_then(|sp| sp.get(i)).and_then(|v| v.as_str()),
+                unklassifiziert,
+            );
+            Some(json!({
+                "type": "Feature",
+                "geometry": { "type": "Point", "coordinates": [lon, lat] },
+                "properties": {
+                    "titel": titel,
+                    "kategorie": "hochwasser",
+                    "pgnr": nummer,
+                    "klasse": klasse
+                }
+            }))
+        })
+        .collect();
+    json!({ "type": "FeatureCollection", "features": features })
+}
+
 #[cfg(test)]
 mod nina_tests {
     use super::*;
@@ -402,5 +483,108 @@ mod pegelonline_tests {
             crate::karte::typen::leere_collection(),
         )
         .expect("Anker beschreibt die leere FeatureCollection");
+    }
+}
+
+#[cfg(test)]
+mod hochwasser_tests {
+    use super::*;
+
+    /// Ausschnitt einer echten `get_lagepegel.php`-Antwort (abgerufen 20.09.2026):
+    /// Struct-of-Arrays, LAT/LON als Zeichenketten, `HW` teils `null`.
+    fn roh() -> Value {
+        json!({
+            "PGNAME": ["Wittenberge / Elbe", "Wiesloch / Leimbach", "Hohensaaten West AP / Havel-Oder-Wasserstrasse"],
+            "PGNR": ["BB_503050", "BW_108", "BB_603400"],
+            "HW": ["0", null, "-1"],
+            "UNK": ["0", "1", "1"],
+            "LAT": ["52.9855", "49.2920", "52.8767"],
+            "LON": ["11.7594", "8.6791", "14.1518"]
+        })
+    }
+
+    fn feature(fc: &Value, i: usize) -> &Value {
+        &fc["features"][i]
+    }
+
+    #[test]
+    fn baut_punkte_aus_den_parallel_arrays() {
+        let fc = normalisiere_hochwasser(&roh());
+        assert_eq!(fc["features"].as_array().unwrap().len(), 3);
+        let f = feature(&fc, 0);
+        assert_eq!(f["geometry"]["type"], "Point");
+        // Koordinaten als ZAHLEN, nicht als Zeichenketten — GeoJSON verlangt das, und
+        // MapLibre zeichnet einen String-Punkt stillschweigend gar nicht.
+        assert_eq!(f["geometry"]["coordinates"], json!([11.7594, 52.9855]));
+        assert_eq!(f["properties"]["titel"], "Wittenberge / Elbe");
+        assert_eq!(f["properties"]["pgnr"], "BB_503050");
+        assert_eq!(f["properties"]["kategorie"], "hochwasser");
+    }
+
+    #[test]
+    fn bildet_die_hochwasserklassen_ab() {
+        let roh = json!({
+            "PGNAME": ["a", "b", "c", "d", "e", "f"],
+            "PGNR": ["1", "2", "3", "4", "5", "6"],
+            "HW": ["-1", "0", "1", "2", "3", "4"],
+            "UNK": ["0", "0", "0", "0", "0", "0"],
+            "LAT": ["50.0", "50.0", "50.0", "50.0", "50.0", "50.0"],
+            "LON": ["8.0", "8.0", "8.0", "8.0", "8.0", "8.0"]
+        });
+        let fc = normalisiere_hochwasser(&roh);
+        let klassen: Vec<&str> = fc["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["properties"]["klasse"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            klassen,
+            [
+                "keine_daten",
+                "kein_hochwasser",
+                "klein",
+                "mittel",
+                "gross",
+                "sehr_gross"
+            ]
+        );
+    }
+
+    #[test]
+    fn unklassifizierter_pegel_mit_daten_ist_unklassifiziert() {
+        let fc = normalisiere_hochwasser(&roh());
+        assert_eq!(feature(&fc, 1)["properties"]["klasse"], "unklassifiziert");
+    }
+
+    #[test]
+    fn unklassifizierter_pegel_ohne_daten_bleibt_keine_daten() {
+        // UNK=1 UND HW=-1 → „unklassifiziert, keine Daten/veraltet" (LHP-Klassenlehre).
+        // Die fehlenden Daten sind die stärkere Aussage; sonst sähe ein veralteter Pegel
+        // aus wie einer, der bloß keine Meldestufen führt.
+        let fc = normalisiere_hochwasser(&roh());
+        assert_eq!(feature(&fc, 2)["properties"]["klasse"], "keine_daten");
+    }
+
+    #[test]
+    fn ueberspringt_eintraege_ohne_brauchbare_koordinaten() {
+        let roh = json!({
+            "PGNAME": ["gut", "kaputt"],
+            "PGNR": ["1", "2"],
+            "HW": ["0", "0"],
+            "UNK": ["0", "0"],
+            "LAT": ["50.0", ""],
+            "LON": ["8.0", "8.0"]
+        });
+        let fc = normalisiere_hochwasser(&roh);
+        assert_eq!(fc["features"].as_array().unwrap().len(), 1);
+        assert_eq!(feature(&fc, 0)["properties"]["titel"], "gut");
+    }
+
+    #[test]
+    fn fremde_antwort_ergibt_leere_collection() {
+        let fc = normalisiere_hochwasser(&json!({ "fehler": "Wartung" }));
+        assert_eq!(fc["type"], "FeatureCollection");
+        assert_eq!(fc["features"].as_array().unwrap().len(), 0);
     }
 }

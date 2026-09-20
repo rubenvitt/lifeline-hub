@@ -16,6 +16,7 @@ import type {
   Verfuegbarkeit,
   Warnstufe,
 } from '../api/types';
+import type { HochwasserKlasse } from '../api/fachebenen';
 
 /**
  * Statusfarb-Vertrag (LFH-328 · A2). EINE Quelle für „welche Bedeutung hat welche
@@ -335,6 +336,38 @@ export const warnstufeKarte: Record<Warnstufe, StatusDarstellung> = {
  * Die Werte sind hier KOPIERT, nicht importiert: `theme/` darf nicht von `pages/`
  * abhängen. Die Gegenrichtung — `lagebild.ts` liest von hier — ist der Zielzustand.
  */
+/**
+ * Hochwasserklasse eines LHP-Pegels auf der Lagekarte (LFH-77).
+ *
+ * DIESELBE AUFLÖSUNGSVERENGUNG WIE BEI {@link warnstufeKarte}, und aus demselben Grund:
+ * das Portal führt vier Meldeklassen in vier eigenen Tönen (gelb/orange/rot/violett),
+ * A0 hat drei Statusrollen. `klein`/`mittel` fallen damit auf `achtung`,
+ * `gross`/`sehr_gross` auf `alarm` — die Farbe unterscheidet ZWEI Stufen, nicht vier.
+ * Eine fünfte Farbe gibt es dafür nicht.
+ *
+ * DIE ZWEI NEUTRALEN SIND EINE ENTSCHEIDUNG, KEIN RESTPOSTEN. Das Portal malt einen
+ * Pegel ohne Daten grau und einen unklassifizierten blau. Blau ist hier `bedien` und
+ * bezeichnet eine aktive Beziehung, keinen Zustand; es dafür zu vergeben hieße, die
+ * benannte Sichtungs-Ausnahme (SK IV) ein zweites Mal zu erfinden. Beide Klassen sagen
+ * operativ dasselbe — dieser Pegel trägt zum Hochwasserlagebild nichts bei —, also
+ * tragen sie dieselbe Rolle und werden über das Pflichtfeld `label` unterschieden.
+ *
+ * DER ZWEITE KANAL AUF DER KARTE IST DER PUNKTDURCHMESSER, nicht nur der Text: ein
+ * Kreis trägt keine Beschriftung. `pages/lagekarte/hochwasserStil.ts` staffelt den
+ * Radius, und eine gemeldete Klasse ist dort sichtbar größer als eine nicht gemeldete —
+ * dieselbe Lesart, die das Portal selbst fährt (`getRadiusPegel`). Das Wort steht im
+ * Inspector.
+ */
+export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
+  keine_daten: { rolle: 'neutral', label: 'keine Daten' },
+  unklassifiziert: { rolle: 'neutral', label: 'ohne Meldeklassen' },
+  kein_hochwasser: { rolle: 'normal', label: 'kein Hochwasser' },
+  klein: { rolle: 'achtung', label: 'kleines Hochwasser' },
+  mittel: { rolle: 'achtung', label: 'mittleres Hochwasser' },
+  gross: { rolle: 'alarm', label: 'großes Hochwasser' },
+  sehr_gross: { rolle: 'alarm', label: 'sehr großes Hochwasser' },
+};
+
 export const warnstufeKennzahl: Record<Warnstufe, StatusDarstellung> = {
   keine: { rolle: 'normal', label: 'keine' },
   niedrig: { rolle: 'normal', label: 'niedrig' },
