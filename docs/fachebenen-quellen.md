@@ -22,7 +22,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
 | **Strahlung / ODL (BfS)** (`odl`) | `https://www.imis.bfs.de/ogc/opendata/ows` (WFS 1.1.0, `opendata:odlinfo_odl_1h_latest`, `outputFormat=application/json`) | GeoJSON-Punkte direkt (~1 676 ortsfeste Sonden, EPSG:4326, Gamma-ODL-Stundenwert in µSv/h) → auf die gelesenen Felder normalisiert, mit Bewertungsstufe | **GeoNutzV bzw. Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0)**, auch kommerziell; Auflage laut BfS-Nutzungsbedingungen: Daten „in sachlicher Art und Weise darzustellen". Kein Schlüssel, keine dokumentierte Abrufgrenze. | `Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0` | 600 s (Quelle im Stundentakt) | leer + ausgegraut |
 | **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (111 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
-| **KRITIS / sensible Objekte** (`kritis`) | `https://overpass-api.de/api/interpreter` (Overpass QL, `nwr … out center`) | OSM-JSON → GeoJSON-Punkte (Zentroide), viewport-`bbox`-getrieben | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | 3600 s (KRITIS-Objekte ändern sich kaum) | leer + ausgegraut |
+| **KRITIS / sensible Objekte** (`kritis`) | Deutschland-Extrakt `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (Geofabrik, konfigurierbar), **kein Abruf je Anfrage** | OSM-PBF → eigener Bestand in `nachschlage-cache.db` (Nodes als Punkt, Ways/Relations als Bounding-Box-Mitte); Route liefert GeoJSON-Punkte je `bbox`, ab 5 000 Objekten Sammelpunkte | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | Import alle 168 h (`--kritis-extrakt-intervall-stunden`), Stand = `Last-Modified` des Extrakts | ohne Bestand leer + ausgegraut; ein vorhandener Bestand bleibt auch ohne Netz unbegrenzt gültig |
 
 ## Hinweise zur Anbindung
 
@@ -30,8 +30,9 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Geometrie → Einzel-Geometrie je Warnung). Der Aggregator lädt die Geometrien parallel und
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
 - **KRITIS** ist die einzige `bbox`-abhängige Ebene: Das Frontend meldet den Karten-Viewport
-  (Parameter `bbox=west,sued,ost,nord`) nach Kartenbewegung (debounced); der Aggregator cacht
-  pro gerundeter bbox. Fehlender/ungültiger `bbox` → HTTP 400.
+  (Parameter `bbox=west,sued,ost,nord`) nach Kartenbewegung (debounced), in jeder Zoomstufe.
+  Fehlender/ungültiger `bbox` → HTTP 400; eine Größengrenze gibt es seit LFH-83 nicht mehr.
+  Details im Abschnitt „KRITIS aus dem OSM-Extrakt" unten.
 - **LHP (`hochwasser`)** ist die zweite zweistufige Quelle — anders als NINA holt Stufe 1
   aber keine Daten, sondern einen **Sitzungs-Token**: die Webservices des Portals antworten
   nur mit einem gültigen, serverseitig ausgegebenen `ki`. Gemessen am 20.09.2026: ohne
@@ -54,7 +55,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   21.09.2026: HTTP 200, ~890 KB, ~1,1 s, 1 676 Sonden — davon 1 584 „in Betrieb" mit Wert,
   81 „defekt" und 11 „Testbetrieb", beide **ohne** Messwert und ohne Messende. Normalisiert
   (Kennung, Name, Wert, Einheit, Messende, Betriebsstatus, Stufe) bleiben ~358 KB (~36 KB
-  gzip); eine bbox- oder Zoombegrenzung wie bei KRITIS ist damit nicht nötig. Sonden ohne
+  gzip); eine bbox- oder Zoombegrenzung, wie sie KRITIS bis LFH-83 hatte, ist damit nicht nötig. Sonden ohne
   Messwert bleiben auf der Karte (Stufe `keine_messung`): eine ausgefallene Sonde ist in
   einer CBRN-Lage eine Lücke im Lagebild, die man sehen muss. Rund 70 Sonden standen zum
   Messzeitpunkt drei Stunden hinter dem aktuellen Stundenwert; das Messende steht deshalb
@@ -219,3 +220,76 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Mobilithek/DATEX II ist registrierungs-/zertifikatsbasiert. **Was seit LFH-80 da ist**, ist
   genau der eng gefasste Rest: die BAB-Ebene oben als Anfahrts-/Logistik-Hilfe und für die
   Lageaufklärung an der Autobahn. Ein flächendeckender Sperrungs-Layer bleibt zurückgestellt.
+
+## KRITIS aus dem OSM-Extrakt (LFH-83)
+
+Bis LFH-83 fragte die Route je Karten-Ausschnitt die öffentliche Overpass-API ab — erst ab
+Zoom 10, höchstens 1° × 1°, gesammelt auf höchstens 4 000 Punkte. Bundesweit war die Ebene
+damit nicht zu sehen, und jeder neue Ausschnitt war eine weitere Anfrage an eine fremde
+Fair-Use-Instanz. Jetzt:
+
+- **Quelle:** der Deutschland-Extrakt von Geofabrik (`germany-latest.osm.pbf`, am
+  21.09.2026 4,84 GB, Geofabrik leitet auf Spiegel wie `ftp5.gwdg.de` um). Die URL ist über
+  `--kritis-extrakt-url` / `LIFELINE_KRITIS_EXTRAKT_URL` auf einen eigenen Spiegel
+  umstellbar (nur https).
+- **Auswahl:** exakt die Tags der früheren Overpass-Query — `amenity=hospital|clinic`
+  (Krankenhaus), `amenity=nursing_home` und `social_facility=*` (Pflege),
+  `amenity=school|kindergarten` (Schule/Kita), `man_made=water_works|water_tower` (Wasser),
+  `power=substation` (Umspannwerk), `amenity=fire_station` (Feuerwehr), `amenity=police`
+  (Polizei). Flächen (Ways, Multipolygon-Relations) werden zur Mitte ihrer Bounding-Box,
+  wie Overpass `out center`.
+- **Takt:** Default-an in jeder Instanz, **auch im Dev-Stack**. 60 s nach dem Start, danach
+  stündlich wird geprüft, ob der Bestand älter als das Intervall ist (Vorgabe 168 h,
+  `--kritis-extrakt-intervall-stunden`). Vor dem Download ein `HEAD`: gleiche `ETag`
+  bzw. `Last-Modified` → kein Download, nur der Zeitpunkt wird fortgeschrieben. Die Datei
+  liegt nur während des Imports unter `<karten-dir>/kritis/` und wird danach immer gelöscht.
+- **Abschalten:** `--kritis-extrakt false` / `LIFELINE_KRITIS_EXTRAKT=false`. So startet die
+  Playwright-Suite; ohne früheren Bestand meldet die Ebene dann `offline`.
+- **Ausfall:** Scheitert ein Lauf (Netz, Platte, kaputte Datei, Extrakt ohne ein einziges
+  Objekt), bleibt der bisherige Bestand samt `stand` stehen, und der nächste stündliche Tick
+  versucht es erneut. Getauscht wird atomar über Staging-Tabellen.
+- **Stand:** `stand` in der Antwort ist das `Last-Modified` der Extrakt-Datei (RFC 3339), wie
+  der ausliefernde Spiegel es meldet — nicht der Abrufzeitpunkt. Geofabrik baut den Extrakt
+  täglich, der Wert liegt also nahe am OSM-Datenstand; exakt wäre der
+  `osmosis_replication_timestamp` im PBF-Kopf, den der Import nicht liest.
+- **Fehlschläge:** Scheitert ein Lauf erst beim oder nach dem Download, wird frühestens nach
+  6 h erneut geladen (`FEHLER_ABSTAND`) — sonst lüde jeder stündliche Tick die 4–5 GB neu.
+  Eine Zeitsperre statt eines Header-Vergleichs, weil die Spiegel unterschiedliche `ETag`s
+  melden. Ein gescheitertes `HEAD` (kein Netz) sperrt nicht.
+- **Verdichtung:** Liegen mehr als 5 000 Objekte im Ausschnitt, liefert die Route
+  Sammelpunkte (`sammelpunkt: true`, `anzahl`) aus einem fest am Nullmeridian/Äquator
+  verankerten Raster (0,01° bis 20°, kleinste Weite mit höchstens 5 000 Zellen). Die Zellen
+  werden beim Import je Rasterstufe vorberechnet (`kritis_zelle`). Eine Zelle zählt immer
+  ganz, damit Bündel beim Pannen nicht ihre Zahl ändern. Die Karte bündelt Einzelobjekte
+  und Sammelpunkte zusätzlich selbst (`cluster: true`, Zahl = Summe der `anzahl`).
+
+**Messung am echten Extrakt** (21.09.2026, Stand `Mon, 21 Sep 2026 01:43:18 GMT`,
+Release-Build, Apple Silicon, 16 Kerne):
+
+| Größe | Wert |
+|---|---|
+| KRITIS-Objekte | 263 394 (Node 76 535 · Way 184 560 · Relation 2 299) |
+| je Kategorie | Umspannwerk 107 616 · Schule/Kita 82 584 · Feuerwehr 29 164 · Pflege 25 895 · Wasser 9 203 · Krankenhaus 5 039 · Polizei 3 893 |
+| Einlesen, alle 16 Kerne | 50 s, Spitze **3,6 GB** RSS |
+| Einlesen, 4 Threads (so läuft der Import) | ~185 s, Spitze ~0,6 GB RSS |
+| Tausch inkl. Zellen | 8 s |
+| Cache-DB danach | 81 MB |
+| Abfrage DE / NRW / Köln | 47 ms (1 290 Sammelpunkte) · 15 ms (2 871) · 17 ms (1 490 Einzelobjekte) |
+
+Der Import läuft deshalb in einem eigenen Pool mit **4 Threads**: dreimal so lang, aber
+ein Sechstel des Speichers, und die übrigen Kerne bleiben dem Einsatzbetrieb. Im Dev-Build
+sind `osmpbf`, `protobuf`, `flate2` und `miniz_oxide` optimiert übersetzt
+(`[profile.dev.package.*]` in `Cargo.toml`), weil der Import auch dort Default-an ist.
+
+**Abhängigkeit `osmpbf`:** zieht `memmap2` 0.5.10 mit, für das `cargo audit` seit
+Einführung RUSTSEC-2026-0186 („unsound": ungeprüfter Zeiger-Offset) als **erlaubte Warnung**
+meldet. Der Import liest über `ElementReader::from_path` (gepufferter Dateileser), nicht über
+den mmap-Weg der Crate; die betroffene Funktion wird nicht aufgerufen. Neu bewerten, wenn
+jemand auf `Mmap`/`from_mmap` umstellt oder `osmpbf` eine Version mit neuerem `memmap2`
+bringt.
+
+**Grenzen:** Das ist keine amtliche KRITIS-Liste, sondern, was in OSM getaggt ist — Lücken
+und Fehlklassifikationen der Quelle werden übernommen (`social_facility=*` ist breit und
+bewusst unverändert aus der Overpass-Zeit übernommen). Der Geltungshinweis im Panel sagt
+das sichtbar.
+

@@ -135,9 +135,7 @@ export default function LagekartePage() {
     fachebenenStatus,
     fachebenenLaedt,
     fachebenenAttribution,
-    kritisZoomZuKlein,
     setKritisBbox,
-    setKartenZoom,
   } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
 
   const { style, basisAttribution } = useBasemap({
@@ -490,7 +488,6 @@ export default function LagekartePage() {
           fachebenenSichtbar={fachebenenSichtbar}
           fachebenenStatus={fachebenenStatus}
           onFachebeneToggle={onFachebeneToggle}
-          kritisZoomZuKlein={kritisZoomZuKlein}
           fachebenenLaedt={fachebenenLaedt}
           bilder={bilder}
           onBildUpload={onBildUpload}
@@ -570,7 +567,6 @@ export default function LagekartePage() {
             onBboxAenderung={
               fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined
             }
-            onZoomAenderung={setKartenZoom}
             onFachebeneKlick={onFachebeneKlick}
             bilder={bildOverlays}
             platzierBild={aktivesPlatzierBild}

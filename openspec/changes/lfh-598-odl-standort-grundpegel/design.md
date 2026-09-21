@@ -115,7 +115,7 @@ ist, und **wartet nie darauf** — auch nicht im kalten Fall (hier weicht es bew
 kalten Zweig von `liefere_mit_swr` ab, der blockiert). Bauform wie `fetch_autobahn`:
 `inflight`-Schlüssel gegen parallele Läufe, Abkühlung von einer Stunde nach einem
 Fehlschlag, damit ein gestörter GeoServer nicht bei jedem 10-min-Poll 8,6 MB anfragt.
-Eigener Timeout **90 s** per `.timeout()` am Request (Muster `KRITIS_TIMEOUT`): die 8 s des
+Eigener Timeout **90 s** per `.timeout()` am Request (Muster des früheren `KRITIS_TIMEOUT`, vor LFH-83): die 8 s des
 gemeinsamen Clients reichen gemessen nicht (10 s bei guter Leitung), und bei ~1 Mbit/s auf
 einem Fükw braucht der Abruf ~70 s. Da er niemanden blockiert, kostet der lange Timeout
 nur einen gebundenen Hintergrund-Task.

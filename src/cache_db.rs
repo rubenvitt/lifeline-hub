@@ -40,6 +40,48 @@ async fn schema_anlegen(pool: &SqlitePool) -> sqlx::Result<()> {
     )
     .execute(pool)
     .await?;
+    // KRITIS-Bestand aus dem OSM-Extrakt (LFH-83, `karte::kritis::bestand`). Der Import
+    // tauscht `kritis_objekt` samt Index aus; hier stehen sie nur, damit die Route vor dem
+    // ersten Import eine leere Tabelle statt eines Fehlers findet.
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS kritis_objekt (\
+             osm_typ         TEXT    NOT NULL, \
+             osm_id          INTEGER NOT NULL, \
+             lon             REAL    NOT NULL, \
+             lat             REAL    NOT NULL, \
+             kategorie       TEXT    NOT NULL, \
+             properties_json TEXT    NOT NULL, \
+             PRIMARY KEY (osm_typ, osm_id))",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS kritis_objekt_lon_lat ON kritis_objekt (lon, lat)")
+        .execute(pool)
+        .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS kritis_zelle (\
+             weite  REAL    NOT NULL, \
+             x      INTEGER NOT NULL, \
+             y      INTEGER NOT NULL, \
+             anzahl INTEGER NOT NULL, \
+             lon    REAL    NOT NULL, \
+             lat    REAL    NOT NULL, \
+             PRIMARY KEY (weite, x, y))",
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS kritis_import (\
+             id            INTEGER PRIMARY KEY CHECK (id = 1), \
+             stand         TEXT    NOT NULL, \
+             quelle_url    TEXT    NOT NULL, \
+             last_modified TEXT, \
+             etag          TEXT, \
+             importiert_at INTEGER NOT NULL, \
+             anzahl        INTEGER NOT NULL)",
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

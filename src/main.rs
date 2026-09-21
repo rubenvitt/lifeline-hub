@@ -146,6 +146,19 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         offline_katalog_manifest_url: config.offline_katalog_manifest_url.clone(),
     });
 
+    // KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt (LFH-83). Default-an; nach
+    // `init_karte_config`, weil die URL-Prüfung den Loopback-Schalter von dort liest.
+    lifeline_hub::karte::kritis::scheduler::starte(
+        karten_dir.clone(),
+        lifeline_hub::karte::kritis::scheduler::KritisExtraktConfig {
+            aktiv: config.kritis_extrakt,
+            url: config.kritis_extrakt_url.clone(),
+            intervall: std::time::Duration::from_secs(
+                config.kritis_extrakt_intervall_stunden * 3600,
+            ),
+        },
+    );
+
     // OIDC-Konfiguriertheit (LFH-41, Increment 3 SSO-Fundament) prozessweit setzen —
     // reine Config-Ableitung, KEIN Netzzugriff (Discovery ist Lazy: erst bei erster
     // OIDC-Nutzung, dann gecacht). Alle vier Settings (inkl. `oidc_redirect_url`) sind

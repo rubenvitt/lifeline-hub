@@ -36,7 +36,7 @@ import { tzIconKey } from './markerIcons';
 import { baueClusterDonut } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
-import { findeGeometrieAn } from './geo';
+import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
@@ -56,13 +56,15 @@ import {
   sorgeFuerFachebeneLayer,
   setzeFachebeneDaten,
   entferneFachebeneLayer,
-  fachebeneClickLayerId,
+  fachebeneClickLayerIds,
+  fachebeneSourceId,
+  entscheideFachebeneKlick,
+  type FachebeneKlickZiel,
 } from './fachebenenLayer';
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
 import type { Ecken } from '../../api/kartenbilder';
-import { KRITIS_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 
 // Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
@@ -165,8 +167,6 @@ export interface KartenflaecheProps {
   bilder?: BildOverlay[];
   /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
   onBboxAenderung?: (bbox: string) => void;
-  /** Aktuelles Zoom-Level nach Bewegung — z. B. um „näher heranzoomen"-Hinweise zu steuern. */
-  onZoomAenderung?: (zoom: number) => void;
   /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle + volle Geometrie
    *  (für Detail-Panel; Geometrie un-geclippt aus der geladenen FeatureCollection, LFH-146). */
   onFachebeneKlick?: (
@@ -214,7 +214,6 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onZeichnenBereitAenderung,
     fachebenen,
     onBboxAenderung,
-    onZoomAenderung,
     onFachebeneKlick,
     bilder,
     platzierBild,
@@ -802,21 +801,18 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, []);
 
-  // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
-  // bbox (für bbox-abhängige Ebenen wie KRITIS) nur ab KRITIS_MIN_ZOOM — verhindert riesige
-  // Overpass-Anfragen. Sendet sofort beim Wirksamwerden und dann nach jedem moveend (600ms-Debounce).
+  // Viewport (bbox) nach Kartenbewegung melden — für bbox-abhängige Ebenen wie KRITIS, in
+  // JEDER Zoomstufe (LFH-83: der Server verdichtet große Ausschnitte selbst zu Sammelpunkten,
+  // die frühere Mindest-Zoomstufe gegen riesige Overpass-Anfragen ist entfallen). Sendet
+  // sofort beim Wirksamwerden und dann nach jedem moveend (600ms-Debounce).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || (!onBboxAenderung && !onZoomAenderung)) return;
+    if (!map || !onBboxAenderung) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const verarbeite = () => {
-      const zoom = map.getZoom();
-      onZoomAenderung?.(zoom);
-      if (onBboxAenderung && zoom >= KRITIS_MIN_ZOOM) {
-        const b = map.getBounds();
-        onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
-      }
+      const b = map.getBounds();
+      onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
     };
 
     const melde = () => {
@@ -824,42 +820,74 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       timer = setTimeout(verarbeite, 600);
     };
 
-    verarbeite(); // initial (z. B. wenn KRITIS aktiviert wird während Karte bereits passend gezoomt ist)
+    verarbeite(); // initial (z. B. wenn KRITIS bei bereits stehender Karte aktiviert wird)
     map.on('moveend', melde);
     return () => {
       if (timer) clearTimeout(timer);
       map.off('moveend', melde);
     };
-  }, [onBboxAenderung, onZoomAenderung]);
+  }, [onBboxAenderung]);
 
   // Klick auf ein Fachebenen-Objekt → meldet Properties + Quelle nach oben (Detail-Panel).
   // Handler je aktivem anklickbaren Layer (Closure über die Quelle); Cursor wird zur Hand.
+  // Gebündelte Ebenen (KRITIS, LFH-83): ein Bündel oder Server-Sammelpunkt zoomt hinein, statt
+  // ein Detail-Panel zu öffnen — die Unterscheidung trifft `entscheideFachebeneKlick`.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const binds = (fachebenen ?? []).map((fe) => {
-      const id = fachebeneClickLayerId(fe.def);
-      const quelle = fe.def.key;
-      const klick = (e: maplibregl.MapLayerMouseEvent) => {
-        const props = (e.features?.[0]?.properties ?? {}) as Record<string, unknown>;
-        // Fläche/Umfang aus der VOLLEN (un-geclippten) Geometrie der geladenen FeatureCollection
-        // beziehen — e.features[0].geometry ist geojson-vt kachel-geclippt und ergäbe für
-        // mehrkachelige NINA/DWD-Warnungen zu kleine Werte (LFH-146). Properties bleiben aus
-        // dem Klick-Feature.
-        const geometrie = findeGeometrieAn({ lng: e.lngLat.lng, lat: e.lngLat.lat }, fe.daten);
-        onFachebeneKlick?.(props, quelle, geometrie);
-      };
-      const enter = () => {
-        map.getCanvas().style.cursor = 'pointer';
-      };
-      const leave = () => {
-        map.getCanvas().style.cursor = '';
-      };
-      map.on('click', id, klick);
-      map.on('mouseenter', id, enter);
-      map.on('mouseleave', id, leave);
-      return { id, klick, enter, leave };
-    });
+    const binds = (fachebenen ?? [])
+      .flatMap((fe) => fachebeneClickLayerIds(fe.def).map((id) => ({ id, fe })))
+      .map(({ id, fe }) => {
+        const quelle = fe.def.key;
+        const klick = (e: maplibregl.MapLayerMouseEvent) => {
+          const feature = e.features?.[0];
+          const props = (feature?.properties ?? {}) as Record<string, unknown>;
+          // Nur gebündelte Ebenen kennen Bündel und Sammelpunkte; jede andere bleibt beim
+          // Detail-Panel, egal was ihre Properties tragen.
+          const ziel: FachebeneKlickZiel = fe.def.buendeln
+            ? entscheideFachebeneKlick(props)
+            : { art: 'einzel' };
+          if (ziel.art !== 'einzel') {
+            // Mittelpunkt aus dem Feature (Punktgeometrie), nicht aus dem Klickort — sonst
+            // zöge das Hineinzoomen den Bündelrand statt des Bündels in die Bildmitte.
+            const g = feature?.geometry;
+            const center: [number, number] =
+              g?.type === 'Point'
+                ? [g.coordinates[0], g.coordinates[1]]
+                : [e.lngLat.lng, e.lngLat.lat];
+            if (ziel.art === 'buendel') {
+              const src = map.getSource(fachebeneSourceId(quelle)) as GeoJSONSource | undefined;
+              src
+                ?.getClusterExpansionZoom(ziel.clusterId)
+                .then((zoom) => map.easeTo({ center, zoom }))
+                .catch(() => {
+                  /* Bündel nach Daten-Update weg → ignorieren */
+                });
+            } else {
+              map.easeTo({ center, zoom: map.getZoom() + ziel.zoomSchritt });
+            }
+            return;
+          }
+          // Properties und volle Geometrie aus DEMSELBEN Feature (LFH-282, siehe
+          // `werteFachebenenKlickAus`).
+          const aus = werteFachebenenKlickAus(
+            feature,
+            { lng: e.lngLat.lng, lat: e.lngLat.lat },
+            fe.daten,
+          );
+          onFachebeneKlick?.(aus.props, quelle, aus.geometrie);
+        };
+        const enter = () => {
+          map.getCanvas().style.cursor = 'pointer';
+        };
+        const leave = () => {
+          map.getCanvas().style.cursor = '';
+        };
+        map.on('click', id, klick);
+        map.on('mouseenter', id, enter);
+        map.on('mouseleave', id, leave);
+        return { id, klick, enter, leave };
+      });
     return () => {
       for (const b of binds) {
         map.off('click', b.id, b.klick);

@@ -1,4 +1,4 @@
-//! Aggregator für externe Fachebenen (NINA, DWD, PEGELONLINE, KRITIS/OSM).
+//! Aggregator für externe Fachebenen (NINA, DWD, PEGELONLINE, KRITIS/OSM-Extrakt).
 //! Holt externe Geodaten, normalisiert sie zu GeoJSON und liefert einen
 //! einheitlichen Umschlag mit definiertem Offline-Verhalten.
 
@@ -6,6 +6,7 @@ pub mod assets;
 pub mod cache;
 pub mod download;
 pub mod katalog;
+pub mod kritis;
 pub mod mbtiles;
 pub mod normalisierung;
 pub mod odl_grundpegel;

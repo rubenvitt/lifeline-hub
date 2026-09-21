@@ -166,8 +166,6 @@ export interface SidebarProps {
       import('../../api/fachebenen').FachebeneStatus
     >
   >;
-  /** KRITIS ist aktiv, aber die Karte ist zu weit herausgezoomt für eine Abfrage. */
-  kritisZoomZuKlein?: boolean;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
   fachebenenLaedt?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Bild-Hintergründe */
@@ -625,7 +623,6 @@ export default function Sidebar(props: SidebarProps) {
             const sichtbar = props.fachebenenSichtbar[key];
             const offline = status === 'offline';
             const laedt = sichtbar && props.fachebenenLaedt?.[key];
-            const zoomHinweis = sichtbar && key === 'kritis' && props.kritisZoomZuKlein;
             return (
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Space align="start">
@@ -646,23 +643,26 @@ export default function Sidebar(props: SidebarProps) {
                 </Space>
                 {laedt ? (
                   <Spin size="small" />
-                ) : zoomHinweis ? (
-                  <Tooltip title="KRITIS-Objekte werden erst ab einer näheren Zoomstufe geladen">
-                    <Typography.Text type="warning" style={{ fontSize: 11 }}>
-                      näher heranzoomen
-                    </Typography.Text>
-                  </Tooltip>
                 ) : (
                   <>
+                    {/* `nowrap`: neben einer Ebene mit Geltungszeile bleibt der Marke sonst so
+                        wenig Breite, dass sie mitten im Wort bricht („offl/ine") — gemessen an
+                        KRITIS in der Aufwärmphase (LFH-83). */}
                     {sichtbar && offline && (
                       <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
-                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                        <Typography.Text
+                          type="secondary"
+                          style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                        >
                           offline
                         </Typography.Text>
                       </Tooltip>
                     )}
                     {sichtbar && status === 'leer' && (
-                      <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                      >
                         keine Daten
                       </Typography.Text>
                     )}

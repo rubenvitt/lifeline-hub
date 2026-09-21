@@ -364,64 +364,63 @@ mod nina_tests {
     }
 }
 
-/// Overpass-JSON (`elements` mit `lat`/`lon` bei Nodes bzw. `center` bei Ways/Relations,
-/// dank `out center`) → GeoJSON-Points. `kategorie` aus den Tags; zusätzlich Adresse,
-/// Betreiber, Telefon, Website und (falls getaggt) Notaufnahme — alles als flache
-/// Skalar-Properties (MapLibre stringifiziert verschachtelte Objekte beim Query).
-pub fn normalisiere_overpass(roh: &Value) -> Value {
-    let elemente = roh
-        .get("elements")
-        .and_then(|e| e.as_array())
-        .cloned()
-        .unwrap_or_default();
-    let features: Vec<Value> = elemente
+/// Tag-Paare, an denen ein OSM-Objekt als KRITIS-Objekt erkannt wird (LFH-83). Exakt die
+/// Auswahl der früheren Overpass-Query; `social_facility` zählt mit JEDEM Wert (`None`).
+/// Eine Quelle für Import-Filter und Kategorie — sonst könnte der Filter ein Objekt
+/// durchlassen, dem die Kategorie dann nur noch „kritis" zuordnen kann.
+pub const KRITIS_TAGS: [(&str, Option<&str>); 11] = [
+    ("amenity", Some("hospital")),
+    ("amenity", Some("clinic")),
+    ("amenity", Some("nursing_home")),
+    ("social_facility", None),
+    ("amenity", Some("school")),
+    ("amenity", Some("kindergarten")),
+    ("man_made", Some("water_works")),
+    ("man_made", Some("water_tower")),
+    ("power", Some("substation")),
+    ("amenity", Some("fire_station")),
+    ("amenity", Some("police")),
+];
+
+/// True, wenn das Tag-Paar eines der [`KRITIS_TAGS`] ist — der billige Vorfilter beim
+/// Lesen des Extrakts, bevor Tags in eine Map gesammelt werden.
+pub fn ist_kritis_tag(k: &str, v: &str) -> bool {
+    KRITIS_TAGS
         .iter()
-        .filter_map(|el| {
-            let (lon, lat) = if let (Some(lon), Some(lat)) = (
-                el.get("lon").and_then(|v| v.as_f64()),
-                el.get("lat").and_then(|v| v.as_f64()),
-            ) {
-                (lon, lat)
-            } else {
-                let c = el.get("center")?;
-                (c.get("lon")?.as_f64()?, c.get("lat")?.as_f64()?)
-            };
-            let tags = el.get("tags").and_then(|t| t.as_object());
-            let g = |k: &str| tags.and_then(|t| t.get(k)).and_then(|v| v.as_str());
-            let kategorie = kritis_kategorie(tags);
-            let titel = g("name").unwrap_or_else(|| kategorie_label(&kategorie));
-            let notaufnahme = match g("emergency") {
-                Some("yes") => Some("ja"),
-                Some("no") => Some("nein"),
-                _ => None,
-            };
-            Some(json!({
-                "type": "Feature",
-                "geometry": { "type": "Point", "coordinates": [lon, lat] },
-                "properties": {
-                    "titel": titel,
-                    "kategorie": kategorie,
-                    "adresse": baue_adresse(tags),
-                    "betreiber": g("operator"),
-                    "telefon": g("phone").or_else(|| g("contact:phone")),
-                    "website": g("website").or_else(|| g("contact:website")).or_else(|| g("url")),
-                    "notaufnahme": notaufnahme
-                }
-            }))
-        })
-        .collect();
-    json!({ "type": "FeatureCollection", "features": features })
+        .any(|(tk, tv)| *tk == k && tv.is_none_or(|tv| tv == v))
+}
+
+/// OSM-Tags eines Objekts → flache KRITIS-Properties (`titel`, `kategorie`, `adresse`,
+/// `betreiber`, `telefon`, `website`, `notaufnahme`); `None`, wenn kein KRITIS-Tag
+/// gesetzt ist. Alles flache Skalare — MapLibre stringifiziert verschachtelte Objekte
+/// beim Query.
+pub fn kritis_properties<'a>(tag: impl Fn(&str) -> Option<&'a str>) -> Option<Value> {
+    let kategorie = kritis_kategorie(&tag)?;
+    let titel = tag("name").unwrap_or_else(|| kategorie_label(kategorie));
+    let notaufnahme = match tag("emergency") {
+        Some("yes") => Some("ja"),
+        Some("no") => Some("nein"),
+        _ => None,
+    };
+    Some(json!({
+        "titel": titel,
+        "kategorie": kategorie,
+        "adresse": baue_adresse(&tag),
+        "betreiber": tag("operator"),
+        "telefon": tag("phone").or_else(|| tag("contact:phone")),
+        "website": tag("website").or_else(|| tag("contact:website")).or_else(|| tag("url")),
+        "notaufnahme": notaufnahme
+    }))
 }
 
 /// Baut „Straße Hausnr., PLZ Ort" aus OSM-`addr:*`-Tags; None wenn nichts vorhanden.
-fn baue_adresse(tags: Option<&serde_json::Map<String, Value>>) -> Option<String> {
-    let g = |k: &str| tags.and_then(|t| t.get(k)).and_then(|v| v.as_str());
-    let strasse = match (g("addr:street"), g("addr:housenumber")) {
+fn baue_adresse<'a>(tag: &impl Fn(&str) -> Option<&'a str>) -> Option<String> {
+    let strasse = match (tag("addr:street"), tag("addr:housenumber")) {
         (Some(s), Some(h)) => Some(format!("{s} {h}")),
         (Some(s), None) => Some(s.to_string()),
         _ => None,
     };
-    let ort = match (g("addr:postcode"), g("addr:city")) {
+    let ort = match (tag("addr:postcode"), tag("addr:city")) {
         (Some(p), Some(c)) => Some(format!("{p} {c}")),
         (None, Some(c)) => Some(c.to_string()),
         (Some(p), None) => Some(p.to_string()),
@@ -435,30 +434,21 @@ fn baue_adresse(tags: Option<&serde_json::Map<String, Value>>) -> Option<String>
     }
 }
 
-fn kritis_kategorie(tags: Option<&serde_json::Map<String, Value>>) -> String {
-    let g = |k: &str| tags.and_then(|t| t.get(k)).and_then(|v| v.as_str());
-    if g("amenity") == Some("hospital") || g("amenity") == Some("clinic") {
-        return "krankenhaus".into();
-    }
-    if g("amenity") == Some("nursing_home") || g("social_facility").is_some() {
-        return "pflege".into();
-    }
-    if g("amenity") == Some("school") || g("amenity") == Some("kindergarten") {
-        return "schule".into();
-    }
-    if g("man_made") == Some("water_works") || g("man_made") == Some("water_tower") {
-        return "wasser".into();
-    }
-    if g("power") == Some("substation") {
-        return "strom".into();
-    }
-    if g("amenity") == Some("fire_station") {
-        return "feuerwehr".into();
-    }
-    if g("amenity") == Some("police") {
-        return "polizei".into();
-    }
-    "kritis".into()
+/// Kategorie in fester Vorrangfolge (ein Objekt mit Krankenhaus- UND Pflege-Tag ist
+/// Krankenhaus); `None` ohne KRITIS-Tag.
+fn kritis_kategorie<'a>(tag: &impl Fn(&str) -> Option<&'a str>) -> Option<&'static str> {
+    let amenity = tag("amenity");
+    let man_made = tag("man_made");
+    Some(match () {
+        _ if matches!(amenity, Some("hospital" | "clinic")) => "krankenhaus",
+        _ if amenity == Some("nursing_home") || tag("social_facility").is_some() => "pflege",
+        _ if matches!(amenity, Some("school" | "kindergarten")) => "schule",
+        _ if matches!(man_made, Some("water_works" | "water_tower")) => "wasser",
+        _ if tag("power") == Some("substation") => "strom",
+        _ if amenity == Some("fire_station") => "feuerwehr",
+        _ if amenity == Some("police") => "polizei",
+        _ => return None,
+    })
 }
 
 fn kategorie_label(k: &str) -> &'static str {
@@ -475,48 +465,86 @@ fn kategorie_label(k: &str) -> &'static str {
 }
 
 #[cfg(test)]
-mod overpass_tests {
+mod kritis_tests {
     use super::*;
-    #[test]
-    fn node_wird_punkt() {
-        let roh = json!({ "elements": [ { "type": "node", "lon": 6.9, "lat": 50.9, "tags": { "amenity": "hospital", "name": "Uniklinik" } } ] });
-        let fc = normalisiere_overpass(&roh);
-        assert_eq!(fc["features"][0]["properties"]["kategorie"], "krankenhaus");
-        assert_eq!(fc["features"][0]["properties"]["titel"], "Uniklinik");
+    use std::collections::HashMap;
+
+    fn props(paare: &[(&str, &str)]) -> Option<Value> {
+        let m: HashMap<String, String> = paare
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        kritis_properties(|k| m.get(k).map(String::as_str))
     }
+
+    /// Jede der elf Tag-Kombinationen der früheren Overpass-Query → ihre Kategorie. Die
+    /// Wörter sind Schnittstelle (Frontend `KATEGORIE_LABEL`) und hier wörtlich gepinnt.
     #[test]
-    fn way_mit_center_wird_punkt() {
-        let roh = json!({ "elements": [ { "type": "way", "center": { "lon": 7.0, "lat": 51.0 }, "tags": { "power": "substation" } } ] });
-        let fc = normalisiere_overpass(&roh);
-        assert_eq!(fc["features"][0]["geometry"]["coordinates"][0], 7.0);
-        assert_eq!(fc["features"][0]["properties"]["kategorie"], "strom");
-        assert_eq!(fc["features"][0]["properties"]["titel"], "Umspannwerk");
+    fn jede_tag_kombination_hat_ihre_kategorie() {
+        let erwartet = [
+            (("amenity", "hospital"), "krankenhaus"),
+            (("amenity", "clinic"), "krankenhaus"),
+            (("amenity", "nursing_home"), "pflege"),
+            (("social_facility", "group_home"), "pflege"),
+            (("amenity", "school"), "schule"),
+            (("amenity", "kindergarten"), "schule"),
+            (("man_made", "water_works"), "wasser"),
+            (("man_made", "water_tower"), "wasser"),
+            (("power", "substation"), "strom"),
+            (("amenity", "fire_station"), "feuerwehr"),
+            (("amenity", "police"), "polizei"),
+        ];
+        assert_eq!(erwartet.len(), KRITIS_TAGS.len());
+        for ((k, v), kat) in erwartet {
+            assert!(ist_kritis_tag(k, v), "{k}={v} muss als KRITIS-Tag gelten");
+            assert_eq!(props(&[(k, v)]).unwrap()["kategorie"], kat, "{k}={v}");
+        }
     }
+
+    #[test]
+    fn ohne_kritis_tag_kein_objekt() {
+        assert!(props(&[("amenity", "cafe"), ("name", "Café")]).is_none());
+        assert!(!ist_kritis_tag("amenity", "cafe"));
+        assert!(!ist_kritis_tag("power", "tower"));
+    }
+
+    #[test]
+    fn titel_faellt_auf_kategorie_zurueck() {
+        assert_eq!(
+            props(&[("power", "substation")]).unwrap()["titel"],
+            "Umspannwerk"
+        );
+        assert_eq!(
+            props(&[("amenity", "hospital"), ("name", "Uniklinik")]).unwrap()["titel"],
+            "Uniklinik"
+        );
+    }
+
     #[test]
     fn reichert_adresse_und_kontakt_an() {
-        let roh = json!({ "elements": [ { "type": "node", "lon": 6.9, "lat": 50.9, "tags": {
-            "amenity": "hospital", "name": "Klinik", "addr:street": "Hauptstr.", "addr:housenumber": "1",
-            "addr:postcode": "50667", "addr:city": "Köln", "operator": "Stadt Köln", "phone": "0221-1",
-            "emergency": "yes"
-        } } ] });
-        let p = &normalisiere_overpass(&roh)["features"][0]["properties"];
+        let p = props(&[
+            ("amenity", "hospital"),
+            ("name", "Klinik"),
+            ("addr:street", "Hauptstr."),
+            ("addr:housenumber", "1"),
+            ("addr:postcode", "50667"),
+            ("addr:city", "Köln"),
+            ("operator", "Stadt Köln"),
+            ("contact:phone", "0221-1"),
+            ("emergency", "yes"),
+        ])
+        .unwrap();
         assert_eq!(p["adresse"], "Hauptstr. 1, 50667 Köln");
         assert_eq!(p["betreiber"], "Stadt Köln");
         assert_eq!(p["telefon"], "0221-1");
         assert_eq!(p["notaufnahme"], "ja");
     }
 
-    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    /// Ein Krankenhaus mit Pflegeangebot bleibt Krankenhaus (Vorrangfolge).
     #[test]
-    fn overpass_output_passt_auf_den_geojson_anker() {
-        let roh = json!({ "elements": [ { "type": "node", "lon": 6.9, "lat": 50.9, "tags": {
-            "amenity": "hospital", "name": "Klinik", "addr:street": "Hauptstr.", "addr:housenumber": "1",
-            "operator": "Stadt Köln", "emergency": "yes"
-        } } ] });
-        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
-            normalisiere_overpass(&roh),
-        )
-        .expect("Anker beschreibt die reale Overpass-Form");
+    fn vorrang_krankenhaus_vor_pflege() {
+        let p = props(&[("amenity", "hospital"), ("social_facility", "nursing_home")]);
+        assert_eq!(p.unwrap()["kategorie"], "krankenhaus");
     }
 }
 

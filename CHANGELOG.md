@@ -1,3 +1,10 @@
+## [1.0.0-alpha.21](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.20...v1.0.0-alpha.21) (2026-09-21)
+
+### Bug Fixes
+
+* **lagekarte:** Fachebenen-Kennzahlen ans angeklickte Feature koppeln (LFH-282) ([cd664f2](https://github.com/rubenvitt/lifeline-hub/commit/cd664f22a13318d551a6135905157a7f46f74bcf))
+* **lagekarte:** Fachebenen-Klick über die Properties statt über den Index zuordnen (LFH-282) ([aed6231](https://github.com/rubenvitt/lifeline-hub/commit/aed62313072c355de4d325785f5e82669e6f458e)), closes [#78](https://github.com/rubenvitt/lifeline-hub/issues/78)
+
 ## [1.0.0-alpha.20](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.19...v1.0.0-alpha.20) (2026-09-21)
 
 ### Features

@@ -7,6 +7,13 @@ AREA   ?= germany
 FORMAT ?= mbtiles
 OUT    ?= out
 IMAGE  := versatiles/versatiles-planetiler:latest
+# HOST_OUT = derselbe Ordner wie $(OUT), aber so, wie ihn der DOCKER-DAEMON sieht (LFH-602).
+# Läuft `make` selbst in einem Container und spricht über den gemounteten Socket mit dem
+# Daemon des Hosts, löst der Daemon den `-v`-Pfad auf dem HOST auf — $(CURDIR) ist dort ein
+# Pfad, den es nicht gibt, und Docker legt stillschweigend einen leeren Ordner an: der Bau
+# läuft durch, das Ergebnis landet aber außerhalb des Containers und die Bounds-Prüfung
+# findet nichts. Ohne Container ist beides derselbe Pfad, der Default ändert daher nichts.
+HOST_OUT ?= $(CURDIR)/$(OUT)
 
 .PHONY: tiles validate
 tiles:
@@ -17,7 +24,7 @@ tiles:
 	# und JEDER Build dieselbe Region liefert. Also die Region-PBFs (klein, werden neu geladen) +
 	# renumbered.osm.pbf vor dem Build entfernen; Wasser-Polygone/Countries/tile_weights bleiben gecacht.
 	rm -f "$(CURDIR)/$(OUT)/sources/"*.osm.pbf "$(CURDIR)/$(OUT)/sources/renumbered.osm.pbf"
-	docker run --rm -v "$(CURDIR)/$(OUT):/app/data" $(IMAGE) \
+	docker run --rm -v "$(HOST_OUT):/app/data" $(IMAGE) \
 	  --area $(AREA) --format $(FORMAT) --checksum
 	@echo "Fertig. Fertige Datei liegt in $(CURDIR)/$(OUT)/result/osm*.$(FORMAT) (+ .sha256)."
 	@echo "Diese .mbtiles hosten und URL + Groesse + SHA256 in src/config.rs::default_offline_katalog() pinnen."

@@ -173,22 +173,100 @@ describe('useFachebenen', () => {
     expect(result.current.fachebenenAttribution).toContain('© NINA');
   });
 
-  it('akkumuliert KRITIS über einen bbox-Wechsel (ersetzt nicht)', async () => {
+  it('ersetzt KRITIS bei einem bbox-Wechsel, statt zu akkumulieren (LFH-83)', async () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('kritis', true));
     act(() => result.current.setKritisBbox('bbox1'));
+    const kritis = () => result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis');
     await waitFor(() =>
-      expect(
-        result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')?.daten.features,
-      ).toHaveLength(1),
+      expect(kritis()?.daten.features[0]?.geometry?.coordinates).toEqual([10, 51]),
     );
     act(() => result.current.setKritisBbox('bbox2'));
-    // Beide Objekte bleiben sichtbar (mergeFeatures akkumuliert), nicht nur das neue.
+    // Der Server liefert je Ausschnitt den vollständigen Bestand bzw. dessen Sammelpunkte.
+    // Akkumulierte die Ebene weiter, lägen nach dem Herauszoomen Einzelobjekte UND die
+    // Sammelpunkte derselben Gegend übereinander — und die Bündelzahl zählte doppelt.
     await waitFor(() =>
-      expect(
-        result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')?.daten.features,
-      ).toHaveLength(2),
+      expect(kritis()?.daten.features[0]?.geometry?.coordinates).toEqual([11, 52]),
     );
+    expect(kritis()?.daten.features).toHaveLength(1);
+  });
+
+  it('hält beim bbox-Wechsel die bisherigen KRITIS-Daten, bis die neuen da sind (LFH-83)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    const original = lade.getMockImplementation()!;
+    let freigeben: () => void = () => {};
+    lade.mockImplementation((quelle, bbox) => {
+      if (quelle !== 'kritis' || bbox !== 'bbox2') return original(quelle, bbox);
+      return new Promise((ok) => {
+        freigeben = () => void original(quelle, bbox).then(ok);
+      });
+    });
+    try {
+      const { result } = rendere();
+      const kritis = () => result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis');
+      act(() => result.current.onFachebeneToggle('kritis', true));
+      act(() => result.current.setKritisBbox('bbox1'));
+      await waitFor(() => expect(kritis()?.daten.features).toHaveLength(1));
+      act(() => result.current.setKritisBbox('bbox2'));
+      await waitFor(() => expect(result.current.fachebenenLaedt.kritis).toBe(true));
+      // Während die neue bbox lädt: kein Leer-Blinken, das alte Bild steht.
+      expect(kritis()?.daten.features[0]?.geometry?.coordinates).toEqual([10, 51]);
+      act(() => freigeben());
+      await waitFor(() =>
+        expect(kritis()?.daten.features[0]?.geometry?.coordinates).toEqual([11, 52]),
+      );
+    } finally {
+      lade.mockImplementation(original);
+    }
+  });
+
+  it('fragt KRITIS im Aufwärm-Takt nach, solange der Bestand offline ist (LFH-83)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    const original = lade.getMockImplementation()!;
+    let rufe = 0;
+    lade.mockImplementation((quelle, bbox) => {
+      if (quelle !== 'kritis') return original(quelle, bbox);
+      rufe += 1;
+      return Promise.resolve({
+        quelle,
+        status: 'offline',
+        attribution: '© OpenStreetMap-Beitragende (ODbL)',
+        stand: null,
+        features: fx.fc([]),
+      });
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { result } = rendere();
+      act(() => result.current.onFachebeneToggle('kritis', true));
+      act(() => result.current.setKritisBbox('bbox1'));
+      await waitFor(() => expect(result.current.fachebenenStatus.kritis).toBe('offline'));
+      const nachErstemRuf = rufe;
+      // Ohne Kartenbewegung: der erste Bestand muss trotzdem erscheinen (Spec „Erster Start").
+      await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.kritis.aufwaermPollMs! + 1_000));
+      expect(rufe).toBeGreaterThan(nachErstemRuf);
+    } finally {
+      vi.useRealTimers();
+      lade.mockImplementation(original);
+    }
+  });
+
+  it('pollt KRITIS nicht, sobald ein Bestand da ist (LFH-83)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { result } = rendere();
+      act(() => result.current.onFachebeneToggle('kritis', true));
+      act(() => result.current.setKritisBbox('bbox1'));
+      await waitFor(() => expect(result.current.fachebenenStatus.kritis).toBe('ok'));
+      const kritisRufe = () => lade.mock.calls.filter(([q]) => q === 'kritis').length;
+      const vorher = kritisRufe();
+      // Gegenstück zur Aufwärmphase: mit Bestand ist die Ebene bbox-getrieben.
+      await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.kritis.aufwaermPollMs! * 3));
+      expect(kritisRufe()).toBe(vorher);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('hält die aktiveFachebenen-Referenz über ein No-op-Re-Render stabil (combine-Memoisierung)', async () => {
@@ -350,14 +428,5 @@ describe('useFachebenen', () => {
       vi.useRealTimers();
       lade.mockImplementation(original);
     }
-  });
-
-  it('meldet kritisZoomZuKlein unterhalb des Mindest-Zooms', () => {
-    const { result } = rendere();
-    act(() => result.current.onFachebeneToggle('kritis', true));
-    act(() => result.current.setKartenZoom(5));
-    expect(result.current.kritisZoomZuKlein).toBe(true);
-    act(() => result.current.setKartenZoom(12));
-    expect(result.current.kritisZoomZuKlein).toBe(false);
   });
 });
