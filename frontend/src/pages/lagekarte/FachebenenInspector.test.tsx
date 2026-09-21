@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import FachebenenInspector from './FachebenenInspector';
+import { taktischeDtgVoll } from '../../anzeige/format';
 
 describe('FachebenenInspector', () => {
   it('Warnung (DWD): Headline, Schwere-Label, Beschreibung, Handlungsempfehlung', () => {
@@ -51,6 +52,64 @@ describe('FachebenenInspector', () => {
     );
     expect(screen.getByText('ohne Meldeklassen')).toBeInTheDocument();
     expect(screen.queryByText('unklassifiziert')).not.toBeInTheDocument();
+  });
+
+  it('Luftqualität: Stufe als Wort, Leitschadstoff, Messwerte mit Einheit, Zeitpunkt (LFH-79)', () => {
+    render(
+      <FachebenenInspector
+        quelle="luftqualitaet"
+        properties={{
+          titel: 'Potsdam-Zentrum',
+          code: 'DEBB021',
+          ort: 'Potsdam',
+          stationstyp: 'Verkehr',
+          umgebung: 'städtisches Gebiet',
+          klasse: 'schlecht',
+          leitschadstoff: 'NO₂',
+          unvollstaendig: false,
+          wert_no2: 145,
+          einheit_no2: 'µg/m³',
+          wert_pm10: 12,
+          einheit_pm10: 'µg/m³',
+          zeitpunkt: '2026-09-21T09:00:00+01:00',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Potsdam-Zentrum')).toBeInTheDocument();
+    // Das WORT trägt die Stufe (WCAG 1.4.1) — auf der Karte nur Farbe und Größe.
+    expect(screen.getByText('schlecht')).toBeInTheDocument();
+    expect(screen.getAllByText('NO₂').length).toBeGreaterThan(0);
+    expect(screen.getByText('145 µg/m³')).toBeInTheDocument();
+    expect(screen.getByText('12 µg/m³')).toBeInTheDocument();
+    expect(screen.getByText(taktischeDtgVoll('2026-09-21T09:00:00+01:00'))).toBeInTheDocument();
+    expect(screen.getByText('DEBB021')).toBeInTheDocument();
+    expect(screen.getByText(/Verkehr/)).toBeInTheDocument();
+    // Ohne Kennzeichnung der Quelle steht kein Unvollständigkeits-Hinweis da.
+    expect(screen.queryByText(/unvollständige Datenbasis/i)).not.toBeInTheDocument();
+  });
+
+  it('Luftqualität: nennt eine unvollständige Datenbasis als Wort', () => {
+    render(
+      <FachebenenInspector
+        quelle="luftqualitaet"
+        properties={{ titel: 'Oldenburg', klasse: 'gut', unvollstaendig: true }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText(/unvollständige Datenbasis/i)).toBeInTheDocument();
+  });
+
+  it('Luftqualität: ein unbekanntes Stufenwort erscheint als „keine Daten", nie roh', () => {
+    render(
+      <FachebenenInspector
+        quelle="luftqualitaet"
+        properties={{ titel: 'Irgendwo', klasse: 'katastrophal' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('keine Daten')).toBeInTheDocument();
+    expect(screen.queryByText('katastrophal')).not.toBeInTheDocument();
   });
 
   it('Pegel: Wasserstand mit Einheit, Zustand-Tag (high→Hoch), Gewässer', () => {

@@ -30,7 +30,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle sechzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle siebzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
@@ -42,6 +42,7 @@ describe('Statusfarb-Vertrag', () => {
       'einsatzStatus',
       'etbTyp',
       'hochwasserKlasse',
+      'luftqualitaetIndex',
       'materialStatus',
       'personStatus',
       'schadenAusmass',
@@ -158,7 +159,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(16);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(17);
   });
 });
 
@@ -269,6 +270,35 @@ describe('dringlichkeit (LFH-395, hierher mit LFH-358)', () => {
     expect(new Set(formen).size).toBe(formen.length);
     expect(formen).not.toContain(undefined);
     expect(sf.dringlichkeit.alarm.label).toBe('dringend');
+  });
+});
+
+describe('luftqualitaetIndex (LFH-79)', () => {
+  it('deckt die fünf UBA-Stufen und „keine Daten" ab', () => {
+    // LITERAL: dieselben Wire-Wörter pinnt `karte::luftqualitaet::tests::bildet_die_indexstufen_ab`.
+    expect(Object.keys(sf.luftqualitaetIndex).sort()).toEqual([
+      'gut',
+      'keine_daten',
+      'maessig',
+      'schlecht',
+      'sehr_gut',
+      'sehr_schlecht',
+    ]);
+  });
+
+  it('legt fünf Stufen auf drei Rollen — ohne Blau', () => {
+    expect(sf.luftqualitaetIndex.sehr_gut.rolle).toBe('normal');
+    expect(sf.luftqualitaetIndex.gut.rolle).toBe('normal');
+    expect(sf.luftqualitaetIndex.maessig.rolle).toBe('achtung');
+    expect(sf.luftqualitaetIndex.schlecht.rolle).toBe('alarm');
+    expect(sf.luftqualitaetIndex.sehr_schlecht.rolle).toBe('alarm');
+    expect(sf.luftqualitaetIndex.keine_daten.rolle).toBe('neutral');
+  });
+
+  it('unterscheidet jede Stufe im Wort — die Farbe tut es nur für drei', () => {
+    const labels = Object.values(sf.luftqualitaetIndex).map((d) => d.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(sf.luftqualitaetIndex.maessig.label).toBe('mäßig');
   });
 });
 

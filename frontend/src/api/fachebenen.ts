@@ -21,7 +21,8 @@ export type FeatureCollection = S['GeoJsonFeatureCollection'];
 export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/karte/fachebenen/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
-export type FachebeneQuelle = 'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser' | 'autobahn';
+export type FachebeneQuelle =
+  'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser' | 'autobahn' | 'luftqualitaet';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), wie sie in den Feature-Properties der
@@ -45,6 +46,22 @@ export type HochwasserKlasse =
   | 'gross'
   | 'sehr_gross'
   | 'unklassifiziert';
+
+/**
+ * Stufe des UBA-Luftqualitätsindex einer Messstation (LFH-79), wie sie in den
+ * Feature-Properties der `luftqualitaet`-Ebene unter `klasse` steht.
+ *
+ * FE-LOKAL aus demselben Grund wie {@link HochwasserKlasse}: Fachebenen-Properties sind
+ * backendseitig `HashMap<String, Value>`, ein registriertes Rust-Enum wäre eine Waise im
+ * OpenAPI-Schema. Die Wire-Wörter sind auf BEIDEN Seiten gepinnt: hier in
+ * `theme/statusFarben.test.ts`, drüben in
+ * `karte::luftqualitaet::tests::bildet_die_indexstufen_ab`.
+ *
+ * Die Quelle zählt 0 („sehr gut") bis 4 („sehr schlecht"); fehlend oder außerhalb der Skala
+ * ist `keine_daten`.
+ */
+export type LuftqualitaetKlasse =
+  'sehr_gut' | 'gut' | 'maessig' | 'schlecht' | 'sehr_schlecht' | 'keine_daten';
 
 /** Lädt eine Fachebene. `bbox` (west,sued,ost,nord) ist nur für `kritis` nötig. */
 export function ladeFachebene(quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> {

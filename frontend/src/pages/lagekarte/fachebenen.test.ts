@@ -17,15 +17,17 @@ const feat = (lon: number, lat: number) => ({
 });
 
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen, die Hochwasserebene und die BAB-Lage', () => {
+  it('enthält die vier v1-Quellen, Hochwasser, Luftqualität und die BAB-Lage', () => {
     // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline`,
     // weil es dieselbe Frage beantwortet: dort der rohe Wasserstand, hier die amtliche
-    // Bewertung (LFH-77). `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
+    // Bewertung (LFH-77). `luftqualitaet` (LFH-79) folgt als drittes Messnetz.
+    // `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
     expect(fachebeneKeys()).toEqual([
       'nina',
       'dwd',
       'pegelonline',
       'hochwasser',
+      'luftqualitaet',
       'kritis',
       'autobahn',
     ]);
@@ -34,6 +36,19 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.hochwasser.geometrieTyp).toBe('punkt');
     expect(FACHEBENEN.hochwasser.bboxAbhaengig).toBe(false);
     expect(FACHEBENEN.hochwasser.pollMs).toBeGreaterThan(0);
+  });
+  it('führt die Luftqualitätsebene als Punktebene im Takt der Server-TTL (LFH-79)', () => {
+    const def = FACHEBENEN.luftqualitaet;
+    expect(def.geometrieTyp).toBe('punkt');
+    expect(def.bboxAbhaengig).toBe(false);
+    // = serverseitige TTL (900 s); häufiger abzufragen liefert nichts Frischeres.
+    expect(def.pollMs).toBe(900_000);
+    // Messpunkte, keine Fläche — die Einschränkung steht als Text, nicht als Tooltip.
+    expect(def.geltung).toMatch(/Messstationen/);
+  });
+  it('gibt jeder Ebene einen eigenen Rückfallton', () => {
+    const farben = fachebeneKeys().map((k) => FACHEBENEN[k].farbe.toLowerCase());
+    expect(new Set(farben).size).toBe(farben.length);
   });
   it('markiert nur kritis als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
@@ -64,12 +79,14 @@ describe('Fachebenen-Registry', () => {
     expect(autobahnTakt('leer')).toBe(lang);
   });
 
-  it('nur die Autobahn-Ebene nennt einen einschränkenden Geltungsbereich', () => {
+  it('nur Autobahn und Luftqualität nennen einen einschränkenden Geltungsbereich', () => {
     // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung.
     // Die Gegenaussage trägt sie mit: stünde der Satz an jeder Ebene, sagte er nichts.
+    // Luftqualität (LFH-79) zeigt Messpunkte, keine Fläche — wer eine Station fern vom
+    // Einsatzort sieht, darf daraus nicht die Luft am Einsatzort lesen.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
-    expect(mitGeltung).toEqual(['autobahn']);
+    expect(mitGeltung).toEqual(['luftqualitaet', 'autobahn']);
   });
   it('jede Ebene hat Label, Farbe, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {

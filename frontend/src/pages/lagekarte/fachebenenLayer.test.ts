@@ -86,5 +86,7 @@ describe('kategorieLabel', () => {
     expect(kategorieLabel('krankenhaus')).toBe('Krankenhaus');
     expect(kategorieLabel('strom')).toBe('Umspannwerk');
     expect(kategorieLabel('unbekannt')).toBe('unbekannt');
+    // Kategorie der Luftqualitätsebene (LFH-79, gesetzt in karte::luftqualitaet).
+    expect(kategorieLabel('luftmessstation')).toBe('Luftmessstation');
   });
 });

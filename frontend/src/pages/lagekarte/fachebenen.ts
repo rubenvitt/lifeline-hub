@@ -67,6 +67,19 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 300_000,
     bboxAbhaengig: false,
   },
+  luftqualitaet: {
+    key: 'luftqualitaet',
+    label: 'Luftqualität (UBA)',
+    // Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt jede Station ihre
+    // Rollenfarbe je Indexstufe (`luftqualitaetStil.ts`). Ein eigener Ton neben den sechs
+    // Bestandsebenen; bewusst kein Grün, das auf der Karte schon „gute Luft" heisst.
+    farbe: '#5b8c00',
+    geometrieTyp: 'punkt',
+    // = serverseitige TTL (900 s). Die Quelle liefert Stundenwerte mit ~2 h Verzug.
+    pollMs: 900_000,
+    bboxAbhaengig: false,
+    geltung: 'Messstationen — keine Aussage zwischen den Stationen',
+  },
   autobahn: {
     key: 'autobahn',
     label: 'Autobahn-Lage (BAB)',
@@ -97,7 +110,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis', 'autobahn'];
+  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'luftqualitaet', 'kritis', 'autobahn'];
 }
 
 /**

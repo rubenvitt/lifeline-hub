@@ -100,6 +100,7 @@ const KATEGORIE_LABEL: Record<string, string> = {
   webcam: 'Webcam',
   baustelle: 'Baustelle',
   sperrung: 'Sperrung',
+  luftmessstation: 'Luftmessstation',
 };
 
 /** Lesbares Label für eine normalisierte Kategorie (Fallback: Rohwert). */

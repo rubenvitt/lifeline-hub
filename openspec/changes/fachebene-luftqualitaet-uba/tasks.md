@@ -40,56 +40,56 @@ zurückdrehen und sehen, dass genau dieser Test rot wird.
       (`date_from`, `time_from`, `date_to`, `time_to`) in MEZ, sechs Stunden rückwärts,
       Stundenenden 1–24. Tests: Sommer-Mittag, 00:30 MEZ (Fenster über den Tageswechsel),
       exakt volle Stunde. Mutationsprobe „Europe/Berlin" → rot.
-- [ ] 2.2 `fetch_luftqualitaet` / `erneuere_luftqualitaet` in `src/karte/quellen.rs` nach
+- [x] 2.2 `fetch_luftqualitaet` / `erneuere_luftqualitaet` in `src/karte/quellen.rs` nach
       dem DWD/Pegel-Muster: Konstanten `LUFTQUALITAET_ATTRIB = "Umweltbundesamt"`,
       `LUFTQUALITAET_TTL = 900 s`, Basis `https://luftdaten.umweltbundesamt.de/api/air-data/v2`;
       beide Abrufe mit `lang=de&index=id`; scheitert einer → `None` (kein Cache-Eintrag).
       Verifikation: `cargo test` grün, Code-Review gegen design D8.
-- [ ] 2.3 Quellen-`match` in `src/routes/karte.rs` um `"luftqualitaet"` erweitern; Test
+- [x] 2.3 Quellen-`match` in `src/routes/karte.rs` um `"luftqualitaet"` erweitern; Test
       `fachebenen_luftqualitaet_wird_bedient` in `tests/karte.rs` nach dem
       Hochwasser-Muster (Cache vorbefüllt, kein Netz) pinnt Route + Cache-Schlüssel, dazu
       die Gegenprobe „ohne `bbox` kein 400".
-- [ ] 2.4 Offline-Pfad belegen: SWR-Kaltstart mit fehlschlagendem Abruf liefert
+- [x] 2.4 Offline-Pfad belegen: SWR-Kaltstart mit fehlschlagendem Abruf liefert
       `offline` + Attribution (vorhandene `liefere_mit_swr`-Tests decken den Kern; hier
       nur die Attribution der neuen Quelle im Offline-Umschlag prüfen).
-- [ ] 2.5 Einmaliger Live-Abruf von Hand (`cargo run`, `curl …/api/karte/fachebenen/luftqualitaet`)
+- [x] 2.5 Einmaliger Live-Abruf von Hand (`cargo run`, `curl …/api/karte/fachebenen/luftqualitaet`)
       mit Plausibilitätsprüfung: Feature-Zahl in der Größenordnung ~380, `stand` ≈ jüngste
       Stunde, Stichprobe einer Station gegen die UBA-Webseite. Ergebnis in die Doku (Task 5.1).
 
 ## 3. Frontend — Vertrag und Darstellung
 
-- [ ] 3.1 `api/fachebenen.ts`: `FachebeneQuelle` um `'luftqualitaet'` erweitern, neuer
+- [x] 3.1 `api/fachebenen.ts`: `FachebeneQuelle` um `'luftqualitaet'` erweitern, neuer
       FE-lokaler Typ `LuftqualitaetKlasse` mit Doc-Kommentar (warum nicht generiert, wo das
       Rust-Gegenstück gepinnt ist); `pnpm tsc` zeigt die nachzuziehenden Stellen.
-- [ ] 3.2 `theme/statusFarben.ts`: Vertragskarte `luftqualitaetIndex` (D9) mit Kopfkommentar
+- [x] 3.2 `theme/statusFarben.ts`: Vertragskarte `luftqualitaetIndex` (D9) mit Kopfkommentar
       zur Auflösungsverengung 5 → 3 Rollen; `statusFarben.test.ts`: Literal-Liste der
       Karten + `toHaveLength(17)` (beide Stellen), Rollen je Stufe, Labels paarweise
       verschieden. `statusVertrag.guard.test.ts` bleibt grün.
-- [ ] 3.3 Neues `pages/lagekarte/luftqualitaetStil.ts` (Radius-Tabelle streng monoton,
+- [x] 3.3 Neues `pages/lagekarte/luftqualitaetStil.ts` (Radius-Tabelle streng monoton,
       `faerbeLuftqualitaet(fc, token)`, `luftqualitaetDarstellung(roh)`, Rückfall
       `keine_daten`) + Test: Monotonie, Hell/Dunkel ergibt verschiedene Farben,
       unbekanntes Wort → „keine Daten".
-- [ ] 3.4 `pages/lagekarte/fachebenen.ts`: `FACHEBENEN.luftqualitaet` (Label
+- [x] 3.4 `pages/lagekarte/fachebenen.ts`: `FACHEBENEN.luftqualitaet` (Label
       „Luftqualität (UBA)", Punkt, `pollMs: 900_000`, eigener, von den sechs Bestandsfarben
       verschiedener Rückfallton, Geltungszeile „Messstationen — keine Aussage zwischen den
       Stationen"), `fachebeneKeys()` hinter `hochwasser`; `fachebenen.test.ts` nachziehen.
-- [ ] 3.5 `fachebenenAuswahl.ts` (Default aus) und `useKartenAnsicht.ts` (`leseFachebenen`
+- [x] 3.5 `fachebenenAuswahl.ts` (Default aus) und `useKartenAnsicht.ts` (`leseFachebenen`
       per Aufzählung `o.luftqualitaet === true`); Test: gespeicherter Stand ohne Schlüssel
       → aus, mit `true` → an.
-- [ ] 3.6 `useFachebenen.ts`: siebte Query **ans Ende** des `useQueries`-Tupels,
+- [x] 3.6 `useFachebenen.ts`: siebte Query **ans Ende** des `useQueries`-Tupels,
       `byKey.luftqualitaet = ergebnisse[6]`, Einfärbung über `faerbeLuftqualitaet`.
       Tests in `useFachebenen.test.tsx`: Einfärbung/Radius je Stufe **und** die Gegenprobe,
       dass nach dem Einschalten Autobahn- und KRITIS-Daten weiter unter ihrem eigenen
       Schlüssel stehen (Mutationsprobe: Query an Position 3 einfügen → rot).
-- [ ] 3.7 `FachebenenInspector.tsx`: Zweig `luftqualitaet` mit `StatusTag` (Stufe als Wort),
+- [x] 3.7 `FachebenenInspector.tsx`: Zweig `luftqualitaet` mit `StatusTag` (Stufe als Wort),
       Leitschadstoff, Einzelwerten mit Einheit, Messzeitpunkt (`taktischeDtgVoll`), Wort
       „unvollständige Datenbasis" nur wenn gesetzt, Stationstyp/Umgebung;
       `kategorieLabel('luftmessstation')` in `fachebenenLayer.ts`. Tests analog Hochwasser
       inkl. unbekanntem Klassenwert.
-- [ ] 3.8 Regressionstest in `kartenLayer.test.ts`: `reAnlegenAlles` legt die neue Ebene
+- [x] 3.8 Regressionstest in `kartenLayer.test.ts`: `reAnlegenAlles` legt die neue Ebene
       nach einem Stilwechsel samt Daten wieder an (die Funktion ist generisch — der Test
       belegt, dass das auch für diese Ebene gilt).
-- [ ] 3.9 Attribution: die Einblendung entsteht generisch in `useFachebenen.ts` (Zeile ~155,
+- [x] 3.9 Attribution: die Einblendung entsteht generisch in `useFachebenen.ts` (Zeile ~155,
       über `fachebeneKeys()`) — keine Quellenliste nachzuziehen. Test in
       `useFachebenen.test.tsx`: eingeschaltete Ebene mit `status: ok` bringt
       „Umweltbundesamt" in die Attribution, mit `status: offline` nicht.

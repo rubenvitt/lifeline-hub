@@ -148,6 +148,40 @@ describe('reAnlegenAlles', () => {
   });
 });
 
+describe('Luftqualitätsebene nach Stilwechsel (LFH-79)', () => {
+  it('steht nach einem Basemap-/Theme-Wechsel samt Daten wieder auf der Karte', () => {
+    // `reAnlegenAlles` ist generisch über die aktiven Ebenen — dieser Test belegt, dass das
+    // für die Luftqualitätsebene auch gilt: Source, Kreis-Layer und die zuletzt bekannten
+    // Stationen kommen über den render-Frame-Poller zurück.
+    let geladen = false;
+    const { map, addSource, setData } = fakeMap(() => geladen);
+    const stationen = {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [13.06, 52.39] },
+          properties: { klasse: 'maessig', farbe: '#faad14', radius: 6 },
+        },
+      ],
+    };
+    planeReAnlegenNachStyle(
+      map,
+      () => leereFlaechen,
+      () => leereZonen,
+      () => [{ def: FACHEBENEN.luftqualitaet, daten: stationen }] as never,
+    );
+    map.feuere('render');
+    expect(addSource).not.toHaveBeenCalledWith('fachebene-luftqualitaet', expect.anything());
+
+    geladen = true;
+    map.feuere('render');
+    expect(addSource).toHaveBeenCalledWith('fachebene-luftqualitaet', expect.anything());
+    expect(map.getLayer('fachebene-luftqualitaet-circle')).toBeTruthy();
+    expect(setData).toHaveBeenCalledWith(stationen);
+  });
+});
+
 describe('planeReAnlegenNachStyle', () => {
   it('legt NICHT an, solange der neue Style (Online-Tiles) noch lädt', () => {
     const { map, addSource } = fakeMap(() => false);

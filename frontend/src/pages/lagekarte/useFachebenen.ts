@@ -16,6 +16,7 @@ import {
 } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import { faerbeHochwasser } from './hochwasserStil';
+import { faerbeLuftqualitaet } from './luftqualitaetStil';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
 
@@ -58,8 +59,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     features: [],
   });
 
-  // Sechs Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys()
-  // (nina, dwd, pegelonline, hochwasser, kritis, autobahn) — `byKey` unten hängt an DIESER
+  // Sieben Fachebenen-Queries als EIN useQueries + combine. Reihenfolge: nina, dwd,
+  // pegelonline, hochwasser, kritis, autobahn, luftqualitaet — NICHT die Panel-Reihenfolge
+  // aus fachebeneKeys(). `byKey` unten hängt an DIESER
   // Reihenfolge und greift sie positionsweise ab; ein verschobener Index ist kein Fehler,
   // sondern eine stille Verwechslung. KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
   // keepPreviousData, 6-h-staleTime/gcTime) im eigenen Config-Eintrag; kein refetchInterval.
@@ -116,6 +118,14 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         // Typen). Gemessen, nicht vermutet — der Versuch steht im Verlauf dieses Tickets.
         refetchInterval: autobahnTakt(autobahnStatus),
       },
+      // SIEBTER Eintrag, bewusst am ENDE (LFH-79): `byKey` greift positionsweise ab, eine
+      // Query mitten im Tupel verschöbe Autobahn/KRITIS still auf fremde Daten.
+      {
+        queryKey: globalKeys.fachebene('luftqualitaet'),
+        queryFn: () => ladeFachebene('luftqualitaet'),
+        enabled: fachebenenSichtbar.luftqualitaet,
+        refetchInterval: FACHEBENEN.luftqualitaet.pollMs,
+      },
     ],
     // combine wird von react-query memoisiert + strukturell geteilt → stabile Ableitungen.
     combine: (ergebnisse) => {
@@ -126,16 +136,23 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         hochwasser: ergebnisse[3],
         kritis: ergebnisse[4],
         autobahn: ergebnisse[5],
+        luftqualitaet: ergebnisse[6],
       } as const;
       const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
         .filter((k) => fachebenenSichtbar[k])
         .map((k) => {
-          // KRITIS aus der akkumulierten Sammlung; Hochwasser mit eingebackener Farbe und
-          // Punktgröße je Meldeklasse; übrige Quellen direkt aus der Query.
+          // KRITIS aus der akkumulierten Sammlung; Hochwasser und Luftqualität mit
+          // eingebackener Farbe und Punktgröße je Klasse; übrige Quellen direkt aus der Query.
           const roh = byKey[k].data?.features ?? leereFc;
           const daten =
-            k === 'kritis' ? kritisAkku : k === 'hochwasser' ? faerbeHochwasser(roh, token) : roh;
+            k === 'kritis'
+              ? kritisAkku
+              : k === 'hochwasser'
+                ? faerbeHochwasser(roh, token)
+                : k === 'luftqualitaet'
+                  ? faerbeLuftqualitaet(roh, token)
+                  : roh;
           return { def: FACHEBENEN[k], daten };
         });
 

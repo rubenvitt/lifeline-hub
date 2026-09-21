@@ -9,6 +9,7 @@ export function defaultFachebenenSichtbar(): FachebenenSichtbar {
     dwd: false,
     pegelonline: false,
     hochwasser: false,
+    luftqualitaet: false,
     kritis: false,
     autobahn: false,
   };

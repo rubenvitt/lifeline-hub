@@ -16,7 +16,7 @@ import type {
   Verfuegbarkeit,
   Warnstufe,
 } from '../api/types';
-import type { HochwasserKlasse } from '../api/fachebenen';
+import type { HochwasserKlasse, LuftqualitaetKlasse } from '../api/fachebenen';
 
 /**
  * Statusfarb-Vertrag (LFH-328 · A2). EINE Quelle für „welche Bedeutung hat welche
@@ -378,6 +378,32 @@ export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
   mittel: { rolle: 'achtung', label: 'mittleres Hochwasser' },
   gross: { rolle: 'alarm', label: 'großes Hochwasser' },
   sehr_gross: { rolle: 'alarm', label: 'sehr großes Hochwasser' },
+};
+
+/**
+ * Stufe des UBA-Luftqualitätsindex einer Messstation auf der Lagekarte (LFH-79).
+ *
+ * DIE SIEBZEHNTE VERTRAGSKARTE, und das ist eine Entscheidung, kein Nebenprodukt: die Stufe
+ * ist eine Domänen-Achse mit Zustandsbedeutung wie {@link hochwasserKlasse}, und eine Karte
+ * außerhalb dieser Datei liefe am Abdeckungstest vorbei (LFH-358).
+ *
+ * FÜNF STUFEN AUF DREI ROLLEN — dieselbe Verengung wie bei {@link warnstufeKarte}.
+ * `sehr_gut`/`gut` → `normal`; `maessig` → `achtung`, weil das UBA ab „mäßig" Wirkungen bei
+ * Langzeit- und Kombinationsexposition nicht mehr ausschließt; `schlecht`/`sehr_schlecht`
+ * → `alarm`, ab dort rät das UBA empfindlichen Gruppen von Aktivität im Freien ab. Kein
+ * Blau: `bedien` bezeichnet eine Beziehung, keinen Zustand. `keine_daten` ist `neutral` —
+ * die Station sagt gerade nichts, das ist etwas anderes als „gute Luft".
+ *
+ * DER ZWEITE KANAL auf der Karte ist der Punktdurchmesser (`pages/lagekarte/luftqualitaetStil.ts`),
+ * im Inspector das Wort. Die zusammengefassten Stufen trennt `label`.
+ */
+export const luftqualitaetIndex: Record<LuftqualitaetKlasse, StatusDarstellung> = {
+  keine_daten: { rolle: 'neutral', label: 'keine Daten' },
+  sehr_gut: { rolle: 'normal', label: 'sehr gut' },
+  gut: { rolle: 'normal', label: 'gut' },
+  maessig: { rolle: 'achtung', label: 'mäßig' },
+  schlecht: { rolle: 'alarm', label: 'schlecht' },
+  sehr_schlecht: { rolle: 'alarm', label: 'sehr schlecht' },
 };
 
 /**

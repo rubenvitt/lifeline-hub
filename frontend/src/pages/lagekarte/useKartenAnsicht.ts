@@ -12,9 +12,9 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import { waehleInitialeBasemap, type GespeicherteBasemap } from './basemapAuswahl';
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
+import { fachebeneKeys } from './fachebenen';
 import type { LayerSichtbar } from './Sidebar';
 
-const FACHEBENE_KEYS = ['nina', 'dwd', 'pegelonline', 'kritis', 'autobahn'] as const;
 const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'einsatzort',
   'uhs',
@@ -61,6 +61,7 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     // als „aus", nicht als `undefined`. Genau deshalb steht hier eine Aufzählung und kein
     // Spread über das gespeicherte Objekt.
     hochwasser: o.hochwasser === true,
+    luftqualitaet: o.luftqualitaet === true,
     kritis: o.kritis === true,
     autobahn: o.autobahn === true,
   };
@@ -106,7 +107,10 @@ function gleich(a: KonfigStand, b: KonfigStand): boolean {
     a.basemap === b.basemap &&
     a.onlineStilName === b.onlineStilName &&
     a.kartenTheme === b.kartenTheme &&
-    FACHEBENE_KEYS.every((k) => a.fachebenenSichtbar[k] === b.fachebenenSichtbar[k]) &&
+    // Aus der Registry abgeleitet statt als eigene Liste geführt: die handgepflegte Fassung
+    // hatte `hochwasser` (LFH-77) nie aufgenommen — deren Umschalten bot „Ansicht speichern"
+    // nicht an. Eine zweite Liste ist genau die Drift, die hier nicht passieren darf.
+    fachebeneKeys().every((k) => a.fachebenenSichtbar[k] === b.fachebenenSichtbar[k]) &&
     LAYER_KEYS.every((k) => a.layer[k] === b.layer[k])
   );
 }
