@@ -219,18 +219,30 @@ export function punktInPolygon(p: PunktLngLat, geom: LoseGeometrie): boolean {
 // `geometry?: … | null` (NINA liefert Einträge ohne Geometrie). Die Struktur ist hier absichtlich
 // weit gehalten, damit sowohl Fachebenen-Collections als auch FE-eigene FCs passen — der Rumpf
 // unten prüft ohnehin per `f?.geometry` + Truthiness.
-type FeatureCollectionLike = { features: { geometry?: LoseGeometrie | null }[] };
+type FeatureCollectionLike = {
+  features: { geometry?: LoseGeometrie | null; properties?: unknown }[];
+};
 
 const istFlaeche = (g: LoseGeometrie) => g.type === 'Polygon' || g.type === 'MultiPolygon';
 
-/** Alle Polygon-/MultiPolygon-Geometrien der Collection, die den Punkt enthalten (Collection-Reihenfolge). */
-function enthaltendeGeometrien(p: PunktLngLat, collection: FeatureCollectionLike): LoseGeometrie[] {
-  const treffer: LoseGeometrie[] = [];
-  for (const f of collection.features) {
-    const g = f?.geometry;
-    if (g && istFlaeche(g) && punktInPolygon(p, g)) treffer.push(g);
+/** Das Klick-Feature, wie MapLibre es liefert — nur die Teile, die hier zählen. */
+type KlickFeature = { id?: unknown; properties?: unknown };
+
+const alsObjekt = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+
+/**
+ * Stimmen die Properties des Klick-Features mit denen eines Collection-Features überein?
+ * Verglichen werden nur primitive Werte (Text, Zahl, Wahrheitswert): die kommen unverändert
+ * durch die Kachel (`@maplibre/vt-pbf`, Zahlen als Double). Listen und Objekte führt die Kachel
+ * dagegen als JSON-Text mit Präfix — die bleiben außen vor, statt am Format zu scheitern.
+ */
+function gleicheProperties(klick: Record<string, unknown>, quelle: unknown): boolean {
+  for (const [k, v] of Object.entries(alsObjekt(quelle))) {
+    const primitiv = typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+    if (primitiv && klick[k] !== v) return false;
   }
-  return treffer;
+  return true;
 }
 
 /**
@@ -238,31 +250,45 @@ function enthaltendeGeometrien(p: PunktLngLat, collection: FeatureCollectionLike
  * Die un-geclippte Geometrie kommt aus der geladenen FeatureCollection statt aus dem
  * kachel-geclippten Klick-Feature (LFH-146 (c)).
  *
- * `featureId` ist die ID des Klick-Features. Die Fachebenen-Sources laufen mit `generateId`
- * (`fachebenenLayer.ts`), MapLibre vergibt damit den Index im `features`-Array der Source-Daten —
- * die ID ist also direkt ein Index in `collection`. Das hält nur, solange `collection` dieselben
- * Daten sind, die in der Source stehen: der Klick-Handler und das `setData` in `Kartenflaeche`
- * hängen beide an `[fachebenen]`. Wer die beiden entkoppelt, lässt diesen Index still veralten.
+ * Kandidaten sind die Flächen, die den Klickpunkt enthalten UND deren Properties mit denen des
+ * Klick-Features übereinstimmen — also die Warnung, deren Text das Panel zeigt. Der Abgleich
+ * hängt NICHT an der Reihenfolge der Collection: die ist bei NINA von Abruf zu Abruf nicht stabil
+ * (`buffer_unordered` in `src/karte/quellen.rs`), und `setData` läuft asynchron im Worker — ein
+ * Klick kann also noch das alte Rendering treffen, während `collection` schon neu ist.
  *
- * Zusätzlich muss die Geometrie am Index den Klickpunkt enthalten. Das VERRINGERT das Risiko
- * veralteter Daten, schließt es aber nicht aus: `setData` läuft asynchron im Worker, und hat ein
- * Nachladen überlappende Warnungen umsortiert, kann der alte Index in diesem kurzen Fenster auf
- * eine andere Fläche zeigen, die den Punkt ebenfalls enthält.
- * Enthält sie ihn nicht (oder fehlt die ID), gilt der Punkt-in-Polygon-Rückfall — aber nur, wenn er
- * EINDEUTIG ist. Bei mehreren enthaltenden Features wäre jede Wahl geraten: dann null, also
- * keine Kennzahlen statt womöglich der Fläche einer anderen Warnung.
+ * Tragen mehrere Kandidaten dieselben Properties (etwa Teilflächen einer Warnung), entscheidet
+ * die Feature-ID. Die Sources laufen mit `generateId` (`fachebenenLayer.ts`), die ID ist also der
+ * Index im `features`-Array. Sie ist nur Stichentscheid unter Gleichen, nie allein maßgeblich:
+ * über ein Nachladen hinweg ist sie nicht stabil. Bleibt es mehrdeutig, gibt es null — keine
+ * Kennzahlen statt womöglich der Fläche einer anderen Warnung.
  */
 export function geometrieZumKlickFeature(
-  featureId: unknown,
+  feature: KlickFeature | undefined,
   p: PunktLngLat,
   collection: FeatureCollectionLike,
 ): LoseGeometrie | null {
-  if (typeof featureId === 'number' && Number.isInteger(featureId) && featureId >= 0) {
-    const g = collection.features[featureId]?.geometry;
-    if (g && istFlaeche(g) && punktInPolygon(p, g)) return g;
-  }
-  const treffer = enthaltendeGeometrien(p, collection);
-  return treffer.length === 1 ? treffer[0] : null;
+  // Ohne Properties am Klick gibt es nichts abzugleichen — dann zählt nur die Lage.
+  const klickProps = feature?.properties ? alsObjekt(feature.properties) : undefined;
+  const kandidaten: number[] = [];
+  collection.features.forEach((f, i) => {
+    const g = f?.geometry;
+    if (
+      g &&
+      istFlaeche(g) &&
+      punktInPolygon(p, g) &&
+      (!klickProps || gleicheProperties(klickProps, f.properties))
+    ) {
+      kandidaten.push(i);
+    }
+  });
+  const id = feature?.id;
+  const index =
+    kandidaten.length === 1
+      ? kandidaten[0]
+      : typeof id === 'number' && kandidaten.includes(id)
+        ? id
+        : undefined;
+  return index === undefined ? null : (collection.features[index].geometry ?? null);
 }
 
 /**
@@ -270,15 +296,15 @@ export function geometrieZumKlickFeature(
  * (LFH-282). Die Properties stammen aus dem Klick-Feature; die Geometrie nicht, weil
  * `e.features[0].geometry` von geojson-vt kachelweise zugeschnitten ist und bei Warnungen über
  * mehrere Kacheln zu kleine Werte ergäbe (LFH-146). Rein und exportiert, damit die Verdrahtung
- * — die ID des Features, nicht etwa ein Property — ohne Karte prüfbar ist.
+ * ohne Karte prüfbar ist.
  */
 export function werteFachebenenKlickAus(
-  feature: { id?: unknown; properties?: unknown } | undefined,
+  feature: KlickFeature | undefined,
   p: PunktLngLat,
   collection: FeatureCollectionLike,
 ): { props: Record<string, unknown>; geometrie: LoseGeometrie | null } {
   return {
     props: (feature?.properties ?? {}) as Record<string, unknown>,
-    geometrie: geometrieZumKlickFeature(feature?.id, p, collection),
+    geometrie: geometrieZumKlickFeature(feature, p, collection),
   };
 }

@@ -341,52 +341,89 @@ describe('geometrieZumKlickFeature (LFH-282)', () => {
       ],
     ],
   };
-  const KLEIN = BOX; // 0,01° × 0,01°, liegt ganz in GROSS
+  const KLEIN = BOX; // 0,01° × 0,01°, liegt ganz in GROSS — rund 100-mal kleiner
+  const GEWITTER = { titel: 'Gewitter', stufe: 2, aktiv: true };
+  const DAUERREGEN = { titel: 'Dauerregen', stufe: 2, aktiv: true };
   const fc = {
     type: 'FeatureCollection' as const,
     features: [
-      { type: 'Feature' as const, geometry: GROSS, properties: { event: 'GEWITTER' } },
-      { type: 'Feature' as const, geometry: KLEIN, properties: { event: 'DAUERREGEN' } },
+      { type: 'Feature' as const, geometry: GROSS, properties: GEWITTER },
+      { type: 'Feature' as const, geometry: KLEIN, properties: DAUERREGEN },
     ],
   };
+  // Dieselben Warnungen nach einem Nachladen in umgekehrter Reihenfolge — NINA baut die Liste
+  // über `buffer_unordered`, die Reihenfolge ist also von Abruf zu Abruf nicht stabil.
+  const umsortiert = { ...fc, features: [fc.features[1], fc.features[0]] };
   const IM_UEBERLAPP = { lng: 8.005, lat: 50.005 };
   const NUR_IN_GROSS = { lng: 8.05, lat: 50.05 };
 
-  it('Überlappung: die Feature-ID des Klick-Features entscheidet, nicht die Collection-Reihenfolge', () => {
-    // Die Fläche des kleinen Kästchens ist rund 100-mal kleiner als die des großen — eine
-    // Verwechslung wäre also nicht nur formal, sondern am Wert sichtbar.
-    expect(geometrieZumKlickFeature(1, IM_UEBERLAPP, fc)).toBe(KLEIN);
-    expect(geometrieZumKlickFeature(0, IM_UEBERLAPP, fc)).toBe(GROSS);
+  it('Überlappung: die Properties des Klick-Features entscheiden, nicht die Collection-Reihenfolge', () => {
+    expect(geometrieZumKlickFeature({ properties: DAUERREGEN }, IM_UEBERLAPP, fc)).toBe(KLEIN);
+    expect(geometrieZumKlickFeature({ properties: GEWITTER }, IM_UEBERLAPP, fc)).toBe(GROSS);
   });
 
-  it('Klick-Auswertung: Properties und Geometrie kommen aus DEMSELBEN Feature', () => {
-    // Das Klick-Feature trägt ein eigenes `id`-Property, das NICHT der Index ist — wer die
-    // Verdrahtung auf ein Property statt auf die Feature-ID drehte, bekäme GROSS.
-    const klick = { id: 1, properties: { event: 'DAUERREGEN', id: 0 } };
-    const { props, geometrie } = werteFachebenenKlickAus(klick, IM_UEBERLAPP, fc);
-    expect(props.event).toBe('DAUERREGEN');
-    expect(geometrie).toBe(KLEIN);
-    expect(werteFachebenenKlickAus(undefined, IM_UEBERLAPP, fc)).toEqual({ props: {}, geometrie: null });
+  it('veralteter Index nach dem Umsortieren führt nicht zur fremden Fläche', () => {
+    // Der Klick trifft noch das alte Rendering (Index 0 = Gewitter), die Collection ist schon neu
+    // (Index 0 = Dauerregen). Beide Flächen enthalten den Punkt — die Punkt-Prüfung am Index
+    // allein hielte das nicht auf; der Abgleich der Properties tut es.
+    expect(
+      geometrieZumKlickFeature({ id: 0, properties: GEWITTER }, IM_UEBERLAPP, umsortiert),
+    ).toBe(GROSS);
+    expect(
+      geometrieZumKlickFeature({ id: 1, properties: DAUERREGEN }, IM_UEBERLAPP, umsortiert),
+    ).toBe(KLEIN);
   });
 
-  it('ohne ID und eindeutig: das einzige enthaltende Feature', () => {
-    expect(geometrieZumKlickFeature(undefined, NUR_IN_GROSS, fc)).toBe(GROSS);
-  });
-
-  it('ohne ID und mehrdeutig: keine Kennzahlen statt womöglich falscher', () => {
-    expect(geometrieZumKlickFeature(undefined, IM_UEBERLAPP, fc)).toBeNull();
-  });
-
-  it('ID zeigt auf ein Feature, das den Punkt nicht enthält (veraltete Daten): Rückfall auf eindeutigen Treffer', () => {
-    // Stand die Source beim Klick noch auf älteren Daten, passt der Index nicht zur Collection.
-    expect(geometrieZumKlickFeature(1, NUR_IN_GROSS, fc)).toBe(GROSS);
-    expect(geometrieZumKlickFeature(0, { lng: 20, lat: 20 }, fc)).toBeNull();
-  });
-
-  it('unbrauchbare IDs (außerhalb, negativ, gebrochen, Zeichenkette) fallen auf den Rückfall', () => {
-    for (const id of [2, -1, 0.5, '1']) {
-      expect(geometrieZumKlickFeature(id, NUR_IN_GROSS, fc)).toBe(GROSS);
-      expect(geometrieZumKlickFeature(id, IM_UEBERLAPP, fc)).toBeNull();
+  it('gleiche Properties: die Feature-ID entscheidet zwischen den Kandidaten', () => {
+    const zwilling = {
+      ...fc,
+      features: [
+        { type: 'Feature' as const, geometry: GROSS, properties: GEWITTER },
+        { type: 'Feature' as const, geometry: KLEIN, properties: GEWITTER },
+      ],
+    };
+    expect(geometrieZumKlickFeature({ id: 1, properties: GEWITTER }, IM_UEBERLAPP, zwilling)).toBe(
+      KLEIN,
+    );
+    expect(geometrieZumKlickFeature({ id: 0, properties: GEWITTER }, IM_UEBERLAPP, zwilling)).toBe(
+      GROSS,
+    );
+    // Ohne brauchbare ID bleibt es mehrdeutig: keine Kennzahlen statt womöglich falscher.
+    for (const id of [undefined, 2, -1, 0.5, '1']) {
+      expect(geometrieZumKlickFeature({ id, properties: GEWITTER }, IM_UEBERLAPP, zwilling)).toBe(
+        null,
+      );
     }
+  });
+
+  it('nicht-primitive Property-Werte werden nicht verglichen (die Kachel führt sie als JSON-Text)', () => {
+    const mitListe = {
+      ...fc,
+      features: [
+        { type: 'Feature' as const, geometry: GROSS, properties: { ...GEWITTER, gebiete: ['A'] } },
+      ],
+    };
+    const klick = { properties: { ...GEWITTER, gebiete: '["A"]' } };
+    expect(geometrieZumKlickFeature(klick, IM_UEBERLAPP, mitListe)).toBe(GROSS);
+  });
+
+  it('ohne Klick-Feature: nur der eindeutige Treffer, sonst null', () => {
+    expect(geometrieZumKlickFeature(undefined, NUR_IN_GROSS, fc)).toBe(GROSS);
+    expect(geometrieZumKlickFeature(undefined, IM_UEBERLAPP, fc)).toBeNull();
+    expect(geometrieZumKlickFeature(undefined, { lng: 20, lat: 20 }, fc)).toBeNull();
+  });
+
+  it('Klick-Auswertung reicht die Properties durch und nimmt die Geometrie desselben Features', () => {
+    const { props, geometrie } = werteFachebenenKlickAus(
+      { id: 0, properties: DAUERREGEN },
+      IM_UEBERLAPP,
+      fc,
+    );
+    expect(props).toBe(DAUERREGEN);
+    expect(geometrie).toBe(KLEIN);
+    expect(werteFachebenenKlickAus(undefined, IM_UEBERLAPP, fc)).toEqual({
+      props: {},
+      geometrie: null,
+    });
   });
 });
