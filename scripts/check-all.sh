@@ -150,9 +150,8 @@ schritt_5() {
     # Im Shard-Betrieb zusätzlich ein Blob-Bericht: nur daraus lassen sich die Teilläufe
     # hinterher zu EINEM Ergebnis zusammenführen (`vitest run --merge-reports`). Ohne ihn
     # hätte man vier getrennte Ausgaben und keine Gesamtaussage.
-    # ACHTUNG BEIM NACHSCHLAGEN: Vitest 4 legt die Blobs in `frontend/.vitest-reports/` ab.
-    # Die aktuelle Doku auf vitest.dev zeigt bereits Vitest 5 mit `.vitest/blob/` — wer das
-    # abschreibt, lädt in der CI ein leeres Verzeichnis hoch.
+    # Seit Vitest 5 legt der Blob-Reporter unter `frontend/.vitest/blob/` ab (gemessen) —
+    # vorher `frontend/.vitest-reports/`. CI lädt den neuen Pfad hoch/herunter.
     bericht=(--reporter=default --reporter=blob)
   fi
   $PNPM -C "$FE" exec vitest run --no-file-parallelism "${bericht[@]}" ${VITEST_SHARD:+--shard="$VITEST_SHARD"}
