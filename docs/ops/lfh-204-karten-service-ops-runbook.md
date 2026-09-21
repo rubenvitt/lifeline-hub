@@ -149,12 +149,23 @@ cargo build --release -p karten-service
 # Binary: target/release/karten-service
 ```
 
-Es existiert **kein** Dockerfile/Compose-File/systemd-Unit für `karten-service` im Repo
-(nur `karten-build/`s eigenes Docker-Image für den Tile-Bau selbst; das `compose.yml` im
-Repo-Root ist reine lokale Dev-Infrastruktur — Garage als S3-Ersatz, siehe `mise run garage` —
-und kein Deployment-Artefakt) — Paketierung/Deployment
-des Service-Binaries ist Operator-Sache (s. Abschnitt 9). Beispiel-systemd-Unit unten unter
-Abschnitt 3.3 ist ein Vorschlag, kein Repo-Artefakt.
+**Seit LFH-602 gibt es ein Container-Abbild:** `ghcr.io/rubenvitt/lifeline-hub-karten-service:<version>`
+entsteht bei jedem Release in `.github/workflows/artefakte.yml` aus `karten-service/Dockerfile`
+(fertige Linux-Binaries, dazu docker-CLI, make, sqlite3 und `karten-build/Makefile` unter
+`/opt/karten-build`). Zwei Betriebsregeln hängen daran:
+
+- Der Container braucht den **Docker-Socket des Hosts** (`/var/run/docker.sock`) — das ist
+  root-äquivalent. Der Service gehört deshalb nur in ein internes Netz neben lifeline-hub,
+  nie hinter einen öffentlichen Router.
+- Mit dem Socket des Hosts löst der Daemon den `docker run -v`-Pfad des Makefiles auf dem
+  **Host** auf. `HOST_OUT` muss deshalb auf den Host-Pfad des Volumes zeigen, das im Container
+  unter `/opt/karten-build/out` hängt (bei einem benannten Volume
+  `/var/lib/docker/volumes/<name>/_data`). Ohne das legt Docker still einen leeren Ordner an,
+  der Bau läuft durch, und die Bounds-Prüfung findet kein Ergebnis.
+
+Das `compose.yml` im Repo-Root bleibt reine lokale Dev-Infrastruktur (Garage als S3-Ersatz,
+siehe `mise run garage`). Wer ohne Container betreibt, nimmt das Binary vom Release oder baut
+es wie oben; die Beispiel-systemd-Unit in Abschnitt 3.2 ist dafür ein Vorschlag.
 
 ---
 

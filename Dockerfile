@@ -19,10 +19,16 @@
 FROM busybox:1.37.0-uclibc AS vorbereitung
 RUN mkdir -p /data
 
-# cc-debian12: glibc + libgcc, keine Shell, kein Paketmanager. Reicht, weil die Binary seit
+# cc-debian13: glibc + libgcc, keine Shell, kein Paketmanager. Reicht, weil die Binary seit
 # LFH-522 sowohl SQLite als auch OpenSSL statisch eingebacken hat — ohne `vendored` bräuchte
 # es hier ein Debian-Slim mit libssl3.
-FROM gcr.io/distroless/cc-debian12:nonroot
+#
+# debian13, NICHT debian12 (LFH-602): die Binary kommt von ubuntu-latest (24.04, glibc 2.39)
+# und verlangt GLIBC_2.38/2.39. cc-debian12 bringt nur glibc 2.36 mit — jedes Abbild bis
+# einschließlich 1.0.0-alpha.21 brach deshalb sofort mit „version `GLIBC_2.39' not found" ab.
+# Wer den Runner in artefakte.yml hebt, prüft hier die glibc mit; der Starttest dort fängt
+# einen Rückfall ab.
+FROM gcr.io/distroless/cc-debian13:nonroot
 
 ARG TARGETARCH
 COPY --from=vorbereitung --chown=nonroot:nonroot /data /data
