@@ -1,9 +1,4 @@
-import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
-
-type Feature = FeatureCollection['features'][number];
-
-/** Mindest-Zoom-Level für KRITIS-Abfragen (unter diesem Zoom keine bbox-Anfrage). */
-export const KRITIS_MIN_ZOOM = 10;
+import type { FachebeneQuelle, FachebeneStatus } from '../../api/fachebenen';
 
 export interface FachebeneDef {
   key: FachebeneQuelle;
@@ -28,6 +23,13 @@ export interface FachebeneDef {
    * nächsten regulären Poll — bei 600 s also zehn Minuten auf Daten, die nach ~30 s da sind.
    */
   aufwaermPollMs?: number;
+  /**
+   * Punkte der Ebene auf der Karte bündeln (LFH-83). Die Source wird dann mit
+   * `cluster: true` angelegt, und neben dem Einzelpunkt-Layer stehen Bündel-Kreis und
+   * Bündel-Zahl (`fachebenenLayer.ts`). Heute nur KRITIS: bundesweit mehrere
+   * hunderttausend Objekte, die der Server ab 5 000 zusätzlich zu Sammelpunkten verdichtet.
+   */
+  buendeln?: boolean;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -117,8 +119,16 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     label: 'KRITIS / sensible Objekte',
     farbe: '#531dab',
     geometrieTyp: 'punkt',
+    // bbox-getrieben: neue Daten kommen mit jeder Kartenbewegung, nicht über einen Takt.
     pollMs: 0,
     bboxAbhaengig: true,
+    // Der erste Import des OSM-Extrakts läuft nach dem Start minutenlang im Hintergrund,
+    // die Ebene meldet solange `offline`. Ohne Aufwärm-Takt erschiene der erste Bestand
+    // erst beim nächsten Pannen. 30 s: der Import dauert Minuten, feiner zu fragen brächte
+    // nichts — die Antwort ist bis dahin eine winzige Leer-Antwort aus dem Backend.
+    aufwaermPollMs: 30_000,
+    buendeln: true,
+    geltung: 'OpenStreetMap-Daten, wöchentlicher Stand — keine amtliche KRITIS-Liste',
   },
 };
 
@@ -128,15 +138,16 @@ export function fachebeneKeys(): FachebeneQuelle[] {
 }
 
 /**
- * Poll-Takt der Autobahn-Ebene nach ihrem zuletzt gesehenen Status. Rein und exportiert,
- * damit die Aufwärm-Regel ohne Render prüfbar ist.
+ * Poll-Takt einer Ebene nach ihrem zuletzt gesehenen Status. Rein und exportiert, damit die
+ * Aufwärm-Regel ohne Render prüfbar ist.
  *
- * `undefined` (noch nichts geladen) und `offline` gelten als „wärmt noch auf". `leer` NICHT:
- * das heisst „Quelle erreichbar, gerade nichts zu melden" — ein gültiger Endzustand, den
- * kurz zu takten nichts brächte.
+ * `undefined` (noch nichts geladen) und `offline` gelten als „wärmt noch auf" — aber nur bei
+ * Ebenen mit `aufwaermPollMs`. `leer` NICHT: das heisst „Quelle erreichbar, gerade nichts zu
+ * melden" — ein gültiger Endzustand, den kurz zu takten nichts brächte. Ein Ergebnis `0`
+ * (KRITIS mit Bestand) schaltet in react-query den Timer ab.
  */
-export function autobahnTakt(status: FachebeneStatus | undefined): number {
-  const def = FACHEBENEN.autobahn;
+export function fachebeneTakt(key: FachebeneQuelle, status: FachebeneStatus | undefined): number {
+  const def = FACHEBENEN[key];
   const waermtAuf = status === undefined || status === 'offline';
   return waermtAuf ? (def.aufwaermPollMs ?? def.pollMs) : def.pollMs;
 }
@@ -146,45 +157,61 @@ export function istBboxAbhaengig(key: FachebeneQuelle): boolean {
 }
 
 /**
- * Rastert eine bbox "west,sued,ost,nord" nach AUSSEN auf ein Gitter (Default 0.05° ≈ 5 km).
- * Benachbarte Viewports liefern so denselben String → identischer Query-/Cache-Schlüssel
- * (Frontend react-query UND Backend-Cache), d. h. KRITIS lädt beim Pannen innerhalb einer
- * Rasterzelle nicht neu. Nach außen gerundet, damit der sichtbare Ausschnitt stets abgedeckt ist.
+ * Rasterleiter in Grad, fein → grob. Die kleinste Stufe ist das bisherige Stadtraster.
  */
-export function rasterBbox(bbox: string, grid = 0.05): string {
-  const t = bbox.split(',').map(Number);
-  if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return bbox;
-  const [w, s, e, n] = t;
-  const ab = (v: number) => Math.floor(v / grid) * grid; // nach unten
-  const auf = (v: number) => Math.ceil(v / grid) * grid; // nach oben
-  const r = (v: number) => Math.round(v * 1e6) / 1e6; // Fließkomma-Rauschen kappen
-  return [r(ab(w)), r(ab(s)), r(auf(e)), r(auf(n))].join(',');
+const RASTER_LEITER = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10] as const;
+
+/**
+ * Rasterweite zu einer bbox-Breite (Grad West-Ost): die kleinste Leiterstufe, die mindestens
+ * ein Achtel der Breite misst. Damit überdeckt eine Zelle stets einen spürbaren Bruchteil der
+ * Ansicht — auf Stadtebene wie bisher 0,05°, auf Deutschland-Ebene 2°. Die Breite in Länge
+ * hängt in Mercator nur an der Zoomstufe, nicht an der Lage; Pannen wechselt die Stufe also
+ * nicht, Zoomen schon.
+ */
+export function rasterWeite(breite: number): number {
+  const ziel = breite / 8;
+  return RASTER_LEITER.find((w) => w >= ziel) ?? RASTER_LEITER[RASTER_LEITER.length - 1];
 }
 
 /**
- * Mergt neue Features in `sammlung` (dedupliziert über die Koordinate), begrenzt auf `max`
- * (älteste zuerst entfernt). So bleiben einmal geladene KRITIS-Objekte sichtbar, auch wenn
- * man wegzoomt oder das Gebiet wechselt. Mutiert `sammlung`; true bei Änderung.
+ * Rastert eine bbox "west,sued,ost,nord" nach AUSSEN auf ein Gitter, dessen Weite mit der
+ * bbox-Breite wächst (`rasterWeite`). Benachbarte Viewports liefern so denselben String →
+ * identischer Query-Schlüssel, d. h. KRITIS lädt beim Pannen innerhalb einer Rasterzelle
+ * nicht neu — auf Stadt- wie auf Deutschland-Ebene (LFH-83; vorher festes 0,05°-Raster, das
+ * erst ab Zoom 10 gefragt wurde). Nach außen gerundet, damit der sichtbare Ausschnitt stets
+ * abgedeckt ist.
+ *
+ * MapLibre meldet Längen jenseits ±180, sobald die Karte über den Antimeridian geschoben ist
+ * (Weltkopien) — das Backend lehnt solche bboxes ab (400), die Ebene stünde dann `offline`.
+ * Deshalb wird der Ausschnitt zuerst als Ganzes um Vielfache von 360° zurückgeschoben (eine
+ * Weltkopie Deutschlands bei 365–376° wird zu 5–16°), erst dann gerastert und gekappt. Ergibt
+ * das keine gültige bbox mehr (Ausschnitt breiter als die Welt, oder nach dem Kappen
+ * `west ≥ ost`), gilt die ganze Welt — das Backend beantwortet sie verdichtet; eine
+ * ausgelassene Anfrage ließe die Ebene dagegen dauerhaft leer (Review LFH-83).
  */
-export function mergeFeatures(
-  sammlung: Map<string, Feature>,
-  neue: Feature[],
-  max: number,
-): boolean {
-  let geaendert = false;
-  for (const f of neue) {
-    const key = JSON.stringify(f.geometry?.coordinates ?? null);
-    if (!sammlung.has(key)) {
-      sammlung.set(key, f);
-      geaendert = true;
-    }
-  }
-  if (geaendert) {
-    while (sammlung.size > max) {
-      const aeltester = sammlung.keys().next().value;
-      if (aeltester === undefined) break;
-      sammlung.delete(aeltester);
-    }
-  }
-  return geaendert;
+export function rasterBbox(bbox: string): string {
+  const t = bbox.split(',').map(Number);
+  if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return bbox;
+  const [w0, s, e0, n] = t;
+  if (e0 - w0 >= 360) return WELT_BBOX;
+  const versatz = Math.floor(((w0 + e0) / 2 + 180) / 360) * 360;
+  const w = w0 - versatz;
+  const e = e0 - versatz;
+  const grid = rasterWeite(e - w);
+  const ab = (v: number) => Math.floor(v / grid) * grid; // nach unten
+  const auf = (v: number) => Math.ceil(v / grid) * grid; // nach oben
+  const r = (v: number) => Math.round(v * 1e6) / 1e6; // Fließkomma-Rauschen kappen
+  const kappe = (v: number, grenze: number) => Math.min(grenze, Math.max(-grenze, v));
+  const ergebnis = [
+    r(kappe(ab(w), 180)),
+    r(kappe(ab(s), 90)),
+    r(kappe(auf(e), 180)),
+    r(kappe(auf(n), 90)),
+  ];
+  const [rw, rs, re, rn] = ergebnis;
+  if (!(rw < re) || !(rs < rn)) return WELT_BBOX;
+  return ergebnis.join(',');
 }
+
+/** Rückfall von {@link rasterBbox}, wenn sich kein gültiger Ausschnitt bilden lässt. */
+export const WELT_BBOX = '-180,-90,180,90';

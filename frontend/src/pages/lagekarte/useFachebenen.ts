@@ -1,28 +1,19 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { theme } from 'antd';
-import { keepPreviousData, useQueries } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import {
   ladeFachebene,
   type FachebeneQuelle,
   type FachebeneStatus,
   type FeatureCollection,
 } from '../../api/fachebenen';
-import {
-  autobahnTakt,
-  FACHEBENEN,
-  fachebeneKeys,
-  KRITIS_MIN_ZOOM,
-  mergeFeatures,
-} from './fachebenen';
+import { FACHEBENEN, fachebeneKeys, fachebeneTakt } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import { faerbeHochwasser } from './hochwasserStil';
 import { faerbeLuftqualitaet } from './luftqualitaetStil';
 import { faerbeOdl } from './odlStil';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
-
-/** KRITIS-Sammlung: Obergrenze gegen unbegrenztes Wachstum (älteste zuerst raus). */
-const KRITIS_MAX = 4000;
 
 interface FachebenenArgs {
   /** Sichtbarkeit + Setter kommen aus useKartenAnsicht (geteilte Ansicht = Wahrheit). */
@@ -31,15 +22,22 @@ interface FachebenenArgs {
 }
 
 /**
- * Fachebenen-Leg der Lagekarte: die fünf externen Daten-Queries und ihre Ableitungen.
+ * Fachebenen-Leg der Lagekarte: die sieben externen Daten-Queries und ihre Ableitungen.
  * Die Sichtbarkeit hält seit LFH-319 `useKartenAnsicht` (geteilte Ansicht) — dieser Hook
  * bekommt sie als Prop und bietet nur den Toggle; kein eigener State/keine Persistenz.
  *
- * Die Queries laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
+ * Die Queries mit festem Schlüssel laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
  * kombinierte Ergebnis (structural sharing via replaceEqualDeep), sodass die Ableitungen
  * (aktiveFachebenen/status/laedt/attribution) OHNE manuelle Dep-Listen und OHNE
  * `eslint-disable react-hooks/exhaustive-deps` stabil bleiben — das inline gebaute,
  * pro Render instabile `fachebenenQueries`-Record (und die vier Disables) entfällt damit.
+ *
+ * KRITIS läuft daneben als eigenes `useQuery` (LFH-83): sein Schlüssel wandert mit der
+ * bbox, und `useQueries` legt je neuem Schlüssel einen NEUEN Observer an
+ * (`QueriesObserver#findMatchingObservers` matcht per `queryHash`) — `keepPreviousData`
+ * hat dort nichts, woran es festhalten könnte, und die Ebene blinkte bei jedem Pannen leer.
+ * Gemessen am Test „hält beim bbox-Wechsel die bisherigen KRITIS-Daten"; vorher verdeckte
+ * die Akkumulation diese Lücke. `combine` liest das Ergebnis über die Closure.
  */
 export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
   // Hochwasser-, ODL- und Luftqualitätsebene färben je Punkt nach ihrer Stufe und brauchen den aufgelösten
@@ -49,23 +47,33 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   const [kritisBbox, setKritisBbox] = useState<string | null>(null);
   // Zuletzt gesehener Status der Autobahn-Ebene — steuert ihren Poll-Takt (Aufwärmphase).
   const [autobahnStatus, setAutobahnStatus] = useState<FachebeneStatus | undefined>(undefined);
-  // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis für KRITIS.
-  const [kartenZoom, setKartenZoom] = useState<number | null>(null);
 
-  // KRITIS akkumulieren: einmal geladene Objekte bleiben sichtbar (auch beim Rauszoomen oder
-  // Wechsel des Gebiets), statt bei jedem Fetch ersetzt zu werden. Dedup über die Koordinate.
-  const kritisSammlungRef = useRef<Map<string, FeatureCollection['features'][number]>>(new Map());
-  const [kritisAkku, setKritisAkku] = useState<FeatureCollection>({
-    type: 'FeatureCollection',
-    features: [],
+  const kritis = useQuery({
+    queryKey: globalKeys.fachebeneKritis(kritisBbox),
+    queryFn: () => ladeFachebene('kritis', kritisBbox!),
+    enabled: fachebenenSichtbar.kritis && !!kritisBbox,
+    // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
+    // Leer-Blinken). Die Antwort ERSETZT das Bild (LFH-83) — der Server liefert je
+    // Ausschnitt den vollständigen Bestand oder dessen Sammelpunkte; akkumuliert lägen
+    // Einzelobjekte und Sammelpunkte derselben Gegend übereinander. Der Bestand wird
+    // wöchentlich erneuert → lange als frisch behandeln (6 h).
+    placeholderData: keepPreviousData,
+    staleTime: 6 * 60 * 60_000,
+    gcTime: 6 * 60 * 60_000,
+    // Mit Bestand 0 (kein Timer), in der Aufwärmphase des ersten Imports der kurze Takt —
+    // sonst erschiene der Bestand erst beim nächsten Pannen. Hier geht die Callback-Form:
+    // die Typinferenz-Falle (siehe `autobahn` unten) betrifft nur das `useQueries`-Tupel.
+    // `error` zählt als offline, weil react-query nach einem gescheiterten Abruf die
+    // vorigen `data` hält.
+    refetchInterval: (q) =>
+      fachebeneTakt('kritis', q.state.status === 'error' ? 'offline' : q.state.data?.status),
   });
 
-  // Acht Fachebenen-Queries als EIN useQueries + combine. Reihenfolge: nina, dwd,
-  // pegelonline, hochwasser, odl, kritis, autobahn, luftqualitaet — NICHT die
-  // Panel-Reihenfolge aus fachebeneKeys(). `byKey` unten hängt an DIESER
+  // Sieben Fachebenen-Queries als EIN useQueries + combine. Reihenfolge: nina, dwd,
+  // pegelonline, hochwasser, odl, autobahn, luftqualitaet — fachebeneKeys() ohne kritis
+  // (LFH-83), und NICHT in Panel-Reihenfolge. `byKey` unten hängt an DIESER
   // Reihenfolge und greift sie positionsweise ab; ein verschobener Index ist kein Fehler,
-  // sondern eine stille Verwechslung. KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
-  // keepPreviousData, 6-h-staleTime/gcTime) im eigenen Config-Eintrag; kein refetchInterval.
+  // sondern eine stille Verwechslung.
   const kombiniert = useQueries({
     queries: [
       {
@@ -99,17 +107,6 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         refetchInterval: FACHEBENEN.odl.pollMs,
       },
       {
-        queryKey: globalKeys.fachebeneKritis(kritisBbox),
-        queryFn: () => ladeFachebene('kritis', kritisBbox!),
-        enabled: fachebenenSichtbar.kritis && !!kritisBbox,
-        // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
-        // Leer-Blinken). KRITIS ist quasi statisch → lange als frisch behandeln (6 h);
-        // serverseitig wird ohnehin 1 Tag gecacht.
-        placeholderData: keepPreviousData,
-        staleTime: 6 * 60 * 60_000,
-        gcTime: 6 * 60 * 60_000,
-      },
-      {
         queryKey: globalKeys.fachebene('autobahn'),
         queryFn: () => ladeFachebene('autobahn'),
         enabled: fachebenenSichtbar.autobahn,
@@ -121,9 +118,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         //
         // Bewusst über einen State statt über die Callback-Form von `refetchInterval`: die
         // Callback-Form lässt die Typinferenz dieses `useQueries`-Tupels kollabieren (alle
-        // acht Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
+        // sieben Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
         // Typen). Gemessen, nicht vermutet — der Versuch steht im Verlauf dieses Tickets.
-        refetchInterval: autobahnTakt(autobahnStatus),
+        refetchInterval: fachebeneTakt('autobahn', autobahnStatus),
       },
       // LETZTER Eintrag, bewusst am ENDE (LFH-79): `byKey` greift positionsweise ab, eine
       // Query mitten im Tupel verschöbe die Nachbarn still auf fremde Daten.
@@ -142,27 +139,25 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         pegelonline: ergebnisse[2],
         hochwasser: ergebnisse[3],
         odl: ergebnisse[4],
-        kritis: ergebnisse[5],
-        autobahn: ergebnisse[6],
-        luftqualitaet: ergebnisse[7],
+        kritis,
+        autobahn: ergebnisse[5],
+        luftqualitaet: ergebnisse[6],
       } as const;
       const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
         .filter((k) => fachebenenSichtbar[k])
         .map((k) => {
-          // KRITIS aus der akkumulierten Sammlung; Hochwasser, ODL und Luftqualität mit
-          // eingebackener Farbe und Punktgröße je Stufe; übrige Quellen direkt aus der Query.
+          // Hochwasser, ODL und Luftqualität mit eingebackener Farbe und Punktgröße je Stufe;
+          // übrige Quellen (auch KRITIS, LFH-83) direkt aus der Query.
           const roh = byKey[k].data?.features ?? leereFc;
           const daten =
-            k === 'kritis'
-              ? kritisAkku
-              : k === 'hochwasser'
-                ? faerbeHochwasser(roh, token)
-                : k === 'odl'
-                  ? faerbeOdl(roh, token)
-                  : k === 'luftqualitaet'
-                    ? faerbeLuftqualitaet(roh, token)
-                    : roh;
+            k === 'hochwasser'
+              ? faerbeHochwasser(roh, token)
+              : k === 'odl'
+                ? faerbeOdl(roh, token)
+                : k === 'luftqualitaet'
+                  ? faerbeLuftqualitaet(roh, token)
+                  : roh;
           return { def: FACHEBENEN[k], daten };
         });
 
@@ -187,8 +182,6 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         fachebenenStatus,
         fachebenenLaedt,
         fachebenenAttribution,
-        // Rohdaten für die KRITIS-Akkumulation (der Akku selbst geht via kritisAkku ein).
-        kritisRoh: byKey.kritis.data,
         // Status der Autobahn-Ebene für den Aufwärm-Takt (siehe `refetchInterval` oben).
         // `isError` gehört dazu wie in der Statuszeile darüber: react-query HÄLT bei einem
         // gescheiterten Refetch die vorigen `data` — ohne den Zweig meldete die Ableitung
@@ -199,24 +192,10 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     },
   });
 
-  useEffect(() => {
-    const fc = kombiniert.kritisRoh?.features;
-    if (!fc) return;
-    if (mergeFeatures(kritisSammlungRef.current, fc.features, KRITIS_MAX)) {
-      setKritisAkku({
-        type: 'FeatureCollection',
-        features: [...kritisSammlungRef.current.values()],
-      });
-    }
-  }, [kombiniert.kritisRoh]);
-
   // Setzen mit demselben Wert ist in React ein No-op → keine Renderschleife.
   useEffect(() => {
     setAutobahnStatus(kombiniert.autobahnStatusRoh);
   }, [kombiniert.autobahnStatusRoh]);
-
-  const kritisZoomZuKlein =
-    fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM;
 
   const onFachebeneToggle = (k: FachebeneQuelle, an: boolean) =>
     setFachebenenSichtbar((s) => ({ ...s, [k]: an }));
@@ -228,8 +207,6 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     fachebenenStatus: kombiniert.fachebenenStatus,
     fachebenenLaedt: kombiniert.fachebenenLaedt,
     fachebenenAttribution: kombiniert.fachebenenAttribution,
-    kritisZoomZuKlein,
     setKritisBbox,
-    setKartenZoom,
   };
 }

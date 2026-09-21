@@ -517,6 +517,120 @@ async fn fachebenen_kritis_ohne_bbox_ist_400() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
+/// KRITIS (LFH-83) antwortet aus dem Extrakt-Bestand in der Cache-DB. Router und Cache-Pool
+/// teilen sich ein Karten-Verzeichnis, damit der Test den Bestand vorher setzen kann.
+async fn kritis_app() -> (axum::Router, sqlx::SqlitePool) {
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = build_router(AppState {
+        pool: pool().await,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+        karten_dir: karten_dir.clone(),
+    });
+    let cache = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    (app, cache)
+}
+
+/// Ganz Deutschland war bis LFH-83 ein 400 („bbox zu groß") — jetzt eine Antwort.
+#[tokio::test]
+async fn fachebenen_kritis_deutschland_ist_kein_400() {
+    let (app, _) = kritis_app().await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/fachebenen/kritis?bbox=5.8,47.2,15.1,55.1",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn fachebenen_kritis_kaputte_bbox_ist_400() {
+    let (app, _) = kritis_app().await;
+    for bbox in ["1,2,3", "7,50,6,51", "a,b,c,d", "0,-95,1,1"] {
+        let res = anfrage(
+            &app,
+            "GET",
+            &format!("/api/karte/fachebenen/kritis?bbox={bbox}"),
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "bbox {bbox}");
+    }
+}
+
+/// Ohne importierten Bestand (Aufwärmphase, Import abgeschaltet) ist die Ebene offline —
+/// und zwar ohne Netzzugriff: früher hätte derselbe Aufruf Overpass gefragt.
+#[tokio::test]
+async fn fachebenen_kritis_ohne_bestand_offline() {
+    let (app, _) = kritis_app().await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/fachebenen/kritis?bbox=6.9,50.9,7.0,51.0",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["status"], "offline");
+    assert_eq!(v["features"]["features"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn fachebenen_kritis_aus_dem_bestand() {
+    use lifeline_hub::karte::kritis::{bestand, extrakt::KritisObjekt};
+    let (app, cache) = kritis_app().await;
+    let objekt = KritisObjekt {
+        osm_typ: "node",
+        osm_id: 1,
+        lon: 6.95,
+        lat: 50.94,
+        kategorie: "krankenhaus".into(),
+        properties: serde_json::json!({ "titel": "Uniklinik", "kategorie": "krankenhaus" }),
+    };
+    let meta = bestand::ImportMeta {
+        stand: "2026-09-20T20:21:44+00:00".into(),
+        quelle_url: "https://download.geofabrik.de/europe/germany-latest.osm.pbf".into(),
+        last_modified: None,
+        etag: None,
+        importiert_at: 0,
+        anzahl: 1,
+    };
+    bestand::ersetze_bestand(&cache, &[objekt], &meta)
+        .await
+        .unwrap();
+
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/fachebenen/kritis?bbox=6.9,50.9,7.0,51.0",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["quelle"], "kritis");
+    assert_eq!(v["status"], "ok");
+    assert_eq!(v["stand"], "2026-09-20T20:21:44+00:00");
+    assert_eq!(v["attribution"], "© OpenStreetMap-Beitragende (ODbL)");
+    assert_eq!(
+        v["features"]["features"][0]["properties"]["titel"],
+        "Uniklinik"
+    );
+}
+
 /// Die Hochwasser-Ebene (LFH-77) muss im Quellen-`match` der Route stehen — sonst
 /// antwortet sie „Unbekannte Quelle" (400), obwohl Adapter und Frontend-Eintrag da sind.
 ///

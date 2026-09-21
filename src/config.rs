@@ -319,6 +319,37 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_BACKUP_BEHALTEN", default_value_t = 7)]
     pub backup_behalten: usize,
 
+    /// KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt periodisch importieren (LFH-83).
+    /// **Default AN** — auch im Dev-Betrieb, damit die Ebene überall bundesweit zeigt, was
+    /// sie zeigen soll. Jeder Lauf lädt rund 4–5 GB (nur, wenn der Extrakt neu ist);
+    /// abschalten mit `--kritis-extrakt false` bzw. `LIFELINE_KRITIS_EXTRAKT=false` — so
+    /// startet die e2e-Suite. Abgeschaltet und ohne früheren Bestand meldet die Ebene
+    /// `offline`.
+    #[arg(
+        long,
+        env = "LIFELINE_KRITIS_EXTRAKT",
+        default_value_t = true,
+        action = clap::ArgAction::Set
+    )]
+    pub kritis_extrakt: bool,
+
+    /// Quelle des KRITIS-Extrakts (eine `.osm.pbf`, nur https). Ein eigener Spiegel nimmt
+    /// Geofabrik die Last, wenn viele Instanzen laufen.
+    #[arg(
+        long,
+        env = "LIFELINE_KRITIS_EXTRAKT_URL",
+        default_value = "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
+    )]
+    pub kritis_extrakt_url: String,
+
+    /// Abstand zwischen zwei KRITIS-Importen in Stunden (Vorgabe: eine Woche).
+    #[arg(
+        long,
+        env = "LIFELINE_KRITIS_EXTRAKT_INTERVALL_STUNDEN",
+        default_value_t = 168
+    )]
+    pub kritis_extrakt_intervall_stunden: u64,
+
     /// Ops-/Dev-Override der Trust-Quelle des Offline-Karten-Katalogs. Ohne Angabe gilt
     /// der einkompilierte Pin (LFH-199). Nimmt Ops die Rebuild-Reibung, wenn das Manifest
     /// woanders liegt (LFH-204) — verbiegt aber die Quelle, der das System vertraut,
@@ -459,6 +490,46 @@ mod tests {
             std::env::set_var(k, v);
         }
         config
+    }
+
+    /// Wie [`parse_hermetisch`], aber mit genau EINER gesetzten Variablen.
+    fn parse_mit_env(k: &str, v: &str, args: &[&str]) -> Config {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let gesichert: Vec<(String, String)> = std::env::vars()
+            .filter(|(k, _)| k.starts_with("LIFELINE_"))
+            .collect();
+        for (k, _) in &gesichert {
+            std::env::remove_var(k);
+        }
+        std::env::set_var(k, v);
+        let config = Config::parse_from(args);
+        std::env::remove_var(k);
+        for (k, v) in gesichert {
+            std::env::set_var(k, v);
+        }
+        config
+    }
+
+    /// LFH-83: der KRITIS-Import ist Default-an und auf beiden Wegen abschaltbar.
+    #[test]
+    fn kritis_extrakt_default_an_und_abschaltbar() {
+        let c = parse_hermetisch(["lifeline-hub"]);
+        assert!(c.kritis_extrakt);
+        assert_eq!(
+            c.kritis_extrakt_url,
+            "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
+        );
+        assert_eq!(c.kritis_extrakt_intervall_stunden, 168);
+        assert!(!parse_hermetisch(["lifeline-hub", "--kritis-extrakt", "false"]).kritis_extrakt);
+        assert!(
+            !parse_mit_env("LIFELINE_KRITIS_EXTRAKT", "false", &["lifeline-hub"]).kritis_extrakt
+        );
+        let c = parse_mit_env(
+            "LIFELINE_KRITIS_EXTRAKT_INTERVALL_STUNDEN",
+            "24",
+            &["lifeline-hub"],
+        );
+        assert_eq!(c.kritis_extrakt_intervall_stunden, 24);
     }
 
     #[test]

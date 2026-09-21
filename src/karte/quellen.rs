@@ -2,14 +2,13 @@
 //! frischer Cache → sofort; veralteter Cache → sofort den alten Stand ausliefern und im
 //! Hintergrund erneuern (nicht blockierend); gar kein Cache → einmalig blockierend holen.
 
-use crate::error::AppError;
 use crate::karte::cache;
 use crate::karte::luftqualitaet::{luftqualitaet_fenster, normalisiere_luftqualitaet};
 use crate::karte::normalisierung::{
     kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_odl,
-    normalisiere_overpass, normalisiere_pegelonline,
+    normalisiere_pegelonline,
 };
-use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
+use crate::karte::typen::{leere_collection, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use futures::stream::{self, StreamExt};
 use serde_json::Value;
@@ -291,90 +290,6 @@ async fn erneuere_nina(client: reqwest::Client, pool: SqlitePool) -> Option<Fach
     );
     cache::setze(&pool, "nina", &a).await;
     Some(a)
-}
-
-// ------------------------------------------------------------------------- KRITIS
-
-const KRITIS_ATTRIB: &str = "© OpenStreetMap-Beitragende (ODbL)";
-/// KRITIS-Objekte (Krankenhäuser, Schulen, Umspannwerke …) sind quasi statisch →
-/// lange cachen (1 Tag). Entlastet Overpass deutlich.
-const KRITIS_TTL: Duration = Duration::from_secs(24 * 3600);
-/// Overpass braucht länger als das globale Client-Timeout (8 s) — interne `[timeout:25]`.
-const KRITIS_TIMEOUT: Duration = Duration::from_secs(30);
-/// Hauptinstanz ist oft überlastet (TimedOut) → Mirror als Fallback.
-const OVERPASS_URLS: [&str; 2] = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-];
-
-fn overpass_query(bbox_op: &str) -> String {
-    format!(
-        "[out:json][timeout:25];(\
-nwr[amenity=hospital]({b});nwr[amenity=clinic]({b});nwr[amenity=nursing_home]({b});\
-nwr[\"social_facility\"]({b});nwr[amenity=school]({b});nwr[amenity=kindergarten]({b});\
-nwr[man_made=water_works]({b});nwr[man_made=water_tower]({b});nwr[power=substation]({b});\
-nwr[amenity=fire_station]({b});nwr[amenity=police]({b}););out center tags;",
-        b = bbox_op
-    )
-}
-
-pub async fn fetch_kritis(
-    s: &FachebenenState,
-    pool: &SqlitePool,
-    bbox_roh: &str,
-) -> Result<FachebeneAntwort, AppError> {
-    let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
-    let key = bbox.cache_key();
-    let (client, pool2, key2) = (s.client.clone(), pool.clone(), key.clone());
-    let a = liefere_mit_swr(
-        pool,
-        &s.inflight,
-        &key,
-        KRITIS_TTL,
-        || FachebeneAntwort::offline("kritis", KRITIS_ATTRIB),
-        move || erneuere_kritis(client, pool2, bbox, key2),
-    )
-    .await;
-    Ok(a)
-}
-
-async fn erneuere_kritis(
-    client: reqwest::Client,
-    pool: SqlitePool,
-    bbox: Bbox,
-    key: String,
-) -> Option<FachebeneAntwort> {
-    let query = overpass_query(&bbox.overpass());
-    // Endpunkte der Reihe nach versuchen (eigenes, längeres Timeout). Einzelfehler nur debug,
-    // erst wenn ALLE scheitern eine warn-Meldung (weniger Log-Rauschen).
-    for url in OVERPASS_URLS {
-        let resp = client
-            .post(url)
-            .timeout(KRITIS_TIMEOUT)
-            .header("Content-Type", "text/plain")
-            .body(query.clone())
-            .send()
-            .await;
-        match resp {
-            Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
-                Ok(roh) => {
-                    let a = FachebeneAntwort::ok(
-                        "kritis",
-                        KRITIS_ATTRIB,
-                        None,
-                        normalisiere_overpass(&roh),
-                    );
-                    cache::setze(&pool, &key, &a).await;
-                    return Some(a);
-                }
-                Err(e) => tracing::debug!("Overpass-JSON-Parse ({url}) fehlgeschlagen: {e}"),
-            },
-            Ok(r) => tracing::debug!("Overpass ({url}) HTTP {}", r.status()),
-            Err(e) => tracing::debug!("Overpass-Fetch ({url}) fehlgeschlagen: {e}"),
-        }
-    }
-    tracing::warn!("Overpass nicht erreichbar (alle Endpunkte) — KRITIS aus Cache/leer");
-    None
 }
 
 // ------------------------------------------------------- HOCHWASSER (LHP, LFH-77)
