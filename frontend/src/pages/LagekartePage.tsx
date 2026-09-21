@@ -15,7 +15,7 @@ import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { useLagekarteDaten } from './lagekarte/useLagekarteDaten';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
-import { rasterBbox } from './lagekarte/fachebenen';
+import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
 import Sidebar from './lagekarte/Sidebar';
@@ -135,7 +135,9 @@ export default function LagekartePage() {
     fachebenenStatus,
     fachebenenLaedt,
     fachebenenAttribution,
-    setKritisBbox,
+    zoomZuKlein,
+    setViewportBbox,
+    setKartenZoom,
   } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
 
   const { style, basisAttribution } = useBasemap({
@@ -488,6 +490,7 @@ export default function LagekartePage() {
           fachebenenSichtbar={fachebenenSichtbar}
           fachebenenStatus={fachebenenStatus}
           onFachebeneToggle={onFachebeneToggle}
+          zoomZuKlein={zoomZuKlein}
           fachebenenLaedt={fachebenenLaedt}
           bilder={bilder}
           onBildUpload={onBildUpload}
@@ -564,9 +567,14 @@ export default function LagekartePage() {
             onZoneGezeichnet={onZoneGezeichnet}
             onZeichnenBereitAenderung={setZeichnenBereit}
             fachebenen={aktiveFachebenen}
+            // Der Ausschnitt hängt an JEDER sichtbaren bbox-Ebene, nicht mehr an KRITIS
+            // allein (LFH-81) — sonst bliebe „Energie an, KRITIS aus" dauerhaft leer.
             onBboxAenderung={
-              fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined
+              braucheViewportBbox(fachebenenSichtbar)
+                ? (b) => setViewportBbox(rasterBbox(b))
+                : undefined
             }
+            onZoomAenderung={setKartenZoom}
             onFachebeneKlick={onFachebeneKlick}
             bilder={bildOverlays}
             platzierBild={aktivesPlatzierBild}

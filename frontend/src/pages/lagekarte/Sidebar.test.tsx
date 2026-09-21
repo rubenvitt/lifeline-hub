@@ -67,6 +67,7 @@ const basisProps: SidebarProps = {
     luftqualitaet: false,
     odl: false,
     kritis: false,
+    energie: false,
     autobahn: false,
   },
   onFachebeneToggle: vi.fn(),
@@ -404,6 +405,45 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(toggle).toBeTruthy();
     fireEvent.click(toggle as Element);
     expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
+  });
+
+  // Zeile einer Fachebene: äußere Space-Zeile um Schalter, Label und Hinweis.
+  const fachebenenZeile = (label: string) =>
+    screen
+      .getByText(label)
+      .closest('.ant-space')!
+      .parentElement!.closest<HTMLElement>('.ant-space')!;
+
+  it('zeigt den Zoom-Hinweis an der Energie-Zeile, auch wenn KRITIS aus ist (LFH-81)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, energie: true }}
+        zoomZuKlein={{ energie: true }}
+      />,
+    );
+    expect(
+      within(fachebenenZeile('Energieanlagen')).getByText('näher heranzoomen'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('näher heranzoomen')).toHaveLength(1);
+  });
+
+  it('zeigt den Zoom-Hinweis an der KRITIS-Zeile weiterhin', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, kritis: true }}
+        zoomZuKlein={{ kritis: true }}
+      />,
+    );
+    expect(
+      within(fachebenenZeile('KRITIS / sensible Objekte')).getByText('näher heranzoomen'),
+    ).toBeInTheDocument();
+  });
+
+  it('eine ausgeschaltete Ebene zeigt keinen Zoom-Hinweis', () => {
+    renderMitProviders(<Sidebar {...basisProps} zoomZuKlein={{ energie: true }} />);
+    expect(screen.queryByText('näher heranzoomen')).not.toBeInTheDocument();
   });
 
   it('öffnet den Zeichen-Picker und startet das Platzieren mit der Entwurfs-Spec (LFH-170)', () => {

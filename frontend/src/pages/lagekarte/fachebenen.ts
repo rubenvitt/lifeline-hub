@@ -1,4 +1,13 @@
-import type { FachebeneQuelle, FachebeneStatus } from '../../api/fachebenen';
+import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
+
+type Feature = FeatureCollection['features'][number];
+
+/**
+ * Mindest-Zoom-Level für ALLE bbox-abhängigen Ebenen (unter diesem Zoom keine bbox-Anfrage).
+ * Bis LFH-81 hiess die Konstante `KRITIS_MIN_ZOOM` und galt nur für KRITIS; der Wert ist
+ * beim Verallgemeinern unverändert geblieben. Das Backend begrenzt die bbox ohnehin auf 1°.
+ */
+export const BBOX_MIN_ZOOM = 10;
 
 export interface FachebeneDef {
   key: FachebeneQuelle;
@@ -130,11 +139,39 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     buendeln: true,
     geltung: 'OpenStreetMap-Daten, wöchentlicher Stand — keine amtliche KRITIS-Liste',
   },
+  energie: {
+    key: 'energie',
+    label: 'Energieanlagen',
+    // antd `lime-7`. `theme/tokens.ts` führt keine Fachebenen-Palette — dort stehen nur die
+    // Sichtungsfarben und die Farbrollen, und beide tragen Bedeutung (`normal` = grün,
+    // `alarm` = rot, `bedien` = blau); eine Ebenenfarbe daraus behauptete einen Status. Die
+    // Bestandsfarben sind wie diese hier Stufe 7 der antd-Presetpalette (rot, gold, blau,
+    // cyan, magenta, violett, lime). Die zunächst gewählte lime-7 hat inzwischen ODL
+    // (LFH-78) belegt — Gelb (`#d4b106`) liegt nah am DWD-Gold, ist aber unterscheidbar und
+    // die letzte freie Stufe-7-Tonlücke. Bewusst NICHT `green-7`: Grün ist die Rolle
+    // `normal` und die Sichtungsfarbe SK III, ein grüner Punkt läse sich als „in Ordnung".
+    farbe: '#d4b106',
+    geometrieTyp: 'punkt',
+    // Wie KRITIS: kein Hintergrund-Polling, Refetch nur über den Ausschnitt. Der Stand ist
+    // serverseitig 24 h frisch (design.md, Entscheidung 1).
+    pollMs: 0,
+    bboxAbhaengig: true,
+  },
 };
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'odl', 'luftqualitaet', 'kritis', 'autobahn'];
+  return [
+    'nina',
+    'dwd',
+    'pegelonline',
+    'hochwasser',
+    'odl',
+    'luftqualitaet',
+    'kritis',
+    'energie',
+    'autobahn',
+  ];
 }
 
 /**
@@ -154,6 +191,15 @@ export function fachebeneTakt(key: FachebeneQuelle, status: FachebeneStatus | un
 
 export function istBboxAbhaengig(key: FachebeneQuelle): boolean {
   return FACHEBENEN[key].bboxAbhaengig;
+}
+
+/**
+ * True, sobald IRGENDEINE bbox-abhängige Ebene sichtbar ist — dann braucht die Seite den
+ * Karten-Ausschnitt (LFH-81). Aus der Registry abgeleitet statt als Aufzählung, damit eine
+ * weitere bbox-Ebene die Meldung nicht wieder vergisst; bis LFH-81 hing sie an KRITIS allein.
+ */
+export function braucheViewportBbox(sichtbar: Record<FachebeneQuelle, boolean>): boolean {
+  return fachebeneKeys().some((k) => sichtbar[k] && istBboxAbhaengig(k));
 }
 
 /**
@@ -215,3 +261,31 @@ export function rasterBbox(bbox: string): string {
 
 /** Rückfall von {@link rasterBbox}, wenn sich kein gültiger Ausschnitt bilden lässt. */
 export const WELT_BBOX = '-180,-90,180,90';
+
+/**
+ * Mergt neue Features in `sammlung` (dedupliziert über die Koordinate), begrenzt auf `max`
+ * (älteste zuerst entfernt). So bleiben einmal geladene Objekte einer bbox-Ebene sichtbar, auch wenn
+ * man wegzoomt oder das Gebiet wechselt. Mutiert `sammlung`; true bei Änderung.
+ */
+export function mergeFeatures(
+  sammlung: Map<string, Feature>,
+  neue: Feature[],
+  max: number,
+): boolean {
+  let geaendert = false;
+  for (const f of neue) {
+    const key = JSON.stringify(f.geometry?.coordinates ?? null);
+    if (!sammlung.has(key)) {
+      sammlung.set(key, f);
+      geaendert = true;
+    }
+  }
+  if (geaendert) {
+    while (sammlung.size > max) {
+      const aeltester = sammlung.keys().next().value;
+      if (aeltester === undefined) break;
+      sammlung.delete(aeltester);
+    }
+  }
+  return geaendert;
+}

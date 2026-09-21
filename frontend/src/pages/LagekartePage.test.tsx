@@ -23,6 +23,10 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
     <div data-testid="kartenflaeche-stub">
       <div data-testid="attribution">{props.attribution ?? ''}</div>
       <div data-testid="bilder-count">{(props.bilder ?? []).length}</div>
+      {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
+          Auslöser, der einen Ausschnitt meldet wie die echte Karte nach `moveend`. */}
+      <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
+      <button onClick={() => props.onBboxAenderung?.('7.01,51.51,7.12,51.58')}>bbox-melden</button>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
@@ -1299,6 +1303,42 @@ function erstelleZonenPostSpy() {
   });
   return { handler, count: () => anzahl, lastBody: () => letzterBody! };
 }
+
+describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () => {
+  it('KRITIS aus, Energie an → der Ausschnitt wird gemeldet und die Ebene damit abgefragt', async () => {
+    const angefragt: (string | null)[] = [];
+    basisHandler([
+      http.get('/api/karte/fachebenen/energie', ({ request }) => {
+        angefragt.push(new URL(request.url).searchParams.get('bbox'));
+        return HttpResponse.json({
+          quelle: 'energie',
+          status: 'ok',
+          attribution: '© OpenStreetMap-Beitragende (ODbL)',
+          features: { type: 'FeatureCollection', features: [] },
+        });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    // Ohne sichtbare bbox-Ebene hört die Seite keinen Ausschnitt — die Karte spart sich
+    // dann die Meldung ganz.
+    expect(await screen.findByTestId('bbox-callback')).toHaveTextContent('aus');
+
+    const schalter = (await screen.findByText('Energieanlagen'))
+      .closest('.ant-space')
+      ?.querySelector('button[role="switch"]');
+    expect(schalter).toBeTruthy();
+    await user.click(schalter as Element);
+
+    // Die tragende Aussage: der Ausschnitt hängt nicht mehr an KRITIS. Mit der alten
+    // Bedingung (`fachebenenSichtbar.kritis`) stünde hier weiter „aus".
+    await waitFor(() => expect(screen.getByTestId('bbox-callback')).toHaveTextContent('an'));
+    await user.click(screen.getByRole('button', { name: 'bbox-melden' }));
+    // Gerastert wie bei KRITIS (0,05°-Gitter nach außen) — derselbe Schlüssel für
+    // benachbarte Ausschnitte, frontend- wie backendseitig.
+    await waitFor(() => expect(angefragt).toContain('7,51.5,7.15,51.6'));
+  });
+});
 
 describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
   it('Zone zeichnen → Overlay „zeichnen" sichtbar', async () => {

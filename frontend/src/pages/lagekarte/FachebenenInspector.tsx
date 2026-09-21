@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { taktischeDtgVoll } from '../../anzeige/format';
-import type { FachebeneQuelle } from '../../api/fachebenen';
+import type { EnergieAnlagenart, FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import StatusTag from '../../components/StatusTag';
 import { rollenFarbe } from '../../theme/statusFarben';
@@ -442,6 +442,89 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
   );
 }
 
+const ANLAGENART: Record<EnergieAnlagenart, string> = {
+  kohle: 'Kohle',
+  gas: 'Gas',
+  oel: 'Öl',
+  kern: 'Kernenergie',
+  abfall: 'Abfall',
+  wasser: 'Wasser',
+  wind: 'Wind',
+  solar: 'Solar',
+  biomasse: 'Biomasse',
+  speicher: 'Speicher',
+  sonstige: 'Sonstige',
+};
+
+const HERKUNFT: Record<string, string> = {
+  osm: 'OpenStreetMap',
+  mastr: 'Marktstammdatenregister',
+  'osm+mastr': 'OpenStreetMap + Marktstammdatenregister',
+};
+
+const MW = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+
+/**
+ * Energieanlage (LFH-81). Die Properties sind flach und tragen `null` für Unbekanntes;
+ * MapLibre liefert null-Properties beim Klick aber als FEHLEND — beide Fälle laufen hier
+ * denselben Weg (`s()` bzw. die Zahlprüfung sehen `null` und `undefined` gleich).
+ */
+function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
+  const artRoh = s(p.anlagenart);
+  const art = artRoh ? (ANLAGENART[artRoh as EnergieAnlagenart] ?? artRoh) : null;
+  // Nur eine echte Zahl ist ein Messwert. Eine Zeichenkette erschiene sonst als Leistung,
+  // obwohl sie nie gemessen wurde — der Vermerk „unbekannt" ist dann die ehrliche Antwort.
+  const mw =
+    typeof p.leistung_mw === 'number' && Number.isFinite(p.leistung_mw) ? p.leistung_mw : null;
+  const herkunftRoh = s(p.herkunft);
+  const herkunft = herkunftRoh ? (HERKUNFT[herkunftRoh] ?? herkunftRoh) : null;
+  const ausMastr = herkunftRoh === 'mastr' || herkunftRoh === 'osm+mastr';
+  const mastrNummer = ausMastr ? s(p.mastr_nummer) : null;
+  // Die ID geht in einen URL-Pfad — nur eine positive Ganzzahl wird ein Link.
+  const mastrId =
+    typeof p.mastr_id === 'number' && Number.isInteger(p.mastr_id) && p.mastr_id > 0
+      ? p.mastr_id
+      : null;
+  const einheiten =
+    ausMastr && typeof p.mastr_einheiten === 'number' && p.mastr_einheiten > 1
+      ? p.mastr_einheiten
+      : null;
+  return (
+    <Descriptions column={1}>
+      {art && <Descriptions.Item label="Anlagenart">{art}</Descriptions.Item>}
+      <Descriptions.Item label="Leistung">
+        {mw != null ? `${MW.format(mw)} MW` : 'unbekannt'}
+      </Descriptions.Item>
+      {s(p.betreiber) && <Descriptions.Item label="Betreiber">{s(p.betreiber)}</Descriptions.Item>}
+      {s(p.betriebsstatus) && (
+        <Descriptions.Item label="Betriebsstatus">{s(p.betriebsstatus)}</Descriptions.Item>
+      )}
+      {herkunft && <Descriptions.Item label="Herkunft">{herkunft}</Descriptions.Item>}
+      {mastrNummer && (
+        <Descriptions.Item label="MaStR-Nummer">
+          {mastrId != null ? (
+            <a
+              href={`https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/${mastrId}`}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              {mastrNummer}
+            </a>
+          ) : (
+            mastrNummer
+          )}
+        </Descriptions.Item>
+      )}
+      {/* Mehrere Einheiten an einer Anlage summieren ihre Leistung (design.md,
+          Entscheidung 4); die Nummer ist die der größten Einheit. Die Zahl sagt, dass
+          Leistung und Nummer nicht dieselbe Einheit beschreiben. */}
+      {einheiten != null && (
+        <Descriptions.Item label="MaStR-Einheiten">{einheiten}</Descriptions.Item>
+      )}
+    </Descriptions>
+  );
+}
+
 function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   const kategorie = s(p.kategorie);
   const bild = nurWeb(s(p.bild));
@@ -552,6 +635,10 @@ export default function FachebenenInspector({
         <AutobahnInhalt p={p} />
       ) : quelle === 'luftqualitaet' ? (
         <LuftqualitaetInhalt p={p} />
+      ) : quelle === 'energie' ? (
+        // VOR dem Rückfall: jede unbekannte Quelle fiele still in den KRITIS-Inhalt, und der
+        // zeigte von einer Energieanlage nur den Betreiber.
+        <EnergieInhalt p={p} />
       ) : (
         <KritisInhalt p={p} />
       )}

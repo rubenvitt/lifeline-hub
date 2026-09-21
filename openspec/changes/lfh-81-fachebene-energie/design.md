@@ -120,6 +120,10 @@ speicher | sonstige` mit zwei Zuordnungen:
   waste → `abfall`, hydro → `wasser`, wind → `wind`, solar → `solar`, biomass → `biomasse`,
   battery → `speicher`.
 
+**Nachtrag aus der Umsetzung:** OSM `hydro` mit `plant:method=water-pumped-storage` wird
+`speicher`, weil MaStR Pumpspeicherwerke als Speicher führt. Ohne diese Regel standen am
+PSW Happurg live fünf Punkte statt einem.
+
 „Konventionell“ im Sinne des Rauschfilters sind `kohle | gas | oel | kern | abfall`. Aus
 `plant:source=biogas` wird bewusst `biomasse` und nicht `gas`: Biogasanlagen gibt es zu
 Tausenden im Kleinformat, und als „konventionell“ gezählt kämen sie ohne Leistungsschwelle
