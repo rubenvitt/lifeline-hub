@@ -3,7 +3,6 @@ import {
   App,
   Breadcrumb,
   Button,
-  Card,
   Descriptions,
   Form,
   Input,
@@ -12,7 +11,6 @@ import {
   Tag,
   Tree,
   TreeSelect,
-  Typography,
   type TreeDataNode,
 } from 'antd';
 import { Select } from '../components/Select';
@@ -47,7 +45,10 @@ import {
 } from '../components/SeitenZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
-import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
+import { flaeche } from '../theme/tokens';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
@@ -98,6 +99,7 @@ export default function EinsatzabschnittePage() {
   const [form] = Form.useForm<AbschnittWerte>();
   const { abBreite } = useViewport();
   const breit = abBreite('md');
+  const { token, rollen } = useRollen();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -267,9 +269,12 @@ export default function EinsatzabschnittePage() {
 
   const einheitenListe = (
     <>
-      <Typography.Title level={5} style={{ marginTop: 16 }}>
+      <Augenbraue
+        als="h3"
+        style={{ display: 'block', marginTop: token.marginLG, marginBottom: token.marginXS }}
+      >
         Zugeordnete Einheiten
-      </Typography.Title>
+      </Augenbraue>
       <Liste
         size="small"
         emptyText="Keine Einheiten zugeordnet"
@@ -279,54 +284,54 @@ export default function EinsatzabschnittePage() {
             <Space>
               <span>{e.name}</span>
               {e.typ_label && <Tag>{e.typ_label}</Tag>}
-              <Tag color="blue">
+              <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
                 kumuliert <StaerkeAnzeige wert={e.ist_kumuliert} />
-              </Tag>
+              </span>
             </Space>
           </ListenEintrag>
         )}
       />
-      <Typography.Text type="secondary">
+      <span style={{ fontSize: 12, color: rollen.gedaempft }}>
         Die Abschnitts-Zuordnung einer Einheit wird auf der Einheiten-Seite gesetzt.
-      </Typography.Text>
+      </span>
     </>
   );
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Einsatzabschnitte' },
-        ]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space orientation="vertical" size={0}>
-          <Space>
-            <Typography.Title level={3} style={{ margin: 0 }}>
-              Einsatzabschnitte
-            </Typography.Title>
-            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-          </Space>
-          <Datenstand
-            dataUpdatedAt={gemeinsamerDatenstand(
-              abschnitteQuery.dataUpdatedAt,
-              einheitenQuery.dataUpdatedAt,
-              personalQuery.dataUpdatedAt,
-            )}
-          />
+    <EinsatzSeite
+      titel={
+        <Space>
+          Einsatzabschnitte
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
-        {darfSchreiben && (
+      }
+      breite={flaeche.seiteBreit}
+      meta={abschnitteQuery.isSuccess ? `${abschnitte.length} Abschnitte` : undefined}
+      dataUpdatedAt={gemeinsamerDatenstand(
+        abschnitteQuery.dataUpdatedAt,
+        einheitenQuery.dataUpdatedAt,
+        personalQuery.dataUpdatedAt,
+      )}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Einsatzabschnitte' },
+          ]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           <Button type="primary" onClick={entwurfOeffnen}>
             Abschnitt anlegen
           </Button>
-        )}
-      </Space>
+        )
+      }
+    >
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
         <Alert
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: token.marginSM }}
           type="info"
           showIcon
           title="Einsatz ist abgeschlossen — nur Ansicht."
@@ -342,17 +347,20 @@ export default function EinsatzabschnittePage() {
         style={{
           display: 'flex',
           flexDirection: breit ? 'row' : 'column',
-          gap: 16,
+          gap: token.margin,
           alignItems: breit ? 'flex-start' : 'stretch',
         }}
       >
-        <Card
+        <div
           data-testid="abschnitte-gliederung"
-          style={breit ? { flex: '0 0 360px' } : { width: '100%' }}
-          size="small"
-          title="Gliederung"
+          style={breit ? { flex: '0 0 360px', minWidth: 0 } : { width: '100%' }}
         >
-          {/* Drei Zustände, in dieser Reihenfolge (LFH-331 · B3). Vorher stand hier eine
+          <Paneel
+            titel="Gliederung"
+            meta={abschnitteQuery.isSuccess ? String(abschnitte.length) : undefined}
+            koerperPolster
+          >
+            {/* Drei Zustände, in dieser Reihenfolge (LFH-331 · B3). Vorher stand hier eine
               einzige Weiche auf die Länge der Liste — die ist während des Ladens und im
               Fehlerfall genauso wahr wie bei einer wirklich leeren Gliederung. Die Seite
               behauptete damit „keine Abschnitte", wenn bloß die Verbindung abgerissen war.
@@ -361,47 +369,50 @@ export default function EinsatzabschnittePage() {
               Der Fehlerzweig trägt zusätzlich die MENGENBEDINGUNG (`listeGescheitert`):
               er verdrängt den Baum nur, wenn es keinen gibt. Steht einer im
               Zwischenspeicher, bleibt er und bekommt das Veraltet-Banner (unten). */}
-          {abschnitteQuery.isLoading ? (
-            <SeitenSkeleton />
-          ) : listeGescheitert ? (
-            <SeitenFehler
-              text="Abschnitte konnten nicht geladen werden"
-              ursache={abschnitteQuery.error}
-              onWiederholen={() => void abschnitteQuery.refetch()}
-            />
-          ) : abschnitte.length === 0 && !entwurf ? (
-            <SeitenLeer
-              titel="Noch keine Abschnitte"
-              hinweis="Gliedere die Lage in Abschnitte, um Einheiten und Führung zuzuordnen."
-              /* Derselbe Wortlaut wie der Kopfknopf: eine zweite Schreibweise für dieselbe
+            {abschnitteQuery.isLoading ? (
+              <SeitenSkeleton />
+            ) : listeGescheitert ? (
+              <SeitenFehler
+                text="Abschnitte konnten nicht geladen werden"
+                ursache={abschnitteQuery.error}
+                onWiederholen={() => void abschnitteQuery.refetch()}
+              />
+            ) : abschnitte.length === 0 && !entwurf ? (
+              <SeitenLeer
+                titel="Noch keine Abschnitte"
+                hinweis="Gliedere die Lage in Abschnitte, um Einheiten und Führung zuzuordnen."
+                /* Derselbe Wortlaut wie der Kopfknopf: eine zweite Schreibweise für dieselbe
                  Geste wäre der Befund, den B3 behebt. Ohne Schreibrecht keine Aktion — ein
                  Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
-              aktion={
-                darfSchreiben ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen } : undefined
-              }
-            />
-          ) : (
-            <>
-              {standVeraltet && (
-                <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
-              )}
-              <Tree
-                treeData={baumDaten}
-                selectedKeys={entwurf ? ['entwurf'] : gewaehlt != null ? [gewaehlt] : []}
-                defaultExpandAll
-                onSelect={(keys) => {
-                  setEntwurf(false);
-                  setGewaehlt(keys.length ? Number(keys[0]) : null);
-                }}
+                aktion={
+                  darfSchreiben
+                    ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen }
+                    : undefined
+                }
               />
-            </>
-          )}
-        </Card>
+            ) : (
+              <>
+                {standVeraltet && (
+                  <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
+                )}
+                <Tree
+                  treeData={baumDaten}
+                  selectedKeys={entwurf ? ['entwurf'] : gewaehlt != null ? [gewaehlt] : []}
+                  defaultExpandAll
+                  onSelect={(keys) => {
+                    setEntwurf(false);
+                    setGewaehlt(keys.length ? Number(keys[0]) : null);
+                  }}
+                />
+              </>
+            )}
+          </Paneel>
+        </div>
 
-        <Card
-          style={{ flex: 1 }}
-          size="small"
-          title={
+        <Paneel
+          style={{ flex: 1, width: breit ? undefined : '100%' }}
+          koerperPolster
+          titel={
             entwurf
               ? 'Neuer Abschnitt'
               : aktuell
@@ -434,9 +445,16 @@ export default function EinsatzabschnittePage() {
                 <Select allowClear placeholder="Disponierte Person" options={personalOptionen} />
               </Form.Item>
 
-              <Typography.Title level={5} style={{ marginTop: 4 }}>
+              <Augenbraue
+                als="h3"
+                style={{
+                  display: 'block',
+                  marginTop: token.marginXS,
+                  marginBottom: token.marginSM,
+                }}
+              >
                 Funk / Kommunikation
-              </Typography.Title>
+              </Augenbraue>
               <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
                 <SprechgruppenPicker einsatzId={einsatzId} />
               </Form.Item>
@@ -526,8 +544,8 @@ export default function EinsatzabschnittePage() {
               {einheitenListe}
             </>
           ) : null}
-        </Card>
+        </Paneel>
       </div>
-    </div>
+    </EinsatzSeite>
   );
 }

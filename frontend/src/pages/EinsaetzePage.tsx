@@ -1,16 +1,4 @@
-import {
-  App,
-  AutoComplete,
-  Button,
-  Card,
-  DatePicker,
-  Form,
-  Input,
-  Space,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
+import { App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme } from 'antd';
 import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
@@ -39,6 +27,9 @@ import { einsatzStatus } from '../theme/statusFarben';
 // ihn wären die Balken 0 px hoch, und jsdom rechnet kein Layout — der Ausfall
 // wäre in keinem Test sichtbar (dieselbe Falle wie `SeitenZustand.tsx:3-7`).
 import '../theme/sprache.css';
+import './EinsaetzePage.css';
+import { monoStil, useRollen } from '../components/instrument';
+import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
 interface AnlegeWerte {
@@ -124,19 +115,20 @@ function rasterStil(minBreite: number, luft: number): CSSProperties {
  */
 function KachelSkelett() {
   return (
-    <Card style={{ minHeight: KACHEL_MIN_HOEHE }}>
-      <div className="lfh-skelett">
+    <div className="lfh-einsatzkachel" style={{ minHeight: KACHEL_MIN_HOEHE, cursor: 'default' }}>
+      <div className="lfh-skelett lfh-einsatzkachel__leib">
         <span className="lfh-skelett__balken lfh-skelett__balken--gross" />
         <span className="lfh-skelett__balken" />
         <span className="lfh-skelett__balken lfh-skelett__balken--kurz" />
       </div>
-    </Card>
+    </div>
   );
 }
 
 export default function EinsaetzePage() {
   const navigate = useNavigate();
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -229,45 +221,80 @@ export default function EinsaetzePage() {
   // diesen Zweig nur noch den „Neuer Einsatz"-Knopf oder gar nichts.
   const keineTreffer = sucheZeigen && suchbegriff !== '' && sichtbareAktive.length === 0;
 
-  const renderKarte = (e: EinsatzAnzeige, klein = false) => (
-    <Card
-      key={e.id}
-      hoverable
-      title={
-        <Link
-          to={einsatzPfad(e.id)}
-          onClick={(event) => event.stopPropagation()}
-          style={kartenTitelStil(token)}
-        >
-          <span style={kartenTitelTextStil}>{e.bezeichnung}</span>
-        </Link>
-      }
-      style={klein ? { opacity: 0.65 } : { minHeight: KACHEL_MIN_HOEHE }}
-      onClick={() => navigate(einsatzPfad(e.id))}
-    >
-      <Space orientation="vertical">
-        <Space wrap>
-          <StatusTag darstellung={einsatzStatus[e.status]} />
-          <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
-          {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
-        </Space>
-        {/* Ort und Beginn beantworten „welcher ist meiner?" — vorher standen sie
-            nur im Kopfdatenformular, drei Klicks entfernt (Befund M4). Die Ikone
-            kommt aus `@ant-design/icons` und trägt eine `aria-hidden`-Hülle: der
-            Knoten brächte sonst ein englisches `role="img"`-Label mit. */}
-        {e.einsatzort && (
-          <Typography.Text type="secondary" data-testid="einsatz-ort">
-            <span aria-hidden="true">
-              <EnvironmentOutlined />{' '}
+  /**
+   * Die Einsatzkachel im Instrumentenstil (Neuentwurf): Fläche + Haarlinie statt antd-Card.
+   * Kopf: Status-Punkt (quadratisch, Radius 0) und der Titel-Link als Tastaturziel. Leib:
+   * Status als Wort (zweiter Kanal zum Punkt, WCAG 1.4.1), Einsatzart, Rolle, Ort und eine
+   * Mono-Zeile aus Einsatznummer, Beginn und Stichwort. Die Nummer steht nur, wenn es eine
+   * gibt (`kachelKennung`) — die Datenbank-`id` ist keine.
+   */
+  const renderKarte = (e: EinsatzAnzeige, klein = false) => {
+    const kennung = kachelKennung(e);
+    const aktiv = e.status === 'aktiv';
+    return (
+      <div
+        key={e.id}
+        data-lfh="einsatzkachel"
+        className={
+          klein ? 'lfh-einsatzkachel lfh-einsatzkachel--abgeschlossen' : 'lfh-einsatzkachel'
+        }
+        style={klein ? undefined : { minHeight: KACHEL_MIN_HOEHE }}
+        onClick={() => navigate(einsatzPfad(e.id))}
+      >
+        <div className="lfh-einsatzkachel__kopf">
+          <span
+            aria-hidden="true"
+            data-lfh="status-punkt"
+            style={{
+              width: 8,
+              height: 8,
+              flex: '0 0 8px',
+              background: aktiv ? rollen.normal : rollen.schwach,
+            }}
+          />
+          <Link
+            to={einsatzPfad(e.id)}
+            onClick={(event) => event.stopPropagation()}
+            className="lfh-einsatzkachel__link"
+            style={{ ...kartenTitelStil(token), minWidth: 0, flex: '1 1 auto' }}
+          >
+            <span style={kartenTitelTextStil}>{e.bezeichnung}</span>
+          </Link>
+        </div>
+        <div className="lfh-einsatzkachel__leib">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}>
+            <StatusTag darstellung={einsatzStatus[e.status]} />
+            <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
+            {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
+          </div>
+          {/* Ort und Beginn beantworten „welcher ist meiner?" — vorher standen sie nur im
+              Kopfdatenformular, drei Klicks entfernt (Befund M4). Die Ikone kommt aus
+              `@ant-design/icons` und trägt eine `aria-hidden`-Hülle: der Knoten brächte
+              sonst ein englisches `role="img"`-Label mit. */}
+          {e.einsatzort && (
+            <span data-testid="einsatz-ort" style={{ color: rollen.text2 }}>
+              <span aria-hidden="true">
+                <EnvironmentOutlined />{' '}
+              </span>
+              {e.einsatzort}
             </span>
-            {e.einsatzort}
-          </Typography.Text>
-        )}
-        <Typography.Text type="secondary">seit {formatZeitKurz(e.begonnen_at)}</Typography.Text>
-        {e.stichwort && <Typography.Text type="secondary">{e.stichwort}</Typography.Text>}
-      </Space>
-    </Card>
-  );
+          )}
+          <span
+            style={{
+              ...monoStil(12),
+              display: 'flex',
+              flexWrap: 'wrap',
+              columnGap: token.marginXS,
+            }}
+          >
+            {kennung && <span data-lfh="einsatznummer">{kennung}</span>}
+            <span>seit {formatZeitKurz(e.begonnen_at)}</span>
+            {e.stichwort && <span>{e.stichwort}</span>}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   const leer = aktive.length === 0 && abgeschlossene.length === 0;
 
@@ -285,6 +312,7 @@ export default function EinsaetzePage() {
   return (
     <EinsatzSeite
       titel="Einsätze"
+      meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
       breite={flaeche.seiteBreit}
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
@@ -328,7 +356,7 @@ export default function EinsaetzePage() {
           Abstand, dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
       <div
         data-testid="einsaetze-raster"
-        style={rasterStil(flaeche.kachelMin, abstand.lg)}
+        style={rasterStil(flaeche.kachelMin, abstand.md)}
         aria-busy={isPending || undefined}
         aria-label={isPending ? 'Einsätze werden geladen' : undefined}
       >

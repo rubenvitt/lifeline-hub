@@ -1,4 +1,5 @@
-import { App, Card, Col, Collapse, DatePicker, Form, Input, Row } from 'antd';
+import { App, Col, Collapse, DatePicker, Form, Input, Row } from 'antd';
+import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { useEffect, type ReactNode } from 'react';
@@ -131,7 +132,7 @@ export default function AuftragFormular({
   /** Nach erfolgreichem Einzel-Erfassen. Ohne Angabe passiert nichts — das
    *  Inline-Formular bleibt offen (LFH-332/B4). */
   onFertig?: () => void;
-  /** Umschließende Card mit Titel rendern. `false` für Inline-/Modal-Einbettung,
+  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-/Modal-Einbettung,
    *  wo der Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
 }) {
@@ -383,8 +384,8 @@ export default function AuftragFormular({
 
   if (!card) return formular;
   return (
-    <Card size="small" title="Neuer Auftrag/Befehl">
+    <Paneel titel="Neuer Auftrag/Befehl" koerperPolster>
       {formular}
-    </Card>
+    </Paneel>
   );
 }

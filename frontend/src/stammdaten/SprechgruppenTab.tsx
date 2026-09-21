@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { StatusChip } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -91,7 +92,13 @@ export default function SprechgruppenTab() {
         { text: 'Inaktiv', value: false },
       ],
       onFilter: (wert, sg) => sg.aktiv === wert,
-      render: (_, sg) => (sg.aktiv ? <Tag color="green">Aktiv</Tag> : <Tag>Inaktiv</Tag>),
+      // Status als getönte Fläche mit Wort (Neuentwurf), nicht als antd-Farbetikett.
+      render: (_, sg) =>
+        sg.aktiv ? (
+          <StatusChip ton="normal" wort="Aktiv" />
+        ) : (
+          <StatusChip ton="neutral" wort="Inaktiv" />
+        ),
     },
     ...(istAdmin
       ? ([

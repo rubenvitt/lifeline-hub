@@ -1,4 +1,5 @@
-import { Button, Card, Col, DatePicker, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { Button, Col, DatePicker, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { ThunderboltOutlined, SendOutlined } from '@ant-design/icons';
@@ -70,7 +71,7 @@ export default function MeldungFormular({
    * Fehlschlag sieht (LFH-332/B4).
    */
   onAnlegen: (d: NeueMeldung) => Promise<unknown>;
-  /** Umschließende Card mit Titel rendern. `false` für Inline-Einbettung, wo der
+  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-Einbettung, wo der
    *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
 }) {
@@ -258,8 +259,8 @@ export default function MeldungFormular({
 
   if (!card) return formular;
   return (
-    <Card size="small" title="Neue Meldung erfassen">
+    <Paneel titel="Neue Meldung erfassen" koerperPolster>
       {formular}
-    </Card>
+    </Paneel>
   );
 }

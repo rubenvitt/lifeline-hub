@@ -16,17 +16,50 @@ interface Props {
   gesetzteFelder: MetaFeld[];
   onWahl: (eintrag: SlashEintrag) => void;
   onSchliessen: () => void;
+  /**
+   * Typbefehle (`/meldung`, `/anordnung` …) als eigene, ERSTE Sektion anbieten. Der
+   * Aufrufer setzt das nur für ein `/` am Zeilenanfang (Neuentwurf S4) — mitten im Satz
+   * bleibt das Menü bei Feldern und Bausteinen, und seine Reihenfolge unverändert.
+   */
+  typenAnbieten?: boolean;
+  /**
+   * `@`-Modus: statt Typen/Feldern/Bausteinen genau diese Einheiten-Einträge
+   * (`filterAtEintraege`). `null`/fehlend = `/`-Modus.
+   */
+  einheiten?: readonly SlashEintrag[] | null;
+  /**
+   * Wohin das Menü aufgeht. Die ETB-Erfassung steht seit dem Neuentwurf am SEITENFUSS —
+   * ein Menü nach unten liefe dort aus dem Fenster.
+   */
+  richtung?: 'unten' | 'oben';
 }
 
 const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
-  { offen, filter, bausteine, gesetzteFelder, onWahl, onSchliessen },
+  {
+    offen,
+    filter,
+    bausteine,
+    gesetzteFelder,
+    onWahl,
+    onSchliessen,
+    typenAnbieten = false,
+    einheiten = null,
+    richtung = 'unten',
+  },
   ref,
 ) {
   const treffer = useMemo(
-    () => filterSlashEintraege(filter, bausteine, gesetzteFelder),
-    [filter, bausteine, gesetzteFelder],
+    () => filterSlashEintraege(filter, bausteine, gesetzteFelder, { typen: typenAnbieten }),
+    [filter, bausteine, gesetzteFelder, typenAnbieten],
   );
-  const flach: SlashEintrag[] = useMemo(() => [...treffer.felder, ...treffer.bausteine], [treffer]);
+  // EINE flache Folge in Anzeigereihenfolge — die Pfeiltasten wandern über alle Sektionen.
+  const flach: SlashEintrag[] = useMemo(
+    () =>
+      einheiten != null
+        ? [...einheiten]
+        : [...treffer.typen, ...treffer.felder, ...treffer.bausteine],
+    [einheiten, treffer],
+  );
   const [aktiv, setAktiv] = useState(0);
   // Aufgelöste Theme-Tokens (theme.useToken()) statt antd-CSS-Variablen: robust
   // gegenüber dem Theme-Modus. Eine antd-Custom-Property griff hier früher nie und
@@ -154,7 +187,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
         position: 'absolute',
         zIndex: 10,
         minWidth: 240,
-        marginTop: 4,
+        ...(richtung === 'oben' ? { bottom: '100%', marginBottom: 4 } : { marginTop: 4 }),
         background: token.colorBgElevated,
         color: token.colorText,
         border: `1px solid ${token.colorBorderSecondary}`,
@@ -173,8 +206,19 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
         </div>
       ) : (
         <>
-          {sektion('Felder', treffer.felder, 0)}
-          {sektion('Bausteine', treffer.bausteine, treffer.felder.length)}
+          {einheiten != null ? (
+            sektion('Einheit', [...einheiten], 0)
+          ) : (
+            <>
+              {sektion('Typ', treffer.typen, 0)}
+              {sektion('Felder', treffer.felder, treffer.typen.length)}
+              {sektion(
+                'Bausteine',
+                treffer.bausteine,
+                treffer.typen.length + treffer.felder.length,
+              )}
+            </>
+          )}
         </>
       )}
     </div>

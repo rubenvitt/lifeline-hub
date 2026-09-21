@@ -90,6 +90,51 @@ describe('SlashMenu', () => {
     expect(onSchliessen).toHaveBeenCalled();
   });
 
+  it('stellt Typen als ERSTE Sektion voran, wenn der Aufrufer sie anbietet (Neuentwurf S4)', () => {
+    const onWahl = vi.fn();
+    const ref = createRef<SlashMenuHandle>();
+    renderMitProviders(
+      <SlashMenu
+        ref={ref}
+        offen
+        filter=""
+        bausteine={bausteine}
+        gesetzteFelder={[]}
+        typenAnbieten
+        onWahl={onWahl}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const menue = screen.getByTestId('slash-menu');
+    const titel = [...menue.querySelectorAll('span')].map((t) => t.textContent);
+    expect(titel.slice(0, 3)).toEqual(['Typ', 'Felder', 'Bausteine']);
+    act(() => {
+      ref.current!.handleKey('Enter');
+    });
+    expect(onWahl).toHaveBeenCalledWith({ art: 'typ', key: 'meldung', label: '/meldung' });
+  });
+
+  it('zeigt im @-Modus nur die Einheiten und geht auf Wunsch nach oben auf', () => {
+    renderMitProviders(
+      <SlashMenu
+        offen
+        filter="flo"
+        bausteine={bausteine}
+        gesetzteFelder={[]}
+        einheiten={[{ art: 'einheit', key: 'von:Florian 1', label: 'Von: Florian 1' }]}
+        richtung="oben"
+        onWahl={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const menue = screen.getByTestId('slash-menu');
+    expect(menue).toHaveTextContent('Einheit');
+    expect(menue).toHaveTextContent('Von: Florian 1');
+    expect(menue).not.toHaveTextContent('Felder');
+    // Die Erfassung steht am Seitenfuß: ein Menü nach unten liefe aus dem Fenster.
+    expect(menue.style.bottom).toBe('100%');
+  });
+
   it('rendert nichts, wenn geschlossen', () => {
     const { container } = renderMitProviders(
       <SlashMenu

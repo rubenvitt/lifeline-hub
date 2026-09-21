@@ -536,7 +536,7 @@ test('Einsatzauswahl: der Ladewechsel Skelett → Karten hält den Kachelboden u
   // Die drei Skelettkacheln stehen unbedingt (`EinsaetzePage.tsx`, kein `&&` davor) — und
   // sie stehen STILL, solange das Tor zu ist. Ohne das fiel diese Messung unter Last aus
   // (siehe `ladeTor`).
-  const skelettHoehe = await kachelnHaltenBoden(page, '.ant-card', 'Skelett-Kachel', 3);
+  const skelettHoehe = await kachelnHaltenBoden(page, '.lfh-einsatzkachel', 'Skelett-Kachel', 3);
 
   // Das Suchfeld darf hier NICHT erscheinen — sonst misst dieser Test den Einschub aus
   // Test 2 mit und die beiden Aussagen wären nicht mehr trennbar.
@@ -544,7 +544,7 @@ test('Einsatzauswahl: der Ladewechsel Skelett → Karten hält den Kachelboden u
   oeffne();
   await kartenStehen(page, liste[0].bezeichnung);
   await expect(page.getByLabel('Einsätze durchsuchen')).toHaveCount(0);
-  const kartenHoehe = await kachelnHaltenBoden(page, '.ant-card', 'Einsatzkarte', 2);
+  const kartenHoehe = await kachelnHaltenBoden(page, '.lfh-einsatzkachel', 'Einsatzkarte', 2);
   // Der Knoten unter dem Raster muss wirklich stehen, sonst hat ein Shift dort keine Quelle.
   await expect(page.getByRole('link', { name: liste[2].bezeichnung, exact: true })).toHaveCount(1);
 

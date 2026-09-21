@@ -4,12 +4,10 @@ import {
   Button,
   Checkbox,
   DatePicker,
-  Flex,
   Form,
   Input,
   Space,
   Spin,
-  Tag,
   Typography,
   theme,
 } from 'antd';
@@ -50,6 +48,8 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
 
 /**
@@ -343,31 +343,14 @@ function LageberichtDetail() {
         onAbbrechen={() => setFreigabeWerte(null)}
         onFreigeben={() => void freigabeAusfuehren()}
       />
-      <Breadcrumb
-        className="lagebericht-no-print"
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: <Link to={lageberichtePfad(einsatzId)}>Lageberichte</Link> },
-          { title: bericht.titel },
-        ]}
-      />
-      {/* Umbruchfähige Kopfzeile nach dem Muster von `BefehlDetailPage` (C8/M73): ohne
-          `wrap` schob der Titel auf 390 px die Aktionen aus dem sichtbaren Bereich. */}
-      <Flex
-        className="lagebericht-no-print"
-        justify="space-between"
-        align="center"
-        gap={16}
-        wrap
-        style={{ marginBottom: 16 }}
-      >
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {bericht.titel}
-          </Typography.Title>
-          <Space size={6} wrap style={{ marginTop: 4 }}>
+      {/* Seitenkopf des Neuentwurfs (`EinsatzSeite`) — der Zwilling in `BefehlDetailPage`.
+          Die Aktionsleiste bricht im Kopf selbst um (C8/M73: „Freigeben" bleibt auf 390 px
+          erreichbar). Im Druck blendet `lageberichtPrint.css` den Kopf aus, wie vorher die
+          Kopfzeile mit `lagebericht-no-print`. */}
+      <EinsatzSeite
+        titel={bericht.titel}
+        meta={
+          <Space size={6} wrap>
             {/* Derselbe Träger wie in der Liste (LFH-493): Fachlabel und Phasenfarbe
                 kommen aus der geteilten Achse, nicht aus zwei handgeschriebenen
                 Ternären. `istEntwurf` bleibt — es steuert die Knöpfe, nicht das Etikett. */}
@@ -375,35 +358,48 @@ function LageberichtDetail() {
               phase={LAGEBERICHT_STATUS[bericht.status].phase}
               label={LAGEBERICHT_STATUS[bericht.status].label}
             />
-            <Tag>{v?.label ?? bericht.vorlage}</Tag>
-            <Tag>v{bericht.version}</Tag>
+            <span>{v?.label ?? bericht.vorlage}</span>
+            <span>v{bericht.version}</span>
           </Space>
-        </div>
-        <Space wrap>
-          <Button onClick={() => window.print()}>Drucken / als PDF</Button>
-          {!istEntwurf && bericht.etb_eintrag_id != null && (
-            <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>
-              Zum ETB-Eintrag
-            </Link>
-          )}
-          {!istEntwurf && darfSchreiben && (
-            <Button
-              onClick={() => fortschreibenMutation.mutate()}
-              loading={fortschreibenMutation.isPending}
-            >
-              Fortschreiben
-            </Button>
-          )}
-          {istEntwurf && darfSchreiben && (
-            <>
-              {/* Der sichtbare Beleg des stillen Autosave. Ohne ihn wäre „gespeichert"
+        }
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: einsatz.bezeichnung },
+              { title: <Link to={lageberichtePfad(einsatzId)}>Lageberichte</Link> },
+              { title: bericht.titel },
+            ]}
+          />
+        }
+        aktionen={
+          <div className="lagebericht-no-print">
+            <Space wrap>
+              <Button onClick={() => window.print()}>Drucken / als PDF</Button>
+              {!istEntwurf && bericht.etb_eintrag_id != null && (
+                <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>
+                  Zum ETB-Eintrag
+                </Link>
+              )}
+              {!istEntwurf && darfSchreiben && (
+                <Button
+                  onClick={() => fortschreibenMutation.mutate()}
+                  loading={fortschreibenMutation.isPending}
+                >
+                  Fortschreiben
+                </Button>
+              )}
+              {istEntwurf && darfSchreiben && (
+                <>
+                  {/* Der sichtbare Beleg des stillen Autosave. Ohne ihn wäre „gespeichert"
                   von „nicht gespeichert" nicht zu unterscheiden. */}
-              <Typography.Text type="secondary">
-                {schutz.ungespeichert
-                  ? 'ungespeicherte Änderungen'
-                  : schutz.zuletztGespeichert && `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
-              </Typography.Text>
-              {/* `loading` NUR am expliziten Pfad, NICHT an `speichertGerade` (LFH-495,
+                  <Typography.Text type="secondary">
+                    {schutz.ungespeichert
+                      ? 'ungespeicherte Änderungen'
+                      : schutz.zuletztGespeichert &&
+                        `zuletzt gespeichert ${schutz.zuletztGespeichert}`}
+                  </Typography.Text>
+                  {/* `loading` NUR am expliziten Pfad, NICHT an `speichertGerade` (LFH-495,
                   gemessen): antds Ladezustand hängt ein `<span role="img" aria-label="loading">`
                   in den Knopf, der zugängliche Name wird dadurch zu „loading Entwurf
                   speichern" — bei `speichertGerade` also bei JEDEM stillen Autosave, alle
@@ -412,106 +408,119 @@ function LageberichtDetail() {
                   Autosave nicht sein soll (und `BefehlDetailPage.test.tsx` fand es sofort:
                   „Unable to find … name 'Entwurf speichern'"). Der Riegel gegen den
                   Doppel-PATCH liegt im Hook, nicht an diesem `loading`. */}
-              <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
-                Entwurf speichern
-              </Button>
-              <Button
-                type="primary"
-                onClick={freigabeBestaetigen}
-                loading={freigebenMutation.isPending}
-              >
-                Freigeben
-              </Button>
-            </>
-          )}
-        </Space>
-      </Flex>
-
-      {/*
+                  <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
+                    Entwurf speichern
+                  </Button>
+                  <Button
+                    type="primary"
+                    onClick={freigabeBestaetigen}
+                    loading={freigebenMutation.isPending}
+                  >
+                    Freigeben
+                  </Button>
+                </>
+              )}
+            </Space>
+          </div>
+        }
+      >
+        {/*
         Der Grund eines gescheiterten Speicherns (LFH-494) — der Zwilling in
         `BefehlDetailPage`. `lagebericht-no-print`, weil ein „Nicht gespeichert"-Banner im
         ausgedruckten Bericht eine Aussage mit Aussenwirkung wäre, die den Druck nicht betrifft.
       */}
-      {schutz.speicherFehler != null && (
-        <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
-          <SpeicherFehler fehler={schutz.speicherFehler} />
-        </div>
-      )}
+        {schutz.speicherFehler != null && (
+          <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
+            <SpeicherFehler fehler={schutz.speicherFehler} />
+          </div>
+        )}
 
-      {/* Im Entwurf trägt das Picker-Feld den Zeitstand — eine zweite Anzeige daneben zeigte
+        {/* Im Entwurf trägt das Picker-Feld den Zeitstand — eine zweite Anzeige daneben zeigte
           zwei Uhrzeiten für denselben Wert. Der Lesezweig rendert seit LFH-350 (F2/H60) über
           `ZeitAnzeige` in der taktischen DTG und in der Anzeigezone; der rohe Wirestring
           (`YYYY-MM-DD HH:mm:ss`, UTC ohne Zonenkennung) stand hier um den Zonenversatz
           falsch. */}
-      {!(istEntwurf && darfSchreiben) && (
-        <Typography.Paragraph type="secondary">
-          Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
-        </Typography.Paragraph>
-      )}
+        {!(istEntwurf && darfSchreiben) && (
+          <Typography.Paragraph type="secondary" style={monoStil(12)}>
+            Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
+          </Typography.Paragraph>
+        )}
 
-      {istEntwurf && darfSchreiben ? (
-        <Form
-          form={form}
-          layout="vertical"
-          onValuesChange={schutz.markiereGeaendert}
-          // Zweiter Auslöser neben der Frist: ein verlassenes Feld ist der Moment, in dem
-          // ein Abschnitt fertig gedacht ist. `onBlur` steigt aus den Feldern auf.
-          onBlur={schutz.autosaveJetzt}
-          onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
-        >
-          <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          {/* Das Backend nimmt den Zeitstand seit jeher (`routes/lagebericht.rs`), nur die
-              UI bot ihn nirgends an (N23). Picker in Ortszeit, Wire in UTC — `etb/filterZeit`. */}
-          <Form.Item label="Zeitstand" name="zeitstand">
-            {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
-                würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die DB. */}
-            <DatePicker
-              showTime
-              allowClear={false}
-              format="DD.MM.YYYY HH:mm"
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Checkbox
-            checked={vorschauNeben}
-            onChange={(e) => setVorschauNeben(e.target.checked)}
-            style={{ marginBottom: token.margin }}
+        {/* Im Entwurf trägt das Abschnittsakkordeon die Gliederung selbst; ein Paneel darum
+            kostete Kopfzeile und Polster auf einer Seite, deren Höhe gemessen gedeckelt ist
+            (`e2e/lagebericht-schmal.spec.ts`, LFH-348 · C13). Das Paneel rahmt nur den
+            Lesezweig. */}
+        {istEntwurf && darfSchreiben ? (
+          <Form
+            form={form}
+            layout="vertical"
+            onValuesChange={schutz.markiereGeaendert}
+            // Zweiter Auslöser neben der Frist: ein verlassenes Feld ist der Moment, in dem
+            // ein Abschnitt fertig gedacht ist. `onBlur` steigt aus den Feldern auf.
+            onBlur={schutz.autosaveJetzt}
+            onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
           >
-            Vorschau neben dem Text
-          </Checkbox>
-          {v && (
-            <AbschnittsAkkordeon
-              abschnitte={v.abschnitte}
-              befuellt={befuellt}
-              // Vorgabe ist der Einstiegs-Abschnitt, nicht stur der erste (LFH-495).
-              offen={offenerAbschnitt ?? einstieg?.feld ?? v.abschnitte[0].schluessel}
-              onOffen={setOffenerAbschnitt}
-              editor={abschnittsEditor}
-            />
-          )}
-          {/* Einstiegsfokus in den offenen Abschnitt (LFH-495). Als LETZTES Kind, damit beim
+            <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            {/* Das Backend nimmt den Zeitstand seit jeher (`routes/lagebericht.rs`), nur die
+              UI bot ihn nirgends an (N23). Picker in Ortszeit, Wire in UTC — `etb/filterZeit`. */}
+            <Form.Item label="Zeitstand" name="zeitstand">
+              {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
+                würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die DB. */}
+              <DatePicker
+                showTime
+                allowClear={false}
+                format="DD.MM.YYYY HH:mm"
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+            <Checkbox
+              checked={vorschauNeben}
+              onChange={(e) => setVorschauNeben(e.target.checked)}
+              style={{ marginBottom: token.margin }}
+            >
+              Vorschau neben dem Text
+            </Checkbox>
+            {v && (
+              <AbschnittsAkkordeon
+                abschnitte={v.abschnitte}
+                befuellt={befuellt}
+                // Vorgabe ist der Einstiegs-Abschnitt, nicht stur der erste (LFH-495).
+                offen={offenerAbschnitt ?? einstieg?.feld ?? v.abschnitte[0].schluessel}
+                onOffen={setOffenerAbschnitt}
+                editor={abschnittsEditor}
+              />
+            )}
+            {/* Einstiegsfokus in den offenen Abschnitt (LFH-495). Als LETZTES Kind, damit beim
               Mount-Effekt alle Felder im DOM stehen; Begründungen in `Einstiegsfokus`. */}
-          <Einstiegsfokus form={form} feld={einstieg?.feld ?? undefined} />
-        </Form>
-      ) : (
-        <div className="lagebericht-druck">
-          {v?.abschnitte.map((a) => {
-            const text = bericht.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
-            return (
-              <section key={a.schluessel} style={{ marginBottom: 16 }}>
-                <Typography.Title level={5}>{a.label}</Typography.Title>
-                {text.trim() ? (
-                  <Markdown variante="dokument">{text}</Markdown>
-                ) : (
-                  <Typography.Paragraph>—</Typography.Paragraph>
-                )}
-              </section>
-            );
-          })}
-        </div>
-      )}
+            <Einstiegsfokus form={form} feld={einstieg?.feld ?? undefined} />
+          </Form>
+        ) : (
+          <Paneel
+            titel="Berichtstext"
+            meta={`${v?.abschnitte.length ?? 0} Abschnitte`}
+            koerperPolster
+          >
+            <div className="lagebericht-druck">
+              {v?.abschnitte.map((a) => {
+                const text =
+                  bericht.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
+                return (
+                  <section key={a.schluessel} style={{ marginBottom: 16 }}>
+                    <Typography.Title level={5}>{a.label}</Typography.Title>
+                    {text.trim() ? (
+                      <Markdown variante="dokument">{text}</Markdown>
+                    ) : (
+                      <Typography.Paragraph>—</Typography.Paragraph>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          </Paneel>
+        )}
+      </EinsatzSeite>
     </div>
   );
 }

@@ -38,7 +38,7 @@ function setup() {
  * unsichtbar.
  */
 describe('Verdichtungszeile', () => {
-  it('zeigt Stärke und Fahrzeugverfügbarkeit und verlinkt auf die Kräfteübersicht', async () => {
+  it('zeigt Stärke und Fahrzeugverfügbarkeit und verlinkt auf das Meldebild', async () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([
       { staerke_position: 'fuehrer', status_kategorie: 'gebunden' },
       { staerke_position: 'mannschaft', status_kategorie: 'gebunden' },
@@ -56,10 +56,12 @@ describe('Verdichtungszeile', () => {
     expect(screen.getByText('1 gebunden')).toBeInTheDocument();
     expect(screen.getByText('0 n. verf.')).toBeInTheDocument();
 
-    expect(screen.getByRole('link', { name: /Kräfteübersicht/ })).toHaveAttribute(
+    // Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`.
+    expect(screen.getByRole('link', { name: 'Meldebild' })).toHaveAttribute(
       'href',
       '/einsaetze/1/kraefteuebersicht',
     );
+    expect(screen.queryByRole('link', { name: /Kräfteübersicht/ })).toBeNull();
   });
 
   it('bleibt beim ERSTEN gescheiterten Abruf stumm, statt eine Null zu behaupten', async () => {
@@ -135,7 +137,7 @@ describe('Verdichtungszeile', () => {
  * `e2e/gate3-trefflaeche.spec.ts` (15 / 16 / 16 px vor dem Fix, gemessen im Browser);
  * hier steht, dass die Höhe aus dem Token kommt und über die Stufen MITZIEHT.
  */
-describe('Kräfteübersicht-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () => {
+describe('Meldebild-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
     controlHeight: dichten[stufe].zeilenhoehe,
     paddingSM: dichten[stufe].abstand.sm,

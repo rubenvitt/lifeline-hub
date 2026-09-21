@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { delay, http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -13,8 +13,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
-import type { Auftrag, Meldung } from '../../api/types';
-import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
+import type { Auftrag, EtbEintragAnzeige, GefahrBewertung, Meldung } from '../../api/types';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 
 class FakeEventSource {
@@ -151,13 +150,65 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   ...over,
 });
 
+const etb = (lfd: number, over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige => ({
+  id: 1000 + lfd,
+  lfd_nr: lfd,
+  typ: 'meldung',
+  inhalt: `Eintrag ${lfd}`,
+  ereigniszeit: '2026-06-11 09:00:00',
+  received_at: '2026-06-11 09:00:00',
+  erfasser_id: 1,
+  erfasser_name: 'Vitt',
+  ...over,
+});
+
+const bewertung = (
+  gebiet: number,
+  gefahrentyp: GefahrBewertung['gefahrentyp'],
+  warnstufe: GefahrBewertung['warnstufe'],
+  schutzobjekt: GefahrBewertung['schutzobjekt'] = 'menschen',
+): GefahrBewertung => ({
+  id: Math.floor(Math.random() * 1e9),
+  gefahrengebiet_id: gebiet,
+  gefahrentyp,
+  schutzobjekt,
+  warnstufe,
+  aktualisiert_von: 1,
+  erstellt_at: '2026-06-11 09:00:00',
+  geaendert_at: '2026-06-11 09:00:00',
+});
+
+const gebiet = (id: number, hoechste_warnstufe: GefahrBewertung['warnstufe'] = 'keine') => ({
+  id,
+  einsatz_id: 1,
+  hoechste_warnstufe,
+  label: `Gebiet ${id}`,
+  zonen_ids: [],
+});
+
+const lagebericht = {
+  id: 3,
+  einsatz_id: 1,
+  titel: 'Lage 14:00',
+  status: 'freigegeben',
+  zeitstand: '2026-07-25 12:00:00',
+  ersteller_id: 1,
+  ersteller_name: 'Muster',
+  erstellt_at: '2026-07-25 12:00:00',
+  aktualisiert_at: '2026-07-25 12:00:00',
+  version: 1,
+  vorlage: 'lagebericht',
+  abschnitte: [{ schluessel: 'gefahren_schadenlage', text: 'Pegel steigend.' }],
+};
+
 interface Daten {
   personen?: unknown[];
   uhs?: unknown[];
   schaeden?: unknown[];
-  tiere?: unknown[];
   gefahren?: unknown[];
-  zonen?: unknown[];
+  /** Matrix je Gefahrengebiet-ID. */
+  matrix?: Record<number, GefahrBewertung[]>;
+  matrixStatus?: number;
   lageberichte?: unknown[];
   einheiten?: unknown[];
   personal?: unknown[];
@@ -166,10 +217,12 @@ interface Daten {
   abschnitte?: unknown[];
   auftraege?: unknown[];
   meldungen?: unknown[];
+  etb?: EtbEintragAnzeige[];
   gefahrenStatus?: number;
   personenStatus?: number;
+  etbStatus?: number;
   /** Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild`
-   *  noch gar nichts liefert und die Kennzahlenleiste ihre Plätze selbst stellen muss. */
+   *  noch gar nichts liefert und das Kennzahlenband seine Plätze selbst stellen muss. */
   einsatzLaedt?: boolean;
 }
 
@@ -185,11 +238,14 @@ function mockEndpunkte(d: Daten) {
     ),
     http.get('/api/einsaetze/1/uhs', () => json(d.uhs)),
     http.get('/api/einsaetze/1/schaeden', () => json(d.schaeden)),
-    http.get('/api/einsaetze/1/tiere', () => json(d.tiere)),
     http.get('/api/einsaetze/1/gefahrengebiete', () =>
       d.gefahrenStatus ? new HttpResponse(null, { status: d.gefahrenStatus }) : json(d.gefahren),
     ),
-    http.get('/api/einsaetze/1/zonen', () => json(d.zonen)),
+    http.get('/api/einsaetze/1/gefahrengebiete/:gid/matrix', ({ params }) =>
+      d.matrixStatus
+        ? new HttpResponse(null, { status: d.matrixStatus })
+        : json(d.matrix?.[Number(params.gid)]),
+    ),
     http.get('/api/einsaetze/1/lageberichte', () => json(d.lageberichte)),
     http.get('/api/einsaetze/1/einheiten', () => json(d.einheiten)),
     http.get('/api/einsaetze/1/personal', () => json(d.personal)),
@@ -198,6 +254,9 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte)),
     http.get('/api/einsaetze/1/auftraege', () => json(d.auftraege)),
     http.get('/api/einsaetze/1/meldungen', () => json(d.meldungen)),
+    http.get('/api/einsaetze/1/etb', () =>
+      d.etbStatus ? new HttpResponse(null, { status: d.etbStatus }) : json(d.etb),
+    ),
   );
 }
 
@@ -206,864 +265,486 @@ function render() {
     <Routes>
       <Route path="/einsaetze/:id/lage-dashboard" element={<LageDashboardPage />} />
       <Route path="/einsaetze/:id/personen" element={<div>PERSONEN-MODUL</div>} />
+      <Route path="/einsaetze/:id/personen/aufnahme" element={<div>AUFNAHME</div>} />
+      <Route path="/einsaetze/:id/gefahren" element={<div>GEFAHREN-MODUL</div>} />
+      <Route path="/einsaetze/:id/etb" element={<div>ETB-MODUL</div>} />
     </Routes>,
     { route: '/einsaetze/1/lage-dashboard' },
   );
 }
 
-/** Die Kennzahl-Kachel zu einem Etikett — die Leiste rendert Knöpfe, keine
- *  antd-`Statistic` mehr (LFH-352 · A0). */
-function kennzahl(etikett: string): HTMLElement {
-  const el = screen.getByText(etikett).closest('button');
+/** Das gepinnte Kennzahl-Set — handgeschrieben, NICHT aus `KENNZAHL_ETIKETTEN` gelesen:
+ *  sonst prüfte der Pin die Konstante gegen sich selbst. */
+const KENNZAHL_SET = [
+  'Betroffene',
+  'Kräfte',
+  'Vermisste',
+  'Höchste Warnstufe',
+  'Schäden offen',
+  'Einsatzdauer',
+];
+
+/** Die Zellen eines Kennzahlenbands (über seinen zugänglichen Gruppennamen). */
+function zellen(band = 'Lage in Zahlen'): HTMLElement[] {
+  const gruppe = screen.getByRole('group', { name: band });
+  return Array.from(gruppe.querySelectorAll<HTMLElement>('[data-lfh="kennzahl"]'));
+}
+
+/** Die Kennzahl-Zelle zu einem Etikett. */
+function kennzahl(etikett: string, band?: string): HTMLElement {
+  const el = zellen(band).find((z) => z.querySelector('.lfh-augenbraue')?.textContent === etikett);
   if (!el) throw new Error(`Kennzahl „${etikett}" nicht gefunden`);
   return el;
 }
 
 /**
- * Das Wartesignal auf „Daten sind da" (LFH-331 · B3).
- *
- * Seit die Leiste ihre sechs Plätze schon WÄHREND des Einsatz-Abrufs stellt, ist
- * ein `findByText(<Etikett>)` kein Gate mehr — es erfüllt sich sofort am
- * Platzhalter, und die Zusicherung danach liefe gegen den Ladezustand statt gegen
- * die Daten (gemessen: sieben Bestandstests fielen genau daran). Angesetzt wird
- * deshalb auf dem KNOPF, den erst das Lagebild baut; der Platzhalter ist keiner.
+ * Wartesignal „Daten sind da" (LFH-331 · B3): die Plätze stehen schon WÄHREND des
+ * Einsatz-Abrufs, ein Griff aufs Etikett erfüllte sich also sofort am Platzhalter.
+ * Angesetzt wird deshalb am LINK, den erst das Lagebild baut — ein Platzhalter ist keiner.
  */
 function kennzahlGeladen(etikett: string): Promise<HTMLElement> {
-  return waitFor(() => kennzahl(etikett));
+  return waitFor(() => {
+    const el = kennzahl(etikett);
+    expect(el.tagName).toBe('A');
+    return el;
+  });
 }
 
-describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
-  it('zeigt Einsatz und Leitzahlen im Instrumentenband', async () => {
+/** Das Paneel zu einem Titel (die Augenbraue ist seine Überschrift). */
+function paneel(titel: string): HTMLElement {
+  return screen.getByRole('region', { name: titel });
+}
+
+/** Die Innenkante der Kennzahl (zweiter Kanal zur Tonfarbe). */
+function kante(el: HTMLElement): number {
+  const m = el.style.boxShadow.match(/inset (\d+)px/);
+  return m ? Number(m[1]) : 0;
+}
+
+describe('LageDashboardPage — Kennzahlenband', () => {
+  it('trägt genau 6 Kennzahlen in fester Reihenfolge', async () => {
+    // Der Reihenfolge-Pin bleibt (Prüfliste Kriterium 9: dieselbe Größe an derselben Stelle,
+    // nie nach Dringlichkeit umsortiert) — neu belegt mit dem Set des Neuentwurfs S3.
+    // Pegel und Evakuiert fehlen bewusst (keine Datenquelle, LFH-606/607).
+    mockEndpunkte({ personen: [person('sk1')] });
+    render();
+    await kennzahlGeladen('Betroffene');
+    const etiketten = zellen().map((z) => z.querySelector('.lfh-augenbraue')?.textContent);
+    expect(etiketten).toEqual(KENNZAHL_SET);
+  });
+
+  it('stellt schon während des Einsatz-Abrufs sechs Plätze — ohne Ziel und ohne Stand', async () => {
+    // Prüfliste Kriterium 12 (CLS): ohne die Plätze sprängen sechs Zellen später herein.
+    mockEndpunkte({ einsatzLaedt: true });
+    render();
+    const plaetze = zellen();
+    expect(plaetze.map((z) => z.querySelector('.lfh-augenbraue')?.textContent)).toEqual(
+      KENNZAHL_SET,
+    );
+    for (const p of plaetze) {
+      expect(p.textContent).toContain('wird abgerufen');
+      // Kein Link: es gibt noch nichts, wohin der Platz führen könnte.
+      expect(p.tagName).not.toBe('A');
+    }
+  });
+
+  it('zeigt Betroffene mit Patienten-Notiz und Vermisste mit Alarmkante', async () => {
     mockEndpunkte({
       personen: [person('sk1'), person('sk1'), person('sk3'), person(null, 'vermisst')],
     });
     render();
-    // Die Bezeichnung steht bewusst zweimal: im Breadcrumb (Navigation) und im
-    // Instrumentenband (Lagebezug). Geprüft wird das Band.
-    const band = (await screen.findAllByText('Hochwasser Musterstadt')).find((e) =>
-      e.classList.contains('lfh-band__titel'),
-    );
-    expect(band).toBeDefined();
-    // Signatur 4: das Band trägt DTG und Gesamtstärke, immer an derselben Stelle.
-    expect(screen.getByText('DTG')).toBeInTheDocument();
-    expect(screen.getByText('Gesamtstärke')).toBeInTheDocument();
-    expect(kennzahl('Patienten SK I–IV')).toHaveTextContent('3');
-    expect(kennzahl('Vermisst')).toHaveTextContent('1');
+    await kennzahlGeladen('Betroffene');
+    expect(kennzahl('Betroffene')).toHaveTextContent('4');
+    expect(kennzahl('Betroffene')).toHaveTextContent('3 Patienten');
+    expect(kennzahl('Vermisste')).toHaveTextContent('1');
+    expect(kante(kennzahl('Vermisste'))).toBe(6);
+    // Betroffene sind eine Menge, keine Gefahrenmeldung — ohne Kante.
+    expect(kante(kennzahl('Betroffene'))).toBe(0);
   });
 
-  it('Kennzahlen tragen Wortlaut, nicht nur Zähler', async () => {
-    mockEndpunkte({ personen: [person('sk1')] });
-    render();
-    // „keine" statt „0" — eine nackte Null sagt nicht, ob gemessen oder leer.
-    expect(await kennzahlGeladen('Höchste Warnstufe')).toBeInTheDocument();
-    expect(kennzahl('Höchste Warnstufe')).toHaveTextContent('keine');
-    expect(kennzahl('Vermisst')).toHaveTextContent('keine offenen Fälle');
-  });
-
-  it('Leerzustand führt zu einer Aktion, statt nur leer zu sein', async () => {
-    mockEndpunkte({});
-    render();
-    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Auftrag erteilen' })).toBeInTheDocument();
-    expect(screen.getByText('Noch keine Personen erfasst.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Person aufnehmen' })).toBeInTheDocument();
-  });
-
-  it('Deep-Link: Klick auf die Patienten-Kennzahl navigiert ins Personen-Modul', async () => {
-    mockEndpunkte({ personen: [person('sk1')] });
-    render();
-    await kennzahlGeladen('Patienten SK I–IV');
-    await userEvent.click(kennzahl('Patienten SK I–IV'));
-    expect(await screen.findByText('PERSONEN-MODUL')).toBeInTheDocument();
-  });
-
-  it('Aufträge: zählt offene/in-Arbeit und zeigt die Überfällig-Plakette', async () => {
-    mockEndpunkte({
-      auftraege: [
-        auftrag({ bearbeitungsstatus: 'offen' }),
-        auftrag({ bearbeitungsstatus: 'in_arbeit', ist_ueberfaellig: true }),
-        auftrag({ bearbeitungsstatus: 'vollzogen' }),
-        auftrag({ bearbeitungsstatus: 'abgenommen' }),
-      ],
-    });
-    render();
-    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
-    // offen = bearbeitungsstatus ∉ {vollzogen, abgenommen} → 2
-    expect(screen.getByText('offen oder in Arbeit').parentElement).toHaveTextContent('2');
-  });
-
-  it('Meldungen: zählt offene/neue und zeigt die Überfällig-Plakette', async () => {
-    mockEndpunkte({
-      meldungen: [
-        meldung({ status: 'neu', ist_offen: true }),
-        meldung({ status: 'gesichtet', ist_offen: true, ist_ueberfaellig: true }),
-        meldung({ status: 'in_bearbeitung', ist_offen: true }),
-        meldung({ status: 'erledigt', ist_offen: false }),
-      ],
-    });
-    render();
-    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
-    const offen = screen.getByText('Offen').closest('div');
-    expect(offen).toHaveTextContent('3');
-    const neu = screen.getByText('Neu').closest('div');
-    expect(neu).toHaveTextContent('1');
-  });
-
-  // AK2 (LFH-336): Der Zähler bleibt, aber er sagt nicht, WAS los ist. Geprüft
-  // wird der Inhalt der Zeile UND ihr Sprungziel — eine Zeile ohne Ziel wäre
-  // wieder nur Text auf einer Kachel.
-  it('Meldungen: die Kurzliste nennt lfd. Nummer, Zeit, Absender und Inhalt', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      meldungen: [
-        meldung({
-          id: 77,
-          lfd_nr: 12,
-          absender: 'ELW 1',
-          inhalt: 'Strom ausgefallen',
-          ereigniszeit: '2026-06-11 14:05:00',
-        }),
-      ],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-    const zeile = await screen.findByRole('link', { name: /Strom ausgefallen/ });
-    expect(zeile).toHaveTextContent('12');
-    // `formatUhrzeit()` rechnet den UTC-Wirestring in die Anzeigezone um (siehe
-    // `anzeige/format.ts`) — die Erwartung darf deshalb nicht von der Maschinen-TZ
-    // abhängen und wird über dieselbe Funktion berechnet wie die Seite selbst.
-    expect(zeile).toHaveTextContent(formatUhrzeit('2026-06-11 14:05:00'));
-    expect(zeile).toHaveTextContent('ELW 1');
-    expect(zeile).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=77');
-  });
-
-  it('Aufträge: die Kurzliste nennt Auftragstext und Frist und springt auf den Auftrag', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      auftraege: [
-        auftrag({
-          id: 88,
-          lfd_nr: 4,
-          auftrag_text: 'Pumpe an Deich 3 setzen',
-          frist_at: '2026-06-11 16:30:00',
-        }),
-      ],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-    const zeile = await screen.findByRole('link', { name: /Pumpe an Deich 3 setzen/ });
-    // `formatUhrzeitMitTag()` rechnet den UTC-Wirestring in die Anzeigezone um und
-    // stellt den Tag voran, wenn die Frist nicht auf den heutigen Tag fällt —
-    // dieselbe Funktion wie in `lagebild.ts`, damit die Erwartung nicht von
-    // Maschinen-TZ oder Testlaufdatum abhängt.
-    expect(zeile).toHaveTextContent(formatUhrzeitMitTag('2026-06-11 16:30:00'));
-    expect(zeile).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=88');
-  });
-
-  it('Kurzlisten-Zeilen verschiedener Dringlichkeit unterscheiden sich ohne Farbe (LFH-395)', async () => {
-    // WCAG 1.4.1: bis LFH-395 hing die Stufe ALLEIN an der Farbe des Markers —
-    // Form, Symbol und Text waren über alle drei Stufen gleich. Der zweite Kanal
-    // ist jetzt doppelt: die FORM des Markers (`form` aus `StatusDarstellung`,
-    // bis dahin ein deklarierter, aber konsumentenloser Slot) und das Stufenwort
-    // im zugänglichen Namen der Zeile. Beides wird geprüft — die Klasse allein
-    // wäre kein Beleg, sie ist der Träger der Farbe (AK1).
-    mockEndpunkte({
-      personen: [person('sk3')],
-      meldungen: [
-        meldung({ id: 1, lfd_nr: 1, inhalt: 'Deich bricht', ist_ueberfaellig: true }),
-        meldung({ id: 2, lfd_nr: 2, inhalt: 'Keller unter Wasser', status: 'neu' }),
-        meldung({ id: 3, lfd_nr: 3, inhalt: 'Sandsaecke geliefert', status: 'in_bearbeitung' }),
-      ],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-
-    const dringend = await screen.findByRole('link', { name: /Deich bricht/ });
-    const erhoeht = screen.getByRole('link', { name: /Keller unter Wasser/ });
-    const normal = screen.getByRole('link', { name: /Sandsaecke geliefert/ });
-
-    // Kanal „Text": ohne das Stufenwort bliebe die Zeile für Vorlesende
-    // stufenlos, egal wie deutlich der Marker aussieht (AK3).
-    expect(dringend).toHaveAccessibleName(/dringend/);
-    expect(erhoeht).toHaveAccessibleName(/erhöht/);
-    expect(normal).toHaveAccessibleName(/normal/);
-
-    // Kanal „Form": drei Stufen, drei verschiedene Formen. Dass die Formachse
-    // ohne Farbe auskommt und die Farbachse ohne Geometrie, belegt die
-    // CSS-Prüfung in „Der Dringlichkeitsmarker (LFH-395)".
-    const form = (zeile: HTMLElement) =>
-      [...zeile.querySelector('.lfh-zeichen')!.classList].find((k) =>
-        /^lfh-zeichen--(dreieck|kreis|balken)$/.test(k),
-      );
-    const formen = [form(dringend), form(erhoeht), form(normal)];
-    expect(formen, 'jede Stufe braucht eine Form').not.toContain(undefined);
-    expect(new Set(formen).size, 'drei Stufen, drei Formen').toBe(3);
-  });
-
-  it('das Zeichen im Kachelkopf bleibt stumme Deko — es trägt keine Stufe', async () => {
-    // Gegenaussage zum Test darüber: der Marker im Kachelkopf ist Gestaltung,
-    // kein Status. Bekäme er im selben Zug eine Stimme, stünde in jeder Kachel
-    // ein bedeutungsloses Vorleseziel — derselbe Fehler, den CLAUDE.md an
-    // `AmpelZelle` beschreibt, nur andersherum.
+  it('ohne Vermisste gibt es keine Kante und den Wortlaut statt einer nackten Null', async () => {
     mockEndpunkte({ personen: [person('sk3')] });
     render();
-    await kennzahlGeladen('Vermisst');
-    const kopf = screen.getByRole('heading', { name: 'Meldungen (eingehend)' }).parentElement!;
-    const deko = kopf.querySelector('.lfh-zeichen')!;
-    expect(deko).toHaveAttribute('aria-hidden', 'true');
-    expect(deko).not.toHaveAttribute('aria-label');
-    expect(within(kopf).queryByRole('img')).toBeNull();
+    await kennzahlGeladen('Vermisste');
+    expect(kante(kennzahl('Vermisste'))).toBe(0);
+    expect(kennzahl('Vermisste')).toHaveTextContent('keine offenen Fälle');
   });
 
-  // Die zweite Hälfte von AK2: ohne sie wäre „mindestens eine Zeile" auch dann
-  // erfüllt, wenn der Leerzustand genauso aussieht.
-  it('ohne Aufträge zeigt die Kachel den Leerzustand und KEINE Zeile', async () => {
-    // Befund M8 (Abschluss-Review): der zugängliche Name einer Zeile ist ihr
-    // Inhalt (lfd. Nr. + Auftragstext + Frist) — eine Regex auf /Auftrag/ träfe
-    // z. B. `auftrag_text: 'Deich sichern'` nie und wäre auch dann grün gewesen,
-    // wenn Zeilen gerendert würden. Geprüft wird deshalb, dass innerhalb DIESER
-    // Kachel (gescopt über den Leertext) gar kein Link steht.
-    mockEndpunkte({ personen: [person('sk3')], auftraege: [] });
+  it('Kräfte zeigen die Gesamtstärke und behalten F/UF/M//Σ in der Notiz', async () => {
+    mockEndpunkte({});
     render();
-    await kennzahlGeladen('Vermisst');
-    const leerText = await screen.findByText('Keine offenen Aufträge.');
-    const kachel = leerText.closest<HTMLElement>('section.lfh-kachel');
-    if (kachel == null) throw new Error('Aufträge-Kachel nicht gefunden');
-    expect(within(kachel).queryAllByRole('link')).toHaveLength(0);
+    await kennzahlGeladen('Kräfte');
+    expect(kennzahl('Kräfte')).toHaveTextContent('0 Einheiten · 0/0/0//0');
   });
 
-  // DER FALL, DER OHNE DIESEN TEST DURCHRUTSCHT. `leer` hing am ROHEN Response,
-  // die Zeilen am gefilterten. Drei vollzogene Aufträge hießen also: nicht leer,
-  // aber auch keine Zeile — die Kachel zeigte einen leeren Kasten. Ein Test mit
-  // `auftraege: []` erfüllt sich am trivialen Fall und sieht das nicht.
-  it('sind alle Aufträge vollzogen, zeigt die Kachel den Leerzustand statt eines leeren Kastens', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      auftraege: [
-        auftrag({ id: 1, lfd_nr: 1, bearbeitungsstatus: 'vollzogen' }),
-        auftrag({ id: 2, lfd_nr: 2, bearbeitungsstatus: 'abgenommen' }),
-      ],
-    });
+  it('die Einsatzdauer läuft seit Beginn und nennt die Beginnzeit', async () => {
+    mockEndpunkte({});
     render();
-    await kennzahlGeladen('Vermisst');
-    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
+    await kennzahlGeladen('Einsatzdauer');
+    const dauer = kennzahl('Einsatzdauer');
+    expect(dauer.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toMatch(/^\d+:\d{2}$/);
+    expect(dauer).toHaveTextContent('h');
+    expect(dauer).toHaveTextContent(/seit /);
   });
 
-  // I1 (LFH-336-Review): Zählung (`ist_ueberfaellig`) und Zeilenfilter
-  // (`bearbeitungsstatus`) laufen im Backend über unabhängige Kriterien
-  // (src/auftrag/repo.rs:73-76) — ein VOLLZOGENER Auftrag mit unquittiertem
-  // Empfänger und abgelaufener Frist ist trotzdem überfällig. Ohne diesen Test
-  // verschwindet die Alarm-Plakette lautlos im selben Moment, in dem der
-  // Leertext einblendet.
-  it('sind alle Aufträge vollzogen und einer davon überfällig, bleibt die Überfällig-Plakette sichtbar', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      auftraege: [
-        auftrag({ id: 1, lfd_nr: 1, bearbeitungsstatus: 'vollzogen', ist_ueberfaellig: true }),
-        auftrag({ id: 2, lfd_nr: 2, bearbeitungsstatus: 'abgenommen' }),
-      ],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-    expect(screen.queryByText('Keine offenen Aufträge.')).not.toBeInTheDocument();
-    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
-  });
-
-  it('sind alle Meldungen erledigt, zeigt die Kachel den Leerzustand', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      meldungen: [meldung({ id: 1, lfd_nr: 1, ist_offen: false, status: 'erledigt' })],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-    expect(await screen.findByText('Keine offenen Meldungen.')).toBeInTheDocument();
-  });
-
-  // I1, Meldungen-Spiegel: `ist_ueberfaellig` (bestaetigung_pflicht AND
-  // quittiert_at IS NULL AND frist <= jetzt, src/meldung/repo.rs:42-43) ist von
-  // `ist_offen`/`status` unabhängig — eine erledigte Meldung kann trotzdem
-  // überfällig sein.
-  it('sind alle Meldungen erledigt und eine davon überfällig, bleibt die Überfällig-Plakette sichtbar', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      meldungen: [
-        meldung({ id: 1, lfd_nr: 1, ist_offen: false, status: 'erledigt', ist_ueberfaellig: true }),
-      ],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-    expect(screen.queryByText('Keine offenen Meldungen.')).not.toBeInTheDocument();
-    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
-  });
-
-  it('die Kurzliste der Aufträge zeigt die fristnächsten zuerst', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      auftraege: [
-        auftrag({ id: 1, lfd_nr: 1, auftrag_text: 'Spaet', frist_at: '2026-06-11 20:00:00' }),
-        auftrag({ id: 2, lfd_nr: 2, auftrag_text: 'Frueh', frist_at: '2026-06-11 10:00:00' }),
-      ],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-    const zeilen = await screen.findAllByRole('link', { name: /Frueh|Spaet/ });
-    expect(zeilen[0]).toHaveTextContent('Frueh');
-  });
-
-  it('der Lagebericht zeigt einen Auszug der Lage, nicht nur Titel und Status', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      lageberichte: [
-        {
-          id: 3,
-          einsatz_id: 1,
-          titel: 'Lage 14:00',
-          status: 'freigegeben',
-          zeitstand: '2026-06-11 14:00:00',
-          ersteller_id: 1,
-          ersteller_name: 'Muster',
-          erstellt_at: '2026-06-11 14:00:00',
-          aktualisiert_at: '2026-06-11 14:00:00',
-          version: 1,
-          vorlage: 'lagebericht',
-          abschnitte: [
-            { schluessel: 'gefahren_schadenlage', text: 'Pegel bei 6,20 m, weiter steigend.' },
-          ],
-        },
-      ],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-    expect(await screen.findByText(/Pegel bei 6,20 m/)).toBeInTheDocument();
-  });
-
-  it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt „?", nicht „0"', async () => {
-    // Der Sweep-Befund, um den es geht: eine tote Abfrage rendert heute denselben
-    // Leerzustand wie „nichts vorhanden". Wer daraus eine Lage funkt, funkt falsch.
+  it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt „?", nicht „keine"', async () => {
     mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
     render();
     await kennzahlGeladen('Höchste Warnstufe');
     const warnstufe = kennzahl('Höchste Warnstufe');
     expect(warnstufe).toHaveTextContent('?');
     expect(warnstufe).toHaveTextContent('Stand unbekannt');
-    // …und ausdrücklich NICHT der Normalfall-Wortlaut.
     expect(warnstufe).not.toHaveTextContent('keine');
+    // Ein Teilfehler macht die übrigen Kennzahlen nicht unkenntlich.
+    expect(kennzahl('Betroffene')).toHaveTextContent('1');
+    expect(kennzahl('Betroffene')).not.toHaveTextContent('Stand unbekannt');
   });
 
-  it('ein Teilfehler macht die übrigen Kennzahlen nicht unkenntlich', async () => {
-    mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
-    render();
-    await kennzahlGeladen('Patienten SK I–IV');
-    // Die Personen-Abfrage lief durch — ihre Zahl bleibt lesbar.
-    expect(kennzahl('Patienten SK I–IV')).toHaveTextContent('1');
-    expect(kennzahl('Patienten SK I–IV')).not.toHaveTextContent('Stand unbekannt');
-  });
-
-  it('die Zustandsliste der Kennzahlen deckt jede Kennzahl ab', async () => {
-    // Seite und `baueLagebild` führen zwei parallele Listen (Kennzahl ↔ Zustand).
-    // Läuft eine der beiden aus dem Takt, zeigt eine Kennzahl den Zustand einer
-    // anderen — ohne Fehler, ohne roten Test. Deshalb dieser Vergleich.
-    mockEndpunkte({ personen: [person('sk1')] });
-    render();
-    await kennzahlGeladen('Patienten SK I–IV');
-    const etiketten = [
-      'Kräfte F/UF/M//Σ',
-      'Patienten SK I–IV',
-      'Vermisst',
-      'Höchste Warnstufe',
-      'Schäden offen',
-      'UHS aktiv',
-    ];
-    for (const e of etiketten) expect(kennzahl(e)).toBeInTheDocument();
-  });
-
-  it('die Leiste trägt genau 6 Kennzahlen in fester Reihenfolge', async () => {
-    // Der Nachbartest darüber prüft VORHANDENSEIN (auch bei Teilfehlern). Dieser
-    // prüft ANZAHL und ORDNUNG — zwei verschiedene Befunde, die nicht zu einem
-    // verschmolzen werden dürfen.
-    //
-    // Warum die Anzahl gepinnt ist: „überfällige Aufträge" wären der Kandidat für
-    // eine siebte Kennzahl. Sie bleiben die Alarm-Plakette der Aufträge-Kachel.
-    // Sieben Kennzahlen ergäben am Handschirm bei 2 Spalten 4 statt 3 Zeilen.
-    //
-    // Warum die Reihenfolge gepinnt ist: Prüfliste Kriterium 9 verlangt, dass
-    // dieselbe Größe in jedem Zustand an derselben Stelle steht. Nach
-    // Dringlichkeit umsortieren ist deshalb ausdrücklich verboten — wer eine Lage
-    // funkt, sucht die Zahl an ihrem Platz, nicht in einer Rangliste.
-    mockEndpunkte({ personen: [person('sk1')] });
-    render();
-    await kennzahlGeladen('Patienten SK I–IV');
-
-    const knoepfe = Array.from(document.querySelectorAll('.lfh-kennzahlen .lfh-kz'));
-    expect(knoepfe).toHaveLength(6);
-    const etiketten = knoepfe.map((k) => k.querySelector('.lfh-etikett')?.textContent);
-    expect(etiketten).toEqual([
-      'Kräfte F/UF/M//Σ',
-      'Patienten SK I–IV',
-      'Vermisst',
-      'Höchste Warnstufe',
-      'Schäden offen',
-      'UHS aktiv',
-    ]);
-  });
-
-  it('die Stufenkante hängt an der Kennzahl, die sie meint', async () => {
-    // Die Kante ist der zweite Kanal nach WCAG 1.4.1 (`sprache.css`, Block
-    // `.lfh-kz--alarm`/`--achtung`). Geprüft werden KLASSENNAMEN, nicht Geometrie:
-    // Vitest fährt mit `css: false`, und jsdom rechnet kein Layout — die Regel
-    // hätte hier keine Wirkung. Dass sie WIRKT, belegt `e2e/lage-dashboard-schmal.spec.ts`.
-    //
-    // NICHT geprüft (und bewusst so): die Bedingung `z === 'daten'` in
-    // `LageDashboardPage.tsx`, die im Fehlerzustand jede Stufenfarbe unterdrückt.
-    // Sie ist über die Endpunkte nicht auslösbar — jede Kennzahl zieht Wert UND
-    // Stufe aus derselben Abfrage, und fällt die aus, ist die Stufe ohnehin
-    // `normal`. Ein Test darauf wäre grün durch Konstruktion. Der Schutz bleibt
-    // trotzdem richtig, sobald eine Kennzahl einmal aus zwei Quellen speist.
-    mockEndpunkte({
-      personen: [person(null, 'vermisst')],
-      gefahren: [{ hoechste_warnstufe: 'mittel' }],
-    });
-    render();
-    await kennzahlGeladen('Vermisst');
-
-    expect(kennzahl('Vermisst').className).toContain('lfh-kz--alarm');
-    expect(kennzahl('Höchste Warnstufe').className).toContain('lfh-kz--achtung');
-    // Kräfte tragen keine Bewertung — eine Stärke ist keine Gefahrenmeldung.
-    expect(kennzahl('Kräfte F/UF/M//Σ').className).not.toContain('lfh-kz--');
-  });
-
-  it('Warnstufe „niedrig" hebt nicht ab und trägt den Wortlaut als zweiten Kanal', async () => {
-    // Entscheidung des Pakets, hier festgenagelt: `niedrig` bleibt Rolle `normal`.
-    // Das Alarmbudget (EEMUA 191 / ISA-18.2, ≤ 3 Eskalationsstufen) trägt die
-    // Entscheidung fachlich — eine niedrige Warnstufe ist definitionsgemäß kein
-    // Alarmbeitrag —, und der zweite Kanal nach WCAG 1.4.1 ist bei dieser Kennzahl
-    // der ausgeschriebene Wortlaut, nicht die Kante.
-    //
-    // Der Pin auf die Karte ist der eigentliche Ertrag: `statusFarben.ts` ist der
-    // app-weite Vertrag mit vielen Konsumenten. Ein stilles Umhängen von `niedrig`
-    // auf `achtung` bräche heute NICHTS — es färbte nur jede Anzeige der Warnstufe
-    // in der ganzen Anwendung um. Ab hier färbt es diesen Test rot.
+  it('Warnstufe „niedrig" hebt nicht ab; „hoch" trägt die Alarmkante und den Kopf-Hinweis', async () => {
+    // Entscheidung des Vertrags, hier festgenagelt: `niedrig` ist kein Alarmbeitrag
+    // (EEMUA 191 / ISA-18.2). Ein stilles Umhängen auf `achtung` färbte app-weit um.
     expect(warnstufeKennzahl.niedrig.rolle).toBe('normal');
-    expect(warnstufeKennzahl.niedrig.label).toBe('niedrig');
 
-    mockEndpunkte({ gefahren: [{ hoechste_warnstufe: 'niedrig' }] });
+    mockEndpunkte({ gefahren: [gebiet(1, 'niedrig')] });
+    const erster = render();
+    await kennzahlGeladen('Höchste Warnstufe');
+    expect(kennzahl('Höchste Warnstufe')).toHaveTextContent('niedrig');
+    expect(kante(kennzahl('Höchste Warnstufe'))).toBe(0);
+    expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
+    erster.unmount();
+
+    mockEndpunkte({ gefahren: [gebiet(1, 'hoch')] });
     render();
     await kennzahlGeladen('Höchste Warnstufe');
-    const knopf = kennzahl('Höchste Warnstufe');
-    expect(knopf).toHaveTextContent('niedrig');
-    expect(knopf.className).not.toContain('lfh-kz--');
+    expect(kante(kennzahl('Höchste Warnstufe'))).toBe(6);
+    const hinweis = document.querySelector('[data-lfh="warnstufe-hinweis"]');
+    expect(hinweis?.textContent).toBe('Warnstufe hoch');
   });
 
-  /**
-   * R1 (LFH-331 · B3). Solange der Einsatz-Abruf läuft, stand die Leiste leer und
-   * sechs Kennzahlen sprangen danach herein — die Weiche je Kennzahl („····" / „?")
-   * konnte nicht greifen, weil es die Knöpfe noch gar nicht gab.
-   *
-   * Die sechs Etiketten sind hier als LITERALE aufgeschrieben, genau wie im
-   * Ordnungstest darüber. Das ist der Sinn: die Liste in der Seite und die in
-   * `lagebild.ts` hängen jetzt beide an derselben handgeschriebenen Reihe — läuft
-   * eine der beiden aus dem Takt, wird eine der beiden Prüfungen rot.
-   *
-   * NICHT geprüft, weil jsdom kein Layout rechnet: dass die Plätze auch WIRKLICH
-   * dieselbe Höhe reservieren (Prüfliste Kriterium 12, CLS ≤ 0,1). Belegt wird hier
-   * die Anzahl, die Ordnung und der Wortlaut — die Höhe misst `e2e/gate1-ueberlauf.spec.ts`.
-   */
-  it('die Kennzahlenleiste stellt schon während des Einsatz-Abrufs sechs Plätze', async () => {
-    mockEndpunkte({ einsatzLaedt: true });
+  it('Deep-Link: Klick auf „Betroffene" führt ins Personen-Modul', async () => {
+    mockEndpunkte({ personen: [person('sk1')] });
     render();
-    const plaetze = Array.from(document.querySelectorAll('.lfh-kennzahlen .lfh-kz'));
-    expect(plaetze).toHaveLength(6);
-    expect(plaetze.map((k) => k.querySelector('.lfh-etikett')?.textContent)).toEqual([
-      'Kräfte F/UF/M//Σ',
-      'Patienten SK I–IV',
-      'Vermisst',
-      'Höchste Warnstufe',
-      'Schäden offen',
-      'UHS aktiv',
-    ]);
-    // Kein Platz behauptet einen Stand, solange keiner abgerufen ist.
-    for (const p of plaetze) expect(p.textContent).toContain('wird abgerufen');
+    await userEvent.click(await kennzahlGeladen('Betroffene'));
+    expect(await screen.findByText('PERSONEN-MODUL')).toBeInTheDocument();
   });
+});
 
-  /**
-   * R2 — der Einsatzname im Band zeigte während des Abrufs einen Gedankenstrich, also
-   * dasselbe Zeichen, das anderswo „kein Wert" bedeutet. Beide Hälften sind POSITIV
-   * formuliert: „wird abgerufen" steht im Ladezustand siebenmal auf der Seite (Band
-   * plus sechs Plätze), ein Griff über den sichtbaren Text wäre mehrdeutig, und eine
-   * Negativ-Zusicherung auf „—" beliebig erfüllbar.
-   */
-  it('das Band nennt während des Abrufs den Ladezustand', async () => {
-    mockEndpunkte({ einsatzLaedt: true });
+describe('LageDashboardPage — Seitenkopf', () => {
+  it('trägt „Lagebild TT.MM. HH:MM" als Titel und den Datenstand als Meta', async () => {
+    mockEndpunkte({});
     render();
-    expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe(
-      'wird abgerufen',
+    await kennzahlGeladen('Betroffene');
+    expect(
+      screen.getByRole('heading', { name: /^Lagebild \d{2}\.\d{2}\. \d{2}:\d{2}$/ }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="datenstand"]')?.textContent).toMatch(
+        /^Stand vor \d+ s$/,
+      ),
     );
   });
+});
 
-  /**
-   * I2 (LFH-336-Review). `zustand` hing an `zustandVon(auftraegeQuery)` — also
-   * NUR an der Aufträge-Abfrage —, während `leer` an `lagebild` hing, das erst
-   * nach dem Einsatz-Abruf existiert. Löst die Aufträge-Query auf, während
-   * `/api/einsaetze/1` noch hängt (kein Kunstprodukt: `api/queryClient.ts:10-12`
-   * wiederholt Netzfehler zweimal mit bis zu 30 s Backoff), galt `zustand ===
-   * 'daten'` UND `leer === true` gleichzeitig — die Kachel behauptete „Keine
-   * offenen Aufträge.“, obwohl welche vorliegen.
-   *
-   * Gewartet wird auf den QueryClient-Status der Aufträge-Abfrage selbst (nicht
-   * auf einen sichtbaren Text) — genau das ist der Zustand, den `kennzahlGeladen`
-   * hier nicht liefern kann: die Kennzahlenleiste hängt am Lagebild und damit am
-   * (hier absichtlich hängenden) Einsatz-Abruf.
-   */
-  it('während der Einsatz-Abruf hängt, bleibt die Aufträge-Kachel im Ladezustand statt „Keine offenen Aufträge." zu zeigen', async () => {
+describe('LageDashboardPage — Gefahrenmatrix', () => {
+  it('verdichtet je Gefahrentyp über ALLE Gebiete auf die höchste Stufe, in Katalogreihenfolge', async () => {
     mockEndpunkte({
-      einsatzLaedt: true,
-      auftraege: [auftrag({ id: 1, lfd_nr: 1 })],
+      gefahren: [gebiet(1, 'mittel'), gebiet(2, 'akut')],
+      matrix: {
+        1: [bewertung(1, 'brand', 'mittel'), bewertung(1, 'ertrinken', 'niedrig')],
+        2: [
+          bewertung(2, 'brand', 'akut', 'sachwerte'),
+          bewertung(2, 'atemgifte', 'keine'),
+          bewertung(2, 'ertrinken', 'hoch'),
+        ],
+      },
     });
+    render();
+    const box = paneel('Gefahrenmatrix');
+    await waitFor(() => expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(3));
+    const zeilen = Array.from(box.querySelectorAll<HTMLElement>('[data-lfh="gefahrenzeile"]'));
+    // Katalog: Atemgifte vor Brand vor Ertrinken.
+    expect(zeilen.map((z) => [z.firstChild?.textContent, z.dataset.stufe])).toEqual([
+      ['Atemgifte', 'keine'],
+      ['Brand', 'akut'],
+      ['Ertrinken', 'hoch'],
+    ]);
+    // Segmente bis zur Stufe gefüllt: keine 0, akut 4, hoch 3.
+    const voll = (z: HTMLElement) => z.querySelectorAll('[data-voll="ja"]').length;
+    expect(zeilen.map(voll)).toEqual([0, 4, 3]);
+    // Das Stufenwort ist der zweite Kanal — es steht in jeder Zeile.
+    expect(zeilen[1]).toHaveTextContent('akut');
+    expect(within(box).getByText('2 Gebiete')).toBeInTheDocument();
+  });
+
+  it('trennt „keine" (bewertet) von „unbewertet" (Lücke)', async () => {
+    mockEndpunkte({
+      gefahren: [gebiet(1)],
+      matrix: { 1: [bewertung(1, 'brand', 'keine')] },
+    });
+    render();
+    const box = paneel('Gefahrenmatrix');
+    await waitFor(() =>
+      expect(within(box).getByText('12 Gefahrentypen unbewertet')).toBeInTheDocument(),
+    );
+    expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(1);
+  });
+
+  it('ohne Gefahrengebiete zeigt es den Leerzustand mit Weg zur Gefahrenseite', async () => {
+    mockEndpunkte({});
+    render();
+    const box = paneel('Gefahrenmatrix');
+    expect(
+      await within(box).findByText('Noch keine Gefahrengebiete angelegt.'),
+    ).toBeInTheDocument();
+    await userEvent.click(within(box).getByRole('button', { name: 'Gefahren bewerten' }));
+    expect(await screen.findByText('GEFAHREN-MODUL')).toBeInTheDocument();
+  });
+
+  it('Gebiete ohne jede Bewertung sind leer, nicht „keine Gefahr"', async () => {
+    mockEndpunkte({ gefahren: [gebiet(1)], matrix: { 1: [] } });
+    render();
+    const box = paneel('Gefahrenmatrix');
+    expect(await within(box).findByText('Noch keine Gefahr bewertet.')).toBeInTheDocument();
+  });
+
+  it('ein gescheiterter Matrix-Abruf ist ein Fehler, kein Leerzustand', async () => {
+    mockEndpunkte({ gefahren: [gebiet(1, 'hoch')], matrixStatus: 500 });
+    render();
+    const box = paneel('Gefahrenmatrix');
+    expect(await within(box).findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(box).queryByText(/Noch keine/)).toBeNull();
+  });
+});
+
+describe('LageDashboardPage — Sichtung', () => {
+  it('zeigt SK I–IV immer, tot nur wenn vorhanden, mit Anteil an allen Gesichteten', async () => {
+    mockEndpunkte({
+      personen: [person('sk1'), person('sk3'), person('sk3'), person('sk3'), person(null)],
+    });
+    render();
+    const box = paneel('Sichtung');
+    await waitFor(() => expect(box.querySelectorAll('li[data-sichtung]')).toHaveLength(4));
+    const zeilen = Array.from(box.querySelectorAll<HTMLElement>('li[data-sichtung]'));
+    expect(zeilen.map((z) => z.dataset.sichtung)).toEqual(['sk1', 'sk2', 'sk3', 'sk4']);
+    const wert = (z: HTMLElement) => z.querySelector('[data-lfh="sichtung-wert"]')?.textContent;
+    expect(zeilen.map(wert)).toEqual(['1', '0', '3', '0']);
+    // Nenner sind die 4 Gesichteten, nicht die 5 Erfassten.
+    const breite = (z: HTMLElement) =>
+      z.querySelector<HTMLElement>('[data-lfh="sichtung-anteil"]')?.style.width;
+    expect(zeilen.map(breite)).toEqual(['25%', '0%', '75%', '0%']);
+    // Die BBK-Farbe steht im Farbfeld, das Kürzel ist der zweite Kanal.
+    expect(zeilen[0].querySelector('[data-lfh="sichtungsfeld"]')).not.toBeNull();
+    expect(zeilen[0]).toHaveTextContent('SK I');
+    expect(within(box).getByText('Ohne Sichtung')).toBeInTheDocument();
+    // „Transportiert / offen" ist nicht sauber ableitbar (LFH-613) und fehlt.
+    expect(within(box).queryByText(/Transportiert/)).toBeNull();
+  });
+
+  it('nimmt Tote dazu, sobald es welche gibt', async () => {
+    mockEndpunkte({ personen: [person('sk2'), person('tot')] });
+    render();
+    const box = paneel('Sichtung');
+    await waitFor(() => expect(box.querySelectorAll('li[data-sichtung]')).toHaveLength(5));
+    expect(box.querySelector('li[data-sichtung="tot"]')).toHaveTextContent('tot');
+  });
+
+  it('bei gescheitertem Personen-Abruf zeigt es den Fehler und NICHT den Leertext', async () => {
+    mockEndpunkte({ personenStatus: 500 });
+    render();
+    const box = paneel('Sichtung');
+    expect(await within(box).findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(box).getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(within(box).queryByText('Noch keine Personen erfasst.')).not.toBeInTheDocument();
+  });
+
+  it('bei leerem Personenbestand zeigt es den Leertext mit Aufnahme und KEINEN Fehler', async () => {
+    mockEndpunkte({});
+    render();
+    const box = paneel('Sichtung');
+    expect(await within(box).findByText('Noch keine Personen erfasst.')).toBeInTheDocument();
+    expect(within(box).queryByText('Daten nicht abrufbar')).not.toBeInTheDocument();
+    await userEvent.click(within(box).getByRole('button', { name: 'Person aufnehmen' }));
+    expect(await screen.findByText('AUFNAHME')).toBeInTheDocument();
+  });
+});
+
+describe('LageDashboardPage — Meldungsstrom', () => {
+  it('zeigt die jüngsten sieben Einträge aller Typen, jüngster zuerst, mit Quelle', async () => {
+    mockEndpunkte({
+      etb: [
+        ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => etb(n)),
+        etb(9, { typ: 'anordnung', von: 'Deichwache Nord', meldeweg: 'funk' }),
+      ],
+    });
+    render();
+    const box = paneel('Meldungsstrom');
+    await waitFor(() => expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(7));
+    const nummern = Array.from(box.querySelectorAll<HTMLElement>('li[data-lfd-nr]')).map((z) =>
+      Number(z.dataset.lfdNr),
+    );
+    expect(nummern).toEqual([9, 8, 7, 6, 5, 4, 3]);
+    const oben = box.querySelector('li[data-lfd-nr="9"]') as HTMLElement;
+    expect(oben).toHaveTextContent('Anordnung');
+    expect(oben).toHaveTextContent('Deichwache Nord · Funk');
+    // Ohne `von` steht der Erfasser als einzige belegte Herkunft da.
+    expect(box.querySelector('li[data-lfd-nr="8"]')).toHaveTextContent('Vitt');
+  });
+
+  it('schiebt neue Einträge NICHT ein, sondern kündigt sie im Sammelbanner an', async () => {
+    const daten: Daten = { etb: [etb(1), etb(2)] };
+    mockEndpunkte(daten);
+    const { client } = render();
+    const box = paneel('Meldungsstrom');
+    await waitFor(() => expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(2));
+
+    daten.etb = [etb(1), etb(2), etb(3, { inhalt: 'Deichbruch km 4' })];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(1) }));
+
+    expect(await within(box).findByText('1 neuer Eintrag')).toBeInTheDocument();
+    expect(within(box).queryByText('Deichbruch km 4')).toBeNull();
+    expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(2);
+
+    await userEvent.click(within(box).getByRole('button', { name: 'anzeigen' }));
+    expect(within(box).getByText('Deichbruch km 4')).toBeInTheDocument();
+    expect(within(box).queryByText('1 neuer Eintrag')).toBeNull();
+  });
+
+  it('ein leerer Strom füllt sich direkt — über einer leeren Fläche springt nichts', async () => {
+    const daten: Daten = { etb: [] };
+    mockEndpunkte(daten);
+    const { client } = render();
+    const box = paneel('Meldungsstrom');
+    expect(
+      await within(box).findByText('Noch keine Einträge im Einsatztagebuch.'),
+    ).toBeInTheDocument();
+
+    daten.etb = [etb(1, { inhalt: 'Erste Lage' })];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(1) }));
+    expect(await within(box).findByText('Erste Lage')).toBeInTheDocument();
+    expect(within(box).queryByRole('status')).toBeNull();
+  });
+
+  it('meldet „live" nur bei offener Leitung', async () => {
+    setzeLiveStatusFuerTest('open');
+    mockEndpunkte({ etb: [etb(1)] });
+    const erster = render();
+    const live = () => paneel('Meldungsstrom').querySelector('[data-lfh="strom-live"]');
+    await waitFor(() => expect(live()?.textContent).toBe('live'));
+    erster.unmount();
+
+    // Der Abriss-Zweig allein wäre auch grün, wenn das Paneel NIE „live" sagte.
+    setzeLiveStatusFuerTest('lost');
+    render();
+    await waitFor(() => expect(live()?.textContent).toBe('Verbindung unterbrochen'));
+  });
+
+  it('ein gescheiterter ETB-Abruf ist ein Fehler, kein leerer Strom', async () => {
+    mockEndpunkte({ etbStatus: 500 });
+    render();
+    const box = paneel('Meldungsstrom');
+    expect(await within(box).findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(box).queryByText('Noch keine Einträge im Einsatztagebuch.')).toBeNull();
+  });
+
+  it('„ETB" im Kopf führt ins Einsatztagebuch', async () => {
+    mockEndpunkte({ etb: [etb(1)] });
+    render();
+    await userEvent.click(within(paneel('Meldungsstrom')).getByRole('button', { name: 'ETB' }));
+    expect(await screen.findByText('ETB-MODUL')).toBeInTheDocument();
+  });
+});
+
+describe('LageDashboardPage — Führungsstand', () => {
+  const FUEHRUNG = 'Führungsstand';
+
+  it('zählt offene Aufträge und hält Überfällige als Alarm fest — auch vollzogene', async () => {
+    // `ist_ueberfaellig` ist vom Bearbeitungsstatus unabhängig (src/auftrag/repo.rs): ein
+    // vollzogener Auftrag mit abgelaufener Frist bleibt ein Alarmbeitrag.
+    mockEndpunkte({
+      auftraege: [
+        auftrag({ bearbeitungsstatus: 'offen' }),
+        auftrag({ bearbeitungsstatus: 'in_arbeit' }),
+        auftrag({ bearbeitungsstatus: 'vollzogen', ist_ueberfaellig: true }),
+        auftrag({ bearbeitungsstatus: 'abgenommen' }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Betroffene');
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Aufträge offen', FUEHRUNG);
+      expect(z).toHaveTextContent('1 überfällig');
+      return z;
+    });
+    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
+    expect(kante(zelle)).toBe(6);
+  });
+
+  it('zählt offene und neue Meldungen, überfällige mit Alarmkante', async () => {
+    mockEndpunkte({
+      meldungen: [
+        meldung({ status: 'neu', ist_offen: true }),
+        meldung({ status: 'gesichtet', ist_offen: true, ist_ueberfaellig: true }),
+        meldung({ status: 'erledigt', ist_offen: false }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Betroffene');
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Meldungen offen', FUEHRUNG);
+      expect(z).toHaveTextContent('1 neu · 1 überfällig');
+      return z;
+    });
+    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
+    expect(kante(zelle)).toBe(6);
+  });
+
+  it('während der Einsatz-Abruf hängt, behauptet der Führungsstand keinen Stand', async () => {
+    // I2 (LFH-336-Review), übertragen: die Aufträge-Abfrage löst auf, der Einsatz hängt.
+    // Ohne Lagebild darf keine Zelle „0" melden.
+    mockEndpunkte({ einsatzLaedt: true, auftraege: [auftrag({ id: 1 })] });
     const { client } = render();
     await waitFor(() =>
       expect(client.getQueryState(einsatzKeys.auftraege(1))?.status).toBe('success'),
     );
-    expect(screen.queryByText('Keine offenen Aufträge.')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Aufträge / Befehle wird geladen')).toBeInTheDocument();
+    for (const z of zellen(FUEHRUNG)) expect(z).toHaveTextContent('wird abgerufen');
   });
 
-  // I2, Meldungen-Spiegel derselben Falle.
-  it('während der Einsatz-Abruf hängt, bleibt die Meldungen-Kachel im Ladezustand statt „Keine offenen Meldungen." zu zeigen', async () => {
-    mockEndpunkte({
-      einsatzLaedt: true,
-      meldungen: [meldung({ id: 1, lfd_nr: 1 })],
-    });
-    const { client } = render();
-    await waitFor(() =>
-      expect(client.getQueryState(einsatzKeys.meldungen(1))?.status).toBe('success'),
-    );
-    expect(screen.queryByText('Keine offenen Meldungen.')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Meldungen (eingehend) wird geladen')).toBeInTheDocument();
-  });
-
-  // I2, Lagebericht: derselbe Fehler bestand hier schon vor LFH-336; er wird im
-  // selben Zug behoben, weil die Datei ohnehin angefasst wird.
-  it('während der Einsatz-Abruf hängt, bleibt die Lagebericht-Kachel im Ladezustand statt „Noch kein Lagebericht erstellt." zu zeigen', async () => {
-    mockEndpunkte({
-      einsatzLaedt: true,
-      lageberichte: [
-        {
-          id: 3,
-          einsatz_id: 1,
-          titel: 'Lage 14:00',
-          status: 'freigegeben',
-          zeitstand: '2026-06-11 14:00:00',
-          ersteller_id: 1,
-          ersteller_name: 'Muster',
-          erstellt_at: '2026-06-11 14:00:00',
-          aktualisiert_at: '2026-06-11 14:00:00',
-          version: 1,
-          vorlage: 'lagebericht',
-          abschnitte: [],
-        },
-      ],
-    });
-    const { client } = render();
-    await waitFor(() =>
-      expect(client.getQueryState(einsatzKeys.lageberichte(1))?.status).toBe('success'),
-    );
-    expect(screen.queryByText('Noch kein Lagebericht erstellt.')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Aktueller Lagebericht wird geladen')).toBeInTheDocument();
-  });
-
-  it('das Band nennt nach dem Abruf den Einsatz', async () => {
+  it('ohne Lagebericht sagt die Zelle das, statt eine Zeit zu erfinden', async () => {
     mockEndpunkte({});
     render();
-    await kennzahlGeladen('Patienten SK I–IV');
-    expect(document.querySelector('.lfh-band .lfh-band__titel')?.textContent).toBe(
-      'Hochwasser Musterstadt',
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() =>
+      expect(kennzahl('Lagebericht', FUEHRUNG)).toHaveTextContent('noch nicht erstellt'),
     );
-  });
-
-  // AK1 (LFH-336): der frühere `<Tag color="blue">Live</Tag>` war statisch; sein
-  // Nachfolger im Band hing an QUERY-Fehlern und meldete bei totem SSE weiter
-  // „Live verbunden". Beide Zweige gehören geprüft — nur der Abriss-Zweig allein
-  // wäre auch dann grün, wenn das Band NIE „Live" sagt.
-  it('das Band meldet die Live-Verbindung, solange sie steht', async () => {
-    setzeLiveStatusFuerTest('open');
-    mockEndpunkte({ personen: [person('sk3')] });
-    render();
-    await kennzahlGeladen('Vermisst');
-    expect(screen.getByText('Live verbunden')).toBeInTheDocument();
-  });
-
-  it('bei abgerissener Live-Verbindung meldet das Band NICHT „Live"', async () => {
-    setzeLiveStatusFuerTest('lost');
-    mockEndpunkte({ personen: [person('sk3')] });
-    render();
-    await kennzahlGeladen('Vermisst');
-    expect(screen.queryByText('Live verbunden')).not.toBeInTheDocument();
-    expect(screen.getByText('Verbindung unterbrochen')).toBeInTheDocument();
-  });
-
-  it('während des Wiederverbindens meldet das Band den Zwischenstand', async () => {
-    setzeLiveStatusFuerTest('connecting');
-    mockEndpunkte({ personen: [person('sk3')] });
-    render();
-    await kennzahlGeladen('Vermisst');
-    expect(screen.getByText('Verbindung wird aufgebaut')).toBeInTheDocument();
-  });
-
-  /**
-   * R3 — das AK4-Partnerpaar. Die Seite trug beide Zustände seit LFH-352 im Code,
-   * aber keinen Beleg: dass eine Umsetzung steht, hieß nie, dass sie belegt ist.
-   *
-   * Nur die Personen-Abfrage fällt aus. Damit ist genau EINE Kachel im Fehlerzustand,
-   * und „Daten nicht abrufbar" bleibt eindeutig greifbar — bei einem Sammelausfall
-   * stünde der Satz sechsmal da und der Griff wäre mehrdeutig.
-   */
-  it('bei gescheitertem Personen-Abruf zeigt die Kachel den Fehler und NICHT den Leertext', async () => {
-    mockEndpunkte({ personenStatus: 500 });
-    render();
-    expect(await screen.findByText('Daten nicht abrufbar')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
-    expect(screen.queryByText('Noch keine Personen erfasst.')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Person aufnehmen' })).not.toBeInTheDocument();
-  });
-
-  it('bei leerem Personenbestand zeigt die Kachel den Leertext und KEINEN Fehler', async () => {
-    mockEndpunkte({});
-    render();
-    expect(await screen.findByText('Noch keine Personen erfasst.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Person aufnehmen' })).toBeInTheDocument();
-    expect(screen.queryByText('Daten nicht abrufbar')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
-  });
-});
-
-/**
- * Quellpins auf `theme/sprache.css`.
- *
- * Gelesen wird über `node:fs`, NICHT über einen Import und NICHT über
- * `import.meta.glob(…?raw)`: Vitest fährt mit `css: false`, und beides lieferte
- * dann den Leerstring — der Pin wäre inhaltsleer grün. Dieselbe Mechanik nutzt
- * `components/EinsatzSeite.test.tsx`; sie ist bewusst kopiert und nicht geteilt,
- * damit nicht zwei Testdateien an einer Hilfsfunktion hängen.
- */
-describe('Die Kennzahlenleiste in sprache.css', () => {
-  const hier = dirname(fileURLToPath(import.meta.url));
-  const css = readFileSync(join(hier, '..', '..', 'theme', 'sprache.css'), 'utf-8');
-
-  /** Der Rumpf der ersten Regel für `wahl` ab Position `ab`. */
-  function regel(wahl: string, ab = 0): string {
-    const start = css.indexOf(wahl, ab);
-    expect(start, `Selektor ${wahl} steht nicht in sprache.css`).toBeGreaterThanOrEqual(0);
-    const auf = css.indexOf('{', start);
-    const zu = css.indexOf('}', auf);
-    return css.slice(auf + 1, zu);
-  }
-
-  it('keine harte min-height mehr in sprache.css — die Hoehen lesen die Staffel', () => {
-    /**
-     * LFH-370 · B5j. Vorher trugen drei Blöcke Pixelwerte, und nur EINER band:
-     *  - `.lfh-kz` 62 px — gemessen wirkungslos (Inhalt ergibt 81,9 / 99,9 / 119,9 px),
-     *  - `.lfh-knopf` 32 px — band, gemessen 32/32/32 über alle drei Stufen,
-     *  - `.lfh-kachel__mehr` gar nichts, bei 19,6 px gerendert.
-     *
-     * Die tragende Zusicherung ist NICHT „keine Pixel", sondern „genau
-     * `--lfh-zeilenhoehe`": ein Wechsel auf irgendeine andere Custom Property wäre
-     * ebenfalls pixelfrei und läse trotzdem die falsche Stufe.
-     */
-    for (const wahl of ['.lfh-kz {', '.lfh-knopf {', '.lfh-kachel__mehr {']) {
-      expect(regel(wahl), `${wahl} liest die Dichte-Staffel`).toMatch(
-        /min-height:\s*var\(--lfh-zeilenhoehe\)/,
-      );
-    }
-    // Und keine harte Mindesthöhe mehr in der ganzen Datei — sonst wandert der
-    // nächste Pixelwert einfach in einen vierten Block.
-    expect(css, 'sprache.css trägt keine harte min-height mehr').not.toMatch(/min-height:\s*\d/);
-  });
-
-  it('der Blank-Reset steht VOR der Kachel-Ausgangsregel — sonst sind deren Schriftangaben tot', () => {
-    /**
-     * Gemessener Kaskadenfehler: `.lfh-knopf-blank { font: inherit }` stand NACH
-     * `.lfh-kachel__mehr` bei gleicher Spezifität. `font` ist eine Kurzform und setzt
-     * font-size UND font-weight mit zurück — der einzige Navigationsausgang jeder Kachel
-     * rendete deshalb mit 13,5 / 15 px bei Gewicht 400 statt der dort verlangten 11,5 / 600,
-     * also größer und dünner als der Kacheltitel über ihm.
-     *
-     * Ein Test auf „font-size steht im Block" fiele darauf herein — er stand ja da. Nur die
-     * REIHENFOLGE ist die Aussage.
-     */
-    expect(css.indexOf('.lfh-knopf-blank {')).toBeLessThan(css.indexOf('.lfh-kachel__mehr {'));
-  });
-
-  it('die Spaltenstaffel der Kennzahlenleiste steht in sprache.css: 6 → 3 → 2', () => {
-    // DIE SCHWELLEN SIND CONTAINER-BREITEN, nicht Viewport-Breiten — `.lfh-flaeche`
-    // trägt `container-type: inline-size`. Im Browser nachgemessen (LFH-329 · B1):
-    // Viewport 1366 → Container 1036 · 1024 → 694 · 390 → 366.
-    //
-    // Dieser Pin ist der einzige Schutz der 1100er-Schwelle: keine der drei
-    // e2e-Prüfbreiten läge nach einer Senkung auf 1000 in einem anderen Band, die
-    // Senkung liefe also durch. Gemessen brauchen sechs Spalten mindestens
-    // ~1036 px Container (Container 950 → 14 px Etikettenüberlauf, 1036 → 0 px);
-    // 1100 ist die nächste Schwelle darüber, die Luft lässt. Wer sie senkt, misst
-    // vorher neu und schreibt die Messung in den Kommentar über dem Block.
-    expect(regel('.lfh-kennzahlen {')).toMatch(
-      /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/,
-    );
-
-    const tablet = css.indexOf('@container lfh (max-width: 1100px)');
-    expect(tablet, 'Schwelle 1100px fehlt').toBeGreaterThanOrEqual(0);
-    expect(regel('.lfh-kennzahlen {', tablet)).toMatch(
-      /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
-    );
-
-    const hand = css.indexOf('@container lfh (max-width: 700px)');
-    expect(hand, 'Schwelle 700px fehlt').toBeGreaterThanOrEqual(0);
-    expect(regel('.lfh-kennzahlen {', hand)).toMatch(
-      /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
-    );
-  });
-
-  it('die Stufenregeln der Kennzahl ändern Farbe und Kantenbreite, nicht Schriftgröße oder -schnitt', () => {
-    // Die verworfene Alternative, hier festgenagelt: eine stufenabhängige
-    // SCHRIFTGRÖSSE ließe die Kennzahlenzeile bei jedem Statuswechsel in der Höhe
-    // springen — Festlegung 6 der Bedien-Leitlinie deckelt CLS bei 0,1 (WCAG 3.2.5).
-    // Der stufenabhängige SCHNITT ist an dieser Stelle nachweislich leer: in
-    // Chromium gemessen liegt die Vorschubbreite der Kennzahl bei 400/500 auf
-    // 96,33 px und bei 600/700/800 auf 96,00 px — über 600 hinaus liefert
-    // `schriften.css` keinen Schnitt, und der Browser setzt keinen künstlichen
-    // Fettdruck. Die Zahl steht bereits auf 600.
-    //
-    // Was stattdessen trägt: die abgestufte Kante. Sie kostet null Layout
-    // (`inset`-Schatten) und unterscheidet die beiden bewerteten Stufen auch ohne
-    // Farbe voneinander — vorher taten das nur die Farbwerte.
-    const alarm = regel('.lfh-kz--alarm {');
-    const achtung = regel('.lfh-kz--achtung {');
-    for (const [name, block] of [
-      ['alarm', alarm],
-      ['achtung', achtung],
-      ['alarm/Zahl', regel('.lfh-kz--alarm .lfh-zahl--gross {')],
-      ['achtung/Zahl', regel('.lfh-kz--achtung .lfh-zahl--gross {')],
-    ] as const) {
-      expect(block, `${name}: Schriftgröße gehört nicht in eine Stufenregel`).not.toMatch(
-        /font-size/,
-      );
-      expect(block, `${name}: Schriftschnitt gehört nicht in eine Stufenregel`).not.toMatch(
-        /font-weight/,
-      );
-    }
-
-    const kante = (block: string) => Number(block.match(/inset (\d+)px/)![1]);
-    expect(kante(alarm), 'Alarmkante muss breiter sein als die Achtungkante').toBeGreaterThan(
-      kante(achtung),
-    );
-
-    // Und die Grundgröße der Kennzahl ist unbedingt — genau ein `font-size`.
-    expect(regel('.lfh-zahl--gross {').match(/font-size/g)).toHaveLength(1);
-  });
-
-  it('die erste Zeile verliert ihre Trennlinie in BEIDEN Bauformen — aber NICHT jede Zeile', () => {
-    // Der `<li>`-Wrapper macht `<a class="lfh-zeile">` zum EINZIGEN Kind seines
-    // `<li>` und damit selbst zu dessen `:first-child`. Ein UNSKOPIERTES
-    // `.lfh-zeile:first-child` träfe dadurch JEDE Zeile, nicht nur die erste der
-    // Liste — genau der Rückfall, den die Erweiterung vermeiden soll. Beide Arme
-    // müssen deshalb an `.lfh-zeilen >` verankert sein.
-    expect(css).toContain('.lfh-zeilen > .lfh-zeile:first-child');
-    expect(css).toContain('.lfh-zeilen > li:first-child > .lfh-zeile');
-    expect(
-      css,
-      'ein unskopiertes .lfh-zeile:first-child träfe jede Zeile im <li>-Wrapper',
-    ).not.toMatch(/^\.lfh-zeile:first-child/m);
-  });
-});
-
-describe('Der Dringlichkeitsmarker (LFH-395)', () => {
-  const hier = dirname(fileURLToPath(import.meta.url));
-  const css = readFileSync(join(hier, '..', '..', 'theme', 'sprache.css'), 'utf-8');
-  const quelle = readFileSync(join(hier, 'LageDashboardPage.tsx'), 'utf8');
-
-  /** Der Rumpf der ersten Regel für `wahl`. */
-  function regel(wahl: string): string {
-    const start = css.indexOf(wahl);
-    expect(start, `Selektor ${wahl} steht nicht in sprache.css`).toBeGreaterThanOrEqual(0);
-    const auf = css.indexOf('{', start);
-    return css.slice(auf + 1, css.indexOf('}', auf));
-  }
-
-  it('Form und Farbe liegen auf getrennten Achsen — die Form braucht die Farbe nicht', () => {
-    // Das ist die Bedingung, unter der die Form überhaupt ein ZWEITER Kanal ist:
-    // eine Formregel, die ihre Statusfarbe selbst mitbrächte, wäre nur eine
-    // zweite Schreibweise der ersten. Die Farbe erreicht die Form über
-    // `currentColor` — dieselbe Bauform wie in `Tastenkuerzel` (CLAUDE.md).
-    const formen = {
-      dreieck: regel('.lfh-zeichen--dreieck {'),
-      kreis: regel('.lfh-zeichen--kreis {'),
-      balken: regel('.lfh-zeichen--balken {'),
-    };
-    for (const [name, block] of Object.entries(formen)) {
-      expect(block, `${name}: eine Formregel trägt keine Statusfarbe`).not.toMatch(
-        /var\(--lfh-(alarm|achtung|normal)\)/,
-      );
-    }
-    // Drei Namen sind noch keine drei Formen.
-    const rumpf = Object.values(formen).map((b) => b.replace(/\s+/g, ' ').trim());
-    expect(new Set(rumpf).size, 'drei Formnamen, drei Geometrien').toBe(3);
-
-    for (const stufe of ['alarm', 'achtung', 'normal'] as const) {
-      const block = regel(`.lfh-zeichen--${stufe} {`);
-      expect(block, `${stufe}: die Farbe kommt aus der Rolle`).toMatch(
-        new RegExp(`color:\\s*var\\(--lfh-${stufe}\\)`),
-      );
-      expect(block, `${stufe}: Geometrie gehört nicht in eine Farbregel`).not.toMatch(
-        /width|height|border-radius|border-left|border-right|border-bottom/,
-      );
-    }
-  });
-
-  it('jeder Marker der Seite trägt eine Formklasse', () => {
-    // Seit LFH-395 trägt `.lfh-zeichen` selbst keine Geometrie mehr — die kommt
-    // aus der Formklasse. Ein Marker ohne sie wäre 0 × 0 px und damit spurlos
-    // weg: kein Fehler, kein roter Test, nur ein verschwundenes Zeichen.
-    const zeilen = quelle.split('\n').filter((z) => z.includes('lfh-zeichen'));
-    expect(zeilen.length, 'die Marker der Seite werden nicht mehr gefunden').toBeGreaterThan(0);
-    for (const z of zeilen) {
-      expect(z.trim(), 'Marker ohne Formklasse').toMatch(
-        /lfh-zeichen--(dreieck|kreis|balken|\$\{)/,
-      );
-    }
   });
 });
 
 describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
-  const quelle = readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), 'LageDashboardPage.tsx'),
-    'utf8',
+  const hier = dirname(fileURLToPath(import.meta.url));
+  const quellen = ['LageDashboardPage.tsx', 'LagePaneele.tsx', 'PaneelZustand.tsx'].map((d) =>
+    readFileSync(join(hier, d), 'utf8'),
   );
 
   it('baut keinen Einsatz-Pfad als Template-Literal — die Builder sind die Quelle', () => {
-    // Ein Inline-Pfad umgeht `routing/deeplinks.ts` und damit LFH-25. Er bricht
-    // nichts sichtbar: die Seite navigiert weiter, nur an der Registry vorbei.
-    expect(quelle).not.toMatch(/`\/einsaetze\/\$\{/);
+    for (const q of quellen) expect(q).not.toMatch(/`\/einsaetze\/\$\{/);
   });
 
-  it('nutzt den Modul-Builder', () => {
-    expect(quelle).toContain('einsatzModulPfad');
+  it('nutzt die Builder aus routing/deeplinks', () => {
+    expect(quellen[0]).toContain("from '../../routing/deeplinks'");
+    expect(quellen[0]).toContain('einsatzModulPfad');
+    expect(quellen[0]).toContain('etbPfad');
   });
 });
 
 /**
- * ── STAND DER LAGEBERICHT-KACHEL (LFH-350 · H60) ────────────────────────────────
+ * ── STAND DES LAGEBERICHTS (LFH-350 · H60) ──────────────────────────────────────
  *
- * `lagebild.bericht.stand` ist `bericht.zeitstand` — ein UTC-Wirestring ohne
- * Zonenkennung. Die Kachel gab ihn roh aus, also um den Zonenversatz falsch.
+ * `bericht.stand` ist `zeitstand` — ein UTC-Wirestring ohne Zonenkennung. Roh ausgegeben
+ * stand er um den Zonenversatz falsch. Formatiert wird in der SEITE (Zone am Provider).
  *
- * Formatiert wird in der SEITE, nicht in `lagebild.ts`: die Zone hängt am
- * `EinsatzAnzeigeProvider`, und `baueLagebild` bleibt eine reine Funktion.
- *
- * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides ist gemessen
- * nötig: (1) ohne Provider fällt `useAnzeigeKonventionen` auf `DEFAULT_KONVENTIONEN` und
- * damit auf die LOKALE Zone der ausführenden Maschine zurück; (2) nur den Provider
- * einzuhängen genügt nicht, weil die Einstellungs-Abfrage ERST NACH dem ersten Render
- * auflöst — die Behauptung hat dann längst getroffen, und auf einem Berliner Rechner wäre
- * der Test auch mit `zeitzone: 'UTC'` grün geblieben (Gegenprobe gefahren). `setQueryData`
- * stellt die Zone vor dem ersten Render; der MSW-Handler bedient nur den Refetch.
+ * Die Zone wird AUSDRÜCKLICH gestellt und der Cache dafür VORBELEGT — beides gemessen
+ * nötig: ohne Provider fällt `useAnzeigeKonventionen` auf die LOKALE Zone der Maschine
+ * zurück, und die Einstellungs-Abfrage löst erst NACH dem ersten Render auf.
  */
 function renderMitZone() {
   server.use(
@@ -1072,8 +753,7 @@ function renderMitZone() {
     ),
   );
   // Bewusst NICHT `neuerQueryClient()`: dessen `gcTime: 0` räumt einen per `setQueryData`
-  // gesetzten, noch unbeobachteten Eintrag beim ersten `await` weg (CLAUDE.md,
-  // Query-Key-Registry). Hier hinge die Zone dann still wieder am MSW-Refetch.
+  // gesetzten, noch unbeobachteten Eintrag beim ersten `await` weg (CLAUDE.md).
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(einsatzKeys.einstellungen(1), {
     einsatz_id: 1,
@@ -1091,30 +771,17 @@ function renderMitZone() {
 }
 
 describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => {
-  it('zeigt den Stand als taktische DTG in der Anzeigezone, nicht roh', async () => {
-    mockEndpunkte({
-      personen: [person('sk3')],
-      lageberichte: [
-        {
-          id: 3,
-          einsatz_id: 1,
-          titel: 'Lage 14:00',
-          status: 'freigegeben',
-          zeitstand: '2026-07-25 12:00:00',
-          ersteller_id: 1,
-          ersteller_name: 'Muster',
-          erstellt_at: '2026-07-25 12:00:00',
-          aktualisiert_at: '2026-07-25 12:00:00',
-          version: 1,
-          vorlage: 'lagebericht',
-          abschnitte: [{ schluessel: 'gefahren_schadenlage', text: 'Pegel steigend.' }],
-        },
-      ],
-    });
+  it('zeigt den Stand in der Anzeigezone, nicht roh', async () => {
+    mockEndpunkte({ personen: [person('sk3')], lageberichte: [lagebericht] });
     renderMitZone();
-    await kennzahlGeladen('Vermisst');
-    // 12:00 UTC → 14:00 Sommerzeit in Berlin.
-    expect(await screen.findByText('251400JUL2026')).toBeInTheDocument();
+    await kennzahlGeladen('Betroffene');
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin; ein anderer Tag trägt den Tag voran.
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Lagebericht', 'Führungsstand');
+      expect(z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('25. 14:00');
+      return z;
+    });
+    expect(zelle).toHaveTextContent('Freigegeben · Lage 14:00');
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });

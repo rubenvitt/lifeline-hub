@@ -100,7 +100,7 @@ describe('GefahrenPage', () => {
       { route: '/einsaetze/1/gefahren', client },
     );
 
-    await screen.findByRole('list');
+    await screen.findByRole('region', { name: 'Gefahrengebiete' });
     expect(
       await screen.findByLabelText(`Datenstand ${formatiereDatenstand(matrixStand)}`),
     ).toBeInTheDocument();
@@ -330,7 +330,9 @@ describe('GefahrenPage', () => {
     server.use(...handlers());
     setzeViewportBreite(800); // < lg (992)
     renderPage();
-    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    const rahmen = (await screen.findByRole('region', { name: 'Gefahrengebiete' })).closest(
+      '[data-gefahren-rahmen]',
+    )!;
     expect(rahmen).toHaveStyle({ flexDirection: 'column' });
   });
 
@@ -338,7 +340,9 @@ describe('GefahrenPage', () => {
     server.use(...handlers());
     setzeViewportBreite(1280);
     renderPage();
-    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    const rahmen = (await screen.findByRole('region', { name: 'Gefahrengebiete' })).closest(
+      '[data-gefahren-rahmen]',
+    )!;
     expect(rahmen).toHaveStyle({ flexDirection: 'row' });
   });
 

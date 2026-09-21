@@ -3,57 +3,76 @@ import SichtungsTag from '../components/SichtungsTag';
 import { Typography } from 'antd';
 import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
 import { STATUS_META } from './personMeta';
+import { GESCHLECHT_KURZ } from './personBefehl';
+import { lueckenText, lueckenVon, verbleibKlasse } from './personenBilanz';
 
-/** Alter-Anzeige: Geburtsdatum > geschätztes Alter > „—". */
-function alterAnzeige(p: Person): string {
+/**
+ * Das EINE Spaltenregister der Betroffenen-Listen (LFH-330 · B2; Neuentwurf S7) — reine
+ * Anzeige, ohne Aktionen. Speist Zeilen- und Rasteransicht und über den Kartenplan beide
+ * Darstellungsformen.
+ *
+ * Spalten nach dem Entwurf, soweit es Daten gibt: Nr. · Person (Name + Geschlecht/Alter) ·
+ * Sichtung · Status · Fundort · Verbleib · Vermerk · Zeit. **„Zustand" fehlt** — an der
+ * Person gibt es kein Zustandsfeld (LFH-613); an seiner Stelle steht der Personenstatus als
+ * echte Spalte (`StatusTag`, A2-Vertrag).
+ *
+ * Eine FABRIK, kein Wert: die Verbleib-Spalte nennt die Unfallhilfsstelle beim Namen, und
+ * den kennt nur die UHS-Liste der Seite. Durch `spaltenFuer<Person>()` geführt, NIE
+ * annotiert — eine Annotation weitet die Schlüssel auf `string`, und der Kartenplan nähme
+ * danach jeden Tippfehler unbemerkt an.
+ *
+ * ── DER ZWEITE KANAL DER LÜCKENTÖNUNG ───────────────────────────────────────────────────
+ *
+ * Eine Zeile ohne Verbleib/Fundort trägt `lueckeZeile` (Seite, `zeilenKlasse`). Die Farbe
+ * allein wäre ein Ein-Kanal-Signal (WCAG 1.4.1), deshalb steht das WORT in der
+ * Personenzelle („Verbleib offen") — und zwar dort, weil die Personenzelle in BEIDEN
+ * Zweigen steht: im Kartenzweig gibt es keine Fundort-/Verbleib-Spalte, dort hinge eine
+ * Tönung sonst ohne Wort. Die Fundort-/Verbleib-Zellen selbst zeigen „—" in `achtung`.
+ */
+
+/** Alter-Anzeige: Geburtsdatum > geschätztes Alter (mit Tilde — das Feld IST geschätzt). */
+export function alterAnzeige(p: Pick<Person, 'geburtsdatum' | 'alter_geschaetzt'>): string | null {
   if (p.geburtsdatum) return p.geburtsdatum;
-  if (p.alter_geschaetzt != null) return `~${p.alter_geschaetzt} J.`;
-  return '—';
+  if (p.alter_geschaetzt != null) return `~${p.alter_geschaetzt}`;
+  return null;
+}
+
+/** „w ~34" — Geschlecht und Alter in der Kurzschreibweise der Erfassungszeile. */
+export function geschlechtAlter(p: Person): string | null {
+  const teile = [p.geschlecht ? GESCHLECHT_KURZ[p.geschlecht] : null, alterAnzeige(p)].filter(
+    (t): t is string => t != null,
+  );
+  return teile.length > 0 ? teile.join(' ') : null;
 }
 
 /**
  * Der Zeitpunkt, seit dem eine Person in ihrem aktuellen Zustand ist — die
- * Vergleichsgrundlage der Dringlichkeit.
- *
- * `aktuelle_sichtung_at` VOR `erfasst_at`: die Erfassung sagt, wann jemand aufgenommen
- * wurde, die Sichtung, wann er zuletzt medizinisch bewertet wurde. Für „wer wartet am
- * längsten auf die nächste Bewertung" ist Letzteres die Frage.
- *
- * `??`, nicht `?.` — und der Rückgabetyp ist `string`, nicht `string | undefined`:
- * `erfasst_at` ist Pflichtfeld von `PersonAnzeige`, also gibt es immer einen Wert. Eine
- * leere Zeitangabe rendert als '' und wäre in der Spalte unsichtbar statt auffällig.
- *
- * `geaendert_at` wäre falsch: es läuft bei jeder Notiz weiter und beantwortet damit eine
- * andere Frage („wann wurde der Satz zuletzt angefasst").
+ * Vergleichsgrundlage der Dringlichkeit. `aktuelle_sichtung_at` VOR `erfasst_at`: für „wer
+ * wartet am längsten auf die nächste Bewertung" zählt die letzte Sichtung. `geaendert_at`
+ * wäre falsch — es läuft bei jeder Notiz weiter.
  */
 export function seitWert(p: Person): string {
   return p.aktuelle_sichtung_at ?? p.erfasst_at;
 }
 
 /**
- * Namenstext einer Person, oder `null`, wenn kein Namensteil bekannt ist.
- *
- * Der Leerwert ist die Pointe: der Anzeigetext „unbekannt" gehört ins `render`, NICHT in den
- * Suchbeitrag — sonst fände eine Freitextsuche nach „unbekannt" jede namenlose Person als
- * Namenstreffer.
+ * Namenstext einer Person, oder `null`. Der Leerwert ist die Pointe: „unbekannt" gehört ins
+ * `render`, NICHT in den Suchbeitrag — sonst fände die Suche nach „unbekannt" jede
+ * namenlose Person als Namenstreffer.
  */
-export function nameText(p: Person): string | null {
+export function nameText(p: Pick<Person, 'name' | 'vorname'>): string | null {
   if (!p.name && !p.vorname) return null;
   return `${p.name ?? ''}${p.vorname ? `, ${p.vorname}` : ''}`;
 }
 
-/**
- * Sichtungskategorie als Etikett, „—" wenn ungesichtet.
- *
- * LFH-455: SichtungsTag trägt die eigene fachliche Farbachse samt lesbarer Beschriftung.
- * Sie bleibt unabhängig vom Personenstatus; „SK II" trägt den zweiten Kanal.
- */
-export function SkTag({ p }: { p: Person }) {
+/** Sichtung als `SichtungsTag` (BBK-Farbfeld, LFH-455), „—" wenn ungesichtet. */
+export function SkTag({ p }: { p: Pick<Person, 'aktuelle_sichtung'> }) {
   return p.aktuelle_sichtung ? (
     <SichtungsTag kategorie={p.aktuelle_sichtung} />
   ) : (
@@ -61,113 +80,159 @@ export function SkTag({ p }: { p: Person }) {
   );
 }
 
-/**
- * Das EINE Spaltenregister der Personenlisten (LFH-330 · B2) — reine Anzeige, ohne Aktionen.
- * Speist Patienten- und Listen-Sicht, und über den Kartenplan unten beide Darstellungsformen.
- *
- * Durch `spaltenFuer<Person>()` geführt, NIE annotiert: eine Annotation
- * (`readonly DatensichtSpalte<Person>[]`) weitet die Schlüsselliterale auf `string`, und der
- * Kartenplan nähme danach jeden Tippfehler unbemerkt an.
- *
- * `abBreite` staffelt statt antds Breiten-Prop, damit der Spaltenzähler beide
- * Ausblendungsgründe kennt. `seit` trägt bewusst KEINE Schwelle: die Zeitachse ist der
- * Zweck dieser Sicht, und eine Spalte, die schon unter 1200 px verschwindet, wäre in jeder
- * jsdom-Prüfung abwesend.
- */
-export const personenSpalten = spaltenFuer<Person>()([
-  {
-    title: 'Reg.-Nr.',
-    key: 'reg',
-    width: 100,
-    immerSichtbar: true,
-    // Sortiert wird über die ZAHL — über den Anzeigetext läge „R-10" vor „R-9".
-    sortWert: (p) => p.registrier_nr,
-    suchText: (p) => registrierAnzeige(p.registrier_nr),
-    // KEIN Anker hier: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden
-    // Zweigen. Ein `<a>` im `render` ergäbe verschachtelte Links.
-    render: (_, p) => (
-      <Typography.Text strong>{registrierAnzeige(p.registrier_nr)}</Typography.Text>
-    ),
-  },
-  {
-    title: 'Status',
-    key: 'status',
-    width: 130,
-    render: (_, p) => <StatusTag darstellung={STATUS_META[p.status]} />,
-  },
-  { title: 'SK', key: 'sk', width: 90, render: (_, p) => <SkTag p={p} /> },
-  {
-    title: 'Name',
-    key: 'name',
-    suchText: nameText,
-    render: (_, p) => nameText(p) ?? <Typography.Text type="secondary">unbekannt</Typography.Text>,
-  },
-  {
-    title: 'Geschlecht',
-    dataIndex: 'geschlecht',
-    key: 'geschlecht',
-    abBreite: 'lg',
-    render: (g) => g ?? '—',
-  },
-  { title: 'Alter', key: 'alter', abBreite: 'lg', render: (_, p) => alterAnzeige(p) },
-  {
-    title: 'seit',
-    key: 'seit',
-    /**
-     * Volle taktische DTG (`dtgVoll`, der Default) statt `kurz`. `formatZeitKurz` liest über
-     * `dayjs()` die echte Wanduhr, um „heute" zu bestimmen — jede Behauptung darüber wäre an
-     * den Ausführungszeitpunkt gekoppelt. `taktischeDtgVoll` ist eine reine Funktion des
-     * Wire-Strings.
-     *
-     * KEIN relatives Alter („vor 20 min"): `ZeitAnzeige` kennt vier Formate, und dayjs'
-     * `relativeTime` ohne geladenes deutsches Gebietsschema lieferte englischen Text — ein
-     * stiller Sprachbruch. Zusätzlich müsste eine tickende Spalte gegen
-     * Prüflisten-Kriterium 12 abgesichert werden. → eigenes Ticket.
-     */
-    sortWert: seitWert,
-    render: (_, p) => <ZeitAnzeige wert={seitWert(p)} />,
-  },
-  {
-    title: 'Antreffort',
-    dataIndex: 'antreff_ort',
-    key: 'antreff_ort',
-    abBreite: 'xl',
-    render: (t) => t ?? '—',
-  },
-]);
+/** Personenzelle: Name 13 + Geschlecht/Alter Mono 11, darunter ggf. der Lückenvermerk. */
+function PersonZelle({ p }: { p: Person }) {
+  const { token, rollen } = useRollen();
+  const ga = geschlechtAlter(p);
+  const offen = lueckenText(lueckenVon(p));
+  return (
+    <div style={{ minWidth: 0 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: token.marginXS }}>
+        <span style={{ fontSize: 13, color: nameText(p) ? rollen.text : rollen.gedaempft }}>
+          {nameText(p) ?? 'unbekannt'}
+        </span>
+        {ga && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{ga}</span>}
+      </span>
+      {offen && (
+        <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtung }}>
+          {offen}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Offene Zelle in `achtung`, sonst neutraler Gedankenstrich. */
+function Leerzelle({ offen }: { offen: boolean }) {
+  const { rollen } = useRollen();
+  return <span style={{ color: offen ? rollen.achtung : rollen.schwach }}>—</span>;
+}
+
+function FundortZelle({ p }: { p: Person }) {
+  const { rollen } = useRollen();
+  if (!p.antreff_ort) return <Leerzelle offen={lueckenVon(p).fundort} />;
+  return <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{p.antreff_ort}</span>;
+}
+
+/** Verbleib-Anzeige: Kurzform, sonst die aktuelle UHS, sonst „—". */
+export function verbleibText(
+  p: Pick<Person, 'aktueller_verbleib' | 'aktuelle_uhs_id'>,
+  uhsName: (id: number) => string | undefined,
+): string | null {
+  const k = verbleibKlasse(p);
+  if (k === 'offen') return null;
+  if (k === 'uhs') return `UHS ${uhsName(p.aktuelle_uhs_id!) ?? ''}`.trim();
+  return p.aktueller_verbleib ?? null;
+}
+
+function VerbleibZelle({ p, uhsName }: { p: Person; uhsName: (id: number) => string | undefined }) {
+  const { rollen } = useRollen();
+  const text = verbleibText(p, uhsName);
+  if (text == null) return <Leerzelle offen={lueckenVon(p).verbleib} />;
+  return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
+}
+
+export function personenSpalten(uhsName: (id: number) => string | undefined) {
+  return spaltenFuer<Person>()([
+    {
+      title: 'Nr.',
+      key: 'reg',
+      width: 84,
+      immerSichtbar: true,
+      zahl: true,
+      // Sortiert wird über die ZAHL — über den Anzeigetext läge „R-10" vor „R-9".
+      sortWert: (p) => p.registrier_nr,
+      suchText: (p) => registrierAnzeige(p.registrier_nr),
+      // KEIN Anker hier: den Titel-Link setzt der Kartenplan über `titel.ziel`.
+      render: (_, p) => registrierAnzeige(p.registrier_nr),
+    },
+    {
+      title: 'Person',
+      key: 'person',
+      mindestBreite: 180,
+      sortWert: (p) => nameText(p),
+      suchText: nameText,
+      render: (_, p) => <PersonZelle p={p} />,
+    },
+    { title: 'Sichtung', key: 'sk', width: 104, render: (_, p) => <SkTag p={p} /> },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 118,
+      render: (_, p) => <StatusTag darstellung={STATUS_META[p.status]} />,
+    },
+    {
+      title: 'Fundort',
+      key: 'fundort',
+      abBreite: 'lg',
+      suchText: (p) => p.antreff_ort,
+      render: (_, p) => <FundortZelle p={p} />,
+    },
+    {
+      title: 'Verbleib',
+      key: 'verbleib',
+      suchText: (p) => verbleibText(p, uhsName),
+      render: (_, p) => <VerbleibZelle p={p} uhsName={uhsName} />,
+    },
+    {
+      title: 'Vermerk',
+      key: 'vermerk',
+      abBreite: 'xxl',
+      mindestBreite: 160,
+      suchText: (p) => p.notiz,
+      render: (_, p) =>
+        p.notiz ? (
+          <Typography.Text
+            type="secondary"
+            ellipsis={{ tooltip: p.notiz }}
+            style={{ fontSize: 12 }}
+          >
+            {p.notiz}
+          </Typography.Text>
+        ) : null,
+    },
+    {
+      title: 'Zeit',
+      key: 'seit',
+      width: 88,
+      align: 'right',
+      zahl: true,
+      /**
+       * Taktische DTG `DDHHmm` statt reiner Uhrzeit: ein Einsatz dauert über Mitternacht,
+       * und „14:19" von gestern sähe aus wie von heute. `taktischeDtg` ist eine reine
+       * Funktion des Wire-Strings — `kurz` läse die Wanduhr, jede Aussage darüber hinge am
+       * Ausführungszeitpunkt.
+       */
+      sortWert: seitWert,
+      render: (_, p) => <ZeitAnzeige wert={seitWert(p)} format="dtg" />,
+    },
+  ]);
+}
 
 /** Die Schlüsselmenge des Registers — Grundlage jedes typgeprüften Kartenplan-Slots. */
-export type PersonenSpaltenKey = (typeof personenSpalten)[number]['key'];
+export type PersonenSpaltenKey = ReturnType<typeof personenSpalten>[number]['key'];
 
 /**
- * Kartenplan der Personenlisten.
- *
- * SK steht als Sekundärfeld, Status als Spalte. LFH-455 zentralisiert beide Farbachsen;
- * der bisherige Kartenumfang bleibt dabei erhalten. Ein zusätzlicher Status-Slot
- * wäre eine eigene Layoutentscheidung.
- *
- * Der Rückgabetyp ist der Plan-ZWEIG, nicht der ganze `Kartenplan`-Verbund. Gemessen: über
- * dem Verbund verliert ein `{ ...personenKarte(id), aktion: … }` die Unterscheidung nach
- * `art`, TypeScript prüft die Zusatzeigenschaft dann gegen den Eigenbau-Zweig und lehnt
- * `aktion` als unbekannt ab. Die Listen-Sicht braucht genau diesen Aufsatz.
+ * Der Rückgabetyp ist der Plan-ZWEIG, nicht der ganze `Kartenplan`-Verbund: über dem
+ * Verbund verlöre `{ ...personenKarte(id), aktion: … }` die Unterscheidung nach `art`.
  */
 type KartenPlanZweig<T, K extends string> = Extract<Kartenplan<T, K>, { art: 'plan' }>;
 
+/**
+ * Kartenplan: Nr. als Titel-Link, Personenstatus im Status-Slot (A2-Vertrag), Person
+ * (samt Lückenvermerk), Sichtung und Zeit als Sekundärfelder.
+ */
 export const personenKarte = (einsatzId: number): KartenPlanZweig<Person, PersonenSpaltenKey> => ({
   art: 'plan',
   titel: { spalte: 'reg', ziel: (p) => personDetailPfad(einsatzId, p.id) },
-  sekundaer: ['name', 'sk', 'seit'],
+  status: (p) => STATUS_META[p.status],
+  sekundaer: ['person', 'sk', 'seit'],
 });
 
 /**
- * Zusatzspalte „Abgleich vorschlagen" (nur Vermisst-Sicht mit Schreibrecht): je Vermisst-Zeile
- * ein Auswahlfeld über die gefundenen Personen. `onAbgleich` löst den Verdachts-Abgleich aus.
- *
- * Die Klein-Variante am Auswahlfeld ist seit LFH-370 · B5j ABGEBAUT — das Feld folgt jetzt
- * der Dichte-Staffel. Damit entfällt das Höhen-Bein der Begründung unten; das Breiten-Bein
- * trägt weiter: ein Steuerelement mit fester 200-px-Breite bleibt auf einer 390-px-Karte
- * unbrauchbar. Der Kartenzweig behält deshalb den Aktions-Deskriptor, der statt des
- * Auswahlfelds einen Knopf mit Modal rendert.
+ * Zusatzspalte „Abgleich vorschlagen" (nur Vermisst-Filter mit Schreibrecht). Die feste
+ * Breite trägt auf einer 390-px-Karte nicht; der Kartenzweig ersetzt das Auswahlfeld durch
+ * einen Knopf plus Dialog (Aktions-Deskriptor der Seite).
  */
 export function abgleichSpalten(
   gefundene: readonly Person[],

@@ -1,5 +1,4 @@
-import { Alert, Button, Card, Checkbox, Space, theme, Tooltip, Typography } from 'antd';
-import { Select } from '../components/Select';
+import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
@@ -16,14 +15,21 @@ import { ERFASSBARE_TYPEN } from './typFarben';
 import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
+import { Schnellerfassungszeile, useRollen } from '../components/instrument';
 import MetaChip from './MetaChip';
 import { useFunkrufnamen } from './funkrufnamen';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
+  amZeilenanfang,
   baueEintrag,
+  einheitAusSchluessel,
+  erkenneAtTrigger,
   erkenneSlashTrigger,
+  erkenneTypBefehl,
+  filterAtEintraege,
   METADATEN_FELDER,
+  TYP_BEFEHLE,
   type MetadatenWerte,
   type MetaFeld,
   type SlashEintrag,
@@ -49,7 +55,7 @@ interface Props {
   onWerteBehaltenChange?: (behalten: boolean) => void;
 }
 
-const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }));
+const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
 const ENTER_HINWEIS =
   'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
 
@@ -92,7 +98,7 @@ export default function Schnellerfassung({
   onWerteBehaltenChange,
 }: Props) {
   const navigate = useNavigate();
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const textRef = useRef<TextAreaRef>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
@@ -114,6 +120,13 @@ export default function Schnellerfassung({
   const [menuOffen, setMenuOffen] = useState(false);
   const [menuFilter, setMenuFilter] = useState('');
   const [triggerStart, setTriggerStart] = useState(-1);
+  /**
+   * Welches Zeichen das Menü geöffnet hat: `/` (Typ am Zeilenanfang, Felder, Bausteine)
+   * oder `@` (Funkrufname nach Von/An). Ein Menü, zwei Modi — zwei schwebende Menüs
+   * übereinander wären zwei Tastaturziele für dieselben Pfeiltasten.
+   */
+  const [menuModus, setMenuModus] = useState<'slash' | 'at'>('slash');
+  const [typenAnbieten, setTypenAnbieten] = useState(false);
 
   const [bausteinOffen, setBausteinOffen] = useState<EtbBaustein | null>(null);
 
@@ -182,13 +195,27 @@ export default function Schnellerfassung({
   }
 
   function aktualisiereTrigger(text: string, caret: number) {
-    const t = erkenneSlashTrigger(text, caret);
+    const slash = erkenneSlashTrigger(text, caret);
+    // `@` gibt es im Berichtigungsmodus nicht: dort bleiben Von/An über `/von`, `/an`
+    // erreichbar, aber die Zeile soll nichts still umschreiben, was das Original trug.
+    const at = slash.aktiv || berichtigungZu ? null : erkenneAtTrigger(text, caret);
+    const t = at?.aktiv ? at : slash;
+    setMenuModus(at?.aktiv ? 'at' : 'slash');
+    setTypenAnbieten(slash.aktiv && !berichtigungZu && amZeilenanfang(text, slash.start));
     setMenuOffen(t.aktiv);
     setMenuFilter(t.filter);
     setTriggerStart(t.start);
   }
 
   function onInhaltChange(neu: string) {
+    // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
+    const befehl = berichtigungZu ? null : erkenneTypBefehl(neu);
+    if (befehl) {
+      setTyp(befehl.typ);
+      setInhalt(befehl.rest);
+      aktualisiereTrigger(befehl.rest, befehl.rest.length);
+      return;
+    }
     setInhalt(neu);
     // Caret-Position aus dem nativen textarea über die antd-Ref.
     // Falls der Ref-Pfad nicht verfügbar ist (ältere antd-Version), Fallback auf Textende.
@@ -215,7 +242,14 @@ export default function Schnellerfassung({
     entferneTriggerText();
     // Auf JEDEM Weg hinaus, unabhängig davon, wie das Menü aufging.
     setMenuOffen(false);
-    if (e.art === 'feld') {
+    if (e.art === 'typ') {
+      setTyp(e.key as EtbTyp);
+      fokusInsFeld();
+    } else if (e.art === 'einheit') {
+      const { feld, wert } = einheitAusSchluessel(e.key);
+      setMetadaten((m) => ({ ...m, [feld]: wert }));
+      fokusInsFeld();
+    } else if (e.art === 'feld') {
       setEditFeld(e.key as MetaFeld);
     } else {
       const b = bausteine.find((x) => String(x.id) === e.key) ?? null;
@@ -281,34 +315,107 @@ export default function Schnellerfassung({
       setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
       fokusInsFeld();
+    } catch {
+      // Abgelehnt: die Meldung zeigt der Aufrufer (`EtbPage`, `message.error`), der
+      // Wortlaut bleibt im Feld stehen (Erfassungs-Norm, `onErfassen` muss ablehnen).
+      // Weiterwerfen hieße hier nur eine unbehandelte Zurückweisung aus `void absenden()`.
     } finally {
       setSendet(false);
     }
   }
 
+  /*
+   * DER PRÄFIX IST DER TYPWÄHLER (Neuentwurf S4: `/anordnung` in der Befehlszelle). Er
+   * zeigt den gewählten Typ als Befehl und öffnet auf Klick die Typen als Menü — der Weg
+   * für Maus und Handschuh; die Tastatur nimmt `/typ` am Zeilenanfang. Das frühere `Select`
+   * unter dem Feld ist damit entfallen: zwei Wähler für denselben Wert wären zwei Stellen,
+   * an denen er stehen kann. Im Berichtigungsmodus ist der Typ fest und der Präfix Text.
+   *
+   * Der zugängliche Name enthält den sichtbaren Befehl (WCAG 2.5.3 „Label in Name").
+   */
+  const praefix = berichtigungZu ? (
+    '/berichtigung'
+  ) : (
+    <Dropdown
+      trigger={['click']}
+      autoFocus
+      menu={{
+        items: TYP_MENUE,
+        selectable: true,
+        selectedKeys: [typ],
+        onClick: ({ key }) => {
+          setTyp(key as EtbTyp);
+          fokusInsFeld();
+        },
+      }}
+    >
+      <Button
+        type="text"
+        aria-label={`Eintragstyp /${typ} ändern`}
+        style={{ font: 'inherit', color: 'inherit', paddingInline: token.paddingXS }}
+      >
+        /{typ}
+      </Button>
+    </Dropdown>
+  );
+
+  /*
+   * DIE HINWEISZEILE trägt den Tastaturvertrag — EINMAL (Nacharbeit zu LFH-335): nicht im
+   * Platzhalter, nicht zusätzlich als „↵ eintragen" in der Zeile. Genannt wird nur, was es
+   * gibt: `# Koordinate` des Entwurfs hat keinen Weg in den Eintrag und fehlt deshalb;
+   * „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt und der
+   * Eintrag dann als nachgetragen erscheint.
+   */
+  const hinweiszeile = (
+    <>
+      {!berichtigungZu && (
+        <span style={{ color: rollen.gedaempft }}>{TYP_BEFEHLE.map((t) => `/${t}`).join(' ')}</span>
+      )}
+      {!berichtigungZu && <span>@ Einheit</span>}
+      <span>/zeit ⧖ Nachtrag</span>
+      <span>{ENTER_HINWEIS}</span>
+    </>
+  );
+
+  const einheitenTreffer =
+    menuModus === 'at' ? filterAtEintraege(menuFilter, funkrufnamen, typ) : null;
+
   return (
-    <Card className="etb-erfassung-card">
+    // `etb-erfassung-card` trägt keine CSS-Regel mehr (den Rahmen zeichnet die
+    // Schnellerfassungszeile), bleibt aber stehen: `e2e/seitenrinne.spec.ts` misst an ihr,
+    // dass der Inhalt der Leiste auf der Seitenrinne steht.
+    <div className="etb-erfassung-card" data-lfh="etb-erfassung">
       {berichtigungZu && (
         <Alert
           type="warning"
           showIcon
-          style={{ marginBottom: 12 }}
-          title={`Berichtigung zu #${berichtigungZu.lfd_nr}`}
+          style={{ marginBottom: token.marginSM }}
+          title={`Berichtigung zu Nr. ${berichtigungZu.lfd_nr}`}
           action={<Button onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
         />
       )}
 
       <div style={{ position: 'relative' }}>
-        <MarkdownEditor
-          ref={textRef}
-          layout="toggle"
-          variante="kompakt"
-          placeholder="Inhalt … ( / für Felder & Bausteine )"
-          autoSize={{ minRows: 1, maxRows: 4 }}
-          value={inhalt}
-          onChange={onInhaltChange}
-          onKeyDown={onKeyDown}
-        />
+        <Schnellerfassungszeile
+          praefix={praefix}
+          hinweis={
+            <Button type="primary" loading={sendet} onClick={() => void absenden()}>
+              Erfassen
+            </Button>
+          }
+          hinweiszeile={hinweiszeile}
+        >
+          <MarkdownEditor
+            ref={textRef}
+            layout="toggle"
+            variante="kompakt"
+            placeholder="Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )"
+            autoSize={{ minRows: 1, maxRows: 4 }}
+            value={inhalt}
+            onChange={onInhaltChange}
+            onKeyDown={onKeyDown}
+          />
+        </Schnellerfassungszeile>
         <SlashMenu
           ref={menuRef}
           offen={menuOffen}
@@ -317,114 +424,97 @@ export default function Schnellerfassung({
           // entfällt (leere Liste → SlashMenu rendert die Bausteine-Sektion nicht).
           bausteine={berichtigungZu ? [] : bausteine}
           gesetzteFelder={gesetzteFelder}
+          typenAnbieten={typenAnbieten}
+          einheiten={einheitenTreffer}
+          richtung="oben"
           onWahl={waehleEintrag}
           onSchliessen={() => setMenuOffen(false)}
         />
       </div>
 
-      {/* Chip-Leiste */}
-      <Space wrap style={{ marginTop: 8 }}>
-        {gesetzteFelder.map((feld) => (
-          <MetaChip
-            key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
-            feld={feld}
-            editing={editFeld === feld}
-            wert={metadaten[feld]}
-            optionen={feld === 'von' || feld === 'an' ? funkrufnamen : undefined}
-            onCommit={commitFeld}
-            onCancel={() => {
-              setEditFeld(null);
-              fokusInsFeld();
-            }}
-            onRemove={(f) => setMetadaten((m) => ({ ...m, [f]: undefined }))}
-            onEdit={(f) => setEditFeld(f)}
-          />
-        ))}
-        {editFeld != null && metadaten[editFeld] == null && (
-          <MetaChip
-            key={`${editFeld}-edit-new`}
-            feld={editFeld}
-            editing
-            wert={undefined}
-            optionen={editFeld === 'von' || editFeld === 'an' ? funkrufnamen : undefined}
-            onCommit={commitFeld}
-            onCancel={() => {
-              setEditFeld(null);
-              fokusInsFeld();
-            }}
-            onRemove={() => setEditFeld(null)}
-            onEdit={() => {}}
-          />
-        )}
-        <Button
-          ref={feldKnopfRef}
-          type="dashed"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            setMenuFilter('');
-            setTriggerStart(-1);
-            setMenuOffen((o) => !o);
-          }}
-        >
-          Feld
-        </Button>
-      </Space>
-
-      {/* EINSTELLUNG — eigene Zeile ÜBER der Steuerzeile, sekundär gesetzt.
-          Der Schalter stand bis zum 30.07.2026 zwischen „Erfassen" und dem
-          Lagebericht-Link, also inmitten von Aktionen; er ist aber keine, sondern
-          eine Vorgabe für das nächste Erfassen. Dieselbe Trennung wie in
-          `components/Erfassung.tsx`, deren Dateikopf sie begründet. */}
-      {zeigeSchalter && (
-        <div style={{ marginTop: 12 }}>
-          <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-            <Checkbox
-              checked={werteBehalten}
-              onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
-            >
-              <Typography.Text type="secondary">Werte behalten</Typography.Text>
-            </Checkbox>
-          </Tooltip>
-        </div>
-      )}
-
-      {/* Steuerzeile.
-          Der Enter-Vertrag steht HIER und nicht mehr zwischen Feld und Chip-Leiste:
-          er gehört zum Absenden, und als eigene Zeile unter dem Editor schob er die
-          Chips nach unten und las sich wie eine Fehlermeldung. Im Platzhalter stand
-          er bis zum 08.08.2026 zusätzlich VOR dem eigentlichen Hinweis „Inhalt …" —
-          also genau dort, wo das Feld sagen soll, was hineingehört. Einmal sichtbar
-          reicht; die Zusicherung aus LFH-335 verlangt den Wortlaut im DOM, nicht
-          zweimal. `wrap`, weil der Satz auf 390 px sonst die Knöpfe hinausschiebt. */}
-      <Space align="center" wrap style={{ marginTop: 12, width: '100%' }}>
-        {!berichtigungZu && (
-          <Select
-            value={typ}
-            style={{ minWidth: 150 }}
-            options={TYP_OPTIONEN}
-            onChange={(v) => setTyp(v)}
-          />
-        )}
-        <Button type="primary" loading={sendet} onClick={() => void absenden()}>
-          Erfassen
-        </Button>
-        {!berichtigungZu && typ === 'lage' && (
+      {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt,
+          die EINSTELLUNG „Werte behalten". Sie steht nicht neben „Erfassen" (die Aktion
+          wohnt in der Zeile darüber) und nicht zwischen Aktionen; ein Umschalter in einer
+          Knopfreihe gilt als wirkungslos (30.07.2026, `components/Erfassung.tsx`). */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: token.marginXS,
+          marginTop: token.marginXS,
+        }}
+      >
+        <Space wrap>
+          {gesetzteFelder.map((feld) => (
+            <MetaChip
+              key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
+              feld={feld}
+              editing={editFeld === feld}
+              wert={metadaten[feld]}
+              optionen={feld === 'von' || feld === 'an' ? funkrufnamen : undefined}
+              onCommit={commitFeld}
+              onCancel={() => {
+                setEditFeld(null);
+                fokusInsFeld();
+              }}
+              onRemove={(f) => setMetadaten((m) => ({ ...m, [f]: undefined }))}
+              onEdit={(f) => setEditFeld(f)}
+            />
+          ))}
+          {editFeld != null && metadaten[editFeld] == null && (
+            <MetaChip
+              key={`${editFeld}-edit-new`}
+              feld={editFeld}
+              editing
+              wert={undefined}
+              optionen={editFeld === 'von' || editFeld === 'an' ? funkrufnamen : undefined}
+              onCommit={commitFeld}
+              onCancel={() => {
+                setEditFeld(null);
+                fokusInsFeld();
+              }}
+              onRemove={() => setEditFeld(null)}
+              onEdit={() => {}}
+            />
+          )}
           <Button
-            type="link"
-            style={{ paddingLeft: 0 }}
-            onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}
+            ref={feldKnopfRef}
+            type="dashed"
+            icon={
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                <PlusOutlined />
+              </span>
+            }
+            onClick={() => {
+              setMenuFilter('');
+              setTriggerStart(-1);
+              setMenuModus('slash');
+              setTypenAnbieten(false);
+              setMenuOffen((o) => !o);
+            }}
           >
-            Als strukturierten Lagebericht erfassen →
+            Feld
           </Button>
+          {!berichtigungZu && typ === 'lage' && (
+            <Button type="link" onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
+              Als strukturierten Lagebericht erfassen →
+            </Button>
+          )}
+        </Space>
+        {zeigeSchalter && (
+          <div style={{ marginInlineStart: 'auto' }}>
+            <Tooltip title={UEBERNAHME_ERKLAERUNG}>
+              <Checkbox
+                checked={werteBehalten}
+                onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
+              >
+                <Typography.Text type="secondary">Werte behalten</Typography.Text>
+              </Checkbox>
+            </Tooltip>
+          </div>
         )}
-        {/* Kein `marginLeft: 'auto'`: `Space` legt jedes Kind in ein eigenes
-            `.ant-space-item`, der Schub ginge also ins Leere. Der Hinweis steht
-            deshalb schlicht hinter den Aktionen und rutscht auf schmalem Schirm
-            per `wrap` in die nächste Zeile. */}
-        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-          {ENTER_HINWEIS}
-        </Typography.Text>
-      </Space>
+      </div>
 
       <BausteinPlatzhalterModal
         baustein={bausteinOffen}
@@ -432,6 +522,6 @@ export default function Schnellerfassung({
         onEinsetzen={bausteinEinsetzen}
         onAbbrechenAll={() => setBausteinOffen(null)}
       />
-    </Card>
+    </div>
   );
 }

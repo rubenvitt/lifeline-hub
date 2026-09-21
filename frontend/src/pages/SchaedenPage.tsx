@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad } from '../routing/deeplinks';
-import { Alert, Breadcrumb, Button, Space, Tabs, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Button, Space, Tag, Typography } from 'antd';
+import { Segmentleiste, monoStil } from '../components/instrument';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -60,7 +61,9 @@ const schaedenSpalten = (einsatzId: number) =>
       suchText: (s) => schadenRegistrierAnzeige(s.registrier_nr),
       // KEIN Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
       render: (_, s) => (
-        <Typography.Text strong>{schadenRegistrierAnzeige(s.registrier_nr)}</Typography.Text>
+        <Typography.Text strong style={monoStil(13, 500)}>
+          {schadenRegistrierAnzeige(s.registrier_nr)}
+        </Typography.Text>
       ),
     },
     {
@@ -269,6 +272,11 @@ export default function SchaedenPage() {
     <EinsatzSeite
       breite={flaeche.seiteBreit}
       dataUpdatedAt={schaedenQuery.dataUpdatedAt}
+      meta={
+        schaedenQuery.isSuccess
+          ? `${alle.length} Schäden · ${alle.filter((s) => s.status === 'offen').length} offen`
+          : undefined
+      }
       titel={
         <Space>
           Schäden
@@ -301,10 +309,14 @@ export default function SchaedenPage() {
         )
       }
     >
-      <Tabs
-        activeKey={sicht}
-        onChange={(k) => setSicht(k as Sicht)}
-        items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))}
+      {/* Statusfilter als Segmentleiste (Neuentwurf) statt antds Reitern: eine Wahl, die die
+          Liste darunter filtert — `radiogroup`, kein Reiterfeld je Segment. */}
+      <Segmentleiste
+        beschriftung="Schäden nach Status filtern"
+        wert={sicht}
+        onWechsel={setSicht}
+        optionen={SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
+        style={{ marginBottom: 12 }}
       />
 
       {listeGescheitert ? (

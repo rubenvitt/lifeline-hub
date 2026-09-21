@@ -125,9 +125,15 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toBeVisible();
 
-  // NavigationControl lebt: beweist, dass die Map nicht nur konstruiert wurde, sondern
-  // ihr Control-/DOM-Gerüst aufgebaut hat.
-  await expect(page.locator('.maplibregl-ctrl-zoom-in')).toBeVisible();
+  // Das Control-Gerüst der Map lebt: beweist, dass sie nicht nur konstruiert wurde, sondern
+  // ihr Control-/DOM-Gerüst aufgebaut hat. Seit dem Neuentwurf (S5) gibt es kein
+  // `NavigationControl` mehr — Zoom/Nordung/Zeichnen sind eigene Knöpfe über der Karte. Das
+  // MapLibre-eigene Control, das bleibt, ist die `AttributionControl`; dazu die
+  // Maßstabsleiste, die MapLibre selbst in das Band des Kartenfußes schreibt (`ScaleControl`
+  // über `onAdd`) — sie trägt nur Text, wenn die Map ihr erstes `move` gerechnet hat.
+  await expect(page.locator('.maplibregl-ctrl-attrib')).toBeAttached();
+  await expect(page.locator('[data-lfh="massstab"] .maplibregl-ctrl-scale')).toHaveText(/\d/);
+  await expect(page.getByRole('button', { name: 'Hineinzoomen' })).toBeVisible();
 
   // Und jetzt das, was das DOM NICHT verrät: arbeitet die Karte überhaupt?
   // Alles oben — Canvas, `toHaveCount(1)`, Controls, weiter unten der Cursor — ist auch dann
@@ -217,10 +223,11 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
 
   // Schmale Fläche (LFH-355, AK3). 1024 × 768 ist der Führungs-Tablet-Kontext der
-  // Bedien-Leitlinie und die schmalste Breite, auf der diese Seite überhaupt eine
-  // Zeichenfläche trägt: die Lagekarten-Sidebar ist fest 300 px breit und die
-  // ZeichnenSteuerung fordert `minWidth: 320` — bei 390 px bliebe für die Karte nichts
-  // übrig. Das ist eine eigene Frage (Sidebar-Responsivität), keine dieses Tickets.
+  // Bedien-Leitlinie; dort steht die 300-px-Leiste noch RECHTS neben der Karte (ab `lg`).
+  // Darunter rutscht sie seit dem Neuentwurf (S5) unter die Karte, und die
+  // ZeichnenSteuerung ist auf `min(320px, 100%)` gedeckelt — die Karte trägt dann die volle
+  // Breite. Die Zeichenwerkzeuge liegen im Paneel „Zeichnen" der Leiste (für Schreibende
+  // vorgabemäßig offen).
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();

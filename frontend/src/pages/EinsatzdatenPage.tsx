@@ -5,17 +5,22 @@ import {
   Button,
   Collapse,
   DatePicker,
-  Descriptions,
   Form,
   Input,
   InputNumber,
   Space,
-  Typography,
-  theme,
 } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite from '../components/EinsatzSeite';
+import {
+  Augenbraue,
+  Paneel,
+  kennzahlenbandStil,
+  monoStil,
+  paneelZeileStil,
+  useRollen,
+} from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
@@ -115,15 +120,60 @@ const KOPF_MIN_BREITE = 220;
  * Nichts hier ist bedienbar, also gilt die Zwei-Angaben-Regel für handgebaute
  * Bedienziele (LFH-365) NICHT — es gibt kein Ziel.
  */
-function KopfAngabe({ etikett, wert }: { etikett: string; wert: ReactNode }) {
-  const { token } = theme.useToken();
+/**
+ * Eine Angabe der Kopfleiste als Zelle im Fugenraster (Neuentwurf: Augenbraue über dem
+ * Wert, Zelle auf `flaeche`). Kein `Kennzahl`-Baustein: die Werte sind Wörter, keine
+ * Zahlen — ein Stichwort in Datenwert-Mono 22 läse sich wie ein Messwert.
+ */
+function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode; mono?: boolean }) {
+  const { token, rollen } = useRollen();
   return (
-    <div>
-      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, display: 'block' }}>
-        {etikett}
-      </Typography.Text>
-      <div style={{ fontSize: token.fontSizeLG, fontWeight: token.fontWeightStrong }}>{wert}</div>
+    <div
+      style={{
+        background: rollen.flaeche,
+        paddingBlock: token.paddingSM,
+        paddingInline: token.padding,
+        minWidth: 0,
+      }}
+    >
+      <Augenbraue style={{ display: 'block', marginBottom: token.marginXXS }}>{etikett}</Augenbraue>
+      <div
+        style={{
+          ...(mono ? monoStil(15, 500) : { fontSize: 15, fontWeight: 500 }),
+          color: rollen.text,
+          overflowWrap: 'anywhere',
+        }}
+      >
+        {wert}
+      </div>
     </div>
+  );
+}
+
+/**
+ * Beschriftete Angaben als Zeilen (`dl`) — ersetzt die umrandete `Descriptions`-Tabelle:
+ * Augenbraue links, Wert rechts, Trenner `flaeche3` wie jede Paneelzeile.
+ */
+function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] }) {
+  const { token, rollen } = useRollen();
+  return (
+    <dl style={{ margin: 0 }}>
+      {zeilen.map(({ etikett, wert }) => (
+        <div
+          key={etikett}
+          style={{
+            ...paneelZeileStil(rollen, token),
+            display: 'grid',
+            gridTemplateColumns: 'minmax(140px, 1fr) minmax(0, 2fr)',
+            gap: token.margin,
+            alignItems: 'baseline',
+          }}
+        >
+          <Augenbraue als="dt">{etikett}</Augenbraue>
+          <dd style={{ margin: 0, color: rollen.text2, overflowWrap: 'anywhere' }}>{wert}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -133,7 +183,7 @@ export default function EinsatzdatenPage() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<FormWerte>();
 
@@ -249,6 +299,7 @@ export default function EinsatzdatenPage() {
           items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
         />
       }
+      dataUpdatedAt={einsatzQuery.dataUpdatedAt}
       aktionen={
         !bearbeiten && darfBearbeiten ? (
           <Button type="primary" onClick={bearbeitenStarten}>
@@ -258,64 +309,69 @@ export default function EinsatzdatenPage() {
       }
     >
       {bearbeiten ? (
-        <Form<FormWerte> form={form} layout="vertical" onFinish={speichern}>
-          <Form.Item
-            label="Bezeichnung"
-            name="bezeichnung"
-            rules={[
-              { required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' },
-            ]}
-          >
-            {/* Der Knopf, der hierher geführt hat, verschwindet im selben Rendern — ohne
+        <Paneel titel="Einsatzdaten bearbeiten" koerperPolster>
+          <Form<FormWerte> form={form} layout="vertical" onFinish={speichern}>
+            <Form.Item
+              label="Bezeichnung"
+              name="bezeichnung"
+              rules={[
+                { required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' },
+              ]}
+            >
+              {/* Der Knopf, der hierher geführt hat, verschwindet im selben Rendern — ohne
                 `autoFocus` fiele der Fokus auf `<body>` und die Tastaturbedienung finge
                 wieder ganz oben an. Das Formular wird beim Wechsel frisch eingehängt,
                 also genügt Reacts Mount-Fokus; das `requestAnimationFrame` aus dem
                 Erfassungs-Primitiv braucht es nur, wo ein Dialog stehen BLEIBT. */}
-            <Input autoFocus />
-          </Form.Item>
-          <Form.Item label="Einsatzstichwort" name="stichwort">
-            <AutoComplete options={stichwortOptionen} allowClear placeholder="z. B. H1, MANV …" />
-          </Form.Item>
-          <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
-            <Select options={EINSATZART_OPTIONEN} />
-          </Form.Item>
-          <Form.Item label="Einsatznummer (intern)" name="einsatznummer_intern">
-            <Input />
-          </Form.Item>
-          <Form.Item label="Leitstellen-Nr." name="leitstellen_nr">
-            <Input />
-          </Form.Item>
-          <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
-            <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="Einsatzort (Adresse)" name="einsatzort">
-            <Input />
-          </Form.Item>
-          <Form.Item label="Nächste Lagebesprechung (optional)" name="naechste_lagebesprechung_at">
-            <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="Koordinate" name="einsatzort_koord">
-            <KoordinatenEingabe einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
-          </Form.Item>
-          <Form.Item label="Meldende/anfordernde Stelle" name="meldende_stelle">
-            <Input />
-          </Form.Item>
-          <Form.Item label="Sachverhalt / Meldebild" name="sachverhalt">
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Form.Item label="Anzahl Betroffene (initial)" name="anzahl_betroffene_initial">
-            <InputNumber min={0} style={{ width: 180 }} />
-          </Form.Item>
-          {/* Der Fehler steht ÜBER dem Knopf, an dem er entsteht — dort ist der Blick nach
+              <Input autoFocus />
+            </Form.Item>
+            <Form.Item label="Einsatzstichwort" name="stichwort">
+              <AutoComplete options={stichwortOptionen} allowClear placeholder="z. B. H1, MANV …" />
+            </Form.Item>
+            <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
+              <Select options={EINSATZART_OPTIONEN} />
+            </Form.Item>
+            <Form.Item label="Einsatznummer (intern)" name="einsatznummer_intern">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Leitstellen-Nr." name="leitstellen_nr">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
+              <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item label="Einsatzort (Adresse)" name="einsatzort">
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label="Nächste Lagebesprechung (optional)"
+              name="naechste_lagebesprechung_at"
+            >
+              <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item label="Koordinate" name="einsatzort_koord">
+              <KoordinatenEingabe einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
+            </Form.Item>
+            <Form.Item label="Meldende/anfordernde Stelle" name="meldende_stelle">
+              <Input />
+            </Form.Item>
+            <Form.Item label="Sachverhalt / Meldebild" name="sachverhalt">
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Form.Item label="Anzahl Betroffene (initial)" name="anzahl_betroffene_initial">
+              <InputNumber min={0} style={{ width: 180 }} />
+            </Form.Item>
+            {/* Der Fehler steht ÜBER dem Knopf, an dem er entsteht — dort ist der Blick nach
               dem Klick, und dort bleibt er stehen, bis das nächste Absenden ihn räumt. */}
-          <SpeicherFehler fehler={speichernMutation.error} />
-          <Space style={{ marginTop: token.margin }}>
-            <Button type="primary" htmlType="submit" loading={speichernMutation.isPending}>
-              Speichern
-            </Button>
-            <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
-          </Space>
-        </Form>
+            <SpeicherFehler fehler={speichernMutation.error} />
+            <Space style={{ marginTop: token.margin }}>
+              <Button type="primary" htmlType="submit" loading={speichernMutation.isPending}>
+                Speichern
+              </Button>
+              <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
+            </Space>
+          </Form>
+        </Paneel>
       ) : (
         <>
           {/* KOPFLEISTE — die vier Angaben, die im Fükw zuerst gebraucht werden.
@@ -324,54 +380,60 @@ export default function EinsatzdatenPage() {
               zwei Treffer statt einem. */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(auto-fit, minmax(${KOPF_MIN_BREITE}px, 1fr))`,
-              gap: token.margin,
-              marginBottom: token.marginLG,
+              ...kennzahlenbandStil(rollen),
+              gridTemplateColumns: `repeat(auto-fit, minmax(min(${KOPF_MIN_BREITE}px, 100%), 1fr))`,
+              marginBottom: token.margin,
             }}
           >
             <KopfAngabe etikett="Einsatzstichwort" wert={einsatz.stichwort ?? '—'} />
             <KopfAngabe
               etikett="Alarmzeit"
+              mono
               wert={<ZeitAnzeige wert={einsatz.begonnen_at} format="dtgVoll" />}
             />
             <KopfAngabe etikett="Einsatzort" wert={einsatz.einsatzort ?? '—'} />
             <KopfAngabe etikett="Einsatzleitung" wert={leitung || '—'} />
           </div>
 
-          <Descriptions bordered column={1} size="middle">
-            <Descriptions.Item label="Einsatzart">
-              {EINSATZART_LABELS[einsatz.einsatzart]}
-            </Descriptions.Item>
-            <Descriptions.Item label="Nächste Lagebesprechung">
-              {einsatz.naechste_lagebesprechung_at ? (
-                <ZeitAnzeige wert={einsatz.naechste_lagebesprechung_at} format="dtgVoll" />
-              ) : (
-                '—'
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Koordinate">
-              {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null ? (
-                <KoordinatenAnzeige
-                  lat={einsatz.einsatzort_lat}
-                  lon={einsatz.einsatzort_lon}
-                  einsatzId={einsatzId}
-                  exclude={`einsatzort:${einsatzId}`}
-                />
-              ) : (
-                '—'
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Meldende Stelle">
-              {einsatz.meldende_stelle ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Sachverhalt / Meldebild">
-              {einsatz.sachverhalt ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Anzahl Betroffene (initial)">
-              {einsatz.anzahl_betroffene_initial ?? '—'}
-            </Descriptions.Item>
-          </Descriptions>
+          <Paneel titel="Lagedaten">
+            <Angaben
+              zeilen={[
+                { etikett: 'Einsatzart', wert: EINSATZART_LABELS[einsatz.einsatzart] },
+                {
+                  etikett: 'Nächste Lagebesprechung',
+                  wert: einsatz.naechste_lagebesprechung_at ? (
+                    <span style={monoStil(13)}>
+                      <ZeitAnzeige wert={einsatz.naechste_lagebesprechung_at} format="dtgVoll" />
+                    </span>
+                  ) : (
+                    '—'
+                  ),
+                },
+                {
+                  etikett: 'Koordinate',
+                  wert:
+                    einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null ? (
+                      <KoordinatenAnzeige
+                        lat={einsatz.einsatzort_lat}
+                        lon={einsatz.einsatzort_lon}
+                        einsatzId={einsatzId}
+                        exclude={`einsatzort:${einsatzId}`}
+                      />
+                    ) : (
+                      '—'
+                    ),
+                },
+                { etikett: 'Meldende Stelle', wert: einsatz.meldende_stelle ?? '—' },
+                { etikett: 'Sachverhalt / Meldebild', wert: einsatz.sachverhalt ?? '—' },
+                {
+                  etikett: 'Anzahl Betroffene (initial)',
+                  wert: (
+                    <span style={monoStil(13)}>{einsatz.anzahl_betroffene_initial ?? '—'}</span>
+                  ),
+                },
+              ]}
+            />
+          </Paneel>
 
           {/* TECHNISCHE ANGABEN — Aktenzeichen und der Anlege-Zeitstempel. Sie werden
               gebraucht, wenn jemand nachweist oder rückfragt, nicht wenn jemand führt;
@@ -387,17 +449,28 @@ export default function EinsatzdatenPage() {
                 key: 'technik',
                 label: 'Technische Angaben',
                 children: (
-                  <Descriptions bordered column={1} size="middle">
-                    <Descriptions.Item label="Einsatznummer (intern)">
-                      {einsatz.einsatznummer_intern ?? '—'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Leitstellen-Nr.">
-                      {einsatz.leitstellen_nr ?? '—'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Angelegt am (techn.)">
-                      <ZeitAnzeige wert={einsatz.angelegt_at} format="dtgVoll" />
-                    </Descriptions.Item>
-                  </Descriptions>
+                  <Angaben
+                    zeilen={[
+                      {
+                        etikett: 'Einsatznummer (intern)',
+                        wert: (
+                          <span style={monoStil(13)}>{einsatz.einsatznummer_intern ?? '—'}</span>
+                        ),
+                      },
+                      {
+                        etikett: 'Leitstellen-Nr.',
+                        wert: <span style={monoStil(13)}>{einsatz.leitstellen_nr ?? '—'}</span>,
+                      },
+                      {
+                        etikett: 'Angelegt am (techn.)',
+                        wert: (
+                          <span style={monoStil(13)}>
+                            <ZeitAnzeige wert={einsatz.angelegt_at} format="dtgVoll" />
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
                 ),
               },
             ]}

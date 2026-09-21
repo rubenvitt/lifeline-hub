@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Card, Flex, Segmented, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -27,7 +27,9 @@ import {
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
-import Datenstand from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { flaeche } from '../theme/tokens';
 
 /** Schluessel-Zeitstempel der Abgeschlossen-Ansicht: erledigt ODER quittiert ODER Anlage. */
 function abschlussZeit(e: Erinnerung): string {
@@ -40,6 +42,7 @@ export default function ErinnerungenPage() {
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const { token } = useRollen();
 
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
@@ -63,7 +66,7 @@ export default function ErinnerungenPage() {
     mutationFn: (daten: NeueErinnerung) => legeErinnerungAn(einsatzId, daten),
     // LFH-343/C8: kein `setFormOffen(false)` mehr — das Inline-Formular bleibt
     // offen, damit die nächste Erinnerung ohne Aufklappen weitergeht. Der
-    // conditional Render der Card würde es sonst unmounten, samt Serienzähler
+    // conditional Render des Paneels würde es sonst unmounten, samt Serienzähler
     // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
     onSuccess: () => {
       invalidiere();
@@ -143,45 +146,38 @@ export default function ErinnerungenPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Erinnerungen' },
-        ]}
-      />
-      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Erinnerungen
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {offene.length} offen · {abgeschlossene.length} abgeschlossen
-          </Typography.Text>
-          <div>
-            <Datenstand dataUpdatedAt={erinnerungenQuery.dataUpdatedAt} />
-          </div>
-        </div>
-        {darfSchreiben && (
+    <EinsatzSeite
+      titel="Erinnerungen"
+      breite={flaeche.seiteBreit}
+      meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
+      dataUpdatedAt={erinnerungenQuery.dataUpdatedAt}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Erinnerungen' },
+          ]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           <Button
             type="primary"
-            size="large"
             icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
             onClick={() => setFormOffen((o) => !o)}
           >
             {formOffen ? 'Formular schließen' : 'Erinnerung anlegen'}
           </Button>
-        )}
-      </Flex>
-
+        )
+      }
+    >
       {darfSchreiben && formOffen && (
-        <Card
-          size="small"
-          title="Neue Erinnerung"
-          style={{ marginBottom: 16 }}
-          extra={
+        <Paneel
+          titel="Neue Erinnerung"
+          koerperPolster
+          style={{ marginBottom: token.margin }}
+          aktion={
             <Button
               type="text"
               icon={<CloseOutlined />}
@@ -197,14 +193,14 @@ export default function ErinnerungenPage() {
             senden={anlegenMutation.isPending}
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
-        </Card>
+        </Paneel>
       )}
 
       {erinnerungenQuery.isError && (
         <Alert
           type="error"
           showIcon
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: token.marginSM }}
           title="Erinnerungen konnten nicht geladen werden"
         />
       )}
@@ -212,17 +208,18 @@ export default function ErinnerungenPage() {
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 16,
+          gap: token.marginSM,
+          marginBottom: token.margin,
           alignItems: 'center',
         }}
       >
-        <Segmented
-          value={ansicht}
-          onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
-          options={[
-            { value: 'offen', label: `Offen (${offene.length})` },
-            { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+        <Segmentleiste
+          beschriftung="Ansicht"
+          wert={ansicht}
+          onWechsel={setAnsicht}
+          optionen={[
+            { wert: 'offen', label: `Offen (${offene.length})` },
+            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
           ]}
         />
       </div>
@@ -231,10 +228,10 @@ export default function ErinnerungenPage() {
           <ErinnerungListe erinnerungen={[]} ansicht="offen" {...listenProps} />
         ) : (
           offeneGruppen.map(({ gruppe, erinnerungen }) => (
-            <div key={gruppe} style={{ marginBottom: 16 }}>
-              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+            <div key={gruppe} style={{ marginBottom: token.margin }}>
+              <Augenbraue als="h2" style={{ display: 'block', marginBottom: token.marginXS }}>
                 {GRUPPE_LABEL[gruppe]} ({erinnerungen.length})
-              </Typography.Text>
+              </Augenbraue>
               <ErinnerungListe erinnerungen={erinnerungen} ansicht="offen" {...listenProps} />
             </div>
           ))
@@ -246,6 +243,6 @@ export default function ErinnerungenPage() {
           {...listenProps}
         />
       )}
-    </div>
+    </EinsatzSeite>
   );
 }

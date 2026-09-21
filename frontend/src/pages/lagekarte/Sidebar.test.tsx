@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import Sidebar, { bedienzielStil, loeschDialogBild } from './Sidebar';
+import Sidebar, { bedienzielStil, ebenenZeileStil, loeschDialogBild } from './Sidebar';
 import type { SidebarProps } from './Sidebar';
 import { dichten } from '../../theme/tokens';
 
@@ -42,14 +42,11 @@ const basisProps: SidebarProps = {
     freies_zeichen: true,
   },
   onLayerToggle: vi.fn(),
+  zonenAnzahl: 0,
   basemap: 'blind',
-  onBasemapWechsel: vi.fn(),
   onMarkerWaehlen: vi.fn(),
   onlineVerfuegbar: false,
   offlineVerfuegbar: false,
-  onlineStyles: [],
-  onlineStilName: null,
-  onOnlineStilWechsel: vi.fn(),
   kartenTheme: 'auto',
   onKartenThemeWechsel: vi.fn(),
   ansichtDirty: false,
@@ -95,6 +92,18 @@ const basisProps: SidebarProps = {
   ansichtBusy: false,
 };
 
+/**
+ * Die Leiste klappt Bild-Hintergründe, Fachebenen und Kartengrundlage zu Beginn ZU
+ * (`PANEEL_VORGABE`, Neuentwurf S5). Die Blöcke hier prüfen deren INHALT; dass die Paneele
+ * zu sind und sich öffnen lassen, belegt der eigene Block „Sidebar: Paneele" weiter unten.
+ */
+function paneeleOffen() {
+  localStorage.setItem(
+    'lfh:lagekarte:paneele',
+    JSON.stringify({ bilder: true, fachebenen: true, grundlage: true }),
+  );
+}
+
 const bildLageplan = {
   id: 1,
   name: 'Lageplan',
@@ -111,6 +120,7 @@ const bildLageplan = {
 };
 
 describe('Sidebar Bild-Hintergründe', () => {
+  beforeEach(paneeleOffen);
   it('listet Bilder und schaltet Sichtbarkeit', () => {
     const onBildToggle = vi.fn();
     renderMitProviders(
@@ -375,12 +385,10 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('schaltet den „Taktische Zeichen"-Ebenen-Toggle (LFH-170)', () => {
     const onLayerToggle = vi.fn();
     renderMitProviders(<Sidebar {...basisProps} onLayerToggle={onLayerToggle} />);
-    const toggle = screen
-      .getByText('Taktische Zeichen')
-      .closest('.ant-space')
-      ?.querySelector('button[role="switch"]');
-    expect(toggle).toBeTruthy();
-    fireEvent.click(toggle as Element);
+    // Die Ebenen-Zeile ist selbst der Schalter (Neuentwurf S5): Farbfeld · Name · Anzahl.
+    const toggle = screen.getByRole('switch', { name: 'Taktische Zeichen' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
     expect(onLayerToggle).toHaveBeenCalledWith('freies_zeichen', false);
   });
 
@@ -578,6 +586,7 @@ describe('Sidebar Fehler-Slots', () => {
   });
 
   it('„Bild-Hintergründe": ohne Fehler kein Slot', () => {
+    paneeleOffen();
     renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[]} />);
     expect(
       screen.queryByText('Bild-Hintergründe konnten nicht geladen werden'),
@@ -787,5 +796,154 @@ describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
 
   it('liefert null, wenn gar keine Rückfrage offensteht', () => {
     expect(loeschDialogBild(bilder, null)).toBeNull();
+  });
+});
+
+/**
+ * Neuentwurf S5 — die rechte Leiste: Ebenen (Farbfeld · Name · Anzahl, Klick schaltet),
+ * Ausgewählt, und die einklappbaren Paneele für alles, was die alte Leiste trug.
+ */
+describe('Sidebar: Paneel „Ebenen"', () => {
+  const uhs = (id: number) => ({
+    schluessel: `uhs-${id}`,
+    typ: 'uhs' as const,
+    id,
+    lat: 50,
+    lon: 8,
+    label: `UHS ${id}`,
+    farbe: '#1677ff',
+  });
+
+  it('zeigt je Ebene Name und Anzahl der verorteten Objekte', () => {
+    renderMitProviders(<Sidebar {...basisProps} verortet={[uhs(1), uhs(2)]} zonenAnzahl={4} />);
+    expect(screen.getByRole('switch', { name: 'UHS' })).toHaveTextContent('UHS2');
+    expect(screen.getByRole('switch', { name: 'Zonen' })).toHaveTextContent('Zonen4');
+    expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden0');
+  });
+
+  it('zeigt im Fehlerfall „—" statt einer Null — an jeder Zeile', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        verortet={[uhs(1)]}
+        sektionFehler={{ nichtVerortet: { text: 'Objektlisten konnten nicht geladen werden' } }}
+      />,
+    );
+    const zeilen = within(
+      screen.getByRole('group', { name: 'Ebenen ein- und ausblenden' }),
+    ).getAllByRole('switch');
+    expect(zeilen).toHaveLength(10);
+    for (const z of zeilen) expect(z).toHaveTextContent('—');
+    expect(screen.getByRole('switch', { name: 'UHS' })).not.toHaveTextContent('1');
+  });
+
+  it('trägt den Zustand als Wort (aria-checked), nicht nur am Farbfeld', () => {
+    const onLayerToggle = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        layer={{ ...basisProps.layer, schaden: false }}
+        onLayerToggle={onLayerToggle}
+      />,
+    );
+    const schaden = screen.getByRole('switch', { name: 'Schäden' });
+    expect(schaden).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(schaden);
+    expect(onLayerToggle).toHaveBeenCalledWith('schaden', true);
+    // Aus: Farbfeld leer. An: gefüllt. Der Zweitkanal ist sichtbar, nicht nur vorgelesen.
+    const feldAus = schaden.querySelector('[data-lfh="ebenen-farbfeld"]') as HTMLElement;
+    const feldAn = screen
+      .getByRole('switch', { name: 'UHS' })
+      .querySelector('[data-lfh="ebenen-farbfeld"]') as HTMLElement;
+    expect(feldAus.style.background).toBe('transparent');
+    // Die Füllung „an" ist ein `color-mix(…)`, den jsdom nicht kennt und still verwirft —
+    // eine Aussage darauf wäre trivial grün. Der Rahmen dagegen trägt in jsdom: an in der
+    // Ebenenfarbe, aus in der Steuerrahmen-Rolle.
+    expect(feldAn.style.borderColor).not.toBe('');
+    expect(feldAn.style.borderColor).not.toBe(feldAus.style.borderColor);
+  });
+});
+
+describe('Sidebar: Ebenen-Zeile als Bedienziel', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    paddingSM: dichten[stufe].abstand.sm,
+    padding: dichten[stufe].abstand.md,
+    marginSM: dichten[stufe].abstand.md,
+  });
+
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px — plus Polsterung', () => {
+    expect(ebenenZeileStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(ebenenZeileStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(ebenenZeileStil(tokenFuer('handschuh')).minHeight).toBe(72);
+    expect(ebenenZeileStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
+    expect(ebenenZeileStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+  });
+});
+
+describe('Sidebar: Paneel „Ausgewählt"', () => {
+  it('sagt ohne Auswahl, wie man etwas wählt', () => {
+    renderMitProviders(<Sidebar {...basisProps} />);
+    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    expect(paneel).toHaveTextContent(/Nichts gewählt/);
+  });
+
+  it('zeigt den übergebenen Inspector-Inhalt statt des Hinweises', () => {
+    renderMitProviders(<Sidebar {...basisProps} auswahl={<div>Inspector-Inhalt</div>} />);
+    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    expect(within(paneel).getByText('Inspector-Inhalt')).toBeInTheDocument();
+    expect(paneel).not.toHaveTextContent(/Nichts gewählt/);
+  });
+});
+
+describe('Sidebar: einklappbare Paneele', () => {
+  it('klappt Einmal-Einstellungen zu Beginn zu und öffnet sie auf Klick', () => {
+    renderMitProviders(<Sidebar {...basisProps} bilder={[bildLageplan]} />);
+    const kopf = screen.getByRole('button', { name: /^Bild-Hintergründe/ });
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Lageplan')).not.toBeInTheDocument();
+    fireEvent.click(kopf);
+    expect(kopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Lageplan')).toBeInTheDocument();
+  });
+
+  it('merkt sich die Wahl über ein Neuladen hinweg', () => {
+    const { unmount } = renderMitProviders(<Sidebar {...basisProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Fachebenen/ }));
+    unmount();
+    renderMitProviders(<Sidebar {...basisProps} />);
+    expect(screen.getByRole('button', { name: /^Fachebenen/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('hält ein Paneel mit Fehler offen — ein zugeklappter Fehler sähe aus wie „nichts da"', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        sektionFehler={{ bilder: { text: 'Bild-Hintergründe konnten nicht geladen werden' } }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /^Bild-Hintergründe/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
+  });
+
+  it('öffnet „Zeichnen" auf Anfrage des Zeichnen-Knopfs über der Karte', () => {
+    localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ zeichnen: false }));
+    const { rerender } = renderMitProviders(<Sidebar {...basisProps} zeichnenAnfrage={0} />);
+    expect(
+      screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).not.toBeInTheDocument();
+    rerender(<Sidebar {...basisProps} zeichnenAnfrage={1} />);
+    expect(screen.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht gibt es kein Paneel „Zeichnen"', () => {
+    renderMitProviders(<Sidebar {...basisProps} darfSchreiben={false} />);
+    expect(screen.queryByRole('button', { name: 'Zeichnen' })).not.toBeInTheDocument();
   });
 });

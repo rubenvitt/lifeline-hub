@@ -166,3 +166,24 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
     expect(bestand.some((r) => r.selektor.includes('.lagebericht-druck .markdown'))).toBe(true);
   });
 });
+
+describe('lageberichtPrint.css — Papier ist hell (Neuentwurf)', () => {
+  it('setzt Schrift und Grund im Druckbereich unbedingt auf Papierfarben', () => {
+    // Nachtbetrieb ist Vorgabe: ohne diese Regel druckte fast weißer Text auf weißes
+    // Papier. `!important` ist tragend, weil die Bausteine Farben INLINE setzen.
+    const regel = regeln().find(
+      (r) => einzeln(r).includes('.lagebericht-print-root *') && /color:/.test(r.koerper),
+    );
+    expect(regel, 'keine Farbregel für den Druckbereich').toBeDefined();
+    expect(regel!.koerper).toMatch(/color:\s*black\s*!important/);
+    expect(regel!.koerper).toMatch(/background:\s*transparent\s*!important/);
+  });
+
+  it('blendet den Seitenkopf im Druck aus', () => {
+    const regel = regeln().find((r) =>
+      einzeln(r).includes(".lagebericht-print-root [data-lfh='seitenkopf']"),
+    );
+    expect(regel, 'Seitenkopf wird mitgedruckt').toBeDefined();
+    expect(versteckt(regel!)).toBe(true);
+  });
+});

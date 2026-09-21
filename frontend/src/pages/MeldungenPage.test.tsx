@@ -152,8 +152,10 @@ describe('MeldungenPage', () => {
     renderPage();
     expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
     expect(screen.getByText('Deich instabil')).toBeInTheDocument();
-    // Status-Tag „Neu" der Meldung (eindeutig über die Tag-Klasse; „Neu" steht auch im Segment-Filter).
-    expect(screen.getByText('Neu', { selector: '.ant-tag' })).toBeInTheDocument();
+    // Status-Chip „Neu" der Meldung (eindeutig über den Chip; „Neu" steht auch im Gruppenkopf).
+    expect(
+      screen.getByText('Neu', { selector: '[data-lfh="status-chip"] span' }),
+    ).toBeInTheDocument();
   });
 
   it('erfasst eine Meldung mit Mindestfeldern (Absender, Inhalt, Meldeweg)', async () => {
@@ -715,5 +717,30 @@ describe('MeldungenPage', () => {
     renderPage();
     expect(await screen.findByText('In Arbeit (1)')).toBeInTheDocument();
     expect(screen.queryByText(/^Neu \(/)).not.toBeInTheDocument();
+  });
+
+  it('verdichtet die Mengen im Kennzahlenband — aus derselben Liste wie die Gruppen', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ id: 1, lfd_nr: 1, status: 'neu' }),
+      meldung({
+        id: 2,
+        lfd_nr: 2,
+        status: 'gesichtet',
+        bestaetigung_pflicht: true,
+        ist_ueberfaellig: true,
+      }),
+      meldung({ id: 3, lfd_nr: 3, status: 'erledigt' }),
+    ]);
+    renderPage();
+    const band = await screen.findByRole('group', { name: 'Meldungen in Zahlen' });
+    const wert = (titel: string) =>
+      within(band)
+        .getByText(titel)
+        .closest('[data-lfh="kennzahl"]')!
+        .querySelector('[data-lfh="kennzahl-wert"]')!.textContent;
+    await waitFor(() => expect(wert('Unbearbeitet')).toBe('1'));
+    expect(wert('In Arbeit')).toBe('1');
+    expect(wert('Alarmiert')).toBe('1');
+    expect(wert('Erledigt')).toBe('1');
   });
 });

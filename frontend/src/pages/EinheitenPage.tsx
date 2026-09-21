@@ -3,16 +3,15 @@ import {
   App,
   Breadcrumb,
   Button,
-  Card,
   Form,
   Input,
   Space,
   Tag,
-  theme,
   Tree,
-  Typography,
   type TreeDataNode,
 } from 'antd';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { UserOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import {
@@ -34,12 +33,12 @@ import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import Datenstand from '../components/Datenstand';
 import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ErfassungsModal } from '../components/Erfassung';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
+import { flaeche } from '../theme/tokens';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LFH-339 · C4).
@@ -83,7 +82,9 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
         <Space size={4}>
           <Link to={einheitDetailPfad(einsatzId, e.id)}>{e.name}</Link>
           {e.typ_label && <Tag>{e.typ_label}</Tag>}
-          <Tag color="blue">
+          {/* Stärke als Mono-Zahl, nicht als blaues Etikett: Blau ist `bedien` und
+              kennzeichnet Bedienbares, eine Stärke ist eine Angabe (Neuentwurf S6). */}
+          <span style={{ ...monoStil(12), color: sekundaerFarbe }}>
             <StaerkeAnzeige wert={e.ist} />
             {e.soll ? (
               <>
@@ -91,7 +92,7 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
                 / Soll <StaerkeAnzeige wert={e.soll} />
               </>
             ) : null}
-          </Tag>
+          </span>
           {e.fuehrer_name && (
             <span style={{ color: sekundaerFarbe }}>
               <span aria-hidden="true">
@@ -122,7 +123,7 @@ export default function EinheitenPage() {
   const { message } = App.useApp();
   const [bildenOffen, setBildenOffen] = useState(false);
   const [bildenForm] = Form.useForm<BildenWerte>();
-  const { token } = theme.useToken();
+  const { rollen } = useRollen();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -190,8 +191,8 @@ export default function EinheitenPage() {
   });
 
   const baumDaten = useMemo(
-    () => baueBaum(einheiten, einsatzId, token.colorTextSecondary),
-    [einheiten, einsatzId, token.colorTextSecondary],
+    () => baueBaum(einheiten, einsatzId, rollen.gedaempft),
+    [einheiten, einsatzId, rollen.gedaempft],
   );
 
   // Seitenzustand: NUR `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
@@ -230,40 +231,39 @@ export default function EinheitenPage() {
   const standVeraltet = einheitenQuery.isError && einheiten.length > 0;
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Einheiten' },
-        ]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space orientation="vertical" size={0}>
-          <Space>
-            <Typography.Title level={3} style={{ margin: 0 }}>
-              Einheiten
-            </Typography.Title>
-            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-          </Space>
-          <Datenstand dataUpdatedAt={einheitenQuery.dataUpdatedAt} />
+    <EinsatzSeite
+      breite={flaeche.seiteBreit}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Einheiten' },
+          ]}
+        />
+      }
+      titel={
+        <Space>
+          Einheiten
+          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
-        {darfSchreiben && (
+      }
+      meta={einheitenQuery.isSuccess ? `${einheiten.length} Einheiten` : undefined}
+      dataUpdatedAt={einheitenQuery.dataUpdatedAt}
+      aktionen={
+        darfSchreiben && (
           <Button type="primary" onClick={() => setBildenOffen(true)}>
             Einheit bilden
           </Button>
-        )}
-      </Space>
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert
-          style={{ marginBottom: 12 }}
-          type="info"
-          showIcon
-          title="Einsatz ist abgeschlossen — nur Ansicht."
-        />
-      )}
-
+        )
+      }
+      hinweis={
+        !darfSchreiben &&
+        einsatz.status !== 'aktiv' && (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        )
+      }
+    >
       <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
 
       {/**
@@ -274,7 +274,12 @@ export default function EinheitenPage() {
        * Schirm, wo ein Baum nicht über die ganze Fläche laufen soll.
        */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Card style={{ flex: '1 1 clamp(260px, 30%, 360px)' }} size="small" title="Gliederung">
+        <Paneel
+          titel="Gliederung"
+          meta={einheitenQuery.isSuccess ? einheiten.length : undefined}
+          koerperPolster
+          style={{ flex: '1 1 clamp(260px, 30%, 360px)' }}
+        >
           {/* DREI Zustände, nicht zwei (LFH-331 · B3). Die frühere Weiche hing an
               `einheiten.length === 0` — und das ist während des Ladens und im Fehlerfall
               genauso wahr wie bei einer tatsächlich leeren Gliederung. Gefragt wird
@@ -315,7 +320,7 @@ export default function EinheitenPage() {
               <Tree treeData={baumDaten} defaultExpandAll selectable={false} />
             </>
           )}
-        </Card>
+        </Paneel>
       </div>
 
       {/* Zwei Felder statt neun: der Rest der Kopfdaten lebt auf der Detailansicht. Der
@@ -347,6 +352,6 @@ export default function EinheitenPage() {
           />
         </Form.Item>
       </ErfassungsModal>
-    </div>
+    </EinsatzSeite>
   );
 }

@@ -2,16 +2,16 @@ import {
   App,
   Breadcrumb,
   Button,
-  Card,
   Form,
   Input,
   Popconfirm,
   Space,
   Tag,
   TreeSelect,
-  Typography,
   theme,
 } from 'antd';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useEffect, useMemo } from 'react';
@@ -44,7 +44,7 @@ import FunkErreichbarkeit, {
   KOMMUNIKATIONSMITTEL_OPTIONEN,
 } from '../components/FunkErreichbarkeit';
 import SektionHeader from '../components/SektionHeader';
-import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { leerZuNull } from '../api/patchTriState';
 import { einheitenPfad, parseRouteId } from '../routing/deeplinks';
 import {
@@ -93,7 +93,7 @@ function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) 
  * einem Speichern-Knopf, der sie nicht betrifft. Das ist zweierlei Bedienlogik unter einer
  * Überschrift, und von aussen ist nicht zu sehen, welche Handlung wann wirkt.
  *
- * Sie liegen deshalb jetzt ausserhalb des Formulars, je unter einem `SektionHeader` mit
+ * Sie liegen deshalb jetzt ausserhalb des Formulars, je in einem eigenen Paneel mit
  * ausdrücklichem Hinweis „wirkt sofort". Das Formular endet vorher mit einer STICKY
  * Aktionsleiste — bei neun Feldern ist der Knopf sonst aus dem Bild gescrollt, während man
  * das letzte Feld ausfüllt.
@@ -145,6 +145,7 @@ export default function EinheitDetailPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const [form] = Form.useForm<KopfWerte>();
 
   const einsatzQuery = useQuery({
@@ -391,286 +392,281 @@ export default function EinheitDetailPage() {
   );
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: token.marginSM }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: <Link to={einheitenPfad(einsatzId)}>Einheiten</Link> },
-          { title: aktuell.name },
-        ]}
-      />
-
-      <Space orientation="vertical" size={0} style={{ marginBottom: token.margin }}>
-        <Space align="center" wrap>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {aktuell.name}
-          </Typography.Title>
-          {aktuell.typ_label && <Tag>{aktuell.typ_label}</Tag>}
-          <Tag color="blue">
-            <StaerkeAnzeige wert={aktuell.ist} />
-            {aktuell.soll ? (
-              <>
-                {' '}
-                / Soll <StaerkeAnzeige wert={aktuell.soll} />
-              </>
-            ) : null}
-          </Tag>
-        </Space>
-        {/* Der ÄLTESTE erfolgreiche Stand über alle hier dargestellten Bestände — nicht
-            der jüngste. Diese Seite zeigt Einheit, Abschnitte und die drei Zuordnungspools
-            nebeneinander; ein Datenstand, der nur die frischeste Quelle nennt, behauptete
-            Aktualität für Zahlen, die älter sind. Die Zusicherung ist mit der Ansicht von
-            der Listenseite hierher gezogen (LFH-339 · C4). */}
-        <Datenstand
-          dataUpdatedAt={gemeinsamerDatenstand(
-            einheitenQuery.dataUpdatedAt,
-            abschnitteQuery.dataUpdatedAt,
-            personalQuery.dataUpdatedAt,
-            fahrzeugeQuery.dataUpdatedAt,
-            materialQuery.dataUpdatedAt,
-          )}
+    <EinsatzSeite
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: <Link to={einheitenPfad(einsatzId)}>Einheiten</Link> },
+            { title: aktuell.name },
+          ]}
         />
-      </Space>
-
-      <Card size="small" style={{ marginBottom: token.margin }}>
-        <Form<KopfWerte>
-          className="lfh-einheit-kopfdaten"
-          form={form}
-          layout="vertical"
-          disabled={!darfSchreiben}
-          onFinish={(w) => speichern.mutate(w)}
-        >
-          <SektionHeader titel="Kopfdaten" />
-          <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="Typ" name="typ_id">
-            {/* Der Typkatalog ist die einzige Fremdquelle dieses Formulars. Fällt er aus,
+      }
+      titel={aktuell.name}
+      // Typ und Stärke im Mono-Meta des Seitenkopfs (Neuentwurf S6: „Stärke 24 / 47 / 186 /
+      // 257"). Soll nur, wenn gesetzt — eine erfundene Soll-Stärke wäre eine Behauptung.
+      meta={
+        <>
+          {aktuell.typ_label && <>{aktuell.typ_label} · </>}
+          Ist <StaerkeAnzeige wert={aktuell.ist} />
+          {aktuell.soll ? (
+            <>
+              {' '}
+              · Soll <StaerkeAnzeige wert={aktuell.soll} />
+            </>
+          ) : null}
+        </>
+      }
+      /* Der ÄLTESTE erfolgreiche Stand über alle hier dargestellten Bestände — nicht der
+         jüngste. Diese Seite zeigt Einheit, Abschnitte und die drei Zuordnungspools
+         nebeneinander; ein Datenstand, der nur die frischeste Quelle nennt, behauptete
+         Aktualität für Zahlen, die älter sind (LFH-339 · C4). */
+      dataUpdatedAt={gemeinsamerDatenstand(
+        einheitenQuery.dataUpdatedAt,
+        abschnitteQuery.dataUpdatedAt,
+        personalQuery.dataUpdatedAt,
+        fahrzeugeQuery.dataUpdatedAt,
+        materialQuery.dataUpdatedAt,
+      )}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+        <Paneel titel="Kopfdaten" koerperPolster>
+          <Form<KopfWerte>
+            className="lfh-einheit-kopfdaten"
+            form={form}
+            layout="vertical"
+            disabled={!darfSchreiben}
+            onFinish={(w) => speichern.mutate(w)}
+          >
+            <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item label="Typ" name="typ_id">
+              {/* Der Typkatalog ist die einzige Fremdquelle dieses Formulars. Fällt er aus,
                 stünde hier ein Auswahlfeld ohne Einträge — die Typzuordnung wäre unmöglich,
                 und zwar lautlos. Der Ausfall steht deshalb im Feld selbst. */}
-            <Select
-              allowClear
-              placeholder="Typ wählen"
-              notFoundContent={nichtGefundenInhalt(typenQuery, {
-                allgemein: 'Einheitentypen konnten nicht geladen werden',
-              })}
-              options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
-            />
-          </Form.Item>
-          <Form.Item label="Abschnitt" name="abschnitt_id">
-            <TreeSelect
-              allowClear
-              placeholder="Abschnitt zuordnen"
-              treeData={abschnittOptionen}
-              notFoundContent={nichtGefundenInhalt(abschnitteQuery, {
-                allgemein: 'Abschnitte konnten nicht geladen werden',
-              })}
-            />
-          </Form.Item>
-          <Form.Item label="Über-Einheit" name="ueber_einheit_id">
-            <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
-          </Form.Item>
+              <Select
+                allowClear
+                placeholder="Typ wählen"
+                notFoundContent={nichtGefundenInhalt(typenQuery, {
+                  allgemein: 'Einheitentypen konnten nicht geladen werden',
+                })}
+                options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
+              />
+            </Form.Item>
+            <Form.Item label="Abschnitt" name="abschnitt_id">
+              <TreeSelect
+                allowClear
+                placeholder="Abschnitt zuordnen"
+                treeData={abschnittOptionen}
+                notFoundContent={nichtGefundenInhalt(abschnitteQuery, {
+                  allgemein: 'Abschnitte konnten nicht geladen werden',
+                })}
+              />
+            </Form.Item>
+            <Form.Item label="Über-Einheit" name="ueber_einheit_id">
+              <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
+            </Form.Item>
 
-          {/* BOS-Fachsprache (Befund N6): die Größe heißt Soll-Stärke und wird als
+            {/* BOS-Fachsprache (Befund N6): die Größe heißt Soll-Stärke und wird als
               Führer / Unterführer / Mannschaft angegeben. Die Eingaberegel steht als
               gedämpfte Hilfszeile, nicht in Klammern im Etikett. */}
-          <Form.Item
-            label="Soll-Stärke (F/UF/M)"
-            extra="Entweder alle drei Werte angeben oder alle leer lassen — teilweise gefüllt wird nicht übernommen."
-          >
-            <Space align="end" wrap>
-              <Form.Item name="soll" noStyle>
-                <StaerkeEingabe />
-              </Form.Item>
-              <span style={{ color: token.colorTextSecondary }}>
-                Ist: <StaerkeAnzeige wert={aktuell.ist} /> · kumuliert:{' '}
-                <StaerkeAnzeige wert={aktuell.ist_kumuliert} />
-              </span>
-            </Space>
-          </Form.Item>
-
-          <SektionHeader titel="Funk / Kommunikation" />
-          <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
-            <SprechgruppenPicker einsatzId={einsatzId} />
-          </Form.Item>
-          <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
-            <Select
-              allowClear
-              placeholder="Digitalfunk / Mobil / Festnetz"
-              options={KOMMUNIKATIONSMITTEL_OPTIONEN}
-            />
-          </Form.Item>
-          <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
-            <Input placeholder="z. B. 0151 23456" allowClear />
-          </Form.Item>
-          <Form.Item label="Bemerkung" name="bemerkung">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-
-          <FunkErreichbarkeit
-            sprechgruppen={aktuell.sprechgruppen}
-            kommunikationsmittel={aktuell.kommunikationsmittel}
-            erreichbarkeit={aktuell.erreichbarkeit}
-          />
-
-          {darfSchreiben && (
-            /**
-             * STICKY am unteren Rand des Formularblocks (Befund M26): bei neun Feldern ist
-             * ein Knopf am Blockende aus dem Bild gescrollt, während man das letzte Feld
-             * ausfüllt — und dort stand er vorher auch noch MITTEN im Inhalt, mit drei
-             * Zuordnungslisten darunter.
-             *
-             * `size="middle"` an der Reihe, nicht der Vorgabewert: hier steht ein
-             * `danger`-Knopf neben einer neutralen Aktion, und antds Vorgabe-`small`
-             * bindet auf `abstand.xs` (3/5/7 px je Dichtestufe) — zu wenig Trennung
-             * zwischen „Speichern" und „Auflösen".
-             */
-            <div
-              ref={(el) => beobachteAktionsleiste(el, token.marginSM)}
-              style={{
-                position: 'sticky',
-                bottom: 0,
-                zIndex: 1,
-                background: token.colorBgContainer,
-                paddingBlock: token.paddingSM,
-                borderTop: `1px solid ${token.colorBorderSecondary}`,
-              }}
+            <Form.Item
+              label="Soll-Stärke (F/UF/M)"
+              extra="Entweder alle drei Werte angeben oder alle leer lassen — teilweise gefüllt wird nicht übernommen."
             >
-              <Space size="middle" wrap>
-                <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-                  Speichern
-                </Button>
-                <Popconfirm
-                  title="Einheit auflösen?"
-                  description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => aufloesen.mutate()}
-                >
-                  <Button danger loading={aufloesen.isPending}>
-                    Auflösen
-                  </Button>
-                </Popconfirm>
+              <Space align="end" wrap>
+                <Form.Item name="soll" noStyle>
+                  <StaerkeEingabe />
+                </Form.Item>
+                <span style={{ color: token.colorTextSecondary }}>
+                  Ist: <StaerkeAnzeige wert={aktuell.ist} /> · kumuliert:{' '}
+                  <StaerkeAnzeige wert={aktuell.ist_kumuliert} />
+                </span>
               </Space>
-            </div>
-          )}
-        </Form>
-      </Card>
+            </Form.Item>
 
-      {/**
-       * ── DIE DREI ZUORDNUNGEN LIEGEN AUSSERHALB DES FORMULARS ─────────────────────────
-       *
-       * Das ist der Kern von Befund M26. Jede Handlung hier wirkt SOFORT — es gibt nichts
-       * zu speichern. Innerhalb des `<Form>` standen sie unter einem Speichern-Knopf, der
-       * sie nicht betrifft: zweierlei Bedienlogik unter einer Überschrift, von aussen
-       * nicht unterscheidbar. Der Hinweis in jedem `SektionHeader` sagt es zusätzlich in
-       * Worten, weil die Trennung allein durch Position eine Vermutung bliebe.
-       */}
-      <Card size="small" style={{ marginBottom: token.margin }}>
-        <SektionHeader
-          titel="Personal"
-          beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern."
-        />
-        {aktuell.personal_mitglieder.map((m) =>
-          zuordnungsZeile(
-            m.ep_id,
-            <span>
-              {m.name}
-              {m.staerke_position ? ` (${m.staerke_position})` : ''}
-              {m.ist_fuehrer && (
-                <Tag color="gold" style={{ marginLeft: token.marginXXS }}>
-                  Einheitsführer
-                </Tag>
-              )}
-            </span>,
-            darfSchreiben && (
-              <Space size="middle" wrap>
-                {!m.ist_fuehrer && (
-                  <Button onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Einheitsführer</Button>
+            <SektionHeader titel="Funk / Kommunikation" />
+            <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
+              <SprechgruppenPicker einsatzId={einsatzId} />
+            </Form.Item>
+            <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
+              <Select
+                allowClear
+                placeholder="Digitalfunk / Mobil / Festnetz"
+                options={KOMMUNIKATIONSMITTEL_OPTIONEN}
+              />
+            </Form.Item>
+            <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
+              <Input placeholder="z. B. 0151 23456" allowClear />
+            </Form.Item>
+            <Form.Item label="Bemerkung" name="bemerkung">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+
+            <FunkErreichbarkeit
+              sprechgruppen={aktuell.sprechgruppen}
+              kommunikationsmittel={aktuell.kommunikationsmittel}
+              erreichbarkeit={aktuell.erreichbarkeit}
+            />
+
+            {darfSchreiben && (
+              /**
+               * STICKY am unteren Rand des Formularblocks (Befund M26): bei neun Feldern ist
+               * ein Knopf am Blockende aus dem Bild gescrollt, während man das letzte Feld
+               * ausfüllt — und dort stand er vorher auch noch MITTEN im Inhalt, mit drei
+               * Zuordnungslisten darunter.
+               *
+               * `size="middle"` an der Reihe, nicht der Vorgabewert: hier steht ein
+               * `danger`-Knopf neben einer neutralen Aktion, und antds Vorgabe-`small`
+               * bindet auf `abstand.xs` (3/5/7 px je Dichtestufe) — zu wenig Trennung
+               * zwischen „Speichern" und „Auflösen".
+               */
+              <div
+                ref={(el) => beobachteAktionsleiste(el, token.marginSM)}
+                style={{
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 1,
+                  background: rollen.paneel,
+                  paddingBlock: token.paddingSM,
+                  borderTop: `1px solid ${rollen.linie}`,
+                }}
+              >
+                <Space size="middle" wrap>
+                  <Button type="primary" htmlType="submit" loading={speichern.isPending}>
+                    Speichern
+                  </Button>
+                  <Popconfirm
+                    title="Einheit auflösen?"
+                    description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => aufloesen.mutate()}
+                  >
+                    <Button danger loading={aufloesen.isPending}>
+                      Auflösen
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              </div>
+            )}
+          </Form>
+        </Paneel>
+
+        {/**
+         * ── DIE DREI ZUORDNUNGEN LIEGEN AUSSERHALB DES FORMULARS ─────────────────────────
+         *
+         * Das ist der Kern von Befund M26. Jede Handlung hier wirkt SOFORT — es gibt nichts
+         * zu speichern. Innerhalb des `<Form>` standen sie unter einem Speichern-Knopf, der
+         * sie nicht betrifft: zweierlei Bedienlogik unter einer Überschrift, von aussen
+         * nicht unterscheidbar. Der Hinweis in jedem Zuordnungs-Paneel sagt es zusätzlich in
+         * Worten, weil die Trennung allein durch Position eine Vermutung bliebe.
+         */}
+        <Paneel titel="Personal" meta={aktuell.personal_mitglieder.length} koerperPolster>
+          <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
+            Zuordnungen wirken sofort — hier gibt es nichts zu speichern.
+          </p>
+          {aktuell.personal_mitglieder.map((m) =>
+            zuordnungsZeile(
+              m.ep_id,
+              <span>
+                {m.name}
+                {m.staerke_position ? ` (${m.staerke_position})` : ''}
+                {m.ist_fuehrer && (
+                  <Tag color="gold" style={{ marginLeft: token.marginXXS }}>
+                    Einheitsführer
+                  </Tag>
                 )}
-                <Button danger onClick={() => personalFrei.mutate(m.ep_id)}>
+              </span>,
+              darfSchreiben && (
+                <Space size="middle" wrap>
+                  {!m.ist_fuehrer && (
+                    <Button onClick={() => fuehrerSetzen.mutate(m.ep_id)}>
+                      Als Einheitsführer
+                    </Button>
+                  )}
+                  <Button danger onClick={() => personalFrei.mutate(m.ep_id)}>
+                    Entfernen
+                  </Button>
+                </Space>
+              ),
+            ),
+          )}
+          {darfSchreiben && (
+            <Select
+              style={{ width: '100%', marginTop: token.marginSM }}
+              placeholder="Person zuordnen …"
+              value={null}
+              notFoundContent={personalInhalt}
+              options={freiesPersonal.map((p) => ({ value: p.id, label: p.name }))}
+              onSelect={(epId) => personalZu.mutate(Number(epId))}
+            />
+          )}
+        </Paneel>
+
+        <Paneel titel="Fahrzeuge" meta={aktuell.fahrzeug_mitglieder.length} koerperPolster>
+          <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
+            Zuordnungen wirken sofort — hier gibt es nichts zu speichern.
+          </p>
+          {aktuell.fahrzeug_mitglieder.map((m) =>
+            zuordnungsZeile(
+              m.ef_id,
+              <span>
+                <span style={monoStil(13)}>{m.funkrufname}</span>
+                {m.fahrzeugtyp ? ` (${m.fahrzeugtyp})` : ''}
+              </span>,
+              darfSchreiben && (
+                <Button danger onClick={() => fahrzeugFrei.mutate(m.ef_id)}>
                   Entfernen
                 </Button>
-              </Space>
+              ),
             ),
-          ),
-        )}
-        {darfSchreiben && (
-          <Select
-            style={{ width: '100%', marginTop: token.marginSM }}
-            placeholder="Person zuordnen …"
-            value={null}
-            notFoundContent={personalInhalt}
-            options={freiesPersonal.map((p) => ({ value: p.id, label: p.name }))}
-            onSelect={(epId) => personalZu.mutate(Number(epId))}
-          />
-        )}
-      </Card>
+          )}
+          {darfSchreiben && (
+            <Select
+              style={{ width: '100%', marginTop: token.marginSM }}
+              placeholder="Fahrzeug zuordnen …"
+              value={null}
+              notFoundContent={fahrzeugInhalt}
+              options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
+              onSelect={(efId) => fahrzeugZu.mutate(Number(efId))}
+            />
+          )}
+        </Paneel>
 
-      <Card size="small" style={{ marginBottom: token.margin }}>
-        <SektionHeader
-          titel="Fahrzeuge"
-          beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern."
-        />
-        {aktuell.fahrzeug_mitglieder.map((m) =>
-          zuordnungsZeile(
-            m.ef_id,
-            <span>
-              {m.funkrufname}
-              {m.fahrzeugtyp ? ` (${m.fahrzeugtyp})` : ''}
-            </span>,
-            darfSchreiben && (
-              <Button danger onClick={() => fahrzeugFrei.mutate(m.ef_id)}>
-                Entfernen
-              </Button>
+        <Paneel titel="Material" meta={aktuell.material_mitglieder.length} koerperPolster>
+          <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
+            Zuordnungen wirken sofort — hier gibt es nichts zu speichern.
+          </p>
+          {aktuell.material_mitglieder.map((m) =>
+            zuordnungsZeile(
+              m.em_id,
+              <span>
+                {m.bezeichnung} <span style={monoStil(13)}>×{m.menge}</span>
+              </span>,
+              darfSchreiben && (
+                <Button danger onClick={() => materialFrei.mutate(m.em_id)}>
+                  Entfernen
+                </Button>
+              ),
             ),
-          ),
-        )}
-        {darfSchreiben && (
-          <Select
-            style={{ width: '100%', marginTop: token.marginSM }}
-            placeholder="Fahrzeug zuordnen …"
-            value={null}
-            notFoundContent={fahrzeugInhalt}
-            options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
-            onSelect={(efId) => fahrzeugZu.mutate(Number(efId))}
-          />
-        )}
-      </Card>
-
-      <Card size="small">
-        <SektionHeader
-          titel="Material"
-          beschreibung="Zuordnungen wirken sofort — hier gibt es nichts zu speichern."
-        />
-        {aktuell.material_mitglieder.map((m) =>
-          zuordnungsZeile(
-            m.em_id,
-            <span>
-              {m.bezeichnung} ×{m.menge}
-            </span>,
-            darfSchreiben && (
-              <Button danger onClick={() => materialFrei.mutate(m.em_id)}>
-                Entfernen
-              </Button>
-            ),
-          ),
-        )}
-        {darfSchreiben && (
-          <Select
-            style={{ width: '100%', marginTop: token.marginSM }}
-            placeholder="Material zuordnen …"
-            value={null}
-            notFoundContent={materialInhalt}
-            options={freiesMaterial.map((m) => ({
-              value: m.id,
-              label: `${m.bezeichnung} ×${m.menge}`,
-            }))}
-            onSelect={(emId) => materialZu.mutate(Number(emId))}
-          />
-        )}
-      </Card>
-    </div>
+          )}
+          {darfSchreiben && (
+            <Select
+              style={{ width: '100%', marginTop: token.marginSM }}
+              placeholder="Material zuordnen …"
+              value={null}
+              notFoundContent={materialInhalt}
+              options={freiesMaterial.map((m) => ({
+                value: m.id,
+                label: `${m.bezeichnung} ×${m.menge}`,
+              }))}
+              onSelect={(emId) => materialZu.mutate(Number(emId))}
+            />
+          )}
+        </Paneel>
+      </div>
+    </EinsatzSeite>
   );
 }

@@ -27,7 +27,7 @@ async function einsatzAnlegenUndOeffnen(page: Page, name: string): Promise<strin
   return id;
 }
 
-test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Tabelle, Entwurf-Tab wird wieder leer', async ({
+test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Zeitachse, Entwurf-Tab wird wieder leer', async ({
   page,
 }) => {
   await anmelden(page);
@@ -51,9 +51,10 @@ test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Tabelle, Entwurf-Tab wird 
   // darum transient sowohl Tab-Label als auch textarea.)
   await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
 
-  // Der erfasste Eintrag steht in der ETB-Tabelle. Eine Tabellen-Zelle (role=cell) ist
-  // eindeutig gegenüber Tab (role=tab) und Eingabefeld (role=textbox).
-  await expect(page.getByRole('cell', { name: inhalt })).toBeVisible();
+  // Der erfasste Eintrag steht in der Zeitachse (Neuentwurf S4 — eine Tabelle gibt es auf
+  // keiner Breite mehr). Die Region grenzt ihn gegen Tab-Label und Eingabefeld ab.
+  const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+  await expect(zeitachse.getByText(inhalt, { exact: true })).toBeVisible();
 });
 
 test('ETB-Entwurf-Autosave: getippter Entwurf überlebt einen Reload', async ({ page }) => {

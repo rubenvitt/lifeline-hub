@@ -174,9 +174,13 @@ describe('BefehlDetailPage', () => {
   it('malt den freigegebenen Status in der Phasenfarbe, nicht im Preset-Grün', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
     renderAt(7);
-    const etikett = (await screen.findByText('Freigegeben')).closest('.ant-tag');
-    expect(etikett).toHaveClass('ant-tag-success');
-    expect(etikett).not.toHaveClass('ant-tag-green');
+    // Neuentwurf: die Phase trägt eine getönte Statusfläche (`StatusChip`), kein antd-Tag.
+    // Die Aussage bleibt dieselbe — die Farbe kommt aus der Phasenachse (`abgeschlossen` →
+    // Ton `normal`), nicht aus einem handgeschriebenen Grün, und es gibt kein Tag-Preset.
+    const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status-chip"]');
+    expect(etikett).toHaveAttribute('data-ton', 'normal');
+    expect(etikett!.closest('[data-phase]')).toHaveAttribute('data-phase', 'abgeschlossen');
+    expect(etikett!.closest('.ant-tag')).toBeNull();
   });
 });
 

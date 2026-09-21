@@ -1,6 +1,7 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -68,7 +69,11 @@ export default function FahrzeugeTab() {
        * betrifft ausschliesslich `Datensicht`, wo Zeilenklick und Link gleichzeitig feuern
        * könnten.
        */
-      render: (_, f) => <Link to={fahrzeugDetailPfad(f.id)}>{f.funkrufname}</Link>,
+      render: (_, f) => (
+        <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
+          {f.funkrufname}
+        </Link>
+      ),
     },
     { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },

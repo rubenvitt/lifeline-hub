@@ -1,12 +1,16 @@
 import type {
+  GefahrBewertung,
   Gefahrengebiet,
+  Gefahrentyp,
   LageberichtAnzeige,
   Person,
   Schaden,
+  Sichtungskategorie,
   Tier,
   Uhs,
   Warnstufe,
 } from '../../api/types';
+import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
 
 export interface SkVerteilung {
   sk1: number;
@@ -36,7 +40,7 @@ export interface BetroffeneVerdichtung {
   gesamt: number;
 }
 
-const WARNSTUFE_RANG: Record<Warnstufe, number> = {
+export const WARNSTUFE_RANG: Record<Warnstufe, number> = {
   keine: 0,
   niedrig: 1,
   mittel: 2,
@@ -61,6 +65,82 @@ export function verdichteGefahrengebiete(gebiete: Gefahrengebiet[]): GefahrVerdi
     if (g.hoechste_warnstufe !== 'keine') anzahlAktiv += 1;
   }
   return { hoechste: max, anzahlAktiv };
+}
+
+/** Eine Zeile der Gefahrenmatrix im Lagebild: ein Gefahrentyp, verdichtet über ALLE
+ *  Gefahrengebiete und Schutzobjekte auf seine höchste Warnstufe. */
+export interface GefahrenZeile {
+  typ: Gefahrentyp;
+  label: string;
+  stufe: Warnstufe;
+}
+
+export interface GefahrenmatrixVerdichtung {
+  /** Nur BEWERTETE Gefahrentypen, in Katalogreihenfolge. */
+  zeilen: GefahrenZeile[];
+  /** Gefahrentypen ohne jede Bewertung in irgendeinem Gebiet. */
+  unbewertet: number;
+}
+
+/**
+ * Verdichtet die Matrizen aller Gefahrengebiete eines Einsatzes (Neuentwurf S3).
+ *
+ * „KEINE" UND „UNBEWERTET" SIND ZWEI AUSSAGEN. Eine Bewertung mit Warnstufe `keine` ist
+ * eine Meldung („hier ist nachgesehen worden, es besteht keine Gefahr"); ein Typ ohne jede
+ * Bewertung ist eine Lücke. Die erste steht als Zeile mit leerem Balken und dem Wort
+ * „keine" da, die zweite erscheint NICHT als Zeile, sondern als Zähler darunter — sonst
+ * sähen dreizehn Zeilen „keine" aus wie ein geprüfter, ruhiger Einsatz.
+ *
+ * Die Reihenfolge ist die des Katalogs (`GEFAHRENTYPEN`), nicht die Dringlichkeit: eine
+ * Zeile steht in jedem Zustand an ihrem Platz (Prüfliste Kriterium 9). Das deckt sich mit
+ * dem Entwurf, der ebenfalls nicht nach Stufe sortiert.
+ */
+export function verdichteGefahrenmatrix(
+  bewertungen: readonly GefahrBewertung[],
+): GefahrenmatrixVerdichtung {
+  const hoechste = new Map<Gefahrentyp, Warnstufe>();
+  for (const b of bewertungen) {
+    const bisher = hoechste.get(b.gefahrentyp);
+    if (bisher == null || WARNSTUFE_RANG[b.warnstufe] > WARNSTUFE_RANG[bisher]) {
+      hoechste.set(b.gefahrentyp, b.warnstufe);
+    }
+  }
+  const zeilen: GefahrenZeile[] = [];
+  for (const { wert, label } of GEFAHRENTYPEN) {
+    const stufe = hoechste.get(wert);
+    if (stufe != null) zeilen.push({ typ: wert, label, stufe });
+  }
+  return { zeilen, unbewertet: GEFAHRENTYPEN.length - zeilen.length };
+}
+
+/** Eine Zeile des Sichtungsbilds. */
+export interface SichtungsZeile {
+  kategorie: Sichtungskategorie;
+  wert: number;
+  /** Anteil an allen GESICHTETEN Personen, 0…1. */
+  anteil: number;
+}
+
+/** Die vier Patientenkategorien stehen immer da — auch mit 0, eine Null ist ein Befund. */
+const SICHTUNG_IMMER: readonly Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4'];
+/** Diese zwei nur, wenn es sie gibt: sie sind keine Behandlungsstufe. */
+const SICHTUNG_FALLS_VORHANDEN: readonly Sichtungskategorie[] = ['tot', 'unverletzt'];
+
+/**
+ * Sichtungsbild aus der SK-Verteilung (Neuentwurf S3).
+ *
+ * Der Anteil bezieht sich auf alle gesichteten Personen (SK I–IV, tot, unverletzt) — nicht
+ * auf alle erfassten: eine Person ohne Sichtung hat keine Kategorie, sie gehört nicht in
+ * den Nenner eines Kategorienanteils. Die Ungesichteten nennt die Seite separat.
+ */
+export function sichtungsZeilen(sk: SkVerteilung): SichtungsZeile[] {
+  const gesichtet = sk.sk1 + sk.sk2 + sk.sk3 + sk.sk4 + sk.tot + sk.unverletzt;
+  const kategorien = [...SICHTUNG_IMMER, ...SICHTUNG_FALLS_VORHANDEN.filter((k) => sk[k] > 0)];
+  return kategorien.map((kategorie) => ({
+    kategorie,
+    wert: sk[kategorie],
+    anteil: gesichtet > 0 ? sk[kategorie] / gesichtet : 0,
+  }));
 }
 
 export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {

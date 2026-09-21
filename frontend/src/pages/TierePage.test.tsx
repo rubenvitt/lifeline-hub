@@ -174,7 +174,7 @@ describe('TierePage', () => {
   it('filtert per Tab auf Vermisst', async () => {
     render(einsatzAktiv, [tierBasis, tierVermisst]);
     await screen.findByText('T-001');
-    await userEvent.click(screen.getByRole('tab', { name: 'Vermisst' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Vermisst' }));
     expect(await screen.findByText('T-002')).toBeInTheDocument();
     expect(screen.getByText('Mimi')).toBeInTheDocument();
   });
@@ -221,7 +221,7 @@ describe('TierePage', () => {
       rasse_beschreibung: 'Schäferhund',
     };
     render(einsatzAktiv, [mimi, bello, rex]);
-    await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+    await userEvent.click(await screen.findByRole('radio', { name: 'Vermisst' }));
     expect(await screen.findByText('Bello')).toBeInTheDocument();
 
     // 1. Die Suche wirkt überhaupt: die nicht passende Zeile fällt heraus.
@@ -233,7 +233,7 @@ describe('TierePage', () => {
     expect(screen.getByText('Mimi')).toBeInTheDocument();
 
     // 2. + 3. Reiterwechsel: die fremde Zeile steht ungefiltert da, das Feld ist leer.
-    await userEvent.click(screen.getByRole('tab', { name: 'Alle' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Alle' }));
     expect(await screen.findByText('Rex')).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Suche in Tiere im Einsatz' })).toHaveValue('');
   });
@@ -340,7 +340,7 @@ describe('TierePage', () => {
     expect(await screen.findByText('T-009')).toBeInTheDocument();
     await waitFor(() => expect(veralteteRefetches).toBeGreaterThan(0));
     expect(screen.getByText('T-009')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Vermisst' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('radio', { name: 'Vermisst' })).toHaveAttribute('aria-checked', 'true');
     expect(container.querySelector('[data-row-key="99"]')).toHaveClass('zeile-hervorgehoben');
   });
 
@@ -411,7 +411,7 @@ describe('TierePage', () => {
     });
     await waitFor(() => expect(screen.queryByText('Tier A')).not.toBeInTheDocument());
     expect(screen.getByText('Tier B')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Aktiv' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('radio', { name: 'Aktiv' })).toHaveAttribute('aria-checked', 'true');
     expect(container.querySelector('[data-row-key="99"]')).not.toHaveClass('zeile-hervorgehoben');
   });
 

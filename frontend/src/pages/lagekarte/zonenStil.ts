@@ -91,7 +91,7 @@ export function gefahrengebietStil(warnstufe: Warnstufe, token: GlobalToken): Zo
  * Wortlaut kommt aus dem Vertrag: {@link warnstufeKarte}`[stufe].label` ist die einzige
  * Quelle. Wer das Wort dort ändert, ändert die Kartenbeschriftung mit — das ist Absicht.
  *
- * `Warnstufe: keine` heißt „keine Stufe gesetzt", nicht „keine Gefahr" — und genau deshalb
+ * „keine Stufe" heißt „keine Stufe gesetzt", nicht „keine Gefahr" — und genau deshalb
  * steht dort nicht „unbewertet": gemessen am Backend (`src/gefahr/repo.rs`, Severity-MAX)
  * entsteht Rang 0 SOWOHL aus gar keiner Bewertung ALS AUCH aus lauter `keine`-Zellen. Die
  * Abfrage kann die beiden Fälle nicht trennen; ein Wort, das es behauptet, wäre falsch.
@@ -114,7 +114,20 @@ export function zonenBeschriftung(
 ): string {
   const name = label?.trim() ?? '';
   if (warnstufe === null) return name;
-  const wort = warnstufe === 'unbekannt' ? 'unbekannt' : warnstufeKarte[warnstufe].label;
-  const stufe = `Warnstufe: ${wort}`;
-  return name ? `${name}\n${stufe}` : stufe;
+  const stufe = stufenWort(warnstufe);
+  return name ? `${name} · ${stufe}` : stufe;
+}
+
+/**
+ * Das Stufenwort der Plakette „NAME · STUFE" (Neuentwurf S5, Versalien per Layer-Stil).
+ *
+ * Eine echte Stufe steht allein („hoch"), weil das Wort dort für sich spricht. Die beiden
+ * Sonderzustände brauchen das Bezugswort, sonst kippt ihre Aussage: „WERK · KEINE" läse sich
+ * als „keine Gefahr" — gemeint ist „keine Stufe gesetzt" (siehe oben) —, und „unbekannt"
+ * allein sagte nicht, WAS unbekannt ist. Der Wortlaut der Stufe bleibt der des Vertrags.
+ */
+function stufenWort(warnstufe: Warnstufe | 'unbekannt'): string {
+  if (warnstufe === 'unbekannt') return 'Stufe unbekannt';
+  const wort = warnstufeKarte[warnstufe].label;
+  return warnstufe === 'keine' ? `${wort} Stufe` : wort;
 }

@@ -1,4 +1,4 @@
-import { Breadcrumb, Button, DatePicker, Flex, Form, Input, Spin, Typography, theme } from 'antd';
+import { Breadcrumb, Button, DatePicker, Form, Input, Spin, Typography, theme } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Select } from '../components/Select';
@@ -18,7 +18,7 @@ import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
-import Datenstand from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
 import { alsBackendZeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
@@ -209,33 +209,24 @@ export default function LageberichtePage() {
   const entwuerfe = berichte.filter((lb) => lb.status === 'entwurf').length;
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Lageberichte' },
-        ]}
-      />
-      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Lageberichte
-          </Typography.Title>
-          {/*
-            Zählt den BESTAND, während die Gruppenköpfe das ANGEZEIGTE zählen — bei aktiver
-            Suche laufen die Zahlen deshalb auseinander. Gewollt: die Kopfzeile ist die
-            Lageauskunft, der Gruppenkopf die Auskunft über die Trefferliste.
-          */}
-          <Typography.Text type="secondary">
-            {berichte.length} Berichte in {koepfe.length} Ketten · {entwuerfe} im Entwurf
-          </Typography.Text>
-          <div>
-            <Datenstand dataUpdatedAt={berichteQuery.dataUpdatedAt} />
-          </div>
-        </div>
-        {darfSchreiben && (
+    // Die Mengen im Kopf zählen den BESTAND, während die Gruppenköpfe das ANGEZEIGTE
+    // zählen — bei aktiver Suche laufen die Zahlen deshalb auseinander. Gewollt: der
+    // Seitenkopf ist die Lageauskunft, der Gruppenkopf die Auskunft über die Trefferliste.
+    <EinsatzSeite
+      titel="Lageberichte"
+      meta={`${berichte.length} Berichte in ${koepfe.length} Ketten · ${entwuerfe} im Entwurf`}
+      dataUpdatedAt={berichteQuery.dataUpdatedAt}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Lageberichte' },
+          ]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
           // `aria-label` gegen antds Icon-Etikett: `<span role="img" aria-label="plus">`
           // fließt sonst in den berechneten Namen ein („plus Neuer Bericht", gemessen).
@@ -250,9 +241,9 @@ export default function LageberichtePage() {
           >
             Neuer Bericht
           </Button>
-        )}
-      </Flex>
-
+        )
+      }
+    >
       <Datensicht
         bezeichnung="Lageberichte"
         form="karte"
@@ -315,6 +306,6 @@ export default function LageberichtePage() {
           <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
         </Form.Item>
       </ErfassungsModal>
-    </div>
+    </EinsatzSeite>
   );
 }

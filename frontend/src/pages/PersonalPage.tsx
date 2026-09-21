@@ -467,6 +467,7 @@ export default function PersonalPage() {
   return (
     <EinsatzSeite
       breite={flaeche.seiteBreit}
+      meta={epQuery.isSuccess ? `${eps.length} Kräfte` : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(
         epQuery.dataUpdatedAt,
         einheitenQuery.dataUpdatedAt,

@@ -1,4 +1,5 @@
-import { Layout, Menu, Spin, theme } from 'antd';
+import { ConfigProvider, Layout, Menu, Spin, theme } from 'antd';
+import { Augenbraue, useRollen } from '../components/instrument';
 import type { MenuProps } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -57,6 +58,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
 
   if (laedt) {
     return (
@@ -78,7 +80,9 @@ export default function AdminLayout() {
     ...adminGruppen.map((g) => ({
       key: g.key,
       type: 'group' as const,
-      label: g.label,
+      // Gruppentitel als Augenbraue (Neuentwurf: Modulpanel-Kopf) — der Wortlaut bleibt der
+      // der Registry, nur der Satz ist 10 px/600/Versalien.
+      label: <Augenbraue>{g.label}</Augenbraue>,
       children: g.sektionen.map((s) => ({ key: sektionsKey(g.key, s.key), label: s.label })),
     })),
     ...(istSystemAdmin ? [{ key: adminBenutzer.key, label: adminBenutzer.label }] : []),
@@ -91,20 +95,41 @@ export default function AdminLayout() {
 
   return (
     <Layout style={{ background: 'transparent' }}>
+      {/* Die Verwaltungs-Seitenleiste im Stil des Modulpanels (Neuentwurf, `shell.dc.html`):
+          Grund `paneel`, Haarlinie zur Seite, Radius 0, aktive Zeile auf `flaeche2` statt
+          der antd-Pille. Farben aus den Rollen, Höhen aus der Staffel. */}
       <Sider
         theme="light"
         width={220}
         breakpoint="lg"
         collapsedWidth={0}
-        style={{ background: 'transparent' }}
+        style={{ background: rollen.paneel, borderInlineEnd: `1px solid ${rollen.linie}` }}
       >
-        <Menu
-          mode="inline"
-          items={items}
-          selectedKeys={selektiert ? [selektiert] : []}
-          onClick={({ key }) => navigate(`/admin/${key}`)}
-          style={{ background: 'transparent', borderInlineEnd: 'none' }}
-        />
+        <ConfigProvider
+          theme={{
+            components: {
+              Menu: {
+                itemBg: 'transparent',
+                itemBorderRadius: 0,
+                itemMarginInline: 0,
+                itemColor: rollen.text2,
+                itemHoverBg: rollen.flaeche,
+                itemHoverColor: rollen.text,
+                itemSelectedBg: rollen.flaeche2,
+                itemSelectedColor: rollen.text,
+                activeBarBorderWidth: 0,
+              },
+            },
+          }}
+        >
+          <Menu
+            mode="inline"
+            items={items}
+            selectedKeys={selektiert ? [selektiert] : []}
+            onClick={({ key }) => navigate(`/admin/${key}`)}
+            style={{ background: 'transparent', borderInlineEnd: 'none' }}
+          />
+        </ConfigProvider>
       </Sider>
       <Content style={{ paddingInlineStart: token.paddingLG }}>
         <Outlet />

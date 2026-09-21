@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Spin, Typography } from 'antd';
+import { Alert, Breadcrumb, Spin } from 'antd';
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +11,8 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { SeitenLeer } from '../components/SeitenZustand';
-import Datenstand from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { monoStil, useRollen } from '../components/instrument';
 import { meldungenPfad } from '../routing/deeplinks';
 import {
   ZEITFENSTER,
@@ -38,6 +39,7 @@ export default function LagemeldungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { konventionen } = useAnzeigeKonventionen();
+  const { token } = useRollen();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -67,7 +69,11 @@ export default function LagemeldungenPage() {
             trifft: (l, w) =>
               imZeitfenster(l.erstellt_at, w as Zeitfenster, undefined, konventionen),
           },
-          render: (_t, l) => <ZeitAnzeige wert={l.erstellt_at} format="kurz" />,
+          render: (_t, l) => (
+            <span style={monoStil(12)}>
+              <ZeitAnzeige wert={l.erstellt_at} format="kurz" />
+            </span>
+          ),
         },
         {
           key: 'herkunft',
@@ -128,24 +134,25 @@ export default function LagemeldungenPage() {
     .reverse();
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Lagemeldungen' },
-        ]}
-      />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>
-        Lagerelevante Meldungen
-      </Typography.Title>
-      <Datenstand dataUpdatedAt={lageQuery.dataUpdatedAt} />
+    <EinsatzSeite
+      titel="Lagerelevante Meldungen"
+      meta={lageQuery.isSuccess ? `${eintraege.length} übergeben` : undefined}
+      dataUpdatedAt={lageQuery.dataUpdatedAt}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Lagemeldungen' },
+          ]}
+        />
+      }
+    >
       {lageQuery.isError && (
         <Alert
           type="error"
           showIcon
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: token.marginSM }}
           title="Lageobjekte konnten nicht geladen werden"
         />
       )}
@@ -173,6 +180,6 @@ export default function LagemeldungenPage() {
           karte={{ art: 'plan', titel: { spalte: 'text' }, sekundaer: ['zeit', 'herkunft', 'ort'] }}
         />
       )}
-    </div>
+    </EinsatzSeite>
   );
 }

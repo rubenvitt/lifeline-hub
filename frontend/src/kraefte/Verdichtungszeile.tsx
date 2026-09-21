@@ -8,7 +8,7 @@ import { rollenFarbe, statusKategorie } from '../theme/statusFarben';
 import { staerkeText, verdichte } from './kraeftebild';
 
 /**
- * Der Kräfteübersicht-Link als Bedienziel auf der Dichte-Staffel (LFH-515, Gate 3).
+ * Der Meldebild-Link (bis 21.09.2026 „Kräfteübersicht") als Bedienziel auf der Dichte-Staffel (LFH-515, Gate 3).
  *
  * GEMESSEN im Browser (`e2e/gate3-trefflaeche.spec.ts`, Stand vor dem Fix): **15 / 16 / 16 px**
  * über die drei Stufen — der Link ist das EINZIGE Bedienelement dieser Zeile und blieb in der
@@ -110,7 +110,7 @@ export default function Verdichtungszeile({
   // nur womöglich alt. Dieselbe Entscheidung trifft `SeitenStandVeraltet` für Listen. Stünde
   // die Fehlerprüfung vorn, spränge die Tabelle darunter bei jeder Störung eine Zeile hoch —
   // unter dem Cursor, mitten in der Arbeit (Prüflisten-Kriterium 12) — und der einzige Weg
-  // zur Kräfteübersicht wäre für die Dauer der Störung weg. Gemessen, nicht vermutet: mit
+  // zum Meldebild wäre für die Dauer der Störung weg. Gemessen, nicht vermutet: mit
   // der umgekehrten Reihenfolge verschwand die Zeile im Test tatsächlich.
   if (!personalQuery.data || !fahrzeugeQuery.data) return null;
 
@@ -130,8 +130,11 @@ export default function Verdichtungszeile({
       <span style={{ color: rollenFarbe(statusKategorie.nicht_verfuegbar.rolle, token) }}>
         {v.fahrzeugStatus.nicht_verfuegbar} n. verf.
       </span>
+      {/* Seit dem Neuentwurf (21.09.2026) heißt die Zielseite „Meldebild" und steht unter
+          Kräfte & Mittel; die Route `kraefteuebersicht` bleibt. Der Linktext folgt dem Namen,
+          den Modulpanel und Seitenkopf zeigen — zwei Namen für eine Seite wären ein Suchbild. */}
       <Link to={pfad} style={verdichtungsLinkStil(token)}>
-        Kräfteübersicht
+        Meldebild
       </Link>
     </Space>
   );

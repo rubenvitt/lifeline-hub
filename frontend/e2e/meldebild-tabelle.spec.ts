@@ -7,12 +7,12 @@ import { expect, test, type Page } from '@playwright/test';
  * `css: false`), und `@media print` wertet es gar nicht aus. Beide Aussagen unten sind
  * reine Layoutaussagen — in Vitest wären sie strukturell unfähig, rot zu werden.
  *
- * NACHWEIS 1 — fixierte erste Spalte × Aufklapp-Symbol im Baum. Keiner der 19
- * `KatalogTabelle`-Bestandskonsumenten ist ein Baum; die Kombination „Spalte 0 fixiert +
- * `expandable` im Meldebild" ist im Repo damit unbelegt. Solange dieser Nachweis nicht grün
- * ist, ist `form="tabelle"` am Meldebild (`pages/KraefteuebersichtPage.tsx:375`) eine
- * Behauptung: die Bedien-Leitlinie verbietet dort die Auflösung in Karten, also MUSS der
- * Baum in der fixierten Tabelle bedienbar sein — auch auf 390 px.
+ * NACHWEIS 1 — fixierte erste Spalte × Aufklapp-Symbol. Seit dem Neuentwurf (S6,
+ * 21.09.2026) ist das Meldebild ein Statusraster: EINE Zeile je Einheit, die Mittel hängen
+ * als aufklappbares Detail darunter. Der Baum ist damit flacher (eine Aufklapp-Ebene statt
+ * zwei), die Kombination „Spalte 0 fixiert + `expandable`" bleibt dieselbe: die
+ * Bedien-Leitlinie verbietet dort die Auflösung in Karten, also MUSS das Aufklappen in der
+ * fixierten Tabelle bedienbar sein — auch auf 390 px.
  *
  * NACHWEIS 2 — der Druckpfad durch den Bildlaufcontainer. `pages/kraefteuebersichtPrint.css`
  * schaltete bis B2 nur `visibility`; `KatalogTabelle` bringt seit B1 einen waagerechten
@@ -37,7 +37,7 @@ import { expect, test, type Page } from '@playwright/test';
  * Beide Male zurückgedreht und byte-gleich verglichen.
  *
  * WARUM NICHT `handleDrucken()`: der Knopf setzt `printPending` und ein Effekt ruft
- * `window.print()` (`KraefteuebersichtPage.tsx:200-212`). Ein modaler Druckdialog im
+ * `window.print()` (`KraefteuebersichtPage.tsx`, `handleDrucken`). Ein modaler Druckdialog im
  * Headless-Chromium ist kein Nachweis, sondern ein Aufhänger. `emulateMedia` liefert das
  * Layout, und das Aufklappen erledigen die Symbole aus Nachweis 1 — derselbe Weg, den ein
  * Benutzer nimmt.
@@ -80,10 +80,9 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 /**
- * Ad-hoc-Kräfte ohne Einheit und ohne Abschnitt. Genau das erzeugt den DREISTUFIGEN
- * Sammelbaum „Ohne Abschnitt → Ohne Einheit → n Personenzeilen"
- * (`kraefte/kraeftebild.ts:576-620`, `hasOhne` über `ohneEinheitPersonal`) — also zwei
- * Aufklapp-Ebenen aus einem einzigen Endpunkt, ohne Einheiten- und Abschnittsanlage.
+ * Ad-hoc-Kräfte ohne Einheit. Das erzeugt die Sammelzeile „Ohne Einheit" mit n
+ * Personenzeilen als Kindern (`kraefte/meldebildRaster.ts`, `OHNE_EINHEIT_SCHLUESSEL`) —
+ * eine Aufklapp-Ebene aus einem einzigen Endpunkt, ohne Einheiten- und Abschnittsanlage.
  *
  * ABSICHTLICH LANGE WERTE: die Bezeichnungsspalte trägt keine `width`, sie wächst mit dem
  * Inhalt. Kurze Namen ließen den waagerechten Bildlaufweg auf 390 px schrumpfen, und die
@@ -118,21 +117,6 @@ async function seedeKraefte(page: Page, einsatzId: string, anzahl: number) {
  * Gemessen wird an der Körperzelle (`td`), nicht am Kopf: mit `sticky` zieht antd Kopf und
  * Körper in zwei getrennte Bildlaufbereiche und gleicht sie per Skript ab.
  */
-/**
- * Stellt den ZUGEKLAPPTEN Ausgangszustand her.
- *
- * Seit LFH-338 · C3 startet das Meldebild aufgeklappt (Befund H7: es ist die Verdichtung,
- * aus der gemeldet wird, und öffnete vollständig zu). Die beiden Nachweise unten prüfen
- * aber gerade das Aufklappen — ohne diesen Schritt wären ihre Zeilenzählungen von Anfang an
- * beim Endwert, und der Klick, um den es geht, bliebe ungeprüft.
- *
- * Über den Umschalter und nicht über die Symbole: er nimmt den ganzen Baum in einem Zug,
- * und sein Vorhandensein ist selbst Teil der Bedienung, die C3 eingeführt hat.
- */
-async function nurAbschnitte(page: Page) {
-  await page.getByText('Nur Abschnitte').click();
-}
-
 async function symbolLage(page: Page) {
   return page.evaluate(() => {
     const koerper = document.querySelector('.ant-table-body')!;
@@ -177,10 +161,11 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   await expect(fixierte).toHaveCount(1);
   await expect(fixierte).toHaveCSS('position', 'sticky');
 
-  // (c) Der Sammelknoten steht. Ohne diesen Anker misst der Rest einen Leerzustand.
-  await expect(page.getByText('Ohne Abschnitt')).toHaveCount(1);
+  // (c) Die Sammelzeile steht, und das Raster startet ZUGEKLAPPT (die Mittel sind Detail,
+  //     die Einheitenzeile trägt Stärke und Verteilung selbst). Ohne diesen Anker misst der
+  //     Rest einen Leerzustand.
+  await expect(page.getByText('Ohne Einheit', { exact: true })).toHaveCount(1);
   const zeilen = page.locator('tr.ant-table-row');
-  await nurAbschnitte(page);
   await expect(zeilen).toHaveCount(1);
 
   // (d) Das Symbol liegt IN der fixierten Zelle — nicht daneben, nicht in einer eigenen
@@ -197,6 +182,15 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   const symbol = symbolIn(0);
   await expect(symbol).toHaveCount(1);
 
+  // (e) FUNKTIONSHÄLFTE. `toBeVisible` belegt nicht, dass ein Element klickbar ist —
+  //     `click()` prüft das Trefferziel und schlägt fehl, wenn ein anderer Knoten den
+  //     Punkt abfängt. Ein Symbol, das rendert, aber nicht feuert, ist der Fehlermodus,
+  //     den eine Sichtbarkeitsprüfung durchwinkt.
+  await symbol.click();
+  await expect(zeilen, 'Aufklappen bringt die 8 gesäten Kräfte').toHaveCount(9);
+
+  // Gemessen wird AUFGEKLAPPT: erst die langen Personennamen geben der Tabelle den
+  // waagerechten Bildlaufweg, den die Halte-Messung braucht.
   const vor = await symbolLage(page);
   // Vorbedingung: ohne waagerechten Bildlaufweg hätte die Halte-Messung unten nichts zu
   // halten und wäre trivial grün (dieselbe Vorbedingung wie
@@ -205,13 +199,6 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
     vor.restweg,
     `Vorbedingung: das Meldebild braucht waagerechten Bildlaufweg (gemessen ${vor.restweg}px)`,
   ).toBeGreaterThan(50);
-
-  // (e) FUNKTIONSHÄLFTE. `toBeVisible` belegt nicht, dass ein Element klickbar ist —
-  //     `click()` prüft das Trefferziel und schlägt fehl, wenn ein anderer Knoten den
-  //     Punkt abfängt. Ein Symbol, das rendert, aber nicht feuert, ist der Fehlermodus,
-  //     den eine Sichtbarkeitsprüfung durchwinkt.
-  await symbol.click();
-  await expect(zeilen, 'Aufklappen muss die Kindzeile „Ohne Einheit" bringen').toHaveCount(2);
 
   // (f) HALTE-HÄLFTE nach echtem waagerechtem Bildlauf. Beide Teile sind nötig: ohne „die
   //     nicht-fixierte Zelle ist gewandert" wäre ein stillschweigend nicht ausgeführter
@@ -224,23 +211,17 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
     `Aufklapp-Symbol hält seine x-Position (${vor.symbolX} → ${nach.symbolX})`,
   ).toBeLessThanOrEqual(1);
 
-  // (g) …und es ist DORT noch bedienbar. Zweite Ebene aufklappen, während die Tabelle
-  //     waagerecht verschoben ist: jetzt kommen die 8 Personenzeilen.
-  const symbolEbene2 = symbolIn(1);
-  await expect(symbolEbene2).toHaveCount(1);
-  await symbolEbene2.click();
-  await expect(zeilen, 'zweite Ebene: „Ohne Einheit" trägt die 8 gesäten Kräfte').toHaveCount(10);
-
   // (g′) BEFUND, mitgemessen weil er genau hier auffällt: der Platzhalter an einer
   //      BLATT-Zeile trägt dieselbe Klasse und ein `aria-label` („Zeile erweitern"), obwohl
   //      es nichts zu erweitern gibt. Ob er ein Fokusziel ist, entscheidet seine
   //      Sichtbarkeit — `visibility: hidden` nimmt ihn aus der Tabulatorfolge. Der Wert
   //      wird protokolliert, nicht bewertet: er ist antd-Bestand, kein B2-Erzeugnis.
-  const platzhalterSichtbarkeit = await symbolIn(2).evaluate(
+  const platzhalterSichtbarkeit = await symbolIn(1).evaluate(
     (el) => getComputedStyle(el).visibility,
   );
 
-  // (h) …und wieder zu. Ein Auslöser, der nur in eine Richtung schaltet, ist halb kaputt.
+  // (h) …und wieder zu, WÄHREND die Tabelle waagerecht verschoben ist — das Symbol ist dort
+  //     also noch bedienbar. Ein Auslöser, der nur in eine Richtung schaltet, ist halb kaputt.
   await symbol.click();
   await expect(zeilen, 'Zuklappen nimmt den ganzen Unterbaum mit').toHaveCount(1);
 
@@ -262,7 +243,7 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   await page.reload();
   await page.waitForLoadState('networkidle');
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
-  await expect(page.getByText('Ohne Abschnitt')).toHaveCount(1);
+  await expect(page.getByText('Ohne Einheit', { exact: true })).toHaveCount(1);
   const handschuh = await symbolLage(page);
 
   test.info().annotations.push({
@@ -332,7 +313,7 @@ async function druckLage(page: Page) {
  */
 const A4_DRUCKBREITE = 717;
 
-test('Druckpfad der Kräfteübersicht: die Neutralisierer WIRKEN, und keine Spalte ragt aus dem Druck-Wurzelknoten', async ({
+test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt aus dem Druck-Wurzelknoten', async ({
   page,
 }) => {
   await anmelden(page);
@@ -342,20 +323,17 @@ test('Druckpfad der Kräfteübersicht: die Neutralisierer WIRKEN, und keine Spal
   await page.setViewportSize({ width: A4_DRUCKBREITE, height: 800 });
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
   await page.waitForLoadState('networkidle');
-  await expect(page.getByText('Ohne Abschnitt')).toHaveCount(1);
+  await expect(page.getByText('Ohne Einheit', { exact: true })).toHaveCount(1);
 
-  // Aufklappen wie `handleDrucken` es tut — über die Symbole, nicht über `window.print()`.
-  // Vorher zuklappen: das Blatt startet seit C3 aufgeklappt, sonst prüften die zwei Klicks
-  // unten nichts (siehe `nurAbschnitte`).
+  // Aufklappen wie `handleDrucken` es tut — über das Symbol, nicht über `window.print()`.
+  // Das Raster startet zugeklappt; der Klick bringt die Mittelzeilen, deren lange Namen den
+  // Überhang erst erzeugen.
   const zeilen = page.locator('tr.ant-table-row');
   const symbolIn = (index: number) =>
     zeilen.nth(index).locator('td.ant-table-cell-fix-start .ant-table-row-expand-icon');
-  await nurAbschnitte(page);
   await expect(zeilen).toHaveCount(1);
   await symbolIn(0).click();
-  await expect(zeilen).toHaveCount(2);
-  await symbolIn(1).click();
-  await expect(zeilen).toHaveCount(10);
+  await expect(zeilen).toHaveCount(9);
 
   // ── GEGENPROBE `screen`: die Enge ist echt, der Container schneidet wirklich ab.
   const bildschirm = await druckLage(page);
@@ -412,61 +390,63 @@ test('Druckpfad der Kräfteübersicht: die Neutralisierer WIRKEN, und keine Spal
 });
 
 /**
- * NACHWEIS 3 — der Monitoring-Kopf bricht um, statt waagerecht zu scrollen
- * (LFH-338 · C3, Befund H6).
+ * NACHWEIS 3 — das Statusband bricht um, statt waagerecht zu scrollen
+ * (LFH-338 · C3, Befund H6; seit dem Neuentwurf S6 das Statusband statt der Kennzahlen-Card).
  *
  * WARUM HIER: „passt ohne Bildlauf auf einen Führungsschirm" ist eine reine Layoutaussage.
- * In Vitest wäre sie strukturell unfähig, rot zu werden — jsdom rechnet kein Layout, und
- * `scrollWidth`/`clientWidth` stehen dort beide auf 0. Was Vitest prüfen kann, ist die
- * STRUKTUR (ein Raster statt einer Reihe) und die Abwesenheit der zwei verantwortlichen
- * Angaben im Quelltext; beides steht in `KraefteuebersichtPage.test.tsx`.
+ * In Vitest wäre sie strukturell unfähig, rot zu werden — jsdom rechnet kein Layout.
  *
- * ABWEICHUNG VOM AKZEPTANZKRITERIUM, bewusst und schärfer: das Ticket nennt „950 px
- * Inhaltsbreite". Gemessen wird stattdessen auf dem Führungs-Tablet (1024 px Sichtfeld),
- * wo die Inhaltsbreite UNTER 950 px liegt — der Test sichert das eigens zu. Wer bei
- * weniger als 950 px nicht scrollt, scrollt bei 950 px erst recht nicht. Eine Messung, die
- * exakt 950 px Inhaltsbreite herstellen wollte, hinge an der jeweiligen Breite von
- * Seitenleiste und Rinne und würde von jeder Navigationsänderung still verstimmt.
+ * Gemessen auf dem Führungs-Tablet (1024 px Sichtfeld), wo die Inhaltsbreite UNTER 950 px
+ * liegt — der Test sichert das eigens zu. Wer bei weniger als 950 px nicht scrollt, scrollt
+ * bei 950 px erst recht nicht.
  *
- * WARUM GESEEDET WIRD: ein frischer Einsatz hat 0 Kräfte. Ohne Zeilen stehen alle
- * Kennzahlen auf 0, die Materialachse rendert gar keine Statuszeile — der Kopf wäre schmal
- * durch Nichtstun, und die Messung grün ohne Aussage.
+ * WARUM GESEEDET WIRD: ohne Kräfte zeigt das Band nur den Leerzustand. Gesät werden Personal
+ * UND Fahrzeuge, damit beide Gruppen stehen; die Fahrzeuge tragen den Default-Status neuer
+ * Dispositionen.
  */
-test('Monitoring-Kopf der Kräfteübersicht bricht um statt waagerecht zu scrollen', async ({
-  page,
-}) => {
+test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `LFH-338 Kopf ${Date.now()}`);
   await seedeKraefte(page, einsatzId, 4);
+  for (let i = 0; i < 4; i += 1) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+      data: { adhoc: { funkrufname: `Florian Musterstadt-Nordwest 3/44-${i}` } },
+    });
+    expect(antwort.ok(), `Seeding Fahrzeug ${i}: ${antwort.status()}`).toBeTruthy();
+  }
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
 
-  const kopf = page.locator('.ant-card').first();
-  await expect(kopf.getByText(/Gesamtstärke/)).toBeVisible();
+  const band = page.locator('[data-lfh="meldebild-statusband"]');
+  await expect(band.getByRole('region', { name: 'Fahrzeuge je Status' })).toBeVisible();
+  await expect(band.getByRole('region', { name: 'Personal je Status' })).toBeVisible();
 
-  const mass = await kopf.evaluate((el) => {
-    const leib = el.querySelector('.ant-card-body') as HTMLElement;
-    return { scrollWidth: leib.scrollWidth, clientWidth: leib.clientWidth };
-  });
-
+  const mass = await band.evaluate((el) => ({
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+  }));
   expect(
     mass.clientWidth,
     `Messung soll auf höchstens 950 px Inhaltsbreite laufen (gemessen ${mass.clientWidth}px)`,
   ).toBeLessThanOrEqual(950);
   expect(
     mass.scrollWidth,
-    `Kopf scrollt waagerecht: ${mass.scrollWidth}px Inhalt in ${mass.clientWidth}px Fläche`,
+    `Band scrollt waagerecht: ${mass.scrollWidth}px Inhalt in ${mass.clientWidth}px Fläche`,
   ).toBeLessThanOrEqual(mass.clientWidth + SUBPIXEL);
 
-  // Alle drei Achsen ohne Bildlauf erreichbar — das ist die Hälfte, die der reine
-  // Bildlaufvergleich NICHT abdeckt: ein Kopf, der eine Achse gar nicht rendert, scrollt
-  // ebenfalls nicht.
-  await expect(kopf.getByText(/Gesamtstärke/)).toBeInViewport();
-  await expect(kopf.locator('.ant-statistic-title', { hasText: /^Fahrzeuge$/ })).toBeInViewport();
-  await expect(kopf.getByText(/Material \(Pos\.\)/)).toBeInViewport();
+  // Jede Zelle ohne Bildlauf erreichbar — die Hälfte, die der reine Bildlaufvergleich NICHT
+  // abdeckt: ein Band, das eine Zelle gar nicht rendert, scrollt ebenfalls nicht.
+  const zellen = band.locator('[data-lfh="meldebild-bandzelle"]');
+  const anzahl = await zellen.count();
+  expect(anzahl, 'mindestens eine Fahrzeug- und eine Personalzelle').toBeGreaterThanOrEqual(2);
+  for (let i = 0; i < anzahl; i += 1) await expect(zellen.nth(i)).toBeInViewport();
+  // Und das Meta im Seitenkopf nennt Einheiten und Stärke in BOS-Schreibweise.
+  await expect(
+    page.locator('[data-lfh="seitenkopf"]').getByText(/Einheiten? · Stärke \d+\/\d+\/\d+\/\/\d+/),
+  ).toBeInViewport();
 
   test.info().annotations.push({
     type: 'messwert',
-    description: `Kopf bei 1024px Sichtfeld: Inhaltsbreite ${mass.clientWidth}px, Inhalt ${mass.scrollWidth}px`,
+    description: `Statusband bei 1024px Sichtfeld: Inhaltsbreite ${mass.clientWidth}px, Inhalt ${mass.scrollWidth}px, ${anzahl} Zellen`,
   });
 });

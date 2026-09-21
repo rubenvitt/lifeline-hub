@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Space, Spin, Typography, theme } from 'antd';
+import { Alert, App, Breadcrumb, Button, Space, Spin, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -22,7 +22,10 @@ import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
-import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
+import { gemeinsamerDatenstand } from '../../components/Datenstand';
+import EinsatzSeite from '../../components/EinsatzSeite';
+import { Paneel } from '../../components/instrument';
+import { flaeche } from '../../theme/tokens';
 
 /**
  * Trefflächenboden der Gebietszeile (Abschluss-Review zu LFH-368 · B5h, Konvention aus
@@ -146,14 +149,38 @@ export default function GefahrenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
+  // Seitenkopf des Neuentwurfs für ALLE Zweige unterhalb des Einsatzes (Laden der Gebiete,
+  // Fehler, leer, Matrix) — der Kopf trägt Titel, Menge und Datenstand, nicht der Inhalt.
+  const seite = (inhalt: ReactNode, dataUpdatedAt?: number) => (
+    <EinsatzSeite
+      titel="Gefahrenmatrix"
+      breite={flaeche.seiteBreit}
+      meta={gebieteQuery.isSuccess ? `${gebiete.length} Gefahrengebiete` : undefined}
+      dataUpdatedAt={dataUpdatedAt}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Gefahrenmatrix' },
+          ]}
+        />
+      }
+    >
+      {inhalt}
+    </EinsatzSeite>
+  );
+
   if (gebieteQuery.isLoading)
-    return (
+    return seite(
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
         <Spin size="large" />
-      </div>
+      </div>,
     );
   if (gebieteQuery.isError)
-    return <Alert type="error" title="Gefahrengebiete konnten nicht geladen werden" showIcon />;
+    return seite(
+      <Alert type="error" title="Gefahrengebiete konnten nicht geladen werden" showIcon />,
+    );
 
   if (gebiete.length === 0) {
     /**
@@ -165,21 +192,21 @@ export default function GefahrenPage() {
      * Der Wortlaut ist derselbe wie vorher, nur auf Aussage und Hinweis aufgeteilt; die
      * Aufforderung „zeichnen" gehört jetzt an den Knopf, der auch dorthin führt.
      */
-    return (
+    return seite(
       <div style={{ marginTop: 64, textAlign: 'center' }}>
-        <Datenstand dataUpdatedAt={gebieteQuery.dataUpdatedAt} />
         <SeitenLeer
           titel="Noch keine Gefahrengebiete"
           hinweis="Auf der Lagekarte ein Gefahrengebiet zeichnen."
           aktion={{ label: 'Zur Lagekarte', pfad: lagekartePfad(einsatzId) }}
         />
-      </div>
+      </div>,
+      gebieteQuery.dataUpdatedAt,
     );
   }
 
   const aktuell = gebiete.find((g) => g.id === gewaehlt);
 
-  return (
+  return seite(
     <div
       data-gefahren-rahmen
       style={{
@@ -196,59 +223,56 @@ export default function GefahrenPage() {
         // begründet in der Prüfliste, Kriterium **14** („Tabellenseite vollständig"):
         // `docs/superpowers/specs/2026-07-30-gefahrenmatrix-pruefliste.md`.
         flexDirection: breit ? 'row' : 'column',
-        gap: 16,
+        gap: token.margin,
         alignItems: breit ? 'flex-start' : 'stretch',
       }}
     >
-      <Liste
+      <Paneel
+        titel="Gefahrengebiete"
+        meta={String(gebiete.length)}
         style={breit ? { width: 240, flexShrink: 0 } : { width: '100%' }}
-        size="small"
-        bordered
-        header={
-          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-            <Typography.Text strong>Gefahrengebiete</Typography.Text>
-            <Datenstand
-              dataUpdatedAt={gemeinsamerDatenstand(
-                gebieteQuery.dataUpdatedAt,
-                matrixQuery.dataUpdatedAt,
-              )}
-            />
-          </Space>
-        }
-        dataSource={gebiete}
-        renderItem={(g) => (
-          <ListenEintrag
-            onClick={() => setGewaehlt(g.id)}
-            style={{
-              // Trefflächenboden ZUERST, die Färbung danach — beides landet über EIN `style`
-              // im Aufrufer, und `ListenEintrag` spreizt es bewusst zuletzt
-              // (`Liste.tsx:171-175`), damit die Kurzform `padding` gegen die Längsformen der
-              // Liste gewinnt. Zöge jemand den Spread dort nach vorn, fiele genau die
-              // Polsterungshälfte der „ZWEI Angaben"-Konvention still weg.
-              ...gebietszeileStil(token),
-              // Die Rolle `bedien`, nicht antds Default-Blau: `rgba(22,119,255,0.08)`
-              // stand hier hartkodiert und blieb im Nachtmodus derselbe helle Schleier
-              // auf dunklem Grund (LFH-368). `colorPrimaryBg` leitet antd aus
-              // `colorPrimary` ab — also aus unserer Rolle, in beiden Modi.
-              background: g.id === gewaehlt ? token.colorPrimaryBg : undefined,
-            }}
-          >
-            <Space>
-              {/* Etikett, nicht Fläche: `warnstufeKarte` liefert die Rolle. Vorher stand hier
+      >
+        <Liste
+          size="small"
+          dataSource={gebiete}
+          renderItem={(g) => (
+            <ListenEintrag
+              onClick={() => setGewaehlt(g.id)}
+              style={{
+                // Trefflächenboden ZUERST, die Färbung danach — beides landet über EIN `style`
+                // im Aufrufer, und `ListenEintrag` spreizt es bewusst zuletzt
+                // (`Liste.tsx:171-175`), damit die Kurzform `padding` gegen die Längsformen der
+                // Liste gewinnt. Zöge jemand den Spread dort nach vorn, fiele genau die
+                // Polsterungshälfte der „ZWEI Angaben"-Konvention still weg.
+                ...gebietszeileStil(token),
+                // Die Rolle `bedien`, nicht antds Default-Blau: `rgba(22,119,255,0.08)`
+                // stand hier hartkodiert und blieb im Nachtmodus derselbe helle Schleier
+                // auf dunklem Grund (LFH-368). `colorPrimaryBg` leitet antd aus
+                // `colorPrimary` ab — also aus unserer Rolle, in beiden Modi.
+                background: g.id === gewaehlt ? token.colorPrimaryBg : undefined,
+              }}
+            >
+              <Space>
+                {/* Etikett, nicht Fläche: `warnstufeKarte` liefert die Rolle. Vorher stand hier
                   `warnstufeFarbe` — dieselbe Sortenverwechslung, die LFH-328 in
                   `ZonenInspector.tsx` behoben hat —, danach ein `rollenFarbe`-Wert an antds
                   `color`-Prop. Auch das ist falsch und seit LFH-358 vom Guard erfasst: antd 6
                   rechnet für einen Nicht-Preset ein STATISCHES Farbpaar aus der Zeichenkette
                   (`StatusTag.tsx` zitiert die Stelle), der Modus erreicht es also nicht mehr,
                   und der Wortlaut steht als Fläche statt als Rand. `StatusTag` löst beides. */}
-              <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
-              <span>{gefahrengebietName(g.label, g.id)}</span>
-              <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
-            </Space>
-          </ListenEintrag>
-        )}
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
+                <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
+                <span>{gefahrengebietName(g.label, g.id)}</span>
+                <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
+              </Space>
+            </ListenEintrag>
+          )}
+        />
+      </Paneel>
+      <Paneel
+        titel="Bewertung"
+        koerperPolster
+        style={{ flex: 1, minWidth: 0, width: breit ? undefined : '100%' }}
+      >
         {aktuell && (
           <div
             style={{
@@ -313,7 +337,8 @@ export default function GefahrenPage() {
             onDetailsSpeichern={(d) => setzen.mutateAsync(d)}
           />
         )}
-      </div>
-    </div>
+      </Paneel>
+    </div>,
+    gemeinsamerDatenstand(gebieteQuery.dataUpdatedAt, matrixQuery.dataUpdatedAt),
   );
 }

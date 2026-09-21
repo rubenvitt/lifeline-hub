@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
@@ -20,8 +20,9 @@ import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import EtbTabelle from '../etb/EtbTabelle';
-import EtbFilterleiste from '../etb/EtbFilterleiste';
+import EtbZeitachse from '../etb/EtbZeitachse';
+import EtbBilanz from '../etb/EtbBilanz';
+import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
@@ -30,10 +31,29 @@ import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { baueZeilen } from '../etb/etbZeile';
 import { scrolleZurZeile } from '../components/Datensicht';
 import type { AbgelehnterEintrag } from '../offline/queue';
-import Datenstand from '../components/Datenstand';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import StatusTag from '../components/StatusTag';
-import { einsatzStatus } from '../theme/statusFarben';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
+import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
+import {
+  filterZusammenfuehren,
+  kopfMeta,
+  pufferZustand,
+  typSegmente,
+  type TypSegment,
+} from '../etb/zeitachseModell';
+
+/**
+ * Lesebreite des Tagebuchs. Breiter als die Listenseiten (`flaeche.seiteBreit`, 960), weil
+ * neben der Zeitachse die 260-px-Seitenleiste steht (Entwurf S4: 1440er Rahmen); nicht
+ * unbegrenzt, weil ein Meldungstext über 1400 px Zeilenlänge nicht mehr zu lesen ist.
+ */
+const ETB_BREITE = 1440;
+
+/** Breite der Seitenleiste „Bilanz" (Entwurf S4, 260 px) — ab `xl`. */
+const LEISTE_BREITE = 260;
 
 export default function EtbPage() {
   const { id } = useParams();
@@ -94,11 +114,41 @@ export default function EtbPage() {
     setFilterMarke((m) => m + 1);
   }, [filterText]);
 
-  function filterAendern(werte: EtbFilterWerte) {
+  /**
+   * Der jeweils AKTUELLE Filter für Meldungen, die verspätet eintreffen: die Filterleiste
+   * meldet ihre Suche entprellt, und ein Nachläufer der Frist sähe sonst einen Filter, in
+   * dem der inzwischen per Segment gewählte Typ noch fehlt
+   * (`etb/zeitachseModell.ts`, `filterZusammenfuehren`).
+   */
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+
+  /**
+   * Eine EIGENE Filteränderung — aus der Leiste (q/von/bis) oder der Typleiste. Beide
+   * setzen die Marke, damit die Leiste NICHT neu aufgesetzt wird: ein Segmentklick nähme
+   * sonst einem halb getippten Suchbegriff Feld und Fokus.
+   */
+  function filterAendern(teil: Partial<EtbFilterWerte>) {
+    const vorher = etbPfad(einsatzId, filterRef.current);
+    const neu = etbPfad(einsatzId, filterZusammenfuehren(filterRef.current, teil));
+    // Keine Navigation ohne Änderung: die Marke bliebe sonst stehen und schluckte die
+    // nächste FREMDE Änderung (Zurücksetzen, Deeplink) — die Leiste behielte dann Werte,
+    // die nicht mehr gelten.
+    if (neu === vorher) return;
     eigeneFilteraenderung.current = true;
     // `replace`, damit eine Suche keine dreißig Verlaufseinträge hinterlässt — der
     // Rückweg soll auf die vorige SEITE führen, nicht auf den vorigen Buchstaben.
-    navigate(etbPfad(einsatzId, werte), { replace: true });
+    navigate(neu, { replace: true });
+  }
+
+  function leisteGeaendert(werte: LeistenFilter) {
+    filterAendern(werte);
+  }
+
+  function typGewaehlt(segment: TypSegment) {
+    filterAendern({ typ: segment === 'alle' ? undefined : segment });
   }
 
   function filterZuruecksetzen() {
@@ -162,7 +212,16 @@ export default function EtbPage() {
     termin?: string | null;
   } | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
-  const [highlightId, setHighlightId] = useState<number | null>(null);
+  /**
+   * Die Hervorhebung trägt eine Zählmarke neben der id: ein zweiter Sprung auf DENSELBEN
+   * Eintrag (zweimal „Grundeintrag anzeigen") änderte die id nicht, der Scroll-Effekt
+   * liefe nicht wieder, und die Zeile bliebe außer Sicht.
+   */
+  const [hervorhebung, setHervorhebung] = useState<{ id: number; marke: number } | null>(null);
+  const highlightId = hervorhebung?.id ?? null;
+  const zeitachseKopf = useRef<HTMLDivElement>(null);
+  const { abBreite } = useViewport();
+  const { token, rollen } = useRollen();
   const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
     einsatzId,
     benutzer?.id,
@@ -208,7 +267,8 @@ export default function EtbPage() {
     if (searchParams.get('neu') !== '1') return;
     const leiste = document.querySelector('.etb-erfassung-sticky');
     if (leiste instanceof HTMLElement) {
-      leiste.scrollIntoView({ block: 'start' });
+      // Die Leiste steht am Seitenfuß (Neuentwurf S4) — ins Bild rollt ihr unteres Ende.
+      leiste.scrollIntoView?.({ block: 'end' });
       const feld = leiste.querySelector('textarea, input');
       if (feld instanceof HTMLElement) feld.focus();
     }
@@ -228,7 +288,7 @@ export default function EtbPage() {
       if (!etbQuery.isFetchingNextPage) etbQuery.fetchNextPage();
       return; // nach dem Laden re-läuft der Effekt (etbQuery.data ändert sich)
     }
-    if (gefunden) setHighlightId(zielEintragId);
+    if (gefunden) setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
     searchParams.delete('eintrag');
     setSearchParams(searchParams, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,20 +301,15 @@ export default function EtbPage() {
   ]);
 
   useEffect(() => {
-    if (highlightId == null) return;
+    if (hervorhebung == null) return;
     /*
-     * Über das Primitiv, nicht über einen eigenen Selektor (LFH-342 · C7). Zwei Gründe,
-     * beide gemessen:
-     *
-     *   · Der Zeilenschlüssel trägt seit dem Zeilentyp-Union das Sortenpräfix
-     *     (`eintrag-<id>`) — ein roher `[data-row-key="<id>"]` träfe nichts mehr, und
-     *     `tsc` sieht einen String-Selektor nicht.
-     *   · Unter `md` gibt es überhaupt kein `data-row-key`; dort findet
-     *     `scrolleZurZeile` die Karte über ihre Marke. Genau auf dem Gerät, auf dem eine
-     *     lange Liste am wenigsten überschaubar ist, lief der Sprung sonst ins Leere.
+     * Über das Primitiv, nicht über einen eigenen Selektor (LFH-342 · C7): die
+     * Zeitachsen-Einträge tragen dieselbe Marke (`data-lfh="datensicht-karte"`) und die
+     * Hervorhebungsklasse, an denen `scrolleZurZeile` eine Karte findet. Einen
+     * `data-row-key` gibt es seit dem Neuentwurf auf keiner Breite mehr.
      */
-    scrolleZurZeile(`eintrag-${highlightId}`);
-  }, [highlightId]);
+    scrolleZurZeile(`eintrag-${hervorhebung.id}`);
+  }, [hervorhebung]);
 
   const abschliessenMutation = useMutation({
     mutationFn: () => schliesseEinsatzAb(einsatzId),
@@ -289,9 +344,28 @@ export default function EtbPage() {
    */
   const chronologie = baueZeilen({ eintraege, ausstehend, abgelehnt });
 
+  /**
+   * EINGABE UNTEN, NEUESTE OBEN (Neuentwurf S4) — und was nach dem eigenen Eintrag passiert.
+   *
+   * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, die Zeitachse läuft
+   * neueste zuerst: wer auf die Lage schaut, sieht oben sofort das Jüngste, und wer
+   * schreibt, hat die Zeile immer an derselben Stelle. Die Vorgängerin stellte die
+   * Erfassung an den KOPF, damit ein neuer Eintrag direkt unter dem Feld erscheint; diese
+   * Nähe gibt der Entwurf bewusst auf.
+   *
+   * Den Preis bezahlt diese Funktion: wer weiter unten liest und erfasst, sähe seinen
+   * eigenen Eintrag nicht ankommen. Nach einem ANGENOMMENEN Eintrag (gesendet oder
+   * gepuffert) rollt die Seite deshalb den Kopf der Zeitachse ins Bild — mit
+   * `block: 'nearest'`, also gar nicht, wenn er ohnehin sichtbar ist. Das ist die Antwort
+   * auf eine eigene Handlung, kein Sprung unter dem Cursor (WCAG 3.2.5 zielt auf
+   * ungefragte Änderungen). Der Fokus bleibt im Feld (Rücksprung der Schnellerfassung),
+   * die Serienerfassung läuft also ungestört weiter. Bei einer Ablehnung rollt nichts:
+   * dann ist nichts angekommen, und der Wortlaut steht noch im Feld.
+   */
   async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
       await erfassen(e);
+      zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
     } catch (err) {
       message.error(err instanceof ApiError ? err.message : 'Senden fehlgeschlagen');
       throw err;
@@ -336,7 +410,7 @@ export default function EtbPage() {
   ) : darfSchreiben ? (
     <SeitenLeer
       titel="Noch keine Einträge."
-      hinweis="Die angepinnte Erfassungszeile am Kopf des Tagebuchs nimmt den ersten Eintrag auf."
+      hinweis="Die Erfassungszeile am Fuß der Seite nimmt den ersten Eintrag auf."
       // Ziel aus der Deeplink-Registry, nicht als Vorlagentext von Hand: `?neu=1` rollt die
       // Erfassungszeile ins Bild und fokussiert sie (Effekt oben).
       aktion={{ label: 'Ersten Eintrag erfassen', pfad: etbPfad(einsatzId, { neu: true }) }}
@@ -348,31 +422,52 @@ export default function EtbPage() {
     />
   );
 
+  const breit = abBreite('xl');
+  const puffer = pufferZustand(ausstehend, abgelehnt);
+  const segmentOptionen: SegmentOption<TypSegment>[] = typSegmente(filter.typ).map((t) => ({
+    wert: t,
+    label: t === 'alle' ? 'Alle' : etbTyp[t].label,
+    // Der Punkt ist Zierde neben dem Wort; „Alle" trägt die neutrale Stufe.
+    punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
+  }));
+
   return (
-    <div>
-      {/* Dezente Breadcrumb-Zeile als Rückweg: vom Content getrennt, kein versehentlicher
-          Kontextwechsel mitten im Tagebuch. Klick auf „Einsätze“ führt zur Liste zurück. */}
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
-      />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space orientation="vertical" size={0}>
-          <Space>
-            <Typography.Title level={3} style={{ margin: 0 }}>
-              {einsatz.bezeichnung}
-            </Typography.Title>
-            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-          </Space>
-          <Datenstand dataUpdatedAt={etbQuery.dataUpdatedAt} />
-        </Space>
-        <Space>
+    <EinsatzSeite
+      titel="Einsatztagebuch"
+      breadcrumb={
+        <Breadcrumb
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
+        />
+      }
+      meta={
+        etbQuery.isSuccess
+          ? kopfMeta({
+              geladen: eintraege.length,
+              weitereSeiten: etbQuery.hasNextPage,
+              filterAktiv,
+            })
+          : undefined
+      }
+      dataUpdatedAt={etbQuery.dataUpdatedAt}
+      breite={ETB_BREITE}
+      aktionen={
+        <>
+          {/* Der Typfilter als Segmentleiste (Entwurf S4). Er schreibt in denselben
+              URL-Filter wie die Leiste darunter (`etbPfad`/`parseEtbFilter`) — das
+              gewählte Segment wird aus der URL GELESEN, Zurück/Vor stimmen also. */}
+          <Segmentleiste<TypSegment>
+            optionen={segmentOptionen}
+            wert={filter.typ ?? 'alle'}
+            onWechsel={typGewaehlt}
+            beschriftung="Einträge nach Typ filtern"
+          />
           {darfAbschliessen && (
             <Popconfirm
               title="Einsatz abschließen?"
               description="Danach sind keine neuen Einträge oder Berichtigungen mehr möglich."
               okText="Ja"
               cancelText="Abbrechen"
+              okButtonProps={{ danger: true }}
               onConfirm={() => abschliessenMutation.mutate()}
             >
               <Button danger loading={abschliessenMutation.isPending}>
@@ -380,116 +475,177 @@ export default function EtbPage() {
               </Button>
             </Popconfirm>
           )}
-        </Space>
-      </Space>
+        </>
+      }
+      hinweis={
+        einsatz.status !== 'aktiv' ? (
+          <Space>
+            <span>Einsatzstatus</span>
+            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
+          </Space>
+        ) : undefined
+      }
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: breit ? 'row' : 'column',
+          alignItems: breit ? 'flex-start' : 'stretch',
+          gap: token.marginLG,
+        }}
+      >
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+          {/* Volltext und Zeitraum: die schmale Filterzeile unter dem Kopf. Der Typ steht
+              oben als Segmentleiste. Entprellung und die Weiche „eigene gegen fremde
+              Änderung" bleiben (`EtbFilterleiste`, Effekt oben). */}
+          <div ref={filterWurzel}>
+            <EtbFilterleiste key={filterMarke} startWerte={filter} onChange={leisteGeaendert} />
+          </div>
 
-      {/* Erfassung als angepinnte Kommandozeile am Kopf des Tagebuchs: Da die
-          Tabelle neueste-zuerst sortiert, erscheint ein neuer Eintrag direkt
-          unter dem Eingabefeld — kein Scrollen an der ganzen Liste vorbei mehr.
-          Die Leiste bleibt beim Blättern durch ältere Einträge sichtbar (sticky). */}
-      {darfSchreiben && (
-        <div className="etb-erfassung-sticky">
-          {berichtigungZu ? (
-            <Schnellerfassung
-              key="berichtigung"
-              erfassen={erfassenMitMeldung}
-              berichtigungZu={berichtigungZu}
-              onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
-              bausteine={bausteineQuery.data ?? []}
-              einsatz={einsatz}
-            />
-          ) : (
-            <EtbEntwurfsTabs
-              key={einsatzId}
-              einsatzId={einsatzId}
-              erfassen={erfassenMitMeldung}
-              bausteine={bausteineQuery.data ?? []}
-              einsatz={einsatz}
-              kontextLaedt={einsatzQuery.isFetching}
-              werteBehalten={werteBehalten}
-              onWerteBehaltenChange={setWerteBehalten}
+          {/* Die Meldung steht ÜBER der Zeitachse, statt sie auszutauschen: bereits geladene
+              Einträge bleiben lesbar, wenn nur das Nachladen scheitert (Spec-Festlegung D4). */}
+          {etbQuery.isError && (
+            <div style={{ marginBottom: token.marginSM }}>
+              <SeitenFehler
+                text="ETB-Einträge konnten nicht geladen werden"
+                ursache={etbQuery.error}
+                onWiederholen={() => void etbQuery.refetch()}
+              />
+            </div>
+          )}
+
+          {abgelehnt.length > 0 && (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: token.marginSM }}
+              title={`${abgelehnt.length} gepufferte(r) Eintrag/Einträge wurde(n) vom Server abgelehnt und NICHT gespeichert`}
+              description={
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {abgelehnt.map((a) => (
+                    <li key={a.id}>
+                      {a.eintrag.inhalt} — {a.grund}
+                      {a.id != null && (
+                        <Button type="link" onClick={() => void abgelehntVerwerfen(a.id!)}>
+                          verwerfen
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              }
             />
           )}
-        </div>
-      )}
+          {ausstehend.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: token.marginSM }}
+              title={`${ausstehend.length} Eintrag/Einträge werden gesendet, sobald wieder Verbindung besteht`}
+              description={
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {ausstehend.map((a) => (
+                    <li key={a.id}>{a.eintrag.inhalt}</li>
+                  ))}
+                </ul>
+              }
+            />
+          )}
 
-      {/* Die Meldung steht ÜBER der Tabelle, statt sie auszutauschen: bereits geladene
-          Einträge bleiben lesbar, wenn nur das Nachladen scheitert. Den Leertext
-          unterdrückt dafür `EtbTabelle` (Spec-Festlegung D4). Wortlaut unverändert,
-          dazugekommen sind Ursache und Wiederholung. */}
-      {etbQuery.isError && (
-        <div style={{ marginBottom: 12 }}>
-          <SeitenFehler
-            text="ETB-Einträge konnten nicht geladen werden"
-            ursache={etbQuery.error}
-            onWiederholen={() => void etbQuery.refetch()}
+          <div
+            ref={zeitachseKopf}
+            data-lfh="etb-zeitachse-rahmen"
+            style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
+          >
+            <EtbZeitachse
+              zeilen={chronologie}
+              einsatzId={einsatzId}
+              highlightId={highlightId}
+              ladend={etbQuery.isLoading}
+              fehler={etbQuery.isError}
+              leerText={leerInhalt}
+              onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+              onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
+              onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
+              onErneutSenden={(p) => void abgelehntErneutSenden(p)}
+              onVerwerfen={(p) => {
+                if (p.id != null) void abgelehntVerwerfen(p.id);
+              }}
+            />
+          </div>
+
+          {etbQuery.hasNextPage && (
+            <div style={{ textAlign: 'center', marginTop: token.marginSM }}>
+              <Button
+                onClick={() => etbQuery.fetchNextPage()}
+                loading={etbQuery.isFetchingNextPage}
+              >
+                Ältere laden
+              </Button>
+            </div>
+          )}
+
+          {/* Die Erfassung am SEITENFUSS, angepinnt (Begründung an `erfassenMitMeldung`).
+              Sie steht in der Spalte der Zeitachse, nicht unter der Seitenleiste — so bleibt
+              sie beim Blättern im Bild, solange die Zeitachse es ist. */}
+          {darfSchreiben && (
+            <div
+              className={
+                breit
+                  ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste'
+                  : 'etb-erfassung-sticky'
+              }
+            >
+              {berichtigungZu ? (
+                <Schnellerfassung
+                  key="berichtigung"
+                  erfassen={erfassenMitMeldung}
+                  berichtigungZu={berichtigungZu}
+                  onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+                  bausteine={bausteineQuery.data ?? []}
+                  einsatz={einsatz}
+                />
+              ) : (
+                <EtbEntwurfsTabs
+                  key={einsatzId}
+                  einsatzId={einsatzId}
+                  erfassen={erfassenMitMeldung}
+                  bausteine={bausteineQuery.data ?? []}
+                  einsatz={einsatz}
+                  kontextLaedt={einsatzQuery.isFetching}
+                  werteBehalten={werteBehalten}
+                  onWerteBehaltenChange={setWerteBehalten}
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Seitenleiste ab `xl` rechts (Entwurf S4), darunter UNTER der Zeitachsenspalte —
+            nicht dazwischen, damit die angepinnte Erfassung am Fuß der Zeitachse bleibt. */}
+        <aside
+          aria-label="Bilanz des Tagebuchs"
+          style={
+            breit
+              ? {
+                  flex: `0 0 ${LEISTE_BREITE}px`,
+                  width: LEISTE_BREITE,
+                  position: 'sticky',
+                  top: token.margin,
+                }
+              : undefined
+          }
+        >
+          <EtbBilanz
+            einsatzId={einsatzId}
+            eintraege={eintraege}
+            weitereSeiten={etbQuery.hasNextPage}
+            filterAktiv={filterAktiv}
+            puffer={puffer}
+            unbestimmt={!etbQuery.isSuccess}
           />
-        </div>
-      )}
-
-      <div ref={filterWurzel}>
-        <EtbFilterleiste key={filterMarke} startWerte={filter} onChange={filterAendern} />
+        </aside>
       </div>
-      {abgelehnt.length > 0 && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 12 }}
-          title={`${abgelehnt.length} gepufferte(r) Eintrag/Einträge wurde(n) vom Server abgelehnt und NICHT gespeichert`}
-          description={
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {abgelehnt.map((a) => (
-                <li key={a.id}>
-                  {a.eintrag.inhalt} — {a.grund}
-                  {a.id != null && (
-                    <Button type="link" onClick={() => void abgelehntVerwerfen(a.id!)}>
-                      verwerfen
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          }
-        />
-      )}
-      {ausstehend.length > 0 && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          title={`${ausstehend.length} Eintrag/Einträge werden gesendet, sobald wieder Verbindung besteht`}
-          description={
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {ausstehend.map((a) => (
-                <li key={a.id}>{a.eintrag.inhalt}</li>
-              ))}
-            </ul>
-          }
-        />
-      )}
-      <EtbTabelle
-        zeilen={chronologie}
-        einsatzId={einsatzId}
-        highlightId={highlightId}
-        ladend={etbQuery.isLoading}
-        fehler={etbQuery.isError}
-        leerText={leerInhalt}
-        onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
-        onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
-        onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
-        onErneutSenden={(p) => void abgelehntErneutSenden(p)}
-        onVerwerfen={(p) => {
-          if (p.id != null) void abgelehntVerwerfen(p.id);
-        }}
-      />
-
-      {etbQuery.hasNextPage && (
-        <div style={{ textAlign: 'center', marginTop: 12 }}>
-          <Button onClick={() => etbQuery.fetchNextPage()} loading={etbQuery.isFetchingNextPage}>
-            Ältere laden
-          </Button>
-        </div>
-      )}
 
       {darfSchreiben && (
         <WiedervorlageModal
@@ -516,6 +672,6 @@ export default function EtbPage() {
           }
         />
       )}
-    </div>
+    </EinsatzSeite>
   );
 }

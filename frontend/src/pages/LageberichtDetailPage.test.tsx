@@ -90,9 +90,13 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     } as never);
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
     renderBei('/einsaetze/1/lageberichte/9');
-    const etikett = (await screen.findByText('Freigegeben')).closest('.ant-tag');
-    expect(etikett).toHaveClass('ant-tag-success');
-    expect(etikett).not.toHaveClass('ant-tag-green');
+    // Neuentwurf: die Phase trägt eine getönte Statusfläche (`StatusChip`), kein antd-Tag.
+    // Die Aussage bleibt dieselbe — die Farbe kommt aus der Phasenachse (`abgeschlossen` →
+    // Ton `normal`), nicht aus einem handgeschriebenen Grün, und es gibt kein Tag-Preset.
+    const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status-chip"]');
+    expect(etikett).toHaveAttribute('data-ton', 'normal');
+    expect(etikett!.closest('[data-phase]')).toHaveAttribute('data-phase', 'abgeschlossen');
+    expect(etikett!.closest('.ant-tag')).toBeNull();
   });
 });
 

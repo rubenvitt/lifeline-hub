@@ -1,20 +1,12 @@
-import {
-  Button,
-  Card,
-  Collapse,
-  Descriptions,
-  Flex,
-  Popconfirm,
-  Space,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
+import { Button, Collapse, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { Auftrag } from '../api/types';
-import { AUFTRAG_STATUS, PRIO_META, StatusBadge, formatZeit } from '../kommunikation';
+import { AUFTRAG_STATUS, PrioBadge, StatusBadge, formatZeit } from '../kommunikation';
+import KommKarte from '../kommunikation/KommKarte';
+import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 
 const { Text } = Typography;
@@ -74,9 +66,8 @@ export default function AuftragKarte({
   onVollzugMelden,
   onAbnehmen,
 }: AuftragKarteProps) {
-  const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
-  const prio = PRIO_META[a.prioritaet] ?? PRIO_META.normal;
   const ueberfaellig = a.ist_ueberfaellig;
   // Eingangszustand (LFH-343 · C8, Befund H47) — derselbe Fall wie
   // `MELDUNG_STATUS.neu`: ein Auftrag, den noch niemand angefasst hat, trug
@@ -150,37 +141,26 @@ export default function AuftragKarte({
     : [];
 
   return (
-    <Card
-      size="small"
+    // Zeitachsen-Optik (Neuentwurf): Erteilungszeit links in Mono, darunter die Nummer.
+    // Der linke Rand ist der Kartenrand-Vertrag aus C8/H47 — überfällig schlägt „offen".
+    <KommKarte
       data-auftrag-id={a.id}
-      data-hervorgehoben={hervorgehoben ? 'true' : undefined}
       data-ueberfaellig={ueberfaellig ? 'true' : undefined}
-      data-unbearbeitet={unbearbeitet ? 'true' : undefined}
-      style={{
-        marginBottom: 10,
-        borderInlineStart: `3px solid ${
-          ueberfaellig ? token.colorError : unbearbeitet ? token.colorWarning : 'transparent'
-        }`,
-        background: ueberfaellig ? token.colorErrorBg : undefined,
-        boxShadow: hervorgehoben ? `0 0 0 2px ${token.colorPrimary}` : undefined,
-      }}
-      styles={{ body: { padding: '12px 16px' } }}
+      alarm={ueberfaellig}
+      unbearbeitet={unbearbeitet}
+      hervorgehoben={hervorgehoben}
+      zeit={<ZeitAnzeige wert={a.erstellt_at} format="uhrzeit" />}
+      nr={a.lfd_nr != null ? `#${a.lfd_nr}` : undefined}
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
-          <Tag color={prio.color} style={{ margin: 0, fontWeight: 600 }}>
-            {prio.label}
-          </Tag>
+          <PrioBadge prio={a.prioritaet} />
           <StatusBadge
             phase={status.phase}
             label={status.label}
             unbearbeitet={!!status.unbearbeitet}
           />
-          {a.richtung === 'extern' && (
-            <Tag color="purple" style={{ margin: 0 }}>
-              Extern
-            </Tag>
-          )}
+          {a.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
           {a.quell_etb_eintrag_id != null && einsatzId != null && (
             <Link to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>↗ ETB-Eintrag</Link>
           )}
@@ -188,11 +168,14 @@ export default function AuftragKarte({
         <Space size={10} wrap>
           {ueberfaellig && (
             <Text type="danger" strong style={{ fontSize: 12 }}>
-              <ClockCircleOutlined /> Überfällig
+              <span aria-hidden="true">
+                <ClockCircleOutlined />
+              </span>{' '}
+              Überfällig
             </Text>
           )}
           {a.frist_at && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
               Frist {formatZeit(a.frist_at)}
             </Text>
           )}
@@ -204,14 +187,15 @@ export default function AuftragKarte({
       </Text>
 
       <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
-        <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+        <Text
+          type="secondary"
+          style={{ ...monoStil(11), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
+        >
           {a.empfaenger_anzahl} Empfänger · {a.quittiert_anzahl}/{a.empfaenger_anzahl} quittiert
         </Text>
         <Space size={4} wrap>
           {quittierteEmpf.map((e) => (
-            <Tag key={e.id} variant="filled" color="green" style={{ margin: 0, fontSize: 12 }}>
-              {e.snap_anzeige} ✓
-            </Tag>
+            <StatusChip key={e.id} ton="normal" wort={`${e.snap_anzeige} ✓`} />
           ))}
           {restEmpf > 0 && (
             <Text type="secondary" style={{ fontSize: 12 }}>
@@ -223,7 +207,7 @@ export default function AuftragKarte({
 
       {/* Quittungs-Aktionen in EIGENER Zeile (LFH-364/B5d, Weg (a) des Elterntickets).
           Der zweite Weg — den Empfänger-Chip komplett antippbar machen — ist verworfen:
-          derselbe Tag trägt oben auch den reinen Statuszustand (grün + ✓). Antippbar und
+          derselbe Chip trägt oben auch den reinen Statuszustand (grün + ✓). Antippbar und
           nicht-antippbar sähen dann gleich aus, die Bedienbarkeit hinge allein an der
           Farbe und der zweite Kanal fehlte (WCAG 1.4.1).
           Der Knopftext bleibt wörtlich „quittieren"; wer für WEN quittiert, steht im
@@ -314,6 +298,6 @@ export default function AuftragKarte({
           {aktionen}
         </Flex>
       )}
-    </Card>
+    </KommKarte>
   );
 }

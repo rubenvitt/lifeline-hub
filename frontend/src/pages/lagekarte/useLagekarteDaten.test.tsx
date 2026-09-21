@@ -159,9 +159,9 @@ describe('useLagekarteDaten Standquelle', () => {
     // Die Zone im Dokument hat keinen eigenen Namen (`label: null`) — übrig bleibt die Stufe.
     // Erwartung als LITERAL, nicht über `zonenBeschriftung`: sonst stünden beide Seiten auf
     // derselben Quelle und eine verbogene Beschriftung bliebe grün.
-    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: mittel');
+    expect(result.current.zonenFeatures[0].label).toBe('mittel');
     // Gegenprobe gegen die Nachbarin auf DERSELBEN Farbe — sie muss am Text auseinandergehen.
-    expect(result.current.zonenFeatures[0].label).not.toBe('Warnstufe: niedrig');
+    expect(result.current.zonenFeatures[0].label).not.toBe('niedrig');
   });
 
   // Codex-Review zu LFH-357 (P1): das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`,
@@ -176,7 +176,7 @@ describe('useLagekarteDaten Standquelle', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
-    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: unbekannt');
+    expect(result.current.zonenFeatures[0].label).toBe('Stufe unbekannt');
     // Die zweite Hälfte der Zusicherung: der vorsichtshalber rote Fallback ist NICHT
     // mitgewandert. Ohne sie beliesse ein Fix, der die Fläche entfärbt, den Test grün.
     const { result: tk } = renderHook(() => theme.useToken(), { wrapper: wrapper() });

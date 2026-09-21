@@ -1,7 +1,6 @@
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
 import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError } from '../api/client';
@@ -15,8 +14,6 @@ import {
 } from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import loginBg from '../assets/login-bg.webp';
-import loginBgLight from '../assets/login-bg-light.webp';
 import './LoginPage.css';
 
 interface FormWerte {
@@ -202,19 +199,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="login-seite"
-      style={
-        {
-          '--login-bg': `url(${loginBg})`,
-          '--login-bg-light': `url(${loginBgLight})`,
-        } as CSSProperties
-      }
-    >
+    <div className="login-seite">
       <div className="login-karte">
         <div className="login-marke">
-          <span className="login-marke__akzent" />
-          <h1 className="login-marke__name">lifeline-hub</h1>
+          <div className="login-marke__zeile">
+            <span className="login-marke__quadrat" aria-hidden="true" />
+            <h1 className="login-marke__name">lifeline-hub</h1>
+          </div>
           <p className="login-marke__untertitel">Einsatzführung &amp; Einsatztagebuch</p>
         </div>
         {fehler && <Alert type="error" title={fehler} style={{ marginBottom: 20 }} showIcon />}

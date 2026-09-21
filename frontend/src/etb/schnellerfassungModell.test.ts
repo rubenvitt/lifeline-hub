@@ -3,8 +3,14 @@ import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import type { EtbBaustein } from '../api/types';
 import {
+  amZeilenanfang,
+  atZielFeld,
   baueEintrag,
+  einheitAusSchluessel,
+  erkenneAtTrigger,
   erkenneSlashTrigger,
+  erkenneTypBefehl,
+  filterAtEintraege,
   filterSlashEintraege,
   METADATEN_FELDER,
   type MetaFeld,
@@ -160,5 +166,69 @@ describe('baueEintrag', () => {
     });
     expect(e.von).toBeUndefined();
     expect(e.an).toBeUndefined();
+  });
+});
+
+describe('Typbefehle (Neuentwurf S4)', () => {
+  it('bietet Typen nur auf Wunsch an — und dann als ERSTE Sektion', () => {
+    expect(filterSlashEintraege('', [], []).typen).toEqual([]);
+    const mit = filterSlashEintraege('an', [], [], { typen: true });
+    expect(mit.typen.map((t) => t.key)).toEqual(['anordnung']);
+    expect(mit.typen[0]).toEqual({ art: 'typ', key: 'anordnung', label: '/anordnung' });
+    // Die Felder bleiben daneben erhalten („An").
+    expect(mit.felder.map((f) => f.key)).toContain('an');
+  });
+
+  it('erkennt den Zeilenanfang — Textanfang oder nach einem Umbruch', () => {
+    expect(amZeilenanfang('/an', 0)).toBe(true);
+    expect(amZeilenanfang('Zeile 1\n/an', 8)).toBe(true);
+    expect(amZeilenanfang('Lage /an', 5)).toBe(false);
+  });
+
+  it('setzt einen ausgetippten Befehl mit Leerzeichen, aber nur exakte Typwörter', () => {
+    expect(erkenneTypBefehl('/anordnung Sandsäcke')).toEqual({
+      typ: 'anordnung',
+      rest: 'Sandsäcke',
+    });
+    expect(erkenneTypBefehl('/lage ')).toEqual({ typ: 'lage', rest: '' });
+    // Kein Leerzeichen: noch nicht fertig getippt.
+    expect(erkenneTypBefehl('/lage')).toBeNull();
+    // Kein Typ, nur ähnlich — und nicht erfassbar.
+    expect(erkenneTypBefehl('/lagebericht x')).toBeNull();
+    expect(erkenneTypBefehl('/system x')).toBeNull();
+    expect(erkenneTypBefehl('/berichtigung x')).toBeNull();
+    // Mitten im Text ist es kein Befehl.
+    expect(erkenneTypBefehl('Lage /anordnung x')).toBeNull();
+  });
+});
+
+describe('@ für Von/An (Neuentwurf S4)', () => {
+  it('erkennt @ am Wortanfang, nicht in einer Adresse', () => {
+    expect(erkenneAtTrigger('Lage @ELW', 9)).toEqual({ aktiv: true, filter: 'ELW', start: 5 });
+    expect(erkenneAtTrigger('mail@example', 12).aktiv).toBe(false);
+  });
+
+  it('ordnet bei einer Anordnung den Empfänger zu, sonst den Absender', () => {
+    expect(atZielFeld('anordnung')).toBe('an');
+    for (const typ of ['meldung', 'lage', 'entscheidung'] as const) {
+      expect(atZielFeld(typ)).toBe('von');
+    }
+  });
+
+  it('beschriftet die Treffer mit dem Zielfeld und bietet Freitext an', () => {
+    const namen = ['ELW 1', 'Florian 1', 'Florian 2'];
+    const meldung = filterAtEintraege('flo', namen, 'meldung');
+    expect(meldung.map((x) => x.label)).toEqual(['Von: Florian 1', 'Von: Florian 2', 'Von: flo']);
+    // Exakter Treffer: kein doppelter Freitext-Eintrag.
+    expect(filterAtEintraege('ELW 1', namen, 'anordnung').map((x) => x.label)).toEqual([
+      'An: ELW 1',
+    ]);
+    // Leerer Filter: nur die Liste, ohne Freitext.
+    expect(filterAtEintraege('', namen, 'lage')).toHaveLength(3);
+  });
+
+  it('kehrt den Schlüssel um, auch wenn der Name selbst einen Doppelpunkt trägt', () => {
+    expect(einheitAusSchluessel('an:ELW 1')).toEqual({ feld: 'an', wert: 'ELW 1' });
+    expect(einheitAusSchluessel('von:Ruf: 4/83-1')).toEqual({ feld: 'von', wert: 'Ruf: 4/83-1' });
   });
 });

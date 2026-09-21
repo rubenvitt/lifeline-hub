@@ -1,4 +1,9 @@
-/* Login-Seite: Vollbild-Hintergrund mit atmosphärischem Lagebild + schwebende Glas-Card. */
+/* Anmeldung im Instrumententafel-Stil (Neuentwurf 21.09.2026): Nachtgrund, Marke als
+   rotes Quadrat plus Wortmarke in Mono, Karte ohne Rundung mit Haarlinie, Bedienung blau.
+   Alle Farben kommen aus den Rollen (`theme/rollen.css`), die mit `data-theme` wechseln —
+   eine eigene Hell-Überschreibung braucht die Seite deshalb nicht mehr. Das frühere
+   Lagebild im Hintergrund samt Glaskarte ist entfallen: ein Foto unter einem Formular ist
+   genau die Atmosphäre, die der Entwurf durch Fläche und Linie ersetzt. */
 
 .login-seite {
   position: relative;
@@ -7,64 +12,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 24px 16px;
   overflow: hidden;
-  background-color: #0b0b0e;
-}
-
-/* Hintergrundbild + abdunkelnder Verlauf für ruhige Lesbarkeit der Card. */
-.login-seite::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(to bottom, rgba(11, 11, 14, 0.55), rgba(11, 11, 14, 0.78)), var(--login-bg);
-  background-size: cover;
-  background-position: center;
-  transform: scale(1.04);
-  animation: login-bg-ein 1.2s ease-out both;
-}
-
-@keyframes login-bg-ein {
-  from {
-    opacity: 0;
-    transform: scale(1.08);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.04);
-  }
+  background: var(--lfh-grund);
+  color: var(--lfh-text);
 }
 
 .login-karte {
   position: relative;
   width: 380px;
   max-width: 100%;
-  /* Auf niedrigen Bildschirmen scrollt die Card intern statt die ganze Seite
-     (Padding der .login-seite = 24px je Seite → 48px abziehen). */
+  /* Auf niedrigen Bildschirmen scrollt die Karte intern statt die ganze Seite
+     (Polsterung der .login-seite = 24px je Seite → 48px abziehen). */
   max-height: calc(100vh - 48px);
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
-  padding: 36px 32px;
-  border-radius: 14px;
-  background: rgba(22, 22, 27, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 24px 60px -12px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
-  /* Ohne Versatz und kürzer (LFH-345 · C10, Befund M18). Die Karte trug 0,15 s Vorlauf
-     plus 0,7 s Dauer; zusammen mit dem gestaffelten Knopf darunter stand der Anmelden-
-     Knopf erst nach 1,06 s vollständig da. Die Bewegung bleibt — sie ist entstaffelt,
-     nicht abgeschafft. */
-  animation: login-karte-ein 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  padding: 32px 28px;
+  border-radius: 0;
+  background: var(--lfh-paneel);
+  border: 1px solid var(--lfh-linie);
+  /* Ohne Versatz und kurz (LFH-345 · C10, Befund M18). Die Karte trug früher 0,15 s
+     Vorlauf plus 0,7 s Dauer; zusammen mit dem gestaffelten Knopf darunter stand der
+     Anmelden-Knopf erst nach 1,06 s vollständig da. Die Bewegung bleibt — sie ist
+     entstaffelt, nicht abgeschafft. */
+  animation: login-karte-ein 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @keyframes login-karte-ein {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -72,74 +49,65 @@
   }
 }
 
-/* Markenbereich: Name + erklärender Untertitel, dezenter roter Akzent. */
+/* Markenbereich: rotes Quadrat + Wortmarke Mono (wie die Markenzelle der Kopfleiste),
+   darunter die Augenbraue. Rot ist hier MARKE, nicht Bedienung — es bedient nichts. */
 .login-marke {
   margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--lfh-linie);
 }
 
-/* Der Akzentstrich ist Signatur-Element 1 der Gestaltungssprache (LFH-352 · A0).
-   Er liest die Markenrolle statt einer antd-Custom-Property — die griff nie, weil der
-   ConfigProvider kein `cssVar: true` setzt, und lief still auf ihren Fallback. Dass
-   `cssVar` aus BLEIBT, ist in A2 (LFH-328) entschieden und begründet: handgeschriebenes
-   CSS liest `--lfh-*`, TSX liest `useToken()`. Radius und Glühen kommen ebenfalls aus
-   den Rollen.
+.login-marke__zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-   Zweimal hat der Erklärtext hier das Gate gerissen, das er erklärt: erst nannte er den
-   Marken-Rot-Wert im Klartext (Gate 5, A1 Festlegung 5), dann die antd-Variable in ihrer
-   `var(…)`-Schreibweise (A2-Kriterium: 0 Vorkommen im Frontend). Beide Male war der Code
-   längst richtig und nur die Prosa daneben. Wer hier etwas ergänzt: die verbotenen
-   Konstrukte umschreiben, nicht zitieren — ein Gate, das an seinem eigenen Erklärtext
-   scheitert, erzieht dazu, es abzuschalten. */
-.login-marke__akzent {
+.login-marke__quadrat {
   display: block;
-  width: 36px;
-  height: 3px;
-  margin-bottom: 16px;
-  border-radius: var(--lfh-radius-marke);
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
   background: var(--lfh-marke);
-  box-shadow: var(--lfh-marke-glut);
 }
 
 .login-marke__name {
   margin: 0;
-  font-family: var(--lfh-schrift-display);
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #f5f5f5;
-  line-height: 1.1;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--lfh-text);
+  line-height: 1.2;
 }
 
 .login-marke__untertitel {
-  margin: 6px 0 0;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: var(--lfh-versal-sperrung);
+  margin: 10px 0 0;
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  font-weight: var(--lfh-typo-augenbraue-gewicht);
+  letter-spacing: var(--lfh-typo-augenbraue-sperrung);
   text-transform: uppercase;
-  /* 0,5 Deckkraft ergab auf der Glaskarte rund 4,4:1 — knapp unter dem Boden aus
-     A1. 0,66 hebt es über 4,5:1, ohne die Metadaten-Stimme laut zu machen. */
-  color: rgba(255, 255, 255, 0.66);
+  color: var(--lfh-schwach);
 }
 
-/* Dev-Schnellanmeldung: dezenter, abgesetzter Block über dem Formular.
-   Nur im Dev-Build sichtbar (siehe LoginPage.tsx). */
+/* Dev-Schnellanmeldung: abgesetzter Block über dem Formular, nur im Dev-Build sichtbar
+   (siehe LoginPage.tsx). */
 .login-dev {
   margin-bottom: 24px;
   padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0;
+  border: 1px dashed var(--lfh-linie-stark);
+  background: var(--lfh-flaeche);
 }
 
 .login-dev__titel {
   display: block;
   margin-bottom: 10px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 1.5px;
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  font-weight: var(--lfh-typo-augenbraue-gewicht);
+  letter-spacing: var(--lfh-typo-augenbraue-sperrung);
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--lfh-schwach);
 }
 
 .login-dev__knoepfe {
@@ -159,19 +127,19 @@
 
 /* Eingangsanimation für die Formularzeilen — ENTSTAFFELT (LFH-345 · C10, Befund M18).
    Felder und Absende-Knopf ziehen gemeinsam auf, ohne Versatz gegeneinander. Der Grund
-   ist nicht Geschmack: der Anmelden-Knopf erschien 0,08 s nach dem Passwortfeld und
-   0,16 s nach dem Benutzernamen — wer schnell tippt und Enter drückt, drückt auf einen
+   ist nicht Geschmack: der Anmelden-Knopf erschien früher 0,08 s nach dem Passwortfeld
+   und 0,16 s nach dem Benutzernamen — wer schnell tippt und Enter drückt, drückt auf einen
    Knopf, der noch halb durchsichtig ist. Ein Absende-Ziel darf nie später da sein als
    die Felder, die es absendet. */
 .login-karte .ant-form-item,
 .login-karte .ant-btn {
-  animation: login-feld-ein 0.35s ease-out both;
+  animation: login-feld-ein 0.3s ease-out both;
 }
 
 @keyframes login-feld-ein {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -179,47 +147,7 @@
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Light-Mode-Overrides. Dunkel ist die Basis (siehe oben); hier wird auf das
-   helle Lagebild + helle Glas-Card umgestellt, sobald <html data-theme="light">.
-   --------------------------------------------------------------------------- */
-[data-theme='light'] .login-seite {
-  background-color: #eef1f5;
-}
-
-[data-theme='light'] .login-seite::before {
-  background-image:
-    linear-gradient(to bottom, rgba(238, 241, 245, 0.45), rgba(238, 241, 245, 0.72)),
-    var(--login-bg-light);
-}
-
-[data-theme='light'] .login-karte {
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow:
-    0 24px 60px -12px rgba(0, 0, 0, 0.18),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
-}
-
-[data-theme='light'] .login-marke__name {
-  color: #1f1f1f;
-}
-
-[data-theme='light'] .login-marke__untertitel {
-  color: rgba(0, 0, 0, 0.5);
-}
-
-[data-theme='light'] .login-dev {
-  border: 1px dashed rgba(0, 0, 0, 0.14);
-  background: rgba(0, 0, 0, 0.02);
-}
-
-[data-theme='light'] .login-dev__titel {
-  color: rgba(0, 0, 0, 0.45);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .login-seite::before,
   .login-karte,
   .login-karte .ant-form-item,
   .login-karte .ant-btn {

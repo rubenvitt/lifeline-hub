@@ -1,15 +1,4 @@
-import {
-  Button,
-  Card,
-  Dropdown,
-  Flex,
-  Modal,
-  Popconfirm,
-  Space,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
+import { Button, Dropdown, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { Select } from '../components/Select';
 import { ClockCircleOutlined, MoreOutlined } from '@ant-design/icons';
@@ -24,6 +13,10 @@ import {
   StatusBadge,
   formatZeit,
 } from '../kommunikation';
+import KommKarte from '../kommunikation/KommKarte';
+import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { istAlarmiert } from './meldungKennzahlen';
 
 const { Text } = Typography;
 
@@ -68,7 +61,7 @@ export interface MeldungKarteProps {
 /**
  * Bestätigungs-Achse (LFH-97) — die Kenntnisnahme-Achse der Sofortmeldung, ORTHOGONAL
  * zum Triage-Status. Bestätigt → gemeinsamer QuittungIndikator; unbestätigt mit
- * Frist/Eskalation → eigenes rotes/oranges Tag (Frist-Read-back, den der Indikator
+ * Frist/Eskalation → eigener Alarm-/Achtung-Chip (Frist-Read-back, den der Indikator
  * nicht abbildet).
  */
 function bestaetigungsAchse(m: Meldung): ReactNode {
@@ -78,15 +71,14 @@ function bestaetigungsAchse(m: Meldung): ReactNode {
   }
   if (m.ist_ueberfaellig || m.eskaliert) {
     return (
-      <Tag color="red" style={{ margin: 0 }}>
-        Bestätigung überfällig{m.eskaliert ? ' (eskaliert)' : ''}
-      </Tag>
+      <StatusChip ton="alarm" wort={`Bestätigung überfällig${m.eskaliert ? ' (eskaliert)' : ''}`} />
     );
   }
   return (
-    <Tag color="orange" style={{ margin: 0 }}>
-      Bestätigung offen bis {formatZeit(m.bestaetigung_frist_at)}
-    </Tag>
+    <StatusChip
+      ton="achtung"
+      wort={`Bestätigung offen bis ${formatZeit(m.bestaetigung_frist_at)}`}
+    />
   );
 }
 
@@ -109,14 +101,11 @@ export default function MeldungKarte({
   onBestaetigen,
   onAuftragErteilen,
 }: MeldungKarteProps) {
-  const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
   // Unübersehbare Hervorhebung (AK1/AK3): unbestätigte überfällige/eskalierte Sofortmeldung.
-  const alarmiert = !!(
-    m.bestaetigung_pflicht &&
-    !m.ist_bestaetigt &&
-    (m.ist_ueberfaellig || m.eskaliert)
-  );
+  // Dieselbe Regel zählt das Kennzahlenband der Seite (`meldungKennzahlen.ts`).
+  const alarmiert = istAlarmiert(m);
   // Eingangszustand (LFH-343 · C8, Befund H47): eine neue Meldung sah exakt aus wie
   // eine bereits gesichtete — beide `phase: 'offen'`, zwei graue Tags, drei
   // Buchstaben Unterschied. Der Akzent liegt auf DEMSELBEN linken Rand wie der
@@ -203,43 +192,26 @@ export default function MeldungKarte({
   const menuItems: MenuProps['items'] = buendeln ? weitere : [];
 
   return (
-    <Card
-      size="small"
+    // Zeitachsen-Optik (Neuentwurf): die Ereigniszeit führt links in Mono, darunter die
+    // laufende Nummer. Der linke Rand ist der Kartenrand-Vertrag aus C8/H47 (`KommKarte`).
+    <KommKarte
       data-meldung-id={m.id}
-      data-hervorgehoben={hervorgehoben ? 'true' : undefined}
-      data-alarm={alarmiert ? 'true' : undefined}
-      data-unbearbeitet={unbearbeitet ? 'true' : undefined}
-      style={{
-        marginBottom: 10,
-        borderInlineStart: `3px solid ${
-          alarmiert ? token.colorError : unbearbeitet ? token.colorWarning : 'transparent'
-        }`,
-        background: alarmiert ? token.colorErrorBg : undefined,
-        boxShadow: hervorgehoben ? `0 0 0 2px ${token.colorPrimary}` : undefined,
-      }}
-      styles={{ body: { padding: '12px 16px' } }}
+      alarm={alarmiert}
+      unbearbeitet={unbearbeitet}
+      hervorgehoben={hervorgehoben}
+      zeit={m.ereigniszeit ? <ZeitAnzeige wert={m.ereigniszeit} format="uhrzeit" /> : '—'}
+      nr={`#${m.lfd_nr}`}
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            #{m.lfd_nr}
-          </Text>
           <PrioBadge prio={m.prioritaet} />
           <StatusBadge
             phase={status.phase}
             label={status.label}
             unbearbeitet={!!status.unbearbeitet}
           />
-          {m.richtung === 'extern' && (
-            <Tag color="purple" style={{ margin: 0 }}>
-              Extern
-            </Tag>
-          )}
-          {m.lagerelevant && (
-            <Tag color="gold" style={{ margin: 0 }}>
-              Lagerelevant ✓
-            </Tag>
-          )}
+          {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
+          {m.lagerelevant && <StatusChip ton="bedien" wort="Lagerelevant ✓" />}
           {m.auftrag_id != null && (
             <Link to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>↗ Auftrag</Link>
           )}
@@ -247,7 +219,10 @@ export default function MeldungKarte({
         <Space size={10} wrap>
           {alarmiert && (
             <Text type="danger" strong style={{ fontSize: 12 }}>
-              <ClockCircleOutlined /> Alarm
+              <span aria-hidden="true">
+                <ClockCircleOutlined />
+              </span>{' '}
+              Alarm
             </Text>
           )}
           {bestaetigungsAchse(m)}
@@ -269,12 +244,12 @@ export default function MeldungKarte({
       </Space>
 
       <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {WEG_LABEL[m.meldeweg]} · {ART_LABEL[m.meldungsart]} · Ereignis:{' '}
           {formatZeit(m.ereigniszeit)}
         </Text>
         {ansicht === 'abgeschlossen' && m.erledigt_at && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
             Erledigt: {formatZeit(m.erledigt_at)}
           </Text>
         )}
@@ -292,7 +267,11 @@ export default function MeldungKarte({
             aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
           />
         ) : (
-          m.bearbeiter_name && <Tag style={{ margin: 0 }}>Bearbeiter: {m.bearbeiter_name}</Tag>
+          m.bearbeiter_name && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Bearbeiter: {m.bearbeiter_name}
+            </Text>
+          )
         )}
       </Flex>
 
@@ -359,6 +338,6 @@ export default function MeldungKarte({
         }}
         onCancel={() => setErledigtOffen(false)}
       />
-    </Card>
+    </KommKarte>
   );
 }

@@ -1,35 +1,80 @@
 /**
- * Lage-Dashboard — die Referenzseite der Gestaltungssprache (LFH-352 · A0).
+ * Lage-Dashboard — die ganze Lage auf einem Schirm (Neuentwurf „Instrumententafel" S3,
+ * `docs/design/2026-09-21-neuentwurf/neuentwurf.dc.html`).
  *
- * Diese Seite ist der Maßstab, gegen den jeder Band-C-Modulumbau geprüft wird.
- * Eine Gestaltungssprache, die nur im Dokument steht, wird nicht befolgt.
+ * ── AUFBAU ──────────────────────────────────────────────────────────────────────────
  *
- * Sie zeigt die fünf Signatur-Elemente an echten Daten: Akzentstrich als Marke,
- * Dreieck als Sektionsmarke (DV 102), Zahlen als Instrument (`tabular-nums`),
- * Instrumentenband, gesperrte Versalien als Metadaten-Stimme.
+ * Seitenkopf (`EinsatzSeite`, 44 px): „Lagebild <TT.MM. HH:MM>", rechts Mono-Meta mit dem
+ * Alter des Datenstands und — nur wenn die höchste Warnstufe ein Alarmbeitrag ist — dem
+ * Warnstufen-Hinweis. Darunter die volle Fläche im FUGENRASTER (`gap: 1px` auf `linie`):
  *
- * DREI DATENZUSTÄNDE, DREI ERSCHEINUNGEN. Der Sweep-Befund lautete „Fehler sieht
- * aus wie leer": eine fehlgeschlagene Abfrage rendert denselben Leerzustand wie
- * „nichts vorhanden", und das Dashboard meldete während des Ladens „Kräfte
- * 0/0/0//0". Wer in dem Moment ans Funkgerät geht, meldet eine falsche Lage.
- * Deshalb hängt jede Kachel an ihren eigenen Queries und unterscheidet
- * `lädt` / `Fehler` / `leer` sichtbar.
+ *  1. Kennzahlenband, sechs Zellen in fester Reihenfolge (`KENNZAHL_ETIKETTEN`).
+ *  2. Drei Paneele nebeneinander (1fr 1fr 1.1fr, unter `lg` gestapelt): Gefahrenmatrix
+ *     (je Gefahrentyp über alle Gebiete auf die höchste Stufe verdichtet), Sichtung (BBK-
+ *     Farben, Anteil an allen Gesichteten), Meldungsstrom (jüngste ETB-Einträge aller Typen,
+ *     neue per Sammelbanner, nie eingeschoben).
+ *  3. Führungsstand, ein zweites, kleines Band — siehe unten.
+ *
+ * ── WAS AUS DEN SECHS KACHELN WURDE (Entscheidung, begründet) ──────────────────────
+ *
+ * Die A0-Referenzseite hatte sechs Kacheln (Betroffene, Kräfte, Infrastruktur,
+ * Lagebericht, Aufträge, Meldungen) und ein Instrumentenband. Der Neuentwurf zeigt nur
+ * Kennzahlen und drei Paneele. Geprüft wurde je Kachel, was ohne Verlust wichtiger
+ * Information aufgeht:
+ *
+ *  - **Betroffene** → Kennzahl „Betroffene" (Notiz Patienten) + Kennzahl „Vermisste" +
+ *    Paneel Sichtung. Nichts verloren.
+ *  - **Kräfte** → Kennzahl „Kräfte" (Gesamtstärke, Notiz Einheiten + F/UF/M//Σ). Die
+ *    BOS-Schreibweise des Bands bleibt damit erhalten. Abschnitte und „Fahrzeuge
+ *    gebunden" entfallen hier — sie sind die Frage des Meldebilds, nicht der Lage.
+ *  - **Infrastruktur** → „Schäden offen" bleibt Kennzahl; „UHS aktiv" wandert in den
+ *    Führungsstand. „Tiere aktiv" und „Lagezonen" entfallen: sie stehen auf ihren
+ *    Modulseiten und auf der Lagekarte, eine Zahl ohne Bezug sagt dort mehr als hier.
+ *  - **Lagebericht, Aufträge, Meldungen** → der FÜHRUNGSSTAND: vier kleine Kennzahlen
+ *    (Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv). Der Grund, sie nicht
+ *    ersatzlos der Überblicksseite (S2) zu überlassen: an ihnen hängen die einzigen
+ *    ALARMBEITRÄGE der alten Seite, die sonst verschwänden — überfällige Aufträge und
+ *    überfällige Meldungen. „Ganze Lage auf einem Schirm" heißt, dass eine überfällige
+ *    Sofortmeldung hier rot steht. Die Kurzlisten (je drei Zeilen) und der Lageauszug
+ *    entfallen; die Zeilen liest man in ihren Modulen, der Meldungsstrom zeigt das Neue.
+ *  - **Instrumentenband** → DTG und Einsatzname trägt jetzt der Rahmen (Kopfleiste mit Uhr,
+ *    Einsatznummer und -name, Seitenkopf mit Lagebild-Zeit). Der Verbindungszustand steht
+ *    in der SYNC-Anzeige der Kopfleiste (dieselbe Quelle `liveStatusStore`) und als Meta
+ *    des Meldungsstroms: „live" nur bei offener Leitung.
+ *
+ * Weggelassen, weil keine Datenquelle existiert: Pegel (LFH-606), Evakuiert (LFH-607),
+ * „Transportiert / offen" im Sichtungsfuß (LFH-613, Verbleib ist Freitext).
+ *
+ * ── DATENZUSTÄNDE ──────────────────────────────────────────────────────────────────
+ *
+ * Jede Kennzahl und jedes Paneel hängt an den Zuständen IHRER Abfragen und unterscheidet
+ * `laden` / `fehler` / `leer` sichtbar (LFH-331 · B3: „Fehler sieht aus wie leer"). Fällt
+ * die Gefahrenmatrix aus, bleibt die Patientenzahl lesbar.
  */
-import { useMemo, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
+import { TbAlertTriangle } from 'react-icons/tb';
 import { einsatzKeys } from '../../api/queryKeys';
-import { auftraegePfad, einsatzModulPfad, meldungenPfad } from '../../routing/deeplinks';
+import {
+  auftraegePfad,
+  einsatzModulPfad,
+  etbPfad,
+  gefahrenPfad,
+  lageberichtDetailPfad,
+  lageberichtePfad,
+  meldungenPfad,
+  personenAufnahmePfad,
+  personenPfad,
+  unfallhilfsstellenListePfad,
+} from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
-import type { LiveVerbindungsStatus } from '../../live/useEinsatzLiveStream';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
-import { listeTiere } from '../../api/einsatzTier';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchaeden } from '../../api/einsatzSchaden';
-import { ladeGefahrengebiete } from '../../api/gefahren';
-import { listeZonen } from '../../api/lagezonen';
+import { ladeGefahrengebiete, ladeMatrix } from '../../api/gefahren';
 import { listeLageberichte } from '../../api/lageberichte';
 import { listeAuftraege } from '../../api/auftraege';
 import { listeMeldungen } from '../../api/meldungen';
@@ -38,173 +83,73 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
-import { baueLagebild, dtgJetzt, type Datenzustand } from './lagebild';
-import { dringlichkeit, type Dringlichkeit } from '../../theme/statusFarben';
-import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import '../../theme/sprache.css';
+import { listeEtb } from '../../api/etb';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import { formatUhrzeitMitTag } from '../../anzeige/format';
+import EinsatzSeite from '../../components/EinsatzSeite';
+import { gemeinsamerDatenstand } from '../../components/Datenstand';
+import { useViewport } from '../../components/useViewport';
+import {
+  Kennzahl,
+  Kennzahlenband,
+  monoStil,
+  useRollen,
+  type KennzahlZustand,
+} from '../../components/instrument';
+import { warnstufeKennzahl } from '../../theme/statusFarben';
+import {
+  KENNZAHL_ETIKETTEN,
+  baueLagebild,
+  lagebildZeit,
+  standText,
+  warnstufeTon,
+  type Datenzustand,
+  type KennzahlEtikett,
+} from './lagebild';
+import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
+import { STROM_ABRUF, stromAuswahl, wassermarkeNachziehen } from './meldungsstrom';
+import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './LagePaneele';
 
-/** Verdichtet mehrere Queries auf den Zustand, den ihre Kachel zeigen muss.
- *  Fehler schlägt Laden: eine halb geladene Kachel mit einem toten Teil darf
- *  nicht so aussehen, als wäre sie vollständig. */
+/** Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener
+ *  Block mit einem toten Teil darf nicht so aussehen, als wäre er vollständig. */
 function zustandVon(...queries: UseQueryResult<unknown>[]): Datenzustand {
   if (queries.some((q) => q.isError)) return 'fehler';
   if (queries.some((q) => q.isLoading)) return 'laden';
   return 'daten';
 }
 
-/**
- * Der Wortlaut des Ladezustands — an EINER Stelle, weil er im Band und in der
- * Kennzahlenleiste dasselbe bedeuten muss (LFH-331 · B3).
- *
- * Er ersetzt den Gedankenstrich im Band: der stand dort während des Abrufs und
- * bedeutet anderswo „kein Wert" — genau die Verwechslung von „lädt" und „ist
- * nichts", gegen die dieses Ticket antritt.
- */
-const LADETEXT = 'wird abgerufen';
-
-/**
- * Wortlaut je Verbindungszustand.
- *
- * `Record` über die volle {@link LiveVerbindungsStatus}-Union, damit eine fünfte
- * Variante hier den Build bricht statt still auf einen Vorgabetext zu fallen.
- *
- * `idle` heißt „noch keine Meldung" und nicht „gestört" — vor dem ersten
- * Stream-Ereignis wäre eine Störungsmeldung eine Falschaussage in die andere
- * Richtung. Es trägt aber auch nicht den Wortlaut von `open`: `meldeStatus('open')`
- * feuert erst in dessen `onopen` (`useEinsatzLiveStream.ts`), auf dieser vom
- * Einsatz-Layout gemounteten Route kann `idle` also nur „noch nicht offen"
- * bedeuten — dauerhaft, wenn eine Verbindung hängt, ohne zu öffnen oder zu
- * erroren. „Live verbunden" wäre dort eine Zusage an eine Leitung, die noch
- * nichts überträgt. Alarmiert wird weiterhin nur bei `lost`.
- */
-const VERBINDUNG_WORTLAUT: Record<LiveVerbindungsStatus, string> = {
-  idle: 'Verbindung wird aufgebaut',
-  open: 'Live verbunden',
-  connecting: 'Verbindung wird aufgebaut',
-  lost: 'Verbindung unterbrochen',
-};
-
-/**
- * Die sechs Kennzahl-Etiketten, in der Reihenfolge aus `lagebild.ts`.
- *
- * Sie stehen hier ein zweites Mal, weil vor dem ersten Einsatz-Abruf gar kein
- * Lagebild existiert und die Leiste ihre Plätze trotzdem stellen muss — sonst
- * bleibt sie leer und sechs Knöpfe springen später herein (Prüfliste Kriterium 12,
- * CLS ≤ 0,1). Die Doppelung ist gegen Drift abgesichert, nicht dem Zufall
- * überlassen: `LageDashboardPage.test.tsx` pinnt BEIDE Reihen gegen dieselben
- * handgeschriebenen Literale — die geladene Leiste und diese hier. Wandert eine
- * Kennzahl, wird eine der beiden Prüfungen rot.
- */
-const KENNZAHL_ETIKETTEN = [
-  'Kräfte F/UF/M//Σ',
-  'Patienten SK I–IV',
-  'Vermisst',
-  'Höchste Warnstufe',
-  'Schäden offen',
-  'UHS aktiv',
-] as const;
-
-function Plakette({ stufe, children }: { stufe: Dringlichkeit; children: React.ReactNode }) {
-  return <span className={`lfh-plakette lfh-plakette--${stufe}`}>{children}</span>;
+/** `Datenzustand` → Zustand der Kennzahl (`leer` gibt es dort nicht: eine Null ist ein Wert). */
+function alsKennzahlZustand(z: Datenzustand): KennzahlZustand {
+  return z === 'leer' ? 'daten' : z;
 }
 
 /**
- * Der Dringlichkeitsmarker einer Kurzlisten-Zeile — mit zweitem Kanal (LFH-395).
- *
- * Die Form kommt aus {@link dringlichkeit}, die Farbe aus der
- * Stufenklasse; `sprache.css` hält beide Achsen getrennt.
- *
- * Er ist NICHT mehr `aria-hidden`: als einziger Träger der Dringlichkeit wäre
- * die Zeile sonst für Vorlesende stufenlos. Ein eigenes Vorleseziel wird er
- * dadurch nicht — er steht INNERHALB des Zeilen-Links, dessen Name sich aus
- * seinem Inhalt bildet, das Stufenwort fliesst also in den Linknamen ein. Genau
- * deshalb bleibt das Zeichen im Kachelkopf `aria-hidden`: dort ist es Deko und
- * hätte nichts zu sagen.
+ * Lesebreite der Fläche. Der Entwurf füllt den Inhaltsbereich (1440er-Schirm → ~1170 px);
+ * darüber hinaus würden die drei Paneele zu Zeilen ohne Blickführung gestreckt. `flaeche`
+ * in `theme/tokens.ts` kennt nur die Lesebreiten der Formular- und Listenseiten.
  */
-function Zeichen({ stufe }: { stufe: Dringlichkeit }) {
-  const { form, label } = dringlichkeit[stufe];
-  return (
-    <span
-      className={`lfh-zeichen lfh-zeichen--${form} lfh-zeichen--${stufe}`}
-      role="img"
-      aria-label={label}
-    />
-  );
-}
+const LAGEBILD_BREITE = 1600;
 
-function Kachel(props: {
-  titel: string;
-  mehr: string;
-  zustand: Datenzustand;
-  leer?: boolean;
-  leerText: string;
-  leerAktion: string;
-  aufMehr: () => void;
-  aufNeuladen: () => void;
-  breit?: boolean;
-  children: React.ReactNode;
-}) {
-  const { titel, mehr, zustand, leer, leerText, leerAktion, aufMehr, aufNeuladen, breit } = props;
-  return (
-    <section className={`lfh-kachel${breit ? ' lfh-kachel--breit' : ''}`}>
-      <header className="lfh-kachel__kopf">
-        {/* Deko, kein Status: stufenlos und stumm (LFH-395). Die Formklasse ist
-            trotzdem Pflicht — die Basis trägt seit LFH-395 keine Geometrie. */}
-        <span className="lfh-zeichen lfh-zeichen--dreieck" aria-hidden="true" />
-        <h2 className="lfh-kachel__titel">{titel}</h2>
-        <button type="button" className="lfh-kachel__mehr lfh-knopf-blank" onClick={aufMehr}>
-          {mehr}
-        </button>
-      </header>
-      <div className="lfh-kachel__leib">
-        {zustand === 'laden' && (
-          <div className="lfh-skelett" aria-busy="true" aria-label={`${titel} wird geladen`}>
-            <span className="lfh-skelett__balken lfh-skelett__balken--gross" />
-            <span className="lfh-skelett__balken" />
-            <span className="lfh-skelett__balken lfh-skelett__balken--kurz" />
-          </div>
-        )}
-        {zustand === 'fehler' && (
-          <div className="lfh-fehler" role="alert">
-            <span className="lfh-fehler__zeichen" aria-hidden="true">
-              !
-            </span>
-            <div>
-              <b className="lfh-fehler__titel">Daten nicht abrufbar</b>
-              <p className="lfh-fehler__text">
-                Stand unbekannt — nicht als Lage melden. Letzter Abruf fehlgeschlagen.
-              </p>
-              <button type="button" className="lfh-knopf" onClick={aufNeuladen}>
-                Erneut abrufen
-              </button>
-            </div>
-          </div>
-        )}
-        {zustand === 'daten' && leer && (
-          <div className="lfh-leer">
-            <p className="lfh-leer__text">{leerText}</p>
-            <button type="button" className="lfh-knopf" onClick={aufMehr}>
-              {leerAktion}
-            </button>
-          </div>
-        )}
-        {zustand === 'daten' && !leer && props.children}
-      </div>
-    </section>
-  );
+/** Takt der Uhr: „Stand vor n s" und die Einsatzdauer laufen mit, ohne jede Sekunde zu rendern. */
+const TAKT_MS = 5000;
+
+function useJetzt(taktMs: number): number {
+  const [jetzt, setJetzt] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setJetzt(Date.now()), taktMs);
+    return () => window.clearInterval(id);
+  }, [taktMs]);
+  return jetzt;
 }
 
 export default function LageDashboardPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  const gehe = (route: string) => navigate(einsatzModulPfad(einsatzId, route));
-
-  // Der Verbindungszustand kommt aus DERSELBEN Quelle wie die globale
-  // Betriebszeile (LFH-336 · M3). Vorher stand hier eine Ableitung aus
-  // Query-Fehlern — die meldete bei totem SSE weiter „Live verbunden", weil ein
-  // abgerissener Stream keine Abfrage rot färbt: der Cache liefert brav die alten
-  // Daten. Genau das ist der Zustand, in dem jemand eine veraltete Lage funkt.
+  const { token, rollen } = useRollen();
+  const { abBreite } = useViewport();
+  const { konventionen: konv } = useAnzeigeKonventionen();
+  const jetzt = useJetzt(TAKT_MS);
   const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
 
   const einsatzQuery = useQuery({
@@ -214,10 +159,6 @@ export default function LageDashboardPage() {
   const personenQuery = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
-  });
-  const tiereQuery = useQuery({
-    queryKey: einsatzKeys.tiere(einsatzId),
-    queryFn: () => listeTiere(einsatzId),
   });
   const uhsQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
@@ -230,10 +171,6 @@ export default function LageDashboardPage() {
   const gefahrenQuery = useQuery({
     queryKey: einsatzKeys.gefahrengebiete(einsatzId),
     queryFn: () => ladeGefahrengebiete(einsatzId),
-  });
-  const zonenQuery = useQuery({
-    queryKey: einsatzKeys.zonen(einsatzId),
-    queryFn: () => listeZonen(einsatzId),
   });
   const lageberichteQuery = useQuery({
     queryKey: einsatzKeys.lageberichte(einsatzId),
@@ -267,36 +204,53 @@ export default function LageDashboardPage() {
     queryKey: einsatzKeys.meldungen(einsatzId),
     queryFn: () => listeMeldungen(einsatzId),
   });
+  // Die Matrix je Gefahrengebiet, unter DEMSELBEN Key wie die Gefahrenseite
+  // (`gefahrenmatrix(einsatzId, gebietId)`): der Cache wird geteilt, und das Live-Event
+  // `gefahr` invalidiert beide.
+  const matrixQueries = useQueries({
+    queries: (gefahrenQuery.data ?? []).map((g) => ({
+      queryKey: einsatzKeys.gefahrenmatrix(einsatzId, g.id),
+      queryFn: () => ladeMatrix(einsatzId, g.id),
+    })),
+  });
+  // Eigener Filter-Key (`{ limit }`), getrennt vom Endlos-Abruf der ETB-Seite (`{}`): beide
+  // hängen am Prefix `etb`, das Live-Event invalidiert also auch diesen.
+  const etbQuery = useQuery({
+    queryKey: einsatzKeys.etbListe(einsatzId, { limit: STROM_ABRUF }),
+    queryFn: () => listeEtb(einsatzId, { limit: STROM_ABRUF }),
+  });
 
   const einsatz = einsatzQuery.data;
 
   const lagebild = useMemo(() => {
     if (!einsatz) return null;
-    return baueLagebild({
-      einsatz,
-      personen: personenQuery.data ?? [],
-      tiere: tiereQuery.data ?? [],
-      uhs: uhsQuery.data ?? [],
-      schaeden: schaedenQuery.data ?? [],
-      gefahren: gefahrenQuery.data ?? [],
-      zonen: zonenQuery.data ?? [],
-      lageberichte: lageberichteQuery.data ?? [],
-      einheiten: einheitenQuery.data ?? [],
-      personal: personalQuery.data ?? [],
-      fahrzeuge: fahrzeugeQuery.data ?? [],
-      material: materialQuery.data ?? [],
-      abschnitte: abschnitteQuery.data ?? [],
-      auftraege: auftraegeQuery.data ?? [],
-      meldungen: meldungenQuery.data ?? [],
-    });
+    return baueLagebild(
+      {
+        einsatz,
+        personen: personenQuery.data ?? [],
+        uhs: uhsQuery.data ?? [],
+        schaeden: schaedenQuery.data ?? [],
+        gefahren: gefahrenQuery.data ?? [],
+        lageberichte: lageberichteQuery.data ?? [],
+        einheiten: einheitenQuery.data ?? [],
+        personal: personalQuery.data ?? [],
+        fahrzeuge: fahrzeugeQuery.data ?? [],
+        material: materialQuery.data ?? [],
+        abschnitte: abschnitteQuery.data ?? [],
+        auftraege: auftraegeQuery.data ?? [],
+        meldungen: meldungenQuery.data ?? [],
+      },
+      jetzt,
+      konv,
+    );
   }, [
     einsatz,
+    jetzt,
+    konv,
     personenQuery.data,
-    tiereQuery.data,
     uhsQuery.data,
     schaedenQuery.data,
     gefahrenQuery.data,
-    zonenQuery.data,
     lageberichteQuery.data,
     einheitenQuery.data,
     personalQuery.data,
@@ -307,7 +261,18 @@ export default function LageDashboardPage() {
     meldungenQuery.data,
   ]);
 
-  // Je Kachel der Zustand ihrer eigenen Quellen — nicht ein globaler.
+  // ── Meldungsstrom: Wassermarke statt Einschieben (Festlegung 6) ──────────────────────
+  const [angezeigtBis, setAngezeigtBis] = useState<number | null>(null);
+  const etbDaten = etbQuery.data;
+  // Abgeleiteter Zustand während des Renderns (React-Muster „storing information from
+  // previous renders"): der erste Abruf und ein leer gewordenes Paneel ziehen die Marke
+  // nach, alles andere wartet auf „anzeigen".
+  if (etbDaten && wassermarkeNachziehen(etbDaten, angezeigtBis)) {
+    setAngezeigtBis(stromAuswahl(etbDaten, null).hoechste);
+  }
+  const strom = stromAuswahl(etbDaten ?? [], angezeigtBis);
+
+  // ── Zustände je Block ─────────────────────────────────────────────────────────────────
   const zBetroffene = zustandVon(personenQuery);
   const zKraefte = zustandVon(
     abschnitteQuery,
@@ -316,360 +281,245 @@ export default function LageDashboardPage() {
     fahrzeugeQuery,
     materialQuery,
   );
-  const zInfra = zustandVon(uhsQuery, schaedenQuery, tiereQuery, zonenQuery);
-  const zBericht = zustandVon(lageberichteQuery);
-  const zAuftraege = zustandVon(auftraegeQuery);
-  const zMeldungen = zustandVon(meldungenQuery);
-  // Je Kennzahl der Zustand IHRER Quelle, nicht ein Sammelzustand: fällt die
-  // Gefahrenmatrix aus, darf das die Patientenzahl nicht mit unkenntlich machen.
-  // Die Reihenfolge ist die aus `baueLagebild` — beide Listen stehen und fallen
-  // gemeinsam, deshalb prüft ein Test sie gegeneinander.
-  const kennzahlZustaende: Datenzustand[] = [
-    zKraefte,
-    zBetroffene,
-    zBetroffene,
-    zustandVon(gefahrenQuery),
-    zustandVon(schaedenQuery),
-    zustandVon(uhsQuery),
-  ];
+  const zGefahren = zustandVon(gefahrenQuery);
+  const zMatrixRoh = zustandVon(gefahrenQuery, ...matrixQueries);
+  const matrix = verdichteGefahrenmatrix(matrixQueries.flatMap((q) => q.data ?? []));
+  const anzahlGebiete = gefahrenQuery.data?.length ?? 0;
+  const zMatrix: Datenzustand =
+    zMatrixRoh === 'daten' && matrix.zeilen.length === 0 ? 'leer' : zMatrixRoh;
+  const zStromRoh = zustandVon(etbQuery);
+  const zStrom: Datenzustand =
+    zStromRoh === 'daten' && (etbDaten ?? []).length === 0 ? 'leer' : zStromRoh;
+
+  // Je Kennzahl der Zustand IHRER Quelle, in der Reihenfolge von KENNZAHL_ETIKETTEN — als
+  // `Record` über die Etiketten, damit eine siebte Kennzahl hier den Build bricht, statt
+  // still den Zustand einer anderen zu tragen.
+  const kennzahlZustand: Record<KennzahlEtikett, Datenzustand> = {
+    Betroffene: zBetroffene,
+    Kräfte: zKraefte,
+    Vermisste: zBetroffene,
+    'Höchste Warnstufe': zGefahren,
+    'Schäden offen': zustandVon(schaedenQuery),
+    Einsatzdauer: zustandVon(einsatzQuery),
+  };
+
+  const datenstand = gemeinsamerDatenstand(
+    einsatzQuery.dataUpdatedAt,
+    personenQuery.dataUpdatedAt,
+    gefahrenQuery.dataUpdatedAt,
+    schaedenQuery.dataUpdatedAt,
+    einheitenQuery.dataUpdatedAt,
+    auftraegeQuery.dataUpdatedAt,
+    meldungenQuery.dataUpdatedAt,
+    etbQuery.dataUpdatedAt,
+  );
 
   if (einsatzQuery.isError || (!einsatzQuery.isLoading && !einsatz)) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
 
+  const warnTon =
+    zGefahren === 'daten' && lagebild ? warnstufeTon(lagebild.hoechsteWarnstufe) : 'neutral';
+  const breit = abBreite('lg');
+  const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
+  const fuehrung = lagebild?.fuehrung;
+  const zFuehrung = (q: UseQueryResult<unknown>): KennzahlZustand =>
+    lagebild ? alsKennzahlZustand(zustandVon(q)) : 'laden';
+
   return (
-    <>
-      <Breadcrumb
-        style={{ marginBottom: 8 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz?.bezeichnung ?? '…' },
-          { title: 'Lage-Dashboard' },
-        ]}
-      />
-
-      <div className="lfh-flaeche">
-        {/* Signatur 4 · Instrumentenband */}
-        <header className="lfh-band">
-          <div className="lfh-marke">
-            <span className="lfh-marke__strich" aria-hidden="true" />
-            <span className="lfh-marke__name">LIFELINE HUB</span>
-          </div>
-          <div className="lfh-band__wert">
-            <span className="lfh-etikett">Einsatz</span>
-            <b className="lfh-band__titel">{einsatz ? einsatz.bezeichnung : LADETEXT}</b>
-          </div>
-          <div className="lfh-band__wert">
-            <span className="lfh-etikett">DTG</span>
-            <b className="lfh-zahl">{dtgJetzt()}</b>
-          </div>
-          <div className="lfh-band__wert">
-            <span className="lfh-etikett">Gesamtstärke</span>
-            <b className="lfh-zahl">
-              {zKraefte === 'daten' && lagebild ? lagebild.staerke : '—/—/—//—'}
-            </b>
-          </div>
-          <div className="lfh-band__verbindung">
+    <EinsatzSeite
+      breite={LAGEBILD_BREITE}
+      titel={`Lagebild ${lagebildZeit(jetzt, konv)}`}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz?.bezeichnung ?? '…' },
+            { title: 'Lage-Dashboard' },
+          ]}
+        />
+      }
+      // Der rechte Slot trägt hier Meta, keine Aktion (Entwurf S3: „Stand" und Warnstufe
+      // rechts). Er enthält keinen Knopf, die Primäraktions-Regel bleibt unberührt.
+      aktionen={
+        <span
+          data-lfh="lagebild-meta"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: token.padding,
+            ...monoStil(11),
+            color: rollen.schwach,
+          }}
+        >
+          <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
+          {warnTon !== 'neutral' && lagebild && (
             <span
-              className={`lfh-puls${liveStatus === 'lost' ? ' lfh-puls--alarm' : ''}`}
-              aria-hidden="true"
-            />
-            <span className="lfh-etikett">{VERBINDUNG_WORTLAUT[liveStatus]}</span>
-          </div>
-        </header>
-
-        {/* Kennzahlen — Wortlaut statt nackter Zähler.
-            Vor dem ersten Einsatz-Abruf gibt es noch kein Lagebild und damit auch
-            keine Kennzahlen; die Leiste stand deshalb leer, und die Weiche je
-            Kennzahl darunter („····" / „?") konnte gar nicht greifen — sie hängt an
-            Knöpfen, die es zu diesem Zeitpunkt nicht gab. Die sechs Plätze stellt
-            die Leiste jetzt selbst, aus den festen Etiketten. */}
-        <div className="lfh-kennzahlen">
-          {lagebild == null &&
-            KENNZAHL_ETIKETTEN.map((etikett) => (
-              <div
-                key={etikett}
-                className="lfh-kz"
-                aria-busy="true"
-                // Der Platz ist kein Knopf: es gibt noch nichts, wohin er führen
-                // könnte. `.lfh-kz` trägt seine Geometrie und den Zeigerwechsel in
-                // einem — der wird hier zurückgenommen, damit der Platz nicht
-                // anbietet, was er nicht kann.
-                style={{ cursor: 'default' }}
-              >
-                <span className="lfh-etikett">{etikett}</span>
-                <b className="lfh-zahl lfh-zahl--gross">····</b>
-                <span className="lfh-zusatz">{LADETEXT}</span>
-              </div>
-            ))}
-          {lagebild?.kennzahlen.map((k, i) => {
-            const z = kennzahlZustaende[i] ?? 'daten';
-            return (
-              <button
-                type="button"
-                key={k.etikett}
-                className={`lfh-kz${k.stufe && k.stufe !== 'normal' && z === 'daten' ? ` lfh-kz--${k.stufe}` : ''}`}
-                onClick={() => gehe(k.route)}
-              >
-                <span className="lfh-etikett">{k.etikett}</span>
-                {z === 'laden' ? (
-                  <b className="lfh-zahl lfh-zahl--gross" aria-busy="true">
-                    ····
-                  </b>
-                ) : z === 'fehler' ? (
-                  <b className="lfh-zahl lfh-zahl--gross" title="Stand unbekannt">
-                    ?
-                  </b>
-                ) : (
-                  <b className="lfh-zahl lfh-zahl--gross">{k.wert}</b>
-                )}
-                <span className="lfh-zusatz">
-                  {z === 'fehler' ? 'Stand unbekannt' : z === 'laden' ? 'wird abgerufen' : k.zusatz}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="lfh-raster">
-          <Kachel
-            titel="Betroffene"
-            mehr="Personenliste"
-            zustand={zBetroffene}
-            leer={lagebild?.betroffeneGesamt === 0}
-            leerText="Noch keine Personen erfasst."
-            leerAktion="Person aufnehmen"
-            aufMehr={() => gehe('personen')}
-            aufNeuladen={() => void personenQuery.refetch()}
-          >
-            <div className="lfh-felder">
-              {(lagebild?.sichtung ?? []).map((s) => (
-                <div key={s.etikett} className={`lfh-feld lfh-feld--${s.stufe}`}>
-                  <span className="lfh-etikett">{s.etikett}</span>
-                  <b className="lfh-zahl lfh-zahl--mittel">{s.wert}</b>
-                </div>
-              ))}
-            </div>
-            <p className="lfh-fussnote">
-              {lagebild?.betroffeneGesamt ?? 0} erfasst
-              {(lagebild?.vermisst ?? 0) > 0 && (
-                <>
-                  {' · '}
-                  <Plakette stufe="alarm">{lagebild?.vermisst} vermisst</Plakette>
-                </>
-              )}
-            </p>
-          </Kachel>
-
-          <Kachel
-            titel="Kräfte"
-            mehr="Meldebild"
-            zustand={zKraefte}
-            leer={lagebild?.einheiten === 0 && lagebild?.abschnitte === 0}
-            leerText="Noch keine Kräfte disponiert."
-            leerAktion="Einheiten öffnen"
-            aufMehr={() => gehe('kraefteuebersicht')}
-            aufNeuladen={() => {
-              void einheitenQuery.refetch();
-              void personalQuery.refetch();
-            }}
-          >
-            <b className="lfh-zahl lfh-staerke">{lagebild?.staerke}</b>
-            <p className="lfh-fussnote">Führer / Unterführer / Mannschaft // Gesamt</p>
-            <dl className="lfh-werte">
-              <div>
-                <dt className="lfh-etikett">Einheiten</dt>
-                <dd className="lfh-zahl">{lagebild?.einheiten}</dd>
-              </div>
-              <div>
-                <dt className="lfh-etikett">Abschnitte</dt>
-                <dd className="lfh-zahl">{lagebild?.abschnitte}</dd>
-              </div>
-              <div>
-                <dt className="lfh-etikett">Fahrzeuge gebunden</dt>
-                <dd className="lfh-zahl">
-                  {lagebild?.fahrzeugeGebunden}/{lagebild?.fahrzeugeGesamt}
-                </dd>
-              </div>
-            </dl>
-          </Kachel>
-
-          <Kachel
-            titel="Infrastruktur"
-            mehr="Übersicht"
-            zustand={zInfra}
-            leer={
-              lagebild?.uhsGesamt === 0 &&
-              lagebild?.schaedenGesamt === 0 &&
-              lagebild?.tiereAktiv === 0 &&
-              lagebild?.zonen === 0
-            }
-            leerText="Noch keine Einrichtungen, Schäden oder Zonen erfasst."
-            leerAktion="Unfallhilfsstellen öffnen"
-            aufMehr={() => gehe('unfallhilfsstellen')}
-            aufNeuladen={() => {
-              void uhsQuery.refetch();
-              void schaedenQuery.refetch();
-            }}
-          >
-            <dl className="lfh-werte lfh-werte--liste">
-              <div>
-                <dt className="lfh-etikett">UHS aktiv</dt>
-                <dd className="lfh-zahl">
-                  {lagebild?.uhsAktiv}/{lagebild?.uhsGesamt}
-                </dd>
-              </div>
-              <div>
-                <dt className="lfh-etikett">Schäden offen</dt>
-                <dd className="lfh-zahl">
-                  {lagebild?.schaedenOffen}/{lagebild?.schaedenGesamt}
-                </dd>
-              </div>
-              <div>
-                <dt className="lfh-etikett">Tiere aktiv</dt>
-                <dd className="lfh-zahl">{lagebild?.tiereAktiv}</dd>
-              </div>
-              <div>
-                <dt className="lfh-etikett">Lagezonen</dt>
-                <dd className="lfh-zahl">{lagebild?.zonen}</dd>
-              </div>
-            </dl>
-          </Kachel>
-
-          <Kachel
-            titel="Aktueller Lagebericht"
-            mehr="Berichte"
-            // `leer` zieht aus `lagebild`, das erst nach dem Einsatz-Abruf existiert
-            // (I2, LFH-336-Review) — `zustand` muss deshalb dieselbe Quelle spiegeln,
-            // sonst gilt `zustand === 'daten'` UND `leer === true` gleichzeitig,
-            // solange nur der Einsatz-Abruf noch hängt.
-            zustand={lagebild ? zBericht : 'laden'}
-            leer={!lagebild?.bericht}
-            leerText="Noch kein Lagebericht erstellt."
-            leerAktion="Lagebericht schreiben"
-            aufMehr={() => gehe('lageberichte')}
-            aufNeuladen={() => void lageberichteQuery.refetch()}
-          >
-            <b className="lfh-band__titel">{lagebild?.bericht?.titel}</b>
-            <p className="lfh-fussnote">
-              <Plakette stufe={lagebild?.bericht?.status === 'freigegeben' ? 'normal' : 'achtung'}>
-                {lagebild?.bericht?.status}
-              </Plakette>
-              {' · Stand '}
-              {/* `stand` ist `bericht.zeitstand`, ein UTC-Wirestring ohne Zonenkennung —
-                  roh ausgegeben stand er um den Zonenversatz falsch (LFH-350 · H60). Die
-                  Formatierung sitzt hier statt in `lagebild.ts`, weil die Zone am
-                  Provider hängt und `baueLagebild` rein bleibt. */}
-              <span className="lfh-zahl">
-                <ZeitAnzeige wert={lagebild?.bericht?.stand} />
+              data-lfh="warnstufe-hinweis"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                color: warnTon === 'alarm' ? rollen.alarm : rollen.achtung,
+              }}
+            >
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                <TbAlertTriangle size={14} />
               </span>
-            </p>
-            <p className="lfh-fussnote">von {lagebild?.bericht?.von}</p>
-            {lagebild?.bericht?.auszug && <p className="lfh-auszug">{lagebild.bericht.auszug}</p>}
-          </Kachel>
+              Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
+            </span>
+          )}
+        </span>
+      }
+    >
+      <div
+        data-lfh="lagebild"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          background: rollen.linie,
+          border: `1px solid ${rollen.linie}`,
+        }}
+      >
+        {/* Die sechs Plätze stehen auch vor dem ersten Einsatz-Abruf (Kriterium 12, CLS):
+            ohne Lagebild als Ladezelle ohne Ziel — es gibt noch nichts, wohin sie führte. */}
+        <Kennzahlenband
+          beschriftung="Lage in Zahlen"
+          spalten={bandSpalten}
+          style={{ border: 'none' }}
+        >
+          {lagebild == null
+            ? KENNZAHL_ETIKETTEN.map((etikett) => (
+                <Kennzahl key={etikett} titel={etikett} wert="" zustand="laden" />
+              ))
+            : lagebild.kennzahlen.map((k) => (
+                <Kennzahl
+                  key={k.etikett}
+                  titel={k.etikett}
+                  wert={k.wert}
+                  einheit={k.einheit}
+                  notiz={k.notiz}
+                  ton={k.ton}
 
-          <Kachel
-            titel="Aufträge / Befehle"
-            mehr="Auftragsliste"
-            // `leer` zieht aus `lagebild`, das erst nach dem Einsatz-Abruf existiert
-            // (I2, LFH-336-Review) — `zustand` hing bisher NUR an `zAuftraege`
-            // (Aufträge-Query). Löst die Aufträge-Query auf, während der Einsatz-Abruf
-            // noch hängt, galt `zustand === 'daten'` UND `leer === true` gleichzeitig,
-            // und die Kachel behauptete „Keine offenen Aufträge.“, obwohl welche
-            // vorliegen.
-            zustand={lagebild ? zAuftraege : 'laden'}
-            // `leer` darf die Überfällig-Plakette nicht verdrängen (LFH-336-Review,
-            // I1): Zählung (`ist_ueberfaellig`) und Zeilenfilter
-            // (`bearbeitungsstatus`) laufen im Backend über unabhängige Kriterien
-            // (src/auftrag/repo.rs:73-76) — ein vollzogener Auftrag mit
-            // unquittiertem Empfänger und abgelaufener Frist ist trotzdem
-            // überfällig. `Kachel` rendert `children` (und darin die Plakette) nur
-            // bei `!leer`; deshalb koppelt `leer` hier zusätzlich an die
-            // Alarmzählung, statt sie strukturell aus `children` herauszuziehen —
-            // der kleinere Eingriff an einer Hülle, die nicht umgebaut werden soll.
-            leer={
-              (lagebild?.auftragszeilen ?? []).length === 0 &&
-              (lagebild?.auftraegeUeberfaellig ?? 0) === 0
-            }
-            leerText="Keine offenen Aufträge."
-            leerAktion="Auftrag erteilen"
-            aufMehr={() => gehe('auftraege')}
-            aufNeuladen={() => void auftraegeQuery.refetch()}
-          >
-            <b className="lfh-zahl lfh-zahl--gross">{lagebild?.auftraegeOffen}</b>
-            <p className="lfh-fussnote">offen oder in Arbeit</p>
-            {(lagebild?.auftraegeUeberfaellig ?? 0) > 0 && (
-              <p className="lfh-fussnote">
-                <Plakette stufe="alarm">{lagebild?.auftraegeUeberfaellig} überfällig</Plakette>
-              </p>
-            )}
-            {/* Die drei fristnächsten — der Zähler sagt WIE VIELE, die Zeilen WAS.
-                Jede springt auf die Selektion im Auftragsmodul (LFH-25). */}
-            <ul className="lfh-zeilen">
-              {(lagebild?.auftragszeilen ?? []).map((z) => (
-                <li key={z.id}>
-                  <Link className="lfh-zeile" to={auftraegePfad(einsatzId, { auftrag: z.id })}>
-                    <Zeichen stufe={z.stufe} />
-                    {z.lfdNr != null && <span className="lfh-zeile__nr">{z.lfdNr}</span>}
-                    <span className="lfh-zeile__text">{z.text}</span>
-                    {z.frist && <time className="lfh-zahl">{z.frist}</time>}
-                  </Link>
-                </li>
+                  zustand={alsKennzahlZustand(kennzahlZustand[k.etikett])}
+                  ziel={einsatzModulPfad(einsatzId, k.route)}
+                />
               ))}
-            </ul>
-          </Kachel>
+        </Kennzahlenband>
 
-          <Kachel
-            titel="Meldungen (eingehend)"
-            mehr="Meldebuch"
-            // Spiegelt die Aufträge-Kachel (I2): `zustand` hing bisher NUR an
-            // `zMeldungen`, `leer` an `lagebild` — siehe Kommentar dort.
-            zustand={lagebild ? zMeldungen : 'laden'}
-            // Spiegelt die Aufträge-Kachel (I1): `ist_ueberfaellig`
-            // (bestaetigung_pflicht AND quittiert_at IS NULL AND frist <= jetzt,
-            // src/meldung/repo.rs:42-43) ist von `ist_offen`/`status` unabhängig —
-            // eine erledigte Meldung kann trotzdem überfällig sein.
-            leer={
-              (lagebild?.meldungszeilen ?? []).length === 0 &&
-              (lagebild?.meldungenUeberfaellig ?? 0) === 0
+        <div
+          data-lfh="lagebild-paneele"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: breit
+              ? 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr)'
+              : 'minmax(0, 1fr)',
+            gap: 1,
+          }}
+        >
+          <GefahrenmatrixPaneel
+            zustand={zMatrix}
+            zeilen={matrix.zeilen}
+            unbewertet={matrix.unbewertet}
+            gebiete={anzahlGebiete}
+            onNeuladen={() => {
+              void gefahrenQuery.refetch();
+              for (const q of matrixQueries) void q.refetch();
+            }}
+            onGefahren={() => navigate(gefahrenPfad(einsatzId))}
+          />
+          <SichtungsPaneel
+            zustand={
+              zBetroffene === 'daten' && (personenQuery.data ?? []).length === 0
+                ? 'leer'
+                : zBetroffene
             }
-            leerText="Keine offenen Meldungen."
-            leerAktion="Meldung erfassen"
-            aufMehr={() => gehe('meldungen')}
-            aufNeuladen={() => void meldungenQuery.refetch()}
-            breit
-          >
-            <div className="lfh-werte">
-              <div>
-                <dt className="lfh-etikett">Offen</dt>
-                <dd className="lfh-zahl lfh-zahl--mittel">{lagebild?.meldungenOffen}</dd>
-              </div>
-              <div>
-                <dt className="lfh-etikett">Neu</dt>
-                <dd className="lfh-zahl lfh-zahl--mittel">{lagebild?.meldungenNeu}</dd>
-              </div>
-              {(lagebild?.meldungenUeberfaellig ?? 0) > 0 && (
-                <div>
-                  <Plakette stufe="alarm">{lagebild?.meldungenUeberfaellig} überfällig</Plakette>
-                </div>
-              )}
-            </div>
-            <ul className="lfh-zeilen">
-              {(lagebild?.meldungszeilen ?? []).map((z) => (
-                <li key={z.id}>
-                  <Link className="lfh-zeile" to={meldungenPfad(einsatzId, { meldung: z.id })}>
-                    <Zeichen stufe={z.stufe} />
-                    <span className="lfh-zeile__nr">{z.lfdNr}</span>
-                    <time className="lfh-zahl">{z.zeit}</time>
-                    <span className="lfh-zeile__text">{z.text}</span>
-                    <span className="lfh-zeile__quelle">{z.absender}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Kachel>
+            zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
+            erfasst={lagebild?.betroffeneGesamt ?? 0}
+            ohneSichtung={lagebild?.sk.ohne ?? 0}
+            onNeuladen={() => void personenQuery.refetch()}
+            onPersonen={() => navigate(personenPfad(einsatzId))}
+            onAufnehmen={() => navigate(personenAufnahmePfad(einsatzId))}
+          />
+          <MeldungsstromPaneel
+            zustand={zStrom}
+            sichtbar={strom.sichtbar}
+            neu={strom.neu}
+            neuMindestens={strom.neuMindestens}
+            liveStatus={liveStatus}
+            konv={konv}
+            onAnzeigen={() => setAngezeigtBis(strom.hoechste)}
+            onNeuladen={() => void etbQuery.refetch()}
+            onEtb={() => navigate(etbPfad(einsatzId))}
+            onErfassen={() => navigate(etbPfad(einsatzId, { neu: true }))}
+          />
         </div>
+
+        {/* Führungsstand: was vorher eigene Kacheln hatte (Dateikopf). Die Überfällig-Zahlen
+            sind Alarmbeiträge und behalten deshalb ihren Ton. */}
+        <Kennzahlenband
+          beschriftung="Führungsstand"
+          spalten={abBreite('md') ? 4 : 2}
+          style={{ border: 'none' }}
+        >
+          <Kennzahl
+            titel="Aufträge offen"
+            groesse="klein"
+            wert={fuehrung?.auftraegeOffen ?? ''}
+            notiz={
+              (fuehrung?.auftraegeUeberfaellig ?? 0) > 0
+                ? `${fuehrung?.auftraegeUeberfaellig} überfällig`
+                : 'keiner überfällig'
+            }
+            ton={(fuehrung?.auftraegeUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
+            zustand={zFuehrung(auftraegeQuery)}
+            ziel={auftraegePfad(einsatzId)}
+          />
+          <Kennzahl
+            titel="Meldungen offen"
+            groesse="klein"
+            wert={fuehrung?.meldungenOffen ?? ''}
+            notiz={
+              `${fuehrung?.meldungenNeu ?? 0} neu` +
+              ((fuehrung?.meldungenUeberfaellig ?? 0) > 0
+                ? ` · ${fuehrung?.meldungenUeberfaellig} überfällig`
+                : '')
+            }
+            ton={(fuehrung?.meldungenUeberfaellig ?? 0) > 0 ? 'alarm' : 'neutral'}
+            zustand={zFuehrung(meldungenQuery)}
+            ziel={meldungenPfad(einsatzId)}
+          />
+          <Kennzahl
+            titel="Lagebericht"
+            groesse="klein"
+            // `stand` ist ein UTC-Wirestring ohne Zonenkennung — roh ausgegeben stand er um
+            // den Zonenversatz falsch (LFH-350 · H60). Formatiert wird hier, weil die Zone
+            // am Provider hängt und `baueLagebild` sie nicht kennen muss.
+            wert={fuehrung?.bericht ? formatUhrzeitMitTag(fuehrung.bericht.stand, konv) : 'keiner'}
+            notiz={
+              fuehrung?.bericht
+                ? `${fuehrung.bericht.statusLabel} · ${fuehrung.bericht.titel}`
+                : 'noch nicht erstellt'
+            }
+            zustand={zFuehrung(lageberichteQuery)}
+            ziel={
+              fuehrung?.bericht
+                ? lageberichtDetailPfad(einsatzId, fuehrung.bericht.id)
+                : lageberichtePfad(einsatzId)
+            }
+          />
+          <Kennzahl
+            titel="UHS aktiv"
+            groesse="klein"
+            wert={fuehrung?.uhsAktiv ?? ''}
+            notiz={`${fuehrung?.uhsGeplant ?? 0} geplant`}
+            zustand={zFuehrung(uhsQuery)}
+            ziel={unfallhilfsstellenListePfad(einsatzId)}
+          />
+        </Kennzahlenband>
       </div>
-    </>
+    </EinsatzSeite>
   );
 }

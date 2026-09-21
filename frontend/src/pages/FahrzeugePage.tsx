@@ -39,6 +39,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { monoStil } from '../components/instrument';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -538,7 +539,8 @@ export default function FahrzeugePage() {
       suchText: (ef) => ef.funkrufname,
       render: (_, ef) => (
         <Space>
-          {ef.funkrufname}
+          {/* Funkrufname in Mono (Neuentwurf: Kennungen und Funkrufnamen immer Mono). */}
+          <span style={monoStil(13)}>{ef.funkrufname}</span>
           {ef.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
         </Space>
       ),
@@ -637,6 +639,7 @@ export default function FahrzeugePage() {
     <EinsatzSeite
       breite={flaeche.seiteBreit}
       dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
+      meta={efQuery.isSuccess ? `${efs.length} Fahrzeuge` : undefined}
       titel={
         <Space>
           Fahrzeuge

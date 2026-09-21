@@ -101,6 +101,7 @@ export default function UnfallhilfsstellenPage() {
     <EinsatzSeite
       titel="Unfallhilfsstellen"
       dataUpdatedAt={uhsQuery.dataUpdatedAt}
+      meta={uhsQuery.isSuccess ? `${alle.length} Hilfsstellen` : undefined}
       breadcrumb={
         <Breadcrumb
           items={[

@@ -100,4 +100,30 @@
     color: inherit;
     text-decoration: underline;
   }
+
+  /* ---- Papier ist hell (Neuentwurf „Instrumententafel", 21.09.2026) ----
+
+     Seit dem Neuentwurf startet die App im Nachtbetrieb: Text `text` ist fast weiß, die
+     Flächen (`paneel`, `flaeche`) stehen INLINE fast schwarz. Browser drucken Hintergründe
+     per Vorgabe nicht — übrig bliebe weißer Text auf weißem Papier. Deshalb setzt der
+     Druckbereich Schrift und Grund unbedingt auf Papierfarben; `!important` ist Pflicht,
+     weil die Bausteine ihre Farben als Inline-Stil tragen und der sonst gewinnt. Benannte
+     Farben statt Hex: Druck ist kein Rollenwert, und Gate 5 hält `theme/` als einzige
+     Quelle für Rollenfarben. */
+  body {
+    background: white !important;
+  }
+  .lagebericht-print-root,
+  .lagebericht-print-root * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Der Seitenkopf (`EinsatzSeite`) ist Bedienung — Ortspfad, Datenstand, Aktionen. Er
+     liegt im Druckbereich, weil die Aktionen dort liegen müssen, und wird hier
+     ausgeblendet wie vorher die Kopfzeile mit `.lagebericht-no-print`. */
+  .lagebericht-print-root [data-lfh='seitenkopf'] {
+    display: none !important;
+  }
 }

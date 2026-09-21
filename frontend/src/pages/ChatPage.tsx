@@ -1,5 +1,5 @@
-import { Alert, App, Badge, Breadcrumb, Button, Col, Row, Segmented, Spin, Typography } from 'antd';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, App, Breadcrumb, Button, Col, Row, Spin } from 'antd';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -55,13 +55,24 @@ import {
   type BezugKurzinfo,
   type BezugOptionen,
 } from '../chat/bezug';
-import Datenstand, { gemeinsamerDatenstand } from '../components/Datenstand';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Segmentleiste, useRollen } from '../components/instrument';
+import { flaeche } from '../theme/tokens';
+
+/**
+ * Mindesthöhe der Chat-Arbeitsfläche (Kanäle, Strom, Eingabe). Unter einem langen Kopf
+ * oder in einem sehr niedrigen Fenster scrollt die Seite weiter, statt die Eingabe unter
+ * den Strom zu quetschen. Beschreibt die Fläche, nicht eine geschätzte Kopfhöhe.
+ */
+const CHAT_MINDESTHOEHE = 320;
 import { useViewport } from '../components/useViewport';
 
 export default function ChatPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { message } = App.useApp();
+  const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
   const { benutzer } = useAuth();
   const qc = useQueryClient();
@@ -97,61 +108,15 @@ export default function ChatPage() {
     return () => document.removeEventListener('visibilitychange', aktualisieren);
   }, []);
 
-  /**
-   * Die Höhenkette der Chat-Seite (LFH-343 · C8, Befund H51).
-   *
-   * `flex: 1; min-height: 0; overflow-y: auto` scrollt NICHTS, solange kein
-   * Vorfahr eine begrenzte Höhe hat — und keiner hat sie: `AppLayout` und
-   * `EinsatzLayout` setzen `minHeight: '100vh'`, der `<Content>` wächst mit
-   * seinem Inhalt. Die Begrenzung muss also von dieser Seite selbst kommen.
-   *
-   * Gemessen statt gerechnet: die Wurzel liest ihren eigenen Abstand zum
-   * Dokumentanfang und nimmt den Rest des Fensters. Ein fester Abzug bräuchte
-   * die Kopfhöhe als Zahl — und die gibt es nirgends als Variable (`rollen.css`
-   * kennt nur `--lfh-kopf-polsterung`), sie käme aus antds Layout-Token und
-   * wäre bei jeder Themeänderung falsch.
-   *
-   * `dvh`, nicht `vh`: auf dem Handschirm frisst die Browserleiste sonst genau
-   * so viel, wie die Eingabe hoch ist.
+  /*
+   * Die Höhenkette der Chat-Seite (LFH-343 · C8, Befund H51) liegt seit dem Neuentwurf im
+   * Rahmen: `EinsatzSeite` mit `fensterInhalt` (→ `FensterRahmen`, LFH-459) begrenzt die
+   * Arbeitsfläche auf die Resthöhe des Fensters — gemessen statt gerechnet, in `dvh`, per
+   * Callback-Ref und ResizeObserver. Das ist genau die Bauform, die diese Seite vorher
+   * selbst trug (eigener Abstand zum Dokumentanfang, Callback-Ref statt Mount-Effekt, weil
+   * die Seite beim Laden früh zurückkehrt); sie steht jetzt EINMAL. `flex: 1; min-height: 0;
+   * overflow-y: auto` im Strom scrollt nur, weil dieser Rahmen eine begrenzte Höhe hat.
    */
-  const wurzel = useRef<HTMLDivElement | null>(null);
-  const [hoehe, setHoehe] = useState<string | undefined>(undefined);
-
-  const messen = useCallback(() => {
-    const el = wurzel.current;
-    if (!el) return;
-    // `scrollY` addieren: `top` ist viewport-relativ und wäre nach einem Scroll
-    // zu klein. Die Seite scrollt zwar nicht mehr, aber die Messung darf sich
-    // nicht darauf verlassen.
-    const oben = Math.round(el.getBoundingClientRect().top + window.scrollY);
-    setHoehe(`calc(100dvh - ${oben}px - var(--lfh-seiten-polsterung))`);
-  }, []);
-
-  /**
-   * Callback-Ref statt `useEffect(…, [])` — und das ist kein Stilfrage.
-   *
-   * Die Seite kehrt oberhalb dieser Stelle früh zurück, solange der Einsatz lädt
-   * (Spinner). Ein Mount-Effekt liefe also, WÄHREND es die Wurzel noch gar nicht
-   * gibt: `ref.current` wäre null, die Messung fiele aus, und der Effekt käme
-   * nie wieder — die Höhe bliebe für immer `undefined`. Gemessen: genau so blieb
-   * die Eingabe unterhalb des Bildes (Playwright „viewport ratio 0").
-   *
-   * Der Callback-Ref feuert dagegen in dem Moment, in dem der Knoten wirklich
-   * eingehängt wird.
-   */
-  const wurzelRef = useCallback(
-    (el: HTMLDivElement | null) => {
-      wurzel.current = el;
-      if (el) messen();
-    },
-    [messen],
-  );
-
-  useEffect(() => {
-    window.addEventListener('resize', messen);
-    return () => window.removeEventListener('resize', messen);
-  }, [messen]);
-
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
@@ -428,44 +393,30 @@ export default function ChatPage() {
     }
   };
 
-  return (
-    <div ref={wurzelRef} style={{ display: 'flex', flexDirection: 'column', height: hoehe }}>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Chat' },
-        ]}
-      />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>
-        Chat
-      </Typography.Title>
-      <Datenstand
-        dataUpdatedAt={gemeinsamerDatenstand(
-          kanaeleQuery.dataUpdatedAt,
-          nachrichtenQuery.dataUpdatedAt,
-        )}
-      />
+  const arbeitsflaeche = (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Unter `md` steht die Kanalauswahl als waagerechte Leiste ÜBER dem Strom,
           statt als Spalte daneben — auf 390 px bliebe für den Strom sonst nichts
           übrig. Sie wird bedingt gerendert und nicht bloß ausgeblendet: sonst
           stünden beide Navigationen im Baum und die Aussage „unter md ist es die
           Leiste" wäre nicht prüfbar (dieselbe Regel wie beim Navigations-Drawer,
           LFH-329/B1). */}
-      {istSchmal && (
-        <div data-testid="kanal-leiste" style={{ marginBottom: 12, overflowX: 'auto' }}>
-          <Segmented
-            value={kanalId ?? undefined}
-            onChange={(v) => setKanalAuswahl({ einsatzId, kanalId: Number(v) })}
-            options={sortiereKanaele(kanaele).map((k) => ({
-              value: k.id,
-              // Ungelesen-Punkt am Etikett — dieselbe Auskunft wie in der Spalte.
-              label: (
-                <Badge dot={k.ungelesen_anzahl > 0} status="processing" offset={[6, 0]}>
-                  {k.name}
-                </Badge>
-              ),
+      {istSchmal && kanalId != null && (
+        <div
+          data-testid="kanal-leiste"
+          style={{ marginBottom: token.marginSM, overflowX: 'auto', flexShrink: 0 }}
+        >
+          <Segmentleiste
+            beschriftung="Kanal"
+            rolle="tablist"
+            wert={kanalId}
+            onWechsel={(neu) => setKanalAuswahl({ einsatzId, kanalId: neu })}
+            optionen={sortiereKanaele(kanaele).map((k) => ({
+              wert: k.id,
+              // Ungelesen: Punkt in Bedienfarbe UND die Zahl im Wortlaut — dieselbe Auskunft
+              // wie in der Spalte, mit zweitem Kanal neben der Farbe.
+              label: k.ungelesen_anzahl > 0 ? `${k.name} (${k.ungelesen_anzahl})` : k.name,
+              punkt: k.ungelesen_anzahl > 0 ? rollen.bedien : undefined,
             }))}
           />
         </div>
@@ -506,12 +457,12 @@ export default function ChatPage() {
             <Alert
               type="error"
               showIcon
-              style={{ marginBottom: 12 }}
+              style={{ marginBottom: token.marginSM }}
               title="Nachrichten konnten nicht geladen werden"
             />
           )}
           {nachrichtenQuery.hasNextPage && (
-            <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <div style={{ textAlign: 'center', marginBottom: token.marginSM }}>
               <Button
                 onClick={() => nachrichtenQuery.fetchNextPage()}
                 loading={nachrichtenQuery.isFetchingNextPage}
@@ -555,7 +506,7 @@ export default function ChatPage() {
             <Alert
               type="info"
               showIcon
-              style={{ marginTop: 12 }}
+              style={{ marginTop: token.marginSM }}
               title={
                 einsatz.status !== 'aktiv'
                   ? 'Schreiben ist nur bei aktivem Einsatz möglich.'
@@ -565,6 +516,29 @@ export default function ChatPage() {
           )}
         </Col>
       </Row>
+    </div>
+  );
+
+  return (
+    <EinsatzSeite
+      titel="Chat"
+      breite={flaeche.seiteBreit}
+      meta={kanaeleQuery.isSuccess ? `${kanaele.length} Kanäle` : undefined}
+      dataUpdatedAt={gemeinsamerDatenstand(
+        kanaeleQuery.dataUpdatedAt,
+        nachrichtenQuery.dataUpdatedAt,
+      )}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Chat' },
+          ]}
+        />
+      }
+      fensterInhalt={{ inhalt: arbeitsflaeche, mindestHoehe: CHAT_MINDESTHOEHE }}
+    >
       <BezugDialog
         offen={bezugNachricht !== null}
         nachricht={bezugNachricht}
@@ -608,6 +582,6 @@ export default function ChatPage() {
             : Promise.reject(new Error('Keine Quellnachricht'))
         }
       />
-    </div>
+    </EinsatzSeite>
   );
 }

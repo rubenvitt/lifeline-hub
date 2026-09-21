@@ -11,8 +11,12 @@ interface HistorienBannerProps {
 }
 
 /**
- * Historien-Modus-Banner (C/LFH-321): schwebt über der Karte, sobald ein Snapshot aktiv ist,
+ * Historien-Modus-Banner (C/LFH-321): steht über der Karte, sobald ein Snapshot aktiv ist,
  * und macht die Schreibsperre sichtbar. Der „Aktuell"-Button springt in den Live-Modus zurück.
+ *
+ * Seit dem Neuentwurf (S5) IM FLUSS über der Kartenfläche statt absolut auf ihr: oben links
+ * liegen jetzt Kartengrundlage und Zeigerkoordinate, oben rechts der Knopfblock — ein
+ * schwebendes Banner auf `top: 12` verdeckte beide.
  */
 export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: HistorienBannerProps) {
   // formatZeit (dayjs.utc) statt new Date(): stand_at ist ein naiver UTC-Wire-String
@@ -30,7 +34,6 @@ export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: Hist
            Bedienung des Banners und erbt seine Trefffläche aus `controlHeight` (LFH-366). */
         <Button onClick={onZurueckAktuell}>Aktuell</Button>
       }
-      style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 5 }}
     />
   );
 }

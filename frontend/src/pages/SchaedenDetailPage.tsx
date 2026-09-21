@@ -4,7 +4,6 @@ import {
   App,
   Breadcrumb,
   Button,
-  Descriptions,
   Form,
   Input,
   Modal,
@@ -14,6 +13,9 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { monoStil } from '../components/instrument';
+import Datenraster, { Datenfeld } from './datenraster/Datenraster';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';
@@ -206,7 +208,7 @@ export default function SchaedenDetailPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item, sonst die Read-Anzeige — so bleibt
-  // dieselbe Descriptions-Tabelle stehen, statt die Ansicht gegen ein separates Formular zu tauschen.
+  // dasselbe Datenraster stehen, statt die Ansicht gegen ein separates Formular zu tauschen.
   const zelle = (
     name: string,
     input: React.ReactNode,
@@ -222,29 +224,29 @@ export default function SchaedenDetailPage() {
     );
 
   const detailAnsicht = (
-    <Descriptions column={1} size="small" bordered>
-      <Descriptions.Item label="Typ">
+    <Datenraster spalten={3} beschriftung="Schadensdaten">
+      <Datenfeld label="Typ">
         {zelle(
           'typ',
           <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />,
           <Tag>{TYP_LABEL[s.typ]}</Tag>,
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label="Ausmaß">
+      </Datenfeld>
+      <Datenfeld label="Ausmaß">
         {zelle(
           'ausmass',
           <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
           <StatusTag darstellung={AUSMASS_META[s.ausmass]} />,
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label="Ort">
+      </Datenfeld>
+      <Datenfeld label="Ort">
         {zelle('ort', <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />, s.ort, [
           { required: true, message: 'Ort ist Pflicht' },
         ])}
-      </Descriptions.Item>
-      <Descriptions.Item label="Beschreibung">
+      </Datenfeld>
+      <Datenfeld label="Beschreibung" breit>
         {zelle('beschreibung', <Input.TextArea rows={2} />, s.beschreibung || '—')}
-      </Descriptions.Item>
+      </Datenfeld>
       {/**
        * VERORTUNG (LFH-340 · C5, Befund M39). Bis dahin sagte die Seite kein Wort darüber,
        * ob dieser Schaden auf der Karte steht — obwohl `lat`/`lon` seit jeher am Datensatz
@@ -255,7 +257,7 @@ export default function SchaedenDetailPage() {
        * (nur `SchadenPatch` tut es), und ein Eingabefeld wäre eine Backend-Erweiterung.
        * Der Weg ist deshalb der Auftrag an die Karte — sie hat die Mechanik bereits.
        */}
-      <Descriptions.Item label="Verortung">
+      <Datenfeld label="Verortung">
         {s.lat != null && s.lon != null ? (
           <KoordinatenAnzeige lat={s.lat} lon={s.lon} einsatzId={einsatzId} />
         ) : (
@@ -268,8 +270,8 @@ export default function SchaedenDetailPage() {
             )}
           </Space>
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label="Geschädigt">
+      </Datenfeld>
+      <Datenfeld label="Geschädigt" breit>
         {zelle(
           'geschaedigt',
           <GeschaedigtPicker
@@ -278,41 +280,41 @@ export default function SchaedenDetailPage() {
           />,
           geschaedigtAnzeige(s, einsatzId),
         )}
-      </Descriptions.Item>
-      {s.status !== 'offen' && (
-        <Descriptions.Item label="Übergeben an">{s.uebergeben_an || '—'}</Descriptions.Item>
-      )}
+      </Datenfeld>
+      {s.status !== 'offen' && <Datenfeld label="Übergeben an">{s.uebergeben_an || '—'}</Datenfeld>}
       {s.status === 'abgeschlossen' && (
-        <Descriptions.Item label="Abschlussgrund">
+        <Datenfeld label="Abschlussgrund">
           {s.abschluss_grund ? ABSCHLUSS_LABEL[s.abschluss_grund] : '—'}
-        </Descriptions.Item>
+        </Datenfeld>
       )}
-    </Descriptions>
+    </Datenraster>
   );
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: <Link to={zurueck}>Schäden</Link> },
-          { title: schadenRegistrierAnzeige(s.registrier_nr) },
-        ]}
-      />
-      <Space
-        style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}
-        align="start"
-      >
-        <Space wrap>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Schaden {schadenRegistrierAnzeige(s.registrier_nr)}
-          </Typography.Title>
+    <EinsatzSeite
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: <Link to={zurueck}>Schäden</Link> },
+            { title: schadenRegistrierAnzeige(s.registrier_nr) },
+          ]}
+        />
+      }
+      titel={
+        <Space wrap size={8}>
+          <span>
+            Schaden{' '}
+            <span style={monoStil(14, 500)}>{schadenRegistrierAnzeige(s.registrier_nr)}</span>
+          </span>
           <StatusTag darstellung={STATUS_META[s.status]} />
           {s.storniert_at && <Tag color="default">storniert</Tag>}
         </Space>
-        <Space>
+      }
+      dataUpdatedAt={detailQuery.dataUpdatedAt}
+      aktionen={
+        <Space wrap>
           {darfSchreiben && !s.storniert_at && !bearbeiten && (
             <Space wrap size="middle">
               <Button disabled={s.status !== 'offen'} onClick={() => setUebergebenOffen(true)}>
@@ -341,6 +343,7 @@ export default function SchaedenDetailPage() {
                 title="Schaden stornieren?"
                 onConfirm={() => stornoMutation.mutate()}
                 okText="Stornieren"
+                okButtonProps={{ danger: true }}
               >
                 <Button danger>Stornieren</Button>
               </Popconfirm>
@@ -348,8 +351,8 @@ export default function SchaedenDetailPage() {
           )}
           <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
         </Space>
-      </Space>
-
+      }
+    >
       {sitzung ? (
         <Form
           form={editForm}
@@ -423,6 +426,6 @@ export default function SchaedenDetailPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </EinsatzSeite>
   );
 }

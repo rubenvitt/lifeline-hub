@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../kommunikation';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
+import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 
 /**
@@ -269,20 +270,23 @@ export default function NachrichtenStrom({
                   <Space size="small">
                     <Typography.Text strong>{n.autor_name}</Typography.Text>
                     <Tooltip title={formatZeit(n.erstellt_at)}>
-                      <Typography.Text
-                        type="secondary"
-                        style={{ fontWeight: 'normal', fontSize: 12 }}
-                      >
+                      <Typography.Text type="secondary" style={monoStil(12)}>
                         {formatZeitKurz(n.erstellt_at)}
                       </Typography.Text>
                     </Tooltip>
                     {n.bearbeitet_at && (
                       <Tooltip title={`bearbeitet am ${formatZeit(n.bearbeitet_at)}`}>
-                        <Tag>bearbeitet</Tag>
+                        <span style={{ display: 'inline-flex' }}>
+                          <StatusChip ton="neutral" wort="bearbeitet" />
+                        </span>
                       </Tooltip>
                     )}
-                    {heraufgestuft && <Tag color="blue">heraufgestuft zu ETB</Tag>}
-                    {heraufgestuftZuAuftrag && <Tag color="geekblue">heraufgestuft zu Auftrag</Tag>}
+                    {/* Heraufstufung ist eine aktive Beziehung zu einem anderen Datensatz →
+                        Ton `bedien` (Neuentwurf „Status als getönte Fläche"). */}
+                    {heraufgestuft && <StatusChip ton="bedien" wort="heraufgestuft zu ETB" />}
+                    {heraufgestuftZuAuftrag && (
+                      <StatusChip ton="bedien" wort="heraufgestuft zu Auftrag" />
+                    )}
                     {!geloescht &&
                       hatBezug &&
                       bezugLabel &&

@@ -9,7 +9,7 @@ import type { Sachgebiet } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
-import SektionHeader from '../components/SektionHeader';
+import { Paneel } from '../components/instrument';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
@@ -119,6 +119,7 @@ export default function StabPage() {
   const stabGescheitert = stabQuery.isError && !stabQuery.data;
   const standVeraltet = stabQuery.isError && stabQuery.data != null;
   const offenerEintrag = SACHGEBIETE.find((s) => s.sachgebiet === offenFuer);
+  const vergeben = SACHGEBIETE.filter((s) => zeileFuer(stabQuery.data, s.sachgebiet)).length;
 
   return (
     <EinsatzSeite
@@ -154,8 +155,9 @@ export default function StabPage() {
         !darfSchreiben && <RechteHinweis sichtbar text={besetzungRechteText(einsatz.status)} />
       }
     >
-      <SektionHeader titel="Lagebesprechung" />
-      <section aria-label="Lagebesprechung" style={{ marginBottom: token.marginLG }}>
+      {/* Paneele statt Sektionskopf + `<section>`: das Paneel IST die benannte Region
+          (`aria-labelledby` auf seine Augenbraue), der Name bleibt „Lagebesprechung". */}
+      <Paneel titel="Lagebesprechung" koerperPolster style={{ marginBottom: token.margin }}>
         <Flex vertical gap={token.margin}>
           {stabGescheitert ? (
             <SeitenFehler
@@ -171,10 +173,13 @@ export default function StabPage() {
           )}
           <LagebesprechungHistorie einsatzId={einsatzId} />
         </Flex>
-      </section>
+      </Paneel>
 
-      <SektionHeader titel="Besetzung S1–S6" />
-      <section aria-label="Besetzung S1–S6">
+      <Paneel
+        titel="Besetzung S1–S6"
+        meta={stabQuery.data ? `${vergeben}/${SACHGEBIETE.length} vergeben` : undefined}
+        koerperPolster
+      >
         {stabGescheitert ? (
           <SeitenFehler
             text="Führungsorganisation konnte nicht geladen werden"
@@ -254,7 +259,7 @@ export default function StabPage() {
             />
           </>
         )}
-      </section>
+      </Paneel>
       {offenerEintrag && darfSchreiben && (
         <BesetzungModal
           key={offenerEintrag.sachgebiet}

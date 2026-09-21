@@ -265,14 +265,19 @@ describe('EtbPage', () => {
     },
   );
 
-  it('zeigt Einsatz-Bezeichnung und ETB-Einträge', async () => {
+  it('zeigt Seitentitel, Einsatz im Ortspfad, Einträge und die ehrliche Zahl im Kopf', async () => {
     setup();
-    // Bezeichnung erscheint als Überschrift (zusätzlich in der Breadcrumb-Zeile) → gezielt die Überschrift prüfen.
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
-    );
+    // Seit dem Neuentwurf (S4) trägt der Seitenkopf den MODULtitel; der Einsatz steht im
+    // Ortspfad davor (und im Rahmen der App, der hier nicht mitgerendert wird).
+    expect(await screen.findByRole('heading', { name: 'Einsatztagebuch' })).toBeInTheDocument();
+    expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument();
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    // Eine Seite, kein Filter: die geladene Menge IST das Tagebuch — „1 Eintrag", ohne
+    // „geladen". Mehr als das weiß die Seite nicht (Gesamtzahl serverseitig: LFH-612).
+    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
+    expect(kopf).toHaveTextContent('1 Eintrag');
+    expect(kopf).not.toHaveTextContent('geladen');
   });
 
   it('startet mit ausgeschaltetem „Werte behalten"', async () => {
@@ -283,21 +288,31 @@ describe('EtbPage', () => {
     expect(await screen.findByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
-  it.each([1024, 1366])(
-    'hebt per ?eintrag=<id> bei %i px hervor und räumt den Param (LFH-25)',
+  it.each([390, 1024, 1366])(
+    'hebt per ?eintrag=<id> bei %i px hervor, rollt hin und räumt den Param (LFH-25)',
     async (breite) => {
       setzeViewportBreite(breite);
-      const { container } = setup('/einsaetze/7/etb?eintrag=1');
-      await screen.findByText('Erste Meldung');
-      await waitFor(() =>
-        // Der Zeilenschlüssel trägt seit LFH-342 das Sortenpräfix (`eintrag-<id>`) —
-        // die Queue-`id` eines gepufferten Eintrags kollidierte sonst mit der DB-`id`.
-        expect(
-          container.querySelector(
-            breite < 1200 ? '[data-zeile="eintrag-1"]' : '[data-row-key="eintrag-1"]',
+      const gerollt: unknown[] = [];
+      const vorher = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
+        if (this.getAttribute('data-zeile') === 'eintrag-1') gerollt.push(arg);
+      };
+      try {
+        const { container } = setup('/einsaetze/7/etb?eintrag=1');
+        await screen.findByText('Erste Meldung');
+        await waitFor(() =>
+          // Seit dem Neuentwurf gibt es auf KEINER Breite mehr einen `data-row-key`: die
+          // Zeitachse trägt die Kartenmarke, an der `scrolleZurZeile` springt.
+          expect(container.querySelector('[data-zeile="eintrag-1"]')).toHaveClass(
+            'zeile-hervorgehoben',
           ),
-        ).toHaveClass('zeile-hervorgehoben'),
-      );
+        );
+        expect(container.querySelector('[data-row-key]')).toBeNull();
+        // Der Sprung selbst: ohne ihn stünde die markierte Zeile irgendwo außer Sicht.
+        await waitFor(() => expect(gerollt).toContainEqual({ block: 'center' }));
+      } finally {
+        Element.prototype.scrollIntoView = vorher;
+      }
       // Adressier-Param wird nach dem Anwenden geräumt (apply-then-clean).
       await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
     },
@@ -335,9 +350,14 @@ describe('EtbPage', () => {
     // Der Ziel-Eintrag liegt erst auf Seite 2 → muss automatisch nachgeladen werden.
     expect(await screen.findByText('Ziel-Eintrag')).toBeInTheDocument();
     await waitFor(() =>
-      expect(container.querySelector('[data-row-key="eintrag-5"]')).toHaveClass(
+      expect(container.querySelector('[data-zeile="eintrag-5"]')).toHaveClass(
         'zeile-hervorgehoben',
       ),
+    );
+    // Beide Seiten sind jetzt da, eine dritte gibt es nicht: der Kopf nennt die Menge
+    // ohne „geladen" — erst jetzt ist sie das ganze Tagebuch.
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent('101 Einträge'),
     );
   });
 
@@ -496,7 +516,7 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     expect(container.querySelector('.lfh-skelett')).not.toBeNull();
     expect(screen.getByLabelText(/wird geladen/i)).toBeInTheDocument();
     // Auflaufen lassen, damit kein Zustandswechsel nach Testende passiert.
-    await screen.findByRole('heading', { name: 'Hochwasser Nord' });
+    await screen.findByRole('heading', { name: 'Einsatztagebuch' });
   });
 
   it('bietet beim gescheiterten Einsatz-Abruf einen erneuten Abruf an', async () => {
@@ -653,10 +673,17 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       // Und die Leiste zeigt ihn. Beide Hälften: ein Filter, der nur im Query-Key
       // steht, ist von außen nicht als gesetzt erkennbar.
       expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
-      // Die Schnellerfassung hat einen eigenen Typwähler. Nur die Filterleiste belegt
-      // den URL-Filter, unabhängig davon, wann der Entwurf fertig geladen ist.
-      const filterleiste = screen.getByPlaceholderText('Volltextsuche').closest('.ant-space')!;
-      expect(within(filterleiste as HTMLElement).getByTitle('Meldung')).toBeInTheDocument();
+      // Der Typ steht seit dem Neuentwurf in der Segmentleiste des Seitenkopfs — das
+      // gewählte Segment wird aus der URL GELESEN.
+      const segmente = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
+      expect(within(segmente).getByRole('radio', { name: 'Meldung' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      expect(within(segmente).getByRole('radio', { name: 'Alle' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
     });
 
     it('schreibt einen getippten Suchbegriff in die URL', async () => {
@@ -707,5 +734,133 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       // kein Filter.
       expect(abrufe.every((a) => !a.includes('eintrag='))).toBe(true);
     });
+  });
+});
+
+describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
+  it('schreibt den Typ aus der Segmentleiste in die URL, „Alle" nimmt ihn heraus', async () => {
+    setup();
+    await screen.findByText('Erste Meldung');
+    const segmente = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
+    await userEvent.click(within(segmente).getByRole('radio', { name: 'Anordnung' }));
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('typ=anordnung'));
+    expect(within(segmente).getByRole('radio', { name: 'Anordnung' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await userEvent.click(within(segmente).getByRole('radio', { name: 'Alle' }));
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('typ='));
+  });
+
+  it('ein Nachläufer der Suchfrist verliert den eben gewählten Typ nicht', async () => {
+    /*
+     * Die Wettlauf-Stelle über die Komponentengrenze: Suche entprellt (300 ms) in der
+     * Leiste, Typ sofort im Seitenkopf. Meldete die Leiste ihre ganze Kopie, schriebe der
+     * Nachläufer die URL ohne Typ zurück.
+     */
+    setupMSW();
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+        <OrtSpy />
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+    await screen.findByText('Erste Meldung');
+    const suche = screen.getByPlaceholderText('Volltextsuche');
+    fireEvent.change(suche, { target: { value: 'pegel' } });
+    // Innerhalb der Frist das Segment wählen …
+    fireEvent.click(screen.getByRole('radio', { name: 'Lage' }));
+    // … und nach Ablauf stehen BEIDE in der URL.
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('q=pegel'));
+    expect(screen.getByTestId('ort-suche')).toHaveTextContent('typ=lage');
+    // Der Segmentklick hat die Leiste NICHT neu aufgesetzt: das Feld ist dasselbe.
+    expect(screen.getByPlaceholderText('Volltextsuche')).toBe(suche);
+  });
+
+  it('zeigt jeden Eintrag als Zeitachseneintrag mit Typkante, Typwort und Nr.', async () => {
+    const { container } = setup();
+    await screen.findByText('Erste Meldung');
+    const zeile = container.querySelector('[data-zeile="eintrag-1"]')!;
+    expect(zeile).toHaveAttribute('data-lfh-eintrag', 'zeitachse');
+    expect(zeile).toHaveAttribute('data-typ', 'meldung');
+    expect(within(zeile as HTMLElement).getByText('Nr. 1')).toBeInTheDocument();
+    expect(zeile.querySelector('[data-lfh="typwort"]')).toHaveTextContent('Meldung');
+    expect(zeile.querySelector('[data-lfh="typkante"]')).not.toBeNull();
+  });
+
+  it('stellt die Erfassung an den Seitenfuß, nach der Zeitachse', async () => {
+    setup();
+    await screen.findByText('Erste Meldung');
+    const leiste = document.querySelector('.etb-erfassung-sticky')!;
+    const zeitachse = document.querySelector('[data-lfh="etb-zeitachse"]')!;
+    // DOCUMENT_POSITION_FOLLOWING: die Leiste steht im Baum HINTER der Zeitachse.
+    expect(
+      zeitachse.compareDocumentPosition(leiste) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Die Hülle der Schnellerfassung trägt den Typ als Befehl im Präfix (nach dem Laden
+    // der Entwürfe).
+    await waitFor(() =>
+      expect(leiste.querySelector('[data-lfh="schnellerfassung-praefix"]')).toHaveTextContent(
+        '/meldung',
+      ),
+    );
+  });
+
+  it('rollt nach einem angenommenen eigenen Eintrag den Kopf der Zeitachse ins Bild — nicht nach einer Ablehnung', async () => {
+    const aufrufe: unknown[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
+      if (this.getAttribute('data-lfh') === 'etb-zeitachse-rahmen') aufrufe.push(arg);
+    };
+    let status = 422;
+    server.use(
+      http.post('/api/einsaetze/7/etb', () =>
+        status === 201
+          ? HttpResponse.json({ ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Neu' }, { status: 201 })
+          : HttpResponse.json({ error: 'abgelehnt' }, { status }),
+      ),
+    );
+    try {
+      setup();
+      const user = userEvent.setup();
+      const feld = await screen.findByPlaceholderText(/Inhalt/);
+      await user.type(feld, 'Wird abgelehnt{Enter}');
+      await waitFor(() => expect(feld).toHaveValue('Wird abgelehnt'));
+      expect(aufrufe).toEqual([]);
+      status = 201;
+      await user.type(feld, '{Enter}');
+      await waitFor(() => expect(aufrufe).toEqual([{ block: 'nearest' }]));
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
+  it('zeigt die Bilanz über die geladenen Einträge und den Puffer „übertragen"', async () => {
+    setzeViewportBreite(1366);
+    setup();
+    await screen.findByText('Erste Meldung');
+    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
+    expect(within(leiste).getByText('im einzigen Eintrag des Tagebuchs')).toBeInTheDocument();
+    expect(within(leiste).getByText('Alle Einträge übertragen')).toBeInTheDocument();
+  });
+
+  it('meldet einen offline gepufferten Eintrag im Puffer als ausstehend', async () => {
+    server.use(http.post('/api/einsaetze/7/etb', () => HttpResponse.error()));
+    setup();
+    const user = userEvent.setup();
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Offline-Eintrag{Enter}');
+    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
+    await waitFor(() =>
+      expect(leiste.querySelector('[data-lfh="puffer"]')).toHaveAttribute(
+        'data-zustand',
+        'ausstehend',
+      ),
+    );
+    // Und der gepufferte Eintrag steht als eigene Zeile in der Zeitachse.
+    expect(await screen.findAllByText('Offline-Eintrag')).not.toHaveLength(0);
   });
 });

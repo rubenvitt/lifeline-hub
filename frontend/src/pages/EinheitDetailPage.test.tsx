@@ -146,7 +146,7 @@ describe('EinheitDetailPage · die Route selbst', () => {
   it('zeigt die Kopfdaten der adressierten Einheit', async () => {
     server.use(...handlers());
     rendere();
-    expect(await screen.findByRole('heading', { name: '1. Zug', level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '1. Zug', level: 4 })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('1. Zug'));
   });
 
@@ -191,9 +191,9 @@ describe('EinheitDetailPage · die Entwirrung (Befund M26)', () => {
     // Worten, und zwar an allen dreien.
     server.use(...handlers());
     rendere();
-    await screen.findByRole('heading', { name: 'Personal', level: 5 });
+    await screen.findByRole('heading', { name: 'Personal', level: 2 });
     for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
-      expect(screen.getByRole('heading', { name: titel, level: 5 })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: titel, level: 2 })).toBeInTheDocument();
     }
     expect(screen.getAllByText(/wirken sofort/)).toHaveLength(3);
   });
@@ -253,7 +253,7 @@ describe('EinheitDetailPage · Funk und Kopfdaten (umgezogen aus EinheitenPage)'
 describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', () => {
   it('gescheiterter Typkatalog: das Auswahlfeld nennt den Ausfall', async () => {
     zeige(http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })));
-    await screen.findByRole('heading', { name: '1. Zug', level: 3 });
+    await screen.findByRole('heading', { name: '1. Zug', level: 4 });
     await userEvent.click(await screen.findByLabelText('Typ'));
     expect(
       await screen.findByText('Einheitentypen konnten nicht geladen werden'),
@@ -264,7 +264,7 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
     // Ohne die Gegenprobe belegt der Test darüber nichts — ein Feld, das IMMER meldet,
     // wäre dort ebenfalls grün.
     zeige();
-    await screen.findByRole('heading', { name: '1. Zug', level: 3 });
+    await screen.findByRole('heading', { name: '1. Zug', level: 4 });
     await userEvent.click(await screen.findByLabelText('Typ'));
     expect((await screen.findAllByTitle('Zug')).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Einheitentypen konnten nicht geladen werden')).toBeNull();
@@ -279,7 +279,7 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
     const { container } = zeige(
       http.get('/api/einsaetze/1/personal', () => new HttpResponse(null, { status: 500 })),
     );
-    await screen.findByRole('heading', { name: '1. Zug', level: 3 });
+    await screen.findByRole('heading', { name: '1. Zug', level: 4 });
     await oeffneAuswahl(container, 'Person zuordnen …');
     expect(await screen.findByText('Kräfte konnten nicht geladen werden')).toBeInTheDocument();
     expect(screen.queryByText('Keine freien Personen')).toBeNull();
@@ -287,7 +287,7 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
 
   it('Partnerhälfte: leere Personalliste behält „Keine freien Personen"', async () => {
     const { container } = zeige();
-    await screen.findByRole('heading', { name: '1. Zug', level: 3 });
+    await screen.findByRole('heading', { name: '1. Zug', level: 4 });
     await oeffneAuswahl(container, 'Person zuordnen …');
     expect(await screen.findByText('Keine freien Personen')).toBeInTheDocument();
     expect(screen.queryByText('Kräfte konnten nicht geladen werden')).toBeNull();
@@ -296,7 +296,7 @@ describe('EinheitDetailPage · Datenzustände (umgezogen aus EinheitenPage)', ()
   it('Beobachter sieht die Daten, aber keine Schreibaktionen', async () => {
     server.use(...handlers('beobachter'));
     rendere();
-    await screen.findByRole('heading', { name: '1. Zug', level: 3 });
+    await screen.findByRole('heading', { name: '1. Zug', level: 4 });
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Auflösen' })).toBeNull();
     expect(screen.queryByText('Person zuordnen …')).toBeNull();

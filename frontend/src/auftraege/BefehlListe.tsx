@@ -1,4 +1,4 @@
-import { App, Button, Flex, Form, Input, Modal, Typography } from 'antd';
+import { App, Button, Form, Input, Modal } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Select } from '../components/Select';
 import { useState } from 'react';
@@ -10,7 +10,7 @@ import type { BefehlAnzeige, BefehlVorlageKey } from '../api/types';
 import { VORLAGEN } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import Datenstand from '../components/Datenstand';
+import Bereichskopf from '../kommunikation/Bereichskopf';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
@@ -131,40 +131,34 @@ export default function BefehlListe({
 
   return (
     <div>
-      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Befehle
-          </Typography.Title>
-          {/*
-            Zählt den BESTAND, während die Gruppenköpfe das ANGEZEIGTE zählen — bei aktiver
-            Suche laufen die Zahlen deshalb auseinander. Gewollt: die Kopfzeile ist die
-            Lageauskunft, der Gruppenkopf die Auskunft über die Trefferliste.
-          */}
-          <Typography.Text type="secondary">
-            {befehle.length} Befehle · {entwuerfe} im Entwurf
-          </Typography.Text>
-          <div>
-            <Datenstand dataUpdatedAt={befehleQuery.dataUpdatedAt} />
-          </div>
-        </div>
-        {darfSchreiben && (
-          // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
-          //
-          // `aria-label` ist hier PFLICHT und keine Doppelung: antds Icon rendert
-          // `<span role="img" aria-label="plus">`, und dessen Etikett fließt in den
-          // berechneten Namen des Knopfes ein — ohne diese Zeile heißt er für
-          // Screenreader und `getByRole` „plus Befehl erteilen" (gemessen).
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            aria-label="Befehl erteilen"
-            onClick={() => setAnlegenOffen(true)}
-          >
-            Befehl erteilen
-          </Button>
-        )}
-      </Flex>
+      {/*
+        Die Mengen zählen den BESTAND, während die Gruppenköpfe das ANGEZEIGTE zählen — bei
+        aktiver Suche laufen die Zahlen deshalb auseinander. Gewollt: die Kopfzeile ist die
+        Lageauskunft, der Gruppenkopf die Auskunft über die Trefferliste.
+      */}
+      <Bereichskopf
+        titel="Befehle"
+        meta={`${befehle.length} Befehle · ${entwuerfe} im Entwurf`}
+        dataUpdatedAt={befehleQuery.dataUpdatedAt}
+        aktion={
+          darfSchreiben && (
+            // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
+            //
+            // `aria-label` ist hier PFLICHT und keine Doppelung: antds Icon rendert
+            // `<span role="img" aria-label="plus">`, und dessen Etikett fließt in den
+            // berechneten Namen des Knopfes ein — ohne diese Zeile heißt er für
+            // Screenreader und `getByRole` „plus Befehl erteilen" (gemessen).
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              aria-label="Befehl erteilen"
+              onClick={() => setAnlegenOffen(true)}
+            >
+              Befehl erteilen
+            </Button>
+          )
+        }
+      />
 
       <Datensicht
         bezeichnung="Befehle"

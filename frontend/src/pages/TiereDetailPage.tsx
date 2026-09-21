@@ -3,7 +3,6 @@ import {
   App,
   Breadcrumb,
   Button,
-  Descriptions,
   Form,
   Input,
   InputNumber,
@@ -14,6 +13,10 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Paneel, StatusChip, monoStil } from '../components/instrument';
+import { TIER_STATUS } from './tiere/tierHelfer';
+import Datenraster, { Datenfeld } from './datenraster/Datenraster';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';
@@ -41,11 +44,7 @@ import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
  *  Halter-Auswahl, die erst beim Absenden in das XOR-Feldpaar zerlegt wird. */
 type TierFormWerte = TierPatch & { halter?: HalterWert | null };
 
-const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
-  aktiv: { label: 'aktiv', color: 'green' },
-  vermisst: { label: 'vermisst', color: 'orange' },
-  abgeschlossen: { label: 'abgeschlossen', color: 'default' },
-};
+const STATUS_META = TIER_STATUS;
 
 const SPEZIES_META: Record<Spezies, string> = {
   hund: 'Hund',
@@ -239,7 +238,7 @@ export default function TiereDetailPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item mit Input, sonst die Read-Anzeige.
-  // So bleibt beim Bearbeiten dieselbe Descriptions-Tabelle stehen — nur die Werte werden zu Feldern,
+  // So bleibt beim Bearbeiten dasselbe Datenraster stehen — nur die Werte werden zu Feldern,
   // statt die ganze Ansicht gegen ein separates Formular zu tauschen.
   const zelle = (name: string, input: React.ReactNode, anzeige: React.ReactNode) =>
     bearbeiten ? (
@@ -251,14 +250,14 @@ export default function TiereDetailPage() {
     );
 
   const detailAnsicht = (
-    <Descriptions column={1} size="small" bordered>
-      <Descriptions.Item label="Rufname">
+    <Datenraster spalten={3} beschriftung="Tierdaten">
+      <Datenfeld label="Rufname">
         {zelle('rufname', <Input placeholder="Rufname" />, t.rufname ?? '—')}
-      </Descriptions.Item>
-      <Descriptions.Item label="Rasse / Beschreibung">
+      </Datenfeld>
+      <Datenfeld label="Rasse / Beschreibung">
         {zelle('rasse_beschreibung', <Input />, t.rasse_beschreibung ?? '—')}
-      </Descriptions.Item>
-      <Descriptions.Item label="Geschlecht">
+      </Datenfeld>
+      <Datenfeld label="Geschlecht">
         {zelle(
           'geschlecht',
           <Select
@@ -273,27 +272,27 @@ export default function TiereDetailPage() {
           />,
           t.geschlecht ?? '—',
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label="Alter in Jahren (geschätzt)">
+      </Datenfeld>
+      <Datenfeld label="Alter in Jahren (geschätzt)" mono>
         {zelle('alter_geschaetzt', <InputNumber min={0} max={120} />, t.alter_geschaetzt ?? '—')}
-      </Descriptions.Item>
-      <Descriptions.Item label="Farbe / Erscheinung">
+      </Datenfeld>
+      <Datenfeld label="Farbe / Erscheinung">
         {zelle('farbe_beschreibung', <Input />, t.farbe_beschreibung ?? '—')}
-      </Descriptions.Item>
-      <Descriptions.Item label="Kennzeichnung">
+      </Datenfeld>
+      <Datenfeld label="Kennzeichnung" mono>
         {zelle(
           'kennzeichnung',
           <Input placeholder="Chip / Tätowierung / Halsband" />,
           t.kennzeichnung ?? '—',
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label="Größe / Gewicht">
+      </Datenfeld>
+      <Datenfeld label="Größe / Gewicht">
         {zelle('groesse_gewicht', <Input />, t.groesse_gewicht ?? '—')}
-      </Descriptions.Item>
-      <Descriptions.Item label="Antreffort">
+      </Datenfeld>
+      <Datenfeld label="Antreffort">
         {zelle('antreff_ort', <Input />, t.antreff_ort ?? '—')}
-      </Descriptions.Item>
-      <Descriptions.Item label="Halter">
+      </Datenfeld>
+      <Datenfeld label="Halter">
         {zelle(
           'halter',
           <HalterPicker einsatzId={einsatzId} />,
@@ -310,36 +309,37 @@ export default function TiereDetailPage() {
             halterAnzeige(t)
           ),
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label="Notiz">
+      </Datenfeld>
+      <Datenfeld label="Notiz" breit>
         {zelle('notiz', <Input.TextArea rows={2} />, t.notiz ?? '—')}
-      </Descriptions.Item>
-    </Descriptions>
+      </Datenfeld>
+    </Datenraster>
   );
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: <Link to={zurueck}>Tiere</Link> },
-          { title: tierRegistrierAnzeige(t.registrier_nr) },
-        ]}
-      />
-      <Space
-        style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}
-        align="start"
-      >
-        <Space wrap>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Tier {tierRegistrierAnzeige(t.registrier_nr)}
-          </Typography.Title>
-          <Tag color={STATUS_META[t.status].color}>{STATUS_META[t.status].label}</Tag>
+    <EinsatzSeite
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: <Link to={zurueck}>Tiere</Link> },
+            { title: tierRegistrierAnzeige(t.registrier_nr) },
+          ]}
+        />
+      }
+      titel={
+        <Space wrap size={8}>
+          <span>
+            Tier <span style={monoStil(14, 500)}>{tierRegistrierAnzeige(t.registrier_nr)}</span>
+          </span>
+          <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
           <Tag>{SPEZIES_META[t.spezies]}</Tag>
           {t.storniert_at && <Tag color="default">storniert</Tag>}
         </Space>
+      }
+      dataUpdatedAt={detailQuery.dataUpdatedAt}
+      aktionen={
         <Space>
           {darfSchreiben && !t.storniert_at && !bearbeiten && (
             <Space wrap size="middle">
@@ -391,6 +391,7 @@ export default function TiereDetailPage() {
               <Popconfirm
                 title="Tier stornieren (Soft-Delete)?"
                 onConfirm={() => stornoMutation.mutate(t.id)}
+                okButtonProps={{ danger: true }}
               >
                 <Button danger>Stornieren</Button>
               </Popconfirm>
@@ -398,8 +399,8 @@ export default function TiereDetailPage() {
           )}
           <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
         </Space>
-      </Space>
-
+      }
+    >
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
         {sitzung ? (
           <Form
@@ -436,12 +437,14 @@ export default function TiereDetailPage() {
         )}
 
         {t.status === 'abgeschlossen' && (
-          <Descriptions column={1} size="small" title="Abschluss">
-            <Descriptions.Item label="Grund">
-              {t.abschluss_grund ? ABSCHLUSS_META[t.abschluss_grund] : '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Ziel">{t.abschluss_ziel ?? '—'}</Descriptions.Item>
-          </Descriptions>
+          <Paneel titel="Abschluss">
+            <Datenraster spalten={2} beschriftung="Abschluss">
+              <Datenfeld label="Grund">
+                {t.abschluss_grund ? ABSCHLUSS_META[t.abschluss_grund] : '—'}
+              </Datenfeld>
+              <Datenfeld label="Ziel">{t.abschluss_ziel ?? '—'}</Datenfeld>
+            </Datenraster>
+          </Paneel>
         )}
       </Space>
 
@@ -478,6 +481,6 @@ export default function TiereDetailPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </EinsatzSeite>
   );
 }

@@ -215,7 +215,7 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
         onVerortungLoeschen={() => {}}
       />,
     );
-    const modulLink = screen.getByRole('link', { name: 'Im Fach-Modul öffnen' });
+    const modulLink = screen.getByRole('link', { name: 'Im Fachmodul öffnen' });
     const loeschen = screen.getByRole('button', { name: 'Verortung löschen' });
 
     // `size="middle"` statt des Vorgabe-Abstands: der rote Knopf steht sonst 3–7 px unter
@@ -243,7 +243,7 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
         onVerortungLoeschen={() => {}}
       />,
     );
-    expect(screen.getByRole('link', { name: 'Im Fach-Modul öffnen' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Im Fachmodul öffnen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Verortung löschen' })).not.toBeInTheDocument();
   });
 
@@ -304,5 +304,99 @@ describe('Inspector Typ-Tag (LFH-276)', () => {
     );
     expect(screen.getByText('Personal')).toBeInTheDocument();
     expect(screen.queryByText('Führungskraft')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Neuentwurf S5: der Inspector steht im Paneel „Ausgewählt" der rechten Leiste —
+ * Symbol-Kachel, Mono-Unterzeile, Datenraster mit Augenbrauen, nur Felder mit Datenquelle.
+ */
+describe('Inspector im Paneel „Ausgewählt"', () => {
+  const einheitMarker = {
+    schluessel: 'einheit-1',
+    typ: 'einheit',
+    id: 1,
+    lat: 51.1,
+    lon: 4.1,
+    label: 'Zug 1',
+    farbe: '#555',
+  } as KarteMarker;
+
+  const roh = {
+    einheiten: [
+      {
+        id: 1,
+        name: 'Zug 1',
+        typ_label: 'Zug',
+        ist: { fuehrer: 1, unterfuehrer: 2, mannschaft: 9 },
+        abschnitt_name: 'Nord',
+        fuehrer_name: null,
+      },
+    ],
+    fahrzeuge: [],
+    fuehrungskraefte: [],
+    uhs: [],
+    schaeden: [],
+    abschnitte: [],
+  } as never;
+
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  it('zeigt Name, Unterzeile und das Datenraster aus den Rohdaten', () => {
+    const { container } = renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+        roh={roh}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 3, name: 'Zug 1' })).toBeInTheDocument();
+    expect(screen.getByText('Einheit · Zug')).toBeInTheDocument();
+    const raster = container.querySelector('[data-lfh="auswahl-raster"]') as HTMLElement;
+    expect(raster).toHaveTextContent('Stärke');
+    expect(raster).toHaveTextContent('1/2/9//12');
+    expect(raster).toHaveTextContent('Nord');
+    // Keine erfundenen Felder: Status/„Seit" einer Einheit (LFH-609), „Letzte Meldung" (LFH-610).
+    expect(raster).not.toHaveTextContent('Status');
+    expect(raster).not.toHaveTextContent('Seit');
+    expect(screen.queryByText(/Letzte Meldung/)).not.toBeInTheDocument();
+  });
+
+  it('ohne Rohdaten kein Raster — nur Ort und Aktionen', () => {
+    const { container } = renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-lfh="auswahl-raster"]')).toBeNull();
+    expect(screen.getByText('Koordinate')).toBeInTheDocument();
+  });
+
+  it('der Deeplink trägt ↗ als Zeichen, der zugängliche Name bleibt die Handlung', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    const link = screen.getByRole('link', { name: 'Im Fachmodul öffnen' });
+    expect(link).toHaveTextContent('Im Fachmodul öffnen↗');
+    expect(link.querySelector('.ant-btn')).toHaveClass('ant-btn-primary');
   });
 });

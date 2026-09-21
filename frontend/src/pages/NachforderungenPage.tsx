@@ -1,16 +1,4 @@
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Card,
-  Flex,
-  Input,
-  Modal,
-  Segmented,
-  Spin,
-  Typography,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Input, Modal, Spin } from 'antd';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -31,7 +19,9 @@ import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikati
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
-import Datenstand from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { flaeche } from '../theme/tokens';
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
 function abschlussZeit(n: Nachforderung): string {
@@ -44,6 +34,7 @@ export default function NachforderungenPage() {
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const { token } = useRollen();
 
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   // Inline-Erfassen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
@@ -75,7 +66,7 @@ export default function NachforderungenPage() {
     mutationFn: (d: NeueNachforderung) => legeNachforderungAn(einsatzId, d),
     // LFH-343/C8: kein `setFormOffen(false)` mehr — das Inline-Formular bleibt
     // offen, damit die nächste Nachforderung ohne Aufklappen weitergeht. Der
-    // conditional Render der Card würde es sonst unmounten, samt Serienzähler
+    // conditional Render des Paneels würde es sonst unmounten, samt Serienzähler
     // und Wertübernahme (Muster: `pages/MeldungenPage.tsx`, LFH-332/B4).
     onSuccess: () => {
       invalidiere();
@@ -172,45 +163,38 @@ export default function NachforderungenPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Nachforderung' },
-        ]}
-      />
-      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Nachforderung Kräfte/Mittel
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {offene.length} offen · {abgeschlossene.length} abgeschlossen
-          </Typography.Text>
-          <div>
-            <Datenstand dataUpdatedAt={nfQuery.dataUpdatedAt} />
-          </div>
-        </div>
-        {darfSchreiben && (
+    <EinsatzSeite
+      titel="Nachforderung Kräfte/Mittel"
+      breite={flaeche.seiteBreit}
+      meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
+      dataUpdatedAt={nfQuery.dataUpdatedAt}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Nachforderung' },
+          ]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           <Button
             type="primary"
-            size="large"
             icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
             onClick={() => setFormOffen((o) => !o)}
           >
             {formOffen ? 'Formular schließen' : 'Nachforderung anlegen'}
           </Button>
-        )}
-      </Flex>
-
+        )
+      }
+    >
       {darfSchreiben && formOffen && (
-        <Card
-          size="small"
-          title="Neue Nachforderung"
-          style={{ marginBottom: 16 }}
-          extra={
+        <Paneel
+          titel="Neue Nachforderung"
+          koerperPolster
+          style={{ marginBottom: token.margin }}
+          aktion={
             <Button
               type="text"
               icon={<CloseOutlined />}
@@ -226,14 +210,14 @@ export default function NachforderungenPage() {
             // Nachforderung wirklich angekommen ist (LFH-332/B4).
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
-        </Card>
+        </Paneel>
       )}
 
       {nfQuery.isError && (
         <Alert
           type="error"
           showIcon
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: token.marginSM }}
           title="Nachforderungen konnten nicht geladen werden"
         />
       )}
@@ -241,17 +225,18 @@ export default function NachforderungenPage() {
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 16,
+          gap: token.marginSM,
+          marginBottom: token.margin,
           alignItems: 'center',
         }}
       >
-        <Segmented
-          value={ansicht}
-          onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
-          options={[
-            { value: 'offen', label: `Offen (${offene.length})` },
-            { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+        <Segmentleiste
+          beschriftung="Ansicht"
+          wert={ansicht}
+          onWechsel={setAnsicht}
+          optionen={[
+            { wert: 'offen', label: `Offen (${offene.length})` },
+            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
           ]}
         />
       </div>
@@ -283,6 +268,6 @@ export default function NachforderungenPage() {
           rows={3}
         />
       </Modal>
-    </div>
+    </EinsatzSeite>
   );
 }

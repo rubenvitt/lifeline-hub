@@ -1,5 +1,6 @@
 import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -58,7 +59,7 @@ export default function MaterialTab() {
       title: 'Bestandsnummer',
       dataIndex: 'bestandsnummer',
       key: 'bestandsnummer',
-      render: (t) => t ?? '—',
+      render: (t) => (t ? <span style={monoStil(13)}>{t}</span> : '—'),
     },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
     {

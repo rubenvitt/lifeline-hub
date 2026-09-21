@@ -142,9 +142,9 @@ describe('MaterialPage', () => {
    * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
    * Builder wäre sonst von ihm nicht zu unterscheiden.
    */
-  it('verlinkt die Kräfteübersicht über der Tabelle', async () => {
+  it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatzAktiv, [em]);
-    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
+    const link = await screen.findByRole('link', { name: 'Meldebild' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht');
   });
 
@@ -220,7 +220,7 @@ describe('MaterialPage', () => {
 
   it('Einsatzleitung sieht Disponier- und Ad-hoc-Aktionen', async () => {
     render(einsatzAktiv, []);
-    await screen.findByRole('heading', { name: 'Material' });
+    await screen.findByRole('heading', { name: /^Material/ });
     expect(screen.getByRole('button', { name: 'Disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Material' })).toBeInTheDocument();
   });
@@ -511,7 +511,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
 
   async function oeffneAdhoc() {
     render(einsatzAktiv, []);
-    await screen.findByRole('heading', { name: 'Material' });
+    await screen.findByRole('heading', { name: /^Material/ });
     await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Material' }));
     return await screen.findByRole('dialog');
   }

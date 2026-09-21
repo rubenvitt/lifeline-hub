@@ -29,3 +29,19 @@ export function kurzVerbleib(v: Verbleib): string {
 
 // Kompatible Exportnamen; die Farbachsen liegen zentral im Theme (LFH-455).
 export { sichtung as SK_META, personStatus as STATUS_META } from '../theme/statusFarben';
+
+/**
+ * Das Bedeutungswort je Sichtungskategorie für Legenden (Seitenleiste „Sichtungsbild").
+ * Nach der BBK-Einteilung: SK I akute vitale Bedrohung, SK II schwer verletzt/erkrankt,
+ * SK III leicht verletzt, SK IV ohne Überlebenschance (betreuende, abwartende Behandlung).
+ * Das Kürzel selbst bleibt `SK_META[k].label` — dies ist der Beisatz, nicht der Name.
+ */
+export const SK_WORT: Record<Sichtungskategorie | 'ohne', string> = {
+  sk1: 'akut',
+  sk2: 'schwer',
+  sk3: 'leicht',
+  sk4: 'abwartend',
+  tot: 'verstorben',
+  unverletzt: 'ohne Verletzung',
+  ohne: 'ohne Sichtung',
+};

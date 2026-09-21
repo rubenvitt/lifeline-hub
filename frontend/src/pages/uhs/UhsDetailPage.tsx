@@ -101,15 +101,11 @@ export default function UhsDetailPage() {
   const uhs = detailQuery.data;
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const meta = [
-    // Der Typ ist eine Kategorie und trägt im Vertrag durchgängig `neutral` — hier zählt
-    // nur seine Beschriftung. Die liegt seit LFH-328/A2 im Vertrag (`theme/statusFarben.ts`,
-    // `uhsTyp`); `UnfallhilfsstellenPage` und `UhsAnlegenDrawer` lesen bereits von dort,
-    // diese Seite ist der dritte Konsument (LFH-341 · M54).
-    `Typ: ${uhsTyp[uhs.typ].label}`,
-    `Standort: ${uhs.standort ?? '—'}`,
-    ...(uhs.notiz ? [`Notiz: ${uhs.notiz}`] : []),
-  ].join('  ·  ');
+  // Typ und Standort sind Kopf-Meta (Neuentwurf: „Titel 14/600 + Mono-Meta"); der Typ ist
+  // eine Kategorie und trägt im Vertrag durchgängig `neutral` — hier zählt nur seine
+  // Beschriftung aus `uhsTyp` (LFH-328/A2, dritter Konsument seit LFH-341 · M54). Die
+  // Notiz ist Freitext und bleibt Beschreibungszeile unter dem Kopf.
+  const meta = [uhsTyp[uhs.typ].label, uhs.standort ?? 'ohne Standort'].join(' · ');
 
   return (
     <EinsatzSeite
@@ -122,7 +118,8 @@ export default function UhsDetailPage() {
           <StatusTag darstellung={uhsStatus[uhs.status]} />
         </Space>
       }
-      beschreibung={meta}
+      meta={meta}
+      beschreibung={uhs.notiz ? `Notiz: ${uhs.notiz}` : undefined}
       /* Betriebs-Feedback im Kopf (B6-Muster): die beiden Reiter tragen es seit B2, die
          Seite selbst nicht — ausgerechnet dort, wo der Grundriss live mitläuft. Das
          Primitiv rendert den Indikator; eine eigene `<Datenstand>`-Zeile daneben wäre die

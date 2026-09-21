@@ -1,7 +1,5 @@
 import {
-  Badge,
   Button,
-  Card,
   Dropdown,
   Modal,
   Radio,
@@ -9,12 +7,10 @@ import {
   Space,
   Spin,
   Switch,
-  theme,
   Tooltip,
   Typography,
   Upload,
 } from 'antd';
-import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
 import {
@@ -24,10 +20,14 @@ import {
   MoreOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { TbLayersIntersect } from 'react-icons/tb';
+import { monoStil, useRollen } from '../../components/instrument';
+import { KlappPaneel, LeistenAbschnitt, usePaneelZustand } from './KlappPaneel';
+import { ebenenFarbe, ebenenZeilen, type EbenenZeile } from './leistenDaten';
+import './lagekarte.css';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
-import type { OnlineStyle } from '../../api/karte';
 import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
@@ -141,14 +141,18 @@ export interface SidebarProps {
   onEinsatzortPlatzieren: () => void;
   layer: LayerSichtbar;
   onLayerToggle: (key: keyof LayerSichtbar, an: boolean) => void;
+  /** Zahl der Zonen der aktiven Ansicht — UNGEGATTERT (siehe `ebenenZeilen`). */
+  zonenAnzahl: number;
+  /**
+   * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das
+   * Paneel „Kartengrundlage" trägt nur, was dort keinen Platz hat (Karten-Design, Hinweise).
+   */
   basemap: BasemapModus;
-  onBasemapWechsel: (modus: BasemapModus) => void;
+  /** Die Grundlagen-Wahl selbst — nur auf dem Handschirm, wo sie nicht über der Karte steht. */
+  grundlageWahl?: ReactNode;
   onMarkerWaehlen: (schluessel: string) => void;
   onlineVerfuegbar: boolean;
   offlineVerfuegbar: boolean;
-  onlineStyles: OnlineStyle[];
-  onlineStilName: string | null;
-  onOnlineStilWechsel: (name: string) => void;
   /** Karten-lokale Theme-Wahl (Offline-Basemap): 'auto' folgt dem App-Theme. */
   kartenTheme: KartenThemeWahl;
   onKartenThemeWechsel: (wahl: KartenThemeWahl) => void;
@@ -196,6 +200,97 @@ export interface SidebarProps {
   ansichtBusy: boolean;
   /** Fehler-Slots je Sektion (LFH-331 · B3) — siehe `SidebarSektionFehler`. */
   sektionFehler?: SidebarSektionFehler;
+  /**
+   * Inhalt des Paneels „Ausgewählt" — die Inspectors der gewählten Objekte (Marker, Zone,
+   * freies Zeichen, Fachebene). Leer → Hinweis, wie man etwas wählt.
+   */
+  auswahl?: ReactNode;
+  /**
+   * Zähler, der bei jeder Erhöhung das Paneel „Zeichnen" öffnet und in den Blick holt — der
+   * Zeichnen-Knopf über der Karte. Ein Zähler statt eines Booleans, damit ein zweiter Klick
+   * nach dem Zuklappen wieder greift.
+   */
+  zeichnenAnfrage?: number;
+}
+
+/**
+ * Stil einer Ebenen-Zeile — ein handgebautes Bedienziel (`<button role="switch">`), also die
+ * ZWEI Angaben aus LFH-365: `minHeight` aus `controlHeight` plus Polsterung. Rein und
+ * exportiert, damit die Staffel 30 / 48 / 72 ohne Rendern prüfbar ist.
+ */
+export function ebenenZeileStil(token: {
+  controlHeight: number;
+  paddingSM: number;
+  padding: number;
+  marginSM: number;
+}): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: token.marginSM,
+    width: '100%',
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px ${token.padding}px`,
+    margin: 0,
+    border: 0,
+    cursor: 'pointer',
+    textAlign: 'start',
+  };
+}
+
+/** Kantenlänge des Farbfelds einer Ebenen-Zeile (Neuentwurf S5). */
+const FARBFELD = 14;
+
+/**
+ * Eine Zeile im Paneel „Ebenen": Farbfeld · Name · Anzahl; Klick schaltet die Ebene.
+ *
+ * `role="switch"` + `aria-checked` tragen den Zustand als Wort — das Farbfeld (gefüllt an,
+ * leer aus) ist nur der zweite, sichtbare Kanal, und der gedämpfte Name der dritte. Der
+ * zugängliche Name ist der Ebenenname allein; die Anzahl steht sichtbar daneben.
+ */
+function EbenenZeilenKnopf({
+  zeile,
+  onUmschalten,
+}: {
+  zeile: EbenenZeile;
+  onUmschalten: (an: boolean) => void;
+}) {
+  const { token, rollen } = useRollen();
+  const farbe = ebenenFarbe(zeile.key, rollen);
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={zeile.sichtbar}
+      aria-label={zeile.name}
+      data-ebene={zeile.key}
+      className="lfh-ebenenzeile"
+      onClick={() => onUmschalten(!zeile.sichtbar)}
+      style={{
+        ...ebenenZeileStil(token),
+        borderBlockEnd: `1px solid ${rollen.flaeche3}`,
+        color: zeile.sichtbar ? rollen.text : rollen.schwach,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        data-lfh="ebenen-farbfeld"
+        style={{
+          width: FARBFELD,
+          height: FARBFELD,
+          flex: `0 0 ${FARBFELD}px`,
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderColor: zeile.sichtbar ? farbe : rollen.steuerRahmen,
+          background: zeile.sichtbar
+            ? `color-mix(in srgb, ${farbe} 55%, transparent)`
+            : 'transparent',
+        }}
+      />
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
+      <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.anzahl}</span>
+    </button>
+  );
 }
 
 /** Ein Fehler-Slot als Markup — oder nichts. Hält die drei Aufrufstellen unten einzeilig. */
@@ -286,17 +381,28 @@ export function bedienzielStil(token: {
   } as const;
 }
 
+/**
+ * Rechte Leiste der Lagekarte (Neuentwurf S5 „Karte führt, Daten folgen"), 300 px ab `lg`.
+ *
+ * Oben die zwei festen Abschnitte des Entwurfs — **Ebenen** (Farbfeld · Name · Anzahl, Klick
+ * schaltet) und **Ausgewählt** (die Inspectors, die vorher über der Karte schwebten). Darunter
+ * als einklappbare Paneele alles, was die alte linke Kartenleiste trug; nichts ist entfallen.
+ * Die Kartengrundlage selbst wird in der Segmentleiste ÜBER der Karte gewählt.
+ */
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
   const sektionFehler = props.sektionFehler ?? {};
   /** Eine Zählung, die im Fehlerfall keine Null behauptet. */
   const zaehler = (n: number) => (sektionFehler.nichtVerortet ? '—' : n);
-  // Darstellungsfarben/-abstände kommen aus den Rollen-Tokens (LFH-328/T14) — dark-safe und
-  // dichteabhängig. Persistierte Farbwerte (Zone `farbe`) sind davon ausgenommen, siehe unten.
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
+  const paneele = usePaneelZustand();
+  const umschalten = (k: Parameters<typeof paneele.setze>[0]) => () =>
+    paneele.setze(k, !paneele.zustand[k]);
+  // Ein Paneel mit Fehler-Slot steht OFFEN, egal wie es zuletzt stand: ein zugeklappter Fehler
+  // wäre von „nichts da" nicht zu unterscheiden (Fehler ≠ leer, LFH-331 · B3).
   const [koord, setKoord] = useState<LatLon | null>(null);
   // Freies-Zeichen-Schnellerfassung (LFH-170): Picker erst auf Klick sichtbar (kein Dauer-
-  // Combobox in der Sidebar), Entwurf bleibt über Platzierungen erhalten.
+  // Combobox in der Leiste), Entwurf bleibt über Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
     grundzeichen: 'taktische-formation',
@@ -305,95 +411,127 @@ export default function Sidebar(props: SidebarProps) {
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
   /**
    * Bild, dessen Entfernen bestätigt werden soll (LFH-366 · B5f) — EIN Dialog für die ganze
-   * Liste, nicht einer je Zeile. Der `AnsichtSwitcher` daneben kommt mit einem einzigen
-   * `<Modal>` aus, weil es genau eine aktive Ansicht gibt; hier sind es n Bilder, und n
-   * Dialoge im Baum wären n gleichnamige Knöpfe pro Rolle.
+   * Liste, nicht einer je Zeile: n Dialoge im Baum wären n gleichnamige Knöpfe pro Rolle.
    */
   const [loeschBildId, setLoeschBildId] = useState<number | null>(null);
   // Entwurf verwerfen, sobald ein anderes Bild platziert wird oder der Modus endet.
   useEffect(() => setBildMitte(null), [props.bildPlatzierenId]);
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
   const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
+  const ebenen = ebenenZeilen(
+    verortet,
+    props.zonenAnzahl,
+    props.layer,
+    sektionFehler.nichtVerortet != null,
+  );
+
+  // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. `setze` ist stabil;
+  // der Effekt hängt allein am Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
+  const zeichnenRef = useRef<HTMLDivElement>(null);
+  const { setze: paneelSetzen } = paneele;
+  useEffect(() => {
+    if (!props.zeichnenAnfrage) return;
+    paneelSetzen('zeichnen', true);
+    // jsdom kennt `scrollIntoView` nicht — optionaler Aufruf statt Absturz im Test.
+    requestAnimationFrame(() => zeichnenRef.current?.scrollIntoView?.({ block: 'nearest' }));
+  }, [props.zeichnenAnfrage, paneelSetzen]);
 
   // Zum kleinen `size`-Prop in dieser Datei (LFH-328/A1 Festlegung 4): auf allen
-  // interaktiven Elementen — Button, Switch, Select, Radio.Group — ist es ENTFERNT; deren
-  // Höhe kommt jetzt aus der Zeilenhöhe der Dichte-Staffel am `ConfigProvider`. Stehen
-  // bleiben ausschliesslich Container-Fälle, und zwar aus zwei getrennten Gründen:
-  //
-  //   * Die elf `Card` und der eine `Spin` ändern nur die Polsterung bzw. die Grösse einer
-  //     Anzeige — sie verkleinern keine Treffläche. Die Leiste ist 300 px breit und
-  //     scrollt; elf Karten auf Normalpolsterung zu heben wäre eine REINE Sichtänderung an
-  //     der meistgenutzten Fläche der Anwendung, die jsdom nicht nachrechnen kann
-  //     (Layout-Regressionen sind hier nur per e2e sichtbar).
-  //   * Die drei `Liste` tragen gar kein antd-Prop: `components/Liste.tsx` bildet `size`
-  //     auf die Abstands-Token ab und zieht bei der Dichte-Umschaltung (B5) mit. Es zu
-  //     entfernen würde die Staffel nicht bedienen, sondern verlassen.
-  //
-  // Nachtrag LFH-366 · B5f — zwei Dinge, die dieser Kommentar bisher offen ließ:
-  //
-  //   * Zwei der drei Listen tragen ANKLICKBARE Einträge („Verortet": UHS und Schäden). Dort
-  //     genügt die Abstands-Zusicherung oben NICHT: die Polsterung allein trägt keinen
-  //     Trefflächenboden. Diese Einträge bekommen deshalb `bedienzielStil` (siehe dort) —
-  //     `minHeight` aus `controlHeight` PLUS Polsterung. Die dritte Liste („Nicht verortet")
-  //     bleibt unangetastet: ihre Einträge sind nicht selbst klickbar, das Bedienziel ist der
-  //     Knopf in der Zeile, und der erbt die Staffel ohnehin.
-  //   * Die harten `marginBottom: 12` an den Karten bleiben stehen und werden NICHT auf ein
-  //     Abstands-Token gezogen. Es ist derselbe Grund wie beim ersten Punkt oben: eine
-  //     Umstellung träfe alle zwölf Karten dieser Leiste auf einmal und wäre eine reine
-  //     Sichtänderung an der meistgenutzten Fläche der Anwendung, die jsdom nicht nachrechnen
-  //     kann. Das ist eine Tokenisierungs-Aufgabe (A2-Linie), keine Dichte-Aufgabe, und sie
-  //     ist als LFH-377 getickt statt hier nebenbei mitgenommen zu werden.
+  // interaktiven Elementen — Button, Switch, Radio.Group — ist es ENTFERNT; deren Höhe kommt
+  // aus der Dichte-Staffel am `ConfigProvider`. Stehen bleiben die `Liste`-Angaben (dort ein
+  // Abstandsmaß, keine Treffläche) und der eine `Spin` (eine Anzeige). Die anklickbaren
+  // Einträge unter „Verortet" tragen `bedienzielStil`, die Ebenen-Zeilen `ebenenZeileStil`.
   //
   // Die Prop-Schreibweise steht hier bewusst NICHT ausgeschrieben: Gate 4 zählt ihr Literal
   // repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht füllen.
   return (
-    <div style={{ width: 300, padding: 12, overflowY: 'auto', height: '100%' }}>
-      {sektionFehler.ansichten ? (
-        <div style={{ marginBottom: 12 }}>
-          <FehlerSlot fehler={sektionFehler.ansichten} />
+    <div
+      data-lfh="kartenleiste"
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        background: rollen.paneel,
+        color: rollen.text,
+      }}
+    >
+      {platzierungZiel && darfSchreiben && (
+        <div
+          data-lfh="platzieren-hinweis"
+          style={{
+            padding: token.padding,
+            borderBlockEnd: `1px solid ${rollen.linie}`,
+            borderInlineStart: `2px solid ${rollen.bedien}`,
+            background: rollen.flaeche2,
+          }}
+        >
+          <Typography.Text type="secondary">
+            Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
+          </Typography.Text>
+          <div style={{ marginTop: token.marginXS }}>
+            <KoordinatenEingabe
+              value={koord}
+              onChange={setKoord}
+              einsatzId={props.einsatzId}
+              exclude={ortVorschauExclude(props.platzierungZiel, props.einsatzId)}
+            />
+          </div>
+          <div style={{ marginTop: token.marginXS }}>
+            <Button
+              disabled={!koord}
+              onClick={() => {
+                if (koord) {
+                  props.onKoordinateEingeben(koord.lat, koord.lon);
+                  setKoord(null);
+                }
+              }}
+            >
+              Übernehmen
+            </Button>
+          </div>
         </div>
-      ) : (
-        <AnsichtSwitcher
-          ansichten={props.ansichten}
-          aktiveAnsichtId={props.aktiveAnsichtId}
-          darfSchreiben={darfSchreiben}
-          busy={props.ansichtBusy}
-          onWaehlen={props.onAnsichtWaehlen}
-          onNeu={props.onAnsichtNeu}
-          onUmbenennen={props.onAnsichtUmbenennen}
-          onStandard={props.onAnsichtStandard}
-          onLoeschen={props.onAnsichtLoeschen}
-        />
       )}
-      <Card
-        size="small"
-        title={
-          <Space>
-            <Typography.Text strong>⚠ Nicht verortet</Typography.Text>
-            {/* Zweiter Kanal ist die Zahl selbst (WCAG 1.4.1) — die Farbe trägt hier nur „Achtung". */}
-            <Badge count={nichtVerortet.length} showZero color={token.colorWarning} />
-          </Space>
-        }
-        style={{ marginBottom: 12 }}
+
+      <LeistenAbschnitt titel="Ebenen" kennung="ebenen" zeichen={<TbLayersIntersect size={16} />}>
+        <div role="group" aria-label="Ebenen ein- und ausblenden">
+          {ebenen.map((z) => (
+            <EbenenZeilenKnopf
+              key={z.key}
+              zeile={z}
+              onUmschalten={(an) => props.onLayerToggle(z.key, an)}
+            />
+          ))}
+        </div>
+      </LeistenAbschnitt>
+
+      <LeistenAbschnitt titel="Ausgewählt" kennung="ausgewaehlt">
+        {props.auswahl ?? (
+          <p
+            style={{
+              margin: 0,
+              padding: token.padding,
+              fontSize: 12,
+              color: rollen.gedaempft,
+            }}
+          >
+            Nichts gewählt. Ein Objekt auf der Karte oder unter „Verortet" antippen.
+          </p>
+        )}
+      </LeistenAbschnitt>
+
+      <KlappPaneel
+        titel="Nicht verortet"
+        kennung="nichtVerortet"
+        meta={zaehler(nichtVerortet.length)}
+        offen={paneele.zustand.nichtVerortet || sektionFehler.nichtVerortet != null}
+        onUmschalten={umschalten('nichtVerortet')}
       >
         {/* Die Weiche ist das Paar aus D3 und D5 (LFH-331 · B3) — dasselbe wie in
             `PersonenPage`/`SchaedenPage`/`TierePage`, und der `anzahl === 0`-Wächter ist
             der tragende Teil daran: **ein Fehler ersetzt Inhalt nur, wenn es keinen
-            Inhalt gibt.**
-
-            Ohne den Wächter nähme der Ausfall EINER der elf Lagebild-Quellen die komplette
-            Liste vom Schirm — und mit ihr die einzige Bedienung zum Verorten, für Objekte,
-            die der Fehler gar nicht betrifft. Stehen also noch Zeilen im Zwischenspeicher,
-            wird der Fehler zum Banner DARÜBER (`SeitenStandVeraltet`: die Zeilen sind echt,
-            nur womöglich alt), und die Liste bleibt bedienbar.
-
-            Nur wenn nichts mehr dasteht, tritt der Fehler an die Stelle des Inhalts —
-            denn „Alles verortet" ist eine Erfolgsaussage und darf nicht fallen, solange
-            unklar ist, ob überhaupt etwas geladen wurde.
-
-            Die Erfolgszeile trägt dasselbe Primitiv wie die übrigen Leerzustände — aber
-            OHNE Aktion und ohne Hinweis „lege etwas an". Sie ist kein Leerzustand, sondern
-            ein Erfolgszustand: hier fehlt nichts, hier ist alles erledigt. */}
+            Inhalt gibt.** Stehen noch Zeilen im Zwischenspeicher, wird der Fehler zum Banner
+            DARÜBER (`SeitenStandVeraltet`), und die Liste — die einzige Bedienung zum
+            Verorten — bleibt bedienbar. „Alles verortet" ist eine Erfolgsaussage und darf
+            nicht stehen, solange unklar ist, ob überhaupt etwas geladen wurde. */}
         {sektionFehler.nichtVerortet && nichtVerortet.length === 0 ? (
           <FehlerSlot fehler={sektionFehler.nichtVerortet} />
         ) : nichtVerortet.length === 0 ? (
@@ -441,38 +579,14 @@ export default function Sidebar(props: SidebarProps) {
             />
           </>
         )}
-      </Card>
+      </KlappPaneel>
 
-      {platzierungZiel && darfSchreiben && (
-        <Card size="small" style={{ marginBottom: 12, borderColor: token.colorPrimary }}>
-          <Typography.Text type="secondary">
-            Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
-          </Typography.Text>
-          <div style={{ marginTop: 8 }}>
-            <KoordinatenEingabe
-              value={koord}
-              onChange={setKoord}
-              einsatzId={props.einsatzId}
-              exclude={ortVorschauExclude(props.platzierungZiel, props.einsatzId)}
-            />
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <Button
-              disabled={!koord}
-              onClick={() => {
-                if (koord) {
-                  props.onKoordinateEingeben(koord.lat, koord.lon);
-                  setKoord(null);
-                }
-              }}
-            >
-              Übernehmen
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      <Card size="small" title="Einsatzort" style={{ marginBottom: 12 }}>
+      <KlappPaneel
+        titel="Einsatzort"
+        kennung="einsatzort"
+        offen={paneele.zustand.einsatzort}
+        onUmschalten={umschalten('einsatzort')}
+      >
         <Space style={{ justifyContent: 'space-between', width: '100%' }}>
           <Typography.Text type={props.einsatzortVerortet ? undefined : 'warning'}>
             {props.einsatzortVerortet ? 'verortet' : 'nicht verortet'}
@@ -489,13 +603,17 @@ export default function Sidebar(props: SidebarProps) {
               </Button>
             ))}
         </Space>
-      </Card>
+      </KlappPaneel>
 
-      <Card size="small" title="Verortet" style={{ marginBottom: 12 }}>
-        {/* Die Karte trägt keinen eigenen Fehlerkasten (Begründung an `SidebarSektionFehler`),
-            aber ihre Zahlen dürfen nicht lügen: „UHS (0)" ist eine Aussage über die Lage, und
-            im Fehlerfall hat sie niemand geprüft. Der Gedankenstrich ist die ehrliche Form.
-            Ein Template-Literal statt {…}-Interpolation, damit der Text EIN Knoten bleibt. */}
+      <KlappPaneel
+        titel="Verortet"
+        kennung="verortet"
+        offen={paneele.zustand.verortet}
+        onUmschalten={umschalten('verortet')}
+      >
+        {/* Kein eigener Fehlerkasten (Begründung an `SidebarSektionFehler`), aber die Zahlen
+            dürfen nicht lügen: „UHS (0)" ist eine Aussage über die Lage, und im Fehlerfall
+            hat sie niemand geprüft. Ein Template-Literal, damit der Text EIN Knoten bleibt. */}
         <Typography.Text type="secondary">{`UHS (${zaehler(uhsVerortet.length)})`}</Typography.Text>
         <Liste
           size="small"
@@ -524,17 +642,155 @@ export default function Sidebar(props: SidebarProps) {
             </ListenEintrag>
           )}
         />
-      </Card>
+      </KlappPaneel>
 
-      {darfSchreiben && props.ansichtDirty && (
-        <Card size="small" style={{ marginBottom: 12 }}>
-          <Space orientation="vertical" style={{ width: '100%' }}>
+      {darfSchreiben && (
+        <div ref={zeichnenRef}>
+          <KlappPaneel
+            titel="Zeichnen"
+            kennung="zeichnen"
+            offen={paneele.zustand.zeichnen}
+            onUmschalten={umschalten('zeichnen')}
+          >
+            <Space orientation="vertical" style={{ width: '100%' }} size="middle">
+              <Space orientation="vertical" style={{ width: '100%' }}>
+                <Typography.Text type="secondary">Zone zeichnen</Typography.Text>
+                {ZONE_TYPEN.map((t) => {
+                  if (t.geometrie === 'beides') {
+                    return (
+                      <Space key={t.typ} wrap>
+                        <Typography.Text>{t.label}</Typography.Text>
+                        {/* `farbe` ist ein PERSISTIERTER Datenwert: er wandert über
+                            `onZoneZeichnenStart` in die Zone und damit in die Datenbank. Er
+                            darf deshalb NICHT auf ein Laufzeit-Token zeigen — ein
+                            Themenwechsel würde sonst gespeicherte Zonen nachträglich
+                            uminterpretieren. Das Literal bleibt bewusst (LFH-328/T14). */}
+                        <Button
+                          onClick={() =>
+                            props.onZoneZeichnenStart({
+                              typ: t.typ,
+                              modus: 'polygon',
+                              farbe: '#1677ff',
+                            })
+                          }
+                        >
+                          Fläche
+                        </Button>
+                        <Button
+                          onClick={() =>
+                            props.onZoneZeichnenStart({
+                              typ: t.typ,
+                              modus: 'linie',
+                              farbe: '#1677ff',
+                            })
+                          }
+                        >
+                          Linie
+                        </Button>
+                      </Space>
+                    );
+                  }
+                  const modus: ZeichenModus = t.geometrie === 'LineString' ? 'linie' : 'polygon';
+                  return (
+                    <Button
+                      key={t.typ}
+                      block
+                      onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus })}
+                    >
+                      {t.label} zeichnen
+                    </Button>
+                  );
+                })}
+              </Space>
+              <Space orientation="vertical" style={{ width: '100%' }}>
+                <Typography.Text type="secondary">Taktisches Zeichen</Typography.Text>
+                {props.zeichenPlatzieren ? (
+                  <Space orientation="vertical" style={{ width: '100%' }}>
+                    <Typography.Text type="secondary">
+                      Auf Karte klicken zum Platzieren.
+                    </Typography.Text>
+                    {/* Serienmodus (LFH-332/M76). Der Schalter steht hier und nicht im Picker,
+                        weil er den LAUFENDEN Modus beschreibt und mitten in einer Serie
+                        umgelegt werden können muss. */}
+                    <Space>
+                      <Switch
+                        checked={props.zeichenSerie}
+                        onChange={props.onZeichenSerieWechsel}
+                        aria-label="Weitere platzieren"
+                      />
+                      <Typography.Text>Weitere platzieren</Typography.Text>
+                    </Space>
+                    {props.zeichenSerieAnzahl > 0 && (
+                      <Typography.Text type="secondary">
+                        {props.zeichenSerieAnzahl} platziert
+                      </Typography.Text>
+                    )}
+                    {/* Ein Knopf, zwei Wahrheiten: solange nichts gesetzt ist, verwirft
+                        Beenden nur die Absicht („Abbrechen"). Ab dem ersten gesetzten Zeichen
+                        wäre „Abbrechen" eine Lüge — das Gespeicherte bleibt. */}
+                    {props.zeichenSerieAnzahl > 0 ? (
+                      <Button type="primary" onClick={props.onZeichenPlatzierenFertig}>
+                        Fertig
+                      </Button>
+                    ) : (
+                      <Button onClick={props.onZeichenPlatzierenAbbrechen}>Abbrechen</Button>
+                    )}
+                  </Space>
+                ) : zeichenPickerOffen ? (
+                  <Space orientation="vertical" style={{ width: '100%' }}>
+                    <FreiesZeichenPicker wert={zeichenEntwurf} onChange={setZeichenEntwurf} />
+                    <Space>
+                      <Button
+                        type="primary"
+                        onClick={() => {
+                          props.onZeichenPlatzierenStart(zeichenEntwurf);
+                          setZeichenPickerOffen(false);
+                        }}
+                      >
+                        Platzieren
+                      </Button>
+                      <Button onClick={() => setZeichenPickerOffen(false)}>Abbrechen</Button>
+                    </Space>
+                  </Space>
+                ) : (
+                  <Button block onClick={() => setZeichenPickerOffen(true)}>
+                    Taktisches Zeichen platzieren
+                  </Button>
+                )}
+              </Space>
+            </Space>
+          </KlappPaneel>
+        </div>
+      )}
+
+      <KlappPaneel
+        titel="Kartenansicht"
+        kennung="ansicht"
+        offen={paneele.zustand.ansicht || sektionFehler.ansichten != null}
+        onUmschalten={umschalten('ansicht')}
+      >
+        {sektionFehler.ansichten ? (
+          <FehlerSlot fehler={sektionFehler.ansichten} />
+        ) : (
+          <AnsichtSwitcher
+            ansichten={props.ansichten}
+            aktiveAnsichtId={props.aktiveAnsichtId}
+            darfSchreiben={darfSchreiben}
+            busy={props.ansichtBusy}
+            onWaehlen={props.onAnsichtWaehlen}
+            onNeu={props.onAnsichtNeu}
+            onUmbenennen={props.onAnsichtUmbenennen}
+            onStandard={props.onAnsichtStandard}
+            onLoeschen={props.onAnsichtLoeschen}
+          />
+        )}
+        {darfSchreiben && props.ansichtDirty && (
+          <Space orientation="vertical" style={{ width: '100%', marginTop: token.marginSM }}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Karten-Konfiguration weicht von der gespeicherten Ansicht ab.
             </Typography.Text>
             {/* Seit LFH-320 schreibt der Button in die AKTIVE Ansicht, nicht in eine
-                einsatzweite Einstellung — die alte Beschriftung „Für den Einsatz speichern"
-                legte genau das Gegenteil nahe (LFH-325). */}
+                einsatzweite Einstellung (LFH-325). */}
             <Button
               type="primary"
               block
@@ -544,78 +800,16 @@ export default function Sidebar(props: SidebarProps) {
               In dieser Ansicht speichern
             </Button>
           </Space>
-        </Card>
-      )}
+        )}
+      </KlappPaneel>
 
-      <Card size="small" title="Ebenen" style={{ marginBottom: 12 }}>
-        <Space orientation="vertical">
-          <Space>
-            <Switch
-              checked={props.layer.einsatzort}
-              onChange={(v) => props.onLayerToggle('einsatzort', v)}
-            />
-            Einsatzort
-          </Space>
-          <Space>
-            <Switch checked={props.layer.uhs} onChange={(v) => props.onLayerToggle('uhs', v)} /> UHS
-          </Space>
-          <Space>
-            <Switch
-              checked={props.layer.schaden}
-              onChange={(v) => props.onLayerToggle('schaden', v)}
-            />{' '}
-            Schäden
-          </Space>
-          <Space>
-            <Switch
-              checked={props.layer.einheit}
-              onChange={(v) => props.onLayerToggle('einheit', v)}
-            />{' '}
-            Einheiten
-          </Space>
-          <Space>
-            <Switch
-              checked={props.layer.fahrzeug}
-              onChange={(v) => props.onLayerToggle('fahrzeug', v)}
-            />{' '}
-            Fahrzeuge
-          </Space>
-          <Space>
-            <Switch
-              checked={props.layer.fuehrung}
-              onChange={(v) => props.onLayerToggle('fuehrung', v)}
-            />{' '}
-            Personal
-          </Space>
-          <Space>
-            <Switch
-              checked={props.layer.abschnitt}
-              onChange={(v) => props.onLayerToggle('abschnitt', v)}
-            />{' '}
-            Abschnitte
-          </Space>
-          <Space>
-            <Switch checked={props.layer.zone} onChange={(v) => props.onLayerToggle('zone', v)} />{' '}
-            Zonen
-          </Space>
-          <Space>
-            <Switch
-              checked={props.layer.lagemeldung}
-              onChange={(v) => props.onLayerToggle('lagemeldung', v)}
-            />{' '}
-            Lagemeldungen
-          </Space>
-          <Space>
-            <Switch
-              checked={props.layer.freies_zeichen}
-              onChange={(v) => props.onLayerToggle('freies_zeichen', v)}
-            />{' '}
-            Taktische Zeichen
-          </Space>
-        </Space>
-      </Card>
-
-      <Card size="small" title="Fachebenen (extern)" style={{ marginBottom: 12 }}>
+      <KlappPaneel
+        titel="Fachebenen (extern)"
+        kennung="fachebenen"
+        offen={paneele.zustand.fachebenen}
+        onUmschalten={umschalten('fachebenen')}
+        meta={fachebeneKeys().filter((k) => props.fachebenenSichtbar[k]).length || undefined}
+      >
         <Space orientation="vertical" style={{ width: '100%' }}>
           {fachebeneKeys().map((key) => {
             const def = FACHEBENEN[key];
@@ -627,11 +821,11 @@ export default function Sidebar(props: SidebarProps) {
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Space align="start">
                   <Switch checked={sichtbar} onChange={(v) => props.onFachebeneToggle(key, v)} />
-                  <span style={{ color: def.farbe }}>●</span>
+                  <span style={{ color: def.farbe }} aria-hidden="true">
+                    ■
+                  </span>
                   {/* Der Geltungsbereich steht als ZEILE, nicht als Tooltip (LFH-80): auf
-                      einem Führungs-Tablet gibt es kein Hovern, und wer die Autobahn-Ebene
-                      für flächendeckende Sperrungen hält, plant den Anmarschweg auf einer
-                      Grundlage, die es nicht gibt. */}
+                      einem Führungs-Tablet gibt es kein Hovern. */}
                   <span style={{ display: 'inline-flex', flexDirection: 'column' }}>
                     <span>{def.label}</span>
                     {def.geltung && (
@@ -645,9 +839,7 @@ export default function Sidebar(props: SidebarProps) {
                   <Spin size="small" />
                 ) : (
                   <>
-                    {/* `nowrap`: neben einer Ebene mit Geltungszeile bleibt der Marke sonst so
-                        wenig Breite, dass sie mitten im Wort bricht („offl/ine") — gemessen an
-                        KRITIS in der Aufwärmphase (LFH-83). */}
+                    {/* `nowrap`: sonst bricht die Marke mitten im Wort (LFH-83). */}
                     {sichtbar && offline && (
                       <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
                         <Typography.Text
@@ -672,32 +864,28 @@ export default function Sidebar(props: SidebarProps) {
             );
           })}
         </Space>
-      </Card>
+      </KlappPaneel>
 
-      <Card size="small" title="Bild-Hintergründe" style={{ marginBottom: 12 }}>
+      <KlappPaneel
+        titel="Bild-Hintergründe"
+        kennung="bilder"
+        offen={paneele.zustand.bilder || sektionFehler.bilder != null}
+        onUmschalten={umschalten('bilder')}
+        meta={props.bilder.length || undefined}
+      >
         <Space orientation="vertical" style={{ width: '100%' }}>
-          {/* Der Slot ist ein BANNER über der Liste, kein Ersatz für sie — dieselbe Regel
-              wie bei „Nicht verortet" oben: ein Fehler ersetzt Inhalt nur, wenn es keinen
-              Inhalt gibt. Hier hat sie eine eigene Schärfe: die Bild-Overlays liegen
-              weiterhin sichtbar auf der KARTE. Verschwänden nur ihre Bedienelemente,
-              bliebe das Bild liegen und liesse sich nicht mehr abschalten — der Fehler
-              nähme die Fähigkeit weg, seine eigene Folge zu beheben. Ist der
-              Zwischenspeicher leer, steht das Banner ohnehin allein.
-
-              Bewusst `SeitenFehler` statt `SeitenStandVeraltet` (anders als oben): dieser
-              Slot führt eine `ursache` (`bilderFehlerUrsache` in `LagekartePage.tsx`), und
-              das Veraltet-Banner hat für sie keinen Kanal. Die Detailzeile ist hier die
-              nützlichere Aussage.
-
-              Der Upload darunter hängt an einer eigenen Route und bleibt ohnehin
-              unberührt bedienbar. */}
+          {/* Der Slot ist ein BANNER über der Liste, kein Ersatz für sie: die Bild-Overlays
+              liegen weiter sichtbar auf der KARTE — verschwänden nur ihre Bedienelemente,
+              liesse sich ein Bild nicht mehr abschalten. `SeitenFehler` statt
+              `SeitenStandVeraltet`, weil dieser Slot eine `ursache` führt. Der Upload darunter
+              hängt an einer eigenen Route und bleibt bedienbar. */}
           <FehlerSlot fehler={sektionFehler.bilder} />
           {props.bilder.map((b) => {
             const imPlatzieren = props.bildPlatzierenId === b.id;
             return (
               <div
                 key={b.id}
-                style={{ borderBottom: `1px solid ${token.colorSplit}`, paddingBottom: 6 }}
+                style={{ borderBottom: `1px solid ${rollen.flaeche3}`, paddingBottom: 6 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Switch
@@ -723,27 +911,15 @@ export default function Sidebar(props: SidebarProps) {
                   >
                     {b.name}
                   </Typography.Text>
-                  {/*
-                    Drei Aktionen an einer Zeile werden gebündelt, nicht aufgereiht (Norm aus
-                    LFH-365 · B5e; Hausvorbilder `AnsichtSwitcher.tsx:137` 250 Zeilen weiter oben
-                    und `etb/EtbTabelle.tsx:166`). Vorher standen sie als drei Icon-Knöpfe in
-                    einem `<Space size={4}>` — vier Pixel zwischen einem harmlosen und einem
-                    roten Knopf, in einer 300 px breiten Leiste, und die vier waren hart
-                    verdrahtet: sie blieben vier, auch im Handschuh-Betrieb. Mit dem Menü fällt
-                    der `<Space>` ersatzlos weg, statt auf ein Token gezogen zu werden.
-
-                    OHNE Schreibrecht bleibt genau eine Aktion übrig, und dafür ist ein Menü
-                    keine Bündelung, sondern ein Umweg: dann steht der Zentrieren-Knopf direkt
-                    da. Beide Fälle sind als Paar getestet — sonst bewiese der Zentrieren-Test
-                    nur, dass es den Knopf irgendwo gibt, nicht dass die Bündelung greift.
-                  */}
+                  {/* Drei Aktionen an einer Zeile werden gebündelt (LFH-365 · B5e). OHNE
+                      Schreibrecht bleibt genau eine — dann steht der Zentrieren-Knopf direkt
+                      da, ein Menü wäre ein Umweg. Beide Fälle sind als Paar getestet. */}
                   <div style={{ flexShrink: 0 }}>
                     {darfSchreiben ? (
                       <Dropdown
                         trigger={['click']}
-                        // `autoFocus` nach dem Befund an `components/Datensicht.tsx`: ohne ihn
-                        // klebt der Fokus am Auslöser und die Pfeiltasten heben im Menü nichts
-                        // hervor. In jsdom nicht prüfbar — Konvention mit Quelle, keine Zusicherung.
+                        // `autoFocus`: ohne ihn klebt der Fokus am Auslöser (Befund an
+                        // `components/Datensicht.tsx`). In jsdom nicht prüfbar.
                         autoFocus
                         menu={{
                           items: [
@@ -761,18 +937,9 @@ export default function Sidebar(props: SidebarProps) {
                             },
                             /*
                              * Die Trennung zwischen destruktiver und harmloser Aktion (AK2): im
-                             * Menü ist sie der Trenner, nicht ein `<Space size>`.
-                             *
-                             * Die Grenze davon gehört dazu, sonst behauptet der Kommentar mehr als
-                             * die Sache trägt: der Trenner trennt **visuell** — eine sichtbare
-                             * Linie, ein zweiter Kanal, den der abgelöste `<Space size={4}>` nie
-                             * hatte. Sein eigener Weissraum skaliert aber NICHT mit der Dichte:
-                             * antd rechnet ihn aus `lineWidth` (`menu/style/index.js`:
-                             * `marginBlock` + `borderTopWidth`), und `theme/tokens.ts` fasst
-                             * `lineWidth` nicht an — also ~3 px in jeder Stufe. Was mitzieht, sind
-                             * die Zeilenhöhen des Menüs (`itemHeight` ← `controlHeightLG`); die
-                             * beiden Ziele stehen im Handschuh-Betrieb also weit auseinander,
-                             * nicht weil der Trenner wächst, sondern weil sie es tun.
+                             * Menü ist sie der Trenner. Er trennt VISUELL; sein Weissraum
+                             * skaliert nicht mit der Dichte (antd rechnet ihn aus `lineWidth`),
+                             * was mitzieht, sind die Zeilenhöhen des Menüs.
                              */
                             { type: 'divider' as const },
                             {
@@ -782,8 +949,7 @@ export default function Sidebar(props: SidebarProps) {
                               danger: true,
                             },
                           ],
-                          // Zuordnung am MENÜ, nicht je Eintrag: ein Riegel hat dann einen Ort
-                          // (Muster `AnsichtSwitcher.tsx:140`, Falle aus LFH-365 dokumentiert).
+                          // Zuordnung am MENÜ, nicht je Eintrag: ein Riegel hat dann einen Ort.
                           onClick: ({ key }) => {
                             if (key === 'zentrieren') props.onBildZentrieren(b.id);
                             else if (key === 'platzieren') {
@@ -793,10 +959,7 @@ export default function Sidebar(props: SidebarProps) {
                           },
                         }}
                       >
-                        {/* Der Name trägt die Bild-Kennung: n Bilder liefern sonst n
-                            gleichnamige Knöpfe, die per Rolle nicht zu unterscheiden sind
-                            (Festlegung aus LFH-364). Kein `size` — die Trefffläche kommt aus
-                            `controlHeight`. */}
+                        {/* Der Name trägt die Bild-Kennung (LFH-364). Kein `size`. */}
                         <Button
                           type="text"
                           icon={<MoreOutlined />}
@@ -828,9 +991,6 @@ export default function Sidebar(props: SidebarProps) {
                   disabled={!darfSchreiben}
                   onChange={(ansichtId) => props.onBildVerschieben(b.id, ansichtId)}
                 />
-                {/* Hinterlegung war `rgba(22,119,255,.06)` — derselbe Blauton wie die
-                    Bedien-Rolle, nur in rgba-Schreibweise und damit für jedes Hex-Grep
-                    unsichtbar. Jetzt die Rolle „aktiver Bedienbereich". */}
                 {imPlatzieren && darfSchreiben && (
                   <div
                     style={{
@@ -884,23 +1044,17 @@ export default function Sidebar(props: SidebarProps) {
             </Upload>
           )}
         </Space>
-      </Card>
+      </KlappPaneel>
 
       {/*
-        Löschbestätigung als EIN Dialog für die ganze Bildliste (LFH-366 · B5f), Bauform wie
-        `AnsichtSwitcher.tsx:167`. Bewusst kein `Popconfirm` mehr: der hing vorher am roten
-        Icon-Knopf, den es nach der Bündelung nicht mehr gibt — und ein Popconfirm IM Menü-Label
-        bräuchte ein `stopPropagation`, um das Auto-Schließen zu überleben (so löst es
-        `chat/NachrichtenStrom.tsx`), was hier nichts kauft.
-
-        `okButtonProps={{ danger: true }}` ist AK2 und keine Kosmetik: sonst bestätigt man das
-        Entfernen mit einem blauen Knopf. Der Dialog steht AUSSERHALB der `map` — n Dialoge im
-        Baum trügen n gleichnamige Knöpfe.
+        Löschbestätigung als EIN Dialog für die ganze Bildliste (LFH-366 · B5f). Kein
+        `Popconfirm`: der bräuchte im Menü-Label ein `stopPropagation`. `okButtonProps={{
+        danger: true }}` ist AK2 — sonst bestätigt man das Entfernen mit einem blauen Knopf.
+        Er steht AUSSERHALB der `map` und des Paneels: n Dialoge im Baum trügen n gleichnamige
+        Knöpfe, und ein zugeklapptes Paneel darf eine offene Rückfrage nicht abhängen.
       */}
       <Modal
-        // Eine Quelle für Sichtbarkeit UND Titel (siehe `loeschDialogBild`): fällt das Bild
-        // während der Rückfrage aus der Liste, schliesst der Dialog, statt einen leeren Namen
-        // zu zeigen und ein DELETE auf ein totes Objekt anzubieten.
+        // Eine Quelle für Sichtbarkeit UND Titel (siehe `loeschDialogBild`).
         open={loeschDialogBild(props.bilder, loeschBildId) != null}
         title={`Bild „${loeschDialogBild(props.bilder, loeschBildId)?.name ?? ''}" entfernen?`}
         okText="Entfernen"
@@ -918,172 +1072,58 @@ export default function Sidebar(props: SidebarProps) {
         </Typography.Paragraph>
       </Modal>
 
-      {darfSchreiben && (
-        <Card size="small" title="Zone zeichnen" style={{ marginBottom: 12 }}>
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            {ZONE_TYPEN.map((t) => {
-              if (t.geometrie === 'beides') {
-                return (
-                  <Space key={t.typ}>
-                    <Typography.Text>{t.label}</Typography.Text>
-                    {/* `farbe` ist ein PERSISTIERTER Datenwert: er wandert über
-                        `onZoneZeichnenStart` in die Zone und damit in die Datenbank. Er darf
-                        deshalb NICHT auf ein Laufzeit-Token zeigen — ein Themenwechsel würde
-                        sonst bereits gespeicherte Zonen nachträglich uminterpretieren. Das
-                        Literal bleibt bewusst stehen (LFH-328/T14). */}
-                    <Button
-                      onClick={() =>
-                        props.onZoneZeichnenStart({
-                          typ: t.typ,
-                          modus: 'polygon',
-                          farbe: '#1677ff',
-                        })
-                      }
-                    >
-                      Fläche
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        props.onZoneZeichnenStart({ typ: t.typ, modus: 'linie', farbe: '#1677ff' })
-                      }
-                    >
-                      Linie
-                    </Button>
-                  </Space>
-                );
-              }
-              const modus: ZeichenModus = t.geometrie === 'LineString' ? 'linie' : 'polygon';
-              return (
-                <Button
-                  key={t.typ}
-                  block
-                  onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus })}
-                >
-                  {t.label} zeichnen
-                </Button>
-              );
-            })}
-          </Space>
-        </Card>
-      )}
-
-      {darfSchreiben && (
-        <Card size="small" title="Taktisches Zeichen" style={{ marginBottom: 12 }}>
-          {props.zeichenPlatzieren ? (
-            <Space orientation="vertical" style={{ width: '100%' }}>
-              <Typography.Text type="secondary">Auf Karte klicken zum Platzieren.</Typography.Text>
-              {/* Serienmodus (LFH-332/M76). Der Entwurf im Picker überlebt eine Platzierung
-                  ohnehin — nur der Modus brach ab, was jedes Folge-Zeichen drei Klicks
-                  kostete. Der Schalter steht hier und nicht im Picker, weil er den LAUFENDEN
-                  Modus beschreibt und mitten in einer Serie umgelegt werden können muss. */}
-              <Space>
-                <Switch
-                  checked={props.zeichenSerie}
-                  onChange={props.onZeichenSerieWechsel}
-                  aria-label="Weitere platzieren"
-                />
-                <Typography.Text>Weitere platzieren</Typography.Text>
-              </Space>
-              {props.zeichenSerieAnzahl > 0 && (
-                <Typography.Text type="secondary">
-                  {props.zeichenSerieAnzahl} platziert
-                </Typography.Text>
-              )}
-              {/* Ein Knopf, zwei Wahrheiten: solange nichts gesetzt ist, verwirft Beenden
-                  tatsächlich nur die Absicht („Abbrechen"). Ab dem ersten gesetzten Zeichen
-                  wäre „Abbrechen" eine Lüge — das Gespeicherte bleibt. */}
-              {props.zeichenSerieAnzahl > 0 ? (
-                <Button type="primary" onClick={props.onZeichenPlatzierenFertig}>
-                  Fertig
-                </Button>
-              ) : (
-                <Button onClick={props.onZeichenPlatzierenAbbrechen}>Abbrechen</Button>
-              )}
-            </Space>
-          ) : zeichenPickerOffen ? (
-            <Space orientation="vertical" style={{ width: '100%' }}>
-              <FreiesZeichenPicker wert={zeichenEntwurf} onChange={setZeichenEntwurf} />
-              <Space>
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    props.onZeichenPlatzierenStart(zeichenEntwurf);
-                    setZeichenPickerOffen(false);
-                  }}
-                >
-                  Platzieren
-                </Button>
-                <Button onClick={() => setZeichenPickerOffen(false)}>Abbrechen</Button>
-              </Space>
-            </Space>
-          ) : (
-            <Button block onClick={() => setZeichenPickerOffen(true)}>
-              Taktisches Zeichen platzieren
-            </Button>
-          )}
-        </Card>
-      )}
-
-      <Card size="small" title="Basemap">
-        <Radio.Group
-          value={props.basemap}
-          onChange={(e) => props.onBasemapWechsel(e.target.value as BasemapModus)}
-          optionType="button"
-          name="lagekarte-basemap"
-        >
-          <Tooltip title={props.onlineVerfuegbar ? '' : 'nicht konfiguriert'}>
-            <Radio.Button value="online" disabled={!props.onlineVerfuegbar}>
-              Online
-            </Radio.Button>
-          </Tooltip>
-          <Tooltip title={props.offlineVerfuegbar ? '' : 'nicht konfiguriert'}>
-            <Radio.Button value="offline" disabled={!props.offlineVerfuegbar}>
-              Offline
-            </Radio.Button>
-          </Tooltip>
-          <Radio.Button value="blind">Blind</Radio.Button>
-        </Radio.Group>
-        {props.basemap === 'online' && props.onlineStyles.length > 1 && (
-          <Select
-            aria-label="Online-Ansicht"
-            style={{ width: '100%', marginTop: 8 }}
-            value={props.onlineStilName ?? props.onlineStyles[0]?.name}
-            onChange={(name) => props.onOnlineStilWechsel(name)}
-            options={props.onlineStyles.map((s) => ({ label: s.name, value: s.name }))}
-          />
-        )}
-        {props.basemap === 'offline' && (
-          <div style={{ marginTop: 8 }}>
-            <Typography.Text
-              type="secondary"
-              style={{ fontSize: 12, display: 'block', marginBottom: 4 }}
-            >
-              Karten-Design
+      <KlappPaneel
+        titel="Kartengrundlage"
+        kennung="grundlage"
+        offen={paneele.zustand.grundlage}
+        onUmschalten={umschalten('grundlage')}
+      >
+        <Space orientation="vertical" style={{ width: '100%' }}>
+          {props.grundlageWahl ?? (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Gewählt wird die Grundlage oben links auf der Karte.
             </Typography.Text>
-            <Radio.Group
-              value={props.kartenTheme}
-              onChange={(e) => props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)}
-              optionType="button"
-              aria-label="Karten-Design"
-              name="lagekarte-karten-design"
-            >
-              <Tooltip title="folgt dem App-Design">
-                <Radio.Button value="auto">Auto</Radio.Button>
-              </Tooltip>
-              <Radio.Button value="light">Hell</Radio.Button>
-              <Radio.Button value="dark">Dunkel</Radio.Button>
-            </Radio.Group>
-          </div>
-        )}
-        {props.basemap === 'blind' && (
-          <Typography.Paragraph
-            type="secondary"
-            style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}
-          >
-            Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
-          </Typography.Paragraph>
-        )}
-      </Card>
+          )}
+          {!props.onlineVerfuegbar && (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Online-Karte: nicht konfiguriert
+            </Typography.Text>
+          )}
+          {!props.offlineVerfuegbar && (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Offline-Karte: nicht konfiguriert
+            </Typography.Text>
+          )}
+          {props.basemap === 'offline' && (
+            <div>
+              <Typography.Text
+                type="secondary"
+                style={{ fontSize: 12, display: 'block', marginBottom: 4 }}
+              >
+                Karten-Design
+              </Typography.Text>
+              <Radio.Group
+                value={props.kartenTheme}
+                onChange={(e) => props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)}
+                optionType="button"
+                aria-label="Karten-Design"
+                name="lagekarte-karten-design"
+              >
+                <Tooltip title="folgt dem App-Design">
+                  <Radio.Button value="auto">Auto</Radio.Button>
+                </Tooltip>
+                <Radio.Button value="light">Hell</Radio.Button>
+                <Radio.Button value="dark">Dunkel</Radio.Button>
+              </Radio.Group>
+            </div>
+          )}
+          {props.basemap === 'blind' && (
+            <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
+              Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
+            </Typography.Paragraph>
+          )}
+        </Space>
+      </KlappPaneel>
     </div>
   );
 }

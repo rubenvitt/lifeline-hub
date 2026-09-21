@@ -60,6 +60,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
+import { Augenbraue, useRollen } from '../../components/instrument';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 
@@ -287,6 +288,7 @@ function PlatzKarte({
     data: { kind: 'platz', platzId: platz.id, uhsId: platz.uhs_id },
   });
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const setRef = (n: HTMLDivElement | null) => {
     setDragRef(n);
     setDropRef(n);
@@ -334,13 +336,12 @@ function PlatzKarte({
     // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
     // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
     // Theme-Tokens statt fixer Hex-Werte, damit die Karten im Dark Mode mitziehen.
-    background: isOver
-      ? token.colorPrimaryBg
-      : belegtVon
-        ? token.colorInfoBg
-        : token.colorBgContainer,
+    // Neuentwurf: Flächen aus den Rollen (`bedienFlaeche` für die aktive Belegung, `flaeche`
+    // sonst), Radius 0. NUR Farbe und Form der Ecke — Höhe, Rand und Polsterung bleiben an
+    // die Konstanten oben gebunden (SCHRITT_X/SCHRITT_Y, Dateikopf).
+    background: isOver ? token.colorPrimaryBg : belegtVon ? rollen.bedienFlaeche : rollen.flaeche,
     padding: PLATZ_KARTE_POLSTER,
-    borderRadius: 4,
+    borderRadius: 0,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
   };
   // Verfügbarkeits-Optionen immer; „Platz löschen" ist eine Layout-/Setup-Aktion und
@@ -716,7 +717,7 @@ export default function Grundriss({
 }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token } = theme.useToken();
+  const { rollen } = useRollen();
   // Sensors: PointerSensor mit 5px-Aktivierungsdistanz (sonst klickt jeder Click den Drag aus),
   // KeyboardSensor für Tests/Accessibility.
   const sensors = useSensors(
@@ -1071,7 +1072,7 @@ export default function Grundriss({
           gap: 8,
         }}
       >
-        <Typography.Text strong>Unfallhilfsstelle</Typography.Text>
+        <Augenbraue als="h3">Unfallhilfsstelle</Augenbraue>
         {!schreibgeschuetzt &&
           (uhs.status === 'geplant' ? (
             <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
@@ -1094,9 +1095,9 @@ export default function Grundriss({
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
-          border: `1px dashed ${token.colorBorder}`,
-          background: token.colorBgLayout,
-          borderRadius: 4,
+          border: `1px dashed ${rollen.linieStark}`,
+          background: rollen.grund,
+          borderRadius: 0,
         }}
       >
         <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>

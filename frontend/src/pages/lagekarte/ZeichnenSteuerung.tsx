@@ -78,7 +78,9 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         // passieren — wer ihr `position: 'absolute'` zurückgibt, holt den Bug mit.
         ...bandStil('mitte'),
         boxShadow: token.boxShadowSecondary,
-        minWidth: 320,
+        // 320 px, aber nie breiter als der Fuß: auf dem Handschirm (390 px) liefe die Karte
+        // sonst waagerecht über (Neuentwurf S5, die Karte trägt dort die volle Breite).
+        minWidth: 'min(320px, 100%)',
       }}
     >
       <Space orientation="vertical" size={8} style={{ width: '100%' }}>

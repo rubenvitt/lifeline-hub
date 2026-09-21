@@ -218,7 +218,7 @@ describe('EinheitenPage', () => {
    * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
    * Builder wäre sonst von ihm nicht zu unterscheiden.
    */
-  it('verlinkt die Kräfteübersicht über der Tabelle', async () => {
+  it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     server.use(...handlers());
     renderMitProviders(
       <Routes>
@@ -226,7 +226,7 @@ describe('EinheitenPage', () => {
       </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
-    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
+    const link = await screen.findByRole('link', { name: 'Meldebild' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht');
   });
 
@@ -375,15 +375,15 @@ describe('EinheitenPage · Datenzustände', () => {
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
     /**
      * Der Knopf heißt BYTE-GLEICH wie der im Seitenkopf — es ist dieselbe Handlung.
-     * Gezählt wird deshalb innerhalb der KARTE, nicht auf der Seite. Das ist zugleich die
+     * Gezählt wird deshalb innerhalb des GLIEDERUNGS-PANEELS, nicht auf der Seite. Das ist zugleich die
      * schärfere Aussage: „genau eine Primäraktion" hält hier nur, weil `SeitenLeer` null
      * eigene Knöpfe beisteuert; ein Primitiv mit eingebautem Knopf machte die Zahl
      * mehrdeutig.
      */
-    const karte = [...container.querySelectorAll<HTMLElement>('.ant-card')].find((k) =>
+    const karte = [...container.querySelectorAll<HTMLElement>('[data-lfh="paneel"]')].find((k) =>
       k.textContent?.includes('Noch keine Einheiten'),
     );
-    expect(karte, 'die Gliederungs-Karte muss den Leertext tragen').toBeTruthy();
+    expect(karte, 'das Gliederungs-Paneel muss den Leertext tragen').toBeTruthy();
     expect(within(karte!).getByRole('button', { name: 'Einheit bilden' })).toBeInTheDocument();
     expect(within(karte!).getAllByRole('button')).toHaveLength(1);
   });
@@ -429,7 +429,7 @@ describe('EinheitenPage · Datenzustände', () => {
         return HttpResponse.json([]);
       }),
     );
-    await screen.findByRole('heading', { name: 'Einheiten' });
+    await screen.findByRole('heading', { name: /^Einheiten/ });
     expect(screen.queryByText('Noch keine Einheiten')).not.toBeInTheDocument();
     // Partnerhälfte, gleiches Literal: nach dem Abruf steht die Aussage da.
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();

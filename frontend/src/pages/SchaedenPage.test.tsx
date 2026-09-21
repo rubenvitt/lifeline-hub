@@ -403,7 +403,7 @@ describe('SchaedenPage', () => {
       }),
     ]);
     await screen.findByText('S-001');
-    await userEvent.click(screen.getByRole('tab', { name: 'Abgeschlossen' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Abgeschlossen' }));
     expect(await screen.findByText('S-002')).toBeInTheDocument();
   });
 

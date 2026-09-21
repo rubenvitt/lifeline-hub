@@ -14,6 +14,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
@@ -123,7 +124,8 @@ export default function BenutzerPage() {
       title: 'Benutzername',
       dataIndex: 'benutzername',
       key: 'benutzername',
-      render: (t) => `@${t}`,
+      // Kennung in Mono (Neuentwurf: Kennungen immer Mono).
+      render: (t) => <span style={monoStil(13)}>@{t}</span>,
     },
     {
       title: 'Rollen',

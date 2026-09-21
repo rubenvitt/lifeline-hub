@@ -147,9 +147,9 @@ describe('FahrzeugePage', () => {
    * wird das `href` und nicht bloß die Existenz eines Links: ein Inline-Pfad neben dem
    * Builder wäre sonst von ihm nicht zu unterscheiden.
    */
-  it('verlinkt die Kräfteübersicht über der Tabelle', async () => {
+  it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatz());
-    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
+    const link = await screen.findByRole('link', { name: 'Meldebild' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
   });
 

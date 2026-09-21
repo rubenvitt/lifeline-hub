@@ -1,4 +1,5 @@
-import { Card, Col, DatePicker, Input, InputNumber, Form, Row } from 'antd';
+import { Col, DatePicker, Input, InputNumber, Form, Row } from 'antd';
+import { Paneel } from '../components/instrument';
 import dayjs, { type Dayjs } from 'dayjs';
 import { ErfassungsFormular } from '../components/Erfassung';
 import type { NeueErinnerung } from '../api/types';
@@ -34,7 +35,7 @@ interface Props {
    * Fehlschlag sieht (LFH-332/B4).
    */
   onAnlegen: (daten: NeueErinnerung) => Promise<unknown>;
-  /** Umschließende Card mit Titel rendern. `false` für Inline-/Modal-Einbettung,
+  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-/Modal-Einbettung,
    *  wo der Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
 }
@@ -116,8 +117,8 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true }: P
 
   if (!card) return formular;
   return (
-    <Card size="small" title="Neue Erinnerung">
+    <Paneel titel="Neue Erinnerung" koerperPolster>
       {formular}
-    </Card>
+    </Paneel>
   );
 }

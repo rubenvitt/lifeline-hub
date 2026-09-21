@@ -134,3 +134,30 @@ test('die Aufnahme-Route zeigt dieselbe Maske und erfasst in Serie', async ({ pa
   // Der Ort bleibt — das ist der Unterschied zum Primär-Knopf, der in die Liste zurückgeht.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/aufnahme`));
 });
+
+test('S7: die Erfassungszeile erfasst per Kürzel in Serie, ohne Dialog', async ({ page }) => {
+  // Das Formular wird zur Zeile (Neuentwurf S7): EINE Eingabe, Enter erfasst, das Feld ist
+  // danach leer und fokussiert, die Quittung steht an der Zeile und kommt aus der ANTWORT
+  // (Registriernummer + Sichtung aus derselben Anlage).
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Zeile ${Date.now()}`);
+  await page.goto(`/einsaetze/${einsatzId}/personen`);
+
+  const feld = page.getByRole('textbox', { name: 'Kurzeingabe Person' });
+  await feld.fill('Kowalski, Anna w 34 sk3');
+  // Erkannt wird die Sichtung als BBK-`SichtungsTag`, nicht als Designfarbe.
+  await expect(page.locator('[data-lfh="erkannt"] [data-sichtung="sk3"]')).toHaveText('SK III');
+  await feld.press('Enter');
+
+  await expect(feld).toHaveValue('');
+  await expect(feld).toBeFocused();
+  const zuletzt = page.locator('[data-lfh="zuletzt"]');
+  await expect(zuletzt).toHaveText(/R-001 Kowalski, Anna · SK III$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  // Serie: sofort die nächste, ohne Namen.
+  await feld.fill('unbekannt m ~50 skt');
+  await feld.press('Enter');
+  await expect(zuletzt).toHaveText(/R-002 · tot$/);
+  await expect(page.locator('tr.ant-table-row')).toHaveCount(2);
+});

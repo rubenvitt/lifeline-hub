@@ -929,8 +929,10 @@ describe('LageberichtePage', () => {
 
   it('trägt Überschrift und Kennzahlenzeile', async () => {
     setup(KETTE);
+    // Seitenkopf des Neuentwurfs (`EinsatzSeite`): der Titel ist die h4 der Kopfleiste,
+    // die Mengen stehen als Mono-Meta daneben — kein eigener Titelblock mehr.
     expect(
-      await screen.findByRole('heading', { name: 'Lageberichte', level: 3 }),
+      await screen.findByRole('heading', { name: 'Lageberichte', level: 4 }),
     ).toBeInTheDocument();
     expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
   });

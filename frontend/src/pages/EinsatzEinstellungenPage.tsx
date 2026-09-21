@@ -1,4 +1,6 @@
-import { Alert, Tabs } from 'antd';
+import { Alert } from 'antd';
+import { useId } from 'react';
+import { Segmentleiste } from '../components/instrument';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -105,6 +107,7 @@ export default function EinsatzEinstellungenPage() {
   const { pathname } = useLocation();
   const daten = useEinstellungenDaten(einsatzId);
   const aktiv = sektionAus(pathname);
+  const panelId = useId();
 
   if (daten.laedt) return <SeitenSkeleton />;
   if (!daten.einsatz) {
@@ -130,21 +133,31 @@ export default function EinsatzEinstellungenPage() {
         )
       }
     >
-      {/* Der `<Outlet>` haengt IM aktiven Reiterfeld, nicht als Geschwister daneben: antd
-          rendert je Eintrag ein `role="tabpanel"`, und ein leeres Panel neben dem eigentlichen
-          Inhalt waere fuer Hilfsmittel eine Beschriftung ohne Gegenstand. antd baut ohnehin nur
-          das AKTIVE Feld auf, der Ausdruck laeuft also genau einmal. */}
-      <Tabs
-        activeKey={aktiv}
-        onChange={(key) =>
-          navigate(einsatzEinstellungenPfad(einsatzId, key as EinstellungenSektion))
-        }
-        items={EINSTELLUNGEN_SEKTIONEN.map((s) => ({
-          key: s.key,
+      {/* Die Reiter als Segmentleiste im Tablist-Modus (Neuentwurf: Radius 0, Fugenraster
+          statt antds Unterstrich-Reitern). Die aktive Sektion kommt weiter aus der URL; ein
+          Wechsel — Klick oder Pfeiltaste — navigiert auf die Sektions-Route. Das EINE
+          Reiterfeld darunter trägt den `<Outlet>`: nur das aktive Feld ist gebaut, und ein
+          leeres Feld je inaktivem Reiter wäre für Hilfsmittel eine Beschriftung ohne
+          Gegenstand. */}
+      <Segmentleiste
+        rolle="tablist"
+        beschriftung="Einstellungsbereiche"
+        wert={aktiv}
+        onWechsel={(key) => navigate(einsatzEinstellungenPfad(einsatzId, key))}
+        optionen={EINSTELLUNGEN_SEKTIONEN.map((s) => ({
+          wert: s.key,
           label: s.label,
-          children: s.key === aktiv ? <Outlet /> : null,
+          steuert: panelId,
         }))}
+        style={{ marginBottom: 16 }}
       />
+      <div
+        role="tabpanel"
+        id={panelId}
+        aria-label={EINSTELLUNGEN_SEKTIONEN.find((s) => s.key === aktiv)?.label}
+      >
+        <Outlet />
+      </div>
     </EinsatzSeite>
   );
 }

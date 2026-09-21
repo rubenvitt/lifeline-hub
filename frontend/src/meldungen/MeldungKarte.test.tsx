@@ -237,16 +237,27 @@ describe('MeldungKarte · Eingangszustand', () => {
     const { container, rerender } = renderKarte(
       <MeldungKarte meldung={meldung({ status: 'neu' })} einsatzId={7} />,
     );
-    expect(container.querySelector('.ant-card')).toHaveAttribute('data-unbearbeitet', 'true');
-    expect(screen.getByText('Neu').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+    expect(container.querySelector('[data-lfh="komm-karte"]')).toHaveAttribute(
+      'data-unbearbeitet',
+      'true',
+    );
+    expect(screen.getByText('Neu').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
 
     rerender(
       <MemoryRouter>
         <MeldungKarte meldung={meldung({ status: 'gesichtet' })} einsatzId={7} />
       </MemoryRouter>,
     );
-    expect(container.querySelector('.ant-card')).not.toHaveAttribute('data-unbearbeitet');
-    expect(screen.getByText('Gesichtet').closest('.ant-tag')).not.toHaveClass('ant-tag-warning');
+    expect(container.querySelector('[data-lfh="komm-karte"]')).not.toHaveAttribute(
+      'data-unbearbeitet',
+    );
+    expect(screen.getByText('Gesichtet').closest('[data-lfh="status-chip"]')).not.toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
   });
 
   it('lässt den Alarm den Neu-Akzent schlagen', () => {
@@ -263,11 +274,14 @@ describe('MeldungKarte · Eingangszustand', () => {
         einsatzId={7}
       />,
     );
-    const karte = container.querySelector('.ant-card')!;
+    const karte = container.querySelector('[data-lfh="komm-karte"]')!;
     expect(karte).toHaveAttribute('data-alarm', 'true');
     expect(karte).not.toHaveAttribute('data-unbearbeitet');
     // Das ETIKETT bleibt trotzdem das der neuen Meldung — nur der Rand ist vergeben.
-    expect(screen.getByText('Neu').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+    expect(screen.getByText('Neu').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
   });
 
   it('macht den Wortlaut zum größten Text der Karte (M69)', () => {

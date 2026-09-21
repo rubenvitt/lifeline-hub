@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Card, Input, Tag, theme, Typography } from 'antd';
+import { Button, Input, Typography } from 'antd';
+import { Augenbraue, Paneel, monoStil, useRollen } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { gruppiereFreieKraefte } from './freieKraefte';
 import type { BrEinheitKurz, BrFahrzeugKurz, Einheit, EinsatzFahrzeug } from '../../api/types';
@@ -35,7 +36,7 @@ export default function KraefteOhneBrSidebar({
 }: Props) {
   const { abBreite } = useViewport();
   const breit = abBreite('md');
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const [suche, setSuche] = useState('');
   const brEinheitIds = new Set(brEinheiten.map((e) => e.id));
   const brFahrzeugIds = new Set(brFahrzeuge.map((f) => f.id));
@@ -57,77 +58,82 @@ export default function KraefteOhneBrSidebar({
     // Unter `md` volle Breite und gestapelt (LFH-341 · H40) — dieselbe Form wie bei
     // Gefahrengebietsliste und Gliederungsbaum. Die Zuweisung läuft hier ohnehin über
     // den „zuweisen"-Knopf, nicht über einen Drag: der Umbruch kostet keinen Bedienweg.
-    <Card
+    <div
       data-testid="kraefte-ohne-br"
-      title="Kräfte ohne BR"
-      size="small"
-      style={breit ? { width: 240, minHeight: 400 } : { width: '100%' }}
+      style={breit ? { width: 240, minHeight: 400, display: 'flex' } : { width: '100%' }}
     >
-      <Input
-        allowClear
-        placeholder="Kräfte suchen"
-        aria-label="Kräfte suchen"
-        value={suche}
-        onChange={(e) => setSuche(e.target.value)}
-        style={{ marginBottom: token.marginSM }}
-      />
-      {/* Eigener Scroll mit begrenzter Höhe (M58): die Höhenkette endet hier an der Karte selbst,
+      <Paneel
+        titel="Kräfte ohne BR"
+        meta={freieEinheiten.length + freiFahrzeuge.length}
+        koerperPolster
+        style={{ flex: '1 1 auto' }}
+      >
+        <Input
+          allowClear
+          placeholder="Kräfte suchen"
+          aria-label="Kräfte suchen"
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+          style={{ marginBottom: token.marginSM }}
+        />
+        {/* Eigener Scroll mit begrenzter Höhe (M58): die Höhenkette endet hier an der Karte selbst,
           nicht am Layout (Falle aus LFH-343 · H51) — deshalb ein Maß in dvh direkt am Container. */}
-      <div style={{ maxHeight: 'min(60dvh, 560px)', overflowY: 'auto' }}>
-        {leer && <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>}
-        {!leer && gruppen.length === 0 && (
-          <Typography.Text type="secondary">keine Treffer</Typography.Text>
-        )}
-        {gruppen.map((g) => (
-          <div key={g.titel} style={{ marginBottom: token.marginSM }}>
-            <Typography.Text
-              type="secondary"
-              strong
-              style={{ display: 'block', marginBottom: token.marginXXS }}
-            >
-              {g.titel}
-            </Typography.Text>
-            {g.einheiten.map((e) => (
-              <div
-                key={`einheit-${e.id}`}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 4,
-                  marginBottom: 6,
-                }}
-              >
-                <Tag style={{ flex: 1, minWidth: 0 }}>{e.name}</Tag>
-                {!schreibgeschuetzt && (
-                  <Button type="primary" onClick={() => onZuweisenEinheit(e)}>
-                    zuweisen
-                  </Button>
-                )}
-              </div>
-            ))}
-            {g.fahrzeuge.map((f) => (
-              <div
-                key={`fahrzeug-${f.id}`}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 4,
-                  marginBottom: 6,
-                }}
-              >
-                <Tag style={{ flex: 1, minWidth: 0 }}>{f.funkrufname}</Tag>
-                {!schreibgeschuetzt && (
-                  <Button type="primary" onClick={() => onZuweisenFahrzeug(f)}>
-                    zuweisen
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </Card>
+        <div style={{ maxHeight: 'min(60dvh, 560px)', overflowY: 'auto' }}>
+          {leer && <Typography.Text type="secondary">keine freien Kräfte</Typography.Text>}
+          {!leer && gruppen.length === 0 && (
+            <Typography.Text type="secondary">keine Treffer</Typography.Text>
+          )}
+          {gruppen.map((g) => (
+            <div key={g.titel} style={{ marginBottom: token.marginSM }}>
+              <Augenbraue als="div" style={{ marginBottom: token.marginXXS }}>
+                {g.titel}
+              </Augenbraue>
+              {g.einheiten.map((e) => (
+                <div
+                  key={`einheit-${e.id}`}
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: rollen.text }}>
+                    {e.name}
+                  </span>
+                  {!schreibgeschuetzt && (
+                    <Button type="primary" onClick={() => onZuweisenEinheit(e)}>
+                      zuweisen
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {g.fahrzeuge.map((f) => (
+                <div
+                  key={`fahrzeug-${f.id}`}
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, ...monoStil(13), color: rollen.text }}>
+                    {f.funkrufname}
+                  </span>
+                  {!schreibgeschuetzt && (
+                    <Button type="primary" onClick={() => onZuweisenFahrzeug(f)}>
+                      zuweisen
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </Paneel>
+    </div>
   );
 }

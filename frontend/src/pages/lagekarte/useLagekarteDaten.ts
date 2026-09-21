@@ -29,7 +29,8 @@ import {
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import { baueTzProps } from './taktischesZeichen';
 import { zoneStil, gefahrengebietStil, zonenBeschriftung } from './zonenStil';
-import type { ZoneFeature } from './kartenLayer';
+import { zonenPlakette, type ZoneFeature } from './kartenLayer';
+import { rollenwerte } from '../../components/instrument';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 
 interface LagekarteDatenArgs {
@@ -238,6 +239,9 @@ export function useLagekarteDaten({
     return m;
   }, [gebieteRoh]);
 
+  // Beschriftungsplakette aus den Rollen des aktiven Modus (Neuentwurf S5).
+  const plakette = useMemo(() => zonenPlakette(rollenwerte(token)), [token]);
+
   const zonenFeatures = useMemo<ZoneFeature[]>(
     () =>
       (zeigeZonen ? zonen : []).flatMap((z) => {
@@ -260,9 +264,19 @@ export function useLagekarteDaten({
           z.label,
           gebietId != null ? (warnstufe ?? 'unbekannt') : null,
         );
-        return [{ id: z.id, geometrie: g, label: beschriftung, stil }];
+        return [
+          {
+            id: z.id,
+            geometrie: g,
+            label: beschriftung,
+            stil,
+            // Gefahrenzonen gestrichelt (Neuentwurf S5) — reine Darstellung am Zonentyp.
+            gestrichelt: z.typ === 'gefahrengebiet',
+            plakette,
+          },
+        ];
       }),
-    [zonen, zeigeZonen, gebietWarnstufe, token],
+    [zonen, zeigeZonen, gebietWarnstufe, token, plakette],
   );
 
   // Benannter Quellenkatalog (LFH-331 · B3): Query-Zustand → der Name, unter dem eine
@@ -386,6 +400,17 @@ export function useLagekarteDaten({
     gebiete: gebieteRoh ?? [],
     // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup (Etappe 4, LFH-170).
     freieZeichen,
+    // Rohlisten für das Datenraster im Paneel „Ausgewählt" (Neuentwurf S5): die Marker tragen
+    // nur Name/Ort/Zeichen, Stärke, Abschnitt oder Status stehen allein im DTO. Dieselben
+    // Listen wie oben — im Historien-Modus also der eingefrorene Stand, nicht der Live-Zustand.
+    rohdaten: {
+      einheiten: einheitenRoh ?? [],
+      fahrzeuge: fahrzeugeRoh ?? [],
+      fuehrungskraefte: fkRoh ?? [],
+      uhs: uhsRoh ?? [],
+      schaeden: schaedenRoh ?? [],
+      abschnitte: abschnitteRoh ?? [],
+    },
     // Abgeleitete Marker/Flächen/Zonen.
     verortet,
     flaechen,

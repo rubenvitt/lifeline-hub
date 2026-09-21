@@ -1,0 +1,406 @@
+import { MoreOutlined } from '@ant-design/icons';
+import { Button, Dropdown, Space } from 'antd';
+import { useCallback, useMemo, useRef, useState, type FocusEvent, type ReactNode } from 'react';
+import { Link } from 'react-router';
+import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
+import { HERVORGEHOBEN } from '../components/Datensicht';
+import Markdown from '../components/Markdown';
+import { SeitenSkeleton } from '../components/SeitenZustand';
+import {
+  Augenbraue,
+  Sammelbanner,
+  StatusChip,
+  useRollen,
+  Zeitachseneintrag,
+} from '../components/instrument';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { formatUhrzeit, inZone } from '../anzeige/format';
+import type { AbgelehnterEintrag } from '../offline/queue';
+import { etbPfad } from '../routing/deeplinks';
+import { etbTyp } from '../theme/statusFarben';
+import EtbBacklinkBadges from './EtbBacklinkBadges';
+import type { EtbZeile } from './etbZeile';
+import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
+import { istNachgetragen } from './typFarben';
+import {
+  berichtigungsindex,
+  einfrierSchluessel,
+  gruppiereNachStunde,
+  teileZufluss,
+  verweisStil,
+  zuflussText,
+} from './zeitachseModell';
+
+interface Props {
+  /** Gesendete und gepufferte Einträge als EINE Chronologie (`etb/etbZeile.ts`). */
+  zeilen: readonly EtbZeile[];
+  /** Einsatz-id für Rückverweise und Sprünge innerhalb des Tagebuchs. */
+  einsatzId: number;
+  /** Per ?eintrag=<id> adressierter Eintrag — wird hervorgehoben (LFH-25). */
+  highlightId?: number | null;
+  /** Wenn gesetzt, bietet jeder Eintrag „Berichtigen" an (nicht an einer Berichtigung). */
+  onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
+  /** Wenn gesetzt, bietet jeder Eintrag „Wiedervorlage" an (ETB→Erinnerung, LFH-106). */
+  onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
+  /** Wenn gesetzt, bietet jeder Eintrag „Auftrag erteilen" an (ETB→Auftrag, LFH-112). */
+  onAuftragErteilen?: (eintrag: EtbEintragAnzeige) => void;
+  /** Abgelehnten Eintrag erneut in die Warteschlange geben (LFH-342 · C7). */
+  onErneutSenden?: (puffer: AbgelehnterEintrag) => void;
+  /** Abgelehnten Eintrag endgültig verwerfen. */
+  onVerwerfen?: (puffer: AbgelehnterEintrag) => void;
+  /** Der Abruf läuft noch — über die Menge wird dann nichts behauptet (LFH-331 · B3). */
+  ladend?: boolean;
+  /** Der Abruf ist gescheitert. Die Meldung gehört der Seite; hier nur die Unterdrückung. */
+  fehler?: boolean;
+  /** Was anstelle der Zeilen steht, wenn keine da sind (die Seite kennt Filter und Rechte). */
+  leerText?: ReactNode;
+}
+
+const MELDEWEG_LABEL = Object.fromEntries(
+  MELDEWEG_OPTIONEN.map((o) => [o.value, o.label]),
+) as Record<MeldeWeg, string>;
+
+function vonAn(von?: string | null, an?: string | null): string | null {
+  if (!von && !an) return null;
+  return `${von || '—'} → ${an || '—'}`;
+}
+
+/** Teile einer Hinweiszeile mit Mittelpunkt dazwischen — der Punkt ist Satz, kein Inhalt. */
+function hinweisZeile(teile: ReactNode[], luft: number): ReactNode {
+  const da = teile.filter((t) => t != null && t !== false);
+  if (da.length === 0) return undefined;
+  return (
+    <span
+      style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', columnGap: luft }}
+    >
+      {da.map((t, i) => (
+        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', columnGap: luft }}>
+          {i > 0 && <span aria-hidden="true">·</span>}
+          {t}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Das Einsatztagebuch als ZEITACHSE auf allen Breiten (Neuentwurf S4, Entscheidung 3 des
+ * Auftraggebers, 21.09.2026).
+ *
+ * ── WARUM KEINE `Datensicht` MEHR ────────────────────────────────────────────────────
+ *
+ * Seit LFH-342 · C7 lief die Chronologie über `Datensicht` — Tabelle ab `xl`
+ * (`tabelleAb="xl"`, LFH-464), darunter ein Karten-EIGENBAU, der erste und einzige Eintrag
+ * in `KARTEN_EIGENBAU`. Beides war die Antwort auf die Frage „welche Form trägt ein
+ * Tagebuch?", und die Antwort des Neuentwurfs ist eindeutiger als die der Vorgänger: ein
+ * Tagebuch wird GELESEN, in Zeitfolge, auf jedem Schirm. Es gibt keine Sortierung, keinen
+ * Spaltenfilter, keine Spaltenauswahl — die Ordnung ist die Zeit und serverseitig
+ * festgelegt. Was `Datensicht` darüber hinaus trug (Stundengruppen, Zeilenschleuse,
+ * Sammelbanner, Lade-/Leerweiche), steht jetzt als reine Funktion in `zeitachseModell.ts`
+ * und ist dort ohne Render geprüft. Damit ist die Datei aus dem Konsumenteninventar
+ * gefallen, und `KARTEN_EIGENBAU` ist wieder leer — wie am Tag 1 des Guards.
+ *
+ * ── WAS JEDE ZEILE SELBST TRÄGT ──────────────────────────────────────────────────────
+ *
+ * `data-lfh="datensicht-karte"` und die Zeilenklasse ({@link HERVORGEHOBEN}): daran findet
+ * `scrolleZurZeile` die Zeile, und daran hängt die Hervorhebung des Deeplinks `?eintrag=`
+ * (`index.css`, e2e `palette-datensaetze`). Der Markenname stammt aus der Datensicht; er
+ * bleibt, weil das Primitiv ihn für den Sprung abfragt und ein zweiter Selektor dort eine
+ * zweite Wahrheit wäre.
+ *
+ * ── LIVE-ZUFLUSS SPRINGT NICHT UNTER DEM CURSOR ─────────────────────────────────────
+ *
+ * Solange der Fokus in der Zeitachse liegt (Aktionsmenü, Verweis), ist die Menge der
+ * gesendeten Einträge eingefroren; Neues wird als Sammelbanner gezählt und erst auf
+ * „anzeigen" eingefügt (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5). Das Banner liegt als
+ * Überlagerung über der Liste, nicht in ihrem Fluss — ein Banner, das beim Eintreffen
+ * Platz nähme, schöbe genau die Zeilen weg, die es schützen soll. Gepufferte Einträge
+ * stehen immer: sie sind die eigenen.
+ */
+export default function EtbZeitachse({
+  zeilen,
+  einsatzId,
+  highlightId,
+  onBerichtigen,
+  onWiedervorlage,
+  onAuftragErteilen,
+  onErneutSenden,
+  onVerwerfen,
+  ladend,
+  fehler,
+  leerText,
+}: Props) {
+  const { token, rollen } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
+  const wurzel = useRef<HTMLDivElement>(null);
+  const [gefroren, setGefroren] = useState<ReadonlySet<string> | null>(null);
+
+  const eintraege = useMemo(
+    () => zeilen.flatMap((z) => (z.art === 'eintrag' ? [z.eintrag] : [])),
+    [zeilen],
+  );
+  const index = useMemo(() => berichtigungsindex(eintraege), [eintraege]);
+  const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, gefroren);
+  const gruppen = gruppiereNachStunde(sichtbar, (utc) =>
+    inZone(utc, konventionen).format('YYYY-MM-DD HH'),
+  );
+
+  const betreten = useCallback(() => {
+    setGefroren((vorher) => {
+      if (vorher != null) return vorher;
+      const schluessel = einfrierSchluessel(zeilen);
+      // Eine leere Folge friert nicht ein: sonst landete die erste Lieferung ganz hinter
+      // dem Banner (dieselbe Falle, die `Datensicht` dokumentiert).
+      return schluessel.size > 0 ? schluessel : null;
+    });
+  }, [zeilen]);
+
+  const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
+    const ziel = e.relatedTarget as Node | null;
+    if (ziel != null && wurzel.current?.contains(ziel)) return;
+    // Ein Menü im Portal ist kein Verlassen (LFH-339 · C4): antds `autoFocus` schiebt den
+    // Fokus an `document.body`, und die Zeile unter dem offenen Menü soll stehen bleiben.
+    if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
+    setGefroren(null);
+  }, []);
+
+  function aktionen(z: EtbZeile): ReactNode {
+    if (z.art === 'abgelehnt') {
+      // Eine Entscheidung, kein Menü: das Verwerfen ist unumkehrbar, das erneute Senden
+      // der wahrscheinlichere Griff — beide stehen offen da, mit Abstand zum Roten.
+      return (
+        <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
+          <Button onClick={() => onErneutSenden?.(z.puffer)}>Erneut senden</Button>
+          <Button danger onClick={() => onVerwerfen?.(z.puffer)}>
+            Verwerfen
+          </Button>
+        </Space>
+      );
+    }
+    // Ausstehend: noch nicht im Tagebuch — nichts zu berichtigen, nichts zu beauftragen.
+    if (z.art === 'ausstehend') return null;
+    const e = z.eintrag;
+    const items = [
+      ...(onBerichtigen && e.typ !== 'berichtigung'
+        ? [{ key: 'berichtigen', label: 'Berichtigen' }]
+        : []),
+      ...(onWiedervorlage ? [{ key: 'wiedervorlage', label: 'Wiedervorlage' }] : []),
+      ...(onAuftragErteilen ? [{ key: 'auftrag', label: 'Auftrag erteilen' }] : []),
+    ];
+    // Kein Auslöser statt eines leeren oder deaktivierten Menüs.
+    if (items.length === 0) return null;
+    return (
+      <Dropdown
+        trigger={['click']}
+        autoFocus
+        menu={{
+          items,
+          // Zuordnung am Menü, nicht je Eintrag (Muster `AnsichtSwitcher.tsx`).
+          onClick: ({ key }) => {
+            if (key === 'berichtigen') onBerichtigen?.(e);
+            if (key === 'wiedervorlage') onWiedervorlage?.(e);
+            if (key === 'auftrag') onAuftragErteilen?.(e);
+          },
+        }}
+      >
+        {/* Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
+            auseinanderzuhalten (LFH-364). Kein `size` — die Höhe kommt aus `controlHeight`. */}
+        <Button
+          type="text"
+          aria-label={`Aktionen zu Eintrag ${e.lfd_nr}`}
+          icon={
+            <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+              <MoreOutlined />
+            </span>
+          }
+        />
+      </Dropdown>
+    );
+  }
+
+  function eintragsHinweis(e: EtbEintragAnzeige): ReactNode {
+    const grund = index.grundeintrag(e);
+    const durch = index.berichtigtDurch(e);
+    const stil = verweisStil(token);
+    return hinweisZeile(
+      [
+        istNachgetragen(e.ereigniszeit, e.received_at) && (
+          <span key="nachtrag">
+            <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
+            {formatUhrzeit(e.received_at, konventionen)}
+          </span>
+        ),
+        /*
+         * Der Verweis ist blau, nicht rot, obwohl der Entwurf ihn in `alarm` zeichnet:
+         * Rot bedient nichts (LFH-315, Entscheidung 2 lässt die Regel ausdrücklich stehen).
+         * Das Signal „Berichtigung" tragen Kante, Typwort und Zeilentönung.
+         *
+         * Der Sprung führt über `?eintrag=` OHNE den aktiven Filter: der Grundeintrag passt
+         * selten zu dem Filter, unter dem man seine Berichtigung gefunden hat, und die Seite
+         * lädt ältere Seiten nach, bis er da ist (LFH-25).
+         */
+        grund && (
+          <span key="grund">
+            berichtigt {grund.lfd_nr != null ? `Nr. ${grund.lfd_nr}` : 'einen älteren Eintrag'} —{' '}
+            <Link to={etbPfad(einsatzId, { eintrag: grund.id })} style={stil}>
+              Grundeintrag anzeigen<span aria-hidden="true"> ↗</span>
+            </Link>
+          </span>
+        ),
+        ...durch.map((b) => (
+          <Link key={`durch-${b.id}`} to={etbPfad(einsatzId, { eintrag: b.id })} style={stil}>
+            berichtigt durch Nr. {b.lfd_nr}
+            <span aria-hidden="true"> ↗</span>
+          </Link>
+        )),
+        (e.befehl_id != null || e.lagebericht_id != null || e.auftrag_id != null) && (
+          <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />
+        ),
+      ],
+      token.marginXS,
+    );
+  }
+
+  function zeile(z: EtbZeile): ReactNode {
+    const hervorgehoben = z.art === 'eintrag' && z.eintrag.id === highlightId;
+    // Die `etb-*`-Klassen tragen keine Regel mehr (die Tönung macht der Baustein über
+    // `toenung`); sie bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
+    const klassen = [
+      z.art === 'eintrag' && z.eintrag.typ === 'berichtigung' ? 'etb-berichtigung' : '',
+      z.art === 'ausstehend' ? 'etb-ausstehend' : '',
+      z.art === 'abgelehnt' ? 'etb-abgelehnt' : '',
+      hervorgehoben ? HERVORGEHOBEN : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const gemeinsam = {
+      als: 'li' as const,
+      'data-lfh': 'datensicht-karte',
+      'data-testid': 'etb-ereigniszeile',
+      'data-zeile': z.schluessel,
+      className: klassen || undefined,
+      aktionen: aktionen(z),
+      // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
+      // Klassenregel käme dagegen nicht an.
+      style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
+    };
+
+    if (z.art !== 'eintrag') {
+      const p = z.puffer;
+      return (
+        <Zeitachseneintrag
+          key={z.schluessel}
+          {...gemeinsam}
+          zeit={formatUhrzeit(p.erstellt_at, konventionen)}
+          // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der
+          // Sendezustand steht als Chip in der Meta-Zeile, NICHT in der Nummernspalte —
+          // die ist inhaltsbreit, und ein `nowrap`-Chip dort machte die Zeitspalte
+          // dieser einen Zeile dreimal so breit wie die der Nachbarn.
+          typ={p.eintrag.typ}
+          typwort={etbTyp[p.eintrag.typ].label}
+          meta={
+            <span
+              style={{
+                display: 'inline-flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: token.marginXS,
+              }}
+            >
+              {z.art === 'ausstehend' ? (
+                <StatusChip ton="achtung" wort="wird gesendet …" />
+              ) : (
+                <StatusChip ton="alarm" wort="abgelehnt" />
+              )}
+              {vonAn(p.eintrag.von, p.eintrag.an)}
+            </span>
+          }
+          toenung={z.art === 'abgelehnt' ? 'problem' : undefined}
+          hinweis={
+            z.art === 'abgelehnt'
+              ? `Vom Server abgelehnt: ${z.puffer.grund}`
+              : 'Wird gesendet, sobald wieder Verbindung besteht.'
+          }
+          hinweisTon={z.art === 'abgelehnt' ? 'alarm' : 'schwach'}
+        >
+          <Markdown variante="kompakt">{p.eintrag.inhalt}</Markdown>
+        </Zeitachseneintrag>
+      );
+    }
+
+    const e = z.eintrag;
+    return (
+      <Zeitachseneintrag
+        key={z.schluessel}
+        {...gemeinsam}
+        zeit={formatUhrzeit(e.ereigniszeit, konventionen)}
+        nr={`Nr. ${e.lfd_nr}`}
+        typ={e.typ}
+        typwort={etbTyp[e.typ].label}
+        meta={vonAn(e.von, e.an)}
+        toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
+        hinweis={eintragsHinweis(e)}
+        verfasser={e.erfasser_name}
+        weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
+      >
+        <Markdown variante="kompakt">{e.inhalt}</Markdown>
+      </Zeitachseneintrag>
+    );
+  }
+
+  /**
+   * Laden und Fehler behaupten nichts über die Menge (LFH-331 · B3): ohne die Weiche
+   * blitzte „Noch keine Einträge." hinter dem Ladebalken auf. Im Fehlerfall bleibt die
+   * Liste montiert — bereits geladene Einträge bleiben lesbar (Spec-Festlegung D4).
+   */
+  let inhalt: ReactNode;
+  if (sichtbar.length === 0) {
+    inhalt = ladend ? <SeitenSkeleton /> : fehler ? null : leerText;
+  } else {
+    inhalt = gruppen.map((g) => (
+      <div key={`${g.schluessel}-${g.zeilen[0].schluessel}`} role="group" aria-label={g.etikett}>
+        <div
+          style={{
+            paddingBlock: token.paddingXS,
+            paddingInline: token.padding,
+            borderBlockEnd: `1px solid ${rollen.linie}`,
+            background: rollen.grund,
+          }}
+        >
+          <Augenbraue>{g.etikett}</Augenbraue>
+        </div>
+        <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
+      </div>
+    ));
+  }
+
+  return (
+    <div
+      ref={wurzel}
+      // Eine benannte Region: Vorleser springen hinein, und die e2e-Messungen greifen
+      // die Sicht darüber (vorher lieferte die Datensicht diese Region).
+      role="region"
+      aria-label="Einsatztagebuch"
+      data-lfh="etb-zeitachse"
+      onFocus={betreten}
+      onBlur={verlassen}
+      style={{ position: 'relative' }}
+    >
+      {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
+      <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
+        {zurueckgehalten > 0 && (
+          <Sammelbanner
+            aktion={{
+              label: 'anzeigen',
+              onKlick: () => setGefroren(einfrierSchluessel(zeilen)),
+            }}
+            style={{ position: 'absolute', insetInline: 0, top: 0 }}
+          >
+            {zuflussText(zurueckgehalten)} — oben einsortiert
+          </Sammelbanner>
+        )}
+      </div>
+      {inhalt}
+    </div>
+  );
+}

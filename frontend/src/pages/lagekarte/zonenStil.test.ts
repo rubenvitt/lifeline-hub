@@ -88,12 +88,15 @@ describe('zonenBeschriftung', () => {
     }
   });
 
-  it('stellt die Stufe unter den Zonennamen; ohne Namen steht sie allein', () => {
-    expect(zonenBeschriftung('Werkshalle Nord', 'hoch')).toBe('Werkshalle Nord\nWarnstufe: hoch');
-    expect(zonenBeschriftung(null, 'hoch')).toBe('Warnstufe: hoch');
-    // Ein Name aus lauter Leerzeichen ist kein Name — sonst stünde die Stufe in Zeile zwei
-    // unter einer leeren Zeile eins.
-    expect(zonenBeschriftung('   ', 'hoch')).toBe('Warnstufe: hoch');
+  it('fügt Name und Stufe zur Plakette „NAME · STUFE"; ohne Namen steht die Stufe allein', () => {
+    expect(zonenBeschriftung('Werkshalle Nord', 'hoch')).toBe('Werkshalle Nord · hoch');
+    expect(zonenBeschriftung(null, 'hoch')).toBe('hoch');
+    // Ein Name aus lauter Leerzeichen ist kein Name — sonst begänne die Plakette mit „ · ".
+    expect(zonenBeschriftung('   ', 'hoch')).toBe('hoch');
+  });
+
+  it('sagt bei `keine`, dass keine STUFE gesetzt ist — nicht „keine Gefahr"', () => {
+    expect(zonenBeschriftung('Werk', 'keine')).toBe('Werk · keine Stufe');
   });
 
   it('lässt Zonen ohne Warnstufe unverändert — die Stufe gehört nur ans Gefahrengebiet', () => {
@@ -107,8 +110,8 @@ describe('zonenBeschriftung', () => {
   // eine Behauptung über Daten, die es nicht gibt. Genau der Maßstab, den dieser Fix selbst
   // an das Wort „unbewertet" angelegt hat.
   it('nennt einen fehlenden Nachschlag `unbekannt` statt ihn zu `keine` zu runden', () => {
-    expect(zonenBeschriftung('Werk', 'unbekannt')).toBe('Werk\nWarnstufe: unbekannt');
-    expect(zonenBeschriftung(null, 'unbekannt')).toBe('Warnstufe: unbekannt');
+    expect(zonenBeschriftung('Werk', 'unbekannt')).toBe('Werk · Stufe unbekannt');
+    expect(zonenBeschriftung(null, 'unbekannt')).toBe('Stufe unbekannt');
     // Die tragende Aussage: `unbekannt` und `keine` sind ZWEI Zustände, nicht einer.
     expect(zonenBeschriftung('Werk', 'unbekannt')).not.toBe(zonenBeschriftung('Werk', 'keine'));
   });

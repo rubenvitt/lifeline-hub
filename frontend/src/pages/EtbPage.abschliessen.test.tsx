@@ -77,7 +77,7 @@ describe('EtbPage – Abschließen', () => {
       </AuthProvider>,
       { route: '/einsaetze/7/etb' },
     );
-    await screen.findByRole('heading', { name: 'Hochwasser' });
+    await screen.findByRole('heading', { name: 'Einsatztagebuch' });
     expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).not.toBeInTheDocument();
   });
 
@@ -97,7 +97,7 @@ describe('EtbPage – Abschließen', () => {
       </AuthProvider>,
       { route: '/einsaetze/7/etb' },
     );
-    await screen.findByRole('heading', { name: 'Hochwasser' });
+    await screen.findByRole('heading', { name: 'Einsatztagebuch' });
     expect(screen.queryByRole('button', { name: 'Erfassen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mitglieder' })).not.toBeInTheDocument();

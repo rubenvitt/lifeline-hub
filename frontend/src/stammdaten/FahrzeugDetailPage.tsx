@@ -14,6 +14,7 @@ import {
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import SektionHeader from '../components/SektionHeader';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -154,7 +155,7 @@ export default function FahrzeugDetailPage() {
         ]}
       />
       <AdminPage
-        titel={fahrzeug.funkrufname}
+        titel={<span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>}
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die ein Fahrzeug nicht auffindbar ist."
         hinweis={
           <SeitenHinweise
