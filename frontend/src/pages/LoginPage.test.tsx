@@ -198,6 +198,24 @@ describe('LoginPage', () => {
       expect(assignSpion).toHaveBeenCalledWith('/api/auth/oidc/start?von=%2Feinsaetze');
     });
 
+    it('zeigt eine Fehlermeldung, wenn der OIDC-Callback auf /login?fehler=oidc zurückleitet', async () => {
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+        { route: '/login?fehler=oidc' },
+      );
+
+      expect(
+        await screen.findByText('Die Anmeldung über Single Sign-On ist fehlgeschlagen'),
+      ).toBeInTheDocument();
+    });
+
     it('zeigt keinen Redirect-Button, wenn der oidc-Provider deaktiviert ist', async () => {
       server.use(
         http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
