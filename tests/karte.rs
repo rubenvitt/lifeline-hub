@@ -564,6 +564,59 @@ async fn fachebenen_hochwasser_wird_bedient() {
     assert_eq!(v["features"]["features"].as_array().unwrap().len(), 1);
 }
 
+/// Die Luftqualitäts-Ebene (LFH-79) muss im Quellen-`match` der Route stehen. Muster wie
+/// bei Hochwasser: Cache vorbefüllt, damit der Test Route UND Cache-Schlüssel pinnt, ohne
+/// die UBA-API zu erreichen.
+#[tokio::test]
+async fn fachebenen_luftqualitaet_wird_bedient() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = build_router(AppState {
+        pool: pool().await,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+        karten_dir: karten_dir.clone(),
+    });
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let gesetzt = FachebeneAntwort::ok(
+        "luftqualitaet",
+        "Umweltbundesamt",
+        Some("2026-09-21T09:00:00+01:00".into()),
+        serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "geometry": { "type": "Point", "coordinates": [13.06, 52.39] },
+                "properties": { "titel": "Potsdam-Zentrum", "klasse": "maessig" }
+            }]
+        }),
+    );
+    lifeline_hub::karte::cache::setze(&cache_pool, "luftqualitaet", &gesetzt).await;
+
+    // Ohne `bbox` — die Ebene ist nicht bbox-abhängig, anders als kritis (Gegenprobe oben).
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/fachebenen/luftqualitaet",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["quelle"], "luftqualitaet");
+    assert_eq!(v["status"], "ok");
+    assert_eq!(v["attribution"], "Umweltbundesamt");
+    assert_eq!(v["stand"], "2026-09-21T09:00:00+01:00");
+    assert_eq!(v["features"]["features"].as_array().unwrap().len(), 1);
+}
+
 // ===== Admin-CRUD: Online-Quellen =====
 
 #[tokio::test]

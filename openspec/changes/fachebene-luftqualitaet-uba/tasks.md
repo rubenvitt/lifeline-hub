@@ -4,20 +4,23 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst rot, dann 
 ein Test eine Falle pinnt, gehört eine **Mutationsprobe** dazu: die Zusicherung
 zurückdrehen und sehen, dass genau dieser Test rot wird.
 
-## 1. Backend — Normalisierung (`src/karte/normalisierung.rs`)
+## 1. Backend — Normalisierung (`src/karte/luftqualitaet.rs`)
 
-- [ ] 1.1 Reine Funktion `luftqualitaet_klasse(index)` mit den sechs Wire-Wörtern
+> Umgesetzt als eigenes Modul statt in `normalisierung.rs` (dort ~900 Zeilen); der
+> Schnitt der Aufgaben ist unverändert.
+
+- [x] 1.1 Reine Funktion `luftqualitaet_klasse(index)` mit den sechs Wire-Wörtern
       (`sehr_gut`…`sehr_schlecht`, `keine_daten` für fehlend/außerhalb 0–4); Test
       `luftqualitaet_tests::bildet_die_indexstufen_ab` pinnt die Literale (Gegenstück zu
       `theme/statusFarben.test.ts`) — `cargo test luftqualitaet` grün.
-- [ ] 1.2 Reine Funktion für den Messzeitpunkt: MEZ-Stundenende → RFC 3339 mit `+01:00`,
+- [x] 1.2 Reine Funktion für den Messzeitpunkt: MEZ-Stundenende → RFC 3339 mit `+01:00`,
       `…24:00:00` → 00:00 Folgetag, unparsebar → `None`. Tests gegen **absolute**
       Zeitpunkte (`DateTime<Utc>`-Vergleich) im Sommer und für die Mitternachtsstunde;
       Mutationsprobe „Europe/Berlin statt +01:00" bzw. „24:00 nicht normalisiert" → rot.
-- [ ] 1.3 Leitschadstoff-Wahl (höchster Teilindex, Gleichstand über `y`) samt
+- [x] 1.3 Leitschadstoff-Wahl (höchster Teilindex, Gleichstand über `y`) samt
       Komponententabelle (ID → Kürzel/Einheit, Rückfall `Komponente <id>`); Tests für
       Gleichstand, Stufe 0 und unbekannte ID.
-- [ ] 1.4 `normalisiere_luftqualitaet(stationen, index_antwort)` → `FeatureCollection` nach
+- [x] 1.4 `normalisiere_luftqualitaet(stationen, index_antwort)` → `FeatureCollection` nach
       design D1/D3/D7: nur Stationen mit Index, jüngster Stundenwert je Station,
       Koordinaten als Zahlen (Quelle liefert Strings), Auflösung über ID **und** Code,
       Station ohne Koordinaten verworfen. Tests mit einer kleinen Fixture im gemessenen
@@ -25,14 +28,15 @@ zurückdrehen und sehen, dass genau dieser Test rot wird.
       geschlüsselte Indexantwort liefert dieselben Features wie nach ID geschlüsselte
       (Mutationsprobe: Code-Eintrag aus der Tabelle entfernen → rot), (c) mehrere Stunden →
       nur die jüngste, (d) kaputte Koordinaten → nur dieses Feature fehlt, (e) kaputte
-      Struktur (kein `data`) → leere Collection statt Panik. Properties per
+      Struktur (kein `data`, fehlende Spalten) → `None` = unbrauchbar (→ offline), nicht
+      „leer" — sonst stünde eine kaputte Antwort 15 min als gültiger Leerstand im Cache. Properties per
       `serde_json::from_value::<GeoJsonFeatureCollection>` gegen den Schema-Anker geprüft.
-- [ ] 1.5 `stand`-Ableitung = Maximum der Messzeitpunkte; Test mit zwei Stationen
+- [x] 1.5 `stand`-Ableitung = Maximum der Messzeitpunkte; Test mit zwei Stationen
       verschiedener Stunden.
 
 ## 2. Backend — Abruf und Route
 
-- [ ] 2.1 Reine Funktion `luftqualitaet_fenster(now_utc)` → Query-Parameter
+- [x] 2.1 Reine Funktion `luftqualitaet_fenster(now_utc)` → Query-Parameter
       (`date_from`, `time_from`, `date_to`, `time_to`) in MEZ, sechs Stunden rückwärts,
       Stundenenden 1–24. Tests: Sommer-Mittag, 00:30 MEZ (Fenster über den Tageswechsel),
       exakt volle Stunde. Mutationsprobe „Europe/Berlin" → rot.

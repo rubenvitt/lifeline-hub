@@ -525,6 +525,7 @@ pub async fn fachebenen(
         "nina" => quellen::fetch_nina(&state.fachebenen, cache_pool).await,
         "hochwasser" => quellen::fetch_hochwasser(&state.fachebenen, cache_pool).await,
         "autobahn" => quellen::fetch_autobahn(&state.fachebenen, cache_pool).await,
+        "luftqualitaet" => quellen::fetch_luftqualitaet(&state.fachebenen, cache_pool).await,
         "kritis" => {
             let bbox =
                 bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;
