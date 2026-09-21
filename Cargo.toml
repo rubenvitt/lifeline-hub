@@ -43,6 +43,9 @@ fs4 = "1.1.0"
 # LFH-83: KRITIS-Objekte aus dem Deutschland-OSM-Extrakt lesen. Reiner Rust-PBF-Leser
 # (MIT/Apache-2.0), kein FFI — das Binary bleibt single-binary.
 osmpbf = "0.3"
+# Eigener, kleiner Thread-Pool für den Extrakt-Import (LFH-83): der globale Pool nähme alle
+# Kerne und bei 16 Threads gemessen 3,6 GB Spitze statt 0,6 GB mit 4.
+rayon = "1"
 # LFH-201: geteilter Offline-Katalog-Typ (Grundstein für den späteren karten-service).
 # `schema` (LFH-265): zieht `ToSchema` für OfflineKatalogEintrag in den Typ-Codegen. Bewusst
 # kein Default-Feature des Crates — karten-service soll utoipa standalone nicht mitziehen.
@@ -156,3 +159,16 @@ clamav = ["dep:clamav-client"]
 # späteren karten-service). `karten-service` ist jetzt Teil des Workspace (Skelett, LFH-201 Task 2).
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service"]
+
+# LFH-83: Der KRITIS-Import liest einen 4–5 GB großen PBF-Extrakt. Im unoptimierten
+# Dev-Build dekomprimieren und dekodieren diese Crates um ein Vielfaches langsamer — und der
+# Import ist auch im Dev-Stack Default-an. Nur diese Abhängigkeiten werden optimiert; der
+# eigene Code bleibt debugbar.
+[profile.dev.package.osmpbf]
+opt-level = 3
+[profile.dev.package.protobuf]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3

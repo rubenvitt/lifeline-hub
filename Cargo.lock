@@ -1987,6 +1987,7 @@ dependencies = [
  "openssl",
  "osmpbf",
  "percent-encoding",
+ "rayon",
  "rcgen",
  "reqwest",
  "rust-embed",

@@ -32,6 +32,9 @@ const PRUEF_TAKT: Duration = Duration::from_secs(3600);
 /// fängt eine falsch konfigurierte URL (Planet-Datei, ~80 GB) ab, bevor die Platte vollläuft.
 const MAX_EXTRAKT_BYTES: u64 = 20 * 1024 * 1024 * 1024;
 
+/// Threads des Einlesens (siehe `lade_und_lies`).
+const IMPORT_THREADS: usize = 4;
+
 /// Konfiguration aus `--kritis-extrakt*`.
 #[derive(Debug, Clone)]
 pub struct KritisExtraktConfig {
@@ -176,10 +179,21 @@ async fn lade_und_lies(
     .await
     .map_err(|e| format!("Download {url}: {e}"))?;
     let pfad = datei.to_path_buf();
-    tokio::task::spawn_blocking(move || extrakt::lies_extrakt(&pfad))
-        .await
-        .map_err(|e| format!("Einlesen abgebrochen: {e}"))?
-        .map_err(|e| format!("Extrakt nicht lesbar: {e}"))
+    tokio::task::spawn_blocking(move || {
+        // Eigener Pool statt des globalen: gemessen am DE-Extrakt (Aufgabe 6.2) nahm der
+        // globale Pool alle 16 Kerne und 3,6 GB Spitze; mit 4 Threads sind es ~0,6 GB bei
+        // rund drei Minuten. Ein wöchentlicher Hintergrundlauf soll den Einsatzbetrieb
+        // nicht ausbremsen.
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(IMPORT_THREADS)
+            .thread_name(|i| format!("kritis-import-{i}"))
+            .build()
+            .map_err(|e| format!("Import-Threads nicht startbar: {e}"))?;
+        pool.install(|| extrakt::lies_extrakt(&pfad))
+            .map_err(|e| format!("Extrakt nicht lesbar: {e}"))
+    })
+    .await
+    .map_err(|e| format!("Einlesen abgebrochen: {e}"))?
 }
 
 /// Verhindert einen zweiten Scheduler im selben Prozess — zwei Läufe gleichzeitig luden

@@ -277,4 +277,64 @@ mod tests {
     fn fehlende_datei_ist_fehler() {
         assert!(lies_extrakt(Path::new("/gibt/es/nicht.osm.pbf")).is_err());
     }
+    /// Messung gegen einen echten Extrakt (LFH-83, Aufgabe 6.2) — nicht Teil der Suite.
+    /// Aufruf (Release, Spitzen-RSS über `time -l`):
+    /// `KRITIS_PBF=/pfad/germany-latest.osm.pbf cargo test --release --lib
+    ///  kritis::extrakt::tests::messung_echter_extrakt -- --ignored --nocapture`
+    #[tokio::test]
+    #[ignore]
+    async fn messung_echter_extrakt() {
+        let pfad = std::env::var("KRITIS_PBF").expect("KRITIS_PBF setzen");
+        let t = std::time::Instant::now();
+        let objekte = lies_extrakt(Path::new(&pfad)).unwrap();
+        println!("Einlesen: {:?}, {} Objekte", t.elapsed(), objekte.len());
+        let mut je: std::collections::BTreeMap<&str, usize> = Default::default();
+        for o in &objekte {
+            *je.entry(o.kategorie.as_str()).or_default() += 1;
+        }
+        println!("je Kategorie: {je:?}");
+        let mut typ: std::collections::BTreeMap<&str, usize> = Default::default();
+        for o in &objekte {
+            *typ.entry(o.osm_typ).or_default() += 1;
+        }
+        println!("je OSM-Typ: {typ:?}");
+
+        let dir = tempfile::tempdir().unwrap();
+        let pool = crate::cache_db::cache_pool(dir.path()).await.unwrap();
+        let meta = crate::karte::kritis::bestand::ImportMeta {
+            stand: "messung".into(),
+            quelle_url: "messung".into(),
+            last_modified: None,
+            etag: None,
+            importiert_at: 0,
+            anzahl: 0,
+        };
+        let t = std::time::Instant::now();
+        crate::karte::kritis::bestand::ersetze_bestand(&pool, &objekte, &meta)
+            .await
+            .unwrap();
+        println!("Tausch: {:?}", t.elapsed());
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let groesse = std::fs::metadata(dir.path().join("nachschlage-cache.db"))
+            .unwrap()
+            .len();
+        println!("Cache-DB: {} MB", groesse / 1_000_000);
+        for (name, b) in [
+            ("DE", "5.8,47.2,15.1,55.1"),
+            ("NRW", "5.8,50.3,9.5,52.6"),
+            ("Köln", "6.85,50.88,7.05,50.98"),
+        ] {
+            let bbox = crate::karte::typen::Bbox::parse(b).unwrap();
+            let t = std::time::Instant::now();
+            let a = crate::karte::kritis::bestand::abfrage(&pool, &bbox).await;
+            println!(
+                "{name}: {:?}, {} Features",
+                t.elapsed(),
+                a.features["features"].as_array().unwrap().len()
+            );
+        }
+    }
 }

@@ -35,8 +35,8 @@ Test, dann den Code. Grundlage sind `specs/lagekarte-fachebenen/spec.md` und `de
 
 ## 6. Doku und Abschluss
 
-- [ ] 6.1 `docs/fachebenen-quellen.md`: KRITIS-Zeile auf Geofabrik-Extrakt umstellen (Quelle, Stand = `Last-Modified`, Intervall, Schalter, Lizenz ODbL, Attribution, Offline-Verhalten), Abschnitt zu Verdichtung und Speicherort; verifiziert durch Lesen des Abschnitts
-- [ ] 6.2 Echter Import einmal lokal mit dem vollen DE-Extrakt: Dauer, Spitzen-RSS, Objektzahl je Kategorie und Tabellengröße messen und in 6.1 eintragen; verifiziert durch die eingetragenen Messwerte
+- [x] 6.1 `docs/fachebenen-quellen.md`: KRITIS-Zeile auf Geofabrik-Extrakt umstellen (Quelle, Stand = `Last-Modified`, Intervall, Schalter, Lizenz ODbL, Attribution, Offline-Verhalten), Abschnitt zu Verdichtung und Speicherort; verifiziert durch Lesen des Abschnitts
+- [x] 6.2 Echter Import einmal lokal mit dem vollen DE-Extrakt: Dauer, Spitzen-RSS, Objektzahl je Kategorie und Tabellengröße messen und in 6.1 eintragen; verifiziert durch die eingetragenen Messwerte — Befund: 263 394 Objekte, Einlesen 50 s mit 16 Kernen bei 3,6 GB Spitze → Import auf einen eigenen Pool mit 4 Threads begrenzt (~185 s, ~0,6 GB) und die PBF-Crates im Dev-Profil optimiert
 - [ ] 6.3 Browser-Prüfung auf der Lagekarte (Dev-Stack mit importiertem Bestand): DE-Ansicht zeigt Bündel mit Zahlen und bleibt bedienbar, Klick auf Bündel zoomt, Klick auf ein Krankenhaus öffnet das Detail-Panel, Attribution sichtbar, Hell/Dunkel; verifiziert durch Screenshots
-- [ ] 6.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die geänderte Ebene ausfüllen; verifiziert durch die ausgefüllte Liste im Change-Ordner
+- [x] 6.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die geänderte Ebene ausfüllen; verifiziert durch die ausgefüllte Liste im Change-Ordner (`design.md`, Abschnitt „Prüfliste Einsatztauglichkeit“)
 - [ ] 6.5 Voller Gate-Lauf `./scripts/check-all.sh` grün; verifiziert durch Exit-Code 0

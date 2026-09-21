@@ -98,6 +98,11 @@ Führungsgeräts — deshalb begrenzt der Server:
   < 300 ms wird im Task gemessen. Reicht es nicht, werden die Zellen je Leiterstufe beim
   Import vorberechnet (`kritis_zelle(g, x, y, lon, lat, anzahl)`) — die Schnittstelle
   ändert sich dadurch nicht.
+**Umgesetzt wurde Plan B** (Messung Aufgabe 3.2, Release-Build, 400 000 Objekte): zur
+Abfragezeit gerechnet brauchte die DE-Ansicht 384 ms; mit `kritis_zelle` (beim Tausch je
+Leiterstufe per `INSERT … SELECT … GROUP BY` gefüllt, mitgetauscht) und einer auf 5 001
+gedeckelten Zählung sind es 4,5 ms. Die Zellen zählen immer ganz — die Spec ist entsprechend
+präzisiert.
 Verworfen: Vorberechnung von Anfang an (mehr Code, bevor klar ist, dass sie nötig ist);
 MVT (neuer Kachelpfad, neuer Layer-Typ, bricht das einheitliche Fachebenen-Umschlag-Muster).
 
@@ -169,6 +174,31 @@ Damit hält auch das Akzeptanzkriterium „Overpass nicht periodisch belasten" t
 - [Abweichung Punktlage gegenüber heute] → Bounding-Box-Mitte wie Overpass `center`.
 - [Kategorie `social_facility=*` ist breit] → unverändert übernommen, um den Bestand nicht
   still zu ändern; Schärfung ist ein eigenes Ticket, falls gewünscht.
+
+## Prüfliste Einsatztauglichkeit
+
+Keine neue Seite; umgebaut ist eine Ebene der Lagekarte (Bündel statt Einzelpunkte, Laden in
+jeder Zoomstufe, ein Hinweis entfällt). Präzedenz LFH-77/78 hat für eine Fachebene keine
+Liste angelegt — hier wird sie trotzdem geführt, weil sich Bedienweg (Klick auf Bündel) und
+Darstellung (Zahl auf Kreis) ändern.
+
+| #  | Verdikt | Beleg / Begründung |
+| -- | ------- | ------------------ |
+| 1  | erfüllt | Kleinster Bündel-Kreis Radius 12 px = 24 × 24 CSS px (`BUENDEL_RADIUS`); Einzelpunkte unverändert (Radius 5 + Kontur, Bestand aller Punkt-Ebenen) — keine zeitkritische Aktion. |
+| 2  | nicht anwendbar | Kartenobjekte folgen nicht der Dichte-Staffel (MapLibre-Layer, kein antd-Element); das Panel (Schalter) ist unverändert. |
+| 3  | erfüllt | `keepPreviousData` (eigene `useQuery`): beim Pannen bleibt das Bild stehen, bis die neue Antwort da ist; Antwortzeit gemessen ≤ 28 ms (Aufgabe 3.2). |
+| 4  | nicht anwendbar | Keine kritische oder irreversible Aktion — lesen und zoomen. |
+| 5  | erfüllt | Zahl in `farbenHell.flaeche` mit Halo `farbenHell.text` auf dem Ebenen-Violett, fest in beiden Modi, weil sie auf dem Kreis und nicht auf dem Kartengrund steht; Sichtprüfung Hell/Dunkel in Aufgabe 6.3. |
+| 6  | erfüllt | Die Ebene trägt keinen Status über Farbe; Bündel unterscheiden sich vom Einzelobjekt durch Zahl und Radius, nicht nur durch Farbe. |
+| 7  | erfüllt | Ebenenfarbe `#531dab` unverändert, keine neue Farbe. |
+| 8  | offen → Folge-Task der Leitlinie | Kein Helligkeitsregler in der Anwendung (seitenübergreifend, s. Referenzvalidierung der Leitlinie). |
+| 9  | nicht anwendbar | Keine kritische Anzeige; Fachebenen sind Zusatzinformation. |
+| 10 | nicht anwendbar | Die Ebene erzeugt keine Alarme. |
+| 11 | erfüllt | Kein Blinken; offline wird als Panel-Status angezeigt. |
+| 12 | erfüllt | Neue Daten ersetzen die Ebene auf der Karte, nicht Listeneinträge unter dem Cursor; das Karten-Layout verschiebt sich nicht (kein Layout-Element, kein CLS). |
+| 13 | nicht anwendbar | Kein neues fixiertes Element; der entfallene Zoom-Hinweis war das einzige hinzugekommene/entfernte Element. |
+| 14 | nicht anwendbar | Keine Tabelle. |
+| 15 | nicht anwendbar | Keine Erfassungsmaske. |
 
 ## Migration Plan
 
