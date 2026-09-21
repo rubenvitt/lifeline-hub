@@ -661,8 +661,33 @@ describe('FachebenenInspector — Energieanlagen (LFH-81)', () => {
         onSchliessen={() => {}}
       />,
     );
-    expect(screen.queryByRole('link')).toBeNull();
+    // Nur der Lizenzlink bleibt — die Nummer selbst ist kein Link.
+    expect(screen.queryByRole('link', { name: 'SEE900000000002' })).toBeNull();
     expect(screen.getByText('SEE900000000002')).toBeInTheDocument();
+  });
+
+  it('MaStR-Herkunft nennt die Datenlizenz als Link (design.md, Entscheidung 5)', () => {
+    for (const herkunft of ['mastr', 'osm+mastr']) {
+      const { unmount } = render(
+        <FachebenenInspector
+          quelle="energie"
+          properties={{ ...scholven, herkunft, mastr_nummer: 'SEE1', mastr_id: 1 }}
+          onSchliessen={() => {}}
+        />,
+      );
+      const link = screen.getByRole('link', {
+        name: 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+      });
+      expect(link).toHaveAttribute('href', 'https://www.govdata.de/dl-de/by-2-0');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link.getAttribute('rel')?.split(' ').sort()).toEqual(['noopener', 'noreferrer']);
+      unmount();
+    }
+  });
+
+  it('reine OSM-Herkunft trägt keinen Lizenzlink', () => {
+    render(<FachebenenInspector quelle="energie" properties={scholven} onSchliessen={() => {}} />);
+    expect(screen.queryByText('Datenlizenz Deutschland – Namensnennung – Version 2.0')).toBeNull();
   });
 
   it('bildet alle elf Anlagenarten auf ein deutsches Wort ab', () => {

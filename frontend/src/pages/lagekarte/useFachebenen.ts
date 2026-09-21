@@ -9,11 +9,13 @@ import {
 } from '../../api/fachebenen';
 import {
   BBOX_MIN_ZOOM,
+  energieNennung,
   FACHEBENEN,
   fachebeneKeys,
   fachebeneTakt,
   istBboxAbhaengig,
-  mergeFeatures,
+  mergeEnergieFeatures,
+  NENNUNG_TRENNER,
 } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import { faerbeHochwasser } from './hochwasserStil';
@@ -70,9 +72,13 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   // Energie akkumuliert: einmal geladene Anlagen bleiben sichtbar (auch beim Rauszoomen oder
   // Wechsel des Gebiets), statt bei jedem Fetch ersetzt zu werden — anders als KRITIS liefert
   // ihr bbox-Fetch nur den Ausschnitt, keinen vollständigen Bestand (s. o.). Dedup über die
-  // Koordinate.
+  // Koordinate, neuere Fassung gewinnt und löst absorbierte MaStR-Einzelpunkte ab
+  // (`mergeEnergieFeatures`, LFH-81).
   const energieSammlungRef = useRef(new Map<string, Feature>());
   const [energieAkku, setEnergieAkku] = useState<FeatureCollection>(leereFc());
+  // In Energie-Antworten gesehene Nennungsteile (LFH-81). Gezeigt wird davon, was die
+  // gesammelten Punkte tragen (`energieNennung`) — nicht die Nennung der letzten Antwort.
+  const [energieTeile, setEnergieTeile] = useState<string[]>([]);
 
   const kritis = useQuery({
     queryKey: globalKeys.fachebeneKritis(viewportBbox),
@@ -214,10 +220,17 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       }
 
       const fachebenenAttribution = fachebeneKeys()
-        .filter(
-          (k) => fachebenenSichtbar[k] && byKey[k].data && byKey[k].data!.status !== 'offline',
-        )
-        .map((k) => byKey[k].data!.attribution)
+        .map((k) => {
+          if (!fachebenenSichtbar[k]) return '';
+          // Energie nennt, was gezeichnet wird: die akkumulierte Sammlung kann Punkte aus
+          // früheren Ausschnitten tragen, deren Quelle die letzte Antwort nicht mehr nennt
+          // (LFH-81). Deshalb auch unabhängig vom Status — gesammelte Punkte stehen auch
+          // bei `offline` auf der Karte.
+          if (k === 'energie')
+            return energieNennung(energieTeile, energieAkku.features).join(NENNUNG_TRENNER);
+          const d = byKey[k].data;
+          return d && d.status !== 'offline' ? d.attribution : '';
+        })
         .filter(Boolean);
 
       return {
@@ -227,6 +240,12 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         fachebenenAttribution,
         // Rohdaten für die Energie-Akkumulation (der Akku selbst geht via `energieAkku` ein).
         energieRoh: byKey.energie.data?.features,
+        // Nennungsteile der aktuellen Energie-Antwort (nur bei online-Status, nie leer) — die
+        // Sammlung der GESEHENEN Teile (`energieTeile`) füllt sich daraus, s. u.
+        energieAttributionRoh:
+          byKey.energie.data && byKey.energie.data.status !== 'offline'
+            ? byKey.energie.data.attribution
+            : undefined,
         // Status der Autobahn-Ebene für den Aufwärm-Takt (siehe `refetchInterval` oben).
         // `isError` gehört dazu wie in der Statuszeile darüber: react-query HÄLT bei einem
         // gescheiterten Refetch die vorigen `data` — ohne den Zweig meldete die Ableitung
@@ -243,9 +262,26 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     const fc = kombiniert.energieRoh;
     if (!fc) return;
     const sammlung = energieSammlungRef.current;
-    if (!mergeFeatures(sammlung, fc.features, ENERGIE_AKKU_MAX)) return;
+    if (!mergeEnergieFeatures(sammlung, fc.features, ENERGIE_AKKU_MAX)) return;
     setEnergieAkku({ type: 'FeatureCollection', features: [...sammlung.values()] });
   }, [kombiniert.energieRoh]);
+
+  // Nennungsteile der Energie-Antworten sammeln sich über die Zeit — gezeigt wird, was die
+  // akkumulierten Punkte tatsächlich tragen (`energieNennung`), nicht die letzte Antwort
+  // allein (LFH-81).
+  useEffect(() => {
+    const attribution = kombiniert.energieAttributionRoh;
+    if (!attribution) return;
+    const neu = attribution
+      .split(NENNUNG_TRENNER)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    // Bestand zurückgeben, wenn nichts Neues dabei ist — sonst rendert jeder Refetch neu.
+    setEnergieTeile((alt) => {
+      const dazu = neu.filter((t) => !alt.includes(t));
+      return dazu.length ? [...alt, ...dazu] : alt;
+    });
+  }, [kombiniert.energieAttributionRoh]);
 
   // Setzen mit demselben Wert ist in React ein No-op → keine Renderschleife.
   useEffect(() => {

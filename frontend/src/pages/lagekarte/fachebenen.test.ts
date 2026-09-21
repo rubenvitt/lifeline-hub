@@ -11,6 +11,8 @@ import {
   rasterBbox,
   WELT_BBOX,
   rasterWeite,
+  mergeEnergieFeatures,
+  energieNennung,
 } from './fachebenen';
 
 // Minimaler Feature-Builder für die Merge-Tests.
@@ -298,5 +300,125 @@ describe('mergeFeatures', () => {
     expect(m.size).toBe(2);
     expect(m.has(JSON.stringify([1, 1]))).toBe(false); // ältester entfernt
     expect(m.has(JSON.stringify([3, 3]))).toBe(true);
+  });
+});
+
+// Energie-Feature mit Properties (LFH-81): Koordinate + Herkunft + MaStR-Angaben.
+const energie = (lon: number, lat: number, props: Record<string, unknown>) => ({
+  type: 'Feature' as const,
+  geometry: { type: 'Point', coordinates: [lon, lat] },
+  properties: props,
+});
+
+describe('mergeEnergieFeatures (LFH-81)', () => {
+  it('überschreibt ein Feature an derselben Koordinate mit der neueren Fassung', () => {
+    // Teilausfall: zuerst kam nur der OSM-Teil, danach dieselbe Anlage mit amtlichen Angaben.
+    const m = new Map();
+    mergeEnergieFeatures(m, [energie(7, 51, { herkunft: 'osm', leistung_mw: null })], 100);
+    const neu = energie(7, 51, {
+      herkunft: 'osm+mastr',
+      leistung_mw: 690,
+      mastr_nummer: 'SEE1',
+      mastr_nummern: 'SEE1',
+    });
+    expect(mergeEnergieFeatures(m, [neu], 100)).toBe(true);
+    expect(m.size).toBe(1);
+    expect(m.get(JSON.stringify([7, 51]))?.properties).toEqual(neu.properties);
+  });
+
+  it('meldet keine Änderung, wenn dieselbe Fassung noch einmal kommt', () => {
+    const m = new Map();
+    mergeEnergieFeatures(m, [energie(7, 51, { herkunft: 'osm' })], 100);
+    expect(mergeEnergieFeatures(m, [energie(7, 51, { herkunft: 'osm' })], 100)).toBe(false);
+  });
+
+  it('entfernt reine MaStR-Punkte, deren Nummer ein osm+mastr-Punkt schon trägt', () => {
+    // Im Ausfall stand die Einheit als eigener MaStR-Punkt da; später ordnet das Backend sie
+    // einer OSM-Anlage zu. Ohne Bereinigung stünde dieselbe Anlage doppelt auf der Karte.
+    const m = new Map();
+    mergeEnergieFeatures(
+      m,
+      [
+        energie(7.01, 51.01, { herkunft: 'mastr', mastr_nummer: 'SEE2' }),
+        energie(8, 52, { herkunft: 'mastr', mastr_nummer: 'SEE9' }),
+      ],
+      100,
+    );
+    expect(
+      mergeEnergieFeatures(
+        m,
+        [
+          energie(7, 51, {
+            herkunft: 'osm+mastr',
+            mastr_nummer: 'SEE1',
+            mastr_nummern: 'SEE1,SEE2',
+          }),
+        ],
+        100,
+      ),
+    ).toBe(true);
+    expect(m.has(JSON.stringify([7.01, 51.01]))).toBe(false);
+    // Eine fremde Nummer bleibt stehen.
+    expect(m.has(JSON.stringify([8, 52]))).toBe(true);
+    expect(m.size).toBe(2);
+  });
+
+  it('entfernt auch, wenn der MaStR-Punkt erst NACH dem osm+mastr-Punkt eintrifft', () => {
+    const m = new Map();
+    mergeEnergieFeatures(
+      m,
+      [
+        energie(7, 51, {
+          herkunft: 'osm+mastr',
+          mastr_nummer: 'SEE1',
+          mastr_nummern: 'SEE1, SEE2',
+        }),
+      ],
+      100,
+    );
+    mergeEnergieFeatures(
+      m,
+      [energie(7.01, 51.01, { herkunft: 'mastr', mastr_nummer: 'SEE2' })],
+      100,
+    );
+    expect(m.size).toBe(1);
+  });
+});
+
+describe('mergeFeatures bleibt first-wins (KRITIS)', () => {
+  it('behält das zuerst gesehene Feature an einer Koordinate', () => {
+    const m = new Map();
+    mergeFeatures(m, [energie(7, 51, { name: 'alt' })], 100);
+    expect(mergeFeatures(m, [energie(7, 51, { name: 'neu' })], 100)).toBe(false);
+    expect(m.get(JSON.stringify([7, 51]))?.properties).toEqual({ name: 'alt' });
+  });
+});
+
+describe('energieNennung (LFH-81)', () => {
+  const OSM = '© OpenStreetMap-Beitragende (ODbL)';
+  const MASTR = 'Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0';
+
+  it('nennt MaStR, solange die Sammlung einen Punkt mit MaStR-Anteil hat', () => {
+    const fs = [energie(7, 51, { herkunft: 'osm' }), energie(8, 52, { herkunft: 'mastr' })];
+    expect(energieNennung([OSM, MASTR], fs)).toEqual([OSM, MASTR]);
+  });
+
+  it('osm+mastr trägt beide Nennungen', () => {
+    expect(energieNennung([OSM, MASTR], [energie(7, 51, { herkunft: 'osm+mastr' })])).toEqual([
+      OSM,
+      MASTR,
+    ]);
+  });
+
+  it('ohne jeden MaStR-Punkt keine MaStR-Nennung', () => {
+    expect(energieNennung([OSM, MASTR], [energie(7, 51, { herkunft: 'osm' })])).toEqual([OSM]);
+  });
+
+  it('ein Punkt ohne Herkunft trägt beide Nennungen (lieber zu viel als zu wenig)', () => {
+    expect(energieNennung([OSM, MASTR], [energie(7, 51, {})])).toEqual([OSM, MASTR]);
+  });
+
+  it('ohne Punkte keine Nennung', () => {
+    expect(energieNennung([OSM, MASTR], [])).toEqual([]);
   });
 });

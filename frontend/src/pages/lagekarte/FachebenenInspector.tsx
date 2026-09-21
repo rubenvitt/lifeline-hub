@@ -521,6 +521,16 @@ function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
       {einheiten != null && (
         <Descriptions.Item label="MaStR-Einheiten">{einheiten}</Descriptions.Item>
       )}
+      {/* Die Lizenz verlangt die Nennung samt Verweis auf den Lizenztext (design.md,
+          Entscheidung 5). Die Attributionszeile der Karte ist Klartext und kann keinen Link
+          tragen — der Verweis steht deshalb hier, an jedem Punkt mit MaStR-Anteil. */}
+      {ausMastr && (
+        <Descriptions.Item label="Lizenz">
+          <a href="https://www.govdata.de/dl-de/by-2-0" target="_blank" rel="noopener noreferrer">
+            Datenlizenz Deutschland – Namensnennung – Version 2.0
+          </a>
+        </Descriptions.Item>
+      )}
     </Descriptions>
   );
 }

@@ -102,6 +102,27 @@ const fx = vi.hoisted(() => {
       [7.3, 51.5],
     ]),
     energieB: fc([[7.4, 51.45]]),
+    // Quellennennung (LFH-81): ein Ausschnitt mit MaStR-Anteil, einer mit reinem OSM.
+    energieMastr: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [7.6, 51.2] },
+          properties: { herkunft: 'mastr', mastr_nummer: 'SEE1' },
+        },
+      ],
+    } as FeatureCollection,
+    energieOsm: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [8.6, 52.2] },
+          properties: { herkunft: 'osm' },
+        },
+      ],
+    } as FeatureCollection,
   };
 });
 
@@ -149,6 +170,23 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           attribution: '© LHP',
           stand: null,
           features: fx.hochwasser,
+        });
+      if (quelle === 'energie' && bbox === 'bbox-mastr')
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution:
+            '© OpenStreetMap-Beitragende (ODbL) · Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0',
+          stand: null,
+          features: fx.energieMastr,
+        });
+      if (quelle === 'energie' && (bbox === 'bbox-osm' || bbox === 'bbox-osm2'))
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: '© OpenStreetMap-Beitragende (ODbL)',
+          stand: null,
+          features: fx.energieOsm,
         });
       if (quelle === 'kritis')
         return Promise.resolve({
@@ -631,5 +669,46 @@ describe('useFachebenen', () => {
     const vorher = result.current.aktiveFachebenen;
     rerender();
     expect(result.current.aktiveFachebenen).toBe(vorher);
+  });
+  it('behält die MaStR-Nennung nach dem Pannen in reines OSM-Gebiet (LFH-81)', async () => {
+    const MASTR = 'Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0';
+    const OSM = '© OpenStreetMap-Beitragende (ODbL)';
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setViewportBbox('bbox-mastr'));
+    await waitFor(() => expect(result.current.fachebenenAttribution.join(' · ')).toContain(MASTR));
+
+    // Die letzte Antwort nennt nur noch OSM — gezeichnet werden aber weiter die gesammelten
+    // MaStR-Punkte, und die tragen die Lizenzpflicht mit.
+    act(() => result.current.setViewportBbox('bbox-osm'));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(2),
+    );
+    const zeile = result.current.fachebenenAttribution.join(' · ');
+    expect(zeile).toContain(MASTR);
+    expect(zeile).toContain(OSM);
+  });
+
+  it('nennt MaStR nicht, solange kein MaStR-Punkt gesammelt ist (LFH-81)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setViewportBbox('bbox-osm'));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(1),
+    );
+    const zeile = result.current.fachebenenAttribution.join(' · ');
+    expect(zeile).toContain('© OpenStreetMap-Beitragende (ODbL)');
+    expect(zeile).not.toContain('Marktstammdatenregister');
+  });
+
+  it('die KRITIS-Nennung bleibt die der Antwort (LFH-81)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('kritis', true));
+    act(() => result.current.setViewportBbox('bbox1'));
+    await waitFor(() => expect(result.current.fachebenenAttribution).toEqual(['© KRITIS']));
   });
 });

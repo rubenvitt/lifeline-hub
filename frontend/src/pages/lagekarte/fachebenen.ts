@@ -289,3 +289,106 @@ export function mergeFeatures(
   }
   return geaendert;
 }
+
+/** Koordinate als Schlüssel der Sammlung — dieselbe Form wie in {@link mergeFeatures}. */
+const koordinatenSchluessel = (f: Feature) => JSON.stringify(f.geometry?.coordinates ?? null);
+
+const herkunftVon = (f: Feature): string => {
+  const h = f.properties?.herkunft;
+  return typeof h === 'string' ? h : '';
+};
+
+/**
+ * Merge der Energie-Ebene (LFH-81). Anders als {@link mergeFeatures} (first-wins, für
+ * KRITIS unverändert) GEWINNT hier die neuere Fassung an derselben Koordinate: nach einem
+ * Teilausfall des MaStR-Teils kommt dieselbe OSM-Anlage später als `osm+mastr` mit
+ * amtlicher Leistung und Nummer zurück — first-wins behielte die ärmere Fassung für immer.
+ *
+ * Danach fallen reine `mastr`-Punkte weg, deren `mastr_nummer` ein `osm+mastr`-Punkt der
+ * Sammlung in seinen `mastr_nummern` führt: im Ausfall stand die Einheit als eigener Punkt
+ * da, jetzt ist sie einer OSM-Anlage zugeordnet und stünde sonst doppelt auf der Karte (an
+ * verschiedenen Koordinaten, deshalb greift die Koordinaten-Deduplizierung dort nicht).
+ * Die Bereinigung läuft über die GANZE Sammlung, nicht nur über den neuen Stand — die
+ * Reihenfolge des Eintreffens darf das Ergebnis nicht ändern.
+ *
+ * Mutiert `sammlung`; true bei Änderung. Eine inhaltsgleiche Fassung gilt NICHT als
+ * Änderung, sonst liefe jeder Refetch als neues Objekt durch die Karte.
+ */
+export function mergeEnergieFeatures(
+  sammlung: Map<string, Feature>,
+  neue: Feature[],
+  max: number,
+): boolean {
+  let geaendert = false;
+  for (const f of neue) {
+    const key = koordinatenSchluessel(f);
+    const alt = sammlung.get(key);
+    if (alt !== undefined && JSON.stringify(alt) === JSON.stringify(f)) continue;
+    // `Map.set` auf einen vorhandenen Schlüssel behält dessen Position — die
+    // Älteste-zuerst-Kappung unten bleibt damit an der ersten Sichtung ausgerichtet.
+    sammlung.set(key, f);
+    geaendert = true;
+  }
+
+  const zugeordnet = new Set<string>();
+  for (const f of sammlung.values()) {
+    if (herkunftVon(f) !== 'osm+mastr') continue;
+    const nummern = f.properties?.mastr_nummern;
+    if (typeof nummern !== 'string') continue;
+    for (const n of nummern.split(',')) {
+      const t = n.trim();
+      if (t) zugeordnet.add(t);
+    }
+  }
+  if (zugeordnet.size > 0) {
+    for (const [key, f] of sammlung) {
+      const nummer = f.properties?.mastr_nummer;
+      if (herkunftVon(f) === 'mastr' && typeof nummer === 'string' && zugeordnet.has(nummer)) {
+        sammlung.delete(key);
+        geaendert = true;
+      }
+    }
+  }
+
+  if (geaendert) {
+    while (sammlung.size > max) {
+      const aeltester = sammlung.keys().next().value;
+      if (aeltester === undefined) break;
+      sammlung.delete(aeltester);
+    }
+  }
+  return geaendert;
+}
+
+/** Trenner der Nennungsteile in der `attribution` einer Antwort (design.md, Entscheidung 5). */
+export const NENNUNG_TRENNER = ' · ';
+
+/**
+ * Quellennennung der Energie-Ebene aus der GEZEICHNETEN Sammlung (LFH-81), nicht aus der
+ * letzten Antwort: die Sammlung akkumuliert über Ausschnitte, und nach dem Pannen in reines
+ * OSM-Gebiet stünden sonst MaStR-Punkte ohne die dl-de/by-2-0-Nennung auf der Karte — die
+ * Lizenz verlangt sie aber für jeden gezeigten Datensatz.
+ *
+ * `teile` sind die in bisherigen Antworten gesehenen Nennungsteile. Ein Teil mit
+ * „OpenStreetMap" bleibt, solange ein Punkt mit `osm` in der Herkunft gesammelt ist, einer
+ * mit „Marktstammdatenregister" entsprechend für `mastr`. Ein Teil, der keiner der beiden
+ * Quellen zuzuordnen ist, bleibt, solange überhaupt ein Punkt gezeigt wird. Ein Punkt ohne
+ * Herkunft trägt beide Nennungen. Rein.
+ */
+export function energieNennung(teile: readonly string[], features: readonly Feature[]): string[] {
+  if (features.length === 0) return [];
+  let osm = false;
+  let mastr = false;
+  for (const f of features) {
+    const h = herkunftVon(f);
+    // Ohne Herkunft ist nicht entscheidbar, woher der Punkt stammt — dann beide Nennungen:
+    // eine überzählige Nennung schadet nicht, eine fehlende verletzt die Lizenz.
+    if (!h || h.includes('osm')) osm = true;
+    if (!h || h.includes('mastr')) mastr = true;
+  }
+  return teile.filter((t) => {
+    if (t.includes('OpenStreetMap')) return osm;
+    if (t.includes('Marktstammdatenregister')) return mastr;
+    return true;
+  });
+}
