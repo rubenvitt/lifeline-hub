@@ -15,7 +15,10 @@ Das System SHALL die Fachebene unter `GET /api/karte/fachebenen/energie` auslief
 Parameter `bbox` (`west,sued,ost,nord`) MUST gesetzt sein. Die Antwort SHALL denselben
 Umschlag haben wie jede andere Fachebene (`quelle`, `status`, `attribution`, `stand`,
 `features` als GeoJSON-FeatureCollection aus Punkten). Sie SHALL nur Anlagen enthalten,
-deren Punkt innerhalb der bbox liegt.
+deren Punkt innerhalb der bbox liegt. Die eine Ausnahme ist eine zusammengeführte Anlage
+(`osm+mastr`), deren MaStR-Einheit in der bbox liegt: ihr Punkt steht am OSM-Standort und
+darf bis zum Zuordnungsradius außerhalb liegen. Benachbarte Ausschnitte SHALL für dieselbe
+Anlage denselben Punkt liefern.
 
 #### Scenario: Ohne bbox
 
@@ -31,6 +34,13 @@ deren Punkt innerhalb der bbox liegt.
 
 - **WHEN** der Cache eine Anlage innerhalb und eine außerhalb der angefragten bbox enthält
 - **THEN** enthält die Antwort nur die Anlage innerhalb der bbox
+
+#### Scenario: Anlage an der Kante des Ausschnitts
+
+- **WHEN** eine MaStR-Einheit knapp innerhalb der bbox liegt und ihre OSM-Anlage derselben
+  Anlagenart weniger als 2 km entfernt knapp außerhalb
+- **THEN** zeigt die Ebene in diesem und im Nachbarausschnitt denselben einen Punkt mit
+  Herkunft `osm+mastr` am OSM-Standort
 
 ### Requirement: Kein Kleinanlagen-Rauschen
 
@@ -73,7 +83,9 @@ festen Menge (Kohle, Gas, Öl, Kernenergie, Abfall, Wasser, Wind, Solar, Biomass
 Speicher, Sonstige), die elektrische Leistung in MW oder den Vermerk „unbekannt“, den
 Betreiber, falls bekannt, sowie die Herkunft (`osm`, `mastr` oder `osm+mastr`). Stammt
 eine Angabe aus dem Marktstammdatenregister, SHALL der Punkt die MaStR-Nummer der Einheit
-tragen.
+tragen, und dazu `mastr_nummern` mit den Nummern aller zugeordneten Einheiten, sortiert
+und durch Kommas ohne Leerzeichen getrennt. `mastr_nummern` ist `null`, wenn keine zugeordnete
+Einheit eine Nummer trägt, insbesondere ohne MaStR-Anteil.
 
 #### Scenario: Leistungsangabe in OSM als Text
 
@@ -141,6 +153,14 @@ warten zu lassen.
 
 - **WHEN** Overpass antwortet, MaStR aber nicht
 - **THEN** enthält die Antwort die OSM-Anlagen, und `status` ist nicht `offline`
+
+#### Scenario: MaStR antwortet langsam
+
+- **WHEN** der Cache leer ist, Overpass sofort antwortet und der MaStR-Abruf länger als
+  10 Sekunden braucht
+- **THEN** antwortet das System nach höchstens 10 Sekunden mit den OSM-Anlagen, der
+  MaStR-Abruf läuft im Hintergrund weiter und legt seinen Stand in den Cache, und die
+  gerissene Frist setzt keine Sperre
 
 ### Requirement: Bedienung in der Lagekarte
 

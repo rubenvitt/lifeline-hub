@@ -896,7 +896,12 @@ async fn fachebenen_energie_wird_aus_beiden_teilen_bedient() {
             "properties": {
                 "titel": titel, "anlagenart": art, "leistung_mw": 15.0,
                 "betreiber": null, "betriebsstatus": null, "herkunft": herkunft,
-                "mastr_nummer": null, "mastr_id": null, "mastr_einheiten": null
+                "mastr_nummer": if herkunft == "mastr" {
+                    serde_json::json!(format!("SEE{}", (lon * 1000.0) as i64))
+                } else {
+                    serde_json::Value::Null
+                },
+                "mastr_id": null, "mastr_einheiten": null
             }
         })
     };
@@ -946,6 +951,21 @@ async fn fachebenen_energie_wird_aus_beiden_teilen_bedient() {
     assert_eq!(titel.len(), 2, "{titel:?}");
     assert!(titel.contains(&"Kraftwerk Scholven"));
     assert!(titel.contains(&"Batteriespeicher Herne"));
+    // Wire-Feld `mastr_nummern` (Review-Befund 3): bei MaStR-Anteil die Nummern, sonst null —
+    // auch wenn der Cache-Stand das Feld noch gar nicht trägt.
+    let props = |t: &str| {
+        v["features"]["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["properties"]["titel"] == t)
+            .unwrap()["properties"]
+            .clone()
+    };
+    assert_eq!(props("Batteriespeicher Herne")["mastr_nummern"], "SEE7190");
+    let scholven = props("Kraftwerk Scholven");
+    assert!(scholven.as_object().unwrap().contains_key("mastr_nummern"));
+    assert_eq!(scholven["mastr_nummern"], serde_json::Value::Null);
 }
 
 // ===== Admin-CRUD: Online-Quellen =====

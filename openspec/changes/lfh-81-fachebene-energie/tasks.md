@@ -38,8 +38,9 @@ Test, dann der Code, dann grün.
   Belegt durch Unit-Tests auf die reinen Teile (Filter-URL als Literal, Entscheidung über
   die Sperre nach dem Muster von `autobahn_darf_starten`).
 - [x] 2.2 `fetch_energie`: beide Teile über `liefere_mit_swr` mit den Schlüsseln
-  `energie:osm:<bbox>` und `energie:mastr`, kalte Pfade parallel, Status `offline` nur
-  ohne jeden Teilstand. Belegt durch Tests mit vorbelegtem Cache (Muster
+  `energie:osm:<bbox>` und `energie:mastr`. Kalte Abrufe laufen als eigene Task weiter;
+  die Anfrage wartet höchstens 10 s (Nachtrag aus dem Review). Status `offline` nur ohne
+  jeden Teilstand. Belegt durch Tests mit vorbelegtem Cache (Muster
   `swr_tests`/`fachebenen_hochwasser_wird_bedient`) für „nur OSM“, „beide“ und „keine“.
 - [x] 2.3 Match-Arm `"energie"` mit Pflicht-bbox in `routes/karte.rs`. Belegt durch
   Integrationstests in `tests/karte.rs`: ohne bbox 400, kaputte bbox 400, vorbelegter

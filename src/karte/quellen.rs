@@ -1,6 +1,8 @@
 //! Fetch-Logik je Quelle mit Stale-while-revalidate (SWR):
 //! frischer Cache → sofort; veralteter Cache → sofort den alten Stand ausliefern und im
 //! Hintergrund erneuern (nicht blockierend); gar kein Cache → einmalig blockierend holen.
+//! Ausnahme Energie (LFH-81): dort wird auch der kalte Abruf von der Anfrage gelöst und nur
+//! bis zu einer Wartefrist abgewartet (`liefere_geloest`).
 
 use crate::error::AppError;
 use crate::karte::cache;
@@ -9,7 +11,7 @@ use crate::karte::normalisierung::{
     energie_attribution, energie_beitraege, fuehre_energie_zusammen, kombiniere_nina,
     normalisiere_autobahn, normalisiere_energie_mastr, normalisiere_energie_osm,
     normalisiere_hochwasser, normalisiere_odl, normalisiere_pegelonline, ENERGIE_MASTR_ATTRIB,
-    ENERGIE_OSM_ATTRIB,
+    ENERGIE_OSM_ATTRIB, ENERGIE_OSM_RAND_RADIEN,
 };
 use crate::karte::odl_grundpegel::{self, GrundpegelKarte};
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
@@ -936,15 +938,24 @@ async fn erneuere_luftqualitaet(
 // Hybride Fachebene aus zwei unabhängig gecachten Teilen, die erst bei der Anfrage
 // zusammengeführt werden (design.md, Entscheidung 1):
 //
-// | Teil            | Schlüssel                    | TTL  | kalter Pfad                              |
-// |-----------------|------------------------------|------|------------------------------------------|
-// | OSM power=plant | `energie:osm:<bbox gerundet>` | 24 h | blockierend, 30 s, zwei Overpass-Endpunkte |
-// | MaStR-Abzug     | `energie:mastr` (bundesweit)  | 24 h | blockierend, 30 s, 5-min-Sperre           |
+// | Teil            | Schlüssel                    | TTL  | kalter Pfad                                    |
+// |-----------------|------------------------------|------|------------------------------------------------|
+// | OSM power=plant | `energie:osm:<bbox gerundet>` | 24 h | gelöst, 30 s je Endpunkt, Abfrage auf bbox + 6 km |
+// | MaStR-Abzug     | `energie:mastr` (bundesweit)  | 24 h | gelöst, 30 s je Seite, 5-min-Sperre            |
+//
+// „Gelöst" heißt: der Abruf läuft als eigene Task, die Anfrage wartet auf beide Teile
+// zusammen höchstens `ENERGIE_WARTE` (10 s) und antwortet dann mit dem, was da ist. Grund
+// (Review-Befund zu LFH-81): das Frontend bricht nach 15 s ab, ein blockierendes Warten auf
+// den langsameren Teil ließ die GANZE Ebene offline wirken, obwohl der andere da war — und
+// verwarf axum den Handler-Future beim Abbruch, starb der MaStR-Abruf mit ihm, ohne je die
+// Sperre zu setzen. Die Task schreibt Cache bzw. Sperre auch nach der Antwort zu Ende.
 
 /// Beide Teile ändern sich kaum → einen Tag cachen, veraltet im Hintergrund erneuern.
 const ENERGIE_TTL: Duration = Duration::from_secs(24 * 3600);
 const ENERGIE_OSM_PRAEFIX: &str = "energie:osm";
 const ENERGIE_MASTR_KEY: &str = "energie:mastr";
+/// So lange wartet eine Anfrage höchstens auf kalte Teile (beide zusammen, nicht je Teil).
+const ENERGIE_WARTE: Duration = Duration::from_secs(10);
 /// Gemessen (21.09.2026): ~7 s und 5,2 MB für den ganzen Abzug — das globale
 /// Client-Timeout (8 s) reichte dafür nicht verlässlich.
 const ENERGIE_MASTR_TIMEOUT: Duration = Duration::from_secs(30);
@@ -961,18 +972,38 @@ const ENERGIE_MASTR_SEITE: u64 = 2000;
 /// eine kaputte `Total`-Angabe davon ab, das Portal mit Seitenabrufen zu überziehen.
 const ENERGIE_MASTR_MAX_SEITEN: u64 = 10;
 
-/// Nach einem gescheiterten MaStR-Abruf ruht der Upstream fünf Minuten. **Anders als bei
-/// Autobahn** (`AUTOBAHN_ABKUEHLUNG`) schützt die Sperre hier keinen Hintergrundlauf, sondern
-/// den BLOCKIERENDEN kalten Pfad: ohne sie wartete bei gestörtem MaStR jedes Verschieben der
-/// Karte bis zu 30 s auf einen Abruf, der gerade nicht gelingen kann. Mit ihr bekommt die
-/// Anfrage sofort den OSM-Anteil. Wer das zu einem Hintergrund-Refresh „vereinheitlicht",
-/// nimmt genau diese Zusage weg.
+/// Nach einem gescheiterten MaStR-Abruf ruht der Upstream fünf Minuten. Seit der kalte
+/// Pfad gelöst ist, hält ein gestörter MaStR die Anfrage höchstens `ENERGIE_WARTE` auf; die
+/// Sperre sorgt dafür, dass es nicht bei JEDEM Verschieben der Karte so ist und dass nicht
+/// jede Anfrage einen neuen Abzug gegen ein Portal startet, das gerade nicht antwortet. Mit
+/// ihr bekommt die Anfrage sofort den OSM-Anteil. Gesetzt wird sie nur von einem echten
+/// Fehlschlag in der gelösten Task — eine gerissene Wartefrist ist keiner.
 const ENERGIE_MASTR_ABKUEHLUNG: Duration = Duration::from_secs(300);
 static ENERGIE_MASTR_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
-/// Einzelspur für den 5-MB-Abruf: der kalte Zweig von `liefere_mit_swr` kennt keinen Riegel,
-/// jeder Bediener, der die Ebene bei leerem Cache einschaltet, holte sonst seinen eigenen
-/// Abzug. Wer gewartet hat, bekommt den frischen Stand des Vorgängers aus dem Cache.
+/// Einzelspur für den 5-MB-Abruf. Die `inflight`-Marke in `liefere_geloest` hält parallele
+/// Anfragen schon davon ab, einen zweiten Abruf zu starten; die Spur ist die Rückfallebene
+/// dahinter (eine Marke gilt nur für EINE `inflight`-Menge). Wer gewartet hat, bekommt den
+/// frischen Stand des Vorgängers aus dem Cache.
 static ENERGIE_MASTR_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+
+/// Die beiden prozessweiten Riegel des MaStR-Abrufs als Naht: Produktion reicht die
+/// Statics durch ([`MastrRiegel::prozess`]), ein Test seine eigenen. Ohne die Naht schrieben
+/// parallel laufende Tests dieselbe Fehlschlag-Uhr — ein Test, der die Sperre setzt, hielte
+/// einen zweiten, der gerade abrufen will, still an.
+#[derive(Clone, Copy)]
+struct MastrRiegel {
+    fehlschlag: &'static Mutex<Option<std::time::Instant>>,
+    spur: &'static tokio::sync::Mutex<()>,
+}
+
+impl MastrRiegel {
+    fn prozess() -> Self {
+        MastrRiegel {
+            fehlschlag: &ENERGIE_MASTR_FEHLSCHLAG,
+            spur: ENERGIE_MASTR_EINZELSPUR.get_or_init(|| tokio::sync::Mutex::new(())),
+        }
+    }
+}
 
 /// Zuordnungsradius OSM-Anlage ↔ MaStR-Einheit (design.md, Entscheidung 4), **gemessen**
 /// am 21.09.2026 (Aufgabe 2.4): 18 zufällige MaStR-Einheiten (je 6 Wasser, Speicher, Solar,
@@ -1020,6 +1051,15 @@ fn energie_overpass_query(bbox_op: &str) -> String {
     format!("[out:json][timeout:25];nwr[power=plant]({bbox_op});out center tags;")
 }
 
+/// Overpass-Abfrage für einen Ausschnitt: auf den um [`ENERGIE_OSM_RAND_RADIEN`]
+/// Zuordnungsradien erweiterten Rand, damit die Zusammenführung an der Kante jede Anlage
+/// sieht, die eine Einheit im Ausschnitt an sich ziehen kann (siehe
+/// [`fuehre_energie_zusammen`]). Der Cache-Schlüssel bleibt am ORIGINAL-Raster.
+fn energie_osm_abfrage(bbox: &Bbox) -> String {
+    let rand = bbox.erweitert_um_m(ENERGIE_OSM_RAND_RADIEN * ENERGIE_RADIUS_M);
+    energie_overpass_query(&rand.overpass())
+}
+
 pub async fn fetch_energie(
     s: &FachebenenState,
     pool: &SqlitePool,
@@ -1037,18 +1077,28 @@ pub async fn fetch_energie(
         pool,
         &s.inflight,
         bbox,
+        ENERGIE_WARTE,
         move || erneuere_energie_osm(c1, p1, bbox, key),
-        move || erneuere_energie_mastr(c2, p2),
+        move || {
+            erneuere_energie_mastr(p2, MastrRiegel::prozess(), move || async move {
+                hole_mastr(&c2).await
+            })
+        },
     )
     .await)
 }
 
-/// Kern von [`fetch_energie`] mit austauschbaren Abrufen — so sind die Teilausfall-Fälle ohne
-/// Netz prüfbar (Muster `swr_tests`).
+/// Kern von [`fetch_energie`] mit austauschbaren Abrufen und Wartefrist — so sind
+/// Teilausfall, langsame und scheiternde Teile ohne Netz und ohne Uhr prüfbar.
+///
+/// `warte` gilt für die ganze Anfrage: beide Teile warten nebenläufig bis zu DEMSELBEN
+/// Zeitpunkt, jeder für sich. Ein gemeinsames `timeout` um beide verlöre bei Ablauf auch den
+/// Teil, der längst da ist — genau das, was die Frist verhindern soll.
 async fn energie_kern<F1, F2>(
     pool: &SqlitePool,
     inflight: &Arc<Mutex<HashSet<String>>>,
     bbox: Bbox,
+    warte: Duration,
     erneuere_osm: impl FnOnce() -> F1,
     erneuere_mastr: impl FnOnce() -> F2,
 ) -> FachebeneAntwort
@@ -1057,20 +1107,97 @@ where
     F2: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
 {
     let osm_key = bbox.cache_key_mit(ENERGIE_OSM_PRAEFIX);
-    let offline = || FachebeneAntwort::offline("energie", "");
-    // Beide kalten Pfade nebenläufig: gewartet wird so lange wie der langsamere, nicht die Summe.
+    let bis = tokio::time::Instant::now() + warte;
     let (osm, mastr) = tokio::join!(
-        liefere_mit_swr(pool, inflight, &osm_key, ENERGIE_TTL, offline, erneuere_osm),
-        liefere_mit_swr(
+        liefere_geloest(pool, inflight, &osm_key, ENERGIE_TTL, bis, erneuere_osm),
+        liefere_geloest(
             pool,
             inflight,
             ENERGIE_MASTR_KEY,
             ENERGIE_TTL,
-            offline,
+            bis,
             erneuere_mastr
         ),
     );
-    baue_energie_antwort(&osm, &mastr, &bbox)
+    let offline = || FachebeneAntwort::offline("energie", "");
+    baue_energie_antwort(
+        &osm.unwrap_or_else(offline),
+        &mastr.unwrap_or_else(offline),
+        &bbox,
+    )
+}
+
+/// SWR mit **gelöstem** kalten Pfad — die Energie-Variante von [`liefere_mit_swr`], deren
+/// kalter Zweig bewusst unverändert blockiert (die übrigen Ebenen hängen daran).
+///
+/// Frisch und veraltet wie dort. Kalt wird der Abruf per `tokio::spawn` von der Anfrage
+/// gelöst und nur bis `bis` abgewartet. Reißt er die Frist, trägt der Teil zu DIESER Antwort
+/// nichts bei (`None`) — der Abruf läuft aber weiter und schreibt Cache bzw. MaStR-Sperre
+/// zu Ende, auch wenn axum den Handler-Future verwirft, weil der Client abgebrochen hat.
+/// Holt schon eine andere Anfrage denselben Schlüssel, wartet diese hier nicht und trägt
+/// nichts bei: ein zweiter Abruf wäre doppelte Last, ein Nachpollen des Cache holte die
+/// Uhr zurück in die Antwort; die nächste Anfrage trifft den Cache.
+async fn liefere_geloest<Fut>(
+    pool: &SqlitePool,
+    inflight: &Arc<Mutex<HashSet<String>>>,
+    key: &str,
+    ttl: Duration,
+    bis: tokio::time::Instant,
+    erneuere: impl FnOnce() -> Fut,
+) -> Option<FachebeneAntwort>
+where
+    Fut: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
+{
+    match cache::eintrag(pool, key).await {
+        Some((a, alter)) if alter < ttl.as_secs() as i64 => Some(a),
+        Some((a, _)) => {
+            loese_ab(inflight, key, erneuere); // veraltet: Stand sofort, Refresh im Hintergrund
+            Some(a)
+        }
+        None => {
+            let abruf = loese_ab(inflight, key, erneuere)?;
+            // Fällt der `JoinHandle` hier weg (Frist, Abbruch), läuft die Task trotzdem weiter.
+            tokio::time::timeout_at(bis, abruf).await.ok()?.ok()?
+        }
+    }
+}
+
+/// Startet `erneuere` als eigene Task, sofern niemand den Schlüssel schon holt. Die
+/// `inflight`-Marke fällt über [`InflightFreigabe`] auch dann, wenn der Abruf panikt — sonst
+/// bliebe der Schlüssel bis zum Neustart gesperrt.
+fn loese_ab<Fut>(
+    inflight: &Arc<Mutex<HashSet<String>>>,
+    key: &str,
+    erneuere: impl FnOnce() -> Fut,
+) -> Option<tokio::task::JoinHandle<Option<FachebeneAntwort>>>
+where
+    Fut: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
+{
+    if !inflight.lock().unwrap().insert(key.to_string()) {
+        return None;
+    }
+    let freigabe = InflightFreigabe {
+        inflight: inflight.clone(),
+        key: key.to_string(),
+    };
+    let abruf = erneuere();
+    Some(tokio::spawn(async move {
+        let _freigabe = freigabe;
+        abruf.await
+    }))
+}
+
+struct InflightFreigabe {
+    inflight: Arc<Mutex<HashSet<String>>>,
+    key: String,
+}
+
+impl Drop for InflightFreigabe {
+    fn drop(&mut self) {
+        // Nie mit Panik im Drop: ein vergifteter Mutex hält die Menge trotzdem.
+        let mut menge = self.inflight.lock().unwrap_or_else(|e| e.into_inner());
+        menge.remove(&self.key);
+    }
 }
 
 /// Setzt die Antwort aus den beiden Teilen zusammen.
@@ -1112,12 +1239,7 @@ async fn erneuere_energie_osm(
     bbox: Bbox,
     key: String,
 ) -> Option<FachebeneAntwort> {
-    let roh = hole_overpass(
-        &client,
-        &energie_overpass_query(&bbox.overpass()),
-        "Energie",
-    )
-    .await?;
+    let roh = hole_overpass(&client, &energie_osm_abfrage(&bbox), "Energie").await?;
     let a = FachebeneAntwort::ok(
         "energie",
         ENERGIE_OSM_ATTRIB,
@@ -1165,27 +1287,26 @@ async fn hole_mastr(client: &reqwest::Client) -> Result<Vec<Value>, String> {
     }
 }
 
-async fn erneuere_energie_mastr(
-    client: reqwest::Client,
+async fn erneuere_energie_mastr<H, F>(
     pool: SqlitePool,
-) -> Option<FachebeneAntwort> {
-    let _spur = ENERGIE_MASTR_EINZELSPUR
-        .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock()
-        .await;
+    riegel: MastrRiegel,
+    hole: H,
+) -> Option<FachebeneAntwort>
+where
+    H: FnOnce() -> F,
+    F: Future<Output = Result<Vec<Value>, String>>,
+{
+    let _spur = riegel.spur.lock().await;
     // Wer gewartet hat, nimmt den frischen Stand des Vorgängers, statt nachzuholen.
     if let Some(a) = cache::frisch(&pool, ENERGIE_MASTR_KEY, ENERGIE_TTL.as_secs() as i64).await {
         return Some(a);
     }
-    let seit_fehlschlag = ENERGIE_MASTR_FEHLSCHLAG
-        .lock()
-        .unwrap()
-        .map(|t| t.elapsed());
+    let seit_fehlschlag = riegel.fehlschlag.lock().unwrap().map(|t| t.elapsed());
     if !mastr_darf_starten(seit_fehlschlag, ENERGIE_MASTR_ABKUEHLUNG) {
         tracing::debug!("MaStR: Abkühlung nach Fehlschlag läuft — kein neuer Abruf");
         return None;
     }
-    let ergebnis = hole_mastr(&client).await.and_then(|punkte| {
+    let ergebnis = hole().await.and_then(|punkte| {
         // Keine einzige Großanlage in Deutschland ist keine glaubwürdige Antwort.
         (!punkte.is_empty())
             .then_some(punkte)
@@ -1193,7 +1314,7 @@ async fn erneuere_energie_mastr(
     });
     match ergebnis {
         Ok(punkte) => {
-            *ENERGIE_MASTR_FEHLSCHLAG.lock().unwrap() = None;
+            *riegel.fehlschlag.lock().unwrap() = None;
             let stand = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
             let a = FachebeneAntwort::ok(
                 "energie",
@@ -1205,7 +1326,7 @@ async fn erneuere_energie_mastr(
             Some(a)
         }
         Err(e) => {
-            *ENERGIE_MASTR_FEHLSCHLAG.lock().unwrap() = Some(std::time::Instant::now());
+            *riegel.fehlschlag.lock().unwrap() = Some(std::time::Instant::now());
             tracing::warn!(
                 "MaStR-Abruf fehlgeschlagen ({e}) — Energie ohne MaStR-Anteil, Sperre 5 min"
             );
@@ -1221,6 +1342,11 @@ mod energie_tests {
     use serde_json::json;
 
     const BBOX: &str = "6.9,51.45,7.3,51.65";
+    /// Wartefrist im Test: kurz, damit kein Test an der Uhr hängt, aber mit Luft für einen
+    /// Cache-Zugriff und eine sofort fertige Task, wenn die Suite parallel unter Last läuft.
+    const FRIST: Duration = Duration::from_millis(300);
+    /// Äußere Schranke, damit ein Rückfall auf blockierendes Warten rot wird statt zu hängen.
+    const HALT: Duration = Duration::from_secs(1);
 
     fn inflight() -> Arc<Mutex<HashSet<String>>> {
         Arc::new(Mutex::new(HashSet::new()))
@@ -1308,21 +1434,240 @@ mod energie_tests {
         );
     }
 
+    /// Overpass wird auf den Ausschnitt plus drei Zuordnungsradien (6 km) gefragt — sonst
+    /// fehlt der Zusammenführung an der Kante die OSM-Anlage (Review-Befund 2). Geprüft an
+    /// den Zahlen der Abfrage, nicht über `erweitert_um_m`: das prüfte sich selbst.
+    #[test]
+    fn osm_abfrage_nimmt_den_erweiterten_ausschnitt() {
+        let q = energie_osm_abfrage(&Bbox::parse(BBOX).unwrap());
+        assert!(
+            q.starts_with("[out:json][timeout:25];nwr[power=plant]("),
+            "{q}"
+        );
+        let innen = &q[q.find('(').unwrap() + 1..q.find(')').unwrap()];
+        let z: Vec<f64> = innen.split(',').map(|t| t.parse().unwrap()).collect();
+        // sued,west,nord,ost; 6 km sind 0,054° Breite und bei ~51,7° N 0,087° Länge.
+        let soll = [51.45 - 0.054, 6.9 - 0.087, 51.65 + 0.054, 7.3 + 0.087];
+        for (ist, soll) in z.iter().zip(soll) {
+            assert!((ist - soll).abs() < 0.002, "{z:?} gegen {soll}");
+        }
+    }
+
+    /// Eigene Riegel je Test — die prozessweiten Statics teilten sich alle parallel
+    /// laufenden Tests (siehe [`MastrRiegel`]).
+    fn riegel() -> MastrRiegel {
+        MastrRiegel {
+            fehlschlag: Box::leak(Box::new(Mutex::new(None))),
+            spur: Box::leak(Box::new(tokio::sync::Mutex::new(()))),
+        }
+    }
+
+    /// Ein Abruf, der mitzählt und nie etwas liefert.
+    fn zaehlender_abruf(
+        zaehler: &Arc<std::sync::atomic::AtomicUsize>,
+    ) -> impl FnOnce() -> std::future::Ready<Result<Vec<Value>, String>> {
+        let z = zaehler.clone();
+        move || {
+            z.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            std::future::ready(Err("dieser Test erwartet keinen Abruf".into()))
+        }
+    }
+
+    /// Wartet höchstens eine Sekunde (100 × 10 ms) darauf, dass `bedingung` gilt.
+    async fn binnen_einer_sekunde<F, Fut>(bedingung: F) -> bool
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = bool>,
+    {
+        for _ in 0..100 {
+            if bedingung().await {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        false
+    }
+
     /// Die zweite Hälfte der Einzelspur: wer gewartet hat, bekommt den frischen Stand des
-    /// Vorgängers aus dem Cache, ohne selbst abzurufen. Belegt mit einem Client, der nirgends
-    /// hinkommt — eine Antwort kann dann nur aus dem Cache stammen.
+    /// Vorgängers aus dem Cache, ohne selbst abzurufen. Hermetisch: der Abruf ist eine
+    /// zählende Closure statt eines HTTP-Clients — ohne die Frisch-Prüfung zählt sie und
+    /// der Test wird rot, ohne dass ein Byte ins Netz geht.
     #[tokio::test]
     async fn wartender_bekommt_frischen_mastr_stand_ohne_abruf() {
         let pool = crate::db::test_pool().await;
         cache::setze(&pool, ENERGIE_MASTR_KEY, &mastr_teil()).await;
-        let nirgendwo = reqwest::Client::builder()
-            .timeout(Duration::from_millis(200))
-            .build()
-            .unwrap();
-        let a = erneuere_energie_mastr(nirgendwo, pool)
-            .await
-            .expect("frischer Stand wird durchgereicht");
+        let abrufe = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let a = erneuere_energie_mastr(pool, riegel(), zaehlender_abruf(&abrufe)).await;
+        assert_eq!(abrufe.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let a = a.expect("frischer Stand wird durchgereicht");
         assert_eq!(a.stand.as_deref(), Some("2026-09-21T10:00:00Z"));
+    }
+
+    /// Während der Sperre wird nicht abgerufen.
+    #[tokio::test]
+    async fn gesperrter_mastr_ruft_nicht_ab() {
+        let pool = crate::db::test_pool().await;
+        let r = riegel();
+        *r.fehlschlag.lock().unwrap() = Some(std::time::Instant::now());
+        let abrufe = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let a = erneuere_energie_mastr(pool, r, zaehlender_abruf(&abrufe)).await;
+        assert!(a.is_none());
+        assert_eq!(abrufe.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    // ---- Wartefrist und gelöster Abruf (Review-Befund 1)
+
+    #[test]
+    fn wartefrist_ist_zehn_sekunden() {
+        // Unter dem 15-s-Abbruch von `apiGet` im Frontend, mit Luft für die Zusammenführung.
+        assert_eq!(ENERGIE_WARTE, Duration::from_secs(10));
+    }
+
+    /// Spec „Nur OSM erreichbar": ein langsamer MaStR darf die Antwort nicht über die Frist
+    /// hinaus aufhalten — sonst bricht das Frontend nach 15 s ab und die GANZE Ebene wirkt
+    /// offline, obwohl der OSM-Teil längst da ist. Der gelöste Abruf läuft weiter und legt
+    /// seinen Stand in den Cache.
+    #[tokio::test]
+    async fn langsamer_mastr_haelt_die_antwort_nicht_auf() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let (tor, offen) = tokio::sync::oneshot::channel::<()>();
+        let p2 = pool.clone();
+        let a = tokio::time::timeout(
+            HALT,
+            energie_kern(
+                &pool,
+                &inflight(),
+                bbox,
+                FRIST,
+                || async { Some(osm_teil()) },
+                move || async move {
+                    let _ = offen.await;
+                    cache::setze(&p2, ENERGIE_MASTR_KEY, &mastr_teil()).await;
+                    Some(mastr_teil())
+                },
+            ),
+        )
+        .await
+        .expect("Antwort nach der Wartefrist, nicht erst nach MaStR");
+        assert_eq!(a.status, FachebeneStatus::Ok);
+        assert_eq!(a.attribution, "© OpenStreetMap-Beitragende (ODbL)");
+        assert_eq!(a.stand, None);
+        assert_eq!(titel(&a), vec!["osm-7.0079".to_string()]);
+        let _ = tor.send(());
+        assert!(
+            binnen_einer_sekunde(|| async {
+                cache::frisch(&pool, ENERGIE_MASTR_KEY, 60).await.is_some()
+            })
+            .await,
+            "der gelöste MaStR-Abruf hat seinen Stand nicht in den Cache gelegt"
+        );
+    }
+
+    /// Die Sperre setzt nur ein ECHTER Fehlschlag — und zwar auch dann, wenn er erst nach
+    /// der Antwort eintritt. Das Reißen der Wartefrist setzt sie nicht.
+    #[tokio::test]
+    async fn im_hintergrund_scheiternder_mastr_setzt_die_sperre() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let r = riegel();
+        let (tor, offen) = tokio::sync::oneshot::channel::<()>();
+        let p2 = pool.clone();
+        let a = tokio::time::timeout(
+            HALT,
+            energie_kern(
+                &pool,
+                &inflight(),
+                bbox,
+                FRIST,
+                || async { Some(osm_teil()) },
+                move || {
+                    erneuere_energie_mastr(p2, r, move || async move {
+                        let _ = offen.await;
+                        Err("Upstream gestört".to_string())
+                    })
+                },
+            ),
+        )
+        .await
+        .expect("Antwort nach der Wartefrist");
+        assert_eq!(a.attribution, "© OpenStreetMap-Beitragende (ODbL)");
+        assert!(
+            r.fehlschlag.lock().unwrap().is_none(),
+            "die gerissene Frist ist kein Fehlschlag"
+        );
+        let _ = tor.send(());
+        assert!(
+            binnen_einer_sekunde(|| async { r.fehlschlag.lock().unwrap().is_some() }).await,
+            "der Fehlschlag im gelösten Abruf hat die Sperre nicht gesetzt"
+        );
+    }
+
+    /// axum verwirft den Handler-Future, wenn der Client abbricht. Der Abruf darf daran
+    /// nicht hängen: er schreibt seinen Stand trotzdem zu Ende.
+    #[tokio::test]
+    async fn abgebrochene_anfrage_laesst_den_abruf_zu_ende_laufen() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let (tor, offen) = tokio::sync::oneshot::channel::<()>();
+        let p2 = pool.clone();
+        let abbruch = tokio::time::timeout(
+            Duration::from_millis(50),
+            energie_kern(
+                &pool,
+                &inflight(),
+                bbox,
+                HALT,
+                || async { None },
+                move || async move {
+                    let _ = offen.await;
+                    cache::setze(&p2, ENERGIE_MASTR_KEY, &mastr_teil()).await;
+                    Some(mastr_teil())
+                },
+            ),
+        )
+        .await;
+        assert!(abbruch.is_err(), "die Anfrage sollte abgebrochen sein");
+        let _ = tor.send(());
+        assert!(
+            binnen_einer_sekunde(|| async {
+                cache::frisch(&pool, ENERGIE_MASTR_KEY, 60).await.is_some()
+            })
+            .await,
+            "der Abruf starb mit der abgebrochenen Anfrage"
+        );
+    }
+
+    /// Zwei gleichzeitige Anfragen bei kaltem Cache starten EINEN Abruf, nicht zwei.
+    #[tokio::test]
+    async fn parallele_kalte_anfragen_starten_einen_abruf() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let infl = inflight();
+        let abrufe = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let tor = Arc::new(tokio::sync::Semaphore::new(0));
+        let abruf = || {
+            let (z, t) = (abrufe.clone(), tor.clone());
+            move || {
+                z.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                async move {
+                    let _ = t.acquire().await;
+                    None
+                }
+            }
+        };
+        let (a, b) = tokio::time::timeout(HALT, async {
+            tokio::join!(
+                energie_kern(&pool, &infl, bbox, FRIST, || async { None }, abruf()),
+                energie_kern(&pool, &infl, bbox, FRIST, || async { None }, abruf()),
+            )
+        })
+        .await
+        .expect("beide Antworten nach der Wartefrist");
+        tor.add_permits(2);
+        assert_eq!(abrufe.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(a.status, FachebeneStatus::Offline);
+        assert_eq!(b.status, FachebeneStatus::Offline);
     }
 
     // ---- 2.2 fetch_energie: Teilausfall und Totalausfall
@@ -1338,6 +1683,7 @@ mod energie_tests {
             &pool,
             &inflight(),
             bbox,
+            FRIST,
             || async { None },
             || async { None },
         )
@@ -1364,6 +1710,7 @@ mod energie_tests {
             &pool,
             &inflight(),
             bbox,
+            FRIST,
             || async { None },
             || async { None },
         )
@@ -1383,6 +1730,7 @@ mod energie_tests {
             &pool,
             &inflight(),
             bbox,
+            FRIST,
             || async { None },
             || async { None },
         )
@@ -1403,6 +1751,7 @@ mod energie_tests {
             &pool,
             &inflight(),
             bbox,
+            FRIST,
             || async { None },
             || async { None },
         )
@@ -1422,6 +1771,7 @@ mod energie_tests {
             &pool,
             &inflight(),
             bbox,
+            FRIST,
             || async { Some(osm_teil()) },
             || async { Some(mastr_teil()) },
         )
@@ -1450,6 +1800,7 @@ mod energie_tests {
             &pool,
             &inflight(),
             bbox,
+            FRIST,
             || async { None },
             || async { None },
         )

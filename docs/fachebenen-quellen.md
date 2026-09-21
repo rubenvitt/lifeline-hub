@@ -24,7 +24,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (111 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
 | **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Acht-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
 | **KRITIS / sensible Objekte** (`kritis`) | Deutschland-Extrakt `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (Geofabrik, konfigurierbar), **kein Abruf je Anfrage** | OSM-PBF → eigener Bestand in `nachschlage-cache.db` (Nodes als Punkt, Ways/Relations als Bounding-Box-Mitte); Route liefert GeoJSON-Punkte je `bbox`, ab 5 000 Objekten Sammelpunkte | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | Import alle 168 h (`--kritis-extrakt-intervall-stunden`), Stand = `Last-Modified` des Extrakts | ohne Bestand leer + ausgegraut; ein vorhandener Bestand bleibt auch ohne Netz unbegrenzt gültig |
-| **Energieanlagen** (`energie`, LFH-81) | OSM: `https://overpass-api.de/api/interpreter` (Mirror `overpass.kumi.systems`), `nwr[power=plant](bbox);out center tags;` · MaStR: `https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung` (Filter: Nettonennleistung > 10 000 kW, Koordinate vorhanden, Status 35/37, `pageSize=2000`) | OSM-JSON + MaStR-JSON → GeoJSON-**Punkte**, je Anfrage auf die `bbox` gefiltert und zusammengeführt | **ODbL** (OSM) · **Datenlizenz Deutschland – Namensnennung – 2.0** ([dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)) für das [Marktstammdatenregister](https://www.marktstammdatenregister.de/MaStR) der Bundesnetzagentur | nur die beitragenden Teile, getrennt durch „ · “: `© OpenStreetMap-Beitragende (ODbL)` · `Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0` | 24 h je Teil (OSM je gerundeter bbox, MaStR bundesweit ein Eintrag); `stand` = Zeitpunkt des MaStR-Abzugs | ein Teil fällt aus → der andere wird gezeigt; beide aus → leer + ausgegraut |
+| **Energieanlagen** (`energie`, LFH-81) | OSM: `https://overpass-api.de/api/interpreter` (Mirror `overpass.kumi.systems`), `nwr[power=plant](bbox);out center tags;` · MaStR: `https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung` (Filter: Nettonennleistung > 10 000 kW, Koordinate vorhanden, Status 35/37, `pageSize=2000`) | OSM-JSON + MaStR-JSON → GeoJSON-**Punkte**, je Anfrage über einen erweiterten Rand zusammengeführt und auf die `bbox` beschränkt | **ODbL** (OSM) · **Datenlizenz Deutschland – Namensnennung – 2.0** ([dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)) für das [Marktstammdatenregister](https://www.marktstammdatenregister.de/MaStR) der Bundesnetzagentur | nur die beitragenden Teile, getrennt durch „ · “: `© OpenStreetMap-Beitragende (ODbL)` · `Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0` | 24 h je Teil (OSM je gerundeter bbox, MaStR bundesweit ein Eintrag); kalter Abruf von der Anfrage gelöst, Wartefrist 10 s für beide Teile zusammen; `stand` = Zeitpunkt des MaStR-Abzugs | ein Teil fällt aus → der andere wird gezeigt; beide aus → leer + ausgegraut |
 
 ## Hinweise zur Anbindung
 
@@ -60,16 +60,34 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 - **Zusammenführung Energie:** eine MaStR-Einheit geht an die **nächste** OSM-Anlage
   **gleicher** Anlagenart im Umkreis von 2 km (`ENERGIE_RADIUS_M`, Messprotokoll im
   Commit von LFH-81); mehrere Einheiten summieren ihre Leistung, geführt werden Nummer und
-  Id der größten. Der Punkt bleibt am OSM-Standort, die Herkunft wird `osm+mastr`. Übrige
-  MaStR-Einheiten erscheinen als eigene Punkte (`mastr`). Der Inspector verlinkt die Einheit
-  über `https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/{mastr_id}`.
+  Id der größten; `mastr_nummern` nennt die Nummern aller Einheiten (sortiert, mit Komma
+  ohne Leerzeichen, sonst `null`). Der Punkt bleibt am OSM-Standort, die Herkunft wird
+  `osm+mastr`. Übrige MaStR-Einheiten erscheinen als eigene Punkte (`mastr`). Der Inspector
+  verlinkt die Einheit über
+  `https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/{mastr_id}`.
+- **Rand des Ausschnitts Energie:** zusammengeführt wird nicht über die bbox, sondern über
+  einen Rand darum — MaStR-Einheiten aus bbox + 2 × Radius, OSM-Anlagen aus bbox + 3 × Radius
+  (die Overpass-Abfrage geht deshalb auf bbox + 6 km, der Cache-Schlüssel bleibt am
+  gerundeten Original). Ausgegeben wird eine Anlage, wenn sie selbst oder eine ihr
+  zugeordnete Einheit im Ausschnitt liegt; eine reine MaStR-Einheit, wenn sie darin liegt.
+  Sonst entstand an der Kante ein eigener `mastr`-Punkt, und im Nachbarausschnitt kam
+  dieselbe Anlage als `osm+mastr` hinzu — beim Verschieben der Karte doppelt. Ein
+  zusammengeführter Punkt kann deshalb bis 2 km außerhalb der bbox stehen; er ist derselbe
+  wie im Nachbarausschnitt.
+- **Wartefrist Energie:** beide Teile werden bei kaltem Cache als eigene Task geholt, die
+  Anfrage wartet zusammen höchstens 10 s (`ENERGIE_WARTE`) und antwortet mit dem, was da
+  ist — das Frontend bricht nach 15 s ab, ein Warten auf den langsameren Teil ließ sonst die
+  ganze Ebene offline wirken. Ein Teil, der die Frist reißt, wird in dieser Antwort nicht
+  genannt, setzt aber keine Sperre; sein Abruf schreibt Cache bzw. Sperre danach zu Ende,
+  auch wenn der Client inzwischen abgebrochen hat.
 - **Der MaStR-JSON-Endpunkt ist inoffiziell** — öffentlich, aber nicht dokumentiert, ohne
   SLA und mit WAF davor. Der Filteroperator `gt` ist undokumentiert und arbeitet live
   numerisch; die Filterfeldnamen sind Anzeigenamen des Portals und können sich still ändern.
   Eine Antwort ohne `Data`-Liste oder ohne eine einzige Einheit gilt deshalb als
   **Fehlschlag**, nicht als Leerstand. Nach einem Fehlschlag ruht der Abruf fünf Minuten
   (`ENERGIE_MASTR_ABKUEHLUNG`), damit ein gestörtes Portal nicht jedes Verschieben der Karte
-  bis zu 30 s aufhält; der letzte gute Stand wird über SWR weiter ausgeliefert (Cache-Aufbewahrung
+  bis zur Wartefrist aufhält und nicht jede Anfrage einen neuen Abzug startet; gesetzt wird
+  sie nur von einem echten Fehlschlag, nicht von einer gerissenen Wartefrist; der letzte gute Stand wird über SWR weiter ausgeliefert (Cache-Aufbewahrung
   2 Tage), danach zeigt die Ebene nur den OSM-Anteil und die Quellennennung nennt nur noch
   OSM. **Ausweichweg**, falls der Endpunkt wegfällt: der
   [MaStR-Gesamtexport](https://www.marktstammdatenregister.de/MaStR/Datendownload) (XML, rund

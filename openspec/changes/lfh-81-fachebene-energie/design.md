@@ -60,12 +60,29 @@ Anfrage zusammen:
 
 | Teil | Schlüssel | TTL | kalter Pfad |
 |---|---|---|---|
-| OSM `power=plant` | `energie:osm:<bbox gerundet>` | 24 h | blockierend (wie KRITIS), 30-s-Timeout, zwei Overpass-Endpunkte |
-| MaStR-Abzug | `energie:mastr` (bundesweit) | 24 h | blockierend mit eigenem 30-s-Timeout, 5-min-Sperre nach Fehlschlag |
+| OSM `power=plant` | `energie:osm:<bbox gerundet>` | 24 h | gelöster Abruf, 30-s-Timeout je Endpunkt, zwei Overpass-Endpunkte, Abfrage auf die um 6 km erweiterte bbox (Entscheidung 4) |
+| MaStR-Abzug | `energie:mastr` (bundesweit) | 24 h | gelöster Abruf mit eigenem 30-s-Timeout, 5-min-Sperre nach Fehlschlag |
 
-Beide kalten Pfade laufen **nebenläufig** (`tokio::join!`). Die Wartezeit ist also die
-längere der beiden, nicht ihre Summe. Beide Teile gehen durch `liefere_mit_swr`: die
-Staffelung frisch/veraltet/kalt ist das etablierte Verhalten.
+Die Staffelung frisch/veraltet ist die von `liefere_mit_swr`. **Den kalten Pfad löst die
+Ebene von der Anfrage** (`liefere_geloest`): der Abruf läuft per `tokio::spawn` als eigene
+Task, und die Anfrage wartet auf beide Teile **zusammen höchstens `ENERGIE_WARTE` = 10 s**.
+Beide Teile warten nebenläufig auf denselben Zeitpunkt, jeder für sich; danach antwortet
+die Anfrage mit dem, was da ist. Ein Teil, der die Frist reißt, trägt zu dieser Antwort
+nichts bei und wird nicht genannt, setzt aber **keine** Sperre. Die Task läuft weiter und
+schreibt den Cache bzw. — bei einem echten Fehlschlag — die MaStR-Sperre zu Ende.
+`status: offline` gilt nur, wenn kein Teil etwas hat. Holt schon eine andere Anfrage
+denselben Schlüssel (`inflight`-Marke), startet keine zweite einen Abruf; sie wartet auch
+nicht auf den ersten, sondern trägt diesen Teil nicht bei. Die nächste Anfrage trifft den
+Cache. Die MaStR-Einzelspur bleibt als Rückfallebene dahinter.
+
+Warum nicht blockierend (Review-Befund, 21.09.2026): der erste Stand wartete per
+`tokio::join!` auf beide kalten Teile, MaStR bis 30 s, Overpass bis 2 × 30 s. `apiGet` im
+Frontend bricht nach **15 s** ab. Dann wirkte die **ganze** Ebene offline, obwohl ein Teil
+längst da war, was dem Spec-Szenario „Nur OSM erreichbar“ widerspricht. Dazu verwirft axum
+den Handler-Future, wenn der Client abbricht. Der MaStR-Abruf starb dann mit ihm, erreichte
+seinen Fehlerzweig nie, und die 5-Minuten-Sperre wurde nie gesetzt. 10 s liegen unter den
+15 s des Frontends und lassen Luft für Zusammenführung und Übertragung. Die übrigen Ebenen
+behalten den blockierenden kalten Pfad von `liefere_mit_swr`.
 
 `Bbox::cache_key()` bekommt das Präfix als Parameter, oder es kommt eine zweite Methode
 hinzu. Das feste `kritis:` bleibt für KRITIS **byte-gleich**, sonst verlöre der Bestand
@@ -76,11 +93,14 @@ dasselbe Wasserkraftwerk doppelt, und die Zusammenführung aus Entscheidung 4 gi
 *Verworfen:* ein **nächtlicher Batch-Job**. Das wäre ein neuer Mechanismus, den keine
 andere Fachebene hat. Eine TTL von 24 h im SWR-Kern leistet dasselbe: veraltet wird im
 Hintergrund erneuert, ohne dass jemand wartet.
-*Verworfen:* der **Autobahn-Weg**, also ein kalter Pfad ohne Warten mit
+*Verworfen:* der **Autobahn-Weg**, also ein kalter Pfad ganz ohne Warten mit
 `aufwaermPollMs`. Den braucht Autobahn, weil sein Fächer rund 25 s dauert. Der
-MaStR-Abruf ist ein einzelner Request von ~7 s und fällt nur einmal am Tag an. Dazu
-kommt: eine bbox-Ebene hat im Frontend keinen `refetchInterval`, ein „wärmt noch
-auf“-Zustand würde also erst beim nächsten Verschieben der Karte aufgelöst.
+MaStR-Abruf ist ein einzelner Request von ~7 s und fällt nur einmal am Tag an, er passt
+also in der Regel in die Wartefrist. Dazu kommt: eine bbox-Ebene hat im Frontend keinen
+`refetchInterval`, ein „wärmt noch auf“-Zustand würde also erst beim nächsten Verschieben
+der Karte aufgelöst. Die Wartefrist ist der Mittelweg: im Normalfall kommt der Teil noch
+in derselben Antwort, im Störfall hält er sie nicht über den Abbruch des Frontends hinaus
+auf.
 
 ### 2. Der MaStR-Abruf filtert beim Upstream, nicht bei uns
 
@@ -149,6 +169,33 @@ Aufgabe 2.4 misst den Abstand an einer Stichprobe echter Paare und legt die Zahl
 bevor sie in den Code geht. Eine falsche Zuordnung setzt eine gleichartige Nachbaranlage
 voraus und kostet eine falsch zugeordnete Leistungsangabe, keinen verschwundenen Punkt.
 
+**Der Abgleich läuft über einen erweiterten Rand, nicht über den Ausschnitt**
+(Review-Befund, 21.09.2026). Der erste Stand beschnitt beide Seiten vorher auf die bbox.
+Lag eine MaStR-Einheit knapp innerhalb und ihre OSM-Anlage (< 2 km) knapp außerhalb,
+entstand ein eigener `mastr`-Punkt. Im Nachbarausschnitt kam nach dem Verschieben die
+`osm+mastr`-Anlage dazu, und das Frontend sammelte beide auf. Jetzt gilt (Radius `r`):
+
+- Ausgegeben wird eine OSM-Anlage, wenn sie selbst im Ausschnitt liegt **oder** eine ihr
+  zugeordnete Einheit. Sie liegt also höchstens `r` vor der Kante, ihr Punkt kann bis `r`
+  außerhalb der bbox stehen. Er ist derselbe wie im Nachbarausschnitt.
+- Ein reiner `mastr`-Punkt erscheint, wenn die Einheit im Ausschnitt liegt.
+- In den Abgleich gehen Einheiten aus der um `2 r` und OSM-Anlagen aus der um `3 r`
+  erweiterten bbox ein. Die Einheiten einer ausgegebenen Anlage liegen bis `2 r` vor der
+  Kante, und wohin eine solche Einheit gehört, entscheidet die nächste Anlage bis `3 r`.
+  Erst damit ist die Antwort für jeden ausgegebenen Punkt in jedem Ausschnitt dieselbe,
+  einschließlich Leistungssumme und Einheitenzahl. Ein Rand von nur `r`, wie im Befund
+  vorgeschlagen, verschöbe die Abweichung eine Stufe nach außen. Dann zählte dieselbe
+  Anlage in zwei Nachbarausschnitten verschieden viele Einheiten (Tests
+  `randanlage_*`, per Mutationsprobe belegt).
+- Die Overpass-Abfrage geht deshalb auf die um `3 r` = 6 km erweiterte bbox. Umgerechnet
+  wird mit dem Erdradius der Haversine-Messung, die Länge mit dem Kosinus der polnäheren
+  Kante. Der **Cache-Schlüssel** des OSM-Teils bleibt am Original-Raster.
+
+Jeder Punkt mit MaStR-Anteil (`mastr`, `osm+mastr`) trägt zusätzlich `mastr_nummern`:
+alle MaStR-Nummern der zugeordneten Einheiten, lexikographisch sortiert und ohne
+Leerzeichen mit Komma verbunden. Sonst ist das Feld `null`. `mastr_nummer`, `mastr_id` und
+`mastr_einheiten` bleiben unverändert.
+
 ### 5. Quellennennung aus den tatsächlich beitragenden Teilen
 
 `FachebeneAntwort::ok(quelle, attribution: &str, …)` bleibt unverändert. Die Ebene
@@ -209,10 +256,12 @@ Liste wäre der Fehler, den diese Zeile verhindern soll. Die Liste wird dabei au
   Leerstand. Der letzte gute Stand wird über SWR weiter ausgeliefert (Cache-Aufbewahrung
   2 Tage). Danach degradiert die Ebene auf den OSM-Anteil, und die Quellennennung zeigt
   das an. Als Ausweichweg ist der Gesamtexport in der Doku benannt.
-- [Kalter Abruf: Overpass bis 30 s, MaStR ~7 s, der Frontend-Aufruf bricht nach 15 s ab]
-  → Das gilt heute schon für KRITIS. Die Anfrage läuft serverseitig zu Ende und schreibt
-  den Cache, der nächste Pan trifft ihn. Beide Teile laufen parallel. Gegen einen
-  dauerhaft gestörten MaStR hilft die 5-Minuten-Sperre.
+- [Kalter Abruf: Overpass bis 2 × 30 s, MaStR ~7 s (Timeout 30 s), der Frontend-Aufruf
+  bricht nach 15 s ab] → Beide Abrufe sind von der Anfrage gelöst, die Anfrage wartet
+  höchstens 10 s und liefert den Teil, der da ist. Der Abruf schreibt den Cache in der
+  gelösten Task zu Ende, auch nach einem Abbruch des Clients, und der nächste Pan trifft
+  ihn. Gegen einen dauerhaft gestörten MaStR hilft die 5-Minuten-Sperre. KRITIS behält
+  den blockierenden Pfad.
 - [OSM-Leistungsangaben sind lückenhaft] → Konventionelle Anlagen erscheinen auch ohne
   Leistung (Leistung „unbekannt“). Bei erneuerbaren Anlagen ohne Angabe trägt MaStR die
   Großanlagen. Eine erneuerbare OSM-Anlage ohne Leistung und ohne MaStR-Treffer fällt

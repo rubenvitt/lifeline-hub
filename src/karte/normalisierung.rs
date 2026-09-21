@@ -1356,6 +1356,7 @@ pub fn normalisiere_energie_osm(roh: &Value) -> Value {
                     "betriebsstatus": Value::Null,
                     "herkunft": "osm",
                     "mastr_nummer": Value::Null,
+                    "mastr_nummern": Value::Null,
                     "mastr_id": Value::Null,
                     "mastr_einheiten": Value::Null,
                 }),
@@ -1427,6 +1428,7 @@ pub fn normalisiere_energie_mastr(roh: &Value) -> Result<Vec<Value>, String> {
                     "betriebsstatus": text(e, "BetriebsStatusName"),
                     "herkunft": "mastr",
                     "mastr_nummer": text(e, "MaStRNummer"),
+                    "mastr_nummern": text(e, "MaStRNummer"),
                     "mastr_id": e.get("Id").and_then(|v| v.as_i64()),
                     "mastr_einheiten": 1,
                 }),
@@ -1435,19 +1437,41 @@ pub fn normalisiere_energie_mastr(roh: &Value) -> Result<Vec<Value>, String> {
         .collect())
 }
 
+/// Rand der OSM-Abfrage in Vielfachen des Zuordnungsradius (siehe [`fuehre_energie_zusammen`]).
+/// `quellen::erneuere_energie_osm` fragt Overpass auf die um diesen Rand erweiterte bbox.
+pub const ENERGIE_OSM_RAND_RADIEN: f64 = 3.0;
+/// Rand der MaStR-Einheiten, die in die Zuordnung eingehen, in Vielfachen des Radius.
+const ENERGIE_MASTR_RAND_RADIEN: f64 = 2.0;
+
 /// Führt die OSM- und MaStR-Punkte für einen Ausschnitt zusammen.
 ///
 /// Jede MaStR-Einheit geht an die **nächste** OSM-Anlage **gleicher** Anlagenart im Umkreis
 /// von `radius_m`; mehrere Einheiten an einer Anlage summieren ihre Leistung, geführt werden
-/// Nummer, Id, Betreiber und Status der größten. Der Punkt bleibt am OSM-Standort (die
-/// OSM-Mitte trifft die Anlage besser als der Einheitenpunkt), die Herkunft wird
-/// `osm+mastr`. Übrige MaStR-Einheiten erscheinen als eigene Punkte. Eine
+/// Nummer, Id, Betreiber und Status der größten, `mastr_nummern` nennt alle. Der Punkt
+/// bleibt am OSM-Standort (die OSM-Mitte trifft die Anlage besser als der Einheitenpunkt),
+/// die Herkunft wird `osm+mastr`. Übrige MaStR-Einheiten erscheinen als eigene Punkte. Eine
 /// nicht-konventionelle OSM-Anlage ohne Leistung (Kandidat aus
 /// [`normalisiere_energie_osm`]) erscheint nur mit Treffer.
 ///
-/// Beide Seiten werden auf den Ausschnitt gefiltert: der MaStR-Teil ist bundesweit, und
-/// der OSM-Teil stammt aus einem auf zwei Nachkommastellen gerundeten Cache-Schlüssel, er
-/// kann also ein Stück über den angefragten Rand ragen.
+/// **Der Abgleich läuft über einen erweiterten Rand, nicht über den Ausschnitt** (Review-
+/// Befund zu LFH-81). Beschnitte man beide Seiten vorher auf die bbox, entstünde an der
+/// Kante eine Doppelung: die Einheit liegt drin, ihre OSM-Anlage 1 km weiter draußen → im
+/// einen Ausschnitt ein eigener `mastr`-Punkt, im Nachbarausschnitt ein `osm+mastr`-Punkt,
+/// und das Frontend sammelt beim Verschieben beide auf. Der Rand ist so gewählt, dass die
+/// Antwort für jeden ausgegebenen Punkt dieselbe ist wie in jedem anderen Ausschnitt:
+///
+/// - ausgegeben wird eine OSM-Anlage, wenn sie selbst im Ausschnitt liegt ODER eine ihr
+///   zugeordnete Einheit — sie liegt also höchstens `r` vor der Kante;
+/// - deren Einheiten liegen höchstens `r` von ihr, also höchstens `2 r` vor der Kante;
+/// - wohin eine solche Einheit gehört, entscheidet die nächste Anlage in `r` um sie, also
+///   bis `3 r` vor der Kante.
+///
+/// Deshalb gehen Einheiten aus `2 r` und OSM-Anlagen aus `3 r` in den Abgleich
+/// ([`ENERGIE_OSM_RAND_RADIEN`] trägt die Overpass-Abfrage mit). Ein Rand von nur `r`
+/// verschöbe die Abweichung eine Stufe nach außen: dann zählte dieselbe Anlage in zwei
+/// Nachbarausschnitten verschieden viele Einheiten. Ein reiner `mastr`-Punkt erscheint,
+/// wenn die Einheit im Ausschnitt liegt. Der Punkt einer zusammengeführten Anlage kann
+/// damit bis `r` außerhalb der bbox stehen — das ist gewollt, er ist derselbe wie nebenan.
 pub fn fuehre_energie_zusammen(
     osm: &[Value],
     mastr: &[Value],
@@ -1455,8 +1479,10 @@ pub fn fuehre_energie_zusammen(
     radius_m: f64,
 ) -> Vec<Value> {
     use crate::geocoding::peilung::haversine_m;
-    let im_ausschnitt =
-        |f: &&Value| punkt_koordinate(f).is_some_and(|(lon, lat)| bbox.enthaelt(lon, lat));
+    let in_bbox = |b: Bbox| {
+        move |f: &&Value| punkt_koordinate(f).is_some_and(|(lon, lat)| b.enthaelt(lon, lat))
+    };
+    let im_ausschnitt = in_bbox(*bbox);
     let art = |f: &Value| {
         f["properties"]["anlagenart"]
             .as_str()
@@ -1464,12 +1490,20 @@ pub fn fuehre_energie_zusammen(
             .to_string()
     };
     let mw = |f: &Value| f["properties"]["leistung_mw"].as_f64();
+    let nummer = |f: &Value| f["properties"]["mastr_nummer"].as_str().map(str::to_string);
 
-    let osm: Vec<&Value> = osm.iter().filter(im_ausschnitt).collect();
+    let osm: Vec<&Value> = osm
+        .iter()
+        .filter(in_bbox(
+            bbox.erweitert_um_m(ENERGIE_OSM_RAND_RADIEN * radius_m),
+        ))
+        .collect();
     let mut zugeordnet: Vec<Vec<&Value>> = vec![Vec::new(); osm.len()];
     let mut ergebnis: Vec<Value> = Vec::new();
 
-    for m in mastr.iter().filter(im_ausschnitt) {
+    for m in mastr.iter().filter(in_bbox(
+        bbox.erweitert_um_m(ENERGIE_MASTR_RAND_RADIEN * radius_m),
+    )) {
         let Some((mlon, mlat)) = punkt_koordinate(m) else {
             continue;
         };
@@ -1486,16 +1520,28 @@ pub fn fuehre_energie_zusammen(
             .min_by(|a, b| a.1.total_cmp(&b.1));
         match naechste {
             Some((i, _)) => zugeordnet[i].push(m),
-            None => ergebnis.push(m.clone()),
+            None if im_ausschnitt(&m) => {
+                let mut f = m.clone();
+                // Aus dem Einzelwert gebildet statt aus dem Normalisierer gelesen: ein
+                // Cache-Stand von vor dem Feld trägt es nicht.
+                f["properties"]["mastr_nummern"] = json!(nummer(m));
+                ergebnis.push(f);
+            }
+            None => {}
         }
     }
 
     let mut osm_punkte: Vec<Value> = Vec::new();
     for (o, einheiten) in osm.into_iter().zip(zugeordnet) {
         if einheiten.is_empty() {
-            if ist_konventionell(&art(o)) || mw(o).is_some() {
-                osm_punkte.push(o.clone());
+            if im_ausschnitt(&o) && (ist_konventionell(&art(o)) || mw(o).is_some()) {
+                let mut f = o.clone();
+                f["properties"]["mastr_nummern"] = Value::Null;
+                osm_punkte.push(f);
             }
+            continue;
+        }
+        if !im_ausschnitt(&o) && !einheiten.iter().any(im_ausschnitt) {
             continue;
         }
         let groesste = einheiten
@@ -1506,6 +1552,10 @@ pub fn fuehre_energie_zusammen(
             .iter()
             .filter_map(|e| mw(e))
             .fold(None, |acc, x| Some(acc.unwrap_or(0.0) + x));
+        // Lexikographisch über die Zeichenketten (`SEE…`), nicht numerisch — die Reihenfolge
+        // ist damit unabhängig von der Reihenfolge des Abzugs und in jedem Ausschnitt gleich.
+        let mut nummern: Vec<String> = einheiten.iter().filter_map(|e| nummer(e)).collect();
+        nummern.sort();
         let gp = &groesste["properties"];
         let mut f = o.clone();
         let p = &mut f["properties"];
@@ -1516,6 +1566,11 @@ pub fn fuehre_energie_zusammen(
         p["betriebsstatus"] = gp["betriebsstatus"].clone();
         p["herkunft"] = json!("osm+mastr");
         p["mastr_nummer"] = gp["mastr_nummer"].clone();
+        p["mastr_nummern"] = if nummern.is_empty() {
+            Value::Null
+        } else {
+            json!(nummern.join(","))
+        };
         p["mastr_id"] = gp["mastr_id"].clone();
         p["mastr_einheiten"] = json!(einheiten.len());
         osm_punkte.push(f);
@@ -1820,6 +1875,7 @@ mod energie_tests {
             "betriebsstatus",
             "herkunft",
             "mastr_nummer",
+            "mastr_nummern",
             "mastr_id",
             "mastr_einheiten",
         ] {
@@ -2060,8 +2116,9 @@ mod energie_tests {
 
     #[test]
     fn nur_anlagen_im_ausschnitt() {
-        // Je Quelle ein Punkt drin, einer knapp draussen: der OSM-Teil stammt aus einem auf
-        // 2 Nachkommastellen gerundeten Cache-Schlüssel und kann über den Rand ragen.
+        // Je Quelle ein Punkt drin, einer draußen: der OSM-Teil ist auf einen Rand um die
+        // bbox abgefragt und ragt über sie hinaus. Eine Anlage dort ohne zugeordnete Einheit
+        // im Ausschnitt erscheint nicht.
         let osm = vec![
             punkt(7.0, 51.5, "gas", None, "osm"),
             punkt(7.504, 51.5, "gas", None, "osm"),
@@ -2078,6 +2135,133 @@ mod energie_tests {
         assert_eq!(fs.len(), 2, "{koord:?}");
         assert!(koord.contains(&json!([7.0, 51.5])));
         assert!(koord.contains(&json!([6.8, 51.2])));
+    }
+
+    // ---- Rand des Ausschnitts (Review-Befund 2)
+
+    /// Zwei Nachbarausschnitte mit gemeinsamer Kante bei 7,0° O, 51,25° N.
+    fn nachbarn() -> (Bbox, Bbox) {
+        (
+            Bbox::parse("6.5,51.0,7.0,51.5").unwrap(),
+            Bbox::parse("7.0,51.0,7.5,51.5").unwrap(),
+        )
+    }
+
+    /// Die MaStR-Einheit liegt im linken Ausschnitt, ihre OSM-Anlage (~1 km entfernt) im
+    /// rechten. Vorher entstand links ein eigener `mastr`-Punkt, rechts ein `osm`-Punkt —
+    /// nach dem Verschieben der Karte standen beide auf ihr. Jetzt liefern beide
+    /// Ausschnitte denselben einen `osm+mastr`-Punkt am OSM-Standort.
+    #[test]
+    fn randanlage_ergibt_in_beiden_nachbarausschnitten_denselben_punkt() {
+        let (links, rechts) = nachbarn();
+        let osm = vec![punkt(7.01, 51.25, "gas", None, "osm")];
+        let mastr = vec![punkt(6.995, 51.25, "gas", Some(120.0), "mastr")];
+        let l = fuehre_energie_zusammen(&osm, &mastr, &links, 2000.0);
+        let r = fuehre_energie_zusammen(&osm, &mastr, &rechts, 2000.0);
+        assert_eq!(l.len(), 1, "{l:?}");
+        assert_eq!(l[0]["properties"]["herkunft"], "osm+mastr");
+        assert_eq!(l[0]["geometry"]["coordinates"], json!([7.01, 51.25]));
+        assert_eq!(l, r);
+    }
+
+    /// Die Randanlage summiert in beiden Ausschnitten dieselben Einheiten: `u2` liegt ~2,4 km
+    /// hinter der Kante (außerhalb eines Randes von nur einem Radius), gehört aber zu `o`.
+    #[test]
+    fn randanlage_summiert_in_beiden_ausschnitten_dieselben_einheiten() {
+        let (links, rechts) = nachbarn();
+        let osm = vec![punkt(7.02, 51.25, "wind", None, "osm")];
+        let mastr = vec![
+            punkt(6.999, 51.25, "wind", Some(12.0), "mastr"),
+            punkt(7.035, 51.25, "wind", Some(15.0), "mastr"),
+        ];
+        let l = fuehre_energie_zusammen(&osm, &mastr, &links, 2000.0);
+        let r = fuehre_energie_zusammen(&osm, &mastr, &rechts, 2000.0);
+        assert_eq!(l.len(), 1, "{l:?}");
+        assert_eq!(l[0]["properties"]["mastr_einheiten"], json!(2));
+        assert_eq!(l[0]["properties"]["leistung_mw"], json!(27.0));
+        assert_eq!(l, r);
+    }
+
+    /// Die zweite Stufe desselben Randfalls: die OSM-Anlage `o` (rechts) bekommt ihre
+    /// Einheit `u1` aus dem linken Ausschnitt; eine zweite Einheit `u2` liegt zwar im
+    /// Radius von `o`, gehört aber zur noch näheren Anlage `o3` weiter östlich. Links darf
+    /// `o` deshalb nicht plötzlich zwei Einheiten tragen, nur weil `o3` dort nicht gesehen
+    /// wird. Das belegt den erweiterten Rand über den Radius hinaus (Einheiten 2 r,
+    /// OSM 3 r) — mit einem Rand von nur einem Radius stünde links `mastr_einheiten: 2`.
+    #[test]
+    fn randanlage_zaehlt_in_beiden_ausschnitten_dieselben_einheiten() {
+        let (links, rechts) = nachbarn();
+        let osm = vec![
+            punkt(7.02, 51.25, "wind", Some(30.0), "osm"), // o
+            punkt(7.07, 51.25, "wind", Some(30.0), "osm"), // o3, ~4,9 km hinter der Kante
+        ];
+        let mastr = vec![
+            punkt(6.999, 51.25, "wind", Some(12.0), "mastr"), // u1 → o (~1,5 km)
+            punkt(7.048, 51.25, "wind", Some(15.0), "mastr"), // u2 → o3 (~1,5 km statt ~1,9 km)
+        ];
+        let an_o = |fs: &[Value]| {
+            fs.iter()
+                .find(|f| f["geometry"]["coordinates"] == json!([7.02, 51.25]))
+                .cloned()
+                .expect("Punkt an o fehlt")
+        };
+        let l = fuehre_energie_zusammen(&osm, &mastr, &links, 2000.0);
+        let r = fuehre_energie_zusammen(&osm, &mastr, &rechts, 2000.0);
+        assert_eq!(
+            l.len(),
+            1,
+            "o3 und u2 liegen beide ausserhalb von links: {l:?}"
+        );
+        assert_eq!(an_o(&l)["properties"]["mastr_einheiten"], json!(1));
+        assert_eq!(an_o(&l), an_o(&r));
+    }
+
+    // ---- MaStR-Nummern aller Einheiten (Review-Befund 3)
+
+    #[test]
+    fn mastr_nummern_nennt_alle_einheiten_sortiert() {
+        let osm = vec![
+            punkt(7.0, 51.5, "speicher", Some(20.0), "osm"),
+            punkt(7.3, 51.5, "gas", None, "osm"),
+        ];
+        let mastr = vec![
+            punkt(7.003, 51.5, "speicher", Some(11.0), "mastr"),
+            punkt(7.001, 51.5, "speicher", Some(12.5), "mastr"),
+            punkt(7.002, 51.5, "speicher", Some(30.0), "mastr"),
+            punkt(6.8, 51.2, "wind", Some(15.0), "mastr"),
+        ];
+        let fs = fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0);
+        let nach_herkunft = |h: &str| {
+            fs.iter()
+                .find(|f| f["properties"]["herkunft"] == h)
+                .unwrap_or_else(|| panic!("{h} fehlt"))["properties"]
+                .clone()
+        };
+        assert_eq!(
+            nach_herkunft("osm+mastr")["mastr_nummern"],
+            "SEE7.001,SEE7.002,SEE7.003"
+        );
+        // Bestandsfeld unverändert: die Nummer der GRÖSSTEN Einheit.
+        assert_eq!(nach_herkunft("osm+mastr")["mastr_nummer"], "SEE7.002");
+        assert_eq!(nach_herkunft("mastr")["mastr_nummern"], "SEE6.8");
+        let osm_p = nach_herkunft("osm");
+        assert!(osm_p.as_object().unwrap().contains_key("mastr_nummern"));
+        assert_eq!(osm_p["mastr_nummern"], Value::Null);
+    }
+
+    #[test]
+    fn normalisierer_fuehren_mastr_nummern() {
+        let o = features(&normalisiere_energie_osm(&anlage(Some("gas"), None)));
+        let p = o[0]["properties"].as_object().unwrap();
+        assert!(p.contains_key("mastr_nummern"));
+        assert_eq!(p["mastr_nummern"], Value::Null);
+        let roh: Value = serde_json::from_str(MASTR_AUSZUG).unwrap();
+        let m = normalisiere_energie_mastr(&roh).unwrap();
+        let wkw = m
+            .iter()
+            .find(|f| f["properties"]["titel"] == "WKW III")
+            .unwrap();
+        assert_eq!(wkw["properties"]["mastr_nummern"], "SEE980008908440");
     }
 
     // ---- 1.7 Quellennennung

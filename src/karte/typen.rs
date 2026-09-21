@@ -155,6 +155,27 @@ impl Bbox {
             self.west, self.sued, self.ost, self.nord
         )
     }
+    /// Um `meter` in jede Richtung erweiterter Ausschnitt, auf den gültigen Bereich
+    /// begrenzt. Die Breite rechnet mit dem Erdradius von [`haversine_m`], damit Rand und
+    /// Abstandsmessung dieselbe Erde meinen. Die Länge teilt durch den Kosinus der
+    /// POLNÄHEREN Kante: dort ist ein Längengrad am kürzesten, der Rand also nirgends zu
+    /// schmal. Konstruiert direkt statt über [`Bbox::parse`], weil ein 1°-Ausschnitt mit
+    /// Rand die 1°-Grenze überschreiten darf.
+    ///
+    /// [`haversine_m`]: crate::geocoding::peilung::haversine_m
+    pub fn erweitert_um_m(&self, meter: f64) -> Bbox {
+        let m_je_grad = crate::geocoding::peilung::ERDRADIUS_M.to_radians();
+        let dlat = meter / m_je_grad;
+        let sued = (self.sued - dlat).max(-90.0);
+        let nord = (self.nord + dlat).min(90.0);
+        let dlon = dlat / sued.abs().max(nord.abs()).to_radians().cos();
+        Bbox {
+            west: (self.west - dlon).max(-180.0),
+            sued,
+            ost: (self.ost + dlon).min(180.0),
+            nord,
+        }
+    }
     /// Liegt der Punkt (Rand eingeschlossen) im Ausschnitt?
     pub fn enthaelt(&self, lon: f64, lat: f64) -> bool {
         lon >= self.west && lon <= self.ost && lat >= self.sued && lat <= self.nord
@@ -168,6 +189,35 @@ mod bbox_tests {
     fn parst_gueltige_bbox() {
         let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
         assert_eq!((b.west, b.sued, b.ost, b.nord), (6.0, 50.0, 7.0, 51.0));
+    }
+    /// Ein Rand von 2 km: in der Breite überall ~0,018°, in der Länge bei 51,6° N ~0,029°
+    /// (Kosinus der POLNÄHEREN Kante, also eher etwas mehr als nötig).
+    #[test]
+    fn erweitert_um_meter_mit_breitenkorrektur() {
+        let b = Bbox::parse("6.9,51.45,7.3,51.65").unwrap();
+        let e = b.erweitert_um_m(2000.0);
+        let dlat = 2000.0 / 111_194.93;
+        assert!((b.sued - e.sued - dlat).abs() < 1e-4, "{e:?}");
+        assert!((e.nord - b.nord - dlat).abs() < 1e-4, "{e:?}");
+        let dlon = dlat / (51.65_f64 + dlat).to_radians().cos();
+        assert!((b.west - e.west - dlon).abs() < 1e-4, "{e:?}");
+        assert!((e.ost - b.ost - dlon).abs() < 1e-4, "{e:?}");
+        // Ein 1°-Ausschnitt darf wachsen — `parse` hätte ihn als „zu groß" abgelehnt.
+        let voll = Bbox::parse("6.0,51.0,7.0,52.0")
+            .unwrap()
+            .erweitert_um_m(6000.0);
+        assert!(voll.ost - voll.west > 1.0);
+    }
+    #[test]
+    fn erweitert_bleibt_im_gueltigen_bereich() {
+        let b = Bbox::parse("179.5,89.5,180.0,90.0")
+            .unwrap()
+            .erweitert_um_m(6000.0);
+        assert!(b.nord <= 90.0 && b.ost <= 180.0, "{b:?}");
+        let b = Bbox::parse("-180.0,-90.0,-179.5,-89.5")
+            .unwrap()
+            .erweitert_um_m(6000.0);
+        assert!(b.sued >= -90.0 && b.west >= -180.0, "{b:?}");
     }
     #[test]
     fn lehnt_vertauschte_grenzen_ab() {
