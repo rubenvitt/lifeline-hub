@@ -28,7 +28,7 @@ Test, dann den Code. Referenz für alle Berührpunkte ist der LFH-77-Commit `c2c
 
 ## 5. Frontend: Inspector
 
-- [ ] 5.1 `FachebenenInspector.tsx`: `OdlInhalt` mit Standortname, Wert (3 Nachkommastellen, de-DE, µSv/h; bei fehlendem Wert „kein Messwert"), Messende in Ortszeit, Betriebsstatus, `StatusTag` der Stufe und dem Hinweissatz „kein amtlicher Schwellenwert"; Tests in `FachebenenInspector.test.tsx` für eine erhöhte und eine defekte Sonde, inkl. Präsenz des Hinweissatzes; verifiziert durch `pnpm vitest run src/pages/lagekarte/FachebenenInspector.test.tsx`
+- [x] 5.1 `FachebenenInspector.tsx`: `OdlInhalt` mit Standortname, Wert (3 Nachkommastellen, de-DE, µSv/h; bei fehlendem Wert „kein Messwert"), Messende in Ortszeit, Betriebsstatus, `StatusTag` der Stufe und dem Hinweissatz „kein amtlicher Schwellenwert"; Tests in `FachebenenInspector.test.tsx` für eine erhöhte und eine defekte Sonde, inkl. Präsenz des Hinweissatzes; verifiziert durch `pnpm vitest run src/pages/lagekarte/FachebenenInspector.test.tsx`
 
 ## 6. Doku und Abschluss
 

@@ -8,6 +8,7 @@ import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
 import { hochwasserDarstellung } from './hochwasserStil';
+import { odlDarstellung } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 
 export interface FachebenenInspectorProps {
@@ -251,6 +252,50 @@ function HochwasserInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+/** Drei Nachkommastellen im deutschen Format — so führt auch ODL-Info die Werte. */
+const ODL_ZAHL = new Intl.NumberFormat('de-DE', {
+  minimumFractionDigits: 3,
+  maximumFractionDigits: 3,
+});
+
+/**
+ * ODL-Sonde des BfS (LFH-78): Stufe als Wort, Messwert, Messende, Betriebsstatus — und der
+ * Satz, dass die Stufe eine Einteilung des Lifeline Hub ist. Der Satz ist KEIN Kleingedrucktes
+ * zum Weglassen: das BfS veröffentlicht keinen absoluten Schwellenwert, und ohne den Hinweis
+ * läse sich „über natürlichem Bereich" wie eine amtliche Bewertung (Spec, Anforderung
+ * „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen").
+ *
+ * Eine Sonde ohne Messwert zeigt „kein Messwert" statt einer Zahl, und das Messende fehlt
+ * dann ganz — die Quelle liefert für defekte Sonden keins. Das Messende steht auch bei
+ * aktuellen Werten: gemessen hängt ein Teil der Sonden Stunden hinter dem Stundenwert, und
+ * eine eigene Stufe „veraltet" gibt es bewusst nicht (design.md, Entscheidung 6).
+ */
+function OdlInhalt({ p }: { p: Record<string, unknown> }) {
+  const wert = typeof p.wert === 'number' && Number.isFinite(p.wert) ? p.wert : null;
+  const messende = fmtZeit(s(p.messende));
+  return (
+    <>
+      <div style={{ marginBottom: 8 }}>
+        <StatusTag darstellung={odlDarstellung(p.stufe)} />
+      </div>
+      <Descriptions column={1}>
+        <Descriptions.Item label="Ortsdosisleistung">
+          {wert === null ? 'kein Messwert' : `${ODL_ZAHL.format(wert)} ${s(p.einheit) ?? 'µSv/h'}`}
+        </Descriptions.Item>
+        {messende && <Descriptions.Item label="Messende">{messende}</Descriptions.Item>}
+        {s(p.betrieb) && <Descriptions.Item label="Sonde">{s(p.betrieb)}</Descriptions.Item>}
+      </Descriptions>
+      <Typography.Paragraph
+        type="secondary"
+        style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}
+      >
+        Einteilung des Lifeline Hub nach dem vom BfS genannten natürlichen Bereich (0,05–0,2 µSv/h)
+        — kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum Dreifachen anheben.
+      </Typography.Paragraph>
+    </>
+  );
+}
+
 /**
  * Standbild einer BAB-Webcam. Eigene Komponente, damit der Aufrufer sie über `key={bild}`
  * strukturell zurücksetzen kann: der Fehlerzustand gehört zu GENAU DIESEM Bild, nicht zum
@@ -390,6 +435,8 @@ export default function FachebenenInspector({
         <PegelInhalt p={p} />
       ) : quelle === 'hochwasser' ? (
         <HochwasserInhalt p={p} />
+      ) : quelle === 'odl' ? (
+        <OdlInhalt p={p} />
       ) : quelle === 'autobahn' ? (
         <AutobahnInhalt p={p} />
       ) : (
