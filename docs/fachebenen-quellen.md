@@ -21,7 +21,8 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
 | **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (111 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
-| **KRITIS / sensible Objekte** (`kritis`) | `https://overpass-api.de/api/interpreter` (Overpass QL, `nwr … out center`) | OSM-JSON → GeoJSON-Punkte (Zentroide), viewport-`bbox`-getrieben | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | 3600 s (KRITIS-Objekte ändern sich kaum) | leer + ausgegraut |
+| **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Sechs-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
+| **KRITIS / sensible Objekte** (`kritis`) | `https://overpass-api.de/api/interpreter` (Overpass QL, `nwr … out center`) | OSM-JSON → GeoJSON-Punkte (Zentroide), viewport-`bbox`-getrieben | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | 24 h (`KRITIS_TTL`, KRITIS-Objekte ändern sich kaum; hier stand bis LFH-79 fälschlich 3600 s) | leer + ausgegraut |
 
 ## Hinweise zur Anbindung
 
@@ -77,7 +78,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   beschreiben (SQLite busy, Platte voll, read-only). Die zweite ist leicht zu übersehen, weil
   der Lauf selbst geglückt ist — sein Ergebnis IST aber der Cache-Eintrag, und ohne ihn
   beginnt derselbe Kreislauf. `cache::setze` meldet einen Schreibfehler deshalb zurück,
-  statt ihn nur zu loggen; die fünf anderen Ebenen dürfen ihn weiter ignorieren, weil sie
+  statt ihn nur zu loggen; die übrigen Ebenen dürfen ihn weiter ignorieren, weil sie
   ihre Antwort im selben Request weiterreichen.
 - **Geltungsbereich Autobahn:** ausschließlich Bundesautobahnen. Das steht als sichtbare Zeile
   unter dem Ebenen-Label in der Lagekarten-Leiste (nicht als Tooltip — ein Führungs-Tablet
@@ -104,6 +105,53 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Die Pflicht-Attribution `Autobahn GmbH des Bundes` wird unabhängig davon immer mitgeführt
   und genügt damit auch der strengsten der in Frage kommenden Bedingungen. Vor einer
   kommerziellen Weiterverwertung ist die Lizenzlage direkt bei der Autobahn GmbH zu klären.
+- **Luftqualität (UBA)** zeigt **Messpunkte, keine Fläche.** Die Ebene sagt, was an den
+  Stationen des Luftmessnetzes gemessen wurde — nicht, wie die Luft zwischen ihnen oder am
+  Einsatzort ist. Das steht als sichtbare Geltungszeile unter dem Ebenen-Label; eine
+  Interpolation oder Ausbreitungsrechnung ist bewusst nicht gebaut, sie behauptete eine
+  Messung, die es nicht gibt. Die Ebene ist Lageaufklärung (steigt die Belastung an den
+  Stationen im Umfeld?), kein Ersatz für eigene Messtrupps.
+- **Luftqualität — gemessene Eigenheiten der Quelle** (21.09.2026, alle per Abruf belegt):
+  * **Host:** der in bundesAPI dokumentierte `https://www.umweltbundesamt.de/api/air_data/v2`
+    antwortet mit **301** auf `https://luftdaten.umweltbundesamt.de/api/air-data/v2`
+    (Bindestrich statt Unterstrich). Der Adapter spricht den finalen Host direkt an.
+  * **Der Indexabruf treibt, nicht die Stationsliste:** `/stations` führt 2400 Stationen
+    (1175 ohne Enddatum), `/airquality` liefert in einem einzigen Abruf den Index für ~390.
+    Gezeichnet werden nur Stationen mit Index; die Liste liefert Koordinaten und Stammdaten.
+    Zwei Abrufe je Aktualisierung (~560 KB + ~140 KB), scheitert einer, gilt der Lauf als
+    gescheitert und der letzte gute Cache-Stand bleibt.
+  * **Zeit ist MEZ ohne Sommerzeit.** `indices` sagt wörtlich `date start (CET)`; ein Abruf um
+    11:39 MESZ lieferte als jüngste Stunde den Start 08:00. Umgerechnet wird deshalb mit festem
+    `+01:00`, nicht mit `Europe/Berlin` (sonst läge jeder Sommerwert eine Stunde daneben). Das
+    Ende der letzten Tagesstunde heißt in der Quelle `…-20 24:00:00` und wird zu 00:00 des
+    Folgetags. Der Messzeitpunkt einer Station ist das **Ende** ihrer Messstunde.
+  * **Verzug:** die jüngste Stunde endet ~1,5–2,5 h vor dem Abruf, einzelne Stationen hängen
+    eine weitere Stunde zurück. Deshalb das Sechs-Stunden-Fenster und TTL 900 s statt 3600 s
+    (eine Stunde TTL legte eine weitere Stunde auf den Verzug). Der Inspector zeigt den
+    Messzeitpunkt immer — ein Wert ohne Zeit läse sich als „jetzt".
+  * **Das `request.index`-Echo ist unzuverlässig:** bei tagesübergreifenden Fenstern meldet es
+    `code`, auch mit explizitem `index=id`, während die Schlüssel numerische IDs bleiben. Der
+    Adapter löst deshalb über ID **und** Stationscode auf — eine reine ID-Auflösung bliebe bei
+    einem echten Umschalten still leer.
+  * **Indexskala 0–4, 0 = „sehr gut".** Gegen die UBA-Klassengrenzen geprüft (NO₂ 0–20 → 0,
+    21–40 → 1, 41–54 → 2; O₃ 0–60 → 0, 61–90 → 1). Wire-Wörter der normalisierten `klasse`:
+    `sehr_gut`/`gut`/`maessig`/`schlecht`/`sehr_schlecht`/`keine_daten`, gepinnt in
+    `karte::luftqualitaet::tests` ↔ `theme/statusFarben.test.ts`.
+  * **„Unvollständig" bei gut der Hälfte:** 209 von 388 Stundenwerten tragen die Kennzeichnung
+    der Quelle, dass der Index aus weniger Komponenten gebildet ist. Die Ebene zeigt das als
+    Wort im Inspector, nicht als Farbe und nicht als Filter — es bleibt die amtliche Einstufung.
+  * **Leitschadstoff** = Komponente mit dem höchsten Teilindex, bei Gleichstand der höhere
+    `y`-Wert (gemessen: Wert relativ zur Obergrenze der „sehr gut"-Klasse, also über
+    Komponenten vergleichbar). Im Index kommen gemessen NO₂, O₃ und PM10 vor.
+  * **Live-Abgleich** (21.09.2026, 12:00 MESZ): 388 Stationen, `stand` 09:00 MEZ;
+    Stichprobe DENI143 (Oldenburg Heiligengeistwall, ID 1025) roh Index 1, NO₂ 31 (Teilindex 1),
+    PM10 15, unvollständig — die Ebene zeigt „gut", Leitschadstoff NO₂, dieselben Werte.
+- **Lizenz-Vorbehalt Luftqualität:** weder die API noch die Luftdaten-Seiten des UBA nennen eine
+  Lizenz. Die Einordnung als Datenlizenz Deutschland – Namensnennung – 2.0 stammt aus
+  Sekundärquellen (GDI-DE-Metadatensatz „Luftdaten Deutschland API", Open-Data-Katalog der
+  Stadt Oldenburg). Die Pflicht-Attribution `Umweltbundesamt` wird unabhängig davon immer
+  mitgeführt. Vor einer kommerziellen Weiterverwertung ist die Lizenzlage direkt beim UBA zu
+  klären.
 - **Luftbild** ist bewusst **keine** Fachebene, sondern gehört als weiterer benannter
   Online-Style in die Server-`KarteConfig` (`online_styles`), da es eine Basiskarte (Raster)
   und kein Overlay ist.

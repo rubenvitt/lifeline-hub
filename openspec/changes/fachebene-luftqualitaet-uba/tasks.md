@@ -96,24 +96,24 @@ zurückdrehen und sehen, dass genau dieser Test rot wird.
 
 ## 4. Browser-Nachweis
 
-- [ ] 4.1 Dev-Stack (`cargo run` + Vite), Lagekarte eines Einsatzes, Ebene einschalten:
+- [x] 4.1 Dev-Stack (`cargo run` + Vite), Lagekarte eines Einsatzes, Ebene einschalten:
       Stationen sichtbar, Farbe + Größe unterscheiden sich, Inspector zeigt Stufe/Zeitpunkt,
       Attribution unten rechts, Basemap-Wechsel lässt die Stationen stehen, Reload mit
       gespeicherter Ansicht stellt die Ebene wieder her. Hell- und Dunkelmodus.
       Screenshot als Beleg.
-- [ ] 4.2 Offline-Verhalten im Browser: Fachebenen-Cache-Eintrag `luftqualitaet` löschen und
+- [x] 4.2 Offline-Verhalten im Browser: Fachebenen-Cache-Eintrag `luftqualitaet` löschen und
       das Backend ohne Netz starten (bzw. den UBA-Host per `/etc/hosts` unerreichbar machen)
       → Panel zeigt „offline", die Karte bleibt ohne Fehlermeldung bedienbar, die Route
       antwortet 200.
 
 ## 5. Doku und Abschluss
 
-- [ ] 5.1 `docs/fachebenen-quellen.md`: Tabellenzeile `luftqualitaet` (Endpoint, Format,
+- [x] 5.1 `docs/fachebenen-quellen.md`: Tabellenzeile `luftqualitaet` (Endpoint, Format,
       Lizenz-Vorbehalt, Attribution, TTL 900 s, Offline) plus Hinweisabschnitt mit den
       gemessenen Eigenheiten (301-Host, MEZ ohne Sommerzeit, `24:00:00`, `index`-Echo,
       Verzug, Anteil „unvollständig") und dem Non-Goal Interpolation; KRITIS-TTL-Angabe
       (3600 s → 24 h, wie im Code) korrigieren. Verifikation: Durchsicht gegen design.md.
-- [ ] 5.2 Prüfliste Einsatztauglichkeit (15 Kriterien, Bedien-Leitlinie) für die geänderte
+- [x] 5.2 Prüfliste Einsatztauglichkeit (15 Kriterien, Bedien-Leitlinie) für die geänderte
       Lagekarten-Fläche ausfüllen, jede Zeile mit Verdikt; Ablage in der PR-Beschreibung.
 - [ ] 5.3 `./scripts/check-all.sh` vollständig grün (inkl. Prettier, Typ-Codegen ohne Diff,
       e2e); Ausgabe ohne `| tail`.
