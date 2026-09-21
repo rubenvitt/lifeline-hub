@@ -23,11 +23,11 @@ interface AdminPageProps {
   /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
   hinweis?: ReactNode;
   /**
-   * Breite der Spalte — dieselbe Achse wie an `EinsatzSeite` (`'voll'`/`'schmal'`/px).
-   * Vorgabe bleibt hier `'schmal'`: die Verwaltungsseiten sind Formularseiten neben einer
-   * Seitenleiste, und ihre Sektionen werden eigens umgebaut. Anders als bei `EinsatzSeite`
-   * (Vorgabe `'voll'`, Neuentwurf 22.09.2026) ist die Umstellung hier keine Rahmenfrage,
-   * sondern je Sektion zu entscheiden.
+   * Breite der Spalte — dieselbe Achse und dieselbe Vorgabe wie an `EinsatzSeite`
+   * (`'voll'`, Neuentwurf 22.09.2026): Stammdaten-Tabellen, Benutzer- und Kartenlisten füllen
+   * die Spalte neben der Verwaltungs-Seitenleiste. `'schmal'` setzen die reinen
+   * Formularseiten AUSDRÜCKLICH (Organisation, Fahrzeug-/Personal-Detail, Profil,
+   * Einstellungen).
    */
   breite?: SeitenBreite;
   children: ReactNode;
@@ -35,8 +35,9 @@ interface AdminPageProps {
 
 /**
  * Geteilter schlanker Seiten-Rahmen + Header für die Verwaltungs-Seiten (LFH-281):
- * Stammdaten, Globale Einstellungen, Karten, Benutzer. Level-4-Überschrift, Abstände und
- * Farben aus `theme.useToken()` bzw. den Rollen des Modus.
+ * Stammdaten, Globale Einstellungen, Karten, Benutzer. Der Titel ist das `h1` der Seite
+ * (Satz 14/600 wie an `EinsatzSeite`), Abstände und Farben aus `theme.useToken()` bzw. den
+ * Rollen des Modus.
  *
  * NEUENTWURF (21.09.2026): derselbe Seitenkopf wie `EinsatzSeite` — 44-px-Leiste mit
  * Haarlinie, Titel 14/600, rechts der Aktionen-Slot. Anders als dort NICHT vollbreit: die
@@ -48,7 +49,7 @@ export default function AdminPage({
   beschreibung,
   aktionen,
   hinweis,
-  breite = 'schmal',
+  breite = 'voll',
   children,
 }: AdminPageProps) {
   const { token } = theme.useToken();
@@ -56,7 +57,7 @@ export default function AdminPage({
   return (
     <div style={{ maxWidth: seitenBreiteMax(breite) }}>
       <div data-lfh="seitenkopf" style={seitenkopfStil(token, farben, false)}>
-        <Typography.Title level={4} style={{ ...seitentitelStil(farben), minWidth: 0 }}>
+        <Typography.Title level={1} style={{ ...seitentitelStil(farben), minWidth: 0 }}>
           {titel}
         </Typography.Title>
         {/* `data-lfh` markiert den Kopf-Slot, damit „genau eine Primäraktion im Kopf" AM KOPF

@@ -27,7 +27,7 @@ import {
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brStatus } from '../../theme/statusFarben';
-import { abstand, flaeche } from '../../theme/tokens';
+import { abstand } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
@@ -170,7 +170,6 @@ export default function BrDetailPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       titel={
         <Space>
           <BrSwitcher einsatzId={einsatzId} aktuellerBr={br} />

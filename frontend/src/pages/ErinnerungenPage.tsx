@@ -29,7 +29,6 @@ import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
-import { flaeche } from '../theme/tokens';
 
 /** Schluessel-Zeitstempel der Abgeschlossen-Ansicht: erledigt ODER quittiert ODER Anlage. */
 function abschlussZeit(e: Erinnerung): string {
@@ -148,7 +147,7 @@ export default function ErinnerungenPage() {
   return (
     <EinsatzSeite
       titel="Erinnerungen"
-      breite={flaeche.seiteBreit}
+
       meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
       dataUpdatedAt={erinnerungenQuery.dataUpdatedAt}
       breadcrumb={

@@ -1313,15 +1313,45 @@ function erstelleZonenPostSpy() {
   return { handler, count: () => anzahl, lastBody: () => letzterBody! };
 }
 
+/**
+ * Knopf über seinen sichtbaren Text statt `*ByRole` über die ganze Seite (22.09.2026).
+ *
+ * GEMESSEN, nicht vermutet: `getByRole('button', { name })` kostete auf der Lagekarte je Aufruf
+ * 2,4–2,6 s, allein und ohne Last — der Test „neuer Zeichenstart …" lief einzeln 6,1 s und in
+ * der vollen Suite über sein Zeitbudget. Die Zeit steckt NICHT in einer Render-Schleife und
+ * nicht in fehlenden Mocks: das CPU-Profil zeigt fast ausschließlich jsdoms
+ * `getComputedStyle` (`#resolveLonghand`, `getInheritedPropertyValue`, `var()`-Auflösung).
+ * Seit jsdom 30 löst `getComputedStyle` CSS-Variablen auf, und antd 6 trägt an jedem
+ * Bedienelement die Klasse `css-var-root` mit ihren Hunderten `--ant-*`-Variablen; die
+ * Rollenabfrage ruft das für JEDEN Knopf der Seite, um Namen und Sichtbarkeit zu bestimmen.
+ * Ein einzelner antd-Knopf in der Kartenleiste (Liste im Paneel im `aside`) kostete so bis
+ * zu 0,85 s — und die Leiste trägt Dutzende.
+ *
+ * `getByText` fragt keine berechneten Stile ab (3 ms statt 2,4 s). Die Rollenaussage geht
+ * dabei nicht verloren: der Treffer wird auf seinen `<button>` hochgereicht und muss einer
+ * sein.
+ */
+function knopfAus(text: HTMLElement): HTMLElement {
+  const knopf = text.closest('button');
+  expect(knopf, `„${text.textContent}" steht in keinem Knopf`).not.toBeNull();
+  return knopf as HTMLElement;
+}
+async function knopf(name: string): Promise<HTMLElement> {
+  return knopfAus(await screen.findByText(name));
+}
+function knopfSofort(name: string): HTMLElement {
+  return knopfAus(screen.getByText(name));
+}
+
 describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
   it('Zone zeichnen → Overlay „zeichnen" sichtbar', async () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+    expect(knopfSofort('Abschließen')).toBeInTheDocument();
+    expect(knopfSofort('Abbrechen')).toBeInTheDocument();
   });
 
   it('nach Abschluss (Stub) → Phase „bestaetigen", noch NICHT persistiert', async () => {
@@ -1329,10 +1359,10 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeInTheDocument();
+    expect(await knopf('Speichern')).toBeInTheDocument();
+    expect(knopfSofort('Verwerfen')).toBeInTheDocument();
     expect(spy.count()).toBe(0);
   });
 
@@ -1341,9 +1371,9 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await user.click(await knopf('Speichern'));
     await waitFor(() => expect(spy.count()).toBe(1));
     expect(spy.lastBody().typ).toBe('gefahrengebiet');
   });
@@ -1353,13 +1383,11 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+    await user.click(await knopf('Verwerfen'));
     expect(spy.count()).toBe(0);
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByText('Speichern')).not.toBeInTheDocument());
   });
 
   it('Abbrechen in Phase zeichnen → kein POST, Overlay weg', async () => {
@@ -1367,8 +1395,8 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
-    await user.click(await screen.findByRole('button', { name: 'Abbrechen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
+    await user.click(await knopf('Abbrechen'));
     expect(spy.count()).toBe(0);
     await waitFor(() =>
       expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
@@ -1383,15 +1411,15 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(await knopf('Speichern')).toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
+    await user.click(await knopf('Absperrgrenze zeichnen'));
     // Zurück in Phase „zeichnen" für den NEUEN Entwurf, keine hängende Bestätigung mehr.
-    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Speichern')).not.toBeInTheDocument();
     expect(await screen.findByText('Absperrgrenze · Linie')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(knopfSofort('Abschließen')).toBeInTheDocument();
     expect(spy.count()).toBe(0);
   });
 });
@@ -1412,7 +1440,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
   it('trägt Titel und Mono-Meta im Seitenkopf', async () => {
     basisHandler();
     renderSeite();
-    expect(await screen.findByRole('heading', { level: 4, name: 'Lagekarte' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Lagekarte' })).toBeInTheDocument();
     // Schaden 9 ist verortet, UHS 5 (BHP 50) nicht.
     const meta = document.querySelector('[data-lfh="seitenkopf-meta"]') as HTMLElement;
     await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));

@@ -18,7 +18,6 @@ import {
   SeitenStandVeraltet,
 } from '../../components/SeitenZustand';
 import { brStatus } from '../../theme/statusFarben';
-import { flaeche } from '../../theme/tokens';
 import KatalogTabelle from '../../components/KatalogTabelle';
 import BrAnlegenDrawer from './BrAnlegenDrawer';
 
@@ -105,7 +104,7 @@ export default function BereitstellungsraeumePage() {
       titel="Bereitstellungsräume"
       dataUpdatedAt={brQuery.dataUpdatedAt}
       meta={brQuery.isSuccess ? `${alle.length} Räume` : undefined}
-      breite={flaeche.seiteBreit}
+
       breadcrumb={
         <Breadcrumb
           items={[

@@ -19,7 +19,6 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
 import { Segmentleiste } from '../../components/instrument';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
-import { flaeche } from '../../theme/tokens';
 import UhsSwitcher from './UhsSwitcher';
 import { merkeLetzteUhs } from './uhsAuswahl';
 import Grundriss from './Grundriss';
@@ -114,7 +113,6 @@ export default function UhsDetailPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       /* Der Titel trägt den Umschalter, nicht bloß den Namen: die UHS-Detailseite ist der
          Ort, an dem zwischen mehreren Hilfsstellen gewechselt wird (LFH-25). */
       titel={

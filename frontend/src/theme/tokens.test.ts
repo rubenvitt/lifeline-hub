@@ -112,10 +112,10 @@ describe('Flächenmaße als Token', () => {
     expect(flaeche.zustandOben).toBeGreaterThan(0);
   });
 
-  it('trägt die fünf gemessenen Baselines aus der Spec §2.2', () => {
+  it('trägt die gemessenen Baselines aus der Spec §2.2 (ohne die entfallene Listenbreite)', () => {
+    // `seiteBreit` (960) ist mit dem Neuentwurf entfallen: Listen füllen die Inhaltsbreite.
     expect(flaeche).toEqual({
       seiteSchmal: 900,
-      seiteBreit: 960,
       zustandOben: 80,
       kachelMin: 260,
       kachelMinKlein: 220,
@@ -157,7 +157,9 @@ describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
     // Der Drawer bekommt bewusst KEINEN Platz in `flaeche`. Ohne diese Zeile
     // würde ein späteres Verschieben dorthin nur den Namen des Pins oben
     // verbiegen, ohne dass hier etwas rot wird.
-    expect(Object.keys(flaeche)).toHaveLength(5);
+    // Vier seit 22.09.2026: `seiteBreit` ist mit dem Neuentwurf entfallen (Listen füllen die
+    // Inhaltsbreite) — ein Wegfall, kein Zuzug; `navDrawer` bleibt ausgeschlossen.
+    expect(Object.keys(flaeche)).toHaveLength(4);
     expect(flaeche).not.toHaveProperty('navDrawer');
   });
 });

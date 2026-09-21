@@ -17,18 +17,41 @@ function rgb(hex: string): string {
 }
 
 describe('Statusband', () => {
-  it('Zellen stehen auf der neutralen Fläche, der Ton nur im Quadrat', () => {
+  it('jede Zelle ist eine Kennzahl auf der neutralen Fläche, der Ton im Quadrat und in der Marke', () => {
     const { container } = renderMitProviders(
       <Statusband fahrzeuge={[zelle('s3', 'achtung', 5)]} personal={[]} zustand="daten" />,
     );
-    const z = container.querySelector('[data-lfh="meldebild-bandzelle"]') as HTMLElement;
+    const band = screen.getByRole('region', { name: 'Fahrzeuge je Status' });
+    const z = band.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
     expect(z).toHaveAttribute('data-ton', 'achtung');
     expect(z).toHaveTextContent('S3');
     expect(z).toHaveTextContent('5');
     expect(z).toHaveTextContent('Wort s3');
-    expect(z.style.background).toBe(rgb(farbenHell.flaeche));
-    const quadrat = z.querySelector('[data-lfh="meldebild-bandquadrat"]') as HTMLElement;
+    // Grund `flaeche` trägt die Klasse (`.lfh-kennzahl` in `sprache.css`), kein Inline-Ton.
+    expect(z).toHaveClass('lfh-kennzahl');
+    expect(z.style.background).toBe('');
+    const quadrat = z.querySelector('[data-lfh="kennzahl-punkt"]') as HTMLElement;
     expect(quadrat.style.background).toBe(rgb(farbenHell.achtung));
+    // Tagesregel: achtung trägt 7 : 1 als Textfarbe nicht — die Zahl steht in `text`.
+    const wert = z.querySelector('[data-lfh="kennzahl-wert"]') as HTMLElement;
+    expect(wert.style.color).toBe(rgb(farbenHell.text));
+    expect(container.querySelectorAll('[data-lfh="meldebild-bandzelle"]')).toHaveLength(0);
+  });
+
+  it('normal und bedien behalten ihre Tonfarbe auch tags', () => {
+    renderMitProviders(
+      <Statusband
+        fahrzeuge={[zelle('s2', 'normal', 4), zelle('s4', 'bedien', 2)]}
+        personal={[]}
+        zustand="daten"
+      />,
+    );
+    const wert = (ton: string) =>
+      document.querySelector(
+        `[data-lfh="kennzahl"][data-ton="${ton}"] [data-lfh="kennzahl-wert"]`,
+      ) as HTMLElement;
+    expect(wert('normal').style.color).toBe(rgb(farbenHell.normalText));
+    expect(wert('bedien').style.color).toBe(rgb(farbenHell.bedienText));
   });
 
   it.each([
@@ -58,6 +81,7 @@ describe('Statusband', () => {
       expect(rasterF.style.gridTemplateColumns).toBe(`repeat(${spalten}, minmax(0, 1fr))`);
       expect(rasterP.style.gridTemplateColumns).toBe(rasterF.style.gridTemplateColumns);
       expect(within(fzg).getAllByText(/^Wort/)).toHaveLength(4);
+      expect(fzg.querySelectorAll('[data-lfh="kennzahl"]')).toHaveLength(4);
       expect(fzg.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(lueckenF);
       expect(pers.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(lueckenP);
     },

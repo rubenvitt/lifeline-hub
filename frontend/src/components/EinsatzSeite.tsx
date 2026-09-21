@@ -52,8 +52,8 @@ export function seitenkopfStil(
   };
 }
 
-/** Titel im Seitenkopf: 14/600 (`schriftskala.seitentitel`). Die ÜBERSCHRIFT bleibt eine
- *  Überschrift (h4, wie bisher) — nur ihr Satz ist der des Entwurfs. */
+/** Titel im Seitenkopf: 14/600 (`schriftskala.seitentitel`). SEMANTISCH ist er das `h1` der
+ *  Seite, optisch bleibt er klein — die Ebene folgt der Gliederung, der Satz dem Entwurf. */
 export function seitentitelStil(farben: Pick<Farbrollen, 'text'>): CSSProperties {
   return {
     margin: 0,
@@ -153,13 +153,14 @@ interface EinsatzSeiteProps {
   dataUpdatedAt?: number;
   /**
    * Breite des Inhalts unter der Kopfleiste. Vorgabe `'voll'`: der Neuentwurf ist eine
-   * Instrumententafel über die ganze Inhaltsbreite (22.09.2026). `'schmal'` begrenzt auf die
-   * Lesebreite einer reinen Formularseite (`flaeche.seiteSchmal`) — das ist die begründete
-   * Ausnahme und wird deshalb AUSDRÜCKLICH gesetzt, nie geerbt.
+   * Instrumententafel über die ganze Inhaltsbreite (22.09.2026) — Listen, Übersichten,
+   * Tabellen, Zeitachsen, Kartenraster und Detailseiten mit Datenraster. `'schmal'` begrenzt
+   * auf die Lesebreite einer reinen Formular-/Editor-/Leseseite (`flaeche.seiteSchmal`:
+   * Befehl- und Lagebericht-Editor, Einstellungen, Einsatzdaten, Aufnahme) — das ist die
+   * begründete Ausnahme und wird deshalb AUSDRÜCKLICH gesetzt, nie geerbt.
    *
-   * Eine Zahl (px) bleibt zulässig, damit die Bestandsaufrufer mit `flaeche.seiteBreit` bis
-   * zu ihrem eigenen Umbau typecheck-grün bleiben; sie begrenzt wie früher. Für Neues ist sie
-   * nicht gedacht — wer eine Seite anfasst, streicht die Zahl oder setzt `'schmal'`.
+   * Eine freie Pixelzahl gibt es nicht mehr: zwei Achsenwerte sind eine Entscheidung, eine
+   * Zahl je Seite waren zwanzig.
    */
   breite?: SeitenBreite;
   /** Arbeitsfläche bis zum Fensterende; children folgen darunter im Dokumentfluss. */
@@ -168,7 +169,7 @@ interface EinsatzSeiteProps {
 }
 
 /** Breite des Seiteninhalts — siehe `EinsatzSeiteProps.breite`. */
-export type SeitenBreite = 'voll' | 'schmal' | number;
+export type SeitenBreite = 'voll' | 'schmal';
 
 /**
  * Löst `breite` in ein `maxWidth` auf — rein und exportiert. `'voll'` ergibt KEINE Grenze
@@ -176,9 +177,7 @@ export type SeitenBreite = 'voll' | 'schmal' | number;
  * Weg, wenn ein Aufrufer per `style` nachsteuert.
  */
 export function seitenBreiteMax(breite: SeitenBreite): number | undefined {
-  if (breite === 'voll') return undefined;
-  if (breite === 'schmal') return flaeche.seiteSchmal;
-  return breite;
+  return breite === 'schmal' ? flaeche.seiteSchmal : undefined;
 }
 
 /**
@@ -201,12 +200,10 @@ function primaeraktionen(wurzel: HTMLElement): number {
  * Mono-Meta und Aktionen; der frühere A0-Akzentstrich über dem Titel ist entfallen. Der
  * Inhalt füllt per Vorgabe die ganze Breite (`breite`), eine Lesebreite ist Ausnahme.
  *
- * **Überschriftenebene:** der Titel ist (noch) ein `h4`, die Paneele darunter sind `h2`. Die
- * Hierarchie steht damit verkehrt herum; der Umzug auf `h1` (Satz bleibt 14/600) ist
- * geplant, braucht aber den gleichzeitigen Nachzug der Testdateien, die `level: 4` pinnen.
- *
- * **Sektionen INNERHALB einer Seite** bekommen weiterhin `SektionHeader` (level 5);
- * dieses Primitiv ersetzt ihn nicht, sondern steht eine Ebene darüber.
+ * **Überschriftenebene (22.09.2026):** der Titel ist das `h1` der Seite (Satz bleibt 14/600),
+ * Paneele und Abschnitte darunter sind `h2` (Vorgabe von `Paneel`, `SektionHeader`),
+ * Unterabschnitte `h3`. Genau EIN `h1` je Seite: die Lagekarte baut ihren Kopf selbst und
+ * setzt dort ebenfalls `level={1}`; die Anmeldeseite ist eine eigene Route ohne diesen Rahmen.
  */
 export default function EinsatzSeite({
   titel,
@@ -294,7 +291,7 @@ export default function EinsatzSeite({
           }}
         >
           {breadcrumb && <Ortspfad farben={farben}>{breadcrumb}</Ortspfad>}
-          <Typography.Title level={4} style={seitentitelStil(farben)}>
+          <Typography.Title level={1} style={seitentitelStil(farben)}>
             {titel}
           </Typography.Title>
           {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}

@@ -76,9 +76,6 @@ import {
  * Weg — mit Namen, Notiz, Melder und Vermisst-Meldung.
  */
 
-/** Lesebreite: der Entwurf füllt den Inhaltsbereich; `flaeche.seiteBreit` (960) ließe der
- *  Tabelle neben der 268-px-Seitenleiste keine 700 px. Muster `LageDashboardPage`. */
-const BETROFFENE_BREITE = 1600;
 const SEITENLEISTE_BREITE = 268;
 
 const ANSICHT_OPTIONEN = [
@@ -608,7 +605,6 @@ export default function PersonenPage() {
 
   return (
     <EinsatzSeite
-      breite={BETROFFENE_BREITE}
       dataUpdatedAt={personenQuery.dataUpdatedAt}
       titel="Betroffene"
       meta={personenQuery.data ? `${alle.length} erfasst` : undefined}

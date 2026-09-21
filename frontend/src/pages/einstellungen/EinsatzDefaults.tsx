@@ -13,15 +13,14 @@ import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
-import { speicherLeisteStil } from './einsatzEinstellungenForm';
+import { speicherLeisteStil } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
   normalisiereEinsatz,
   zuUpdate,
 } from './orgEinstellungenForm';
-import Formularpaneel from './Formularpaneel';
-import { flaeche } from '../../theme/tokens';
+import { Formularpaneel } from '../../components/instrument';
 
 /**
  * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen,
@@ -105,7 +104,7 @@ export default function EinsatzDefaults() {
   return (
     <AdminPage
       titel="Einsatz-Defaults"
-      breite={flaeche.seiteSchmal}
+      breite="schmal"
       beschreibung="Org-weite Defaults für neue Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte."
       hinweis={
         // NUR der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre

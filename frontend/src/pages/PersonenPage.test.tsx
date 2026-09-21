@@ -300,13 +300,13 @@ describe('PersonenPage', () => {
   /**
    * LFH-340 · C5. Der Kopf kam aus einem handgebauten Block (Breadcrumb, `Title level={3}`,
    * Status-Tag, `Datenstand`, Schreibrecht-Alert) — also genau aus dem Slotsatz, den
-   * `EinsatzSeite` seit LFH-328 · A2 trägt. Die zweite Zeile ist die tragende: „level 4 da"
+   * `EinsatzSeite` seit LFH-328 · A2 trägt. Die zweite Zeile ist die tragende: „level 1 da"
    * allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
    */
   it('trägt den Seitenkopf „Betroffene" mit Mono-Meta „n erfasst"', async () => {
     render(einsatzAktiv, [person, unbekannt]);
     expect(
-      await screen.findByRole('heading', { level: 4, name: 'Betroffene' }),
+      await screen.findByRole('heading', { level: 1, name: 'Betroffene' }),
     ).toBeInTheDocument();
     expect(await screen.findByText('2 erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();

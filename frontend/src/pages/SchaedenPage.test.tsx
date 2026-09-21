@@ -235,7 +235,7 @@ describe('SchaedenPage', () => {
   it('trägt den gemeinsamen Modulkopf: Breadcrumb, Einsatz-Status, eine Überschrift', async () => {
     render(einsatzAktiv, [basisSchaden()]);
     expect(await screen.findByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 4, name: /Schäden/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /Schäden/ })).toBeInTheDocument();
     expect(screen.getAllByRole('heading')).toHaveLength(1);
     // „Aktiv", nicht „aktiv": der Kopf zeigt seit LFH-358 die BESCHRIFTUNG aus dem
     // Statusfarb-Vertrag über `StatusTag`, nicht mehr den rohen Wire-Wert in einem

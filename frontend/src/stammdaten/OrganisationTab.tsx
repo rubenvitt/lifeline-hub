@@ -8,9 +8,8 @@ import { useAuth } from '../auth/AuthContext';
 import { ladeOrganisation, setzeOrgDefault } from '../api/organisation';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import Formularpaneel from '../pages/einstellungen/Formularpaneel';
-import { speicherLeisteStil } from '../pages/einstellungen/einsatzEinstellungenForm';
-import { flaeche } from '../theme/tokens';
+import { Formularpaneel } from '../components/instrument';
+import { speicherLeisteStil } from '../components/speicherLeiste';
 
 interface FormWerte {
   tz_organisation: string;
@@ -71,7 +70,7 @@ export default function OrganisationTab() {
        `<form>` und könnte nichts übermitteln (Erfassungs-Norm B4/LFH-332). */
     <AdminPage
       titel="Organisation"
-      breite={flaeche.seiteSchmal}
+      breite="schmal"
       hinweis={
         <SeitenHinweise
           fehler={speichern.error}

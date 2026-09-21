@@ -1,7 +1,7 @@
 import { App } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
-import Formularpaneel from './Formularpaneel';
+import { Formularpaneel } from '../../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import ModulEinstellungsListe from './ModulEinstellungsListe';

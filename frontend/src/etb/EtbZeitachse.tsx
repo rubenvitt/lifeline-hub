@@ -89,9 +89,9 @@ function hinweisZeile(teile: ReactNode[], luft: number): ReactNode {
  *
  * ── WARUM KEINE `Datensicht` MEHR ────────────────────────────────────────────────────
  *
- * Seit LFH-342 · C7 lief die Chronologie über `Datensicht` — Tabelle ab `xl`
- * (`tabelleAb="xl"`, LFH-464), darunter ein Karten-EIGENBAU, der erste und einzige Eintrag
- * in `KARTEN_EIGENBAU`. Beides war die Antwort auf die Frage „welche Form trägt ein
+ * Seit LFH-342 · C7 lief die Chronologie über `Datensicht` — Tabelle ab `xl` (LFH-464, ein
+ * eigener Umbruchpunkt, den das Primitiv seither nicht mehr kennt), darunter ein
+ * Karten-EIGENBAU, der erste und einzige Eintrag in `KARTEN_EIGENBAU`. Beides war die Antwort auf die Frage „welche Form trägt ein
  * Tagebuch?", und die Antwort des Neuentwurfs ist eindeutiger als die der Vorgänger: ein
  * Tagebuch wird GELESEN, in Zeitfolge, auf jedem Schirm. Es gibt keine Sortierung, keinen
  * Spaltenfilter, keine Spaltenauswahl — die Ordnung ist die Zeit und serverseitig

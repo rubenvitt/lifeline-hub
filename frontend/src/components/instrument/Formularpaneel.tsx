@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
-import Datenstand from '../../components/Datenstand';
-import { Paneel, useRollen } from '../../components/instrument';
+import Datenstand from '../Datenstand';
+import Paneel, { type PaneelUeberschrift } from './Paneel';
+import { useRollen } from './rollenwerte';
 
 /**
- * Feldgruppe einer Einstellungsseite im Neuentwurf: ein `Paneel` mit Augenbrauen-Kopf statt
- * einer Überschrift über losen Feldern. Die Gruppe ist eine Überschrift der Ebene 3 (die
- * Seite trägt h4 im Seitenkopf nicht als Gliederungsanfang, sondern als Titel — Paneele
- * gliedern darunter, wie auf `EinsatzdatenPage`).
+ * Feldgruppe einer Formularseite im Neuentwurf: ein `Paneel` mit Augenbrauen-Kopf statt
+ * einer Überschrift über losen Feldern. Die Gruppe ist eine Überschrift der Ebene 2 — der
+ * Seitentitel im Kopf ist das `h1`, die Paneele gliedern direkt darunter.
  *
- * LOKAL in `pages/einstellungen/`, weil `components/instrument/**` parallel benutzt wird;
- * gebraucht wird hier nur eine feste Kombination (Kopf + optionale Beschreibung + gepolsterter
- * Körper + Abstand nach unten), keine neue Fähigkeit des Bausteins.
+ * Seit 22.09.2026 ein Baustein (vorher lokal in `pages/einstellungen/`): die Stammdaten-
+ * Formulare (Organisation, Fahrzeug- und Personal-Detail) nutzen dieselbe feste Kombination
+ * (Kopf + optionale Beschreibung + gepolsterter Körper + Abstand nach unten).
  *
  * Die Felder bleiben Kinder desselben `<Form>` — das Paneel ist reine Hülle. Die sticky
  * Speichern-Leiste steht DANACH im selben `<form>` (Enter sendet, Erfassungs-Norm B4).
@@ -20,6 +20,7 @@ export default function Formularpaneel({
   beschreibung,
   aktion,
   dataUpdatedAt,
+  ueberschrift = 'h2',
   children,
 }: {
   titel: ReactNode;
@@ -29,13 +30,15 @@ export default function Formularpaneel({
   aktion?: ReactNode;
   /** Letzter erfolgreicher Abruf (`query.dataUpdatedAt`) — steht als Mono-Meta im Kopf. */
   dataUpdatedAt?: number;
+  /** Überschriftenebene; Vorgabe `h2` (direkt unter dem Seitentitel). */
+  ueberschrift?: PaneelUeberschrift;
   children: ReactNode;
 }) {
   const { token, rollen } = useRollen();
   return (
     <Paneel
       titel={titel}
-      ueberschrift="h3"
+      ueberschrift={ueberschrift}
       aktion={aktion}
       meta={dataUpdatedAt ? <Datenstand dataUpdatedAt={dataUpdatedAt} /> : undefined}
       koerperPolster

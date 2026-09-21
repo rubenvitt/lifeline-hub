@@ -12,7 +12,6 @@ import {
 } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import { renderMitProviders } from '../test/utils';
-import { flaeche } from '../theme/tokens';
 import EinsatzSeite, { seitenBreiteMax, seitenkopfStil } from './EinsatzSeite';
 
 /**
@@ -63,7 +62,7 @@ describe('EinsatzSeite', () => {
     );
     const heading = screen.getByRole('heading', { name: 'Personen' });
     // Gleiche Ebene wie `AdminPage` — eine Seite ist eine Seite (Spec §3.1).
-    expect(heading.tagName).toBe('H4');
+    expect(heading.tagName).toBe('H1');
     expect(screen.getByText('Einsätze / Personen')).toBeInTheDocument();
     expect(screen.getByText('Betreute und vermisste Personen')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
@@ -127,21 +126,11 @@ describe('EinsatzSeite', () => {
       </EinsatzSeite>,
     );
     expect(inhalt(schmal.container).style.maxWidth).toBe('900px');
-    schmal.unmount();
-
-    // Bestandsaufrufer mit einer Zahl behalten ihre Grenze, bis sie selbst umgebaut werden.
-    const zahl = renderMitProviders(
-      <EinsatzSeite titel="Zahl" breite={flaeche.seiteBreit}>
-        <div>x</div>
-      </EinsatzSeite>,
-    );
-    expect(inhalt(zahl.container).style.maxWidth).toBe('960px');
   });
 
   it('löst die Breite rein auf — voll ist keine Grenze, nicht 100 %', () => {
     expect(seitenBreiteMax('voll')).toBeUndefined();
     expect(seitenBreiteMax('schmal')).toBe(900);
-    expect(seitenBreiteMax(640)).toBe(640);
   });
 
   it('zeigt den Query-Datenstand im Seitenkopf', () => {

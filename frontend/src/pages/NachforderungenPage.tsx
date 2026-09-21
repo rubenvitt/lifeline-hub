@@ -21,7 +21,6 @@ import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
-import { flaeche } from '../theme/tokens';
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
 function abschlussZeit(n: Nachforderung): string {
@@ -165,7 +164,7 @@ export default function NachforderungenPage() {
   return (
     <EinsatzSeite
       titel="Nachforderung Kräfte/Mittel"
-      breite={flaeche.seiteBreit}
+
       meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
       dataUpdatedAt={nfQuery.dataUpdatedAt}
       breadcrumb={

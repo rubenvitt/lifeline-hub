@@ -348,6 +348,8 @@ function LageberichtDetail() {
           erreichbar). Im Druck blendet `lageberichtPrint.css` den Kopf aus, wie vorher die
           Kopfzeile mit `lagebericht-no-print`. */}
       <EinsatzSeite
+        // Editor: reine Schreibfläche, ausdrücklich in Lesebreite.
+        breite="schmal"
         titel={bericht.titel}
         meta={
           <Space size={6} wrap>
@@ -508,7 +510,10 @@ function LageberichtDetail() {
                   bericht.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
                 return (
                   <section key={a.schluessel} style={{ marginBottom: 16 }}>
-                    <Typography.Title level={5}>{a.label}</Typography.Title>
+                    {/* h3 unter dem Paneel (h2); Satz bleibt der von h5. */}
+                    <Typography.Title level={3} style={{ fontSize: token.fontSizeHeading5 }}>
+                      {a.label}
+                    </Typography.Title>
                     {text.trim() ? (
                       <Markdown variante="dokument">{text}</Markdown>
                     ) : (

@@ -21,6 +21,14 @@ import { monoStil, useRollen } from './rollenwerte';
  *
  * Die 38 px sind eine MINDESThöhe, keine feste: steht rechts eine Aktion, wächst der Kopf
  * mit deren Dichte-Staffel (30 / 48 / 72) mit, statt sie abzuschneiden.
+ *
+ * ENGER KOPF (22.09.2026, gemessen im Lage-Dashboard bei 1024 px: „5 Gebiete · Gefahren ↗"
+ * lief in den Nachbarkopf). Keins der beiden Kinder konnte schrumpfen, und
+ * `space-between` schob den rechten Block einfach über den Rand. Jetzt:
+ * der Kopf BRICHT UM (`flexWrap`), der rechte Block rückt als Ganzes in eine zweite Zeile
+ * und bleibt rechtsbündig (`marginInlineStart: auto`); reicht selbst die nicht, kürzt das
+ * Meta mit Auslassung (`paneelMetaStil`), die Aktion nie — ein abgeschnittener Link ist kein
+ * Ziel mehr. Das volle Meta steht dann im `title`, wenn es ein Text ist.
  */
 export const PANEEL_KOPF_HOEHE = 38;
 
@@ -42,14 +50,41 @@ export function paneelKopfStil(
 ): CSSProperties {
   return {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: token.padding,
+    columnGap: token.padding,
+    rowGap: token.paddingXS,
     minHeight: PANEEL_KOPF_HOEHE,
     paddingBlock: token.paddingXS,
     paddingInline: token.padding,
     borderBlockEnd: `1px solid ${rollen.linie}`,
     flex: '0 0 auto',
+  };
+}
+
+/** Rechter Block des Kopfs (Meta + Aktion): darf schrumpfen und bleibt rechtsbündig, auch
+ *  wenn er in die zweite Zeile umbricht. */
+export function paneelKopfRechtsStil(token: { paddingSM: number }): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: token.paddingSM,
+    minWidth: 0,
+    maxWidth: '100%',
+    marginInlineStart: 'auto',
+  };
+}
+
+/** Das Mono-Meta im Kopf: kürzt mit Auslassung statt überzulaufen. */
+export function paneelMetaStil(rollen: Pick<Farbrollen, 'schwach'>): CSSProperties {
+  return {
+    ...monoStil(11),
+    color: rollen.schwach,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   };
 }
 
@@ -107,13 +142,27 @@ export default function Paneel({
       style={{ ...paneelStil(rollen), ...style }}
     >
       <div style={paneelKopfStil(rollen, token)}>
-        <Augenbraue als={ueberschrift} id={kopfId}>
+        <Augenbraue
+          als={ueberschrift}
+          id={kopfId}
+          style={{ minWidth: 0, overflowWrap: 'anywhere' }}
+        >
           {titel}
         </Augenbraue>
         {(meta != null || aktion != null) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: token.paddingSM }}>
-            {meta != null && <span style={{ ...monoStil(11), color: rollen.schwach }}>{meta}</span>}
-            {aktion}
+          <div data-lfh="paneel-kopf-rechts" style={paneelKopfRechtsStil(token)}>
+            {meta != null && (
+              <span
+                data-lfh="paneel-meta"
+                title={
+                  typeof meta === 'string' || typeof meta === 'number' ? String(meta) : undefined
+                }
+                style={paneelMetaStil(rollen)}
+              >
+                {meta}
+              </span>
+            )}
+            {aktion != null && <span style={{ flex: '0 0 auto' }}>{aktion}</span>}
           </div>
         )}
       </div>

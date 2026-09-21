@@ -262,11 +262,11 @@ describe('TierePage', () => {
   /**
    * LFH-340 · C5, wortgleich zu `PersonenPage.test.tsx`: der Kopf kam aus einem
    * handgebauten Block statt aus `EinsatzSeite`. Die zweite Zeile ist die tragende —
-   * „level 4 da" allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
+   * „level 1 da" allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
    */
   it('trägt den gemeinsamen Modulkopf statt einer handgebauten Titelzeile', async () => {
     render(einsatzAktiv, []);
-    expect(await screen.findByRole('heading', { level: 4, name: /Tiere/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /Tiere/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
   });

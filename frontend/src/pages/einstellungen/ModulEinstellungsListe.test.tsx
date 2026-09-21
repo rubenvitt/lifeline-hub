@@ -205,7 +205,7 @@ describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
   it('gruppiert die Module in die sechs Registry-Kategorien — in der Ordnung der Icon-Rail', async () => {
     renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
 
-    const koepfe = await screen.findAllByRole('heading', { level: 5 });
+    const koepfe = await screen.findAllByRole('heading', { level: 3 });
     // Gepinnt gegen `kategorien` selbst, nicht gegen eine Literal-Liste: die Reihenfolge ist
     // die der Icon-Rail (`modulRegistry.ts`), eine eigene Sortierung hier waere eine zweite
     // Wahrheit. Der Plan nannte ein `modulNachKategorie()` — das gibt es nicht, die Registry
@@ -235,7 +235,7 @@ describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
     fireEvent.change(screen.getByLabelText('Modul filtern'), { target: { value: 'zzz' } });
 
     expect(screen.getByText('Kein Modul passt zum Filter.')).toBeInTheDocument();
-    expect(screen.queryAllByRole('heading', { level: 5 })).toHaveLength(0);
+    expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0);
   });
 
   it('benennt die nicht ausblendbaren Module als solche', async () => {

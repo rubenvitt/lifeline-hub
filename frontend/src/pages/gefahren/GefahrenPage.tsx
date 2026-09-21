@@ -25,7 +25,6 @@ import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
-import { flaeche } from '../../theme/tokens';
 
 /**
  * Trefflächenboden der Gebietszeile (Abschluss-Review zu LFH-368 · B5h, Konvention aus
@@ -154,7 +153,7 @@ export default function GefahrenPage() {
   const seite = (inhalt: ReactNode, dataUpdatedAt?: number) => (
     <EinsatzSeite
       titel="Gefahrenmatrix"
-      breite={flaeche.seiteBreit}
+
       meta={gebieteQuery.isSuccess ? `${gebiete.length} Gefahrengebiete` : undefined}
       dataUpdatedAt={dataUpdatedAt}
       breadcrumb={
@@ -283,8 +282,9 @@ export default function GefahrenPage() {
             }}
           >
             <Typography.Title
-              level={5}
-              style={{ marginTop: 0 }}
+              // h3 unter dem Paneel „Bewertung" (h2); Satz bleibt der von h5.
+              level={3}
+              style={{ marginTop: 0, fontSize: token.fontSizeHeading5 }}
               editable={
                 darfSchreiben
                   ? {

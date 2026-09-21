@@ -10,11 +10,11 @@ import {
   initialAufbewahrung,
   normalisiereAufbewahrung,
   orgHinweisWert,
-  speicherLeisteStil,
   zuUpdate,
   type FormWerteAufbewahrung,
 } from './einsatzEinstellungenForm';
-import Formularpaneel from './Formularpaneel';
+import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { Formularpaneel } from '../../components/instrument';
 
 /**
  * Sektion `…/einstellungen/aufbewahrung` (LFH-345 · C10) — die Aufbewahrungs-Dauer.

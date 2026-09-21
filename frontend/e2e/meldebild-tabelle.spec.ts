@@ -436,7 +436,7 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
 
   // Jede Zelle ohne Bildlauf erreichbar — die Hälfte, die der reine Bildlaufvergleich NICHT
   // abdeckt: ein Band, das eine Zelle gar nicht rendert, scrollt ebenfalls nicht.
-  const zellen = band.locator('[data-lfh="meldebild-bandzelle"]');
+  const zellen = band.locator('[data-lfh="kennzahl"]');
   const anzahl = await zellen.count();
   expect(anzahl, 'mindestens eine Fahrzeug- und eine Personalzelle').toBeGreaterThanOrEqual(2);
   for (let i = 0; i < anzahl; i += 1) await expect(zellen.nth(i)).toBeInViewport();

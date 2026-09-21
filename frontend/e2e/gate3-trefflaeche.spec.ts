@@ -38,17 +38,18 @@ import {
  *
  * ── WAS GEMESSEN WIRD (die fünf Ziele aus dem Ticket) ─────────────────────────────
  *
- *  Lage-Dashboard (`/einsaetze/:id/lage-dashboard`):
- *   - `a.lfh-zeile`         die Kurzlisten-Zeilen (Meldung + Auftrag, je eine gesät)
- *   - `button.lfh-kz`       die sechs Kennzahl-Knöpfe
- *   - `.lfh-kachel__mehr`   der „Mehr"-Ausgang jeder Kachel
+ *  Lage-Dashboard (`/einsaetze/:id/lage-dashboard`, Neuentwurf 22.09.2026):
+ *   - `a[data-lfh="kennzahl"]`     die sechs Kennzahl-Zellen des Bands „Lage in Zahlen"
+ *   - `[data-lfh="paneel-link"]`   der Ausgang („… ↗") im Kopf jedes der drei Paneele
+ *   (Die früheren Kurzlisten-Zeilen `a.lfh-zeile` und Kachel-Ausgänge `.lfh-kachel__mehr`
+ *   gibt es mit dem Neuentwurf nicht mehr.)
  *  Einsatzauswahl (`/einsaetze`):
  *   - der Titel-Link der Einsatzkarte (das Tastaturziel der Karte)
  *   - das Suchfeld samt Such-Knopf — es erscheint erst ab `SUCHE_AB = 8` aktiven
  *     Einsätzen (`EinsaetzePage.tsx`), deshalb sät der Test acht.
  *
  * MENGEN STATT EINZELKNOTEN. `datensicht-schmal.spec.ts` verlangt `toHaveCount(1)` vor jeder
- * Messung; hier ist das für Zeilen, Kennzahlen und Mehr-Knöpfe nicht die richtige Aussage —
+ * Messung; hier ist das für Kennzahlen und Paneel-Ausgänge nicht die richtige Aussage —
  * sie stehen bewusst mehrfach, und jeder Einzelne muss den Boden halten. `alleHaltenStufe`
  * verlangt deshalb eine MINDESTZAHL (die gesäte, nicht null) und misst dann jeden Knoten;
  * ein leerer Locator wäre sonst grün durch Nichtstun. Der Titel-Link und das Suchfeld sind
@@ -245,20 +246,7 @@ async function alleHaltenStufe(
   return kleinstes;
 }
 
-/**
- * Zeitstempel im Wire-Format `YYYY-MM-DD HH:MM:SS` (UTC). Die Meldungsroute nimmt auch
- * RFC 3339 (`etb::normalisiere_zeit`), die Auftragsroute NICHT: `auftrag/eingabe.rs`
- * `parse_zeit` kennt nur `%Y-%m-%d %H:%M(:%S)` — ein `toISOString()` mit Millisekunden und
- * `Z` war dort gemessen „400 Ungültiger Zeitpunkt". Ein Format für beide.
- */
-function wireZeit(d: Date): string {
-  return d.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-const MELDUNG = 'Wasserversorgung über Hydrant Nordring 14 hergestellt';
-const AUFTRAG = 'Menschenrettung im zweiten Obergeschoss über die Drehleiter fortsetzen';
-
-test('Lage-Dashboard: Kurzlisten-Zeile, Kennzahl-Knopf und Mehr-Knopf folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
   // Drei Stufen mit je einem Neuladen — einzeln reicht das Vorgabebudget, unter Volllast
@@ -268,62 +256,33 @@ test('Lage-Dashboard: Kurzlisten-Zeile, Kennzahl-Knopf und Mehr-Knopf folgen der
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Lage`);
 
-  // Je eine offene Meldung und ein offener Auftrag: ohne sie rendert das Dashboard keine
-  // einzige `a.lfh-zeile`, und die Zeilenmessung liefe auf einem Leerzustand.
-  // `meldungszeilen` filtert auf `ist_offen`, `auftragszeilen` auf „nicht vollzogen /
-  // abgenommen" (`lagebild.ts`) — beides ist der Anlage-Default.
-  await anlegen(
-    page,
-    einsatzId,
-    'meldungen',
-    {
-      absender: 'Florian Musterstadt 1/44-1',
-      meldeweg: 'funk',
-      inhalt: MELDUNG,
-      ereigniszeit: wireZeit(new Date()),
-    },
-    'Meldung',
-  );
-  await anlegen(
-    page,
-    einsatzId,
-    'auftraege',
-    {
-      auftrag_text: AUFTRAG,
-      frist_at: wireZeit(new Date(Date.now() + 60 * 60 * 1000)),
-      empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnittsleitung Nord' }],
-    },
-    'Auftrag',
-  );
-
+  // Kein Säen mehr (Neuentwurf 22.09.2026): die früheren Kurzlisten-Zeilen (`a.lfh-zeile`)
+  // gibt es nicht mehr, der Meldungsstrom besteht aus Lesezeilen ohne Bedienziel. Die
+  // Ziele des neuen Dashboards stehen UNBEDINGT da — die sechs Kennzahl-Zellen des Bands
+  // „Lage in Zahlen" (Links, sobald das Lagebild geladen ist) und die drei Ausgänge in den
+  // Paneelköpfen (Gefahren ↗, Personen ↗, ETB ↗), die außerhalb der Zustandsweiche sitzen.
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
     await stelleDichte(page, dichte);
 
-    // Anker: die Daten sind da. Vor dem Einsatz-Abruf stellt die Leiste sechs `div.lfh-kz`
-    // als Platzhalter (kein Knopf); gemessen wird der KNOPF, also erst nach dem Laden.
-    const kennzahlen = page.locator('.lfh-kennzahlen button.lfh-kz');
+    // Anker: die Daten sind da. Vor dem Einsatz-Abruf stehen die sechs Zellen als
+    // Platzhalter ohne Ziel (`div`); gemessen wird der LINK, also erst nach dem Laden.
+    const kennzahlen = page
+      .getByRole('group', { name: 'Lage in Zahlen' })
+      .locator('a[data-lfh="kennzahl"]');
     await expect(kennzahlen).toHaveCount(6);
-    const zeilen = page.locator('a.lfh-zeile');
-    await expect(zeilen.filter({ hasText: MELDUNG })).toHaveCount(1);
-    await expect(zeilen.filter({ hasText: AUFTRAG })).toHaveCount(1);
+    const ausgaenge = page.locator('[data-lfh="lagebild-paneele"] [data-lfh="paneel-link"]');
+    await expect(ausgaenge).toHaveCount(3);
 
-    const zeile = await alleHaltenStufe(zeilen, soll, `Kurzlisten-Zeile (${dichte})`, 2);
-    const kennzahl = await alleHaltenStufe(kennzahlen, soll, `Kennzahl-Knopf (${dichte})`, 6);
-    // Sechs, nicht „mindestens eine": das Dashboard rendert sechs `<Kachel>` UNBEDINGT
-    // (`LageDashboardPage.tsx`, keine steht hinter einem `&&`), und der Mehr-Knopf sitzt im
-    // Kachelkopf außerhalb der Zustandsweiche. Mit `1` bliebe der Test grün, wenn fünf
-    // Kacheln verschwänden (Review-Befund).
-    const mehr = await alleHaltenStufe(
-      page.locator('.lfh-kachel__mehr'),
-      soll,
-      `Mehr-Knopf der Kachel (${dichte})`,
-      6,
-    );
+    const kennzahl = await alleHaltenStufe(kennzahlen, soll, `Kennzahl-Zelle (${dichte})`, 6);
+    // Drei, nicht „mindestens einer": das Dashboard rendert die drei Paneele UNBEDINGT
+    // (`LageDashboardPage.tsx`), und der Ausgang sitzt im Paneelkopf außerhalb der
+    // Zustandsweiche. Mit `1` bliebe der Test grün, wenn zwei Paneele verschwänden.
+    const ausgang = await alleHaltenStufe(ausgaenge, soll, `Paneel-Ausgang (${dichte})`, 3);
 
-    gemessen.push(`${dichte} (Soll ≥ ${soll}): Zeile ${zeile}, Kennzahl ${kennzahl}, Mehr ${mehr}`);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Kennzahl ${kennzahl}, Ausgang ${ausgang}`);
   }
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

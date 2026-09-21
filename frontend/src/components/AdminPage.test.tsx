@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Button, Form, Input } from 'antd';
 import { renderMitProviders } from '../test/utils';
-import { flaeche } from '../theme/tokens';
 import AdminPage from './AdminPage';
 
 describe('AdminPage', () => {
@@ -19,7 +18,7 @@ describe('AdminPage', () => {
       </AdminPage>,
     );
     const heading = screen.getByRole('heading', { name: 'Einstellungen' });
-    expect(heading.tagName).toBe('H4');
+    expect(heading.tagName).toBe('H1');
     expect(screen.getByText('Org-weite Defaults')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
     expect(screen.getByText('Nur lesend')).toBeInTheDocument();
@@ -48,7 +47,7 @@ describe('AdminPage', () => {
     expect(onFinish).toHaveBeenCalledWith({ feld: 'wert' });
   });
 
-  it('hält die Container-Breite auf `flaeche.seiteSchmal` und lässt sie überschreiben', () => {
+  it('füllt ohne Angabe die Spalte; schmal (`flaeche.seiteSchmal`) nur ausdrücklich', () => {
     // Wörtlich nach dem Muster des Schwester-Primitivs `EinsatzSeite.test.tsx`:
     // `renderMitProviders` legt eine `.ant-app`-Hülle um den Baum — die Wurzel
     // des Primitivs ist deren erstes Kind, nicht `container.firstElementChild`.
@@ -61,8 +60,18 @@ describe('AdminPage', () => {
     // belegte er nur die Zahl, nicht deren Quelle.
     const wurzel = (c: HTMLElement) => c.querySelector<HTMLElement>('.ant-app > div')!;
 
-    const { container, unmount } = renderMitProviders(
-      <AdminPage titel="Schmal">
+    // Vorgabe `voll` wie an `EinsatzSeite` (Neuentwurf 22.09.2026): die Stammdaten-Tabellen
+    // füllen die Spalte neben der Verwaltungs-Seitenleiste.
+    const voll = renderMitProviders(
+      <AdminPage titel="Voll">
+        <div>x</div>
+      </AdminPage>,
+    );
+    expect(wurzel(voll.container).style.maxWidth).toBe('');
+    voll.unmount();
+
+    const { container } = renderMitProviders(
+      <AdminPage titel="Schmal" breite="schmal">
         <div>x</div>
       </AdminPage>,
     );
@@ -74,13 +83,5 @@ describe('AdminPage', () => {
     // zusammen belegen die Verdrahtung. Die Regel dahinter steht in CLAUDE.md
     // („Charakterisierungstests bauen ihre Keys als Literale").
     expect(wurzel(container).style.maxWidth).toBe('900px');
-    unmount();
-
-    const breit = renderMitProviders(
-      <AdminPage titel="Breit" breite={flaeche.seiteBreit}>
-        <div>x</div>
-      </AdminPage>,
-    );
-    expect(wurzel(breit.container).style.maxWidth).toBe('960px');
   });
 });

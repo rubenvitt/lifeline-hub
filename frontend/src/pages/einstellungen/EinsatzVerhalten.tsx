@@ -14,11 +14,11 @@ import {
   normalisiereVerhalten,
   orgHinweisAutoEtb,
   orgHinweisWert,
-  speicherLeisteStil,
   zuUpdate,
   type FormWerteVerhalten,
 } from './einsatzEinstellungenForm';
-import Formularpaneel from './Formularpaneel';
+import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { Formularpaneel } from '../../components/instrument';
 
 /** Tristate-Optionen für automatische ETB-Einträge (leer = erbt Org, true = An, false = Aus).
  *  Bleibt bewusst hier: diese Liste gibt es nur auf der Einsatz-Ebene. */

@@ -508,7 +508,7 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
   // Die Anker sind bewusst aus den Nachbar-Specs übernommen, wo sie am
   // Handschirm bereits belegt sind — sie müssen auf ALLEN DREI Breiten stehen,
   // auch auf 390 px:
-  //  - `.lfh-kennzahlen .lfh-kz` → `lage-dashboard-schmal.spec.ts`
+  //  - `[data-lfh="kennzahl"]` im Band „Lage in Zahlen" → `lage-dashboard-schmal.spec.ts`
   //  - `Inhalt …` (ETB-Schnellerfassung) → `nav-schmal.spec.ts`
   //  - `tr.ant-table-row` → `katalogtabelle-schmal.spec.ts`
   // Für `/einsaetze` gibt es keinen Nachbar-Spec; gemessen trägt die Seite auf
@@ -529,7 +529,8 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
     { pfad: '/einsaetze', anker: (p: Page) => p.locator('[data-testid="einsaetze-raster"]') },
     {
       pfad: `/einsaetze/${einsatzId}/lage-dashboard`,
-      anker: (p: Page) => p.locator('.lfh-kennzahlen .lfh-kz').first(),
+      anker: (p: Page) =>
+        p.getByRole('group', { name: 'Lage in Zahlen' }).locator('[data-lfh="kennzahl"]').first(),
     },
     {
       pfad: `/einsaetze/${einsatzId}/etb`,

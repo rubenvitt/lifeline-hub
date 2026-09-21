@@ -48,7 +48,6 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
-import { flaeche } from '../theme/tokens';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
@@ -305,7 +304,7 @@ export default function EinsatzabschnittePage() {
           <StatusTag darstellung={einsatzStatus[einsatz.status]} />
         </Space>
       }
-      breite={flaeche.seiteBreit}
+
       meta={abschnitteQuery.isSuccess ? `${abschnitte.length} Abschnitte` : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(
         abschnitteQuery.dataUpdatedAt,

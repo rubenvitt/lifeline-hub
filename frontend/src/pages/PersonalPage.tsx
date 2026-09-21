@@ -41,7 +41,7 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { einsatzStatus, statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
-import { abstand, flaeche } from '../theme/tokens';
+import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 
 /**
@@ -466,7 +466,6 @@ export default function PersonalPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       meta={epQuery.isSuccess ? `${eps.length} Kräfte` : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(
         epQuery.dataUpdatedAt,

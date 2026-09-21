@@ -58,7 +58,6 @@ import {
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, useRollen } from '../components/instrument';
-import { flaeche } from '../theme/tokens';
 
 /**
  * Mindesthöhe der Chat-Arbeitsfläche (Kanäle, Strom, Eingabe). Unter einem langen Kopf
@@ -522,7 +521,7 @@ export default function ChatPage() {
   return (
     <EinsatzSeite
       titel="Chat"
-      breite={flaeche.seiteBreit}
+
       meta={kanaeleQuery.isSuccess ? `${kanaele.length} Kanäle` : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(
         kanaeleQuery.dataUpdatedAt,

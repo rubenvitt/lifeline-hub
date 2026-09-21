@@ -12,7 +12,6 @@ import {
   Tag,
 } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { flaeche } from '../theme/tokens';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -406,7 +405,6 @@ export default function MaterialPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       breadcrumb={
         <Breadcrumb
           items={[

@@ -6,7 +6,6 @@ import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
-import { flaeche } from '../../theme/tokens';
 import { Paneel } from '../../components/instrument';
 
 /**
@@ -88,7 +87,7 @@ export default function Anmeldeverfahren() {
   return (
     <AdminPage
       titel="Anmeldeverfahren"
-      breite={flaeche.seiteSchmal}
+      breite="schmal"
       beschreibung="Verfügbare Login-Wege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren erscheinen hier. Änderungen werden sofort gespeichert."
       hinweis={
         <SeitenHinweise

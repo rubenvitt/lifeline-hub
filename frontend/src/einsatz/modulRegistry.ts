@@ -157,7 +157,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: TbListDetails,
     route: 'kraefteuebersicht',
     status: 'fertig',
-    beschreibung: 'Meldebild der eingesetzten Kräfte (Kräfteübersicht).',
+    beschreibung: 'Meldebild der eingesetzten Kräfte: Status, Stärke und Gliederung.',
   },
   {
     key: 'einheiten',

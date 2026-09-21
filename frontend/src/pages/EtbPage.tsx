@@ -45,13 +45,6 @@ import {
   type TypSegment,
 } from '../etb/zeitachseModell';
 
-/**
- * Lesebreite des Tagebuchs. Breiter als die Listenseiten (`flaeche.seiteBreit`, 960), weil
- * neben der Zeitachse die 260-px-Seitenleiste steht (Entwurf S4: 1440er Rahmen); nicht
- * unbegrenzt, weil ein Meldungstext über 1400 px Zeilenlänge nicht mehr zu lesen ist.
- */
-const ETB_BREITE = 1440;
-
 /** Breite der Seitenleiste „Bilanz" (Entwurf S4, 260 px) — ab `xl`. */
 const LEISTE_BREITE = 260;
 
@@ -395,7 +388,7 @@ export default function EtbPage() {
 
   /**
    * Der vierteilige Zustandsraum des Tagebuchs, dritter und vierter Teil: leer-mit-Filter
-   * und leer-ohne-Filter. Laden und Fehler unterdrücken diesen Knoten in `EtbTabelle`.
+   * und leer-ohne-Filter. Laden und Fehler unterdrücken diesen Knoten in `EtbZeitachse`.
    *
    * Die Rechte-Weiche ist keine Kosmetik: ohne Schreibrecht wird die Erfassungsleiste gar
    * nicht gerendert (siehe unten), ein Sprung dorthin zeigte auf einen Knoten, den es
@@ -449,7 +442,6 @@ export default function EtbPage() {
           : undefined
       }
       dataUpdatedAt={etbQuery.dataUpdatedAt}
-      breite={ETB_BREITE}
       aktionen={
         <>
           {/* Der Typfilter als Segmentleiste (Entwurf S4). Er schreibt in denselben

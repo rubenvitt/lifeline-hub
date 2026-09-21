@@ -58,7 +58,7 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { einsatzStatus, statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
-import { abstand, flaeche } from '../theme/tokens';
+import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 
 /**
@@ -637,7 +637,6 @@ export default function FahrzeugePage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
       meta={efQuery.isSuccess ? `${efs.length} Fahrzeuge` : undefined}
       titel={

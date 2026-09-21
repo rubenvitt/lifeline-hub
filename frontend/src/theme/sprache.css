@@ -18,11 +18,11 @@
    AUFGERÄUMT am 22.09.2026: die A0-Klassen ohne Erzeuger im Quelltext sind entfallen —
    Fläche mit Kartenraster samt Container-Staffel (`.lfh-flaeche`, 1100/700 px), Marke
    und Akzentstrich, Formzeichen (`.lfh-zeichen--*`), Instrumentenband, Kachel-Innenteile,
-   Werteblöcke, Plaketten, Leer-/Fehler-Innenteile und der Blankknopf. Stehen geblieben
-   sind neben den lebenden Klassen VIER ohne Erzeuger, weil e2e-Specs sie noch als
-   Selektor führen (`gate1-ueberlauf`, `gate3-trefflaeche`): `.lfh-kennzahlen`, `.lfh-kz`,
-   `.lfh-zeile`, `.lfh-kachel__mehr`. Sie fallen, sobald die Specs aufs neue
-   Lage-Dashboard zeigen.
+   Werteblöcke, Plaketten, Leer-/Fehler-Innenteile und der Blankknopf. Die vier letzten
+   Klassen ohne Erzeuger (`.lfh-kennzahlen`, `.lfh-kz`, `.lfh-zeile`, `.lfh-kachel__mehr`)
+   lebten nur noch als e2e-Selektor; seit `gate1-ueberlauf` und `gate3-trefflaeche` auf die
+   Anker des neuen Lage-Dashboards zeigen (`[data-lfh="kennzahl"]`, `[data-lfh="paneel-link"]`),
+   sind auch sie entfallen.
    ========================================================================== */
 
 /* ── Signatur 3 · Zahlen als Instrument ────────────────────────────────────
@@ -53,74 +53,6 @@
   white-space: nowrap;
 }
 
-/* ── Kennzahlenleiste des früheren Lage-Dashboards ─────────────────────────
-   Ohne Erzeuger im Quelltext; bleibt nur als Selektor der e2e-Specs (Dateikopf). */
-.lfh-kennzahlen {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 1px;
-  background: var(--lfh-linie);
-  border-bottom: 1px solid var(--lfh-linie);
-}
-
-.lfh-kz {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--lfh-luft-1);
-  padding: var(--lfh-luft-3);
-  /* GEMESSEN eine Nulländerung: der Inhalt (Etikett + Zahl + Zusatz, zwei gaps,
-     Polster rundum) ergibt bereits 81,9 / 99,9 / 119,9 px — die 62 px banden in
-     KEINER Stufe. Sie fallen trotzdem, weil ein harter Pixelwert hier als
-     Zusicherung gelesen wird, die er nie war; als Boden für künftig kürzere
-     Inhalte trägt die Staffel ihn besser. */
-  min-height: var(--lfh-zeilenhoehe);
-  background: var(--lfh-flaeche);
-  border: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--lfh-uebergang);
-}
-
-.lfh-kz:hover {
-  background: var(--lfh-flaeche-2);
-}
-
-/* Der „Mehr"-Ausgang der früheren Dashboard-Kacheln — ohne Erzeuger, e2e-Selektor. */
-.lfh-kachel__mehr {
-  margin-left: auto;
-  /* Der EINZIGE Navigationsausgang jeder Dashboard-Kachel — und bis LFH-370 der
-     einzige ohne jede Mindesthöhe (gemessen 19,6 / 21,8 / 21,8 px, also schon in
-     der kompakten Stufe unter dem Gate-1-Boden von 24 px).
-     `inline-flex` + `align-items` sind nicht Zierde: ohne sie sitzt das Etikett
-     bei 72 px Höhe oben statt mittig. Die Polsterung gibt der waagerechten Achse
-     eine Fläche, die sonst die blosse Textbreite wäre. */
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--lfh-zeilenhoehe);
-  padding: 0 var(--lfh-luft-2);
-  /* Neuentwurf: Mono 11 in Bedienfarbe, ohne Versalien — der Verweis im Paneelkopf
-     („ETB ↗"). Vorher 11,5 px Versalien wie der Kacheltitel; die 10,5 der noch älteren
-     Absicht hatten wegen eines Kaskadenfehlers (Kurzform `font: inherit` am früheren
-     Blankknopf) nie gewirkt. Die Größe liegt eine
-     Stufe über der Augenbraue daneben (10 px), damit der Ausgang nicht leiser ist als
-     der Titel. */
-  font-family: var(--lfh-schrift-zahl);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--lfh-bedien);
-}
-
-/* Der Ausgang im Entwurf ist ein Mono-Verweis in Bedienfarbe („ETB ↗") — unter dem
-   Zeiger heller. */
-.lfh-kachel__mehr:hover {
-  color: var(--lfh-bedien-hover);
-}
-
 /* ── Werteblöcke ───────────────────────────────────────────────────────────── */
 .lfh-felder {
   display: grid;
@@ -143,39 +75,6 @@
 }
 .lfh-feld--achtung .lfh-zahl {
   color: var(--lfh-achtung);
-}
-
-/* ── Ereigniszeile des früheren Lage-Dashboards — ohne Erzeuger, e2e-Selektor ── */
-.lfh-zeile {
-  display: flex;
-  align-items: center;
-  gap: var(--lfh-luft-2);
-  min-height: var(--lfh-zeilenhoehe);
-  padding: var(--lfh-luft-1) 0;
-  border-top: 1px solid var(--lfh-flaeche-3);
-  font-size: 13px;
-}
-
-.lfh-zeile time {
-  color: var(--lfh-gedaempft);
-  font-family: var(--lfh-schrift-zahl);
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  flex: 0 0 auto;
-}
-
-/* Eine Kurzlisten-Zeile, die auf ihren Datensatz springt (LFH-336).
-   Trägt `.lfh-zeile` und damit deren Boden (`--lfh-zeilenhoehe`) und Polsterung —
-   die zwei Angaben, die LFH-365 einem Bedienziel abverlangt, kommen aus der
-   Basisklasse und werden hier NICHT wiederholt. */
-a.lfh-zeile {
-  color: inherit;
-  text-decoration: none;
-}
-
-a.lfh-zeile:hover,
-a.lfh-zeile:focus-visible {
-  background: var(--lfh-flaeche-2);
 }
 
 /* ── Datenzustände: LADEN, FEHLER und LEER sehen verschieden aus ───────────

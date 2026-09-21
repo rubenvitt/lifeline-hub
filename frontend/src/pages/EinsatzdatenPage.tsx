@@ -13,7 +13,6 @@ import {
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { flaeche } from '../theme/tokens';
 import {
   Augenbraue,
   Paneel,
@@ -286,7 +285,7 @@ export default function EinsatzdatenPage() {
     <EinsatzSeite
       // Datenblatt und Bearbeitungsformular: ausdrücklich die schmale Lesebreite, unabhängig
       // von der Vorgabe des Primitivs (die für Arbeitsflächen breit wird).
-      breite={flaeche.seiteSchmal}
+      breite="schmal"
       titel={
         <Space>
           {einsatz.bezeichnung}

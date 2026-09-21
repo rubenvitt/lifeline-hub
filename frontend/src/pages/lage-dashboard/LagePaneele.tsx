@@ -9,6 +9,8 @@ import type { EtbEintragAnzeige, Sichtungskategorie } from '../../api/types';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import {
   Paneel,
+  PaneelLink,
+  PaneelZustand,
   Sammelbanner,
   Zeitachseneintrag,
   monoStil,
@@ -17,7 +19,6 @@ import {
 import type { LiveVerbindungsStatus } from '../../live/useEinsatzLiveStream';
 import { etbTyp, sichtung, warnstufeBalkenFarbe } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
-import PaneelZustand, { PaneelLink } from './PaneelZustand';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { warnstufeTon, type Datenzustand } from './lagebild';
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';

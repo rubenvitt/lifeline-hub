@@ -99,7 +99,7 @@ test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page })
 
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/auftraege`);
-  // Reiterkopf `Bereichskopf` (h3, Augenbraue in CSS-Versalien); `level` trennt ihn vom h4-Seitentitel
+  // Reiterkopf `Bereichskopf` (h3, Augenbraue in CSS-Versalien); `level` trennt ihn vom h1-Seitentitel
   // „Aufträge/Befehle" — ohne `exact`, damit die Groß-/Kleinschreibung des Namens egal ist.
   await expect(page.getByRole('heading', { level: 3, name: 'Aufträge' })).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);

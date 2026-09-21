@@ -8,7 +8,6 @@ import { einsatzKeys } from '../api/queryKeys';
 import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { flaeche } from '../theme/tokens';
 
 export default function AuftraegePage() {
   const { id } = useParams();
@@ -38,7 +37,7 @@ export default function AuftraegePage() {
     // gehören dem jeweiligen Reiter (`Bereichskopf`) — die zwei Bereiche zählen Verschiedenes.
     <EinsatzSeite
       titel="Aufträge/Befehle"
-      breite={flaeche.seiteBreit}
+
       breadcrumb={
         <Breadcrumb
           items={[

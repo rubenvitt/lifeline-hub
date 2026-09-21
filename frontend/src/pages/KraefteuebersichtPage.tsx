@@ -45,7 +45,6 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
-import { flaeche } from '../theme/tokens';
 import './kraefteuebersichtPrint.css';
 
 /**
@@ -551,7 +550,6 @@ export default function KraefteuebersichtPage() {
     // und `EinsatzSeite` nimmt kein `className` entgegen.
     <div className="kraefte-print-root">
       <EinsatzSeite
-        breite={flaeche.seiteBreit}
         titel="Meldebild"
         meta={meta}
         dataUpdatedAt={datenstand}

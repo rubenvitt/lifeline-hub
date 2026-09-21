@@ -24,7 +24,6 @@ import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensic
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { flaeche } from '../theme/tokens';
 import { einsatzStatus } from '../theme/statusFarben';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
@@ -270,7 +269,6 @@ export default function SchaedenPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       dataUpdatedAt={schaedenQuery.dataUpdatedAt}
       meta={
         schaedenQuery.isSuccess

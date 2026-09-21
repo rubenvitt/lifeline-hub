@@ -123,13 +123,6 @@ function alsKennzahlZustand(z: Datenzustand): KennzahlZustand {
   return z === 'leer' ? 'daten' : z;
 }
 
-/**
- * Lesebreite der Fläche. Der Entwurf füllt den Inhaltsbereich (1440er-Schirm → ~1170 px);
- * darüber hinaus würden die drei Paneele zu Zeilen ohne Blickführung gestreckt. `flaeche`
- * in `theme/tokens.ts` kennt nur die Lesebreiten der Formular- und Listenseiten.
- */
-const LAGEBILD_BREITE = 1600;
-
 /** Takt der Uhr: „Stand vor n s" und die Einsatzdauer laufen mit, ohne jede Sekunde zu rendern. */
 const TAKT_MS = 5000;
 
@@ -328,7 +321,6 @@ export default function LageDashboardPage() {
 
   return (
     <EinsatzSeite
-      breite={LAGEBILD_BREITE}
       titel={`Lagebild ${lagebildZeit(jetzt, konv)}`}
       breadcrumb={
         <Breadcrumb

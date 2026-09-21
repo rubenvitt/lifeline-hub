@@ -489,8 +489,8 @@ describe('EtbPage', () => {
  * leer-mit-Filter (LFH-331 · B3, Spec §5 Bündel 7).
  *
  * Die Zusicherungen „Leertitel NICHT im DOM" unten sind Regressionsklammern; ihre
- * Beweiskraft liegt im Primitivtest (`etb/EtbTabelle.test.tsx`), wo die Tabelle in allen
- * drei Fällen montiert bleibt. Hier steht die Partnerhälfte mit byte-gleichem Literal
+ * Beweiskraft liegt im Zeitachsen-Test (`etb/EtbZeitachse.test.tsx`), wo die Zeitachse in
+ * allen drei Fällen montiert bleibt. Hier steht die Partnerhälfte mit byte-gleichem Literal
  * (Spec §3/F2).
  */
 describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {

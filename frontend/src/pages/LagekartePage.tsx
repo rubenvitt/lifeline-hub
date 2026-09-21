@@ -565,7 +565,7 @@ export default function LagekartePage() {
           minWidth: 0,
         }}
       >
-        <Typography.Title level={4} style={seitentitelStil(farben)}>
+        <Typography.Title level={1} style={seitentitelStil(farben)}>
           Lagekarte
         </Typography.Title>
         <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>
@@ -829,9 +829,10 @@ export default function LagekartePage() {
   return (
     // Der Höhenrahmen des Projekts (LFH-459, `FensterRahmen`): die Arbeitsfläche endet am
     // Fensterrand, gemessen in `dvh` — nicht mehr das frühere `calc(100vh - 120px)` mit einer
-    // geratenen Kopfhöhe. Nicht über `EinsatzSeite.fensterInhalt`: dessen Körper deckelt die
-    // Breite auf `flaeche.seiteSchmal`/`seiteBreit` (900/960 px), und Karte plus 300-px-Leiste
-    // brauchen die ganze Inhaltsfläche. Kopf und Titel folgen deren exportierten Stilen.
+    // geratenen Kopfhöhe. Nicht über `EinsatzSeite.fensterInhalt`: die Karte baut ihren Kopf
+    // selbst (Ansichtswahl im Kopf, keine Seitenebene für „Neue Zeile"), und Karte plus
+    // 300-px-Leiste brauchen die ganze Inhaltsfläche. Kopf und Titel folgen den exportierten
+    // Stilen von `EinsatzSeite`.
     <FensterRahmen kopf={kopf} mindestHoehe={360}>
       <div
         data-lfh="lagekarte-flaeche"

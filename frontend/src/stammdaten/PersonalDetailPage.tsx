@@ -17,14 +17,13 @@ import { listeQualifikationen } from '../api/qualifikationen';
 import { listeBenutzer } from '../api/benutzer';
 import { globalKeys } from '../api/queryKeys';
 // Wiederverwendet statt nachgebaut — siehe Kopf von `FahrzeugDetailPage`.
-import { speicherLeisteStil } from '../pages/einstellungen/einsatzEinstellungenForm';
+import { speicherLeisteStil } from '../components/speicherLeiste';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
 import type { Personal, StaerkePosition } from '../api/types';
-import { flaeche } from '../theme/tokens';
 import { personalListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import Formularpaneel from '../pages/einstellungen/Formularpaneel';
+import { Formularpaneel } from '../components/instrument';
 
 interface FormWerte {
   name: string;
@@ -124,13 +123,13 @@ export default function PersonalDetailPage() {
   }));
 
   return (
-    <div style={{ maxWidth: flaeche.seiteSchmal, margin: '0 auto' }}>
+    <div>
       <Breadcrumb
         style={{ marginBottom: token.marginSM }}
         items={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
       />
       <AdminPage
-        breite={flaeche.seiteSchmal}
+        breite="schmal"
         titel={person.name}
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die eine Person nicht auffindbar ist."
         hinweis={

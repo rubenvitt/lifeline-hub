@@ -21,7 +21,6 @@ import Datensicht, {
   type Kartenplan,
 } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { flaeche } from '../theme/tokens';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
   liesErfassungsSitzungswert,
@@ -354,7 +353,6 @@ export default function TierePage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       dataUpdatedAt={tiereQuery.dataUpdatedAt}
       meta={tiereQuery.isSuccess ? `${tiereQuery.data.length} Tiere` : undefined}
       titel={

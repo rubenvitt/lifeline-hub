@@ -80,7 +80,7 @@ describe('GefahrenPage', () => {
     zeile.focus();
     await user.keyboard('{Enter}');
 
-    expect(await screen.findByRole('heading', { level: 5 })).toHaveTextContent('Süd');
+    expect(await screen.findByRole('heading', { level: 3 })).toHaveTextContent('Süd');
   });
 
   it('weist Gebietsliste und Matrix mit dem älteren erfolgreichen Stand aus', async () => {
@@ -245,7 +245,7 @@ describe('GefahrenPage', () => {
       { route: '/einsaetze/1/gefahren?gefahrengebiet=8', client },
     );
     // FINALE Auswahl: der editierbare Titel (h5) zeigt NUR das gewählte Gebiet.
-    const titel = await screen.findByRole('heading', { level: 5 });
+    const titel = await screen.findByRole('heading', { level: 3 });
     expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
   });
 
@@ -274,7 +274,7 @@ describe('GefahrenPage', () => {
       await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     );
     // Der Eintrag wird über das OFFENE Menü gegriffen — antd lässt die Portale
-    // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbTabelle.test.tsx`).
+    // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbZeitachse.test.tsx`).
     const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );

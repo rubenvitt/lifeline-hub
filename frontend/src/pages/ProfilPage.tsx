@@ -8,7 +8,6 @@ import {
   monoStil,
   useRollen,
 } from '../components/instrument';
-import { farbenHell, flaeche } from '../theme/tokens';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
@@ -179,7 +178,7 @@ export default function ProfilPage() {
 
   return (
     // Reine Formularseite: ausdrücklich schmal, unabhängig von der Vorgabe des Primitivs.
-    <AdminPage titel="Profil" breite={flaeche.seiteSchmal}>
+    <AdminPage titel="Profil" breite="schmal">
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
         <Paneel titel="Konto">
           {/* Die Organisation steht nicht am Benutzer, sie kommt aus einem eigenen Abruf.
@@ -294,14 +293,16 @@ export default function ProfilPage() {
                   <div
                     style={{
                       // Ein QR-Code braucht hellen Grund, auch im Nachtbetrieb — Scanner lesen
-                      // dunkle Module auf hellem Feld. Der Wert kommt aus der Hellpalette.
-                      background: farbenHell.flaeche,
-                      padding: 12,
+                      // dunkle Module auf hellem Feld. Den hellen Grund samt Ruhezone
+                      // (4 Module, `marginSize`) trägt das SVG selbst (Vorgabe `bgColor` der
+                      // Bibliothek); die Hülle nimmt nur die Modus-Rolle und liest keine
+                      // Palette fest aus (vorher `farbenHell.flaeche`).
+                      background: rollen.flaeche,
                       width: 'fit-content',
-                      marginBottom: 12,
+                      marginBottom: token.marginSM,
                     }}
                   >
-                    <QRCodeSVG value={totpEnrollment.otpauthUrl} size={176} />
+                    <QRCodeSVG value={totpEnrollment.otpauthUrl} size={200} marginSize={4} />
                   </div>
                   <Typography.Paragraph copyable={{ text: totpEnrollment.secretBase32 }}>
                     Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>

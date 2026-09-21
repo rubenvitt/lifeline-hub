@@ -300,7 +300,7 @@ export default function EinsaetzePage() {
 
   if (isError) {
     return (
-      <EinsatzSeite titel="Einsätze" breite={flaeche.seiteBreit}>
+      <EinsatzSeite titel="Einsätze">
         <SeitenFehler
           text="Die Einsatzliste konnte nicht geladen werden."
           onWiederholen={() => void refetch()}
@@ -313,7 +313,7 @@ export default function EinsaetzePage() {
     <EinsatzSeite
       titel="Einsätze"
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
-      breite={flaeche.seiteBreit}
+
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
       {/* Leer und anlegeberechtigt schließen sich NICHT aus: vorher lief der

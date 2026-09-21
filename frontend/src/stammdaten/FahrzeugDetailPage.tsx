@@ -28,14 +28,13 @@ import {
 import { globalKeys } from '../api/queryKeys';
 // Die Speicherleiste wird WIEDERVERWENDET, nicht nachgebaut: sie ist seit LFH-345 · C10 die
 // eine Stelle, an der „sticky am unteren Rand, im Formular" begründet und geprüft steht.
-import { speicherLeisteStil } from '../pages/einstellungen/einsatzEinstellungenForm';
+import { speicherLeisteStil } from '../components/speicherLeiste';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
 import type { Fahrzeug, Staerke } from '../api/types';
-import { flaeche } from '../theme/tokens';
 import { fahrzeugListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import Formularpaneel from '../pages/einstellungen/Formularpaneel';
+import { Formularpaneel } from '../components/instrument';
 
 interface FormWerte {
   funkrufname: string;
@@ -143,7 +142,7 @@ export default function FahrzeugDetailPage() {
   };
 
   return (
-    <div style={{ maxWidth: flaeche.seiteSchmal, margin: '0 auto' }}>
+    <div>
       {/* Brotkrume statt eines zweiten „Zurück"-Knopfes im Kopf: der Aktionen-Slot sichert
           GENAU EINE Primäraktion zu (LFH-340 · C5), und die ist hier das Speichern — das
           im Formular steht, nicht im Kopf. */}
@@ -155,7 +154,7 @@ export default function FahrzeugDetailPage() {
         ]}
       />
       <AdminPage
-        breite={flaeche.seiteSchmal}
+        breite="schmal"
         titel={<span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>}
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die ein Fahrzeug nicht auffindbar ist."
         hinweis={

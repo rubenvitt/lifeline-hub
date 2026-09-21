@@ -284,7 +284,9 @@ describe('KraefteuebersichtPage — Statusband', () => {
     mitEinheit();
     const { container } = setup();
     const zelle = await waitFor(() => {
-      const z = container.querySelector('[data-lfh="meldebild-bandzelle"]') as HTMLElement;
+      const z = container.querySelector(
+        '[aria-label="Fahrzeuge je Status"] [data-lfh="kennzahl"]',
+      ) as HTMLElement;
       expect(z).not.toBeNull();
       return z;
     });

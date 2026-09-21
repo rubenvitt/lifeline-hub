@@ -38,7 +38,6 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ErfassungsModal } from '../components/Erfassung';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
-import { flaeche } from '../theme/tokens';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LFH-339 · C4).
@@ -232,7 +231,6 @@ export default function EinheitenPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       breadcrumb={
         <Breadcrumb
           items={[

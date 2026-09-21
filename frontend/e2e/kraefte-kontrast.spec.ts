@@ -345,7 +345,9 @@ for (const modus of ['light', 'dark'] as const) {
     }
 
     // (1) STATUSBAND — Zahl und Wort je Ton, auf der neutralen Zellfläche (Nacharbeit
-    // 22.09.2026: der Ton steht nur noch im Quadrat und in der Zahl, `statusbandStil.ts`).
+    // 22.09.2026: der Ton steht nur noch im Quadrat und in der Zahl). Die Zellen sind seit
+    // dem Umbau `Kennzahl`-Bausteine: Marke `kennzahl` mit `data-ton`, Zahl `kennzahl-wert`,
+    // das Wort ist die Notiz (`kennzahl-notiz`).
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
@@ -353,15 +355,20 @@ for (const modus of ['light', 'dark'] as const) {
     for (const { ton } of BAND_TOENE) {
       // `.first()` ist hier KEINE Mittelung: mehrere Katalogstatus derselben Kategorie
       // tragen dieselbe Fläche und dieselbe Textfarbe, das Paar ist also eines.
-      const zelle = band.locator(`[data-lfh="meldebild-bandzelle"][data-ton="${ton}"]`).first();
+      const zelle = band.locator(`[data-lfh="kennzahl"][data-ton="${ton}"]`).first();
       await expect(zelle, `Bandzelle mit Ton ${ton}`).toHaveCount(1);
       await pruefe(
-        zelle.locator('[data-lfh="meldebild-bandwert"]'),
+        zelle.locator('[data-lfh="kennzahl-wert"]'),
         'Statusband',
         `Zahl ${ton}`,
         ZIEL[modus],
       );
-      await pruefe(zelle.locator('span').last(), 'Statusband', `Wort ${ton}`, ZIEL[modus]);
+      await pruefe(
+        zelle.locator('[data-lfh="kennzahl-notiz"]'),
+        'Statusband',
+        `Wort ${ton}`,
+        ZIEL[modus],
+      );
     }
 
     // (2) SEITENGRUND — dieselben drei Rollen in der Verdichtungszeile.

@@ -75,7 +75,8 @@ describe('MarkdownEditor', () => {
     }
     const { container } = render(<Wrapper />);
     await userEvent.type(screen.getByRole('textbox'), '# Titel');
-    expect(container.querySelector('.markdown h1')).toHaveTextContent('Titel');
+    // `#` rendert als h4 mit der Quellstufe als Klasse (`Markdown.tsx`, UEBERSCHRIFT_VERSATZ).
+    expect(container.querySelector('.markdown .md-h1')).toHaveTextContent('Titel');
   });
 });
 

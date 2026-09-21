@@ -24,7 +24,7 @@ const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
 /**
  * Der Eintrag wird IMMER über das geöffnete Menü gegriffen: antd lässt die Portale
  * geschlossener Dropdowns im Baum stehen, ein globales getByText träfe auch sie.
- * Muster aus `etb/EtbTabelle.test.tsx` (LFH-365 · B5e); in einer Matrix mit 58
+ * Muster aus `etb/EtbZeitachse.test.tsx` (vorher `EtbTabelle`, LFH-365 · B5e); in einer Matrix mit 58
  * Auslösern liegt je bereits geöffneter Zelle ein eigenes totes Portal herum.
  *
  * `:not(.ant-dropdown-hidden)` allein GENÜGT HIER NICHT — gemessen an genau dem Fall,

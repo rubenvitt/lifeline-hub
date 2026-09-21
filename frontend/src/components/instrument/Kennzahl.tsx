@@ -34,6 +34,27 @@ import '../../theme/sprache.css';
  * ohne Farbe, und die Zeile springt beim Statuswechsel nicht (keine stufenabhängige
  * Schriftgröße).
  *
+ * `normal`/`bedien` (22.09.2026, für das Meldebild-Statusband: „frei", „am Einsatzort")
+ * färben nur die Zahl und setzen KEINE Kante — die abgestufte Kante trennt die beiden
+ * ESKALATIONSstufen; ein Zustand ohne Handlungsbedarf bekommt keine. Der zweite Kanal ist
+ * dort das Wort in Augenbraue und Notiz.
+ *
+ * KONTRAST DER ZAHL (übernommen aus `kraefte/statusbandStil.ts`, gerechnet 22.09.2026 nach
+ * WCAG gegen `flaeche` — den Grund von `.lfh-kennzahl`; Boden Tag ≥ 7 : 1, Nacht ≥ 5 : 1):
+ *
+ * | Ton     | Rolle der Zahl | Tag (auf #ffffff) | Nacht (auf #0f1215) |
+ * |---------|----------------|-------------------|---------------------|
+ * | normal  | normalText     | 9,18              | 10,92               |
+ * | bedien  | bedienText     | 8,41              |  9,95               |
+ * | achtung | achtung        | 6,92 ✗            | 11,75               |
+ * | alarm   | alarm          | 6,78 ✗            |  6,77               |
+ *
+ * `neutral` steht in `text` (Tag 18,47 — die Tagesausweichfarbe unten ist dieselbe Rolle).
+ * `achtung`/`alarm` tragen den Tagesboden als Textfarbe nicht (es fehlen Rollen
+ * `achtungText`/`alarmText`, dieselbe Lücke wie in `statusFlaeche.ts`). TAGS steht deren
+ * Zahl deshalb in `text`; der Ton bleibt in Kante und Statuspunkt sichtbar. Nachts gilt der
+ * Entwurf ungebrochen.
+ *
  * ── STATUSPUNKT (Neuentwurf S6, Statusstufen-Kacheln) ──────────────────────────────
  *
  * `punkt` setzt ein 8-px-Quadrat in der Tonfarbe VOR die Augenbraue — die Kachel benennt
@@ -53,7 +74,7 @@ import '../../theme/sprache.css';
  */
 
 export type KennzahlZustand = 'daten' | 'laden' | 'fehler';
-export type KennzahlTon = 'neutral' | 'achtung' | 'alarm';
+export type KennzahlTon = 'neutral' | 'normal' | 'bedien' | 'achtung' | 'alarm';
 export type KennzahlGroesse = 'klein' | 'mittel' | 'gross';
 
 const STUFE: Record<KennzahlGroesse, Schriftstufenname> = {
@@ -63,21 +84,39 @@ const STUFE: Record<KennzahlGroesse, Schriftstufenname> = {
 };
 
 /** Kantenbreite je Ton — abgestuft, damit Alarm und Achtung ohne Farbe unterscheidbar sind. */
-export const KANTE: Record<KennzahlTon, number> = { neutral: 0, achtung: 3, alarm: 6 };
+export const KANTE: Record<KennzahlTon, number> = {
+  neutral: 0,
+  normal: 0,
+  bedien: 0,
+  achtung: 3,
+  alarm: 6,
+};
 
 export const LADE_ZEICHEN = '····';
 export const FEHLER_ZEICHEN = '?';
 export const STAND_UNBEKANNT = 'Stand unbekannt';
 export const WIRD_ABGERUFEN = 'wird abgerufen';
 
-/** Die Zahlfarbe — nur im Zustand `daten` getönt. Rein. */
+/** Die Zahlfarbe — nur im Zustand `daten` getönt, Tagesregel siehe Dateikopf. Rein. */
 export function zahlFarbe(
-  rollen: Pick<Farbrollen, 'text' | 'achtung' | 'alarm'>,
+  rollen: Pick<Farbrollen, 'text' | 'normalText' | 'bedienText' | 'achtung' | 'alarm'>,
   ton: KennzahlTon,
   zustand: KennzahlZustand,
+  dunkel: boolean,
 ): string {
-  if (zustand !== 'daten' || ton === 'neutral') return rollen.text;
-  return ton === 'alarm' ? rollen.alarm : rollen.achtung;
+  if (zustand !== 'daten') return rollen.text;
+  switch (ton) {
+    case 'normal':
+      return rollen.normalText;
+    case 'bedien':
+      return rollen.bedienText;
+    case 'achtung':
+      return dunkel ? rollen.achtung : rollen.text;
+    case 'alarm':
+      return dunkel ? rollen.alarm : rollen.text;
+    case 'neutral':
+      return rollen.text;
+  }
 }
 
 /**
@@ -198,7 +237,7 @@ export function Kennzahl({
           style={{
             ...schriftStil(STUFE[groesse]),
             lineHeight: 1,
-            color: zahlFarbe(rollen, ton, zustand),
+            color: zahlFarbe(rollen, ton, zustand, dunkel),
           }}
         >
           {zahl}
@@ -215,18 +254,32 @@ export function Kennzahl({
         />
       )}
       {notizText != null && (
-        <span style={{ fontSize: 11, lineHeight: 1.4, color: rollen.gedaempft }}>{notizText}</span>
+        <span
+          data-lfh="kennzahl-notiz"
+          style={{
+            fontSize: 11,
+            lineHeight: 1.4,
+            color: rollen.gedaempft,
+            overflowWrap: 'anywhere',
+          }}
+        >
+          {notizText}
+        </span>
       )}
     </>
   );
 
   const stil = { ...kennzahlStil(rollen, token, ton, zustand), ...style };
+  // Der WIRKSAME Ton als Marke (Prüfanker für e2e-Kontrast und Tests): außerhalb von `daten`
+  // neutral, wie Farbe und Kante.
+  const datenTon: KennzahlTon = zustand === 'daten' ? ton : 'neutral';
   return ziel != null ? (
     <Link
       to={ziel}
       aria-label={zielBeschriftung}
       className="lfh-kennzahl lfh-kennzahl--ziel"
       data-lfh="kennzahl"
+      data-ton={datenTon}
       style={stil}
     >
       {inhalt}
@@ -235,6 +288,7 @@ export function Kennzahl({
     <div
       className="lfh-kennzahl"
       data-lfh="kennzahl"
+      data-ton={datenTon}
       aria-busy={zustand === 'laden' || undefined}
       style={stil}
     >

@@ -10,9 +10,12 @@ export {
   PANEEL_KOPF_HOEHE,
   paneelStil,
   paneelKopfStil,
+  paneelKopfRechtsStil,
+  paneelMetaStil,
   paneelZeileStil,
   type PaneelUeberschrift,
 } from './Paneel';
+export { default as Formularpaneel } from './Formularpaneel';
 export {
   Kennzahl,
   Kennzahlenband,

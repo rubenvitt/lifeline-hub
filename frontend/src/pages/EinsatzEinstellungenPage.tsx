@@ -4,7 +4,6 @@ import { Segmentleiste } from '../components/instrument';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { flaeche } from '../theme/tokens';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { ladeEinsatz, ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
@@ -125,7 +124,7 @@ export default function EinsatzEinstellungenPage() {
       titel="Einstellungen"
       // Reine Formularseite: ausdrücklich die schmale Lesebreite, unabhängig von der Vorgabe
       // des Primitivs (die für Arbeitsflächen breit wird).
-      breite={flaeche.seiteSchmal}
+      breite="schmal"
       beschreibung={`Einsatzbezogene Einstellungen für „${daten.einsatz.bezeichnung}". Gelten nur für diesen Einsatz.`}
       hinweis={
         !daten.istAktiv && (

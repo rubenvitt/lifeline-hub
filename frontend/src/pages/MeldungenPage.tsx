@@ -28,7 +28,6 @@ import MeldungFormular from '../meldungen/MeldungFormular';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { flaeche } from '../theme/tokens';
 import {
   Augenbraue,
   Kennzahl,
@@ -301,7 +300,7 @@ export default function MeldungenPage() {
   return (
     <EinsatzSeite
       titel="Meldungen (eingehend)"
-      breite={flaeche.seiteBreit}
+
       meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
       dataUpdatedAt={meldungenQuery.dataUpdatedAt}
       breadcrumb={

@@ -405,6 +405,8 @@ function BefehlDetail() {
         `befehl-no-print` trug.
       */}
       <EinsatzSeite
+        // Editor: reine Schreibfläche, ausdrücklich in Lesebreite.
+        breite="schmal"
         titel={befehl.titel}
         meta={
           <Space size={6} wrap>
@@ -496,7 +498,10 @@ function BefehlDetail() {
                   befehl.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
                 return (
                   <section key={a.schluessel} style={{ marginBottom: 16 }}>
-                    <Typography.Title level={5}>{a.label}</Typography.Title>
+                    {/* h3 unter dem Paneel (h2); Satz bleibt der von h5. */}
+                    <Typography.Title level={3} style={{ fontSize: token.fontSizeHeading5 }}>
+                      {a.label}
+                    </Typography.Title>
                     {text.trim() ? (
                       <Markdown variante="dokument">{text}</Markdown>
                     ) : (

@@ -8,7 +8,7 @@ import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
 import { modulRegistry } from '../../einsatz/modulRegistry';
 import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
-import Formularpaneel from './Formularpaneel';
+import { Formularpaneel } from '../../components/instrument';
 import {
   EINHEITEN_OPTIONEN,
   KOORDINATEN_OPTIONEN,
@@ -20,10 +20,10 @@ import {
   normalisiereAllgemein,
   orgHinweisSelect,
   orgHinweisWert,
-  speicherLeisteStil,
   zuUpdate,
   type FormWerteAllgemein,
 } from './einsatzEinstellungenForm';
+import { speicherLeisteStil } from '../../components/speicherLeiste';
 
 /**
  * Sektion `…/einstellungen/allgemein` (LFH-345 · C10) — Einstieg + Anzeige-Konventionen.

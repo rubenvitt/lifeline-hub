@@ -8,6 +8,17 @@ describe('Markdown', () => {
     expect(screen.getByRole('heading', { name: 'Lageüberblick' })).toBeInTheDocument();
   });
 
+  it('rückt Inhaltsüberschriften unter Seitentitel/Paneel/Abschnitt — nie ein zweites h1', () => {
+    // Gemessen im ETB (22.09.2026): sechs `h1` auf einer Seite, fünf davon aus Einträgen.
+    render(<Markdown>{'# Eins\n\n## Zwei\n\n### Drei\n\n#### Vier'}</Markdown>);
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(screen.getByRole('heading', { level: 4, name: 'Eins' })).toHaveClass('md-h1');
+    expect(screen.getByRole('heading', { level: 5, name: 'Zwei' })).toHaveClass('md-h2');
+    // Ab der dritten Quellstufe ist h6 der Boden; die Optik unterscheidet die Klasse.
+    expect(screen.getByRole('heading', { name: 'Drei' }).tagName).toBe('H6');
+    expect(screen.getByRole('heading', { name: 'Vier' })).toHaveClass('md-h4');
+  });
+
   it('rendert eine Liste als list items', () => {
     render(<Markdown>{'- Punkt A\n- Punkt B'}</Markdown>);
     const items = screen.getAllByRole('listitem');

@@ -487,7 +487,7 @@ export default function EinheitDetailPage() {
               </Space>
             </Form.Item>
 
-            <SektionHeader titel="Funk / Kommunikation" />
+            <SektionHeader titel="Funk / Kommunikation" ueberschrift="h3" />
             <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
               <SprechgruppenPicker einsatzId={einsatzId} />
             </Form.Item>

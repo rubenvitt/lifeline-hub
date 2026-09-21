@@ -68,8 +68,9 @@ function ms(wire: string | null | undefined): number | null {
 // ── Kennzahlen ──────────────────────────────────────────────────────────────────
 
 /** Statusrolle → Ton der Kennzahl. Exhaustiv über die volle Rolle, damit eine neue Rolle
- *  den Build bricht. `KennzahlTon` kennt kein `normal`: „keine Gefahr" ist die neutrale
- *  Zahl, keine grüne. */
+ *  den Build bricht. `KennzahlTon` kennt seit 22.09.2026 auch `normal`/`bedien` (für das
+ *  Meldebild-Statusband) — hier bleiben sie bewusst neutral: „keine Gefahr" ist die neutrale
+ *  Zahl, keine grüne, und eine Warnstufe ist keine Bedienbeziehung. */
 const ROLLE_ALS_TON: Record<Statusrolle, KennzahlTon> = {
   alarm: 'alarm',
   achtung: 'achtung',

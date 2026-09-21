@@ -19,9 +19,8 @@ import {
   normalisiereAnzeige,
   zuUpdate,
 } from './orgEinstellungenForm';
-import { speicherLeisteStil } from './einsatzEinstellungenForm';
-import Formularpaneel from './Formularpaneel';
-import { flaeche } from '../../theme/tokens';
+import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { Formularpaneel } from '../../components/instrument';
 
 /**
  * Admin-Sektion `/admin/einstellungen/anzeige` — org-weite Darstellungs-Defaults + Geocoder.
@@ -77,7 +76,7 @@ export default function AnzeigeEinstellungen() {
   return (
     <AdminPage
       titel="Anzeige-Konventionen"
-      breite={flaeche.seiteSchmal}
+      breite="schmal"
       beschreibung="Org-weite Darstellungs-Defaults für alle Einsätze. Leer = hartkodierter Fallback."
       hinweis={
         <SeitenHinweise

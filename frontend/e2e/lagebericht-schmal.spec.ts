@@ -138,10 +138,10 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
     if (pfad === 'lagemeldungen') await lagemeldungAnlegen(page, einsatzId!);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/einsaetze/${einsatzId}/${pfad}`);
-    // Seitenkopf des Neuentwurfs: der Titel ist die h4 der `EinsatzSeite`-Kopfleiste.
+    // Seitenkopf des Neuentwurfs: der Titel ist das h1 der `EinsatzSeite`-Kopfleiste.
     await expect(
       page.getByRole('heading', {
-        level: 4,
+        level: 1,
         name: pfad === 'lageberichte' ? 'Lageberichte' : 'Lagerelevante Meldungen',
       }),
     ).toBeVisible();

@@ -743,9 +743,13 @@ describe('LageDashboardPage — Führungsstand', () => {
 
 describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
   const hier = dirname(fileURLToPath(import.meta.url));
-  const quellen = ['LageDashboardPage.tsx', 'LagePaneele.tsx', 'PaneelZustand.tsx'].map((d) =>
-    readFileSync(join(hier, d), 'utf8'),
-  );
+  // `PaneelZustand.tsx` lag bis 22.09.2026 hier; seit dem Umzug nach
+  // `components/instrument/` wird es dort mitgeprüft — es baut ohnehin keine Pfade.
+  const quellen = [
+    join(hier, 'LageDashboardPage.tsx'),
+    join(hier, 'LagePaneele.tsx'),
+    join(hier, '../../components/instrument/PaneelZustand.tsx'),
+  ].map((d) => readFileSync(d, 'utf8'));
 
   it('baut keinen Einsatz-Pfad als Template-Literal — die Builder sind die Quelle', () => {
     for (const q of quellen) expect(q).not.toMatch(/`\/einsaetze\/\$\{/);

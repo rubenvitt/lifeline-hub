@@ -2,7 +2,14 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { farbenHell } from '../../theme/tokens';
-import Paneel, { PANEEL_KOPF_HOEHE, paneelKopfStil, paneelStil, paneelZeileStil } from './Paneel';
+import Paneel, {
+  PANEEL_KOPF_HOEHE,
+  paneelKopfRechtsStil,
+  paneelKopfStil,
+  paneelMetaStil,
+  paneelStil,
+  paneelZeileStil,
+} from './Paneel';
 
 describe('Paneel', () => {
   it('ist eine Region, benannt über ihre Augenbrauen-Überschrift', () => {
@@ -52,6 +59,34 @@ describe('Paneel', () => {
     expect(PANEEL_KOPF_HOEHE).toBe(38);
     expect(stil.minHeight).toBe(38);
     expect(stil.height).toBeUndefined();
+  });
+
+  it('ein enger Kopf bricht um und kürzt das Meta — die Aktion bleibt ganz (1024-px-Befund)', () => {
+    // jsdom rechnet kein Layout; belegt werden die Angaben, aus denen das Verhalten folgt.
+    // Ohne `flexWrap` und `minWidth: 0` schob `space-between` den rechten Block über den
+    // Rand in den Nachbarkopf (Lage-Dashboard, drei Paneele nebeneinander).
+    expect(paneelKopfStil(farbenHell, { padding: 11, paddingXS: 3 }).flexWrap).toBe('wrap');
+    expect(paneelKopfRechtsStil({ paddingSM: 7 })).toMatchObject({
+      minWidth: 0,
+      maxWidth: '100%',
+      marginInlineStart: 'auto',
+    });
+    expect(paneelMetaStil(farbenHell)).toMatchObject({
+      minWidth: 0,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    });
+    renderMitProviders(
+      <Paneel titel="Gefahren" meta="5 Gebiete" aktion={<button type="button">Gefahren</button>} />,
+    );
+    const meta = screen.getByText('5 Gebiete');
+    expect(meta).toHaveAttribute('title', '5 Gebiete');
+    // Die Aktion steht NICHT im kürzenden Meta, sondern daneben mit festem Maß.
+    expect(meta).not.toContainElement(screen.getByRole('button', { name: 'Gefahren' }));
+    expect(screen.getByRole('button', { name: 'Gefahren' }).parentElement).toHaveStyle({
+      flex: '0 0 auto',
+    });
   });
 
   it('Zeilen trennt flaeche3 (Entwurf #16191d)', () => {

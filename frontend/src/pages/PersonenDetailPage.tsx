@@ -63,7 +63,6 @@ import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
-import { flaeche } from '../theme/tokens';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import KatalogTabelle from '../components/KatalogTabelle';
 import type {
@@ -1098,7 +1097,6 @@ export default function PersonenDetailPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       dataUpdatedAt={gemeinsamerDatenstand(
         detailQuery.dataUpdatedAt,
         tiereDerPersonQuery.dataUpdatedAt,

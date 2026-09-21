@@ -99,7 +99,12 @@ export default function PaneelZustand({
 export function PaneelLink({ label, onKlick }: { label: string; onKlick: () => void }) {
   const { token } = useRollen();
   return (
-    <Button type="link" onClick={onKlick} style={{ paddingInline: token.paddingXS, fontSize: 12 }}>
+    <Button
+      type="link"
+      data-lfh="paneel-link"
+      onClick={onKlick}
+      style={{ paddingInline: token.paddingXS, fontSize: 12 }}
+    >
       {label}
       <span aria-hidden="true" style={{ marginInlineStart: token.marginXXS }}>
         ↗

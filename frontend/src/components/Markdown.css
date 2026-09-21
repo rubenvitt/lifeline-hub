@@ -106,18 +106,20 @@
   font-weight: 600;
   margin: 1.4em 0 0.5em;
 }
-.markdown--dokument h1 {
+/* Größe an der QUELLstufe (`md-h<n>`), nicht am Tag: `Markdown.tsx` rückt die Tags um drei
+   Ebenen nach unten (unter Seitentitel, Paneel und Abschnitt), die Optik bleibt. */
+.markdown--dokument .md-h1 {
   font-size: 1.5em;
 }
-.markdown--dokument h2 {
+.markdown--dokument .md-h2 {
   font-size: 1.3em;
 }
-.markdown--dokument h3 {
+.markdown--dokument .md-h3 {
   font-size: 1.15em;
 }
-.markdown--dokument h4,
-.markdown--dokument h5,
-.markdown--dokument h6 {
+.markdown--dokument .md-h4,
+.markdown--dokument .md-h5,
+.markdown--dokument .md-h6 {
   font-size: 1em;
 }
 .markdown--dokument p {

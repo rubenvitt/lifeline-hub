@@ -61,18 +61,52 @@ describe('Kennzahl — Ton und zweiter Kanal', () => {
   });
 
   it('außerhalb von `daten` gibt es weder Tonfarbe noch Kante — ein rotes „?" behauptete eine Lage', () => {
-    expect(zahlFarbe(farbenHell, 'alarm', 'fehler')).toBe(farbenHell.text);
-    expect(zahlFarbe(farbenHell, 'alarm', 'laden')).toBe(farbenHell.text);
-    expect(zahlFarbe(farbenHell, 'alarm', 'daten')).toBe(farbenHell.alarm);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'fehler', true)).toBe(farbenDunkel.text);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'laden', true)).toBe(farbenDunkel.text);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'daten', true)).toBe(farbenDunkel.alarm);
     expect(
       kennzahlStil(farbenHell, tokenFuer('kompakt'), 'alarm', 'fehler').boxShadow,
     ).toBeUndefined();
   });
 
+  it('nachts steht die Zahl in der Tonfarbe — alle fünf Töne (Entwurf S6)', () => {
+    expect(zahlFarbe(farbenDunkel, 'normal', 'daten', true)).toBe(farbenDunkel.normalText);
+    expect(zahlFarbe(farbenDunkel, 'bedien', 'daten', true)).toBe(farbenDunkel.bedienText);
+    expect(zahlFarbe(farbenDunkel, 'achtung', 'daten', true)).toBe(farbenDunkel.achtung);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'daten', true)).toBe(farbenDunkel.alarm);
+    expect(zahlFarbe(farbenDunkel, 'neutral', 'daten', true)).toBe(farbenDunkel.text);
+  });
+
+  it('tags tragen achtung/alarm den 7:1-Boden nicht — die Zahl nimmt text', () => {
+    expect(zahlFarbe(farbenHell, 'achtung', 'daten', false)).toBe(farbenHell.text);
+    expect(zahlFarbe(farbenHell, 'alarm', 'daten', false)).toBe(farbenHell.text);
+    // Gegenprobe: die Töne mit eigener Textrolle bleiben getönt.
+    expect(zahlFarbe(farbenHell, 'normal', 'daten', false)).toBe(farbenHell.normalText);
+    expect(zahlFarbe(farbenHell, 'bedien', 'daten', false)).toBe(farbenHell.bedienText);
+  });
+
+  it('normal und bedien setzen keine Kante — die Kante trennt nur die Eskalationsstufen', () => {
+    for (const ton of ['normal', 'bedien'] as const) {
+      expect(
+        kennzahlStil(farbenHell, tokenFuer('kompakt'), ton, 'daten').boxShadow,
+      ).toBeUndefined();
+    }
+  });
+
+  it('trägt den wirksamen Ton als Marke — außerhalb von `daten` neutral', () => {
+    const { rerender } = renderMitProviders(<Kennzahl titel="S4" wert={3} ton="bedien" />);
+    expect(screen.getByText('3').closest('[data-lfh="kennzahl"]')).toHaveAttribute(
+      'data-ton',
+      'bedien',
+    );
+    rerender(<Kennzahl titel="S4" wert={3} ton="bedien" zustand="laden" />);
+    expect(document.querySelector('[data-lfh="kennzahl"]')).toHaveAttribute('data-ton', 'neutral');
+  });
+
   it('die Schrift der Zahl ändert sich mit dem Ton NICHT (kein Zeilensprung)', () => {
     renderMitProviders(
       <>
-        <Kennzahl titel="A" wert="1" ton="alarm" />
+        <Kennzahl titel="A" wert="1" ton="bedien" />
         <Kennzahl titel="B" wert="2" />
       </>,
     );
