@@ -1190,3 +1190,905 @@ mod odl_tests {
         }
     }
 }
+
+// ------------------------------------------------------------ ENERGIE (LFH-81)
+//
+// Hybride Fachebene „Energieanlagen": OSM `power=plant` für die Standorte (auch die
+// konventionellen Kraftwerke, die das Marktstammdatenregister ohne Koordinaten führt) und
+// der bundesweite MaStR-Abzug der Einheiten über 10 MW. Beide Teile werden hier zu Punkten
+// mit denselben flachen Properties normalisiert und bei der Anfrage zusammengeführt.
+// Herleitung: `openspec/changes/lfh-81-fachebene-energie/design.md`.
+
+use crate::karte::typen::Bbox;
+
+/// Schwelle des Rauschfilters für nicht-konventionelle OSM-Anlagen: **mindestens** 10 MW.
+/// Bewusst NICHT dieselbe Vergleichsart wie beim MaStR-Abruf (`~gt~10000`, also strikt
+/// **über** 10 MW, beim Upstream gefiltert) — die Spec legt beide Grenzen getrennt fest, und
+/// eine Anlage mit genau 10 MW aus OSM ist drin, eine MaStR-Einheit mit genau 10 000 kW nicht.
+pub(crate) const ENERGIE_OSM_MIN_MW: f64 = 10.0;
+
+/// Anlagenart aus dem MaStR-Feld `EnergietraegerName`. Unbekanntes → `sonstige`.
+pub(crate) fn anlagenart_mastr(energietraeger: &str) -> &'static str {
+    match energietraeger.trim().to_lowercase().as_str() {
+        "braunkohle" | "steinkohle" => "kohle",
+        "erdgas" | "andere gase" | "grubengas" => "gas",
+        "mineralölprodukte" => "oel",
+        "kernenergie" => "kern",
+        "nicht biogener abfall" => "abfall",
+        "wasser" => "wasser",
+        "wind" => "wind",
+        "solare strahlungsenergie" => "solar",
+        "biomasse" => "biomasse",
+        "speicher" => "speicher",
+        _ => "sonstige",
+    }
+}
+
+/// Anlagenart aus OSM `plant:source`. Mehrfachwerte (`biogas;solar`) zählen mit dem ERSTEN
+/// Wert. `None` heißt „keine Quellenangabe" (für den Rauschfilter), ein unbekannter Wert
+/// ergibt `sonstige`.
+pub(crate) fn anlagenart_osm(plant_source: Option<&str>) -> Option<&'static str> {
+    let erster = plant_source?.split(';').next()?.trim().to_lowercase();
+    let art = match erster.as_str() {
+        "" => return None,
+        "coal" | "lignite" => "kohle",
+        "gas" => "gas",
+        // Bewusst Biomasse, nicht Gas: Biogasanlagen gibt es zu Tausenden im Kleinformat,
+        // als „konventionell" gezählt kämen sie ohne Leistungsschwelle durch.
+        "biogas" | "biomass" => "biomasse",
+        "oil" => "oel",
+        "nuclear" => "kern",
+        "waste" => "abfall",
+        "hydro" => "wasser",
+        "wind" => "wind",
+        "solar" => "solar",
+        "battery" => "speicher",
+        _ => "sonstige",
+    };
+    Some(art)
+}
+
+/// „Konventionell" im Sinne des Rauschfilters: erscheint unabhängig von der Leistung.
+pub(crate) fn ist_konventionell(anlagenart: &str) -> bool {
+    matches!(anlagenart, "kohle" | "gas" | "oel" | "kern" | "abfall")
+}
+
+/// Deutsches Label je Anlagenart — Titel einer OSM-Anlage ohne `name`.
+fn anlagenart_label(anlagenart: &str) -> &'static str {
+    match anlagenart {
+        "kohle" => "Kohlekraftwerk",
+        "gas" => "Gaskraftwerk",
+        "oel" => "Ölkraftwerk",
+        "kern" => "Kernkraftwerk",
+        "abfall" => "Abfallkraftwerk",
+        "wasser" => "Wasserkraftwerk",
+        "wind" => "Windpark",
+        "solar" => "Solarpark",
+        "biomasse" => "Biomasseanlage",
+        "speicher" => "Energiespeicher",
+        _ => "Energieanlage",
+    }
+}
+
+/// Rundet auf drei Nachkommastellen (1 kW) — Summen aus Kilowatt-Angaben tragen sonst
+/// Gleitkomma-Rauschen wie `53.49999999`.
+fn runde_mw(mw: f64) -> f64 {
+    (mw * 1000.0).round() / 1000.0
+}
+
+/// Liest `plant:output:electricity` tolerant als MW. Nicht eindeutig Lesbares → `None`.
+pub(crate) fn lies_leistung_mw(roh: &str) -> Option<f64> {
+    let t = roh.trim();
+    let zahl_ende = t
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(t.len());
+    let (zahl, einheit) = t.split_at(zahl_ende);
+    let faktor = match einheit.trim().to_lowercase().as_str() {
+        "kw" => 0.001,
+        "mw" => 1.0,
+        "gw" => 1000.0,
+        // Ohne Einheit ist eine Zahl nicht eindeutig; alles andere (`yes`, `~50`,
+        // `12,1 MW`, `5 MW;3 MW`) auch nicht. Eine geschätzte Zahl erscheint nie als Messwert.
+        _ => return None,
+    };
+    let wert: f64 = zahl.parse().ok()?;
+    wert.is_finite().then(|| runde_mw(wert * faktor))
+}
+
+/// Overpass-JSON (`power=plant`) → FeatureCollection mit Rauschfilter.
+///
+/// Konventionelle Anlagen bleiben immer. Andere fallen weg, wenn ihre getaggte Leistung
+/// unter [`ENERGIE_OSM_MIN_MW`] liegt; ohne auswertbare Leistung bleiben sie als
+/// **Kandidat** stehen (`leistung_mw: null`) — trifft sie bei der Zusammenführung eine
+/// MaStR-Einheit, trägt die die Leistung, sonst fällt sie dort heraus. Ohne Quellenangabe
+/// UND ohne Leistung fällt eine Anlage gleich hier weg. Nur `power=plant` zählt; ein
+/// Umspannwerk gehört zur KRITIS-Ebene, ein `generator` ist ein Einzelaggregat.
+pub fn normalisiere_energie_osm(roh: &Value) -> Value {
+    let elemente = roh
+        .get("elements")
+        .and_then(|e| e.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let features: Vec<Value> = elemente
+        .iter()
+        .filter_map(|el| {
+            let tags = el.get("tags").and_then(|t| t.as_object());
+            let g = |k: &str| tags.and_then(|t| t.get(k)).and_then(|v| v.as_str());
+            if g("power") != Some("plant") {
+                return None;
+            }
+            let (lon, lat) = if let (Some(lon), Some(lat)) = (
+                el.get("lon").and_then(|v| v.as_f64()),
+                el.get("lat").and_then(|v| v.as_f64()),
+            ) {
+                (lon, lat)
+            } else {
+                let c = el.get("center")?;
+                (c.get("lon")?.as_f64()?, c.get("lat")?.as_f64()?)
+            };
+            let art = anlagenart_osm(g("plant:source"));
+            let leistung = g("plant:output:electricity").and_then(lies_leistung_mw);
+            let art = match (art, leistung) {
+                (None, None) => return None,
+                // Pumpspeicher führt MaStR unter „Speicher"; gleiche Art ist die Bedingung der
+                // Zusammenführung, sonst stünde das Werk neben seinen eigenen Turbinen.
+                (Some("wasser"), _) if g("plant:method") == Some("water-pumped-storage") => {
+                    "speicher"
+                }
+                (Some(a), _) => a,
+                (None, Some(_)) => "sonstige",
+            };
+            if !ist_konventionell(art) && leistung.is_some_and(|mw| mw < ENERGIE_OSM_MIN_MW) {
+                return None;
+            }
+            let titel = g("name")
+                .map(str::trim)
+                .filter(|n| !n.is_empty())
+                .unwrap_or_else(|| anlagenart_label(art));
+            Some(energie_punkt(
+                lon,
+                lat,
+                json!({
+                    "titel": titel,
+                    "anlagenart": art,
+                    "leistung_mw": leistung,
+                    "betreiber": g("operator"),
+                    "betriebsstatus": Value::Null,
+                    "herkunft": "osm",
+                    "mastr_nummer": Value::Null,
+                    "mastr_id": Value::Null,
+                    "mastr_einheiten": Value::Null,
+                }),
+            ))
+        })
+        .collect();
+    json!({ "type": "FeatureCollection", "features": features })
+}
+
+fn energie_punkt(lon: f64, lat: f64, properties: Value) -> Value {
+    json!({
+        "type": "Feature",
+        "geometry": { "type": "Point", "coordinates": [lon, lat] },
+        "properties": properties
+    })
+}
+
+/// `(lon, lat)` eines Punkt-Features.
+fn punkt_koordinate(f: &Value) -> Option<(f64, f64)> {
+    let c = f.get("geometry")?.get("coordinates")?.as_array()?;
+    Some((c.first()?.as_f64()?, c.get(1)?.as_f64()?))
+}
+
+/// MaStR-Antwort (`{"Total":n,"Data":[…]}`) → Punkte.
+///
+/// Fehlt die `Data`-Liste oder ist sie keine Liste, ist das ein `Err` und **keine** leere
+/// Collection: die Filterfelder des Endpunkts sind Anzeigenamen des Portals und können sich
+/// still ändern, und ein Leerstand sähe aus wie „keine Großanlagen in Deutschland".
+/// Einheiten ohne Koordinate werden übersprungen (der Upstream-Filter sortiert sie schon aus).
+pub fn normalisiere_energie_mastr(roh: &Value) -> Result<Vec<Value>, String> {
+    let daten = roh
+        .get("Data")
+        .and_then(|d| d.as_array())
+        .ok_or_else(|| "MaStR-Antwort ohne Data-Liste".to_string())?;
+    let text = |e: &Value, k: &str| {
+        e.get(k)
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
+    Ok(daten
+        .iter()
+        .filter_map(|e| {
+            let lat = e.get("Breitengrad")?.as_f64()?;
+            let lon = e.get("Laengengrad")?.as_f64()?;
+            let art = anlagenart_mastr(e.get("EnergietraegerName")?.as_str().unwrap_or(""));
+            let titel = [
+                "KraftwerkName",
+                "SolarparkName",
+                "WindparkName",
+                "EinheitName",
+            ]
+            .iter()
+            .find_map(|k| text(e, k))
+            .unwrap_or_else(|| anlagenart_label(art).to_string());
+            let leistung = e
+                .get("Nettonennleistung")
+                .and_then(|v| v.as_f64())
+                .map(|kw| runde_mw(kw / 1000.0));
+            Some(energie_punkt(
+                lon,
+                lat,
+                json!({
+                    "titel": titel,
+                    "anlagenart": art,
+                    "leistung_mw": leistung,
+                    "betreiber": text(e, "AnlagenbetreiberName"),
+                    "betriebsstatus": text(e, "BetriebsStatusName"),
+                    "herkunft": "mastr",
+                    "mastr_nummer": text(e, "MaStRNummer"),
+                    "mastr_id": e.get("Id").and_then(|v| v.as_i64()),
+                    "mastr_einheiten": 1,
+                }),
+            ))
+        })
+        .collect())
+}
+
+/// Führt die OSM- und MaStR-Punkte für einen Ausschnitt zusammen.
+///
+/// Jede MaStR-Einheit geht an die **nächste** OSM-Anlage **gleicher** Anlagenart im Umkreis
+/// von `radius_m`; mehrere Einheiten an einer Anlage summieren ihre Leistung, geführt werden
+/// Nummer, Id, Betreiber und Status der größten. Der Punkt bleibt am OSM-Standort (die
+/// OSM-Mitte trifft die Anlage besser als der Einheitenpunkt), die Herkunft wird
+/// `osm+mastr`. Übrige MaStR-Einheiten erscheinen als eigene Punkte. Eine
+/// nicht-konventionelle OSM-Anlage ohne Leistung (Kandidat aus
+/// [`normalisiere_energie_osm`]) erscheint nur mit Treffer.
+///
+/// Beide Seiten werden auf den Ausschnitt gefiltert: der MaStR-Teil ist bundesweit, und
+/// der OSM-Teil stammt aus einem auf zwei Nachkommastellen gerundeten Cache-Schlüssel, er
+/// kann also ein Stück über den angefragten Rand ragen.
+pub fn fuehre_energie_zusammen(
+    osm: &[Value],
+    mastr: &[Value],
+    bbox: &Bbox,
+    radius_m: f64,
+) -> Vec<Value> {
+    use crate::geocoding::peilung::haversine_m;
+    let im_ausschnitt =
+        |f: &&Value| punkt_koordinate(f).is_some_and(|(lon, lat)| bbox.enthaelt(lon, lat));
+    let art = |f: &Value| {
+        f["properties"]["anlagenart"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    };
+    let mw = |f: &Value| f["properties"]["leistung_mw"].as_f64();
+
+    let osm: Vec<&Value> = osm.iter().filter(im_ausschnitt).collect();
+    let mut zugeordnet: Vec<Vec<&Value>> = vec![Vec::new(); osm.len()];
+    let mut ergebnis: Vec<Value> = Vec::new();
+
+    for m in mastr.iter().filter(im_ausschnitt) {
+        let Some((mlon, mlat)) = punkt_koordinate(m) else {
+            continue;
+        };
+        let m_art = art(m);
+        let naechste = osm
+            .iter()
+            .enumerate()
+            .filter(|(_, o)| art(o) == m_art)
+            .filter_map(|(i, o)| {
+                let (olon, olat) = punkt_koordinate(o)?;
+                let d = haversine_m((mlat, mlon), (olat, olon));
+                (d <= radius_m).then_some((i, d))
+            })
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        match naechste {
+            Some((i, _)) => zugeordnet[i].push(m),
+            None => ergebnis.push(m.clone()),
+        }
+    }
+
+    let mut osm_punkte: Vec<Value> = Vec::new();
+    for (o, einheiten) in osm.into_iter().zip(zugeordnet) {
+        if einheiten.is_empty() {
+            if ist_konventionell(&art(o)) || mw(o).is_some() {
+                osm_punkte.push(o.clone());
+            }
+            continue;
+        }
+        let groesste = einheiten
+            .iter()
+            .max_by(|a, b| mw(a).unwrap_or(0.0).total_cmp(&mw(b).unwrap_or(0.0)))
+            .expect("nicht leer");
+        let summe: Option<f64> = einheiten
+            .iter()
+            .filter_map(|e| mw(e))
+            .fold(None, |acc, x| Some(acc.unwrap_or(0.0) + x));
+        let gp = &groesste["properties"];
+        let mut f = o.clone();
+        let p = &mut f["properties"];
+        p["leistung_mw"] = json!(summe.map(runde_mw).or_else(|| mw(o)));
+        if !gp["betreiber"].is_null() {
+            p["betreiber"] = gp["betreiber"].clone();
+        }
+        p["betriebsstatus"] = gp["betriebsstatus"].clone();
+        p["herkunft"] = json!("osm+mastr");
+        p["mastr_nummer"] = gp["mastr_nummer"].clone();
+        p["mastr_id"] = gp["mastr_id"].clone();
+        p["mastr_einheiten"] = json!(einheiten.len());
+        osm_punkte.push(f);
+    }
+    osm_punkte.extend(ergebnis);
+    osm_punkte
+}
+
+/// Quellennennung aus den tatsächlich beitragenden Teilen.
+///
+/// Genannt wird nur, was zu den ausgelieferten Punkten beiträgt (Spec „Korrekte
+/// Quellennennung": MUST NOT eine Quelle nennen, die nichts beiträgt). Ohne Beitrag bleibt
+/// die Zeile leer — dann ist auch nichts eingezeichnet.
+pub fn energie_attribution(osm_traegt_bei: bool, mastr_traegt_bei: bool) -> String {
+    let mut teile = Vec::new();
+    if osm_traegt_bei {
+        teile.push(ENERGIE_OSM_ATTRIB);
+    }
+    if mastr_traegt_bei {
+        teile.push(ENERGIE_MASTR_ATTRIB);
+    }
+    teile.join(" · ")
+}
+
+/// OSM-Nennung (ODbL), wortgleich mit der KRITIS-Ebene.
+pub const ENERGIE_OSM_ATTRIB: &str = "© OpenStreetMap-Beitragende (ODbL)";
+/// MaStR-Nennung nach §2 dl-de/by-2-0, Bereitsteller laut Impressum des Portals. Den Link
+/// auf die Lizenz und den Datensatz tragen `docs/fachebenen-quellen.md` und der Inspector —
+/// die Attributionszeile der Karte ist Klartext.
+pub const ENERGIE_MASTR_ATTRIB: &str = "Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0";
+
+/// Trägt eine Herkunft zum OSM- bzw. MaStR-Teil bei? Liefert `(osm, mastr)`.
+pub fn energie_beitraege(features: &[Value]) -> (bool, bool) {
+    features.iter().fold((false, false), |(o, m), f| {
+        let h = f["properties"]["herkunft"].as_str().unwrap_or("");
+        (o || h.starts_with("osm"), m || h.ends_with("mastr"))
+    })
+}
+
+#[cfg(test)]
+mod energie_tests {
+    use super::*;
+
+    const OVERPASS_RUHR: &str = include_str!("testdaten/energie-overpass-ruhr.json");
+    const MASTR_AUSZUG: &str = include_str!("testdaten/energie-mastr-auszug.json");
+
+    fn anlage(source: Option<&str>, leistung: Option<&str>) -> Value {
+        let mut tags = serde_json::Map::new();
+        tags.insert("power".into(), json!("plant"));
+        tags.insert("name".into(), json!("Testanlage"));
+        if let Some(s) = source {
+            tags.insert("plant:source".into(), json!(s));
+        }
+        if let Some(l) = leistung {
+            tags.insert("plant:output:electricity".into(), json!(l));
+        }
+        json!({ "elements": [ { "type": "way", "id": 1,
+            "center": { "lat": 51.5, "lon": 7.0 }, "tags": tags } ] })
+    }
+
+    fn features(fc: &Value) -> Vec<Value> {
+        fc["features"].as_array().cloned().unwrap_or_default()
+    }
+
+    fn titel(fs: &[Value]) -> Vec<String> {
+        fs.iter()
+            .map(|f| f["properties"]["titel"].as_str().unwrap_or("").to_string())
+            .collect()
+    }
+
+    /// Ein Punkt mit den flachen Energie-Properties, wie ihn die beiden Normalisierer bauen.
+    fn punkt(lon: f64, lat: f64, art: &str, mw: Option<f64>, herkunft: &str) -> Value {
+        let mastr = herkunft == "mastr";
+        json!({ "type": "Feature",
+            "geometry": { "type": "Point", "coordinates": [lon, lat] },
+            "properties": {
+                "titel": format!("{herkunft}-{art}-{lon}"),
+                "anlagenart": art,
+                "leistung_mw": mw,
+                "betreiber": if mastr { json!("MaStR-Betreiber") } else { json!("OSM-Betreiber") },
+                "betriebsstatus": if mastr { json!("In Betrieb") } else { Value::Null },
+                "herkunft": herkunft,
+                "mastr_nummer": if mastr { json!(format!("SEE{lon}")) } else { Value::Null },
+                "mastr_id": if mastr { json!((lon * 1000.0) as i64) } else { Value::Null },
+                "mastr_einheiten": if mastr { json!(1) } else { Value::Null },
+            } })
+    }
+
+    // ---- 1.2 Anlagenart
+
+    #[test]
+    fn anlagenart_aus_mastr_energietraeger() {
+        for (roh, art) in [
+            ("Braunkohle", "kohle"),
+            ("Steinkohle", "kohle"),
+            ("Erdgas", "gas"),
+            ("andere Gase", "gas"),
+            ("Grubengas", "gas"),
+            ("Mineralölprodukte", "oel"),
+            ("Kernenergie", "kern"),
+            ("nicht biogener Abfall", "abfall"),
+            ("Nicht biogener Abfall", "abfall"),
+            ("Wasser", "wasser"),
+            ("Wind", "wind"),
+            ("Solare Strahlungsenergie", "solar"),
+            ("Biomasse", "biomasse"),
+            ("Speicher", "speicher"),
+            ("Wärme", "sonstige"),
+            ("Geothermie", "sonstige"),
+            ("völlig unbekannt", "sonstige"),
+        ] {
+            assert_eq!(anlagenart_mastr(roh), art, "Energieträger {roh:?}");
+        }
+    }
+
+    #[test]
+    fn anlagenart_aus_osm_plant_source() {
+        for (roh, art) in [
+            ("coal", "kohle"),
+            ("lignite", "kohle"),
+            ("gas", "gas"),
+            ("biogas", "biomasse"),
+            ("oil", "oel"),
+            ("nuclear", "kern"),
+            ("waste", "abfall"),
+            ("hydro", "wasser"),
+            ("wind", "wind"),
+            ("solar", "solar"),
+            ("biomass", "biomasse"),
+            ("battery", "speicher"),
+            // Mehrfachwert: der ERSTE zählt, und Biogas ist Biomasse, nicht Gas.
+            ("biogas;solar", "biomasse"),
+            ("gas; oil", "gas"),
+            ("geothermal", "sonstige"),
+        ] {
+            assert_eq!(anlagenart_osm(Some(roh)), Some(art), "plant:source {roh:?}");
+        }
+        assert_eq!(anlagenart_osm(None), None);
+        assert_eq!(anlagenart_osm(Some("")), None);
+    }
+
+    #[test]
+    fn konventionell_sind_genau_fuenf_arten() {
+        for art in ["kohle", "gas", "oel", "kern", "abfall"] {
+            assert!(ist_konventionell(art), "{art}");
+        }
+        for art in [
+            "wasser", "wind", "solar", "biomasse", "speicher", "sonstige",
+        ] {
+            assert!(!ist_konventionell(art), "{art}");
+        }
+    }
+
+    // ---- 1.3 Leistungsleser
+
+    #[test]
+    fn leistung_wird_tolerant_gelesen() {
+        for (roh, mw) in [
+            ("690 MW", Some(690.0)),
+            ("690MW", Some(690.0)),
+            ("1.2 GW", Some(1200.0)),
+            ("12000 kW", Some(12.0)),
+            ("12.1 MW", Some(12.1)),
+            ("5.420 MW", Some(5.42)),
+            (" 15 mw ", Some(15.0)),
+            ("yes", None),
+            ("", None),
+            ("~50", None),
+            ("50", None),      // ohne Einheit nicht eindeutig
+            ("12,1 MW", None), // Komma: Dezimal- oder Tausendertrenner?
+            ("-5 MW", None),
+            ("5 MW;3 MW", None),
+        ] {
+            let ist = lies_leistung_mw(roh);
+            match (ist, mw) {
+                (Some(a), Some(b)) => assert!((a - b).abs() < 1e-9, "{roh:?}: {a} ≠ {b}"),
+                (a, b) => assert_eq!(a, b, "{roh:?}"),
+            }
+        }
+    }
+
+    // ---- 1.4 OSM-Normalisierer mit Rauschfilter
+
+    #[test]
+    fn kleine_solaranlage_erscheint_nicht() {
+        let fc = normalisiere_energie_osm(&anlage(Some("solar"), Some("2 MW")));
+        assert!(features(&fc).is_empty());
+    }
+
+    #[test]
+    fn gaskraftwerk_ohne_leistung_erscheint_mit_leistung_unbekannt() {
+        let fc = normalisiere_energie_osm(&anlage(Some("gas"), None));
+        let fs = features(&fc);
+        assert_eq!(fs.len(), 1);
+        let p = &fs[0]["properties"];
+        assert_eq!(p["anlagenart"], "gas");
+        assert_eq!(p["leistung_mw"], Value::Null);
+        assert_eq!(p["herkunft"], "osm");
+    }
+
+    #[test]
+    fn anlage_ohne_quelle_und_ohne_leistung_faellt_weg() {
+        assert!(features(&normalisiere_energie_osm(&anlage(None, None))).is_empty());
+        // Nicht auswertbare Leistung zählt wie keine.
+        assert!(features(&normalisiere_energie_osm(&anlage(None, Some("yes")))).is_empty());
+        // Ohne Quelle, aber mit großer Leistung: bleibt, als `sonstige`.
+        let fs = features(&normalisiere_energie_osm(&anlage(None, Some("40 MW"))));
+        assert_eq!(fs.len(), 1);
+        assert_eq!(fs[0]["properties"]["anlagenart"], "sonstige");
+    }
+
+    #[test]
+    fn nicht_auswertbare_leistung_wird_unbekannt_statt_erfunden() {
+        let fs = features(&normalisiere_energie_osm(&anlage(Some("gas"), Some("yes"))));
+        assert_eq!(fs.len(), 1);
+        assert_eq!(fs[0]["properties"]["leistung_mw"], Value::Null);
+    }
+
+    #[test]
+    fn leistung_als_text_wird_zahl() {
+        let fs = features(&normalisiere_energie_osm(&anlage(
+            Some("coal"),
+            Some("690 MW"),
+        )));
+        assert_eq!(fs[0]["properties"]["leistung_mw"], json!(690.0));
+    }
+
+    /// Die OSM-Grenze ist „mindestens 10 MW" (≥), anders als MaStR (> 10 MW, beim
+    /// Upstream). Eine spätere Vereinheitlichung auf eine Vergleichsart färbt das rot.
+    #[test]
+    fn osm_grenze_ist_mindestens_zehn_mw() {
+        assert_eq!(
+            features(&normalisiere_energie_osm(&anlage(
+                Some("solar"),
+                Some("10 MW")
+            )))
+            .len(),
+            1
+        );
+        assert!(features(&normalisiere_energie_osm(&anlage(
+            Some("solar"),
+            Some("9.99 MW")
+        )))
+        .is_empty());
+    }
+
+    /// Erneuerbare ohne Leistung bleiben im OSM-Teil als KANDIDAT stehen: trifft sie eine
+    /// MaStR-Einheit, trägt die die Leistung (design.md, Risiken). Ohne Treffer fällt sie
+    /// erst bei der Zusammenführung heraus (siehe `fuehre_*`-Tests).
+    #[test]
+    fn erneuerbare_ohne_leistung_bleibt_kandidat() {
+        let fs = features(&normalisiere_energie_osm(&anlage(
+            Some("hydro"),
+            Some("yes"),
+        )));
+        assert_eq!(fs.len(), 1);
+        assert_eq!(fs[0]["properties"]["leistung_mw"], Value::Null);
+    }
+
+    /// MaStR führt Pumpspeicher unter „Speicher", OSM als `plant:source=hydro` mit
+    /// `plant:method=water-pumped-storage`. Ohne Angleichung stünde ein Pumpspeicherwerk
+    /// neben seinen eigenen Turbinen (live gemessen am PSW Happurg: fünf Punkte statt einem).
+    #[test]
+    fn pumpspeicher_ist_speicher_wie_im_mastr() {
+        let roh = json!({ "elements": [ { "type": "way", "id": 1,
+            "center": { "lat": 49.49, "lon": 11.47 },
+            "tags": { "power": "plant", "name": "Pumpspeicherwerk", "plant:source": "hydro",
+                "plant:method": "water-pumped-storage", "plant:output:electricity": "160 MW" } } ] });
+        let fs = features(&normalisiere_energie_osm(&roh));
+        assert_eq!(fs[0]["properties"]["anlagenart"], "speicher");
+        // Laufwasser bleibt Wasser.
+        let fs = features(&normalisiere_energie_osm(&anlage(
+            Some("hydro"),
+            Some("20 MW"),
+        )));
+        assert_eq!(fs[0]["properties"]["anlagenart"], "wasser");
+    }
+
+    #[test]
+    fn umspannwerk_und_generator_gehoeren_nicht_dazu() {
+        let roh = json!({ "elements": [
+            { "type": "node", "id": 1, "lat": 51.5, "lon": 7.0,
+              "tags": { "power": "substation", "name": "UW", "plant:source": "gas" } },
+            { "type": "node", "id": 2, "lat": 51.5, "lon": 7.0,
+              "tags": { "power": "generator", "generator:source": "gas", "plant:source": "gas" } }
+        ] });
+        assert!(features(&normalisiere_energie_osm(&roh)).is_empty());
+    }
+
+    #[test]
+    fn osm_punkt_traegt_alle_schluessel_flach() {
+        let fs = features(&normalisiere_energie_osm(&anlage(
+            Some("gas"),
+            Some("608 MW"),
+        )));
+        let p = fs[0]["properties"].as_object().unwrap();
+        for k in [
+            "titel",
+            "anlagenart",
+            "leistung_mw",
+            "betreiber",
+            "betriebsstatus",
+            "herkunft",
+            "mastr_nummer",
+            "mastr_id",
+            "mastr_einheiten",
+        ] {
+            assert!(p.contains_key(k), "Schlüssel {k} fehlt");
+        }
+        assert_eq!(p["betriebsstatus"], Value::Null);
+        assert_eq!(p["mastr_einheiten"], Value::Null);
+        assert_eq!(fs[0]["geometry"]["coordinates"], json!([7.0, 51.5]));
+    }
+
+    #[test]
+    fn osm_titel_faellt_auf_die_anlagenart_zurueck() {
+        let roh = json!({ "elements": [ { "type": "node", "id": 1, "lat": 51.5, "lon": 7.0,
+            "tags": { "power": "plant", "plant:source": "gas", "operator": "Stadtwerke" } } ] });
+        let fs = features(&normalisiere_energie_osm(&roh));
+        assert_eq!(fs[0]["properties"]["titel"], "Gaskraftwerk");
+        assert_eq!(fs[0]["properties"]["betreiber"], "Stadtwerke");
+    }
+
+    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    #[test]
+    fn energie_osm_output_passt_auf_den_geojson_anker() {
+        let roh: Value = serde_json::from_str(OVERPASS_RUHR).unwrap();
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
+            normalisiere_energie_osm(&roh),
+        )
+        .expect("Anker beschreibt die reale Energie-Form");
+    }
+
+    /// Echter Overpass-Abzug (Ruhrgebiet, 21.09.2026, 30 Objekte, auf die gelesenen Tags
+    /// gekürzt), durch Normalisierer UND Zusammenführung ohne MaStR-Teil: die zwei großen
+    /// Kraftwerke stehen drin, keine PV-Kleinanlage und keine Biogasanlage ohne Leistung.
+    #[test]
+    fn echter_ruhr_abzug_zeigt_grosskraftwerke_und_keine_kleinanlagen() {
+        let roh: Value = serde_json::from_str(OVERPASS_RUHR).unwrap();
+        let osm = features(&normalisiere_energie_osm(&roh));
+        let bbox = Bbox::parse("6.8,51.35,7.4,51.65").unwrap();
+        let fs = fuehre_energie_zusammen(&osm, &[], &bbox, 2000.0);
+        let t = titel(&fs);
+        for soll in [
+            "Kraftwerk Scholven",
+            "GuD Herne",
+            "Heizkraftwerk Herne",
+            "GBS KW Herne",
+        ] {
+            assert!(t.iter().any(|x| x == soll), "{soll} fehlt in {t:?}");
+        }
+        for nicht in [
+            "Harpener Watt",                 // Solar ohne Leistung, kein MaStR-Treffer
+            "Biogasanlage Bebbelsdorf",      // biogas;solar → Biomasse, ohne Leistung
+            "storage44",                     // Speicher 0,36 MW
+            "Wasserkraftwerk Baldeney",      // Wasser 9,2 MW
+            "Wasserkraftwerk Horster Mühle", // Wasser „yes"
+        ] {
+            assert!(
+                !t.iter().any(|x| x == nicht),
+                "{nicht} dürfte nicht erscheinen"
+            );
+        }
+        // Keine Solaranlage überhaupt — die drei im Abzug haben keine auswertbare Leistung.
+        assert!(fs.iter().all(|f| f["properties"]["anlagenart"] != "solar"));
+        let scholven = fs
+            .iter()
+            .find(|f| f["properties"]["titel"] == "Kraftwerk Scholven")
+            .unwrap();
+        assert_eq!(scholven["properties"]["anlagenart"], "kohle");
+        assert_eq!(scholven["properties"]["leistung_mw"], json!(690.0));
+        assert_eq!(scholven["properties"]["betreiber"], "Uniper Kraftwerke");
+    }
+
+    // ---- 1.5 MaStR-Normalisierer
+
+    #[test]
+    fn mastr_auszug_wird_zu_punkten() {
+        let roh: Value = serde_json::from_str(MASTR_AUSZUG).unwrap();
+        let fs = normalisiere_energie_mastr(&roh).unwrap();
+        assert_eq!(fs.len(), 5);
+        let wkw = fs
+            .iter()
+            .find(|f| f["properties"]["titel"] == "WKW III")
+            .unwrap();
+        let p = &wkw["properties"];
+        assert_eq!(p["anlagenart"], "wasser");
+        assert_eq!(p["leistung_mw"], json!(18.5));
+        assert_eq!(p["betreiber"], "Alzkraftwerke Heider GmbH");
+        assert_eq!(p["betriebsstatus"], "In Betrieb");
+        assert_eq!(p["herkunft"], "mastr");
+        assert_eq!(p["mastr_nummer"], "SEE980008908440");
+        assert_eq!(p["mastr_id"], json!(1815635));
+        assert_eq!(p["mastr_einheiten"], json!(1));
+        assert_eq!(wkw["geometry"]["coordinates"], json!([12.652, 48.154]));
+        // Titelkette: KraftwerkName (im Bestand nie gesetzt) → SolarparkName → WindparkName
+        // → EinheitName.
+        let t = titel(&fs);
+        assert!(t.contains(&"SA Giebelstadt II".to_string()), "{t:?}");
+        assert!(t.contains(&"EnBW He Dreiht".to_string()), "{t:?}");
+        assert!(fs
+            .iter()
+            .any(|f| f["properties"]["betriebsstatus"] == "Vorübergehend stillgelegt"));
+    }
+
+    #[test]
+    fn mastr_titel_nimmt_den_ersten_nicht_leeren_namen() {
+        let roh = json!({ "Total": 1, "Data": [ {
+            "Id": 7, "MaStRNummer": "SEE1", "KraftwerkName": "  ", "SolarparkName": "",
+            "WindparkName": null, "EinheitName": "Einheit 7", "Breitengrad": 51.0,
+            "Laengengrad": 7.0, "Nettonennleistung": 12000.0, "EnergietraegerName": "Wind",
+            "BetriebsStatusName": "In Betrieb", "AnlagenbetreiberName": null } ] });
+        let fs = normalisiere_energie_mastr(&roh).unwrap();
+        assert_eq!(fs[0]["properties"]["titel"], "Einheit 7");
+        assert_eq!(fs[0]["properties"]["betreiber"], Value::Null);
+    }
+
+    #[test]
+    fn mastr_einheit_ohne_koordinate_wird_uebersprungen() {
+        let roh = json!({ "Total": 1, "Data": [ { "Id": 7, "EinheitName": "X",
+            "Breitengrad": null, "Laengengrad": 7.0, "Nettonennleistung": 12000.0,
+            "EnergietraegerName": "Wind" } ] });
+        assert!(normalisiere_energie_mastr(&roh).unwrap().is_empty());
+    }
+
+    /// Eine Antwort ohne `Data`-Liste ist ein FEHLSCHLAG, kein Leerstand — ein Leerstand
+    /// sähe aus wie „keine Großanlagen in Deutschland", und niemand würde misstrauisch.
+    #[test]
+    fn mastr_formfehler_ist_err_und_keine_leere_collection() {
+        assert!(normalisiere_energie_mastr(&json!({ "Total": 0 })).is_err());
+        assert!(normalisiere_energie_mastr(&json!({ "Data": "kaputt" })).is_err());
+        assert!(normalisiere_energie_mastr(&json!([1, 2])).is_err());
+        assert!(normalisiere_energie_mastr(&json!({ "Errors": ["WAF"] })).is_err());
+    }
+
+    #[test]
+    fn energie_mastr_output_passt_auf_den_geojson_anker() {
+        let roh: Value = serde_json::from_str(MASTR_AUSZUG).unwrap();
+        let fs = normalisiere_energie_mastr(&roh).unwrap();
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
+            json!({ "type": "FeatureCollection", "features": fs }),
+        )
+        .expect("Anker beschreibt die reale MaStR-Form");
+    }
+
+    // ---- 1.6 Zusammenführung und bbox
+
+    fn bbox() -> Bbox {
+        Bbox::parse("6.5,51.0,7.5,52.0").unwrap()
+    }
+
+    #[test]
+    fn wasserkraftwerk_in_beiden_quellen_wird_ein_punkt() {
+        let osm = vec![punkt(7.0, 51.5, "wasser", None, "osm")];
+        // ~500 m östlich (bei 51,5° N sind 0,0072° Länge rund 500 m).
+        let mastr = vec![punkt(7.0072, 51.5, "wasser", Some(18.5), "mastr")];
+        let fs = fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0);
+        assert_eq!(fs.len(), 1);
+        let f = &fs[0];
+        let p = &f["properties"];
+        assert_eq!(p["herkunft"], "osm+mastr");
+        assert_eq!(p["leistung_mw"], json!(18.5));
+        assert_eq!(p["betreiber"], "MaStR-Betreiber");
+        assert_eq!(p["betriebsstatus"], "In Betrieb");
+        assert_eq!(p["mastr_nummer"], "SEE7.0072");
+        assert_eq!(p["mastr_einheiten"], json!(1));
+        // Punkt und Titel bleiben am OSM-Standort bzw. beim OSM-Namen.
+        assert_eq!(f["geometry"]["coordinates"], json!([7.0, 51.5]));
+        assert_eq!(p["titel"], "osm-wasser-7");
+    }
+
+    #[test]
+    fn unterschiedliche_anlagenart_ergibt_zwei_punkte() {
+        let osm = vec![punkt(7.0, 51.5, "gas", None, "osm")];
+        let mastr = vec![punkt(7.001, 51.5, "speicher", Some(15.0), "mastr")];
+        let fs = fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0);
+        assert_eq!(fs.len(), 2);
+        let herkunft: Vec<_> = fs
+            .iter()
+            .map(|f| f["properties"]["herkunft"].clone())
+            .collect();
+        assert!(herkunft.contains(&json!("osm")) && herkunft.contains(&json!("mastr")));
+    }
+
+    #[test]
+    fn mehrere_einheiten_an_einer_anlage_summieren() {
+        let osm = vec![punkt(7.0, 51.5, "speicher", Some(20.0), "osm")];
+        let mastr = vec![
+            punkt(7.001, 51.5, "speicher", Some(12.5), "mastr"),
+            punkt(7.002, 51.5, "speicher", Some(30.0), "mastr"),
+            punkt(7.003, 51.5, "speicher", Some(11.0), "mastr"),
+        ];
+        let fs = fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0);
+        assert_eq!(fs.len(), 1);
+        let p = &fs[0]["properties"];
+        assert_eq!(p["leistung_mw"], json!(53.5));
+        assert_eq!(p["mastr_einheiten"], json!(3));
+        // Nummer und Id der GRÖSSTEN Einheit.
+        assert_eq!(p["mastr_nummer"], "SEE7.002");
+        assert_eq!(p["mastr_id"], json!(7002));
+    }
+
+    #[test]
+    fn einheit_geht_an_die_naechste_gleichartige_anlage() {
+        let osm = vec![
+            punkt(7.0, 51.5, "wasser", Some(12.0), "osm"),
+            punkt(7.02, 51.5, "wasser", Some(12.0), "osm"),
+        ];
+        let mastr = vec![punkt(7.015, 51.5, "wasser", Some(18.0), "mastr")];
+        let fs = fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0);
+        assert_eq!(fs.len(), 2);
+        let gemischt = fs
+            .iter()
+            .find(|f| f["properties"]["herkunft"] == "osm+mastr")
+            .unwrap();
+        assert_eq!(gemischt["geometry"]["coordinates"], json!([7.02, 51.5]));
+    }
+
+    #[test]
+    fn ausserhalb_des_radius_bleiben_zwei_punkte() {
+        let osm = vec![punkt(7.0, 51.5, "wasser", Some(12.0), "osm")];
+        // ~3,5 km östlich
+        let mastr = vec![punkt(7.05, 51.5, "wasser", Some(18.0), "mastr")];
+        assert_eq!(
+            fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0).len(),
+            2
+        );
+    }
+
+    #[test]
+    fn erneuerbare_osm_ohne_leistung_nur_mit_mastr_treffer() {
+        let osm = vec![
+            punkt(7.0, 51.5, "solar", None, "osm"),
+            punkt(7.3, 51.5, "solar", None, "osm"),
+        ];
+        let mastr = vec![punkt(7.001, 51.5, "solar", Some(14.0), "mastr")];
+        let fs = fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0);
+        assert_eq!(fs.len(), 1, "der Kandidat ohne Treffer fällt weg");
+        assert_eq!(fs[0]["properties"]["herkunft"], "osm+mastr");
+        assert_eq!(fs[0]["properties"]["leistung_mw"], json!(14.0));
+    }
+
+    #[test]
+    fn nur_anlagen_im_ausschnitt() {
+        // Je Quelle ein Punkt drin, einer knapp draussen: der OSM-Teil stammt aus einem auf
+        // 2 Nachkommastellen gerundeten Cache-Schlüssel und kann über den Rand ragen.
+        let osm = vec![
+            punkt(7.0, 51.5, "gas", None, "osm"),
+            punkt(7.504, 51.5, "gas", None, "osm"),
+        ];
+        let mastr = vec![
+            punkt(6.8, 51.2, "wind", Some(15.0), "mastr"),
+            punkt(12.0, 48.0, "wind", Some(15.0), "mastr"),
+        ];
+        let fs = fuehre_energie_zusammen(&osm, &mastr, &bbox(), 2000.0);
+        let koord: Vec<_> = fs
+            .iter()
+            .map(|f| f["geometry"]["coordinates"].clone())
+            .collect();
+        assert_eq!(fs.len(), 2, "{koord:?}");
+        assert!(koord.contains(&json!([7.0, 51.5])));
+        assert!(koord.contains(&json!([6.8, 51.2])));
+    }
+
+    // ---- 1.7 Quellennennung
+
+    #[test]
+    fn quellennennung_nur_aus_beitragenden_teilen() {
+        let osm = "© OpenStreetMap-Beitragende (ODbL)";
+        let mastr = "Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0";
+        assert_eq!(energie_attribution(true, true), format!("{osm} · {mastr}"));
+        assert_eq!(energie_attribution(true, false), osm);
+        assert_eq!(energie_attribution(false, true), mastr);
+        assert_eq!(energie_attribution(false, false), "");
+    }
+}

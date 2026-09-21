@@ -24,16 +24,56 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (111 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
 | **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Acht-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
 | **KRITIS / sensible Objekte** (`kritis`) | Deutschland-Extrakt `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (Geofabrik, konfigurierbar), **kein Abruf je Anfrage** | OSM-PBF → eigener Bestand in `nachschlage-cache.db` (Nodes als Punkt, Ways/Relations als Bounding-Box-Mitte); Route liefert GeoJSON-Punkte je `bbox`, ab 5 000 Objekten Sammelpunkte | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | Import alle 168 h (`--kritis-extrakt-intervall-stunden`), Stand = `Last-Modified` des Extrakts | ohne Bestand leer + ausgegraut; ein vorhandener Bestand bleibt auch ohne Netz unbegrenzt gültig |
+| **Energieanlagen** (`energie`, LFH-81) | OSM: `https://overpass-api.de/api/interpreter` (Mirror `overpass.kumi.systems`), `nwr[power=plant](bbox);out center tags;` · MaStR: `https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung` (Filter: Nettonennleistung > 10 000 kW, Koordinate vorhanden, Status 35/37, `pageSize=2000`) | OSM-JSON + MaStR-JSON → GeoJSON-**Punkte**, je Anfrage auf die `bbox` gefiltert und zusammengeführt | **ODbL** (OSM) · **Datenlizenz Deutschland – Namensnennung – 2.0** ([dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)) für das [Marktstammdatenregister](https://www.marktstammdatenregister.de/MaStR) der Bundesnetzagentur | nur die beitragenden Teile, getrennt durch „ · “: `© OpenStreetMap-Beitragende (ODbL)` · `Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0` | 24 h je Teil (OSM je gerundeter bbox, MaStR bundesweit ein Eintrag); `stand` = Zeitpunkt des MaStR-Abzugs | ein Teil fällt aus → der andere wird gezeigt; beide aus → leer + ausgegraut |
 
 ## Hinweise zur Anbindung
 
 - **NINA** ist die einzige Quelle mit einem zweistufigen Abruf (Übersichtsliste ohne
   Geometrie → Einzel-Geometrie je Warnung). Der Aggregator lädt die Geometrien parallel und
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
-- **KRITIS** ist die einzige `bbox`-abhängige Ebene: Das Frontend meldet den Karten-Viewport
-  (Parameter `bbox=west,sued,ost,nord`) nach Kartenbewegung (debounced), in jeder Zoomstufe.
-  Fehlender/ungültiger `bbox` → HTTP 400; eine Größengrenze gibt es seit LFH-83 nicht mehr.
-  Details im Abschnitt „KRITIS aus dem OSM-Extrakt" unten.
+- **KRITIS** und **Energie** sind die `bbox`-abhängigen Ebenen: Das Frontend meldet den
+  Karten-Viewport (Parameter `bbox=west,sued,ost,nord`) nach Kartenbewegung (debounced), in
+  jeder Zoomstufe. Fehlender/ungültiger `bbox` → HTTP 400 bei beiden. **KRITIS** fragt damit
+  nur seinen lokalen Extrakt-Bestand ab (kein Cache je bbox nötig, kein Netzabruf, keine
+  Größengrenze seit LFH-83 — Details im Abschnitt „KRITIS aus dem OSM-Extrakt" unten);
+  **Energie** cacht dagegen ihren OSM-Anteil pro gerundeter bbox (der MaStR-Anteil bundesweit
+  in einem Eintrag, s. u.).
+- **Energie (LFH-81) ist hybrid**, weil keine der beiden Quellen allein trägt. Gemessen am
+  21.09.2026: das Marktstammdatenregister veröffentlicht für konventionelle Großkraftwerke
+  **keine Koordinaten** (über 50 MW: 0 von 202 Erdgas-, 0 von 100 Kohle-, 0 von 25
+  Mineralöl-Einheiten georeferenziert), Speicher, Solar, Wasser und Wind dagegen fast
+  vollständig. Umspannwerke führt MaStR gar nicht (sie stehen als `power=substation` in
+  KRITIS). Deshalb liefert OSM `power=plant` die Standorte samt der konventionellen Anlagen,
+  MaStR die amtlich registrierten Großanlagen ab 10 MW. **Solange die Herkunft eines Punktes
+  nur `osm` ist, ist seine Leistung eine OSM-Angabe und nicht amtlich** — für Kohle-, Gas-
+  und Ölkraftwerke ist das mangels MaStR-Koordinaten der Regelfall.
+- **Rauschfilter Energie:** aus OSM zählen nur `power=plant`; konventionelle Anlagen (Kohle,
+  Gas, Öl, Kern, Abfall) immer, alle anderen nur mit getaggter Leistung **ab** 10 MW
+  (`plant:output:electricity`, tolerant gelesen: `690 MW`, `1.2 GW`, `12000 kW`; `yes` oder
+  `~50` gelten als unbekannt). Eine erneuerbare OSM-Anlage ohne Leistung erscheint nur, wenn
+  ihr eine MaStR-Einheit zugeordnet wird. Ein Pumpspeicherwerk (`plant:source=hydro` mit
+  `plant:method=water-pumped-storage`) zählt als **Speicher**, weil MaStR es so führt —
+  sonst stünde es neben seinen eigenen Turbinen (gemessen am PSW Happurg: fünf Punkte statt
+  einem). Aus MaStR kommen nur Einheiten **über** 10 MW, mit
+  Koordinate, „In Betrieb“ oder „Vorübergehend stillgelegt“ — gefiltert beim Upstream,
+  gemessen 1.267 Einheiten in einem Abruf (~7 s, ~5 MB).
+- **Zusammenführung Energie:** eine MaStR-Einheit geht an die **nächste** OSM-Anlage
+  **gleicher** Anlagenart im Umkreis von 2 km (`ENERGIE_RADIUS_M`, Messprotokoll im
+  Commit von LFH-81); mehrere Einheiten summieren ihre Leistung, geführt werden Nummer und
+  Id der größten. Der Punkt bleibt am OSM-Standort, die Herkunft wird `osm+mastr`. Übrige
+  MaStR-Einheiten erscheinen als eigene Punkte (`mastr`). Der Inspector verlinkt die Einheit
+  über `https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/{mastr_id}`.
+- **Der MaStR-JSON-Endpunkt ist inoffiziell** — öffentlich, aber nicht dokumentiert, ohne
+  SLA und mit WAF davor. Der Filteroperator `gt` ist undokumentiert und arbeitet live
+  numerisch; die Filterfeldnamen sind Anzeigenamen des Portals und können sich still ändern.
+  Eine Antwort ohne `Data`-Liste oder ohne eine einzige Einheit gilt deshalb als
+  **Fehlschlag**, nicht als Leerstand. Nach einem Fehlschlag ruht der Abruf fünf Minuten
+  (`ENERGIE_MASTR_ABKUEHLUNG`), damit ein gestörtes Portal nicht jedes Verschieben der Karte
+  bis zu 30 s aufhält; der letzte gute Stand wird über SWR weiter ausgeliefert (Cache-Aufbewahrung
+  2 Tage), danach zeigt die Ebene nur den OSM-Anteil und die Quellennennung nennt nur noch
+  OSM. **Ausweichweg**, falls der Endpunkt wegfällt: der
+  [MaStR-Gesamtexport](https://www.marktstammdatenregister.de/MaStR/Datendownload) (XML, rund
+  3 GB) oder der SOAP-Webdienst (Registrierung nötig).
 - **LHP (`hochwasser`)** ist die zweite zweistufige Quelle — anders als NINA holt Stufe 1
   aber keine Daten, sondern einen **Sitzungs-Token**: die Webservices des Portals antworten
   nur mit einem gültigen, serverseitig ausgegebenen `ki`. Gemessen am 20.09.2026: ohne

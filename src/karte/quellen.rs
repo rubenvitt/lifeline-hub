@@ -2,14 +2,17 @@
 //! frischer Cache → sofort; veralteter Cache → sofort den alten Stand ausliefern und im
 //! Hintergrund erneuern (nicht blockierend); gar kein Cache → einmalig blockierend holen.
 
+use crate::error::AppError;
 use crate::karte::cache;
 use crate::karte::luftqualitaet::{luftqualitaet_fenster, normalisiere_luftqualitaet};
 use crate::karte::normalisierung::{
-    kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_odl,
-    normalisiere_pegelonline,
+    energie_attribution, energie_beitraege, fuehre_energie_zusammen, kombiniere_nina,
+    normalisiere_autobahn, normalisiere_energie_mastr, normalisiere_energie_osm,
+    normalisiere_hochwasser, normalisiere_odl, normalisiere_pegelonline, ENERGIE_MASTR_ATTRIB,
+    ENERGIE_OSM_ATTRIB,
 };
 use crate::karte::odl_grundpegel::{self, GrundpegelKarte};
-use crate::karte::typen::{leere_collection, FachebeneAntwort};
+use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use futures::stream::{self, StreamExt};
 use serde_json::Value;
@@ -395,6 +398,42 @@ async fn erneuere_nina(client: reqwest::Client, pool: SqlitePool) -> Option<Fach
     );
     cache::setze(&pool, "nina", &a).await;
     Some(a)
+}
+
+// KRITIS selbst kommt seit LFH-83 aus dem bundesweiten OSM-Extrakt (`karte::kritis::bestand`),
+// nicht mehr aus einem Live-Overpass-Abruf je Anfrage — `fetch_kritis`/`erneuere_kritis` samt
+// ihrer KRITIS-eigenen Overpass-Query sind deshalb entfallen. `hole_overpass` bleibt: Energie
+// (LFH-81) braucht denselben Mehrfach-Endpunkt-Abruf für `power=plant`.
+/// Overpass antwortet langsamer als das globale Client-Timeout (8 s) — interne `[timeout:25]`.
+const OVERPASS_TIMEOUT: Duration = Duration::from_secs(30);
+/// Hauptinstanz ist oft überlastet (TimedOut) → Mirror als Fallback.
+const OVERPASS_URLS: [&str; 2] = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+];
+
+/// Overpass-Abruf über [`OVERPASS_URLS`], der Reihe nach (eigenes, längeres Timeout).
+/// Einzelfehler nur debug, erst wenn ALLE scheitern eine warn-Meldung (weniger Log-Rauschen).
+async fn hole_overpass(client: &reqwest::Client, query: &str, ebene: &str) -> Option<Value> {
+    for url in OVERPASS_URLS {
+        let resp = client
+            .post(url)
+            .timeout(OVERPASS_TIMEOUT)
+            .header("Content-Type", "text/plain")
+            .body(query.to_string())
+            .send()
+            .await;
+        match resp {
+            Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
+                Ok(roh) => return Some(roh),
+                Err(e) => tracing::debug!("Overpass-JSON-Parse ({url}) fehlgeschlagen: {e}"),
+            },
+            Ok(r) => tracing::debug!("Overpass ({url}) HTTP {}", r.status()),
+            Err(e) => tracing::debug!("Overpass-Fetch ({url}) fehlgeschlagen: {e}"),
+        }
+    }
+    tracing::warn!("Overpass nicht erreichbar (alle Endpunkte) — {ebene} aus Cache/leer");
+    None
 }
 
 // ------------------------------------------------------- HOCHWASSER (LHP, LFH-77)
@@ -890,6 +929,560 @@ async fn erneuere_luftqualitaet(
     let a = luftqualitaet_antwort(stationen, index)?;
     cache::setze(&pool, "luftqualitaet", &a).await;
     Some(a)
+}
+
+// ------------------------------------------------------------------ ENERGIE (LFH-81)
+//
+// Hybride Fachebene aus zwei unabhängig gecachten Teilen, die erst bei der Anfrage
+// zusammengeführt werden (design.md, Entscheidung 1):
+//
+// | Teil            | Schlüssel                    | TTL  | kalter Pfad                              |
+// |-----------------|------------------------------|------|------------------------------------------|
+// | OSM power=plant | `energie:osm:<bbox gerundet>` | 24 h | blockierend, 30 s, zwei Overpass-Endpunkte |
+// | MaStR-Abzug     | `energie:mastr` (bundesweit)  | 24 h | blockierend, 30 s, 5-min-Sperre           |
+
+/// Beide Teile ändern sich kaum → einen Tag cachen, veraltet im Hintergrund erneuern.
+const ENERGIE_TTL: Duration = Duration::from_secs(24 * 3600);
+const ENERGIE_OSM_PRAEFIX: &str = "energie:osm";
+const ENERGIE_MASTR_KEY: &str = "energie:mastr";
+/// Gemessen (21.09.2026): ~7 s und 5,2 MB für den ganzen Abzug — das globale
+/// Client-Timeout (8 s) reichte dafür nicht verlässlich.
+const ENERGIE_MASTR_TIMEOUT: Duration = Duration::from_secs(30);
+const ENERGIE_MASTR_BASIS: &str = "https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung";
+/// Upstream-Filter, fertig URL-kodiert. Klartext:
+/// `Nettonennleistung der Einheit~gt~10000~and~Koordinate: Breitengrad (WGS84)~gt~-90~and~Betriebs-Status~eq~'35,37'`
+/// — über 10 MW (kW-Angabe; `gt` ist undokumentiert, arbeitet aber live numerisch), mit
+/// Koordinate (`NULL` erfüllt keinen Bereichsvergleich) und im Status „In Betrieb" (35) oder
+/// „Vorübergehend stillgelegt" (37). Die Feldnamen sind Anzeigenamen des Portals und können
+/// sich still ändern; deshalb gilt eine unerwartete Antwortform als Fehlschlag.
+const ENERGIE_MASTR_FILTER: &str = "Nettonennleistung%20der%20Einheit~gt~10000~and~Koordinate%3A%20Breitengrad%20%28WGS84%29~gt~-90~and~Betriebs-Status~eq~%2735%2C37%27";
+const ENERGIE_MASTR_SEITE: u64 = 2000;
+/// Obergrenze der Seitenschleife. Heute reicht eine Seite (1267 Einheiten); die Grenze hält
+/// eine kaputte `Total`-Angabe davon ab, das Portal mit Seitenabrufen zu überziehen.
+const ENERGIE_MASTR_MAX_SEITEN: u64 = 10;
+
+/// Nach einem gescheiterten MaStR-Abruf ruht der Upstream fünf Minuten. **Anders als bei
+/// Autobahn** (`AUTOBAHN_ABKUEHLUNG`) schützt die Sperre hier keinen Hintergrundlauf, sondern
+/// den BLOCKIERENDEN kalten Pfad: ohne sie wartete bei gestörtem MaStR jedes Verschieben der
+/// Karte bis zu 30 s auf einen Abruf, der gerade nicht gelingen kann. Mit ihr bekommt die
+/// Anfrage sofort den OSM-Anteil. Wer das zu einem Hintergrund-Refresh „vereinheitlicht",
+/// nimmt genau diese Zusage weg.
+const ENERGIE_MASTR_ABKUEHLUNG: Duration = Duration::from_secs(300);
+static ENERGIE_MASTR_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// Einzelspur für den 5-MB-Abruf: der kalte Zweig von `liefere_mit_swr` kennt keinen Riegel,
+/// jeder Bediener, der die Ebene bei leerem Cache einschaltet, holte sonst seinen eigenen
+/// Abzug. Wer gewartet hat, bekommt den frischen Stand des Vorgängers aus dem Cache.
+static ENERGIE_MASTR_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+
+/// Zuordnungsradius OSM-Anlage ↔ MaStR-Einheit (design.md, Entscheidung 4), **gemessen**
+/// am 21.09.2026 (Aufgabe 2.4): 18 zufällige MaStR-Einheiten (je 6 Wasser, Speicher, Solar,
+/// Seed 81) gegen OSM `power=plant` im Umkreis von 5 km, 17 auswertbar. Echte Paare
+/// (gleichnamig bzw. Einheitenpunkt in der OSM-Fläche) lagen bei Wasser 29–289 m, Speicher
+/// 20–113 m (Pumpspeicher Happurg eingerechnet), Solar 27–729 m — Höchstwert 729 m
+/// (Solarpark Halberstadt, flächig). Der kleinste Abstand zu einer gleichartigen Anlage, die
+/// NICHT dieselbe war, betrug 2,4 km (Elsterheide), der nächste 4,2 km. 2 km deckt also jedes
+/// gemessene Paar mit fast dreifacher Reserve und bleibt unter dem nächsten Fehlpaar; ein
+/// größerer Radius holte genau diese Fehlpaare herein.
+pub(crate) const ENERGIE_RADIUS_M: f64 = 2000.0;
+
+pub(crate) fn mastr_url(seite: u64) -> String {
+    format!(
+        "{ENERGIE_MASTR_BASIS}?filter={ENERGIE_MASTR_FILTER}&pageSize={ENERGIE_MASTR_SEITE}&page={seite}"
+    )
+}
+
+/// Seitenzahl aus `Total`. 0 ist ein Fehlschlag (keine Großanlage in Deutschland ist keine
+/// glaubwürdige Antwort), zu viele Seiten ebenso.
+pub(crate) fn mastr_seiten(total: u64) -> Result<u64, String> {
+    if total == 0 {
+        return Err("MaStR meldet Total 0".into());
+    }
+    let seiten = total.div_ceil(ENERGIE_MASTR_SEITE);
+    if seiten > ENERGIE_MASTR_MAX_SEITEN {
+        return Err(format!(
+            "MaStR meldet Total {total} — mehr als {ENERGIE_MASTR_MAX_SEITEN} Seiten"
+        ));
+    }
+    Ok(seiten)
+}
+
+/// Darf ein neuer MaStR-Abruf starten? Rein und ohne Uhr prüfbar.
+pub(crate) fn mastr_darf_starten(seit_fehlschlag: Option<Duration>, abkuehlung: Duration) -> bool {
+    match seit_fehlschlag {
+        None => true,
+        Some(vergangen) => vergangen >= abkuehlung,
+    }
+}
+
+/// Nur `power=plant`: `power=generator` sind Einzelaggregate, `power=substation` steht schon
+/// in der KRITIS-Ebene und würde doppelt eingezeichnet.
+fn energie_overpass_query(bbox_op: &str) -> String {
+    format!("[out:json][timeout:25];nwr[power=plant]({bbox_op});out center tags;")
+}
+
+pub async fn fetch_energie(
+    s: &FachebenenState,
+    pool: &SqlitePool,
+    bbox_roh: &str,
+) -> Result<FachebeneAntwort, AppError> {
+    let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
+    let (c1, p1, c2, p2) = (
+        s.client.clone(),
+        pool.clone(),
+        s.client.clone(),
+        pool.clone(),
+    );
+    let key = bbox.cache_key_mit(ENERGIE_OSM_PRAEFIX);
+    Ok(energie_kern(
+        pool,
+        &s.inflight,
+        bbox,
+        move || erneuere_energie_osm(c1, p1, bbox, key),
+        move || erneuere_energie_mastr(c2, p2),
+    )
+    .await)
+}
+
+/// Kern von [`fetch_energie`] mit austauschbaren Abrufen — so sind die Teilausfall-Fälle ohne
+/// Netz prüfbar (Muster `swr_tests`).
+async fn energie_kern<F1, F2>(
+    pool: &SqlitePool,
+    inflight: &Arc<Mutex<HashSet<String>>>,
+    bbox: Bbox,
+    erneuere_osm: impl FnOnce() -> F1,
+    erneuere_mastr: impl FnOnce() -> F2,
+) -> FachebeneAntwort
+where
+    F1: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
+    F2: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
+{
+    let osm_key = bbox.cache_key_mit(ENERGIE_OSM_PRAEFIX);
+    let offline = || FachebeneAntwort::offline("energie", "");
+    // Beide kalten Pfade nebenläufig: gewartet wird so lange wie der langsamere, nicht die Summe.
+    let (osm, mastr) = tokio::join!(
+        liefere_mit_swr(pool, inflight, &osm_key, ENERGIE_TTL, offline, erneuere_osm),
+        liefere_mit_swr(
+            pool,
+            inflight,
+            ENERGIE_MASTR_KEY,
+            ENERGIE_TTL,
+            offline,
+            erneuere_mastr
+        ),
+    );
+    baue_energie_antwort(&osm, &mastr, &bbox)
+}
+
+/// Setzt die Antwort aus den beiden Teilen zusammen.
+pub(crate) fn baue_energie_antwort(
+    osm: &FachebeneAntwort,
+    mastr: &FachebeneAntwort,
+    bbox: &Bbox,
+) -> FachebeneAntwort {
+    use crate::karte::typen::FachebeneStatus;
+    let osm_da = osm.status != FachebeneStatus::Offline;
+    let mastr_da = mastr.status != FachebeneStatus::Offline;
+    // `offline` genau dann, wenn KEIN Teil einen Stand hat (weder frisch noch aus dem Cache).
+    if !osm_da && !mastr_da {
+        return FachebeneAntwort::offline("energie", "");
+    }
+    let features = |a: &FachebeneAntwort| {
+        a.features
+            .get("features")
+            .and_then(|f| f.as_array())
+            .cloned()
+            .unwrap_or_default()
+    };
+    let punkte = fuehre_energie_zusammen(&features(osm), &features(mastr), bbox, ENERGIE_RADIUS_M);
+    let (osm_traegt_bei, mastr_traegt_bei) = energie_beitraege(&punkte);
+    // `stand` ist der Zeitpunkt des MaStR-Abzugs — aus dessen eigenem Eintrag, damit ein
+    // veralteter Stand seinen echten Zeitpunkt behält.
+    let stand = if mastr_da { mastr.stand.clone() } else { None };
+    FachebeneAntwort::ok(
+        "energie",
+        &energie_attribution(osm_traegt_bei, mastr_traegt_bei),
+        stand,
+        serde_json::json!({ "type": "FeatureCollection", "features": punkte }),
+    )
+}
+
+async fn erneuere_energie_osm(
+    client: reqwest::Client,
+    pool: SqlitePool,
+    bbox: Bbox,
+    key: String,
+) -> Option<FachebeneAntwort> {
+    let roh = hole_overpass(
+        &client,
+        &energie_overpass_query(&bbox.overpass()),
+        "Energie",
+    )
+    .await?;
+    let a = FachebeneAntwort::ok(
+        "energie",
+        ENERGIE_OSM_ATTRIB,
+        None,
+        normalisiere_energie_osm(&roh),
+    );
+    cache::setze(&pool, &key, &a).await;
+    Some(a)
+}
+
+/// Holt den ganzen Abzug, Seite für Seite, bis `Total` erreicht ist.
+async fn hole_mastr(client: &reqwest::Client) -> Result<Vec<Value>, String> {
+    let mut alle = Vec::new();
+    let mut seiten = 1;
+    let mut seite = 1;
+    loop {
+        let resp = client
+            .get(mastr_url(seite))
+            .timeout(ENERGIE_MASTR_TIMEOUT)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {}", resp.status()));
+        }
+        let roh: Value = resp.json().await.map_err(|e| e.to_string())?;
+        if seite == 1 {
+            let total = roh
+                .get("Total")
+                .and_then(|t| t.as_u64())
+                .ok_or("MaStR-Antwort ohne Total")?;
+            seiten = mastr_seiten(total)?;
+        }
+        let roh_anzahl = roh.get("Data").and_then(|d| d.as_array()).map(Vec::len);
+        let punkte = normalisiere_energie_mastr(&roh)?;
+        if roh_anzahl == Some(0) {
+            // Eine leere Seite vor dem gemeldeten Ende hieße still abgeschnitten.
+            return Err(format!("MaStR-Seite {seite} von {seiten} ist leer"));
+        }
+        alle.extend(punkte);
+        if seite >= seiten {
+            return Ok(alle);
+        }
+        seite += 1;
+    }
+}
+
+async fn erneuere_energie_mastr(
+    client: reqwest::Client,
+    pool: SqlitePool,
+) -> Option<FachebeneAntwort> {
+    let _spur = ENERGIE_MASTR_EINZELSPUR
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await;
+    // Wer gewartet hat, nimmt den frischen Stand des Vorgängers, statt nachzuholen.
+    if let Some(a) = cache::frisch(&pool, ENERGIE_MASTR_KEY, ENERGIE_TTL.as_secs() as i64).await {
+        return Some(a);
+    }
+    let seit_fehlschlag = ENERGIE_MASTR_FEHLSCHLAG
+        .lock()
+        .unwrap()
+        .map(|t| t.elapsed());
+    if !mastr_darf_starten(seit_fehlschlag, ENERGIE_MASTR_ABKUEHLUNG) {
+        tracing::debug!("MaStR: Abkühlung nach Fehlschlag läuft — kein neuer Abruf");
+        return None;
+    }
+    let ergebnis = hole_mastr(&client).await.and_then(|punkte| {
+        // Keine einzige Großanlage in Deutschland ist keine glaubwürdige Antwort.
+        (!punkte.is_empty())
+            .then_some(punkte)
+            .ok_or_else(|| "MaStR-Abzug ohne georeferenzierte Einheit".to_string())
+    });
+    match ergebnis {
+        Ok(punkte) => {
+            *ENERGIE_MASTR_FEHLSCHLAG.lock().unwrap() = None;
+            let stand = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let a = FachebeneAntwort::ok(
+                "energie",
+                ENERGIE_MASTR_ATTRIB,
+                Some(stand),
+                serde_json::json!({ "type": "FeatureCollection", "features": punkte }),
+            );
+            cache::setze(&pool, ENERGIE_MASTR_KEY, &a).await;
+            Some(a)
+        }
+        Err(e) => {
+            *ENERGIE_MASTR_FEHLSCHLAG.lock().unwrap() = Some(std::time::Instant::now());
+            tracing::warn!(
+                "MaStR-Abruf fehlgeschlagen ({e}) — Energie ohne MaStR-Anteil, Sperre 5 min"
+            );
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod energie_tests {
+    use super::*;
+    use crate::karte::typen::FachebeneStatus;
+    use serde_json::json;
+
+    const BBOX: &str = "6.9,51.45,7.3,51.65";
+
+    fn inflight() -> Arc<Mutex<HashSet<String>>> {
+        Arc::new(Mutex::new(HashSet::new()))
+    }
+
+    fn punkt(lon: f64, lat: f64, art: &str, mw: f64, herkunft: &str) -> Value {
+        json!({ "type": "Feature",
+            "geometry": { "type": "Point", "coordinates": [lon, lat] },
+            "properties": { "titel": format!("{herkunft}-{lon}"), "anlagenart": art,
+                "leistung_mw": mw, "betreiber": null, "betriebsstatus": null,
+                "herkunft": herkunft, "mastr_nummer": null, "mastr_id": null,
+                "mastr_einheiten": null } })
+    }
+
+    fn osm_teil() -> FachebeneAntwort {
+        FachebeneAntwort::ok(
+            "energie",
+            ENERGIE_OSM_ATTRIB,
+            None,
+            json!({ "type": "FeatureCollection",
+                "features": [ punkt(7.0079, 51.6002, "kohle", 690.0, "osm") ] }),
+        )
+    }
+
+    fn mastr_teil() -> FachebeneAntwort {
+        FachebeneAntwort::ok(
+            "energie",
+            ENERGIE_MASTR_ATTRIB,
+            Some("2026-09-21T10:00:00Z".into()),
+            json!({ "type": "FeatureCollection", "features": [
+                punkt(7.19, 51.55, "speicher", 15.0, "mastr"),
+                punkt(12.0, 48.0, "wasser", 18.5, "mastr"), // weit ausserhalb
+            ] }),
+        )
+    }
+
+    fn titel(a: &FachebeneAntwort) -> Vec<String> {
+        a.features["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["properties"]["titel"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    // ---- 2.1 reine Teile des MaStR-Abrufs
+
+    #[test]
+    fn mastr_url_ist_das_literal() {
+        assert_eq!(
+            mastr_url(1),
+            "https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung?filter=Nettonennleistung%20der%20Einheit~gt~10000~and~Koordinate%3A%20Breitengrad%20%28WGS84%29~gt~-90~and~Betriebs-Status~eq~%2735%2C37%27&pageSize=2000&page=1"
+        );
+        assert!(mastr_url(2).ends_with("&pageSize=2000&page=2"));
+    }
+
+    /// Stilles Abschneiden bei 2000 Einheiten würde niemand bemerken — deshalb die Schleife.
+    #[test]
+    fn seitenzahl_folgt_total() {
+        assert_eq!(mastr_seiten(1267), Ok(1));
+        assert_eq!(mastr_seiten(2000), Ok(1));
+        assert_eq!(mastr_seiten(2001), Ok(2));
+        assert_eq!(mastr_seiten(20_000), Ok(10));
+        assert!(mastr_seiten(0).is_err());
+        assert!(mastr_seiten(20_001).is_err());
+    }
+
+    #[test]
+    fn nach_mastr_fehlschlag_fuenf_minuten_sperre() {
+        let ab = ENERGIE_MASTR_ABKUEHLUNG;
+        assert_eq!(ab, Duration::from_secs(300));
+        assert!(mastr_darf_starten(None, ab));
+        assert!(!mastr_darf_starten(Some(Duration::from_secs(0)), ab));
+        assert!(!mastr_darf_starten(Some(Duration::from_secs(299)), ab));
+        assert!(mastr_darf_starten(Some(ab), ab));
+        assert!(mastr_darf_starten(Some(Duration::from_secs(301)), ab));
+    }
+
+    #[test]
+    fn overpass_query_fragt_nur_power_plant() {
+        let b = Bbox::parse(BBOX).unwrap();
+        assert_eq!(
+            energie_overpass_query(&b.overpass()),
+            "[out:json][timeout:25];nwr[power=plant](51.45,6.9,51.65,7.3);out center tags;"
+        );
+    }
+
+    /// Die zweite Hälfte der Einzelspur: wer gewartet hat, bekommt den frischen Stand des
+    /// Vorgängers aus dem Cache, ohne selbst abzurufen. Belegt mit einem Client, der nirgends
+    /// hinkommt — eine Antwort kann dann nur aus dem Cache stammen.
+    #[tokio::test]
+    async fn wartender_bekommt_frischen_mastr_stand_ohne_abruf() {
+        let pool = crate::db::test_pool().await;
+        cache::setze(&pool, ENERGIE_MASTR_KEY, &mastr_teil()).await;
+        let nirgendwo = reqwest::Client::builder()
+            .timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let a = erneuere_energie_mastr(nirgendwo, pool)
+            .await
+            .expect("frischer Stand wird durchgereicht");
+        assert_eq!(a.stand.as_deref(), Some("2026-09-21T10:00:00Z"));
+    }
+
+    // ---- 2.2 fetch_energie: Teilausfall und Totalausfall
+
+    #[tokio::test]
+    async fn beide_teile_aus_dem_cache() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        // Handgeschriebene Schlüssel: ein Vergleich gegen `cache_key_mit` prüfte sich selbst.
+        cache::setze(&pool, "energie:osm:6.90,51.45,7.30,51.65", &osm_teil()).await;
+        cache::setze(&pool, "energie:mastr", &mastr_teil()).await;
+        let a = energie_kern(
+            &pool,
+            &inflight(),
+            bbox,
+            || async { None },
+            || async { None },
+        )
+        .await;
+        assert_eq!(a.quelle, "energie");
+        assert_eq!(a.status, FachebeneStatus::Ok);
+        assert_eq!(
+            a.attribution,
+            "© OpenStreetMap-Beitragende (ODbL) · Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0"
+        );
+        assert_eq!(a.stand.as_deref(), Some("2026-09-21T10:00:00Z"));
+        let t = titel(&a);
+        assert_eq!(t.len(), 2, "{t:?}"); // die Einheit bei 12°/48° liegt ausserhalb
+        assert!(t.contains(&"osm-7.0079".to_string()));
+        assert!(t.contains(&"mastr-7.19".to_string()));
+    }
+
+    #[tokio::test]
+    async fn nur_osm_erreichbar() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        cache::setze(&pool, "energie:osm:6.90,51.45,7.30,51.65", &osm_teil()).await;
+        let a = energie_kern(
+            &pool,
+            &inflight(),
+            bbox,
+            || async { None },
+            || async { None },
+        )
+        .await;
+        assert_ne!(a.status, FachebeneStatus::Offline);
+        assert_eq!(a.attribution, "© OpenStreetMap-Beitragende (ODbL)");
+        assert_eq!(a.stand, None);
+        assert_eq!(titel(&a), vec!["osm-7.0079".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn nur_mastr_erreichbar() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        cache::setze(&pool, "energie:mastr", &mastr_teil()).await;
+        let a = energie_kern(
+            &pool,
+            &inflight(),
+            bbox,
+            || async { None },
+            || async { None },
+        )
+        .await;
+        assert_eq!(a.status, FachebeneStatus::Ok);
+        assert_eq!(
+            a.attribution,
+            "Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0"
+        );
+        assert_eq!(a.stand.as_deref(), Some("2026-09-21T10:00:00Z"));
+    }
+
+    #[tokio::test]
+    async fn keine_quelle_erreichbar_ist_offline() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let a = energie_kern(
+            &pool,
+            &inflight(),
+            bbox,
+            || async { None },
+            || async { None },
+        )
+        .await;
+        assert_eq!(a.status, FachebeneStatus::Offline);
+        assert_eq!(a.quelle, "energie");
+        assert!(a.features["features"].as_array().unwrap().is_empty());
+        assert_eq!(a.stand, None);
+    }
+
+    /// Kalte Pfade werden live geholt (und nicht etwa übersprungen).
+    #[tokio::test]
+    async fn kalte_teile_werden_geholt() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let a = energie_kern(
+            &pool,
+            &inflight(),
+            bbox,
+            || async { Some(osm_teil()) },
+            || async { Some(mastr_teil()) },
+        )
+        .await;
+        assert_eq!(titel(&a).len(), 2);
+    }
+
+    /// Ein Teil, der geantwortet hat, aber im Ausschnitt nichts beiträgt, wird nicht genannt
+    /// (Spec: MUST NOT eine Quelle nennen, die nichts beiträgt) — die Ebene ist dann `leer`,
+    /// nicht `offline`.
+    #[tokio::test]
+    async fn geantwortet_aber_nichts_im_ausschnitt() {
+        let pool = crate::db::test_pool().await;
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let leer = FachebeneAntwort::ok("energie", ENERGIE_OSM_ATTRIB, None, leere_collection());
+        cache::setze(&pool, "energie:osm:6.90,51.45,7.30,51.65", &leer).await;
+        let nur_fern = FachebeneAntwort::ok(
+            "energie",
+            ENERGIE_MASTR_ATTRIB,
+            Some("2026-09-21T10:00:00Z".into()),
+            json!({ "type": "FeatureCollection",
+                "features": [ punkt(12.0, 48.0, "wasser", 18.5, "mastr") ] }),
+        );
+        cache::setze(&pool, "energie:mastr", &nur_fern).await;
+        let a = energie_kern(
+            &pool,
+            &inflight(),
+            bbox,
+            || async { None },
+            || async { None },
+        )
+        .await;
+        assert_eq!(a.status, FachebeneStatus::Leer);
+        assert_eq!(a.attribution, "");
+        // `stand` ist der Zeitpunkt des MaStR-Abzugs, nicht „einer beitragenden Quelle" — er
+        // bleibt also stehen, auch wenn MaStR im Ausschnitt nichts beiträgt.
+        assert_eq!(a.stand.as_deref(), Some("2026-09-21T10:00:00Z"));
+    }
+
+    /// Pinnt den GEMESSENEN Radius dort, wo er verbraucht wird: die `fuehre_*`-Tests reichen
+    /// ihren Radius als Literal herein und sähen eine Änderung an `ENERGIE_RADIUS_M` nicht.
+    /// ~500 m (bei 51,6° N sind 0,0072° Länge rund 500 m) wird zusammengeführt, ~3 km nicht.
+    #[test]
+    fn gemessener_radius_fuehrt_500_m_zusammen_und_3_km_nicht() {
+        let bbox = Bbox::parse(BBOX).unwrap();
+        let mit_einheit_bei = |lon: f64| {
+            FachebeneAntwort::ok(
+                "energie",
+                ENERGIE_MASTR_ATTRIB,
+                Some("2026-09-21T10:00:00Z".into()),
+                json!({ "type": "FeatureCollection",
+                    "features": [ punkt(lon, 51.6002, "kohle", 700.0, "mastr") ] }),
+            )
+        };
+        let nah = baue_energie_antwort(&osm_teil(), &mit_einheit_bei(7.0151), &bbox);
+        let f = nah.features["features"].as_array().unwrap();
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0]["properties"]["herkunft"], "osm+mastr");
+        let fern = baue_energie_antwort(&osm_teil(), &mit_einheit_bei(7.0513), &bbox);
+        assert_eq!(fern.features["features"].as_array().unwrap().len(), 2);
+    }
 }
 
 #[cfg(test)]
