@@ -645,15 +645,24 @@ export default function Sidebar(props: SidebarProps) {
                   <Spin size="small" />
                 ) : (
                   <>
+                    {/* `nowrap`: neben einer Ebene mit Geltungszeile bleibt der Marke sonst so
+                        wenig Breite, dass sie mitten im Wort bricht („offl/ine") — gemessen an
+                        KRITIS in der Aufwärmphase (LFH-83). */}
                     {sichtbar && offline && (
                       <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
-                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                        <Typography.Text
+                          type="secondary"
+                          style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                        >
                           offline
                         </Typography.Text>
                       </Tooltip>
                     )}
                     {sichtbar && status === 'leer' && (
-                      <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                      >
                         keine Daten
                       </Typography.Text>
                     )}
