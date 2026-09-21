@@ -1,0 +1,90 @@
+# Deployment anlegen (LFH-602) — meldet ein fertiges Release als GitHub-Deployment an.
+#
+# DIESER WORKFLOW ROLLT NICHTS AUS. Er legt nur das Deployment an und setzt es auf `queued`.
+# Das eigentliche Ausrollen übernimmt ein Pull-Agent auf dem Zielserver: er fragt die
+# Deployments der Umgebung ab, zieht die Abbilder, startet neu, prüft den Health-Endpunkt und
+# meldet `success` oder `failure` zurück. Die Deployments-Seite des Repos zeigt damit den
+# echten Zustand des Servers, nicht bloß „der Workflow ist durchgelaufen".
+#
+# Warum Pull und nicht Push: das Repo ist öffentlich. Ein Self-hosted Runner auf dem Server
+# ließe jeden Fork-PR, der seinen Workflow auf dieses Label umbiegt, Code auf dem Server
+# ausführen (GitHub rät für öffentliche Repos ausdrücklich davon ab). Ein Push per SSH
+# bräuchte einen eingehenden Weg auf den Server und einen Schlüssel als Secret. Beim Pull
+# wählt nur der Server nach außen, und GitHub hält kein Geheimnis, mit dem man auf ihn käme.
+#
+# Aufrufwege:
+#   - automatisch aus artefakte.yml, nachdem beide Abbilder eines Alpha-Releases gepusht sind;
+#   - von Hand (workflow_dispatch) für ein erneutes Ausrollen oder einen Rücksprung auf einen
+#     älteren Tag — dessen Abbilder müssen dann schon auf GHCR liegen.
+name: Deployment
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      umgebung:
+        required: false
+        type: string
+        default: alpha
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release-Tag, der ausgerollt werden soll, z. B. v1.0.0-alpha.21'
+        required: true
+        type: string
+      umgebung:
+        description: 'Zielumgebung'
+        required: true
+        type: choice
+        options: [alpha]
+        default: alpha
+
+permissions:
+  deployments: write
+
+concurrency:
+  group: deployment-${{ inputs.umgebung }}
+  cancel-in-progress: false
+
+jobs:
+  anlegen:
+    name: Deployment ${{ inputs.umgebung }} anlegen
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      deployments: write
+    steps:
+      # Derselbe Tag-Check wie in artefakte.yml und aus demselben Grund: bei workflow_dispatch
+      # ist der Tag freie Eingabe und landet unten als `ref` bei GitHub und im Payload, den der
+      # Server liest. Der Server prüft ihn ein zweites Mal, bevor er ihn anfasst.
+      - name: Anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ROH_TAG: ${{ inputs.tag }}
+          UMGEBUNG: ${{ inputs.umgebung }}
+          LAUF_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$ROH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "FEHLER: '$ROH_TAG' ist kein zulässiger Release-Tag (erwartet: vX.Y.Z[-vorab])." >&2
+            exit 1
+          fi
+          version="${ROH_TAG#v}"
+
+          # required_contexts leer: der Tag zeigt auf den Versions-Commit von semantic-release
+          # ([skip ci]), an dem keine Prüfungen hängen. Mit der Vorgabe (alle Kontexte grün)
+          # lehnte GitHub das Deployment ab oder wartete auf Prüfungen, die nie kommen. Das
+          # Gate ist schon vorher gelaufen — sonst gäbe es kein Release.
+          id="$(jq -n \
+                  --arg ref "$ROH_TAG" --arg env "$UMGEBUNG" --arg version "$version" \
+                  '{ref: $ref, environment: $env, auto_merge: false, required_contexts: [],
+                    production_environment: false, description: ("lifeline-hub " + $version),
+                    payload: {version: $version}}' \
+                | gh api "repos/$GH_REPO/deployments" --input - --jq .id)"
+          gh api "repos/$GH_REPO/deployments/$id/statuses" \
+            -f state=queued -f log_url="$LAUF_URL" \
+            -f description="wartet auf den Server" > /dev/null
+          echo "::notice::Deployment $id für $ROH_TAG → $UMGEBUNG angelegt, der Server holt es ab."
