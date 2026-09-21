@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  autobahnTakt,
   FACHEBENEN,
   fachebeneKeys,
   istBboxAbhaengig,
@@ -16,11 +17,18 @@ const feat = (lon: number, lat: number) => ({
 });
 
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen und die Hochwasserebene', () => {
+  it('enthält die vier v1-Quellen, die Hochwasserebene und die BAB-Lage', () => {
     // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline`,
     // weil es dieselbe Frage beantwortet: dort der rohe Wasserstand, hier die amtliche
-    // Bewertung (LFH-77).
-    expect(fachebeneKeys()).toEqual(['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis']);
+    // Bewertung (LFH-77). `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
+    expect(fachebeneKeys()).toEqual([
+      'nina',
+      'dwd',
+      'pegelonline',
+      'hochwasser',
+      'kritis',
+      'autobahn',
+    ]);
   });
   it('führt die Hochwasserebene als Punktebene mit Hintergrund-Polling', () => {
     expect(FACHEBENEN.hochwasser.geometrieTyp).toBe('punkt');
@@ -30,6 +38,38 @@ describe('Fachebenen-Registry', () => {
   it('markiert nur kritis als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
     expect(istBboxAbhaengig('dwd')).toBe(false);
+    // Die Autobahn-Ebene aggregiert das ganze Netz serverseitig — sie darf NICHT in den
+    // bbox-Zweig geraten, sonst bliebe sie ohne Viewport-Meldung dauerhaft leer.
+    expect(istBboxAbhaengig('autobahn')).toBe(false);
+  });
+  it('jeder fachebeneKeys()-Eintrag hat auch eine Definition (und umgekehrt)', () => {
+    // Beide Richtungen: ein Key ohne Def stürzt beim Rendern ab, eine Def ohne Key ist
+    // unerreichbar und fällt sonst niemandem auf.
+    expect([...fachebeneKeys()].sort()).toEqual(Object.keys(FACHEBENEN).sort());
+  });
+  it('taktet die Autobahn-Ebene kurz, solange sie aufwärmt (LFH-80)', () => {
+    // Der erste Lauf hängt serverseitig an keinem Request; bis er durch ist, meldet die
+    // Ebene `offline`. Mit dem regulären 600-s-Takt sähe der Bediener zehn Minuten lang
+    // nichts, obwohl die Daten nach ~30 s bereitstehen.
+    const kurz = FACHEBENEN.autobahn.aufwaermPollMs!;
+    const lang = FACHEBENEN.autobahn.pollMs;
+    expect(kurz).toBeLessThan(lang);
+    expect(autobahnTakt(undefined)).toBe(kurz);
+    expect(autobahnTakt('offline')).toBe(kurz);
+
+    // Und die Gegenaussage, die die Regel erst scharf macht: ein ERREICHTER Zustand fällt
+    // auf den regulären Takt zurück. `leer` gehört dazu — „Quelle erreichbar, gerade nichts
+    // zu melden" ist ein gültiges Ende, kurz zu takten brächte dort nichts.
+    expect(autobahnTakt('ok')).toBe(lang);
+    expect(autobahnTakt('leer')).toBe(lang);
+  });
+
+  it('nur die Autobahn-Ebene nennt einen einschränkenden Geltungsbereich', () => {
+    // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung.
+    // Die Gegenaussage trägt sie mit: stünde der Satz an jeder Ebene, sagte er nichts.
+    expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
+    const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
+    expect(mitGeltung).toEqual(['autobahn']);
   });
   it('jede Ebene hat Label, Farbe, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {

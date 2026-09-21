@@ -21,7 +21,7 @@ export type FeatureCollection = S['GeoJsonFeatureCollection'];
 export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/karte/fachebenen/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
-export type FachebeneQuelle = 'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser';
+export type FachebeneQuelle = 'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser' | 'autobahn';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), wie sie in den Feature-Properties der

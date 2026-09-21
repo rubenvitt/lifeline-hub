@@ -628,9 +628,21 @@ export default function Sidebar(props: SidebarProps) {
             const zoomHinweis = sichtbar && key === 'kritis' && props.kritisZoomZuKlein;
             return (
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
-                <Space>
+                <Space align="start">
                   <Switch checked={sichtbar} onChange={(v) => props.onFachebeneToggle(key, v)} />
-                  <span style={{ color: def.farbe }}>●</span> {def.label}
+                  <span style={{ color: def.farbe }}>●</span>
+                  {/* Der Geltungsbereich steht als ZEILE, nicht als Tooltip (LFH-80): auf
+                      einem Führungs-Tablet gibt es kein Hovern, und wer die Autobahn-Ebene
+                      für flächendeckende Sperrungen hält, plant den Anmarschweg auf einer
+                      Grundlage, die es nicht gibt. */}
+                  <span style={{ display: 'inline-flex', flexDirection: 'column' }}>
+                    <span>{def.label}</span>
+                    {def.geltung && (
+                      <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                        {def.geltung}
+                      </Typography.Text>
+                    )}
+                  </span>
                 </Space>
                 {laedt ? (
                   <Spin size="small" />

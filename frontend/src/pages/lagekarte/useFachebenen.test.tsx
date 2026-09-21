@@ -4,8 +4,14 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { neuerQueryClient } from '../../test/utils';
-import type { FachebeneAntwort, FachebeneQuelle, FeatureCollection } from '../../api/fachebenen';
+import {
+  ladeFachebene,
+  type FachebeneAntwort,
+  type FachebeneQuelle,
+  type FeatureCollection,
+} from '../../api/fachebenen';
 import { useFachebenen } from './useFachebenen';
+import { FACHEBENEN } from './fachebenen';
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
 import { hochwasserRadius } from './hochwasserStil';
 
@@ -36,7 +42,20 @@ const fx = vi.hoisted(() => {
       },
     ],
   };
-  return { fc, nina: fc([[9, 50]]), kritisA: fc([[10, 51]]), kritisB: fc([[11, 52]]), hochwasser };
+  return {
+    fc,
+    nina: fc([[9, 50]]),
+    kritisA: fc([[10, 51]]),
+    kritisB: fc([[11, 52]]),
+    hochwasser,
+    // Bewusst DREI Punkte: die Menge unterscheidet die Autobahn-Ebene von jeder anderen
+    // Fixture — ein vertauschter `combine`-Index fiele sonst nicht auf.
+    autobahn: fc([
+      [6.86, 50.98],
+      [7.67, 51.57],
+      [6.96, 49.27],
+    ]),
+  };
 });
 
 vi.mock('../../api/fachebenen', async (importOriginal) => {
@@ -51,6 +70,14 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           attribution: '© NINA',
           stand: null,
           features: fx.nina,
+        });
+      if (quelle === 'autobahn')
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: 'Autobahn GmbH des Bundes',
+          stand: null,
+          features: fx.autobahn,
         });
       if (quelle === 'hochwasser')
         return Promise.resolve({
@@ -187,6 +214,71 @@ describe('useFachebenen', () => {
       .features[0];
     expect(nina.properties.farbe).toBeUndefined();
     expect(nina.properties.radius).toBeUndefined();
+  });
+
+  it('aktiviert autobahn → eigene Daten und Pflicht-Attribution (LFH-80)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('autobahn', true));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn')?.daten.features,
+      ).toHaveLength(3),
+    );
+    // Die Zuordnung Query→Ebene läuft in `combine` über POSITIONEN. Ein verschobener Index
+    // wäre kein Fehler, sondern eine stille Verwechslung: die Ebene zeigte fremde Daten.
+    // Deshalb gegen die konkrete Koordinate prüfen, nicht bloß gegen die Anzahl.
+    const ab = result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn');
+    expect(ab?.daten.features[0].geometry?.coordinates).toEqual([6.86, 50.98]);
+    expect(result.current.fachebenenStatus.autobahn).toBe('ok');
+    // AK „Quellennennung korrekt".
+    expect(result.current.fachebenenAttribution).toContain('Autobahn GmbH des Bundes');
+  });
+
+  it('autobahn braucht keine bbox — sie lädt schon durch das Einschalten (LFH-80)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('autobahn', true));
+    // Gegenstück zu KRITIS, das ohne `setKritisBbox` dauerhaft leer bliebe. Geriete die
+    // Autobahn-Ebene in den bbox-Zweig, stünde hier 0 statt 3.
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'autobahn')?.daten.features,
+      ).toHaveLength(3),
+    );
+    expect(result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')).toBeUndefined();
+  });
+
+  it('fällt nach einem gescheiterten Refetch auf den Aufwärm-Takt zurück (LFH-80)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    const original = lade.getMockImplementation()!;
+    let rufe = 0;
+    lade.mockImplementation((quelle, bbox) => {
+      if (quelle !== 'autobahn') return original(quelle, bbox);
+      rufe += 1;
+      // Erster Lauf trägt, jeder weitere scheitert — der Fall „Backend kurz weg".
+      return rufe === 1 ? original(quelle, bbox) : Promise.reject(new Error('Netz weg'));
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { result } = rendere();
+      act(() => result.current.onFachebeneToggle('autobahn', true));
+      await waitFor(() => expect(result.current.fachebenenStatus.autobahn).toBe('ok'));
+
+      // Nach dem Erfolg läuft der reguläre Takt; der Lauf danach scheitert.
+      await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.pollMs + 1_000));
+      await waitFor(() => expect(result.current.fachebenenStatus.autobahn).toBe('offline'));
+      const nachFehlschlag = rufe;
+
+      // Die tragende Aussage: react-query HÄLT nach einem gescheiterten Refetch die
+      // vorigen `data` — ohne `isError` in der Takt-Ableitung stünde dort weiter `ok`,
+      // die Ebene bliebe auf 600 s und zeigte zehn Minuten lang nichts, obwohl das
+      // Backend längst wieder da wäre. Hier muss innerhalb des Aufwärm-Takts ein
+      // weiterer Versuch laufen.
+      await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.aufwaermPollMs! + 1_000));
+      expect(rufe).toBeGreaterThan(nachFehlschlag);
+    } finally {
+      vi.useRealTimers();
+      lade.mockImplementation(original);
+    }
   });
 
   it('meldet kritisZoomZuKlein unterhalb des Mindest-Zooms', () => {

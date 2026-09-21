@@ -63,6 +63,39 @@ describe('useKartenAnsicht', () => {
     expect(result.current.dirty).toBe(false);
   });
 
+  it('hydratisiert die Autobahn-Sichtbarkeit aus der gespeicherten Ansicht (LFH-80)', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({
+        fachebenen_sichtbar: { autobahn: true, nina: true },
+      } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.fachebenenSichtbar.autobahn).toBe(true));
+    // Die Spalte ist opakes JSON; ein neuer Key ohne Eintrag in `leseFachebenen` käme
+    // stillschweigend als `undefined` zurück und die Ebene wäre nach jedem Reload aus —
+    // ohne Fehler und ohne roten Test anderswo.
+    expect(result.current.fachebenenSichtbar.nina).toBe(true);
+    expect(result.current.fachebenenSichtbar.kritis).toBe(false);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('das Umschalten der Autobahn-Ebene macht die Ansicht schmutzig (LFH-80)', async () => {
+    ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    // Auf die HYDRATION warten, nicht auf `dirty === false`: das ist es vor dem Hydrieren
+    // ohnehin, die Bedingung wäre sofort erfüllt und der Toggle liefe ins Re-Seed.
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    expect(result.current.dirty).toBe(false);
+    // Ohne den Key im Vergleichs-Tupel (`FACHEBENE_KEYS`) bliebe die Ansicht sauber und
+    // „Ansicht speichern" böte sich nie an — die Wahl wäre nach dem Reload weg.
+    act(() => result.current.setFachebenenSichtbar((v) => ({ ...v, autobahn: true })));
+    await waitFor(() => expect(result.current.dirty).toBe(true));
+  });
+
   it('wird schmutzig bei Basemap-Wechsel und wieder sauber nach dem Speichern', async () => {
     ladeKartenAnsichten.mockResolvedValue([standardansicht({ basemap_modus: 'offline' })]);
     patcheKartenAnsicht.mockImplementation((_e: number, _a: number, patch: PatchKartenAnsicht) =>

@@ -56,13 +56,16 @@ const basisProps: SidebarProps = {
   ansichtSpeichert: false,
   onAnsichtSpeichern: vi.fn(),
   // BEWUSST ausgeschrieben statt `defaultFachebenenSichtbar()`: eine neue Fachebene soll
-  // hier den Typcheck brechen und damit jemanden zwingen, die Sidebar anzusehen.
+  // hier den Typcheck brechen und damit jemanden zwingen, die Sidebar anzusehen. (LFH-80
+  // ist genau so aufgelaufen — der Import von `defaultFachebenenSichtbar` ist deshalb
+  // wieder weg.)
   fachebenenSichtbar: {
     nina: false,
     dwd: false,
     pegelonline: false,
     hochwasser: false,
     kritis: false,
+    autobahn: false,
   },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
@@ -377,6 +380,28 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(toggle).toBeTruthy();
     fireEvent.click(toggle as Element);
     expect(onLayerToggle).toHaveBeenCalledWith('freies_zeichen', false);
+  });
+
+  it('nennt den Geltungsbereich der Autobahn-Ebene als sichtbare Zeile (LFH-80)', () => {
+    renderMitProviders(<Sidebar {...basisProps} />);
+    // AK „Limitation (nur BAB) im UI transparent": der Satz steht DA, nicht erst beim Hovern —
+    // auf einem Führungs-Tablet gäbe es kein Hovern.
+    expect(screen.getByText(/nur Bundesautobahnen/i)).toBeVisible();
+    // Gegenaussage: keine der Bestandsebenen behauptet plötzlich eine Einschränkung.
+    expect(screen.getByText('Autobahn-Lage (BAB)')).toBeInTheDocument();
+    expect(screen.getAllByText(/nur Bundesautobahnen/i)).toHaveLength(1);
+  });
+
+  it('schaltet die Autobahn-Ebene über ihren eigenen Schalter (LFH-80)', () => {
+    const onFachebeneToggle = vi.fn();
+    renderMitProviders(<Sidebar {...basisProps} onFachebeneToggle={onFachebeneToggle} />);
+    const toggle = screen
+      .getByText('Autobahn-Lage (BAB)')
+      .closest('.ant-space')
+      ?.querySelector('button[role="switch"]');
+    expect(toggle).toBeTruthy();
+    fireEvent.click(toggle as Element);
+    expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
   });
 
   it('öffnet den Zeichen-Picker und startet das Platzieren mit der Entwurfs-Spec (LFH-170)', () => {

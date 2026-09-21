@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import FachebenenInspector from './FachebenenInspector';
 
 describe('FachebenenInspector', () => {
@@ -177,6 +177,119 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
       />,
     );
     expect(screen.getByText('Fläche')).toBeInTheDocument();
+  });
+
+  it('Autobahn/Webcam: Standbild mit sprechendem Alt-Text, Livebild-Link, Betreiber', () => {
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{
+          titel: 'A1 | ID005 AK Köln-Nord',
+          kategorie: 'webcam',
+          strasse: 'A1',
+          richtung: 'Blickrichtung Dortmund',
+          betreiber: 'NRW',
+          bild: 'https://www.verkehr.nrw/webcams/1.jpg',
+          link: 'https://www.blitzvideoserver.de/player.html',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    // Das Standbild ist der Zweck dieser Kategorie — es muss als Bild ankommen, nicht als URL-Text.
+    const bild = screen.getByRole('img', { name: 'Webcam-Standbild: A1 | ID005 AK Köln-Nord' });
+    expect(bild).toHaveAttribute('src', 'https://www.verkehr.nrw/webcams/1.jpg');
+    expect(screen.getByText('Webcam')).toBeInTheDocument();
+    expect(screen.getByText('Blickrichtung Dortmund')).toBeInTheDocument();
+    expect(screen.getByText('NRW')).toBeInTheDocument();
+    const livebild = screen.getByRole('link', { name: /Livebild/ });
+    expect(livebild).toHaveAttribute('href', 'https://www.blitzvideoserver.de/player.html');
+    // Eigenständige Aktion ⇒ Bedienziel. Geprüft wird die STRUKTUR, aus der die Höhe folgt:
+    // ein antd-Knopf erbt `controlHeight` vom `ConfigProvider` (30/48/72), ein nackter `<a>`
+    // bliebe auf Zeilenhöhe. Ein Pixelmaß taugt hier nicht — jsdom rechnet kein Layout, und
+    // `test/utils.tsx` rendert ein ConfigProvider OHNE Theme (CLAUDE.md, Erfassungs-Norm).
+    expect(livebild).toHaveClass('ant-btn');
+  });
+
+  it('Autobahn/Webcam: ein zweites Feature bekommt sein Standbild, auch nach einem Fehler', () => {
+    // Der Inspector tauscht beim Klick auf ein anderes Feature nur die Props — die
+    // Komponenteninstanz bleibt stehen. Ein Fehler-`boolean` überlebte den Wechsel und
+    // verschluckte das nächste Standbild, ohne es je zu laden.
+    const props = (bild: string) => ({
+      quelle: 'autobahn' as const,
+      properties: { titel: 'A1 | X', kategorie: 'webcam', bild },
+      onSchliessen: () => {},
+    });
+    const { rerender } = render(<FachebenenInspector {...props('https://a.example/1.jpg')} />);
+    fireEvent.error(screen.getByRole('img', { name: /Webcam-Standbild/ }));
+    expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
+
+    rerender(<FachebenenInspector {...props('https://b.example/2.jpg')} />);
+    expect(screen.getByRole('img', { name: /Webcam-Standbild/ })).toHaveAttribute(
+      'src',
+      'https://b.example/2.jpg',
+    );
+
+    // Und zurück auf A: auch der Rückweg beginnt mit einem frischen Versuch. Ein Merker, der
+    // nur die zuletzt gescheiterte URL vergleicht, bliebe hier auf „nicht abrufbar" stehen,
+    // obwohl die Verbindung inzwischen wieder da sein kann.
+    rerender(<FachebenenInspector {...props('https://a.example/1.jpg')} />);
+    expect(screen.getByRole('img', { name: /Webcam-Standbild/ })).toHaveAttribute(
+      'src',
+      'https://a.example/1.jpg',
+    );
+  });
+
+  it('Autobahn: eine nicht-http(s)-Bild-/Link-URL wird weder als Bild noch als Link gerendert', () => {
+    // Die Werte stammen aus einer fremden Quelle; ein javascript:-URI in src/href wäre XSS.
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{
+          titel: 'A1 | X',
+          kategorie: 'webcam',
+          bild: 'javascript:alert(1)',
+          link: 'javascript:alert(2)',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Livebild/ })).not.toBeInTheDocument();
+  });
+
+  it('Autobahn/Webcam: ein nicht ladendes Standbild wird erklärt statt als kaputtes Bild gezeigt', () => {
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{ titel: 'A1 | X', kategorie: 'webcam', bild: 'https://example.invalid/x.jpg' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    const bild = screen.getByRole('img', { name: /Webcam-Standbild/ });
+    fireEvent.error(bild);
+    // Beide Hälften: das tote Bild ist WEG und an seiner Stelle steht der Grund.
+    expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Internetverbindung am Gerät/)).toBeInTheDocument();
+  });
+
+  it('Autobahn/Baustelle: Zeilen der Quelle bleiben getrennt, kein Webcam-Zubehör', () => {
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{
+          titel: 'A1 | Saarbrücken-Von-der-Heydt - Riegelsberg',
+          kategorie: 'baustelle',
+          strasse: 'A1',
+          beschreibung: 'Länge: 1.36 km\nMaximale Durchfahrtsbreite: 3.25 m',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Baustelle')).toBeInTheDocument();
+    // `pre-line` hält die Gliederung der Quelle; ohne sie stünde alles in einem Zug.
+    const text = screen.getByText(/Maximale Durchfahrtsbreite/);
+    expect(text).toHaveStyle({ whiteSpace: 'pre-line' });
+    expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
   });
 
   it('Punkt-/keine Geometrie zeigt keine Fläche', () => {

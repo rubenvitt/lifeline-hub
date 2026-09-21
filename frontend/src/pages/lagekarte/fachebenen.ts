@@ -1,4 +1,4 @@
-import type { FachebeneQuelle, FeatureCollection } from '../../api/fachebenen';
+import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -14,6 +14,20 @@ export interface FachebeneDef {
   pollMs: number;
   /** True → braucht Karten-Viewport-bbox (kein Hintergrund-Polling, Refetch bei moveend). */
   bboxAbhaengig: boolean;
+  /**
+   * Dauerhaft sichtbarer Geltungsbereich der Quelle — bewusst als TEXT unter dem Label und
+   * nicht als Tooltip (LFH-80): eine Reichweiten-Einschränkung, die man nur beim Hovern
+   * sieht, ist auf einem Touch-Führungsgerät gar nicht zu sehen, und wer die Ebene für
+   * flächendeckend hält, plant einen Anmarschweg auf einer Grundlage, die es nicht gibt.
+   */
+  geltung?: string;
+  /**
+   * Takt, solange die Ebene noch KEINEN brauchbaren Stand hat (LFH-80). Nur für Quellen,
+   * deren erster Lauf serverseitig im Hintergrund läuft und die deshalb kurz `offline`
+   * melden, obwohl sie gerade füllen. Ohne den kurzen Takt wartete der Bediener bis zum
+   * nächsten regulären Poll — bei 600 s also zehn Minuten auf Daten, die nach ~30 s da sind.
+   */
+  aufwaermPollMs?: number;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -53,6 +67,24 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 300_000,
     bboxAbhaengig: false,
   },
+  autobahn: {
+    key: 'autobahn',
+    label: 'Autobahn-Lage (BAB)',
+    // Eigener Ton neben Rot/Orange/Blau/Türkis/Violett der fünf Bestandsebenen. NICHT das
+    // `#08979c` von `hochwasser` — die beiden stünden im Panel untereinander.
+    farbe: '#c41d7f',
+    geometrieTyp: 'punkt',
+    // = serverseitige TTL (600 s). Die Ebene aggregiert 111 Autobahnen × 3 Dienste;
+    // häufiger abzufragen belastet die Quelle, ohne frischer zu werden.
+    pollMs: 600_000,
+    bboxAbhaengig: false,
+    // Der erste Lauf hängt an keinem Request (siehe `fetch_autobahn`), die Ebene meldet
+    // währenddessen `offline`. 20 s ist kurz genug, dass die Aufwärmphase nicht auffällt,
+    // und lang genug, dass ein dauerhaft gestörter Anbieter nicht getrommelt wird — der
+    // Abruf ist dann eine winzige Leer-Antwort aus dem Backend, kein neuer Fächer.
+    aufwaermPollMs: 20_000,
+    geltung: 'nur Bundesautobahnen — keine Kreis-, Land- oder Ortsstraßen',
+  },
   kritis: {
     key: 'kritis',
     label: 'KRITIS / sensible Objekte',
@@ -65,7 +97,21 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis'];
+  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis', 'autobahn'];
+}
+
+/**
+ * Poll-Takt der Autobahn-Ebene nach ihrem zuletzt gesehenen Status. Rein und exportiert,
+ * damit die Aufwärm-Regel ohne Render prüfbar ist.
+ *
+ * `undefined` (noch nichts geladen) und `offline` gelten als „wärmt noch auf". `leer` NICHT:
+ * das heisst „Quelle erreichbar, gerade nichts zu melden" — ein gültiger Endzustand, den
+ * kurz zu takten nichts brächte.
+ */
+export function autobahnTakt(status: FachebeneStatus | undefined): number {
+  const def = FACHEBENEN.autobahn;
+  const waermtAuf = status === undefined || status === 'offline';
+  return waermtAuf ? (def.aufwaermPollMs ?? def.pollMs) : def.pollMs;
 }
 
 export function istBboxAbhaengig(key: FachebeneQuelle): boolean {

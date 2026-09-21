@@ -5,15 +5,17 @@
 use crate::error::AppError;
 use crate::karte::cache;
 use crate::karte::normalisierung::{
-    kombiniere_nina, normalisiere_hochwasser, normalisiere_overpass, normalisiere_pegelonline,
+    kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_overpass,
+    normalisiere_pegelonline,
 };
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use futures::stream::{self, StreamExt};
+use serde_json::Value;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 /// SWR-Kern: entscheidet anhand des Cache-Eintrags, ob sofort (frisch), sofort+Hintergrund-
@@ -426,6 +428,484 @@ fn extrahiere_ki(html: &str) -> Option<String> {
         let token = &rest[..rest.find(')')?];
         (!token.is_empty() && token.bytes().all(|b| b.is_ascii_digit())).then(|| token.to_string())
     })
+}
+
+// ----------------------------------------------------------------------- AUTOBAHN
+
+const AUTOBAHN_ATTRIB: &str = "Autobahn GmbH des Bundes";
+/// 10 min. Baustellen und Sperrungen sind mehrstündige bis mehrtägige Ereignisse; was sich
+/// bewegt, ist ihr `future`-Übergang. Kürzer zu takten holt keine frischeren Daten, kostet
+/// aber je Runde 334 Abrufe gegen eine fremde Behörden-API.
+const AUTOBAHN_TTL: Duration = Duration::from_secs(600);
+const AUTOBAHN_BASIS: &str = "https://verkehr.autobahn.de/o/autobahn/";
+/// Die drei für Anfahrt und Lageaufklärung belegten Dienste (LFH-80). `warning`,
+/// `parking_lorry`, `electric_charging_station` sind bewusst NICHT dabei: sie tragen zum
+/// Ticket-Zweck nichts bei und kosteten je 111 weitere Abrufe pro Runde.
+const AUTOBAHN_DIENSTE: [&str; 3] = ["webcam", "roadworks", "closure"];
+/// Gemessen (20.09.2026): bei 8 gleichzeitigen Abrufen scheitern 1–2 der 334, bei 16 bereits
+/// 30 — die Quelle drosselt. Mehr Parallelität macht den Lauf also nicht schneller, sondern
+/// löchriger.
+const AUTOBAHN_PARALLEL: usize = 8;
+/// Gesamtdeckel über den Fächer. Das Client-Timeout (8 s) gilt je Abruf; ohne diesen Deckel
+/// stünde der kalte, BLOCKIERENDE Pfad im schlechtesten Fall bei 334/8 × 8 s ≈ 5,5 min.
+/// Gemessener Normallauf: ~25 s.
+const AUTOBAHN_BUDGET: Duration = Duration::from_secs(60);
+
+/// `{"roads":["A1","A2",…]}` → saubere Liste. Drei Dinge passieren hier, alle gemessen:
+/// getrimmt (die Liste führt am 20.09.2026 `"A60 "` mit Leerzeichen — der Abruf darauf
+/// liefert 0 Einträge, während `"A60"` 18 hat), entdoppelt (ebendeshalb), und **auf
+/// alphanumerisch gefiltert**: der Wert kommt aus einer fremden Quelle und landet in einem
+/// URL-PFAD — ein `../` darin zeigte auf einen anderen Endpunkt desselben Hosts.
+pub(crate) fn autobahn_strassen(roh: &Value) -> Vec<String> {
+    let mut namen: Vec<String> = roh
+        .get("roads")
+        .and_then(|r| r.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .map(str::trim)
+                .filter(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_alphanumeric()))
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+    namen.sort();
+    namen.dedup();
+    namen
+}
+
+/// Trägt dieser Teilabruf überhaupt eine Dienst-Liste? HTTP 200 mit gültigem JSON heisst
+/// NICHT, dass Daten drinstehen: ein `{}` oder ein Fehlerumschlag des Portals parst
+/// anstandslos. Ohne diese Prüfung zählte so eine Antwort als beantwortet, der
+/// Normalisierer überspränge sie still — und 333 davon ergäben eine „vollständige" Antwort
+/// mit null Features.
+fn autobahn_nutzlast(eintrag: &(String, String, Value)) -> bool {
+    let (_, dienst, antwort) = eintrag;
+    antwort.get(dienst).is_some_and(Value::is_array)
+}
+
+/// Ergebnis eines Fächer-Laufs → speicherbare Antwort, oder `None`, wenn der Lauf zu
+/// löchrig war. Rein und damit ohne Netz prüfbar — und zwar **an der Stelle, an der die
+/// Entscheidung wirkt**: wer hier `None` bekommt, schreibt nichts in den Cache und lässt den
+/// bisherigen Stand stehen. Eine Schwelle, die nur als eigene Prädikatsfunktion getestet
+/// wird, kann an der Aufrufstelle entfallen, ohne dass ein Test rot wird.
+///
+/// Gezählt wird, was eine **Dienst-Liste trägt**, nicht was ein HTTP 200 erwidert hat —
+/// sonst hinge die Schwelle an der Zustellung statt am Inhalt.
+///
+/// Die Schwelle ist die **Hälfte**, und das ist eine Abwägung, keine Messung: ein bis zwei
+/// Ausfälle je Lauf sind normal (Drosselung) und dürfen den Lauf nicht verwerfen — sonst
+/// veraltete die Ebene dauerhaft. Fällt dagegen mehr als die Hälfte aus, ist ein
+/// gespeicherter Teilstand schlechter als der bisherige: er sieht vollständig aus, ist es
+/// aber nicht, und niemand sieht ihm das an.
+pub(crate) fn autobahn_antwort(
+    gesamt: usize,
+    roh: &[(String, String, Value)],
+) -> Option<FachebeneAntwort> {
+    let brauchbar = roh.iter().filter(|e| autobahn_nutzlast(e)).count();
+    if brauchbar == 0 || brauchbar * 2 <= gesamt {
+        return None;
+    }
+    Some(FachebeneAntwort::ok(
+        "autobahn",
+        AUTOBAHN_ATTRIB,
+        None,
+        normalisiere_autobahn(roh),
+    ))
+}
+
+/// Nach einem GESCHEITERTEN Lauf wird nicht sofort neu versucht. Ohne diese Sperre trommelt
+/// eine anhaltende Störung die Quelle: die Ebene meldet `offline`, das Frontend pollt
+/// deshalb im Aufwärmtakt (20 s), und jeder Poll stiesse einen neuen Fächer mit 333 Abrufen
+/// an — gegen einen Anbieter, der ohnehin gerade nicht kann. Fünf Minuten sind kurz genug,
+/// dass eine Erholung zeitnah ankommt, und lang genug, dass aus dem Takt kein Dauerfeuer wird.
+const AUTOBAHN_ABKUEHLUNG: Duration = Duration::from_secs(300);
+
+/// Zeitpunkt des letzten GESCHEITERTEN Laufs; `None` heisst „kein Fehlschlag offen".
+/// `std::sync::Mutex`, nie über ein `await` gehalten (wie `inflight`).
+static AUTOBAHN_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+/// Darf ein neuer Fächer starten? Rein und ohne Uhr prüfbar (die Zeitspanne kommt von aussen).
+pub(crate) fn autobahn_darf_starten(
+    seit_fehlschlag: Option<Duration>,
+    abkuehlung: Duration,
+) -> bool {
+    match seit_fehlschlag {
+        None => true,
+        Some(vergangen) => vergangen >= abkuehlung,
+    }
+}
+
+/// Entscheidung je Cache-Zustand — rein und ohne Netz prüfbar. Die Fälle sind dieselben wie
+/// in [`liefere_mit_swr`], **mit einer Ausnahme, die der ganze Grund für diese Funktion ist**:
+/// der KALTE Fall wartet nicht.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum AutobahnWeg {
+    /// Frischer Cache → unverändert ausliefern, nichts anstoßen.
+    Frisch,
+    /// Veraltet → alten Stand ausliefern, im Hintergrund erneuern.
+    AltUndErneuern,
+    /// Gar nichts da → sofort `offline` antworten, im Hintergrund erstmalig füllen.
+    LeerUndErneuern,
+}
+
+pub(crate) fn autobahn_weg(eintrag_alter: Option<i64>, ttl: Duration) -> AutobahnWeg {
+    match eintrag_alter {
+        Some(alter) if alter < ttl.as_secs() as i64 => AutobahnWeg::Frisch,
+        Some(_) => AutobahnWeg::AltUndErneuern,
+        None => AutobahnWeg::LeerUndErneuern,
+    }
+}
+
+/// Die Autobahn-Ebene benutzt [`liefere_mit_swr`] **nicht**, und das ist der Kern ihrer
+/// Besonderheit: dessen kalter Zweig wartet auf `erneuere()`, und genau das geht hier nicht.
+///
+/// Gemessen: ein voller Fächer dauert ~25 s. Dagegen stehen ZWEI Schranken, die beide vor ihm
+/// feuern würden — `apiGet` im Frontend bricht nach 15 s ab (`api/client.ts`), und
+/// [`crate::zulassung::REQUEST_BUDGET`] kappt den Handler nach 60 s mit einem 503. Die
+/// Schranke in `zulassung.rs` trägt sogar die Begründung, die Routen mit ausgehendem Aufruf
+/// hätten „deutlich kürzere" eigene Timeouts und feuerten „immer zuerst" — ein blockierender
+/// 25-s-Fächer bricht genau diese Zusage. Das erste Einschalten der Ebene liefe damit
+/// zuverlässig in einen Netzfehler statt in Daten.
+///
+/// Deshalb hängt der teure Lauf an KEINEM Request: er läuft als eigene Aufgabe, und die
+/// Anfrage ist sofort beantwortet. Der Preis ist eine Aufwärmphase, in der die Ebene
+/// `offline` meldet, obwohl sie gerade erst lädt; das Frontend pollt währenddessen kurz
+/// getaktet (`FACHEBENEN.autobahn.aufwaermPollMs`) und hat den ersten Stand nach ~30 s.
+pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    let eintrag = cache::eintrag(pool, "autobahn").await;
+    let weg = autobahn_weg(eintrag.as_ref().map(|(_, alter)| *alter), AUTOBAHN_TTL);
+    if weg == AutobahnWeg::Frisch {
+        return eintrag.expect("Frisch entsteht nur aus einem Eintrag").0;
+    }
+    // Zwei Riegel vor dem Lauf. ERSTENS die Abkühlung nach einem Fehlschlag — ohne sie
+    // stiesse jeder Aufwärm-Poll einen neuen Fächer an, solange die Quelle gestört ist.
+    let seit_fehlschlag = AUTOBAHN_FEHLSCHLAG.lock().unwrap().map(|t| t.elapsed());
+    let darf = autobahn_darf_starten(seit_fehlschlag, AUTOBAHN_ABKUEHLUNG);
+    // ZWEITENS nur EIN Lauf gleichzeitig (wie der stale-Zweig von `liefere_mit_swr`). Der
+    // Schlüssel wird erst freigegeben, wenn die Aufgabe durch ist — ein Poll währenddessen
+    // stösst nichts Zweites an, was bei 333 Abrufen je Lauf der ganze Punkt ist.
+    if darf && s.inflight.lock().unwrap().insert("autobahn".to_string()) {
+        let (client, pool2, inflight) = (s.client.clone(), pool.clone(), s.inflight.clone());
+        tokio::spawn(async move {
+            let ergebnis = erneuere_autobahn(client, pool2).await;
+            // Erst den Ausgang vermerken, dann freigeben: andersherum könnte ein Poll
+            // dazwischen den Schlüssel greifen und lospreschen, bevor die Sperre steht.
+            *AUTOBAHN_FEHLSCHLAG.lock().unwrap() = match ergebnis {
+                Some(_) => None,
+                None => Some(std::time::Instant::now()),
+            };
+            inflight.lock().unwrap().remove("autobahn");
+        });
+    } else if !darf {
+        tracing::debug!("Autobahn: Abkühlung nach Fehlschlag läuft — kein neuer Fächer");
+    }
+    match eintrag {
+        Some((a, _)) => a, // veralteter Stand ist besser als keiner
+        None => FachebeneAntwort::offline("autobahn", AUTOBAHN_ATTRIB),
+    }
+}
+
+/// Einzelspur für den Fächer. `liefere_mit_swr` entkoppelt nur die HINTERGRUND-Erneuerung
+/// (veralteter Cache) über `inflight`; sein **kalter** Zweig wartet direkt auf `erneuere()`
+/// und kennt keinen Riegel. Bei einer Ebene mit EINEM Abruf ist das belanglos — hier
+/// startete jeder Bediener, der die Ebene bei leerem Cache einschaltet, seine eigenen 333
+/// Abrufe. Schon zwei gleichzeitig ergäben die 16er-Nebenläufigkeit, bei der die Quelle
+/// gemessen drosselt; eine Anfangswelle vervielfachte das weiter.
+///
+/// Bewusst hier statt im geteilten `liefere_mit_swr`: dessen kalter Zweig trägt fünf weitere
+/// Ebenen, für die der Riegel nichts verbessert und deren Verhalten sich ändern würde.
+static AUTOBAHN_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+
+async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
+    // Wer wartet, fetcht danach NICHT blind nach: der Vorgänger hat den Cache in aller Regel
+    // gerade gefüllt. Der Wartende bekommt damit DATEN statt `offline` — das ist der
+    // Unterschied zu einem Riegel, der den Zweiten einfach abweist.
+    let _spur = AUTOBAHN_EINZELSPUR
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await;
+    if let Some((a, alter)) = cache::eintrag(&pool, "autobahn").await {
+        if alter < AUTOBAHN_TTL.as_secs() as i64 {
+            tracing::debug!("Autobahn: Lauf übersprungen, Vorgänger hat frisch gefüllt");
+            return Some(a);
+        }
+    }
+    let liste = match hole_json(&client, AUTOBAHN_BASIS).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("Autobahn-Streckenliste nicht abrufbar: {e}");
+            return None;
+        }
+    };
+    let strassen = autobahn_strassen(&liste);
+    if strassen.is_empty() {
+        tracing::warn!("Autobahn-Streckenliste leer oder unlesbar");
+        return None;
+    }
+    // Aussortiertes sichtbar machen: heute ist das genau die Dublette `"A60 "`. Führte die
+    // Quelle eines Tages Namen mit Leer- oder Sonderzeichen ein, fielen sie durch den
+    // Pfad-Filter — das soll im Log stehen und nicht still passieren.
+    let roh_anzahl = liste
+        .get("roads")
+        .and_then(|r| r.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+    if roh_anzahl > strassen.len() {
+        tracing::debug!(
+            "Autobahn: {} von {roh_anzahl} Streckennamen aussortiert (Dublette oder nicht \
+             alphanumerisch)",
+            roh_anzahl - strassen.len()
+        );
+    }
+    let jobs: Vec<(String, String)> = strassen
+        .iter()
+        .flat_map(|s| {
+            AUTOBAHN_DIENSTE
+                .iter()
+                .map(move |d| (s.clone(), d.to_string()))
+        })
+        .collect();
+    let gesamt = jobs.len();
+    // Einzelne Abrufe dürfen scheitern (Drosselung, leerer Body) — die übrigen Strecken
+    // bleiben. Dieselbe Toleranz wie bei den NINA-Einzelgeometrien.
+    let faecher = stream::iter(jobs)
+        .map(|(strasse, dienst)| {
+            let client = client.clone();
+            let url = format!("{AUTOBAHN_BASIS}{strasse}/services/{dienst}");
+            async move {
+                match hole_json(&client, &url).await {
+                    Ok(v) => Some((strasse, dienst, v)),
+                    Err(e) => {
+                        tracing::debug!("Autobahn {strasse}/{dienst} fehlgeschlagen: {e}");
+                        None
+                    }
+                }
+            }
+        })
+        .buffer_unordered(AUTOBAHN_PARALLEL)
+        .collect::<Vec<_>>();
+    let roh: Vec<(String, String, Value)> =
+        match tokio::time::timeout(AUTOBAHN_BUDGET, faecher).await {
+            Ok(v) => v.into_iter().flatten().collect(),
+            Err(_) => {
+                tracing::warn!("Autobahn-Abruf über {AUTOBAHN_BUDGET:?} hinaus — Cache/leer");
+                return None;
+            }
+        };
+    // Ein bis zwei Ausfälle je Lauf sind der gemessene Normalfall (Drosselung) und dürfen
+    // das Log nicht alle 10 min mit einer Warnung fluten — sonst gewöhnt man sich sie ab und
+    // übersieht den Tag, an dem die Quelle wirklich wegbricht. Erst ab einem Zehntel laut.
+    let fehlend = gesamt - roh.len();
+    if fehlend * 10 > gesamt {
+        tracing::warn!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
+    } else if fehlend > 0 {
+        tracing::debug!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
+    }
+    // Ein zu löchriger Lauf wird VERWORFEN statt gespeichert. Ohne diesen Riegel schriebe ein
+    // Totalausfall der Dienste (Streckenliste antwortet, alle 333 Teilabrufe nicht) eine
+    // Antwort mit null Features in den Cache und überschriebe damit den gesunden Stand — die
+    // Ebene meldete zehn Minuten lang „keine Daten", statt den alten Stand weiterzureichen.
+    // Genau diese Zusicherung ist der Zweck des SWR-Caches; `None` lässt ihn stehen.
+    let Some(a) = autobahn_antwort(gesamt, &roh) else {
+        tracing::warn!(
+            "Autobahn: nur {} von {gesamt} Teilabrufen beantwortet — Lauf verworfen, \
+             bisheriger Cache-Stand bleibt",
+            roh.len()
+        );
+        return None;
+    };
+    // Ein misslungener Schreibvorgang ist hier ein FEHLSCHLAG, nicht eine Randnotiz: dieser
+    // Lauf hängt an keinem Request, sein einziges Ergebnis IST der Cache-Eintrag. Meldete
+    // `setze` den Fehler nur ins Log und der Lauf trotzdem Erfolg, fiele die Abkühlung, der
+    // Cache bliebe leer — und der nächste Aufwärm-Poll 20 s später stiesse den nächsten
+    // Fächer mit 333 Abrufen an, dauerhaft. Das ist derselbe Schaden wie beim Quell-Ausfall,
+    // nur durch die Tür, die die Abkühlung nicht abdeckt (SQLite busy, Platte voll,
+    // read-only). Die fünf anderen Ebenen dürfen den Wert weiter ignorieren: sie reichen
+    // ihre Antwort im selben Request weiter, für sie ist der Cache eine Beschleunigung.
+    if !cache::setze(&pool, "autobahn", &a).await {
+        tracing::warn!("Autobahn: Lauf nicht speicherbar — gilt als Fehlschlag, Abkühlung greift");
+        return None;
+    }
+    Some(a)
+}
+
+#[cfg(test)]
+mod autobahn_strassen_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn trimmt_entdoppelt_und_sortiert() {
+        // "A60 " mit Leerzeichen steht so in der echten Liste (gemessen) und ist dieselbe
+        // Strecke wie "A60" — ohne Trim+Dedup liefe ein Abruf ins Leere.
+        let l = autobahn_strassen(&json!({ "roads": ["A3", "A60 ", "A60", "A1"] }));
+        assert_eq!(l, vec!["A1", "A3", "A60"]);
+    }
+
+    #[test]
+    fn verwirft_pfad_trennende_und_leere_namen() {
+        // Der Name landet in einem URL-Pfad; alles außer [A-Za-z0-9] fliegt raus.
+        let l =
+            autobahn_strassen(&json!({ "roads": ["A1", "../details/webcam", "", "A/2", "A 3"] }));
+        assert_eq!(l, vec!["A1"]);
+    }
+
+    #[test]
+    fn fehlender_oder_kaputter_schluessel_liefert_leer() {
+        assert!(autobahn_strassen(&json!({})).is_empty());
+        assert!(autobahn_strassen(&json!({ "roads": "A1" })).is_empty());
+    }
+
+    /// Ein Eintrag, wie ihn der Fächer liefert.
+    fn treffer(strasse: &str) -> (String, String, Value) {
+        (
+            strasse.to_string(),
+            "closure".to_string(),
+            json!({ "closure": [
+                { "title": "X", "coordinate": { "lat": 51.0, "long": 7.0 } }
+            ]}),
+        )
+    }
+
+    /// Der übliche Lauf (1–2 Ausfälle von 333) muss durchgehen — sonst veraltete die Ebene
+    /// dauerhaft, weil sie sich nie wieder speichern dürfte.
+    #[test]
+    fn normaler_lauf_mit_wenigen_ausfaellen_wird_gespeichert() {
+        let roh: Vec<_> = (0..331).map(|i| treffer(&format!("A{i}"))).collect();
+        let a = autobahn_antwort(333, &roh).expect("331 von 333 ist brauchbar");
+        assert_eq!(a.quelle, "autobahn");
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
+        assert_eq!(a.attribution, "Autobahn GmbH des Bundes");
+    }
+
+    /// Ein Eintrag, der zugestellt wurde, aber KEINE Dienst-Liste trägt: HTTP 200 mit
+    /// gültigem JSON, wie es ein Portal in Wartung erwidert.
+    fn leere_nutzlast(strasse: &str) -> (String, String, Value) {
+        (strasse.to_string(), "closure".to_string(), json!({}))
+    }
+
+    /// Der zweite Weg in denselben Schaden: die Abrufe GELINGEN alle, tragen aber keine
+    /// Liste. Zählte die Schwelle die Zustellung statt den Inhalt, ginge ein Lauf mit 333
+    /// leeren Nutzlasten als vollständig durch und überschriebe den gesunden Cache mit null
+    /// Features — genau das Bild, gegen das die Schwelle existiert.
+    #[test]
+    fn zugestellte_aber_leere_nutzlasten_zaehlen_nicht_als_antwort() {
+        let roh: Vec<_> = (0..333).map(|i| leere_nutzlast(&format!("A{i}"))).collect();
+        assert!(autobahn_antwort(333, &roh).is_none());
+
+        // Und die Gegenprobe: dieselbe Menge mit echten Listen geht durch. Ohne sie wäre der
+        // Test auch von einer Schwelle erfüllt, die grundsätzlich alles ablehnt.
+        let echt: Vec<_> = (0..333).map(|i| treffer(&format!("A{i}"))).collect();
+        assert!(autobahn_antwort(333, &echt).is_some());
+    }
+
+    /// Eine LEERE Dienst-Liste (`{"closure": []}`) ist eine gültige Antwort — „auf dieser
+    /// Strecke ist gerade nichts" — und muss mitzählen. Sonst verwürfe ein ruhiger Tag den
+    /// ganzen Lauf.
+    #[test]
+    fn leere_aber_vorhandene_dienstliste_zaehlt_mit() {
+        let ruhig: Vec<(String, String, Value)> = (0..333)
+            .map(|i| {
+                (
+                    format!("A{i}"),
+                    "closure".to_string(),
+                    json!({ "closure": [] }),
+                )
+            })
+            .collect();
+        assert!(autobahn_antwort(333, &ruhig).is_some());
+    }
+
+    /// Die tragende Aussage, und zwar als NEGATIVE: aus einem Totalausfall entsteht gar keine
+    /// Antwort. Gäbe es hier eine, überschriebe sie den gesunden Cache-Stand mit null
+    /// Features, und die Ebene meldete zehn Minuten lang „keine Daten".
+    #[test]
+    fn totalausfall_und_zu_loechriger_lauf_liefern_keine_antwort() {
+        assert!(autobahn_antwort(333, &[]).is_none());
+        let haelfte: Vec<_> = (0..5).map(|i| treffer(&format!("A{i}"))).collect();
+        assert!(
+            autobahn_antwort(10, &haelfte).is_none(),
+            "genau die Hälfte reicht nicht — die Schwelle ist ein echtes „mehr als\""
+        );
+        let knapp_drueber: Vec<_> = (0..6).map(|i| treffer(&format!("A{i}"))).collect();
+        assert!(autobahn_antwort(10, &knapp_drueber).is_some());
+    }
+
+    /// Die drei Cache-Zustände. Die tragende Aussage ist die dritte: ein KALTER Cache führt
+    /// zu `LeerUndErneuern`, also zu einer sofortigen Antwort plus Hintergrundlauf — und
+    /// NICHT zu Warten. Ein wartender kalter Pfad liefe in die 15-s-Schranke von `apiGet`
+    /// und in das 60-s-`REQUEST_BUDGET` der Zulassung; das erste Einschalten der Ebene
+    /// endete zuverlässig im Netzfehler statt in Daten.
+    #[test]
+    fn kalter_cache_wartet_nicht() {
+        let ttl = Duration::from_secs(600);
+        assert_eq!(autobahn_weg(None, ttl), AutobahnWeg::LeerUndErneuern);
+        assert_eq!(autobahn_weg(Some(599), ttl), AutobahnWeg::Frisch);
+        assert_eq!(autobahn_weg(Some(601), ttl), AutobahnWeg::AltUndErneuern);
+        // Genau auf der TTL gilt als veraltet — dieselbe Grenze wie in `liefere_mit_swr`
+        // (`alter < ttl`), damit beide Ebenen-Sorten dasselbe Alter als frisch ansehen.
+        assert_eq!(autobahn_weg(Some(600), ttl), AutobahnWeg::AltUndErneuern);
+    }
+
+    /// Ohne Abkühlung trommelt eine anhaltende Störung die Quelle: die Ebene meldet
+    /// `offline`, das Frontend pollt deshalb im 20-s-Aufwärmtakt, und jeder Poll stiesse
+    /// einen neuen Fächer mit 333 Abrufen an — gegen einen Anbieter, der gerade nicht kann.
+    #[test]
+    fn nach_fehlschlag_wird_nicht_sofort_neu_gestartet() {
+        let ab = Duration::from_secs(300);
+        // Kein Fehlschlag offen → freie Fahrt.
+        assert!(autobahn_darf_starten(None, ab));
+        // Frischer Fehlschlag → gesperrt.
+        assert!(!autobahn_darf_starten(Some(Duration::from_secs(0)), ab));
+        assert!(!autobahn_darf_starten(Some(Duration::from_secs(299)), ab));
+        // Abgelaufen → wieder erlaubt; auf der Grenze schon, sonst bliebe die Ebene bei
+        // exakt gleichem Takt für immer gesperrt.
+        assert!(autobahn_darf_starten(Some(ab), ab));
+        assert!(autobahn_darf_starten(Some(Duration::from_secs(301)), ab));
+    }
+
+    /// Die zweite Hälfte der Einzelspur: wer auf den Vorgänger gewartet hat, bekommt dessen
+    /// frischen Stand — und fetcht NICHT blind hinterher. Belegt über einen Client, der
+    /// nirgendwo hinkommt (Port 1, ECONNREFUSED): kommt trotzdem eine Antwort zurück, kann
+    /// sie nur aus dem Cache stammen. Ohne die Nachschau liefe der Wartende in die
+    /// Streckenliste, scheiterte und lieferte `None` — also 333 Abrufe umsonst und
+    /// `offline` für den Bediener.
+    ///
+    /// Die erste Hälfte (der Riegel selbst) ist bewusst NICHT getestet: zwei echte Fächer
+    /// gegeneinander laufen zu lassen hiesse, 666 Abrufe gegen eine fremde Behörden-API zu
+    /// schicken, und ein Test mit Netz wäre ohnehin eine Wackelstelle statt einer Aussage.
+    #[tokio::test]
+    async fn wartender_bekommt_den_frischen_stand_ohne_eigenen_abruf() {
+        let pool = crate::db::test_pool().await;
+        let vorgaenger = FachebeneAntwort::ok(
+            "autobahn",
+            AUTOBAHN_ATTRIB,
+            None,
+            json!({ "type": "FeatureCollection", "features": [
+                { "type": "Feature",
+                  "geometry": { "type": "Point", "coordinates": [7.0, 51.0] },
+                  "properties": { "titel": "A1 | X", "kategorie": "sperrung" } }
+            ]}),
+        );
+        cache::setze(&pool, "autobahn", &vorgaenger).await;
+
+        let nirgendwo = reqwest::Client::builder()
+            .timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let a = erneuere_autobahn(nirgendwo, pool)
+            .await
+            .expect("frischer Cache-Stand wird durchgereicht, ohne die Quelle anzufassen");
+        assert_eq!(a.features["features"][0]["properties"]["titel"], "A1 | X");
+    }
+
+    /// Randfall ohne eigene Bedeutung im Betrieb (eine leere Streckenliste bricht schon in
+    /// `erneuere_autobahn` ab), aber ohne ihn trüge `roh.is_empty()` die Aussage allein.
+    #[test]
+    fn leerer_gesamtlauf_liefert_keine_antwort() {
+        assert!(autobahn_antwort(0, &[]).is_none());
+    }
 }
 
 #[cfg(test)]

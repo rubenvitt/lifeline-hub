@@ -1,4 +1,5 @@
-import { Descriptions, Tag, Typography, theme } from 'antd';
+import { useState } from 'react';
+import { Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
@@ -31,6 +32,12 @@ function pick(p: Record<string, unknown>, ...keys: string[]): string | null {
     if (v) return v;
   }
   return null;
+}
+
+/** Nur http(s) zulassen. Die Werte kommen aus fremden Quellen (OSM-Tags, Autobahn-API);
+ *  ein `javascript:`-URI in `href`/`src` wäre XSS. */
+function nurWeb(v: string | null): string | null {
+  return v && /^https?:\/\//i.test(v) ? v : null;
 }
 
 /** ISO-Zeit hübsch (de-DE), Fallback auf Rohwert. */
@@ -188,8 +195,7 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   const kategorie = s(p.kategorie);
   const telefon = s(p.telefon);
   const websiteRoh = s(p.website);
-  // Nur http(s) als Link zulassen (OSM-Tag ist untrusted → javascript:-URI wäre XSS).
-  const website = websiteRoh && /^https?:\/\//i.test(websiteRoh) ? websiteRoh : null;
+  const website = nurWeb(websiteRoh);
   const notaufnahme = s(p.notaufnahme);
   return (
     <>
@@ -245,6 +251,108 @@ function HochwasserInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+/**
+ * Standbild einer BAB-Webcam. Eigene Komponente, damit der Aufrufer sie über `key={bild}`
+ * strukturell zurücksetzen kann: der Fehlerzustand gehört zu GENAU DIESEM Bild, nicht zum
+ * Panel. Ein Merker im Panel überlebte den Wechsel auf eine andere Kamera — und ein Merker,
+ * der nur die zuletzt gescheiterte URL vergleicht, überlebte den Weg A → B → **A**: bei der
+ * Rückkehr stünde weiter „nicht abrufbar", ohne es noch einmal zu versuchen, obwohl die
+ * Verbindung inzwischen wieder da sein kann. Mit dem `key` stellt sich die Frage nicht.
+ *
+ * Das Bild kommt NICHT über den Backend-Proxy, sondern direkt vom Betreiber (die Quelle
+ * liefert nur die URL). Ohne Internet am Gerät — der Normalfall, für den die Lagekarte
+ * offline-fähig ist — lädt es also nicht. Ein kaputtes Bildsymbol wäre in einer
+ * Führungsoberfläche die schlechteste Antwort: es sagt nicht, WAS fehlt.
+ */
+function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }) {
+  const { token } = theme.useToken();
+  const [fehler, setFehler] = useState(false);
+  if (fehler) {
+    return (
+      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+        Standbild nicht abrufbar — es kommt direkt vom Kamera-Betreiber und braucht eine
+        Internetverbindung am Gerät.
+      </Typography.Paragraph>
+    );
+  }
+  return (
+    /* Bewusst ohne feste Höhe — die Betreiber liefern verschiedene Seitenverhältnisse, ein
+       erzwungenes Maß schnitte den Fahrbahnrand ab. */
+    <img
+      src={bild}
+      alt={titel ? `Webcam-Standbild: ${titel}` : 'Webcam-Standbild'}
+      onError={() => setFehler(true)}
+      style={{
+        width: '100%',
+        display: 'block',
+        marginBottom: token.marginXS,
+        borderRadius: token.borderRadius,
+      }}
+    />
+  );
+}
+
+function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
+  const kategorie = s(p.kategorie);
+  const bild = nurWeb(s(p.bild));
+  const link = nurWeb(s(p.link));
+  const beschreibung = s(p.beschreibung);
+  const titel = s(p.titel);
+  return (
+    <>
+      {kategorie && (
+        <Tag color="magenta" style={{ marginBottom: 8 }}>
+          {kategorieLabel(kategorie)}
+        </Tag>
+      )}
+      {/* Das Standbild IST der Zweck der Webcam-Kategorie (LFH-80): visuelle Lagebestätigung
+          an der BAB. Der `key` bindet den Fehlerzustand an die URL — ein Wechsel der Kamera
+          (auch hin und zurück) beginnt mit einem frischen Versuch. */}
+      {bild && <WebcamStandbild key={bild} bild={bild} titel={titel} />}
+      <Descriptions column={1}>
+        {s(p.strasse) && <Descriptions.Item label="Autobahn">{s(p.strasse)}</Descriptions.Item>}
+        {s(p.richtung) && <Descriptions.Item label="Richtung">{s(p.richtung)}</Descriptions.Item>}
+        {fmtZeit(s(p.beginn)) && (
+          <Descriptions.Item label="Beginn">{fmtZeit(s(p.beginn))}</Descriptions.Item>
+        )}
+        {s(p.betreiber) && (
+          <Descriptions.Item label="Betreiber">{s(p.betreiber)}</Descriptions.Item>
+        )}
+      </Descriptions>
+      {/* Die Quelle liefert `description` als Zeilen-Array; der Normalisierer fügt sie mit
+          \n zusammen. `pre-line` hält diese Gliederung — ohne sie steht „Länge: 1.36 km
+          Max. 80 km/h Maximale Durchfahrtsbreite: 3.25 m" in einem Zug. */}
+      {beschreibung && (
+        <Typography.Paragraph
+          style={{ marginTop: 8, marginBottom: 0, fontSize: 13, whiteSpace: 'pre-line' }}
+        >
+          {beschreibung}
+        </Typography.Paragraph>
+      )}
+      {/* Eigenständige AKTION, nicht ein Anker im Fließtext — und damit ein Bedienziel, das
+          die Dichtestaffel halten muss (30/48/72). Bewusst ein antd-`Button type="link"`
+          statt eines nackten `<a>` mit handgesetzter `minHeight`: so erbt es `controlHeight`
+          vom `ConfigProvider` und schuldet nicht die zwei Angaben aus LFH-365. Dieselbe
+          Begründung wie beim Platzhalter in `BemerkungZelle` (LFH-369). Die
+          `telefon`/`website`-Anker im KRITIS-Zweig bleiben nackt: die stehen als WERT in einer
+          `Descriptions`-Zeile, nicht als Aktion auf eigener Zeile. */}
+      {link && (
+        <div style={{ marginTop: 8 }}>
+          <Button
+            type="link"
+            href={link}
+            target="_blank"
+            rel="noreferrer noopener"
+            style={{ paddingInline: 0 }}
+          >
+            Livebild beim Betreiber öffnen
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Detailpanel für ein angeklicktes Fachebenen-Objekt (read-only externe Daten). */
 export default function FachebenenInspector({
   quelle,
@@ -282,6 +390,8 @@ export default function FachebenenInspector({
         <PegelInhalt p={p} />
       ) : quelle === 'hochwasser' ? (
         <HochwasserInhalt p={p} />
+      ) : quelle === 'autobahn' ? (
+        <AutobahnInhalt p={p} />
       ) : (
         <KritisInhalt p={p} />
       )}
