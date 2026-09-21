@@ -63,7 +63,7 @@ export function parseGeometry(geojson: string | null | undefined): GeoJsonGeomet
 // Rein clientseitig aus der GeoJSON-Geometrie. Bewusst ohne turf/geo-Lib (nicht im Repo).
 // Die strikte GeoJsonGeometry-Union (Polygon|LineString) bleibt für den Draw-/Zonen-Pfad
 // unverändert; MultiPolygon/MultiLineString werden NUR über die permissiven, losen
-// Signaturen (geoKennzahlen/punktInPolygon/findeGeometrieAn) unterstützt.
+// Signaturen (geoKennzahlen/punktInPolygon/geometrieZumKlickFeature) unterstützt.
 
 const ERD_RADIUS_M = 6371000;
 /** Meter pro Grad auf dem verwendeten Kugelmodell (≈ 111194,9 m) — für Projektion & Distanz gleich. */
@@ -221,24 +221,43 @@ export function punktInPolygon(p: PunktLngLat, geom: LoseGeometrie): boolean {
 // unten prüft ohnehin per `f?.geometry` + Truthiness.
 type FeatureCollectionLike = { features: { geometry?: LoseGeometrie | null }[] };
 
+const istFlaeche = (g: LoseGeometrie) => g.type === 'Polygon' || g.type === 'MultiPolygon';
+
+/** Alle Polygon-/MultiPolygon-Geometrien der Collection, die den Punkt enthalten (Collection-Reihenfolge). */
+function enthaltendeGeometrien(p: PunktLngLat, collection: FeatureCollectionLike): LoseGeometrie[] {
+  const treffer: LoseGeometrie[] = [];
+  for (const f of collection.features) {
+    const g = f?.geometry;
+    if (g && istFlaeche(g) && punktInPolygon(p, g)) treffer.push(g);
+  }
+  return treffer;
+}
+
 /**
- * Volle Geometrie des ersten Features, dessen Polygon/MultiPolygon den Punkt enthält; sonst null.
- * Für LFH-146 (c): die un-geclippte Fachebenen-Geometrie aus der geladenen FeatureCollection
- * beziehen statt des kachel-geclippten Klick-Features.
+ * Volle Geometrie GENAU des angeklickten Fachebenen-Features (LFH-282).
+ * Die un-geclippte Geometrie kommt aus der geladenen FeatureCollection statt aus dem
+ * kachel-geclippten Klick-Feature (LFH-146 (c)).
  *
- * Bekannte Limitierung (Review LFH-209): bei mehreren an der Klickstelle ÜBERLAPPENDEN Features
- * (z. B. gleichzeitige Gewitter- + Dauerregen-Warnung über demselben Gebiet) liefert dies das
- * erste enthaltende Feature der Collection-Reihenfolge — die im Panel gezeigten Properties stammen
- * aber vom obersten gerenderten Feature. Dann können Kennzahlen und Text divergieren. Robusterer
- * Weg (Follow-up): Match über eine stabile Feature-ID des Klick-Features statt First-Point-in-Polygon.
+ * `featureId` ist die ID des Klick-Features. Die Fachebenen-Sources laufen mit `generateId`
+ * (`fachebenenLayer.ts`), MapLibre vergibt damit den Index im `features`-Array der Source-Daten —
+ * die ID ist also direkt ein Index in `collection`. Das hält nur, solange `collection` dieselben
+ * Daten sind, die in der Source stehen: der Klick-Handler und das `setData` in `Kartenflaeche`
+ * hängen beide an `[fachebenen]`. Wer die beiden entkoppelt, lässt diesen Index still veralten.
+ *
+ * Als Riegel gegen genau diesen Fall muss die Geometrie am Index den Klickpunkt auch enthalten.
+ * Tut sie das nicht (oder fehlt die ID), gilt der Punkt-in-Polygon-Rückfall — aber nur, wenn er
+ * EINDEUTIG ist. Bei mehreren enthaltenden Features wäre jede Wahl geraten: dann null, also
+ * keine Kennzahlen statt womöglich der Fläche einer anderen Warnung.
  */
-export function findeGeometrieAn(
+export function geometrieZumKlickFeature(
+  featureId: unknown,
   p: PunktLngLat,
   collection: FeatureCollectionLike,
 ): LoseGeometrie | null {
-  for (const f of collection.features) {
-    const g = f?.geometry;
-    if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon') && punktInPolygon(p, g)) return g;
+  if (typeof featureId === 'number' && Number.isInteger(featureId) && featureId >= 0) {
+    const g = collection.features[featureId]?.geometry;
+    if (g && istFlaeche(g) && punktInPolygon(p, g)) return g;
   }
-  return null;
+  const treffer = enthaltendeGeometrien(p, collection);
+  return treffer.length === 1 ? treffer[0] : null;
 }

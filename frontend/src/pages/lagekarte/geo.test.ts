@@ -9,7 +9,7 @@ import {
   formatLaenge,
   geoKennzahlen,
   punktInPolygon,
-  findeGeometrieAn,
+  geometrieZumKlickFeature,
 } from './geo';
 import type { GeoJsonPolygon, GeoJsonLineString } from './geo';
 
@@ -275,7 +275,7 @@ describe('geoKennzahlen (Dispatcher über lose Geometrie)', () => {
   });
 });
 
-describe('punktInPolygon / findeGeometrieAn', () => {
+describe('punktInPolygon / Rückfall', () => {
   it('Punkt innerhalb → true, außerhalb → false', () => {
     expect(punktInPolygon({ lng: 8.005, lat: 50.005 }, BOX)).toBe(true);
     expect(punktInPolygon({ lng: 9, lat: 51 }, BOX)).toBe(false);
@@ -305,7 +305,7 @@ describe('punktInPolygon / findeGeometrieAn', () => {
     expect(punktInPolygon({ lng: 8.01, lat: 50.01 }, mitLoch)).toBe(false); // im Loch
     expect(punktInPolygon({ lng: 8.001, lat: 50.001 }, mitLoch)).toBe(true); // im Rand-Vollteil
   });
-  it('findeGeometrieAn liefert die volle Geometrie des treffenden Features, sonst null', () => {
+  it('Rückfall ohne ID liefert die volle Geometrie des treffenden Features, Punkte zählen nicht', () => {
     const fc = {
       type: 'FeatureCollection' as const,
       features: [
@@ -317,8 +317,65 @@ describe('punktInPolygon / findeGeometrieAn', () => {
         },
       ],
     };
-    const treffer = findeGeometrieAn({ lng: 8.005, lat: 50.005 }, fc);
+    const treffer = geometrieZumKlickFeature(undefined, { lng: 8.005, lat: 50.005 }, fc);
     expect(treffer?.type).toBe('Polygon');
-    expect(findeGeometrieAn({ lng: 0, lat: 0 }, fc)).toBeNull();
+    expect(geometrieZumKlickFeature(undefined, { lng: 0, lat: 0 }, fc)).toBeNull();
+  });
+});
+
+// LFH-282: zwei an der Klickstelle ÜBERLAPPENDE Warnflächen verschiedener Größe — etwa eine
+// Gewitterwarnung über dem Landkreis und eine kleinere Dauerregenwarnung darin. Die Kennzahlen
+// müssen zu DEM Feature gehören, dessen Properties das Panel zeigt, nicht zum ersten, das den
+// Punkt enthält.
+describe('geometrieZumKlickFeature (LFH-282)', () => {
+  const GROSS: GeoJsonPolygon = {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [8, 50],
+        [8.1, 50],
+        [8.1, 50.1],
+        [8, 50.1],
+        [8, 50],
+      ],
+    ],
+  };
+  const KLEIN = BOX; // 0,01° × 0,01°, liegt ganz in GROSS
+  const fc = {
+    type: 'FeatureCollection' as const,
+    features: [
+      { type: 'Feature' as const, geometry: GROSS, properties: { event: 'GEWITTER' } },
+      { type: 'Feature' as const, geometry: KLEIN, properties: { event: 'DAUERREGEN' } },
+    ],
+  };
+  const IM_UEBERLAPP = { lng: 8.005, lat: 50.005 };
+  const NUR_IN_GROSS = { lng: 8.05, lat: 50.05 };
+
+  it('Überlappung: die Feature-ID des Klick-Features entscheidet, nicht die Collection-Reihenfolge', () => {
+    // Die Fläche des kleinen Kästchens ist rund 100-mal kleiner als die des großen — eine
+    // Verwechslung wäre also nicht nur formal, sondern am Wert sichtbar.
+    expect(geometrieZumKlickFeature(1, IM_UEBERLAPP, fc)).toBe(KLEIN);
+    expect(geometrieZumKlickFeature(0, IM_UEBERLAPP, fc)).toBe(GROSS);
+  });
+
+  it('ohne ID und eindeutig: das einzige enthaltende Feature', () => {
+    expect(geometrieZumKlickFeature(undefined, NUR_IN_GROSS, fc)).toBe(GROSS);
+  });
+
+  it('ohne ID und mehrdeutig: keine Kennzahlen statt womöglich falscher', () => {
+    expect(geometrieZumKlickFeature(undefined, IM_UEBERLAPP, fc)).toBeNull();
+  });
+
+  it('ID zeigt auf ein Feature, das den Punkt nicht enthält (veraltete Daten): Rückfall auf eindeutigen Treffer', () => {
+    // Stand die Source beim Klick noch auf älteren Daten, passt der Index nicht zur Collection.
+    expect(geometrieZumKlickFeature(1, NUR_IN_GROSS, fc)).toBe(GROSS);
+    expect(geometrieZumKlickFeature(0, { lng: 20, lat: 20 }, fc)).toBeNull();
+  });
+
+  it('unbrauchbare IDs (außerhalb, negativ, gebrochen, Zeichenkette) fallen auf den Rückfall', () => {
+    for (const id of [2, -1, 0.5, '1']) {
+      expect(geometrieZumKlickFeature(id, NUR_IN_GROSS, fc)).toBe(GROSS);
+      expect(geometrieZumKlickFeature(id, IM_UEBERLAPP, fc)).toBeNull();
+    }
   });
 });
