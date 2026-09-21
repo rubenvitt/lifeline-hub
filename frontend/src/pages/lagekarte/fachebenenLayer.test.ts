@@ -11,15 +11,20 @@ import { FACHEBENEN } from './fachebenen';
 function fakeMap() {
   const sources = new Set<string>();
   const layers = new Set<string>();
-  const specs = new Map<string, { paint?: Record<string, unknown> }>();
+  const specs = new Map<
+    string,
+    { paint?: Record<string, unknown>; layout?: Record<string, unknown> }
+  >();
   return {
     getSource: vi.fn((id: string) => (sources.has(id) ? {} : undefined)),
     addSource: vi.fn((id: string) => sources.add(id)),
     getLayer: vi.fn((id: string) => (layers.has(id) ? {} : undefined)),
-    addLayer: vi.fn((l: { id: string; paint?: Record<string, unknown> }) => {
-      layers.add(l.id);
-      specs.set(l.id, l);
-    }),
+    addLayer: vi.fn(
+      (l: { id: string; paint?: Record<string, unknown>; layout?: Record<string, unknown> }) => {
+        layers.add(l.id);
+        specs.set(l.id, l);
+      },
+    ),
     removeLayer: vi.fn((id: string) => layers.delete(id)),
     removeSource: vi.fn((id: string) => sources.delete(id)),
     _sources: sources,
@@ -65,6 +70,17 @@ describe('fachebenenLayer', () => {
     expect(paint?.['circle-radius']).toEqual(['coalesce', ['get', 'radius'], 5]);
   });
 
+  it('zeichnet größere Punkte über kleinere — eine erhöhte Sonde verschwindet nicht (LFH-78)', () => {
+    // Ohne Sortierschlüssel folgt die Zeichenreihenfolge der Quellreihenfolge: bei ~1 600
+    // dicht stehenden ODL-Sonden legte sich ein später gezeichneter kleiner Nachbar samt
+    // weißem Rand über einen großen `stark_erhoeht`-Punkt. Der Radius IST die Stufe (je
+    // höher, desto größer), also sortiert er auch — MapLibre zeichnet höhere Schlüssel oben.
+    const m = fakeMap();
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.odl, leer as never);
+    const layout = m._specs.get('fachebene-odl-circle')?.layout;
+    expect(layout?.['circle-sort-key']).toEqual(['coalesce', ['get', 'radius'], 0]);
+  });
+
   it('entfernt Layer + Source', () => {
     const m = fakeMap();
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never);
@@ -85,6 +101,7 @@ describe('kategorieLabel', () => {
   it('mappt bekannte Kategorien, Fallback auf Rohwert', () => {
     expect(kategorieLabel('krankenhaus')).toBe('Krankenhaus');
     expect(kategorieLabel('strom')).toBe('Umspannwerk');
+    expect(kategorieLabel('odl')).toBe('ODL-Messsonde (BfS)');
     expect(kategorieLabel('unbekannt')).toBe('unbekannt');
   });
 });

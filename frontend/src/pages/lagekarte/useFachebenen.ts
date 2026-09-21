@@ -16,6 +16,7 @@ import {
 } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import { faerbeHochwasser } from './hochwasserStil';
+import { faerbeOdl } from './odlStil';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
 
@@ -40,7 +41,7 @@ interface FachebenenArgs {
  * pro Render instabile `fachebenenQueries`-Record (und die vier Disables) entfällt damit.
  */
 export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
-  // Die Hochwasserebene färbt je Pegel nach Meldeklasse und braucht dafür den aufgelösten
+  // Hochwasser- und ODL-Ebene färben je Punkt nach ihrer Stufe und brauchen dafür den aufgelösten
   // Modus-Token — die Kartenstil-Module haben den bewusst nicht (LFH-328/A2), also wird er
   // hier gelesen und in die Features gebacken.
   const { token } = theme.useToken();
@@ -58,8 +59,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     features: [],
   });
 
-  // Sechs Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys()
-  // (nina, dwd, pegelonline, hochwasser, kritis, autobahn) — `byKey` unten hängt an DIESER
+  // Sieben Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys()
+  // (nina, dwd, pegelonline, hochwasser, odl, kritis, autobahn) — `byKey` unten hängt an DIESER
   // Reihenfolge und greift sie positionsweise ab; ein verschobener Index ist kein Fehler,
   // sondern eine stille Verwechslung. KRITIS trägt seine Sonderoptionen (dynamischer bbox-Key,
   // keepPreviousData, 6-h-staleTime/gcTime) im eigenen Config-Eintrag; kein refetchInterval.
@@ -90,6 +91,12 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         refetchInterval: FACHEBENEN.hochwasser.pollMs,
       },
       {
+        queryKey: globalKeys.fachebene('odl'),
+        queryFn: () => ladeFachebene('odl'),
+        enabled: fachebenenSichtbar.odl,
+        refetchInterval: FACHEBENEN.odl.pollMs,
+      },
+      {
         queryKey: globalKeys.fachebeneKritis(kritisBbox),
         queryFn: () => ladeFachebene('kritis', kritisBbox!),
         enabled: fachebenenSichtbar.kritis && !!kritisBbox,
@@ -112,7 +119,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         //
         // Bewusst über einen State statt über die Callback-Form von `refetchInterval`: die
         // Callback-Form lässt die Typinferenz dieses `useQueries`-Tupels kollabieren (alle
-        // sechs Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
+        // sieben Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
         // Typen). Gemessen, nicht vermutet — der Versuch steht im Verlauf dieses Tickets.
         refetchInterval: autobahnTakt(autobahnStatus),
       },
@@ -124,18 +131,25 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         dwd: ergebnisse[1],
         pegelonline: ergebnisse[2],
         hochwasser: ergebnisse[3],
-        kritis: ergebnisse[4],
-        autobahn: ergebnisse[5],
+        odl: ergebnisse[4],
+        kritis: ergebnisse[5],
+        autobahn: ergebnisse[6],
       } as const;
       const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
         .filter((k) => fachebenenSichtbar[k])
         .map((k) => {
-          // KRITIS aus der akkumulierten Sammlung; Hochwasser mit eingebackener Farbe und
-          // Punktgröße je Meldeklasse; übrige Quellen direkt aus der Query.
+          // KRITIS aus der akkumulierten Sammlung; Hochwasser und ODL mit eingebackener
+          // Farbe und Punktgröße je Stufe; übrige Quellen direkt aus der Query.
           const roh = byKey[k].data?.features ?? leereFc;
           const daten =
-            k === 'kritis' ? kritisAkku : k === 'hochwasser' ? faerbeHochwasser(roh, token) : roh;
+            k === 'kritis'
+              ? kritisAkku
+              : k === 'hochwasser'
+                ? faerbeHochwasser(roh, token)
+                : k === 'odl'
+                  ? faerbeOdl(roh, token)
+                  : roh;
           return { def: FACHEBENEN[k], daten };
         });
 

@@ -203,6 +203,103 @@ pub fn normalisiere_hochwasser(roh: &Value) -> Value {
     json!({ "type": "FeatureCollection", "features": features })
 }
 
+/// Obergrenze des natürlichen ODL-Bereichs in Deutschland laut BfS („zwischen 0,05 und
+/// 0,2 Mikrosievert pro Stunde", ODL-Info, Messwertinterpretation). Inklusiv.
+const ODL_NATUERLICH_BIS: f64 = 0.2;
+/// 3 × Obergrenze. Angelehnt an den vom BfS genannten Faktor 3 — der dort aber
+/// STANDORTBEZOGEN gemeint ist, nicht absolut.
+const ODL_STARK_AB: f64 = 3.0 * ODL_NATUERLICH_BIS;
+/// Einheit, in der die Bänder gerechnet sind — und die die Quelle für jede Sonde führt.
+const ODL_EINHEIT: &str = "µSv/h";
+
+/// Bewertungsstufe einer ODL-Sonde als Wire-Wert (LFH-78).
+///
+/// DIE BÄNDER SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE. Das BfS veröffentlicht
+/// keinen absoluten Schwellenwert für „erhöht", sondern empfiehlt eine standortbezogene
+/// Bewertung; ein Grundpegel je Sonde ist über die Schnittstelle aber nicht billig zu
+/// haben (Zeitreihe = eine Sonde je Abruf, gemessen). Entschieden mit dem Menschen am
+/// 21.09.2026; Herleitung in `docs/fachebenen-quellen.md`.
+///
+/// Die Zeichenketten sind der Wire-Vertrag zu `frontend/src/api/fachebenen.ts`
+/// (`OdlStufe`) und wie bei [`hochwasser_klasse`] auf BEIDEN Seiten gepinnt.
+fn odl_stufe(wert: Option<f64>) -> &'static str {
+    match wert {
+        None => "keine_messung",
+        Some(w) if w <= ODL_NATUERLICH_BIS => "normal",
+        Some(w) if w <= ODL_STARK_AB => "erhoeht",
+        Some(_) => "stark_erhoeht",
+    }
+}
+
+/// BfS-WFS `opendata:odlinfo_odl_1h_latest` (GeoJSON) → GeoJSON-Punkte je Sonde (LFH-78).
+///
+/// Die Quelle liefert bereits GeoJSON in EPSG:4326; normalisiert wird auf die gelesenen
+/// Felder (~890 KB → ~358 KB). Sonden OHNE Messwert (defekt, Testbetrieb) bleiben drin:
+/// eine ausgefallene Sonde ist in einer CBRN-Lage Information, kein Rauschen. Für sie
+/// fehlen `wert` und `messende` ganz, statt als `null` zu erscheinen — dieselbe
+/// Ehrlichkeit wie bei optionalen Response-Feldern (Norm ab LFH-265).
+pub fn normalisiere_odl(roh: &Value) -> Value {
+    let features: Vec<Value> = roh
+        .get("features")
+        .and_then(|f| f.as_array())
+        .map(|liste| {
+            liste
+                .iter()
+                .filter_map(|f| {
+                    let koord = f.get("geometry")?.get("coordinates")?.as_array()?;
+                    let (lon, lat) = (koord.first()?.as_f64()?, koord.get(1)?.as_f64()?);
+                    let p = f.get("properties");
+                    let text = |k: &str| {
+                        p.and_then(|p| p.get(k))
+                            .and_then(|v| v.as_str())
+                            .map(str::trim)
+                            .filter(|t| !t.is_empty())
+                    };
+                    let wert = p.and_then(|p| p.get("value")).and_then(|v| v.as_f64());
+                    let einheit = text("unit").unwrap_or(ODL_EINHEIT);
+                    // Die Bänder sind in µSv/h gerechnet. Unter fremder Einheit wird NICHT
+                    // bewertet — sonst stünde nach einer Umstellung auf nSv/h jede Sonde auf
+                    // `stark_erhoeht`. Der Wert bleibt mit seiner Einheit sichtbar.
+                    let stufe = if einheit == ODL_EINHEIT {
+                        odl_stufe(wert)
+                    } else {
+                        "keine_messung"
+                    };
+                    let kennung = text("id").or_else(|| text("kenn"));
+                    let mut props = serde_json::Map::new();
+                    props.insert(
+                        "titel".into(),
+                        json!(text("name").map(str::to_string).unwrap_or_else(|| {
+                            kennung.map_or("ODL-Sonde".into(), |k| format!("ODL-Sonde {k}"))
+                        })),
+                    );
+                    props.insert("kategorie".into(), json!("odl"));
+                    if let Some(k) = kennung {
+                        props.insert("kennung".into(), json!(k));
+                    }
+                    props.insert("einheit".into(), json!(einheit));
+                    props.insert("stufe".into(), json!(stufe));
+                    if let Some(w) = wert {
+                        props.insert("wert".into(), json!(w));
+                    }
+                    if let Some(m) = text("end_measure") {
+                        props.insert("messende".into(), json!(m));
+                    }
+                    if let Some(b) = text("site_status_text") {
+                        props.insert("betrieb".into(), json!(b));
+                    }
+                    Some(json!({
+                        "type": "Feature",
+                        "geometry": { "type": "Point", "coordinates": [lon, lat] },
+                        "properties": props
+                    }))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    json!({ "type": "FeatureCollection", "features": features })
+}
+
 #[cfg(test)]
 mod nina_tests {
     use super::*;
@@ -899,5 +996,167 @@ mod autobahn_tests {
             normalisiere_autobahn(&roh),
         )
         .expect("Anker beschreibt die reale Autobahn-Form");
+    }
+}
+
+#[cfg(test)]
+mod odl_tests {
+    use super::*;
+
+    /// Ausschnitt einer echten `odlinfo_odl_1h_latest`-Antwort (abgerufen 21.09.2026), auf
+    /// die gelesenen Felder gekürzt: eine Sonde in Betrieb, eine defekte und eine im
+    /// Testbetrieb — die beiden letzten gemessen OHNE Wert und ohne Messende.
+    fn roh() -> Value {
+        json!({
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": { "type": "Point", "coordinates": [12.87, 50.79] },
+                    "properties": {
+                        "id": "DEZ3068", "name": "Chemnitz", "site_status": 1,
+                        "site_status_text": "in Betrieb", "end_measure": "2026-09-21T09:00:00Z",
+                        "value": 0.115, "unit": "µSv/h"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "geometry": { "type": "Point", "coordinates": [10.63, 49.18] },
+                    "properties": {
+                        "id": "DEZ2345", "name": "Bechhofen", "site_status": 2,
+                        "site_status_text": "defekt", "end_measure": null,
+                        "value": null, "unit": "µSv/h"
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "geometry": { "type": "Point", "coordinates": [9.1, 52.3] },
+                    "properties": {
+                        "id": "DEZ9001", "name": "Testsonde", "site_status": 3,
+                        "site_status_text": "Testbetrieb", "value": null, "unit": "µSv/h"
+                    }
+                }
+            ]
+        })
+    }
+
+    fn sonde(wert: Value) -> Value {
+        json!({
+            "type": "Feature",
+            "geometry": { "type": "Point", "coordinates": [8.0, 50.0] },
+            "properties": { "id": "X", "name": "x", "site_status": 1, "value": wert }
+        })
+    }
+
+    fn stufe_zu(wert: Value) -> String {
+        let fc = normalisiere_odl(&json!({ "features": [sonde(wert)] }));
+        fc["features"][0]["properties"]["stufe"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn baut_punkte_mit_messwert() {
+        let fc = normalisiere_odl(&roh());
+        assert_eq!(fc["type"], "FeatureCollection");
+        assert_eq!(fc["features"].as_array().unwrap().len(), 3);
+        let f = &fc["features"][0];
+        assert_eq!(
+            f["geometry"],
+            json!({ "type": "Point", "coordinates": [12.87, 50.79] })
+        );
+        let p = &f["properties"];
+        assert_eq!(p["titel"], "Chemnitz");
+        assert_eq!(p["kategorie"], "odl");
+        assert_eq!(p["kennung"], "DEZ3068");
+        assert_eq!(p["wert"], 0.115);
+        assert_eq!(p["einheit"], "µSv/h");
+        assert_eq!(p["messende"], "2026-09-21T09:00:00Z");
+        assert_eq!(p["betrieb"], "in Betrieb");
+        assert_eq!(p["stufe"], "normal");
+    }
+
+    #[test]
+    fn sonde_ohne_messwert_bleibt_mit_eigener_stufe() {
+        // Eine ausgefallene Sonde ist in einer CBRN-Lage eine Lücke im Lagebild — sie
+        // wird nicht verworfen, sondern als „keine Messung" gezeigt.
+        let fc = normalisiere_odl(&roh());
+        for (i, betrieb) in [(1, "defekt"), (2, "Testbetrieb")] {
+            let p = &fc["features"][i]["properties"];
+            assert_eq!(p["stufe"], "keine_messung");
+            assert_eq!(p["betrieb"], betrieb);
+            let o = p.as_object().unwrap();
+            // Presence statt `== Null`: ein fehlender Key und `null` sind beim
+            // Index-Zugriff nicht unterscheidbar (CLAUDE.md, Typ-Codegen-Testfalle).
+            assert!(!o.contains_key("wert"), "kein erfundener Messwert");
+            assert!(!o.contains_key("messende"));
+        }
+    }
+
+    #[test]
+    fn baender_pinnen_die_wire_woerter_und_grenzen() {
+        // Die Wörter sind der Vertrag zu `frontend/src/api/fachebenen.ts` (`OdlStufe`) und
+        // stehen in keinem OpenAPI-Schema — deshalb hier wörtlich.
+        assert_eq!(stufe_zu(json!(0.042)), "normal");
+        assert_eq!(stufe_zu(json!(0.2)), "normal"); // BfS: „zwischen 0,05 und 0,2"
+        assert_eq!(stufe_zu(json!(0.21)), "erhoeht");
+        assert_eq!(stufe_zu(json!(0.6)), "erhoeht");
+        assert_eq!(stufe_zu(json!(0.61)), "stark_erhoeht");
+        assert_eq!(stufe_zu(Value::Null), "keine_messung");
+        assert_eq!(stufe_zu(json!("0.3")), "keine_messung"); // kein Zahlwert → keine Bewertung
+    }
+
+    #[test]
+    fn verwirft_features_ohne_brauchbare_geometrie() {
+        let mut kaputt = sonde(json!(0.1));
+        kaputt["geometry"] = json!({ "type": "Point", "coordinates": ["8", 50.0] });
+        let mut ohne = sonde(json!(0.1));
+        ohne["geometry"] = Value::Null;
+        let fc = normalisiere_odl(&json!({ "features": [sonde(json!(0.1)), kaputt, ohne] }));
+        assert_eq!(fc["features"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn fremde_einheit_wird_nicht_bewertet() {
+        // Die Bänder sind µSv/h. Stellte die Quelle auf nSv/h um, stünde sonst jede Sonde
+        // bundesweit auf `stark_erhoeht` — in einer CBRN-Lage der schlimmste Fehlalarm.
+        let mut f = sonde(json!(115.0));
+        f["properties"]["unit"] = json!("nSv/h");
+        let fc = normalisiere_odl(&json!({ "features": [f] }));
+        let p = &fc["features"][0]["properties"];
+        assert_eq!(p["stufe"], "keine_messung");
+        // Der Wert bleibt mit SEINER Einheit sichtbar — verworfen wird nur die Bewertung.
+        assert_eq!(p["wert"], 115.0);
+        assert_eq!(p["einheit"], "nSv/h");
+    }
+
+    #[test]
+    fn fehlende_einheit_gilt_als_mikrosievert() {
+        // Beobachtet trägt jede Sonde `unit`; fehlt es, ist µSv/h die dokumentierte Einheit.
+        let fc = normalisiere_odl(&json!({ "features": [sonde(json!(0.7))] }));
+        assert_eq!(fc["features"][0]["properties"]["stufe"], "stark_erhoeht");
+        assert_eq!(fc["features"][0]["properties"]["einheit"], "µSv/h");
+    }
+
+    #[test]
+    fn kennung_faellt_auf_kenn_zurueck_und_fehlt_sonst_ganz() {
+        let mut mit_kenn = sonde(json!(0.1));
+        mit_kenn["properties"] = json!({ "kenn": "141610002", "name": "Chemnitz", "value": 0.1 });
+        let mut ohne = sonde(json!(0.1));
+        ohne["properties"] = json!({ "value": 0.1 });
+        let fc = normalisiere_odl(&json!({ "features": [mit_kenn, ohne] }));
+        assert_eq!(fc["features"][0]["properties"]["kennung"], "141610002");
+        let p = fc["features"][1]["properties"].as_object().unwrap();
+        assert!(!p.contains_key("kennung"), "keine leere Kennung erfinden");
+        assert_eq!(p["titel"], "ODL-Sonde");
+    }
+
+    #[test]
+    fn formatbruch_ergibt_leere_collection() {
+        for roh in [json!({}), json!([]), json!({ "features": "x" })] {
+            let fc = normalisiere_odl(&roh);
+            assert_eq!(fc, json!({ "type": "FeatureCollection", "features": [] }));
+        }
     }
 }

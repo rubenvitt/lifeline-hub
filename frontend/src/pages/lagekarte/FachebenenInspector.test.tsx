@@ -26,6 +26,52 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('Meiden Sie überflutete Bereiche.')).toBeInTheDocument();
   });
 
+  it('ODL: Messwert, Messende, Stufe im Wortlaut und der Hinweis auf die Projekt-Einteilung (LFH-78)', () => {
+    render(
+      <FachebenenInspector
+        quelle="odl"
+        properties={{
+          titel: 'Chemnitz',
+          kennung: 'DEZ3068',
+          wert: 0.7,
+          einheit: 'µSv/h',
+          messende: '2026-09-21T09:00:00Z',
+          betrieb: 'in Betrieb',
+          stufe: 'stark_erhoeht',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Chemnitz')).toBeInTheDocument();
+    // Deutsches Zahlformat mit drei Nachkommastellen — so zeigt auch das BfS die Werte.
+    expect(screen.getByText('0,700 µSv/h')).toBeInTheDocument();
+    // Taktische DTG in der Anzeigezone: 09:00 UTC = 11:00 MESZ.
+    expect(screen.getByText('211100SEP2026')).toBeInTheDocument();
+    expect(screen.getByText('über 3 × natürlicher Obergrenze')).toBeInTheDocument();
+    expect(screen.getByText('in Betrieb')).toBeInTheDocument();
+    // Ortsnamen sind nicht eindeutig — die Kennung ist der Schlüssel für den Abgleich mit ODL-Info.
+    expect(screen.getByText('DEZ3068')).toBeInTheDocument();
+    // Spec „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen".
+    expect(screen.getByText(/kein amtlicher Schwellenwert/)).toBeInTheDocument();
+  });
+
+  it('ODL: eine defekte Sonde sagt „kein Messwert", statt eine Zahl zu erfinden', () => {
+    render(
+      <FachebenenInspector
+        quelle="odl"
+        properties={{ titel: 'Bechhofen', betrieb: 'defekt', stufe: 'keine_messung' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('kein Messwert')).toBeInTheDocument();
+    expect(screen.getByText('defekt')).toBeInTheDocument();
+    expect(screen.getByText('keine Messung')).toBeInTheDocument();
+    // Gezielt auf einen FORMATIERTEN Messwert: ein bloßes /µSv\/h/ träfe auch den Hinweissatz
+    // mit dem natürlichen Bereich „0,05–0,2 µSv/h".
+    expect(screen.queryByText(/^\d+,\d{3} µSv\/h$/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Messende')).not.toBeInTheDocument();
+  });
+
   it('Hochwasser: Meldeklasse im Wortlaut, Pegelname und Pegelnummer (LFH-77)', () => {
     render(
       <FachebenenInspector

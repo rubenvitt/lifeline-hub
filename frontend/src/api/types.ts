@@ -49,7 +49,13 @@ export interface FachebenenSichtbar {
   nina: boolean;
   dwd: boolean;
   pegelonline: boolean;
+  // Nachgezogen in LFH-78: die Form kannte nur die vier v1-Quellen, obwohl die Spalte seit
+  // LFH-77/80 auch diese Schlüssel trägt. Opak durchgereicht, also ohne Laufzeitfolge —
+  // aber ein Typ, der weniger Felder behauptet als die Daten haben, führt in die Irre.
+  hochwasser: boolean;
+  odl: boolean;
   kritis: boolean;
+  autobahn: boolean;
 }
 
 // ============================== Admin — Org-weite Einstellungen ==============================

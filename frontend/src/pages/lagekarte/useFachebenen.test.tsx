@@ -14,6 +14,7 @@ import { useFachebenen } from './useFachebenen';
 import { FACHEBENEN } from './fachebenen';
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
 import { hochwasserRadius } from './hochwasserStil';
+import { odlRadius } from './odlStil';
 
 // Fixtures via vi.hoisted, damit sowohl die (hochgezogene) vi.mock-Factory als auch
 // die Assertions dieselben Feature-Sammlungen sehen.
@@ -42,8 +43,24 @@ const fx = vi.hoisted(() => {
       },
     ],
   };
+  // VIER Sonden — keine andere Fixture hat vier Features, ein vertauschter `combine`-Index
+  // fiele an der Menge auf. Eine davon stark erhöht, eine ohne Messung.
+  const odl: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [
+      ['Chemnitz', 'stark_erhoeht', [12.87, 50.79]],
+      ['Flensburg', 'normal', [9.43, 54.78]],
+      ['Bechhofen', 'keine_messung', [10.63, 49.18]],
+      ['Görlitz', 'erhoeht', [14.99, 51.15]],
+    ].map(([titel, stufe, c]) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: c },
+      properties: { titel, stufe },
+    })),
+  };
   return {
     fc,
+    odl,
     nina: fc([[9, 50]]),
     kritisA: fc([[10, 51]]),
     kritisB: fc([[11, 52]]),
@@ -78,6 +95,14 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           attribution: 'Autobahn GmbH des Bundes',
           stand: null,
           features: fx.autobahn,
+        });
+      if (quelle === 'odl')
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: 'Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0',
+          stand: null,
+          features: fx.odl,
         });
       if (quelle === 'hochwasser')
         return Promise.resolve({
@@ -200,6 +225,52 @@ describe('useFachebenen', () => {
     expect(alarm.properties.farbe).not.toBe(ruhig.properties.farbe);
     // Die Bestandsproperties überleben die Einfärbung (der Inspector liest `titel`).
     expect(alarm.properties.titel).toBe('Alarmpegel');
+  });
+
+  it('färbt und staffelt die ODL-Sonden nach ihrer Stufe, mit BfS-Attribution (LFH-78)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('odl', true));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'odl')?.daten.features,
+      ).toHaveLength(4),
+    );
+    const [stark, normal, ohne, erhoeht] = result.current.aktiveFachebenen.find(
+      (f) => f.def.key === 'odl',
+    )!.daten.features;
+    // Positionsweise Zuordnung in `combine`: gegen die konkrete Koordinate prüfen.
+    expect(stark.geometry?.coordinates).toEqual([12.87, 50.79]);
+    expect(stark.properties.radius).toBe(odlRadius('stark_erhoeht'));
+    expect(erhoeht.properties.radius).toBe(odlRadius('erhoeht'));
+    expect(normal.properties.radius).toBe(odlRadius('normal'));
+    expect(ohne.properties.radius).toBe(odlRadius('keine_messung'));
+    expect(stark.properties.farbe).not.toBe(normal.properties.farbe);
+    expect(stark.properties.titel).toBe('Chemnitz');
+    expect(result.current.fachebenenStatus.odl).toBe('ok');
+    // Spec „Quellennennung".
+    // Das Ergebnis ist ein ARRAY ganzer Attributionstexte — `toContain` auf dem Array prüfte
+    // Gleichheit eines Elements, nicht einen Teilstring. Deshalb über den verbundenen Text.
+    expect(result.current.fachebenenAttribution.join(' | ')).toContain(
+      'Bundesamt für Strahlenschutz (BfS)',
+    );
+  });
+
+  it('nennt die BfS-Quelle nicht, solange die ODL-Ebene offline ist (LFH-78)', async () => {
+    vi.mocked(ladeFachebene).mockImplementationOnce((quelle) =>
+      Promise.resolve({
+        quelle,
+        status: 'offline',
+        attribution: 'Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0',
+        stand: null,
+        features: fx.fc([]),
+      }),
+    );
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('odl', true));
+    await waitFor(() => expect(result.current.fachebenenStatus.odl).toBe('offline'));
+    // Über den verbundenen Text: auf dem Array wäre `not.toContain('Strahlenschutz')` IMMER
+    // grün, weil kein Element exakt so lautet — ein Test, der nicht rot werden kann.
+    expect(result.current.fachebenenAttribution.join(' | ')).not.toContain('Strahlenschutz');
   });
 
   it('lässt die übrigen Ebenen unangetastet — nur Hochwasser wird eingefärbt', async () => {
