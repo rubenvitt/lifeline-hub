@@ -459,7 +459,7 @@ jobs:
           mise exec node@26.7.0 pnpm@11.10.0 -- pnpm -C frontend exec vitest run --coverage
           --coverage.reporter=lcov --testTimeout=30000 --no-file-parallelism --retry=1
 
-      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info,frontend/coverage/lcov.info
