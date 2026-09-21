@@ -271,6 +271,7 @@ const ODL_ZAHL = new Intl.NumberFormat('de-DE', {
  * eine eigene Stufe „veraltet" gibt es bewusst nicht (design.md, Entscheidung 6).
  */
 function OdlInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
   const wert = typeof p.wert === 'number' && Number.isFinite(p.wert) ? p.wert : null;
   const messende = fmtZeit(s(p.messende));
   return (
@@ -284,10 +285,12 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
         </Descriptions.Item>
         {messende && <Descriptions.Item label="Messende">{messende}</Descriptions.Item>}
         {s(p.betrieb) && <Descriptions.Item label="Sonde">{s(p.betrieb)}</Descriptions.Item>}
+        {/* Ortsnamen sind nicht eindeutig; die Kennung ist der Schlüssel für ODL-Info. */}
+        {s(p.kennung) && <Descriptions.Item label="Kennung">{s(p.kennung)}</Descriptions.Item>}
       </Descriptions>
       <Typography.Paragraph
         type="secondary"
-        style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}
+        style={{ fontSize: token.fontSizeSM, marginTop: token.marginXS, marginBottom: 0 }}
       >
         Einteilung des Lifeline Hub nach dem vom BfS genannten natürlichen Bereich (0,05–0,2 µSv/h)
         — kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum Dreifachen anheben.

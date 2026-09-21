@@ -39,6 +39,10 @@ export function sorgeFuerFachebeneLayer(
         id: `fachebene-${def.key}-circle`,
         type: 'circle',
         source: src,
+        // Größer zeichnet oben (LFH-78): Hochwasser und ODL tragen ihre Stufe im Radius, und
+        // ohne Schlüssel folgte die Reihenfolge der Quelle — ein später gezeichneter kleiner
+        // Nachbar deckte einen großen Alarm-Punkt zu. Ebenen ohne `radius` sind unberührt.
+        layout: { 'circle-sort-key': ['coalesce', ['get', 'radius'], 0] },
         paint: {
           // Ein Feature darf Durchmesser und Farbe selbst mitbringen (LFH-77:
           // `hochwasserStil.ts` staffelt beides nach Pegelklasse und backt die im

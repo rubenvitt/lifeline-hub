@@ -64,6 +64,11 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   (`karte::quellen::odl_antwort`). Die Nachbar-Layer `odl_brutto_1h` und `odlinfo_sitelist`
   sind auf der BfS-Schnittstellenseite nicht dokumentiert und liefen im Test über 120 s —
   verwendet wird ausschließlich der dokumentierte Layer.
+  Gestuft wird nur unter der Einheit `µSv/h`; meldete die Quelle eine andere, bleibt der
+  Wert sichtbar und die Stufe ist `keine_messung` (sonst stünde nach einer Umstellung auf
+  nSv/h das ganze Netz auf „stark erhöht"). Der Server liefert gzip (81 KB statt 890 KB),
+  der Fachebenen-Client handelt es noch nicht aus — bei 8-s-Gesamtschranke kann der
+  Kaltstart über eine schwache Mobilfunkverbindung `offline` ergeben (**LFH-599**).
 - **Die ODL-Stufen sind eine Einteilung des Lifeline Hub, KEIN Schwellenwert des BfS.** Das
   BfS veröffentlicht keinen absoluten Wert für „erhöht". Es nennt 0,05–0,2 µSv/h als
   natürlichen Bereich in Deutschland, kurzzeitige Erhöhungen durch Regen „bis etwa einen

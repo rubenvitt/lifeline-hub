@@ -49,6 +49,8 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('211100SEP2026')).toBeInTheDocument();
     expect(screen.getByText('über 3 × natürlicher Obergrenze')).toBeInTheDocument();
     expect(screen.getByText('in Betrieb')).toBeInTheDocument();
+    // Ortsnamen sind nicht eindeutig — die Kennung ist der Schlüssel für den Abgleich mit ODL-Info.
+    expect(screen.getByText('DEZ3068')).toBeInTheDocument();
     // Spec „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen".
     expect(screen.getByText(/kein amtlicher Schwellenwert/)).toBeInTheDocument();
   });

@@ -209,6 +209,8 @@ const ODL_NATUERLICH_BIS: f64 = 0.2;
 /// 3 × Obergrenze. Angelehnt an den vom BfS genannten Faktor 3 — der dort aber
 /// STANDORTBEZOGEN gemeint ist, nicht absolut.
 const ODL_STARK_AB: f64 = 3.0 * ODL_NATUERLICH_BIS;
+/// Einheit, in der die Bänder gerechnet sind — und die die Quelle für jede Sonde führt.
+const ODL_EINHEIT: &str = "µSv/h";
 
 /// Bewertungsstufe einer ODL-Sonde als Wire-Wert (LFH-78).
 ///
@@ -247,21 +249,36 @@ pub fn normalisiere_odl(roh: &Value) -> Value {
                     let koord = f.get("geometry")?.get("coordinates")?.as_array()?;
                     let (lon, lat) = (koord.first()?.as_f64()?, koord.get(1)?.as_f64()?);
                     let p = f.get("properties");
-                    let text = |k: &str| p.and_then(|p| p.get(k)).and_then(|v| v.as_str());
+                    let text = |k: &str| {
+                        p.and_then(|p| p.get(k))
+                            .and_then(|v| v.as_str())
+                            .map(str::trim)
+                            .filter(|t| !t.is_empty())
+                    };
                     let wert = p.and_then(|p| p.get("value")).and_then(|v| v.as_f64());
-                    let kennung = text("id").unwrap_or_default();
+                    let einheit = text("unit").unwrap_or(ODL_EINHEIT);
+                    // Die Bänder sind in µSv/h gerechnet. Unter fremder Einheit wird NICHT
+                    // bewertet — sonst stünde nach einer Umstellung auf nSv/h jede Sonde auf
+                    // `stark_erhoeht`. Der Wert bleibt mit seiner Einheit sichtbar.
+                    let stufe = if einheit == ODL_EINHEIT {
+                        odl_stufe(wert)
+                    } else {
+                        "keine_messung"
+                    };
+                    let kennung = text("id").or_else(|| text("kenn"));
                     let mut props = serde_json::Map::new();
                     props.insert(
                         "titel".into(),
-                        json!(text("name")
-                            .filter(|t| !t.trim().is_empty())
-                            .map(str::to_string)
-                            .unwrap_or_else(|| format!("ODL-Sonde {kennung}"))),
+                        json!(text("name").map(str::to_string).unwrap_or_else(|| {
+                            kennung.map_or("ODL-Sonde".into(), |k| format!("ODL-Sonde {k}"))
+                        })),
                     );
                     props.insert("kategorie".into(), json!("odl"));
-                    props.insert("kennung".into(), json!(kennung));
-                    props.insert("einheit".into(), json!(text("unit").unwrap_or("µSv/h")));
-                    props.insert("stufe".into(), json!(odl_stufe(wert)));
+                    if let Some(k) = kennung {
+                        props.insert("kennung".into(), json!(k));
+                    }
+                    props.insert("einheit".into(), json!(einheit));
+                    props.insert("stufe".into(), json!(stufe));
                     if let Some(w) = wert {
                         props.insert("wert".into(), json!(w));
                     }
@@ -1098,6 +1115,41 @@ mod odl_tests {
         ohne["geometry"] = Value::Null;
         let fc = normalisiere_odl(&json!({ "features": [sonde(json!(0.1)), kaputt, ohne] }));
         assert_eq!(fc["features"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn fremde_einheit_wird_nicht_bewertet() {
+        // Die Bänder sind µSv/h. Stellte die Quelle auf nSv/h um, stünde sonst jede Sonde
+        // bundesweit auf `stark_erhoeht` — in einer CBRN-Lage der schlimmste Fehlalarm.
+        let mut f = sonde(json!(115.0));
+        f["properties"]["unit"] = json!("nSv/h");
+        let fc = normalisiere_odl(&json!({ "features": [f] }));
+        let p = &fc["features"][0]["properties"];
+        assert_eq!(p["stufe"], "keine_messung");
+        // Der Wert bleibt mit SEINER Einheit sichtbar — verworfen wird nur die Bewertung.
+        assert_eq!(p["wert"], 115.0);
+        assert_eq!(p["einheit"], "nSv/h");
+    }
+
+    #[test]
+    fn fehlende_einheit_gilt_als_mikrosievert() {
+        // Beobachtet trägt jede Sonde `unit`; fehlt es, ist µSv/h die dokumentierte Einheit.
+        let fc = normalisiere_odl(&json!({ "features": [sonde(json!(0.7))] }));
+        assert_eq!(fc["features"][0]["properties"]["stufe"], "stark_erhoeht");
+        assert_eq!(fc["features"][0]["properties"]["einheit"], "µSv/h");
+    }
+
+    #[test]
+    fn kennung_faellt_auf_kenn_zurueck_und_fehlt_sonst_ganz() {
+        let mut mit_kenn = sonde(json!(0.1));
+        mit_kenn["properties"] = json!({ "kenn": "141610002", "name": "Chemnitz", "value": 0.1 });
+        let mut ohne = sonde(json!(0.1));
+        ohne["properties"] = json!({ "value": 0.1 });
+        let fc = normalisiere_odl(&json!({ "features": [mit_kenn, ohne] }));
+        assert_eq!(fc["features"][0]["properties"]["kennung"], "141610002");
+        let p = fc["features"][1]["properties"].as_object().unwrap();
+        assert!(!p.contains_key("kennung"), "keine leere Kennung erfinden");
+        assert_eq!(p["titel"], "ODL-Sonde");
     }
 
     #[test]

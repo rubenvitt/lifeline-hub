@@ -53,6 +53,17 @@ Hintergrund-Refresh nicht. Ein eigener Timeout wie `KRITIS_TIMEOUT` (30 s) ist n
 nötig: der gemessene Abruf braucht ~1 s, und KRITIS verlängert die Schranke, statt sie zu
 verkürzen.
 
+**Nachtrag aus dem Review:** die 8 s gelten für die GANZE Anfrage, nicht nur den
+Verbindungsaufbau. ~890 KB brauchen bei ~1 Mbit/s rund 7 s — auf einem Fükw über schwaches
+LTE kann der **Kaltstart** deshalb `offline` ergeben; danach trägt der SWR-Stand. Der BfS-Server
+liefert gzip (gemessen **81 KB**), unser `reqwest` ist aber ohne das Feature `gzip` gebaut.
+Es einzuschalten ändert die Vorgabe **aller** Clients, auch des Kachel-Proxys — das ist eine
+eigene Entscheidung und liegt als **LFH-599**, nicht in diesem Change.
+
+**Einheit:** gestuft wird nur, wenn die Quelle `µSv/h` meldet (oder die Einheit fehlt).
+Unter fremder Einheit bleibt der Wert sichtbar, die Stufe ist `keine_messung` — sonst stünde
+nach einer Umstellung auf nSv/h bundesweit jede Sonde auf `stark_erhoeht`.
+
 ### 2. TTL 600 s, Frontend-Poll 600 s
 Die Quelle hat Stundentakt; eine kürzere TTL (300 s wie DWD) holt 890 KB, ohne frischer zu
 werden. Eine Stunde TTL ließe dagegen einen neuen Stundenwert bis zu einer Stunde
