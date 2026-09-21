@@ -207,7 +207,11 @@ export default defineConfig({
   webServer: [
     {
       name: 'Backend',
-      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw`,
+      // `--kritis-extrakt false` (LFH-83): der KRITIS-Import ist Default-an und lädt nach
+      // 60 s Startverzögerung den Deutschland-Extrakt von Geofabrik — rund 4–5 GB je Lauf,
+      // in ein Temp-Verzeichnis, das nach der Suite niemand mehr ansieht. Die Specs brauchen
+      // keinen Bestand; ohne ihn antwortet die KRITIS-Route mit `offline`.
+      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false`,
       url: `${backendUrl}/api/health`,
       // Nie einen fremden Server übernehmen: ein laufender Dev-Stack hätte eine andere DB
       // und ein anderes Admin-Passwort — alle Logins scheiterten mit irreführender Meldung.

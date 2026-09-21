@@ -166,8 +166,6 @@ export interface SidebarProps {
       import('../../api/fachebenen').FachebeneStatus
     >
   >;
-  /** KRITIS ist aktiv, aber die Karte ist zu weit herausgezoomt für eine Abfrage. */
-  kritisZoomZuKlein?: boolean;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
   fachebenenLaedt?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Bild-Hintergründe */
@@ -625,7 +623,6 @@ export default function Sidebar(props: SidebarProps) {
             const sichtbar = props.fachebenenSichtbar[key];
             const offline = status === 'offline';
             const laedt = sichtbar && props.fachebenenLaedt?.[key];
-            const zoomHinweis = sichtbar && key === 'kritis' && props.kritisZoomZuKlein;
             return (
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Space align="start">
@@ -646,12 +643,6 @@ export default function Sidebar(props: SidebarProps) {
                 </Space>
                 {laedt ? (
                   <Spin size="small" />
-                ) : zoomHinweis ? (
-                  <Tooltip title="KRITIS-Objekte werden erst ab einer näheren Zoomstufe geladen">
-                    <Typography.Text type="warning" style={{ fontSize: 11 }}>
-                      näher heranzoomen
-                    </Typography.Text>
-                  </Tooltip>
                 ) : (
                   <>
                     {sichtbar && offline && (
