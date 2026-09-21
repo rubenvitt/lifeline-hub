@@ -209,6 +209,24 @@ pub fn normalisiere_luftqualitaet(
     let zeilen = stationen.get("data")?.as_object()?;
     let werte = index.get("data")?.as_object()?;
 
+    // Nicht-leere Nutzlast ohne einen einzigen strukturell gültigen Eintrag ist ein
+    // Formbruch der Quelle, kein Leerstand (Code-Review PR #79): sonst stünde er 15 Minuten
+    // als `leer` im Cache. EINZELNE kaputte Einträge neben gültigen bleiben toleriert.
+    let gueltige_zeilen = zeilen.values().filter(|z| z.is_array()).count();
+    if !zeilen.is_empty() && gueltige_zeilen == 0 {
+        return None;
+    }
+    let gueltige_stationen = werte
+        .values()
+        .filter(|st| {
+            st.as_object()
+                .is_some_and(|m| m.values().any(Value::is_array))
+        })
+        .count();
+    if !werte.is_empty() && gueltige_stationen == 0 {
+        return None;
+    }
+
     let mut tabelle: HashMap<String, &Vec<Value>> = HashMap::new();
     for zeile in zeilen.values().filter_map(|z| z.as_array()) {
         for pos in [spalten.id, spalten.code] {
@@ -218,13 +236,15 @@ pub fn normalisiere_luftqualitaet(
         }
     }
 
-    let koordinate = |z: &Vec<Value>, pos: usize| -> Option<f64> {
+    // Endlich UND im Wertebereich (Code-Review PR #79): eine Breite von 999 ist kein gültiges
+    // GeoJSON, MapLibre verwürfe oder verzerrte das Feature.
+    let koordinate = |z: &Vec<Value>, pos: usize, grenze: f64| -> Option<f64> {
         let w = match z.get(pos)? {
             Value::Number(n) => n.as_f64()?,
             Value::String(s) => s.trim().parse::<f64>().ok()?,
             _ => return None,
         };
-        w.is_finite().then_some(w)
+        (w.is_finite() && w.abs() <= grenze).then_some(w)
     };
 
     let mut stand: Option<DateTime<FixedOffset>> = None;
@@ -234,17 +254,22 @@ pub fn normalisiere_luftqualitaet(
             continue;
         };
         let (Some(lon), Some(lat)) = (
-            koordinate(zeile, spalten.lon),
-            koordinate(zeile, spalten.lat),
+            koordinate(zeile, spalten.lon, 180.0),
+            koordinate(zeile, spalten.lat, 90.0),
         ) else {
             continue;
         };
-        // Jüngster Stundenwert: die Schlüssel sind `YYYY-MM-DD HH:MM:SS`, also
-        // lexikographisch gleich chronologisch.
+        // Jüngster GÜLTIGER Stundenwert: die Schlüssel sind `YYYY-MM-DD HH:MM:SS`, also
+        // lexikographisch gleich chronologisch. Erst filtern, dann wählen — sonst verlöre ein
+        // kaputter jüngster Eintrag die ganze Station, obwohl ältere Werte gültig sind.
         let Some(eintrag) = stunden
             .as_object()
-            .and_then(|m| m.iter().max_by(|a, b| a.0.cmp(b.0)))
-            .and_then(|(_, v)| v.as_array())
+            .and_then(|m| {
+                m.iter()
+                    .filter_map(|(k, v)| v.as_array().map(|a| (k, a)))
+                    .max_by(|a, b| a.0.cmp(b.0))
+            })
+            .map(|(_, a)| a)
         else {
             continue;
         };
@@ -617,6 +642,68 @@ mod tests {
         assert!(normalisiere_luftqualitaet(&stationen(), &json!({ "fehler": 1 })).is_none());
         let ohne_spalten = json!({ "indices": ["station id"], "data": {} });
         assert!(normalisiere_luftqualitaet(&ohne_spalten, &index_nach_id()).is_none());
+    }
+
+    /// Code-Review (PR #79): bleiben `indices`/`data` erhalten, bricht aber die INNERE Form
+    /// (Zeilen oder Stundenwerte keine Arrays mehr), verwarf `filter_map` still jeden Eintrag
+    /// und die Antwort galt als `leer` — 15 Minuten im Cache statt `offline` mit dem letzten
+    /// guten Stand. Nicht-leere Nutzlast ohne einen einzigen strukturell gültigen Eintrag ist
+    /// unbrauchbar.
+    #[test]
+    fn nichtleere_nutzlast_ohne_gueltige_zeile_ist_unbrauchbar() {
+        let mut kaputte_stationen = stationen();
+        for zeile in kaputte_stationen["data"]
+            .as_object_mut()
+            .unwrap()
+            .values_mut()
+        {
+            *zeile = json!({ "umgebaut": true });
+        }
+        assert!(normalisiere_luftqualitaet(&kaputte_stationen, &index_nach_id()).is_none());
+
+        let kaputter_index = json!({ "data": {
+            "21": { "2026-09-21 08:00:00": { "ende": "2026-09-21 09:00:00" } },
+            "31": "kein Objekt"
+        } });
+        assert!(normalisiere_luftqualitaet(&stationen(), &kaputter_index).is_none());
+    }
+
+    /// Die Gegenaussage, die den Riegel erst scharf macht: EINZELNE kaputte Einträge neben
+    /// gültigen bleiben toleriert, sonst risse ein Ausreißer die ganze Ebene auf `offline`.
+    #[test]
+    fn einzelne_kaputte_eintraege_werden_toleriert() {
+        let mut index = index_nach_id();
+        index["data"]["99"] = json!("kein Objekt");
+        index["data"]["21"]["2026-09-21 09:00:00"] = json!({ "kaputt": 1 });
+        let mut st = stationen();
+        st["data"]["55"] = json!({ "umgebaut": true });
+        let (fc, _) = normalisiere_luftqualitaet(&st, &index).expect("brauchbar");
+        assert_eq!(features(&fc).len(), 2);
+    }
+
+    /// Code-Review (PR #79): endlich allein genügt nicht — eine Breite von 999 wäre kein
+    /// gültiges GeoJSON und MapLibre verwürfe oder verzerrte das Feature.
+    #[test]
+    fn koordinaten_ausserhalb_des_wertebereichs_werden_verworfen() {
+        let mut st = stationen();
+        st["data"]["21"][7] = json!("13.0647");
+        st["data"]["21"][8] = json!("999");
+        st["data"]["31"][7] = json!("-181");
+        let (fc, _) = normalisiere_luftqualitaet(&st, &index_nach_id()).unwrap();
+        assert!(
+            features(&fc).is_empty(),
+            "beide Stationen außerhalb des Bereichs"
+        );
+
+        // Grenzwerte selbst sind gültig.
+        let mut rand = stationen();
+        rand["data"]["21"][7] = json!("180");
+        rand["data"]["21"][8] = json!("-90");
+        let (fc, _) = normalisiere_luftqualitaet(&rand, &index_nach_id()).unwrap();
+        assert_eq!(
+            feature(&fc, "DEBB021")["geometry"]["coordinates"],
+            json!([180.0, -90.0])
+        );
     }
 
     #[test]

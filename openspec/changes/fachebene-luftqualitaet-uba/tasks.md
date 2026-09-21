@@ -28,7 +28,7 @@ zurückdrehen und sehen, dass genau dieser Test rot wird.
       geschlüsselte Indexantwort liefert dieselben Features wie nach ID geschlüsselte
       (Mutationsprobe: Code-Eintrag aus der Tabelle entfernen → rot), (c) mehrere Stunden →
       nur die jüngste, (d) kaputte Koordinaten → nur dieses Feature fehlt, (e) kaputte
-      Struktur (kein `data`, fehlende Spalten) → `None` = unbrauchbar (→ offline), nicht
+      Struktur (kein `data`, fehlende Spalten, nicht-leere Nutzlast ohne eine einzige gültige Zeile — PR-Review) → `None` = unbrauchbar (→ offline), nicht
       „leer" — sonst stünde eine kaputte Antwort 15 min als gültiger Leerstand im Cache. Properties per
       `serde_json::from_value::<GeoJsonFeatureCollection>` gegen den Schema-Anker geprüft.
 - [x] 1.5 `stand`-Ableitung = Maximum der Messzeitpunkte; Test mit zwei Stationen
