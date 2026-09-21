@@ -5,13 +5,13 @@ Test, dann den Code. Referenz für alle Berührpunkte ist der LFH-77-Commit `c2c
 
 ## 1. Backend: Normalisierung und Stufen
 
-- [x] 1.1 In `src/karte/normalisierung.rs` einen Modul-Test `odl_tests` mit einem kleinen BfS-Rohfixture (je eine Sonde „in Betrieb", „defekt", „Testbetrieb") anlegen und `normalisiere_odl` bauen: Punkt-Features mit `id`, `name`, `wert` (µSv/h oder fehlend), `einheit`, `messende`, `betrieb`, `stufe`, `kategorie: "odl"`; verifiziert durch `cargo test --lib odl_tests`
+- [x] 1.1 In `src/karte/normalisierung.rs` einen Modul-Test `odl_tests` mit einem kleinen BfS-Rohfixture (je eine Sonde „in Betrieb", „defekt", „Testbetrieb") anlegen und `normalisiere_odl` bauen: Punkt-Features mit `kennung`, `titel` (einheitlich mit den übrigen Ebenen, die der Inspector über `titel` liest), `wert` (µSv/h oder fehlend), `einheit`, `messende`, `betrieb`, `stufe`, `kategorie: "odl"`; verifiziert durch `cargo test --lib odl_tests`
 - [x] 1.2 Stufenfunktion mit den Bändern aus der Spec (≤ 0,2 `normal`, ≤ 0,6 `erhoeht`, darüber `stark_erhoeht`, kein Wert `keine_messung`) samt Grenzwert-Tests 0,2 / 0,21 / 0,6 / 0,61 und einem Test, der die vier Wire-Wörter wörtlich pinnt; verifiziert durch `cargo test --lib odl_tests`
 - [x] 1.3 Robustheit: Feature ohne Geometrie oder mit kaputter Koordinate wird verworfen, fehlende `features` ergeben eine leere Collection statt Panik; verifiziert durch je einen Test in `odl_tests`
 
 ## 2. Backend: Abruf und Route
 
-- [x] 2.1 In `src/karte/quellen.rs` `fetch_odl`/`erneuere_odl` nach DWD-Vorbild (`hole_json` auf `odlinfo_odl_1h_latest`, TTL 600 s, Attribution „Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0", Cache-Schlüssel `odl`, Fehler → `None` mit `tracing::warn!`); verifiziert durch `cargo build`
+- [x] 2.1 In `src/karte/quellen.rs` `fetch_odl`/`erneuere_odl` nach DWD-Vorbild, Formatbruch (keine `features`-Liste) über die reine `odl_antwort` als Fehlschlag statt als leerer Stand (`hole_json` auf `odlinfo_odl_1h_latest`, TTL 600 s, Attribution „Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0", Cache-Schlüssel `odl`, Fehler → `None` mit `tracing::warn!`); verifiziert durch `cargo build`
 - [x] 2.2 `match`-Arm `"odl"` in `src/routes/karte.rs` und Integrationstest `fachebenen_odl_wird_bedient` in `tests/karte.rs` nach dem Muster von `fachebenen_hochwasser_wird_bedient` (Cache vorbelegt → 200, `quelle: "odl"`, Features durchgereicht); verifiziert durch `cargo test --test karte fachebenen_odl`
 
 ## 3. Frontend: Typen und Statusfarb-Vertrag
