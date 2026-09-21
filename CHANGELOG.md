@@ -1,3 +1,15 @@
+## [1.0.0-alpha.20](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.19...v1.0.0-alpha.20) (2026-09-21)
+
+### Features
+
+* **lagekarte:** Backend-Adapter für die ODL-Fachebene des BfS (LFH-78) ([c846a41](https://github.com/rubenvitt/lifeline-hub/commit/c846a41acb2cfba3d301a4f4c9203adcf4cbe2a0))
+* **lagekarte:** Inspector der ODL-Sonde mit Messwert und Einteilungshinweis (LFH-78) ([adc8d9f](https://github.com/rubenvitt/lifeline-hub/commit/adc8d9feb65c0565592e94439e0c28cdad41ba9e))
+* **lagekarte:** ODL-Fachebene im Frontend — Panel, Stufenfarbe, Persistenz (LFH-78) ([b254607](https://github.com/rubenvitt/lifeline-hub/commit/b25460706bf0b2550c4d1f398fc93b531572b455))
+
+### Bug Fixes
+
+* **lagekarte:** Review-Korrekturen an der ODL-Fachebene (LFH-78) ([a833f6f](https://github.com/rubenvitt/lifeline-hub/commit/a833f6f4fd7852481c517449c42d0979f4c4475b))
+
 ## [1.0.0-alpha.19](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.18...v1.0.0-alpha.19) (2026-09-21)
 
 ### Features
