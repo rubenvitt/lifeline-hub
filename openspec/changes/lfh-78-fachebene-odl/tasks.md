@@ -32,7 +32,7 @@ Test, dann den Code. Referenz für alle Berührpunkte ist der LFH-77-Commit `c2c
 
 ## 6. Doku und Abschluss
 
-- [ ] 6.1 `docs/fachebenen-quellen.md`: Tabellenzeile `odl` (Endpoint, Format, Lizenz GeoNutzV/dl-de/by-2-0, Attribution, TTL 600 s, Offline) und Abschnitt mit den Messbefunden aus design.md, der Bänder-Herkunft („Projekt-Einteilung, keine BfS-Schwelle"), dem Regen-Effekt und dem Grund gegen den Grundpegel (Zeitreihe = eine Sonde je Abruf); verifiziert durch Lesen des gerenderten Abschnitts und `prettier --check` in Schritt 6.3
-- [ ] 6.2 Folgeticket „standortbezogener ODL-Grundpegel" über den Skill `clickup-task-anlegen` anlegen und in der Doku verlinken; verifiziert durch die Ticketnummer im Doku-Abschnitt
+- [x] 6.1 `docs/fachebenen-quellen.md`: Tabellenzeile `odl` (Endpoint, Format, Lizenz GeoNutzV/dl-de/by-2-0, Attribution, TTL 600 s, Offline) und Abschnitt mit den Messbefunden aus design.md, der Bänder-Herkunft („Projekt-Einteilung, keine BfS-Schwelle"), dem Regen-Effekt und dem Grund gegen den Grundpegel (Zeitreihe = eine Sonde je Abruf); verifiziert durch Lesen des gerenderten Abschnitts (Prettier prüft im Gate nur `frontend/`, die Doku lag schon vorher nicht prettier-sauber und wird nicht umgebrochen)
+- [x] 6.2 Folgeticket „standortbezogener ODL-Grundpegel" über den Skill `clickup-task-anlegen` anlegen und in der Doku verlinken; verifiziert durch die Ticketnummer im Doku-Abschnitt (**LFH-598**)
 - [ ] 6.3 Voller Gate-Lauf `./scripts/check-all.sh` grün (fmt/Prettier, Lint, Typ-Codegen, `cargo test`, Vitest, e2e); verifiziert durch Exit-Code 0
 - [ ] 6.4 Browser-Sichtprüfung auf der Lagekarte (Dev-Stack): Ebene zuschalten, Sonden erscheinen, Inspector zeigt Wert + Hinweis, Attribution unten rechts, Hell/Dunkel; verifiziert durch Screenshot

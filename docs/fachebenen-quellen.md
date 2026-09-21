@@ -20,6 +20,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **GeoNutzV — offen, auch kommerziell**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). | `Datenbasis: Deutscher Wetterdienst` | 300 s | leer + ausgegraut |
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
+| **Strahlung / ODL (BfS)** (`odl`) | `https://www.imis.bfs.de/ogc/opendata/ows` (WFS 1.1.0, `opendata:odlinfo_odl_1h_latest`, `outputFormat=application/json`) | GeoJSON-Punkte direkt (~1 676 ortsfeste Sonden, EPSG:4326, Gamma-ODL-Stundenwert in µSv/h) → auf die gelesenen Felder normalisiert, mit Bewertungsstufe | **GeoNutzV bzw. Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0)**, auch kommerziell; Auflage laut BfS-Nutzungsbedingungen: Daten „in sachlicher Art und Weise darzustellen". Kein Schlüssel, keine dokumentierte Abrufgrenze. | `Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0` | 600 s (Quelle im Stundentakt) | leer + ausgegraut |
 | **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (111 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
 | **KRITIS / sensible Objekte** (`kritis`) | `https://overpass-api.de/api/interpreter` (Overpass QL, `nwr … out center`) | OSM-JSON → GeoJSON-Punkte (Zentroide), viewport-`bbox`-getrieben | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | 3600 s (KRITIS-Objekte ändern sich kaum) | leer + ausgegraut |
 
@@ -49,6 +50,49 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   (`karte::normalisierung::hochwasser_tests` ↔ `pages/lagekarte/hochwasserStil.test.ts`);
   im OpenAPI-Schema stehen sie nicht, weil Fachebenen-Properties `HashMap<String, Value>`
   sind und ein registriertes Enum dort eine Waise wäre.
+- **ODL (`odl`)** holt das ganze Messnetz mit **einem** WFS-Abruf. Gemessen am
+  21.09.2026: HTTP 200, ~890 KB, ~1,1 s, 1 676 Sonden — davon 1 584 „in Betrieb" mit Wert,
+  81 „defekt" und 11 „Testbetrieb", beide **ohne** Messwert und ohne Messende. Normalisiert
+  (Kennung, Name, Wert, Einheit, Messende, Betriebsstatus, Stufe) bleiben ~358 KB (~36 KB
+  gzip); eine bbox- oder Zoombegrenzung wie bei KRITIS ist damit nicht nötig. Sonden ohne
+  Messwert bleiben auf der Karte (Stufe `keine_messung`): eine ausgefallene Sonde ist in
+  einer CBRN-Lage eine Lücke im Lagebild, die man sehen muss. Rund 70 Sonden standen zum
+  Messzeitpunkt drei Stunden hinter dem aktuellen Stundenwert; das Messende steht deshalb
+  im Detailpanel, eine eigene Stufe „veraltet" gibt es nicht. Eine Antwort **ohne
+  `features`-Liste** (GeoServer-Fehlerbericht mit HTTP 200) gilt als Fehlschlag, nicht als
+  „leer": die Ebene geht auf `offline`, ein vorhandener Stand bleibt stehen
+  (`karte::quellen::odl_antwort`). Die Nachbar-Layer `odl_brutto_1h` und `odlinfo_sitelist`
+  sind auf der BfS-Schnittstellenseite nicht dokumentiert und liefen im Test über 120 s —
+  verwendet wird ausschließlich der dokumentierte Layer.
+- **Die ODL-Stufen sind eine Einteilung des Lifeline Hub, KEIN Schwellenwert des BfS.** Das
+  BfS veröffentlicht keinen absoluten Wert für „erhöht". Es nennt 0,05–0,2 µSv/h als
+  natürlichen Bereich in Deutschland, kurzzeitige Erhöhungen durch Regen „bis etwa einen
+  Faktor 3" und einen Anlass zur Besorgnis erst bei längerer signifikanter Erhöhung „bzw.
+  wenn die Erhöhung über einen Faktor 3 hinausgeht" — **standortbezogen** gemeint
+  ([ODL-Info, Messwertinterpretation](https://odlinfo.bfs.de/ODL/DE/themen/wie-wird-gemessen/interpretation/interpretation.html)).
+  Die Ebene bildet daraus absolute Bänder (Entscheidung mit dem Menschen, 21.09.2026):
+
+  | Stufe (`stufe`) | Messwert | Rolle | Wort |
+  |---|---|---|---|
+  | `keine_messung` | kein Wert | neutral | keine Messung |
+  | `normal` | ≤ 0,2 µSv/h | normal | im natürlichen Bereich |
+  | `erhoeht` | > 0,2 bis ≤ 0,6 µSv/h | achtung | über natürlichem Bereich |
+  | `stark_erhoeht` | > 0,6 µSv/h (3 × Obergrenze) | alarm | über 3 × natürlicher Obergrenze |
+
+  Das Detailpanel jeder Sonde sagt das mit einem eigenen Satz, die Wörter beschreiben die
+  Lage zum natürlichen Bereich und keine Gefährdung. **Bekannte Schwäche:** Regen hebt
+  Sonden in Gebieten mit hohem Grundpegel zeitweise über 0,2 µSv/h; schon am Messtag
+  standen zwei Sonden ohne jede Lage knapp darüber. Umgekehrt fällt eine Verdreifachung an
+  einer Sonde mit niedrigem Grundpegel nicht auf. Eine **standortbezogene** Bewertung
+  scheitert an der Schnittstelle: die Zeitreihe `odlinfo_timeseries_odl_24h` ist eine
+  parametrisierte Sicht, die **eine Sonde je Abruf** liefert (`viewparams=kenn:…`, 365
+  Tageswerte) — für das ganze Netz 1 676 Abrufe. Das ist als **LFH-598** festgehalten.
+  Die Stufenwörter stehen wie die LHP-Klassen in keinem OpenAPI-Schema und sind beidseitig
+  gepinnt (`karte::normalisierung::odl_tests` ↔ `theme/statusFarben.test.ts`,
+  `pages/lagekarte/odlStil.test.ts`).
+- **Geltungsbereich ODL:** ausschließlich die ortsfesten Sonden des BfS-Messnetzes mit ihren
+  Stundenwerten. Messungen von Messtrupps, Messfahrzeugen oder Hubschraubern im Einsatz sind
+  **nicht** enthalten — die Zeile steht sichtbar unter dem Ebenen-Label.
 - **Autobahn** ist die einzige Quelle mit einem **Fächer-Abruf**: die Streckenliste liefert die
   Autobahnen, danach werden je Strecke drei Dienste geholt (334 Abrufe, 8 gleichzeitig,
   Einzelfehler toleriert wie bei NINA). Gemessen am 20.09.2026: ein voller Lauf dauert ~25 s
