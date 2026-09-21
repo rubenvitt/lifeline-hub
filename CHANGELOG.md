@@ -1,3 +1,19 @@
+## [1.0.0-alpha.19](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.18...v1.0.0-alpha.19) (2026-09-21)
+
+### Features
+
+* **lagekarte:** Fachebene Autobahn-Lage (Webcams, Baustellen, Sperrungen) ([76f90ac](https://github.com/rubenvitt/lifeline-hub/commit/76f90ac0ccf53ccb8671de7e54b5c7c4a136a52b))
+
+### Bug Fixes
+
+* **lagekarte:** Abkühlung nach gescheitertem Autobahn-Fächer (LFH-80) ([8e18299](https://github.com/rubenvitt/lifeline-hub/commit/8e1829993002b06acf31acb96c3679ea8c8aac4c))
+* **lagekarte:** Autobahn-Aufwärmtakt zählt auch den Fehlerfall (LFH-80) ([0354057](https://github.com/rubenvitt/lifeline-hub/commit/03540574b131e16e50faaafc66dbb0c2795969fb))
+* **lagekarte:** Autobahn-Fächer hängt an keinem Request mehr (LFH-80) ([2b8f5f9](https://github.com/rubenvitt/lifeline-hub/commit/2b8f5f975b65c9f8daa793adae0a5ff92e11a827))
+* **lagekarte:** ein misslungener Cache-Schreibvorgang gilt als Fehlschlag (LFH-80) ([8655bc6](https://github.com/rubenvitt/lifeline-hub/commit/8655bc6b9e481fce705cd8a5e45443a45b872b27))
+* **lagekarte:** Review-Korrekturen an der Autobahn-Fachebene (LFH-80) ([ae1d5db](https://github.com/rubenvitt/lifeline-hub/commit/ae1d5db3a74048708bcbb11b666dff8f80976461))
+* **lagekarte:** Webcam-Standbild setzt seinen Fehlerzustand strukturell zurück (LFH-80) ([c4a5384](https://github.com/rubenvitt/lifeline-hub/commit/c4a5384b48d387db4267380698b3ee2bdda25b7c))
+* **lagekarte:** zwei weitere Review-Befunde an der Autobahn-Fachebene (LFH-80) ([d7ada34](https://github.com/rubenvitt/lifeline-hub/commit/d7ada3446bc948e341032dc37be4e3100e56b7f1))
+
 ## [1.0.0-alpha.18](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.17...v1.0.0-alpha.18) (2026-09-20)
 
 ### Features

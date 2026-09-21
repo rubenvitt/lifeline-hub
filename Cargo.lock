@@ -1913,7 +1913,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-hub"
-version = "1.0.0-alpha.18"
+version = "1.0.0-alpha.19"
 dependencies = [
  "anyhow",
  "argon2",
