@@ -97,6 +97,7 @@ const KATEGORIE_LABEL: Record<string, string> = {
   kritis: 'KRITIS-Objekt',
   warnung: 'Amtliche Warnung',
   pegel: 'Pegel',
+  odl: 'ODL-Messsonde (BfS)',
   webcam: 'Webcam',
   baustelle: 'Baustelle',
   sperrung: 'Sperrung',

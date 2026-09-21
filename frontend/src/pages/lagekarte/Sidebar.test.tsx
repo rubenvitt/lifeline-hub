@@ -64,6 +64,7 @@ const basisProps: SidebarProps = {
     dwd: false,
     pegelonline: false,
     hochwasser: false,
+    odl: false,
     kritis: false,
     autobahn: false,
   },

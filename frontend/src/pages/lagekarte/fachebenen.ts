@@ -67,6 +67,20 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     pollMs: 300_000,
     bboxAbhaengig: false,
   },
+  odl: {
+    key: 'odl',
+    label: 'Strahlung / ODL (BfS)',
+    // Wie bei `hochwasser` nur Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte
+    // trägt jede Sonde ihre Rollenfarbe je Stufe (`odlStil.ts`). Eigener Ton neben den
+    // sechs belegten, damit die Ebene im Panel unterscheidbar bleibt.
+    farbe: '#7cb305',
+    geometrieTyp: 'punkt',
+    // = serverseitige TTL (600 s). Die Quelle liefert Stundenwerte; häufiger abzufragen
+    // wird nicht frischer, seltener ließe einen neuen Stundenwert zu lange liegen.
+    pollMs: 600_000,
+    bboxAbhaengig: false,
+    geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
+  },
   autobahn: {
     key: 'autobahn',
     label: 'Autobahn-Lage (BAB)',
@@ -97,7 +111,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'kritis', 'autobahn'];
+  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'odl', 'kritis', 'autobahn'];
 }
 
 /**

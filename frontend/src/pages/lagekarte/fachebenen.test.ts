@@ -17,15 +17,17 @@ const feat = (lon: number, lat: number) => ({
 });
 
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen, die Hochwasserebene und die BAB-Lage', () => {
+  it('enthält die vier v1-Quellen, die Hochwasserebene, die ODL-Ebene und die BAB-Lage', () => {
     // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline`,
     // weil es dieselbe Frage beantwortet: dort der rohe Wasserstand, hier die amtliche
-    // Bewertung (LFH-77). `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
+    // Bewertung (LFH-77). `odl` (LFH-78) folgt als zweite bewertete Messnetz-Ebene.
+    // `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
     expect(fachebeneKeys()).toEqual([
       'nina',
       'dwd',
       'pegelonline',
       'hochwasser',
+      'odl',
       'kritis',
       'autobahn',
     ]);
@@ -34,6 +36,23 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.hochwasser.geometrieTyp).toBe('punkt');
     expect(FACHEBENEN.hochwasser.bboxAbhaengig).toBe(false);
     expect(FACHEBENEN.hochwasser.pollMs).toBeGreaterThan(0);
+  });
+  it('führt die ODL-Ebene bundesweit, im Takt der Quelle und mit sichtbarem Geltungsbereich', () => {
+    expect(FACHEBENEN.odl.geometrieTyp).toBe('punkt');
+    // ~358 KB normalisiert, 1 676 Sonden — keine bbox-Pflicht wie bei KRITIS (design.md, E7).
+    expect(FACHEBENEN.odl.bboxAbhaengig).toBe(false);
+    // = serverseitige TTL: die Quelle hat Stundentakt, häufiger zu fragen wird nicht frischer.
+    expect(FACHEBENEN.odl.pollMs).toBe(600_000);
+    // Als TEXT, nicht als Tooltip (LFH-80): wer die Ebene für Einsatzmessungen hält, liest
+    // eine Messtrupp-Lücke als „alles unauffällig".
+    expect(FACHEBENEN.odl.geltung).toMatch(/ortsfeste/);
+    expect(FACHEBENEN.odl.geltung).toMatch(/keine Einsatzmessungen/);
+  });
+  it('gibt der ODL-Ebene einen eigenen Ebenenton', () => {
+    const andere = fachebeneKeys()
+      .filter((k) => k !== 'odl')
+      .map((k) => FACHEBENEN[k].farbe);
+    expect(andere).not.toContain(FACHEBENEN.odl.farbe);
   });
   it('markiert nur kritis als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
@@ -64,12 +83,13 @@ describe('Fachebenen-Registry', () => {
     expect(autobahnTakt('leer')).toBe(lang);
   });
 
-  it('nur die Autobahn-Ebene nennt einen einschränkenden Geltungsbereich', () => {
-    // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung.
+  it('nur ODL- und Autobahn-Ebene nennen einen einschränkenden Geltungsbereich', () => {
+    // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung;
+    // LFH-78 setzt den zweiten (nur ortsfestes Messnetz, keine Einsatzmessungen).
     // Die Gegenaussage trägt sie mit: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
-    expect(mitGeltung).toEqual(['autobahn']);
+    expect(mitGeltung).toEqual(['odl', 'autobahn']);
   });
   it('jede Ebene hat Label, Farbe, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {

@@ -12,9 +12,14 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import { waehleInitialeBasemap, type GespeicherteBasemap } from './basemapAuswahl';
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
+import { fachebeneKeys } from './fachebenen';
 import type { LayerSichtbar } from './Sidebar';
 
-const FACHEBENE_KEYS = ['nina', 'dwd', 'pegelonline', 'kritis', 'autobahn'] as const;
+// Aus der Registry abgeleitet, NICHT von Hand gepflegt: die Handliste hatte `hochwasser`
+// (LFH-77) verloren — das Umschalten machte die Ansicht nie schmutzig, „Ansicht speichern"
+// bot sich nicht an, die Wahl war nach dem Neuladen weg. Aufgefallen bei LFH-78. Die
+// Hydration unten bleibt dagegen bewusst eine Aufzählung (siehe `leseFachebenen`).
+const FACHEBENE_KEYS = fachebeneKeys();
 const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'einsatzort',
   'uhs',
@@ -61,6 +66,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     // als „aus", nicht als `undefined`. Genau deshalb steht hier eine Aufzählung und kein
     // Spread über das gespeicherte Objekt.
     hochwasser: o.hochwasser === true,
+    // Dasselbe für LFH-78: jede heute gespeicherte Ansicht kennt `odl` nicht.
+    odl: o.odl === true,
     kritis: o.kritis === true,
     autobahn: o.autobahn === true,
   };

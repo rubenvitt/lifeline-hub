@@ -16,15 +16,15 @@ Test, dann den Code. Referenz für alle Berührpunkte ist der LFH-77-Commit `c2c
 
 ## 3. Frontend: Typen und Statusfarb-Vertrag
 
-- [ ] 3.1 `api/fachebenen.ts`: `'odl'` in `FachebeneQuelle`, FE-lokaler Typ `OdlStufe` mit Doc-Kommentar zum Pin; `api/queryKeys.ts`-Kommentar ergänzen; Byte-Pin `globalKeys.fachebene('odl')` in `api/globalKeys.test.ts`; verifiziert durch `pnpm vitest run src/api/globalKeys.test.ts` und `tsc` (aus `check-typ-codegen.sh`)
-- [ ] 3.2 `theme/statusFarben.ts`: Vertragskarte `odlStufe` (neutral / normal / achtung / alarm, Labels aus design.md) mit Kopfkommentar zur Projekt-Einteilung; Abdeckungstest in `statusFarben.test.ts` auf 17 heben und die Rollen je Stufe prüfen; verifiziert durch `pnpm vitest run src/theme`
+- [x] 3.1 `api/fachebenen.ts`: `'odl'` in `FachebeneQuelle`, FE-lokaler Typ `OdlStufe` mit Doc-Kommentar zum Pin; `api/queryKeys.ts`-Kommentar ergänzen; Byte-Pin `globalKeys.fachebene('odl')` in `api/globalKeys.test.ts`; verifiziert durch `pnpm vitest run src/api/globalKeys.test.ts` und `tsc` (aus `check-typ-codegen.sh`)
+- [x] 3.2 `theme/statusFarben.ts`: Vertragskarte `odlStufe` (neutral / normal / achtung / alarm, Labels aus design.md) mit Kopfkommentar zur Projekt-Einteilung; Abdeckungstest in `statusFarben.test.ts` auf 17 heben und die Rollen je Stufe prüfen; verifiziert durch `pnpm vitest run src/theme`
 
 ## 4. Frontend: Ebene, Stil, Laden
 
-- [ ] 4.1 Neues `pages/lagekarte/odlStil.ts` (`faerbeOdl`, `odlRadius`, `odlDarstellung`, Rückfall unbekanntes Wort → `keine_messung`) mit `odlStil.test.ts`: Radius streng steigend über die vier Stufen, Farbe aus dem Token je Modus, Wire-Wörter wörtlich gepinnt; verifiziert durch `pnpm vitest run src/pages/lagekarte/odlStil.test.ts`
-- [ ] 4.2 `fachebenen.ts` (`FACHEBENEN.odl` mit Label, `#7cb305`, `pollMs: 600_000`, `geltung`; `fachebeneKeys()` hinter `hochwasser`), `fachebenenAuswahl.ts` (`odl: false`), `fachebenenLayer.ts` (`KATEGORIE_LABEL.odl`) samt Anpassung von `fachebenen.test.ts`/`fachebenenLayer.test.ts`; verifiziert durch `pnpm vitest run src/pages/lagekarte/fachebenen`
-- [ ] 4.3 `useFachebenen.ts`: siebte Query in `useQueries` (Reihenfolge = `fachebeneKeys()`, `byKey` mitziehen) und `faerbeOdl` beim Zusammensetzen der aktiven Ebenen; Test in `useFachebenen.test.tsx`, dass ODL-Features `farbe`/`radius` tragen und die Attribution bei sichtbarer, nicht-offline Ebene erscheint; verifiziert durch `pnpm vitest run src/pages/lagekarte/useFachebenen.test.tsx`
-- [ ] 4.4 `useKartenAnsicht.ts`: `odl: o.odl === true` als Aufzählung; Test in `useKartenAnsicht.test.tsx`, dass ein gespeicherter Stand ohne `odl` als „aus" gelesen wird und `odl: true` erhalten bleibt; verifiziert durch `pnpm vitest run src/pages/lagekarte/useKartenAnsicht.test.tsx`
+- [x] 4.1 Neues `pages/lagekarte/odlStil.ts` (`faerbeOdl`, `odlRadius`, `odlDarstellung`, Rückfall unbekanntes Wort → `keine_messung`) mit `odlStil.test.ts`: Radius streng steigend über die vier Stufen, Farbe aus dem Token je Modus, Wire-Wörter wörtlich gepinnt; verifiziert durch `pnpm vitest run src/pages/lagekarte/odlStil.test.ts`
+- [x] 4.2 `fachebenen.ts` (`FACHEBENEN.odl` mit Label, `#7cb305`, `pollMs: 600_000`, `geltung`; `fachebeneKeys()` hinter `hochwasser`), `fachebenenAuswahl.ts` (`odl: false`), `fachebenenLayer.ts` (`KATEGORIE_LABEL.odl`) samt Anpassung von `fachebenen.test.ts`/`fachebenenLayer.test.ts`; verifiziert durch `pnpm vitest run src/pages/lagekarte/fachebenen`
+- [x] 4.3 `useFachebenen.ts`: siebte Query in `useQueries` (Reihenfolge = `fachebeneKeys()`, `byKey` mitziehen) und `faerbeOdl` beim Zusammensetzen der aktiven Ebenen; Test in `useFachebenen.test.tsx`, dass ODL-Features `farbe`/`radius` tragen und die Attribution bei sichtbarer, nicht-offline Ebene erscheint; verifiziert durch `pnpm vitest run src/pages/lagekarte/useFachebenen.test.tsx`
+- [x] 4.4 `useKartenAnsicht.ts`: `odl: o.odl === true` als Aufzählung; Test in `useKartenAnsicht.test.tsx`, dass ein gespeicherter Stand ohne `odl` als „aus" gelesen wird und `odl: true` erhalten bleibt; dazu `odl` ins Vergleichs-Tupel für „schmutzig" — das Tupel ist seither aus `fachebeneKeys()` abgeleitet, weil die Handliste `hochwasser` (LFH-77) verloren hatte (Nachzug mit eigenem Test); verifiziert durch `pnpm vitest run src/pages/lagekarte/useKartenAnsicht.test.tsx`
 
 ## 5. Frontend: Inspector
 

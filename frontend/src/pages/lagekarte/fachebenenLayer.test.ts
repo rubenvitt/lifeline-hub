@@ -85,6 +85,7 @@ describe('kategorieLabel', () => {
   it('mappt bekannte Kategorien, Fallback auf Rohwert', () => {
     expect(kategorieLabel('krankenhaus')).toBe('Krankenhaus');
     expect(kategorieLabel('strom')).toBe('Umspannwerk');
+    expect(kategorieLabel('odl')).toBe('ODL-Messsonde (BfS)');
     expect(kategorieLabel('unbekannt')).toBe('unbekannt');
   });
 });
