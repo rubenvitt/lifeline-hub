@@ -94,7 +94,7 @@ Test, dann der Code, dann grün.
   Gesamtexport). **Kein Handeintrag in `CHANGELOG.md`**: semantic-release schreibt die
   Datei und übernimmt den Eintrag aus der `feat`-Commit-Botschaft. Belegt durch
   Sichtprüfung im Diff.
-- [ ] 5.2 `./scripts/check-all.sh` ist grün. Belegt durch die Ausgabe des Laufs.
-- [ ] 5.3 Browser-Blick auf die Lagekarte bei 1280 px (Vite-Dev plus Backend): „Energie“
+- [x] 5.2 `./scripts/check-all.sh` ist grün. Belegt durch die Ausgabe des Laufs.
+- [x] 5.3 Browser-Blick auf die Lagekarte bei 1280 px (Vite-Dev plus Backend): „Energie“
   einschalten, KRITIS bleibt aus, im Ruhrgebiet auf Zoom 11 gehen, einen Punkt anklicken,
   die Attributionszeile prüfen. Belegt durch einen Screenshot für die Abschlussmeldung.

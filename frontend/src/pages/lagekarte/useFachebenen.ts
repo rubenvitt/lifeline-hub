@@ -107,10 +107,13 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     enabled: fachebenenSichtbar.energie && !!viewportBbox,
     // Anders als KRITIS liefert der Energie-Fetch nur den Ausschnitt (OSM live je bbox,
     // MaStR bundesweit gecacht) — client-seitige Akkumulation (`energieAkku` unten) hält die
-    // schon gesehenen Anlagen sichtbar. Serverseitig 24 h frisch; 6 h hier reichen weit über
-    // eine Einsatzschicht.
+    // schon gesehenen Anlagen sichtbar. `staleTime` aber bewusst KURZ, anders als KRITIS: ein
+    // kalter Abruf antwortet nach höchstens 10 s mit dem Teil, der schon da ist, und holt den
+    // Rest im Hintergrund (`fetch_energie`). Mit 6 h bliebe genau diese unvollständige
+    // Antwort für die Rasterzelle stehen, bis jemand weit genug schwenkt. Ein erneuter Abruf
+    // trifft serverseitig den Cache und kostet Millisekunden.
     placeholderData: keepPreviousData,
-    staleTime: 6 * 60 * 60_000,
+    staleTime: 2 * 60_000,
     gcTime: 6 * 60 * 60_000,
   });
 
