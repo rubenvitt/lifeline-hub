@@ -279,6 +279,19 @@ describe('rasterBbox', () => {
   it('gibt ungültige Eingabe unverändert zurück', () => {
     expect(rasterBbox('kaputt')).toBe('kaputt');
   });
+  it('rastert mit fester Weite, wenn eine übergeben wird (Energie, LFH-81)', () => {
+    expect(rasterBbox('7.01,51.51,7.12,51.58', 0.05)).toBe('7,51.5,7.15,51.6');
+    // Ein Zoom-10-Ausschnitt (~0,9° bei rund 1300 px Kartenbreite): die Leiter rundet auf
+    // 0,25° nach außen und vergrößert die Overpass-Abfrage merklich, das feste Stadtraster
+    // bleibt nah am Ausschnitt. Genau deshalb nimmt Energie nicht die Leiter.
+    const zoom10 = '7.13,51.21,8.03,51.76';
+    const breite = (b: string) => {
+      const [w, , e] = b.split(',').map(Number);
+      return e - w;
+    };
+    expect(breite(rasterBbox(zoom10))).toBeGreaterThan(1);
+    expect(breite(rasterBbox(zoom10, 0.05))).toBeLessThanOrEqual(1);
+  });
 });
 
 describe('mergeFeatures', () => {

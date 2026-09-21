@@ -3,11 +3,34 @@ import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../
 type Feature = FeatureCollection['features'][number];
 
 /**
- * Mindest-Zoom-Level für ALLE bbox-abhängigen Ebenen (unter diesem Zoom keine bbox-Anfrage).
- * Bis LFH-81 hiess die Konstante `KRITIS_MIN_ZOOM` und galt nur für KRITIS; der Wert ist
- * beim Verallgemeinern unverändert geblieben. Das Backend begrenzt die bbox ohnehin auf 1°.
+ * Mindest-Zoom der Energie-Ebene (LFH-81): unter diesem Zoom keine Abfrage, stattdessen der
+ * Hinweis „näher heranzoomen". Bis LFH-81 hiess die Konstante `KRITIS_MIN_ZOOM`; seit LFH-83
+ * fragt KRITIS in JEDER Zoomstufe (Extrakt-Bestand, gebündelt), die Schwelle gilt also nur
+ * noch für Ebenen, die sie über `minZoom` tragen — heute allein Energie, deren Backend live
+ * Overpass fragt und Ausschnitte über {@link ENERGIE_MAX_SPANNE_GRAD} ablehnt
+ * (`pruefe_energie_bbox`). Wert unverändert.
  */
 export const BBOX_MIN_ZOOM = 10;
+
+/**
+ * Größte Spanne eines Energie-Ausschnitts in Grad je Achse — dieselbe Zahl wie
+ * `ENERGIE_MAX_SPANNE_GRAD` im Backend (`src/karte/quellen.rs`). Der Zoom allein reicht als
+ * Bremse nicht: bei Zoom 10 ist ein Grad rund 1456 px breit, ein breiter Schirm zeigt also
+ * mehr als ein Grad. Das Frontend prüft deshalb die Spanne selbst, statt eine Anfrage zu
+ * schicken, die das Backend mit 400 ablehnt und die Ebene auf „offline“ setzt.
+ */
+export const ENERGIE_MAX_SPANNE_GRAD = 3;
+
+/**
+ * Passt ein Ausschnitt `west,sued,ost,nord` in die Energie-Grenze? Rein und exportiert. Ein
+ * nicht lesbarer Ausschnitt gilt als passend — über ihn entscheidet das Backend.
+ */
+export function energieAusschnittPasst(bbox: string): boolean {
+  const t = bbox.split(',').map(Number);
+  if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return true;
+  const [w, s, e, n] = t;
+  return e - w <= ENERGIE_MAX_SPANNE_GRAD && n - s <= ENERGIE_MAX_SPANNE_GRAD;
+}
 
 export interface FachebeneDef {
   key: FachebeneQuelle;
@@ -39,6 +62,14 @@ export interface FachebeneDef {
    * hunderttausend Objekte, die der Server ab 5 000 zusätzlich zu Sammelpunkten verdichtet.
    */
   buendeln?: boolean;
+  /**
+   * Mindest-Zoom, unter dem die Ebene NICHT gefragt wird (Hinweis „näher heranzoomen" statt
+   * einer Anfrage). Bis LFH-81 galt {@link BBOX_MIN_ZOOM} für ALLE bbox-abhängigen Ebenen;
+   * seit LFH-83 fragt KRITIS in jeder Zoomstufe (Extrakt-Bestand, gebündelt) — die Schwelle
+   * gilt also nur für Ebenen, die sie hier ausdrücklich tragen. Heute allein Energie, deren
+   * Backend live Overpass fragt.
+   */
+  minZoom?: number;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -156,6 +187,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // serverseitig 24 h frisch (design.md, Entscheidung 1).
     pollMs: 0,
     bboxAbhaengig: true,
+    // Anders als KRITIS (LFH-83) fragt Energie live Overpass je Ausschnitt; das Backend lehnt
+    // alles über ENERGIE_MAX_SPANNE_GRAD ab. Erst ab dieser Zoomstufe wird gefragt.
+    minZoom: BBOX_MIN_ZOOM,
   },
 };
 
@@ -234,8 +268,12 @@ export function rasterWeite(breite: number): number {
  * das keine gültige bbox mehr (Ausschnitt breiter als die Welt, oder nach dem Kappen
  * `west ≥ ost`), gilt die ganze Welt — das Backend beantwortet sie verdichtet; eine
  * ausgelassene Anfrage ließe die Ebene dagegen dauerhaft leer (Review LFH-83).
+ *
+ * `grid` setzt eine FESTE Rasterweite statt der Leiter. Die Energie-Ebene (LFH-81) nimmt das
+ * alte 0,05°-Stadtraster: sie fragt Overpass live je Ausschnitt, und die Leiter rundet
+ * einen Zoom-10-Ausschnitt (~0,9°) auf 0,25° nach außen — eine unnötig größere Abfrage.
  */
-export function rasterBbox(bbox: string): string {
+export function rasterBbox(bbox: string, grid?: number): string {
   const t = bbox.split(',').map(Number);
   if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return bbox;
   const [w0, s, e0, n] = t;
@@ -243,7 +281,7 @@ export function rasterBbox(bbox: string): string {
   const versatz = Math.floor(((w0 + e0) / 2 + 180) / 360) * 360;
   const w = w0 - versatz;
   const e = e0 - versatz;
-  const grid = rasterWeite(e - w);
+  grid ??= rasterWeite(e - w);
   const ab = (v: number) => Math.floor(v / grid) * grid; // nach unten
   const auf = (v: number) => Math.ceil(v / grid) * grid; // nach oben
   const r = (v: number) => Math.round(v * 1e6) / 1e6; // Fließkomma-Rauschen kappen

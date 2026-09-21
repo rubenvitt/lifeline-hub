@@ -8,12 +8,11 @@ import {
   type FeatureCollection,
 } from '../../api/fachebenen';
 import {
-  BBOX_MIN_ZOOM,
+  energieAusschnittPasst,
   energieNennung,
   FACHEBENEN,
   fachebeneKeys,
   fachebeneTakt,
-  istBboxAbhaengig,
   mergeEnergieFeatures,
   NENNUNG_TRENNER,
 } from './fachebenen';
@@ -76,6 +75,20 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   // (`mergeEnergieFeatures`, LFH-81).
   const energieSammlungRef = useRef(new Map<string, Feature>());
   const [energieAkku, setEnergieAkku] = useState<FeatureCollection>(leereFc());
+  // Braucht Energie ihren Mindest-Zoom UND passt der (einzige, geteilte) Ausschnitt in ihre
+  // Grenze? Ihr Backend fragt anders als KRITIS weiterhin live Overpass, lehnt große
+  // Ausschnitte ab (`pruefe_energie_bbox`, LFH-81) und ist unter dem Mindest-Zoom erst gar
+  // nicht gemeint (`Kartenflaeche` meldet den Ausschnitt zwar erst ab `BBOX_MIN_ZOOM`, ein im
+  // Test direkt gesetzter `viewportBbox` unterhalb dessen bliebe ohne diesen Riegel aber
+  // aktiv) — ohne beides ginge auf breiten Schirmen oder bei zu niedrigem Zoom eine Anfrage
+  // raus, die das Backend mit 400 quittiert oder die Ebene fälschlich auf „offline" zeigt.
+  const energieMinZoom = FACHEBENEN.energie.minZoom;
+  const energieZoomReicht =
+    energieMinZoom === undefined || (kartenZoom !== null && kartenZoom >= energieMinZoom);
+  // Nur relevant, wenn überhaupt ein Ausschnitt existiert — ohne Ausschnitt ist „zu groß"
+  // keine sinnvolle Aussage, dort entscheidet für den Zoom-Hinweis allein der Zoom (s. u.).
+  const energieBboxZuGross = viewportBbox !== null && !energieAusschnittPasst(viewportBbox);
+  const energiePasst = energieZoomReicht && viewportBbox !== null && !energieBboxZuGross;
   // In Energie-Antworten gesehene Nennungsteile (LFH-81). Gezeigt wird davon, was die
   // gesammelten Punkte tragen (`energieNennung`) — nicht die Nennung der letzten Antwort.
   const [energieTeile, setEnergieTeile] = useState<string[]>([]);
@@ -104,7 +117,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   const energie = useQuery({
     queryKey: globalKeys.fachebeneEnergie(viewportBbox),
     queryFn: () => ladeFachebene('energie', viewportBbox!),
-    enabled: fachebenenSichtbar.energie && !!viewportBbox,
+    // `energiePasst` hält eine Anfrage über einen zu großen Ausschnitt zurück, statt sie ans
+    // Backend zu schicken, das dort ohnehin 400 antwortete (s. o.).
+    enabled: fachebenenSichtbar.energie && !!viewportBbox && energiePasst,
     // Anders als KRITIS liefert der Energie-Fetch nur den Ausschnitt (OSM live je bbox,
     // MaStR bundesweit gecacht) — client-seitige Akkumulation (`energieAkku` unten) hält die
     // schon gesehenen Anlagen sichtbar. `staleTime` aber bewusst KURZ, anders als KRITIS: ein
@@ -291,12 +306,14 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     setAutobahnStatus(kombiniert.autobahnStatusRoh);
   }, [kombiniert.autobahnStatusRoh]);
 
-  // „Zu weit herausgezoomt" je Quelle (LFH-81): gesetzt nur für sichtbare bbox-Ebenen, die
-  // unter dem Mindest-Zoom stehen — die Sidebar liest es für jede bbox-Ebene gleich.
-  const zuWeitDraussen = kartenZoom != null && kartenZoom < BBOX_MIN_ZOOM;
+  // „Zu weit herausgezoomt" bzw. „Ausschnitt zu groß" je Quelle (LFH-81): geprüft nur für
+  // sichtbare Ebenen, die eine `minZoom`-Schwelle tragen — heute allein Energie, denn KRITIS
+  // fragt seit LFH-83 in jeder Zoomstufe (s. o.). Die Sidebar liest es für jede bbox-Ebene gleich.
   const zoomZuKlein: Partial<Record<FachebeneQuelle, boolean>> = {};
   for (const k of fachebeneKeys()) {
-    if (istBboxAbhaengig(k) && fachebenenSichtbar[k]) zoomZuKlein[k] = zuWeitDraussen;
+    const minZoom = FACHEBENEN[k].minZoom;
+    if (minZoom === undefined || !fachebenenSichtbar[k] || kartenZoom === null) continue;
+    zoomZuKlein[k] = kartenZoom < minZoom || (k === 'energie' && energieBboxZuGross);
   }
 
   const onFachebeneToggle = (k: FachebeneQuelle, an: boolean) =>

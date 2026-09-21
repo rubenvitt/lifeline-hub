@@ -1060,12 +1060,39 @@ fn energie_osm_abfrage(bbox: &Bbox) -> String {
     energie_overpass_query(&rand.overpass())
 }
 
+/// Größte Spanne eines Energie-Ausschnitts in Grad, je Achse. Bis LFH-83 stand diese Grenze
+/// in [`Bbox::parse`] und galt für KRITIS mit; seit KRITIS aus dem Extrakt-Bestand kommt, hat
+/// `parse` keine Größengrenze mehr. Die Energie-Ebene fragt Overpass aber weiter live je
+/// Ausschnitt — ohne eigene Grenze löste eine Deutschland-bbox eine bundesweite
+/// Overpass-Abfrage aus.
+///
+/// 3° statt der früheren 1°: die Ebene fragt ab Zoom 10, und dort ist ein Grad rund 1456 px
+/// breit. Ein 1920-px-Schirm zeigt damit schon ~1,3°, ein 4K-Schirm ~2,6° — mit 1° antwortete
+/// das Backend dort 400, und die Ebene stand leer auf „offline". `power=plant` ist dünn
+/// besetzt, drei Grad sind für Overpass eine kleine Abfrage; ganz Deutschland (~10°) bleibt
+/// abgelehnt. Das Frontend bremst mit derselben Zahl vorher (`ENERGIE_MAX_SPANNE_GRAD` in
+/// `pages/lagekarte/fachebenen.ts`).
+const ENERGIE_MAX_SPANNE_GRAD: f64 = 3.0;
+
+/// Ist der Ausschnitt klein genug für eine Overpass-Abfrage? Rein, damit die Grenze ohne
+/// Route prüfbar ist. Geprüft wird der ANGEFRAGTE Ausschnitt, vor dem Rand aus
+/// [`energie_osm_abfrage`] — der darf über die Grenze hinauswachsen.
+pub(crate) fn pruefe_energie_bbox(bbox: &Bbox) -> Result<(), String> {
+    if bbox.ost - bbox.west > ENERGIE_MAX_SPANNE_GRAD
+        || bbox.nord - bbox.sued > ENERGIE_MAX_SPANNE_GRAD
+    {
+        return Err("bbox zu groß — weiter hineinzoomen".to_string());
+    }
+    Ok(())
+}
+
 pub async fn fetch_energie(
     s: &FachebenenState,
     pool: &SqlitePool,
     bbox_roh: &str,
 ) -> Result<FachebeneAntwort, AppError> {
     let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
+    pruefe_energie_bbox(&bbox).map_err(AppError::Validation)?;
     let (c1, p1, c2, p2) = (
         s.client.clone(),
         pool.clone(),
@@ -1347,6 +1374,26 @@ mod energie_tests {
     const FRIST: Duration = Duration::from_millis(300);
     /// Äußere Schranke, damit ein Rückfall auf blockierendes Warten rot wird statt zu hängen.
     const HALT: Duration = Duration::from_secs(1);
+
+    /// Die Größengrenze ist seit LFH-83 energie-eigen (`Bbox::parse` nimmt jede Größe).
+    #[test]
+    fn energie_bbox_grenze_drei_grad() {
+        let ok = |b: &str| pruefe_energie_bbox(&Bbox::parse(b).unwrap());
+        assert!(ok(BBOX).is_ok());
+        // Genau 3° je Achse ist noch erlaubt (nicht > 3) — das deckt einen Zoom-10-Ausschnitt
+        // auch auf einem breiten Schirm (1920 px ≈ 1,3°, 4K ≈ 2,6°).
+        assert!(ok("6.0,50.0,9.0,53.0").is_ok());
+        assert!(ok("6.0,50.0,7.6,51.0").is_ok());
+        // Ganz Deutschland, und je eine Achse knapp drüber.
+        for b in [
+            "5.0,47.0,15.0,55.0",
+            "6.0,50.0,9.1,50.9",
+            "6.0,50.0,6.9,53.1",
+        ] {
+            let fehler = ok(b).unwrap_err();
+            assert!(fehler.contains("bbox zu groß"), "{b}: {fehler}");
+        }
+    }
 
     fn inflight() -> Arc<Mutex<HashSet<String>>> {
         Arc::new(Mutex::new(HashSet::new()))

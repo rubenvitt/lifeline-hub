@@ -30,6 +30,12 @@ Anlage denselben Punkt liefern.
 - **WHEN** `bbox` keine vier Zahlen trägt oder `west ≥ ost` bzw. `sued ≥ nord` gilt
 - **THEN** antwortet das System mit 400
 
+#### Scenario: Zu großer Ausschnitt
+
+- **WHEN** die bbox in Länge oder Breite mehr als 3° umfasst (etwa ganz Deutschland)
+- **THEN** antwortet das System mit 400 („bbox zu groß“) und fragt Overpass nicht ab — anders
+  als KRITIS, das seit LFH-83 jede Größe aus dem Extrakt-Bestand beantwortet
+
 #### Scenario: Nur Anlagen im Ausschnitt
 
 - **WHEN** der Cache eine Anlage innerhalb und eine außerhalb der angefragten bbox enthält

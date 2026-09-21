@@ -33,11 +33,24 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
 - **KRITIS** und **Energie** sind die `bbox`-abhängigen Ebenen: Das Frontend meldet den
   Karten-Viewport (Parameter `bbox=west,sued,ost,nord`) nach Kartenbewegung (debounced), in
-  jeder Zoomstufe. Fehlender/ungültiger `bbox` → HTTP 400 bei beiden. **KRITIS** fragt damit
-  nur seinen lokalen Extrakt-Bestand ab (kein Cache je bbox nötig, kein Netzabruf, keine
-  Größengrenze seit LFH-83 — Details im Abschnitt „KRITIS aus dem OSM-Extrakt" unten);
-  **Energie** cacht dagegen ihren OSM-Anteil pro gerundeter bbox (der MaStR-Anteil bundesweit
-  in einem Eintrag, s. u.).
+  jeder Zoomstufe. Fehlender/ungültiger `bbox` → HTTP 400. Die beiden gehen mit dem
+  Ausschnitt verschieden um:
+  - **KRITIS** fragt den eigenen Extrakt-Bestand, in jeder Zoomstufe und ohne Größengrenze
+    (seit LFH-83; kein Cache je bbox nötig, kein Netzabruf). Details im Abschnitt „KRITIS aus
+    dem OSM-Extrakt" unten.
+  - **Energie** fragt Overpass weiter **live** je Ausschnitt und hat deshalb als einzige
+    Ebene einen **Mindest-Zoom 10** (darunter keine Abfrage, Hinweis „näher heranzoomen")
+    und eine **Größengrenze von 3° je Achse** (`karte::quellen::pruefe_energie_bbox`,
+    größer → HTTP 400 „bbox zu groß — weiter hineinzoomen"; das Frontend prüft dieselbe
+    Spanne vorab, `energieAusschnittPasst` in `pages/lagekarte/fachebenen.ts`, und zeigt dann
+    den Zoom-Hinweis statt eine Anfrage zu schicken). Bis LFH-83 stand eine 1°-Grenze in
+    `Bbox::parse` und galt für beide Ebenen; bei Zoom 10 ist ein Grad aber rund 1456 px
+    breit, auf einem 1920-px-Schirm lehnte das Backend den Ausschnitt deshalb ab und die
+    Ebene stand leer. Der Ausschnitt selbst ist derselbe geteilte, gerasterte Viewport wie
+    bei KRITIS (EIN Raster für beide bbox-Ebenen, LFH-81) — der Aggregator cacht Energie je
+    gerundeter bbox (der MaStR-Anteil bundesweit in einem Eintrag, s. u.). Für den
+    Overpass-Abruf gilt ein eigenes Timeout von 30 s (`OVERPASS_TIMEOUT`), weil die Abfrage
+    intern mit `[timeout:25]` läuft und damit über dem globalen 8-s-Client-Timeout liegt.
 - **Energie (LFH-81) ist hybrid**, weil keine der beiden Quellen allein trägt. Gemessen am
   21.09.2026: das Marktstammdatenregister veröffentlicht für konventionelle Großkraftwerke
   **keine Koordinaten** (über 50 MW: 0 von 202 Erdgas-, 0 von 100 Kohle-, 0 von 25

@@ -234,6 +234,36 @@ leer.
 - `FachebenenInspector`: ein eigener Zweig `EnergieInhalt`, **vor** dem Rückfall auf
   KRITIS.
 
+**Nachtrag nach dem Merge mit LFH-83 (21.09.2026).** LFH-83 hat KRITIS parallel auf einen
+periodisch importierten OSM-Extrakt umgestellt: KRITIS fragt in **jeder** Zoomstufe, ohne
+Größengrenze, bündelt auf der Karte, akkumuliert **nicht** mehr und läuft als eigenes
+`useQuery` (in `useQueries` griff `keepPreviousData` beim Schlüsselwechsel nicht). Von der
+Verallgemeinerung oben bleibt:
+
+- **Ein** Viewport-State `viewportBbox` und `braucheViewportBbox` — unverändert, und beide
+  bbox-Ebenen teilen sich denselben, bereits gerasterten Ausschnitt (die Karte rastert EINMAL
+  über die Rasterleiter aus LFH-83, `LagekartePage.tsx`); ein zweites, energie-eigenes Gitter
+  ist bewusst **nicht** entstanden — zwei getrennte States könnten nur auseinanderlaufen, und
+  die Größengrenze (s. u.) fängt den Fall ab, in dem die Leiterstufe für Energie zu grob wäre.
+- Der Mindest-Zoom ist ein Registry-Feld `minZoom` und steht **nur an Energie**
+  (`BBOX_MIN_ZOOM` = 10, Name beibehalten). Die Karte meldet Zoom und bbox in jeder
+  Zoomstufe; das Gate sitzt jetzt in `useFachebenen` — unter `minZoom` (oder ohne gemeldeten
+  Zoom) bleibt die Energie-Query über `enabled: false` aus, ohne eigenen Schlüsselzustand.
+- `zoomZuKlein` bleibt ein Record je Quelle, wird aber nur für Ebenen mit `minZoom`
+  gefüllt. KRITIS bekommt keinen Hinweis mehr (Spec LFH-83: Bündel statt „näher
+  heranzoomen").
+- Die **Akkumulation** gilt nur noch für Energie (`mergeEnergieFeatures`, 2000);
+  `mergeFeatures` (KRITIS, first-wins) ist entfallen. Energie läuft als eigenes `useQuery`
+  neben KRITIS statt im `useQueries`-Tupel — dieselbe Begründung wie bei KRITIS oben
+  (`keepPreviousData` griffe bei wechselndem Schlüssel nicht).
+- Die **Größengrenze** ist aus `Bbox::parse` in `quellen::pruefe_energie_bbox` gewandert und
+  gilt nur noch für Energie. Sie ist dabei von 1° auf **3°** gestiegen: bei Zoom 10 ist ein
+  Grad rund 1456 px breit, auf einem 1920-px-Schirm stand die Ebene mit 1° leer auf
+  „offline“. Das Frontend prüft dieselbe Spanne vorab (`energieAusschnittPasst` in
+  `pages/lagekarte/fachebenen.ts`) und zeigt dann den Zoom-Hinweis; `hole_overpass` wird
+  weiterhin nur von Energie genutzt, der KRITIS-Cache-Schlüssel `Bbox::cache_key` ist
+  entfallen.
+
 ### 7. Persistenz: Aufzählung statt Spread
 
 `defaultFachebenenSichtbar()` bekommt `energie: false`, `leseFachebenen()` eine Zeile

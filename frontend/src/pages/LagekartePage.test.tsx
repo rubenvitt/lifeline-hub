@@ -26,7 +26,17 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
       {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
           Auslöser, der einen Ausschnitt meldet wie die echte Karte nach `moveend`. */}
       <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
-      <button onClick={() => props.onBboxAenderung?.('7.01,51.51,7.12,51.58')}>bbox-melden</button>
+      {/* Die echte Karte meldet Zoom und bbox im selben Zug (`Kartenflaeche.tsx`, `verarbeite`)
+          — der Stub tut das nachgebildet, sonst bliebe eine zoom-gebundene Ebene (Energie,
+          LFH-81) ohne je gemeldeten Zoom fälschlich aus. */}
+      <button
+        onClick={() => {
+          props.onZoomAenderung?.(10);
+          props.onBboxAenderung?.('7.01,51.51,7.12,51.58');
+        }}
+      >
+        bbox-melden
+      </button>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>

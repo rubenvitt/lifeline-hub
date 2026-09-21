@@ -581,13 +581,17 @@ describe('useFachebenen', () => {
     }
   });
 
-  it('meldet den Zoom-Hinweis für KRITIS unterhalb des Mindest-Zooms', () => {
+  it('meldet für KRITIS in keiner Zoomstufe einen Zoom-Hinweis (LFH-83)', () => {
+    // KRITIS fragt seit LFH-83 in JEDER Zoomstufe den Extrakt-Bestand (gebündelt ab 5000
+    // Objekten) — anders als vor LFH-81/83, als dieselbe `BBOX_MIN_ZOOM`-Schwelle noch für
+    // alle bbox-abhängigen Ebenen galt. Die Schwelle gilt seither nur für Ebenen mit eigenem
+    // `minZoom` in der Registry, und KRITIS trägt keinen.
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('kritis', true));
     act(() => result.current.setKartenZoom(5));
-    expect(result.current.zoomZuKlein.kritis).toBe(true);
+    expect(result.current.zoomZuKlein.kritis).toBeFalsy();
     act(() => result.current.setKartenZoom(12));
-    expect(result.current.zoomZuKlein.kritis).toBe(false);
+    expect(result.current.zoomZuKlein.kritis).toBeFalsy();
   });
 
   it('meldet den Zoom-Hinweis auch für die Energieanlagen, KRITIS bleibt aus (LFH-81)', () => {
@@ -613,6 +617,7 @@ describe('useFachebenen', () => {
     lade.mockClear();
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
     // Ohne bbox keine Abfrage — die Ebene ist bbox-abhängig wie KRITIS.
     expect(lade.mock.calls.filter(([q]) => q === 'energie')).toHaveLength(0);
     act(() => result.current.setViewportBbox('bbox1'));
@@ -644,6 +649,7 @@ describe('useFachebenen', () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('kritis', true));
     act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
     act(() => result.current.setViewportBbox('bbox1'));
     await waitFor(() => {
       expect(
@@ -657,9 +663,61 @@ describe('useFachebenen', () => {
     expect(kritis?.daten.features[0].geometry?.coordinates).toEqual([10, 51]);
   });
 
+  it('fragt die Energieanlagen unter dem Mindest-Zoom nicht ab, auch mit bbox (LFH-81)', async () => {
+    // Seit LFH-83 meldet die Karte den Ausschnitt in JEDER Zoomstufe (KRITIS braucht ihn
+    // dort). Die Energie-Ebene fragt Overpass live und braucht deshalb weiterhin ihren
+    // eigenen Mindest-Zoom — das Gate sitzt im Hook, nicht mehr an der Karte.
+    const lade = vi.mocked(ladeFachebene);
+    lade.mockClear();
+    const { result } = rendere();
+    const energieRufe = () => lade.mock.calls.filter(([q]) => q === 'energie');
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(9));
+    act(() => result.current.setViewportBbox('7.01,51.51,7.12,51.58'));
+    // Ein Zyklus Zeit, damit eine fälschlich aktivierte Query hier auch wirklich feuerte.
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(energieRufe()).toHaveLength(0);
+    expect(result.current.zoomZuKlein.energie).toBe(true);
+    // Gegenaussage: ab Zoom 10 geht dieselbe (einzige, geteilte) bbox unverändert raus.
+    act(() => result.current.setKartenZoom(10));
+    await waitFor(() => expect(energieRufe()).toHaveLength(1));
+    expect(energieRufe()[0][1]).toBe('7.01,51.51,7.12,51.58');
+  });
+
+  it('fragt Energie auf breitem Schirm ab Zoom 10 ab, bremst aber einen zu großen Ausschnitt (LFH-81)', async () => {
+    // Bei Zoom 10 ist ein Grad rund 1456 px breit — ab etwa 1920 px Bildschirm war der
+    // Ausschnitt größer als die frühere 1°-Grenze, und die Ebene stand leer auf „offline".
+    const lade = vi.mocked(ladeFachebene);
+    lade.mockClear();
+    const { result } = rendere();
+    const energieRufe = () => lade.mock.calls.filter(([q]) => q === 'energie');
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
+    // 3,6° breit: über der Grenze → keine Abfrage, dafür der Hinweis.
+    act(() => result.current.setViewportBbox('5.0,50.0,8.6,51.0'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(energieRufe()).toHaveLength(0);
+    expect(result.current.zoomZuKlein.energie).toBe(true);
+    // 1,6° breit (1920-px-Schirm bei Zoom 10): geht raus, kein Hinweis.
+    act(() => result.current.setViewportBbox('6.2,51.2,7.8,51.8'));
+    await waitFor(() => expect(energieRufe()).toHaveLength(1));
+    expect(result.current.zoomZuKlein.energie).toBe(false);
+  });
+
+  it('ein Ausschnitt ohne gemeldeten Zoom schaltet die Energie-Abfrage nicht frei', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    lade.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setViewportBbox('bbox1'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(lade.mock.calls.filter(([q]) => q === 'energie')).toHaveLength(0);
+  });
+
   it('hält die aktiveFachebenen-Referenz auch mit aktiver Energie-Ebene stabil', async () => {
     const { result, rerender } = rendere();
     act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
     act(() => result.current.setViewportBbox('bbox1'));
     await waitFor(() =>
       expect(
@@ -675,6 +733,7 @@ describe('useFachebenen', () => {
     const OSM = '© OpenStreetMap-Beitragende (ODbL)';
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
     act(() => result.current.setViewportBbox('bbox-mastr'));
     await waitFor(() => expect(result.current.fachebenenAttribution.join(' · ')).toContain(MASTR));
 
@@ -694,6 +753,7 @@ describe('useFachebenen', () => {
   it('nennt MaStR nicht, solange kein MaStR-Punkt gesammelt ist (LFH-81)', async () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
     act(() => result.current.setViewportBbox('bbox-osm'));
     await waitFor(() =>
       expect(
