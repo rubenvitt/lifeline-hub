@@ -258,10 +258,14 @@ const ODL_ZAHL = new Intl.NumberFormat('de-DE', {
   maximumFractionDigits: 3,
 });
 
-/** Faktor mit einer Nachkommastelle („3,2 ×"). */
+/**
+ * Faktor mit ZWEI Nachkommastellen („1,52 ×"), so genau wie das Backend ihn liefert. Mit einer
+ * stünde „1,5 ×" sowohl neben „unauffällig" (1,48) als auch neben „erhöht" (1,52) — gerade im
+ * Regenfall, den der Hinweis erklären soll.
+ */
 const ODL_FAKTOR = new Intl.NumberFormat('de-DE', {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 /**
@@ -312,13 +316,17 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
       {grundlage.art === 'standort' ? (
         <Typography.Paragraph type="secondary" style={hinweisStil}>
           Einteilung des Lifeline Hub nach dem Grundpegel dieser Sonde (unteres Quartil der letzten
-          sieben Tage): ab 1,5 × erhöht, ab 3 × stark erhöht — den Faktor 3 nennt das BfS als Anlass
-          zur Besorgnis. Kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum
+          sieben Tage): über 1,5 × erhöht, über 3 × stark erhöht — den Faktor 3 nennt das BfS als
+          Anlass zur Besorgnis. Kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum
           Dreifachen anheben.
         </Typography.Paragraph>
       ) : (
         <Typography.Paragraph type="secondary" style={hinweisStil}>
-          {wert !== null && 'Für diese Sonde liegt noch kein Grundpegel vor. '}
+          {/* Nur wo ein Grundpegel überhaupt gälte: mit Messwert in µSv/h. Unter fremder Einheit
+              wird gar nicht bewertet, der Satz stimmte dort nicht. */}
+          {wert !== null &&
+            (s(p.einheit) ?? 'µSv/h') === 'µSv/h' &&
+            'Für diese Sonde liegt noch kein Grundpegel vor. '}
           Einteilung des Lifeline Hub nach dem vom BfS genannten natürlichen Bereich (0,05–0,2
           µSv/h) — kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum Dreifachen
           anheben.

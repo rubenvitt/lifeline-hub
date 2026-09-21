@@ -119,12 +119,15 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Das Quartil statt des Medians, weil es in einer mehrtägigen Lage später mitwandert (über
   fünf statt gut vier Tage), ohne Lage aber gemessen innerhalb von 1,5 % des Medians liegt.
   Eine **Sperrklinke** verwirft zusätzlich jede Neuberechnung, die den gespeicherten Pegel
-  einer Sonde um 1,5 × oder mehr anheben würde; der alte Pegel bleibt samt Stand stehen. Sie
-  kennt nur den gespeicherten Stand: räumt das Prune des Caches (2 Tage) ihn weg, weil so
-  lange niemand die Ebene abrief, trägt allein das Quartil.
+  einer Sonde um 1,5 × oder mehr anheben würde; der alte Pegel bleibt samt Stand stehen —
+  höchstens 14 Tage, danach wandert der Maßstab mit (sonst stünde etwa eine getauschte,
+  empfindlichere Sonde für immer auf „erhöht"). Ein schleichender Anstieg knapp unter 1,5 ×
+  je Tag kommt durch; das Quartil bremst ihn nur. Der Eintrag ist vom Prune des Caches
+  (2 Tage) **ausgenommen**, damit eine länger gestörte Zeitreihe ihn nicht wegräumt.
   Der Abruf läuft **nur im Hintergrund** (angestossen vom ODL-Abruf, TTL 24 h, eigene
   90-s-Schranke, eine Stunde Abkühlung nach Fehlschlag) und hält die Ebene nie auf; eine
-  unbrauchbare oder leere Antwort schreibt nichts (`karte::quellen::grundpegel_antwort`).
+  unbrauchbare, leere oder nur für weniger als die Hälfte der bekannten Sonden gefüllte
+  Antwort schreibt nichts (`karte::odl_grundpegel::neue_karte`).
   Abgelegt wird er im Fachebenen-Cache unter `odl:grundpegel`, bewertet wird bei Auslieferung
   (`karte::odl_grundpegel::bewerte`). Niederschlag rechnet die Ebene nicht heraus; der BfS
   führt dafür `odlinfo_timeseries_precipitation_15min`.

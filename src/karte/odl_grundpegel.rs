@@ -35,6 +35,12 @@ pub const FAKTOR_STARK: f64 = 3.0;
 /// wird verworfen. Dieselbe Schwelle wie `erhoeht` — ein Anstieg, der eine Sonde auffällig
 /// machte, ist in einer Lage genau das, was nicht in den Maßstab wandern darf.
 pub const SPERRKLINKE: f64 = FAKTOR_ERHOEHT;
+/// So lange hält die Sperrklinke einen Grundpegel über seinen Stand hinaus. Ohne Grenze
+/// hielte sie ihn für immer (der Eintrag wird täglich neu geschrieben und altert nie) — ein
+/// Sondentausch mit +50 % Empfindlichkeit stünde dann dauerhaft auf `erhoeht`. Vierzehn Tage
+/// decken eine mehrtägige Lage reichlich ab; dauert eine Lage länger, wandert der Maßstab ab
+/// dann mit, und der Stand im Inspector zeigt, seit wann er gilt.
+pub const SPERRKLINKE_HOECHSTALTER_TAGE: i64 = 14;
 
 const EINHEIT: &str = "µSv/h";
 const GLEITKOMMA_TOLERANZ: f64 = 1e-9;
@@ -60,7 +66,7 @@ pub fn iso_utc(t: DateTime<Utc>) -> String {
 
 /// Stichproben-Zeitpunkte (`end_measure`) für den Abruf, jüngster zuerst.
 ///
-/// Start ist die letzte volle Rasterstunde VOR `jetzt − 1 h`: der Stundenwert der gerade
+/// Start ist die letzte volle Rasterstunde an oder vor `jetzt − 1 h`: der Stundenwert der gerade
 /// abgelaufenen Stunde ist gemessen noch nicht für alle Sonden veröffentlicht.
 pub fn zeitpunkte(jetzt: DateTime<Utc>) -> Vec<DateTime<Utc>> {
     let basis = jetzt - Duration::hours(1);
@@ -148,30 +154,62 @@ pub fn berechne(roh: &Value) -> BTreeMap<String, (f64, usize)> {
 /// Neue Berechnung gegen den gespeicherten Stand abgleichen (Sperrklinke).
 ///
 /// Steigt eine Sonde um [`SPERRKLINKE`] oder mehr, bleibt ihr alter Eintrag samt `stand`
-/// stehen. Sinken und leichtes Steigen werden übernommen. Eine Sonde, die in der neuen
-/// Berechnung fehlt (zu wenige Werte), fällt heraus — sie wird dann absolut bewertet, wie es
-/// die Spec für „zu wenig Historie" verlangt.
+/// stehen — höchstens [`SPERRKLINKE_HOECHSTALTER_TAGE`] über diesen Stand hinaus. Sinken und
+/// leichtes Steigen werden übernommen; ein schleichender Anstieg knapp unter 1,5 × je Tag
+/// kommt also durch, das Quartil bremst ihn nur. Eine Sonde, die in der neuen Berechnung
+/// fehlt (zu wenige Werte), fällt heraus — sie wird dann absolut bewertet, wie es die Spec
+/// für „zu wenig Historie" verlangt.
 pub fn uebernimm(
     neu: BTreeMap<String, (f64, usize)>,
     alt: &GrundpegelKarte,
-    stand: &str,
+    jetzt: DateTime<Utc>,
 ) -> GrundpegelKarte {
+    let stand = iso_utc(jetzt);
+    // `stand` hat festes Format (`iso_utc`), der Vergleich als Zeichenkette ist also einer
+    // der Zeitpunkte.
+    let haltbar_ab = iso_utc(jetzt - Duration::days(SPERRKLINKE_HOECHSTALTER_TAGE));
     neu.into_iter()
         .map(|(k, (pegel, n))| {
             let eintrag = match alt.get(&k) {
                 // Toleranz statt blankem `>=`: 1,5 × 0,1 ergibt 0,150…02, und genau 0,15 soll
                 // laut Spec („das 1,5-Fache oder mehr") verworfen werden. Die Quelle liefert
                 // drei Nachkommastellen, 1e-9 verschiebt also keinen echten Wert.
-                Some(a) if pegel >= SPERRKLINKE * a.pegel - GLEITKOMMA_TOLERANZ => a.clone(),
+                Some(a)
+                    if pegel >= SPERRKLINKE * a.pegel - GLEITKOMMA_TOLERANZ
+                        && a.stand > haltbar_ab =>
+                {
+                    a.clone()
+                }
                 _ => Grundpegel {
                     pegel,
                     n,
-                    stand: stand.to_string(),
+                    stand: stand.clone(),
                 },
             };
             (k, eintrag)
         })
         .collect()
+}
+
+/// Rohe Zeitreihe + gespeicherter Stand → zu schreibende Karte, oder `None`, wenn NICHTS
+/// geschrieben werden darf. Der reine Kern der täglichen Erneuerung.
+///
+/// `None` bei einer Antwort ohne `features`-Liste (Formatbruch), bei einer, die keinen
+/// einzigen Pegel trägt (leere Liste, gekürzte Aufbewahrung), und bei einer, die weniger als
+/// die HÄLFTE der bisher bekannten Sonden trägt (etwa ein serverseitiges Feature-Limit). In
+/// allen drei Fällen löschte ein Schreiben den gespeicherten Grundpegel samt Sperrklinke,
+/// statt ihn stehen zu lassen.
+pub fn neue_karte(
+    roh: &Value,
+    alt: &GrundpegelKarte,
+    jetzt: DateTime<Utc>,
+) -> Option<GrundpegelKarte> {
+    roh.get("features").filter(|f| f.is_array())?;
+    let neu = berechne(roh);
+    if neu.is_empty() || neu.len() * 2 < alt.len() {
+        return None;
+    }
+    Some(uebernimm(neu, alt, jetzt))
 }
 
 /// Stufe aus Messwert und Grundpegel; die Grenze gehört zur unteren Stufe. Verglichen wird
@@ -347,19 +385,24 @@ mod tests {
         BTreeMap::from([("A".to_string(), (pegel, 26))])
     }
 
+    /// Einen Tag nach dem Stand von [`alt`].
+    fn morgen() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 9, 21, 12, 0, 0).unwrap()
+    }
+
     #[test]
     fn mehrtaegige_erhoehung_wandert_nicht_in_den_grundpegel() {
-        let k = uebernimm(neu(0.16), &alt(0.1), "2026-09-21T12:00:00Z");
+        let k = uebernimm(neu(0.16), &alt(0.1), morgen());
         assert_eq!(k["A"], alt(0.1)["A"], "alter Pegel samt altem Stand");
         // Grenzfall: genau 1,5 × wird ebenfalls verworfen.
-        let k = uebernimm(neu(0.15), &alt(0.1), "2026-09-21T12:00:00Z");
+        let k = uebernimm(neu(0.15), &alt(0.1), morgen());
         assert_eq!(k["A"].pegel, 0.1);
     }
 
     #[test]
     fn leichte_verschiebung_und_sinken_werden_uebernommen() {
         for p in [0.12, 0.08] {
-            let k = uebernimm(neu(p), &alt(0.1), "2026-09-21T12:00:00Z");
+            let k = uebernimm(neu(p), &alt(0.1), morgen());
             assert_eq!(
                 k["A"],
                 Grundpegel {
@@ -372,10 +415,56 @@ mod tests {
     }
 
     #[test]
+    fn sperrklinke_haelt_hoechstens_vierzehn_tage() {
+        // Stand 20.09. 12:00 → gehalten bis einschliesslich knapp vor 04.10. 12:00.
+        let noch = Utc.with_ymd_and_hms(2026, 10, 4, 11, 59, 59).unwrap();
+        assert_eq!(uebernimm(neu(0.16), &alt(0.1), noch)["A"].pegel, 0.1);
+        let vorbei = Utc.with_ymd_and_hms(2026, 10, 4, 12, 0, 0).unwrap();
+        let k = uebernimm(neu(0.16), &alt(0.1), vorbei);
+        assert_eq!(k["A"].pegel, 0.16, "nach 14 Tagen wandert der Maßstab mit");
+        assert_eq!(k["A"].stand, "2026-10-04T12:00:00Z");
+    }
+
+    #[test]
+    fn neue_karte_schreibt_nichts_bei_bruch_leere_oder_teilantwort() {
+        let voll = roh(reihe("A", &[0.1; 20]));
+        assert_eq!(
+            neue_karte(&voll, &BTreeMap::new(), morgen()).unwrap()["A"].pegel,
+            0.1
+        );
+        for r in [
+            json!({ "exceptions": [] }),
+            json!({ "features": "x" }),
+            roh(vec![]),
+        ] {
+            assert!(neue_karte(&r, &BTreeMap::new(), morgen()).is_none(), "{r}");
+        }
+        // Zu wenige Werte → kein Pegel → nichts schreiben (statt die Karte zu leeren).
+        assert!(neue_karte(&roh(reihe("A", &[0.1; 19])), &alt(0.1), morgen()).is_none());
+        // Teilantwort: 1 Sonde gegen bisher 3 → weniger als die Hälfte → nicht schreiben.
+        let mut drei = alt(0.1);
+        for k in ["B", "C"] {
+            drei.insert(k.into(), drei["A"].clone());
+        }
+        assert!(neue_karte(&voll, &drei, morgen()).is_none());
+        // 2 von 3 reicht.
+        let mut f = reihe("A", &[0.1; 20]);
+        f.extend(reihe("B", &[0.1; 20]));
+        assert_eq!(neue_karte(&roh(f), &drei, morgen()).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn neue_karte_wendet_die_sperrklinke_gegen_den_gespeicherten_stand_an() {
+        let lage = roh(reihe("A", &[0.2; 20]));
+        let k = neue_karte(&lage, &alt(0.1), morgen()).unwrap();
+        assert_eq!(k["A"], alt(0.1)["A"]);
+    }
+
+    #[test]
     fn ohne_alten_stand_wird_uebernommen_und_fehlende_sonde_faellt_heraus() {
-        let k = uebernimm(neu(0.5), &BTreeMap::new(), "S");
+        let k = uebernimm(neu(0.5), &BTreeMap::new(), morgen());
         assert_eq!(k["A"].pegel, 0.5);
-        let k = uebernimm(BTreeMap::new(), &alt(0.1), "S");
+        let k = uebernimm(BTreeMap::new(), &alt(0.1), morgen());
         assert!(k.is_empty());
     }
 

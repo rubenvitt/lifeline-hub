@@ -16,6 +16,13 @@ use sqlx::SqlitePool;
 /// ohne gültiges Stale-Serving zu verlieren.
 const MAX_ALTER_SEKUNDEN: i64 = 2 * 24 * 3600;
 
+/// Vom Prune ausgenommen: der ODL-Grundpegel (LFH-598). Er wird nur geschrieben, wenn die
+/// BfS-Zeitreihe brauchbar antwortet; jeder andere Schreibvorgang (der `odl`-Eintrag alle
+/// zehn Minuten) löste sonst das Prune aus. Nach zwei Tagen gestörter Zeitreihe wäre er
+/// weg — samt Sperrklinken-Gedächtnis —, obwohl die Spec verlangt, ihn weiterzuverwenden.
+/// Ein Eintrag, ~100 KB; er wächst nicht.
+const DAUERHAFT: &str = crate::karte::odl_grundpegel::CACHE_SCHLUESSEL;
+
 fn deserialisiere(json: &str) -> Option<FachebeneAntwort> {
     match serde_json::from_str(json) {
         Ok(a) => Some(a),
@@ -123,11 +130,15 @@ pub async fn setze_wert<T: Serialize + ?Sized>(
         return false;
     }
     // Prune-on-Write: überalterte Einträge entfernen (begrenzt die Tabelle dauerhaft).
-    if let Err(e) =
-        sqlx::query("DELETE FROM fachebenen_cache WHERE unixepoch() - gespeichert_at > ?")
-            .bind(MAX_ALTER_SEKUNDEN)
-            .execute(pool)
-            .await
+    // Ausgenommen sind die DAUERHAFTEN Schlüssel (s. dort).
+    if let Err(e) = sqlx::query(
+        "DELETE FROM fachebenen_cache WHERE unixepoch() - gespeichert_at > ? \
+         AND schluessel <> ?",
+    )
+    .bind(MAX_ALTER_SEKUNDEN)
+    .bind(DAUERHAFT)
+    .execute(pool)
+    .await
     {
         tracing::warn!("Fachebenen-Cache: Prune fehlgeschlagen: {e}");
     }
@@ -266,5 +277,25 @@ mod tests {
         assert!(eintrag_wert::<BTreeMap<String, f64>>(&pool, "fehlt")
             .await
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn prune_verschont_den_odl_grundpegel() {
+        let pool = crate::db::test_pool().await;
+        setze_wert(&pool, "odl:grundpegel", &serde_json::json!({})).await;
+        setze(&pool, "dwd", &antwort()).await;
+        sqlx::query("UPDATE fachebenen_cache SET gespeichert_at = unixepoch() - 30 * 86400")
+            .execute(&pool)
+            .await
+            .unwrap();
+        // Irgendein Schreibvorgang löst das Prune aus.
+        setze(&pool, "nina", &antwort()).await;
+        assert!(stale(&pool, "dwd").await.is_none(), "Prune läuft");
+        assert!(
+            eintrag_wert::<serde_json::Value>(&pool, "odl:grundpegel")
+                .await
+                .is_some(),
+            "der Grundpegel überlebt"
+        );
     }
 }

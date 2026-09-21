@@ -84,11 +84,16 @@ Grundlagen-Wörter sind Teil der Schnittstelle und MUST beidseitig gepinnt sein.
 Das System SHALL den Grundpegel einer Sonde höchstens einmal täglich neu berechnen. Würde
 eine Neuberechnung den bisher gespeicherten Grundpegel einer Sonde auf das 1,5-Fache oder
 mehr anheben, MUST das System die Neuberechnung für diese Sonde verwerfen und den bisherigen
-Grundpegel samt seinem Stand beibehalten.
+Grundpegel samt seinem Stand beibehalten — höchstens 14 Tage über diesen Stand hinaus; danach
+SHALL die Neuberechnung übernommen werden.
 
 #### Scenario: Mehrtägige Erhöhung
 - **WHEN** eine Sonde mit gespeichertem Grundpegel 0,1 µSv/h über mehrere Tage erhöht misst und die Neuberechnung 0,16 µSv/h ergäbe
 - **THEN** bleibt ihr Grundpegel 0,1 µSv/h mit dem bisherigen Stand, und der Faktor wird weiter gegen 0,1 µSv/h gebildet
+
+#### Scenario: Gehaltener Grundpegel nach 14 Tagen
+- **WHEN** ein Grundpegel seit 14 Tagen gegen höhere Neuberechnungen gehalten wird
+- **THEN** übernimmt das System die nächste Neuberechnung mit neuem Stand
 
 #### Scenario: Leichte Verschiebung des Grundpegels
 - **WHEN** die Neuberechnung für eine Sonde mit gespeichertem Grundpegel 0,1 µSv/h 0,12 µSv/h ergibt
@@ -97,9 +102,10 @@ Grundpegel samt seinem Stand beibehalten.
 ### Requirement: Ausfall der Zeitreihe bricht die Ebene nicht
 Die Berechnung des Grundpegels SHALL die Auslieferung der ODL-Ebene weder verzögern noch
 verhindern: die Route MUST ihre Antwort nicht auf den Abruf der Zeitreihe warten lassen.
-Ist die Zeitreihe nicht erreichbar oder unbrauchbar, SHALL das System einen früher
-berechneten Grundpegel weiterverwenden, sonst nach den festen Bändern bewerten, und MUST
-dabei keinen 5xx-Fehler liefern.
+Ist die Zeitreihe nicht erreichbar oder unbrauchbar — dazu zählt eine Antwort, die keinen
+einzigen Grundpegel oder weniger als halb so viele Sonden wie der gespeicherte Stand trägt —,
+SHALL das System einen früher berechneten Grundpegel unbefristet weiterverwenden, sonst nach
+den festen Bändern bewerten, und MUST dabei keinen 5xx-Fehler liefern.
 
 #### Scenario: Zeitreihe weg beim ersten Start
 - **WHEN** die ODL-Ebene zum ersten Mal abgerufen wird und die BfS-Zeitreihe nicht antwortet
@@ -107,4 +113,8 @@ dabei keinen 5xx-Fehler liefern.
 
 #### Scenario: Zeitreihe weg, alter Grundpegel vorhanden
 - **WHEN** die tägliche Neuberechnung scheitert, aber ein früher berechneter Grundpegel gespeichert ist
-- **THEN** werden die Sonden weiter gegen diesen Grundpegel bewertet
+- **THEN** werden die Sonden weiter gegen diesen Grundpegel bewertet, auch wenn die Störung länger als zwei Tage dauert
+
+#### Scenario: Teilantwort der Zeitreihe
+- **WHEN** die Zeitreihe Werte für weniger als die Hälfte der Sonden liefert, für die ein Grundpegel gespeichert ist
+- **THEN** bleibt der gespeicherte Grundpegel unverändert

@@ -278,29 +278,20 @@ async fn erneuere_grundpegel(client: reqwest::Client, pool: SqlitePool) -> bool 
             return false;
         }
     };
-    let Some(neu) = grundpegel_antwort(&roh) else {
-        tracing::warn!("BfS-ODL-Zeitreihe ohne brauchbare Werte — alter Grundpegel bleibt");
-        return false;
-    };
     let alt = cache::eintrag_wert::<GrundpegelKarte>(&pool, odl_grundpegel::CACHE_SCHLUESSEL)
         .await
         .map(|(k, _)| k)
         .unwrap_or_default();
-    let karte = odl_grundpegel::uebernimm(neu, &alt, &odl_grundpegel::iso_utc(jetzt));
+    let Some(karte) = odl_grundpegel::neue_karte(&roh, &alt, jetzt) else {
+        tracing::warn!(
+            "BfS-ODL-Zeitreihe unbrauchbar (Formatbruch, leer oder weniger als die Hälfte der \
+             {} bekannten Sonden) — alter Grundpegel bleibt",
+            alt.len()
+        );
+        return false;
+    };
     tracing::info!("ODL-Grundpegel für {} Sonden berechnet", karte.len());
     cache::setze_wert(&pool, odl_grundpegel::CACHE_SCHLUESSEL, &karte).await
-}
-
-/// Rohe Zeitreihe → neue Grundpegel, oder `None`, wenn die Antwort keinen einzigen trägt.
-/// Rein, Muster [`odl_antwort`]: wer `None` bekommt, schreibt nichts — und zwar auch bei
-/// einer formal gültigen, aber leeren Liste. Sonst löschte eine Störung der Quelle (Report
-/// mit `features: []`, gekürzte Aufbewahrung) den ganzen gespeicherten Grundpegel samt
-/// Sperrklinke, statt ihn stehen zu lassen.
-pub(crate) fn grundpegel_antwort(
-    roh: &Value,
-) -> Option<std::collections::BTreeMap<String, (f64, usize)>> {
-    roh.get("features").filter(|f| f.is_array())?;
-    Some(odl_grundpegel::berechne(roh)).filter(|k| !k.is_empty())
 }
 
 async fn erneuere_odl(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
@@ -1238,24 +1229,6 @@ mod odl_antwort_tests {
         assert_eq!(a.quelle, "odl");
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
         assert_eq!(a.attribution, ODL_ATTRIB);
-    }
-
-    #[test]
-    fn grundpegel_antwort_schreibt_nur_mit_mindestens_einem_pegel() {
-        let werte: Vec<_> = (0..20)
-            .map(|_| json!({ "properties": { "id": "A", "value": 0.1 } }))
-            .collect();
-        let k = grundpegel_antwort(&json!({ "features": werte })).expect("brauchbar");
-        assert_eq!(k["A"], (0.1, 20));
-        // Formatbruch UND leere Liste: beide lassen den alten Grundpegel stehen.
-        for roh in [
-            json!({ "exceptions": [] }),
-            json!({ "features": "x" }),
-            json!({ "features": [] }),
-            json!({ "features": [{ "properties": { "id": "A", "value": 0.1 } }] }),
-        ] {
-            assert!(grundpegel_antwort(&roh).is_none(), "{roh}");
-        }
     }
 
     #[test]

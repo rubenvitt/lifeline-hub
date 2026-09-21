@@ -84,16 +84,28 @@ Der sichtbare Stand im Inspector zeigt dann, dass ein Grundpegel älter ist als 
 **Verworfen:** *festes Einfrieren* auf Knopfdruck/Einsatzbeginn — braucht eine Bedienung und
 eine Instanz-weite Frage „wer friert ein?"; *Fenster ohne die letzten 24 h* — verschiebt
 das Problem um einen Tag.
-**Grenze:** die Sperrklinke kennt nur den zuletzt gespeicherten Stand. Räumt das Prune
-(`cache::MAX_ALTER_SEKUNDEN`, 2 Tage) den Eintrag weg, weil zwei Tage niemand die Ebene
-abrief, beginnt die nächste Berechnung ohne Gedächtnis — dann trägt allein das Quartil.
+**Höchstens 14 Tage** (Nachtrag aus dem Review): ohne Grenze hielte die Sperrklinke einen
+Pegel für immer — der Eintrag wird täglich neu geschrieben und altert nie, ein Sondentausch
+mit +50 % stünde dauerhaft auf `erhoeht`. Nach 14 Tagen über seinen Stand hinaus wird die
+Neuberechnung übernommen; eine längere Lage zieht den Maßstab ab dann mit, der Stand im
+Inspector zeigt, seit wann er gilt. **Schleichender Anstieg** knapp unter 1,5 × je Tag kommt
+durch, das Quartil bremst ihn nur — bewusst hingenommen.
+**Grenze:** die Sperrklinke kennt nur den zuletzt gespeicherten Stand; der Eintrag ist
+deshalb vom Prune ausgenommen (Decision 4).
 
 ### 4. Ablage: eigener Schlüssel `odl:grundpegel` im bestehenden Cache, TTL 24 h
 Ein JSON-Objekt `{ kennung → { pegel, n, stand } }` (~1 600 Einträge, ~100 KB) unter
 eigenem Schlüssel in `fachebenen_cache`. `FachebeneAntwort` ist dafür der falsche Umschlag;
 `cache.rs` bekommt ein generisches Lese-/Schreibpaar für serialisierbare Werte auf derselben
-Tabelle (die Spalte ist ohnehin JSON-Text). **Keine Migration.** 24 h liegen unter dem
-Prune-Alter von 2 Tagen; ein Eintrag, der täglich erneuert wird, überlebt also.
+Tabelle (die Spalte ist ohnehin JSON-Text). **Keine Migration.**
+**Vom Prune ausgenommen** (Nachtrag aus dem Review): das Prune-on-Write räumt alles über
+2 Tage, und der `odl`-Eintrag wird alle zehn Minuten geschrieben. Wäre die Zeitreihe länger
+als zwei Tage gestört, während `_latest` antwortet, verschwände der Grundpegel samt
+Sperrklinken-Gedächtnis — gegen die Spec („früher berechneten Grundpegel weiterverwenden").
+Ein Eintrag, ~100 KB, er wächst nicht.
+**Nichts schreiben** bei Formatbruch, bei keinem einzigen Pegel und bei weniger als der
+Hälfte der bisher bekannten Sonden (etwa ein serverseitiges Feature-Limit) — reiner Kern
+`odl_grundpegel::neue_karte`.
 **Verworfen:** eigene Tabelle `odl_grundpegel` — mehr Bau für dieselbe Aussage, und LFH-78
 war ausdrücklich „ohne neuen Mechanismus".
 
@@ -153,8 +165,8 @@ Faktor 3,2 falsch. Neu: `normal` „unauffällig", `erhoeht` „erhöht", `stark
 „stark erhöht" (`keine_messung` bleibt „keine Messung"). Rollen unverändert. Der Maßstab
 wandert in den Inspector:
 - **standort:** Zeilen „Grundpegel" (drei Nachkommastellen, µSv/h, „Stand <Datum>") und
-  „Faktor" („1,8 ×", eine Nachkommastelle). Hinweis: Einteilung des Lifeline Hub — ab
-  1,5 × Grundpegel erhöht, ab 3 × stark erhöht (Faktor 3 nennt das BfS als Anlass zur
+  „Faktor" („1,82 ×", zwei Nachkommastellen — mit einer stünde „1,5 ×" neben beiden Stufen).
+  Hinweis: Einteilung des Lifeline Hub — über 1,5 × Grundpegel erhöht, über 3 × stark erhöht (Faktor 3 nennt das BfS als Anlass zur
   Besorgnis), kein amtlicher Schwellenwert; Grundpegel = unteres Quartil der letzten sieben
   Tage; Regen kann Werte kurzzeitig bis zum Dreifachen anheben.
 - **absolut:** Satz „Für diese Sonde liegt noch kein Grundpegel vor." plus der bisherige
@@ -169,11 +181,11 @@ Test prüft sie gegen den Backend-Pin.
 - [BfS kürzt die Aufbewahrung oder ändert den Layer] → Mindestzahl 20 fängt ein kürzeres
   Fenster ab (Sonden fallen auf `absolut`), Formatbruch → alter Grundpegel bleibt, Log.
 - [Sperrklinke hält einen legitim gestiegenen Grundpegel fest (z. B. Sondentausch mit
-  anderer Empfindlichkeit, +50 %)] → die Sonde steht dann dauerhaft auf `erhoeht`, bis der
-  Eintrag altert; sichtbar am alten Stand im Inspector. Akzeptiert: in die falsche Richtung
-  ist „zu empfindlich" die sichere Seite.
-- [Nach zwei Tagen ohne Abruf fehlt der Sperrklinke das Gedächtnis] → Decision 3, Grenze;
-  das Quartil trägt bis ~5 Tage Lage.
+  anderer Empfindlichkeit, +50 %)] → die Sonde steht bis zu 14 Tage auf `erhoeht`; sichtbar
+  am alten Stand im Inspector. Akzeptiert: in die falsche Richtung ist „zu empfindlich" die
+  sichere Seite.
+- [Dauerhaft unbrauchbare Zeitreihe] → stündlich ein Versuch (~8,6 MB, Abkühlung 1 h); der
+  alte Grundpegel bleibt stehen. Ein längerer Backoff wäre eine eigene Entscheidung.
 - [Zwei Grundlagen nebeneinander auf einer Karte (Kaltstart, junge Sonden)] → Farbe und
   Wort bedeuten in beiden „auffällig oder nicht"; der Maßstab steht je Sonde im Inspector.
 

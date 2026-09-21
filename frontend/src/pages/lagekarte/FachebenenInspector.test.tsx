@@ -82,13 +82,32 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('Grundpegel')).toBeInTheDocument();
     // Stand als taktische DTG in der Anzeigezone: 12:00 UTC = 14:00 MESZ.
     expect(screen.getByText('0,060 µSv/h (Stand 211400SEP2026)')).toBeInTheDocument();
-    expect(screen.getByText('3,2 ×')).toBeInTheDocument();
+    expect(screen.getByText('3,17 ×')).toBeInTheDocument();
     // Die Schwellen als LITERALE — sie stehen im Backend (`FAKTOR_ERHOEHT`/`FAKTOR_STARK`)
     // und in der Spec; zurückgelesen aus einer Konstante prüfte der Test sich selbst.
-    expect(screen.getByText(/ab 1,5 × erhöht, ab 3 × stark erhöht/)).toBeInTheDocument();
+    // „über", nicht „ab": genau 1,5 × ist noch `normal`, genau 3 × noch `erhoeht` (Spec).
+    expect(screen.getByText(/über 1,5 × erhöht, über 3 × stark erhöht/)).toBeInTheDocument();
     expect(screen.getByText(/kein amtlicher Schwellenwert/i)).toBeInTheDocument();
     // Der Bänder-Maßstab gilt für diese Sonde NICHT und wird deshalb nicht genannt.
     expect(screen.queryByText(/natürlichen Bereich/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/noch kein Grundpegel/)).not.toBeInTheDocument();
+  });
+
+  it('ODL: unter fremder Einheit behauptet der Inspector keinen fehlenden Grundpegel (LFH-598)', () => {
+    render(
+      <FachebenenInspector
+        quelle="odl"
+        properties={{
+          titel: 'X',
+          wert: 115,
+          einheit: 'nSv/h',
+          stufe: 'keine_messung',
+          bewertung: 'absolut',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('115,000 nSv/h')).toBeInTheDocument();
     expect(screen.queryByText(/noch kein Grundpegel/)).not.toBeInTheDocument();
   });
 
