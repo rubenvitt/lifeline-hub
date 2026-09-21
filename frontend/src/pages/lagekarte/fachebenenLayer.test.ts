@@ -47,6 +47,18 @@ describe('fachebenenLayer', () => {
     expect(m.addSource).toHaveBeenCalledTimes(1);
   });
 
+  it('lässt MapLibre die Feature-ID aus dem Index vergeben (LFH-282)', () => {
+    // Ohne `generateId` trägt das Klick-Feature keine ID; der Klick fiele still auf den
+    // Punkt-in-Polygon-Rückfall zurück und überlappende Warnungen zeigten wieder keine oder
+    // fremde Kennzahlen — ohne dass irgendwo etwas rot wird.
+    const m = fakeMap();
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never);
+    expect(m.addSource).toHaveBeenCalledWith(
+      fachebeneSourceId('dwd'),
+      expect.objectContaining({ type: 'geojson', generateId: true }),
+    );
+  });
+
   it('legt Circle-Layer für Punkt-Ebene (pegelonline) an', () => {
     const m = fakeMap();
     sorgeFuerFachebeneLayer(m as never, FACHEBENEN.pegelonline, leer as never);

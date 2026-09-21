@@ -36,7 +36,7 @@ import { tzIconKey } from './markerIcons';
 import { baueClusterDonut } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
-import { findeGeometrieAn } from './geo';
+import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
@@ -841,12 +841,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       const id = fachebeneClickLayerId(fe.def);
       const quelle = fe.def.key;
       const klick = (e: maplibregl.MapLayerMouseEvent) => {
-        const props = (e.features?.[0]?.properties ?? {}) as Record<string, unknown>;
-        // Fläche/Umfang aus der VOLLEN (un-geclippten) Geometrie der geladenen FeatureCollection
-        // beziehen — e.features[0].geometry ist geojson-vt kachel-geclippt und ergäbe für
-        // mehrkachelige NINA/DWD-Warnungen zu kleine Werte (LFH-146). Properties bleiben aus
-        // dem Klick-Feature.
-        const geometrie = findeGeometrieAn({ lng: e.lngLat.lng, lat: e.lngLat.lat }, fe.daten);
+        const { props, geometrie } = werteFachebenenKlickAus(
+          e.features?.[0],
+          { lng: e.lngLat.lng, lat: e.lngLat.lat },
+          fe.daten,
+        );
         onFachebeneKlick?.(props, quelle, geometrie);
       };
       const enter = () => {

@@ -63,7 +63,7 @@ export function parseGeometry(geojson: string | null | undefined): GeoJsonGeomet
 // Rein clientseitig aus der GeoJSON-Geometrie. Bewusst ohne turf/geo-Lib (nicht im Repo).
 // Die strikte GeoJsonGeometry-Union (Polygon|LineString) bleibt für den Draw-/Zonen-Pfad
 // unverändert; MultiPolygon/MultiLineString werden NUR über die permissiven, losen
-// Signaturen (geoKennzahlen/punktInPolygon/findeGeometrieAn) unterstützt.
+// Signaturen (geoKennzahlen/punktInPolygon/geometrieZumKlickFeature) unterstützt.
 
 const ERD_RADIUS_M = 6371000;
 /** Meter pro Grad auf dem verwendeten Kugelmodell (≈ 111194,9 m) — für Projektion & Distanz gleich. */
@@ -219,26 +219,92 @@ export function punktInPolygon(p: PunktLngLat, geom: LoseGeometrie): boolean {
 // `geometry?: … | null` (NINA liefert Einträge ohne Geometrie). Die Struktur ist hier absichtlich
 // weit gehalten, damit sowohl Fachebenen-Collections als auch FE-eigene FCs passen — der Rumpf
 // unten prüft ohnehin per `f?.geometry` + Truthiness.
-type FeatureCollectionLike = { features: { geometry?: LoseGeometrie | null }[] };
+type FeatureCollectionLike = {
+  features: { geometry?: LoseGeometrie | null; properties?: unknown }[];
+};
+
+const istFlaeche = (g: LoseGeometrie) => g.type === 'Polygon' || g.type === 'MultiPolygon';
+
+/** Das Klick-Feature, wie MapLibre es liefert — nur die Teile, die hier zählen. */
+type KlickFeature = { id?: unknown; properties?: unknown };
+
+const alsObjekt = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
 
 /**
- * Volle Geometrie des ersten Features, dessen Polygon/MultiPolygon den Punkt enthält; sonst null.
- * Für LFH-146 (c): die un-geclippte Fachebenen-Geometrie aus der geladenen FeatureCollection
- * beziehen statt des kachel-geclippten Klick-Features.
- *
- * Bekannte Limitierung (Review LFH-209): bei mehreren an der Klickstelle ÜBERLAPPENDEN Features
- * (z. B. gleichzeitige Gewitter- + Dauerregen-Warnung über demselben Gebiet) liefert dies das
- * erste enthaltende Feature der Collection-Reihenfolge — die im Panel gezeigten Properties stammen
- * aber vom obersten gerenderten Feature. Dann können Kennzahlen und Text divergieren. Robusterer
- * Weg (Follow-up): Match über eine stabile Feature-ID des Klick-Features statt First-Point-in-Polygon.
+ * Stimmen die Properties des Klick-Features mit denen eines Collection-Features überein?
+ * Verglichen werden nur primitive Werte (Text, Zahl, Wahrheitswert): die kommen unverändert
+ * durch die Kachel (`@maplibre/vt-pbf`, Zahlen als Double). Listen und Objekte führt die Kachel
+ * dagegen als JSON-Text mit Präfix — die bleiben außen vor, statt am Format zu scheitern.
  */
-export function findeGeometrieAn(
+function gleicheProperties(klick: Record<string, unknown>, quelle: unknown): boolean {
+  for (const [k, v] of Object.entries(alsObjekt(quelle))) {
+    const primitiv = typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+    if (primitiv && klick[k] !== v) return false;
+  }
+  return true;
+}
+
+/**
+ * Volle Geometrie GENAU des angeklickten Fachebenen-Features (LFH-282).
+ * Die un-geclippte Geometrie kommt aus der geladenen FeatureCollection statt aus dem
+ * kachel-geclippten Klick-Feature (LFH-146 (c)).
+ *
+ * Kandidaten sind die Flächen, die den Klickpunkt enthalten UND deren Properties mit denen des
+ * Klick-Features übereinstimmen — also die Warnung, deren Text das Panel zeigt. Der Abgleich
+ * hängt NICHT an der Reihenfolge der Collection: die ist bei NINA von Abruf zu Abruf nicht stabil
+ * (`buffer_unordered` in `src/karte/quellen.rs`), und `setData` läuft asynchron im Worker — ein
+ * Klick kann also noch das alte Rendering treffen, während `collection` schon neu ist.
+ *
+ * Tragen mehrere Kandidaten dieselben Properties (etwa Teilflächen einer Warnung), entscheidet
+ * die Feature-ID. Die Sources laufen mit `generateId` (`fachebenenLayer.ts`), die ID ist also der
+ * Index im `features`-Array. Sie ist nur Stichentscheid unter Gleichen, nie allein maßgeblich:
+ * über ein Nachladen hinweg ist sie nicht stabil. Bleibt es mehrdeutig, gibt es null — keine
+ * Kennzahlen statt womöglich der Fläche einer anderen Warnung.
+ */
+export function geometrieZumKlickFeature(
+  feature: KlickFeature | undefined,
   p: PunktLngLat,
   collection: FeatureCollectionLike,
 ): LoseGeometrie | null {
-  for (const f of collection.features) {
+  // Ohne Properties am Klick gibt es nichts abzugleichen — dann zählt nur die Lage.
+  const klickProps = feature?.properties ? alsObjekt(feature.properties) : undefined;
+  const kandidaten: number[] = [];
+  collection.features.forEach((f, i) => {
     const g = f?.geometry;
-    if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon') && punktInPolygon(p, g)) return g;
-  }
-  return null;
+    if (
+      g &&
+      istFlaeche(g) &&
+      punktInPolygon(p, g) &&
+      (!klickProps || gleicheProperties(klickProps, f.properties))
+    ) {
+      kandidaten.push(i);
+    }
+  });
+  const id = feature?.id;
+  const index =
+    kandidaten.length === 1
+      ? kandidaten[0]
+      : typeof id === 'number' && kandidaten.includes(id)
+        ? id
+        : undefined;
+  return index === undefined ? null : (collection.features[index].geometry ?? null);
+}
+
+/**
+ * Wertet einen Fachebenen-Klick aus: Properties UND volle Geometrie aus DEMSELBEN Feature
+ * (LFH-282). Die Properties stammen aus dem Klick-Feature; die Geometrie nicht, weil
+ * `e.features[0].geometry` von geojson-vt kachelweise zugeschnitten ist und bei Warnungen über
+ * mehrere Kacheln zu kleine Werte ergäbe (LFH-146). Rein und exportiert, damit die Verdrahtung
+ * ohne Karte prüfbar ist.
+ */
+export function werteFachebenenKlickAus(
+  feature: KlickFeature | undefined,
+  p: PunktLngLat,
+  collection: FeatureCollectionLike,
+): { props: Record<string, unknown>; geometrie: LoseGeometrie | null } {
+  return {
+    props: (feature?.properties ?? {}) as Record<string, unknown>,
+    geometrie: geometrieZumKlickFeature(feature, p, collection),
+  };
 }
