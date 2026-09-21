@@ -92,11 +92,15 @@ describe('StatusWahl', () => {
     expect(ausloeser.textContent).not.toMatch(/Florian 44\/1/);
   });
 
-  it('trennt die Statusfarbe am Rand vom lesbaren Wortlaut, ohne Hintergrundfläche', async () => {
+  it('zeigt den Status als getönte Fläche mit Rand (Neuentwurf), die Menüzeilen bleiben ungefärbt', async () => {
     aufbauen();
     const etikett = screen.getByText('1 – Frei auf Funk').closest('.ant-tag') as HTMLElement;
-    expect(etikett.style.background).toBe('transparent');
-    expect(etikett.style.borderColor).not.toBe(etikett.style.color);
+    // Entscheidung 2 des Neuentwurfs: Rollenfarbe als Fläche. Werte und Kontrastrechnung in
+    // `instrument/statusFlaeche.ts`; hier nur die Form — Fläche, Rand und Text getrennt.
+    expect(etikett.dataset.darstellung).toBe('flaeche');
+    expect(etikett.style.backgroundColor).not.toBe('transparent');
+    expect(etikett.style.borderColor).not.toBe(etikett.style.backgroundColor);
+    expect(etikett.style.color).not.toBe(etikett.style.backgroundColor);
 
     // Auch im Menü: der Farbpunkt steht NEBEN dem Text, die Zeile bleibt ungefärbt.
     const menue = await oeffneMenue();

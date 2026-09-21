@@ -137,15 +137,50 @@ describe('modulRegistry', () => {
     expect(istModulGesperrt(adminModul, admin, ov('x', true, null))).toBe(false);
   });
 
-  it('redirectZiel: Dashboard ist Default sobald fertig', () => {
-    expect(redirectZiel(modulRegistry)).toBe('lage-dashboard');
+  it('redirectZiel: der Führungsüberblick ist die Startseite (Neuentwurf, 21.09.2026)', () => {
+    expect(redirectZiel(modulRegistry)).toBe('ueberblick');
   });
 
-  it('redirectZiel: Fallback ETB solange Dashboard nicht fertig', () => {
-    const ohneFertigesDashboard = modulRegistry.map((m) =>
-      m.key === 'lage-dashboard' ? { ...m, status: 'geplant' as const } : m,
+  it('redirectZiel: Fallback ETB solange der Überblick nicht fertig ist', () => {
+    const ohneFertigenUeberblick = modulRegistry.map((m) =>
+      m.key === 'ueberblick' ? { ...m, status: 'geplant' as const } : m,
     );
-    expect(redirectZiel(ohneFertigesDashboard)).toBe('etb');
+    expect(redirectZiel(ohneFertigenUeberblick)).toBe('etb');
+  });
+
+  /**
+   * Modulstruktur des Neuentwurfs („UI neu denken", Entscheidung 3): Führung trägt den
+   * Überblick und die Aufträge (Anordnungen sind Führungsmittel), das Meldebild steht vorn
+   * unter Kräfte & Mittel, Lage führt keine Kräfteübersicht mehr. Die Reihenfolge ist
+   * Registry-Reihenfolge und damit die Rangfolge von `erstesFreigegebenesModul`.
+   */
+  it('Modulstruktur: Führung, Kräfte-Kopf, Lage ohne Meldebild', () => {
+    expect(moduleNachKategorie('fuehrung').map((m) => m.key)).toEqual([
+      'ueberblick',
+      'einsatzdaten',
+      'einsatzabschnitte',
+      'auftraege',
+      'stab',
+    ]);
+    const kraefte = moduleNachKategorie('kraefte');
+    expect(kraefte[0].key).toBe('kraefteuebersicht');
+    expect(kraefte[0].label).toBe('Meldebild');
+    // Route bleibt — Deeplinks und gespeicherte Standard-Module tragen weiter.
+    expect(kraefte[0].route).toBe('kraefteuebersicht');
+    expect(moduleNachKategorie('lage').map((m) => m.key)).not.toContain('kraefteuebersicht');
+    expect(moduleNachKategorie('kommunikation').map((m) => m.key)).not.toContain('auftraege');
+  });
+
+  it('Kategorien: Kurzetikett je Kategorie, nur Einstellungen steht am Rail-Fuß', () => {
+    expect(kategorien.map((k) => k.kurz)).toEqual([
+      'Führung',
+      'Kräfte',
+      'Erfassung',
+      'Lage',
+      'Komm.',
+      'Einst.',
+    ]);
+    expect(kategorien.filter((k) => k.fuss).map((k) => k.key)).toEqual(['einstellungen']);
   });
 
   it('aufloeseStandardModul: liefert Route eines fertigen Standard-Moduls', () => {
@@ -276,7 +311,9 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
     // Kategorie 'kraefte', nicht 'fuehrung': deren erstes Modul wäre 'einsatzdaten' —
     // eines der beiden `NICHT_AUSBLENDBARE_MODULE`, an dem ein Sichtbarkeits-Override
     // wirkungslos bleibt (`istModulSichtbar` liefert dafür immer `true`). Der Test
-    // bräuchte dann ein Modul, das der Override überhaupt treffen kann.
+    // bräuchte dann ein Modul, das der Override überhaupt treffen kann. (Seit dem
+    // Neuentwurf steht in 'fuehrung' zwar der Überblick vorn — die Kategorie 'kraefte'
+    // bleibt trotzdem die sprechendere Probe.)
     const erstes = erstesFreigegebenesModul('kraefte', admin)!;
     const m = erstesFreigegebenesModul('kraefte', admin, {
       [erstes.key]: {
@@ -291,16 +328,16 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
     // Konkretes Folgemodul statt bloßer Ungleichheit (Fix-Runde 1): ein Resolver, der bei
     // gesetztem Override fälschlich kapituliert (`null` statt weiterzusuchen), bestünde
     // `not.toBe(erstes.key)` trivial — `expect(undefined).not.toBe('einheiten')` ist wahr.
-    // 'personal' ist laut Registry-Reihenfolge das nächste fertige/sichtbare/entsperrte
-    // Modul der Kategorie 'kraefte' nach 'einheiten'.
-    expect(erstes.key).toBe('einheiten');
-    expect(m?.key).toBe('personal');
+    // 'einheiten' ist laut Registry-Reihenfolge das nächste fertige/sichtbare/entsperrte
+    // Modul der Kategorie 'kraefte' nach dem Meldebild (seit dem Neuentwurf vorn).
+    expect(erstes.key).toBe('kraefteuebersicht');
+    expect(m?.key).toBe('einheiten');
   });
 
   it('überspringt rollen-gesperrte Module', () => {
     // Dieselbe Begründung wie oben: 'einsatzdaten' ist als nicht-ausblendbares Modul
     // auch nie rollen-sperrbar (Selbst-Aussperr-Schutz in `istModulGesperrt`) — 'kraefte'
-    // trifft mit 'einheiten' ein Modul, an dem der Rollen-Override tatsächlich greift.
+    // trifft mit dem Meldebild ein Modul, an dem der Rollen-Override tatsächlich greift.
     const erstes = erstesFreigegebenesModul('kraefte', admin)!;
     const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
     const m = erstesFreigegebenesModul('kraefte', ohne, {
@@ -314,8 +351,8 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
       },
     });
     // Konkretes Folgemodul statt bloßer Ungleichheit — dieselbe Begründung wie im Test darüber.
-    expect(erstes.key).toBe('einheiten');
-    expect(m?.key).toBe('personal');
+    expect(erstes.key).toBe('kraefteuebersicht');
+    expect(m?.key).toBe('einheiten');
   });
 
   it('liefert null, wenn die Kategorie kein freigegebenes Modul hat', () => {

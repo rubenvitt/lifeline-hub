@@ -8,12 +8,15 @@
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 25] = [
-    // Führung
+pub const MODUL_KEYS: [&str; 26] = [
+    // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
+    "ueberblick",
     "einsatzdaten",
     "einsatzabschnitte",
+    "auftraege",
     "stab",
-    // Kräfte & Mittel
+    // Kräfte & Mittel (Meldebild = `kraefteuebersicht`, bis 21.09.2026 unter Lage)
+    "kraefteuebersicht",
     "einheiten",
     "personal",
     "fahrzeuge",
@@ -29,13 +32,11 @@ pub const MODUL_KEYS: [&str; 25] = [
     "lage-dashboard",
     "lagekarte",
     "lageberichte",
-    "kraefteuebersicht",
     "gefahrenzonen",
     "lagemeldungen",
     // Kommunikation
     "chat",
     "erinnerungen",
-    "auftraege",
     "meldungen",
     "nachforderungen",
     // Einstellungen

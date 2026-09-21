@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Divider, Drawer, Layout, Space, Spin, theme } from 'antd';
+import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { TbMenu2 } from 'react-icons/tb';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -22,11 +22,22 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
-import BenutzerMenu from '../components/BenutzerMenu';
+import BenutzerMenu, { funktionAusSachgebieten } from '../components/BenutzerMenu';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
+import {
+  KOPF_HOEHE,
+  KopfRechts,
+  Markenzelle,
+  SyncAnzeige,
+  Uhr,
+  Wortmarke,
+  kopfZelleStil,
+} from '../components/Kopfleiste';
 import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
-import { farbenDunkel, navDrawerBreite } from '../theme/tokens';
+import type { EinsatzAnzeige } from '../api/types';
+import { einsatzStatus } from '../theme/statusFarben';
+import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
@@ -43,31 +54,36 @@ const { Header, Content } = Layout;
 const TREFFLAECHE = 48;
 
 /**
- * Die Kopfzeile trägt ihre Polsterung selbst (LFH-329 · B1/M12).
+ * Die Kommandoleiste (Neuentwurf „Instrumententafel", `shell.dc.html`): 52 px auf dem
+ * modusunabhängig dunklen Rahmengrund, Haarlinie unten, Zellen statt Abständen.
  *
- * Ohne diesen Stil hinge sie am antd-Komponententoken, der sich aus der
- * Steuerhöhe ableitet und bei der kompakten Stufe rund 47 px je Seite beträgt —
- * auf einem 390-px-Schirm knapp ein Viertel der Breite, nur für Rand. Die Zahl
- * steht NICHT hier, sondern als Custom Property in `theme/rollen.css`: sie
- * hängt am Viewport, und eine Media-Regel greift beim ersten Paint, während
- * eine JS-Ableitung erst nach dem Mount stimmte. Geschwisterstil in
- * `components/AppLayout.tsx` — beide Kopfzeilen lesen dieselbe Property.
+ * `flexWrap` bleibt: auf dem Handschirm bricht die rechte Zellgruppe als GANZES in eine
+ * zweite Zeile (LFH-460 erlaubt zwei), statt waagerecht überzulaufen. `height: auto` und
+ * `lineHeight: normal`, weil antds `Header` sonst seine Tokenhöhe als Textzeile reserviert.
+ * Die 52 px sind ein Boden — in `handschuh` wachsen die Ziele auf 72 px, die Leiste mit.
+ *
+ * Die Seiten-Polsterung der Leiste selbst ist 0: die Zellen tragen ihren Rand. Die
+ * Kopf-Polsterung (`--lfh-kopf-polsterung`, LFH-329 · B1/M12) sitzt an der Suchzelle — sie
+ * ist die eine Stelle, deren Luft mit dem Viewport wachsen soll.
  */
 const KOPF_STIL = {
   display: 'flex',
   flexWrap: 'wrap',
+  alignItems: 'stretch',
   height: 'auto',
   lineHeight: 'normal',
-  alignItems: 'center',
-  columnGap: 16,
-  paddingInline: 'var(--lfh-kopf-polsterung)',
+  minHeight: KOPF_HOEHE,
+  padding: 0,
+  background: rahmenFarben.grund,
+  borderBottom: `1px solid ${rahmenFarben.linie}`,
+  color: rahmenFarben.text,
 } as const;
 
 /**
  * Der Einsatzname bekommt die Restbreite — und nur die.
  *
  * `flexBasis: 0` ist tragend: mit `auto` bemäße sich der Rahmen am Inhalt, und
- * eine 60-Zeichen-Bezeichnung schöbe die Umschalter rechts aus der Kopfzeile
+ * eine 60-Zeichen-Bezeichnung schöbe die Zellen rechts aus der Kopfzeile
  * heraus. `minWidth: 0` ebenso — ohne die Aufhebung der Mindestbreite kürzt ein
  * Flex-Kind nicht, sondern wächst über seinen Rahmen hinaus. Die andere Hälfte
  * der Kürzung (Ellipsis, `title`) sitzt im `EinsatzSwitcher`: der Name steht in
@@ -75,11 +91,35 @@ const KOPF_STIL = {
  */
 const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
 
-/** LFH-460: Die Aktionsreihe darf umbrechen; ihre Ziele wachsen mit der Dichte.
- *  Unter lg bleibt der Abstand aus LFH-511 gedeckelt. Der Deckel spart Weissraum,
- *  ist aber kein Breitenbeweis mehr: das prüft gate1-ueberlauf.spec.ts im Browser. */
-export function kopfAbstaende(padding: number, schmal: boolean): { kopf: number; reihe: number } {
-  return schmal ? { kopf: 12, reihe: Math.min(padding, 10) } : { kopf: 16, reihe: padding };
+/**
+ * Die Einsatznummer im Kopf: die interne Nummer, sonst die Leitstellennummer, sonst KEINE
+ * (Neuentwurf, Entscheidung 4: nichts erfinden — die Datenbank-`id` ist keine Einsatznummer).
+ */
+export function einsatzKennung(
+  einsatz: Pick<EinsatzAnzeige, 'einsatznummer_intern' | 'leitstellen_nr'> | undefined,
+): string | null {
+  const intern = einsatz?.einsatznummer_intern?.trim();
+  if (intern) return intern;
+  const leitstelle = einsatz?.leitstellen_nr?.trim();
+  return leitstelle ? leitstelle : null;
+}
+
+/**
+ * Statuspunkt vor der Einsatznummer: `normal` bei aktivem Einsatz, sonst neutral. Die
+ * Farbe ist nie allein — das Wort steht als zugänglicher Name (`role="img"`) und `title`
+ * am Punkt (WCAG 1.4.1). Die Zuordnung liest `einsatzStatus` aus dem Statusvertrag.
+ */
+function StatusPunkt({ status }: { status: EinsatzAnzeige['status'] }) {
+  const darstellung = einsatzStatus[status];
+  const farbe = darstellung.rolle === 'normal' ? farbenDunkel.normal : farbenDunkel.schwach;
+  return (
+    <span
+      role="img"
+      aria-label={`Einsatzstatus: ${darstellung.label}`}
+      title={darstellung.label}
+      style={{ width: 6, height: 6, flexShrink: 0, background: farbe }}
+    />
+  );
 }
 
 /**
@@ -116,11 +156,11 @@ export default function EinsatzLayout() {
 
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
-  // `token.padding` IST der Wert, den `Space size="middle"` sonst zöge
-  // (`abstand.md`, 11/18/26) — der Deckel deckelt also den echten Abstand und
-  // führt keine Parallelzahl ein.
+  const mittel = abBreite('md');
   const { token } = theme.useToken();
-  const abstaende = kopfAbstaende(token.padding, !breit);
+  // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite
+  // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
+  const zellToken = mittel ? token : { padding: token.paddingXS };
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
@@ -266,122 +306,106 @@ export default function EinsatzLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header
-        style={{
-          ...KOPF_STIL,
-          columnGap: abstaende.kopf,
-          rowGap: token.paddingXS,
-          paddingBlock: token.paddingXS,
-          minHeight: token.controlHeight * 2,
-        }}
-      >
-        {/* Navigation und Einsatzname bleiben zusammen. Bei Platzmangel wechselt
-            die Aktionsreihe darunter, statt den Wechsler auf null zu drücken. */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: abstaende.kopf,
-            flex: '1 1 240px',
-            minWidth: 0,
-          }}
-        >
-          {!breit && (
-            <Button
-              type="text"
-              aria-label="Navigation öffnen"
-              // `flexShrink: 0` ist nicht Kosmetik: der Header ist eine Flex-Zeile,
-              // und ohne die Sperre drückt der Inhalt daneben den Knopf auf dem
-              // Handschirm auf gut die halbe Trefffläche zusammen (gemessen: 26 px).
-              //
-              // `color` ebenso wenig: ein antd-Textknopf erbt `colorText`, und die
-              // Rolle folgt dem Farbschema — im Hellmodus also dunkel. Die
-              // Kopfzeile trägt aber in BEIDEN Modi denselben dunklen Grund
-              // (gemessen `rgb(0, 21, 41)`), sodass der Griff dort dunkel auf
-              // dunkel verschwand. Er folgt jetzt seinem Grund statt dem Modus —
-              // dieselbe Entscheidung, die Alarmzentrale und Benutzermenü
-              // nebenan schon treffen, hier nur als Rolle statt als wiederholter
-              // Festwert.
-              style={{
-                width: Math.max(TREFFLAECHE, token.controlHeight),
-                height: Math.max(TREFFLAECHE, token.controlHeight),
-                flexShrink: 0,
-                color: 'var(--lfh-kopf-vordergrund)',
-              }}
-              icon={<TbMenu2 size={24} />}
-              onClick={() => setNavOffen(true)}
-            />
+      <Header style={KOPF_STIL}>
+        {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Sie
+            bleibt zusammen; bei Platzmangel bricht die rechte Gruppe um, statt den
+            Einsatznamen auf null zu drücken. */}
+        <div style={{ display: 'flex', alignItems: 'stretch', flex: '1 1 240px', minWidth: 0 }}>
+          {breit ? (
+            <Markenzelle />
+          ) : (
+            <div style={kopfZelleStil({ padding: 0 })}>
+              <Button
+                type="text"
+                aria-label="Navigation öffnen"
+                // `flexShrink: 0` ist nicht Kosmetik: ohne die Sperre drückt der Inhalt
+                // daneben den Knopf auf dem Handschirm auf gut die halbe Trefffläche
+                // zusammen (gemessen: 26 px). Die Farbe folgt dem dunklen Rahmengrund,
+                // nicht dem Modus — sonst verschwände der Griff im Tagmodus.
+                style={{
+                  width: Math.max(TREFFLAECHE, token.controlHeight),
+                  height: Math.max(TREFFLAECHE, token.controlHeight),
+                  flexShrink: 0,
+                  color: rahmenFarben.text,
+                }}
+                icon={<TbMenu2 size={22} aria-hidden />}
+                onClick={() => setNavOffen(true)}
+              />
+            </div>
           )}
-          <div style={REST_STIL}>
-            {einsatzQuery.isLoading ? (
-              <Spin />
-            ) : (
-              <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
+          <div style={{ ...kopfZelleStil(zellToken), ...REST_STIL }}>
+            {breit && (
+              <>
+                <Wortmarke />
+                <span
+                  aria-hidden="true"
+                  style={{ width: 1, height: 18, flexShrink: 0, background: rahmenFarben.linie }}
+                />
+              </>
             )}
+            {einsatz && <StatusPunkt status={einsatz.status} />}
+            {mittel && einsatzKennung(einsatz) && (
+              <span
+                data-lfh="kopf-einsatznummer"
+                style={{
+                  fontFamily: schrift.zahl,
+                  fontSize: 12,
+                  color: rahmenFarben.text,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                {einsatzKennung(einsatz)}
+              </span>
+            )}
+            <div style={REST_STIL}>
+              {einsatzQuery.isLoading ? (
+                <Spin />
+              ) : (
+                <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
+              )}
+            </div>
           </div>
         </div>
-        <Space wrap style={{ marginLeft: 'auto', maxWidth: '100%' }} size={abstaende.reihe}>
-          {/* Die Alarm-Zentrale bleibt auf JEDER Breite stehen und nennt
-              Desktop-/Tonstatus ausdrücklich; „blockiert“ oder „stumm“ darf im
-              Einsatz nicht nur über eine Ikone vermittelt werden.
-              ABGESETZT SEIT LFH-392 (ab `lg`, Begründung am Trenner unten): sie
-              ZEIGT einen Zustand, die zwei Ziele rechts vom Trenner FÜHREN eine
-              Handlung aus. Bis dahin standen beide Sorten im selben
-              `middle`-Rhythmus und im selben Gewicht. Der Trenner ist die ganze
-              Absetzung — eine eigene Klammer braucht es nicht: antds `Space` flacht nur Fragment-KINDER ab, und
-              `<AlarmZentrale/>` ist ein Komponenten-Element, ihre zwei Knöpfe
-              liegen also ohnehin schon in EINEM `.ant-space-item` ohne inneren
-              Abstand (gemessen).
-              Farbschema und Bediendichte sind hier ganz heraus und wohnen
-              breitenunabhängig im Benutzermenü — Einstellungen gehören nicht in
-              eine Aktionsreihe (CLAUDE.md, Nachtrag 30.07.2026). */}
-          <AlarmZentrale />
-          {/* DER TRENNER STEHT ERST AB `lg` — und das ist eine Messung, keine
-              Vorliebe. Er ist ein eigenes `Space`-Kind und kostet damit nicht
-              nur seine Strichbreite, sondern zusätzlich einen vollen
-              `middle`-Abstand: auf 390 px lief der UHS-Grundriss dadurch um
-              20 px waagerecht über (`e2e/uhs-grundriss-touch.spec.ts` — auf
-              `main` grün, mit dem breitenunabhängigen Trenner rot). Das
-              Kopfzeilenbudget auf 390 px ist eine bewirtschaftete Größe
-              (LFH-329 · B1); ein Trenner, der es sprengt, kauft Gliederung mit
-              Überlauf.
-              DIE HÜLLENVARIANTE IST GEMESSEN UND VERWORFEN: Alarmzentrale und
-              Trenner in ein gemeinsames `inline-flex` zu packen spart zwar den
-              Abstand, nimmt den zwei Alarm-Knöpfen aber die Umbruchmöglichkeit —
-              die Kopfzeile wuchs damit auf 486 px bei 390 px Schirm (135 px
-              Überlauf), also schlimmer als der Ausgangszustand.
-              KEIN WIDERSPRUCH ZUM ZWECK DES TASKS, ABER EINE ABWEICHUNG VON DER
-              ENTSCHEIDUNG „eigene Gruppe + Trenner": unter `lg` ist die
-              Alarmzentrale UNABGESETZT — nicht anders abgesetzt. Rechts von ihr
-              stehen dieselben zwei Ziele wie ab `lg`, nur schmaler (Suchen ohne
-              Beschriftung, Benutzermenü als Initialen); zu trennen ist die
-              Reihe, die dicht ist, und dicht ist sie ab `lg`. Dass die
-              Alarmtexte auf 390 px heute umbrechen, ist der Befund LFH-511 und
-              KEIN Ersatz für die Trennung — die Entscheidung hier steht auf der
-              20-px-Messung allein und hält auch, wenn LFH-511 den Umbruch
-              beseitigt.
-
-              `vertical`, NICHT `type="vertical"`: antd 6 meldet `type` als
-              veraltet (`divider/index.js`) und schriebe bei jedem Render beider
-              Layout-Suiten eine Dev-Warnung ins Protokoll.
-              `farbenDunkel.linieStark` statt eines rgba-Literals, weil die
-              Kopfzeile in BEIDEN Modi denselben dunklen Grund trägt — dieselbe
-              Begründung wie am `GlobalLink` und an der `IconRail`; ein
-              erfundener Farbwert wäre ein Fehler, kein Vorschlag.
-              `margin: 0`, weil der `middle`-Abstand des `Space` beidseits schon
-              sitzt. `height: 20` ist ein festes Maß und KEIN Bedienziel — die
-              Nachbarn wachsen mit der Dichte-Staffel, der Strich nicht;
-              dieselbe Trennung wie bei `Tastenkuerzel` (CLAUDE.md: „ein `<kbd>`
-              ist Satz, kein Ziel"). */}
-          {breit && (
-            <Divider
-              vertical
-              style={{ borderInlineStartColor: farbenDunkel.linieStark, height: 20, margin: 0 }}
-            />
+        {/* SUCHZELLE ab `lg`: das Suchfeld (max. 520 px) als Auslöser der Palette. Sie trägt
+            die Kopf-Polsterung (`kopfpolsterung.guard.test.ts` zählt genau diese Stelle). */}
+        {breit && (
+          <div
+            data-lfh="kopf-suche"
+            style={{
+              flex: '1 1 280px',
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              paddingInline: 'var(--lfh-kopf-polsterung)',
+            }}
+          >
+            <CommandPaletteTrigger />
+          </div>
+        )}
+        {/* RECHTE GRUPPE: Zellen mit Haarlinien. Die Alarmzentrale behält ihren Platz im
+            Kopf und steht in EIGENER Zelle — sie ZEIGT einen Zustand (Ton, Desktop) und
+            ist damit von den Zielen daneben abgesetzt (LFH-392); die Haarlinie der Zelle
+            ersetzt den früheren Trenner. Sie bleibt auf JEDER Breite stehen und nennt
+            ihren Zustand im Text: „blockiert" oder „stumm" darf im Einsatz nicht nur über
+            eine Ikone laufen. */}
+        <KopfRechts>
+          <div data-lfh="kopf-alarm" style={kopfZelleStil(zellToken)}>
+            <AlarmZentrale />
+          </div>
+          <SyncAnzeige liveErwartet kompakt={!mittel} />
+          {mittel && <Uhr />}
+          {!breit && (
+            <div style={kopfZelleStil(zellToken)}>
+              <CommandPaletteTrigger />
+            </div>
           )}
-          <CommandPaletteTrigger />
-          <BenutzerMenu />
-        </Space>
+          <div
+            style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
+          >
+            <BenutzerMenu funktion={funktionAusSachgebieten(einsatz?.meine_sachgebiete)} />
+          </div>
+        </KopfRechts>
       </Header>
       {/* Warnung, keine Sackgasse: der Einsatz bleibt vollständig bedienbar, nur die
           Navigation zeigt womöglich mehr, als konfiguriert ist. `istModulSichtbar`
@@ -416,6 +440,7 @@ export default function EinsatzLayout() {
         {breit && offeneKategorie && !panelEingeklappt && (
           <ModulPanel
             titel={kategorien.find((k) => k.key === offeneKategorie)!.label}
+            einsatz={einsatz}
             module={moduleNachKategorie(offeneKategorie)}
             benutzer={benutzer}
             overrides={modulOverrides}

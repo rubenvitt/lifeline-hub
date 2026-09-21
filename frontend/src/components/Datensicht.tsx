@@ -16,6 +16,8 @@ import { Liste, ListenEintrag } from './Liste';
 import { Select } from './Select';
 import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
+import Augenbraue from './instrument/Augenbraue';
+import { monoStil } from './instrument/rollenwerte';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
@@ -175,6 +177,12 @@ export type DatensichtSpalte<T, K extends string = string> = AntdErbe<T> & {
   mindestBreite?: number;
   /** Nicht abwählbar (Aktionsspalte). Spalte 0 ist es immer, unabhängig vom Flag. */
   immerSichtbar?: boolean;
+  /**
+   * Zahl, Zeit, Kennung (Funkrufname, Nr., Koordinate): Mono mit `tabular-nums` in BEIDEN
+   * Zweigen (Neuentwurf). Durchgereicht an {@link KatalogSpalte.zahl} — EIN Begriff, zwei
+   * Träger, wie `suchText` und `mindestBreite`.
+   */
+  zahl?: boolean;
 };
 
 /**
@@ -1510,10 +1518,12 @@ export default function Datensicht<T extends object, const K extends string>(
                     data-lfh="datensicht-feld"
                     style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}
                   >
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      {etikettVon(spalte) ?? spalte.key}
-                    </Typography.Text>
-                    <span>{zelle(spalte, zeile, index)}</span>
+                    {/* Feldetikett als Augenbraue (Neuentwurf): 10 px, Versalien per CSS —
+                        der Wortlaut im DOM bleibt, wie die Spalte ihn nennt. */}
+                    <Augenbraue>{etikettVon(spalte) ?? spalte.key}</Augenbraue>
+                    <span style={spalte.zahl ? monoStil(token.fontSize) : undefined}>
+                      {zelle(spalte, zeile, index)}
+                    </span>
                   </span>
                 ))}
               </div>

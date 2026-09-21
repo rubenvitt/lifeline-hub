@@ -11,7 +11,7 @@ function rendern() {
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id" element={<DefaultModulRedirect />} />
-      <Route path="/einsaetze/:id/lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
+      <Route path="/einsaetze/:id/ueberblick" element={<div>Überblick-Inhalt</div>} />
       <Route path="/einsaetze/:id/etb" element={<div>ETB-Inhalt</div>} />
     </Routes>,
     { route: '/einsaetze/7' },
@@ -23,7 +23,7 @@ describe('DefaultModulRedirect', () => {
     vi.mocked(ladeEinstellungen).mockReset();
   });
 
-  it('leitet ohne Override auf das Lage-Dashboard um', async () => {
+  it('leitet ohne Override auf den Führungsüberblick um', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7,
       standard_modul: null,
@@ -52,7 +52,7 @@ describe('DefaultModulRedirect', () => {
       org_defaults: { org_id: 1 },
     });
     rendern();
-    expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();
+    expect(await screen.findByText('Überblick-Inhalt')).toBeInTheDocument();
   });
 
   it('leitet auf das konfigurierte Standard-Modul um', async () => {
@@ -87,7 +87,7 @@ describe('DefaultModulRedirect', () => {
     expect(await screen.findByText('ETB-Inhalt')).toBeInTheDocument();
   });
 
-  it('fällt bei unbekanntem Standard-Modul auf das Dashboard zurück', async () => {
+  it('fällt bei unbekanntem Standard-Modul auf den Überblick zurück', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7,
       standard_modul: 'gibtsnicht',
@@ -116,6 +116,6 @@ describe('DefaultModulRedirect', () => {
       org_defaults: { org_id: 1 },
     });
     rendern();
-    expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();
+    expect(await screen.findByText('Überblick-Inhalt')).toBeInTheDocument();
   });
 });

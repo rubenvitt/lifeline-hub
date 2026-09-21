@@ -50,13 +50,19 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
   return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
-test('Kopf-Polsterung: 24 px am Fükw-Schirm, 12 px auf 390 px', async ({ page }) => {
+test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste auf 390 px', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Kopf ${Date.now()}`);
 
   // BEIDE Layouts: `/einsaetze` hängt an der Ebene-1-Shell, die Modulseite am
   // Einsatz-Workspace. Es sind Geschwister — wer nur eines umstellt, lässt den
   // Handschirm auf der halben App auf dem antd-Maß stehen.
+  //
+  // NEUENTWURF (21.09.2026): die Kommandoleiste ist randlos — Markenzelle bzw. Griff
+  // stehen bündig am Fensterrand, die Zellen tragen ihren eigenen Innenrand. Die
+  // viewportabhängige Kopf-Polsterung sitzt an der Suchzelle (ab `lg`).
   for (const route of ['/einsaetze', `/einsaetze/${einsatzId}/etb`]) {
     await page.setViewportSize(BREIT);
     await page.goto(route);
@@ -64,12 +70,17 @@ test('Kopf-Polsterung: 24 px am Fükw-Schirm, 12 px auf 390 px', async ({ page }
     // Beweist, dass der Selektor genau eine Kopfzeile trifft — sonst wäre eine
     // grüne Zusicherung grün durch Nichtstun.
     await expect(kopf, route).toHaveCount(1);
-    await expect(kopf, route).toHaveCSS('padding-left', '24px');
-    await expect(kopf, route).toHaveCSS('padding-right', '24px');
+    await expect(kopf, route).toHaveCSS('padding-left', '0px');
+    const suche = kopf.locator('[data-lfh="kopf-suche"]');
+    await expect(suche, route).toHaveCount(1);
+    await expect(suche, route).toHaveCSS('padding-left', '24px');
+    await expect(suche, route).toHaveCSS('padding-right', '24px');
 
     await page.setViewportSize(SCHMAL);
-    await expect(kopf, route).toHaveCSS('padding-left', '12px');
-    await expect(kopf, route).toHaveCSS('padding-right', '12px');
+    await expect(kopf, route).toHaveCSS('padding-left', '0px');
+    await expect(kopf, route).toHaveCSS('padding-right', '0px');
+    // Unter `lg` gibt es kein Suchfeld — die Suche steht als Ikone in der rechten Gruppe.
+    await expect(suche, route).toHaveCount(0);
   }
 });
 
@@ -104,7 +115,10 @@ async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' 
   );
   // LFH-460 erlaubt zwei Zeilen. Der Deckel verhindert ungebremstes Wachstum,
   // während die Inhaltsprüfung oben weiterhin jedes Abschneiden aufdeckt.
-  const einzeilig = stufe === 'kompakt' ? 60 : 96;
+  // Neuentwurf (21.09.2026): eine Zeile ist die 52-px-Kommandoleiste — in `kompakt` wie in
+  // `komfortabel`, weil die 48-px-Ziele der komfortablen Stufe in 52 px passen. (Vorher
+  // 60 / 96: die alte Kopfzeile trug die doppelte Steuerhöhe als Mindesthöhe.)
+  const einzeilig = 52;
   expect(masse.klientH, `${route}: Kopfhöhe der Stufe ${stufe}`).toBeGreaterThanOrEqual(einzeilig);
   expect(masse.klientH, `${route}: höchstens zwei Kopfzeilen`).toBeLessThanOrEqual(2 * einzeilig);
 }
@@ -293,31 +307,32 @@ test('auch ab lg stehen die Umschalter nicht im Kopf — bedienbar bleiben sie',
 
 test('die Alarmzentrale steht ab lg sichtbar abgesetzt von den Aktionen', async ({ page }) => {
   /**
-   * DIE HÄLFTE, DIE VITEST NICHT KANN (LFH-392). `EinsatzLayout.test.tsx` belegt
-   * die DOM-Semantik — genau ein Trenner, Alarm davor, Aktionen dahinter. Ob
-   * daraus im Browser eine sichtbare Trennung wird, kann es nicht sagen:
-   * `vite.config.ts` fährt Vitest mit `css: false`, und jsdom rechnet kein Layout.
+   * DIE HÄLFTE, DIE VITEST NICHT KANN (LFH-392). `EinsatzLayout.test.tsx` belegt die
+   * DOM-Semantik — die Alarm-Knöpfe in eigener Zelle, Suche und Benutzermenü außerhalb.
+   * Ob daraus im Browser eine sichtbare Trennung wird, kann es nicht sagen: jsdom rechnet
+   * kein Layout.
    *
-   * Gemessen wird deshalb, dass der Trenner eine echte Ausdehnung hat und
-   * zwischen den zwei Gruppen LIEGT — nicht nur, dass er im Baum steht. Ein
-   * `display: none` oder eine Nullbreite fiele hier auf und in jsdom nicht.
+   * Seit dem Neuentwurf trennt die HAARLINIE der Zelle, nicht mehr ein Trenner-Element im
+   * Knopfrhythmus. Gemessen wird deshalb, dass die Zelle eine echte Linie trägt und dass die
+   * Suche nicht in ihr liegt — ein `display: none` oder eine Nullbreite fiele hier auf.
    */
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Absetzung ${Date.now()}`);
   await page.setViewportSize(BREIT);
   await page.goto(`/einsaetze/${einsatzId}/etb`);
 
-  const trenner = page.locator('header [role="separator"]');
-  await expect(trenner).toHaveCount(1);
-  const trennerKasten = (await trenner.boundingBox())!;
-  expect(trennerKasten.height, 'Trenner hat sichtbare Höhe').toBeGreaterThan(0);
+  const zelle = page.locator('header [data-lfh="kopf-alarm"]');
+  await expect(zelle).toHaveCount(1);
+  await expect(zelle).toHaveCSS('border-right-width', '1px');
+  const kasten = (await zelle.boundingBox())!;
+  expect(kasten.height, 'Zelle hat sichtbare Höhe').toBeGreaterThan(0);
 
   const ton = (await page.getByRole('button', { name: /Alarmton/ }).boundingBox())!;
   const suchen = (await page.getByRole('button', { name: 'Suchen' }).boundingBox())!;
-  expect(ton.x + ton.width, 'Alarmzentrale endet links vom Trenner').toBeLessThanOrEqual(
-    trennerKasten.x + 1,
+  expect(ton.x, 'Alarmknopf liegt in der Alarmzelle').toBeGreaterThanOrEqual(kasten.x - 1);
+  expect(ton.x + ton.width, 'Alarmknopf liegt in der Alarmzelle').toBeLessThanOrEqual(
+    kasten.x + kasten.width + 1,
   );
-  expect(suchen.x, 'Aktionen beginnen rechts vom Trenner').toBeGreaterThanOrEqual(
-    trennerKasten.x + trennerKasten.width - 1,
-  );
+  const suchenDrin = suchen.x < kasten.x + kasten.width && suchen.x + suchen.width > kasten.x;
+  expect(suchenDrin, 'die Suche liegt NICHT in der Alarmzelle').toBe(false);
 });

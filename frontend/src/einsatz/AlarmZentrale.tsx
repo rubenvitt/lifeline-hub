@@ -19,6 +19,20 @@ import {
 } from '../alarm/desktopAlarm';
 import { auftraegePfad, erinnerungenPfad, meldungenPfad } from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
+import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+
+/**
+ * Farbe eines Alarm-Knopfs in der Kommandoleiste (Neuentwurf „Instrumententafel").
+ *
+ * Rein und exportiert, damit die Zuordnung ohne Rendern prüfbar ist. Die Leiste ist in
+ * beiden Modi dunkel — die Werte kommen deshalb aus den NACHTrollen, nicht aus dem
+ * Modus-Token und nicht mehr aus `#fff`. Ein auffälliger Zustand („stumm", „blockiert")
+ * steht in `achtung`: er verzögert eine Alarmierung, er ist selbst keine. Der zweite Kanal
+ * ist das Wort im Knopf (WCAG 1.4.1) — die Farbe ergänzt, sie trägt nicht allein.
+ */
+export function alarmKnopfFarbe(auffaellig: boolean): string {
+  return auffaellig ? farbenDunkel.achtung : rahmenFarben.gedaempft;
+}
 
 type ErinnerungDetail = {
   erinnerung_id?: number;
@@ -423,7 +437,7 @@ export default function AlarmZentrale() {
       <TbBellOff aria-hidden />
     ) : (
       <Badge dot status="error">
-        <TbBell aria-hidden style={{ color: '#fff' }} />
+        <TbBell aria-hidden style={{ color: rahmenFarben.gedaempft }} />
       </Badge>
     );
 
@@ -501,7 +515,11 @@ export default function AlarmZentrale() {
           // nicht, wozu der Knopf gehört.
           aria-label={`Alarmzentrale: ${sammelText}`}
           icon={zeigtTon ? tonIkone : desktopIkone}
-          style={{ color: '#fff', flexShrink: 0 }}
+          style={{
+            color: alarmKnopfFarbe(zeigtTon ? tonAuffaellig : desktop === 'browser-blockiert'),
+            fontSize: 12,
+            flexShrink: 0,
+          }}
         >
           {sammelText}
         </Button>
@@ -518,7 +536,7 @@ export default function AlarmZentrale() {
           aria-disabled={desktop !== 'aus'}
           onClick={desktop === 'aus' ? desktopAktivieren : undefined}
           icon={desktopIkone}
-          style={{ color: '#fff' }}
+          style={{ color: alarmKnopfFarbe(desktop === 'browser-blockiert'), fontSize: 12 }}
         >
           {desktopText}
         </Button>
@@ -529,7 +547,10 @@ export default function AlarmZentrale() {
           aria-label={tonHinweis}
           aria-pressed={gemutet}
           onClick={() => void tonUmschalten()}
-          style={{ color: '#fff' }}
+          style={{
+            color: alarmKnopfFarbe(gemutet || tonStatus !== 'bereit'),
+            fontSize: 12,
+          }}
           icon={tonIkone}
         >
           {tonText}

@@ -13,7 +13,7 @@ import {
 import type { TastaturAktionen } from '../command-palette/typen';
 import { renderMitProviders } from '../test/utils';
 import { flaeche } from '../theme/tokens';
-import EinsatzSeite from './EinsatzSeite';
+import EinsatzSeite, { seitenkopfStil } from './EinsatzSeite';
 
 /**
  * Attrappe für die Palettenbefehle (LFH-391 · B5). Nötig, weil `src/test/setup.ts` MSW mit
@@ -43,6 +43,7 @@ vi.mock('../command-palette/useBefehle', () => ({
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const spracheCss = readFileSync(join(hier, '..', 'theme', 'sprache.css'), 'utf-8');
+const seiteCss = readFileSync(join(hier, 'EinsatzSeite.css'), 'utf-8');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -69,14 +70,48 @@ describe('EinsatzSeite', () => {
     expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
     expect(screen.getByText('Nur lesend')).toBeInTheDocument();
     expect(screen.getByText('Seiteninhalt')).toBeInTheDocument();
-    // Signatur-Element 1 aus A0: der Akzentstrich steht über dem Titel.
-    expect(container.querySelector('.lfh-marke__strich')).not.toBeNull();
+    // Neuentwurf (21.09.2026): die Seitenkopfleiste trägt die Seite — der A0-Akzentstrich
+    // über dem Titel ist entfallen, Titel und Aktionen stehen in EINER Leiste.
+    expect(container.querySelector('.lfh-marke__strich')).toBeNull();
+    const leiste = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(leiste).toContainElement(heading);
+    expect(leiste).toContainElement(screen.getByRole('button', { name: 'Anlegen' }));
+    // 14/600 — der Satz des Entwurfs, die Ebene bleibt h4.
+    expect(heading).toHaveStyle({ fontSize: '14px', fontWeight: '600' });
   });
 
-  it('hält die Container-Breite auf `flaeche.seiteSchmal` und lässt sie überschreiben', () => {
-    // `renderMitProviders` legt eine `.ant-app`-Hülle um den Baum — die Wurzel des
-    // Primitivs ist deren erstes Kind, nicht `container.firstElementChild`.
-    const wurzel = (c: HTMLElement) => c.querySelector<HTMLElement>('.ant-app > div')!;
+  it('zeigt ein optionales Mono-Meta neben dem Titel', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="Lagebericht" meta="Nr. 12">
+        <div>x</div>
+      </EinsatzSeite>,
+    );
+    const leiste = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    const meta = screen.getByText('Nr. 12');
+    expect(leiste).toContainElement(meta);
+    expect(meta.style.fontFamily).toContain('Mono');
+  });
+
+  it('zieht die Kopfleiste über die Seitenrinne, die Lesebreite gilt dem Inhalt', () => {
+    // Über die REINE Stilfunktion, nicht über das gerenderte `style`: cssstyle (jsdom)
+    // verwirft logische Kurzschreibweisen mit `var()` — rot oder grün aus dem falschen Grund.
+    const token = { margin: 11, marginLG: 18, paddingXS: 3 };
+    const vollbreit = seitenkopfStil(token, { linie: '#LINIE' }, true);
+    // Derselbe negative Rand wie die ETB-Erfassungsleiste — und der Innenrand nimmt die
+    // Rinne wieder auf, sonst klebte der Titel am Rand.
+    expect(vollbreit.marginInline).toBe('calc(-1 * var(--lfh-seiten-polsterung))');
+    expect(vollbreit.marginTop).toBe('calc(-1 * var(--lfh-seiten-polsterung))');
+    expect(vollbreit.paddingInline).toBe('var(--lfh-seiten-polsterung)');
+    expect(vollbreit.minHeight).toBe(44);
+    expect(vollbreit.borderBottom).toBe('1px solid #LINIE');
+    // Gegenprobe: in einer Spalte (AdminPage) KEIN negativer Rand.
+    expect(seitenkopfStil(token, { linie: '#LINIE' }, false).marginInline).toBeUndefined();
+  });
+
+  it('hält die Inhaltsbreite auf `flaeche.seiteSchmal` und lässt sie überschreiben', () => {
+    // Seit dem Neuentwurf ist die WURZEL vollbreit (die Kopfleiste zieht bis an den Rand);
+    // die Lesebreite trägt der Inhaltsbereich darunter.
+    const wurzel = (c: HTMLElement) => c.querySelector<HTMLElement>('[data-lfh="seiten-inhalt"]')!;
 
     const { container, unmount } = renderMitProviders(
       <EinsatzSeite titel="Schmal">
@@ -105,6 +140,10 @@ describe('EinsatzSeite', () => {
   });
 
   /**
+   * SEIT DEM NEUENTWURF benutzt `EinsatzSeite` den Strich nicht mehr — einziger Konsument ist
+   * das Lage-Dashboard (`pages/lage-dashboard/LageDashboardPage.tsx`). Der Pin bleibt hier,
+   * bis er dorthin umzieht; er bewacht `sprache.css`, nicht dieses Primitiv.
+   *
    * Der Akzentstrich lebt als CSS-Klasse, und `vite.config.ts` setzt für Vitest
    * `css: false` — die Klassen-Assertion oben belegt also NUR das Attribut, keine
    * Wirkung. Dieser Guard (Muster: `theme/rollen.guard.test.ts`) pinnt deshalb die
@@ -120,6 +159,22 @@ describe('EinsatzSeite', () => {
     expect(block).toMatch(/height:\s*3px/);
     expect(block).toMatch(/background:\s*var\(--lfh-marke\)/);
     expect(block).toMatch(/box-shadow:\s*var\(--lfh-marke-glut\)/);
+  });
+
+  /**
+   * Die EINE Regel, die „Schäden › Schäden" verhindert: der letzte Pfadeintrag (der
+   * Seitenname) wird ausgeblendet, weil der Titel ihn direkt danach trägt. Vitest fährt mit
+   * `css: false` — die Wirkung ist hier nicht messbar, deshalb ein Quelltext-Pin (Muster
+   * `theme/seitenrinne.guard.test.ts`). Der Trenner davor darf NICHT mit verschwinden: er ist
+   * der Chevron vor dem Titel.
+   */
+  it('blendet im Ortspfad genau den letzten EINTRAG aus, nicht den Trenner davor', () => {
+    const regel = seiteCss.match(/([^{}]+)\{\s*display:\s*none;\s*\}/);
+    expect(regel, 'EinsatzSeite.css trägt die Ausblendregel').not.toBeNull();
+    const selektor = regel![1].trim();
+    expect(selektor).toContain('.lfh-seitenkopf__pfad');
+    expect(selektor).toContain('li:last-child');
+    expect(selektor).toContain(':not(.ant-breadcrumb-separator)');
   });
 
   it('löst über einen Header-Button (außerhalb des Form) das Speichern via form.submit() aus', async () => {

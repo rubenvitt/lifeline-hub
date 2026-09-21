@@ -1,6 +1,12 @@
-import { Input, Table, type InputRef, type TableProps } from 'antd';
+import { ConfigProvider, Input, Table, type InputRef, type TableProps } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import type { Farbrollen } from '../theme/tokens';
+import { useRollen } from './instrument/rollenwerte';
+// Kopfzellen-Typografie und die Mono-Spalten liegen als Klassen in der Gestaltungssprache
+// (`.lfh-katalog …`). Der Import gehört HIERHER, nicht an die Aufrufer: achtzehn
+// Konsumenten, und nur einige montieren `EinsatzSeite` (Muster `SeitenZustand.tsx`).
+import '../theme/sprache.css';
 
 /**
  * Geteiltes Tabellen-Primitiv der Katalog-/Verwaltungsseiten (LFH-329 · B1).
@@ -125,7 +131,43 @@ export type KatalogSpalte<T> = NonNullable<TableProps<T>['columns']>[number] & {
    * Katalogtabellen inhaltsgetrieben wie bisher. Siehe {@link fliessBreite}.
    */
   mindestBreite?: number;
+  /**
+   * Zahlen-, Zeit- oder Kennungsspalte: Zellen in Mono mit `tabular-nums` (Neuentwurf,
+   * „Zahlen, Zeiten, Funkrufnamen, Koordinaten, Nr. immer Mono"). Wird als Klasse
+   * `lfh-zahl-spalte` an Kopf- und Datenzelle gehängt; die Schrift steht in `sprache.css`.
+   */
+  zahl?: boolean;
 };
+
+/**
+ * Die Tabellen-Tokens des Neuentwurfs — rein und exportiert, damit die Zuordnung ohne
+ * Render prüfbar ist (jsdom rechnet kein CSS-in-JS nach).
+ *
+ * Kopfzeile auf `kopf` (nachts `#0c0e11`), Kopftext `schwach`, keine senkrechten Trenner im
+ * Kopf; Zeilentrenner als Haarlinie — nachts `flaeche2` (Entwurf `#14171b`), am Tag
+ * `flaeche3`: `flaeche2` läge dort bei 1,08 : 1 auf Weiß und wäre schlicht nicht da.
+ * Hover dezent auf `flaeche2`. Die Zellpolsterung folgt der Dichte-Staffel (`paddingSM` /
+ * `padding`), statt auf antds festen 16 px zu stehen — die Zeilenhöhe zieht damit mit.
+ */
+export function tabellenTokens(
+  rollen: Pick<Farbrollen, 'kopf' | 'schwach' | 'flaeche2' | 'flaeche3'>,
+  dunkel: boolean,
+  token: { paddingSM: number; padding: number },
+) {
+  return {
+    headerBg: rollen.kopf,
+    headerColor: rollen.schwach,
+    headerSplitColor: 'transparent',
+    headerSortActiveBg: rollen.kopf,
+    headerSortHoverBg: rollen.flaeche3,
+    fixedHeaderSortActiveBg: rollen.kopf,
+    headerBorderRadius: 0,
+    borderColor: dunkel ? rollen.flaeche2 : rollen.flaeche3,
+    rowHoverBg: rollen.flaeche2,
+    cellPaddingBlock: token.paddingSM,
+    cellPaddingInline: token.padding,
+  };
+}
 
 export type KatalogTabelleProps<T> = Omit<
   TableProps<T>,
@@ -340,6 +382,7 @@ export default function KatalogTabelle<T extends object>({
   ...rest
 }: KatalogTabelleProps<T>) {
   const [suchbegriff, setSuchbegriff] = useState('');
+  const { token, rollen, dunkel } = useRollen();
   const feldRef = useRef<InputRef>(null);
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
@@ -358,9 +401,14 @@ export default function KatalogTabelle<T extends object>({
    * Blattspalte, ihre Fixierung wäre wirkungslos.
    */
   const fixierteSpalten = useMemo(() => {
-    const erste = columns?.[0];
-    if (!columns || !erste || erste.fixed !== undefined || 'children' in erste) return columns;
-    return [{ ...erste, fixed: 'left' as const }, ...columns.slice(1)];
+    // Mono-Spalten (`zahl`) bekommen ihre Klasse, bevor fixiert wird — eine Optik-Zutat,
+    // die an der Spaltenfolge und damit an der Fixierregel darunter nichts ändert.
+    const gestaltet = columns?.map((s) =>
+      s.zahl ? { ...s, className: [s.className, 'lfh-zahl-spalte'].filter(Boolean).join(' ') } : s,
+    );
+    const erste = gestaltet?.[0];
+    if (!gestaltet || !erste || erste.fixed !== undefined || 'children' in erste) return gestaltet;
+    return [{ ...erste, fixed: 'left' as const }, ...gestaltet.slice(1)];
   }, [columns]);
 
   /**
@@ -455,36 +503,42 @@ export default function KatalogTabelle<T extends object>({
           />
         </div>
       )}
-      <Table<T>
-        {...rest}
-        columns={fixierteSpalten}
-        dataSource={sichtbareZeilen}
-        loading={loading}
-        locale={wirkendesLocale}
-        pagination={blaetterung}
-        // `test/utils.tsx` montiert `ConfigProvider` OHNE Locale, die Produktion setzt
-        // `deDE` — der Sortier-Tooltip wäre im Test englisch und in Produktion deutsch,
-        // jede Textzusicherung darauf entweder falsch oder umgebungsabhängig. Am
-        // Berührungsgerät trägt er ohnehin nichts.
-        showSorterTooltip={false}
-        scroll={{ x: scrollX }}
-        /*
-         * GEMESSEN an `@rc-component/table/es/Table.js`: das Layout wählt rc-table selbst —
-         * `if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'`. Dieses
-         * Primitiv fixiert Spalte 0 IMMER, `fixColumn` ist also gesetzt; eine Zahl statt
-         * `'max-content'` kippte das Layout still auf `fixed`. Unter `fixed` ist eine
-         * Spaltenbreite BINDEND statt bevorzugt — die 96 px der ETB-Aktionsspalte schnitten
-         * den 72-px-Knopf der Handschuhstufe an, und die Mindestinhaltsbreite jeder anderen
-         * Spalte gleich mit. `auto` ist zugleich das, was der Bestand schon fährt.
-         *
-         * Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und im
-         * Sonderfall einer Spaltengruppe an Position 0 (dann fixiert das Primitiv nichts,
-         * und `sticky` führt auf `fixed`) wäre ein hartes `auto` eine stille Änderung an
-         * einer Tabelle, die von LFH-523 gar nicht handelt.
-         */
-        tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
-        sticky
-      />
+      {/* Geschachtelter Provider nur für die Tabellen-Tokens: er erbt Algorithmus, Rollen und
+          Dichte vom Eltern-Theme (`inherit` ist antds Vorgabe) und färbt NUR diese Tabelle —
+          `tokens.ts:antdKomponenten` bleibt die globale Stelle und wird nicht angefasst. */}
+      <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
+        <Table<T>
+          {...rest}
+          className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
+          columns={fixierteSpalten}
+          dataSource={sichtbareZeilen}
+          loading={loading}
+          locale={wirkendesLocale}
+          pagination={blaetterung}
+          // `test/utils.tsx` montiert `ConfigProvider` OHNE Locale, die Produktion setzt
+          // `deDE` — der Sortier-Tooltip wäre im Test englisch und in Produktion deutsch,
+          // jede Textzusicherung darauf entweder falsch oder umgebungsabhängig. Am
+          // Berührungsgerät trägt er ohnehin nichts.
+          showSorterTooltip={false}
+          scroll={{ x: scrollX }}
+          /*
+           * GEMESSEN an `@rc-component/table/es/Table.js`: das Layout wählt rc-table selbst —
+           * `if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'`. Dieses
+           * Primitiv fixiert Spalte 0 IMMER, `fixColumn` ist also gesetzt; eine Zahl statt
+           * `'max-content'` kippte das Layout still auf `fixed`. Unter `fixed` ist eine
+           * Spaltenbreite BINDEND statt bevorzugt — die 96 px der ETB-Aktionsspalte schnitten
+           * den 72-px-Knopf der Handschuhstufe an, und die Mindestinhaltsbreite jeder anderen
+           * Spalte gleich mit. `auto` ist zugleich das, was der Bestand schon fährt.
+           *
+           * Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und im
+           * Sonderfall einer Spaltengruppe an Position 0 (dann fixiert das Primitiv nichts,
+           * und `sticky` führt auf `fixed`) wäre ein hartes `auto` eine stille Änderung an
+           * einer Tabelle, die von LFH-523 gar nicht handelt.
+           */
+          tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
+          sticky
+        />
+      </ConfigProvider>
     </>
   );
 }

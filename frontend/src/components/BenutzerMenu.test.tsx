@@ -83,6 +83,21 @@ describe('BenutzerMenu — ab lg', () => {
     expect((await trigger()).textContent).toContain(ANZEIGENAME);
   });
 
+  it('der Trigger trägt die Funktion statt des Namens, wenn sie bekannt ist (Neuentwurf)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzer)));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <BenutzerMenu funktion="S2 Lage" />
+      </ThemeModeProvider>,
+    );
+    const knopf = await trigger();
+    expect(knopf.textContent).toContain('S2 Lage');
+    expect(knopf.textContent).toContain(INITIALEN);
+    expect(knopf.textContent).not.toContain(ANZEIGENAME);
+    // Der zugängliche Name bleibt — daran hängen die Layout-Suiten.
+    expect(knopf).toHaveAttribute('aria-label', 'Benutzermenü');
+  });
+
   it('zeigt die gebaute Frontend-Version sichtbar im Dropdown', async () => {
     zeige();
     await oeffne();

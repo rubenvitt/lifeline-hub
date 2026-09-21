@@ -28,8 +28,11 @@
   margin-bottom: 0;
 }
 
+/* Links in der BEDIENFARBE, nicht im Akzent (Neuentwurf, 21.09.2026): `--lfh-marke` liegt
+   nachts bei 2,57 : 1 auf dem Grund und ist rot — ein Link ist ein Bedienziel, und Rot
+   bedient nichts. Der Akzent bleibt der dekorativen Zitatkante vorbehalten. */
 .markdown a {
-  color: var(--md-akzent);
+  color: var(--lfh-bedien);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

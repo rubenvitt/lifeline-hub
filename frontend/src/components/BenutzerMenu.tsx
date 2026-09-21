@@ -3,9 +3,10 @@ import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import type { IconType } from 'react-icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import { rollenFarbe } from '../theme/statusFarben';
+import type { Sachgebiet } from '../api/types';
+import { SACHGEBIETE } from '../stab/sachgebiete';
 import { useDichte, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
-import type { Dichte } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schrift, type Dichte } from '../theme/tokens';
 import { DARSTELLUNG_OPTIONEN, DICHTE_OPTIONEN } from '../theme/darstellungOptionen';
 import { useViewport } from './useViewport';
 
@@ -15,6 +16,27 @@ function initialen(name: string): string {
   if (teile.length === 0) return '?';
   if (teile.length === 1) return teile[0].slice(0, 2).toUpperCase();
   return (teile[0][0] + teile[teile.length - 1][0]).toUpperCase();
+}
+
+/**
+ * Die Funktion im Einsatz als Klartext („S2 Lage") — aus den Sachgebieten, die der
+ * Benutzer in DIESEM Einsatz besetzt (`EinsatzAnzeige.meine_sachgebiete`, LFH-46).
+ *
+ * Besetzt er mehrere, nennt der Kopf das ERSTE in der Reihenfolge S1–S6 (die Liste in
+ * `stab/sachgebiete.ts`, nicht die Reihenfolge der Antwort) — der Kopf hat eine Zeile, und
+ * eine stabile Wahl ist besser als eine, die mit der Serialisierung wechselt. Alle
+ * Sachgebiete stehen auf der Stabsseite.
+ *
+ * `null`, wenn keines besetzt ist: eine „Funktion des Nutzers" gibt es im Datenmodell sonst
+ * nicht (Neuentwurf, bekannte Lücke) — der Aufrufer fällt dann auf den Anzeigenamen zurück,
+ * statt eine Funktion zu erfinden.
+ */
+export function funktionAusSachgebieten(
+  sachgebiete: readonly Sachgebiet[] | null | undefined,
+): string | null {
+  if (!sachgebiete || sachgebiete.length === 0) return null;
+  const treffer = SACHGEBIETE.find((e) => sachgebiete.includes(e.sachgebiet));
+  return treffer ? `${treffer.kuerzel} ${treffer.label}` : null;
 }
 
 /** Präfixe der beiden Umschalt-Gruppen. Sie tragen den Wert im Schlüssel,
@@ -46,9 +68,11 @@ function umschaltEintrag(
  * Rollen-Übersicht, Profil und Abmelden. Holt sich Benutzer und Logout selbst,
  * damit es in beiden Layout-Ebenen (global + Einsatz-Workspace) gleich nutzbar ist.
  *
- * Der Avatar trägt die MARKENFARBE (LFH-328/A2, Spec §1.2) — er ist das Markenzeichen im
- * Kopf, keine Gefahrenmeldung. Sie kommt über `rollenFarbe('marke', token)` und damit je
- * Modus aus `theme/tokens.ts`; vorher stand hier eine Kopie des Hex-Werts.
+ * DIE INITIALEN STEHEN NEUTRAL (Neuentwurf „Instrumententafel", 21.09.2026): eine 24-px-
+ * Kachel auf `flaeche3`, nicht mehr markenrot. Rot ist im Rahmen genau zweimal vergeben —
+ * Logo-Quadrat und aktive Rail-Marke —, eine dritte rote Fläche daneben verwässerte beide.
+ * Neben der Kachel steht ab `lg` die FUNKTION (`funktion`, z. B. „S2 Lage"), sonst der
+ * Anzeigename.
  *
  * ZWEI GESTALTEN, EINE SCHWELLE — die Schwelle gilt nur noch dem TRIGGER
  * (LFH-329 · B1/M12, eingeschränkt in LFH-392). Unterhalb von antds `lg`
@@ -66,11 +90,10 @@ function umschaltEintrag(
  * Kommandopalette: deren Hook wirft außerhalb seines Providers, und der
  * Test-Wrapper rendert keinen — ein Zugriff darüber risse die Layout-Suiten mit.
  */
-export default function BenutzerMenu() {
+export default function BenutzerMenu({ funktion }: { funktion?: string | null } = {}) {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
   const { token } = theme.useToken();
-  const avatarFarbe = rollenFarbe('marke', token);
   // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die
   // Hook-Reihenfolge, sobald der Benutzer eintrifft.
   const { abBreite } = useViewport();
@@ -107,7 +130,15 @@ export default function BenutzerMenu() {
       type: 'group',
       label: (
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '4px 0' }}>
-          <Avatar style={{ backgroundColor: avatarFarbe, color: '#fff', flexShrink: 0 }}>
+          <Avatar
+            shape="square"
+            style={{
+              backgroundColor: token.colorFillSecondary,
+              color: token.colorText,
+              fontFamily: token.fontFamilyCode,
+              flexShrink: 0,
+            }}
+          >
             {initialen(benutzer.anzeigename)}
           </Avatar>
           <div style={{ minWidth: 0 }}>
@@ -187,24 +218,37 @@ export default function BenutzerMenu() {
         style={{
           height: Math.max(40, token.controlHeight),
           minWidth: token.controlHeight,
-          padding: '0 8px',
-          color: '#fff',
+          padding: `0 ${token.paddingXS}px`,
+          color: rahmenFarben.gedaempft,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 8,
+          gap: 9,
         }}
       >
-        <Avatar
-          size={28}
-          style={{ backgroundColor: avatarFarbe, color: '#fff', fontSize: 13, flexShrink: 0 }}
+        {/* Initialen-Kachel 24 px, quadratisch (Entwurf). Kein antd-`Avatar`: der trägt
+            seine Farbe über `colorTextLightSolid`, und der Kopf ist in beiden Modi dunkel —
+            die Kachel liest deshalb die Nachtrollen wie der übrige Rahmen. */}
+        <span
+          style={{
+            width: 24,
+            height: 24,
+            flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: rahmenFarben.aktiv,
+            color: farbenDunkel.text2,
+            fontFamily: schrift.zahl,
+            fontSize: 10,
+          }}
         >
           {initialen(benutzer.anzeigename)}
-        </Avatar>
-        {/* Unter `lg` bleibt der Avatar allein stehen: Name und Pfeil kosten
-            dort bis zu 190 px der Kopfzeile, und der Name steht ohnehin in der
-            Kopfgruppe des Dropdowns. Das `aria-label` am Knopf bleibt, damit
-            der Trigger auch als reines Symbol benannt ist. Höhe und Mindestbreite
-            folgen der Dichte; 40 px bleiben nur der kompakte Höhenboden (LFH-460). */}
+        </span>
+        {/* Unter `lg` bleibt die Kachel allein stehen: Funktion und Pfeil kosten dort
+            bis zu 190 px der Kopfzeile, und der Name steht ohnehin in der Kopfgruppe des
+            Dropdowns. Das `aria-label` am Knopf bleibt, damit der Trigger auch als reines
+            Symbol benannt ist. Höhe und Mindestbreite folgen der Dichte; 40 px bleiben nur
+            der kompakte Höhenboden (LFH-460). */}
         {breit && (
           <>
             <span
@@ -213,11 +257,12 @@ export default function BenutzerMenu() {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                fontSize: 12,
               }}
             >
-              {benutzer.anzeigename}
+              {funktion ?? benutzer.anzeigename}
             </span>
-            <DownOutlined style={{ fontSize: 10, opacity: 0.65 }} />
+            <DownOutlined aria-hidden style={{ fontSize: 10, opacity: 0.65 }} />
           </>
         )}
       </Button>

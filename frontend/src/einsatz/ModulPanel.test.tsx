@@ -2,8 +2,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { dichten } from '../theme/tokens';
-import ModulPanel, { modulListenStil, modulZeilenStil } from './ModulPanel';
+import { dichten, farbenDunkel } from '../theme/tokens';
+import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
 import type { ModulEintrag } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
@@ -200,7 +200,11 @@ describe('ModulPanel', () => {
     const knopf = screen.getByRole('button', {
       name: 'Meldungen, 5 offene Meldungen, davon 2 ungesehen',
     });
-    expect(knopf.querySelector('.ant-badge')).not.toBeNull();
+    // Mono-Zahl statt Badge-Pille (Neuentwurf) — der Wert steht sichtbar im Knopf.
+    const zahl = knopf.querySelector('[data-lfh="modul-zaehler"]');
+    expect(zahl).not.toBeNull();
+    expect(zahl!.textContent).toBe('5');
+    expect(knopf.querySelector('.ant-badge')).toBeNull();
     expect(screen.getByTitle('5 offene Meldungen, davon 2 ungesehen')).toHaveAttribute(
       'aria-hidden',
       'true',
@@ -288,13 +292,19 @@ describe('ModulPanel · Dichte', () => {
     paddingSM: dichten[s].abstand.sm,
     marginSM: dichten[s].abstand.sm,
     marginXS: dichten[s].abstand.xs,
-    colorPrimary: '#BEDIEN',
-    colorPrimaryBg: '#BEDIENBG',
     colorTextDisabled: '#GRAU',
   });
+  const farben = {
+    flaeche2: '#FLAECHE2',
+    text: '#TEXT',
+    text2: '#TEXT2',
+    gedaempft: '#GEDAEMPFT',
+    schwach: '#SCHWACH',
+    bedien: '#BEDIEN',
+  };
   const frei = { aktiv: false, gesperrt: false };
   const hoehe = (s: keyof typeof dichten, mindestTrefflaeche?: number) =>
-    modulZeilenStil(tokenFuer(s), { ...frei, mindestTrefflaeche }).minHeight;
+    modulZeilenStil(tokenFuer(s), farben, { ...frei, mindestTrefflaeche }).minHeight;
 
   it('traegt ohne Trefflaechen-Prop den Boden aus controlHeight', () => {
     expect(hoehe('kompakt')).toBe(30);
@@ -317,31 +327,79 @@ describe('ModulPanel · Dichte', () => {
 
   it('traegt neben der Hoehe eine mitziehende Polsterung', () => {
     // Die ZWEITE Angabe (LFH-365): `minHeight` allein klebt den Text an die Kante.
-    expect(modulZeilenStil(tokenFuer('kompakt'), frei).padding).toBe('7px 11px');
-    expect(modulZeilenStil(tokenFuer('handschuh'), frei).padding).toBe('16px 26px');
+    expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).padding).toBe('7px 11px');
+    expect(modulZeilenStil(tokenFuer('handschuh'), farben, frei).padding).toBe('16px 26px');
   });
 
   it('liest beide Abstaende aus der Staffel', () => {
-    expect(modulZeilenStil(tokenFuer('kompakt'), frei).gap).toBe(7);
-    expect(modulZeilenStil(tokenFuer('handschuh'), frei).gap).toBe(16);
-    // Der Spaltenabstand haengt an `marginXS`. Mit dem statischen `abstand`-Export aus
-    // tokens.ts:171 stuende hier in jeder Stufe 3 — er ist die eingefrorene kompakte Stufe.
-    expect(modulListenStil(tokenFuer('kompakt')).gap).toBe(3);
-    expect(modulListenStil(tokenFuer('komfortabel')).gap).toBe(5);
-    expect(modulListenStil(tokenFuer('handschuh')).gap).toBe(7);
+    expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).gap).toBe(7);
+    expect(modulZeilenStil(tokenFuer('handschuh'), farben, frei).gap).toBe(16);
+    // Die Liste trägt ihre Luft oben/unten aus `marginXS` — mit der Dichte, nicht aus dem
+    // statischen `abstand`-Export (der ist die eingefrorene kompakte Stufe).
+    expect(modulListenStil(tokenFuer('kompakt')).paddingBlock).toBe(6);
+    expect(modulListenStil(tokenFuer('handschuh')).paddingBlock).toBe(14);
   });
 
-  it('markiert die aktive Zeile mit einem Balken ZUSAETZLICH zur Flaeche', () => {
-    const aktiv = modulZeilenStil(tokenFuer('kompakt'), { ...frei, aktiv: true });
-    expect(aktiv.borderLeft).toBe('3px solid #BEDIEN');
-    expect(aktiv.background, 'der Balken ergaenzt die Flaeche, ersetzt sie nicht').toBe(
-      '#BEDIENBG',
-    );
-    // Inaktiv bleibt der Platz reserviert — sonst springt die Zeile beim Aktivieren.
-    expect(modulZeilenStil(tokenFuer('kompakt'), frei).borderLeft).toBe('3px solid transparent');
+  it('aktiv: Fläche flaeche2 und Text, dazu die Marke in bedien (Neuentwurf)', () => {
+    const aktiv = modulZeilenStil(tokenFuer('kompakt'), farben, { ...frei, aktiv: true });
+    expect(aktiv.background).toBe('#FLAECHE2');
+    expect(aktiv.color).toBe('#TEXT');
+    expect(modulMarkeStil(farben, true).background).toBe('#BEDIEN');
+    // Inaktiv gedämpft, ohne Fläche — und die Marke bleibt als Platzhalter stehen, sonst
+    // spränge das Etikett beim Aktivieren um die Markenbreite.
+    const inaktiv = modulZeilenStil(tokenFuer('kompakt'), farben, frei);
+    expect(inaktiv.background).toBe('transparent');
+    expect(inaktiv.color).toBe('#GEDAEMPFT');
+    expect(modulMarkeStil(farben, false)).toMatchObject({ width: 2, height: 16 });
+    expect(modulMarkeStil(farben, false).background).toBe('transparent');
   });
 
   it('traegt den Steuer-Radius, nicht die weiche Ecke', () => {
-    expect(modulZeilenStil(tokenFuer('kompakt'), frei).borderRadius).toBe(0);
+    expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).borderRadius).toBe(0);
+  });
+});
+
+describe('ModulPanel · Einsatzdauer im Fuß', () => {
+  it('zeigt die Dauer seit Beginn, wenn der Einsatz da ist', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Führung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        einsatz={{ begonnen_at: '2026-01-01 00:00:00', abgeschlossen_at: '2026-01-01 06:41:00' }}
+      />,
+    );
+    expect(screen.getByText('Einsatzdauer')).toBeInTheDocument();
+    expect(screen.getByText('06:41 h')).toBeInTheDocument();
+  });
+
+  it('lässt den Fuß ohne Einsatz weg, statt eine Dauer zu erfinden', () => {
+    const { container } = renderMitProviders(
+      <ModulPanel
+        titel="Führung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-lfh="modul-panel-fuss"]')).toBeNull();
+  });
+
+  it('trägt Kopf-Augenbraue und Panelgrund aus den Nachtrollen (Vorgabe)', () => {
+    const { container } = renderMitProviders(
+      <ModulPanel
+        titel="Führung"
+        module={module}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    const panel = container.querySelector<HTMLElement>('[data-lfh="modul-panel"]')!;
+    expect(panel).toHaveStyle({ backgroundColor: farbenDunkel.paneel, width: '208px' });
+    expect(screen.getByText('Führung')).toHaveStyle({ textTransform: 'uppercase' });
   });
 });

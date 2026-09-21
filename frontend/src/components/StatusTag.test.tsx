@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ConfigProvider, theme } from 'antd';
 import { renderMitProviders } from '../test/utils';
-import StatusTag from './StatusTag';
+import StatusTag, { wirksameDarstellungsart } from './StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { antdToken, farbenHell, farbenDunkel } from '../theme/tokens';
 
@@ -19,7 +19,7 @@ function stilVon(element: HTMLElement) {
 
 describe('StatusTag', () => {
   it.each(['light', 'dark'] as const)(
-    '%s: Beschriftung bleibt unabhängig von der Statusfarbe lesbar',
+    '%s: die Rand-Form legt die Rolle auf den Rand und den Wortlaut auf colorText',
     (modus) => {
       const config = {
         algorithm: modus === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
@@ -28,14 +28,55 @@ describe('StatusTag', () => {
       const token = theme.getDesignToken(config);
       renderMitProviders(
         <ConfigProvider theme={config}>
-          <StatusTag darstellung={{ rolle: 'achtung', label: 'vermisst' }} />
+          <StatusTag darstellung={{ rolle: 'achtung', label: 'vermisst' }} darstellungsart="rand" />
         </ConfigProvider>,
       );
       const tag = screen.getByText('vermisst').closest('.ant-tag') as HTMLElement;
       expect(tag).toHaveStyle({ color: token.colorText, borderColor: token.colorWarning });
       expect(tag.style.background).toBe('transparent');
+      expect(tag.dataset.darstellung).toBe('rand');
     },
   );
+
+  /**
+   * Neuentwurf (Entscheidung 2): die Vorgabe ist die getönte FLÄCHE. Die Erwartungen stehen
+   * als Rollenwerte aus der Palette des Modus — die Kontrastrechnung dazu liegt in
+   * `instrument/statusFlaeche.ts`. Geprüft wird der Tagmodus-Sonderfall mit: `achtung`
+   * behält die Fläche, die Beschriftung nimmt `text` (6,02 : 1 getönt läge unter 7).
+   */
+  it.each([
+    ['light', 'normal', farbenHell.normalFlaeche, farbenHell.normalText, farbenHell.normal],
+    ['light', 'achtung', farbenHell.achtungFlaeche, farbenHell.text, farbenHell.achtung],
+    ['light', 'alarm', farbenHell.alarmFlaeche, farbenHell.text, farbenHell.alarm],
+    ['light', 'neutral', farbenHell.flaeche3, farbenHell.text2, farbenHell.schwach],
+    ['dark', 'achtung', farbenDunkel.achtungFlaeche, farbenDunkel.achtung, farbenDunkel.achtung],
+    ['dark', 'alarm', farbenDunkel.alarmFlaeche, farbenDunkel.alarm, farbenDunkel.alarm],
+    ['dark', 'bedien', farbenDunkel.bedienFlaeche, farbenDunkel.bedienText, farbenDunkel.bedien],
+  ] as const)('%s/%s: Vorgabe ist die getönte Fläche', (modus, rolle, grund, text, rand) => {
+    const config = {
+      algorithm: modus === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
+      token: antdToken(modus === 'dark' ? farbenDunkel : farbenHell),
+    };
+    renderMitProviders(
+      <ConfigProvider theme={config}>
+        <StatusTag darstellung={{ rolle, label: 'Probe' }} />
+      </ConfigProvider>,
+    );
+    const tag = screen.getByText('Probe').closest('.ant-tag') as HTMLElement;
+    expect(tag.dataset.darstellung).toBe('flaeche');
+    expect(tag).toHaveStyle({ backgroundColor: grund, color: text, borderColor: rand });
+  });
+
+  it('die Regel: Mandantenfarbe und Marke bleiben am Rand, sonst Fläche', () => {
+    expect(wirksameDarstellungsart(normal, null)).toBe('flaeche');
+    expect(wirksameDarstellungsart(normal, '   ')).toBe('flaeche');
+    expect(wirksameDarstellungsart(normal, '#123456')).toBe('rand');
+    // Eine gesetzte Mandantenfarbe schlägt auch den ausdrücklichen Wunsch.
+    expect(wirksameDarstellungsart(normal, 'red', 'flaeche')).toBe('rand');
+    expect(wirksameDarstellungsart({ rolle: 'marke', label: 'm' }, null)).toBe('rand');
+    expect(wirksameDarstellungsart(normal, null, 'rand')).toBe('rand');
+  });
+
   it('rendert den Text IMMER — die Farbe allein ist kein Kanal (WCAG 1.4.1)', () => {
     renderMitProviders(<StatusTag darstellung={alarm} />);
     expect(screen.getByText('nicht verfügbar')).toBeInTheDocument();
@@ -53,14 +94,14 @@ describe('StatusTag', () => {
     expect(a.dataset.rolle).toBe('alarm');
     expect(n.dataset.rolle).toBe('normal');
     expect(stilVon(a).color).toBeTruthy();
-    expect(stilVon(a).color).toBe(stilVon(n).color);
     expect(stilVon(a).borderColor).not.toBe(stilVon(n).borderColor);
+    expect(a.style.backgroundColor).not.toBe(n.style.backgroundColor);
   });
 
   it('setzt keinen hartkodierten Farbwert — der Wert kommt aus dem aktiven Token', () => {
     renderMitProviders(
       <ConfigProvider theme={{ token: { colorText: '#123456', colorError: '#654321' } }}>
-        <StatusTag darstellung={{ ...alarm, form: 'dreieck' }} />
+        <StatusTag darstellung={{ ...alarm, form: 'dreieck' }} darstellungsart="rand" />
       </ConfigProvider>,
     );
     const tag = screen.getByText('nicht verfügbar').closest('.ant-tag') as HTMLElement;
@@ -93,7 +134,7 @@ describe('StatusTag', () => {
   it('eine transparente Mandantenfarbe lässt Wortlaut und tragenden Rahmen unverändert lesbar', () => {
     renderMitProviders(
       <>
-        <StatusTag darstellung={{ ...normal, label: 'Rollenfarbe' }} />
+        <StatusTag darstellung={{ ...normal, label: 'Rollenfarbe' }} darstellungsart="rand" />
         <StatusTag darstellung={{ ...normal, label: 'Mandantenfarbe' }} farbe="transparent" />
       </>,
     );

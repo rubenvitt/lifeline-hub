@@ -1,21 +1,128 @@
-import { Flex, Typography, theme } from 'antd';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { ConfigProvider, Typography, theme } from 'antd';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { TbChevronRight } from 'react-icons/tb';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
-import { flaeche } from '../theme/tokens';
-// Der Akzentstrich lebt als Klasse in der Gestaltungssprache. Der Import ist
-// bewusst hier und nicht global: bis A2 hatte `sprache.css` genau einen
-// Konsumenten (das Lage-Dashboard). Alle Selektoren der Datei sind klassen-
-// gebunden (`.lfh-*`) — sie färbt also nichts ein, was sie nicht anfasst.
+import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
+// `sprache.css` bleibt importiert: Seiten unter diesem Primitiv benutzen ihre `.lfh-*`-
+// Klassen. Alle Selektoren der Datei sind klassengebunden — sie färbt also nichts ein, was
+// sie nicht anfasst. Der Akzentstrich über dem Titel ist mit dem Neuentwurf entfallen.
 import '../theme/sprache.css';
+import './EinsatzSeite.css';
 import Datenstand from './Datenstand';
 import FensterRahmen from './FensterRahmen';
+import { useModusFarben } from './rahmenStil';
+
+/** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — Aktionen in
+ *  `komfortabel`/`handschuh` (48/72) lassen sie wachsen. */
+export const SEITENKOPF_HOEHE = 44;
+
+/**
+ * Stil der Seitenkopfleiste — rein und exportiert.
+ *
+ * `vollbreit`: die Leiste zieht über die Seitenrinne bis an die Ränder des Inhaltsbereichs
+ * (negativer Rand um genau `--lfh-seiten-polsterung`, Innenrand wieder dieselbe Rinne) —
+ * dieselbe Bauform wie die ETB-Erfassungsleiste (`index.css`, `.etb-erfassung-sticky`). Nur
+ * `EinsatzSeite` setzt das: sie sitzt direkt im `<Content>` der Layouts. `AdminPage` steht
+ * neben der Verwaltungs-Seitenleiste und bleibt in ihrer Spalte.
+ */
+export function seitenkopfStil(
+  token: { margin: number; marginLG: number; paddingXS: number },
+  farben: Pick<Farbrollen, 'linie'>,
+  vollbreit: boolean,
+): CSSProperties {
+  return {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: token.margin,
+    rowGap: token.paddingXS,
+    minHeight: SEITENKOPF_HOEHE,
+    paddingBlock: token.paddingXS,
+    borderBottom: `1px solid ${farben.linie}`,
+    marginBottom: token.marginLG,
+    boxSizing: 'border-box',
+    ...(vollbreit
+      ? {
+          marginInline: 'calc(-1 * var(--lfh-seiten-polsterung))',
+          marginTop: 'calc(-1 * var(--lfh-seiten-polsterung))',
+          paddingInline: 'var(--lfh-seiten-polsterung)',
+        }
+      : {}),
+  };
+}
+
+/** Titel im Seitenkopf: 14/600 (`schriftskala.seitentitel`). Die ÜBERSCHRIFT bleibt eine
+ *  Überschrift (h4, wie bisher) — nur ihr Satz ist der des Entwurfs. */
+export function seitentitelStil(farben: Pick<Farbrollen, 'text'>): CSSProperties {
+  return {
+    margin: 0,
+    fontFamily: schrift[schriftskala.seitentitel.familie],
+    fontSize: schriftskala.seitentitel.groesse,
+    fontWeight: schriftskala.seitentitel.gewicht,
+    lineHeight: 1.4,
+    color: farben.text,
+  };
+}
+
+/** Mono-Meta neben dem Titel (`schriftskala.meta`). */
+export function seitenMetaStil(farben: Pick<Farbrollen, 'gedaempft'>): CSSProperties {
+  return {
+    fontFamily: schrift[schriftskala.meta.familie],
+    fontSize: schriftskala.meta.groesse,
+    fontVariantNumeric: 'tabular-nums',
+    color: farben.gedaempft,
+    whiteSpace: 'nowrap',
+  };
+}
+
+/**
+ * Der Ortspfad im Seitenkopf: 12 px, `schwach`, Chevron als Trenner, letzter Teil `text2`.
+ *
+ * Über einen verschachtelten `ConfigProvider`, nicht über Props: der Breadcrumb ist ein
+ * `ReactNode` der Seite (14 Aufrufer bauen ihn selbst) — Trenner und Farben lassen sich nur so
+ * einheitlich setzen, ohne jede Seite anzufassen. Der letzte Eintrag des Pfads nennt die
+ * Seite selbst; er wird ausgeblendet (`EinsatzSeite.css`), weil der Titel ihn direkt danach
+ * als Überschrift trägt — sonst stünde „Schäden › Schäden" da.
+ */
+function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrollen }) {
+  return (
+    <ConfigProvider
+      breadcrumb={{
+        separator: (
+          <span aria-hidden="true" style={{ display: 'inline-flex', verticalAlign: 'middle' }}>
+            <TbChevronRight size={13} />
+          </span>
+        ),
+      }}
+      theme={{
+        token: { fontSize: 12 },
+        components: {
+          Breadcrumb: {
+            itemColor: farben.schwach,
+            linkColor: farben.schwach,
+            separatorColor: farben.schwach,
+            lastItemColor: farben.text2,
+          },
+        },
+      }}
+    >
+      <div className="lfh-seitenkopf__pfad">{children}</div>
+    </ConfigProvider>
+  );
+}
 
 interface EinsatzSeiteProps {
   titel: ReactNode;
   /** Einzeilige, gedämpfte Beschreibung unter dem Titel. */
   beschreibung?: ReactNode;
-  /** Ortsangabe über dem Titel (z. B. eine `Breadcrumb` aus `routing/deeplinks`). */
+  /** Ortsangabe vor dem Titel (z. B. eine `Breadcrumb` aus `routing/deeplinks`). */
   breadcrumb?: ReactNode;
+  /**
+   * Optionales Mono-Meta neben dem Titel (Neuentwurf: „Titel 14/600 + Mono-Meta"), z. B.
+   * eine Nummer oder ein Zählerstand. Zahlen und Zeiten laufen in Mono.
+   */
+  meta?: ReactNode;
   /**
    * Rechter Header-Slot — **genau eine Primäraktion**, der Rest sekundär.
    *
@@ -84,6 +191,7 @@ export default function EinsatzSeite({
   titel,
   beschreibung,
   breadcrumb,
+  meta,
   aktionen,
   neueZeile,
   hinweis,
@@ -93,6 +201,7 @@ export default function EinsatzSeite({
   children,
 }: EinsatzSeiteProps) {
   const { token } = theme.useToken();
+  const farben = useModusFarben();
   const aktionenRef = useRef<HTMLDivElement>(null);
   const seitenWurzel = useRef<HTMLDivElement>(null);
 
@@ -137,41 +246,40 @@ export default function EinsatzSeite({
     }
   });
 
+  const koerperStil: CSSProperties = { maxWidth: breite };
+
   const kopf = (
     <>
-      {breadcrumb && <div style={{ marginBottom: token.marginXS }}>{breadcrumb}</div>}
       {/**
-       * `wrap` ist keine Kosmetik (LFH-339 · C4, gemessen). Ohne es steht der
-       * Aktionsblock unbedingt neben dem Titel, und ein einziger Knopf mit langer
-       * Beschriftung sprengt den Schirm: auf `/fahrzeuge` bei 390 px lief die Seite bis
-       * 505 px, der innerste sprengende Knoten war „Ad-hoc-Fahrzeug".
+       * DIE SEITENKOPFLEISTE (Neuentwurf „Instrumententafel", `neuentwurf.dc.html` S2):
+       * 44 px, Haarlinie unten, bis an die Ränder des Inhaltsbereichs. Links Ortspfad und
+       * Titel 14/600 mit Mono-Meta, rechts der Aktionen-Slot. Der Akzentstrich über dem
+       * Titel (A0-Signatur) ist entfallen — die Leiste trägt die Seite, kein Titelblock.
        *
-       * `minWidth: 0` an beiden Kindern, weil ein Flex-Kind per Vorgabe `min-width: auto`
-       * hat und damit NICHT unter seine Inhaltsbreite schrumpft — ohne das bringt `wrap`
-       * allein nichts, sobald ein Kind für sich schon zu breit ist.
+       * `wrap` ist keine Kosmetik (LFH-339 · C4, gemessen): ohne es steht der Aktionsblock
+       * unbedingt neben dem Titel, und ein einziger Knopf mit langer Beschriftung sprengt
+       * den Schirm (`/fahrzeuge` bei 390 px lief bis 505 px). `minWidth: 0` an beiden
+       * Kindern, weil ein Flex-Kind sonst nicht unter seine Inhaltsbreite schrumpft.
        */}
-      <Flex
-        wrap
-        justify="space-between"
-        align="flex-start"
-        gap={token.margin}
-        style={{ marginBottom: token.marginLG }}
-      >
-        <div style={{ minWidth: 0 }}>
-          <span
-            className="lfh-marke__strich"
-            style={{ marginBottom: token.marginXS }}
-            aria-hidden="true"
-          />
-          <Typography.Title level={4} style={{ margin: 0 }}>
+      <div data-lfh="seitenkopf" style={seitenkopfStil(token, farben, true)}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: token.marginXS * 3,
+            rowGap: 2,
+            minWidth: 0,
+          }}
+        >
+          {breadcrumb && <Ortspfad farben={farben}>{breadcrumb}</Ortspfad>}
+          <Typography.Title level={4} style={seitentitelStil(farben)}>
             {titel}
           </Typography.Title>
-          {beschreibung && (
-            <div>
-              <Typography.Text type="secondary">{beschreibung}</Typography.Text>
-            </div>
-          )}
-          <Datenstand dataUpdatedAt={dataUpdatedAt} />
+          {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}
+          <span style={{ color: farben.gedaempft }}>
+            <Datenstand dataUpdatedAt={dataUpdatedAt} />
+          </span>
         </div>
         {/* Die Marke macht die Zusicherung von außen prüfbar (LFH-340 · C5): „genau eine
             Primäraktion IM KOPF" ist ohne sie nur global zählbar, und eine Seite mit einem
@@ -179,25 +287,44 @@ export default function EinsatzSeite({
             im Kopf etwas falsch zu machen. Die Dev-Warnung oben zählt bereits genau diesen
             Teilbaum — das Attribut gibt dem Test denselben Zuschnitt. */}
         {aktionen && (
-          <div ref={aktionenRef} data-lfh="seitenkopf-aktionen" style={{ minWidth: 0 }}>
+          <div
+            ref={aktionenRef}
+            data-lfh="seitenkopf-aktionen"
+            style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginXS * 2 }}
+          >
             {aktionen}
           </div>
         )}
-      </Flex>
-      {hinweis && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
+      </div>
+      {(beschreibung || hinweis) && (
+        <div style={koerperStil}>
+          {beschreibung && (
+            <div style={{ marginBottom: token.margin }}>
+              <Typography.Text type="secondary">{beschreibung}</Typography.Text>
+            </div>
+          )}
+          {hinweis && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
+        </div>
+      )}
     </>
   );
 
+  // Die WURZEL ist vollbreit (sonst reichte die Kopfleiste nur so weit wie die Lesebreite);
+  // die Lesebreite `breite` gilt für den Inhalt darunter. Linksbündig statt zentriert: der
+  // Entwurf verankert Seiten an der Navigation, nicht in der Fenstermitte — ein zentrierter
+  // Inhalt unter einem linksbündigen Titel stünde versetzt.
   return (
-    <div ref={seitenWurzel} style={{ maxWidth: breite, margin: '0 auto' }}>
+    <div ref={seitenWurzel}>
       {fensterInhalt != null ? (
         <FensterRahmen kopf={kopf} mindestHoehe={fensterInhalt.mindestHoehe}>
-          {fensterInhalt.inhalt}
+          <div style={{ ...koerperStil, height: '100%' }}>{fensterInhalt.inhalt}</div>
         </FensterRahmen>
       ) : (
         kopf
       )}
-      {children}
+      <div data-lfh="seiten-inhalt" style={koerperStil}>
+        {children}
+      </div>
     </div>
   );
 }

@@ -2,8 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Modal, Input, theme, type InputRef } from 'antd';
+import { TbSearch } from 'react-icons/tb';
+import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
-import { form } from '../theme/tokens';
+import { schrift } from '../theme/tokens';
 import { sichtbareDatensaetze } from './datensaetze';
 import {
   filtereBefehle,
@@ -30,6 +32,20 @@ import { palettenZeilenStil } from './zeilenStil';
  * (Befund M80) — ein zweiter Entprellungsmechanismus wäre eine zweite Wahrheit.
  */
 const ENTPRELLUNG_MS = 300;
+
+/**
+ * Maß der Sprungpalette nach dem Neuentwurf (S2-Overlay): 640 breit, 120 px von oben, Kopf
+ * 52 px. Layoutmaße, keine Trefflächen — die Zeilen tragen ihren Boden über
+ * `palettenZeilenStil` aus der Dichte-Staffel.
+ */
+const PALETTE = { breite: 640, oben: 120, kopf: 52 } as const;
+
+/**
+ * Die abgedunkelte Maske hinter der Palette (Entwurf: `rgba(5,6,8,.72)`). Kein Rollenwert:
+ * sie ist in beiden Modi dieselbe Abdunkelung — die Palette ist ein Fokusmoment, kein
+ * Farbträger. Deshalb hier als Wert und nicht als Farbrolle in `theme/`.
+ */
+const MASKE = 'rgba(5, 6, 8, 0.72)';
 
 /** EIN Leer-Array statt eines Vorgabewerts im Kopf: ein `[]` dort wäre je Render eine neue
  *  Identität und machte die `useMemo` darunter wirkungslos. */
@@ -65,6 +81,7 @@ export function CommandPalette({
   schliesse,
 }: Props) {
   const { token } = theme.useToken();
+  const farben = useModusFarben();
   const [suche, setSuche] = useState('');
   /**
    * Die Auswahl hängt an der BEFEHLS-ID, nicht am Listenindex (LFH-391 · C3).
@@ -256,23 +273,56 @@ export function CommandPalette({
     const i = indexVon.get(b.id)!;
     const istAktiv = i === aktiv;
     const Icon = b.icon;
+    const kontextId = b.kontext ? `cmd-${b.id}-kontext` : undefined;
     return (
       <div
         key={b.id}
         id={`cmd-${b.id}`}
         role="option"
         aria-selected={istAktiv}
+        // Der Kontext BESCHREIBT, er benennt nicht (Begründung an `Befehl.kontext`).
+        aria-describedby={kontextId}
         onMouseEnter={() => setAktivId(b.id)}
         onClick={() => fuehreAus(b)}
         style={{
           ...palettenZeilenStil(token),
-          background: istAktiv ? token.colorPrimaryBg : 'transparent',
-          color: istAktiv ? token.colorPrimary : token.colorText,
+          // Aktive Zeile (Neuentwurf): Grund `flaeche3`, Ikone in Bedienfarbe. Der Text
+          // bleibt `text` — die Auswahl trägt die Fläche plus `aria-selected`, nicht eine
+          // eingefärbte Schrift.
+          background: istAktiv ? farben.flaeche3 : 'transparent',
+          color: token.colorText,
         }}
       >
-        {Icon && <Icon size={18} />}
-        <span>{b.label}</span>
-        {b.kuerzel && <Tastenkuerzel style={{ marginLeft: 'auto' }}>{b.kuerzel}</Tastenkuerzel>}
+        {Icon && (
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-flex',
+              flexShrink: 0,
+              color: istAktiv ? token.colorPrimary : farben.schwach,
+            }}
+          >
+            <Icon size={16} />
+          </span>
+        )}
+        <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{b.label}</span>
+        {b.kontext && (
+          <span
+            id={kontextId}
+            aria-hidden="true"
+            style={{ flexShrink: 0, fontSize: 11, color: farben.schwach, whiteSpace: 'nowrap' }}
+          >
+            {b.kontext}
+          </span>
+        )}
+        {b.kuerzel && <Tastenkuerzel>{b.kuerzel}</Tastenkuerzel>}
+        {/* Die Enter-Marke steht NUR an der aktiven Zeile (Entwurf): sie sagt, was Enter
+            gerade auslöst. Satz, kein Ziel — `aria-hidden`, der Weg steht in der Fußzeile. */}
+        {istAktiv && !b.kuerzel && (
+          <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
+            ↵
+          </Tastenkuerzel>
+        )}
       </div>
     );
   }
@@ -284,70 +334,78 @@ export function CommandPalette({
       onCancel={schliesse}
       footer={null}
       closable={false}
-      width={640}
+      width={PALETTE.breite}
       zIndex={2000}
-      styles={{ body: { padding: 0 } }}
+      style={{ top: PALETTE.oben }}
+      styles={{
+        mask: { background: MASKE },
+        // Rahmen in Bedienfarbe, keine Rundung (Entwurf). `colorBgElevated` ist `flaeche2`
+        // des Modus — die Palette folgt dem Farbschema, nur Kopf und Rail sind modusfest.
+        container: {
+          padding: 0,
+          borderRadius: 0,
+          border: `1px solid ${token.colorPrimary}`,
+          background: token.colorBgElevated,
+        },
+        body: { padding: 0 },
+      }}
       destroyOnHidden
     >
       <div>
-        <Input
-          ref={inputRef}
-          autoFocus
-          variant="borderless"
-          size="large"
-          placeholder="Suchen: Module, Aktionen, Einstellungen …"
-          role="combobox"
-          aria-expanded={flach.length > 0}
-          aria-controls="cmd-liste"
-          aria-activedescendant={aktiverId ? `cmd-${aktiverId}` : undefined}
-          value={suche}
-          onChange={(e) => setSuche(e.target.value)}
-          onKeyDown={aufTaste}
-          style={{ padding: '12px 16px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}
-        />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: token.paddingSM,
+            minHeight: PALETTE.kopf,
+            paddingInline: token.padding,
+            borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          }}
+        >
+          <span aria-hidden="true" style={{ display: 'inline-flex', color: token.colorPrimary }}>
+            <TbSearch size={18} />
+          </span>
+          <Input
+            ref={inputRef}
+            autoFocus
+            variant="borderless"
+            // Der Platzhalter bleibt BYTE-GLEICH: sechs e2e-Locator greifen das Feld darüber,
+            // einer davon als zugänglichen Namen der Combobox (`gate1-ueberlauf.spec.ts`).
+            placeholder="Suchen: Module, Aktionen, Einstellungen …"
+            role="combobox"
+            aria-expanded={flach.length > 0}
+            aria-controls="cmd-liste"
+            aria-activedescendant={aktiverId ? `cmd-${aktiverId}` : undefined}
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+            onKeyDown={aufTaste}
+            style={{ flex: 1, padding: 0, fontSize: 16 }}
+          />
+          <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
+            ESC
+          </Tastenkuerzel>
+        </div>
         {/*
-         * Die Modusanzeige (LFH-391 · A4) — sichtbarer Gegenpart zu einem Filter, der die
-         * Liste um zwei Drittel kürzt. Sie beantwortet zwei Fragen: WIE komme ich hinein
-         * (Legende, solange nichts getippt ist) und BIN ich drin (Wortlaut, solange der
-         * Modus steht). Ohne die zweite Hälfte wäre der aktive Modus von einem kaputten
-         * Filter nicht zu unterscheiden — auf dem Berührungsweg sieht niemand die getippte
-         * Zeile als Syntax.
+         * Die Modusanzeige (LFH-391 · A4): BIN ich im Modus? Solange ein Präfix steht,
+         * nennt sie ihn — ohne sie wäre ein Filter, der die Liste um zwei Drittel kürzt,
+         * von einem kaputten nicht zu unterscheiden. Die Legende „WIE komme ich hinein"
+         * steht seit dem Neuentwurf dauerhaft in der Fußzeile (unten), nicht mehr hier.
          *
-         * BEDINGT, nicht dauerhaft: bei gewöhnlicher Suche kostet sie sonst eine der rund
-         * sieben Zeilen, die der Fükw-Schirm zeigt. Der Tastaturvertrag steht damit in der
-         * Steuerzeile und NICHT im Platzhalter (CLAUDE.md, Nacharbeit zu LFH-335) — der
-         * Platzhaltertext bleibt byte-gleich, womit auch die fünf e2e-Locator halten.
+         * Der Tastaturvertrag steht in Steuer- und Fußzeile und NICHT im Platzhalter
+         * (CLAUDE.md, Nacharbeit zu LFH-335).
          *
-         * Rollen statt Werte (LFH-352): Sekundärfarbe, kleine Schrift, Abstandsrollen.
          * KEIN Bedienziel — Satz, kein Ziel, also kein `controlHeight`-Boden.
          */}
-        {(modus !== 'alles' || rest === '') && (
+        {modus !== 'alles' && (
           <div
             data-lfh="palette-modus"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: token.margin,
-              padding: `${token.paddingXS}px ${token.paddingSM}px`,
+              padding: `${token.paddingXS}px ${token.padding}px`,
               fontSize: token.fontSizeSM,
               color: token.colorTextSecondary,
             }}
           >
-            {modus === 'alles'
-              ? modiMitPraefix().map((m) => (
-                  // Das Präfixzeichen als Marke, nicht als Satzzeichen im Fliesstext: ein
-                  // nacktes '>' hat weder Rahmen noch Abstand zum Nachbarn — JSX verschluckt
-                  // den Umbruch zwischen zwei Elementen ersatzlos, deshalb die Flex-Zeile
-                  // mit `gap` statt eines Leerzeichens.
-                  <span
-                    key={m.modus}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}
-                  >
-                    <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
-                    {m.legende}
-                  </span>
-                ))
-              : PALETTE_MODI[modus].hinweis}
+            {PALETTE_MODI[modus].hinweis}
           </div>
         )}
         <div
@@ -355,24 +413,22 @@ export function CommandPalette({
           role="listbox"
           ref={listeRef}
           // `min(60vh, 480px)` statt der festen 380 (LFH-337 · M11): auf dem Fükw-Schirm
-          // zeigte der Kasten von 42+ Befehlen rund sieben. Die Obergrenze bleibt, damit
-          // die Liste auf einem hohen Schirm nicht die ganze Seite füllt; `60vh` deckelt
-          // sie auf niedrigen Schirmen, wo 480 px über den Rand liefen.
-          style={{ maxHeight: 'min(60vh, 480px)', overflowY: 'auto', padding: token.paddingXS }}
+          // zeigte der Kasten von 42+ Befehlen rund sieben. `60vh` deckelt ihn auf niedrigen
+          // Schirmen, wo 480 px über den Rand liefen.
+          style={{
+            maxHeight: 'min(60vh, 480px)',
+            overflowY: 'auto',
+            paddingBlock: token.paddingXS,
+          }}
         >
           {sucheAktiv && flach.map((b) => optionsZeile(b))}
           {gruppen.map((x) => (
             <div key={x.gruppe} role="group" aria-label={GRUPPEN_LABEL[x.gruppe]}>
+              {/* Gruppen-Augenbraue (10/600/.14em, Versalien) — `schriftskala.augenbraue`. */}
               <div
                 style={{
-                  padding: `${token.paddingXS}px ${token.paddingSM}px`,
-                  fontSize: token.fontSizeSM,
-                  textTransform: 'uppercase',
-                  // Versalien ohne Sperrung sind der Grund, warum eine
-                  // Gruppenüberschrift „gedrängt" aussieht — LFH-352 hält den Wert
-                  // als Formrolle, statt ihn je Stelle zu erfinden.
-                  letterSpacing: form.versalSperrung,
-                  color: token.colorTextSecondary,
+                  ...augenbraueStil(farben.schwach),
+                  padding: `${token.paddingSM}px ${token.padding}px ${token.paddingXS}px`,
                 }}
               >
                 {GRUPPEN_LABEL[x.gruppe]}
@@ -385,22 +441,14 @@ export function CommandPalette({
          * Zwei Leerzustände, nicht einer (LFH-391 · C3): wer '@a' tippt, sieht per
          * Konstruktion nichts — die statischen Befehle sind vom Modus ausgefiltert, die
          * Datensatz-Abrufe laufen erst ab zwei Zeichen. Ein stummes „Keine Treffer" wäre
-         * dort von „kaputt" nicht zu unterscheiden, und auf dem Berührungsweg sieht niemand
-         * die getippte Zeile als Syntax.
+         * dort von „kaputt" nicht zu unterscheiden.
          *
-         * DIE REGION STEHT IMMER, auch wenn sie schweigt (Review-Befund 7, Bauform
-         * `components/Erfassung.tsx:352`): eine `aria-live`-Region meldet nur Änderungen an
-         * bereits vorhandenem Inhalt. Zusammen mit ihrem Text eingehängt sagte sie nichts an
-         * — hörbar blieb allein der Wechsel der Combobox auf `aria-expanded=false`, und der
-         * trennt „zu kurz" nicht von „nichts gefunden". Genau diese Ununterscheidbarkeit ist
-         * der Grund, aus dem die Zeile existiert.
+         * DIE REGION STEHT IMMER, auch wenn sie schweigt (Review-Befund 7): eine
+         * `aria-live`-Region meldet nur Änderungen an bereits vorhandenem Inhalt.
          *
-         * AUSSERHALB der Listbox: deren Kinder sind Optionen und Gruppen, ein Satz gehört
-         * dort nicht hinein. Sichtbar ändert das nichts — die Liste ist leer, wenn die
-         * Region spricht.
+         * AUSSERHALB der Listbox: deren Kinder sind Optionen und Gruppen.
          *
-         * KEIN Bedienziel: Satz, kein Ziel, also kein `controlHeight`-Boden. Die Polsterung
-         * hängt am Inhalt, sonst stünde im Trefferfall ein leerer Streifen unter der Liste.
+         * KEIN Bedienziel: Satz, kein Ziel, also kein `controlHeight`-Boden.
          */}
         <div
           data-lfh="palette-leerzustand"
@@ -408,6 +456,44 @@ export function CommandPalette({
           style={{ padding: leerText ? token.padding : 0, color: token.colorTextSecondary }}
         >
           {leerText}
+        </div>
+        {/*
+         * FUSSZEILE (Neuentwurf): Mono 10, NUR Hinweise, die wirklich funktionieren — Enter
+         * öffnet, und die drei Präfixe aus `PALETTE_MODI` (eine Quelle, kein zweiter
+         * Wortlaut). Der Entwurf zeigt zusätzlich „⇧↵ im Panel" und „# Koordinate"; beides
+         * gibt es nicht (`#` ist das ETB-Präfix, eine Koordinatensuche fehlt) und steht
+         * deshalb nicht da.
+         */}
+        <div
+          data-lfh="palette-fuss"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            columnGap: token.margin,
+            rowGap: token.paddingXS,
+            padding: `${token.paddingSM}px ${token.padding}px`,
+            borderTop: `1px solid ${token.colorBorderSecondary}`,
+            fontFamily: schrift.zahl,
+            fontSize: 10,
+            color: farben.schwach,
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+            <Tastenkuerzel>↵</Tastenkuerzel>
+            öffnen
+          </span>
+          {modiMitPraefix().map((m) => (
+            // Das Präfixzeichen als Marke, nicht als Satzzeichen im Fließtext: ein nacktes
+            // '>' hat weder Rahmen noch Abstand zum Nachbarn — JSX verschluckt den Umbruch
+            // zwischen zwei Elementen ersatzlos, deshalb die Flex-Zeile mit `gap`.
+            <span
+              key={m.modus}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}
+            >
+              <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
+              {m.legende}
+            </span>
+          ))}
         </div>
       </div>
     </Modal>

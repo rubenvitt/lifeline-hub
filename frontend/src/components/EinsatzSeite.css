@@ -1,0 +1,13 @@
+/* Seitenkopf (Neuentwurf „Instrumententafel", 21.09.2026).
+   ============================================================================
+   Der Ortspfad einer Seite endet in ihrem eigenen Namen („Einsätze › Hochwasser ›
+   Schäden"). Im Seitenkopf folgt direkt danach der Titel als Überschrift — der letzte
+   Pfadeintrag wird deshalb ausgeblendet, sonst stünde der Name zweimal nebeneinander.
+   Der Trenner davor BLEIBT: er ist der Chevron vor dem Titel.
+
+   Nur der letzte EINTRAG (`li` ohne Trennerklasse): antd hängt hinter den letzten
+   Eintrag keinen Trenner mehr an, `:last-child` trifft also immer den Seitennamen.
+   Keine Farbwerte hier — die setzt `EinsatzSeite.tsx` über den antd-Komponententoken. */
+.lfh-seitenkopf__pfad .ant-breadcrumb ol > li:last-child:not(.ant-breadcrumb-separator) {
+  display: none;
+}

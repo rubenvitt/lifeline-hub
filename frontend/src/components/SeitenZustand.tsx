@@ -1,8 +1,10 @@
-import { Alert, Button, Result, theme } from 'antd';
+import { Alert, Button, theme } from 'antd';
 import { useNavigate } from 'react-router';
 import { ApiError } from '../api/client';
 import { flaeche } from '../theme/tokens';
 import type { PlatzhalterRueckweg } from './Platzhalter';
+import Paneel from './instrument/Paneel';
+import { schriftStil, useRollen } from './instrument/rollenwerte';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache (`.lfh-skelett`,
 // A0-Referenzseite Lage-Dashboard). Der Import gehört HIERHER und nicht an den
 // Aufrufer: zwei der vier Konsumenten stecken in `AdminPage`, nicht in
@@ -96,7 +98,7 @@ interface SeitenLeerProps {
  * **Weder `Empty` noch `Result` noch `Alert`**, sondern die zentrierte Box, die
  * `components/Liste.tsx` schon immer baut. Drei Gründe, jeder gemessen: antds Leer-Element
  * trägt genau den Bezeichner, den AK3 repoweit auf null zählt — hier eingebaut, wäre das
- * Kriterium unerfüllbar; `Result` — die Form von `Platzhalter` — ist für eine 360-px-Karte
+ * Kriterium unerfüllbar; `Result` — die frühere Form von `Platzhalter` — ist für eine 360-px-Karte
  * zu groß; und ein `Alert` mit Aktions-Slot ist im Bestand das *Fehler*-Idiom, eine leere
  * Liste aber keine Meldung.
  *
@@ -220,25 +222,44 @@ export function SeitenSackgasse({
   rueckweg,
 }: SeitenSackgasseProps) {
   const navigate = useNavigate();
-  const knoepfe = [
-    onWiederholen && (
-      <Button key="wiederholen" type="primary" onClick={onWiederholen}>
-        Erneut abrufen
-      </Button>
-    ),
-    rueckweg && (
-      <Button key="rueckweg" onClick={() => void navigate(rueckweg.pfad)}>
-        {rueckweg.label}
-      </Button>
-    ),
-  ].filter(Boolean);
+  const { token: t, rollen } = useRollen();
+  const untertitel = hinweis ?? ursacheText(ursache);
   return (
-    <Result
-      status="error"
-      title={titel}
-      subTitle={hinweis ?? ursacheText(ursache)}
-      extra={knoepfe}
-    />
+    // Neuentwurf „Instrumententafel": dieselbe Form wie `Platzhalter` (Paneel statt antds
+    // `Result`), damit zwei Sackgassen nicht zwei Formensprachen sprechen. Die Kante links
+    // in `alarm` trägt die Aussage „gescheitert" zusätzlich zum Wortlaut (WCAG 1.4.1); die
+    // Knöpfe bleiben blau — Rot bedient nichts.
+    <Paneel
+      titel="Nicht verfügbar"
+      koerperPolster
+      style={{
+        maxWidth: flaeche.seiteSchmal,
+        marginInline: 'auto',
+        marginBlockStart: t.marginLG,
+        boxShadow: `inset 3px 0 0 0 ${rollen.alarm}`,
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: t.marginSM }}>
+        <div style={{ ...schriftStil('seitentitel'), color: rollen.text }}>{titel}</div>
+        {untertitel != null && (
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
+            {untertitel}
+          </p>
+        )}
+        {(onWiederholen || rueckweg) && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.marginSM }}>
+            {onWiederholen && (
+              <Button type="primary" onClick={onWiederholen}>
+                Erneut abrufen
+              </Button>
+            )}
+            {rueckweg && (
+              <Button onClick={() => void navigate(rueckweg.pfad)}>{rueckweg.label}</Button>
+            )}
+          </div>
+        )}
+      </div>
+    </Paneel>
   );
 }
 

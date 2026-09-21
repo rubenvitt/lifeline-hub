@@ -106,7 +106,7 @@ describe('Kommandopalette · Datensätze finden (LFH-391 · C3)', () => {
 
     const zeile = await screen.findByRole(
       'option',
-      { name: /Personen · R-042 · Müller/ },
+      { name: /R-042 · Müller/, description: 'Personen' },
       { timeout: 3000 },
     );
     await u.click(zeile);
@@ -162,7 +162,11 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     await suche(u, '42');
 
     expect(
-      await screen.findByRole('option', { name: /Personen · R-042 · Müller/ }, { timeout: 3000 }),
+      await screen.findByRole(
+        'option',
+        { name: /R-042 · Müller/, description: 'Personen' },
+        { timeout: 3000 },
+      ),
     ).toBeInTheDocument();
   });
 
@@ -183,8 +187,10 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     await suche(u, '42');
 
     // Der Schaden trägt dieselbe Nummer und kommt — die Suche läuft, nur das Modul fehlt.
-    await screen.findByRole('option', { name: /Schäden · S-042/ }, { timeout: 3000 });
-    expect(screen.queryByRole('option', { name: /Personen · R-042/ })).not.toBeInTheDocument();
+    await screen.findByRole('option', { name: /S-042/, description: 'Schäden' }, { timeout: 3000 });
+    expect(
+      screen.queryByRole('option', { name: /R-042/, description: 'Personen' }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -213,10 +219,21 @@ describe('Kommandopalette · Rangvorteil des Moduls, in dem man steht (LFH-391 �
     zeigePalette(route);
 
     await suche(u, 'florian');
-    await screen.findByRole('option', { name: /Personal · Florian 1/ }, { timeout: 3000 });
+    await screen.findByRole(
+      'option',
+      { name: /Florian 1/, description: 'Personal' },
+      { timeout: 3000 },
+    );
+    // „Kontext · Label", wie die Zeile gelesen wird: seit dem Neuentwurf steht die
+    // Modulherkunft als Kontext (Beschreibung der Option) neben dem Label.
     return screen
       .getAllByRole('option')
-      .map((o) => o.textContent ?? '')
+      .map((o) => {
+        const kontext = o.getAttribute('aria-describedby');
+        const k = kontext ? (document.getElementById(kontext)?.textContent ?? '') : '';
+        const label = o.querySelector('span:not([aria-hidden])')?.textContent ?? '';
+        return `${k} · ${label}`;
+      })
       .filter((t) => t.includes('Florian 1'));
   }
 

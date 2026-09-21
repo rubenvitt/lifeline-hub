@@ -599,7 +599,11 @@ function befehlFuer(kand: Kandidat, navigate: (pfad: string) => void): Befehl {
   return {
     id: schluessel(kand),
     gruppe: 'datensaetze',
-    label: `${m?.label ?? kand.modulKey} · ${kand.basisLabel}`,
+    // Die Modulherkunft steht seit dem Neuentwurf als KONTEXT rechts, nicht mehr als Präfix
+    // im Label — und als Schlagwort, damit „personen" weiterhin Personen-Datensätze findet.
+    label: kand.basisLabel,
+    kontext: m?.label ?? kand.modulKey,
+    schlagworte: [m?.label ?? kand.modulKey],
     icon: m?.icon,
     ausfuehren: () => navigate(kand.ziel),
   };

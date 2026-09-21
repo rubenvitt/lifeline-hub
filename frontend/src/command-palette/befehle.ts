@@ -13,7 +13,13 @@ import {
   TbArrowsMaximize,
   TbHandStop,
 } from 'react-icons/tb';
-import { modulRegistry, istModulFreigegeben, modulZielRoute } from '../einsatz/modulRegistry';
+import {
+  kategorien,
+  modulRegistry,
+  istModulFreigegeben,
+  modulZielRoute,
+  type KategorieKey,
+} from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
   einsaetzePfad,
@@ -31,6 +37,11 @@ import type { Befehl, BefehlKontext, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import type { Koordinatenformat } from '../api/types';
+
+/** Kontext einer Moduloption: der volle Kategoriename (Neuentwurf, Sprungpalette S2). */
+function kategorieKontext(key: KategorieKey): string | undefined {
+  return kategorien.find((k) => k.key === key)?.label;
+}
 
 /**
  * Die Ziele stehen als **Builder** aus `routing/deeplinks.ts` in der Tabelle, nicht als
@@ -264,6 +275,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         id: `zuletzt:${m.key}`,
         gruppe: 'zuletzt',
         label: m.label,
+        kontext: kategorieKontext(m.kategorie),
         icon: m.icon,
         ausfuehren: () => {
           k.merkeModulBesuch?.(m.key);
@@ -280,6 +292,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         id: `modul:${m.key}`,
         gruppe: 'module',
         label: m.label,
+        kontext: kategorieKontext(m.kategorie),
         icon: m.icon,
         schlagworte: m.beschreibung ? [m.beschreibung] : undefined,
         ausfuehren: () => {

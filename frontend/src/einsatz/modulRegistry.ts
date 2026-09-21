@@ -1,6 +1,7 @@
 import type { IconType } from 'react-icons';
 import {
-  TbHierarchy,
+  TbHierarchy2,
+  TbLayoutGrid,
   TbFileDescription,
   TbSitemap,
   TbUsers,
@@ -36,8 +37,23 @@ export type ModulZaehlerQuelle = 'meldungen' | 'auftraege' | 'erinnerungen' | 'c
 
 export interface Kategorie {
   key: KategorieKey;
+  /** Voller Name — zugänglicher Name des Rail-Ziels, Kopf des Modulpanels, Drawer-Zeile. */
   label: string;
+  /**
+   * Sichtbares Kurzetikett unter der Rail-Ikone (Neuentwurf „Instrumententafel",
+   * `docs/design/2026-09-21-neuentwurf/shell.dc.html`): 9 px Versalien in 60 px Breite
+   * tragen „Kommunikation" nicht. Der volle Name bleibt `aria-label` und `title` —
+   * die Namensabfrage der Tests und der Screenreader hängen an `label`, nicht hieran.
+   */
+  kurz: string;
   icon: IconType;
+  /**
+   * Steht abgesetzt am FUSS der Rail statt in der Kategorienreihe (Neuentwurf: „Einstellungen
+   * unten abgesetzt"). Bewusst ein Flag und keine zweite Liste: `kategorien` bleibt die EINE
+   * Aufzählung, über die Rail, Drawer-Akkordeon, Rahmen und Kommandopalette iterieren — eine
+   * herausgelöste Einstellungs-Kategorie müsste jeder dieser Leser einzeln wieder einsammeln.
+   */
+  fuss?: true;
 }
 
 export interface ModulEintrag {
@@ -63,18 +79,37 @@ export interface ModulEintrag {
   zaehlerQuelle?: ModulZaehlerQuelle;
 }
 
-/** Reihenfolge der Icon-Rail (eine Zeile je Kategorie). */
+/** Reihenfolge der Icon-Rail (eine Zeile je Kategorie; `fuss` steht abgesetzt unten).
+ *  Ikonen nach dem Neuentwurf (Tabler: hierarchy-2, truck, clipboard-text, map-2, message,
+ *  settings). */
 export const kategorien: Kategorie[] = [
-  { key: 'fuehrung', label: 'Führung', icon: TbHierarchy },
-  { key: 'kraefte', label: 'Kräfte & Mittel', icon: TbTruck },
-  { key: 'erfassung', label: 'Erfassung', icon: TbClipboardText },
-  { key: 'lage', label: 'Lage', icon: TbMap2 },
-  { key: 'kommunikation', label: 'Kommunikation', icon: TbMessage },
-  { key: 'einstellungen', label: 'Einstellungen', icon: TbSettings },
+  { key: 'fuehrung', label: 'Führung', kurz: 'Führung', icon: TbHierarchy2 },
+  { key: 'kraefte', label: 'Kräfte & Mittel', kurz: 'Kräfte', icon: TbTruck },
+  { key: 'erfassung', label: 'Erfassung', kurz: 'Erfassung', icon: TbClipboardText },
+  { key: 'lage', label: 'Lage', kurz: 'Lage', icon: TbMap2 },
+  { key: 'kommunikation', label: 'Kommunikation', kurz: 'Komm.', icon: TbMessage },
+  {
+    key: 'einstellungen',
+    label: 'Einstellungen',
+    kurz: 'Einst.',
+    icon: TbSettings,
+    fuss: true,
+  },
 ];
 
 export const modulRegistry: ModulEintrag[] = [
-  // Führung
+  // Führung — neu gedacht mit dem Neuentwurf (21.09.2026): der Überblick ist die Startseite
+  // eines Einsatzes, und die Aufträge/Befehle stehen hier statt unter Kommunikation —
+  // Anordnungen sind ein Führungsmittel, kein Nachrichtenkanal.
+  {
+    key: 'ueberblick',
+    kategorie: 'fuehrung',
+    label: 'Überblick',
+    icon: TbLayoutGrid,
+    route: 'ueberblick',
+    status: 'fertig',
+    beschreibung: 'Führungsüberblick des Einsatzes — Startseite des Einsatz-Workspace.',
+  },
   {
     key: 'einsatzdaten',
     kategorie: 'fuehrung',
@@ -94,6 +129,16 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.',
   },
   {
+    key: 'auftraege',
+    kategorie: 'fuehrung',
+    label: 'Aufträge/Befehle',
+    icon: TbClipboardList,
+    route: 'auftraege',
+    status: 'fertig',
+    beschreibung: 'Aufträge und Befehle mit Quittierung.',
+    zaehlerQuelle: 'auftraege',
+  },
+  {
     key: 'stab',
     kategorie: 'fuehrung',
     label: 'Stab',
@@ -102,7 +147,18 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung',
   },
-  // Kräfte & Mittel
+  // Kräfte & Mittel — das Meldebild (bis 21.09.2026 „Kräfteübersicht" unter Lage) steht
+  // vorn: es ist die Verdichtung der Kategorie. Route und Schlüssel bleiben, damit
+  // Deeplinks und gespeicherte Standard-Module nicht brechen.
+  {
+    key: 'kraefteuebersicht',
+    kategorie: 'kraefte',
+    label: 'Meldebild',
+    icon: TbListDetails,
+    route: 'kraefteuebersicht',
+    status: 'fertig',
+    beschreibung: 'Meldebild der eingesetzten Kräfte (Kräfteübersicht).',
+  },
   {
     key: 'einheiten',
     kategorie: 'kraefte',
@@ -226,15 +282,6 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Strukturierte Lageberichte.',
   },
   {
-    key: 'kraefteuebersicht',
-    kategorie: 'lage',
-    label: 'Kräfteübersicht',
-    icon: TbListDetails,
-    route: 'kraefteuebersicht',
-    status: 'fertig',
-    beschreibung: 'Meldebild der eingesetzten Kräfte.',
-  },
-  {
     key: 'gefahrenzonen',
     kategorie: 'lage',
     label: 'Gefahren',
@@ -273,16 +320,6 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Terminierte Erinnerungen.',
     zaehlerQuelle: 'erinnerungen',
-  },
-  {
-    key: 'auftraege',
-    kategorie: 'kommunikation',
-    label: 'Aufträge/Befehle',
-    icon: TbClipboardList,
-    route: 'auftraege',
-    status: 'fertig',
-    beschreibung: 'Aufträge und Befehle mit Quittierung.',
-    zaehlerQuelle: 'auftraege',
   },
   {
     key: 'meldungen',
@@ -448,10 +485,14 @@ export function istModulFreigegeben(
   );
 }
 
-/** Ziel der Default-Route /einsaetze/:id: Lage-Dashboard sobald fertig, sonst ETB-Fallback. */
+/**
+ * Ziel der Default-Route /einsaetze/:id: der Führungsüberblick (Neuentwurf, Entscheidung 3
+ * des Auftraggebers: „Führung · Überblick ist die Startseite eines Einsatzes"), solange er
+ * fertig ist, sonst der ETB-Fallback. Bis 21.09.2026 stand hier das Lage-Dashboard.
+ */
 export function redirectZiel(register: ModulEintrag[] = modulRegistry): string {
-  const dashboard = register.find((m) => m.key === 'lage-dashboard');
-  return dashboard && dashboard.status === 'fertig' ? dashboard.route : 'etb';
+  const start = register.find((m) => m.key === 'ueberblick');
+  return start && start.status === 'fertig' ? start.route : 'etb';
 }
 
 /**

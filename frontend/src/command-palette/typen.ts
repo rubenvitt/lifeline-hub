@@ -45,6 +45,17 @@ export interface Befehl {
   label: string;
   schlagworte?: string[];
   icon?: IconType;
+  /**
+   * Kontext rechts neben dem Label (Neuentwurf, Sprungpalette S2): wo der Treffer wohnt —
+   * die Kategorie eines Moduls („Lage"), das Modul eines Datensatzes („Personen"). Er
+   * ersetzt das frühere Präfix „Modul · …" IM Label.
+   *
+   * DARSTELLUNG, KEIN NAME: die Zeile nennt ihn als Beschreibung (`aria-describedby`), nicht
+   * im zugänglichen Namen — sonst hieße jede Moduloption „ETB Erfassung", und der Name, an
+   * dem Tests und Gedächtnis hängen, wechselte mit der Kategorie. Wer über den Kontext
+   * SUCHEN können soll, trägt ihn zusätzlich in `schlagworte` (so `datensaetze.ts`).
+   */
+  kontext?: string;
   kuerzel?: string;
   /**
    * Dieser eine Befehl geht NICHT ins Gedächtnis, obwohl seine Gruppe merkbar ist

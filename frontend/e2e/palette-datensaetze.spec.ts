@@ -61,6 +61,18 @@ function paletteInput(page: Page): Locator {
 
 // Login-/Anlege-Helfer aus `command-palette.spec.ts` kopiert — es gibt (noch) kein
 // geteiltes e2e-Hilfsmodul (gleichlautend in sechs Bestands-Specs vermerkt).
+/**
+ * Eine Datensatz-Option über Label UND Modul-Kontext (Neuentwurf „Instrumententafel"): die
+ * Modulherkunft steht seit 21.09.2026 als KONTEXT rechts in der Zeile (Beschreibung der
+ * Option, `aria-describedby`), nicht mehr als Präfix „Personen · …" im Label. Der Name der
+ * Option ist damit das Label allein; der Kontext wird über seinen eigenen Knoten gebunden.
+ */
+function datensatzOption(page: Page, kontext: string, name: RegExp): Locator {
+  return page
+    .getByRole('option', { name })
+    .filter({ has: page.locator('[id$="-kontext"]', { hasText: kontext }) });
+}
+
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -115,7 +127,7 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
   await zumModul(page, einsatzId, 'etb');
 
   await suche(page, kennung);
-  const treffer = page.getByRole('option', { name: new RegExp(`Personen · ${kennung}`) });
+  const treffer = datensatzOption(page, 'Personen', new RegExp(kennung));
   await expect(treffer).toBeVisible();
 
   /*
@@ -131,7 +143,7 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
    */
   const nachbar = `R-${String(Number(kennung.slice(2)) + 1).padStart(3, '0')}`;
   await paletteInput(page).fill(nachbar);
-  await expect(page.getByRole('option', { name: /Personen · R-/ })).toHaveCount(0);
+  await expect(datensatzOption(page, 'Personen', /R-/)).toHaveCount(0);
 
   await paletteInput(page).fill(kennung);
   await expect(treffer).toBeVisible();
@@ -222,12 +234,8 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
   // der Deeplink trägt oder die Chronologie ohnehin schon stand.
   await zumModul(page, einsatzId, 'personen');
 
-  const etbTreffer = page.getByRole('option', {
-    name: new RegExp(`ETB · #${zahl} · ${ZIELTEXT}`),
-  });
-  const personTreffer = page.getByRole('option', {
-    name: new RegExp(`Personen · ${personKennung}`),
-  });
+  const etbTreffer = datensatzOption(page, 'ETB', new RegExp(`#${zahl} · ${ZIELTEXT}`));
+  const personTreffer = datensatzOption(page, 'Personen', new RegExp(personKennung));
 
   /*
    * ERST OHNE PRÄFIX — die Hälfte, die die Bindung überhaupt prüfbar macht: dieselbe Zahl
