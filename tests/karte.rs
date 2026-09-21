@@ -564,6 +564,51 @@ async fn fachebenen_hochwasser_wird_bedient() {
     assert_eq!(v["features"]["features"].as_array().unwrap().len(), 1);
 }
 
+/// Die ODL-Ebene (LFH-78) steht im Quellen-`match` und liest den Cache-Schlüssel `odl`.
+/// Muster und Begründung für das Vorbefüllen wie bei `fachebenen_hochwasser_wird_bedient`:
+/// netzunabhängig, der BfS-GeoServer bleibt außen vor. Ohne `bbox` — die Ebene ist
+/// bundesweit, eine bbox-Pflicht wie bei KRITIS wäre hier ein 400 aus Versehen.
+#[tokio::test]
+async fn fachebenen_odl_wird_bedient() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = build_router(AppState {
+        pool: pool().await,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+        karten_dir: karten_dir.clone(),
+    });
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let gesetzt = FachebeneAntwort::ok(
+        "odl",
+        "Testattribution",
+        None,
+        serde_json::json!({
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "geometry": { "type": "Point", "coordinates": [12.87, 50.79] },
+                "properties": { "titel": "Chemnitz", "wert": 0.7, "stufe": "stark_erhoeht" }
+            }]
+        }),
+    );
+    lifeline_hub::karte::cache::setze(&cache_pool, "odl", &gesetzt).await;
+
+    let res = anfrage(&app, "GET", "/api/karte/fachebenen/odl", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["quelle"], "odl");
+    assert_eq!(v["status"], "ok");
+    let f = &v["features"]["features"][0];
+    assert_eq!(f["properties"]["stufe"], "stark_erhoeht");
+}
+
 // ===== Admin-CRUD: Online-Quellen =====
 
 #[tokio::test]
