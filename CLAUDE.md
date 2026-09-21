@@ -68,12 +68,90 @@ stehen in …", „Herleitung und Prüfspur: …") — die brechen beim Verschie
 Test, kein Fehlerbild, nur ein toter Pfad in einer Begründung. Wer den Baum doch anfasst, greppt
 die Verweise zuerst.
 
+## Frontend — Gestaltungssprache Neuentwurf „Instrumententafel“ (22.09.2026)
+
+Der Claude-Design-Neuentwurf ist app-weit umgesetzt (Commits `aed31b40`…`060a1b39`). Er ist
+keine neue Grundlage, sondern die Fortschreibung von LFH-352 (dunkel, Radius 0,
+Archivo/JetBrains Mono, Bedienfarbe blau): neutralere, tiefere Palette · Nachtbetrieb als
+Vorgabe · neuer Rahmen · neue Bausteine · neu gedachte Screens. **Maßgeblich sind die
+Entscheidungen des Auftraggebers** in `docs/design/2026-09-21-neuentwurf/umsetzung.md` (dort
+auch die Palette mit Werten); die Entwürfe liegen daneben (`neuentwurf.dc.html`,
+`shell.dc.html`, Inline-Styles maßgeblich — das mitgelieferte `_ds/…/tokens/*.css` ist der
+ALTE Stand und wird nicht übernommen). **Bei Konflikten mit älteren Regeln gewinnt das
+Design — außer bei der Sichtung** (BBK bleibt, siehe unten). Wo diese Datei eine ältere Regel
+umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
+
+- **Nachtbetrieb ist die Vorgabe.** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`
+  (vorher `system`, das als Wahl erhalten bleibt), **gespiegelt im Bootstrap-Skript von
+  `index.html`** — wer eines ändert, ändert beide. Die Hellpalette ist aus der Nachtpalette
+  **abgeleitet** (gleiche Rollen, Kontrast mindestens wie vorher).
+- **Rollen in `theme/tokens.ts`** (+ `theme/rollen.css`, Gate 5 unverändert): neu `kopf`,
+  `paneel`, `flaeche3`, `text2`, `steuerRahmen` (trägt antds `colorBorder` — der Entwurfswert
+  `linieStark` hält WCAG 1.4.11 nicht), `bedienHover`, `bedienText`, `aufBedien`, `normalText`,
+  die deckenden Statusflächen `normal|achtung|alarm|bedienFlaeche`, `bannerGrund`/`bannerLinie`
+  und die Zeilentönungen `berichtigung|luecke|problemZeile`. Zwei gemessene Abweichungen vom
+  Entwurf (`schwach`, `steuerRahmen`) und die benannte Verschlechterung von `marke` stehen mit
+  Messwerten am Nachtblock. **`rahmenFarben`** ist bewusst modusunabhängig: Kopfleiste und Rail
+  bleiben in **beiden** Modi dunkel, und als `Farbrollen` müsste der Nachtblock sie wertgleich
+  doppeln — genau die Redundanz, die `rollen.guard.test.ts` verbietet. Daneben eigene
+  Paletten, keine `Statusrolle`: **`etbTypFarben{Dunkel,Hell}`** (je Typ `kante` + `wort`, weil
+  Dekoration und Text verschiedene Böden haben; Zugriff über `etbTypFarbe()` in
+  `statusFarben.ts`) und **`warnstufeFarben{Dunkel,Hell}`** (Balken der Gefahrenmatrix, Zugriff
+  `warnstufeBalkenFarbe()`; die Zellfläche bleibt `flaechenFarbe`). **`schriftskala`** benennt
+  die Stufen über der Dichte-Grundschrift (Überschrift 30 · Seitentitel 14/600 · Augenbraue
+  10/600 Versalien .14em · Mono-Meta 11 · Datenwert 22/32/40 Mono 500); CSS-Seite
+  `--lfh-typo-*`, deckungsgleich gehalten von `rollen.guard.test.ts`. Zahlen, Zeiten,
+  Funkrufnamen, Koordinaten und Nummern laufen immer Mono mit `tabular-nums`. Die Dichte-Staffel
+  30/48/72 gilt weiter — die 22/30/46 des Entwurfs sind Skizze.
+- **Bausteine in `components/instrument/`** (Seiten importieren über `index.ts`; jede Datei
+  trägt im Kopf, welche Regel sie hält): `Augenbraue` (Metadaten-Stimme; `als="h2…h6"` macht
+  sie zur Überschrift, ohne die Optik zu ändern) · `Paneel`/`PaneelZeile` (Grundfläche, Kopf
+  38 px) · `Formularpaneel` (Feldgruppe einer Formularseite als Paneel; reine Hülle im selben
+  `<Form>`, die sticky Speichern-Leiste steht danach im selben `<form>`) · `PaneelZustand` (Lade-/Fehler-/Leerzustand eines Paneelkörpers) · `Kennzahl`/
+  `Kennzahlenband` („Zahl führt", Fugenraster) · `Aufgliederung`/`Balken` (Mengenbilder, nie
+  Ersatz der Zahl) · `Zeitachseneintrag` (Zeile jedes zeitlich gelesenen Stroms: Zeit ·
+  2-px-Typkante · Typwort · Text · Hinweiszeile) · `StatusZelle`/`StatusChip` (Status als
+  getönte Fläche, `wort` ist Pflicht-Prop) mit der einen Übersetzung `statusFlaeche.ts` ·
+  `Segmentleiste` (Ersatz für antds `Segmented`, dessen Pillenform die Formensprache bricht) ·
+  `Sammelbanner` (Live-Zufluss, blau: Bedienaufforderung, keine Gefahr) ·
+  `Schnellerfassungszeile` (nur die Hülle — die Erfassungs-Norm gilt weiter) · `Datenraster`/
+  `Datenfeld` (Detail-Optik statt `Descriptions`, `<dl>`) · `rollenwerte`/`useRollen` (Rollen
+  des aktiven Modus für TSX, weil antd `paneel`, `flaeche3` & Co. nicht kennt).
+- **Seitenkopf 44 px** in `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE`, Boden, der mit der
+  Staffel wächst): `titel` 14/600 als `h1` (Paneele gliedern darunter ab `h2`) · `meta` Mono · `aktionen` rechts (Primär blau gefüllt,
+  sekundär umrandet). **`breite` ist per Vorgabe `'voll'`** — die Instrumententafel füllt die
+  Inhaltsbreite; `'schmal'` (`flaeche.seiteSchmal`) ist die begründete Ausnahme für reine
+  Formularseiten. `flaeche.seiteBreit` lebt nur noch, bis Bestandsaufrufer es beim eigenen
+  Umbau streichen. Der Akzentstrich über dem Titel ist entfallen.
+- **Rahmen** (Layoutmaße des Entwurfs, keine Dichte-Angaben): Kopfleiste 52 px
+  (`components/Kopfleiste.tsx`, `KOPF_HOEHE`; Markenzelle in `RAIL_BREITE` 60 mit
+  14-px-Quadrat in `marke`) · Rail 60 px, Kategoriezeile 62 px als Boden unter der Staffel
+  (`einsatz/IconRail.tsx`; sichtbares Kurzetikett `kurz`, voller Name bleibt `aria-label`;
+  Einstellungen per `fuss: true` unten abgesetzt, in derselben `kategorien`-Liste) ·
+  Modulpanel 208 px mit 42-px-Kopf, aktive Modulmarke 2 × 16 px in `bedien`, Fuß
+  „Einsatzdauer" (`einsatz/ModulPanel.tsx`) · **Sprungpalette** ⌘K 640 breit, 120 px von oben,
+  Kopf 52, Maske als fester Wert (`command-palette/CommandPalette.tsx`; die Zeilen tragen ihren
+  Boden weiter über die Staffel).
+- **Modulstruktur** (`einsatz/modulRegistry.ts`): **Führung · Überblick** ist die Startseite
+  eines Einsatzes (`redirectZiel()`, Fallback ETB; vorher das Lage-Dashboard); **Aufträge/
+  Befehle** stehen unter Führung statt Kommunikation (Anordnungen sind Führungsmittel);
+  **Meldebild** ist der sichtbare Name der früheren Kräfteübersicht und steht vorn unter
+  Kräfte & Mittel — **Schlüssel und Route bleiben `kraefteuebersicht`**, damit Deeplinks und
+  gespeicherte Standard-Module nicht brechen.
+- **Keine erfundenen Daten.** Was der Entwurf zeigt, aber keine Datenquelle hat, wird
+  weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
+  Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Pegel/Evakuiert 606/607,
+  FMS-Status je Einheit 609, „keine Rückmeldung" 610, ETB-Gesamtzahl/Tagesbilanz-Summen 612,
+  Koordinate an der Person 613). Die Auslassung trägt ihr Ticket im Code-Kommentar und wird im
+  Test als **Abwesenheit** gepinnt.
+
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
 **Farbachse der Betroffenen-Module (LFH-455):** Personenstatus, Schadensstatus und
 Schadensausmaß gehören zum A2-Vertrag in `theme/statusFarben.ts`. Ihre Darstellung folgt
-`StatusTag` aus LFH-446: die Rollenfarbe kennzeichnet den Rand, `token.colorText` trägt die
-Beschriftung. Dafür ist keine zusätzliche Darstellungsoption nötig. „Betroffen“ und
+`StatusTag` — seit dem Neuentwurf (22.09.2026) als getönte Fläche (siehe „Statusfarbe" in
+der Bedien-Leitlinie); die Rand-Form aus LFH-446 (Rollenfarbe am Rand, `colorText` als
+Beschriftung) bleibt über `darstellungsart="rand"` erreichbar. „Betroffen“ und
 „abgemeldet“ sagen nichts über medizinische Dringlichkeit; „verstorben“ ist kein roter
 Alarm wie SK I. Diese Personenstatus sind neutral, „vermisst“ ist `achtung`. Beim Schaden
 ist „offen“ `achtung`, „übergeben“ `bedien`, „abgeschlossen“ neutral. Beim Ausmaß ist
@@ -90,7 +168,9 @@ es ist kein Preset und erzeugt ein statisches Farbpaar ohne Nachtmodus. SK IV/bl
 benannte fachliche Ausnahme zur blauen Bedien-/Beziehungsrolle. Übergabe, Geschädigt-Bezug
 und UHS-Verortung tragen `bedien` als aktive Beziehung, nicht als Zustand der referenzierten
 Entität. Personenstatus und Sichtung bleiben unabhängig, auch bei `SK=tot` mit anderem
-Personenstatus.
+Personenstatus. **Die Sichtung ist die eine Ausnahme vom Vorrang des Neuentwurfs**
+(22.09.2026): dessen Farben (II orange, III gelb, IV grau) hat der Auftraggeber ausdrücklich
+abgelehnt — `SichtungsTag`/`sichtungsfarben` bleiben BBK.
 
 `e2e/betroffene-kontrast.spec.ts` prüft die tatsächlich zusammengesetzten Text-/Hintergrundpaare
 auf Aufnahme-Route, im Modal, in Listen und Details: Tag ≥ 7:1, Nacht ≥ 5:1. Die Sichtungswahl
@@ -147,10 +227,12 @@ unter `md` (`form="auto"`) ist die begründungspflichtige Ausnahme, nicht der No
 Begründung steht im Dateikopf von `Datensicht.tsx`, die Regel in Abschnitt AK3b des
 Drawer-Specs. Keine der 13 Katalogtabellen wird zu Karten.
 
-**ETB-Nachzüge LFH-463/464:** `Datensicht` hat für die Auto-Form einen optionalen
-`tabelleAb`-Punkt; der Default bleibt `md`. Ausschließlich die ETB-Chronologie setzt
-nach Browsermessung `xl` (1200 px): darunter Ereigniskarten, darüber Tabelle.
-`lg` würde den gemessenen 1024-px-Engpass nicht beheben. Der optionale Einsatztermin
+**ETB-Nachzüge LFH-463/464:** Der `tabelleAb`-Punkt, den LFH-464 der ETB-Chronologie als
+einziger Konsumentin nach Browsermessung auf `xl` gesetzt hatte (`lg` behob den gemessenen
+1024-px-Engpass nicht), ist mit dem Neuentwurf (22.09.2026) **entfallen** — das Tagebuch ist
+keine `Datensicht` mehr (siehe unten). Die Auto-Form bricht fest bei `md`;
+`datensicht.guard.test.ts` hält die Prop aus der Deklaration fern — wer sie zurückholt,
+braucht wieder eine Browsermessung, nicht den Verweis auf LFH-464. Der optionale Einsatztermin
 `naechste_lagebesprechung_at` wird in den Einsatzdaten gepflegt und als absolute
 Wiedervorlage-Schnellwahl angeboten, wenn er bekannt und zukünftig ist. Kein
 berechneter Rhythmus. Prüfbelege stehen in
@@ -166,7 +248,9 @@ ein Test auf `document.body.scrollWidth` allein ist gegen diesen Befund blind (e
 altem Stand grün, während der Text 1122 px weit aus der Sicht ragte). Die Abhilfe ist ein
 **Opt-in**: trägt genau EINE Spalte `mindestBreite` und haben alle übrigen eine Zahlbreite,
 setzt das Primitiv `Σ(width) + mindestBreite` als `scroll.x`; `min-width: 100%` bleibt daneben
-stehen. Ohne den Haken ändert sich an den achtzehn Katalogtabellen nichts.
+stehen. Ohne den Haken ändert sich an den achtzehn Katalogtabellen nichts. Gemessen wurde der
+Befund an der ETB-Tabelle, die es seit dem Neuentwurf nicht mehr gibt; der Haken lebt in
+`personen/personenSpalten.tsx` weiter, die ETB-Zahlen unten sind Herleitung, kein Bestand.
 **Die ≥50-%-Zusicherung aus C7 ist davon nicht berührt, und das folgt aus der Rechnung statt
 aus einer Messung:** liegt die Zahl unter der Containerbreite, ist die *benutzte* Breite in
 beiden Fassungen dieselbe und die `auto`-Layoutrechnung verteilt identisch — auseinander gehen
@@ -184,31 +268,33 @@ nimmt, bekommt das Bestandsverhalten plus DEV-Warnung zurück — ein Opt-in, da
 tut, wäre von einem kaputten nicht zu unterscheiden. Herleitung und Prüfspur:
 `docs/superpowers/specs/2026-09-11-lfh-523-etb-langtext-umbruch.md`.
 
-**Die erste eingelöste Karten-Ausnahme ist die ETB-Chronologie** (LFH-342/C7,
-`etb/EtbTabelle.tsx`). Sie zeigt, woran die Formfrage wirklich hängt, und korrigiert dabei ein
-früheres Verdikt: die B5e-Prüfliste hatte „die Chronologie wird verglichen, sie bleibt eine
-Tabelle" geschrieben. Ein **Tagebuch wird gelesen** — die Frage ist „was ist passiert?", nicht
-„welcher von diesen ist der richtige?"; es gibt keine Sortierung, keinen Spaltenfilter und
-keine Suche über die Spalten, die Ordnung ist die Zeit und serverseitig festgelegt. Der Satz
-„keine der 13" traf sie ohnehin nie: `katalogTabelle.guard.test.ts` führte sie ausdrücklich als
-**neunzehnte** Konsumentin und benannten Restposten (LFH-330/AP8) — der ist damit eingelöst,
-das ETB ist **nach oben** aus dem Inventar herausgefallen wie `SchaedenPage` in C5.
-**Der Kartenzweig ist ein Eigenbau** (`art: 'eigen'`, erster und einziger Eintrag in
-`KARTEN_EIGENBAU`), und auch das ist begründungspflichtig: der Plan-Modus trägt Titel + Status
-+ höchstens **drei** Sekundärfelder + genau **eine** Primäraktion, die Ereigniszeile braucht
-fünf Kopffelder, einen Volltextblock und **drei** Aktionen. Wer den zweiten Eigenbau einträgt,
-begründet ebenso — und prüft zwei gemessene Fallen mit: `Datensicht` gibt beim Eigenbau
-`karte.render(...)` **roh** zurück, der Wrapper mit `zeilenKlasse` und
-`data-lfh="datensicht-karte"` entsteht nur im Plan-Modus. Ohne die Marke findet
-`scrolleZurZeile` die Karte nicht, und ein Deeplink läuft unter `md` still ins Leere; ohne die
-Klasse gilt jede Zeilenmarkierung nur im Tabellenzweig.
-**Das Spaltenbudget ist die Zusicherung, nicht die Kartenauflösung**: dass der Meldungstext im
-Fükw ≥ 50 % der Contentbreite bekommt, tragen `abBreite: 'xxl'` an den zwei Nebenspalten und
-der Zähler des Spaltenschalters — beide Ausblendungsgründe laufen durch dieselbe Funktion, der
-Zähler kann also nicht lügen. Gemessen wird das in Playwright gegen die **Contentbreite**, nie
-gegen die Tabellenbreite: `KatalogTabelle` rendert mit `width: max-content`, bei langem Inhalt
-wächst die Tabelle über den Container und ein Verhältnis Spalte-zu-Tabelle würde kleiner,
-obwohl der Text mehr Platz hat.
+**Ein Tagebuch wird gelesen — das ETB ist auf allen Breiten eine Zeitachse** (Neuentwurf S4,
+22.09.2026; `etb/EtbZeitachse.tsx` aus dem Baustein `Zeitachseneintrag`, Ableitungen rein in
+`etb/zeitachseModell.ts`). Die Frage ist „was ist passiert?", nicht „welcher von diesen ist der
+richtige?"; es gibt keine Sortierung, keinen Spaltenfilter, keine Spaltenauswahl, die Ordnung
+ist die Zeit und serverseitig festgelegt. Das hatte LFH-342/C7 schon gegen die B5e-Prüfliste
+(„die Chronologie wird verglichen") entschieden, damals noch als `Datensicht` mit Tabelle ab
+`xl` und Karten-**Eigenbau** darunter (`etb/EtbTabelle.tsx`, erster Eintrag in
+`KARTEN_EIGENBAU`) — der Neuentwurf zieht die Linie zu Ende. Damit ist das ETB aus dem
+Konsumenteninventar gefallen (vorher elfte `Datensicht`- und in `katalogTabelle.guard.test.ts`
+die **neunzehnte** Konsumentin, LFH-330/AP8), ebenso die **Lagemeldungen**
+(`pages/LagemeldungenPage.tsx`, Zeitachse mit Typkante „Lage"), und `KARTEN_EIGENBAU` ist
+**wieder leer** (`datensicht.guard.test.ts` pinnt die Länge 0). Die Seite trägt auf breitem
+Schirm rechts eine Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`) — **nicht** „Tagesbilanz" wie
+im Entwurf: sie zählt nur die geladenen Einträge, Summen und Gesamtzahl fehlen serverseitig
+(LFH-612) — und die Erfassung **unten** am Fuß der Zeitachse (`.etb-erfassung-sticky` in
+`index.css`, Grund `kopf`).
+**Eine gemessene Falle bleibt, auch ohne Datensicht:** jede Zeile trägt
+`data-lfh="datensicht-karte"` und die Zeilenklasse selbst — daran findet `scrolleZurZeile` sie,
+und daran hängt der Deeplink `?eintrag=`. Wer einen neuen Eigenbau in `KARTEN_EIGENBAU`
+einträgt, begründet ihn gegen den Plan-Modus (Titel + Status + höchstens **drei**
+Sekundärfelder + genau **eine** Primäraktion) und prüft dieselbe Falle: `Datensicht` gibt beim
+Eigenbau `karte.render(...)` **roh** zurück, Marke und Klasse entstehen nur im Plan-Modus.
+**Die ≥ 50-%-Zusicherung für den Meldungstext im Fükw gilt weiter** und wird in
+`e2e/etb-chronologie.spec.ts` jetzt an der Zeitachse gemessen — gegen die **Contentbreite**,
+nie gegen die Breite des eigenen Containers: der Befund ist in der Contentbreite formuliert,
+und ein Verhältnis zu einem mitwachsenden Container kann kleiner werden, obwohl der Text mehr
+Platz hat.
 
 **Zwei schwebende Bänder an einem Rand werden gestapelt, nicht gestaffelt** (LFH-355,
 `pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
@@ -255,7 +341,7 @@ bedeutungslos.
 Die **zweite Achse** neben LFH-19 (Gerät und Einsatzkontext, LFH-327). Die Regel oben bleibt
 unverändert gültig — sie sagt, welche **Form** der Inhalt bekommt. Diese hier sagt, für welchen
 **Kontext** er gebaut wird; die **Erscheinung** (Farbe, Form, Schrift) regelt die
-Gestaltungssprache aus LFH-352. Dieselbe Form kann je Kontext eine andere Dichte, Treffläche und
+Gestaltungssprache aus LFH-352 in der Fassung des Neuentwurfs (Abschnitt oben). Dieselbe Form kann je Kontext eine andere Dichte, Treffläche und
 Spaltenzahl haben.
 
 **Die vier Kontexte:** **Fükw** (primär, 13–15", Tastatur+Maus, kompakt, voll) · **Führungs-Tablet**
@@ -427,7 +513,8 @@ Alltag wichtigsten:
   Sichtbarkeitsfilterung keine Aktion übrig, wird **gar kein** Auslöser gerendert statt eines
   deaktivierten. Der zugängliche Name trägt die **Zeilenkennung** (`Aktionen zu Eintrag 7`), weil n
   Zeilen sonst n gleichnamige Knöpfe liefern. Träger: `chat/NachrichtenStrom.tsx:88`,
-  `etb/EtbTabelle.tsx`, `etb/MetaChip.tsx`, `pages/lagekarte/Sidebar.tsx` (Bild-Zeile).
+  `etb/EtbZeitachse.tsx` (vorher `EtbTabelle.tsx`), `etb/MetaChip.tsx`,
+  `pages/lagekarte/Sidebar.tsx` (Bild-Zeile).
   **Gezählt wird NACH der Rechteprüfung** (LFH-366): fällt die Menge unter drei, ist ein Menü
   keine Bündelung, sondern ein Umweg — die Bild-Zeile zeigt ohne Schreibrecht ihre eine Aktion
   weiter direkt. Beide Fälle gehören als **Paar** getestet; „mit Recht ist der direkte Knopf WEG"
@@ -526,12 +613,20 @@ Alltag wichtigsten:
   `StatusTag`/`BemerkungZelle`, und `Datensicht` konsumiert es) plus `statusBedienung` am
   Kartenplan. Der Bedienweg sitzt am **`status`-Slot**, nie am `aktion`-Slot: der sichert genau
   EINE Primäraktion zu und ist auf allen drei Seiten mit „Entfernen" belegt.
-  **Statusfarbe nur als Punkt/Rand/Beistrich, nie als Textfläche.** `status_farbe` ist bei
-  Fahrzeug und Personal ungeprüfter Freitext (`statusFarben.ts:28-41`), Kontrast ist dort nicht
-  zugesichert. C4 hat die Fläche deshalb auch im **Bestand** abgetragen: A2 hatte die DB-Achse
-  auf antds `color`-Prop stehenlassen, aus Sorge um den **Verlust** der gepflegten Farbe — die
-  geht über `StatusTag`s `farbe`-Prop auf Rand und Text und bleibt damit erhalten. Das ist
-  A2s Sorge eingelöst, kein Zurückdrehen.
+  **Statusfarbe: Rollenfarben als getönte Fläche, Mandanten-Freitextfarben nur am Rand**
+  (Neuentwurf 22.09.2026 — **kehrt** „nur als Punkt/Rand/Beistrich, nie als Textfläche" für
+  ROLLENfarben **um**, Entscheidung 2 des Auftraggebers: „Ampel als Fläche, Zahl bleibt
+  lesbar"). `StatusTag` zeigt per Vorgabe `darstellungsart="flaeche"`; die Werte und ihre
+  Kontrastrechnung stehen an **einer** Stelle, `components/instrument/statusFlaeche.ts`, die
+  auch `StatusChip`/`StatusZelle` tragen. Kontrastregel dort: im **Tagmodus** fallen `achtung`
+  (6,02) und `alarm` (5,52) als getönter Text unter den 7 : 1-Boden — die Beschriftung nimmt
+  dann `text`, die Fläche behält ihren Ton, der 1-px-Rand bleibt in der Rollenfarbe (≥ 3 : 1,
+  gemessen in `kraefte-kontrast.spec.ts`); nachts gilt der Entwurf ungebrochen. **Die
+  Rand-Form bleibt Vertrag** für zwei Fälle: `status_farbe` ist bei Fahrzeug und Personal
+  ungeprüfter Freitext (`statusFarben.ts:28-41`) — ist eine Mandantenfarbe gesetzt, erzwingt
+  `wirksameDarstellungsart` `rand`, weil niemand den Kontrast einer Fläche neben einem frei
+  gewählten Punkt zusichern kann; und die Rolle `marke` hat keine Fläche. Die gepflegte Farbe
+  geht als dekorativer Punkt (LFH-446) nicht verloren — A2s Sorge bleibt eingelöst.
   **`fms_anker` bleibt Sortier-Anker und Tastenkürzel**, nicht tragende Bedienform — die Spalte
   ist nullable, ein 0–9-Tastenfeld darauf hätte Löcher.
   **Material war der Grenzfall, und die Linie ist seit LFH-341/C6 gezogen.** C4 hatte für
@@ -598,13 +693,15 @@ Alltag wichtigsten:
   aufgelöst, nicht umbenannt**: den Zählweg erfüllt das Modal (offen → Kategorie → speichern,
   URL unverändert), die Route ist die **Anspring-Adresse** für andere Module (C6) — ein Dialog
   hat keine. Beide zeigen dieselbe Maske.
-- **`SK_META` führt antd-TAG-Farbnamen, keine CSS-Werte** (LFH-340 · C5). Sie in ein
-  `style={{ color }}` zu schreiben ergibt einen **anderen** Ton als überall sonst — CSS-`gold`
-  ist nicht antds Gold — und wäre damit ein erfundener Farbwert, den `theme/tokens.ts` nicht
-  kennt. Wo eine Fläche die Kategorie farbig zeigen soll, trägt ein `<Tag color={…}>` **in** der
-  Fläche die Farbe, nicht die Fläche selbst; das hält zugleich „Statusfarbe nur als
-  Punkt/Rand/Beistrich, nie als Textfläche". Der zweite Kanal ist die Beschriftung — „SK I" sagt
-  es auch ohne jede Farbe, weshalb `unverletzt` mit `color: 'default'` vollwertig ist.
+- **`SK_META` führt Schlüssel der Sichtungspalette, keine CSS-Werte** (LFH-340 · C5, seit
+  LFH-455 ein Alias auf `sichtung` in `theme/statusFarben.ts`: `farbe` ist ein Schlüssel von
+  `sichtungsfarben` oder `null`). Einen Farbnamen in ein `style={{ color }}` zu schreiben
+  ergäbe einen erfundenen Farbwert, den `theme/tokens.ts` nicht kennt (gemessen in C5: CSS-`gold`
+  ist nicht antds Gold). Wo eine Fläche die Kategorie farbig zeigen soll, trägt ein
+  `SichtungsTag` **in** der Fläche die Farbe, nicht die Fläche selbst — die Sichtung ist von der
+  Flächen-Umkehr des Neuentwurfs ausdrücklich ausgenommen (siehe UI-Form-Leitlinie). Der zweite
+  Kanal ist die Beschriftung — „SK I" sagt es auch ohne jede Farbe, weshalb `unverletzt` mit
+  `farbe: null` vollwertig ist.
 - **Ein Verortungsauftrag geht als Deeplink an die Karte** (LFH-340 · C5):
   `lagekartePfad(einsatzId, { platzieren: { typ, id } })` erzeugt `?platzieren=<typ>:<id>`,
   `parsePlatzierenAuftrag` liest ihn zurück, `pages/LagekartePage.tsx` schickt die Karte in den
@@ -645,10 +742,26 @@ Alltag wichtigsten:
   `null` liefern; sie gehören auf `title`/Klassenselektor umgestellt, nicht gelöscht.
   **Nicht gemeint** ist ein Schriftzeichen **innerhalb** eines Textetiketts (das Häkchen in
   „Quittiert", das Warnzeichen vor „Nicht verortet") — das ist eine eigene Frage, kein Piktogramm.
+  **Zwei Glyphen sind seit dem Neuentwurf (22.09.2026) ausdrücklich erlaubt**, als
+  Textzeichen, nicht als Ikone: **⧖** (nachgetragen, `etb/EtbZeitachse.tsx`) und **↗**
+  (Deeplink/Textverweis, `etb/EtbBacklinkBadges.tsx`, `etb/EtbBilanz.tsx`). Sie stehen
+  `aria-hidden` neben einem Wort, das die Aussage trägt („nachgetragen um …", Verweisname) —
+  die Regel oben gilt für jedes andere Bildzeichen weiter.
 - **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.
   Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
   kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein
   Fehler, kein Vorschlag.
+  **Rot als MARKE ist keine Bedienung** (Neuentwurf 22.09.2026, Entscheidung 2): die aktive
+  Rail-Kategorie trägt einen 2-px-Strich in `marke` am linken Rand (`railZielStil` in
+  `einsatz/IconRail.tsx`, als inneres `boxShadow`, damit nichts verspringt), die Fläche ist
+  neutral `flaeche3`, das Etikett hell — Rot markiert den Ort, es bedient nichts. Vorher trug
+  der aktive Zustand eine blaue Vollfläche (LFH-328/A2). Primärknöpfe bleiben blau, `marke`
+  taugt nachts nicht als Textfarbe (2,57 : 1). **ETB-Typfarben** (Meldung blau, Anordnung
+  orange, Entscheidung violett, Lage cyan, Berichtigung rot, System neutral) erscheinen als
+  **2-px-Kante plus Typwort in Typfarbe, nicht als Etikett** — sie sind eine Kategorie, keine
+  Dringlichkeit, und liegen deshalb in `etbTypFarben*` statt auf der Statusachse; der frühere
+  „bewusste Auflösungsverlust" (`lage`/`entscheidung` → neutral) gilt nur noch fürs Etikett
+  `etbTyp` in `statusFarben.ts`. Das Rot der Berichtigung ist eine Kante, kein Bedienziel.
   **Die Fläche ist die dritte Darstellungssorte, und sie liegt seit LFH-368/B5h im Vertrag**:
   `theme/statusFarben.ts:warnstufeFlaeche` bildet die fünf Warnstufen auf **drei** Farbtöne ab —
   zwei Intensitäten von `achtung`/`alarm` plus leer —, `flaechenFarbe` löst sie je Modus auf.
@@ -955,14 +1068,21 @@ Alltag wichtigsten:
   `dringlichkeit` ist über eine `Statusrolle` geschlüsselt und beschriftet die Stufe selbst,
   nicht eine Domänen-Achse. Nach LFH-358 stand sie bei 15; seither kamen `hochwasserKlasse`
   (LFH-77) und `odlStufe` (LFH-78, Entscheidung 4 in
-  `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`) dazu — **Stand 21.09.2026: 17**. Jede weitere Karte bleibt eine
-  eigene Entscheidung, die im Ticket begründet wird.
+  `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`) und
+  `luftqualitaetIndex` (LFH-79) dazu — **Stand 22.09.2026: 18**. Der Neuentwurf hat **keine**
+  Karte hinzugefügt: ETB-Typfarben und Warnstufen-Balken sind eigene Paletten
+  (`etbTypFarbe`/`warnstufeBalkenFarbe`), keine `StatusDarstellung`. Jede weitere Karte bleibt
+  eine eigene Entscheidung, die im Ticket begründet wird.
   **Zwei Guards halten beide Grenzen maschinell** (`theme/statusVertrag.guard.test.ts`):
   kein `Record<…, StatusDarstellung>` außerhalb `statusFarben.ts` — **die Datei, nicht das
   Verzeichnis**, denn ein Geschwistermodul exportiert nichts über sie und liefe am
   Abdeckungstest genauso vorbei —, und kein `<Tag color={…}>`, das ein Vertrags-Enum
   einfärbt; dafür ist `components/StatusTag.tsx` da. Blinde Flecken stehen mit gemessener
-  Fundstelle im Kopfkommentar; eine Schuldmenge gibt es bewusst nicht.
+  Fundstelle im Kopfkommentar; eine Schuldmenge gibt es bewusst nicht. Der Selbsttest des
+  zweiten Guards (der Schnitt findet überhaupt `<Tag`-Stellen) steht seit dem Neuentwurf auf
+  **≥ 50** statt ≥ 100: gemessen 132 Stellen am 12.09., **70** am 22.09.2026, weil Status jetzt
+  als `StatusChip`/`StatusZelle` statt antd-`Tag` erscheint. Die Zahl kann nur fallen; wer sie
+  unter 50 drückt, misst neu und senkt die Schranke.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET** (LFH-346 · C11). Die
   Anlegen-Knöpfe der elf Stammdaten-Sektionen sind in den `aktionen`-Slot von `AdminPage`
   gewandert, der Speichern-Knopf der Einsatz-Defaults im selben Ticket **heraus** in eine
@@ -1058,9 +1178,10 @@ Alltag wichtigsten:
   mit Wort „(leer)" als zweitem Kanal) SIND die Navigation. Wer eine Seitenhöhe misst, wartet
   bis sie steht: `autoSize` misst nach dem Einhängen nach, ein Griff davor las 1324 statt 2108.
   Die Lageberichte-Liste zeigt **Kettenköpfe** (`lageberichte/ketten.ts`, Kopf = ohne
-  Nachfolger, nicht `vorgaenger_id == null`), die Lagemeldungen sind die **zwölfte**
-  `Datensicht`-Konsumentin; ihre Tagesgrenze liegt in der Anzeigezone
-  (`lagemeldungen/zeitachse.ts`), nicht in UTC.
+  Nachfolger, nicht `vorgaenger_id == null`). Die Lagemeldungen waren hier die zwölfte
+  `Datensicht`-Konsumentin und sind seit dem Neuentwurf (22.09.2026) wie das ETB eine
+  Zeitachse; ihre Tagesgrenze liegt weiter in der Anzeigezone (`lagemeldungen/zeitachse.ts`),
+  nicht in UTC.
 - **Ein Klick auf „Entwurf speichern" ist EIN PATCH** (LFH-495, Nachzug zu C13/N3+N4). Der
   Klick ist zwei Ereignisse: er nimmt dem Feld zuerst den Fokus — `onBlur` startet den
   Autosave —, und erst danach kommt `click` mit `form.submit()`. Bis dahin sperrte `laeuftRef`
@@ -1243,7 +1364,9 @@ Aufrufstellen ihre Knopf-Abfrage umschreiben.
 
 **Ein Tastaturvertrag steht EINMAL, und nicht im Platzhalter** (Nacharbeit zu LFH-335,
 08.08.2026). Der Platzhalter sagt, **was** in das Feld gehört; der Vertrag sagt, **was beim
-Absenden passiert** — das ist die Steuerzeile. Die ETB-Schnellerfassung trug beides doppelt:
+Absenden passiert** — das ist die Steuerzeile (seit dem Neuentwurf die Hinweiszeile unter der
+`Schnellerfassungszeile`, `etb/Schnellerfassung.tsx`; sie nennt nur, was es gibt — `# Koordinate`
+des Entwurfs hat keinen Weg in den Eintrag und fehlt). Die ETB-Schnellerfassung trug beides doppelt:
 `Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden` stand als
 sichtbare Zeile zwischen Feld und Chip-Leiste **und** noch einmal als **Anfang** des
 Platzhalters — der sichtbare Beginn des leeren Feldes war damit der Tastaturvertrag, „Inhalt
