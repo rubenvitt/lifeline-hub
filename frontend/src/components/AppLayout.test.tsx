@@ -119,8 +119,9 @@ describe('AppLayout (globale Topbar)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
 
     const menu = await screen.findByRole('menu');
-    expect(within(menu).getByRole('menuitem', { name: /System ✓/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /^Dunkel$/ })).toBeInTheDocument();
+    // Vorgabe seit dem Neuentwurf (21.09.2026): Nachtbetrieb trägt das Häkchen.
+    expect(within(menu).getByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /^Handschuh$/ })).toBeInTheDocument();
   });

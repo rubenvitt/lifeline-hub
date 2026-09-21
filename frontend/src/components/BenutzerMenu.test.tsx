@@ -149,9 +149,11 @@ describe.each([
     await oeffne();
     // Das Häkchen ist der ZWEITE KANAL neben der Auswahlfarbe (WCAG 1.4.1) —
     // und zugleich das, was hier prüfbar ist: eine Klasse wäre es nicht.
-    expect(await screen.findByRole('menuitem', { name: /System ✓/ })).toBeInTheDocument();
+    // Ohne gespeicherte Wahl ist seit dem Neuentwurf (21.09.2026) der Nachtbetrieb
+    // aktiv; „System" bleibt wählbar, trägt aber nicht mehr das Häkchen.
+    expect(await screen.findByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /^Hell$/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /^Dunkel$/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
   });
 
   it('die Bediendichte liegt daneben — alle drei Stufen', async () => {
@@ -173,8 +175,10 @@ describe.each([
     // dessen `onClick`-Zweig fehlt, ließe beide Tests oben grün.
     zeige();
     await oeffne();
-    await userEvent.click(screen.getByRole('menuitem', { name: /^Dunkel$/ }));
-    expect(document.documentElement.dataset.theme).toBe('dark');
+    // Gewählt wird der NICHT aktive Modus: seit der Vorgabe `dark` bewiese ein Klick
+    // auf „Dunkel" nichts mehr — das Merkmal stünde auch ohne `onClick`-Zweig dort.
+    await userEvent.click(screen.getByRole('menuitem', { name: /^Hell$/ }));
+    expect(document.documentElement.dataset.theme).toBe('light');
 
     await oeffne();
     await userEvent.click(screen.getByRole('menuitem', { name: /^Handschuh$/ }));
@@ -185,6 +189,6 @@ describe.each([
     // betrifft aber nicht die gelöschte Komponente, sondern den weiterlebenden
     // `ThemeModeProvider` (ein Context, ein `useMemo`, zwei Setter). Mit der
     // Testdatei wäre sie ersatzlos gefallen.
-    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('light');
   });
 });

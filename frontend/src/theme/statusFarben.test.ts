@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import * as sf from './statusFarben';
-import { antdToken, farbenDunkel, farbenHell, type Farbrollen } from './tokens';
+import {
+  antdAlgorithmus,
+  antdToken,
+  etbTypFarbenDunkel,
+  etbTypFarbenHell,
+  farbenDunkel,
+  farbenHell,
+  warnstufeFarbenDunkel,
+  warnstufeFarbenHell,
+  type Farbrollen,
+} from './tokens';
 import type { EinsatzStatus, MaterialStatus } from '../api/types';
 
 /** Vollständiger GlobalToken eines Modus — dieselbe Ableitung wie im `ThemeModeProvider`,
  *  damit der Test die echte Kette Rolle → antd-Token prüft und nicht ein Stück davon. */
 function tokenFuer(farben: Farbrollen, dunkel: boolean) {
   return theme.getDesignToken({
-    algorithm: dunkel ? theme.darkAlgorithm : theme.defaultAlgorithm,
+    algorithm: antdAlgorithmus(dunkel),
     token: antdToken(farben),
   });
 }
@@ -121,8 +131,10 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
   it('pinnt die zwei neuen Intensitäten byte-genau', () => {
     expect(farbenHell.achtungFuellungStark).toBe('rgba(122, 82, 0, 0.2)');
     expect(farbenHell.alarmFuellungStark).toBe('rgba(176, 35, 24, 0.2)');
-    expect(farbenDunkel.achtungFuellungStark).toBe('rgba(245, 185, 66, 0.24)');
-    expect(farbenDunkel.alarmFuellungStark).toBe('rgba(255, 122, 127, 0.24)');
+    // Nachtwerte seit dem Neuentwurf (21.09.2026) auf die neue Palette gestimmt:
+    // dieselbe Intensität, der Farbton aus `achtung` #e8cc3a bzw. `alarm` #ff6b6b.
+    expect(farbenDunkel.achtungFuellungStark).toBe('rgba(232, 204, 58, 0.24)');
+    expect(farbenDunkel.alarmFuellungStark).toBe('rgba(255, 107, 107, 0.24)');
   });
 
   it('nutzt DREI Farbtöne für fünf Stufen — keine sechste Farbe', () => {
@@ -372,5 +384,77 @@ describe('hochwasserKlasse (LFH-77)', () => {
     expect(sf.hochwasserKlasse.keine_daten.label).not.toBe(
       sf.hochwasserKlasse.unklassifiziert.label,
     );
+  });
+});
+
+describe('ETB-Typfarben als Kante + Typwort (Neuentwurf, 21.09.2026)', () => {
+  const TYPEN = ['meldung', 'anordnung', 'entscheidung', 'lage', 'berichtigung', 'system'] as const;
+
+  it('pinnt die Entwurfskanten im Nachtmodus als Literale (Entscheidung 2)', () => {
+    expect(TYPEN.map((t) => sf.etbTypFarbe(t, dunkelToken).kante)).toEqual([
+      '#1677ff',
+      '#d46b08',
+      '#722ed1',
+      '#13c2c2',
+      '#cf1322',
+      farbenDunkel.schwach,
+    ]);
+  });
+
+  it('folgt dem Modus und fällt ohne unsere Tokens auf Hell zurück', () => {
+    for (const t of TYPEN) {
+      expect(sf.etbTypFarbe(t, dunkelToken)).toBe(etbTypFarbenDunkel[t]);
+      expect(sf.etbTypFarbe(t, hellToken)).toBe(etbTypFarbenHell[t]);
+      expect(sf.etbTypFarbe(t, theme.getDesignToken({}))).toBe(etbTypFarbenHell[t]);
+    }
+  });
+
+  it('unterscheidet die fünf farbigen Typen — System bleibt neutral', () => {
+    for (const palette of [etbTypFarbenDunkel, etbTypFarbenHell]) {
+      const kanten = TYPEN.filter((t) => t !== 'system').map((t) => palette[t].kante);
+      expect(new Set(kanten).size).toBe(5);
+    }
+  });
+
+  it('lässt den Wortlaut beim Vertrag — die Typfarbe trägt keinen zweiten Kanal selbst', () => {
+    for (const t of TYPEN) expect(sf.etbTyp[t].label.trim()).not.toBe('');
+  });
+});
+
+describe('Warnstufen-Balken (Neuentwurf, 21.09.2026)', () => {
+  it('pinnt die Entwurfswerte im Nachtmodus als Literale', () => {
+    expect(
+      (['niedrig', 'mittel', 'hoch', 'akut'] as const).map((w) =>
+        sf.warnstufeBalkenFarbe(w, dunkelToken),
+      ),
+    ).toEqual(['#d4b106', '#d46b08', '#cf1322', '#a8071a']);
+  });
+
+  it('gibt `keine` keinen Balken und folgt sonst dem Modus', () => {
+    expect(sf.warnstufeBalkenFarbe('keine', dunkelToken)).toBeNull();
+    expect(sf.warnstufeBalkenFarbe('keine', hellToken)).toBeNull();
+    expect(sf.warnstufeBalkenFarbe('niedrig', hellToken)).toBe(warnstufeFarbenHell.niedrig);
+    expect(sf.warnstufeBalkenFarbe('niedrig', dunkelToken)).toBe(warnstufeFarbenDunkel.niedrig);
+  });
+});
+
+describe('Nacht-Algorithmus hält die Signalfarben auf dem Rollenwert (Neuentwurf)', () => {
+  it('colorPrimary/Error/Warning/Success sind nachts genau die Rollen', () => {
+    // Literale: ohne die zweite Algorithmusstufe rechnete `darkAlgorithm` sie um
+    // (gemessen #4d94d6 → #4481b9, #ff6b6b → #dc5e5e, #52c41a → #49aa19).
+    expect(dunkelToken.colorPrimary).toBe('#4d94d6');
+    expect(dunkelToken.colorError).toBe('#ff6b6b');
+    expect(dunkelToken.colorWarning).toBe('#e8cc3a');
+    expect(dunkelToken.colorSuccess).toBe('#52c41a');
+    expect(dunkelToken.colorPrimaryHover).toBe('#7db3e8');
+  });
+
+  it('die übrigen Ableitungen bleiben die des Dunkel-Algorithmus', () => {
+    const nurDunkel = theme.getDesignToken({
+      algorithm: theme.darkAlgorithm,
+      token: antdToken(farbenDunkel),
+    });
+    expect(dunkelToken.colorPrimaryBg).toBe(nurDunkel.colorPrimaryBg);
+    expect(dunkelToken.colorBgBase).toBe(nurDunkel.colorBgBase);
   });
 });

@@ -6,7 +6,9 @@
 
    Alle drei Familien stehen unter SIL OFL 1.1; Herkunft und Lizenztexte in
    `src/assets/fonts/LIESMICH.md` bzw. `src/assets/fonts/lizenzen/`.
-   Gesamtbudget 96,6 KB in 6 Schnitten — der Deckel aus LFH-352 liegt bei 200 KB.
+   Gesamtbudget 131,4 KB in 8 Schnitten — der Deckel aus LFH-352 liegt bei 200 KB.
+   Archivo 600 und JetBrains Mono 500 kamen mit dem Neuentwurf „Instrumententafel"
+   (21.09.2026) dazu: Seitentitel/Augenbraue tragen 600, Datenwerte Mono 500.
 
    ROLLEN (die Namen stehen auch in `tokens.ts` und `rollen.css`):
      LFH Archivo         Fließtext, Formulare, Listen
@@ -32,6 +34,13 @@
 }
 @font-face {
   font-family: 'LFH Archivo';
+  src: url('../assets/fonts/archivo-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Archivo';
   src: url('../assets/fonts/archivo-700.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
@@ -48,6 +57,13 @@
   font-family: 'LFH JetBrains Mono';
   src: url('../assets/fonts/jetbrains-mono-400.woff2') format('woff2');
   font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH JetBrains Mono';
+  src: url('../assets/fonts/jetbrains-mono-500.woff2') format('woff2');
+  font-weight: 500;
   font-style: normal;
   font-display: swap;
 }

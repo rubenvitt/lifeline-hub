@@ -1,5 +1,16 @@
 import type { GlobalToken } from 'antd';
-import { farbenDunkel, farbenHell, type sichtungsfarben } from './tokens';
+import {
+  etbTypFarbenDunkel,
+  etbTypFarbenHell,
+  farbenDunkel,
+  farbenHell,
+  warnstufeFarbenDunkel,
+  warnstufeFarbenHell,
+  type EtbTypFarbe,
+  type EtbTypTon,
+  type WarnstufeBalken,
+  type sichtungsfarben,
+} from './tokens';
 import type {
   BelegungsArt,
   Ausmass,
@@ -202,13 +213,20 @@ export const verfuegbarkeit: Record<Verfuegbarkeit, StatusDarstellung> = {
 };
 
 /**
- * ETB-Eintragstyp (früher `TYP_FARBE`/`TYP_LABEL`, `etb/typFarben.ts`).
+ * ETB-Eintragstyp (früher `TYP_FARBE`/`TYP_LABEL`, `etb/typFarben.ts`) — als ETIKETT.
  *
- * BEWUSSTER AUFLÖSUNGSVERLUST: `lage` (Cyan) und `entscheidung` (Violett) hatten
- * antd-Presets ohne A0-Gegenstück. Sie werden `neutral` — ein Eintragstyp ist eine
- * KATEGORIE, keine Dringlichkeit, und eine gesättigte Farbe ohne Bedeutung verbraucht
- * Aufmerksamkeit, die der Alarm braucht (ASM, A1 Festlegung 5). Der Text trägt die
- * Unterscheidung; er ist hier Pflichtfeld und damit garantiert vorhanden.
+ * Diese Karte trägt Wortlaut und eine Statusrolle für die Etikett-Darstellung
+ * (`StatusTag`). Seit dem Neuentwurf „Instrumententafel" (21.09.2026, Entscheidung 2 des
+ * Auftraggebers) ist die Zieldarstellung aber eine andere: farbige KANTE plus TYPWORT in
+ * Typfarbe, nicht mehr ein Etikett — Meldung blau, Anordnung orange, Entscheidung
+ * violett, Lage cyan, Berichtigung rot, System neutral. Die Typfarbe liefert
+ * {@link etbTypFarbe}, der Wortlaut bleibt HIER (`label`).
+ *
+ * Damit ist der frühere „bewusste Auflösungsverlust" (`lage`/`entscheidung` → `neutral`)
+ * für die Kante aufgehoben — nicht über eine neue {@link Statusrolle}, sondern über eine
+ * eigene Palette: ein Eintragstyp ist eine KATEGORIE, keine Dringlichkeit, und gehört
+ * deshalb nicht auf die Statusachse. Die Rollen unten bleiben stehen, solange das
+ * Etikett noch Konsumenten hat (`EtbTabelle`); die Karte selbst bleibt im Vertrag.
  */
 export const etbTyp: Record<EtbTyp, StatusDarstellung> = {
   meldung: { rolle: 'bedien', label: 'Meldung' },
@@ -490,7 +508,10 @@ export const dringlichkeit: Record<Dringlichkeit, StatusDarstellung> = {
  * dunkel). NICHT über einen Vergleich mit `farbenDunkel.bedien`: `colorPrimary` ist ein
  * Seed-Token, und der `darkAlgorithm` rechnet es um — gemessen wird aus dem gesetzten
  * `#6fb4ec` ein `#619ccc`, aus `alarm` `#ff7a7f` ein `#dc6b6f`. Ein Gleichheitstest auf
- * die Rollenwerte schlägt dort also immer fehl. Ein fremdes Theme (z. B. blanker
+ * die Rollenwerte schlägt dort also immer fehl. (Seit dem Neuentwurf hält
+ * `antdAlgorithmus` in `tokens.ts` die Signalfarben nachts auf dem Rollenwert — die Probe
+ * über die Basisfläche bleibt trotzdem richtig: sie hängt an keinem Algorithmus und
+ * keinem Aufrufer, der den Provider nachbaut.) Ein fremdes Theme (z. B. blanker
  * `ConfigProvider` im Test) landet damit im Hellmodus, statt zu werfen.
  */
 export function rollenFarbe(rolle: Statusrolle, token: GlobalToken): string {
@@ -585,4 +606,46 @@ export function flaechenFarbe(w: Warnstufe, token: GlobalToken): string {
   const rolle = warnstufeFlaeche[w].fuellung;
   if (rolle === null) return 'transparent';
   return (istDunklerModus(token) ? farbenDunkel : farbenHell)[rolle];
+}
+
+/**
+ * ETB-Typfarbe des aktiven Modus: Kante (2 px) und Typwort (Neuentwurf, Entscheidung 2).
+ *
+ * Der Wortlaut kommt aus {@link etbTyp} — diese Funktion liefert NUR Farbe, der zweite
+ * Kanal ist das Typwort selbst. Modus wie bei {@link flaechenFarbe} über die Helligkeit
+ * der Basisfläche; ein fremdes Theme fällt auf Hell zurück.
+ *
+ * Die Zuordnung ist exhaustiv: `Record<EtbTyp, …>` bricht bei einer neuen Variante des
+ * Wire-Enums den Typcheck, statt einen Typ still ohne Farbe zu lassen.
+ */
+const ETB_TYP_TON: Record<EtbTyp, EtbTypTon> = {
+  meldung: 'meldung',
+  anordnung: 'anordnung',
+  entscheidung: 'entscheidung',
+  lage: 'lage',
+  berichtigung: 'berichtigung',
+  system: 'system',
+};
+
+export function etbTypFarbe(typ: EtbTyp, token: GlobalToken): EtbTypFarbe {
+  return (istDunklerModus(token) ? etbTypFarbenDunkel : etbTypFarbenHell)[ETB_TYP_TON[typ]];
+}
+
+/**
+ * Balkenfarbe einer Warnstufe (Gefahrenmatrix, Neuentwurf S3) im aktiven Modus.
+ * `keine` hat keinen Balken (`null`). Die Fläche der Matrixzelle bleibt
+ * {@link flaechenFarbe} — Balken und Fläche sind zwei Darstellungssorten, nicht eine.
+ */
+const WARNSTUFE_BALKEN: Record<Warnstufe, WarnstufeBalken | null> = {
+  keine: null,
+  niedrig: 'niedrig',
+  mittel: 'mittel',
+  hoch: 'hoch',
+  akut: 'akut',
+};
+
+export function warnstufeBalkenFarbe(w: Warnstufe, token: GlobalToken): string | null {
+  const stufe = WARNSTUFE_BALKEN[w];
+  if (stufe === null) return null;
+  return (istDunklerModus(token) ? warnstufeFarbenDunkel : warnstufeFarbenHell)[stufe];
 }

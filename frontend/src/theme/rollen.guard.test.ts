@@ -33,6 +33,18 @@ import {
 // unangetastet, während die Seitenrinne unten ihren eigenen Guard bekommt.
 import { theme } from 'antd';
 import { seitenrinne } from './tokens';
+// Neuentwurf „Instrumententafel" (21.09.2026): eigene Importzeile aus demselben Grund.
+import {
+  etbTypFarbenDunkel,
+  etbTypFarbenHell,
+  rahmenFarben,
+  schriftskala,
+  warnstufeFarbenDunkel,
+  warnstufeFarbenHell,
+  type EtbTypTon,
+  type Schriftstufenname,
+  type WarnstufeBalken,
+} from './tokens';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(hier, 'rollen.css'), 'utf-8');
@@ -106,7 +118,76 @@ const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
   achtungFuellung: '--lfh-achtung-fuellung',
   achtungFuellungStark: '--lfh-achtung-fuellung-stark',
   normalFuellung: '--lfh-normal-fuellung',
+  kopf: '--lfh-kopf',
+  paneel: '--lfh-paneel',
+  flaeche3: '--lfh-flaeche-3',
+  text2: '--lfh-text-2',
+  steuerRahmen: '--lfh-steuer-rahmen',
+  bedienHover: '--lfh-bedien-hover',
+  bedienText: '--lfh-bedien-text',
+  aufBedien: '--lfh-auf-bedien',
+  normalText: '--lfh-normal-text',
+  normalFlaeche: '--lfh-normal-flaeche',
+  achtungFlaeche: '--lfh-achtung-flaeche',
+  alarmFlaeche: '--lfh-alarm-flaeche',
+  bedienFlaeche: '--lfh-bedien-flaeche',
+  bannerGrund: '--lfh-banner-grund',
+  bannerLinie: '--lfh-banner-linie',
+  berichtigungZeile: '--lfh-berichtigung-zeile',
+  lueckeZeile: '--lfh-luecke-zeile',
+  problemZeile: '--lfh-problem-zeile',
 };
+
+/** ETB-Typ → die zwei Properties (Kante, Typwort). Exhaustiv über {@link EtbTypTon}:
+ *  ein siebter Typ bricht hier den Typcheck, statt still ohne CSS-Seite zu bleiben. */
+const ETB_ABBILDUNG: Record<EtbTypTon, { kante: string; wort: string }> = {
+  meldung: { kante: '--lfh-etb-meldung-kante', wort: '--lfh-etb-meldung-wort' },
+  anordnung: { kante: '--lfh-etb-anordnung-kante', wort: '--lfh-etb-anordnung-wort' },
+  entscheidung: { kante: '--lfh-etb-entscheidung-kante', wort: '--lfh-etb-entscheidung-wort' },
+  lage: { kante: '--lfh-etb-lage-kante', wort: '--lfh-etb-lage-wort' },
+  berichtigung: { kante: '--lfh-etb-berichtigung-kante', wort: '--lfh-etb-berichtigung-wort' },
+  system: { kante: '--lfh-etb-system-kante', wort: '--lfh-etb-system-wort' },
+};
+
+const WARNSTUFE_ABBILDUNG: Record<WarnstufeBalken, string> = {
+  niedrig: '--lfh-warnstufe-niedrig',
+  mittel: '--lfh-warnstufe-mittel',
+  hoch: '--lfh-warnstufe-hoch',
+  akut: '--lfh-warnstufe-akut',
+};
+
+/** Der modusunabhängige Rahmen (Kommandoleiste + Rail). Steht NUR unter `:root`. */
+const RAHMEN_ABBILDUNG: Record<keyof typeof rahmenFarben, string> = {
+  grund: '--lfh-rahmen-grund',
+  aktiv: '--lfh-rahmen-aktiv',
+  feld: '--lfh-rahmen-feld',
+  linie: '--lfh-rahmen-linie',
+  text: '--lfh-rahmen-text',
+  gedaempft: '--lfh-rahmen-gedaempft',
+  schwach: '--lfh-rahmen-schwach',
+  marke: '--lfh-rahmen-marke',
+};
+
+/** Schriftstufe → Präfix der Properties (`-groesse`, `-gewicht`, `-sperrung`). */
+const TYPO_ABBILDUNG: Record<Schriftstufenname, string> = {
+  ueberschrift: '--lfh-typo-ueberschrift',
+  seitentitel: '--lfh-typo-seitentitel',
+  text: '--lfh-typo-text',
+  textKlein: '--lfh-typo-text-klein',
+  augenbraue: '--lfh-typo-augenbraue',
+  railEtikett: '--lfh-typo-rail-etikett',
+  meta: '--lfh-typo-meta',
+  datenwertKlein: '--lfh-typo-datenwert-klein',
+  datenwert: '--lfh-typo-datenwert',
+  datenwertGross: '--lfh-typo-datenwert-gross',
+};
+
+/** Alles, was der Nachtmodus überschreiben MUSS: Farbrollen, ETB-Typfarben, Balken. */
+const MODUS_PROPERTIES = [
+  ...Object.values(FARB_ABBILDUNG),
+  ...Object.values(ETB_ABBILDUNG).flatMap((p) => [p.kante, p.wort]),
+  ...Object.values(WARNSTUFE_ABBILDUNG),
+];
 
 describe('Gestaltungssprache E — CSS und TS tragen dieselben Werte', () => {
   it.each(Object.keys(FARB_ABBILDUNG) as (keyof Farbrollen)[])(
@@ -124,10 +205,31 @@ describe('Gestaltungssprache E — CSS und TS tragen dieselben Werte', () => {
   );
 
   it('der Nachtmodus überschreibt genau die Farbrollen — keine mehr, keine weniger', () => {
-    // Form, Raster und Schrift sind modusunabhängig und dürfen im
+    // Form, Raster, Schrift und der Rahmen sind modusunabhängig und dürfen im
     // dark-Block NICHT noch einmal auftauchen; sonst driften sie unbemerkt.
-    expect(Object.keys(dunkel).sort()).toEqual(Object.values(FARB_ABBILDUNG).sort());
+    // Seit dem Neuentwurf gehören ETB-Typfarben und Warnstufen-Balken zur Menge —
+    // beide existieren je Modus.
+    expect(Object.keys(dunkel).sort()).toEqual([...MODUS_PROPERTIES].sort());
   });
+
+  it.each(Object.keys(ETB_ABBILDUNG) as EtbTypTon[])(
+    'ETB-Typ %s: Kante und Wort je Modus',
+    (typ) => {
+      const p = ETB_ABBILDUNG[typ];
+      expect(hell[p.kante]).toBe(etbTypFarbenHell[typ].kante);
+      expect(hell[p.wort]).toBe(etbTypFarbenHell[typ].wort);
+      expect(dunkel[p.kante]).toBe(etbTypFarbenDunkel[typ].kante);
+      expect(dunkel[p.wort]).toBe(etbTypFarbenDunkel[typ].wort);
+    },
+  );
+
+  it.each(Object.keys(WARNSTUFE_ABBILDUNG) as WarnstufeBalken[])(
+    'Warnstufen-Balken %s je Modus',
+    (stufe) => {
+      expect(hell[WARNSTUFE_ABBILDUNG[stufe]]).toBe(warnstufeFarbenHell[stufe]);
+      expect(dunkel[WARNSTUFE_ABBILDUNG[stufe]]).toBe(warnstufeFarbenDunkel[stufe]);
+    },
+  );
 
   it('Abstandsraster stimmt überein', () => {
     expect(hell['--lfh-luft-1']).toBe(`${abstand.xs}px`);
@@ -295,5 +397,97 @@ describe('Seitenrinne — CSS und TS tragen dieselben Stufen (LFH-329 · B1)', (
     // benannte Diagnose statt eines Mengendiffs.
     expect(DICHTE_BLOECKE.komfortabel['--lfh-seiten-polsterung']).toBeUndefined();
     expect(DICHTE_BLOECKE.handschuh['--lfh-seiten-polsterung']).toBeUndefined();
+  });
+});
+
+describe('Rahmen — modusunabhängig dunkel (Neuentwurf, 21.09.2026)', () => {
+  it.each(Object.keys(RAHMEN_ABBILDUNG) as (keyof typeof rahmenFarben)[])(
+    '%s steht unter :root mit dem Wert aus tokens.ts',
+    (rolle) => {
+      expect(hell[RAHMEN_ABBILDUNG[rolle]]).toBe(rahmenFarben[rolle]);
+    },
+  );
+
+  it('kein Rahmenwert hat einen Nachtmodus-Gegenwert — der Rahmen folgt keinem Modus', () => {
+    // Folgt schon aus der Partition oben; hier mit benannter Diagnose, weil genau
+    // dieser Eintrag der naheliegende Fehler ist (vgl. `--lfh-kopf-vordergrund`).
+    for (const property of [...Object.values(RAHMEN_ABBILDUNG), '--lfh-kopf-vordergrund']) {
+      expect(dunkel[property], property).toBeUndefined();
+    }
+  });
+
+  it('der Rahmen ist die Nachtpalette, nicht eine Kopie daneben', () => {
+    // Literale, nicht `farbenDunkel.x`: der Rahmen soll auch dann dunkel bleiben,
+    // wenn jemand die Zeiger in `rahmenFarben` auf `farbenHell` umbiegt.
+    expect(rahmenFarben.grund).toBe('#0c0e11');
+    expect(rahmenFarben.text).toBe('#e8ebee');
+    expect(rahmenFarben.grund).toBe(farbenDunkel.kopf);
+  });
+
+  it('der Kopf-Vordergrund ist der Rahmentext — eine Vordergrundfarbe, nicht zwei', () => {
+    expect(hell['--lfh-kopf-vordergrund']).toBe(rahmenFarben.text);
+  });
+});
+
+describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09.2026)', () => {
+  it.each(Object.keys(TYPO_ABBILDUNG) as Schriftstufenname[])('%s stimmt überein', (stufe) => {
+    const praefix = TYPO_ABBILDUNG[stufe];
+    const ts: { groesse: number; gewicht: number; sperrung?: string } = schriftskala[stufe];
+    expect(hell[`${praefix}-groesse`]).toBe(`${ts.groesse}px`);
+    expect(hell[`${praefix}-gewicht`]).toBe(String(ts.gewicht));
+    // Auch die ABWESENHEIT wird geprüft: eine Sperrung nur auf einer Seite ist Drift.
+    expect(hell[`${praefix}-sperrung`]).toBe(ts.sperrung);
+  });
+
+  it('die CSS-Seite trägt keine Schriftstufe, die TS nicht kennt', () => {
+    const bekannt = new Set(
+      Object.values(TYPO_ABBILDUNG).flatMap((p) => [
+        `${p}-groesse`,
+        `${p}-gewicht`,
+        `${p}-sperrung`,
+      ]),
+    );
+    const fremd = Object.keys(hell).filter((k) => k.startsWith('--lfh-typo-') && !bekannt.has(k));
+    expect(fremd).toEqual([]);
+  });
+
+  it('pinnt die Entwurfswerte als Literale (umsetzung.md § Form & Typografie)', () => {
+    expect(schriftskala.augenbraue).toEqual({
+      groesse: 10,
+      gewicht: 600,
+      familie: 'text',
+      sperrung: '0.14em',
+      versal: true,
+    });
+    expect(schriftskala.seitentitel).toMatchObject({ groesse: 14, gewicht: 600 });
+    expect(
+      [schriftskala.datenwertKlein, schriftskala.datenwert, schriftskala.datenwertGross].map(
+        (s) => [s.groesse, s.gewicht, s.familie],
+      ),
+    ).toEqual([
+      [22, 500, 'zahl'],
+      [32, 500, 'zahl'],
+      [40, 500, 'zahl'],
+    ]);
+  });
+
+  it('jeder Schnitt der Skala wird lokal ausgeliefert — kein künstlicher Fettdruck', () => {
+    // Die Skala verlangt Archivo 400/500/600 und JetBrains Mono 400/500. Fehlt ein
+    // Schnitt in `schriften.css`, setzt der Browser den nächsten — gemessen am
+    // Lage-Dashboard: über 600 hinaus lieferte die Datei keinen, die Breite blieb stehen.
+    const schriften = readFileSync(join(hier, 'schriften.css'), 'utf-8');
+    const familie = {
+      text: 'LFH Archivo',
+      zahl: 'LFH JetBrains Mono',
+      display: 'LFH Archivo Narrow',
+    };
+    for (const stufe of Object.values(schriftskala)) {
+      const fam = familie[stufe.familie];
+      const faces = [...schriften.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]);
+      const treffer = faces.filter(
+        (f) => f.includes(`font-family: '${fam}';`) && f.includes(`font-weight: ${stufe.gewicht};`),
+      );
+      expect(treffer, `${fam} ${stufe.gewicht}`).toHaveLength(1);
+    }
   });
 });
