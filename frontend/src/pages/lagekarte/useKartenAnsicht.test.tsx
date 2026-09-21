@@ -137,6 +137,59 @@ describe('useKartenAnsicht', () => {
     await waitFor(() => expect(result.current.dirty).toBe(true));
   });
 
+  it('hydratisiert die ODL-Sichtbarkeit aus der gespeicherten Ansicht (LFH-78)', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({
+        fachebenen_sichtbar: { odl: true, dwd: true },
+      } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.fachebenenSichtbar.odl).toBe(true));
+    expect(result.current.fachebenenSichtbar.dwd).toBe(true);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('liest einen vor LFH-78 gespeicherten Stand ohne `odl` als „aus"', async () => {
+    // Genau der Bestand jeder heute gespeicherten Ansicht: der Schlüssel fehlt. Er muss als
+    // `false` ankommen, nicht als `undefined` — die übrigen Ebenen behalten ihren Stand.
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({
+        fachebenen_sichtbar: { hochwasser: true, autobahn: true },
+      } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.fachebenenSichtbar.hochwasser).toBe(true));
+    expect(result.current.fachebenenSichtbar.odl).toBe(false);
+    expect(result.current.fachebenenSichtbar.autobahn).toBe(true);
+  });
+
+  it('das Umschalten der ODL-Ebene macht die Ansicht schmutzig (LFH-78)', async () => {
+    ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    expect(result.current.dirty).toBe(false);
+    act(() => result.current.setFachebenenSichtbar((v) => ({ ...v, odl: true })));
+    await waitFor(() => expect(result.current.dirty).toBe(true));
+  });
+
+  it('das Umschalten der Hochwasser-Ebene macht die Ansicht schmutzig (Nachzug LFH-77)', async () => {
+    // Gefunden beim Anfassen für LFH-78: das Vergleichs-Tupel führte `hochwasser` nicht,
+    // die Wahl ging beim Neuladen verloren. Jede Ebene aus `fachebeneKeys()` gehört hinein.
+    ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    act(() => result.current.setFachebenenSichtbar((v) => ({ ...v, hochwasser: true })));
+    await waitFor(() => expect(result.current.dirty).toBe(true));
+  });
+
   it('wird schmutzig bei Basemap-Wechsel und wieder sauber nach dem Speichern', async () => {
     ladeKartenAnsichten.mockResolvedValue([standardansicht({ basemap_modus: 'offline' })]);
     patcheKartenAnsicht.mockImplementation((_e: number, _a: number, patch: PatchKartenAnsicht) =>

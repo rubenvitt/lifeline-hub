@@ -6,8 +6,8 @@ use crate::error::AppError;
 use crate::karte::cache;
 use crate::karte::luftqualitaet::{luftqualitaet_fenster, normalisiere_luftqualitaet};
 use crate::karte::normalisierung::{
-    kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_overpass,
-    normalisiere_pegelonline,
+    kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_odl,
+    normalisiere_overpass, normalisiere_pegelonline,
 };
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use crate::karte::FachebenenState;
@@ -162,6 +162,65 @@ async fn erneuere_pegelonline(
             None
         }
     }
+}
+
+// ---------------------------------------------------------------------------- ODL
+
+const ODL_ATTRIB: &str = "Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0";
+/// Die Quelle hat STUNDENtakt (`duration: "1h"`). 300 s wie bei DWD holte ~890 KB, ohne
+/// frischer zu werden; eine Stunde ließe einen neuen Stundenwert in einer radiologischen
+/// Lage bis zu einer Stunde liegen. 600 s begrenzt das auf zehn Minuten.
+const ODL_TTL: Duration = Duration::from_secs(600);
+/// Der auf der BfS-Schnittstellenseite dokumentierte Layer (ODL-Info → Datenschnittstelle).
+/// Die Nachbar-Layer `odl_brutto_1h`/`odlinfo_sitelist` sind dort nicht beschrieben und
+/// liefen im Test über 120 s — die 8-s-Schranke des gemeinsamen Clients fängt einen
+/// hängenden GeoServer ab, ohne dass hier ein eigener Timeout stehen muss.
+const ODL_URL: &str = "https://www.imis.bfs.de/ogc/opendata/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=opendata:odlinfo_odl_1h_latest&outputFormat=application/json";
+
+pub async fn fetch_odl(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    let (client, pool2) = (s.client.clone(), pool.clone());
+    liefere_mit_swr(
+        pool,
+        &s.inflight,
+        "odl",
+        ODL_TTL,
+        || FachebeneAntwort::offline("odl", ODL_ATTRIB),
+        move || erneuere_odl(client, pool2),
+    )
+    .await
+}
+
+async fn erneuere_odl(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
+    let roh = match hole_json(&client, ODL_URL).await {
+        Ok(roh) => roh,
+        Err(e) => {
+            tracing::warn!("BfS-ODL-Fetch fehlgeschlagen: {e}");
+            return None;
+        }
+    };
+    let Some(a) = odl_antwort(&roh) else {
+        tracing::warn!("BfS-ODL-Antwort ohne `features`-Liste — Formatbruch, alter Stand bleibt");
+        return None;
+    };
+    cache::setze(&pool, "odl", &a).await;
+    Some(a)
+}
+
+/// Rohe BfS-Antwort → speicherbare Antwort, oder `None` bei Formatbruch. Rein und damit
+/// ohne Netz prüfbar, und zwar an der Stelle, an der die Entscheidung wirkt (Muster
+/// [`autobahn_antwort`]): wer `None` bekommt, schreibt nichts in den Cache.
+///
+/// Ohne `features`-LISTE ist die Antwort unbrauchbar, nicht leer. Ein GeoServer meldet
+/// Fehler gern mit HTTP 200 und einem Report-Objekt; als `leer` gespeichert zeigte die
+/// Ebene zehn Minuten lang „keine Sonden", wo sie „offline" zeigen muss.
+pub(crate) fn odl_antwort(roh: &Value) -> Option<FachebeneAntwort> {
+    roh.get("features").filter(|f| f.is_array())?;
+    Some(FachebeneAntwort::ok(
+        "odl",
+        ODL_ATTRIB,
+        None,
+        normalisiere_odl(roh),
+    ))
 }
 
 // --------------------------------------------------------------------------- NINA
@@ -1211,5 +1270,39 @@ mod luftqualitaet_tests {
             "{ix}"
         );
         assert!(ix.contains("time_to=11"), "{ix}");
+    }
+}
+
+#[cfg(test)]
+mod odl_antwort_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn brauchbare_antwort_wird_gespeichert() {
+        let roh = json!({ "type": "FeatureCollection", "features": [{
+            "type": "Feature",
+            "geometry": { "type": "Point", "coordinates": [8.0, 50.0] },
+            "properties": { "id": "X", "name": "x", "value": 0.1 }
+        }]});
+        let a = odl_antwort(&roh).expect("brauchbar");
+        assert_eq!(a.quelle, "odl");
+        assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
+        assert_eq!(a.attribution, ODL_ATTRIB);
+    }
+
+    #[test]
+    fn formatbruch_ist_ein_fehlschlag_und_kein_leerer_stand() {
+        // Ein GeoServer antwortet auf Fehler mit HTTP 200 und einem OGC-Report bzw. einem
+        // Objekt ohne `features`. Als „leer" gespeichert sähe das für zehn Minuten aus wie
+        // „keine Sonden" — die Ebene muss stattdessen `offline` zeigen (Spec: „Ausfall der
+        // Quelle bricht die Karte nicht"), und ein alter Stand bleibt stehen.
+        for roh in [
+            json!({ "exceptions": [] }),
+            json!([]),
+            json!({ "features": "x" }),
+        ] {
+            assert!(odl_antwort(&roh).is_none(), "{roh}");
+        }
     }
 }

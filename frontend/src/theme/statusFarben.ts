@@ -16,7 +16,7 @@ import type {
   Verfuegbarkeit,
   Warnstufe,
 } from '../api/types';
-import type { HochwasserKlasse, LuftqualitaetKlasse } from '../api/fachebenen';
+import type { HochwasserKlasse, LuftqualitaetKlasse, OdlStufe } from '../api/fachebenen';
 
 /**
  * Statusfarb-Vertrag (LFH-328 · A2). EINE Quelle für „welche Bedeutung hat welche
@@ -383,9 +383,10 @@ export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
 /**
  * Stufe des UBA-Luftqualitätsindex einer Messstation auf der Lagekarte (LFH-79).
  *
- * DIE SIEBZEHNTE VERTRAGSKARTE, und das ist eine Entscheidung, kein Nebenprodukt: die Stufe
- * ist eine Domänen-Achse mit Zustandsbedeutung wie {@link hochwasserKlasse}, und eine Karte
- * außerhalb dieser Datei liefe am Abdeckungstest vorbei (LFH-358).
+ * DIE ACHTZEHNTE VERTRAGSKARTE (nach `odlStufe`, LFH-78), und das ist eine Entscheidung, kein
+ * Nebenprodukt: die Stufe ist eine Domänen-Achse mit Zustandsbedeutung wie
+ * {@link hochwasserKlasse}, und eine Karte außerhalb dieser Datei liefe am Abdeckungstest
+ * vorbei (LFH-358).
  *
  * FÜNF STUFEN AUF DREI ROLLEN — dieselbe Verengung wie bei {@link warnstufeKarte}.
  * `sehr_gut`/`gut` → `normal`; `maessig` → `achtung`, weil das UBA ab „mäßig" Wirkungen bei
@@ -404,6 +405,28 @@ export const luftqualitaetIndex: Record<LuftqualitaetKlasse, StatusDarstellung> 
   maessig: { rolle: 'achtung', label: 'mäßig' },
   schlecht: { rolle: 'alarm', label: 'schlecht' },
   sehr_schlecht: { rolle: 'alarm', label: 'sehr schlecht' },
+};
+
+/**
+ * Bewertungsstufe einer ODL-Sonde des BfS auf der Lagekarte (LFH-78) — die siebzehnte
+ * Vertragskarte, als eigene Entscheidung in `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`
+ * (Entscheidung 4) getroffen.
+ *
+ * DIE BÄNDER SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE. Das BfS nennt 0,05–0,2 µSv/h
+ * als natürlichen Bereich in Deutschland und empfiehlt eine standortbezogene Bewertung; einen
+ * absoluten Schwellenwert veröffentlicht es nicht. Deshalb beschreiben die Labels die Lage
+ * zum natürlichen Bereich und NICHT eine Gefährdung — „über natürlichem Bereich" statt
+ * „gefährlich". Regen hebt Werte kurzzeitig bis Faktor 3; eine `achtung`-Sonde ist also
+ * zuerst ein Anlass hinzusehen, kein Befund.
+ *
+ * Der zweite Kanal auf der Karte ist wie bei {@link hochwasserKlasse} der Punktdurchmesser
+ * (`pages/lagekarte/odlStil.ts`); Wort und Messwert stehen im Inspector.
+ */
+export const odlStufe: Record<OdlStufe, StatusDarstellung> = {
+  keine_messung: { rolle: 'neutral', label: 'keine Messung' },
+  normal: { rolle: 'normal', label: 'im natürlichen Bereich' },
+  erhoeht: { rolle: 'achtung', label: 'über natürlichem Bereich' },
+  stark_erhoeht: { rolle: 'alarm', label: 'über 3 × natürlicher Obergrenze' },
 };
 
 /**

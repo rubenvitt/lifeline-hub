@@ -30,7 +30,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle siebzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle achtzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
@@ -44,6 +44,7 @@ describe('Statusfarb-Vertrag', () => {
       'hochwasserKlasse',
       'luftqualitaetIndex',
       'materialStatus',
+      'odlStufe',
       'personStatus',
       'schadenAusmass',
       'schadenStatus',
@@ -159,7 +160,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(17);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(18);
   });
 });
 
@@ -299,6 +300,36 @@ describe('luftqualitaetIndex (LFH-79)', () => {
     const labels = Object.values(sf.luftqualitaetIndex).map((d) => d.label);
     expect(new Set(labels).size).toBe(labels.length);
     expect(sf.luftqualitaetIndex.maessig.label).toBe('mäßig');
+  });
+});
+
+describe('odlStufe (LFH-78)', () => {
+  it('deckt die vier Wire-Wörter der ODL-Ebene ab', () => {
+    // LITERAL: gegenüber `karte::normalisierung::odl_tests` gepinnt, nicht aus dem Typ abgeleitet.
+    expect(Object.keys(sf.odlStufe).sort()).toEqual([
+      'erhoeht',
+      'keine_messung',
+      'normal',
+      'stark_erhoeht',
+    ]);
+  });
+
+  it('staffelt die Bänder über neutral, normal, achtung und alarm', () => {
+    expect(sf.odlStufe.keine_messung).toEqual({ rolle: 'neutral', label: 'keine Messung' });
+    expect(sf.odlStufe.normal).toEqual({ rolle: 'normal', label: 'im natürlichen Bereich' });
+    expect(sf.odlStufe.erhoeht).toEqual({ rolle: 'achtung', label: 'über natürlichem Bereich' });
+    expect(sf.odlStufe.stark_erhoeht).toEqual({
+      rolle: 'alarm',
+      label: 'über 3 × natürlicher Obergrenze',
+    });
+  });
+
+  it('behauptet im Wort keine Gefahr — die Bänder sind keine BfS-Schwelle', () => {
+    // Das Label beschreibt die Lage zum natürlichen Bereich, nicht eine Gefährdung: das BfS
+    // veröffentlicht keinen absoluten Schwellenwert, eine „gefährlich"-Aussage stünde ohne Beleg.
+    for (const d of Object.values(sf.odlStufe)) {
+      expect(d.label).not.toMatch(/gef(a|ä)hr|kritisch|alarm/i);
+    }
   });
 });
 

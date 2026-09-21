@@ -15,6 +15,11 @@ import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenen
 import { fachebeneKeys } from './fachebenen';
 import type { LayerSichtbar } from './Sidebar';
 
+// Aus der Registry abgeleitet, NICHT von Hand gepflegt: die Handliste hatte `hochwasser`
+// (LFH-77) verloren — das Umschalten machte die Ansicht nie schmutzig, „Ansicht speichern"
+// bot sich nicht an, die Wahl war nach dem Neuladen weg. Aufgefallen bei LFH-78. Die
+// Hydration unten bleibt dagegen bewusst eine Aufzählung (siehe `leseFachebenen`).
+const FACHEBENE_KEYS = fachebeneKeys();
 const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'einsatzort',
   'uhs',
@@ -62,6 +67,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     // Spread über das gespeicherte Objekt.
     hochwasser: o.hochwasser === true,
     luftqualitaet: o.luftqualitaet === true,
+    // Dasselbe für LFH-78: jede heute gespeicherte Ansicht kennt `odl` nicht.
+    odl: o.odl === true,
     kritis: o.kritis === true,
     autobahn: o.autobahn === true,
   };
@@ -107,10 +114,7 @@ function gleich(a: KonfigStand, b: KonfigStand): boolean {
     a.basemap === b.basemap &&
     a.onlineStilName === b.onlineStilName &&
     a.kartenTheme === b.kartenTheme &&
-    // Aus der Registry abgeleitet statt als eigene Liste geführt: die handgepflegte Fassung
-    // hatte `hochwasser` (LFH-77) nie aufgenommen — deren Umschalten bot „Ansicht speichern"
-    // nicht an. Eine zweite Liste ist genau die Drift, die hier nicht passieren darf.
-    fachebeneKeys().every((k) => a.fachebenenSichtbar[k] === b.fachebenenSichtbar[k]) &&
+    FACHEBENE_KEYS.every((k) => a.fachebenenSichtbar[k] === b.fachebenenSichtbar[k]) &&
     LAYER_KEYS.every((k) => a.layer[k] === b.layer[k])
   );
 }

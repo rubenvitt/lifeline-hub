@@ -86,6 +86,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('dwd')).toEqual(['fachebene', 'dwd']);
     expect(globalKeys.fachebene('pegelonline')).toEqual(['fachebene', 'pegelonline']);
     expect(globalKeys.fachebene('hochwasser')).toEqual(['fachebene', 'hochwasser']);
+    expect(globalKeys.fachebene('odl')).toEqual(['fachebene', 'odl']);
     // `null` ist der Ist-Zustand (useState<string | null>(null)) und MUSS im Key erhalten
     // bleiben — auf `undefined` normalisiert entstünde ein zweites Cache-Fach für denselben
     // Zustand, und der `enabled`-Guard lädt dann gegen einen anderen Key als die Invalidierung.

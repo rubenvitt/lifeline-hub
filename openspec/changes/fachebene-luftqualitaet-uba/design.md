@@ -116,7 +116,7 @@ Rollen.** `sehr_gut`/`gut` → `normal`, `maessig` → `achtung`, `schlecht`/`se
 `alarm`, `keine_daten` → `neutral`. Begründung der Zuordnung: das UBA beschreibt „mäßig" als
 Stufe, ab der Wirkungen bei Langzeit- und Kombinationsexposition nicht auszuschließen sind —
 Anlass zur Aufmerksamkeit, kein Alarm; ab „schlecht" empfiehlt das UBA empfindlichen Gruppen,
-Aktivität im Freien zu meiden. Die Zählung im Abdeckungstest steigt von 16 auf 17 (bewusste
+Aktivität im Freien zu meiden. Die Zählung im Abdeckungstest steigt auf 18, nach `odlStufe` aus dem parallel gelandeten LFH-78 (bewusste
 Vertragsentscheidung, siehe Proposal). Kein Blau: `bedien` ist eine Beziehung, kein Zustand.
 
 **D10 — Zweiter Kanal = Radius, eingebacken wie Hochwasser.** Neues

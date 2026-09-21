@@ -22,7 +22,7 @@ export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/karte/fachebenen/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
 export type FachebeneQuelle =
-  'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser' | 'autobahn' | 'luftqualitaet';
+  'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser' | 'autobahn' | 'odl' | 'luftqualitaet';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), wie sie in den Feature-Properties der
@@ -62,6 +62,20 @@ export type HochwasserKlasse =
  */
 export type LuftqualitaetKlasse =
   'sehr_gut' | 'gut' | 'maessig' | 'schlecht' | 'sehr_schlecht' | 'keine_daten';
+
+/**
+ * Bewertungsstufe einer BfS-ODL-Sonde (LFH-78), wie sie in den Feature-Properties der
+ * `odl`-Ebene unter `stufe` steht.
+ *
+ * FE-LOKAL und beidseitig gepinnt aus demselben Grund wie {@link HochwasserKlasse}: hier in
+ * `theme/statusFarben.test.ts` und `pages/lagekarte/odlStil.test.ts`, drüben in
+ * `karte::normalisierung::odl_tests`.
+ *
+ * Die Bänder (bis 0,2 µSv/h · bis 0,6 · darüber) sind eine PROJEKT-EINTEILUNG nach dem vom
+ * BfS genannten natürlichen Bereich, keine BfS-Schwelle; `keine_messung` sind Sonden ohne
+ * Messwert (defekt, Testbetrieb). Herleitung: `docs/fachebenen-quellen.md`.
+ */
+export type OdlStufe = 'keine_messung' | 'normal' | 'erhoeht' | 'stark_erhoeht';
 
 /** Lädt eine Fachebene. `bbox` (west,sued,ost,nord) ist nur für `kritis` nötig. */
 export function ladeFachebene(quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> {

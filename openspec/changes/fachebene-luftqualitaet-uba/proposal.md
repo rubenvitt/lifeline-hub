@@ -26,7 +26,7 @@ Lagekarte kann diese Werte bisher nicht zeigen (LFH-79, Folgeebene zu LFH-69).
   Indexstufe (zwei Kanäle, WCAG 1.4.1), Detailanzeige im Fachebenen-Inspector,
   Persistenz der Sichtbarkeit in Kartenansichten.
 - Neue Vertragskarte **`luftqualitaetIndex`** in `theme/statusFarben.ts` — die
-  **siebzehnte**. CLAUDE.md führt jede weitere Karte als eigene Entscheidung; sie ist hier
+  **achtzehnte** (nach `odlStufe` aus LFH-78, parallel gelandet). CLAUDE.md führt jede weitere Karte als eigene Entscheidung; sie ist hier
   begründet: die Indexstufe ist eine Domänen-Achse mit Zustandsbedeutung wie
   `hochwasserKlasse` (LFH-77), und eine Karte außerhalb der Datei liefe am Abdeckungstest
   vorbei (LFH-358). Fünf Stufen fallen dabei auf drei Rollen (`normal`/`achtung`/`alarm`),
