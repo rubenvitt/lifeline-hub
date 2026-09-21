@@ -212,13 +212,15 @@ const ODL_STARK_AB: f64 = 3.0 * ODL_NATUERLICH_BIS;
 /// Einheit, in der die Bänder gerechnet sind — und die die Quelle für jede Sonde führt.
 const ODL_EINHEIT: &str = "µSv/h";
 
-/// Bewertungsstufe einer ODL-Sonde als Wire-Wert (LFH-78).
+/// Absolute Bewertungsstufe einer ODL-Sonde als Wire-Wert (LFH-78) — seit LFH-598 der
+/// RÜCKFALL: liegt für die Sonde ein Standort-Grundpegel vor, überschreibt
+/// `karte::odl_grundpegel::bewerte` diese Stufe bei Auslieferung mit der relativen.
 ///
 /// DIE BÄNDER SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE. Das BfS veröffentlicht
 /// keinen absoluten Schwellenwert für „erhöht", sondern empfiehlt eine standortbezogene
-/// Bewertung; ein Grundpegel je Sonde ist über die Schnittstelle aber nicht billig zu
-/// haben (Zeitreihe = eine Sonde je Abruf, gemessen). Entschieden mit dem Menschen am
-/// 21.09.2026; Herleitung in `docs/fachebenen-quellen.md`.
+/// Bewertung. Die Bänder gelten, bis ein Grundpegel da ist (erster Start, zu wenig
+/// Historie). Entschieden mit dem Menschen am 21.09.2026; Herleitung in
+/// `docs/fachebenen-quellen.md`.
 ///
 /// Die Zeichenketten sind der Wire-Vertrag zu `frontend/src/api/fachebenen.ts`
 /// (`OdlStufe`) und wie bei [`hochwasser_klasse`] auf BEIDEN Seiten gepinnt.

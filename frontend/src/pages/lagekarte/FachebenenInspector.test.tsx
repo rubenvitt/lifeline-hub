@@ -47,12 +47,87 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('0,700 µSv/h')).toBeInTheDocument();
     // Taktische DTG in der Anzeigezone: 09:00 UTC = 11:00 MESZ.
     expect(screen.getByText('211100SEP2026')).toBeInTheDocument();
-    expect(screen.getByText('über 3 × natürlicher Obergrenze')).toBeInTheDocument();
+    expect(screen.getByText('stark erhöht')).toBeInTheDocument();
     expect(screen.getByText('in Betrieb')).toBeInTheDocument();
     // Ortsnamen sind nicht eindeutig — die Kennung ist der Schlüssel für den Abgleich mit ODL-Info.
     expect(screen.getByText('DEZ3068')).toBeInTheDocument();
-    // Spec „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen".
+    // Spec „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen" — ohne `bewertung`
+    // gilt der Bänder-Maßstab, und der Satz sagt, warum (LFH-598).
+    expect(screen.getByText(/noch kein Grundpegel vor/)).toBeInTheDocument();
+    expect(screen.getByText(/natürlichen Bereich \(0,05–0,2\s+µSv\/h\)/)).toBeInTheDocument();
     expect(screen.getByText(/kein amtlicher Schwellenwert/)).toBeInTheDocument();
+    expect(screen.queryByText('Grundpegel')).not.toBeInTheDocument();
+    expect(screen.queryByText('Faktor')).not.toBeInTheDocument();
+  });
+
+  it('ODL: mit Grundpegel nennt der Inspector Grundpegel, Stand, Faktor und die Faktor-Schwellen (LFH-598)', () => {
+    render(
+      <FachebenenInspector
+        quelle="odl"
+        properties={{
+          titel: 'Flensburg',
+          kennung: 'DEZ0001',
+          wert: 0.19,
+          einheit: 'µSv/h',
+          stufe: 'stark_erhoeht',
+          bewertung: 'standort',
+          grundpegel: 0.06,
+          faktor: 3.17,
+          grundpegel_stand: '2026-09-21T12:00:00Z',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('stark erhöht')).toBeInTheDocument();
+    expect(screen.getByText('Grundpegel')).toBeInTheDocument();
+    // Stand als taktische DTG in der Anzeigezone: 12:00 UTC = 14:00 MESZ.
+    expect(screen.getByText('0,060 µSv/h (Stand 211400SEP2026)')).toBeInTheDocument();
+    expect(screen.getByText('3,17 ×')).toBeInTheDocument();
+    // Die Schwellen als LITERALE — sie stehen im Backend (`FAKTOR_ERHOEHT`/`FAKTOR_STARK`)
+    // und in der Spec; zurückgelesen aus einer Konstante prüfte der Test sich selbst.
+    // „über", nicht „ab": genau 1,5 × ist noch `normal`, genau 3 × noch `erhoeht` (Spec).
+    expect(screen.getByText(/über 1,5 × erhöht, über 3 × stark erhöht/)).toBeInTheDocument();
+    expect(screen.getByText(/kein amtlicher Schwellenwert/i)).toBeInTheDocument();
+    // Der Bänder-Maßstab gilt für diese Sonde NICHT und wird deshalb nicht genannt.
+    expect(screen.queryByText(/natürlichen Bereich/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/noch kein Grundpegel/)).not.toBeInTheDocument();
+  });
+
+  it('ODL: unter fremder Einheit behauptet der Inspector keinen fehlenden Grundpegel (LFH-598)', () => {
+    render(
+      <FachebenenInspector
+        quelle="odl"
+        properties={{
+          titel: 'X',
+          wert: 115,
+          einheit: 'nSv/h',
+          stufe: 'keine_messung',
+          bewertung: 'absolut',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('115,000 nSv/h')).toBeInTheDocument();
+    expect(screen.queryByText(/noch kein Grundpegel/)).not.toBeInTheDocument();
+  });
+
+  it('ODL: ein unbekanntes Grundlagen-Wort zeigt keinen Grundpegel (LFH-598)', () => {
+    render(
+      <FachebenenInspector
+        quelle="odl"
+        properties={{
+          titel: 'X',
+          wert: 0.19,
+          stufe: 'erhoeht',
+          bewertung: 'relativ',
+          grundpegel: 0.06,
+          faktor: 3.17,
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.queryByText('Grundpegel')).not.toBeInTheDocument();
+    expect(screen.getByText(/natürlichen Bereich/)).toBeInTheDocument();
   });
 
   it('ODL: eine defekte Sonde sagt „kein Messwert", statt eine Zahl zu erfinden', () => {

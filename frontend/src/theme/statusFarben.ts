@@ -385,21 +385,23 @@ export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
  * Vertragskarte, als eigene Entscheidung in `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`
  * (Entscheidung 4) getroffen.
  *
- * DIE BÄNDER SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE. Das BfS nennt 0,05–0,2 µSv/h
- * als natürlichen Bereich in Deutschland und empfiehlt eine standortbezogene Bewertung; einen
- * absoluten Schwellenwert veröffentlicht es nicht. Deshalb beschreiben die Labels die Lage
- * zum natürlichen Bereich und NICHT eine Gefährdung — „über natürlichem Bereich" statt
- * „gefährlich". Regen hebt Werte kurzzeitig bis Faktor 3; eine `achtung`-Sonde ist also
- * zuerst ein Anlass hinzusehen, kein Befund.
+ * DIE STUFEN SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE — und zwar eine von ZWEI:
+ * relativ zum Standort-Grundpegel der Sonde (LFH-598) oder, solange keiner vorliegt, nach
+ * absoluten Bändern am natürlichen Bereich (LFH-78). Die Labels müssen deshalb für BEIDE
+ * stimmen und nennen keinen Maßstab („erhöht", nicht „über natürlichem Bereich" — eine Sonde
+ * mit 0,19 µSv/h und Faktor 3,2 liegt im natürlichen Bereich und ist trotzdem stark erhöht).
+ * Den Maßstab nennt der Inspector je Sonde. Die Labels beschreiben eine Auffälligkeit, KEINE
+ * Gefährdung; Regen hebt Werte kurzzeitig bis Faktor 3, eine `achtung`-Sonde ist also zuerst
+ * ein Anlass hinzusehen, kein Befund.
  *
  * Der zweite Kanal auf der Karte ist wie bei {@link hochwasserKlasse} der Punktdurchmesser
  * (`pages/lagekarte/odlStil.ts`); Wort und Messwert stehen im Inspector.
  */
 export const odlStufe: Record<OdlStufe, StatusDarstellung> = {
   keine_messung: { rolle: 'neutral', label: 'keine Messung' },
-  normal: { rolle: 'normal', label: 'im natürlichen Bereich' },
-  erhoeht: { rolle: 'achtung', label: 'über natürlichem Bereich' },
-  stark_erhoeht: { rolle: 'alarm', label: 'über 3 × natürlicher Obergrenze' },
+  normal: { rolle: 'normal', label: 'unauffällig' },
+  erhoeht: { rolle: 'achtung', label: 'erhöht' },
+  stark_erhoeht: { rolle: 'alarm', label: 'stark erhöht' },
 };
 
 /**

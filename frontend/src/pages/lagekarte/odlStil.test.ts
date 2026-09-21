@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
-import { faerbeOdl, odlDarstellung, odlRadius } from './odlStil';
+import { faerbeOdl, odlDarstellung, odlGrundlage, odlRadius } from './odlStil';
 import { antdToken, farbenDunkel, farbenHell, type Farbrollen } from '../../theme/tokens';
 import type { FeatureCollection } from '../../api/fachebenen';
 
@@ -66,13 +66,44 @@ describe('faerbeOdl', () => {
 describe('odlDarstellung', () => {
   it('liest die Wire-Wörter wörtlich (Gegenstück zu karte::normalisierung::odl_tests)', () => {
     expect(odlDarstellung('keine_messung').label).toBe('keine Messung');
-    expect(odlDarstellung('normal').label).toBe('im natürlichen Bereich');
-    expect(odlDarstellung('erhoeht').label).toBe('über natürlichem Bereich');
-    expect(odlDarstellung('stark_erhoeht').label).toBe('über 3 × natürlicher Obergrenze');
+    expect(odlDarstellung('normal').label).toBe('unauffällig');
+    expect(odlDarstellung('erhoeht').label).toBe('erhöht');
+    expect(odlDarstellung('stark_erhoeht').label).toBe('stark erhöht');
   });
 
   it('lässt einen Rohwert nicht in die Oberfläche', () => {
     expect(odlDarstellung('stark-erhoeht').label).toBe('keine Messung');
     expect(odlDarstellung(0.7).label).toBe('keine Messung');
+  });
+});
+
+describe('odlGrundlage (LFH-598)', () => {
+  it('liest `standort` samt Grundpegel, Faktor und Stand', () => {
+    // LITERAL: das Wort ist gegenüber `karte::odl_grundpegel::tests` gepinnt.
+    expect(
+      odlGrundlage({
+        bewertung: 'standort',
+        grundpegel: 0.06,
+        faktor: 3.17,
+        grundpegel_stand: '2026-09-21T12:00:00Z',
+      }),
+    ).toEqual({ art: 'standort', grundpegel: 0.06, faktor: 3.17, stand: '2026-09-21T12:00:00Z' });
+  });
+
+  it('liest `absolut` als absolut', () => {
+    // LITERAL, zweites Wort des Vertrags.
+    expect(odlGrundlage({ bewertung: 'absolut' })).toEqual({ art: 'absolut' });
+  });
+
+  it('erfindet keinen Maßstab: unbekanntes Wort, fehlende Felder, keine Properties', () => {
+    for (const p of [
+      { bewertung: 'relativ', grundpegel: 0.1, faktor: 2 },
+      { bewertung: 'standort', faktor: 2 },
+      { bewertung: 'standort', grundpegel: '0.1', faktor: 2 },
+      { grundpegel: 0.1, faktor: 2 },
+      undefined,
+    ]) {
+      expect(odlGrundlage(p)).toEqual({ art: 'absolut' });
+    }
   });
 });
