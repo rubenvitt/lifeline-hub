@@ -23,14 +23,14 @@ kann.
 - [x] 3.2 Reiner Kern `neue_karte(roh, alt, jetzt)`: ohne `features`-Liste, ohne einzigen Pegel oder mit weniger als der Hälfte der bekannten Sonden → `None` (nichts schreiben); Tests
 - [x] 3.3 Hintergrund-Erneuerung unter `odl:grundpegel`: TTL 24 h, `inflight`-Riegel, Abkühlung 1 h nach Fehlschlag, eigener Request-Timeout 90 s, Sperrklinke gegen den gespeicherten Stand, Schreiben; Entscheidungslogik (frisch/anstossen/abkühlen) als reine Funktion mit Tests nach Muster `autobahn_weg`/`autobahn_darf_starten`
 - [x] 3.4 `fetch_odl`: nach `liefere_mit_swr` Grundpegel anstossen (nie darauf warten) und `bewerte_odl` anwenden; Integrationstest gegen die Route mit vorbelegtem Cache (`odl` + `odl:grundpegel`) → Features tragen `standort`; ohne `odl:grundpegel` → `absolut`, Antwort kommt ohne Netz zur Zeitreihe zustande
-- [ ] 3.5 `cargo test --workspace` und `cargo test --no-default-features -p lifeline-hub karte` grün; `cargo fmt --all`
+- [x] 3.5 `cargo test --workspace` und `cargo test --no-default-features -p lifeline-hub karte` grün; `cargo fmt --all`
 
 ## 4. Frontend
 
 - [x] 4.1 `api/fachebenen.ts`: Typ `OdlBewertung = 'standort' | 'absolut'` mit Doc-Verweis auf den Rust-Pin; `odlStil.test.ts` pinnt die Wörter als Literale (über `odlGrundlage`, das auch den Rückfall trägt)
 - [x] 4.2 `theme/statusFarben.ts`: Labels `odlStufe` → „keine Messung" · „unauffällig" · „erhöht" · „stark erhöht"; `statusFarben.test.ts` angepasst (Rollen unverändert, Kartenzahl bleibt 17)
 - [x] 4.3 `FachebenenInspector.tsx` `OdlInhalt`: bei `standort` Zeilen Grundpegel (3 Nachkommastellen, µSv/h, Stand in Ortszeit) und Faktor („1,8 ×") plus Faktor-Hinweis; bei `absolut` bzw. unbekanntem Wort Satz „noch kein Grundpegel" plus Bänder-Hinweis und KEINE Grundpegel-/Faktor-Zeile; Tests für beide Grundlagen und das unbekannte Wort, Zahlen im Hinweis als Literale geprüft
-- [ ] 4.4 `pnpm lint`, `pnpm exec tsc` (über `check-typ-codegen.sh`) und Vitest grün; Prettier-Fixpunkt
+- [x] 4.4 `pnpm lint`, `pnpm exec tsc` (über `check-typ-codegen.sh`) und Vitest grün; Prettier-Fixpunkt
 
 ## 5. Doku und Abschluss
 
@@ -39,4 +39,5 @@ kann.
 - [x] 5.1 `docs/fachebenen-quellen.md`: Zeitreihen-Aussage korrigieren (1h-Layer liefert alle Sonden, Messung 21.09.2026), Grundpegel-Verfahren, Sperrklinke, Faktor-Schwellen als Projekt-Einteilung, Rückfall auf Bänder; `rg "1 676 Abrufe|eine Sonde je Abruf"` zeigt keine veraltete Aussage mehr ohne Einordnung
 - [x] 5.2 Kommentar an `odl_stufe`/`ODL_*` in `normalisierung.rs` auf „Rückfall ohne Grundpegel" umstellen (der Satz „nicht billig zu haben" ist widerlegt)
 - [ ] 5.3 Live-Abruf gegen den echten BfS-Dienst: Dev-Stack starten, Ebene zuschalten, nach dem Grundpegel-Lauf tragen ≥ 1 500 Sonden `bewertung: "standort"`; Inspector-Sichtprüfung beider Grundlagen in Hell und Dunkel (eine Sonde mit < 20 Werten für `absolut`)
-- [ ] 5.4 `./scripts/check-all.sh` grün
+  — Stand 21.09.2026: Live-Abruf ERLEDIGT (Kaltstart 1 676 × `absolut`, nach ~5 s Grundpegel für 1 581 Sonden → 1 581 `standort`, 95 `absolut`, davon 91 ohne Messwert); die Sichtprüfung im Browser ist OFFEN (Anmeldung im Browser nur durch den Menschen)
+- [x] 5.4 `./scripts/check-all.sh` grün
