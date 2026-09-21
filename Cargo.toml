@@ -40,6 +40,9 @@ tower-http = { version = "0.7", features = ["fs", "catch-panic", "trace", "reque
 # um `ServeFile` per Request laufen zu lassen (siehe routes/karte.rs).
 tower = { version = "0.5", features = ["util", "limit"] }
 fs4 = "1.1.0"
+# LFH-83: KRITIS-Objekte aus dem Deutschland-OSM-Extrakt lesen. Reiner Rust-PBF-Leser
+# (MIT/Apache-2.0), kein FFI — das Binary bleibt single-binary.
+osmpbf = "0.3"
 # LFH-201: geteilter Offline-Katalog-Typ (Grundstein für den späteren karten-service).
 # `schema` (LFH-265): zieht `ToSchema` für OfflineKatalogEintrag in den Typ-Codegen. Bewusst
 # kein Default-Feature des Crates — karten-service soll utoipa standalone nicht mitziehen.

@@ -34,13 +34,14 @@ werden, auch eine, die ganz Deutschland umfasst. Einzelobjekte MUST die Properti
 Eine KRITIS-Antwort MUST höchstens 5 000 Features enthalten. Liegen im Ausschnitt mehr
 Objekte, SHALL das System Sammelpunkte liefern: je Zelle eines festen, vom Ausschnitt
 unabhängig verankerten Rasters ein Punkt mit den Properties `sammelpunkt: true` und
-`anzahl` (Zahl der zusammengefassten Objekte). Die Summe aller `anzahl`-Werte MUST der
-Zahl der Objekte im Ausschnitt entsprechen. Zwei Ausschnitte, die sich überlappen,
-MUST für dieselbe Rasterzelle denselben Sammelpunkt liefern.
+`anzahl` (Zahl der zusammengefassten Objekte). Eine Zelle wird immer ganz gezählt, auch
+wenn sie nur teilweise im Ausschnitt liegt; die Summe aller `anzahl`-Werte MUST der Zahl
+der Objekte in diesen Zellen entsprechen. Zwei Ausschnitte, die sich überlappen und
+dieselbe Rasterweite ergeben, MUST für dieselbe Rasterzelle denselben Sammelpunkt liefern.
 
 #### Scenario: Deutschland-Ansicht
 - **WHEN** die bbox ganz Deutschland umfasst und der Bestand mehr als 5 000 Objekte hat
-- **THEN** besteht die Antwort aus höchstens 5 000 Sammelpunkten, deren `anzahl` sich zur Zahl der Objekte im Ausschnitt summiert
+- **THEN** besteht die Antwort aus höchstens 5 000 Sammelpunkten, deren `anzahl` sich zur Zahl der Objekte in den berührten Rasterzellen summiert
 
 #### Scenario: Wenige Objekte
 - **WHEN** der Ausschnitt höchstens 5 000 Objekte enthält
