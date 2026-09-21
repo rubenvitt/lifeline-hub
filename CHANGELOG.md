@@ -1,3 +1,15 @@
+## [1.0.0-alpha.24](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.23...v1.0.0-alpha.24) (2026-09-21)
+
+### Features
+
+* **karte:** Fachebene Luftqualität (UBA) im Backend (LFH-79) ([cbe4ad0](https://github.com/rubenvitt/lifeline-hub/commit/cbe4ad083790f705747e8546bf9a10489d4f8bdd))
+* **lagekarte:** Fachebene Luftqualität (UBA) im Frontend (LFH-79) ([1d80698](https://github.com/rubenvitt/lifeline-hub/commit/1d80698c523d885d5b5e12d4a94a1987bb19e0a5))
+
+### Bug Fixes
+
+* **karte:** Formbruch der UBA-Antwort und Koordinaten-Wertebereich (LFH-79) ([be5156a](https://github.com/rubenvitt/lifeline-hub/commit/be5156af602b2076d16c89feb570aa287dab9240))
+* **lagekarte:** Review-Befunde zur Fachebene Luftqualität (LFH-79) ([4be59d6](https://github.com/rubenvitt/lifeline-hub/commit/4be59d6be4351be2a9f9545444ee4831c6963c57))
+
 ## [1.0.0-alpha.23](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.22...v1.0.0-alpha.23) (2026-09-21)
 
 ### Features
