@@ -44,7 +44,9 @@ const RADIUS: Record<HochwasserKlasse, number> = {
  * Klasse, die nur eine Seite bekommt — wer eine einführt, fasst beide Pins an.
  */
 function alsKlasse(roh: unknown): HochwasserKlasse {
-  return typeof roh === 'string' && roh in hochwasserKlasse
+  // Eigene Schlüssel, nicht `in`: das sähe auch `constructor`/`toString` aus der
+  // Prototypkette. `Object.hasOwn` scheidet wegen `lib: ES2020` aus.
+  return typeof roh === 'string' && Object.prototype.hasOwnProperty.call(hochwasserKlasse, roh)
     ? (roh as HochwasserKlasse)
     : 'keine_daten';
 }

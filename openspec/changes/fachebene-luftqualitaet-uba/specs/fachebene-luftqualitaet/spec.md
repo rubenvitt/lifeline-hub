@@ -29,7 +29,7 @@ ohne `bbox`-Parameter auskommen.
 ### Requirement: Nur Stationen mit aktuellem Index
 
 Das System SHALL genau die Stationen als Features liefern, für die die Quelle im
-Abfragefenster (die letzten sechs Stunden) einen Luftqualitätsindex meldet. Stationen, die
+Abfragefenster (die letzten acht Stunden) einen Luftqualitätsindex meldet. Stationen, die
 nur in der Stationsliste stehen, MUST NOT gezeichnet werden. Eine Station ohne auflösbare
 Koordinaten MUST verworfen werden, ohne die übrigen Stationen zu beeinträchtigen.
 

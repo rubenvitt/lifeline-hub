@@ -70,10 +70,10 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
   luftqualitaet: {
     key: 'luftqualitaet',
     label: 'Luftqualität (UBA)',
-    // Rückfall für Panel-Punkt und Inspector-Akzent — auf der Karte trägt jede Station ihre
-    // Rollenfarbe je Indexstufe (`luftqualitaetStil.ts`). Ein eigener Ton neben den sechs
-    // Bestandsebenen; bewusst kein Grün, das auf der Karte schon „gute Luft" heisst.
-    farbe: '#5b8c00',
+    // Nur der Panel-Punkt: auf der Karte trägt jede Station ihre Rollenfarbe je Indexstufe
+    // (`luftqualitaetStil.ts`), und der Inspector-Akzent folgt ihr. Deshalb ein entsättigter
+    // Ton, der KEINE Rollenfarbe ist — ein Grün hieße dort schon „gute Luft", Gelb „mäßig".
+    farbe: '#5b6b82',
     geometrieTyp: 'punkt',
     // = serverseitige TTL (900 s). Die Quelle liefert Stundenwerte mit ~2 h Verzug.
     pollMs: 900_000,

@@ -29,7 +29,9 @@ const RADIUS: Record<LuftqualitaetKlasse, number> = {
  * ihre Literale pinnen (`karte::luftqualitaet::tests` ↔ `theme/statusFarben.test.ts`).
  */
 function alsKlasse(roh: unknown): LuftqualitaetKlasse {
-  return typeof roh === 'string' && roh in luftqualitaetIndex
+  // Eigene Schlüssel, nicht `in`: das sähe auch `constructor`/`toString` aus der
+  // Prototypkette. `Object.hasOwn` scheidet wegen `lib: ES2020` aus.
+  return typeof roh === 'string' && Object.prototype.hasOwnProperty.call(luftqualitaetIndex, roh)
     ? (roh as LuftqualitaetKlasse)
     : 'keine_daten';
 }

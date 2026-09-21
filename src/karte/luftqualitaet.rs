@@ -66,12 +66,14 @@ fn als_stundenende(ende: NaiveDateTime) -> (String, String) {
     }
 }
 
-/// Anzahl der Stunden im Abfragefenster. Der gemessene Verzug der Quelle liegt bei
-/// 1,5–2,5 h, Nachzügler hängen eine weitere Stunde zurück; sechs Stunden decken das mit
-/// Reserve ab und kosten ~140 KB statt ~300 KB für einen ganzen Tag.
-const FENSTER_STUNDEN: i64 = 6;
+/// Anzahl der Stunden im Abfragefenster. Das Fenster endet mit der LAUFENDEN Stunde, und bei
+/// gemessenen 1,5–2,5 h Verzug sind deren jüngste zwei bis drei Stundenenden noch leer. Acht
+/// Stunden lassen damit rund fünf Stunden Daten übrig — Reserve für Nachzügler (gemessen eine
+/// weitere Stunde) und für einen Importausfall der Quelle von etwa vier Stunden, bevor eine
+/// Station aus der Ebene fällt. Kostet gemessen ~210 KB statt ~300 KB für einen ganzen Tag.
+const FENSTER_STUNDEN: i64 = 8;
 
-/// Query-Parameter des Indexabrufs für die letzten sechs Stunden (MEZ). `time_*` sind
+/// Query-Parameter des Indexabrufs für die letzten acht Stunden (MEZ). `time_*` sind
 /// Stundenenden 1–24 (gemessen: `time_from=1` ↔ `datetime_from 00:00`); das Fenster endet
 /// mit der laufenden Stunde.
 pub fn luftqualitaet_fenster(jetzt: DateTime<Utc>) -> [(&'static str, String); 4] {
@@ -388,24 +390,24 @@ mod tests {
         luftqualitaet_fenster(jetzt).into_iter().collect()
     }
 
-    /// 11:39 MESZ = 09:39 UTC = 10:39 MEZ. Die laufende Stunde endet 11:00 MEZ; sechs
-    /// Stunden rückwärts sind die Stundenenden 06 … 11.
+    /// 11:39 MESZ = 09:39 UTC = 10:39 MEZ. Die laufende Stunde endet 11:00 MEZ; acht
+    /// Stunden rückwärts sind die Stundenenden 04 … 11.
     #[test]
     fn fenster_im_sommer_rechnet_in_mez() {
         let f = fenster_map(Utc.with_ymd_and_hms(2026, 9, 21, 9, 39, 0).unwrap());
         assert_eq!(f["date_from"], "2026-09-21");
-        assert_eq!(f["time_from"], "6");
+        assert_eq!(f["time_from"], "4");
         assert_eq!(f["date_to"], "2026-09-21");
         assert_eq!(f["time_to"], "11");
     }
 
     /// 00:30 MEZ: die laufende Stunde endet 01:00 heute; das Fenster beginnt mit dem
-    /// Stundenende 20:00 des Vortags — und die Stunde bis Mitternacht heisst `24`, nicht `0`.
+    /// Stundenende 18:00 des Vortags.
     #[test]
     fn fenster_ueber_den_tageswechsel() {
         let f = fenster_map(Utc.with_ymd_and_hms(2026, 9, 20, 23, 30, 0).unwrap());
         assert_eq!(f["date_from"], "2026-09-20");
-        assert_eq!(f["time_from"], "20");
+        assert_eq!(f["time_from"], "18");
         assert_eq!(f["date_to"], "2026-09-21");
         assert_eq!(f["time_to"], "1");
     }
@@ -416,7 +418,7 @@ mod tests {
         let f = fenster_map(Utc.with_ymd_and_hms(2026, 1, 15, 22, 10, 0).unwrap());
         assert_eq!(f["date_to"], "2026-01-15");
         assert_eq!(f["time_to"], "24");
-        assert_eq!(f["time_from"], "19");
+        assert_eq!(f["time_from"], "17");
     }
 
     #[test]
@@ -424,7 +426,19 @@ mod tests {
         // 12:00:00 MEZ genau → die Stunde 12–13 hat begonnen und endet 13.
         let f = fenster_map(Utc.with_ymd_and_hms(2026, 1, 15, 11, 0, 0).unwrap());
         assert_eq!(f["time_to"], "13");
-        assert_eq!(f["time_from"], "8");
+        assert_eq!(f["time_from"], "6");
+    }
+
+    /// Beginnt das Fenster genau mit dem Stundenende Mitternacht, heisst sein Anfang `24` des
+    /// VORTAGS (06:30 MEZ → Stundenenden 24:00 Vortag … 07:00). Gegen die Live-API belegt:
+    /// `time_from=24` wird angenommen und beginnt um 23:00.
+    #[test]
+    fn fensteranfang_um_mitternacht_ist_24_des_vortags() {
+        let f = fenster_map(Utc.with_ymd_and_hms(2026, 9, 21, 5, 30, 0).unwrap());
+        assert_eq!(f["date_from"], "2026-09-20");
+        assert_eq!(f["time_from"], "24");
+        assert_eq!(f["date_to"], "2026-09-21");
+        assert_eq!(f["time_to"], "7");
     }
 
     // ------------------------------------------------------------------ Leitschadstoff

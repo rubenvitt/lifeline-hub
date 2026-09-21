@@ -743,7 +743,7 @@ const LUFTQUALITAET_TTL: Duration = Duration::from_secs(900);
 /// hierher (Bindestrich statt Unterstrich). Kein Verlass auf die Weiterleitung.
 const LUFTQUALITAET_BASIS: &str = "https://luftdaten.umweltbundesamt.de/api/air-data/v2";
 
-/// Die beiden Abruf-URLs eines Laufs (Stationsliste, Index im Sechs-Stunden-Fenster).
+/// Die beiden Abruf-URLs eines Laufs (Stationsliste, Index im Acht-Stunden-Fenster).
 /// `index=id` steht explizit — das Echo der Quelle meldet trotzdem mal `code` (gemessen),
 /// weshalb der Normalisierer zusätzlich über den Stationscode auflöst.
 pub(crate) fn luftqualitaet_urls(jetzt: chrono::DateTime<chrono::Utc>) -> (String, String) {
@@ -797,7 +797,7 @@ pub async fn fetch_luftqualitaet(s: &FachebenenState, pool: &SqlitePool) -> Fach
     .await
 }
 
-/// Zwei Abrufe je Lauf (Stationsliste ~560 KB, Index ~140 KB), nebenläufig — gemessen beide
+/// Zwei Abrufe je Lauf (Stationsliste ~560 KB, Index ~210 KB), nebenläufig — gemessen beide
 /// unter einer Sekunde, der Lauf darf also blockierend am ersten Request hängen.
 async fn erneuere_luftqualitaet(
     client: reqwest::Client,
@@ -1207,7 +1207,7 @@ mod luftqualitaet_tests {
         assert!(st.contains("/stations/json?"));
         assert!(ix.contains("/airquality/json?"));
         assert!(
-            ix.contains("date_from=2026-09-21") && ix.contains("time_from=6"),
+            ix.contains("date_from=2026-09-21") && ix.contains("time_from=4"),
             "{ix}"
         );
         assert!(ix.contains("time_to=11"), "{ix}");

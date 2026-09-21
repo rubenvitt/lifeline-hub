@@ -4,6 +4,7 @@ import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import StatusTag from '../../components/StatusTag';
+import { rollenFarbe } from '../../theme/statusFarben';
 import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
@@ -445,7 +446,13 @@ export default function FachebenenInspector({
   return (
     <KartenDetailCard
       titel={titel}
-      akzentFarbe={FACHEBENEN[quelle].farbe}
+      akzentFarbe={
+        // Die Luftqualitätsebene färbt je Station nach ihrer Stufe; der Akzent folgt dem, sonst
+        // stünde neben einem Alarm-Tag die Ebenenfarbe — eine Farbe mit zwei Bedeutungen.
+        quelle === 'luftqualitaet'
+          ? rollenFarbe(luftqualitaetDarstellung(p.klasse).rolle, token)
+          : FACHEBENEN[quelle].farbe
+      }
       onSchliessen={onSchliessen}
     >
       {istWarnung ? (

@@ -19,7 +19,7 @@ Farbe/Radius (`hochwasserStil.ts`) dargestellt.
 |---|---|
 | Host | `https://www.umweltbundesamt.de/api/air_data/v2/…` antwortet **301** auf `https://luftdaten.umweltbundesamt.de/api/air-data/v2/…` (Bindestrich statt Unterstrich) |
 | `/stations/json` | 2400 Stationen, 1175 ohne `station active to`; ~560 KB; Zeilen als Arrays, Spaltennamen in `indices` |
-| `/airquality/json` | **ein** Abruf für alle Stationen (kein N+1): 388 Stationen; ~140 KB für 6 h, ~300 KB für einen Tag; tagesübergreifendes Fenster funktioniert |
+| `/airquality/json` | **ein** Abruf für alle Stationen (kein N+1): 388 Stationen; ~140 KB für 6 h, ~210 KB für 8 h, ~300 KB für einen Tag; tagesübergreifendes Fenster funktioniert |
 | Struktur | `data[station_id][start] = [ende, gesamtindex, unvollstaendig, [komp_id, wert, teilindex, y], …]`; das Ende der letzten Tagesstunde heisst `…-20 24:00:00` |
 | Zeitzone | `indices` sagt wörtlich `date start (CET)`; Abruf 11:39 MESZ lieferte als jüngste Stunde Start 08:00 → MEZ fest, **ohne Sommerzeit** |
 | Verzug | jüngste Stunde endet ~1,5–2,5 h vor dem Abruf; 5 von 388 Stationen hingen eine weitere Stunde zurück |
@@ -68,11 +68,13 @@ dokumentiert. Liefe die Quelle eines Tages wirklich nach Code geschlüsselt aus,
 Ebene mit einer reinen ID-Tabelle **still leer** — `status: leer`, kein Fehler, kein roter
 Test. Der Normalisierer-Test deckt beide Schlüsselformen ab.
 
-**D4 — Abfragefenster: die letzten sechs Stunden in MEZ, rein und exportiert.** Eine reine
+**D4 — Abfragefenster: die letzten acht Stunden in MEZ, rein und exportiert.** Eine reine
 Funktion bildet `now (UTC)` auf `date_from/time_from/date_to/time_to` in MEZ (UTC+1 fest)
 ab. `time_*` sind Stundenenden 1–24 (gemessen: `time_from=1` → `datetime_from 00:00`).
-Sechs Stunden decken den gemessenen Verzug (≤ ~3 h) samt Nachzüglern mit Reserve ab und
-kosten ~140 KB statt ~300 KB für einen Tag. Getestet wird kurz nach Mitternacht (Fenster
+Das Fenster endet mit der laufenden, noch leeren Stunde; bei ~2 h Verzug bleiben von acht
+Stunden rund fünf mit Daten — Reserve für Nachzügler und einen Importausfall der Quelle von
+etwa vier Stunden. Kostet ~210 KB statt ~300 KB für einen Tag. (Im Review korrigiert: die
+erste Fassung mit sechs Stunden rechnete die leeren Zukunftsstunden als Reserve mit.) Getestet wird kurz nach Mitternacht (Fenster
 über den Tageswechsel) und im Sommer (MESZ darf nicht einfließen).
 
 **D5 — Zeitstempel: MEZ fest, Stundenende, RFC 3339 mit `+01:00`.** Der Messzeitpunkt ist

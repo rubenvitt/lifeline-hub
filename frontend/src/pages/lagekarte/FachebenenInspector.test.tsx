@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import FachebenenInspector from './FachebenenInspector';
+import { FACHEBENEN } from './fachebenen';
 import { taktischeDtgVoll } from '../../anzeige/format';
 
 describe('FachebenenInspector', () => {
@@ -79,7 +80,10 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('Potsdam-Zentrum')).toBeInTheDocument();
     // Das WORT trägt die Stufe (WCAG 1.4.1) — auf der Karte nur Farbe und Größe.
     expect(screen.getByText('schlecht')).toBeInTheDocument();
-    expect(screen.getAllByText('NO₂').length).toBeGreaterThan(0);
+    // Der Leitschadstoff gehört ins Label-Paar „Leitschadstoff: NO₂" — ein bloßes
+    // `getAllByText('NO₂')` fände auch die Messwertzeile und bliebe ohne die Angabe grün.
+    const leitLabel = screen.getByText('Leitschadstoff');
+    expect(leitLabel.closest('tr')?.textContent).toContain('NO₂');
     expect(screen.getByText('145 µg/m³')).toBeInTheDocument();
     expect(screen.getByText('12 µg/m³')).toBeInTheDocument();
     expect(screen.getByText(taktischeDtgVoll('2026-09-21T09:00:00+01:00'))).toBeInTheDocument();
@@ -87,6 +91,44 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText(/Verkehr/)).toBeInTheDocument();
     // Ohne Kennzeichnung der Quelle steht kein Unvollständigkeits-Hinweis da.
     expect(screen.queryByText(/unvollständige Datenbasis/i)).not.toBeInTheDocument();
+  });
+
+  it('Luftqualität: der Leitschadstoff steht auch ohne eigenen Messwert da', () => {
+    // Trennscharf: Leitschadstoff O₃, aber kein `wert_o3` — die O₃-Angabe kann nur aus der
+    // Leitschadstoff-Zeile stammen.
+    render(
+      <FachebenenInspector
+        quelle="luftqualitaet"
+        properties={{ titel: 'Station', klasse: 'gut', leitschadstoff: 'O₃', wert_no2: 10 }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('O₃')).toBeInTheDocument();
+  });
+
+  it('Luftqualität: der Kartenakzent trägt die Stufe der Station, nicht die Ebenenfarbe', () => {
+    // Sonst öffnete eine „sehr schlecht"-Station eine Karte mit dem Akzent der Ebene
+    // neben einem Alarm-Tag — eine Farbe mit zwei Bedeutungen (Prüfliste Kriterium 7).
+    const akzent = (klasse: string) => {
+      const { container, unmount } = render(
+        <FachebenenInspector
+          quelle="luftqualitaet"
+          properties={{ titel: 'S', klasse }}
+          onSchliessen={() => {}}
+        />,
+      );
+      const rand = (container.querySelector('.ant-card-head') as HTMLElement).style.borderLeftColor;
+      unmount();
+      return rand;
+    };
+    const ebene = (() => {
+      const probe = document.createElement('div');
+      probe.style.color = FACHEBENEN.luftqualitaet.farbe;
+      return probe.style.color;
+    })();
+    expect(akzent('sehr_schlecht')).not.toBe(akzent('sehr_gut'));
+    expect(akzent('sehr_schlecht')).not.toBe(ebene);
+    expect(akzent('sehr_gut')).not.toBe(ebene);
   });
 
   it('Luftqualität: nennt eine unvollständige Datenbasis als Wort', () => {

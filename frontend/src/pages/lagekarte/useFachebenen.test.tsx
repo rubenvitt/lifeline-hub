@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -154,6 +154,12 @@ function rendere() {
 }
 
 describe('useFachebenen', () => {
+  // Der Luftqualitäts-Status ist modulweit veränderlich; ein vorzeitig scheiternder Test darf
+  // `offline` nicht an den nächsten weitergeben.
+  afterEach(() => {
+    fx.lqStatus = 'ok';
+  });
+
   it('startet mit allen Ebenen aus (keine Queries, keine Attribution)', () => {
     const { result } = rendere();
     expect(result.current.aktiveFachebenen).toHaveLength(0);
@@ -321,7 +327,6 @@ describe('useFachebenen', () => {
     act(() => result.current.onFachebeneToggle('luftqualitaet', true));
     await waitFor(() => expect(result.current.fachebenenStatus.luftqualitaet).toBe('offline'));
     expect(result.current.fachebenenAttribution).not.toContain('Umweltbundesamt');
-    fx.lqStatus = 'ok';
   });
 
   it('autobahn braucht keine bbox — sie lädt schon durch das Einschalten (LFH-80)', async () => {

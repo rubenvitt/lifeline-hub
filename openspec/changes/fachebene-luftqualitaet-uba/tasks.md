@@ -37,7 +37,7 @@ zurückdrehen und sehen, dass genau dieser Test rot wird.
 ## 2. Backend — Abruf und Route
 
 - [x] 2.1 Reine Funktion `luftqualitaet_fenster(now_utc)` → Query-Parameter
-      (`date_from`, `time_from`, `date_to`, `time_to`) in MEZ, sechs Stunden rückwärts,
+      (`date_from`, `time_from`, `date_to`, `time_to`) in MEZ, acht Stunden rückwärts (Review: vorher sechs),
       Stundenenden 1–24. Tests: Sommer-Mittag, 00:30 MEZ (Fenster über den Tageswechsel),
       exakt volle Stunde. Mutationsprobe „Europe/Berlin" → rot.
 - [x] 2.2 `fetch_luftqualitaet` / `erneuere_luftqualitaet` in `src/karte/quellen.rs` nach
@@ -115,5 +115,5 @@ zurückdrehen und sehen, dass genau dieser Test rot wird.
       (3600 s → 24 h, wie im Code) korrigieren. Verifikation: Durchsicht gegen design.md.
 - [x] 5.2 Prüfliste Einsatztauglichkeit (15 Kriterien, Bedien-Leitlinie) für die geänderte
       Lagekarten-Fläche ausfüllen, jede Zeile mit Verdikt; Ablage in der PR-Beschreibung.
-- [ ] 5.3 `./scripts/check-all.sh` vollständig grün (inkl. Prettier, Typ-Codegen ohne Diff,
+- [x] 5.3 `./scripts/check-all.sh` vollständig grün (inkl. Prettier, Typ-Codegen ohne Diff,
       e2e); Ausgabe ohne `| tail`.
