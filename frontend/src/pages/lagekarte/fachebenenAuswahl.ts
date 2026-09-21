@@ -12,6 +12,7 @@ export function defaultFachebenenSichtbar(): FachebenenSichtbar {
     luftqualitaet: false,
     odl: false,
     kritis: false,
+    energie: false,
     autobahn: false,
   };
 }

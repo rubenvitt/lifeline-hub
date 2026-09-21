@@ -123,9 +123,38 @@ describe('useKartenAnsicht', () => {
     expect(result.current.fachebenenSichtbar.luftqualitaet).toBe(false);
   });
 
+  it('ein gespeicherter Stand ohne Energie-Schlüssel liest „aus" (LFH-81)', async () => {
+    // Ein vor LFH-81 gespeicherter Stand: andere Ebenen an, `energie` fehlt ganz.
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({
+        fachebenen_sichtbar: { kritis: true, nina: true },
+      } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.fachebenenSichtbar.kritis).toBe(true));
+    // `toBe(false)`, nicht `toBeFalsy()`: ein fehlender Eintrag in `leseFachebenen` käme als
+    // `undefined` zurück und wäre für den Schalter „aus", für den Vergleich aber ein Wert.
+    expect(result.current.fachebenenSichtbar.energie).toBe(false);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('hydratisiert eine gespeicherte Energie-Sichtbarkeit (LFH-81)', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({ fachebenen_sichtbar: { energie: true } } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.fachebenenSichtbar.energie).toBe(true));
+    expect(result.current.dirty).toBe(false);
+  });
+
   // Jede Fachebene muss den Schmutzig-Vergleich treffen — sonst böte sich „Ansicht
   // speichern" nach dem Umschalten nie an. `hochwasser` fehlte im Vergleichs-Tupel seit
-  // LFH-77; der Test läuft deshalb über ALLE Ebenen, nicht nur über die neue.
+  // LFH-77; der Test läuft deshalb über ALLE Ebenen (seit LFH-81 auch `energie`), nicht nur
+  // über die jeweils neue.
   it.each(fachebeneKeys())('das Umschalten von %s macht die Ansicht schmutzig', async (k) => {
     ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
     const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {

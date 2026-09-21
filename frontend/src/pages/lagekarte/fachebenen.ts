@@ -1,4 +1,36 @@
-import type { FachebeneQuelle, FachebeneStatus } from '../../api/fachebenen';
+import type { FachebeneQuelle, FachebeneStatus, FeatureCollection } from '../../api/fachebenen';
+
+type Feature = FeatureCollection['features'][number];
+
+/**
+ * Mindest-Zoom der Energie-Ebene (LFH-81): unter diesem Zoom keine Abfrage, stattdessen der
+ * Hinweis „näher heranzoomen". Bis LFH-81 hiess die Konstante `KRITIS_MIN_ZOOM`; seit LFH-83
+ * fragt KRITIS in JEDER Zoomstufe (Extrakt-Bestand, gebündelt), die Schwelle gilt also nur
+ * noch für Ebenen, die sie über `minZoom` tragen — heute allein Energie, deren Backend live
+ * Overpass fragt und Ausschnitte über {@link ENERGIE_MAX_SPANNE_GRAD} ablehnt
+ * (`pruefe_energie_bbox`). Wert unverändert.
+ */
+export const BBOX_MIN_ZOOM = 10;
+
+/**
+ * Größte Spanne eines Energie-Ausschnitts in Grad je Achse — dieselbe Zahl wie
+ * `ENERGIE_MAX_SPANNE_GRAD` im Backend (`src/karte/quellen.rs`). Der Zoom allein reicht als
+ * Bremse nicht: bei Zoom 10 ist ein Grad rund 1456 px breit, ein breiter Schirm zeigt also
+ * mehr als ein Grad. Das Frontend prüft deshalb die Spanne selbst, statt eine Anfrage zu
+ * schicken, die das Backend mit 400 ablehnt und die Ebene auf „offline“ setzt.
+ */
+export const ENERGIE_MAX_SPANNE_GRAD = 3;
+
+/**
+ * Passt ein Ausschnitt `west,sued,ost,nord` in die Energie-Grenze? Rein und exportiert. Ein
+ * nicht lesbarer Ausschnitt gilt als passend — über ihn entscheidet das Backend.
+ */
+export function energieAusschnittPasst(bbox: string): boolean {
+  const t = bbox.split(',').map(Number);
+  if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return true;
+  const [w, s, e, n] = t;
+  return e - w <= ENERGIE_MAX_SPANNE_GRAD && n - s <= ENERGIE_MAX_SPANNE_GRAD;
+}
 
 export interface FachebeneDef {
   key: FachebeneQuelle;
@@ -30,6 +62,14 @@ export interface FachebeneDef {
    * hunderttausend Objekte, die der Server ab 5 000 zusätzlich zu Sammelpunkten verdichtet.
    */
   buendeln?: boolean;
+  /**
+   * Mindest-Zoom, unter dem die Ebene NICHT gefragt wird (Hinweis „näher heranzoomen" statt
+   * einer Anfrage). Bis LFH-81 galt {@link BBOX_MIN_ZOOM} für ALLE bbox-abhängigen Ebenen;
+   * seit LFH-83 fragt KRITIS in jeder Zoomstufe (Extrakt-Bestand, gebündelt) — die Schwelle
+   * gilt also nur für Ebenen, die sie hier ausdrücklich tragen. Heute allein Energie, deren
+   * Backend live Overpass fragt.
+   */
+  minZoom?: number;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -130,11 +170,42 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     buendeln: true,
     geltung: 'OpenStreetMap-Daten, wöchentlicher Stand — keine amtliche KRITIS-Liste',
   },
+  energie: {
+    key: 'energie',
+    label: 'Energieanlagen',
+    // antd `lime-7`. `theme/tokens.ts` führt keine Fachebenen-Palette — dort stehen nur die
+    // Sichtungsfarben und die Farbrollen, und beide tragen Bedeutung (`normal` = grün,
+    // `alarm` = rot, `bedien` = blau); eine Ebenenfarbe daraus behauptete einen Status. Die
+    // Bestandsfarben sind wie diese hier Stufe 7 der antd-Presetpalette (rot, gold, blau,
+    // cyan, magenta, violett, lime). Die zunächst gewählte lime-7 hat inzwischen ODL
+    // (LFH-78) belegt — Gelb (`#d4b106`) liegt nah am DWD-Gold, ist aber unterscheidbar und
+    // die letzte freie Stufe-7-Tonlücke. Bewusst NICHT `green-7`: Grün ist die Rolle
+    // `normal` und die Sichtungsfarbe SK III, ein grüner Punkt läse sich als „in Ordnung".
+    farbe: '#d4b106',
+    geometrieTyp: 'punkt',
+    // Wie KRITIS: kein Hintergrund-Polling, Refetch nur über den Ausschnitt. Der Stand ist
+    // serverseitig 24 h frisch (design.md, Entscheidung 1).
+    pollMs: 0,
+    bboxAbhaengig: true,
+    // Anders als KRITIS (LFH-83) fragt Energie live Overpass je Ausschnitt; das Backend lehnt
+    // alles über ENERGIE_MAX_SPANNE_GRAD ab. Erst ab dieser Zoomstufe wird gefragt.
+    minZoom: BBOX_MIN_ZOOM,
+  },
 };
 
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
-  return ['nina', 'dwd', 'pegelonline', 'hochwasser', 'odl', 'luftqualitaet', 'kritis', 'autobahn'];
+  return [
+    'nina',
+    'dwd',
+    'pegelonline',
+    'hochwasser',
+    'odl',
+    'luftqualitaet',
+    'kritis',
+    'energie',
+    'autobahn',
+  ];
 }
 
 /**
@@ -154,6 +225,15 @@ export function fachebeneTakt(key: FachebeneQuelle, status: FachebeneStatus | un
 
 export function istBboxAbhaengig(key: FachebeneQuelle): boolean {
   return FACHEBENEN[key].bboxAbhaengig;
+}
+
+/**
+ * True, sobald IRGENDEINE bbox-abhängige Ebene sichtbar ist — dann braucht die Seite den
+ * Karten-Ausschnitt (LFH-81). Aus der Registry abgeleitet statt als Aufzählung, damit eine
+ * weitere bbox-Ebene die Meldung nicht wieder vergisst; bis LFH-81 hing sie an KRITIS allein.
+ */
+export function braucheViewportBbox(sichtbar: Record<FachebeneQuelle, boolean>): boolean {
+  return fachebeneKeys().some((k) => sichtbar[k] && istBboxAbhaengig(k));
 }
 
 /**
@@ -188,8 +268,12 @@ export function rasterWeite(breite: number): number {
  * das keine gültige bbox mehr (Ausschnitt breiter als die Welt, oder nach dem Kappen
  * `west ≥ ost`), gilt die ganze Welt — das Backend beantwortet sie verdichtet; eine
  * ausgelassene Anfrage ließe die Ebene dagegen dauerhaft leer (Review LFH-83).
+ *
+ * `grid` setzt eine FESTE Rasterweite statt der Leiter. Die Energie-Ebene (LFH-81) nimmt das
+ * alte 0,05°-Stadtraster: sie fragt Overpass live je Ausschnitt, und die Leiter rundet
+ * einen Zoom-10-Ausschnitt (~0,9°) auf 0,25° nach außen — eine unnötig größere Abfrage.
  */
-export function rasterBbox(bbox: string): string {
+export function rasterBbox(bbox: string, grid?: number): string {
   const t = bbox.split(',').map(Number);
   if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return bbox;
   const [w0, s, e0, n] = t;
@@ -197,7 +281,7 @@ export function rasterBbox(bbox: string): string {
   const versatz = Math.floor(((w0 + e0) / 2 + 180) / 360) * 360;
   const w = w0 - versatz;
   const e = e0 - versatz;
-  const grid = rasterWeite(e - w);
+  grid ??= rasterWeite(e - w);
   const ab = (v: number) => Math.floor(v / grid) * grid; // nach unten
   const auf = (v: number) => Math.ceil(v / grid) * grid; // nach oben
   const r = (v: number) => Math.round(v * 1e6) / 1e6; // Fließkomma-Rauschen kappen
@@ -215,3 +299,134 @@ export function rasterBbox(bbox: string): string {
 
 /** Rückfall von {@link rasterBbox}, wenn sich kein gültiger Ausschnitt bilden lässt. */
 export const WELT_BBOX = '-180,-90,180,90';
+
+/**
+ * Mergt neue Features in `sammlung` (dedupliziert über die Koordinate), begrenzt auf `max`
+ * (älteste zuerst entfernt). So bleiben einmal geladene Objekte einer bbox-Ebene sichtbar, auch wenn
+ * man wegzoomt oder das Gebiet wechselt. Mutiert `sammlung`; true bei Änderung.
+ */
+export function mergeFeatures(
+  sammlung: Map<string, Feature>,
+  neue: Feature[],
+  max: number,
+): boolean {
+  let geaendert = false;
+  for (const f of neue) {
+    const key = JSON.stringify(f.geometry?.coordinates ?? null);
+    if (!sammlung.has(key)) {
+      sammlung.set(key, f);
+      geaendert = true;
+    }
+  }
+  if (geaendert) {
+    while (sammlung.size > max) {
+      const aeltester = sammlung.keys().next().value;
+      if (aeltester === undefined) break;
+      sammlung.delete(aeltester);
+    }
+  }
+  return geaendert;
+}
+
+/** Koordinate als Schlüssel der Sammlung — dieselbe Form wie in {@link mergeFeatures}. */
+const koordinatenSchluessel = (f: Feature) => JSON.stringify(f.geometry?.coordinates ?? null);
+
+const herkunftVon = (f: Feature): string => {
+  const h = f.properties?.herkunft;
+  return typeof h === 'string' ? h : '';
+};
+
+/**
+ * Merge der Energie-Ebene (LFH-81). Anders als {@link mergeFeatures} (first-wins, für
+ * KRITIS unverändert) GEWINNT hier die neuere Fassung an derselben Koordinate: nach einem
+ * Teilausfall des MaStR-Teils kommt dieselbe OSM-Anlage später als `osm+mastr` mit
+ * amtlicher Leistung und Nummer zurück — first-wins behielte die ärmere Fassung für immer.
+ *
+ * Danach fallen reine `mastr`-Punkte weg, deren `mastr_nummer` ein `osm+mastr`-Punkt der
+ * Sammlung in seinen `mastr_nummern` führt: im Ausfall stand die Einheit als eigener Punkt
+ * da, jetzt ist sie einer OSM-Anlage zugeordnet und stünde sonst doppelt auf der Karte (an
+ * verschiedenen Koordinaten, deshalb greift die Koordinaten-Deduplizierung dort nicht).
+ * Die Bereinigung läuft über die GANZE Sammlung, nicht nur über den neuen Stand — die
+ * Reihenfolge des Eintreffens darf das Ergebnis nicht ändern.
+ *
+ * Mutiert `sammlung`; true bei Änderung. Eine inhaltsgleiche Fassung gilt NICHT als
+ * Änderung, sonst liefe jeder Refetch als neues Objekt durch die Karte.
+ */
+export function mergeEnergieFeatures(
+  sammlung: Map<string, Feature>,
+  neue: Feature[],
+  max: number,
+): boolean {
+  let geaendert = false;
+  for (const f of neue) {
+    const key = koordinatenSchluessel(f);
+    const alt = sammlung.get(key);
+    if (alt !== undefined && JSON.stringify(alt) === JSON.stringify(f)) continue;
+    // `Map.set` auf einen vorhandenen Schlüssel behält dessen Position — die
+    // Älteste-zuerst-Kappung unten bleibt damit an der ersten Sichtung ausgerichtet.
+    sammlung.set(key, f);
+    geaendert = true;
+  }
+
+  const zugeordnet = new Set<string>();
+  for (const f of sammlung.values()) {
+    if (herkunftVon(f) !== 'osm+mastr') continue;
+    const nummern = f.properties?.mastr_nummern;
+    if (typeof nummern !== 'string') continue;
+    for (const n of nummern.split(',')) {
+      const t = n.trim();
+      if (t) zugeordnet.add(t);
+    }
+  }
+  if (zugeordnet.size > 0) {
+    for (const [key, f] of sammlung) {
+      const nummer = f.properties?.mastr_nummer;
+      if (herkunftVon(f) === 'mastr' && typeof nummer === 'string' && zugeordnet.has(nummer)) {
+        sammlung.delete(key);
+        geaendert = true;
+      }
+    }
+  }
+
+  if (geaendert) {
+    while (sammlung.size > max) {
+      const aeltester = sammlung.keys().next().value;
+      if (aeltester === undefined) break;
+      sammlung.delete(aeltester);
+    }
+  }
+  return geaendert;
+}
+
+/** Trenner der Nennungsteile in der `attribution` einer Antwort (design.md, Entscheidung 5). */
+export const NENNUNG_TRENNER = ' · ';
+
+/**
+ * Quellennennung der Energie-Ebene aus der GEZEICHNETEN Sammlung (LFH-81), nicht aus der
+ * letzten Antwort: die Sammlung akkumuliert über Ausschnitte, und nach dem Pannen in reines
+ * OSM-Gebiet stünden sonst MaStR-Punkte ohne die dl-de/by-2-0-Nennung auf der Karte — die
+ * Lizenz verlangt sie aber für jeden gezeigten Datensatz.
+ *
+ * `teile` sind die in bisherigen Antworten gesehenen Nennungsteile. Ein Teil mit
+ * „OpenStreetMap" bleibt, solange ein Punkt mit `osm` in der Herkunft gesammelt ist, einer
+ * mit „Marktstammdatenregister" entsprechend für `mastr`. Ein Teil, der keiner der beiden
+ * Quellen zuzuordnen ist, bleibt, solange überhaupt ein Punkt gezeigt wird. Ein Punkt ohne
+ * Herkunft trägt beide Nennungen. Rein.
+ */
+export function energieNennung(teile: readonly string[], features: readonly Feature[]): string[] {
+  if (features.length === 0) return [];
+  let osm = false;
+  let mastr = false;
+  for (const f of features) {
+    const h = herkunftVon(f);
+    // Ohne Herkunft ist nicht entscheidbar, woher der Punkt stammt — dann beide Nennungen:
+    // eine überzählige Nennung schadet nicht, eine fehlende verletzt die Lizenz.
+    if (!h || h.includes('osm')) osm = true;
+    if (!h || h.includes('mastr')) mastr = true;
+  }
+  return teile.filter((t) => {
+    if (t.includes('OpenStreetMap')) return osm;
+    if (t.includes('Marktstammdatenregister')) return mastr;
+    return true;
+  });
+}

@@ -846,6 +846,128 @@ async fn fachebenen_odl_bewertet_gegen_den_grundpegel() {
     assert_eq!(ohne["bewertung"], "absolut");
 }
 
+/// Energie (LFH-81) ist wie KRITIS bbox-pflichtig: ohne bbox 400 mit `{error}`-Rumpf.
+#[tokio::test]
+async fn fachebenen_energie_ohne_bbox_ist_400() {
+    let app = app_mit_pool(pool().await);
+    let res = anfrage(&app, "GET", "/api/karte/fachebenen/energie", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    // Der Grund muss die bbox sein — ein 400 „Unbekannte Quelle" sähe sonst genauso aus.
+    let fehler = json(res).await["error"].as_str().unwrap().to_string();
+    assert!(fehler.contains("bbox"), "{fehler}");
+}
+
+#[tokio::test]
+async fn fachebenen_energie_kaputte_bbox_ist_400() {
+    let app = app_mit_pool(pool().await);
+    for bbox in ["1,2,3", "7.3,51.45,6.9,51.65", "a,b,c,d"] {
+        let uri = format!("/api/karte/fachebenen/energie?bbox={bbox}");
+        let res = anfrage(&app, "GET", &uri, None, None).await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "bbox {bbox}");
+        let fehler = json(res).await["error"].as_str().unwrap().to_string();
+        assert!(fehler.contains("bbox"), "{bbox}: {fehler}");
+    }
+}
+
+/// Beide Teile VORHER in den Cache (Schlüssel als handgeschriebene Literale): der Test pinnt
+/// damit die Schlüssel, bleibt netzunabhängig und prüft Zusammenführung, bbox-Filter und
+/// die Quellennennung aus beiden beitragenden Teilen über die echte Route.
+#[tokio::test]
+async fn fachebenen_energie_wird_aus_beiden_teilen_bedient() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = build_router(AppState {
+        pool: pool().await,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+        karten_dir: karten_dir.clone(),
+    });
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let punkt = |lon: f64, lat: f64, titel: &str, art: &str, herkunft: &str| {
+        serde_json::json!({
+            "type": "Feature",
+            "geometry": { "type": "Point", "coordinates": [lon, lat] },
+            "properties": {
+                "titel": titel, "anlagenart": art, "leistung_mw": 15.0,
+                "betreiber": null, "betriebsstatus": null, "herkunft": herkunft,
+                "mastr_nummer": if herkunft == "mastr" {
+                    serde_json::json!(format!("SEE{}", (lon * 1000.0) as i64))
+                } else {
+                    serde_json::Value::Null
+                },
+                "mastr_id": null, "mastr_einheiten": null
+            }
+        })
+    };
+    let osm = FachebeneAntwort::ok(
+        "energie",
+        "egal",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [
+            punkt(7.0079, 51.6002, "Kraftwerk Scholven", "kohle", "osm")
+        ] }),
+    );
+    let mastr = FachebeneAntwort::ok(
+        "energie",
+        "egal",
+        Some("2026-09-21T10:00:00Z".into()),
+        serde_json::json!({ "type": "FeatureCollection", "features": [
+            punkt(7.19, 51.55, "Batteriespeicher Herne", "speicher", "mastr"),
+            punkt(12.0, 48.0, "Weit weg", "wasser", "mastr")
+        ] }),
+    );
+    lifeline_hub::karte::cache::setze(&cache_pool, "energie:osm:6.90,51.45,7.30,51.65", &osm).await;
+    lifeline_hub::karte::cache::setze(&cache_pool, "energie:mastr", &mastr).await;
+
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/fachebenen/energie?bbox=6.9,51.45,7.3,51.65",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["quelle"], "energie");
+    assert_eq!(v["status"], "ok");
+    assert_eq!(
+        v["attribution"],
+        "© OpenStreetMap-Beitragende (ODbL) · Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0"
+    );
+    assert_eq!(v["stand"], "2026-09-21T10:00:00Z");
+    let titel: Vec<&str> = v["features"]["features"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["properties"]["titel"].as_str().unwrap())
+        .collect();
+    assert_eq!(titel.len(), 2, "{titel:?}");
+    assert!(titel.contains(&"Kraftwerk Scholven"));
+    assert!(titel.contains(&"Batteriespeicher Herne"));
+    // Wire-Feld `mastr_nummern` (Review-Befund 3): bei MaStR-Anteil die Nummern, sonst null —
+    // auch wenn der Cache-Stand das Feld noch gar nicht trägt.
+    let props = |t: &str| {
+        v["features"]["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["properties"]["titel"] == t)
+            .unwrap()["properties"]
+            .clone()
+    };
+    assert_eq!(props("Batteriespeicher Herne")["mastr_nummern"], "SEE7190");
+    let scholven = props("Kraftwerk Scholven");
+    assert!(scholven.as_object().unwrap().contains_key("mastr_nummern"));
+    assert_eq!(scholven["mastr_nummern"], serde_json::Value::Null);
+}
+
 // ===== Admin-CRUD: Online-Quellen =====
 
 #[tokio::test]

@@ -1,21 +1,35 @@
 import { describe, it, expect } from 'vitest';
+import { defaultFachebenenSichtbar } from './fachebenenAuswahl';
 import {
   FACHEBENEN,
   fachebeneKeys,
   fachebeneTakt,
+  BBOX_MIN_ZOOM,
+  braucheViewportBbox,
   istBboxAbhaengig,
+  mergeFeatures,
   rasterBbox,
   WELT_BBOX,
   rasterWeite,
+  mergeEnergieFeatures,
+  energieNennung,
 } from './fachebenen';
 
+// Minimaler Feature-Builder für die Merge-Tests.
+const feat = (lon: number, lat: number) => ({
+  type: 'Feature' as const,
+  geometry: { type: 'Point', coordinates: [lon, lat] },
+  properties: {},
+});
+
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen, Hochwasser, ODL, Luftqualität und die BAB-Lage', () => {
+  it('enthält die vier v1-Quellen, Hochwasser, ODL, Luftqualität, KRITIS/Energie und die BAB-Lage', () => {
     // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline`,
     // weil es dieselbe Frage beantwortet: dort der rohe Wasserstand, hier die amtliche
     // Bewertung (LFH-77). `odl` (LFH-78) folgt als zweite bewertete Messnetz-Ebene,
-    // `luftqualitaet` (LFH-79) als dritte. `autobahn` (LFH-80) hängt hinten an — eigene
-    // Fragestellung.
+    // `luftqualitaet` (LFH-79) als dritte. `energie` (LFH-81) steht neben `kritis`: beide
+    // sind Infrastruktur im Kartenausschnitt, und KRITIS führt die Umspannwerke, die MaStR
+    // nicht kennt. `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
     expect(fachebeneKeys()).toEqual([
       'nina',
       'dwd',
@@ -24,8 +38,24 @@ describe('Fachebenen-Registry', () => {
       'odl',
       'luftqualitaet',
       'kritis',
+      'energie',
       'autobahn',
     ]);
+  });
+  it('führt die Energieanlagen als bbox-abhängige Punktebene ohne Polling (LFH-81)', () => {
+    expect(FACHEBENEN.energie.label).toBe('Energieanlagen');
+    expect(FACHEBENEN.energie.geometrieTyp).toBe('punkt');
+    expect(FACHEBENEN.energie.pollMs).toBe(0);
+    expect(FACHEBENEN.energie.bboxAbhaengig).toBe(true);
+  });
+  it('Farbe der Energieanlagen fällt mit keiner Bestandsebene zusammen (LFH-81)', () => {
+    // Handgeschriebene Literale der sechs Bestandsfarben, nicht aus FACHEBENEN gelesen:
+    // sonst prüfte der Test die Registry gegen sich selbst.
+    const bestand = ['#cf1322', '#d48806', '#096dd9', '#08979c', '#c41d7f', '#531dab'];
+    expect(bestand).not.toContain(FACHEBENEN.energie.farbe.toLowerCase());
+    // Und über alle Ebenen: jede Farbe genau einmal — gilt auch für eine achte Ebene.
+    const farben = Object.values(FACHEBENEN).map((f) => f.farbe.toLowerCase());
+    expect(new Set(farben).size).toBe(farben.length);
   });
   it('führt die Hochwasserebene als Punktebene mit Hintergrund-Polling', () => {
     expect(FACHEBENEN.hochwasser.geometrieTyp).toBe('punkt');
@@ -62,9 +92,11 @@ describe('Fachebenen-Registry', () => {
       .map((k) => FACHEBENEN[k].farbe);
     expect(andere).not.toContain(FACHEBENEN.odl.farbe);
   });
-  it('markiert nur kritis als bbox-abhängig', () => {
+  it('markiert genau kritis und energie als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
+    expect(istBboxAbhaengig('energie')).toBe(true);
     expect(istBboxAbhaengig('dwd')).toBe(false);
+    expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual(['kritis', 'energie']);
     // Die Autobahn-Ebene aggregiert das ganze Netz serverseitig — sie darf NICHT in den
     // bbox-Zweig geraten, sonst bliebe sie ohne Viewport-Meldung dauerhaft leer.
     expect(istBboxAbhaengig('autobahn')).toBe(false);
@@ -137,6 +169,10 @@ describe('Fachebenen-Registry', () => {
       expect(e.pollMs).toBeGreaterThanOrEqual(0);
     }
   });
+  it('BBOX_MIN_ZOOM bleibt die bisherige KRITIS-Schwelle 10', () => {
+    // Der Wert ist beim Umbenennen unverändert geblieben (LFH-81, design.md Entscheidung 6).
+    expect(BBOX_MIN_ZOOM).toBe(10);
+  });
 });
 
 describe('rasterWeite', () => {
@@ -151,6 +187,18 @@ describe('rasterWeite', () => {
     const breiten = [0.01, 0.1, 0.5, 1, 2, 4, 8, 16, 45, 180, 360];
     const weiten = breiten.map(rasterWeite);
     for (let i = 1; i < weiten.length; i++) expect(weiten[i]).toBeGreaterThanOrEqual(weiten[i - 1]);
+  });
+});
+
+describe('braucheViewportBbox (LFH-81)', () => {
+  it('ist aus, solange keine bbox-abhängige Ebene sichtbar ist', () => {
+    expect(braucheViewportBbox(defaultFachebenenSichtbar())).toBe(false);
+    // Eine sichtbare Ebene OHNE bbox zählt nicht.
+    expect(braucheViewportBbox({ ...defaultFachebenenSichtbar(), autobahn: true })).toBe(false);
+  });
+  it('ist an, sobald irgendeine bbox-abhängige Ebene sichtbar ist — auch ohne KRITIS', () => {
+    expect(braucheViewportBbox({ ...defaultFachebenenSichtbar(), kritis: true })).toBe(true);
+    expect(braucheViewportBbox({ ...defaultFachebenenSichtbar(), energie: true })).toBe(true);
   });
 });
 
@@ -230,5 +278,160 @@ describe('rasterBbox', () => {
   });
   it('gibt ungültige Eingabe unverändert zurück', () => {
     expect(rasterBbox('kaputt')).toBe('kaputt');
+  });
+  it('rastert mit fester Weite, wenn eine übergeben wird (Energie, LFH-81)', () => {
+    expect(rasterBbox('7.01,51.51,7.12,51.58', 0.05)).toBe('7,51.5,7.15,51.6');
+    // Ein Zoom-10-Ausschnitt (~0,9° bei rund 1300 px Kartenbreite): die Leiter rundet auf
+    // 0,25° nach außen und vergrößert die Overpass-Abfrage merklich, das feste Stadtraster
+    // bleibt nah am Ausschnitt. Genau deshalb nimmt Energie nicht die Leiter.
+    const zoom10 = '7.13,51.21,8.03,51.76';
+    const breite = (b: string) => {
+      const [w, , e] = b.split(',').map(Number);
+      return e - w;
+    };
+    expect(breite(rasterBbox(zoom10))).toBeGreaterThan(1);
+    expect(breite(rasterBbox(zoom10, 0.05))).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('mergeFeatures', () => {
+  it('akkumuliert über mehrere Aufrufe und dedupliziert per Koordinate', () => {
+    const m = new Map();
+    expect(mergeFeatures(m, [feat(6.9, 50.9), feat(7.0, 51.0)], 100)).toBe(true);
+    // anderer Ausschnitt mit einem überlappenden Punkt → nur der neue kommt dazu
+    expect(mergeFeatures(m, [feat(7.0, 51.0), feat(8.0, 52.0)], 100)).toBe(true);
+    expect(m.size).toBe(3); // 6.9/7.0/8.0, der doppelte 7.0 nur einmal
+  });
+  it('meldet keine Änderung, wenn nichts Neues dazukommt', () => {
+    const m = new Map();
+    mergeFeatures(m, [feat(6.9, 50.9)], 100);
+    expect(mergeFeatures(m, [feat(6.9, 50.9)], 100)).toBe(false);
+  });
+  it('begrenzt die Größe (älteste zuerst raus)', () => {
+    const m = new Map();
+    mergeFeatures(m, [feat(1, 1), feat(2, 2), feat(3, 3)], 2);
+    expect(m.size).toBe(2);
+    expect(m.has(JSON.stringify([1, 1]))).toBe(false); // ältester entfernt
+    expect(m.has(JSON.stringify([3, 3]))).toBe(true);
+  });
+});
+
+// Energie-Feature mit Properties (LFH-81): Koordinate + Herkunft + MaStR-Angaben.
+const energie = (lon: number, lat: number, props: Record<string, unknown>) => ({
+  type: 'Feature' as const,
+  geometry: { type: 'Point', coordinates: [lon, lat] },
+  properties: props,
+});
+
+describe('mergeEnergieFeatures (LFH-81)', () => {
+  it('überschreibt ein Feature an derselben Koordinate mit der neueren Fassung', () => {
+    // Teilausfall: zuerst kam nur der OSM-Teil, danach dieselbe Anlage mit amtlichen Angaben.
+    const m = new Map();
+    mergeEnergieFeatures(m, [energie(7, 51, { herkunft: 'osm', leistung_mw: null })], 100);
+    const neu = energie(7, 51, {
+      herkunft: 'osm+mastr',
+      leistung_mw: 690,
+      mastr_nummer: 'SEE1',
+      mastr_nummern: 'SEE1',
+    });
+    expect(mergeEnergieFeatures(m, [neu], 100)).toBe(true);
+    expect(m.size).toBe(1);
+    expect(m.get(JSON.stringify([7, 51]))?.properties).toEqual(neu.properties);
+  });
+
+  it('meldet keine Änderung, wenn dieselbe Fassung noch einmal kommt', () => {
+    const m = new Map();
+    mergeEnergieFeatures(m, [energie(7, 51, { herkunft: 'osm' })], 100);
+    expect(mergeEnergieFeatures(m, [energie(7, 51, { herkunft: 'osm' })], 100)).toBe(false);
+  });
+
+  it('entfernt reine MaStR-Punkte, deren Nummer ein osm+mastr-Punkt schon trägt', () => {
+    // Im Ausfall stand die Einheit als eigener MaStR-Punkt da; später ordnet das Backend sie
+    // einer OSM-Anlage zu. Ohne Bereinigung stünde dieselbe Anlage doppelt auf der Karte.
+    const m = new Map();
+    mergeEnergieFeatures(
+      m,
+      [
+        energie(7.01, 51.01, { herkunft: 'mastr', mastr_nummer: 'SEE2' }),
+        energie(8, 52, { herkunft: 'mastr', mastr_nummer: 'SEE9' }),
+      ],
+      100,
+    );
+    expect(
+      mergeEnergieFeatures(
+        m,
+        [
+          energie(7, 51, {
+            herkunft: 'osm+mastr',
+            mastr_nummer: 'SEE1',
+            mastr_nummern: 'SEE1,SEE2',
+          }),
+        ],
+        100,
+      ),
+    ).toBe(true);
+    expect(m.has(JSON.stringify([7.01, 51.01]))).toBe(false);
+    // Eine fremde Nummer bleibt stehen.
+    expect(m.has(JSON.stringify([8, 52]))).toBe(true);
+    expect(m.size).toBe(2);
+  });
+
+  it('entfernt auch, wenn der MaStR-Punkt erst NACH dem osm+mastr-Punkt eintrifft', () => {
+    const m = new Map();
+    mergeEnergieFeatures(
+      m,
+      [
+        energie(7, 51, {
+          herkunft: 'osm+mastr',
+          mastr_nummer: 'SEE1',
+          mastr_nummern: 'SEE1, SEE2',
+        }),
+      ],
+      100,
+    );
+    mergeEnergieFeatures(
+      m,
+      [energie(7.01, 51.01, { herkunft: 'mastr', mastr_nummer: 'SEE2' })],
+      100,
+    );
+    expect(m.size).toBe(1);
+  });
+});
+
+describe('mergeFeatures bleibt first-wins (KRITIS)', () => {
+  it('behält das zuerst gesehene Feature an einer Koordinate', () => {
+    const m = new Map();
+    mergeFeatures(m, [energie(7, 51, { name: 'alt' })], 100);
+    expect(mergeFeatures(m, [energie(7, 51, { name: 'neu' })], 100)).toBe(false);
+    expect(m.get(JSON.stringify([7, 51]))?.properties).toEqual({ name: 'alt' });
+  });
+});
+
+describe('energieNennung (LFH-81)', () => {
+  const OSM = '© OpenStreetMap-Beitragende (ODbL)';
+  const MASTR = 'Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0';
+
+  it('nennt MaStR, solange die Sammlung einen Punkt mit MaStR-Anteil hat', () => {
+    const fs = [energie(7, 51, { herkunft: 'osm' }), energie(8, 52, { herkunft: 'mastr' })];
+    expect(energieNennung([OSM, MASTR], fs)).toEqual([OSM, MASTR]);
+  });
+
+  it('osm+mastr trägt beide Nennungen', () => {
+    expect(energieNennung([OSM, MASTR], [energie(7, 51, { herkunft: 'osm+mastr' })])).toEqual([
+      OSM,
+      MASTR,
+    ]);
+  });
+
+  it('ohne jeden MaStR-Punkt keine MaStR-Nennung', () => {
+    expect(energieNennung([OSM, MASTR], [energie(7, 51, { herkunft: 'osm' })])).toEqual([OSM]);
+  });
+
+  it('ein Punkt ohne Herkunft trägt beide Nennungen (lieber zu viel als zu wenig)', () => {
+    expect(energieNennung([OSM, MASTR], [energie(7, 51, {})])).toEqual([OSM, MASTR]);
+  });
+
+  it('ohne Punkte keine Nennung', () => {
+    expect(energieNennung([OSM, MASTR], [])).toEqual([]);
   });
 });

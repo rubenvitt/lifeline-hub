@@ -92,6 +92,37 @@ const fx = vi.hoisted(() => {
       [7.67, 51.57],
       [6.96, 49.27],
     ]),
+    // Energie (LFH-81): VIER Punkte im ersten, ein weiterer im zweiten Ausschnitt — die
+    // Mengen unterscheiden sich von jeder anderen Fixture (KRITIS 1, Autobahn 3), ein
+    // vertauschter `combine`-Index fiele also auf.
+    energieA: fc([
+      [7.05, 51.6],
+      [7.21, 51.53],
+      [7.19, 51.54],
+      [7.3, 51.5],
+    ]),
+    energieB: fc([[7.4, 51.45]]),
+    // Quellennennung (LFH-81): ein Ausschnitt mit MaStR-Anteil, einer mit reinem OSM.
+    energieMastr: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [7.6, 51.2] },
+          properties: { herkunft: 'mastr', mastr_nummer: 'SEE1' },
+        },
+      ],
+    } as FeatureCollection,
+    energieOsm: {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [8.6, 52.2] },
+          properties: { herkunft: 'osm' },
+        },
+      ],
+    } as FeatureCollection,
   };
 });
 
@@ -140,6 +171,23 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           stand: null,
           features: fx.hochwasser,
         });
+      if (quelle === 'energie' && bbox === 'bbox-mastr')
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution:
+            '© OpenStreetMap-Beitragende (ODbL) · Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0',
+          stand: null,
+          features: fx.energieMastr,
+        });
+      if (quelle === 'energie' && (bbox === 'bbox-osm' || bbox === 'bbox-osm2'))
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: '© OpenStreetMap-Beitragende (ODbL)',
+          stand: null,
+          features: fx.energieOsm,
+        });
       if (quelle === 'kritis')
         return Promise.resolve({
           quelle,
@@ -147,6 +195,14 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           attribution: '© KRITIS',
           stand: null,
           features: bbox === 'bbox2' ? fx.kritisB : fx.kritisA,
+        });
+      if (quelle === 'energie')
+        return Promise.resolve({
+          quelle,
+          status: 'ok',
+          attribution: '© OpenStreetMap-Beitragende (ODbL)',
+          stand: null,
+          features: bbox === 'bbox2' ? fx.energieB : fx.energieA,
         });
       return Promise.resolve({
         quelle,
@@ -210,12 +266,12 @@ describe('useFachebenen', () => {
   it('ersetzt KRITIS bei einem bbox-Wechsel, statt zu akkumulieren (LFH-83)', async () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('kritis', true));
-    act(() => result.current.setKritisBbox('bbox1'));
+    act(() => result.current.setViewportBbox('bbox1'));
     const kritis = () => result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis');
     await waitFor(() =>
       expect(kritis()?.daten.features[0]?.geometry?.coordinates).toEqual([10, 51]),
     );
-    act(() => result.current.setKritisBbox('bbox2'));
+    act(() => result.current.setViewportBbox('bbox2'));
     // Der Server liefert je Ausschnitt den vollständigen Bestand bzw. dessen Sammelpunkte.
     // Akkumulierte die Ebene weiter, lägen nach dem Herauszoomen Einzelobjekte UND die
     // Sammelpunkte derselben Gegend übereinander — und die Bündelzahl zählte doppelt.
@@ -239,9 +295,9 @@ describe('useFachebenen', () => {
       const { result } = rendere();
       const kritis = () => result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis');
       act(() => result.current.onFachebeneToggle('kritis', true));
-      act(() => result.current.setKritisBbox('bbox1'));
+      act(() => result.current.setViewportBbox('bbox1'));
       await waitFor(() => expect(kritis()?.daten.features).toHaveLength(1));
-      act(() => result.current.setKritisBbox('bbox2'));
+      act(() => result.current.setViewportBbox('bbox2'));
       await waitFor(() => expect(result.current.fachebenenLaedt.kritis).toBe(true));
       // Während die neue bbox lädt: kein Leer-Blinken, das alte Bild steht.
       expect(kritis()?.daten.features[0]?.geometry?.coordinates).toEqual([10, 51]);
@@ -273,7 +329,7 @@ describe('useFachebenen', () => {
     try {
       const { result } = rendere();
       act(() => result.current.onFachebeneToggle('kritis', true));
-      act(() => result.current.setKritisBbox('bbox1'));
+      act(() => result.current.setViewportBbox('bbox1'));
       await waitFor(() => expect(result.current.fachebenenStatus.kritis).toBe('offline'));
       const nachErstemRuf = rufe;
       // Ohne Kartenbewegung: der erste Bestand muss trotzdem erscheinen (Spec „Erster Start").
@@ -291,7 +347,7 @@ describe('useFachebenen', () => {
     try {
       const { result } = rendere();
       act(() => result.current.onFachebeneToggle('kritis', true));
-      act(() => result.current.setKritisBbox('bbox1'));
+      act(() => result.current.setViewportBbox('bbox1'));
       await waitFor(() => expect(result.current.fachebenenStatus.kritis).toBe('ok'));
       const kritisRufe = () => lade.mock.calls.filter(([q]) => q === 'kritis').length;
       const vorher = kritisRufe();
@@ -448,7 +504,7 @@ describe('useFachebenen', () => {
       result.current.onFachebeneToggle('luftqualitaet', true);
       result.current.onFachebeneToggle('autobahn', true);
       result.current.onFachebeneToggle('kritis', true);
-      result.current.setKritisBbox('bbox1');
+      result.current.setViewportBbox('bbox1');
     });
     const daten = (k: string) =>
       result.current.aktiveFachebenen.find((f) => f.def.key === k)?.daten.features;
@@ -481,7 +537,7 @@ describe('useFachebenen', () => {
   it('autobahn braucht keine bbox — sie lädt schon durch das Einschalten (LFH-80)', async () => {
     const { result } = rendere();
     act(() => result.current.onFachebeneToggle('autobahn', true));
-    // Gegenstück zu KRITIS, das ohne `setKritisBbox` dauerhaft leer bliebe. Geriete die
+    // Gegenstück zu KRITIS, das ohne `setViewportBbox` dauerhaft leer bliebe. Geriete die
     // Autobahn-Ebene in den bbox-Zweig, stünde hier 0 statt 3.
     await waitFor(() =>
       expect(
@@ -523,5 +579,196 @@ describe('useFachebenen', () => {
       vi.useRealTimers();
       lade.mockImplementation(original);
     }
+  });
+
+  it('meldet für KRITIS in keiner Zoomstufe einen Zoom-Hinweis (LFH-83)', () => {
+    // KRITIS fragt seit LFH-83 in JEDER Zoomstufe den Extrakt-Bestand (gebündelt ab 5000
+    // Objekten) — anders als vor LFH-81/83, als dieselbe `BBOX_MIN_ZOOM`-Schwelle noch für
+    // alle bbox-abhängigen Ebenen galt. Die Schwelle gilt seither nur für Ebenen mit eigenem
+    // `minZoom` in der Registry, und KRITIS trägt keinen.
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('kritis', true));
+    act(() => result.current.setKartenZoom(5));
+    expect(result.current.zoomZuKlein.kritis).toBeFalsy();
+    act(() => result.current.setKartenZoom(12));
+    expect(result.current.zoomZuKlein.kritis).toBeFalsy();
+  });
+
+  it('meldet den Zoom-Hinweis auch für die Energieanlagen, KRITIS bleibt aus (LFH-81)', () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(9));
+    expect(result.current.zoomZuKlein.energie).toBe(true);
+    // Der Hinweis hängt an der sichtbaren Ebene, nicht an KRITIS.
+    expect(result.current.zoomZuKlein.kritis).toBeFalsy();
+    act(() => result.current.setKartenZoom(10));
+    expect(result.current.zoomZuKlein.energie).toBe(false);
+  });
+
+  it('eine Ebene ohne bbox bekommt keinen Zoom-Hinweis', () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('autobahn', true));
+    act(() => result.current.setKartenZoom(5));
+    expect(result.current.zoomZuKlein.autobahn).toBeFalsy();
+  });
+
+  it('fragt die Energieanlagen mit der bbox ab und akkumuliert sie (LFH-81)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    lade.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
+    // Ohne bbox keine Abfrage — die Ebene ist bbox-abhängig wie KRITIS.
+    expect(lade.mock.calls.filter(([q]) => q === 'energie')).toHaveLength(0);
+    act(() => result.current.setViewportBbox('bbox1'));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(4),
+    );
+    expect(lade).toHaveBeenCalledWith('energie', 'bbox1');
+    // Gegen die konkrete Koordinate, nicht bloß die Anzahl (Index-Verwechslung in `combine`).
+    const energie = result.current.aktiveFachebenen.find((f) => f.def.key === 'energie');
+    expect(energie?.daten.features[0].geometry?.coordinates).toEqual([7.05, 51.6]);
+    expect(result.current.fachebenenStatus.energie).toBe('ok');
+    expect(result.current.fachebenenAttribution).toContain('© OpenStreetMap-Beitragende (ODbL)');
+
+    act(() => result.current.setViewportBbox('bbox2'));
+    // Der neue Ausschnitt kommt dazu, der alte bleibt stehen (Energie akkumuliert — anders
+    // als KRITIS, dessen bbox-Antwort das Bild ersetzt, s. o.).
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(5),
+    );
+    // KRITIS ist aus und wurde nie abgefragt — der Ausschnitt gehört nicht mehr KRITIS allein.
+    expect(lade.mock.calls.filter(([q]) => q === 'kritis')).toHaveLength(0);
+  });
+
+  it('teilt den Ausschnitt zwischen KRITIS und Energie, die Sammlungen bleiben getrennt', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('kritis', true));
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
+    act(() => result.current.setViewportBbox('bbox1'));
+    await waitFor(() => {
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(4);
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis')?.daten.features,
+      ).toHaveLength(1);
+    });
+    const kritis = result.current.aktiveFachebenen.find((f) => f.def.key === 'kritis');
+    expect(kritis?.daten.features[0].geometry?.coordinates).toEqual([10, 51]);
+  });
+
+  it('fragt die Energieanlagen unter dem Mindest-Zoom nicht ab, auch mit bbox (LFH-81)', async () => {
+    // Seit LFH-83 meldet die Karte den Ausschnitt in JEDER Zoomstufe (KRITIS braucht ihn
+    // dort). Die Energie-Ebene fragt Overpass live und braucht deshalb weiterhin ihren
+    // eigenen Mindest-Zoom — das Gate sitzt im Hook, nicht mehr an der Karte.
+    const lade = vi.mocked(ladeFachebene);
+    lade.mockClear();
+    const { result } = rendere();
+    const energieRufe = () => lade.mock.calls.filter(([q]) => q === 'energie');
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(9));
+    act(() => result.current.setViewportBbox('7.01,51.51,7.12,51.58'));
+    // Ein Zyklus Zeit, damit eine fälschlich aktivierte Query hier auch wirklich feuerte.
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(energieRufe()).toHaveLength(0);
+    expect(result.current.zoomZuKlein.energie).toBe(true);
+    // Gegenaussage: ab Zoom 10 geht dieselbe (einzige, geteilte) bbox unverändert raus.
+    act(() => result.current.setKartenZoom(10));
+    await waitFor(() => expect(energieRufe()).toHaveLength(1));
+    expect(energieRufe()[0][1]).toBe('7.01,51.51,7.12,51.58');
+  });
+
+  it('fragt Energie auf breitem Schirm ab Zoom 10 ab, bremst aber einen zu großen Ausschnitt (LFH-81)', async () => {
+    // Bei Zoom 10 ist ein Grad rund 1456 px breit — ab etwa 1920 px Bildschirm war der
+    // Ausschnitt größer als die frühere 1°-Grenze, und die Ebene stand leer auf „offline".
+    const lade = vi.mocked(ladeFachebene);
+    lade.mockClear();
+    const { result } = rendere();
+    const energieRufe = () => lade.mock.calls.filter(([q]) => q === 'energie');
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
+    // 3,6° breit: über der Grenze → keine Abfrage, dafür der Hinweis.
+    act(() => result.current.setViewportBbox('5.0,50.0,8.6,51.0'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(energieRufe()).toHaveLength(0);
+    expect(result.current.zoomZuKlein.energie).toBe(true);
+    // 1,6° breit (1920-px-Schirm bei Zoom 10): geht raus, kein Hinweis.
+    act(() => result.current.setViewportBbox('6.2,51.2,7.8,51.8'));
+    await waitFor(() => expect(energieRufe()).toHaveLength(1));
+    expect(result.current.zoomZuKlein.energie).toBe(false);
+  });
+
+  it('ein Ausschnitt ohne gemeldeten Zoom schaltet die Energie-Abfrage nicht frei', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    lade.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setViewportBbox('bbox1'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(lade.mock.calls.filter(([q]) => q === 'energie')).toHaveLength(0);
+  });
+
+  it('hält die aktiveFachebenen-Referenz auch mit aktiver Energie-Ebene stabil', async () => {
+    const { result, rerender } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
+    act(() => result.current.setViewportBbox('bbox1'));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(4),
+    );
+    const vorher = result.current.aktiveFachebenen;
+    rerender();
+    expect(result.current.aktiveFachebenen).toBe(vorher);
+  });
+  it('behält die MaStR-Nennung nach dem Pannen in reines OSM-Gebiet (LFH-81)', async () => {
+    const MASTR = 'Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0';
+    const OSM = '© OpenStreetMap-Beitragende (ODbL)';
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
+    act(() => result.current.setViewportBbox('bbox-mastr'));
+    await waitFor(() => expect(result.current.fachebenenAttribution.join(' · ')).toContain(MASTR));
+
+    // Die letzte Antwort nennt nur noch OSM — gezeichnet werden aber weiter die gesammelten
+    // MaStR-Punkte, und die tragen die Lizenzpflicht mit.
+    act(() => result.current.setViewportBbox('bbox-osm'));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(2),
+    );
+    const zeile = result.current.fachebenenAttribution.join(' · ');
+    expect(zeile).toContain(MASTR);
+    expect(zeile).toContain(OSM);
+  });
+
+  it('nennt MaStR nicht, solange kein MaStR-Punkt gesammelt ist (LFH-81)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('energie', true));
+    act(() => result.current.setKartenZoom(10));
+    act(() => result.current.setViewportBbox('bbox-osm'));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'energie')?.daten.features,
+      ).toHaveLength(1),
+    );
+    const zeile = result.current.fachebenenAttribution.join(' · ');
+    expect(zeile).toContain('© OpenStreetMap-Beitragende (ODbL)');
+    expect(zeile).not.toContain('Marktstammdatenregister');
+  });
+
+  it('die KRITIS-Nennung bleibt die der Antwort (LFH-81)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('kritis', true));
+    act(() => result.current.setViewportBbox('bbox1'));
+    await waitFor(() => expect(result.current.fachebenenAttribution).toEqual(['© KRITIS']));
   });
 });

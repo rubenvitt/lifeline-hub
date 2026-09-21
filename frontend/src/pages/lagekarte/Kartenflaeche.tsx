@@ -65,6 +65,7 @@ import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
 import type { Ecken } from '../../api/kartenbilder';
+import { BBOX_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 
 // Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
@@ -167,6 +168,8 @@ export interface KartenflaecheProps {
   bilder?: BildOverlay[];
   /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
   onBboxAenderung?: (bbox: string) => void;
+  /** Aktueller Zoom nach Bewegung — für „näher heranzoomen"-Hinweise bbox-abhängiger Ebenen. */
+  onZoomAenderung?: (zoom: number) => void;
   /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle + volle Geometrie
    *  (für Detail-Panel; Geometrie un-geclippt aus der geladenen FeatureCollection, LFH-146). */
   onFachebeneKlick?: (
@@ -214,6 +217,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onZeichnenBereitAenderung,
     fachebenen,
     onBboxAenderung,
+    onZoomAenderung,
     onFachebeneKlick,
     bilder,
     platzierBild,
@@ -801,18 +805,25 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, []);
 
-  // Viewport (bbox) nach Kartenbewegung melden — für bbox-abhängige Ebenen wie KRITIS, in
-  // JEDER Zoomstufe (LFH-83: der Server verdichtet große Ausschnitte selbst zu Sammelpunkten,
-  // die frühere Mindest-Zoomstufe gegen riesige Overpass-Anfragen ist entfallen). Sendet
-  // sofort beim Wirksamwerden und dann nach jedem moveend (600ms-Debounce).
+  // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
+  // bbox nur ab BBOX_MIN_ZOOM. KRITIS selbst bräuchte das Gate seit LFH-83 nicht mehr (der
+  // Server verdichtet große Ausschnitte aus dem Extrakt zu Sammelpunkten, keine Overpass-Anfrage
+  // mehr) — aber Energie (LFH-81) fragt für `power=plant` weiterhin LIVE bei Overpass an, und
+  // der Handler ist für alle bbox-abhängigen Ebenen gemeinsam. Das Gate bleibt deshalb an, es
+  // schützt jetzt Energie vor einer Welt-weiten Anfrage.
+
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !onBboxAenderung) return;
+    if (!map || (!onBboxAenderung && !onZoomAenderung)) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const verarbeite = () => {
-      const b = map.getBounds();
-      onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+      const zoom = map.getZoom();
+      onZoomAenderung?.(zoom);
+      if (onBboxAenderung && zoom >= BBOX_MIN_ZOOM) {
+        const b = map.getBounds();
+        onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+      }
     };
 
     const melde = () => {
@@ -820,13 +831,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       timer = setTimeout(verarbeite, 600);
     };
 
-    verarbeite(); // initial (z. B. wenn KRITIS bei bereits stehender Karte aktiviert wird)
+    verarbeite(); // initial (z. B. wenn eine bbox-Ebene aktiviert wird, während die Karte bereits passend gezoomt ist)
     map.on('moveend', melde);
     return () => {
       if (timer) clearTimeout(timer);
       map.off('moveend', melde);
     };
-  }, [onBboxAenderung]);
+  }, [onBboxAenderung, onZoomAenderung]);
 
   // Klick auf ein Fachebenen-Objekt → meldet Properties + Quelle nach oben (Detail-Panel).
   // Handler je aktivem anklickbaren Layer (Closure über die Quelle); Cursor wird zur Hand.

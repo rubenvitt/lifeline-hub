@@ -1,0 +1,428 @@
+{
+ "elements": [
+  {
+   "type": "way",
+   "id": 22943608,
+   "center": {
+    "lat": 51.6001805,
+    "lon": 7.0078917
+   },
+   "tags": {
+    "name": "Kraftwerk Scholven",
+    "operator": "Uniper Kraftwerke",
+    "plant:output:electricity": "690 MW",
+    "plant:source": "coal",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 25032143,
+   "center": {
+    "lat": 51.3604092,
+    "lon": 6.9356345
+   },
+   "tags": {
+    "name": "Wasserkraftwerk Kettwig",
+    "operator": "RWE Innogy",
+    "plant:output:electricity": "5.3 MW",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 25649285,
+   "center": {
+    "lat": 51.5513392,
+    "lon": 7.1878902
+   },
+   "tags": {
+    "name": "Heizkraftwerk Herne",
+    "operator": "STEAG GmbH",
+    "plant:output:electricity": "435 MW",
+    "plant:source": "coal",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 26551785,
+   "center": {
+    "lat": 51.4288421,
+    "lon": 7.0115364
+   },
+   "tags": {
+    "name": "Heizkraftwerk Essen-Rüttenscheid STEAG",
+    "plant:output:electricity": "12.1 MW",
+    "plant:source": "gas",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 30152617,
+   "center": {
+    "lat": 51.5163216,
+    "lon": 6.9962981
+   },
+   "tags": {
+    "name": "RWE Müllheizkraftwerk Karnap",
+    "operator": "RWE Power AG",
+    "plant:source": "waste",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 30969781,
+   "center": {
+    "lat": 51.4420033,
+    "lon": 6.8268606
+   },
+   "tags": {
+    "name": "Wasserkraftwerk Raffelberg",
+    "operator": "Stadt Mülheim an der Ruhr",
+    "plant:output:electricity": "5.2 MW",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 38456845,
+   "center": {
+    "lat": 51.4295399,
+    "lon": 7.1092807
+   },
+   "tags": {
+    "name": "Wasserkraftwerk Horster Mühle",
+    "operator": "RWE",
+    "plant:output:electricity": "yes",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 46851694,
+   "center": {
+    "lat": 51.5111947,
+    "lon": 6.8462078
+   },
+   "tags": {
+    "operator": "EVO",
+    "plant:output:electricity": "3 MW",
+    "plant:source": "biomass",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 83818512,
+   "center": {
+    "lat": 51.4138895,
+    "lon": 7.2519107
+   },
+   "tags": {
+    "name": "Wasserkraftwerk Kemnader See",
+    "operator": "Ruhrverband",
+    "plant:output:electricity": "0.75 MW",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 90641606,
+   "center": {
+    "lat": 51.4127709,
+    "lon": 7.2209426
+   },
+   "tags": {
+    "name": "Wasserwerk Blankenstein",
+    "plant:output:electricity": "0.4 MW",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 92841490,
+   "center": {
+    "lat": 51.3971674,
+    "lon": 7.0010083
+   },
+   "tags": {
+    "name": "Wasserkraftwerk Baldeney",
+    "operator": "RWE Generation",
+    "plant:output:electricity": "9.2 MW",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 97994062,
+   "center": {
+    "lat": 51.4755607,
+    "lon": 7.2987808
+   },
+   "tags": {
+    "name": "storage44",
+    "operator": "Global Plan",
+    "plant:output:electricity": "0.36 MW",
+    "plant:source": "battery",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 101840382,
+   "center": {
+    "lat": 51.4390699,
+    "lon": 7.0611465
+   },
+   "tags": {
+    "name": "Wasserkraftwerk Spillenburger Mühle",
+    "operator": "Ruhrverband",
+    "plant:output:electricity": "yes",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 102639378,
+   "center": {
+    "lat": 51.4216168,
+    "lon": 6.8754735
+   },
+   "tags": {
+    "name": "Wasserkraftwerk Kahlenberg",
+    "operator": "Rheinisch-Westfälischen Wasserwerksgesellschaft",
+    "plant:output:electricity": "5.420 MW",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 139576041,
+   "center": {
+    "lat": 51.4595461,
+    "lon": 7.3453101
+   },
+   "tags": {
+    "name": "Biogasanlage Bebbelsdorf",
+    "operator": "AHE",
+    "plant:source": "biogas;solar",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 156398566,
+   "center": {
+    "lat": 51.508128,
+    "lon": 7.2507224
+   },
+   "tags": {
+    "name": "Heizkraftwerk Hiltrop",
+    "operator": "Stadtwerke Bochum GmbH",
+    "plant:source": "gas",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 176871262,
+   "center": {
+    "lat": 51.4627406,
+    "lon": 7.3086426
+   },
+   "tags": {
+    "name": "Blockheizkraftwerk Neggenborn",
+    "operator": "Stadtwerke Bochum",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 307322271,
+   "center": {
+    "lat": 51.4554643,
+    "lon": 6.9793408
+   },
+   "tags": {
+    "operator": "DEW21",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 759567140,
+   "center": {
+    "lat": 51.4595258,
+    "lon": 7.2925323
+   },
+   "tags": {
+    "plant:output:electricity": "yes",
+    "plant:source": "gas",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1040170220,
+   "center": {
+    "lat": 51.4648574,
+    "lon": 7.0112287
+   },
+   "tags": {
+    "name": "Heizwerk Essen-Innenstadt",
+    "operator": "STEAG",
+    "plant:output:electricity": "yes",
+    "plant:source": "oil",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1063436058,
+   "center": {
+    "lat": 51.4067655,
+    "lon": 6.8686374
+   },
+   "tags": {
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1125221900,
+   "center": {
+    "lat": 51.5266354,
+    "lon": 7.1819392
+   },
+   "tags": {
+    "name": "Heizwerk Shamrock",
+    "operator": "Uniper",
+    "plant:source": "oil",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1170867779,
+   "center": {
+    "lat": 51.4032727,
+    "lon": 7.1724312
+   },
+   "tags": {
+    "name": "Birschel-Mühle",
+    "plant:output:electricity": "yes",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1227695203,
+   "center": {
+    "lat": 51.5976466,
+    "lon": 7.0076464
+   },
+   "tags": {
+    "name": "Fernwärmekraftwerk Buer",
+    "operator": "Uniper Kraftwerke GmbH",
+    "plant:output:electricity": "70 MW",
+    "plant:source": "coal",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1276215595,
+   "center": {
+    "lat": 51.5491023,
+    "lon": 7.1814816
+   },
+   "tags": {
+    "name": "GuD Herne",
+    "operator": "GuD Herne",
+    "plant:output:electricity": "608 MW",
+    "plant:source": "gas",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1289066722,
+   "center": {
+    "lat": 51.4287602,
+    "lon": 7.1367376
+   },
+   "tags": {
+    "plant:output:electricity": "yes",
+    "plant:source": "solar",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1362375823,
+   "center": {
+    "lat": 51.552442,
+    "lon": 7.1897463
+   },
+   "tags": {
+    "name": "GBS KW Herne",
+    "operator": "Iqony Battery System (orig. registr.)",
+    "plant:output:electricity": "15 MW",
+    "plant:source": "battery",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1382957420,
+   "center": {
+    "lat": 51.4053299,
+    "lon": 7.2028392
+   },
+   "tags": {
+    "plant:source": "solar",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 7282564,
+   "center": {
+    "lat": 51.3787507,
+    "lon": 7.392371
+   },
+   "tags": {
+    "name": "Kraftwerk Harkort",
+    "operator": "RWE Power AG",
+    "plant:output:electricity": "6.1 MW",
+    "plant:source": "hydro",
+    "power": "plant"
+   }
+  },
+  {
+   "type": "relation",
+   "id": 9305305,
+   "center": {
+    "lat": 51.4838994,
+    "lon": 7.2682724
+   },
+   "tags": {
+    "name": "Harpener Watt",
+    "plant:source": "solar",
+    "power": "plant"
+   }
+  }
+ ]
+}
