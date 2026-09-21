@@ -59,7 +59,7 @@ Konkrete, adaptierbare Workflow-Skripte für Phase 1/2/4 stehen in
    stehende Subtasks nicht zurücksetzen.
 3. **Workspace/Branch:** für den Parent einen Branch/Worktree wählen. Delegiere die
    Anlage an `dev-clickup-ausfuehren` (das wiederum `superpowers:using-git-worktrees` nutzt) —
-   diese Phase ist interaktiv und fragt vor der Anlage.
+   die Wahl läuft dort **automatisch** und wird nur gemeldet, nicht erfragt.
 
 Task mehrdeutig oder keine Subtasks auffindbar → kurz beim User rückfragen, nicht raten.
 
