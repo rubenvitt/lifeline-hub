@@ -526,10 +526,12 @@ pub async fn fachebenen(
         "hochwasser" => quellen::fetch_hochwasser(&state.fachebenen, cache_pool).await,
         "autobahn" => quellen::fetch_autobahn(&state.fachebenen, cache_pool).await,
         "odl" => quellen::fetch_odl(&state.fachebenen, cache_pool).await,
+        // KRITIS (LFH-83) kommt aus dem Extrakt-Bestand — kein externer Abruf je Anfrage.
         "kritis" => {
             let bbox =
                 bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;
-            quellen::fetch_kritis(&state.fachebenen, cache_pool, bbox).await?
+            let bbox = crate::karte::typen::Bbox::parse(bbox).map_err(AppError::Validation)?;
+            crate::karte::kritis::bestand::abfrage(cache_pool, &bbox).await
         }
         _ => return Err(AppError::Validation(format!("Unbekannte Quelle: {quelle}"))),
     };

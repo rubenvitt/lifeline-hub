@@ -10,7 +10,8 @@ use crate::karte::typen::FachebeneAntwort;
 use sqlx::SqlitePool;
 
 /// Maximalalter, ab dem Einträge beim Schreiben weggeräumt werden (Prune-on-Write).
-/// Bewusst über der längsten TTL (KRITIS 24 h) → begrenzt die Tabelle dauerhaft,
+/// Bewusst über der längsten TTL (früher KRITIS mit 24 h; KRITIS liegt seit LFH-83 in einer
+/// eigenen Tabelle, siehe `karte::kritis::bestand`) → begrenzt die Tabelle dauerhaft,
 /// ohne gültiges Stale-Serving zu verlieren.
 const MAX_ALTER_SEKUNDEN: i64 = 2 * 24 * 3600;
 

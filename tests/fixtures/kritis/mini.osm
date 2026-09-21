@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="handgeschrieben (LFH-83)">
+  <!-- 1: getaggter Node (Krankenhaus mit Adresse) -->
+  <node id="1" version="1" lat="50.9400000" lon="6.9500000">
+    <tag k="amenity" v="hospital"/>
+    <tag k="name" v="Uniklinik"/>
+    <tag k="addr:street" v="Kerpener Str."/>
+    <tag k="addr:housenumber" v="62"/>
+    <tag k="addr:postcode" v="50937"/>
+    <tag k="addr:city" v="Köln"/>
+    <tag k="emergency" v="yes"/>
+  </node>
+  <!-- 2: ungetaggter Node / Node mit fremdem Tag -> kein Objekt -->
+  <node id="2" version="1" lat="51.0000000" lon="7.0000000">
+    <tag k="amenity" v="cafe"/>
+  </node>
+  <!-- Nodes des Umspannwerk-Ways (Rechteck 7,0..7,2 / 51,0..51,4) -->
+  <node id="10" version="1" lat="51.0000000" lon="7.0000000"/>
+  <node id="11" version="1" lat="51.0000000" lon="7.2000000"/>
+  <node id="12" version="1" lat="51.4000000" lon="7.2000000"/>
+  <node id="13" version="1" lat="51.4000000" lon="7.0000000"/>
+  <!-- Nodes der Schul-Relation (äußerer Ring 8,0..8,4 / 52,0..52,2) -->
+  <node id="20" version="1" lat="52.0000000" lon="8.0000000"/>
+  <node id="21" version="1" lat="52.0000000" lon="8.4000000"/>
+  <node id="22" version="1" lat="52.2000000" lon="8.4000000"/>
+  <node id="23" version="1" lat="52.2000000" lon="8.0000000"/>
+  <!-- 3: getaggter Way -> Punkt = bbox-Mitte (7,1 / 51,2) -->
+  <way id="100" version="1">
+    <nd ref="10"/><nd ref="11"/><nd ref="12"/><nd ref="13"/><nd ref="10"/>
+    <tag k="power" v="substation"/>
+  </way>
+  <!-- ungetaggter Way, nur Member der Relation -->
+  <way id="200" version="1">
+    <nd ref="20"/><nd ref="21"/><nd ref="22"/><nd ref="23"/><nd ref="20"/>
+  </way>
+  <!-- ungetaggter Way ohne Bezug -> kein Objekt -->
+  <way id="300" version="1">
+    <nd ref="10"/><nd ref="20"/>
+    <tag k="highway" v="residential"/>
+  </way>
+  <!-- 4: Multipolygon-Relation -> Punkt = bbox-Mitte (8,2 / 52,1) -->
+  <relation id="1000" version="1">
+    <member type="way" ref="200" role="outer"/>
+    <tag k="type" v="multipolygon"/>
+    <tag k="amenity" v="school"/>
+    <tag k="name" v="Gesamtschule"/>
+  </relation>
+</osm>
