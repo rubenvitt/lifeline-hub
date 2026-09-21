@@ -134,6 +134,18 @@ MapLibre ohne Clustering.
   Nutzer (Cache-DB + Inflight-Sperre).
 - [Die 17. Vertragskarte weitet den Vertrag] → bewusst, begründet in Entscheidung 4.
 
+## Prüfliste Einsatztauglichkeit — nicht angelegt, mit Begründung
+
+CLAUDE.md verlangt die 15-Kriterien-Prüfliste für „jede neue oder umgebaute **Seite**". Diese
+Änderung legt keine Seite an und baut keine um: die Lagekarte, ihre Sidebar und der Inspector
+bleiben in Form und Bedienweg unverändert, hinzu kommt ein Eintrag in einer bestehenden
+Liste (Fachebenen-Panel) und ein Inhaltsblock im bestehenden Inspector. Präzedenz: LFH-77
+(`hochwasser`, gleiche Bauform) hat ebenfalls keine Prüfliste angelegt. Die Kriterien, die
+eine Fachebene überhaupt berühren, sind trotzdem eigens belegt: zweiter Kanal neben der Farbe
+(Radius + Wort, WCAG 1.4.1), Hell/Dunkel über aufgelöste Tokens (Sichtprüfung beider Modi),
+sichtbarer Geltungshinweis als Text statt Tooltip, keine neue Trefffläche (der Schalter ist
+das bestehende antd-`Switch` des Panels).
+
 ## Migration Plan
 
 Keine Migration: die Sichtbarkeit liegt in bestehenden opaken JSON-Spalten, der Cache in
