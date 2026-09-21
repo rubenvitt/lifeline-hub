@@ -32,6 +32,15 @@ const PRUEF_TAKT: Duration = Duration::from_secs(3600);
 /// fängt eine falsch konfigurierte URL (Planet-Datei, ~80 GB) ab, bevor die Platte vollläuft.
 const MAX_EXTRAKT_BYTES: u64 = 20 * 1024 * 1024 * 1024;
 
+/// Mindestabstand nach einem Lauf, der beim Herunterladen oder danach gescheitert ist (Review
+/// LFH-83). Ohne ihn wäre der nächste stündliche Tick sofort wieder fällig und lüde dieselben
+/// 4–5 GB erneut — bei einem dauerhaften Fehler (Platte voll, unlesbares Format) bis zu 24-mal
+/// am Tag gegen Geofabrik. Bewusst eine Zeitsperre und kein Vergleich mit den Headern des
+/// gescheiterten Versuchs: Geofabrik leitet auf wechselnde Spiegel um, deren `ETag`s sich
+/// unterscheiden — ein Header-Vergleich griffe dann nie. Ein gescheitertes `HEAD` (kein Netz)
+/// kostet nichts und sperrt nicht: ohne Internet soll der erste Import nicht Stunden warten.
+pub const FEHLER_ABSTAND: Duration = Duration::from_secs(6 * 3600);
+
 /// Threads des Einlesens (siehe `lade_und_lies`).
 const IMPORT_THREADS: usize = 4;
 
@@ -52,6 +61,8 @@ pub enum TickErgebnis {
     Unveraendert,
     /// Neuer Bestand übernommen.
     Importiert { anzahl: usize },
+    /// Fällig, aber der letzte Download-Versuch ist jünger als [`FEHLER_ABSTAND`].
+    Zurueckgestellt,
 }
 
 /// Ist ein Lauf fällig? Ohne Bestand immer, sonst nach Ablauf des Intervalls.
@@ -60,6 +71,11 @@ pub fn ist_faellig(meta: Option<&ImportMeta>, jetzt: i64, intervall: Duration) -
         None => true,
         Some(m) => jetzt - m.importiert_at >= intervall.as_secs() as i64,
     }
+}
+
+/// Darf nach einem gescheiterten Download-Versuch (Unix-Sekunden) wieder geladen werden?
+pub fn darf_laden(letzter_fehlversuch: Option<i64>, jetzt: i64) -> bool {
+    letzter_fehlversuch.is_none_or(|t| jetzt - t >= FEHLER_ABSTAND.as_secs() as i64)
 }
 
 /// Gilt der Extrakt hinter diesen Headern als derselbe wie beim letzten Import? Das `ETag`
@@ -101,6 +117,8 @@ fn header(resp: &reqwest::Response, name: reqwest::header::HeaderName) -> Option
 }
 
 /// Ein Lauf. `url` ist bereits geprüft (https bzw. Dev-Loopback, siehe [`starte`]).
+/// `fehlversuch` hält der Aufrufer über die Ticks: ein Lauf, der ab dem Download scheitert,
+/// setzt ihn, ein gelungener Import löscht ihn (siehe [`FEHLER_ABSTAND`]).
 pub async fn tick_einmal(
     pool: &SqlitePool,
     verzeichnis: &Path,
@@ -108,6 +126,7 @@ pub async fn tick_einmal(
     url: &Url,
     intervall: Duration,
     jetzt: i64,
+    fehlversuch: &mut Option<i64>,
 ) -> Result<TickErgebnis, String> {
     let meta = bestand::meta(pool).await;
     if !ist_faellig(meta.as_ref(), jetzt, intervall) {
@@ -132,6 +151,12 @@ pub async fn tick_einmal(
             return Ok(TickErgebnis::Unveraendert);
         }
     }
+    if !darf_laden(*fehlversuch, jetzt) {
+        return Ok(TickErgebnis::Zurueckgestellt);
+    }
+    // Ab hier kostet ein Fehlschlag einen Multi-GB-Download: bis zum Erfolg gilt der Versuch
+    // als gescheitert.
+    *fehlversuch = Some(jetzt);
 
     tokio::fs::create_dir_all(verzeichnis)
         .await
@@ -158,6 +183,7 @@ pub async fn tick_einmal(
     bestand::ersetze_bestand(pool, &objekte, &neu)
         .await
         .map_err(|e| format!("Bestand nicht tauschbar: {e}"))?;
+    *fehlversuch = None;
     Ok(TickErgebnis::Importiert {
         anzahl: objekte.len(),
     })
@@ -230,6 +256,7 @@ pub fn starte(karten_dir: PathBuf, config: KritisExtraktConfig) {
         let client = download::download_client();
         let verzeichnis = karten_dir.join("kritis");
         let mut ticker = tokio::time::interval(PRUEF_TAKT);
+        let mut fehlversuch: Option<i64> = None;
         loop {
             ticker.tick().await;
             let pool = match crate::cache_db::cache_pool(&karten_dir).await {
@@ -240,8 +267,18 @@ pub fn starte(karten_dir: PathBuf, config: KritisExtraktConfig) {
                 }
             };
             let jetzt = chrono::Utc::now().timestamp();
-            match tick_einmal(&pool, &verzeichnis, &client, &url, config.intervall, jetzt).await {
-                Ok(TickErgebnis::NichtFaellig) => {}
+            match tick_einmal(
+                &pool,
+                &verzeichnis,
+                &client,
+                &url,
+                config.intervall,
+                jetzt,
+                &mut fehlversuch,
+            )
+            .await
+            {
+                Ok(TickErgebnis::NichtFaellig) | Ok(TickErgebnis::Zurueckgestellt) => {}
                 Ok(TickErgebnis::Unveraendert) => {
                     tracing::info!("KRITIS-Extrakt unverändert — Bestand bleibt")
                 }
@@ -351,6 +388,7 @@ mod tests {
             &url,
             INTERVALL,
             5_000,
+            &mut None,
         )
         .await
         .unwrap();
@@ -369,10 +407,10 @@ mod tests {
         let (url, gets) = server(fixture_bytes(), "\"v1\"").await;
         let verz = d.path().join("kritis");
         let c = download::download_client();
-        tick_einmal(&p, &verz, &c, &url, INTERVALL, 5_000)
+        tick_einmal(&p, &verz, &c, &url, INTERVALL, 5_000, &mut None)
             .await
             .unwrap();
-        let e = tick_einmal(&p, &verz, &c, &url, INTERVALL, 5_001)
+        let e = tick_einmal(&p, &verz, &c, &url, INTERVALL, 5_001, &mut None)
             .await
             .unwrap();
         assert_eq!(e, TickErgebnis::NichtFaellig);
@@ -386,11 +424,11 @@ mod tests {
         let (url, gets) = server(fixture_bytes(), "\"v1\"").await;
         let verz = d.path().join("kritis");
         let c = download::download_client();
-        tick_einmal(&p, &verz, &c, &url, INTERVALL, 5_000)
+        tick_einmal(&p, &verz, &c, &url, INTERVALL, 5_000, &mut None)
             .await
             .unwrap();
         let spaeter = 5_000 + INTERVALL.as_secs() as i64;
-        let e = tick_einmal(&p, &verz, &c, &url, INTERVALL, spaeter)
+        let e = tick_einmal(&p, &verz, &c, &url, INTERVALL, spaeter, &mut None)
             .await
             .unwrap();
         assert_eq!(e, TickErgebnis::Unveraendert);
@@ -408,14 +446,20 @@ mod tests {
         let verz = d.path().join("kritis");
         let c = download::download_client();
         let (gut, _) = server(fixture_bytes(), "\"v1\"").await;
-        tick_einmal(&p, &verz, &c, &gut, INTERVALL, 5_000)
+        tick_einmal(&p, &verz, &c, &gut, INTERVALL, 5_000, &mut None)
             .await
             .unwrap();
 
         let (kaputt, _) = server(b"kein pbf".to_vec(), "\"v2\"").await;
         let spaeter = 5_000 + INTERVALL.as_secs() as i64;
-        let e = tick_einmal(&p, &verz, &c, &kaputt, INTERVALL, spaeter).await;
+        let mut fehlversuch = None;
+        let e = tick_einmal(&p, &verz, &c, &kaputt, INTERVALL, spaeter, &mut fehlversuch).await;
         assert!(e.is_err(), "{e:?}");
+        assert_eq!(
+            fehlversuch,
+            Some(spaeter),
+            "gescheiterter Download merkt sich den Zeitpunkt"
+        );
         assert!(leer(&verz), "Datei auch nach Fehler weg");
         let m = bestand::meta(&p).await.unwrap();
         assert_eq!(m.anzahl, 3);
@@ -427,6 +471,7 @@ mod tests {
     async fn nicht_erreichbar_ist_fehler_ohne_bestand() {
         let (d, p) = pool().await;
         // Port 1 auf Loopback: sofort ECONNREFUSED.
+        let mut fehlversuch = None;
         let url = Url::parse("http://127.0.0.1:1/de.osm.pbf").unwrap();
         let e = tick_einmal(
             &p,
@@ -435,10 +480,58 @@ mod tests {
             &url,
             INTERVALL,
             0,
+            &mut fehlversuch,
         )
         .await;
         assert!(e.is_err());
         assert!(bestand::meta(&p).await.is_none());
+        // Ein gescheitertes HEAD hat nichts geladen — es sperrt den nächsten Versuch nicht.
+        assert_eq!(fehlversuch, None);
+    }
+
+    #[test]
+    fn fehlerabstand() {
+        assert!(darf_laden(None, 0));
+        let sperre = FEHLER_ABSTAND.as_secs() as i64;
+        assert!(!darf_laden(Some(1_000), 1_000 + sperre - 1));
+        assert!(darf_laden(Some(1_000), 1_000 + sperre));
+    }
+
+    /// Review LFH-83: ein dauerhaft scheiternder Lauf lud jede Stunde 4–5 GB neu. Nach einem
+    /// Fehlschlag ab dem Download gibt es innerhalb von FEHLER_ABSTAND keinen zweiten GET —
+    /// auch wenn der Spiegel ein anderes ETag meldet; danach wird es erneut versucht.
+    #[tokio::test]
+    async fn nach_fehlschlag_kein_neuer_download_vor_ablauf_der_sperre() {
+        let (d, p) = pool().await;
+        let verz = d.path().join("kritis");
+        let c = download::download_client();
+        let (kaputt, gets) = server(b"kein pbf".to_vec(), "\"v2\"").await;
+        let mut fehlversuch = None;
+        assert!(
+            tick_einmal(&p, &verz, &c, &kaputt, INTERVALL, 0, &mut fehlversuch)
+                .await
+                .is_err()
+        );
+        assert_eq!(gets.load(Ordering::SeqCst), 1);
+
+        let e = tick_einmal(&p, &verz, &c, &kaputt, INTERVALL, 3_600, &mut fehlversuch)
+            .await
+            .unwrap();
+        assert_eq!(e, TickErgebnis::Zurueckgestellt);
+        assert_eq!(
+            gets.load(Ordering::SeqCst),
+            1,
+            "kein zweiter Download in der Sperre"
+        );
+
+        let (gut, gut_gets) = server(fixture_bytes(), "\"v3\"").await;
+        let spaeter = FEHLER_ABSTAND.as_secs() as i64;
+        let e = tick_einmal(&p, &verz, &c, &gut, INTERVALL, spaeter, &mut fehlversuch)
+            .await
+            .unwrap();
+        assert_eq!(e, TickErgebnis::Importiert { anzahl: 3 });
+        assert_eq!(gut_gets.load(Ordering::SeqCst), 1);
+        assert_eq!(fehlversuch, None, "Erfolg hebt die Sperre auf");
     }
 
     #[test]

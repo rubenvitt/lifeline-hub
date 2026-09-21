@@ -209,8 +209,14 @@ Fair-Use-Instanz. Jetzt:
 - **Ausfall:** Scheitert ein Lauf (Netz, Platte, kaputte Datei, Extrakt ohne ein einziges
   Objekt), bleibt der bisherige Bestand samt `stand` stehen, und der nächste stündliche Tick
   versucht es erneut. Getauscht wird atomar über Staging-Tabellen.
-- **Stand:** `stand` in der Antwort ist das `Last-Modified` des Extrakts (RFC 3339), also
-  der Datenstand von OpenStreetMap, nicht der Abrufzeitpunkt.
+- **Stand:** `stand` in der Antwort ist das `Last-Modified` der Extrakt-Datei (RFC 3339), wie
+  der ausliefernde Spiegel es meldet — nicht der Abrufzeitpunkt. Geofabrik baut den Extrakt
+  täglich, der Wert liegt also nahe am OSM-Datenstand; exakt wäre der
+  `osmosis_replication_timestamp` im PBF-Kopf, den der Import nicht liest.
+- **Fehlschläge:** Scheitert ein Lauf erst beim oder nach dem Download, wird frühestens nach
+  6 h erneut geladen (`FEHLER_ABSTAND`) — sonst lüde jeder stündliche Tick die 4–5 GB neu.
+  Eine Zeitsperre statt eines Header-Vergleichs, weil die Spiegel unterschiedliche `ETag`s
+  melden. Ein gescheitertes `HEAD` (kein Netz) sperrt nicht.
 - **Verdichtung:** Liegen mehr als 5 000 Objekte im Ausschnitt, liefert die Route
   Sammelpunkte (`sammelpunkt: true`, `anzahl`) aus einem fest am Nullmeridian/Äquator
   verankerten Raster (0,01° bis 20°, kleinste Weite mit höchstens 5 000 Zellen). Die Zellen
@@ -235,6 +241,13 @@ Der Import läuft deshalb in einem eigenen Pool mit **4 Threads**: dreimal so la
 ein Sechstel des Speichers, und die übrigen Kerne bleiben dem Einsatzbetrieb. Im Dev-Build
 sind `osmpbf`, `protobuf`, `flate2` und `miniz_oxide` optimiert übersetzt
 (`[profile.dev.package.*]` in `Cargo.toml`), weil der Import auch dort Default-an ist.
+
+**Abhängigkeit `osmpbf`:** zieht `memmap2` 0.5.10 mit, für das `cargo audit` seit
+Einführung RUSTSEC-2026-0186 („unsound": ungeprüfter Zeiger-Offset) als **erlaubte Warnung**
+meldet. Der Import liest über `ElementReader::from_path` (gepufferter Dateileser), nicht über
+den mmap-Weg der Crate; die betroffene Funktion wird nicht aufgerufen. Neu bewerten, wenn
+jemand auf `Mmap`/`from_mmap` umstellt oder `osmpbf` eine Version mit neuerem `memmap2`
+bringt.
 
 **Grenzen:** Das ist keine amtliche KRITIS-Liste, sondern, was in OSM getaggt ist — Lücken
 und Fehlklassifikationen der Quelle werden übernommen (`social_facility=*` ist breit und

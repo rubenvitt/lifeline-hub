@@ -133,6 +133,12 @@ Damit hält auch das Akzeptanzkriterium „Overpass nicht periodisch belasten" t
 - `stand` = `Last-Modified` des Extrakts (Geofabrik setzt ihn auf den Stand der Daten);
   fehlt er, der Import-Zeitpunkt.
 - Ein prozessweiter `AtomicBool` verhindert parallele Läufe.
+- **Nachtrag aus dem Review:** Scheitert ein Lauf ab dem Download, sperrt eine Zeitsperre
+  (`FEHLER_ABSTAND`, 6 h, im Scheduler-Loop gehalten) den nächsten Download — sonst lüde jeder
+  stündliche Tick die 4–5 GB neu. Kein Header-Vergleich, weil Geofabrik auf Spiegel mit
+  unterschiedlichen `ETag`s umleitet. Ein gescheitertes `HEAD` sperrt nicht. Im Frontend
+  schiebt `rasterBbox` Weltkopien jenseits ±180° um Vielfache von 360° zurück und fällt auf
+  die Welt-bbox zurück, statt eine ungültige (`west ≥ ost`) zu melden.
 - e2e: `playwright.config.ts` hängt `--kritis-extrakt false` an. Vitest und
   `cargo test` starten `main` nicht und brauchen nichts.
 

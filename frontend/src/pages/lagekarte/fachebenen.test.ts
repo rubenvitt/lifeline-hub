@@ -5,6 +5,7 @@ import {
   fachebeneTakt,
   istBboxAbhaengig,
   rasterBbox,
+  WELT_BBOX,
   rasterWeite,
 } from './fachebenen';
 
@@ -184,6 +185,32 @@ describe('rasterBbox', () => {
     expect(e).toBeLessThanOrEqual(180);
     expect(s).toBeGreaterThanOrEqual(-90);
     expect(n).toBeLessThanOrEqual(90);
+  });
+  // Review LFH-83: nur Kappen reichte nicht — eine Weltkopie jenseits ±180 wurde zu
+  // „180,…,180,…" (west = ost → 400), und Deutschland in der Kopie bei 365–376° blieb leer.
+  // Geprüft wird die Invariante, an der das Backend scheitert, über eine Tabelle.
+  it.each([
+    ['182,50,183,51'],
+    ['365,47,376,56'],
+    ['-190,50,-170,51'],
+    ['-250.3,-88.1,250.7,88.4'],
+    ['-540,-80,540,80'],
+    ['179.99,50,180.01,50.01'],
+    ['6.96,50.91,6.99,50.94'],
+  ])('liefert für %s eine vom Backend annehmbare bbox', (eingabe) => {
+    const [w, s, e, n] = rasterBbox(eingabe).split(',').map(Number);
+    expect(w).toBeLessThan(e);
+    expect(s).toBeLessThan(n);
+    expect(w).toBeGreaterThanOrEqual(-180);
+    expect(e).toBeLessThanOrEqual(180);
+    expect(s).toBeGreaterThanOrEqual(-90);
+    expect(n).toBeLessThanOrEqual(90);
+  });
+  it('schiebt eine Weltkopie Deutschlands zurück statt sie wegzukappen', () => {
+    expect(rasterBbox('365,47,376,56')).toBe(rasterBbox('5,47,16,56'));
+  });
+  it('gibt für einen Ausschnitt breiter als die Welt die ganze Welt', () => {
+    expect(rasterBbox('-540,-80,540,80')).toBe(WELT_BBOX);
   });
   it('gibt ungültige Eingabe unverändert zurück', () => {
     expect(rasterBbox('kaputt')).toBe('kaputt');

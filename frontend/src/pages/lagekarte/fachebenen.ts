@@ -166,22 +166,39 @@ export function rasterWeite(breite: number): number {
  * identischer Query-Schlüssel, d. h. KRITIS lädt beim Pannen innerhalb einer Rasterzelle
  * nicht neu — auf Stadt- wie auf Deutschland-Ebene (LFH-83; vorher festes 0,05°-Raster, das
  * erst ab Zoom 10 gefragt wurde). Nach außen gerundet, damit der sichtbare Ausschnitt stets
- * abgedeckt ist; danach auf den gültigen Koordinatenbereich gekappt, weil MapLibre auf
- * kleiner Zoomstufe Längen jenseits ±180 meldet und das Backend solche bboxes ablehnt.
+ * abgedeckt ist.
+ *
+ * MapLibre meldet Längen jenseits ±180, sobald die Karte über den Antimeridian geschoben ist
+ * (Weltkopien) — das Backend lehnt solche bboxes ab (400), die Ebene stünde dann `offline`.
+ * Deshalb wird der Ausschnitt zuerst als Ganzes um Vielfache von 360° zurückgeschoben (eine
+ * Weltkopie Deutschlands bei 365–376° wird zu 5–16°), erst dann gerastert und gekappt. Ergibt
+ * das keine gültige bbox mehr (Ausschnitt breiter als die Welt, oder nach dem Kappen
+ * `west ≥ ost`), gilt die ganze Welt — das Backend beantwortet sie verdichtet; eine
+ * ausgelassene Anfrage ließe die Ebene dagegen dauerhaft leer (Review LFH-83).
  */
 export function rasterBbox(bbox: string): string {
   const t = bbox.split(',').map(Number);
   if (t.length !== 4 || t.some((n) => Number.isNaN(n))) return bbox;
-  const [w, s, e, n] = t;
+  const [w0, s, e0, n] = t;
+  if (e0 - w0 >= 360) return WELT_BBOX;
+  const versatz = Math.floor(((w0 + e0) / 2 + 180) / 360) * 360;
+  const w = w0 - versatz;
+  const e = e0 - versatz;
   const grid = rasterWeite(e - w);
   const ab = (v: number) => Math.floor(v / grid) * grid; // nach unten
   const auf = (v: number) => Math.ceil(v / grid) * grid; // nach oben
   const r = (v: number) => Math.round(v * 1e6) / 1e6; // Fließkomma-Rauschen kappen
   const kappe = (v: number, grenze: number) => Math.min(grenze, Math.max(-grenze, v));
-  return [
+  const ergebnis = [
     r(kappe(ab(w), 180)),
     r(kappe(ab(s), 90)),
     r(kappe(auf(e), 180)),
     r(kappe(auf(n), 90)),
-  ].join(',');
+  ];
+  const [rw, rs, re, rn] = ergebnis;
+  if (!(rw < re) || !(rs < rn)) return WELT_BBOX;
+  return ergebnis.join(',');
 }
+
+/** Rückfall von {@link rasterBbox}, wenn sich kein gültiger Ausschnitt bilden lässt. */
+export const WELT_BBOX = '-180,-90,180,90';
