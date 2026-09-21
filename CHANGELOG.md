@@ -1,3 +1,13 @@
+## [1.0.0-alpha.23](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.22...v1.0.0-alpha.23) (2026-09-21)
+
+### Features
+
+* **karte:** ODL-Stufe relativ zum Standort-Grundpegel je Sonde (LFH-598) ([f1e575e](https://github.com/rubenvitt/lifeline-hub/commit/f1e575e79a623aca584f9ebc353b0f3b6c8e6797))
+
+### Bug Fixes
+
+* **karte:** Review-Nachzüge zum ODL-Grundpegel (LFH-598) ([c310f30](https://github.com/rubenvitt/lifeline-hub/commit/c310f30f233e966e0188d1706610474df7a9176a))
+
 ## [1.0.0-alpha.22](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.21...v1.0.0-alpha.22) (2026-09-21)
 
 ### Features
