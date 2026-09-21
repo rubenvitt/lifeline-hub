@@ -1,3 +1,22 @@
+## [1.0.0-alpha.22](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.21...v1.0.0-alpha.22) (2026-09-21)
+
+### Features
+
+* **deployment:** Alpha-Releases automatisch ausrollen, karten-service als Abbild (LFH-602) ([c4801df](https://github.com/rubenvitt/lifeline-hub/commit/c4801dfc15d0d9f661450255168e8dd3f0be3c5b))
+* **karte:** KRITIS aus dem Deutschland-OSM-Extrakt statt Overpass (LFH-83) ([1ccd57a](https://github.com/rubenvitt/lifeline-hub/commit/1ccd57a6d12081a9c75028ed34a4ceeccd213e8c))
+* **karte:** KRITIS-Extrakt periodisch importieren, Default-an (LFH-83) ([e5ebb9b](https://github.com/rubenvitt/lifeline-hub/commit/e5ebb9b1602d4a4e81b25f415973fc8a77d82523))
+* **lagekarte:** KRITIS in jeder Zoomstufe, gebündelt statt gesammelt (LFH-83) ([839c96b](https://github.com/rubenvitt/lifeline-hub/commit/839c96bb35e389c7eabbeb07a2555769461b565e))
+
+### Bug Fixes
+
+* **container:** Abbild auf distroless cc-debian13, damit die Binary überhaupt startet (LFH-602) ([bd41226](https://github.com/rubenvitt/lifeline-hub/commit/bd41226827b7a1dd8a03ab1c089eef75aaede5ed))
+* **karte:** Review-Befunde zu LFH-83 — Weltkopie und Fehlerabstand ([5422769](https://github.com/rubenvitt/lifeline-hub/commit/5422769dac973b582e68a424af7cc7a4f6fdb109))
+* **lagekarte:** Statusmarke der Fachebene bricht nicht mehr im Wort um (LFH-83) ([c6781b0](https://github.com/rubenvitt/lifeline-hub/commit/c6781b0d6909d3035d7198370cd27089d14b0f6d))
+
+### Performance Improvements
+
+* **karte:** KRITIS-Import auf 4 Threads begrenzt, Quellendoku mit Messung (LFH-83) ([888d300](https://github.com/rubenvitt/lifeline-hub/commit/888d300aca8df92bb31a7136ab23aad132ddc44a))
+
 ## [1.0.0-alpha.21](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.20...v1.0.0-alpha.21) (2026-09-21)
 
 ### Bug Fixes
