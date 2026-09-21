@@ -244,8 +244,11 @@ function enthaltendeGeometrien(p: PunktLngLat, collection: FeatureCollectionLike
  * Daten sind, die in der Source stehen: der Klick-Handler und das `setData` in `Kartenflaeche`
  * hängen beide an `[fachebenen]`. Wer die beiden entkoppelt, lässt diesen Index still veralten.
  *
- * Als Riegel gegen genau diesen Fall muss die Geometrie am Index den Klickpunkt auch enthalten.
- * Tut sie das nicht (oder fehlt die ID), gilt der Punkt-in-Polygon-Rückfall — aber nur, wenn er
+ * Zusätzlich muss die Geometrie am Index den Klickpunkt enthalten. Das VERRINGERT das Risiko
+ * veralteter Daten, schließt es aber nicht aus: `setData` läuft asynchron im Worker, und hat ein
+ * Nachladen überlappende Warnungen umsortiert, kann der alte Index in diesem kurzen Fenster auf
+ * eine andere Fläche zeigen, die den Punkt ebenfalls enthält.
+ * Enthält sie ihn nicht (oder fehlt die ID), gilt der Punkt-in-Polygon-Rückfall — aber nur, wenn er
  * EINDEUTIG ist. Bei mehreren enthaltenden Features wäre jede Wahl geraten: dann null, also
  * keine Kennzahlen statt womöglich der Fläche einer anderen Warnung.
  */
@@ -260,4 +263,22 @@ export function geometrieZumKlickFeature(
   }
   const treffer = enthaltendeGeometrien(p, collection);
   return treffer.length === 1 ? treffer[0] : null;
+}
+
+/**
+ * Wertet einen Fachebenen-Klick aus: Properties UND volle Geometrie aus DEMSELBEN Feature
+ * (LFH-282). Die Properties stammen aus dem Klick-Feature; die Geometrie nicht, weil
+ * `e.features[0].geometry` von geojson-vt kachelweise zugeschnitten ist und bei Warnungen über
+ * mehrere Kacheln zu kleine Werte ergäbe (LFH-146). Rein und exportiert, damit die Verdrahtung
+ * — die ID des Features, nicht etwa ein Property — ohne Karte prüfbar ist.
+ */
+export function werteFachebenenKlickAus(
+  feature: { id?: unknown; properties?: unknown } | undefined,
+  p: PunktLngLat,
+  collection: FeatureCollectionLike,
+): { props: Record<string, unknown>; geometrie: LoseGeometrie | null } {
+  return {
+    props: (feature?.properties ?? {}) as Record<string, unknown>,
+    geometrie: geometrieZumKlickFeature(feature?.id, p, collection),
+  };
 }

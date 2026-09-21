@@ -36,7 +36,7 @@ import { tzIconKey } from './markerIcons';
 import { baueClusterDonut } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
-import { geometrieZumKlickFeature } from './geo';
+import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
@@ -841,15 +841,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       const id = fachebeneClickLayerId(fe.def);
       const quelle = fe.def.key;
       const klick = (e: maplibregl.MapLayerMouseEvent) => {
-        const feature = e.features?.[0];
-        const props = (feature?.properties ?? {}) as Record<string, unknown>;
-        // Fläche/Umfang aus der VOLLEN (un-geclippten) Geometrie der geladenen FeatureCollection
-        // beziehen — e.features[0].geometry ist geojson-vt kachel-geclippt und ergäbe für
-        // mehrkachelige NINA/DWD-Warnungen zu kleine Werte (LFH-146). Gefunden wird sie über die
-        // ID DESSELBEN Features, dessen Properties das Panel zeigt — sonst gehörte die Fläche bei
-        // überlappenden Warnungen womöglich zur anderen (LFH-282).
-        const geometrie = geometrieZumKlickFeature(
-          feature?.id,
+        const { props, geometrie } = werteFachebenenKlickAus(
+          e.features?.[0],
           { lng: e.lngLat.lng, lat: e.lngLat.lat },
           fe.daten,
         );

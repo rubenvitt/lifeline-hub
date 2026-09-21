@@ -10,6 +10,7 @@ import {
   geoKennzahlen,
   punktInPolygon,
   geometrieZumKlickFeature,
+  werteFachebenenKlickAus,
 } from './geo';
 import type { GeoJsonPolygon, GeoJsonLineString } from './geo';
 
@@ -356,6 +357,16 @@ describe('geometrieZumKlickFeature (LFH-282)', () => {
     // Verwechslung wäre also nicht nur formal, sondern am Wert sichtbar.
     expect(geometrieZumKlickFeature(1, IM_UEBERLAPP, fc)).toBe(KLEIN);
     expect(geometrieZumKlickFeature(0, IM_UEBERLAPP, fc)).toBe(GROSS);
+  });
+
+  it('Klick-Auswertung: Properties und Geometrie kommen aus DEMSELBEN Feature', () => {
+    // Das Klick-Feature trägt ein eigenes `id`-Property, das NICHT der Index ist — wer die
+    // Verdrahtung auf ein Property statt auf die Feature-ID drehte, bekäme GROSS.
+    const klick = { id: 1, properties: { event: 'DAUERREGEN', id: 0 } };
+    const { props, geometrie } = werteFachebenenKlickAus(klick, IM_UEBERLAPP, fc);
+    expect(props.event).toBe('DAUERREGEN');
+    expect(geometrie).toBe(KLEIN);
+    expect(werteFachebenenKlickAus(undefined, IM_UEBERLAPP, fc)).toEqual({ props: {}, geometrie: null });
   });
 
   it('ohne ID und eindeutig: das einzige enthaltende Feature', () => {
