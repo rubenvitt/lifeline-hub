@@ -10,17 +10,19 @@ import {
 } from './fachebenen';
 
 describe('Fachebenen-Registry', () => {
-  it('enthält die vier v1-Quellen, die Hochwasserebene, die ODL-Ebene und die BAB-Lage', () => {
+  it('enthält die vier v1-Quellen, Hochwasser, ODL, Luftqualität und die BAB-Lage', () => {
     // Reihenfolge = Anzeigereihenfolge im Panel. `hochwasser` steht neben `pegelonline`,
     // weil es dieselbe Frage beantwortet: dort der rohe Wasserstand, hier die amtliche
-    // Bewertung (LFH-77). `odl` (LFH-78) folgt als zweite bewertete Messnetz-Ebene.
-    // `autobahn` (LFH-80) hängt hinten an — eigene Fragestellung.
+    // Bewertung (LFH-77). `odl` (LFH-78) folgt als zweite bewertete Messnetz-Ebene,
+    // `luftqualitaet` (LFH-79) als dritte. `autobahn` (LFH-80) hängt hinten an — eigene
+    // Fragestellung.
     expect(fachebeneKeys()).toEqual([
       'nina',
       'dwd',
       'pegelonline',
       'hochwasser',
       'odl',
+      'luftqualitaet',
       'kritis',
       'autobahn',
     ]);
@@ -29,6 +31,19 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.hochwasser.geometrieTyp).toBe('punkt');
     expect(FACHEBENEN.hochwasser.bboxAbhaengig).toBe(false);
     expect(FACHEBENEN.hochwasser.pollMs).toBeGreaterThan(0);
+  });
+  it('führt die Luftqualitätsebene als Punktebene im Takt der Server-TTL (LFH-79)', () => {
+    const def = FACHEBENEN.luftqualitaet;
+    expect(def.geometrieTyp).toBe('punkt');
+    expect(def.bboxAbhaengig).toBe(false);
+    // = serverseitige TTL (900 s); häufiger abzufragen liefert nichts Frischeres.
+    expect(def.pollMs).toBe(900_000);
+    // Messpunkte, keine Fläche — die Einschränkung steht als Text, nicht als Tooltip.
+    expect(def.geltung).toMatch(/Messstationen/);
+  });
+  it('gibt jeder Ebene einen eigenen Rückfallton', () => {
+    const farben = fachebeneKeys().map((k) => FACHEBENEN[k].farbe.toLowerCase());
+    expect(new Set(farben).size).toBe(farben.length);
   });
   it('führt die ODL-Ebene bundesweit, im Takt der Quelle und mit sichtbarem Geltungsbereich', () => {
     expect(FACHEBENEN.odl.geometrieTyp).toBe('punkt');
@@ -105,13 +120,14 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.kritis.geltung).toMatch(/keine amtliche KRITIS-Liste/);
   });
 
-  it('nur ODL-, KRITIS- und Autobahn-Ebene nennen einen einschränkenden Geltungsbereich', () => {
-    // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung;
-    // LFH-78 setzt den zweiten (nur ortsfestes Messnetz, keine Einsatzmessungen).
+  it('nur ODL, Luftqualität, KRITIS und Autobahn nennen einen einschränkenden Geltungsbereich', () => {
+    // Das ist das Akzeptanzkriterium „Limitation (nur BAB) transparent" als Zusicherung.
     // Die Gegenaussage trägt sie mit: stünde der Satz an jeder Ebene, sagte er nichts.
+    // ODL (LFH-78): nur ortsfestes Messnetz. Luftqualität (LFH-79): Messpunkte, keine Aussage
+    // zwischen den Stationen. KRITIS (LFH-83): OSM-Stand, keine amtliche Liste.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
-    expect(mitGeltung).toEqual(['odl', 'kritis', 'autobahn']);
+    expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn']);
   });
   it('jede Ebene hat Label, Farbe, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {

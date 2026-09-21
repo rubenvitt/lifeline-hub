@@ -76,6 +76,14 @@ describe('hochwasserDarstellung', () => {
     });
   });
 
+  it('fällt auch bei Namen aus der Prototypkette auf „keine Daten" zurück', () => {
+    // `roh in karte` sähe `constructor`/`toString` als Schlüssel und gäbe die
+    // Object-Funktion statt einer Darstellung zurück.
+    for (const roh of ['constructor', 'toString', '__proto__']) {
+      expect(hochwasserDarstellung(roh).label, roh).toBe('keine Daten');
+    }
+  });
+
   it('fällt bei unbekanntem Wert auf „keine Daten" zurück, statt den Rohwert zu zeigen', () => {
     expect(hochwasserDarstellung('quatsch').label).toBe('keine Daten');
   });

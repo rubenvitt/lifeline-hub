@@ -3,6 +3,7 @@
 //! Hintergrund erneuern (nicht blockierend); gar kein Cache → einmalig blockierend holen.
 
 use crate::karte::cache;
+use crate::karte::luftqualitaet::{luftqualitaet_fenster, normalisiere_luftqualitaet};
 use crate::karte::normalisierung::{
     kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_odl,
     normalisiere_pegelonline,
@@ -809,6 +810,88 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
     Some(a)
 }
 
+// ------------------------------------------------------------------ LUFTQUALITÄT (UBA)
+
+/// Pflicht-Attribution. Die Lizenzlage ist nur sekundär belegt (siehe Lizenz-Vorbehalt in
+/// `docs/fachebenen-quellen.md`); die Quellennennung wird deshalb immer mitgeführt.
+const LUFTQUALITAET_ATTRIB: &str = "Umweltbundesamt";
+/// Die Quelle liefert stündliche Werte zu einem unregelmäßigen Importzeitpunkt mit ~2 h
+/// Verzug. Eine Stunde TTL (die „Analogie zu KRITIS") legte eine weitere Stunde darauf.
+const LUFTQUALITAET_TTL: Duration = Duration::from_secs(900);
+/// Finaler Host: `https://www.umweltbundesamt.de/api/air_data/v2` antwortet gemessen mit 301
+/// hierher (Bindestrich statt Unterstrich). Kein Verlass auf die Weiterleitung.
+const LUFTQUALITAET_BASIS: &str = "https://luftdaten.umweltbundesamt.de/api/air-data/v2";
+
+/// Die beiden Abruf-URLs eines Laufs (Stationsliste, Index im Acht-Stunden-Fenster).
+/// `index=id` steht explizit — das Echo der Quelle meldet trotzdem mal `code` (gemessen),
+/// weshalb der Normalisierer zusätzlich über den Stationscode auflöst.
+pub(crate) fn luftqualitaet_urls(jetzt: chrono::DateTime<chrono::Utc>) -> (String, String) {
+    let fenster = luftqualitaet_fenster(jetzt)
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("&");
+    (
+        format!("{LUFTQUALITAET_BASIS}/stations/json?lang=de&index=id"),
+        format!("{LUFTQUALITAET_BASIS}/airquality/json?{fenster}&lang=de&index=id"),
+    )
+}
+
+/// Umschlag aus den beiden Abrufen eines Laufs. `None` = Lauf gescheitert: einer der Abrufe
+/// schlug fehl oder die Antwort ist strukturell unbrauchbar. Beides darf NICHT als `leer`
+/// in den Cache, sonst überdeckte es 15 Minuten lang den letzten guten Stand.
+pub(crate) fn luftqualitaet_antwort(
+    stationen: Result<Value, String>,
+    index: Result<Value, String>,
+) -> Option<FachebeneAntwort> {
+    let (stationen, index) = match (stationen, index) {
+        (Ok(s), Ok(i)) => (s, i),
+        (Err(e), _) | (_, Err(e)) => {
+            tracing::warn!("Luftqualität-Fetch fehlgeschlagen: {e}");
+            return None;
+        }
+    };
+    let Some((fc, stand)) = normalisiere_luftqualitaet(&stationen, &index) else {
+        tracing::warn!("Luftqualität: Antwort der Quelle strukturell unbrauchbar");
+        return None;
+    };
+    Some(FachebeneAntwort::ok(
+        "luftqualitaet",
+        LUFTQUALITAET_ATTRIB,
+        stand,
+        fc,
+    ))
+}
+
+pub async fn fetch_luftqualitaet(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    let (client, pool2) = (s.client.clone(), pool.clone());
+    liefere_mit_swr(
+        pool,
+        &s.inflight,
+        "luftqualitaet",
+        LUFTQUALITAET_TTL,
+        || FachebeneAntwort::offline("luftqualitaet", LUFTQUALITAET_ATTRIB),
+        move || erneuere_luftqualitaet(client, pool2),
+    )
+    .await
+}
+
+/// Zwei Abrufe je Lauf (Stationsliste ~560 KB, Index ~210 KB), nebenläufig — gemessen beide
+/// unter einer Sekunde, der Lauf darf also blockierend am ersten Request hängen.
+async fn erneuere_luftqualitaet(
+    client: reqwest::Client,
+    pool: SqlitePool,
+) -> Option<FachebeneAntwort> {
+    let (url_stationen, url_index) = luftqualitaet_urls(chrono::Utc::now());
+    let (stationen, index) = futures::join!(
+        hole_json(&client, &url_stationen),
+        hole_json(&client, &url_index)
+    );
+    let a = luftqualitaet_antwort(stationen, index)?;
+    cache::setze(&pool, "luftqualitaet", &a).await;
+    Some(a)
+}
+
 #[cfg(test)]
 mod autobahn_strassen_tests {
     use super::*;
@@ -1125,6 +1208,88 @@ mod lhp_ki_tests {
     #[test]
     fn nicht_numerisches_argument_ist_none() {
         assert_eq!(extrahiere_ki("addLagePegel(ki)"), None);
+    }
+}
+
+#[cfg(test)]
+mod luftqualitaet_tests {
+    use super::*;
+    use crate::karte::typen::FachebeneStatus;
+    use serde_json::json;
+
+    fn stationen() -> Value {
+        json!({
+            "indices": ["station id", "station code", "station name", "station city",
+                        "station longitude", "station latitude"],
+            "data": { "21": ["21", "DEBB021", "Potsdam-Zentrum", "Potsdam", "13.0647", "52.3985"] }
+        })
+    }
+
+    fn index() -> Value {
+        json!({ "data": { "21": {
+            "2026-09-21 08:00:00": ["2026-09-21 09:00:00", 1, 0, [5, 30, 1, "1.5"]]
+        } } })
+    }
+
+    #[test]
+    fn beide_abrufe_ergeben_ok_mit_stand_und_attribution() {
+        let a = luftqualitaet_antwort(Ok(stationen()), Ok(index())).expect("Lauf geglückt");
+        assert_eq!(a.quelle, "luftqualitaet");
+        assert_eq!(a.status, FachebeneStatus::Ok);
+        assert!(a.attribution.contains("Umweltbundesamt"));
+        assert!(a.stand.is_some(), "stand = jüngster Messzeitpunkt");
+        assert_eq!(a.features["features"].as_array().unwrap().len(), 1);
+    }
+
+    /// Scheitert einer der beiden Abrufe, ist der ganze Lauf gescheitert — sonst stünde eine
+    /// halbe Antwort als `leer` 15 Minuten im Cache und überdeckte den letzten guten Stand.
+    #[test]
+    fn ein_gescheiterter_abruf_laesst_den_lauf_scheitern() {
+        assert!(luftqualitaet_antwort(Err("HTTP 502".into()), Ok(index())).is_none());
+        assert!(luftqualitaet_antwort(Ok(stationen()), Err("Timeout".into())).is_none());
+    }
+
+    #[test]
+    fn unbrauchbare_antwort_laesst_den_lauf_scheitern() {
+        assert!(luftqualitaet_antwort(Ok(json!({})), Ok(index())).is_none());
+    }
+
+    #[test]
+    fn erreichbar_ohne_werte_ist_leer() {
+        let a = luftqualitaet_antwort(Ok(stationen()), Ok(json!({ "data": {} }))).unwrap();
+        assert_eq!(a.status, FachebeneStatus::Leer);
+    }
+
+    /// Die Attribution steht auch im Offline-Umschlag (Spec „Attribution auch offline").
+    #[test]
+    fn offline_umschlag_traegt_die_attribution() {
+        let a = FachebeneAntwort::offline("luftqualitaet", LUFTQUALITAET_ATTRIB);
+        assert_eq!(a.status, FachebeneStatus::Offline);
+        assert!(a.attribution.contains("Umweltbundesamt"));
+    }
+
+    /// Finaler Host fest verdrahtet (design D2): der im Ticket genannte Host antwortet mit
+    /// 301 hierher. Ein Verlass auf die Weiterleitung bräche still, sobald der alte Pfad
+    /// abgeschaltet wird.
+    #[test]
+    fn abruf_urls_zielen_auf_den_finalen_host_und_setzen_index_id() {
+        let jetzt =
+            chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2026, 9, 21, 9, 39, 0).unwrap();
+        let (st, ix) = luftqualitaet_urls(jetzt);
+        for u in [&st, &ix] {
+            assert!(
+                u.starts_with("https://luftdaten.umweltbundesamt.de/api/air-data/v2/"),
+                "{u}"
+            );
+            assert!(u.contains("index=id"), "{u}");
+        }
+        assert!(st.contains("/stations/json?"));
+        assert!(ix.contains("/airquality/json?"));
+        assert!(
+            ix.contains("date_from=2026-09-21") && ix.contains("time_from=4"),
+            "{ix}"
+        );
+        assert!(ix.contains("time_to=11"), "{ix}");
     }
 }
 

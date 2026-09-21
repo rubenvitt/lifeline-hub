@@ -66,6 +66,7 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     // als „aus", nicht als `undefined`. Genau deshalb steht hier eine Aufzählung und kein
     // Spread über das gespeicherte Objekt.
     hochwasser: o.hochwasser === true,
+    luftqualitaet: o.luftqualitaet === true,
     // Dasselbe für LFH-78: jede heute gespeicherte Ansicht kennt `odl` nicht.
     odl: o.odl === true,
     kritis: o.kritis === true,

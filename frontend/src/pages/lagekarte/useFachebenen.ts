@@ -10,6 +10,7 @@ import {
 import { FACHEBENEN, fachebeneKeys, fachebeneTakt } from './fachebenen';
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import { faerbeHochwasser } from './hochwasserStil';
+import { faerbeLuftqualitaet } from './luftqualitaetStil';
 import { faerbeOdl } from './odlStil';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
@@ -39,7 +40,7 @@ interface FachebenenArgs {
  * die Akkumulation diese Lücke. `combine` liest das Ergebnis über die Closure.
  */
 export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
-  // Hochwasser- und ODL-Ebene färben je Punkt nach ihrer Stufe und brauchen dafür den aufgelösten
+  // Hochwasser-, ODL- und Luftqualitätsebene färben je Punkt nach ihrer Stufe und brauchen den aufgelösten
   // Modus-Token — die Kartenstil-Module haben den bewusst nicht (LFH-328/A2), also wird er
   // hier gelesen und in die Features gebacken.
   const { token } = theme.useToken();
@@ -68,8 +69,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       fachebeneTakt('kritis', q.state.status === 'error' ? 'offline' : q.state.data?.status),
   });
 
-  // Sechs Fachebenen-Queries als EIN useQueries + combine. Reihenfolge = fachebeneKeys() ohne
-  // kritis (nina, dwd, pegelonline, hochwasser, odl, autobahn) — `byKey` unten hängt an DIESER
+  // Sieben Fachebenen-Queries als EIN useQueries + combine. Reihenfolge: nina, dwd,
+  // pegelonline, hochwasser, odl, autobahn, luftqualitaet — fachebeneKeys() ohne kritis
+  // (LFH-83), und NICHT in Panel-Reihenfolge. `byKey` unten hängt an DIESER
   // Reihenfolge und greift sie positionsweise ab; ein verschobener Index ist kein Fehler,
   // sondern eine stille Verwechslung.
   const kombiniert = useQueries({
@@ -116,9 +118,17 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         //
         // Bewusst über einen State statt über die Callback-Form von `refetchInterval`: die
         // Callback-Form lässt die Typinferenz dieses `useQueries`-Tupels kollabieren (alle
-        // sechs Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
+        // sieben Einträge werden zu `UseQueryResult<unknown>`, und `combine` verliert seine
         // Typen). Gemessen, nicht vermutet — der Versuch steht im Verlauf dieses Tickets.
         refetchInterval: fachebeneTakt('autobahn', autobahnStatus),
+      },
+      // LETZTER Eintrag, bewusst am ENDE (LFH-79): `byKey` greift positionsweise ab, eine
+      // Query mitten im Tupel verschöbe die Nachbarn still auf fremde Daten.
+      {
+        queryKey: globalKeys.fachebene('luftqualitaet'),
+        queryFn: () => ladeFachebene('luftqualitaet'),
+        enabled: fachebenenSichtbar.luftqualitaet,
+        refetchInterval: FACHEBENEN.luftqualitaet.pollMs,
       },
     ],
     // combine wird von react-query memoisiert + strukturell geteilt → stabile Ableitungen.
@@ -131,20 +141,23 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         odl: ergebnisse[4],
         kritis,
         autobahn: ergebnisse[5],
+        luftqualitaet: ergebnisse[6],
       } as const;
       const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
         .filter((k) => fachebenenSichtbar[k])
         .map((k) => {
-          // Hochwasser und ODL mit eingebackener Farbe und Punktgröße je Stufe; übrige
-          // Quellen (auch KRITIS, LFH-83) direkt aus der Query.
+          // Hochwasser, ODL und Luftqualität mit eingebackener Farbe und Punktgröße je Stufe;
+          // übrige Quellen (auch KRITIS, LFH-83) direkt aus der Query.
           const roh = byKey[k].data?.features ?? leereFc;
           const daten =
             k === 'hochwasser'
               ? faerbeHochwasser(roh, token)
               : k === 'odl'
                 ? faerbeOdl(roh, token)
-                : roh;
+                : k === 'luftqualitaet'
+                  ? faerbeLuftqualitaet(roh, token)
+                  : roh;
           return { def: FACHEBENEN[k], daten };
         });
 

@@ -7,6 +7,7 @@ pub mod cache;
 pub mod download;
 pub mod katalog;
 pub mod kritis;
+pub mod luftqualitaet;
 pub mod mbtiles;
 pub mod normalisierung;
 pub mod odl_grundpegel;

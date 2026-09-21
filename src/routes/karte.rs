@@ -525,6 +525,7 @@ pub async fn fachebenen(
         "nina" => quellen::fetch_nina(&state.fachebenen, cache_pool).await,
         "hochwasser" => quellen::fetch_hochwasser(&state.fachebenen, cache_pool).await,
         "autobahn" => quellen::fetch_autobahn(&state.fachebenen, cache_pool).await,
+        "luftqualitaet" => quellen::fetch_luftqualitaet(&state.fachebenen, cache_pool).await,
         "odl" => quellen::fetch_odl(&state.fachebenen, cache_pool).await,
         // KRITIS (LFH-83) kommt aus dem Extrakt-Bestand — kein externer Abruf je Anfrage.
         "kritis" => {

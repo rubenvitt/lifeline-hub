@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -14,6 +14,7 @@ import { useFachebenen } from './useFachebenen';
 import { FACHEBENEN } from './fachebenen';
 import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
 import { hochwasserRadius } from './hochwasserStil';
+import { luftqualitaetRadius } from './luftqualitaetStil';
 import { odlRadius } from './odlStil';
 
 // Fixtures via vi.hoisted, damit sowohl die (hochgezogene) vi.mock-Factory als auch
@@ -43,6 +44,22 @@ const fx = vi.hoisted(() => {
       },
     ],
   };
+  // VIER Stationen: die Menge unterscheidet auch diese Ebene von jeder anderen Fixture.
+  const luftqualitaet: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: (
+      [
+        ['sehr_schlecht', [13.06, 52.39]],
+        ['sehr_gut', [8.21, 53.14]],
+        ['gut', [7.1, 50.7]],
+        ['maessig', [11.5, 48.1]],
+      ] as const
+    ).map(([klasse, c]) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [...c] },
+      properties: { titel: `Station ${klasse}`, klasse },
+    })),
+  };
   // VIER Sonden — keine andere Fixture hat vier Features, ein vertauschter `combine`-Index
   // fiele an der Menge auf. Eine davon stark erhöht, eine ohne Messung.
   const odl: FeatureCollection = {
@@ -60,6 +77,9 @@ const fx = vi.hoisted(() => {
   };
   return {
     fc,
+    luftqualitaet,
+    // Umschaltbar je Test: der Status steuert, ob die Attribution erscheint.
+    lqStatus: 'ok' as FachebeneAntwort['status'],
     odl,
     nina: fc([[9, 50]]),
     kritisA: fc([[10, 51]]),
@@ -95,6 +115,14 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
           attribution: 'Autobahn GmbH des Bundes',
           stand: null,
           features: fx.autobahn,
+        });
+      if (quelle === 'luftqualitaet')
+        return Promise.resolve({
+          quelle,
+          status: fx.lqStatus,
+          attribution: 'Umweltbundesamt',
+          stand: '2026-09-21T09:00:00+01:00',
+          features: fx.lqStatus === 'offline' ? fx.fc([]) : fx.luftqualitaet,
         });
       if (quelle === 'odl')
         return Promise.resolve({
@@ -151,6 +179,12 @@ function rendere() {
 }
 
 describe('useFachebenen', () => {
+  // Der Luftqualitäts-Status ist modulweit veränderlich; ein vorzeitig scheiternder Test darf
+  // `offline` nicht an den nächsten weitergeben.
+  afterEach(() => {
+    fx.lqStatus = 'ok';
+  });
+
   it('startet mit allen Ebenen aus (keine Queries, keine Attribution)', () => {
     const { result } = rendere();
     expect(result.current.aktiveFachebenen).toHaveLength(0);
@@ -381,6 +415,67 @@ describe('useFachebenen', () => {
     expect(result.current.fachebenenStatus.autobahn).toBe('ok');
     // AK „Quellennennung korrekt".
     expect(result.current.fachebenenAttribution).toContain('Autobahn GmbH des Bundes');
+  });
+
+  it('färbt und staffelt die Luftmessstationen nach ihrer Indexstufe (LFH-79)', async () => {
+    fx.lqStatus = 'ok';
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('luftqualitaet', true));
+    await waitFor(() =>
+      expect(
+        result.current.aktiveFachebenen.find((f) => f.def.key === 'luftqualitaet')?.daten.features,
+      ).toHaveLength(4),
+    );
+    const [schlecht, sehrGut, gut] = result.current.aktiveFachebenen.find(
+      (f) => f.def.key === 'luftqualitaet',
+    )!.daten.features;
+    // Koordinate statt Anzahl: die Zuordnung Query→Ebene läuft über Positionen.
+    expect(schlecht.geometry?.coordinates).toEqual([13.06, 52.39]);
+    expect(schlecht.properties.radius).toBe(luftqualitaetRadius('sehr_schlecht'));
+    expect(schlecht.properties.farbe).not.toBe(sehrGut.properties.farbe);
+    // Zwei Stufen, eine Rolle: gleiche Farbe, verschiedene Größe — der zweite Kanal.
+    expect(sehrGut.properties.farbe).toBe(gut.properties.farbe);
+    expect(sehrGut.properties.radius).not.toBe(gut.properties.radius);
+    expect(schlecht.properties.titel).toBe('Station sehr_schlecht');
+  });
+
+  it('verschiebt mit der siebten Query keine Bestandsebene (LFH-79)', async () => {
+    // `combine` greift positionsweise ab. Stünde die neue Query nicht am ENDE des Tupels,
+    // trügen Autobahn oder KRITIS still die Daten einer Nachbarebene.
+    fx.lqStatus = 'ok';
+    const { result } = rendere();
+    act(() => {
+      result.current.onFachebeneToggle('luftqualitaet', true);
+      result.current.onFachebeneToggle('autobahn', true);
+      result.current.onFachebeneToggle('kritis', true);
+      result.current.setKritisBbox('bbox1');
+    });
+    const daten = (k: string) =>
+      result.current.aktiveFachebenen.find((f) => f.def.key === k)?.daten.features;
+    await waitFor(() => {
+      expect(daten('luftqualitaet')).toHaveLength(4);
+      expect(daten('autobahn')).toHaveLength(3);
+      expect(daten('kritis')).toHaveLength(1);
+    });
+    expect(daten('autobahn')![0].geometry?.coordinates).toEqual([6.86, 50.98]);
+    expect(daten('kritis')![0].geometry?.coordinates).toEqual([10, 51]);
+    expect(daten('luftqualitaet')![0].geometry?.coordinates).toEqual([13.06, 52.39]);
+  });
+
+  it('nennt das Umweltbundesamt, solange die Ebene nicht offline ist (LFH-79)', async () => {
+    fx.lqStatus = 'ok';
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('luftqualitaet', true));
+    await waitFor(() => expect(result.current.fachebenenStatus.luftqualitaet).toBe('ok'));
+    expect(result.current.fachebenenAttribution).toContain('Umweltbundesamt');
+  });
+
+  it('blendet die Attribution einer offline gemeldeten Luftqualitätsebene aus (LFH-79)', async () => {
+    fx.lqStatus = 'offline';
+    const { result } = rendere();
+    act(() => result.current.onFachebeneToggle('luftqualitaet', true));
+    await waitFor(() => expect(result.current.fachebenenStatus.luftqualitaet).toBe('offline'));
+    expect(result.current.fachebenenAttribution).not.toContain('Umweltbundesamt');
   });
 
   it('autobahn braucht keine bbox — sie lädt schon durch das Einschalten (LFH-80)', async () => {

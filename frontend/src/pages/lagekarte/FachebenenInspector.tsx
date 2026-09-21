@@ -4,10 +4,12 @@ import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import StatusTag from '../../components/StatusTag';
+import { rollenFarbe } from '../../theme/statusFarben';
 import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
 import { hochwasserDarstellung } from './hochwasserStil';
+import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 
@@ -337,6 +339,69 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 /**
+ * Komponenten der Luftqualitätsebene in Anzeigereihenfolge. Die Schlüssel stammen aus dem
+ * Normalisierer (`karte::luftqualitaet::komponenten_etikett`, Property `wert_<schluessel>`);
+ * unbekannte Komponenten kommen dort als `wert_k<id>` und werden unten angehängt.
+ */
+const LUFT_KOMPONENTEN: [string, string][] = [
+  ['no2', 'NO₂'],
+  ['o3', 'O₃'],
+  ['pm10', 'PM10'],
+  ['pm25', 'PM2,5'],
+  ['so2', 'SO₂'],
+  ['co', 'CO'],
+];
+
+/**
+ * UBA-Luftmessstation (LFH-79). Die Stufe steht als WORT (zweiter Kanal zur Farbe auf der
+ * Karte), der Messzeitpunkt immer — die Quelle hinkt rund zwei Stunden hinterher, und ein
+ * Wert ohne Zeit läse sich als „jetzt". Die unvollständige Datenbasis ist ein Hinweis, keine
+ * Farbe: der Index ist die amtliche Einstufung, nur aus weniger Komponenten gebildet.
+ */
+function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
+  const unbekannt = Object.keys(p)
+    .filter((k) => /^wert_k\d+$/.test(k))
+    .sort()
+    .map((k): [string, string] => [k.slice(5), `Komponente ${k.slice(6)}`]);
+  const werte = [...LUFT_KOMPONENTEN, ...unbekannt]
+    .map(([schluessel, name]) => {
+      const wert = s(p[`wert_${schluessel}`]);
+      const einheit = s(p[`einheit_${schluessel}`]);
+      return wert ? { name, text: einheit ? `${wert} ${einheit}` : wert } : null;
+    })
+    .filter((w): w is { name: string; text: string } => w !== null);
+  const art = [s(p.stationstyp), s(p.umgebung)].filter(Boolean).join(' · ');
+  return (
+    <>
+      <div style={{ marginBottom: 8 }}>
+        <StatusTag darstellung={luftqualitaetDarstellung(p.klasse)} />
+      </div>
+      <Descriptions column={1}>
+        {s(p.leitschadstoff) && (
+          <Descriptions.Item label="Leitschadstoff">{s(p.leitschadstoff)}</Descriptions.Item>
+        )}
+        {werte.map((w) => (
+          <Descriptions.Item key={w.name} label={w.name}>
+            {w.text}
+          </Descriptions.Item>
+        ))}
+        {fmtZeit(s(p.zeitpunkt)) && (
+          <Descriptions.Item label="Messzeitpunkt">{fmtZeit(s(p.zeitpunkt))}</Descriptions.Item>
+        )}
+        {s(p.ort) && <Descriptions.Item label="Ort">{s(p.ort)}</Descriptions.Item>}
+        {art && <Descriptions.Item label="Station">{art}</Descriptions.Item>}
+        {s(p.code) && <Descriptions.Item label="Stationscode">{s(p.code)}</Descriptions.Item>}
+      </Descriptions>
+      {p.unvollstaendig === true && (
+        <Typography.Text type="secondary">
+          Unvollständige Datenbasis — der Index ist aus weniger Komponenten gebildet.
+        </Typography.Text>
+      )}
+    </>
+  );
+}
+
+/**
  * Standbild einer BAB-Webcam. Eigene Komponente, damit der Aufrufer sie über `key={bild}`
  * strukturell zurücksetzen kann: der Fehlerzustand gehört zu GENAU DIESEM Bild, nicht zum
  * Panel. Ein Merker im Panel überlebte den Wechsel auf eine andere Kamera — und ein Merker,
@@ -466,7 +531,13 @@ export default function FachebenenInspector({
   return (
     <KartenDetailCard
       titel={titel}
-      akzentFarbe={FACHEBENEN[quelle].farbe}
+      akzentFarbe={
+        // Die Luftqualitätsebene färbt je Station nach ihrer Stufe; der Akzent folgt dem, sonst
+        // stünde neben einem Alarm-Tag die Ebenenfarbe — eine Farbe mit zwei Bedeutungen.
+        quelle === 'luftqualitaet'
+          ? rollenFarbe(luftqualitaetDarstellung(p.klasse).rolle, token)
+          : FACHEBENEN[quelle].farbe
+      }
       onSchliessen={onSchliessen}
     >
       {istWarnung ? (
@@ -479,6 +550,8 @@ export default function FachebenenInspector({
         <OdlInhalt p={p} />
       ) : quelle === 'autobahn' ? (
         <AutobahnInhalt p={p} />
+      ) : quelle === 'luftqualitaet' ? (
+        <LuftqualitaetInhalt p={p} />
       ) : (
         <KritisInhalt p={p} />
       )}

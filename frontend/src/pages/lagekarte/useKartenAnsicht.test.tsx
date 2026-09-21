@@ -18,6 +18,7 @@ vi.mock('../../api/kartenAnsicht', () => ({
 }));
 
 import { useKartenAnsicht } from './useKartenAnsicht';
+import { fachebeneKeys } from './fachebenen';
 
 // Minimal-Config: online + offline verfügbar, damit waehleInitialeBasemap beide Modi akzeptiert.
 const CONFIG = {
@@ -93,6 +94,46 @@ describe('useKartenAnsicht', () => {
     // Ohne den Key im Vergleichs-Tupel (`FACHEBENE_KEYS`) bliebe die Ansicht sauber und
     // „Ansicht speichern" böte sich nie an — die Wahl wäre nach dem Reload weg.
     act(() => result.current.setFachebenenSichtbar((v) => ({ ...v, autobahn: true })));
+    await waitFor(() => expect(result.current.dirty).toBe(true));
+  });
+
+  it('hydratisiert die Luftqualitäts-Sichtbarkeit und liest einen alten Stand als aus (LFH-79)', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({
+        fachebenen_sichtbar: { luftqualitaet: true },
+      } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.fachebenenSichtbar.luftqualitaet).toBe(true));
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('ein vor LFH-79 gespeicherter Stand kennt den Schlüssel nicht → Ebene aus', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({
+        fachebenen_sichtbar: { nina: true },
+      } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.fachebenenSichtbar.nina).toBe(true));
+    expect(result.current.fachebenenSichtbar.luftqualitaet).toBe(false);
+  });
+
+  // Jede Fachebene muss den Schmutzig-Vergleich treffen — sonst böte sich „Ansicht
+  // speichern" nach dem Umschalten nie an. `hochwasser` fehlte im Vergleichs-Tupel seit
+  // LFH-77; der Test läuft deshalb über ALLE Ebenen, nicht nur über die neue.
+  it.each(fachebeneKeys())('das Umschalten von %s macht die Ansicht schmutzig', async (k) => {
+    ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    expect(result.current.dirty).toBe(false);
+    act(() => result.current.setFachebenenSichtbar((v) => ({ ...v, [k]: !v[k] })));
     await waitFor(() => expect(result.current.dirty).toBe(true));
   });
 
