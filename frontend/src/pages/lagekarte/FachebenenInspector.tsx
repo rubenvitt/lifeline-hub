@@ -10,7 +10,7 @@ import { kategorieLabel } from './fachebenenLayer';
 import { geoKennzahlen } from './geo';
 import { hochwasserDarstellung } from './hochwasserStil';
 import { luftqualitaetDarstellung } from './luftqualitaetStil';
-import { odlDarstellung } from './odlStil';
+import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 
 export interface FachebenenInspectorProps {
@@ -261,21 +261,37 @@ const ODL_ZAHL = new Intl.NumberFormat('de-DE', {
 });
 
 /**
- * ODL-Sonde des BfS (LFH-78): Stufe als Wort, Messwert, Messende, Betriebsstatus — und der
- * Satz, dass die Stufe eine Einteilung des Lifeline Hub ist. Der Satz ist KEIN Kleingedrucktes
- * zum Weglassen: das BfS veröffentlicht keinen absoluten Schwellenwert, und ohne den Hinweis
- * läse sich „über natürlichem Bereich" wie eine amtliche Bewertung (Spec, Anforderung
- * „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen").
+ * Faktor mit ZWEI Nachkommastellen („1,52 ×"), so genau wie das Backend ihn liefert. Mit einer
+ * stünde „1,5 ×" sowohl neben „unauffällig" (1,48) als auch neben „erhöht" (1,52) — gerade im
+ * Regenfall, den der Hinweis erklären soll.
+ */
+const ODL_FAKTOR = new Intl.NumberFormat('de-DE', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/**
+ * ODL-Sonde des BfS (LFH-78/LFH-598): Stufe als Wort, Messwert, Messende, Betriebsstatus — und
+ * der Maßstab, nach dem die Stufe gebildet ist. Seit LFH-598 gibt es ZWEI: den
+ * Standort-Grundpegel der Sonde (Faktor-Schwellen 1,5 × / 3 ×) und, solange keiner vorliegt,
+ * die absoluten Bänder am natürlichen Bereich. Die Stufen-Labels nennen bewusst keinen der
+ * beiden (`theme/statusFarben.ts`), der Maßstab steht deshalb HIER, je Sonde.
+ *
+ * Der Hinweissatz ist KEIN Kleingedrucktes zum Weglassen: das BfS veröffentlicht keinen
+ * Schwellenwert für „erhöht", und ohne ihn läse sich die Stufe wie eine amtliche Bewertung
+ * (Spec, Anforderung „Die Einteilung gibt sich als Projekt-Einteilung zu erkennen").
  *
  * Eine Sonde ohne Messwert zeigt „kein Messwert" statt einer Zahl, und das Messende fehlt
  * dann ganz — die Quelle liefert für defekte Sonden keins. Das Messende steht auch bei
  * aktuellen Werten: gemessen hängt ein Teil der Sonden Stunden hinter dem Stundenwert, und
- * eine eigene Stufe „veraltet" gibt es bewusst nicht (design.md, Entscheidung 6).
+ * eine eigene Stufe „veraltet" gibt es bewusst nicht (LFH-78, design.md, Entscheidung 6).
  */
 function OdlInhalt({ p }: { p: Record<string, unknown> }) {
   const { token } = theme.useToken();
   const wert = typeof p.wert === 'number' && Number.isFinite(p.wert) ? p.wert : null;
   const messende = fmtZeit(s(p.messende));
+  const grundlage = odlGrundlage(p);
+  const hinweisStil = { fontSize: token.fontSizeSM, marginTop: token.marginXS, marginBottom: 0 };
   return (
     <>
       <div style={{ marginBottom: 8 }}>
@@ -286,17 +302,38 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
           {wert === null ? 'kein Messwert' : `${ODL_ZAHL.format(wert)} ${s(p.einheit) ?? 'µSv/h'}`}
         </Descriptions.Item>
         {messende && <Descriptions.Item label="Messende">{messende}</Descriptions.Item>}
+        {grundlage.art === 'standort' && (
+          <>
+            <Descriptions.Item label="Grundpegel">
+              {`${ODL_ZAHL.format(grundlage.grundpegel)} µSv/h`}
+              {grundlage.stand && ` (Stand ${fmtZeit(grundlage.stand)})`}
+            </Descriptions.Item>
+            <Descriptions.Item label="Faktor">{`${ODL_FAKTOR.format(grundlage.faktor)} ×`}</Descriptions.Item>
+          </>
+        )}
         {s(p.betrieb) && <Descriptions.Item label="Sonde">{s(p.betrieb)}</Descriptions.Item>}
         {/* Ortsnamen sind nicht eindeutig; die Kennung ist der Schlüssel für ODL-Info. */}
         {s(p.kennung) && <Descriptions.Item label="Kennung">{s(p.kennung)}</Descriptions.Item>}
       </Descriptions>
-      <Typography.Paragraph
-        type="secondary"
-        style={{ fontSize: token.fontSizeSM, marginTop: token.marginXS, marginBottom: 0 }}
-      >
-        Einteilung des Lifeline Hub nach dem vom BfS genannten natürlichen Bereich (0,05–0,2 µSv/h)
-        — kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum Dreifachen anheben.
-      </Typography.Paragraph>
+      {grundlage.art === 'standort' ? (
+        <Typography.Paragraph type="secondary" style={hinweisStil}>
+          Einteilung des Lifeline Hub nach dem Grundpegel dieser Sonde (unteres Quartil der letzten
+          sieben Tage): über 1,5 × erhöht, über 3 × stark erhöht — den Faktor 3 nennt das BfS als
+          Anlass zur Besorgnis. Kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum
+          Dreifachen anheben.
+        </Typography.Paragraph>
+      ) : (
+        <Typography.Paragraph type="secondary" style={hinweisStil}>
+          {/* Nur wo ein Grundpegel überhaupt gälte: mit Messwert in µSv/h. Unter fremder Einheit
+              wird gar nicht bewertet, der Satz stimmte dort nicht. */}
+          {wert !== null &&
+            (s(p.einheit) ?? 'µSv/h') === 'µSv/h' &&
+            'Für diese Sonde liegt noch kein Grundpegel vor. '}
+          Einteilung des Lifeline Hub nach dem vom BfS genannten natürlichen Bereich (0,05–0,2
+          µSv/h) — kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum Dreifachen
+          anheben.
+        </Typography.Paragraph>
+      )}
     </>
   );
 }

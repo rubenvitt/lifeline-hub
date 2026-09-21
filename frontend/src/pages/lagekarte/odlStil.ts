@@ -1,6 +1,6 @@
 import type { GlobalToken } from 'antd';
 import { odlStufe, rollenFarbe, type StatusDarstellung } from '../../theme/statusFarben';
-import type { FeatureCollection, OdlStufe } from '../../api/fachebenen';
+import type { FeatureCollection, OdlBewertung, OdlStufe } from '../../api/fachebenen';
 
 /**
  * Darstellung der BfS-ODL-Ebene (LFH-78): Rollenfarbe und Punktdurchmesser je Stufe, in die
@@ -54,4 +54,33 @@ export function faerbeOdl(fc: FeatureCollection, token: GlobalToken): FeatureCol
       };
     }),
   };
+}
+
+/** Grundlage der Stufe einer Sonde, aus den Properties gelesen (LFH-598). */
+export type OdlGrundlage =
+  | {
+      art: Extract<OdlBewertung, 'standort'>;
+      grundpegel: number;
+      faktor: number;
+      stand: string | null;
+    }
+  | { art: Extract<OdlBewertung, 'absolut'> };
+
+function endlich(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * `standort` nur, wenn das Wort stimmt UND Grundpegel und Faktor als Zahlen dastehen — sonst
+ * `absolut`. Ein unbekanntes Wort oder ein halber Satz Felder zeigt also keinen Grundpegel,
+ * statt einen Maßstab zu erfinden, der für die Stufe nicht gegolten hat.
+ */
+export function odlGrundlage(p: Record<string, unknown> | undefined): OdlGrundlage {
+  const grundpegel = endlich(p?.grundpegel);
+  const faktor = endlich(p?.faktor);
+  if (p?.bewertung === 'standort' && grundpegel !== null && faktor !== null) {
+    const stand = typeof p.grundpegel_stand === 'string' ? p.grundpegel_stand : null;
+    return { art: 'standort', grundpegel, faktor, stand };
+  }
+  return { art: 'absolut' };
 }

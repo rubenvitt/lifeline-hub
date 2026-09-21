@@ -77,26 +77,65 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Faktor 3" und einen Anlass zur Besorgnis erst bei längerer signifikanter Erhöhung „bzw.
   wenn die Erhöhung über einen Faktor 3 hinausgeht" — **standortbezogen** gemeint
   ([ODL-Info, Messwertinterpretation](https://odlinfo.bfs.de/ODL/DE/themen/wie-wird-gemessen/interpretation/interpretation.html)).
-  Die Ebene bildet daraus absolute Bänder (Entscheidung mit dem Menschen, 21.09.2026):
+  Die Ebene bewertet deshalb **zweistufig** — beide Einteilungen sind Projekt-Entscheidungen
+  (21.09.2026, LFH-78 und LFH-598):
+
+  **Standortbezogen, sobald ein Grundpegel vorliegt (LFH-598).** Stufe nach dem Faktor
+  Stundenwert ÷ Grundpegel der Sonde; die Grenze gehört zur unteren Stufe.
+
+  | Stufe (`stufe`) | Faktor | Rolle | Wort |
+  |---|---|---|---|
+  | `normal` | ≤ 1,5 × | normal | unauffällig |
+  | `erhoeht` | > 1,5 × bis ≤ 3 × | achtung | erhöht |
+  | `stark_erhoeht` | > 3 × | alarm | stark erhöht |
+
+  3 × ist der Faktor des BfS, hier so gemeint wie dort — standortbezogen. 1,5 × liegt über
+  der normalen Streuung: in einer ruhigen Woche (Stichprobe 21.09.2026, 42 559 Werte) stand
+  ein Wert bei 0,05 % der Fälle auf ≥ 1,5 × des Medians seiner Sonde, bei zwei Werten auf
+  ≥ 2 ×. Regen fängt die Schwelle ein; das ist `achtung`, kein Alarm.
+
+  **Absolut, solange keiner vorliegt (LFH-78)** — beim ersten Start, für Sonden mit zu
+  wenig Historie und für Sonden in fremder Einheit:
 
   | Stufe (`stufe`) | Messwert | Rolle | Wort |
   |---|---|---|---|
   | `keine_messung` | kein Wert | neutral | keine Messung |
-  | `normal` | ≤ 0,2 µSv/h | normal | im natürlichen Bereich |
-  | `erhoeht` | > 0,2 bis ≤ 0,6 µSv/h | achtung | über natürlichem Bereich |
-  | `stark_erhoeht` | > 0,6 µSv/h (3 × Obergrenze) | alarm | über 3 × natürlicher Obergrenze |
+  | `normal` | ≤ 0,2 µSv/h | normal | unauffällig |
+  | `erhoeht` | > 0,2 bis ≤ 0,6 µSv/h | achtung | erhöht |
+  | `stark_erhoeht` | > 0,6 µSv/h (3 × Obergrenze) | alarm | stark erhöht |
 
-  Das Detailpanel jeder Sonde sagt das mit einem eigenen Satz, die Wörter beschreiben die
-  Lage zum natürlichen Bereich und keine Gefährdung. **Bekannte Schwäche:** Regen hebt
-  Sonden in Gebieten mit hohem Grundpegel zeitweise über 0,2 µSv/h; schon am Messtag
-  standen zwei Sonden ohne jede Lage knapp darüber. Umgekehrt fällt eine Verdreifachung an
-  einer Sonde mit niedrigem Grundpegel nicht auf. Eine **standortbezogene** Bewertung
-  scheitert an der Schnittstelle: die Zeitreihe `odlinfo_timeseries_odl_24h` ist eine
-  parametrisierte Sicht, die **eine Sonde je Abruf** liefert (`viewparams=kenn:…`, 365
-  Tageswerte) — für das ganze Netz 1 676 Abrufe. Das ist als **LFH-598** festgehalten.
-  Die Stufenwörter stehen wie die LHP-Klassen in keinem OpenAPI-Schema und sind beidseitig
-  gepinnt (`karte::normalisierung::odl_tests` ↔ `theme/statusFarben.test.ts`,
-  `pages/lagekarte/odlStil.test.ts`).
+  Die **Wörter nennen keinen Maßstab**, weil sie für beide Einteilungen stimmen müssen — eine
+  Sonde mit 0,19 µSv/h und Faktor 3,2 liegt im natürlichen Bereich und ist trotzdem stark
+  erhöht. Welche Einteilung gilt, trägt jedes Feature als `bewertung` (`standort` /
+  `absolut`), bei `standort` mit `grundpegel`, `faktor` und `grundpegel_stand`; das
+  Detailpanel nennt je Sonde den Maßstab und dass er keine BfS-Schwelle ist.
+
+  **Woher der Grundpegel kommt.** Die frühere Aussage an dieser Stelle — ein Grundpegel sei
+  nur über 1 676 Einzelabrufe zu haben — gilt für den Layer `odlinfo_timeseries_odl_24h`
+  (eine Sonde je Abruf, `viewparams=kenn:…`). Der Nachbar-Layer
+  **`opendata:odlinfo_timeseries_odl_1h`** hält dagegen die Stundenwerte **aller** Sonden der
+  letzten sieben Tage (gemessen 21.09.2026: 263 687 Werte, ältester 167 h zurück) und nimmt
+  einen `CQL_FILTER`. Einmal täglich holt das Backend damit eine Stichprobe von bis zu 28
+  Zeitpunkten im 6-h-Raster in **einem** Abruf (gemessen ~8,6 MB, ~10 s, 1 585 Sonden) und
+  bildet je Sonde das **untere Quartil** — ab **20** Werten, sonst bleibt die Sonde absolut.
+  Das Quartil statt des Medians, weil es in einer mehrtägigen Lage später mitwandert (über
+  fünf statt gut vier Tage), ohne Lage aber gemessen innerhalb von 1,5 % des Medians liegt.
+  Eine **Sperrklinke** verwirft zusätzlich jede Neuberechnung, die den gespeicherten Pegel
+  einer Sonde um 1,5 × oder mehr anheben würde; der alte Pegel bleibt samt Stand stehen —
+  höchstens 14 Tage, danach wandert der Maßstab mit (sonst stünde etwa eine getauschte,
+  empfindlichere Sonde für immer auf „erhöht"). Ein schleichender Anstieg knapp unter 1,5 ×
+  je Tag kommt durch; das Quartil bremst ihn nur. Der Eintrag ist vom Prune des Caches
+  (2 Tage) **ausgenommen**, damit eine länger gestörte Zeitreihe ihn nicht wegräumt.
+  Der Abruf läuft **nur im Hintergrund** (angestossen vom ODL-Abruf, TTL 24 h, eigene
+  90-s-Schranke, eine Stunde Abkühlung nach Fehlschlag) und hält die Ebene nie auf; eine
+  unbrauchbare, leere oder nur für weniger als die Hälfte der bekannten Sonden gefüllte
+  Antwort schreibt nichts (`karte::odl_grundpegel::neue_karte`).
+  Abgelegt wird er im Fachebenen-Cache unter `odl:grundpegel`, bewertet wird bei Auslieferung
+  (`karte::odl_grundpegel::bewerte`). Niederschlag rechnet die Ebene nicht heraus; der BfS
+  führt dafür `odlinfo_timeseries_precipitation_15min`.
+  Stufen- und Grundlagenwörter stehen in keinem OpenAPI-Schema und sind beidseitig gepinnt
+  (`karte::normalisierung::odl_tests`, `karte::odl_grundpegel::tests` ↔
+  `theme/statusFarben.test.ts`, `pages/lagekarte/odlStil.test.ts`).
 - **Geltungsbereich ODL:** ausschließlich die ortsfesten Sonden des BfS-Messnetzes mit ihren
   Stundenwerten. Messungen von Messtrupps, Messfahrzeugen oder Hubschraubern im Einsatz sind
   **nicht** enthalten — die Zeile steht sichtbar unter dem Ebenen-Label.

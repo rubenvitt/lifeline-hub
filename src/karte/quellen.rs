@@ -8,6 +8,7 @@ use crate::karte::normalisierung::{
     kombiniere_nina, normalisiere_autobahn, normalisiere_hochwasser, normalisiere_odl,
     normalisiere_pegelonline,
 };
+use crate::karte::odl_grundpegel::{self, GrundpegelKarte};
 use crate::karte::typen::{leere_collection, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use futures::stream::{self, StreamExt};
@@ -176,9 +177,12 @@ const ODL_TTL: Duration = Duration::from_secs(600);
 /// hängenden GeoServer ab, ohne dass hier ein eigener Timeout stehen muss.
 const ODL_URL: &str = "https://www.imis.bfs.de/ogc/opendata/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=opendata:odlinfo_odl_1h_latest&outputFormat=application/json";
 
+/// Liefert die Sonden und bewertet sie bei Auslieferung gegen den Standort-Grundpegel
+/// (LFH-598). Der Grundpegel wird hier nur ANGESTOSSEN, nie abgewartet — auch im kalten
+/// Fall nicht: bis er da ist, gelten die absoluten Bänder aus `normalisiere_odl`.
 pub async fn fetch_odl(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let (client, pool2) = (s.client.clone(), pool.clone());
-    liefere_mit_swr(
+    let mut a = liefere_mit_swr(
         pool,
         &s.inflight,
         "odl",
@@ -186,7 +190,108 @@ pub async fn fetch_odl(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwo
         || FachebeneAntwort::offline("odl", ODL_ATTRIB),
         move || erneuere_odl(client, pool2),
     )
-    .await
+    .await;
+    let grundpegel =
+        cache::eintrag_wert::<GrundpegelKarte>(pool, odl_grundpegel::CACHE_SCHLUESSEL).await;
+    stosse_grundpegel_an(s, pool, grundpegel.as_ref().map(|(_, alter)| *alter));
+    let karte = grundpegel.map(|(k, _)| k).unwrap_or_default();
+    odl_grundpegel::bewerte(&mut a.features, &karte);
+    a
+}
+
+/// Der Grundpegel ändert sich über Tage, nicht über Stunden; ein Abruf kostet ~8,6 MB.
+const ODL_GRUNDPEGEL_TTL: Duration = Duration::from_secs(24 * 3600);
+/// Gemessen ~10 s bei guter Leitung für ~8,6 MB, bei ~1 Mbit/s rund 70 s. Die 8 s des
+/// gemeinsamen Clients reichen nicht; da der Lauf niemanden blockiert, kostet die lange
+/// Schranke nur einen gebundenen Hintergrund-Task.
+const ODL_GRUNDPEGEL_TIMEOUT: Duration = Duration::from_secs(90);
+/// Nach einem Fehlschlag eine Stunde Ruhe — sonst fragte jeder 10-min-Poll erneut 8,6 MB
+/// bei einem GeoServer an, der gerade nicht kann.
+const ODL_GRUNDPEGEL_ABKUEHLUNG: Duration = Duration::from_secs(3600);
+static ODL_GRUNDPEGEL_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// Zeitreihe ALLER Sonden, sieben Tage, Stundenwerte (gemessen 21.09.2026: 263 687 Werte).
+/// Der Filter wählt die Stichprobe; `propertyName` spart Volumen (`name` kommt trotzdem mit).
+const ODL_ZEITREIHE_URL: &str = "https://www.imis.bfs.de/ogc/opendata/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=opendata:odlinfo_timeseries_odl_1h&outputFormat=application/json&propertyName=id,end_measure,value,unit&CQL_FILTER=";
+
+/// Muss der Grundpegel neu geholt werden? Rein: fehlt er oder ist er älter als die TTL,
+/// und läuft keine Abkühlung nach einem Fehlschlag — dieselben Bausteine wie bei der
+/// Autobahn-Ebene.
+pub(crate) fn grundpegel_anstossen(
+    eintrag_alter: Option<i64>,
+    seit_fehlschlag: Option<Duration>,
+) -> bool {
+    autobahn_weg(eintrag_alter, ODL_GRUNDPEGEL_TTL) != AutobahnWeg::Frisch
+        && autobahn_darf_starten(seit_fehlschlag, ODL_GRUNDPEGEL_ABKUEHLUNG)
+}
+
+fn stosse_grundpegel_an(s: &FachebenenState, pool: &SqlitePool, eintrag_alter: Option<i64>) {
+    let seit_fehlschlag = ODL_GRUNDPEGEL_FEHLSCHLAG
+        .lock()
+        .unwrap()
+        .map(|t| t.elapsed());
+    if !grundpegel_anstossen(eintrag_alter, seit_fehlschlag) {
+        return;
+    }
+    let key = odl_grundpegel::CACHE_SCHLUESSEL;
+    if !s.inflight.lock().unwrap().insert(key.to_string()) {
+        return; // läuft schon
+    }
+    let (client, pool, inflight) = (s.client.clone(), pool.clone(), s.inflight.clone());
+    tokio::spawn(async move {
+        let ok = erneuere_grundpegel(client, pool).await;
+        // Erst den Ausgang vermerken, dann freigeben (Begründung bei `fetch_autobahn`).
+        *ODL_GRUNDPEGEL_FEHLSCHLAG.lock().unwrap() = if ok {
+            None
+        } else {
+            Some(std::time::Instant::now())
+        };
+        inflight.lock().unwrap().remove(key);
+    });
+}
+
+async fn erneuere_grundpegel(client: reqwest::Client, pool: SqlitePool) -> bool {
+    let jetzt = chrono::Utc::now();
+    let filter = odl_grundpegel::cql_filter(&odl_grundpegel::zeitpunkte(jetzt));
+    let url = format!(
+        "{ODL_ZEITREIHE_URL}{}",
+        percent_encoding::utf8_percent_encode(&filter, percent_encoding::NON_ALPHANUMERIC)
+    );
+    let roh = match client
+        .get(&url)
+        .timeout(ODL_GRUNDPEGEL_TIMEOUT)
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => match r.json::<Value>().await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!("BfS-ODL-Zeitreihe nicht lesbar: {e}");
+                return false;
+            }
+        },
+        Ok(r) => {
+            tracing::warn!("BfS-ODL-Zeitreihe: HTTP {}", r.status());
+            return false;
+        }
+        Err(e) => {
+            tracing::warn!("BfS-ODL-Zeitreihe-Fetch fehlgeschlagen: {e}");
+            return false;
+        }
+    };
+    let alt = cache::eintrag_wert::<GrundpegelKarte>(&pool, odl_grundpegel::CACHE_SCHLUESSEL)
+        .await
+        .map(|(k, _)| k)
+        .unwrap_or_default();
+    let Some(karte) = odl_grundpegel::neue_karte(&roh, &alt, jetzt) else {
+        tracing::warn!(
+            "BfS-ODL-Zeitreihe unbrauchbar (Formatbruch, leer oder weniger als die Hälfte der \
+             {} bekannten Sonden) — alter Grundpegel bleibt",
+            alt.len()
+        );
+        return false;
+    };
+    tracing::info!("ODL-Grundpegel für {} Sonden berechnet", karte.len());
+    cache::setze_wert(&pool, odl_grundpegel::CACHE_SCHLUESSEL, &karte).await
 }
 
 async fn erneuere_odl(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
@@ -1204,6 +1309,23 @@ mod odl_antwort_tests {
         assert_eq!(a.quelle, "odl");
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
         assert_eq!(a.attribution, ODL_ATTRIB);
+    }
+
+    #[test]
+    fn grundpegel_wird_nur_bei_fehlen_oder_alter_und_ohne_abkuehlung_angestossen() {
+        let tag = 24 * 3600;
+        assert!(grundpegel_anstossen(None, None), "kalt → anstossen");
+        assert!(
+            grundpegel_anstossen(Some(tag), None),
+            "24 h alt → anstossen"
+        );
+        assert!(
+            !grundpegel_anstossen(Some(tag - 1), None),
+            "frisch → nichts"
+        );
+        let kurz = Some(Duration::from_secs(60));
+        assert!(!grundpegel_anstossen(None, kurz), "Abkühlung läuft");
+        assert!(grundpegel_anstossen(None, Some(Duration::from_secs(3600))));
     }
 
     #[test]

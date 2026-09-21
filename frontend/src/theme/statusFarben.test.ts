@@ -314,19 +314,25 @@ describe('odlStufe (LFH-78)', () => {
     ]);
   });
 
-  it('staffelt die Bänder über neutral, normal, achtung und alarm', () => {
+  it('staffelt die Stufen über neutral, normal, achtung und alarm', () => {
     expect(sf.odlStufe.keine_messung).toEqual({ rolle: 'neutral', label: 'keine Messung' });
-    expect(sf.odlStufe.normal).toEqual({ rolle: 'normal', label: 'im natürlichen Bereich' });
-    expect(sf.odlStufe.erhoeht).toEqual({ rolle: 'achtung', label: 'über natürlichem Bereich' });
-    expect(sf.odlStufe.stark_erhoeht).toEqual({
-      rolle: 'alarm',
-      label: 'über 3 × natürlicher Obergrenze',
-    });
+    expect(sf.odlStufe.normal).toEqual({ rolle: 'normal', label: 'unauffällig' });
+    expect(sf.odlStufe.erhoeht).toEqual({ rolle: 'achtung', label: 'erhöht' });
+    expect(sf.odlStufe.stark_erhoeht).toEqual({ rolle: 'alarm', label: 'stark erhöht' });
+  });
+
+  it('nennt im Wort keinen Maßstab — es gilt für Standort- UND Bänder-Bewertung (LFH-598)', () => {
+    // Unter relativer Bewertung ist eine Sonde mit 0,19 µSv/h und Faktor 3,2 „stark erhöht",
+    // liegt aber im natürlichen Bereich: ein Label, das den natürlichen Bereich nennt, wäre dort
+    // falsch. Der Maßstab steht je Sonde im Inspector.
+    for (const d of Object.values(sf.odlStufe)) {
+      expect(d.label).not.toMatch(/natürlich|Grundpegel|µSv|×/);
+    }
   });
 
   it('behauptet im Wort keine Gefahr — die Bänder sind keine BfS-Schwelle', () => {
-    // Das Label beschreibt die Lage zum natürlichen Bereich, nicht eine Gefährdung: das BfS
-    // veröffentlicht keinen absoluten Schwellenwert, eine „gefährlich"-Aussage stünde ohne Beleg.
+    // Das Label beschreibt eine Auffälligkeit, nicht eine Gefährdung: das BfS veröffentlicht
+    // keinen Schwellenwert für „gefährlich", eine solche Aussage stünde ohne Beleg.
     for (const d of Object.values(sf.odlStufe)) {
       expect(d.label).not.toMatch(/gef(a|ä)hr|kritisch|alarm/i);
     }

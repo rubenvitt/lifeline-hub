@@ -10,6 +10,7 @@ pub mod kritis;
 pub mod luftqualitaet;
 pub mod mbtiles;
 pub mod normalisierung;
+pub mod odl_grundpegel;
 pub mod proxy;
 pub mod quellen;
 pub mod registry;

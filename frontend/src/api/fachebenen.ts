@@ -71,11 +71,25 @@ export type LuftqualitaetKlasse =
  * `theme/statusFarben.test.ts` und `pages/lagekarte/odlStil.test.ts`, drüben in
  * `karte::normalisierung::odl_tests`.
  *
- * Die Bänder (bis 0,2 µSv/h · bis 0,6 · darüber) sind eine PROJEKT-EINTEILUNG nach dem vom
- * BfS genannten natürlichen Bereich, keine BfS-Schwelle; `keine_messung` sind Sonden ohne
- * Messwert (defekt, Testbetrieb). Herleitung: `docs/fachebenen-quellen.md`.
+ * Die Stufe stammt aus einer von ZWEI Einteilungen des Lifeline Hub (keine BfS-Schwelle),
+ * welche, sagt {@link OdlBewertung}: relativ zum Standort-Grundpegel der Sonde (bis 1,5 × ·
+ * bis 3 × · darüber, LFH-598) oder, solange keiner vorliegt, nach absoluten Bändern am vom
+ * BfS genannten natürlichen Bereich (bis 0,2 µSv/h · bis 0,6 · darüber, LFH-78).
+ * `keine_messung` sind Sonden ohne Messwert (defekt, Testbetrieb). Herleitung:
+ * `docs/fachebenen-quellen.md`.
  */
 export type OdlStufe = 'keine_messung' | 'normal' | 'erhoeht' | 'stark_erhoeht';
+
+/**
+ * Grundlage der {@link OdlStufe} einer Sonde (LFH-598), Property `bewertung`. Bei `standort`
+ * tragen die Properties zusätzlich `grundpegel` (µSv/h), `faktor` und `grundpegel_stand`
+ * (ISO-UTC); bei `absolut` fehlen alle drei.
+ *
+ * FE-lokal und beidseitig gepinnt wie {@link OdlStufe}: hier in
+ * `pages/lagekarte/odlStil.test.ts`, drüben in `karte::odl_grundpegel::tests`. Ein
+ * unbekanntes Wort liest `odlGrundlage` als `absolut` — es erfindet keinen Maßstab.
+ */
+export type OdlBewertung = 'standort' | 'absolut';
 
 /** Lädt eine Fachebene. `bbox` (west,sued,ost,nord) ist nur für `kritis` nötig. */
 export function ladeFachebene(quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> {
