@@ -48,7 +48,11 @@ export function sorgeFuerFachebeneLayer(
             // so trägt ein Client-Bündel die Zahl der Objekte, nicht die seiner Punkte.
             clusterProperties: { anzahl: ['+', ['coalesce', ['get', 'anzahl'], 1]] },
           }
-        : { type: 'geojson', data: daten as never },
+        : // `generateId`: die Feature-ID ist der Index im `features`-Array. Sie entscheidet beim
+          // Klick zwischen überlappenden Flächen mit gleichen Properties (LFH-282,
+          // `geometrieZumKlickFeature`). Die Wire-Features tragen keine eigene ID. Gebündelte
+          // Ebenen (KRITIS) sind Punkte und brauchen den Stichentscheid nicht.
+          { type: 'geojson', data: daten as never, generateId: true },
     );
   }
   if (def.geometrieTyp === 'polygon') {
