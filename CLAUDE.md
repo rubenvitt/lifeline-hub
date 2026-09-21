@@ -954,8 +954,8 @@ Alltag wichtigsten:
   **Die Zahl im Abdeckungstest zählt „Vertragskarten", nicht „Vertrags-Enums"**:
   `dringlichkeit` ist über eine `Statusrolle` geschlüsselt und beschriftet die Stufe selbst,
   nicht eine Domänen-Achse. Nach LFH-358 stand sie bei 15; seither kamen `hochwasserKlasse`
-  (LFH-77) und `odlStufe` (LFH-78, Entscheidung 4 im OpenSpec-Change
-  `lfh-78-fachebene-odl`) dazu — **Stand 21.09.2026: 17**. Jede weitere Karte bleibt eine
+  (LFH-77) und `odlStufe` (LFH-78, Entscheidung 4 in
+  `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`) dazu — **Stand 21.09.2026: 17**. Jede weitere Karte bleibt eine
   eigene Entscheidung, die im Ticket begründet wird.
   **Zwei Guards halten beide Grenzen maschinell** (`theme/statusVertrag.guard.test.ts`):
   kein `Record<…, StatusDarstellung>` außerhalb `statusFarben.ts` — **die Datei, nicht das

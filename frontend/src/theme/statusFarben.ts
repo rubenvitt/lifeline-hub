@@ -382,7 +382,7 @@ export const hochwasserKlasse: Record<HochwasserKlasse, StatusDarstellung> = {
 
 /**
  * Bewertungsstufe einer ODL-Sonde des BfS auf der Lagekarte (LFH-78) — die siebzehnte
- * Vertragskarte, als eigene Entscheidung in `openspec/changes/lfh-78-fachebene-odl/design.md`
+ * Vertragskarte, als eigene Entscheidung in `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`
  * (Entscheidung 4) getroffen.
  *
  * DIE BÄNDER SIND EINE PROJEKT-EINTEILUNG, KEINE BfS-SCHWELLE. Das BfS nennt 0,05–0,2 µSv/h
